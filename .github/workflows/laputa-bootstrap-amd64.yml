@@ -1,0 +1,135 @@
+name: Laputa Bootstrap AMD64
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  LAPUTA_DOCKER_PLATFORM: linux/amd64
+  LAPUTA_PACKAGE_ARCH: x86_64
+  LAPUTA_MIRROR_URL: https://laputa.17166969.xyz
+
+jobs:
+  bootstrap-build-essential-native:
+    name: Bootstrap build-essential-native
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Checkout packages
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: laputa-systems/packages
+          path: packages
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Build bootstrap repo
+        run: |
+          set -euo pipefail
+          export_bootstrap_repo() {
+            pkg="$1"
+            rm -rf .out/source-mirrors
+            mkdir -p .out/source-mirrors
+            docker buildx build \
+              --platform "$LAPUTA_DOCKER_PLATFORM" \
+              --build-context packages=packages \
+              --target "bootstrap-$pkg-source-mirror-export" \
+              --output type=local,dest=.out/source-mirrors \
+              -f Dockerfile.bootstrap-build-essential-native \
+              .
+            test -n "$(find .out/source-mirrors -maxdepth 1 -type f -name "$pkg-*.tar.gz" -print -quit)"
+
+            rm -rf ".out/laputa-bootstrap-$pkg-repo"
+            docker buildx build \
+              --platform "$LAPUTA_DOCKER_PLATFORM" \
+              --build-context packages=packages \
+              --target "bootstrap-$pkg-repo-export" \
+              --output "type=local,dest=.out/laputa-bootstrap-$pkg-repo" \
+              -f Dockerfile.bootstrap-build-essential-native \
+              .
+            test -f ".out/laputa-bootstrap-$pkg-repo/index.json"
+            test -n "$(find ".out/laputa-bootstrap-$pkg-repo/packages/$LAPUTA_PACKAGE_ARCH/$pkg" -maxdepth 1 -type f -name '*.tar.gz' -print -quit)"
+          }
+
+          export_bootstrap_repo musl
+          export_bootstrap_repo samurai
+          export_bootstrap_repo pkgconf
+          export_bootstrap_repo cmake
+          export_bootstrap_repo m4
+          export_bootstrap_repo flex
+          export_bootstrap_repo bison
+          export_bootstrap_repo linux
+          export_bootstrap_repo muon
+
+          test -f .out/laputa-bootstrap-muon-repo/index.json
+          test -f .out/laputa-bootstrap-muon-repo/packages/x86_64/muon/muon-0.5.0-1.tar.gz
+          rm -rf .out/laputa-bootstrap-build-essential-native-repo
+          docker buildx build \
+            --platform "$LAPUTA_DOCKER_PLATFORM" \
+              --build-context packages=packages \
+            --target bootstrap-build-essential-native-repo-export \
+            --output type=local,dest=.out/laputa-bootstrap-build-essential-native-repo \
+            -f Dockerfile.bootstrap-build-essential-native \
+            .
+          test -f .out/laputa-bootstrap-build-essential-native-repo/index.json
+          test -f .out/laputa-bootstrap-build-essential-native-repo/packages/x86_64/build-essential-native/build-essential-native-1-2.tar.gz
+          test -f .out/laputa-bootstrap-build-essential-native-repo/packages/x86_64/baselayout/baselayout-1-10.tar.gz
+
+      - name: Check bootstrap repo
+        run: |
+          set -euo pipefail
+          test -f .out/laputa-bootstrap-build-essential-native-repo/index.json
+          test -f .out/laputa-bootstrap-build-essential-native-repo/packages/x86_64/baselayout/baselayout-1-10.tar.gz
+          test -f .out/laputa-bootstrap-build-essential-native-repo/packages/x86_64/build-essential-native/build-essential-native-1-2.tar.gz
+          test -f .out/laputa-bootstrap-build-essential-native-repo/packages/x86_64/linux/linux-7.0.5-6.tar.gz
+          jq -e '.[] | select((.arch // "aarch64") == "x86_64" and .name == "build-essential-native" and .rel == "2")' \
+            .out/laputa-bootstrap-build-essential-native-repo/index.json >/dev/null
+
+      - name: Build publisher image
+        run: |
+          docker buildx build \
+            --platform "$LAPUTA_DOCKER_PLATFORM" \
+              --build-context packages=packages \
+            --target bootstrap-build-essential-native \
+            --load \
+            -t laputa-bootstrap-amd64-publisher \
+            -f Dockerfile.bootstrap-build-essential-native \
+            .
+
+      - name: Publish bootstrap repo
+        env:
+          LAPUTA_TOKEN: ${{ secrets.LAPUTA_TOKEN || secrets.LAPUTA_MIRROR_TOKEN }}
+        run: |
+          docker run --rm \
+            --platform "$LAPUTA_DOCKER_PLATFORM" \
+            -e XSH_PM_REPO="$LAPUTA_MIRROR_URL" \
+            -e LAPUTA_TOKEN \
+            -v "$PWD/.out/laputa-bootstrap-build-essential-native-repo:/repo" \
+            laputa-bootstrap-amd64-publisher \
+            /bin/xsh /usr/lib/pm/pm.xsh -- upload-repo-export /repo
+
+      - name: Verify mirror seed
+        run: |
+          set -euo pipefail
+          curl -fsSL "$LAPUTA_MIRROR_URL/index.json" -o /tmp/laputa-index.json
+          tarball="$(jq -r '.[] | select((.arch // "aarch64") == "x86_64" and .name == "build-essential-native") | .tarball' /tmp/laputa-index.json | head -n1)"
+          test -n "$tarball"
+          curl -fsSL "$LAPUTA_MIRROR_URL/$tarball" -o /tmp/build-essential-native.tar.gz
+          test -s /tmp/build-essential-native.tar.gz
+          rm -rf .out/laputa-bootstrap-build-essential-native-repo/.upload-work \
+            .out/laputa-bootstrap-build-essential-native-repo/.upload-out \
+            .out/laputa-bootstrap-build-essential-native-repo/.upload-root
+
+      - name: Upload bootstrap repo artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: laputa-bootstrap-build-essential-native-repo-amd64
+          path: .out/laputa-bootstrap-build-essential-native-repo
+          if-no-files-found: error
+          include-hidden-files: true

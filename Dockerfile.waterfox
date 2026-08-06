@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1.4
+ARG PACKAGE_TOOLS_IMAGE=laputa-bootstrapped-build-essential-native:latest
+ARG DWL_FOOT_IMAGE=laputa-dwl-foot-minimal-proof:latest
+FROM ${PACKAGE_TOOLS_IMAGE} AS package-tools-base
+
+FROM ${DWL_FOOT_IMAGE} AS rootfs
+WORKDIR /src
+ENV XSH_MODULE_PATH=/usr/lib/pm
+RUN mkdir -p /build-env/usr/share/bison/m4sugar /build-env/usr/share/bison/skeletons /build-env/usr/share/bison/xslt && \
+    apk add --no-cache bison flex m4 meson python3 py3-mako py3-packaging py3-yaml
+COPY --from=packages pm.xsh /usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /usr/lib/pm/pm/
+COPY --from=packages repo/alsa-lib/ packages/repo/alsa-lib/
+COPY --from=packages repo/alsa-ucm-conf/ packages/repo/alsa-ucm-conf/
+COPY --from=packages repo/alsa-utils-minimal/ packages/repo/alsa-utils-minimal/
+COPY --from=packages repo/ca-certificates/ packages/repo/ca-certificates/
+COPY --from=packages repo/libunwind/ packages/repo/libunwind/
+COPY --from=packages repo/libudev-zero/ packages/repo/libudev-zero/
+COPY --from=packages repo/libva/ packages/repo/libva/
+COPY --from=packages repo/mesa-minimal/ packages/repo/mesa-minimal/
+COPY --from=packages repo/musl/ packages/repo/musl/
+COPY --from=packages repo/wayland-protocols/ packages/repo/wayland-protocols/
+COPY --from=packages repo/waterfox-bin/ packages/repo/waterfox-bin/
+COPY --from=packages repo/waterfox-dwl-session/ packages/repo/waterfox-dwl-session/
+COPY --from=packages repo/wl-clipboard/ packages/repo/wl-clipboard/
+COPY --from=packages repo/wlroots0.19-mesa/ packages/repo/wlroots0.19-mesa/
+RUN --mount=type=bind,from=package-tools-base,source=/src/target/repo,target=/mnt/repo,readonly \
+    XSH_PM_REPO=file:///mnt/repo \
+    PATH=/build-env/usr/bin:/usr/bin:$PATH \
+    /bin/xsh /usr/lib/pm/pm.xsh -- build-install \
+    /rootfs /build-env /tmp/pm-work-waterfox /tmp/pm-out-waterfox \
+    /src/packages/repo/ca-certificates \
+    /src/packages/repo/waterfox-bin \
+    /src/packages/repo/waterfox-dwl-session \
+    /src/packages/repo/libudev-zero \
+    /src/packages/repo/alsa-lib \
+    /src/packages/repo/alsa-ucm-conf \
+    /src/packages/repo/alsa-utils-minimal \
+    /src/packages/repo/libunwind \
+    /src/packages/repo/wl-clipboard \
+    /src/packages/repo/musl \
+    /src/packages/repo/libva \
+    /src/packages/repo/mesa-minimal \
+    /src/packages/repo/wlroots0.19-mesa
+RUN rm -rf /rootfs/usr/include/alsa /rootfs/usr/lib/pkgconfig/alsa.pc
+RUN --mount=type=bind,from=package-tools-base,source=/src/target/repo,target=/mnt/repo,readonly \
+    XSH_PM_REPO=file:///mnt/repo \
+    PATH=/build-env/usr/bin:/usr/bin:$PATH \
+    /bin/xsh /usr/lib/pm/pm.xsh -- build-install \
+    /rootfs /build-env /tmp/pm-work-waterfox-protocols /tmp/pm-out-waterfox-protocols \
+    /src/packages/repo/wayland-protocols
+RUN install -D -m 0755 /bin/xsh /rootfs/bin/xsh && \
+    install -D -m 0755 /bin/xshi /rootfs/bin/xshi && \
+    install -D -m 4755 /usr/bin/su /rootfs/usr/bin/su
+
+FROM rootfs AS proof
+WORKDIR /src
+COPY proof-waterfox.xsh proof-waterfox.xsh
+RUN /bin/xsh proof-waterfox.xsh -- /rootfs /bin/xsh /usr/lib/pm/pm.xsh

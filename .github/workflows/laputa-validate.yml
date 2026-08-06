@@ -1,0 +1,62 @@
+name: Laputa Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  XSH_RELEASE: release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac
+  XSH_RELEASE_ARCH: x86_64
+  XSH_RELEASE_SHA256: 680660d5206e42b7430ab2d6d331ad20fecb2df12efa8214c4df5ef1af39b7b6
+
+jobs:
+  scripts:
+    name: Released XSH script checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Checkout packages
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: laputa-systems/packages
+          path: packages
+
+      - name: Install XSH release
+        run: |
+          set -euo pipefail
+          XSH_RELEASE_URL="https://github.com/laputa-systems/xsh/releases/download/$XSH_RELEASE/xsh-multicall-$XSH_RELEASE-$XSH_RELEASE_ARCH-linux-musl"
+          mkdir -p /tmp/xsh-release/bin
+          curl --proto '=https' --tlsv1.2 -fsSL "$XSH_RELEASE_URL" -o /tmp/xsh-release/bin/xsh-multicall
+          echo "$XSH_RELEASE_SHA256  /tmp/xsh-release/bin/xsh-multicall" | sha256sum -c -
+          chmod 0755 /tmp/xsh-release/bin/xsh-multicall
+          ln -s xsh-multicall /tmp/xsh-release/bin/xsh
+          ln -s xsh-multicall /tmp/xsh-release/bin/xshi
+          ln -s xsh-multicall /tmp/xsh-release/bin/xsht
+          echo "/tmp/xsh-release/bin" >> "$GITHUB_PATH"
+
+      - name: Check PM entrypoint
+        run: |
+          XSH_MODULE_PATH="$PWD/packages" \
+            xsh packages/pm.xsh -- list /tmp/laputa-pm-root /tmp/laputa-pm-work /tmp/laputa-pm-out
+
+      - name: Check boot entrypoint
+        run: |
+          set -euo pipefail
+          if xsh boot.xsh -- --bad > /tmp/boot.out 2> /tmp/boot.err; then
+            cat /tmp/boot.out
+            cat /tmp/boot.err >&2
+            exit 1
+          fi
+          grep -q "boot-usage" /tmp/boot.err
+
+      - name: Check proof stage entrypoint
+        run: |
+          xsh proof-stage.xsh -- /tmp/laputa-proof-stage-root

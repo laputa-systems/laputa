@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1.4
+ARG PACKAGE_TOOLS_IMAGE=laputa-bootstrapped-build-essential-native:latest
+FROM ${PACKAGE_TOOLS_IMAGE} AS package-tools-base
+
+FROM package-tools-base AS builder
+WORKDIR /src
+ENV XSH_MODULE_PATH=/usr/lib/pm
+RUN mkdir -p /usr/lib/pm
+COPY --from=packages pm.xsh /usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /usr/lib/pm/pm/
+COPY --from=packages repo/baselayout/ packages/repo/baselayout/
+COPY --from=packages repo/dwl-minimal/ packages/repo/dwl-minimal/
+COPY --from=packages repo/expat/ packages/repo/expat/
+COPY --from=packages repo/fcft-minimal/ packages/repo/fcft-minimal/
+COPY --from=packages repo/font-ttf-hack/ packages/repo/font-ttf-hack/
+COPY --from=packages repo/fontconfig/ packages/repo/fontconfig/
+COPY --from=packages repo/foot-minimal/ packages/repo/foot-minimal/
+COPY --from=packages repo/freetype/ packages/repo/freetype/
+COPY --from=packages repo/hwdata/ packages/repo/hwdata/
+COPY --from=packages repo/libdisplay-info/ packages/repo/libdisplay-info/
+COPY --from=packages repo/libdrm/ packages/repo/libdrm/
+COPY --from=packages repo/libevdev/ packages/repo/libevdev/
+COPY --from=packages repo/libffi/ packages/repo/libffi/
+COPY --from=packages repo/libinput/ packages/repo/libinput/
+COPY --from=packages repo/libpng/ packages/repo/libpng/
+COPY --from=packages repo/libseat/ packages/repo/libseat/
+COPY --from=packages repo/libudev-zero/ packages/repo/libudev-zero/
+COPY --from=packages repo/libxkbcommon/ packages/repo/libxkbcommon/
+COPY --from=packages repo/mdevd/ packages/repo/mdevd/
+COPY --from=packages repo/musl/ packages/repo/musl/
+COPY --from=packages repo/mtdev/ packages/repo/mtdev/
+COPY --from=packages repo/pixman/ packages/repo/pixman/
+COPY --from=packages repo/pixman-dev/ packages/repo/pixman-dev/
+COPY --from=packages repo/seatd/ packages/repo/seatd/
+COPY --from=packages repo/tllist/ packages/repo/tllist/
+COPY --from=packages repo/wayland-dev/ packages/repo/wayland-dev/
+COPY --from=packages repo/wayland-libs-client/ packages/repo/wayland-libs-client/
+COPY --from=packages repo/wayland-libs-cursor/ packages/repo/wayland-libs-cursor/
+COPY --from=packages repo/wayland-libs-server/ packages/repo/wayland-libs-server/
+COPY --from=packages repo/wayland-protocols/ packages/repo/wayland-protocols/
+COPY --from=packages repo/wlroots0.19-mesa/ packages/repo/wlroots0.19-mesa/
+COPY --from=packages repo/xkeyboard-config/ packages/repo/xkeyboard-config/
+RUN rm -rf /rootfs /build-env
+RUN --mount=type=bind,from=package-tools-base,source=/src/target/repo,target=/mnt/repo,readonly \
+    XSH_PM_REPO=file:///mnt/repo \
+    PATH=/build-env/usr/bin:$PATH \
+    /bin/xsh /usr/lib/pm/pm.xsh -- build-install \
+    /rootfs /build-env /tmp/pm-work-dwl-foot-minimal /tmp/pm-out-dwl-foot-minimal \
+    /src/packages/repo/musl \
+    /src/packages/repo/baselayout \
+    /src/packages/repo/expat \
+    /src/packages/repo/libffi \
+    /src/packages/repo/wayland-libs-server \
+    /src/packages/repo/wayland-libs-client \
+    /src/packages/repo/wayland-libs-cursor \
+    /src/packages/repo/wayland-dev \
+    /src/packages/repo/wayland-protocols \
+    /src/packages/repo/xkeyboard-config \
+    /src/packages/repo/libxkbcommon \
+    /src/packages/repo/hwdata \
+    /src/packages/repo/libudev-zero \
+    /src/packages/repo/mdevd \
+    /src/packages/repo/libdrm \
+    /src/packages/repo/libdisplay-info \
+    /src/packages/repo/libevdev \
+    /src/packages/repo/mtdev \
+    /src/packages/repo/libinput \
+    /src/packages/repo/libseat \
+    /src/packages/repo/seatd \
+    /src/packages/repo/pixman \
+    /src/packages/repo/pixman-dev \
+    /src/packages/repo/wlroots0.19-mesa \
+    /src/packages/repo/dwl-minimal \
+    /src/packages/repo/libpng \
+    /src/packages/repo/freetype \
+    /src/packages/repo/fontconfig \
+    /src/packages/repo/font-ttf-hack \
+    /src/packages/repo/tllist \
+    /src/packages/repo/fcft-minimal \
+    /src/packages/repo/foot-minimal
+RUN install -D -m 0755 /bin/xsh /rootfs/bin/xsh && \
+    install -D -m 0755 /bin/xshi /rootfs/bin/xshi && \
+    install -D -m 4755 /usr/bin/su /rootfs/usr/bin/su
+COPY proof-dwl-foot-minimal.xsh proof-dwl-foot-minimal.xsh
+RUN /bin/xsh proof-dwl-foot-minimal.xsh -- /rootfs /bin/xsh /usr/lib/pm/pm.xsh

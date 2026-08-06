@@ -1,0 +1,8 @@
+target
+.env
+.xsh-linux-host
+.xsh-linux-scratch
+.xsh-linux-tools
+.out
+*.deb
+tools/__pycache__

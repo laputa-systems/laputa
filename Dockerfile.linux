@@ -1,0 +1,7 @@
+# syntax=docker/dockerfile:1.4
+ARG PACKAGE_TOOLS_IMAGE=laputa-bootstrapped-build-essential-native:latest
+FROM ${PACKAGE_TOOLS_IMAGE}
+
+WORKDIR /src
+ENV PATH=/build-env/usr/bin:/usr/local/bin:/usr/bin:/bin
+ENV XSH_MODULE_PATH=/usr/lib/pm

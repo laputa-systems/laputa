@@ -1,0 +1,90 @@
+# syntax=docker/dockerfile:1.19
+# Note: compiled Laputa packages use pm.make (packages/pm/make.xsh), not GNU
+# make.  Do NOT add GNU make to this image — it will not help package builds.
+# Packages declare build tools via mkdeps_host; the chroot only gets declared deps.
+ARG XSH_RELEASE=release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac
+ARG XSH_RELEASE_ARCH=aarch64
+ARG XSH_RELEASE_SHA256=029c85cd921b5ef28fa9bf8f4454427192119225abd69c32beb4e57ccb706d44
+ARG XSH_CORE_SHA256=588d4b52da1096398c3b8d80be3f04b0b65122a8a0ca656fe5e6940d06a1f760
+
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS xsh-release-builder
+ARG XSH_RELEASE
+ARG XSH_RELEASE_ARCH
+ARG XSH_RELEASE_SHA256
+ARG XSH_CORE_SHA256
+RUN apk add --no-cache xz
+ADD --checksum=sha256:${XSH_RELEASE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-multicall-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsh-multicall
+ADD --checksum=sha256:${XSH_CORE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/core-${XSH_RELEASE}.tar.xz /tmp/xsh-core.tar.xz
+RUN mkdir -p /xsh-release/bin /xsh-release/usr/bin && \
+    cp /tmp/xsh-multicall /xsh-release/bin/xsh-multicall && \
+    chmod 0755 /xsh-release/bin/xsh-multicall && \
+    for command_name in xsh xshi xsht; do ln -s xsh-multicall /xsh-release/bin/"${command_name}"; done && \
+    mkdir -p /xsh-release/usr/lib/xsh && \
+    tar -C /xsh-release/usr/lib/xsh -xJf /tmp/xsh-core.tar.xz && \
+    find /xsh-release/usr/lib/xsh/core -type f -exec sed -i -e '1s|^#!/usr/local/bin/xsh|#!/bin/xsh|' -e '1s|^#!/usr/bin/env -S xsh|#!/bin/xsh|' {} + && \
+    for script in /xsh-release/usr/lib/xsh/core/*; do if [ -f "$script" ]; then command_name="$(basename "$script")"; if [ "$command_name" != su ]; then ln -s ../lib/xsh/core/"${command_name}" /xsh-release/usr/bin/"${command_name}"; fi; fi; done && \
+    ln -s ../bin/xshi /xsh-release/usr/bin/sh
+
+FROM scratch AS xsh-release
+COPY --from=xsh-release-builder /xsh-release/ /
+
+FROM xsh-release AS build-essential-native-installer
+
+ARG LAPUTA_REPO_URL=https://laputa.17166969.xyz
+
+WORKDIR /src
+ENV PATH=/bin:/usr/bin
+ENV XSH_MODULE_PATH=/usr/lib/pm
+ENV XSH_PM_REPO=${LAPUTA_REPO_URL}
+
+COPY --from=packages pm.xsh /usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /usr/lib/pm/pm/
+COPY export-remote-cache.xsh /usr/lib/pm/export-remote-cache.xsh
+COPY --from=packages repo/ca-certificates/files/cacert.pem /etc/ssl/certs/ca-certificates.crt
+COPY --from=packages repo/ca-certificates/files/cacert.pem /etc/ssl/cert.pem
+
+RUN ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "install", "/build-env", "/tmp/pm-work-build-env", "/tmp/pm-out-build-env", "baselayout", "ca-certificates", "zlib", "build-essential-native"]
+RUN ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "install", "/rootfs", "/tmp/pm-work-rootfs", "/tmp/pm-out-rootfs", "baselayout", "ca-certificates", "zlib", "build-essential-native"]
+RUN ["/bin/xsh", "/usr/lib/pm/export-remote-cache.xsh", "--", "/tmp/pm-out-build-env", "/repo"]
+
+FROM scratch AS build-essential-native
+
+COPY --from=build-essential-native-installer /build-env/ /
+COPY --from=build-essential-native-installer /build-env/ /build-env/
+COPY --from=build-essential-native-installer /rootfs/ /rootfs/
+COPY --from=build-essential-native-installer /repo/ /src/target/repo/
+
+COPY --from=xsh-release /bin/ /bin/
+COPY --from=xsh-release /usr/bin/ /usr/bin/
+COPY --from=xsh-release /usr/lib/xsh/ /usr/lib/xsh/
+COPY --from=packages pm.xsh /usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /usr/lib/pm/pm/
+
+COPY --from=xsh-release /bin/ /build-env/bin/
+COPY --from=xsh-release /usr/bin/ /build-env/usr/bin/
+COPY --from=xsh-release /usr/lib/xsh/ /build-env/usr/lib/xsh/
+COPY --from=packages pm.xsh /build-env/usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /build-env/usr/lib/pm/pm/
+
+COPY --from=xsh-release /bin/ /rootfs/bin/
+COPY --from=xsh-release /usr/bin/ /rootfs/usr/bin/
+COPY --from=xsh-release /usr/lib/xsh/ /rootfs/usr/lib/xsh/
+COPY --from=packages pm.xsh /rootfs/usr/lib/pm/pm.xsh
+COPY --from=packages pm/ /rootfs/usr/lib/pm/pm/
+
+ENV PATH=/bin:/usr/bin
+ENV XSH_MODULE_PATH=/usr/lib/pm
+ENV XSH_PM_REPO=file:///src/target/repo
+
+COPY --from=packages repo/llvm-toolchain/PKGBUILD.xsh /usr/lib/pm/local-llvm-toolchain/PKGBUILD.xsh
+COPY --from=packages repo/m4/files/m4.xsh /usr/lib/pm/local-m4/m4.xsh
+COPY install-local-llvm-wrappers.xsh /usr/lib/pm/install-local-llvm-wrappers.xsh
+RUN --network=none ["/bin/xsh", "/usr/lib/pm/install-local-llvm-wrappers.xsh"]
+
+COPY prepare-build-essential-native-image.xsh /usr/lib/pm/prepare-build-essential-native-image.xsh
+RUN --network=none ["/bin/xsh", "/usr/lib/pm/prepare-build-essential-native-image.xsh"]
+
+FROM build-essential-native AS build-essential-native-proof
+
+COPY --from=packages repo/build-essential-native/proof-image.xsh /usr/lib/pm/proof-build-essential-native.xsh
+RUN --network=none ["/bin/xsh", "/usr/lib/pm/proof-build-essential-native.xsh"]

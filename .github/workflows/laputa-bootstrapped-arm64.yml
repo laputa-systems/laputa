@@ -1,0 +1,120 @@
+name: Laputa Repo ARM64
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LAPUTA_REPO_URL: https://laputa.17166969.xyz
+
+jobs:
+  build-essential-native:
+    name: Repo build-essential-native
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.sha_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Checkout packages
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: laputa-systems/packages
+          path: packages
+
+      - name: Check package repo
+        run: |
+          curl -fsSL "$LAPUTA_REPO_URL/index.json" -o /tmp/laputa-index.json
+          grep -q '"name": "baselayout"' /tmp/laputa-index.json
+          grep -q '"name": "build-essential-native"' /tmp/laputa-index.json
+          curl -fsSL "$LAPUTA_REPO_URL/packages/build-essential-native/build-essential-native-1-2.tar.gz" \
+            -o /tmp/build-essential-native.tar.gz
+          test -s /tmp/build-essential-native.tar.gz
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Image tags
+        id: image
+        shell: bash
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}/laputa-bootstrapped-build-essential-native"
+          ref="${GITHUB_REF_NAME//\//-}"
+          echo "sha_tag=$repo:arm64-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "ref_tag=$repo:arm64-$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build repo-backed proof image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          file: Dockerfile.build-essential-native
+          build-contexts: packages=packages
+          platforms: linux/arm64
+          target: build-essential-native-proof
+          build-args: |
+            LAPUTA_REPO_URL=${{ env.LAPUTA_REPO_URL }}
+          cache-from: |
+            type=gha,scope=laputa-build-essential-native-arm64
+          cache-to: type=gha,scope=laputa-build-essential-native-arm64,mode=max
+
+      - name: Build and push repo-backed image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          file: Dockerfile.build-essential-native
+          build-contexts: packages=packages
+          platforms: linux/arm64
+          target: build-essential-native
+          build-args: |
+            LAPUTA_REPO_URL=${{ env.LAPUTA_REPO_URL }}
+          cache-from: |
+            type=gha,scope=laputa-build-essential-native-arm64
+          cache-to: type=gha,scope=laputa-build-essential-native-push-arm64,mode=max
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.ref_tag }}
+
+  zlib-package-proof:
+    name: Zlib package proof
+    runs-on: ubuntu-24.04-arm
+    needs: build-essential-native
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Checkout packages
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: laputa-systems/packages
+          path: packages
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull build-essential image
+        run: docker pull "${{ needs.build-essential-native.outputs.image }}"
+
+      - name: Build and prove zlib
+        run: |
+          make zlib-test PACKAGE_TOOLS_IMAGE="${{ needs.build-essential-native.outputs.image }}"
