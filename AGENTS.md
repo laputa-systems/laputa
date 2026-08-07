@@ -45,11 +45,9 @@ handles architecture emulation via QEMU/binfmt transparently. Packages are
 mounted read-only into the container. This is the only world-build path that
 works on macOS.
 
-The XSH checkout is canonical for this path. `make world-build` first builds a
-local Linux-musl `xsh-multicall` through the xsh repo's Docker toolchain, mounts
-it over `/bin/xsh-multicall`, sets `XSH_HOST=/bin/xsh`, and
-mounts the local `core/` applets. The release XSH baked into the package-tools
-image is only bootstrap state.
+`make world-build` downloads the pinned Linux `xsh`, `xshi`, and `xsht` release
+assets from GitHub, verifies their checksums, and mounts them with the local
+`core/` applets. The published XSH binaries are the execution environment.
 
 ### `make world-build-aarch64` — native cross-compilation (amd64 host only)
 
@@ -194,11 +192,11 @@ checks are run from this repo through `LAPUTA_PACKAGES_ROOT`, for example
 
 ## Local Development
 
-Use the checked-out XSH and package repos by default. `make package-test` and
-`make world-build` build and mount a local Linux-musl `xsh-multicall`, local
-`xsht`/`xshi` symlinks, and local `core/` applets before invoking PM inside
-Docker. This avoids stale published XSH releases while preserving the
-package-tools image as bootstrap state.
+Use the checked-out package repo by default. `make package-test` and
+`make world-build` download and mount the pinned Linux XSH release binaries and
+local `core/` applets before invoking PM inside Docker. This keeps the
+package-tools image as bootstrap state while using the published execution
+binaries.
 
 On macOS, Docker/OrbStack is required for Linux target binaries and package
 proofs. A host-native XSH binary is enough to run scripts, but it is not a

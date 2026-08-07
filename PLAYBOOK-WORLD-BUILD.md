@@ -13,17 +13,17 @@ that staged repository to the public package repo.
 | `make world-build-amd64` | amd64 host as root | `x86_64` | native chroot |
 
 `make world-build` is the normal macOS path. It ensures the local package-tools
-image exists, builds a local Linux-musl `xsh-multicall` from the sibling `xsh`
-checkout, mounts that as the world-build `xsh`, and mounts local `core/`
-applets. The published xsh inside the Docker image is bootstrap state.
+image exists, downloads the pinned Linux `xsh`, `xshi`, and `xsht` release
+assets, mounts those as the world-build runners, and mounts local `core/`
+applets.
 
 `make world-build-aarch64` is the fast native-cross path for amd64 Linux hosts.
 It sets `XSH_PM_NATIVE_CROSS=1`, using an x86_64 build root for host tools and
 an aarch64 target root for package artifacts.
 
 `make world-build-amd64` is a native x86_64 chroot build and requires root.
-On Threadripper, it runs the checked-out debug XSH from the sibling `xsh`
-checkout through the `host-xsh-multicall` links created by the Makefile. It
+On Threadripper, it runs the pinned x86_64 Linux XSH release binaries from the
+host release directory created by the Makefile. It
 also requires the configured mirror to contain the x86_64 bootstrap packages.
 If the mirror has only aarch64 entries, seed the x86_64 bootstrap repository
 before resuming the world; the musl/LLVM bootstrap dependency cycle cannot be

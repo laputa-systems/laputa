@@ -637,11 +637,11 @@ laputa:x:1000:
 export PATH=/bin:/usr/bin
 ```
 
-The shell executable is installed by the `xsh` package as a symlink to the xsh
-multicall binary:
+The shell executable is installed by the `xsh` package as the independent
+`xshi` release binary:
 
 ```text
-/bin/xshi -> xsh
+/bin/sh -> xshi
 ```
 
 At this point the serial boot chain has reached the login shell:

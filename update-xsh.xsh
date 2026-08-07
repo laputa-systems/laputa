@@ -1,5 +1,13 @@
 #!/bin/xsh
-type Hashes = {aarch64: Str, x86_64: Str, core: Str}
+type Hashes = {
+  aarch64_xsh: Str,
+  aarch64_xshi: Str,
+  aarch64_xsht: Str,
+  x86_64_xsh: Str,
+  x86_64_xshi: Str,
+  x86_64_xsht: Str,
+  core: Str,
+}
 
 error FindError = NotFound(message: Str)
 
@@ -32,60 +40,63 @@ proc fetch_release_sha256(label: Str, url: Str) [net, error] -> Result[Str] {
 }
 
 proc fetch_new_hashes(tag: Str) [fs, net, error] -> Result[Hashes] {
-  let aarch64_url = f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-multicall-${tag}-aarch64-linux-musl.sha256"
-  let aarch64 = fetch_release_sha256("aarch64 multicall", aarch64_url)?
-  let x86_64_url = f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-multicall-${tag}-x86_64-linux-musl.sha256"
-  let x86_64 = fetch_release_sha256("x86_64 multicall", x86_64_url)?
+  let aarch64_xsh = fetch_release_sha256("aarch64 xsh", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-aarch64-linux-musl.sha256")?
+  let aarch64_xshi = fetch_release_sha256("aarch64 xshi", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-aarch64-linux-musl.sha256")?
+  let aarch64_xsht = fetch_release_sha256("aarch64 xsht", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-aarch64-linux-musl.sha256")?
+  let x86_64_xsh = fetch_release_sha256("x86_64 xsh", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-x86_64-linux-musl.sha256")?
+  let x86_64_xshi = fetch_release_sha256("x86_64 xshi", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-x86_64-linux-musl.sha256")?
+  let x86_64_xsht = fetch_release_sha256("x86_64 xsht", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-x86_64-linux-musl.sha256")?
   let core_url = f"https://github.com/laputa-systems/xsh/releases/download/${tag}/core-${tag}.sha256"
   let core = fetch_release_sha256("core scripts", core_url)?
-  return {aarch64: aarch64, x86_64: x86_64, core: core}
-}
-
-pure hash_context(line: Str) -> Str {
-  if "XSH_CORE_SHA" in line {
-    return "core"
-  }
-
-  if "aarch64" in line or "arm64" in line {
-    return "aarch64"
-  }
-
-  if "x86_64" in line or "amd64" in line {
-    return "x86_64"
-  }
-
-  if "core" in line and "sha256sum" in line {
-    return "core"
-  }
-
-  return ""
+  return {aarch64_xsh, aarch64_xshi, aarch64_xsht, x86_64_xsh, x86_64_xshi, x86_64_xsht, core}
 }
 
 proc replace_context_hashes(content: Str, hashes: Hashes) [error] -> Result[Str] {
   let hash_re = regex.compile("[0-9a-f]{64}")?
   let lines = content.lines()
   var result: List[Str] = []
-  var prev = ""
+  var arch = "aarch64"
+  var binary = "xsh"
 
   for line in lines {
     var l = line
-    var htype = hash_context(l)
-
-    if htype == "" {
-      htype = hash_context(prev)
+    if "aarch64" in line or "arm64" in line {
+      arch = "aarch64"
+    } else if "x86_64" in line or "amd64" in line {
+      arch = "x86_64"
     }
 
-    if htype != "" {
-      let caps = hash_re.captures(l)
+    if "CORE_SHA" in line or "core-" in line {
+      binary = "core"
+    } else if "XSHI" in line or "xshi-" in line {
+      binary = "xshi"
+    } else if "XSHT" in line or "xsht-" in line {
+      binary = "xsht"
+    } else if "XSH" in line or "xsh-" in line {
+      binary = "xsh"
+    }
 
-      if caps.len() >= 1 {
-        let new_hash = match htype { "aarch64" => hashes.aarch64, "x86_64" => hashes.x86_64, _ => hashes.core }
-        l = l.replace(caps[0], new_hash)
+    let caps = hash_re.captures(l)
+    if caps.len() >= 1 {
+      let new_hash = if binary == "core" {
+        hashes.core
+      } else if arch == "aarch64" and binary == "xsh" {
+        hashes.aarch64_xsh
+      } else if arch == "aarch64" and binary == "xshi" {
+        hashes.aarch64_xshi
+      } else if arch == "aarch64" {
+        hashes.aarch64_xsht
+      } else if binary == "xsh" {
+        hashes.x86_64_xsh
+      } else if binary == "xshi" {
+        hashes.x86_64_xshi
+      } else {
+        hashes.x86_64_xsht
       }
+      l = l.replace(caps[0], new_hash)
     }
 
     result = result.push(l)
-    prev = line
   }
 
   return result.join("\n")
@@ -147,58 +158,49 @@ proc update_pkgbuild(file: Path, tag: Str, commit: Str, hashes: Hashes) [fs, err
   updated = updated.replace(old_commit, commit)
   let hash_re = regex.compile("[0-9a-f]{64}")?
   let rel_re = regex.compile("export let rel: Str = \"(\\d+)\"")?
-  var in_aarch64 = false
-  var in_x86_64 = false
-  var in_checksums = false
-  var aarch64_binary_done = false
-  var x86_64_binary_done = false
-  var generic_core_done = false
-  var aarch64_core_done = false
-  var x86_64_core_done = false
+  var arch = "aarch64"
+  var binary = "xsh"
   var bumped = false
   var new_lines: List[Str] = []
 
   for line in updated.lines() {
     var l = line
 
-    if "export let checksums_aarch64" in l {
-      in_aarch64 = true
-      in_x86_64 = false
-      in_checksums = false
-      aarch64_binary_done = false
-      aarch64_core_done = false
-    } else if "export let checksums_x86_64" in l {
-      in_aarch64 = false
-      in_x86_64 = true
-      in_checksums = false
-      x86_64_binary_done = false
-      x86_64_core_done = false
-    } else if "export let checksums:" in l {
-      in_aarch64 = false
-      in_x86_64 = false
-      in_checksums = true
-      generic_core_done = false
+    if "arch: \"aarch64\"" in l {
+      arch = "aarch64"
+    } else if "arch: \"x86_64\"" in l {
+      arch = "x86_64"
+    }
+
+    if "xsh-core" in l or "core-" in l {
+      binary = "core"
+    } else if "xshi-bin" in l or "xshi-" in l {
+      binary = "xshi"
+    } else if "xsht-bin" in l or "xsht-" in l {
+      binary = "xsht"
+    } else if "xsh-bin" in l or "xsh-" in l {
+      binary = "xsh"
     }
 
     let caps = hash_re.captures(l)
 
     if caps.len() >= 1 {
-      if in_aarch64 and ! aarch64_binary_done {
-        l = l.replace(caps[0], hashes.aarch64)
-        aarch64_binary_done = true
-      } else if in_aarch64 and ! aarch64_core_done {
-        l = l.replace(caps[0], hashes.core)
-        aarch64_core_done = true
-      } else if in_x86_64 and ! x86_64_binary_done {
-        l = l.replace(caps[0], hashes.x86_64)
-        x86_64_binary_done = true
-      } else if in_x86_64 and ! x86_64_core_done {
-        l = l.replace(caps[0], hashes.core)
-        x86_64_core_done = true
-      } else if in_checksums and ! generic_core_done {
-        l = l.replace(caps[0], hashes.core)
-        generic_core_done = true
+      let new_hash = if binary == "core" {
+        hashes.core
+      } else if arch == "aarch64" and binary == "xsh" {
+        hashes.aarch64_xsh
+      } else if arch == "aarch64" and binary == "xshi" {
+        hashes.aarch64_xshi
+      } else if arch == "aarch64" {
+        hashes.aarch64_xsht
+      } else if binary == "xsh" {
+        hashes.x86_64_xsh
+      } else if binary == "xshi" {
+        hashes.x86_64_xshi
+      } else {
+        hashes.x86_64_xsht
       }
+      l = l.replace(caps[0], new_hash)
     }
 
     if ! bumped {
@@ -236,8 +238,12 @@ proc main(...argv: List[Str]) [fs, net, error] {
   print f"updating xsh to ${tag}"
   print "fetching release asset hashes..."
   let hashes = fetch_new_hashes(tag)?
-  print f"  aarch64: ${hashes.aarch64}"
-  print f"  x86_64:  ${hashes.x86_64}"
+  print f"  aarch64 xsh:  ${hashes.aarch64_xsh}"
+  print f"  aarch64 xshi: ${hashes.aarch64_xshi}"
+  print f"  aarch64 xsht: ${hashes.aarch64_xsht}"
+  print f"  x86_64 xsh:   ${hashes.x86_64_xsh}"
+  print f"  x86_64 xshi:  ${hashes.x86_64_xshi}"
+  print f"  x86_64 xsht:  ${hashes.x86_64_xsht}"
   print f"  core:    ${hashes.core}"
 
   let laputa_files = [

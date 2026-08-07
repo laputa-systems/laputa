@@ -1,6 +1,6 @@
 .PHONY: boot boot-userspace-e2e boot-tailscale-test proof-kernel ensure-proof-kernel build-essential-native packages-builder ensure-build-essential-native ensure-world-xsh ensure-world-docker-volumes world-build world-build-aarch64 world-build-amd64 world-smoke-amd64 amd64-package-test linux-amd64-config linux-amd64-prepare-proof linux-amd64-discover-proof linux-amd64-plan-proof linux-amd64-compile-proof linux-amd64-link-proof linux-amd64-package-proof linux-amd64-object linux-amd64-sources linux-amd64-cache linux-amd64-kconfig-proof package-test package-deps-test linux-plan-only linux-kbuild-oracle package-publish package-publish-userspace-arm64 pkgconf-test cmake-test samurai-test \
         dropbear-test tmux-test linux-pam-test sudo-rs-test iptables-test tailscale-test less-test dwl-foot-minimal-test ensure-dwl-foot-minimal-proof dwl-foot-minimal-qemu-debug waterfox-test ensure-waterfox-proof waterfox-qemu-test proof-rootfs \
-        scratch-build-env installer-image installer-image-aarch64 installer-image-amd64 installer-image-x86_64 installer-qemu-test installer-qemu-test-aarch64 installer-qemu-test-amd64 installer-qemu-test-x86_64 installer-qemu-manual ensure-host-xsh ensure-host-xsh-multicall ensure-package-docker-volumes _world-build-amd64
+        scratch-build-env installer-image installer-image-aarch64 installer-image-amd64 installer-image-x86_64 installer-qemu-test installer-qemu-test-aarch64 installer-qemu-test-amd64 installer-qemu-test-x86_64 installer-qemu-manual ensure-host-xsh ensure-host-xsh-release ensure-package-docker-volumes _world-build-amd64
 
 LAPUTA_DOCKER_PLATFORM ?= linux/arm64
 LAPUTA_PACKAGE_ARCH ?= aarch64
@@ -42,24 +42,28 @@ LAPUTA_LINUX_INPUTS = \
 	$(LAPUTA_PACKAGES_ROOT)/pm/world.xsh
 XSH_SOURCE_ROOT ?= $(abspath $(CURDIR)/../../laputa-systems/xsh)
 XSH_HOST ?= $(XSH_SOURCE_ROOT)/target/debug/xsh
-XSH_WORLD_DOCKER_IMAGE ?= xsh-test
 CARGO ?= $(HOME)/.cargo/bin/cargo
-XSH_RELEASE ?= release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac
-XSH_CORE_SHA256 ?= 588d4b52da1096398c3b8d80be3f04b0b65122a8a0ca656fe5e6940d06a1f760
+XSH_RELEASE ?= release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
+XSH_CORE_SHA256 ?= 7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
 LAPUTA_PACKAGES_ROOT ?= $(shell if [ -d "$$HOME/d/laputa-systems/packages" ]; then printf '%s' "$$HOME/d/laputa-systems/packages"; else printf '%s' "$(abspath $(CURDIR)/../packages)"; fi)
 
 ifeq ($(LAPUTA_PACKAGE_ARCH),aarch64)
-XSH_RELEASE_SHA256 ?= 029c85cd921b5ef28fa9bf8f4454427192119225abd69c32beb4e57ccb706d44
-XSH_WORLD_RUST_TARGET ?= aarch64-unknown-linux-musl
 else ifeq ($(LAPUTA_PACKAGE_ARCH),x86_64)
-XSH_RELEASE_SHA256 ?= 680660d5206e42b7430ab2d6d331ad20fecb2df12efa8214c4df5ef1af39b7b6
-XSH_WORLD_RUST_TARGET ?= x86_64-unknown-linux-musl
 else
 $(error unsupported LAPUTA_PACKAGE_ARCH: $(LAPUTA_PACKAGE_ARCH))
 endif
-XSH_HOST_MULTICALL_BIN_DIR ?= $(XSH_SOURCE_ROOT)/target/host-xsh-multicall
+ifeq ($(LAPUTA_PACKAGE_ARCH),aarch64)
+XSH_RELEASE_XSH_SHA256 ?= bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
+XSH_RELEASE_XSHI_SHA256 ?= 5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
+XSH_RELEASE_XSHT_SHA256 ?= 86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
+else
+XSH_RELEASE_XSH_SHA256 ?= 03e190c8ee15020b04b27e2066a7e53665452c9dce821bd0af80378ef664c746
+XSH_RELEASE_XSHI_SHA256 ?= 897b22cae065625179f8b2cb18c48828464eb1cd135f32da0e9358b237f3e195
+XSH_RELEASE_XSHT_SHA256 ?= 83ea617d6fc1a9f9e7908b292d51d8b263df15904d67d17b7c7f04d825a98a20
+endif
+XSH_HOST_RELEASE_BIN_DIR ?= $(XSH_SOURCE_ROOT)/target/host-xsh-release
+XSH_RELEASE_HELPER_IMAGE ?= alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 DOCKER_VOLUME_PREFIX ?= laputa
-XSH_SOURCE_VOLUME ?= $(DOCKER_VOLUME_PREFIX)-xsh-source-$(LAPUTA_PACKAGE_ARCH)
 XSH_WORLD_VOLUME ?= $(DOCKER_VOLUME_PREFIX)-xsh-world-$(LAPUTA_PACKAGE_ARCH)
 XSH_CORE_VOLUME ?= $(DOCKER_VOLUME_PREFIX)-xsh-core-$(LAPUTA_PACKAGE_ARCH)
 LAPUTA_PACKAGES_VOLUME ?= $(DOCKER_VOLUME_PREFIX)-packages-$(LAPUTA_PACKAGE_ARCH)
@@ -105,17 +109,19 @@ $(LAPUTA_LINUX_PACKAGE): $(LAPUTA_LINUX_INPUTS)
 	tar -xOf $(LAPUTA_LINUX_PACKAGE) ./boot/vmlinuz > $(LAPUTA_LINUX_KERNEL_IMAGE)
 	test -f $(LAPUTA_LINUX_PACKAGE)
 
-ensure-host-xsh-multicall:
-	test -f "$(XSH_SOURCE_ROOT)/Cargo.toml"
-	$(CARGO) build --manifest-path "$(XSH_SOURCE_ROOT)/Cargo.toml" --features "tools" --bin xsh-multicall
-	rm -rf "$(XSH_HOST_MULTICALL_BIN_DIR)"
-	mkdir -p "$(XSH_HOST_MULTICALL_BIN_DIR)"
-	ln -sf "../debug/xsh-multicall" "$(XSH_HOST_MULTICALL_BIN_DIR)/xsh-multicall"
-	ln -sf xsh-multicall "$(XSH_HOST_MULTICALL_BIN_DIR)/xsh"
-	ln -sf xsh-multicall "$(XSH_HOST_MULTICALL_BIN_DIR)/xshi"
-	ln -sf xsh-multicall "$(XSH_HOST_MULTICALL_BIN_DIR)/xsht"
-	test -x "$(XSH_HOST_MULTICALL_BIN_DIR)/xsh"
-	test -x "$(XSH_HOST_MULTICALL_BIN_DIR)/xsht"
+ensure-host-xsh-release:
+	set -e; mkdir -p "$(XSH_HOST_RELEASE_BIN_DIR)"; \
+	for command_name in xsh xshi xsht; do \
+	    case "$$command_name" in \
+	        xsh) sha="$(XSH_RELEASE_XSH_SHA256)" ;; \
+	        xshi) sha="$(XSH_RELEASE_XSHI_SHA256)" ;; \
+	        xsht) sha="$(XSH_RELEASE_XSHT_SHA256)" ;; \
+	    esac; \
+	    dest="$(XSH_HOST_RELEASE_BIN_DIR)/$$command_name"; \
+	    curl --proto '=https' --tlsv1.2 -fsSL "https://github.com/laputa-systems/xsh/releases/download/$(XSH_RELEASE)/$$command_name-$(XSH_RELEASE)-$(LAPUTA_PACKAGE_ARCH)-linux-musl" -o "$$dest"; \
+	    echo "$$sha  $$dest" | sha256sum -c -; \
+	    chmod 0755 "$$dest"; \
+	done
 
 boot: ensure-host-xsh
 	set -e; kernel_source="$${XSH_BOOT_KERNEL:-}"; \
@@ -210,7 +216,9 @@ build-essential-native:
 	    --build-arg LAPUTA_REPO_URL=$(LAPUTA_REPO_URL) \
 	    --build-arg XSH_RELEASE=$(XSH_RELEASE) \
 	    --build-arg XSH_RELEASE_ARCH=$(LAPUTA_PACKAGE_ARCH) \
-	    --build-arg XSH_RELEASE_SHA256=$(XSH_RELEASE_SHA256) \
+	    --build-arg XSH_RELEASE_XSH_SHA256=$(XSH_RELEASE_XSH_SHA256) \
+	    --build-arg XSH_RELEASE_XSHI_SHA256=$(XSH_RELEASE_XSHI_SHA256) \
+	    --build-arg XSH_RELEASE_XSHT_SHA256=$(XSH_RELEASE_XSHT_SHA256) \
 	    --build-arg XSH_CORE_SHA256=$(XSH_CORE_SHA256) \
 	    --build-context packages=$(LAPUTA_PACKAGES_ROOT) \
 	    --target build-essential-native-proof \
@@ -221,7 +229,9 @@ build-essential-native:
 	    --build-arg LAPUTA_REPO_URL=$(LAPUTA_REPO_URL) \
 	    --build-arg XSH_RELEASE=$(XSH_RELEASE) \
 	    --build-arg XSH_RELEASE_ARCH=$(LAPUTA_PACKAGE_ARCH) \
-	    --build-arg XSH_RELEASE_SHA256=$(XSH_RELEASE_SHA256) \
+	    --build-arg XSH_RELEASE_XSH_SHA256=$(XSH_RELEASE_XSH_SHA256) \
+	    --build-arg XSH_RELEASE_XSHI_SHA256=$(XSH_RELEASE_XSHI_SHA256) \
+	    --build-arg XSH_RELEASE_XSHT_SHA256=$(XSH_RELEASE_XSHT_SHA256) \
 	    --build-arg XSH_CORE_SHA256=$(XSH_CORE_SHA256) \
 	    --build-context packages=$(LAPUTA_PACKAGES_ROOT) \
 	    --target build-essential-native \
@@ -239,27 +249,19 @@ ensure-build-essential-native:
 	@docker image inspect $(PACKAGE_TOOLS_IMAGE) >/dev/null 2>&1 || $(MAKE) build-essential-native
 
 ensure-world-xsh:
-	test -f "$(XSH_SOURCE_ROOT)/Cargo.toml"
-	test -f "$(XSH_SOURCE_ROOT)/Dockerfile.test"
-	docker build \
-	    --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    -t $(XSH_WORLD_DOCKER_IMAGE) \
-	    -f "$(XSH_SOURCE_ROOT)/Dockerfile.test" \
-	    "$(XSH_SOURCE_ROOT)"
-	"$(DOCKER_SYNC_VOLUME)" "$(XSH_SOURCE_VOLUME)" "$(XSH_SOURCE_ROOT)" /work "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_WORLD_DOCKER_IMAGE)"
-	docker run --rm \
-	    --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    -e CARGO_TARGET_DIR=/work/target \
-	    -v "$(XSH_SOURCE_VOLUME)":/work \
-	    -v "$(XSH_WORLD_VOLUME)":/work/target \
-	    -v xsh-cargo-registry:/root/.cargo/registry \
-	    -w /work \
-	    $(XSH_WORLD_DOCKER_IMAGE) \
-	    sh -c 'cargo build --target $(XSH_WORLD_RUST_TARGET) --no-default-features --features "net tools" --bin xsh-multicall'
-	docker run --rm --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    -v "$(XSH_WORLD_VOLUME)":/work/target \
-	    $(XSH_WORLD_DOCKER_IMAGE) \
-	    sh -c 'test -x /work/target/$(XSH_WORLD_RUST_TARGET)/debug/xsh-multicall && rm -rf /work/target/bin && mkdir -p /work/target/bin && ln -sf ../$(XSH_WORLD_RUST_TARGET)/debug/xsh-multicall /work/target/bin/xsh-multicall && ln -sf xsh-multicall /work/target/bin/xsh && ln -sf xsh-multicall /work/target/bin/xshi && ln -sf xsh-multicall /work/target/bin/xsht && test -x /work/target/bin/xsh && test -x /work/target/bin/xsht'
+	set -e; stage=$$(mktemp -d); trap 'rm -rf "$$stage"' EXIT; mkdir -p "$$stage/bin"; \
+	for command_name in xsh xshi xsht; do \
+	    case "$$command_name" in \
+	        xsh) sha="$(XSH_RELEASE_XSH_SHA256)" ;; \
+	        xshi) sha="$(XSH_RELEASE_XSHI_SHA256)" ;; \
+	        xsht) sha="$(XSH_RELEASE_XSHT_SHA256)" ;; \
+	    esac; \
+	    dest="$$stage/bin/$$command_name"; \
+	    curl --proto '=https' --tlsv1.2 -fsSL "https://github.com/laputa-systems/xsh/releases/download/$(XSH_RELEASE)/$$command_name-$(XSH_RELEASE)-$(LAPUTA_PACKAGE_ARCH)-linux-musl" -o "$$dest"; \
+	    echo "$$sha  $$dest" | sha256sum -c -; \
+	    chmod 0755 "$$dest"; \
+	done; \
+	"$(DOCKER_SYNC_VOLUME)" "$(XSH_WORLD_VOLUME)" "$$stage" /opt/laputa/xsh-world "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_RELEASE_HELPER_IMAGE)"
 
 package-test: ensure-package-docker-volumes
 	docker run --rm \
@@ -340,8 +342,8 @@ linux-plan-only: ensure-package-docker-volumes
 	    /src/packages/repo/linux || status=$$?; test "$$status" -eq 3
 
 ensure-world-docker-volumes: ensure-build-essential-native ensure-world-xsh
-	"$(DOCKER_SYNC_VOLUME)" "$(LAPUTA_PACKAGES_VOLUME)" "$(LAPUTA_PACKAGES_ROOT)" /src/packages "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_WORLD_DOCKER_IMAGE)"
-	"$(DOCKER_SYNC_VOLUME)" "$(XSH_CORE_VOLUME)" "$(XSH_SOURCE_ROOT)/core" /usr/lib/xsh/core "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_WORLD_DOCKER_IMAGE)"
+	"$(DOCKER_SYNC_VOLUME)" "$(LAPUTA_PACKAGES_VOLUME)" "$(LAPUTA_PACKAGES_ROOT)" /src/packages "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_RELEASE_HELPER_IMAGE)"
+	"$(DOCKER_SYNC_VOLUME)" "$(XSH_CORE_VOLUME)" "$(XSH_SOURCE_ROOT)/core" /usr/lib/xsh/core "$(LAPUTA_DOCKER_PLATFORM)" "$(XSH_RELEASE_HELPER_IMAGE)"
 	docker volume create "$(WORLD_CACHE_VOLUME)" >/dev/null
 
 ensure-package-docker-volumes: ensure-world-docker-volumes
@@ -540,7 +542,7 @@ world-build-aarch64: ensure-host-xsh
 	    --jobs $(WORLD_JOBS) \
 	    $$extra
 
-world-build-amd64: ensure-host-xsh-multicall
+world-build-amd64: ensure-host-xsh-release
 	set -e; \
 	case "$$(uname -m)" in x86_64|amd64) ;; *) echo "world-build-amd64 requires an amd64 host" >&2; exit 1 ;; esac; \
 	if [ "$$(id -u)" != "0" ]; then \
@@ -568,7 +570,7 @@ _world-build-amd64:
 	mkdir -p "$$HOME/.cache/laputa"; extra=""; \
 	if [ -n "$(WORLD_TO_TRANCHE)" ]; then extra="$$extra --to-tranche $(WORLD_TO_TRANCHE)"; fi; \
 	if [ "$(WORLD_UPLOAD)" = "1" ]; then extra="$$extra --upload"; fi; \
-	XSH_HOST="$(XSH_HOST_MULTICALL_BIN_DIR)/xsh" \
+	XSH_HOST="$(XSH_HOST_RELEASE_BIN_DIR)/xsh" \
 	XSH_MODULE_PATH="$(LAPUTA_PACKAGES_ROOT)" \
 	XSH_PM_REPO="$(LAPUTA_MIRROR_URL)" \
 	XSH_PM_PUBLIC_REPO="$(LAPUTA_MIRROR_URL)" \
@@ -586,7 +588,7 @@ _world-build-amd64:
 	XSH_LINUX_KBUILD_REUSE_ARCHIVES="$${XSH_LINUX_KBUILD_REUSE_ARCHIVES:-}" \
 	XSH_LINUX_KBUILD_TRUST_PLAN_CACHE="$${XSH_LINUX_KBUILD_TRUST_PLAN_CACHE:-}" \
 	XSH_MAKE_PROGRESS="$${XSH_MAKE_PROGRESS:-1}" \
-	"$(XSH_HOST_MULTICALL_BIN_DIR)/xsh" "$(LAPUTA_PACKAGES_ROOT)/pm.xsh" -- world-plan \
+	"$(XSH_HOST_RELEASE_BIN_DIR)/xsh" "$(LAPUTA_PACKAGES_ROOT)/pm.xsh" -- world-plan \
 	    "$(LAPUTA_PACKAGES_ROOT)/repo" \
 	    --arch x86_64 \
 	    --build \
@@ -605,7 +607,7 @@ world-smoke-amd64: ensure-host-xsh
 	XSH_HOST="$${XSH_HOST:-$(XSH_HOST)}" \
 	"$${XSH_HOST:-$(XSH_HOST)}" boot.xsh -- --linux-only
 
-amd64-package-test: ensure-host-xsh-multicall
+amd64-package-test: ensure-host-xsh-release
 	set -e; \
 	if [ "$$(id -u)" != "0" ]; then echo "amd64-package-test requires root for chroot; run with doas" >&2; exit 1; fi; \
 	mkdir -p "$$HOME/.cache/laputa"; \
@@ -624,7 +626,7 @@ amd64-package-test: ensure-host-xsh-multicall
 	XSH_PM_BUILD_CHROOT="$${XSH_PM_BUILD_CHROOT:-1}" \
 	XSH_PM_REUSE_WORK="$${XSH_PM_REUSE_WORK:-1}" \
 	XSH_PM_REUSE_SET_ROOTS="$${XSH_PM_REUSE_SET_ROOTS:-1}" \
-	XSH_HOST="$(XSH_HOST_MULTICALL_BIN_DIR)/xsh" \
+	XSH_HOST="$(XSH_HOST_RELEASE_BIN_DIR)/xsh" \
 	XSH_MODULE_PATH="$(LAPUTA_PACKAGES_ROOT)" \
 	XSH_PM_REPO="$(LAPUTA_MIRROR_URL)" \
 	XSH_PM_PUBLIC_REPO="$(LAPUTA_MIRROR_URL)" \
@@ -646,7 +648,7 @@ amd64-package-test: ensure-host-xsh-multicall
 	XSH_LINUX_KBUILD_USE_PLAN_TEXT="$${XSH_LINUX_KBUILD_USE_PLAN_TEXT:-}" \
 	XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE="$${XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE:-}" \
 	XSH_LINUX_KBUILD_TRUST_PLAN_CACHE="$(XSH_LINUX_KBUILD_TRUST_PLAN_CACHE)" \
-	"$(XSH_HOST_MULTICALL_BIN_DIR)/xsh" "$(LAPUTA_PACKAGES_ROOT)/pm.xsh" -- build-set \
+	"$(XSH_HOST_RELEASE_BIN_DIR)/xsh" "$(LAPUTA_PACKAGES_ROOT)/pm.xsh" -- build-set \
 	    "$$HOME/.cache/laputa/amd64-package-test" \
 	    "$(LAPUTA_PACKAGES_ROOT)/repo/$(PKGNAME)"
 

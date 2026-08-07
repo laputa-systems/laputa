@@ -11,9 +11,11 @@ permissions:
   contents: read
 
 env:
-  XSH_RELEASE: release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac
+  XSH_RELEASE: release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
   XSH_RELEASE_ARCH: x86_64
-  XSH_RELEASE_SHA256: 680660d5206e42b7430ab2d6d331ad20fecb2df12efa8214c4df5ef1af39b7b6
+  XSH_RELEASE_XSH_SHA256: 03e190c8ee15020b04b27e2066a7e53665452c9dce821bd0af80378ef664c746
+  XSH_RELEASE_XSHI_SHA256: 897b22cae065625179f8b2cb18c48828464eb1cd135f32da0e9358b237f3e195
+  XSH_RELEASE_XSHT_SHA256: 83ea617d6fc1a9f9e7908b292d51d8b263df15904d67d17b7c7f04d825a98a20
 
 jobs:
   scripts:
@@ -32,14 +34,18 @@ jobs:
       - name: Install XSH release
         run: |
           set -euo pipefail
-          XSH_RELEASE_URL="https://github.com/laputa-systems/xsh/releases/download/$XSH_RELEASE/xsh-multicall-$XSH_RELEASE-$XSH_RELEASE_ARCH-linux-musl"
           mkdir -p /tmp/xsh-release/bin
-          curl --proto '=https' --tlsv1.2 -fsSL "$XSH_RELEASE_URL" -o /tmp/xsh-release/bin/xsh-multicall
-          echo "$XSH_RELEASE_SHA256  /tmp/xsh-release/bin/xsh-multicall" | sha256sum -c -
-          chmod 0755 /tmp/xsh-release/bin/xsh-multicall
-          ln -s xsh-multicall /tmp/xsh-release/bin/xsh
-          ln -s xsh-multicall /tmp/xsh-release/bin/xshi
-          ln -s xsh-multicall /tmp/xsh-release/bin/xsht
+          for command_name in xsh xshi xsht; do
+            case "$command_name" in
+              xsh) sha="$XSH_RELEASE_XSH_SHA256" ;;
+              xshi) sha="$XSH_RELEASE_XSHI_SHA256" ;;
+              xsht) sha="$XSH_RELEASE_XSHT_SHA256" ;;
+            esac
+            path="/tmp/xsh-release/bin/$command_name"
+            curl --proto '=https' --tlsv1.2 -fsSL "https://github.com/laputa-systems/xsh/releases/download/$XSH_RELEASE/$command_name-$XSH_RELEASE-$XSH_RELEASE_ARCH-linux-musl" -o "$path"
+            echo "$sha  $path" | sha256sum -c -
+            chmod 0755 "$path"
+          done
           echo "/tmp/xsh-release/bin" >> "$GITHUB_PATH"
 
       - name: Check PM entrypoint

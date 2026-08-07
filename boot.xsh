@@ -895,45 +895,13 @@ proc ensure_boot_sudo_rs(root: Path, rootfs_dir: Path) [fs, process, env, error]
   print "ensuring sudo-rs runtime: ok"
 }
 
-proc install_local_release_xsh(root: Path, rootfs_dir: Path) [fs, process, env, error] {
-  let source_root = local_xsh_source_root(root)?
-  let target = "aarch64-unknown-linux-musl"
-  let target_dir = fp"${source_root}/target/docker-aarch64-release"
-  let default_binary = fp"${target_dir}/${target}/dist/xsh-multicall".display()
-  let local_binary = fp"${env.get("XSH_BOOT_LOCAL_RELEASE_XSH") ?? default_binary}"
-
-  if ! fs.exists(local_binary)? {
-    let make = process.which("make")?
-    require_file(fp"${source_root}/Makefile")?
-    require_file(fp"${source_root}/Cargo.toml")?
-
-    require_ok(
-      process.run(
-        process.command_argv(
-          make,
-          ["make", "dist", f"TARGET=${target}"],
-          source_root,
-          {CARGO_TARGET_DIR: target_dir.display()},
-        ),
-      )?,
-      "boot-xsh-release",
-      f"failed to build release xsh at ${source_root}",
-    )?
-  }
-
-  require_file(local_binary)?
-  fs.copy(local_binary, fp"${rootfs_dir}/bin/xsh", overwrite: true)?
-  fs.chmod(fp"${rootfs_dir}/bin/xsh", 0o755)?
-
-  for command_name in ["xshi", "xsht"] {
-    let link = fp"${rootfs_dir}/bin/${command_name}"
-    fs.remove(link, missing_ok: true)?
-    fs.symlink(p"xsh", link)?
+proc sync_local_core_applets(root: Path, rootfs_dir: Path) [fs, env, error] {
+  for command_name in ["xsh", "xshi", "xsht"] {
+    require_file(fp"${rootfs_dir}/bin/${command_name}")?
   }
 
   # The xsh package ships core applets from a pinned upstream commit. For local
-  # dev boots, sync the working-tree core applets (e.g. ifup's DHCP support) so
-  # they match the local release binary without republishing the package.
+  # dev boots, sync the working-tree core applets (e.g. ifup's DHCP support).
   let core_src = fp"${local_xsh_source_root(root)?}/core"
 
   if fs.exists(core_src)? {
@@ -1124,7 +1092,7 @@ proc assemble_native_userspace_e2e_rootfs(root: Path, rootfs_dir: Path, sh: Path
   )?
 
   ensure_boot_sudo_rs(root, rootfs_dir)?
-  install_local_release_xsh(root, rootfs_dir)?
+  sync_local_core_applets(root, rootfs_dir)?
   install_local_xinit(root, rootfs_dir)?
   install_rootfs_overlay(root, rootfs_dir, false, false, true)?
   write_rootfs_cache(root, rootfs_dir, "native-userspace-e2e-rootfs", native_userspace_e2e_rootfs_id(root)?, false)?

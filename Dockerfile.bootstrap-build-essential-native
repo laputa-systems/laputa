@@ -1,27 +1,51 @@
 # syntax=docker/dockerfile:1.4
+ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
+ARG XSH_AARCH64_XSH_SHA=bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
+ARG XSH_AARCH64_XSHI_SHA=5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
+ARG XSH_AARCH64_XSHT_SHA=86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
+ARG XSH_X86_64_XSH_SHA=03e190c8ee15020b04b27e2066a7e53665452c9dce821bd0af80378ef664c746
+ARG XSH_X86_64_XSHI_SHA=897b22cae065625179f8b2cb18c48828464eb1cd135f32da0e9358b237f3e195
+ARG XSH_X86_64_XSHT_SHA=83ea617d6fc1a9f9e7908b292d51d8b263df15904d67d17b7c7f04d825a98a20
+ARG XSH_CORE_SHA=7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS alpine-seed
 
 WORKDIR /src
 RUN apk add --no-cache build-base ca-certificates curl xz zlib
 ARG TARGETARCH
+ARG XSH_RELEASE
+ARG XSH_AARCH64_XSH_SHA
+ARG XSH_AARCH64_XSHI_SHA
+ARG XSH_AARCH64_XSHT_SHA
+ARG XSH_X86_64_XSH_SHA
+ARG XSH_X86_64_XSHI_SHA
+ARG XSH_X86_64_XSHT_SHA
+ARG XSH_CORE_SHA
 RUN case "$TARGETARCH" in \
-      arm64) XSH_ARCH=aarch64; XSH_SHA=029c85cd921b5ef28fa9bf8f4454427192119225abd69c32beb4e57ccb706d44 ;; \
-      amd64) XSH_ARCH=x86_64; XSH_SHA=680660d5206e42b7430ab2d6d331ad20fecb2df12efa8214c4df5ef1af39b7b6 ;; \
+      arm64) XSH_ARCH=aarch64; XSH_XSH_SHA="$XSH_AARCH64_XSH_SHA"; XSH_XSHI_SHA="$XSH_AARCH64_XSHI_SHA"; XSH_XSHT_SHA="$XSH_AARCH64_XSHT_SHA" ;; \
+      amd64) XSH_ARCH=x86_64; XSH_XSH_SHA="$XSH_X86_64_XSH_SHA"; XSH_XSHI_SHA="$XSH_X86_64_XSHI_SHA"; XSH_XSHT_SHA="$XSH_X86_64_XSHT_SHA" ;; \
       *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
     esac && \
-    XSH_CORE_SHA=588d4b52da1096398c3b8d80be3f04b0b65122a8a0ca656fe5e6940d06a1f760 && \
     curl --proto '=https' --tlsv1.2 -sSfL \
-    "https://github.com/laputa-systems/xsh/releases/download/release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac/xsh-multicall-release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac-${XSH_ARCH}-linux-musl" \
-    -o /tmp/xsh-multicall && \
-    echo "${XSH_SHA}  /tmp/xsh-multicall" | sha256sum -c - && \
+    "https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-${XSH_RELEASE}-${XSH_ARCH}-linux-musl" \
+    -o /tmp/xsh && \
+    echo "${XSH_XSH_SHA}  /tmp/xsh" | sha256sum -c - && \
     curl --proto '=https' --tlsv1.2 -sSfL \
-    "https://github.com/laputa-systems/xsh/releases/download/release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac/core-release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac.tar.xz" \
+    "https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xshi-${XSH_RELEASE}-${XSH_ARCH}-linux-musl" \
+    -o /tmp/xshi && \
+    echo "${XSH_XSHI_SHA}  /tmp/xshi" | sha256sum -c - && \
+    curl --proto '=https' --tlsv1.2 -sSfL \
+    "https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsht-${XSH_RELEASE}-${XSH_ARCH}-linux-musl" \
+    -o /tmp/xsht && \
+    echo "${XSH_XSHT_SHA}  /tmp/xsht" | sha256sum -c - && \
+    curl --proto '=https' --tlsv1.2 -sSfL \
+    "https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/core-${XSH_RELEASE}.tar.xz" \
     -o /tmp/xsh-core.tar.xz && \
     echo "${XSH_CORE_SHA}  /tmp/xsh-core.tar.xz" | sha256sum -c - && \
     mkdir -p /xsh-release/bin /xsh-release/usr/bin && \
-    cp /tmp/xsh-multicall /xsh-release/bin/xsh-multicall && \
-    chmod 0755 /xsh-release/bin/xsh-multicall && \
-    for command_name in xsh xshi xsht; do ln -s xsh-multicall /xsh-release/bin/"${command_name}"; done && \
+    cp /tmp/xsh /xsh-release/bin/xsh && \
+    cp /tmp/xshi /xsh-release/bin/xshi && \
+    cp /tmp/xsht /xsh-release/bin/xsht && \
+    chmod 0755 /xsh-release/bin/xsh /xsh-release/bin/xshi /xsh-release/bin/xsht && \
     mkdir -p /xsh-release/usr/lib/xsh && \
     tar -C /xsh-release/usr/lib/xsh -xJf /tmp/xsh-core.tar.xz && \
     find /xsh-release/usr/lib/xsh/core -type f -exec sed -i -e '1s|^#!/usr/local/bin/xsh|#!/bin/xsh|' -e '1s|^#!/usr/bin/env -S xsh|#!/bin/xsh|' {} + && \
@@ -33,7 +57,7 @@ RUN case "$TARGETARCH" in \
     echo "74c81ca48e466fed707dd52d5d4d59671cc73b5aa8ce9d8c6f53d14fc082da59  /xsh-release/usr/bin/xinit" | sha256sum -c - && \
     chmod 0755 /xsh-release/usr/bin/xinit && \
     ln -s xinit /xsh-release/usr/bin/init && \
-    rm /tmp/xsh-multicall /tmp/xsh-core.tar.xz
+    rm /tmp/xsh /tmp/xshi /tmp/xsht /tmp/xsh-core.tar.xz
 ENV PATH="/xsh-release/bin:/xsh-release/usr/bin:$PATH"
 ENV XSH_MODULE_PATH=/src/packages
 

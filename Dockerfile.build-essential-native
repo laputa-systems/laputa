@@ -2,23 +2,30 @@
 # Note: compiled Laputa packages use pm.make (packages/pm/make.xsh), not GNU
 # make.  Do NOT add GNU make to this image — it will not help package builds.
 # Packages declare build tools via mkdeps_host; the chroot only gets declared deps.
-ARG XSH_RELEASE=release-dcdfcbdf0d35724d90be04fd95d35cef2478a3ac
+ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
 ARG XSH_RELEASE_ARCH=aarch64
-ARG XSH_RELEASE_SHA256=029c85cd921b5ef28fa9bf8f4454427192119225abd69c32beb4e57ccb706d44
-ARG XSH_CORE_SHA256=588d4b52da1096398c3b8d80be3f04b0b65122a8a0ca656fe5e6940d06a1f760
+ARG XSH_RELEASE_XSH_SHA256=bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
+ARG XSH_RELEASE_XSHI_SHA256=5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
+ARG XSH_RELEASE_XSHT_SHA256=86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
+ARG XSH_CORE_SHA256=7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
 
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS xsh-release-builder
 ARG XSH_RELEASE
 ARG XSH_RELEASE_ARCH
-ARG XSH_RELEASE_SHA256
+ARG XSH_RELEASE_XSH_SHA256
+ARG XSH_RELEASE_XSHI_SHA256
+ARG XSH_RELEASE_XSHT_SHA256
 ARG XSH_CORE_SHA256
 RUN apk add --no-cache xz
-ADD --checksum=sha256:${XSH_RELEASE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-multicall-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsh-multicall
+ADD --checksum=sha256:${XSH_RELEASE_XSH_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsh
+ADD --checksum=sha256:${XSH_RELEASE_XSHI_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xshi-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xshi
+ADD --checksum=sha256:${XSH_RELEASE_XSHT_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsht-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsht
 ADD --checksum=sha256:${XSH_CORE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/core-${XSH_RELEASE}.tar.xz /tmp/xsh-core.tar.xz
 RUN mkdir -p /xsh-release/bin /xsh-release/usr/bin && \
-    cp /tmp/xsh-multicall /xsh-release/bin/xsh-multicall && \
-    chmod 0755 /xsh-release/bin/xsh-multicall && \
-    for command_name in xsh xshi xsht; do ln -s xsh-multicall /xsh-release/bin/"${command_name}"; done && \
+    cp /tmp/xsh /xsh-release/bin/xsh && \
+    cp /tmp/xshi /xsh-release/bin/xshi && \
+    cp /tmp/xsht /xsh-release/bin/xsht && \
+    chmod 0755 /xsh-release/bin/xsh /xsh-release/bin/xshi /xsh-release/bin/xsht && \
     mkdir -p /xsh-release/usr/lib/xsh && \
     tar -C /xsh-release/usr/lib/xsh -xJf /tmp/xsh-core.tar.xz && \
     find /xsh-release/usr/lib/xsh/core -type f -exec sed -i -e '1s|^#!/usr/local/bin/xsh|#!/bin/xsh|' -e '1s|^#!/usr/bin/env -S xsh|#!/bin/xsh|' {} + && \
