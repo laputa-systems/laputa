@@ -15,7 +15,7 @@ pure fixture_config() -> docker.DockerConfig {
 }
 
 proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
-  let argv = docker.command_argv(fixture_config(), ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "check"])
+  let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "check"])
   test.eq(argv[0], "docker")?
   test.ok("linux/arm64" in argv)?
   test.ok(argv |> any .contains("/src/packages,readonly"))?

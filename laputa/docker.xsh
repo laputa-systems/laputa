@@ -23,7 +23,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 ## Resolve the allowed Docker configuration surface from the host environment.
-export proc config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
+export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
   let packages_root = fp"${env_value("LAPUTA_PACKAGES_ROOT", fp"${laputa_root.parent}/packages".display())}"
   let xsh_root = fp"${env_value("XSH_SOURCE_ROOT", fp"${laputa_root.parent}/xsh".display())}"
   let docker = fp"${env_value("DOCKER", "docker")}"
@@ -54,7 +54,7 @@ export proc config(laputa_root: Path, profile_name: Str) [fs, process, env, erro
 }
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
-export pure command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
+export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
   [
     value.docker.display(),
     "run",
@@ -86,7 +86,7 @@ export pure command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str
 ## Return the structured host command that executes an exact Docker invocation.
 export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] -> Result[Command] {
   fs.mkdir(value.output_root)?
-  process.command_argv(value.docker, command_argv(value, inner_argv), value.laputa_root)
+  process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root)
 }
 
 ## Reject Docker images that are not a native arm64 execution substrate.

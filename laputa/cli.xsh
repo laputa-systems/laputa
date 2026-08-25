@@ -61,7 +61,7 @@ export proc dispatch(argv: List[Str]) [fs, process, env, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
   let value = profile.load(parsed.profile_name, fp"${root}/profiles")?
-  let docker_config = docker.config(root, value.name)?
+  let docker_config = docker.build_config(root, value.name)?
 
   if parsed.command == "clean" {
     build.clean(docker_config)?
