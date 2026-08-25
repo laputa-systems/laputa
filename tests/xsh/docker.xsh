@@ -68,3 +68,15 @@ proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
   test.ok(! (argv |> any .contains("amd64")))?
   test.ok(! (argv |> any .contains("x86_64")))?
 }
+
+proc test_generation_projection_and_build_use_the_single_container_adapter() [fs, error] {
+  let value = profile.load("qemu-dwl-foot", p"profiles")?
+  test.eq(
+    docker.docker_generation_plan_argv(value),
+    ["/bin/xsh", "/src/laputa/laputa/container_build.xsh", "--", "plan", "qemu-dwl-foot", "1"],
+  )?
+  test.eq(
+    docker.docker_profile_build_argv(value, 3),
+    ["/bin/xsh", "/src/laputa/laputa/container_build.xsh", "--", "build", "qemu-dwl-foot", "3"],
+  )?
+}

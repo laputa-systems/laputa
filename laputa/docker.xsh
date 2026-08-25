@@ -78,7 +78,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--workdir",
     "/src/packages",
     "--env",
-    "XSH_MODULE_PATH=/src/packages",
+    "XSH_MODULE_PATH=/src/laputa:/src/packages",
     "--env",
     "PATH=/bin:/usr/bin",
   ]
@@ -114,6 +114,30 @@ export pure docker_plan_command_argv(value: DockerConfig, profile: types.SystemP
   docker_command_argv(value, docker_pm_plan_argv(profile))
 }
 
+## Construct the typed in-container generation-plan projection without executing or composing artifacts.
+export pure docker_generation_plan_argv(profile: types.SystemProfile) -> List[Str] {
+  [
+    "/bin/xsh",
+    "/src/laputa/laputa/container_build.xsh",
+    "--",
+    "plan",
+    profile.name,
+    "1",
+  ]
+}
+
+## Construct the typed in-container artifact execution, generation composition, kernel extraction, ext4, and GPT workflow.
+export pure docker_profile_build_argv(profile: types.SystemProfile, jobs: Int) -> List[Str] {
+  [
+    "/bin/xsh",
+    "/src/laputa/laputa/container_build.xsh",
+    "--",
+    "build",
+    profile.name,
+    f"${jobs}",
+  ]
+}
+
 ## Return the structured host command that executes an exact Docker invocation.
 export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] -> Result[Command] {
   fs.mkdir(value.output_root)?
@@ -143,7 +167,40 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
   }
 }
 
+## Run a profile build while atomically replacing its log only after Docker exits successfully.
+export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
+  verify_arm64_image(value)?
+  let temporary = fp"${log}.tmp"
+  fs.mkdir(log.parent)?
+  fs.remove(temporary, missing_ok: true)?
+  defer fs.remove(temporary, missing_ok: true)?
+  let status = process.run(
+    process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
+  )?
+
+  if ! status.ok {
+    return Err(types.LaputaError.Docker(f"Docker command failed for ${value.image}"))
+  }
+
+  fs.fsync(temporary)?
+  fs.rename(temporary, log, overwrite: true)?
+}
+
 ## Run the sole profile PM-plan adapter through the checked native arm64 runner.
 export proc docker_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
   docker_run(value, docker_pm_plan_argv(profile))?
+}
+
+## Project one saved BuildPlan to its typed generation plan through the native arm64 runner.
+export proc docker_generation_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
+  docker_run(value, docker_generation_plan_argv(profile))?
+}
+
+## Build one complete profile image through the native arm64 runner and keep its build log transactional.
+export proc docker_profile_build(value: DockerConfig, profile: types.SystemProfile, jobs: Int, log: Path) [fs, process, error] {
+  if jobs < 1 {
+    return Err(types.LaputaError.Usage("laputa build jobs must be positive"))
+  }
+
+  docker_run_logged(value, docker_profile_build_argv(profile, jobs), log)?
 }

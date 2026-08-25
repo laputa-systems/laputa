@@ -101,8 +101,8 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
     LaputaTest => qemu.run_test(qemu.qemu_config(root)?, value, build.outputs(fp"${root}/target/laputa/${value.name}"))?
     LaputaBoot => qemu.boot(qemu.qemu_config(root)?, value, build.outputs(fp"${root}/target/laputa/${value.name}"))?
     LaputaBuild => {
-      let _ = parsed.jobs
-      build.unavailable("build")?
+      let _ = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
+      print f"laputa build ${value.name}: ok"
     }
   }
 }

@@ -1,5 +1,9 @@
 ##! Deterministic ext4 sizing and atomic GPT disk construction for Laputa generations.
-use laputa.types as types
+# This module deliberately owns a narrow error boundary instead of importing `laputa.types`.
+# The native build helper imports PM modules and XSH currently shares union-tag names across
+# user modules; both domains model the supported ARM target with the same tag spelling.
+## Image-construction failures retained at the narrow image boundary.
+export error ImageError = Failed(message: Str) : InvalidData
 
 # The byte size of one GPT sector.
 let sector_size = 512
@@ -18,14 +22,14 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int] {
   if trimmed.ends_with("M") {
     let mebibytes = trimmed.replace("M", "").parse_int()?
     if mebibytes <= 0 {
-      return Err(types.LaputaError.Profile(f"image size must be positive: ${value}"))
+      return Err(ImageError.Failed(f"image size must be positive: ${value}"))
     }
     return mebibytes * 1024 * 1024
   }
 
   let byte_count = trimmed.parse_int()?
   if byte_count <= 0 {
-    return Err(types.LaputaError.Profile(f"image size must be positive: ${value}"))
+    return Err(ImageError.Failed(f"image size must be positive: ${value}"))
   }
   return byte_count
 }
@@ -40,6 +44,95 @@ export pure rootfs_size_bytes(used_bytes: Int) -> Int {
   }
 
   return rounded
+}
+
+## Sum regular-file payload bytes in a verified immutable generation before allocating its ext4 image.
+export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int] {
+  if ! fs.exists(root)? or fs.metadata(root)?.kind != "dir" {
+    return Err(ImageError.Failed(f"generation root is missing or not a directory: ${root}"))
+  }
+
+  var total = 0
+  for entry in fs.walk(root, hidden: true) {
+    if entry.kind == "file" {
+      total += entry.size
+    }
+  }
+
+  total
+}
+
+## Resolve a nonempty regular kernel file from its profile-declared relative manifest path.
+export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Result[Path] {
+  let relative = kernel_path.display()
+
+  if relative == "" or relative.starts_with("/") or ".." in relative.split("/") {
+    return Err(ImageError.Failed(f"kernel manifest path must be relative: ${relative}"))
+  }
+
+  let source = fp"${root}/${relative}"
+  if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
+    return Err(ImageError.Failed(f"kernel manifest path is missing or empty: ${relative}"))
+  }
+
+  source
+}
+
+## Atomically copy one manifest-verified kernel to its profile-owned host output path.
+export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
+  let temporary = fp"${output}.tmp"
+  fs.mkdir(output.parent)?
+  fs.remove(temporary, missing_ok: true)?
+  defer fs.remove(temporary, missing_ok: true)?
+  fs.copy(source, temporary)?
+
+  if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
+    return Err(ImageError.Failed(f"kernel copy does not match ${source}"))
+  }
+
+  fs.fsync(temporary)?
+  fs.rename(temporary, output, overwrite: true)?
+}
+
+## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.
+export proc image_write_rootfs(generation_root: Path, formatter: Path, output: Path) [fs, process, error] {
+  let used_bytes = image_generation_used_bytes(generation_root)?
+  let target_size = rootfs_size_bytes(used_bytes)
+  let temporary = fp"${output}.tmp"
+  fs.mkdir(output.parent)?
+  fs.remove(temporary, missing_ok: true)?
+  defer fs.remove(temporary, missing_ok: true)?
+  fs.write(temporary, b"")?
+  temporary.truncate(target_size)?
+
+  let xsh = p"/bin/xsh"
+  let status = process.run(
+    process.command_argv(
+      xsh,
+      [
+        "xsh",
+        formatter.display(),
+        "--",
+        "-q",
+        "-O",
+        "^64bit,^metadata_csum",
+        "-E",
+        "no_copy_xattrs",
+        "-L",
+        "LAPUTA_ROOT",
+        "-d",
+        generation_root.display(),
+        temporary.display(),
+      ],
+    ),
+  )?
+
+  if ! status.ok or fs.metadata(temporary)?.size != target_size {
+    return Err(ImageError.Failed(f"native ext4 formatter failed for ${output}"))
+  }
+
+  fs.fsync(temporary)?
+  fs.rename(temporary, output, overwrite: true)?
 }
 
 # Replaces an exact byte range inside an immutable byte value.
@@ -84,7 +177,7 @@ proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int,
 ## Construct a protective MBR covering the complete disk.
 export proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
   if total_sectors <= 1 {
-    return Err(types.LaputaError.Profile("GPT disk needs at least two sectors"))
+    return Err(ImageError.Failed("GPT disk needs at least two sectors"))
   }
   var sector = bytes.zero(sector_size)?
   sector = put(sector, 447, bytes.from_ints([0, 2, 0])?)?
@@ -137,25 +230,25 @@ export proc root_partition_guid() [error] -> Result[Bytes] {
 export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
   let metadata = fs.metadata(image)?
   if metadata.size <= rootfs_bytes {
-    return Err(types.LaputaError.Profile(f"disk image is too small: ${image}"))
+    return Err(ImageError.Failed(f"disk image is too small: ${image}"))
   }
   let mbr = bytes.read_at(image, 510, 2)?
   if mbr != bytes.from_ints([85, 170])? {
-    return Err(types.LaputaError.Profile(f"${image} has no protective MBR signature"))
+    return Err(ImageError.Failed(f"${image} has no protective MBR signature"))
   }
   let header = bytes.read_at(image, sector_size, 8)?
   if header != bytes.from_text("EFI PART") {
-    return Err(types.LaputaError.Profile(f"${image} has no GPT header signature"))
+    return Err(ImageError.Failed(f"${image} has no GPT header signature"))
   }
   let entry = bytes.read_at(image, 2 * sector_size, 128)?
   let guid = entry.slice(offset: 16, length: 16)
   if guid != root_partition_guid()? {
-    return Err(types.LaputaError.Profile(f"${image} root partition GUID does not match ${image_root_partuuid()}"))
+    return Err(ImageError.Failed(f"${image} root partition GUID does not match ${image_root_partuuid()}"))
   }
   let start = bytes.unpack_le(entry, 8, offset: 32)?
   let end = bytes.unpack_le(entry, 8, offset: 40)?
   if start != root_start_lba or end < start or (end - start + 1) * sector_size < rootfs_bytes {
-    return Err(types.LaputaError.Profile(f"${image} has invalid root partition bounds"))
+    return Err(ImageError.Failed(f"${image} has invalid root partition bounds"))
   }
 }
 
@@ -163,7 +256,7 @@ export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
 export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   let rootfs_bytes = fs.metadata(rootfs)?.size
   if rootfs_bytes <= 0 or rootfs_bytes % sector_size != 0 {
-    return Err(types.LaputaError.Profile(f"rootfs must be nonempty and sector aligned: ${rootfs}"))
+    return Err(ImageError.Failed(f"rootfs must be nonempty and sector aligned: ${rootfs}"))
   }
   let rootfs_sectors = rootfs_bytes / sector_size
   let entry_count = 128
@@ -174,7 +267,7 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   let last_usable = total_sectors - entry_sectors - 2
   let root_end = root_start_lba + rootfs_sectors - 1
   if root_end > last_usable {
-    return Err(types.LaputaError.Profile("root filesystem does not fit GPT disk layout"))
+    return Err(ImageError.Failed("root filesystem does not fit GPT disk layout"))
   }
   let backup_entries_lba = total_sectors - entry_sectors - 1
   let tmp = fp"${image}.tmp"
