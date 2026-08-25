@@ -1,4 +1,4 @@
-##! Profile-output paths and the future package-plan execution boundary.
+##! Profile-output paths and the typed package-plan Docker adapter.
 use laputa.docker as docker
 use laputa.types as types
 
@@ -37,8 +37,20 @@ export pure outputs(root: Path) -> ProfileOutputs {
 }
 
 ## Remove only generated outputs, preserving the immutable artifact-store volume.
-export proc clean(value: docker.DockerConfig) [fs, error] {
-  fs.remove(value.output_root, missing_ok: true)?
+export proc clean(output_root: Path) [fs, error] {
+  fs.remove(output_root, missing_ok: true)?
+}
+
+## Generate the profile's exact BuildPlan through PM's explicit Docker CLI, without beginning Task 13 artifact execution or image construction.
+export proc plan_profile(value: docker.DockerConfig, profile: types.SystemProfile) [fs, process, error] -> Result[ProfileOutputs] {
+  let result = outputs(value.output_root)
+  docker.docker_plan(value, profile)?
+
+  if ! fs.exists(result.build_plan)? {
+    return Err(types.LaputaError.Docker(f"PM plan command did not write ${result.build_plan}"))
+  }
+
+  result
 }
 
 ## Explain that package planning awaits the typed package-manager BuildPlan API.

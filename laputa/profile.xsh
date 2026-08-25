@@ -29,7 +29,7 @@ export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
 
   match value.target {
     Aarch64LinuxMusl => {}
-    InvalidSystemTarget => return Err(types.LaputaError.Profile(f"${value.name} has an unsupported target"))
+    UnsupportedSystemTarget => return Err(types.LaputaError.Profile(f"${value.name} has an unsupported target"))
   }
 
   if value.package_roots.len() == 0 {
@@ -80,6 +80,32 @@ export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
 
   if value.proof.success_markers.len() == 0 or value.proof.failure_markers.len() == 0 or value.proof.input_text == "" {
     return Err(types.LaputaError.Profile(f"${value.name} has an incomplete guest proof contract"))
+  }
+
+  var forbidden_packages: Map[Bool] = {}
+  for package_name in value.forbidden_packages {
+    if ! valid_package_name(package_name)? {
+      return Err(types.LaputaError.Profile(f"${value.name} has invalid forbidden package ${package_name}"))
+    }
+
+    if forbidden_packages.get(package_name, false) {
+      return Err(types.LaputaError.Profile(f"${value.name} names forbidden package ${package_name} more than once"))
+    }
+
+    forbidden_packages[package_name] = true
+  }
+
+  var forbidden_sonames: Map[Bool] = {}
+  for soname in value.forbidden_sonames {
+    if soname == "" or soname.contains("/") or soname.contains("\\") {
+      return Err(types.LaputaError.Profile(f"${value.name} has invalid forbidden SONAME ${soname}"))
+    }
+
+    if forbidden_sonames.get(soname, false) {
+      return Err(types.LaputaError.Profile(f"${value.name} names forbidden SONAME ${soname} more than once"))
+    }
+
+    forbidden_sonames[soname] = true
   }
 }
 

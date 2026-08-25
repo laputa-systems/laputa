@@ -1,7 +1,9 @@
 ##! Typed contracts for the single supported Laputa reference system.
 
-## The system target accepted by Laputa profiles and build adapters.
-export type SystemTarget = Aarch64LinuxMusl | InvalidSystemTarget
+## The sole supported system target accepted by Laputa profiles and build adapters.
+## XSH requires at least two tags to encode a tag union, so the second tag is an
+## internal parse sentinel. Every profile and external parser rejects it.
+export type SystemTarget = Aarch64LinuxMusl | UnsupportedSystemTarget
 
 ## The host display mode selected by a QEMU invocation.
 export type DisplayMode = Headless | Cocoa
@@ -56,7 +58,7 @@ export error LaputaError = Usage(message: Str) : Usage | Profile(message: Str) :
 export pure system_target_text(target: SystemTarget) -> Str {
   match target {
     Aarch64LinuxMusl => "aarch64-linux-musl"
-    InvalidSystemTarget => "invalid"
+    UnsupportedSystemTarget => "unsupported"
   }
 }
 

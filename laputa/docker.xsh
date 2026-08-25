@@ -11,6 +11,7 @@ export type DockerConfig = {
   artifact_volume: Str,
   source_volume: Str,
   image: Str,
+  repo_url: Str,
 }
 
 proc env_value(name: Str, fallback: Str) [env] -> Str {
@@ -50,12 +51,13 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     artifact_volume: "laputa-artifacts-aarch64-v1",
     source_volume: "laputa-sources-aarch64-v1",
     image: "laputa-package-tools",
+    repo_url: env_value("LAPUTA_REPO_URL", ""),
   }
 }
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
 export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
-  [
+  var argv = [
     value.docker.display(),
     "run",
     "--rm",
@@ -79,8 +81,37 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "XSH_MODULE_PATH=/src/packages",
     "--env",
     "PATH=/bin:/usr/bin",
-    value.image,
-  ].extend(inner_argv)
+  ]
+
+  if value.repo_url != "" {
+    argv = argv.extend(["--env", f"XSH_PM_REPO=${value.repo_url}", "--env", f"XSH_PM_PUBLIC_REPO=${value.repo_url}"])
+  }
+
+  argv.push(value.image).extend(inner_argv)
+}
+
+## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
+export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
+  var argv = ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages"]
+
+  for package_name in profile.package_roots {
+    argv = argv.extend(["--root", package_name])
+  }
+
+  argv = argv.extend([
+    "--root",
+    profile.kernel_package,
+    "--target",
+    types.system_target_text(profile.target),
+    "--output",
+    "/output/build-plan.json",
+  ])
+  argv
+}
+
+## Construct the complete native-arm64 Docker invocation for a profile BuildPlan without encoding a second package closure.
+export pure docker_plan_command_argv(value: DockerConfig, profile: types.SystemProfile) -> List[Str] {
+  docker_command_argv(value, docker_pm_plan_argv(profile))
 }
 
 ## Return the structured host command that executes an exact Docker invocation.
@@ -89,12 +120,30 @@ export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, er
   process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root)
 }
 
+## Reject an image architecture other than the native arm64 runner required for package planning and execution.
+export proc require_arm64_image_architecture(architecture: Str) [error] {
+  if architecture != "arm64" {
+    return Err(types.LaputaError.Docker(f"Docker runner reports ${architecture}; native arm64 is required"))
+  }
+}
+
 ## Reject Docker images that are not a native arm64 execution substrate.
 export proc verify_arm64_image(value: DockerConfig) [process, error] {
   let output = run.text $value.docker image inspect --format "{{.Architecture}}" $value.image ?
-  let architecture = output.trim()
+  require_arm64_image_architecture(output.trim())?
+}
 
-  if architecture != "arm64" {
-    return Err(types.LaputaError.Docker(f"${value.image} reports ${architecture}; native arm64 is required"))
+## Run a profile-owned Docker command only after the runner image proves it is arm64.
+export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] {
+  verify_arm64_image(value)?
+  let status = process.run(command(value, inner_argv)?)?
+
+  if ! status.ok {
+    return Err(types.LaputaError.Docker(f"Docker command failed for ${value.image}"))
   }
+}
+
+## Run the sole profile PM-plan adapter through the checked native arm64 runner.
+export proc docker_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
+  docker_run(value, docker_pm_plan_argv(profile))?
 }
