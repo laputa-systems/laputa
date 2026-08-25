@@ -1,0 +1,68 @@
+##! The one canonical Laputa graphical QEMU reference system profile.
+use laputa.types as types
+
+## The direct package intent for a real dwl and foot system; dependencies are resolved by PM.
+export let profile: types.SystemProfile = {
+  name: "qemu-dwl-foot",
+  target: types.Aarch64LinuxMusl,
+  package_roots: [
+    "baselayout",
+    "xsh",
+    "laputa-pm",
+    "xinit",
+    "mdevd",
+    "seatd",
+    "dwl-minimal",
+    "foot-minimal",
+  ],
+  kernel_package: "linux",
+  kernel_path: p"boot/vmlinuz",
+  session: {
+    compositor: p"/usr/bin/dwl",
+    terminal: p"/usr/bin/foot",
+    interactive_argv: ["dwl", "-s", "/usr/bin/foot /bin/xshi --no-config"],
+    proof_argv: ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/qemu-dwl-foot-proof.xsh"],
+  },
+  qemu: {
+    machine: "virt,accel=hvf,highmem=off",
+    cpu: "host",
+    smp: 2,
+    memory: "1536M",
+    width: 1280,
+    height: 800,
+  },
+  proof: {
+    success_markers: ["LAPUTA_DWL_FOOT_PROOF_OK"],
+    failure_markers: [
+      "Kernel panic",
+      "not syncing",
+      "Attempted to kill init",
+      "Insufficient stack space",
+      "LAPUTA_DWL_FOOT_PROOF_FAILED",
+    ],
+    input_text: "laputa",
+    screenshot_required: true,
+  },
+  forbidden_packages: [
+    "llvm-toolchain",
+    "pkgconf",
+    "cmake",
+    "muon",
+    "samurai",
+    "m4",
+    "flex",
+    "bison",
+    "wayland-dev",
+    "wayland-protocols",
+    "pixman-dev",
+    "dbus",
+    "systemd",
+    "xwayland",
+    "gtk",
+    "pango",
+    "pipewire",
+    "pulseaudio",
+    "python",
+  ],
+  forbidden_sonames: ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"],
+}
