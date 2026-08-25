@@ -79,7 +79,7 @@ This removes only `target/laputa/qemu-dwl-foot`; it must not remove the immutabl
 
 ## Verify the artifact store
 
-The profile CLI intentionally has no top-level store command. Run the exact Docker-backed PM command exposed by the system adapter:
+The final public Laputa CLI intentionally has no store command. Invoke the PM verifier inside the Docker runner:
 
 ```bash
 cd "$HOME/d/laputa-systems/laputa"
@@ -89,7 +89,7 @@ docker run --rm --platform linux/arm64 \
   pm store verify --store /artifacts
 ```
 
-Every artifact must verify. This command is the documented Laputa adapter for `pm store verify --store STORE`; it does not publish or mutate the repository.
+Every artifact must verify. This is `pm store verify --store STORE` running in the Docker build environment; it does not publish or mutate the repository.
 
 ## Inspect a root generation
 
