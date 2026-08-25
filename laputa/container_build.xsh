@@ -68,6 +68,10 @@ pure container_overlay_root(name: Str) -> Path {
   fp"/src/laputa/profiles/${name}"
 }
 
+pure container_guest_proof_source() -> Path {
+  p"/src/laputa/guest/qemu-dwl-foot-proof.xsh"
+}
+
 pure container_store_root() -> Path {
   p"/artifacts"
 }
@@ -117,9 +121,26 @@ proc container_load_request() [fs, error] -> Result[ContainerProfileBuildRequest
   value
 }
 
-proc container_load_generation_plan(request: ContainerProfileBuildRequest) [fs, error] -> Result[pm_types.GenerationPlan] {
+proc container_prepare_overlay(request: ContainerProfileBuildRequest, work: Path) [fs, error] -> Result[Path] {
+  let source = container_overlay_root(request.name)
+  let overlay = fp"${work}/overlay"
+  let guest_proof = container_guest_proof_source()
+
+  if ! fs.exists(source)? or fs.metadata(source)?.kind != "dir" {
+    return Err(ContainerBuildError.Failed(f"profile overlay is missing: ${source}"))
+  }
+
+  if ! fs.exists(guest_proof)? or fs.metadata(guest_proof)?.kind != "file" {
+    return Err(ContainerBuildError.Failed(f"guest proof source is missing: ${guest_proof}"))
+  }
+
+  let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
+  fs.install(guest_proof, fp"${overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)?
+  overlay
+}
+
+proc container_load_generation_plan(request: ContainerProfileBuildRequest, overlay: Path) [fs, error] -> Result[pm_types.GenerationPlan] {
   let value = pm_plan_json.read(container_build_plan_path())?
-  let overlay = container_overlay_root(request.name)
   let profile = pm_generation.overlay_profile(overlay)?
 
   if profile.name != request.name {
@@ -143,7 +164,7 @@ proc container_publish_generation_receipt(root: Path, expected: pm_types.Generat
   fs.write_atomic(container_generation_receipt_path(), fs.read_text(fp"${root}/var/lib/laputa/generation.json")?)?
 }
 
-proc container_ensure_generation(value: pm_types.GenerationPlan, request: ContainerProfileBuildRequest) [fs, error] -> Result[pm_types.GenerationReceipt] {
+proc container_ensure_generation(value: pm_types.GenerationPlan, overlay: Path) [fs, error] -> Result[pm_types.GenerationReceipt] {
   let root = container_generation_root(value.generation_sha256)
 
   if fs.exists(root)? {
@@ -156,7 +177,7 @@ proc container_ensure_generation(value: pm_types.GenerationPlan, request: Contai
     return receipt
   }
 
-  let receipt = pm_generation.compose(value, container_store_root(), root, container_overlay_root(request.name))?
+  let receipt = pm_generation.compose(value, container_store_root(), root, overlay)?
   pm_generation.verify_generation(root, receipt)?
   container_publish_generation_receipt(root, receipt)?
   receipt
@@ -249,9 +270,12 @@ proc container_execute_profile(request: ContainerProfileBuildRequest, jobs: Int)
   let urls = pm_remote.load_repo_urls()?
   let remote_repo = if urls.repo != "" { urls.repo } else { urls.public_repo }
   let _ = pm_execute.build_plan(plan_value, container_package_root(), container_store_root(), remote_repo, jobs)?
-  let generation = container_load_generation_plan(request)?
+  let handle = fs.tempdir()?
+  defer fs.close_root(handle)?
+  let overlay = container_prepare_overlay(request, fs.root_path(handle)?)?
+  let generation = container_load_generation_plan(request, overlay)?
   container_write_generation_plan(generation)?
-  let receipt = container_ensure_generation(generation, request)?
+  let receipt = container_ensure_generation(generation, overlay)?
   let root = container_generation_root(receipt.generation_sha256)
   container_require_no_forbidden_packages(receipt, request)?
   container_require_no_forbidden_sonames(root, request)?
@@ -274,7 +298,10 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
   }
 
   if argv[0] == "plan" {
-    container_write_generation_plan(container_load_generation_plan(request)?)?
+    let handle = fs.tempdir()?
+    defer fs.close_root(handle)?
+    let overlay = container_prepare_overlay(request, fs.root_path(handle)?)?
+    container_write_generation_plan(container_load_generation_plan(request, overlay)?)?
     return
   }
 

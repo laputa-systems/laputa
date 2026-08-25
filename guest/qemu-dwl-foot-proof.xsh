@@ -2,64 +2,97 @@
 #!/bin/xsh
 error GuestProofError = Failed(phase: Str, message: Str)
 
-proc console(message: Str) [fs, error] {
+proc guest_console(message: Str) [fs, error] {
   fs.write(/dev/console, f"${message}\n")?
 }
 
-proc fail(phase: Str, message: Str) [fs, error] {
-  console(f"LAPUTA_DWL_FOOT_PROOF_FAILED ${phase}: ${message}")?
+proc guest_fail(phase: Str, message: Str) [fs, error] {
+  guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED ${phase}: ${message}")?
   return Err(GuestProofError.Failed(phase, message))
 }
 
-proc wait_for(path_value: Path, seconds: Int) [fs, time, error] {
+proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error] {
   var elapsed = 0
   while ! fs.exists(path_value)? {
     if elapsed >= seconds {
-      fail("wait", f"missing ${path_value}")?
+      guest_fail(phase, f"missing ${path_value}")?
     }
     time.sleep(1s)?
     elapsed += 1
   }
 }
 
+proc guest_run_required(command: Command, phase: Str) [fs, process, error] {
+  match process.run(command) {
+    Ok(status) => {
+      if ! status.ok {
+        guest_fail(phase, "command exited unsuccessfully")?
+      }
+    }
+    Err(_) => guest_fail(phase, "command could not start")?
+  }
+}
+
 proc main() [fs, process, time, error] {
-  let mdevd = process.which("mdevd-coldplug")?
+  let mdevd = process.which("mdevd")?
+  let coldplug = process.which("mdevd-coldplug")?
   let seatd = process.which("seatd")?
   let dwl = process.which("dwl")?
   let foot = process.which("foot")?
-  run $mdevd "-O" "4" ?
+  let _mdevd = spawn process.command_argv(
+    mdevd,
+    ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-C"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
+  )?
+  guest_run_required(process.command_argv(coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")?
 
   for device in [p"/dev/input/event0", p"/dev/input/event1"] {
-    wait_for(device, 20)?
+    guest_wait_for(device, "input-devices", 20)?
   }
 
-  let _seatd = spawn process.command_argv(seatd, ["seatd", "-g", "video"])?
-  wait_for(p"/run/seatd.sock", 20)?
-  fs.mkdir(p"/run/user/0")?
+  fs.remove(p"/run/seatd.sock", missing_ok: true)?
+  let _seatd = spawn process.command_argv(seatd, ["seatd", "-g", "seat"], env: {PATH: "/usr/local/bin:/usr/bin:/bin"})?
+  guest_wait_for(p"/run/seatd.sock", "seatd", 20)?
+  if ! fs.exists(p"/run/user/0")? {
+    fs.mkdir(p"/run/user/0")?
+  }
   fs.chmod(p"/run/user/0", 0o700)?
+  fs.remove(p"/run/laputa-foot-input.txt", missing_ok: true)?
+  fs.remove(p"/run/laputa-foot-read-ready", missing_ok: true)?
   fs.write(
     p"/run/laputa-foot-read.xsh",
     """#!/bin/xsh
+fs.write(p"/run/laputa-foot-read-ready", "ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
 let input = io.stdin().read_to_end()?.utf8()?
 fs.write(p"/run/laputa-foot-input.txt", input)?
 """,
   )?
   fs.chmod(p"/run/laputa-foot-read.xsh", 0o755)?
-  console("LAPUTA_DWL_FOOT_PROOF_READY")?
   let command = process.command_argv(
     dwl,
     ["dwl", "-s", f"${foot} /bin/xsh /run/laputa-foot-read.xsh"],
-    env: {XDG_RUNTIME_DIR: "/run/user/0", WLR_BACKENDS: "drm,libinput", WLR_RENDERER: "pixman"},
+    env: {
+      PATH: "/usr/local/bin:/usr/bin:/bin",
+      XDG_RUNTIME_DIR: "/run/user/0",
+      LIBSEAT_BACKEND: "seatd",
+      SEATD_SOCK: "/run/seatd.sock",
+      WLR_BACKENDS: "drm,libinput",
+      WLR_RENDERER: "pixman",
+    },
   )
   let compositor = spawn command?
   let _ = compositor
-  wait_for(p"/run/laputa-foot-input.txt", 90)?
+  # This appears only after dwl has started foot and foot has started its
+  # stdin reader.  The host sends QMP keyboard input only after this boundary.
+  guest_wait_for(p"/run/laputa-foot-read-ready", "foot", 30)?
+  guest_console("LAPUTA_DWL_FOOT_PROOF_READY")?
+  guest_wait_for(p"/run/laputa-foot-input.txt", "input", 90)?
   let input = fs.read_text(p"/run/laputa-foot-input.txt")?.trim()
   if input != "laputa" {
-    fail("input", f"expected laputa, got ${input}")?
+    guest_fail("input", f"expected laputa, got ${input}")?
   }
-  console("LAPUTA_DWL_FOOT_PROOF_OK")?
+  guest_console("LAPUTA_DWL_FOOT_PROOF_OK")?
 }
 
 main()?

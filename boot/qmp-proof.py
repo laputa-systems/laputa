@@ -52,6 +52,11 @@ def screenshot(sock_path, shot):
     print("laputa-qemu-qmp-screenshot ok")
 
 
+def ready(sock_path):
+    with_qmp(sock_path, lambda _sock: None)
+    print("laputa-qemu-qmp-ready ok")
+
+
 def input_proof(sock_path):
     def run(sock):
         for key in ["l", "a", "p", "u", "t", "a", "ret"]:
@@ -82,6 +87,12 @@ def main(argv):
 
     if mode == "input":
         input_proof(sock_path)
+        return
+
+    if mode == "ready":
+        if len(argv) != 3:
+            raise SystemExit("usage: qmp-proof.py ready SOCKET")
+        ready(sock_path)
         return
 
     raise SystemExit(f"unknown qmp proof mode {mode}")
