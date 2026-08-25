@@ -95,8 +95,8 @@ export proc load(name: Str, profiles_root: Path) [fs, error] -> Result[types.Sys
     return Err(types.LaputaError.Profile(f"unknown profile ${name}"))
   }
 
-  let exports = module.load(source)?
-  let value = exports.get("profile")?.require(types.SystemProfile)?
+  let exports = module.load(source)?.require(SystemProfileModule)?
+  let value = exports.profile
   validate(value)?
   value
 }
