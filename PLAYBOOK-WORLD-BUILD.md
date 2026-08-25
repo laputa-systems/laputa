@@ -264,11 +264,10 @@ make installer-image
 make installer-qemu-test
 ```
 
-For browser/session proofs:
+For desktop proofs:
 
 ```bash
 make dwl-foot-minimal-test
-make waterfox-test
 ```
 
 ## Linux Kbuild Planner Oracle

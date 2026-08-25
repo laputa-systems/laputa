@@ -1,5 +1,5 @@
 .PHONY: boot boot-userspace-e2e boot-tailscale-test proof-kernel ensure-proof-kernel build-essential-native packages-builder ensure-build-essential-native ensure-world-xsh ensure-world-docker-volumes world-build world-build-aarch64 world-build-amd64 world-smoke-amd64 amd64-package-test linux-amd64-config linux-amd64-prepare-proof linux-amd64-discover-proof linux-amd64-plan-proof linux-amd64-compile-proof linux-amd64-link-proof linux-amd64-package-proof linux-amd64-object linux-amd64-sources linux-amd64-cache linux-amd64-kconfig-proof package-test package-deps-test linux-plan-only linux-kbuild-oracle package-publish package-publish-userspace-arm64 pkgconf-test cmake-test samurai-test \
-        dropbear-test tmux-test linux-pam-test sudo-rs-test iptables-test tailscale-test less-test dwl-foot-minimal-test ensure-dwl-foot-minimal-proof dwl-foot-minimal-qemu-debug waterfox-test ensure-waterfox-proof waterfox-qemu-test proof-rootfs \
+        dropbear-test tmux-test linux-pam-test sudo-rs-test iptables-test tailscale-test less-test dwl-foot-minimal-test ensure-dwl-foot-minimal-proof dwl-foot-minimal-qemu-debug proof-rootfs \
         scratch-build-env installer-image installer-image-aarch64 installer-image-amd64 installer-image-x86_64 installer-qemu-test installer-qemu-test-aarch64 installer-qemu-test-amd64 installer-qemu-test-x86_64 installer-qemu-manual ensure-host-xsh ensure-host-xsh-release ensure-package-docker-volumes _world-build-amd64
 
 LAPUTA_DOCKER_PLATFORM ?= linux/arm64
@@ -415,35 +415,11 @@ ensure-dwl-foot-minimal-proof:
 
 dwl-foot-minimal-qemu-debug: ensure-dwl-foot-minimal-proof
 	XSH_BOOT_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_DEBUG=1 \
+	XSH_BOOT_QEMU_PROOF=1 \
+	XSH_BOOT_QEMU_DEBUG=1 \
 	XSH_BOOT_ATTACH=0 \
 	XSH_BOOT_ROOTFS_IMAGE=$${XSH_BOOT_ROOTFS_IMAGE:-laputa-dwl-foot-minimal-proof} \
 	XSH_BOOT_CONSOLE_TIMEOUT=$${XSH_BOOT_CONSOLE_TIMEOUT:-40} \
-	xsh boot.xsh
-
-waterfox-test: ensure-dwl-foot-minimal-proof
-	docker build --build-arg PACKAGE_TOOLS_IMAGE=$(PACKAGE_TOOLS_IMAGE) \
-	    --build-arg DWL_FOOT_IMAGE=laputa-dwl-foot-minimal-proof:latest \
-	    --build-context packages=$(LAPUTA_PACKAGES_ROOT) \
-	    -t laputa-waterfox-proof \
-	    -f Dockerfile.waterfox .
-
-ensure-waterfox-proof:
-	@docker image inspect laputa-waterfox-proof:latest >/dev/null 2>&1 || $(MAKE) waterfox-test
-
-waterfox-qemu-test: ensure-waterfox-proof ensure-proof-kernel
-	XSH_BOOT_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_BROWSER_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_AUDIO_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_CLIPBOARD_PROOF=1 \
-	XSH_BOOT_WATERFOX_QEMU_MESA_PROOF=1 \
-	XSH_BOOT_ATTACH=0 \
-	XSH_BOOT_ROOTFS_IMAGE=$${XSH_BOOT_ROOTFS_IMAGE:-laputa-waterfox-proof} \
-	XSH_BOOT_QEMU_DISPLAY=$${XSH_BOOT_QEMU_DISPLAY:-none} \
-	XSH_BOOT_QEMU_GPU_DEVICE=$${XSH_BOOT_QEMU_GPU_DEVICE:-virtio} \
-	XSH_BOOT_CONSOLE_TIMEOUT=$${XSH_BOOT_CONSOLE_TIMEOUT:-320} \
 	xsh boot.xsh
 
 PKGNAME ?= pkgconf

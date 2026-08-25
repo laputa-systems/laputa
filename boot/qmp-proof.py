@@ -67,7 +67,7 @@ def screenshot(sock_path, shot):
         qmp_cmd(sock, "human-monitor-command", {"command-line": f"screendump {shot}"})
 
     with_qmp(sock_path, run)
-    print("waterfox-qemu-qmp-screenshot ok")
+    print("laputa-qemu-qmp-screenshot ok")
 
 
 def input_proof(sock_path):
@@ -88,24 +88,11 @@ def input_proof(sock_path):
         for key in ["l", "a", "p", "u", "t", "a", "ret", "ctrl-d"]:
             result = qmp_cmd(sock, "human-monitor-command", {"command-line": f"sendkey {key}"})
             if result:
-                print(f"waterfox-qemu-hmp-sendkey {key}: {result!r}")
+                print(f"laputa-qemu-hmp-sendkey {key}: {result!r}")
             time.sleep(0.08)
 
     with_qmp(sock_path, run)
-    print("waterfox-qemu-qmp-input ok")
-
-
-def browser_proof(sock_path):
-    def run(sock):
-        hmp_key(sock, "ctrl-l")
-        for key in [
-            "h", "t", "t", "p", "s", "shift-semicolon", "slash", "slash",
-            "e", "x", "a", "m", "p", "l", "e", "dot", "c", "o", "m", "slash", "ret",
-        ]:
-            hmp_key(sock, key)
-
-    with_qmp(sock_path, run)
-    print("waterfox-qemu-browser-qmp-input ok")
+    print("laputa-qemu-qmp-input ok")
 
 
 def main(argv):
@@ -123,10 +110,6 @@ def main(argv):
 
     if mode == "input":
         input_proof(sock_path)
-        return
-
-    if mode == "browser":
-        browser_proof(sock_path)
         return
 
     raise SystemExit(f"unknown qmp proof mode {mode}")

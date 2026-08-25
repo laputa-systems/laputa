@@ -18,7 +18,7 @@ The first real-hardware profile should provide:
   USB HID, Intel HDA audio, Intel Wi-Fi, and Dell laptop platform support;
 - `/dev/dri/card0` and `/dev/dri/renderD128` populated by the device layer;
 - `seatd`, `libseat`, `libudev-zero`, `libinput`, `dwl`, and the existing
-  Wayland Waterfox session;
+  Wayland compositor and terminal session;
 - Mesa EGL/GLES/GBM with `/usr/lib/dri/iris_dri.so`;
 - a software fallback DRI driver, preferably `swrast_dri.so`;
 - no GLX, X11, XCB, Vulkan, OpenCL, desktop tools, tests, demos, or docs in the
@@ -179,7 +179,7 @@ The package proof should require:
    depends on `mesa-intel`. Do not change `wlroots0.19-mesa` until the real
    Mesa package is proved.
 4. Add an XPS rootfs/image profile that installs `mesa-intel`, the compositor
-   profile, the current Waterfox Wayland session, and `libva`.
+   profile and the current Wayland session.
 5. Build and upload the amd64 packages.
 6. Build the amd64 installer ISO:
 
@@ -208,7 +208,6 @@ Expected first-pass result:
 - the `laputa` user can access the render node through seat/device policy;
 - `xps-preflight.xsh` passes;
 - `dwl` starts with `WLR_RENDERER=gles2`;
-- Waterfox starts on Wayland after the compositor is stable.
 
 ## Open Work
 

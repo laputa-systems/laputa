@@ -50,8 +50,8 @@ proc settle_devices(log: Path, label: Str) [fs, process, time, error] {
     match process.run(
       process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"], env: {PATH: "/bin:/usr/bin"}),
     ) {
-      Ok(_) => append_line(log, f"waterfox-qemu ${label} mdevd-coldplug ok")?
-      Err(_) => append_line(log, f"waterfox-qemu ${label} mdevd-coldplug failed")?
+      Ok(_) => append_line(log, f"laputa-qemu ${label} mdevd-coldplug ok")?
+      Err(_) => append_line(log, f"laputa-qemu ${label} mdevd-coldplug failed")?
     }
 
     time.sleep(500ms)?
@@ -63,7 +63,7 @@ proc settle_devices(log: Path, label: Str) [fs, process, time, error] {
     let _ = spawn process.command_argv(/usr/bin/udevd, ["udevd", "--daemon"], env: {PATH: "/bin:/usr/bin"})?
     run /usr/bin/udevadm "trigger" "--action=add" ?
     run /usr/bin/udevadm "settle" "--timeout=10" ?
-    append_line(log, f"waterfox-qemu ${label} udev-settle ok")?
+    append_line(log, f"laputa-qemu ${label} udev-settle ok")?
     time.sleep(500ms)?
   }
 }
@@ -144,41 +144,31 @@ proc wait_for_socket(path_value: Path) [fs, time, error] {
     tries -= 1
   }
 
-  return Err(ProofError.Failed("waterfox-qemu-seatd", f"seatd did not create ${path_value.display()}"))
+  return Err(ProofError.Failed("laputa-qemu-seatd", f"seatd did not create ${path_value.display()}"))
 }
 
-proc waterfox_foot_input_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_INPUT_PROOF") ?? "0").trim()
+proc qemu_foot_input_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_QEMU_INPUT_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_debug_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_DEBUG") ?? "0").trim()
+proc qemu_debug_enabled() [env] -> Bool {
+  let value = (env.get("XSH_QEMU_DEBUG") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_foot_shell_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_FOOT_SHELL") ?? "0").trim()
+proc qemu_foot_shell_enabled() [env] -> Bool {
+  let value = (env.get("XSH_QEMU_FOOT_SHELL") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_browser_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_BROWSER_PROOF") ?? "0").trim()
+proc qemu_audio_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_QEMU_AUDIO_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_clipboard_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_CLIPBOARD_PROOF") ?? "0").trim()
-  return value == "1" or value == "true" or value == "yes" or value == "on"
-}
-
-proc waterfox_qemu_audio_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_AUDIO_PROOF") ?? "0").trim()
-  return value == "1" or value == "true" or value == "yes" or value == "on"
-}
-
-proc waterfox_qemu_mesa_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_WATERFOX_QEMU_MESA_PROOF") ?? "0").trim()
+proc qemu_mesa_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_QEMU_MESA_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
@@ -187,11 +177,11 @@ proc write_foot_input_script(script: Path) [fs, error] {
     script,
     """#!/bin/xsh
 proc main() [fs, io, time, error] {
-  fs.write(/run/waterfox-foot-input-started.txt, "started")?
+  fs.write(/run/laputa-foot-input-started.txt, "started")?
   print "LAPUTA STAGE11 FOOT INPUT PROOF"
   print "type laputa and send EOF"
   let data = io.stdin_text()?
-  fs.write(/run/waterfox-foot-input.txt, data)?
+  fs.write(/run/laputa-foot-input.txt, data)?
   time.sleep(2s)?
 }
 
@@ -226,16 +216,16 @@ main(@args)?
 
 proc append_command_output(log: Path, label: Str, command: Path, args: List[Str]) [fs, process, error] {
   match run.text $command @args {
-    Ok(out) => append_line(log, f"waterfox-qemu-debug ${label}: ${out.trim()}")?
-    Err(err) => append_line(log, f"waterfox-qemu-debug ${label}: failed: ${err.message}")?
+    Ok(out) => append_line(log, f"laputa-qemu-debug ${label}: ${out.trim()}")?
+    Err(err) => append_line(log, f"laputa-qemu-debug ${label}: failed: ${err.message}")?
   }
 }
 
 proc append_path_text(log: Path, label: Str, path_value: Path) [fs, error] {
   if fs.exists(path_value)? {
-    append_line(log, f"waterfox-qemu-debug ${label}: ${fs.read_text(path_value)?.trim()}")?
+    append_line(log, f"laputa-qemu-debug ${label}: ${fs.read_text(path_value)?.trim()}")?
   } else {
-    append_line(log, f"waterfox-qemu-debug ${label}: missing")?
+    append_line(log, f"laputa-qemu-debug ${label}: missing")?
   }
 }
 
@@ -251,7 +241,7 @@ proc dump_debug_state(log: Path) [fs, process, error] {
 
 proc verify_libinput_devices(log: Path) [fs, process, time, error] {
   settle_devices(log, "input")?
-  wait_for_path(/dev/input, "waterfox-qemu-input", "missing /dev/input after device settle")?
+  wait_for_path(/dev/input, "laputa-qemu-input", "missing /dev/input after device settle")?
   var event_count = 0
 
   for entry in fs.ls(/dev/input)? {
@@ -260,7 +250,7 @@ proc verify_libinput_devices(log: Path) [fs, process, time, error] {
     }
   }
 
-  ensure(event_count >= 2, "waterfox-qemu-input", f"expected at least two evdev nodes, saw ${event_count}")?
+  ensure(event_count >= 2, "laputa-qemu-input", f"expected at least two evdev nodes, saw ${event_count}")?
   var devices = ""
   var tries = 20
 
@@ -273,21 +263,21 @@ proc verify_libinput_devices(log: Path) [fs, process, time, error] {
     tries -= 1
   }
 
-  ensure("Device:" in devices, "waterfox-qemu-libinput", "libinput listed no devices")?
+  ensure("Device:" in devices, "laputa-qemu-libinput", "libinput listed no devices")?
 
   ensure(
     "Keyboard" in devices or "keyboard" in devices,
-    "waterfox-qemu-libinput",
+    "laputa-qemu-libinput",
     f"libinput did not list a keyboard: ${devices.trim()}",
   )?
 
   ensure(
     "Mouse" in devices or "mouse" in devices or "Pointer" in devices or "pointer" in devices or "Touchscreen" in devices or "touchscreen" in devices or "Tablet" in devices or "tablet" in devices,
-    "waterfox-qemu-libinput",
+    "laputa-qemu-libinput",
     f"libinput did not list a pointer: ${devices.trim()}",
   )?
 
-  append_line(log, f"waterfox-qemu libinput devices=${event_count}")?
+  append_line(log, f"laputa-qemu libinput devices=${event_count}")?
 }
 
 proc run_dwl_debug(log: Path) [fs, process, time, error] {
@@ -302,16 +292,16 @@ proc run_dwl_debug(log: Path) [fs, process, time, error] {
 
   defer terminate_if_live(seatd.pid)
   wait_for_socket(seatd_socket)?
-  let runtime_dir = /run/waterfox-qemu-runtime
+  let runtime_dir = /run/laputa-qemu-runtime
   ensure_dir(runtime_dir, 0o700)?
-  let foot_visual_script = /run/waterfox-foot-visual.xsh
+  let foot_visual_script = /run/laputa-foot-visual.xsh
   write_foot_visual_script(foot_visual_script)?
   dump_debug_state(log)?
-  append_line(log, "waterfox-qemu-debug launch-dwl-foot-visual")?
+  append_line(log, "laputa-qemu-debug launch-dwl-foot-visual")?
 
   let command = process.command_argv(
     /usr/bin/dwl,
-    ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/waterfox-foot-visual.xsh"],
+    ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/laputa-foot-visual.xsh"],
     env: {
       LIBSEAT_BACKEND: "seatd",
       PATH: "/bin:/usr/bin",
@@ -330,9 +320,9 @@ proc run_dwl_debug(log: Path) [fs, process, time, error] {
   let compositor = spawn command?
   defer terminate_if_live(compositor.pid)
   time.sleep(8s)?
-  console_marker("waterfox-qemu debug done")?
+  console_marker("laputa-qemu debug done")?
   time.sleep(8s)?
-  append_line(log, "waterfox-qemu-debug dwl-live-window-ok")?
+  append_line(log, "laputa-qemu-debug dwl-live-window-ok")?
 }
 
 proc run_dwl_foot_shell(log: Path) [fs, process, time, error] {
@@ -347,10 +337,10 @@ proc run_dwl_foot_shell(log: Path) [fs, process, time, error] {
 
   defer terminate_if_live(seatd.pid)
   wait_for_socket(seatd_socket)?
-  let runtime_dir = /run/waterfox-qemu-runtime
+  let runtime_dir = /run/laputa-qemu-runtime
   ensure_dir(runtime_dir, 0o700)?
   dump_debug_state(log)?
-  append_line(log, "waterfox-qemu launch-dwl-foot-shell")?
+  append_line(log, "laputa-qemu launch-dwl-foot-shell")?
 
   let command = process.command_argv(
     /usr/bin/dwl,
@@ -370,63 +360,14 @@ proc run_dwl_foot_shell(log: Path) [fs, process, time, error] {
   )
 
   let compositor = spawn command?
-  console_marker("waterfox-qemu foot-shell-ready")?
+  console_marker("laputa-qemu foot-shell-ready")?
   let status = wait compositor?
-  ensure(status.ok, "waterfox-qemu-dwl", "dwl foot shell exited non-zero")?
-}
-
-proc run_waterfox_browser_proof(log: Path) [fs, process, time, error] {
-  ensure(fs.exists(/usr/bin/waterfox-dwl-session)?, "waterfox-qemu-browser", "missing waterfox-dwl-session")?
-  ensure(fs.exists(/usr/bin/waterfox)?, "waterfox-qemu-browser", "missing waterfox wrapper")?
-  ensure(fs.exists(/opt/waterfox/waterfox-bin)?, "waterfox-qemu-browser", "missing waterfox-bin")?
-  append_line(log, "waterfox-qemu launch-waterfox-session")?
-
-  let session = spawn process.command_argv(
-    /usr/bin/waterfox-dwl-session,
-    ["waterfox-dwl-session"],
-    env: {PATH: "/bin:/usr/bin"},
-    timeout: 110s,
-  )?
-
-  console_marker("waterfox-qemu browser-session-ready")?
-
-  match wait session {
-    Err(ProcessError.Timeout {message: _}) => append_line(log, "waterfox-qemu browser-session timeout-ok")?
-    Err(e) => return Err(ProofError.Failed("waterfox-qemu-browser", f"browser session wait failed: ${e.message}"))
-    Ok(status) => ensure(status.ok, "waterfox-qemu-browser", "browser session exited non-zero before proof timeout")?
-  }
-}
-
-proc run_waterfox_clipboard_proof(log: Path) [fs, process, time, error] {
-  ensure(fs.exists(/usr/bin/waterfox-dwl-session)?, "waterfox-qemu-clipboard", "missing waterfox-dwl-session")?
-
-  ensure(
-    fs.exists(/usr/bin/waterfox-session-clipboard-proof)?,
-    "waterfox-qemu-clipboard",
-    "missing clipboard proof launcher",
-  )?
-
-  ensure(fs.exists(/usr/bin/wl-copy)?, "waterfox-qemu-clipboard", "missing wl-copy")?
-  ensure(fs.exists(/usr/bin/wl-paste)?, "waterfox-qemu-clipboard", "missing wl-paste")?
-  append_line(log, "waterfox-qemu launch-clipboard-session")?
-
-  let session = spawn process.command_argv(
-    /usr/bin/waterfox-dwl-session,
-    ["waterfox-dwl-session", "clipboard"],
-    env: {PATH: "/bin:/usr/bin"},
-    timeout: 80s,
-  )?
-
-  match wait session {
-    Err(ProcessError.Timeout {message: _}) => append_line(log, "waterfox-qemu clipboard-session timeout-ok")?
-    Err(e) => return Err(ProofError.Failed("waterfox-qemu-clipboard", f"clipboard session wait failed: ${e.message}"))
-    Ok(status) => ensure(status.ok, "waterfox-qemu-clipboard", "clipboard session exited non-zero before proof timeout")?
-  }
+  ensure(status.ok, "laputa-qemu-dwl", "dwl foot shell exited non-zero")?
 }
 
 proc verify_alsa_virtio_device(log: Path) [fs, process, time, error] {
-  ensure(fs.exists(/usr/bin/aplay)?, "waterfox-qemu-audio", "missing aplay")?
-  console_marker("waterfox-qemu audio probe start")?
+  ensure(fs.exists(/usr/bin/aplay)?, "laputa-qemu-audio", "missing aplay")?
+  console_marker("laputa-qemu audio probe start")?
   settle_sound_devices(log)?
   var cards = ""
   var devices = ""
@@ -442,9 +383,9 @@ proc verify_alsa_virtio_device(log: Path) [fs, process, time, error] {
       }
 
       if ("VirtIO" in cards or "virtio" in cards or "VIRTIO" in cards) and "card " in devices {
-        append_line(log, f"waterfox-qemu audio cards: ${cards.trim()}")?
-        append_line(log, f"waterfox-qemu audio devices: ${devices.trim()}")?
-        console_marker("waterfox-qemu audio ok")?
+        append_line(log, f"laputa-qemu audio cards: ${cards.trim()}")?
+        append_line(log, f"laputa-qemu audio devices: ${devices.trim()}")?
+        console_marker("laputa-qemu audio ok")?
         return
       }
     }
@@ -453,22 +394,22 @@ proc verify_alsa_virtio_device(log: Path) [fs, process, time, error] {
     tries -= 1
   }
 
-  console_marker(f"waterfox-qemu audio failed cards=${cards.trim()} aplay=${devices.trim()}")?
+  console_marker(f"laputa-qemu audio failed cards=${cards.trim()} aplay=${devices.trim()}")?
 
   return Err(
-    ProofError.Failed("waterfox-qemu-audio", f"no virtio ALSA device; cards=${cards.trim()} aplay=${devices.trim()}"),
+    ProofError.Failed("laputa-qemu-audio", f"no virtio ALSA device; cards=${cards.trim()} aplay=${devices.trim()}"),
   )
 }
 
 proc verify_mesa_runtime(log: Path) [fs, error] {
   for lib in [/usr/lib/libEGL.so.1, /usr/lib/libGLESv2.so.2, /usr/lib/libgbm.so.1] {
-    ensure(fs.exists(lib)?, "waterfox-qemu-mesa", f"missing ${lib.display()}")?
+    ensure(fs.exists(lib)?, "laputa-qemu-mesa", f"missing ${lib.display()}")?
   }
 
-  ensure(! fs.exists(/usr/lib/libGLX.so.0)?, "waterfox-qemu-mesa", "libGLX must not be installed")?
-  ensure(! fs.exists(/usr/lib/libvulkan.so.1)?, "waterfox-qemu-mesa", "libvulkan must not be installed")?
-  ensure(fs.exists(/usr/lib/libva.so.2)?, "waterfox-qemu-mesa", "libva must be installed for VA-API runtime support")?
-  append_line(log, "waterfox-qemu mesa runtime ok")?
+  ensure(! fs.exists(/usr/lib/libGLX.so.0)?, "laputa-qemu-mesa", "libGLX must not be installed")?
+  ensure(! fs.exists(/usr/lib/libvulkan.so.1)?, "laputa-qemu-mesa", "libvulkan must not be installed")?
+  ensure(fs.exists(/usr/lib/libva.so.2)?, "laputa-qemu-mesa", "libva must be installed for VA-API runtime support")?
+  append_line(log, "laputa-qemu mesa runtime ok")?
 }
 
 proc run_dwl_mesa_proof(log: Path) [fs, process, time, error] {
@@ -484,16 +425,16 @@ proc run_dwl_mesa_proof(log: Path) [fs, process, time, error] {
 
   defer terminate_if_live(seatd.pid)
   wait_for_socket(seatd_socket)?
-  let runtime_dir = /run/waterfox-qemu-runtime
+  let runtime_dir = /run/laputa-qemu-runtime
   ensure_dir(runtime_dir, 0o700)?
-  let foot_visual_script = /run/waterfox-foot-visual.xsh
+  let foot_visual_script = /run/laputa-foot-visual.xsh
   write_foot_visual_script(foot_visual_script)?
   dump_debug_state(log)?
-  append_line(log, "waterfox-qemu launch-dwl-foot-mesa")?
+  append_line(log, "laputa-qemu launch-dwl-foot-mesa")?
 
   let command = process.command_argv(
     /usr/bin/dwl,
-    ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/waterfox-foot-visual.xsh"],
+    ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/laputa-foot-visual.xsh"],
     env: {
       GALLIUM_DRIVER: "softpipe",
       LIBGL_ALWAYS_SOFTWARE: "1",
@@ -516,8 +457,8 @@ proc run_dwl_mesa_proof(log: Path) [fs, process, time, error] {
   let compositor = spawn command?
   defer terminate_if_live(compositor.pid)
   time.sleep(14s)?
-  append_line(log, "waterfox-qemu mesa dwl-live-window-ok")?
-  console_marker("waterfox-qemu mesa ok")?
+  append_line(log, "laputa-qemu mesa dwl-live-window-ok")?
+  console_marker("laputa-qemu mesa ok")?
   time.sleep(8s)?
 }
 
@@ -537,12 +478,12 @@ proc verify_dwl_start(log: Path) [fs, process, env, time, error] {
 
   defer terminate_if_live(seatd.pid)
   wait_for_socket(seatd_socket)?
-  let runtime_dir = /run/waterfox-qemu-runtime
+  let runtime_dir = /run/laputa-qemu-runtime
   ensure_dir(runtime_dir, 0o700)?
-  let input_proof = waterfox_foot_input_proof_enabled()
-  let foot_input_script = /run/waterfox-foot-input.xsh
-  let foot_input = /run/waterfox-foot-input.txt
-  let foot_input_started = /run/waterfox-foot-input-started.txt
+  let input_proof = qemu_foot_input_proof_enabled()
+  let foot_input_script = /run/laputa-foot-input.xsh
+  let foot_input = /run/laputa-foot-input.txt
+  let foot_input_started = /run/laputa-foot-input-started.txt
   var argv = ["dwl"]
 
   if fs.exists(/usr/bin/foot)? {
@@ -550,11 +491,11 @@ proc verify_dwl_start(log: Path) [fs, process, env, time, error] {
       fs.remove(foot_input, missing_ok: true)?
       fs.remove(foot_input_started, missing_ok: true)?
       write_foot_input_script(foot_input_script)?
-      argv = ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/waterfox-foot-input.xsh"]
-      append_line(log, "waterfox-qemu dwl-start foot-input-proof=enabled")?
+      argv = ["dwl", "-s", "/usr/bin/foot /bin/xsh /run/laputa-foot-input.xsh"]
+      append_line(log, "laputa-qemu dwl-start foot-input-proof=enabled")?
     } else {
       argv = ["dwl", "-s", "/usr/bin/foot /usr/bin/true"]
-      append_line(log, "waterfox-qemu dwl-start foot-startup=enabled")?
+      append_line(log, "laputa-qemu dwl-start foot-startup=enabled")?
     }
   }
 
@@ -581,73 +522,60 @@ proc verify_dwl_start(log: Path) [fs, process, env, time, error] {
   let compositor = spawn command?
 
   if input_proof {
-    wait_for_path_slow(foot_input_started, "waterfox-qemu-foot-input", "foot input recorder did not start")?
-    console_marker("waterfox-qemu foot-input-ready")?
-    let typed = wait_for_text(foot_input, "laputa", "waterfox-qemu-foot-input", "foot did not receive sentinel input")?
-    append_line(log, f"waterfox-qemu foot-input text=${typed.trim()}")?
-    append_line(log, "waterfox-qemu foot-input ok")?
-    console_marker("waterfox-qemu foot-input ok")?
+    wait_for_path_slow(foot_input_started, "laputa-qemu-foot-input", "foot input recorder did not start")?
+    console_marker("laputa-qemu foot-input-ready")?
+    let typed = wait_for_text(foot_input, "laputa", "laputa-qemu-foot-input", "foot did not receive sentinel input")?
+    append_line(log, f"laputa-qemu foot-input text=${typed.trim()}")?
+    append_line(log, "laputa-qemu foot-input ok")?
+    console_marker("laputa-qemu foot-input ok")?
     terminate_if_live(compositor.pid)
     return
   }
 
   match wait compositor {
-    Err(ProcessError.Timeout {message: _}) => append_line(log, "waterfox-qemu dwl-start timeout-ok")?
-    Err(e) => return Err(ProofError.Failed("waterfox-qemu-dwl", f"dwl wait failed: ${e.message}"))
+    Err(ProcessError.Timeout {message: _}) => append_line(log, "laputa-qemu dwl-start timeout-ok")?
+    Err(e) => return Err(ProofError.Failed("laputa-qemu-dwl", f"dwl wait failed: ${e.message}"))
     Ok(status) => {
-      ensure(status.ok, "waterfox-qemu-dwl", "dwl exited before the startup window elapsed")?
-      append_line(log, "waterfox-qemu dwl-start exited-ok")?
+      ensure(status.ok, "laputa-qemu-dwl", "dwl exited before the startup window elapsed")?
+      append_line(log, "laputa-qemu dwl-start exited-ok")?
     }
   }
 }
 
-proc verify_waterfox_qemu(log: Path) [fs, process, env, time, error] {
-  let enabled = env.get("XSH_WATERFOX_QEMU_PROOF") ?? "0"
+proc verify_qemu(log: Path) [fs, process, env, time, error] {
+  let enabled = env.get("XSH_QEMU_PROOF") ?? "0"
 
   if enabled.trim() != "1" {
     return
   }
 
-  if waterfox_qemu_audio_proof_enabled() {
+  if qemu_audio_proof_enabled() {
     verify_alsa_virtio_device(log)?
 
-    if ! waterfox_qemu_mesa_proof_enabled() and ! waterfox_qemu_browser_proof_enabled() and ! waterfox_qemu_clipboard_proof_enabled() and ! waterfox_qemu_foot_shell_enabled() and ! waterfox_qemu_debug_enabled() {
+    if ! qemu_mesa_proof_enabled() and ! qemu_foot_shell_enabled() and ! qemu_debug_enabled() {
       return
     }
   }
 
   verify_libinput_devices(log)?
 
-  if waterfox_qemu_mesa_proof_enabled() {
+  if qemu_mesa_proof_enabled() {
     run_dwl_mesa_proof(log)?
   }
 
-  if waterfox_qemu_clipboard_proof_enabled() {
-    run_waterfox_clipboard_proof(log)?
-  }
-
-  if waterfox_qemu_browser_proof_enabled() {
-    run_waterfox_browser_proof(log)?
-    return
-  }
-
-  if waterfox_qemu_clipboard_proof_enabled() {
-    return
-  }
-
-  if waterfox_qemu_foot_shell_enabled() {
+  if qemu_foot_shell_enabled() {
     run_dwl_foot_shell(log)?
     return
   }
 
-  if waterfox_qemu_debug_enabled() {
+  if qemu_debug_enabled() {
     run_dwl_debug(log)?
-    append_line(log, "waterfox-qemu debug ok")?
+    append_line(log, "laputa-qemu debug ok")?
     return
   }
 
   verify_dwl_start(log)?
-  append_line(log, "waterfox-qemu ok")?
+  append_line(log, "laputa-qemu ok")?
 }
 
 proc main(root: Path = /) [fs, process, env, time, error] {
@@ -664,7 +592,7 @@ proc main(root: Path = /) [fs, process, env, time, error] {
 """,
   )?
 
-  verify_waterfox_qemu(proof_log)?
+  verify_qemu(proof_log)?
   print true
 }
 
@@ -673,7 +601,7 @@ match main(@args) {
   Err(err) => {
     match fs.write(
       /dev/console,
-      f"""waterfox-qemu proof failed: ${err.message}
+      f"""laputa-qemu proof failed: ${err.message}
 """,
     ) {
       Ok(_) => {}
@@ -682,7 +610,7 @@ match main(@args) {
 
     match fs.write(
       /dev/kmsg,
-      f"""waterfox-qemu proof failed: ${err.message}
+      f"""laputa-qemu proof failed: ${err.message}
 """,
     ) {
       Ok(_) => {}

@@ -1,7 +1,7 @@
 # Agent Guide
 
 This repository owns Laputa Linux integration: proof images, installer images,
-QEMU harnesses, local Linux iteration helpers, Waterfox/XPS workflows, and the
+QEMU harnesses and local Linux iteration helpers, plus the
 reusable package-build Docker base.
 
 Package manager code and package definitions live in the sibling package repo,
@@ -21,12 +21,10 @@ assembly; override it with `XINIT_SOURCE_ROOT` when using another checkout.
 
 - `Dockerfile.build-essential-native` and
   `Dockerfile.bootstrap-build-essential-native`: reusable package-build bases.
-- `Dockerfile.proof-rootfs`, `Dockerfile.dwl-foot-minimal`, and
-  `Dockerfile.waterfox`: image-level proofs.
+- `Dockerfile.proof-rootfs` and `Dockerfile.dwl-foot-minimal`: image-level proofs.
 - `boot.xsh` and `LINUX.md`: QEMU and Linux iteration/proof workflows.
 - `build-installer-image.xsh`, `installer-qemu-test.xsh`,
   `installer-qemu-manual.xsh`, and `INSTALLER.md`: installer image workflows.
-- `WATERFOX.md` and `XPS.md`: desktop/browser and hardware iteration notes.
 
 For package rules, PM behavior, and package acceptance policy, read
 `~/d/laputa-systems/packages/AGENTS.md`.

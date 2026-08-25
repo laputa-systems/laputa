@@ -1212,14 +1212,12 @@ if proof_stage == "1" and fs.exists(/usr/lib/xinit/proof-stage.xsh)? {
       /,
       {
         XSH_UNIX_DRY_RUN: "0",
-        XSH_WATERFOX_QEMU_AUDIO_PROOF: proof_flag("XSH_WATERFOX_QEMU_AUDIO_PROOF", cmdline),
-        XSH_WATERFOX_QEMU_BROWSER_PROOF: proof_flag("XSH_WATERFOX_QEMU_BROWSER_PROOF", cmdline),
-        XSH_WATERFOX_QEMU_CLIPBOARD_PROOF: proof_flag("XSH_WATERFOX_QEMU_CLIPBOARD_PROOF", cmdline),
-        XSH_WATERFOX_QEMU_DEBUG: proof_flag("XSH_WATERFOX_QEMU_DEBUG", cmdline),
-        XSH_WATERFOX_QEMU_FOOT_SHELL: proof_flag("XSH_WATERFOX_QEMU_FOOT_SHELL", cmdline),
-        XSH_WATERFOX_QEMU_INPUT_PROOF: proof_flag("XSH_WATERFOX_QEMU_INPUT_PROOF", cmdline),
-        XSH_WATERFOX_QEMU_MESA_PROOF: proof_flag("XSH_WATERFOX_QEMU_MESA_PROOF", cmdline),
-        XSH_WATERFOX_QEMU_PROOF: proof_flag("XSH_WATERFOX_QEMU_PROOF", cmdline),
+        XSH_QEMU_AUDIO_PROOF: proof_flag("XSH_QEMU_AUDIO_PROOF", cmdline),
+        XSH_QEMU_DEBUG: proof_flag("XSH_QEMU_DEBUG", cmdline),
+        XSH_QEMU_FOOT_SHELL: proof_flag("XSH_QEMU_FOOT_SHELL", cmdline),
+        XSH_QEMU_INPUT_PROOF: proof_flag("XSH_QEMU_INPUT_PROOF", cmdline),
+        XSH_QEMU_MESA_PROOF: proof_flag("XSH_QEMU_MESA_PROOF", cmdline),
+        XSH_QEMU_PROOF: proof_flag("XSH_QEMU_PROOF", cmdline),
       },
     ),
   )?
@@ -2106,7 +2104,7 @@ proc console_contains(log: Path, needle: Str) [fs, error] -> Result[Bool] {
 }
 
 proc console_timeout_seconds() [env, error] -> Result[Int] {
-  let fallback = if waterfox_qemu_proof_enabled() { "75" } else { "5" }
+  let fallback = if qemu_proof_enabled() { "75" } else { "5" }
   let raw = (env.get("XSH_BOOT_CONSOLE_TIMEOUT") ?? fallback).trim()
 
   if raw == "" {
@@ -2171,44 +2169,15 @@ proc print_console_excerpt(trace: Path, console_log: Path, max_lines: Int) [fs, 
   trace_line(trace, f"console excerpt: ${count} line(s), ${fs.metadata(console_log)?.size} byte(s)")?
 }
 
-proc verify_waterfox_qemu_visual_proof(
+proc verify_qemu_visual_proof(
   trace: Path,
   console_log: Path,
-  qemu_log: Path,
   screenshot: Path,
   sh: Path,
   debug_only: Bool,
   foot_shell: Bool,
-  browser_proof: Bool,
-  clipboard_proof: Bool,
   mesa_proof: Bool,
 ) [fs, process, error] {
-  if clipboard_proof {
-    for marker in [
-      "waterfox-session mdevd ok",
-      "waterfox-session seatd ok",
-      "waterfox-session dwl start",
-      "waterfox-session startup clipboard",
-      "waterfox-qemu clipboard ok",
-    ] {
-      if ! console_contains(console_log, marker)? {
-        return Err(
-          ScriptError.Failed("waterfox-qemu-clipboard", f"missing clipboard proof marker '${marker}' in ${console_log}"),
-        )
-      }
-    }
-
-    for term in ["DBus", "dbus", "GTK", "gtk", "X11", "xcb"] {
-      if console_contains(console_log, term)? {
-        return Err(
-          ScriptError.Failed("waterfox-qemu-forbidden-log", f"clipboard proof log contains rejected term ${term}"),
-        )
-      }
-    }
-
-    trace_line(trace, "waterfox qemu clipboard: ok")?
-  }
-
   require_file(screenshot)?
 
   require_ok(
@@ -2219,112 +2188,61 @@ proc verify_waterfox_qemu_visual_proof(
           sh.display(),
           "-c",
           "shot=$1; test $(wc -c < \"$shot\") -gt 128 && dd if=\"$shot\" bs=1 skip=64 2>/dev/null | od -An -tu1 | awk '{ for (i = 1; i <= NF; i++) if ($i != 0) found = 1 } END { exit(found ? 0 : 1) }'",
-          "waterfox-qemu-screenshot",
+          "laputa-qemu-screenshot",
           screenshot.display(),
         ],
       ),
     )?,
-    "waterfox-qemu-screenshot",
+    "laputa-qemu-screenshot",
     f"screenshot was missing or blank: ${screenshot}",
   )?
 
   if debug_only {
-    if ! console_contains(console_log, "waterfox-qemu debug done")? {
-      return Err(ScriptError.Failed("waterfox-qemu-debug", f"missing debug completion proof in ${console_log}"))
+    if ! console_contains(console_log, "laputa-qemu debug done")? {
+      return Err(ScriptError.Failed("laputa-qemu-debug", f"missing debug completion proof in ${console_log}"))
     }
 
-    trace_line(trace, f"waterfox qemu screenshot: ${screenshot}")?
-    trace_line(trace, "waterfox qemu debug: ok")?
+    trace_line(trace, f"laputa qemu screenshot: ${screenshot}")?
+    trace_line(trace, "laputa qemu debug: ok")?
     return
   }
 
   if foot_shell {
-    trace_line(trace, f"waterfox qemu screenshot: ${screenshot}")?
-    trace_line(trace, "waterfox qemu foot shell: ok")?
+    trace_line(trace, f"laputa qemu screenshot: ${screenshot}")?
+    trace_line(trace, "laputa qemu foot shell: ok")?
     return
   }
 
   if mesa_proof {
-    if ! console_contains(console_log, "waterfox-qemu mesa ok")? {
-      return Err(ScriptError.Failed("waterfox-qemu-mesa", f"missing Mesa proof marker in ${console_log}"))
+    if ! console_contains(console_log, "laputa-qemu mesa ok")? {
+      return Err(ScriptError.Failed("laputa-qemu-mesa", f"missing Mesa proof marker in ${console_log}"))
     }
 
     for term in ["libGLX", "libX11", "libxcb", "vulkan", "Vulkan", "DBus", "dbus"] {
       if console_contains(console_log, term)? {
-        return Err(ScriptError.Failed("waterfox-qemu-forbidden-log", f"Mesa proof log contains rejected term ${term}"))
+        return Err(ScriptError.Failed("laputa-qemu-forbidden-log", f"Mesa proof log contains rejected term ${term}"))
       }
     }
 
-    trace_line(trace, f"waterfox qemu screenshot: ${screenshot}")?
-    trace_line(trace, "waterfox qemu mesa: ok")?
-  }
-
-  if browser_proof {
-    for marker in [
-      "waterfox-session mdevd ok",
-      "waterfox-session seatd ok",
-      "waterfox-session dwl start",
-      "waterfox-session startup waterfox about:blank",
-      "waterfox-qemu browser-session-ready",
-    ] {
-      if ! console_contains(console_log, marker)? {
-        return Err(
-          ScriptError.Failed("waterfox-qemu-browser", f"missing browser proof marker '${marker}' in ${console_log}"),
-        )
-      }
-    }
-
-    if ! console_contains(qemu_log, "waterfox-qemu-browser-qmp-input ok")? {
-      return Err(ScriptError.Failed("waterfox-qemu-browser-input", f"missing browser QMP input proof in ${qemu_log}"))
-    }
-
-    for term in [
-      "libEGL",
-      "libGLES",
-      "libgbm",
-      "vulkan",
-      "Vulkan",
-      "X11",
-      "xcb",
-      "DBus",
-      "dbus",
-      "PipeWire",
-      "pipewire",
-      "PulseAudio",
-      "pulseaudio",
-      "libva",
-      "error[runtime.error]",
-      "runtime traceback",
-    ] {
-      if console_contains(console_log, term)? {
-        return Err(
-          ScriptError.Failed("waterfox-qemu-forbidden-log", f"browser proof log contains rejected term ${term}"),
-        )
-      }
-    }
-
-    trace_line(trace, f"waterfox qemu screenshot: ${screenshot}")?
-    trace_line(trace, "waterfox qemu browser: ok")?
-  }
-
-  if clipboard_proof or mesa_proof or browser_proof {
+    trace_line(trace, f"laputa qemu screenshot: ${screenshot}")?
+    trace_line(trace, "laputa qemu mesa: ok")?
     return
   }
 
-  if ! console_contains(console_log, "waterfox-qemu foot-input ok")? {
-    return Err(ScriptError.Failed("waterfox-qemu-foot-input", f"missing foot input proof in ${console_log}"))
+  if ! console_contains(console_log, "laputa-qemu foot-input ok")? {
+    return Err(ScriptError.Failed("laputa-qemu-foot-input", f"missing foot input proof in ${console_log}"))
   }
 
-  trace_line(trace, f"waterfox qemu screenshot: ${screenshot}")?
-  trace_line(trace, "waterfox qemu foot input: ok")?
+  trace_line(trace, f"laputa qemu screenshot: ${screenshot}")?
+  trace_line(trace, "laputa qemu foot input: ok")?
 }
 
-proc verify_waterfox_qemu_audio_proof(trace: Path, console_log: Path) [fs, error] {
-  if ! console_contains(console_log, "waterfox-qemu audio ok")? {
-    return Err(ScriptError.Failed("waterfox-qemu-audio", f"missing audio proof marker in ${console_log}"))
+proc verify_qemu_audio_proof(trace: Path, console_log: Path) [fs, error] {
+  if ! console_contains(console_log, "laputa-qemu audio ok")? {
+    return Err(ScriptError.Failed("laputa-qemu-audio", f"missing audio proof marker in ${console_log}"))
   }
 
-  trace_line(trace, "waterfox qemu audio: ok")?
+  trace_line(trace, "laputa qemu audio: ok")?
 }
 
 proc qemu_machine_arg() [env] -> Str {
@@ -2376,55 +2294,45 @@ proc qemu_rtc_arg() [env] -> Str {
   return raw
 }
 
-proc waterfox_qemu_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_PROOF") ?? "0").trim()
+proc qemu_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_BOOT_QEMU_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_debug_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_DEBUG") ?? "0").trim()
+proc qemu_debug_enabled() [env] -> Bool {
+  let value = (env.get("XSH_BOOT_QEMU_DEBUG") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_foot_shell_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_FOOT_SHELL") ?? "0").trim()
+proc qemu_foot_shell_enabled() [env] -> Bool {
+  let value = (env.get("XSH_BOOT_QEMU_FOOT_SHELL") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_browser_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_BROWSER_PROOF") ?? "0").trim()
+proc qemu_audio_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_BOOT_QEMU_AUDIO_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_clipboard_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_CLIPBOARD_PROOF") ?? "0").trim()
+proc qemu_mesa_proof_enabled() [env] -> Bool {
+  let value = (env.get("XSH_BOOT_QEMU_MESA_PROOF") ?? "0").trim()
   return value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc waterfox_qemu_audio_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_AUDIO_PROOF") ?? "0").trim()
-  return value == "1" or value == "true" or value == "yes" or value == "on"
-}
-
-proc waterfox_qemu_mesa_proof_enabled() [env] -> Bool {
-  let value = (env.get("XSH_BOOT_WATERFOX_QEMU_MESA_PROOF") ?? "0").trim()
-  return value == "1" or value == "true" or value == "yes" or value == "on"
-}
-
-proc waterfox_qemu_visual_proof_enabled() [env] -> Bool {
-  if waterfox_qemu_debug_enabled() or waterfox_qemu_foot_shell_enabled() {
+proc qemu_visual_proof_enabled() [env] -> Bool {
+  if qemu_debug_enabled() or qemu_foot_shell_enabled() {
     return true
   }
 
-  if ! waterfox_qemu_proof_enabled() {
+  if ! qemu_proof_enabled() {
     return false
   }
 
-  if waterfox_qemu_browser_proof_enabled() or waterfox_qemu_clipboard_proof_enabled() or waterfox_qemu_mesa_proof_enabled() {
+  if qemu_mesa_proof_enabled() {
     return true
   }
 
-  return ! waterfox_qemu_audio_proof_enabled()
+  return ! qemu_audio_proof_enabled()
 }
 
 proc qemu_input_enabled() [env] -> Bool {
@@ -2462,7 +2370,7 @@ proc qemu_memory_arg() [env] -> Str {
     return raw
   }
 
-  if waterfox_qemu_visual_proof_enabled() {
+  if qemu_visual_proof_enabled() {
     return "1536M"
   }
 
@@ -2487,14 +2395,14 @@ proc rootfs_source_path() [env] -> Str {
   let raw = (env.get("XSH_BOOT_ROOTFS_SOURCE") ?? "/").trim()
 
   if raw == "" {
-    if waterfox_qemu_proof_enabled() {
+    if qemu_proof_enabled() {
       return "/rootfs"
     }
 
     return "/"
   }
 
-  if raw == "/" and waterfox_qemu_proof_enabled() {
+  if raw == "/" and qemu_proof_enabled() {
     return "/rootfs"
   }
 
@@ -2523,39 +2431,31 @@ proc kernel_cmdline(proof_enabled: Bool, userspace_e2e: Bool) [env] -> Str {
   let base = f"${console_args} ignore_loglevel devtmpfs.mount=1 root=PARTUUID=33333333-3333-3333-3333-333333333333 rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8${network_arg} XSH_LINUX_REAL=1 XSH_UNIX_REAL=1 XSH_INIT_FAST_SHUTDOWN=1 XSH_INIT_FINAL_CLEANUP=0"
 
   if proof_enabled {
-    if waterfox_qemu_proof_enabled() {
-      var flags = ["XSH_XINIT_PROOF_STAGE=1", "XSH_WATERFOX_QEMU_PROOF=1"]
+    if qemu_proof_enabled() {
+      var flags = ["XSH_XINIT_PROOF_STAGE=1", "XSH_QEMU_PROOF=1"]
 
-      if waterfox_qemu_visual_proof_enabled() {
+      if qemu_visual_proof_enabled() {
         flags = flags.push("video=Virtual-1:1280x800@60e")
       }
 
-      if waterfox_qemu_clipboard_proof_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_CLIPBOARD_PROOF=1")
+      if qemu_audio_proof_enabled() {
+        flags = flags.push("XSH_QEMU_AUDIO_PROOF=1")
       }
 
-      if waterfox_qemu_audio_proof_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_AUDIO_PROOF=1")
+      if qemu_mesa_proof_enabled() {
+        flags = flags.push("XSH_QEMU_MESA_PROOF=1")
       }
 
-      if waterfox_qemu_mesa_proof_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_MESA_PROOF=1")
+      if qemu_foot_shell_enabled() {
+        flags = flags.push("XSH_QEMU_FOOT_SHELL=1")
       }
 
-      if waterfox_qemu_browser_proof_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_BROWSER_PROOF=1")
+      if qemu_debug_enabled() {
+        flags = flags.push("XSH_QEMU_DEBUG=1")
       }
 
-      if waterfox_qemu_foot_shell_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_FOOT_SHELL=1")
-      }
-
-      if waterfox_qemu_debug_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_DEBUG=1")
-      }
-
-      if ! waterfox_qemu_debug_enabled() and ! waterfox_qemu_foot_shell_enabled() and ! waterfox_qemu_browser_proof_enabled() and ! waterfox_qemu_clipboard_proof_enabled() and ! waterfox_qemu_audio_proof_enabled() and ! waterfox_qemu_mesa_proof_enabled() {
-        flags = flags.push("XSH_WATERFOX_QEMU_INPUT_PROOF=1")
+      if ! qemu_debug_enabled() and ! qemu_foot_shell_enabled() and ! qemu_audio_proof_enabled() and ! qemu_mesa_proof_enabled() {
+        flags = flags.push("XSH_QEMU_INPUT_PROOF=1")
       }
 
       return f"${base} ${flags.join(" ")}"
@@ -2779,8 +2679,8 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
   let log = fp"${vm_target}/qemu.log"
   let console_log = fp"${vm_target}/console.log"
   let qemu_monitor = fp"${vm_target}/qemu-monitor.sock"
-  let qemu_audio_wav = fp"${vm_target}/waterfox-audio.wav"
-  let waterfox_screenshot = fp"${vm_target}/waterfox.ppm"
+  let qemu_audio_wav = fp"${vm_target}/qemu-audio.wav"
+  let qemu_screenshot = fp"${vm_target}/qemu.ppm"
   let qmp_proof = fp"${root}/boot/qmp-proof.py"
   let trace = fp"${vm_target}/boot.trace"
   let boot_kernel = boot_kernel_path(kernel)?
@@ -2856,8 +2756,6 @@ tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 
   let rootfs_size = if fs.exists(fp"${rootfs_dir}/usr/bin/rustc")? {
     "3072M"
-  } else if fs.exists(fp"${rootfs_dir}/opt/waterfox/waterfox-bin")? {
-    "3072M"
   } else if fs.exists(fp"${rootfs_dir}/usr/bin/clang")? {
     "1536M"
   } else {
@@ -2888,7 +2786,7 @@ tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
   fs.remove(console_log, missing_ok: true)?
   fs.remove(qemu_monitor, missing_ok: true)?
   fs.remove(qemu_audio_wav, missing_ok: true)?
-  fs.remove(waterfox_screenshot, missing_ok: true)?
+  fs.remove(qemu_screenshot, missing_ok: true)?
   let cmdline = kernel_cmdline(proof_enabled, userspace_e2e)
   trace_line(trace, f"kernel cmdline: ${cmdline}")?
 
@@ -2920,22 +2818,22 @@ tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
     )
   }
 
-  if qemu_input_enabled() or waterfox_qemu_visual_proof_enabled() {
+  if qemu_input_enabled() or qemu_visual_proof_enabled() {
     qemu_argv = qemu_argv.extend(
       ["-device", "virtio-keyboard-pci", "-device", "virtio-tablet-pci", "-device", "virtio-mouse-pci"],
     )
   }
 
-  if qemu_gpu_enabled() or waterfox_qemu_visual_proof_enabled() {
+  if qemu_gpu_enabled() or qemu_visual_proof_enabled() {
     qemu_argv = qemu_argv.extend(["-device", qemu_gpu_device_arg()])
   }
 
-  if waterfox_qemu_visual_proof_enabled() {
+  if qemu_visual_proof_enabled() {
     qemu_argv = qemu_argv.extend(["-qmp", f"unix:${qemu_monitor},server,nowait"])
     require_file(qmp_proof)?
   }
 
-  if waterfox_qemu_audio_proof_enabled() {
+  if qemu_audio_proof_enabled() {
     qemu_argv = qemu_argv.extend(
       [
         "-audiodev",
@@ -2950,7 +2848,7 @@ tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 
   qemu_argv = qemu_argv.extend(["-netdev", "user,id=net0", "-device", qemu_net_device_arg()])
 
-  if waterfox_qemu_visual_proof_enabled() {
+  if qemu_visual_proof_enabled() {
     let display_arg = qemu_display_arg()
     qemu_argv = qemu_argv.extend(["-display", display_arg, "-serial", "stdio"])
   } else {
@@ -2973,16 +2871,12 @@ attach_enabled=$4
 interactive_attach=$5
 monitor_sock=$6
 screenshot=$7
-waterfox_visual_proof=$8
-waterfox_input_proof=$9
+qemu_visual_proof=$8
+qemu_input_proof=$9
 shift 9
-waterfox_browser_proof=$1
+qemu_audio_proof=$1
 shift 1
-waterfox_clipboard_proof=$1
-shift 1
-waterfox_audio_proof=$1
-shift 1
-waterfox_mesa_proof=$1
+qemu_mesa_proof=$1
 shift 1
 qmp_proof=$1
 shift 1
@@ -3032,15 +2926,9 @@ capture_qmp_ppm() {
   python3 "$qmp_proof" screenshot "$sock" "$shot"
 }
 
-send_qmp_browser_proof() {
-  sock=$1
-  python3 "$qmp_proof" browser "$sock"
-}
-
 ticks=0
 saw_output=0
 input_attempts=0
-browser_attempts=0
 while :; do
   if [ -s "$console_log" ]; then
     saw_output=1
@@ -3154,87 +3042,30 @@ while :; do
     exit "$status"
   fi
 
-  if [ "$waterfox_visual_proof" = "1" ] && [ "$ticks" -ge 10 ] && [ -S "$monitor_sock" ]; then
+  if [ "$qemu_visual_proof" = "1" ] && [ "$ticks" -ge 10 ] && [ -S "$monitor_sock" ]; then
     if [ "$proof_attempts" -lt 36 ]; then
-      echo "waterfox-qemu-monitor attempt=$proof_attempts ticks=$ticks" >> "$qemu_log"
+      echo "laputa-qemu-monitor attempt=$proof_attempts ticks=$ticks" >> "$qemu_log"
       capture_qmp_ppm "$monitor_sock" "$screenshot" >> "$qemu_log" 2>&1 || true
       proof_attempts=$((proof_attempts + 1))
     fi
 
-    if [ "$waterfox_input_proof" = "1" ] && [ "$input_attempts" -lt 70 ] && [ "$ticks" -ge 18 ]; then
-      echo "waterfox-qemu-input attempt=$input_attempts ticks=$ticks" >> "$qemu_log"
+    if [ "$qemu_input_proof" = "1" ] && [ "$input_attempts" -lt 70 ] && [ "$ticks" -ge 18 ]; then
+      echo "laputa-qemu-input attempt=$input_attempts ticks=$ticks" >> "$qemu_log"
       write_qmp_input_proof "$monitor_sock" >> "$qemu_log" 2>&1 || true
       input_attempts=$((input_attempts + 1))
     fi
 
-    if [ "$waterfox_browser_proof" = "1" ] && [ "$browser_attempts" -lt 8 ] && [ "$ticks" -ge 30 ]; then
-      echo "waterfox-qemu-browser-input attempt=$browser_attempts ticks=$ticks" >> "$qemu_log"
-      send_qmp_browser_proof "$monitor_sock" >> "$qemu_log" 2>&1 || true
-      browser_attempts=$((browser_attempts + 1))
-    fi
-  fi
-
-  ticks=$((ticks + 1))
-  if [ "$saw_output" = "0" ] && [ "$ticks" -ge "$timeout_seconds" ]; then
-    kill -TERM "$qemu_pid" 2>/dev/null || true
-    sleep 1
-    kill -KILL "$qemu_pid" 2>/dev/null || true
-    [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
-    wait "$qemu_pid" 2>/dev/null || true
-    [ -n "$tail_pid" ] && wait "$tail_pid" 2>/dev/null || true
-    exit 124
-  fi
-
-  if [ "$attach_enabled" = "0" ] && [ "$boot_proof" != "1" ] && [ "$tailscale_probe" != "1" ] && [ "$userspace_e2e" != "1" ] && [ "$saw_output" = "1" ] && [ "$ticks" -ge "$timeout_seconds" ]; then
-    kill -TERM "$qemu_pid" 2>/dev/null || true
-    sleep 1
-    kill -KILL "$qemu_pid" 2>/dev/null || true
-    wait "$qemu_pid" 2>/dev/null || true
-    exit 0
-  fi
-
-  if { [ "$boot_proof" = "1" ] || [ "$tailscale_probe" = "1" ] || [ "$userspace_e2e" = "1" ]; } && [ "$ticks" -ge "$timeout_seconds" ]; then
-    kill -TERM "$qemu_pid" 2>/dev/null || true
-    sleep 1
-    kill -KILL "$qemu_pid" 2>/dev/null || true
-    [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
-    wait "$qemu_pid" 2>/dev/null || true
-    [ -n "$tail_pid" ] && wait "$tail_pid" 2>/dev/null || true
-    exit 124
-  fi
-
-  if [ "$waterfox_visual_proof" = "1" ]; then
-    proof_selected=0
-    proof_done=1
-
-    if [ "$waterfox_input_proof" = "1" ]; then
+    if [ "$qemu_audio_proof" = "1" ]; then
       proof_selected=1
-      grep -q 'waterfox-qemu foot-input ok' "$console_log" || proof_done=0
+      grep -q 'laputa-qemu audio ok' "$console_log" || proof_done=0
     fi
 
-    if [ "$waterfox_browser_proof" = "1" ]; then
+    if [ "$qemu_mesa_proof" = "1" ]; then
       proof_selected=1
-      if ! { [ "$browser_attempts" -ge 2 ] && [ -s "$screenshot" ] && grep -q 'waterfox-qemu browser-session-ready' "$console_log" && grep -q 'waterfox-qemu-browser-qmp-input ok' "$qemu_log"; } && ! grep -q 'Example Domain' "$console_log"; then
-        proof_done=0
-      fi
+      grep -q 'laputa-qemu mesa ok' "$console_log" || proof_done=0
     fi
 
-    if [ "$waterfox_clipboard_proof" = "1" ]; then
-      proof_selected=1
-      grep -q 'waterfox-qemu clipboard ok' "$console_log" || proof_done=0
-    fi
-
-    if [ "$waterfox_audio_proof" = "1" ]; then
-      proof_selected=1
-      grep -q 'waterfox-qemu audio ok' "$console_log" || proof_done=0
-    fi
-
-    if [ "$waterfox_mesa_proof" = "1" ]; then
-      proof_selected=1
-      grep -q 'waterfox-qemu mesa ok' "$console_log" || proof_done=0
-    fi
-
-    if { [ "$proof_selected" = "0" ] && grep -q 'waterfox-qemu debug done' "$console_log"; } || { [ "$proof_selected" = "1" ] && [ "$proof_done" = "1" ]; }; then
+    if { [ "$proof_selected" = "0" ] && grep -q 'laputa-qemu debug done' "$console_log"; } || { [ "$proof_selected" = "1" ] && [ "$proof_done" = "1" ]; }; then
       kill -TERM "$qemu_pid" 2>/dev/null || true
       sleep 1
       kill -KILL "$qemu_pid" 2>/dev/null || true
@@ -3243,7 +3074,7 @@ while :; do
     fi
   fi
 
-  if [ "$waterfox_visual_proof" != "1" ] && [ "$waterfox_audio_proof" = "1" ] && grep -q 'waterfox-qemu audio ok' "$console_log"; then
+  if [ "$qemu_visual_proof" != "1" ] && [ "$qemu_audio_proof" = "1" ] && grep -q 'laputa-qemu audio ok' "$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     sleep 1
     kill -KILL "$qemu_pid" 2>/dev/null || true
@@ -3261,17 +3092,15 @@ done
     if boot_attach_enabled() { "1" } else { "0" },
     if boot_attach_enabled() and ! proof_enabled { "1" } else { "0" },
     qemu_monitor.display(),
-    waterfox_screenshot.display(),
-    if waterfox_qemu_visual_proof_enabled() { "1" } else { "0" },
-    if waterfox_qemu_proof_enabled() and ! waterfox_qemu_debug_enabled() and ! waterfox_qemu_foot_shell_enabled() and ! waterfox_qemu_browser_proof_enabled() and ! waterfox_qemu_clipboard_proof_enabled() and ! waterfox_qemu_audio_proof_enabled() and ! waterfox_qemu_mesa_proof_enabled() {
+    qemu_screenshot.display(),
+    if qemu_visual_proof_enabled() { "1" } else { "0" },
+    if qemu_proof_enabled() and ! qemu_debug_enabled() and ! qemu_foot_shell_enabled() and ! qemu_audio_proof_enabled() and ! qemu_mesa_proof_enabled() {
       "1"
     } else {
       "0"
     },
-    if waterfox_qemu_browser_proof_enabled() { "1" } else { "0" },
-    if waterfox_qemu_clipboard_proof_enabled() { "1" } else { "0" },
-    if waterfox_qemu_audio_proof_enabled() { "1" } else { "0" },
-    if waterfox_qemu_mesa_proof_enabled() { "1" } else { "0" },
+    if qemu_audio_proof_enabled() { "1" } else { "0" },
+    if qemu_mesa_proof_enabled() { "1" } else { "0" },
     qmp_proof.display(),
     if proof_enabled { "1" } else { "0" },
     if tailscale_probe { "1" } else { "0" },
@@ -3289,23 +3118,20 @@ done
       return Err(ScriptError.Failed("boot-console-failed", f"console probe failed; see ${trace}"))
     }
 
-    if waterfox_qemu_visual_proof_enabled() {
-      verify_waterfox_qemu_visual_proof(
+    if qemu_visual_proof_enabled() {
+      verify_qemu_visual_proof(
         trace,
         console_log,
-        log,
-        waterfox_screenshot,
+        qemu_screenshot,
         sh,
-        waterfox_qemu_debug_enabled(),
-        waterfox_qemu_foot_shell_enabled(),
-        waterfox_qemu_browser_proof_enabled(),
-        waterfox_qemu_clipboard_proof_enabled(),
-        waterfox_qemu_mesa_proof_enabled(),
+        qemu_debug_enabled(),
+        qemu_foot_shell_enabled(),
+        qemu_mesa_proof_enabled(),
       )?
     }
 
-    if waterfox_qemu_audio_proof_enabled() {
-      verify_waterfox_qemu_audio_proof(trace, console_log)?
+    if qemu_audio_proof_enabled() {
+      verify_qemu_audio_proof(trace, console_log)?
     }
 
     if userspace_e2e {
@@ -3340,18 +3166,15 @@ done
     return Err(ScriptError.Failed("boot-console-failed", f"qemu exited non-zero; see ${trace}"))
   }
 
-  if waterfox_qemu_visual_proof_enabled() {
-    verify_waterfox_qemu_visual_proof(
+  if qemu_visual_proof_enabled() {
+    verify_qemu_visual_proof(
       trace,
       console_log,
-      log,
-      waterfox_screenshot,
+      qemu_screenshot,
       sh,
-      waterfox_qemu_debug_enabled(),
-      waterfox_qemu_foot_shell_enabled(),
-      waterfox_qemu_browser_proof_enabled(),
-      waterfox_qemu_clipboard_proof_enabled(),
-      waterfox_qemu_mesa_proof_enabled(),
+      qemu_debug_enabled(),
+      qemu_foot_shell_enabled(),
+      qemu_mesa_proof_enabled(),
     )?
   }
 }

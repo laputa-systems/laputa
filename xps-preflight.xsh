@@ -81,7 +81,6 @@ proc verify_mesa_runtime(root: Path) [fs, error] {
 proc verify_session(root: Path) [fs, error] {
   ensure_file(root, p"usr/bin/seatd", "seatd")?
   ensure_file(root, p"usr/bin/dwl", "dwl")?
-  ensure_file(root, p"usr/bin/waterfox-dwl-session", "Waterfox Wayland session")?
 }
 
 proc main(root: Path = /, mode: Str = "live") [fs, error] {
