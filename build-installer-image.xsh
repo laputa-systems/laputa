@@ -45,36 +45,6 @@ proc packages_root(root: Path) [fs, env, error] -> Result[Path] {
   return sibling
 }
 
-proc xsh_root(root: Path) [fs, env, error] -> Result[Path] {
-  let configured = env.get("LAPUTA_XSH_ROOT") ?? ""
-
-  if configured.trim() != "" {
-    return fp"${configured}"
-  }
-
-  let home = env.get("HOME") ?? ""
-
-  if home != "" {
-    let home_root = fp"${home}/d/laputa-systems/xsh"
-
-    if fs.exists(home_root)? {
-      return home_root
-    }
-  }
-
-  let sibling = fp"${root.parent}/xsh"
-
-  if fs.exists(sibling)? {
-    return sibling
-  }
-
-  if home != "" {
-    return fp"${home}/d/laputa-systems/xsh"
-  }
-
-  return sibling
-}
-
 proc installer_work_path(root: Path, arch: Str) [env, error] -> Result[Path] {
   let raw = env.get("LAPUTA_INSTALLER_WORK") ?? ""
 

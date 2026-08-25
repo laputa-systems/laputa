@@ -40,15 +40,41 @@ proc fetch_release_sha256(label: Str, url: Str) [net, error] -> Result[Str] {
 }
 
 proc fetch_new_hashes(tag: Str) [fs, net, error] -> Result[Hashes] {
-  let aarch64_xsh = fetch_release_sha256("aarch64 xsh", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-aarch64-linux-musl.sha256")?
-  let aarch64_xshi = fetch_release_sha256("aarch64 xshi", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-aarch64-linux-musl.sha256")?
-  let aarch64_xsht = fetch_release_sha256("aarch64 xsht", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-aarch64-linux-musl.sha256")?
-  let x86_64_xsh = fetch_release_sha256("x86_64 xsh", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-x86_64-linux-musl.sha256")?
-  let x86_64_xshi = fetch_release_sha256("x86_64 xshi", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-x86_64-linux-musl.sha256")?
-  let x86_64_xsht = fetch_release_sha256("x86_64 xsht", f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-x86_64-linux-musl.sha256")?
+  let aarch64_xsh = fetch_release_sha256(
+    "aarch64 xsh",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-aarch64-linux-musl.sha256",
+  )?
+  let aarch64_xshi = fetch_release_sha256(
+    "aarch64 xshi",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-aarch64-linux-musl.sha256",
+  )?
+  let aarch64_xsht = fetch_release_sha256(
+    "aarch64 xsht",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-aarch64-linux-musl.sha256",
+  )?
+  let x86_64_xsh = fetch_release_sha256(
+    "x86_64 xsh",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsh-${tag}-x86_64-linux-musl.sha256",
+  )?
+  let x86_64_xshi = fetch_release_sha256(
+    "x86_64 xshi",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xshi-${tag}-x86_64-linux-musl.sha256",
+  )?
+  let x86_64_xsht = fetch_release_sha256(
+    "x86_64 xsht",
+    f"https://github.com/laputa-systems/xsh/releases/download/${tag}/xsht-${tag}-x86_64-linux-musl.sha256",
+  )?
   let core_url = f"https://github.com/laputa-systems/xsh/releases/download/${tag}/core-${tag}.sha256"
   let core = fetch_release_sha256("core scripts", core_url)?
-  return {aarch64_xsh, aarch64_xshi, aarch64_xsht, x86_64_xsh, x86_64_xshi, x86_64_xsht, core}
+  return {
+    aarch64_xsh,
+    aarch64_xshi,
+    aarch64_xsht,
+    x86_64_xsh,
+    x86_64_xshi,
+    x86_64_xsht,
+    core,
+  }
 }
 
 proc replace_context_hashes(content: Str, hashes: Hashes) [error] -> Result[Str] {

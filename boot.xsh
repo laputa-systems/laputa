@@ -250,36 +250,6 @@ proc remove_tree(path_value: Path) [fs, error] {
   path_value.remove_dir()?
 }
 
-proc require_fresh_packaged_kernel(root: Path, package: Path) [fs, env, error] {
-  let inputs = [
-    fp"${packages_root(root)?}/repo/linux/PKGBUILD.xsh",
-    fp"${packages_root(root)?}/repo/linux/kbuild.xsh",
-    fp"${packages_root(root)?}/repo/linux/files/kernel.config",
-    fp"${packages_root(root)?}/repo/linux/files/sysreg-defs.h",
-    fp"${packages_root(root)?}/repo/linux/files/generated/timeconst.h",
-    fp"${packages_root(root)?}/repo/linux/files/generated/bounds.h",
-    fp"${packages_root(root)?}/repo/linux/files/generated/asm-offsets.h",
-    fp"${packages_root(root)?}/repo/linux/files/generated/rq-offsets.h",
-    fp"${packages_root(root)?}/repo/linux/files/generated/sha256-core.S",
-    fp"${packages_root(root)?}/repo/linux/files/generated/sha512-core.S",
-  ]
-
-  let package_modified = fs.metadata(package)?.modified
-
-  for input in inputs {
-    require_file(input)?
-
-    if fs.metadata(input)?.modified > package_modified {
-      return Err(
-        ScriptError.Failed(
-          "boot-stale-kernel",
-          f"packaged kernel ${package} is older than ${input}; rebuild it with `make proof-kernel` before `make boot`",
-        ),
-      )
-    }
-  }
-}
-
 proc packaged_kernel_package(root: Path) [fs, net, env, error] -> Result[Path] {
   let explicit = env_value("XSH_BOOT_KERNEL_PACKAGE", "")
 
@@ -340,7 +310,7 @@ proc image_exists(sh: Path, docker: Path, image: Str) [process, error] -> Result
       [
         sh.display(),
         "-c",
-        "docker_bin=$1; image=$2; \"$docker_bin\" image inspect \"$image\" >/dev/null 2>&1",
+        "docker_bin=$1; image=$2; \"$docker_bin\" image inspect \"\$image\" >/dev/null 2>&1",
         "docker-image-exists",
         docker.display(),
         image,
@@ -395,32 +365,6 @@ proc ensure_linux_sh(rootfs_dir: Path) [fs, error] {
 
 proc linux_loop_image_name() [env] -> Str {
   return (env.get("XSH_LINUX_LOOP_IMAGE") ?? "laputa-linux-loop-env").trim()
-}
-
-proc ensure_linux_loop_xinit(rootfs_dir: Path, work: Path, sh: Path, docker: Path) [fs, process, env, error] {
-  let out = fp"${work}/xinit"
-
-  docker_quiet(
-    sh,
-    docker,
-    """docker_bin=$1
-image=$2
-out_dir=$3
-container=$("$docker_bin" create "$image" /usr/bin/xinit)
-cleanup() {
-  "$docker_bin" rm "$container" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
-"$docker_bin" cp "$container:/usr/bin/xinit" "$out_dir/xinit"
-""",
-    [linux_loop_image_name(), work.display()],
-  )?
-
-  require_file(out)?
-  fs.copy(out, fp"${rootfs_dir}/init", overwrite: true)?
-  fs.copy(out, fp"${rootfs_dir}/usr/bin/xinit", overwrite: true)?
-  fs.chmod(fp"${rootfs_dir}/init", 0o755)?
-  fs.chmod(fp"${rootfs_dir}/usr/bin/xinit", 0o755)?
 }
 
 proc install_linux_only_runtime(root: Path, work: Path, rootfs_dir: Path) [fs, process, env, error] {
@@ -729,18 +673,6 @@ proc write_rootfs_image(
   )?
 }
 
-proc ensure_tailscale_state_image(root: Path, state_image: Path, sh: Path) [fs, process, env, error] {
-  if fs.exists(state_image)? {
-    return
-  }
-
-  let state_seed = fp"${root}/target/linux-vm/tailscale-state-seed"
-  fs.remove(state_seed, missing_ok: true)?
-  state_seed.mkdir()?
-  write_rootfs_image(root, state_seed, state_image, "64M", sh)?
-  fs.remove(state_seed, missing_ok: true)?
-}
-
 proc run_pm(root: Path, xsh: Path, argv: List[Str]) [fs, process, env, error] {
   let repo_url = env_value("LAPUTA_REPO_URL", "https://laputa.17166969.xyz")
   let arch = env_value("LAPUTA_PACKAGE_ARCH", "aarch64")
@@ -793,18 +725,6 @@ proc ensure_boot_runtime(root: Path, rootfs_dir: Path, _: Path) [fs, process, en
   install_local_xinit(root, rootfs_dir)?
   ensure_boot_mdevd(root, rootfs_dir)?
   ensure_boot_sudo_rs(root, rootfs_dir)?
-}
-
-proc ensure_boot_runtime_if_missing(root: Path, rootfs_dir: Path, sh: Path) [fs, process, env, error] {
-  if fs.exists(fp"${rootfs_dir}/init")? and fs.exists(fp"${rootfs_dir}/usr/bin/xinit")? and fs.exists(
-    fp"${rootfs_dir}/bin/xsh",
-  )? and fs.exists(fp"${rootfs_dir}/bin/xshi")? and fs.exists(fp"${rootfs_dir}/usr/bin/su")? and fs.exists(
-    fp"${rootfs_dir}/usr/bin/cat",
-  )? {
-    return
-  }
-
-  ensure_boot_runtime(root, rootfs_dir, sh)?
 }
 
 proc ensure_boot_tailscale(root: Path, rootfs_dir: Path) [fs, process, env, error] {
@@ -2028,7 +1948,7 @@ proc ensure_interactive_rootfs(
   docker_quiet(
     sh,
     docker,
-    "docker_bin=$1; name=$2; image=$3; \"$docker_bin\" create --name \"$name\" \"$image\" /bin/xsh >/dev/null",
+    "docker_bin=$1; name=$2; image=$3; \"$docker_bin\" create --name \"$name\" \"\$image\" /bin/xsh >/dev/null",
     [container, image],
   )?
 
@@ -2573,20 +2493,20 @@ timeout_seconds=$3
 attach_enabled=$4
 shift 4
 
-: > "$console_log"
-: > "$qemu_log"
-"$@" > "$console_log" 2> "$qemu_log" &
+: > "\$console_log"
+: > "\$qemu_log"
+"$@" > "\$console_log" 2> "\$qemu_log" &
 qemu_pid=$!
 tail_pid=
 
 if [ "$attach_enabled" != "0" ]; then
-  tail -n +1 -f "$console_log" &
+  tail -n +1 -f "\$console_log" &
   tail_pid=$!
 fi
 
 ticks=0
 while :; do
-  if [ -f "$console_log" ] && grep -Eq 'Kernel panic|not syncing|Attempted to kill init|Insufficient stack space' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -Eq 'Kernel panic|not syncing|Attempted to kill init|Insufficient stack space' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -2889,14 +2809,14 @@ shift 1
 userspace_e2e=$1
 shift 1
 
-: > "$console_log"
-: > "$qemu_log"
+: > "\$console_log"
+: > "\$qemu_log"
 
 if [ "$interactive_attach" = "1" ]; then
-  fifo="$console_log.fifo.$$"
+  fifo="\$console_log.fifo.$$"
   rm -f "$fifo"
   mkfifo "$fifo" || exit 1
-  tee "$console_log" < "$fifo" &
+  tee "\$console_log" < "$fifo" &
   tee_pid=$!
   "$@" > "$fifo" 2> "$qemu_log"
   status=$?
@@ -2905,36 +2825,36 @@ if [ "$interactive_attach" = "1" ]; then
   exit "$status"
 fi
 
-"$@" > "$console_log" 2> "$qemu_log" &
+"$@" > "\$console_log" 2> "\$qemu_log" &
 	qemu_pid=$!
 	tail_pid=
 	proof_attempts=0
 
 if [ "$attach_enabled" != "0" ]; then
-  tail -n +1 -f "$console_log" &
+  tail -n +1 -f "\$console_log" &
   tail_pid=$!
 fi
 
 write_qmp_input_proof() {
   sock=$1
-  python3 "$qmp_proof" input "$sock"
+  python3 "\$qmp_proof" input "$sock"
 }
 
 capture_qmp_ppm() {
   sock=$1
   shot=$2
-  python3 "$qmp_proof" screenshot "$sock" "$shot"
+  python3 "\$qmp_proof" screenshot "$sock" "$shot"
 }
 
 ticks=0
 saw_output=0
 input_attempts=0
 while :; do
-  if [ -s "$console_log" ]; then
+  if [ -s "\$console_log" ]; then
     saw_output=1
   fi
 
-  if [ -f "$console_log" ] && grep -Eq 'Kernel panic|not syncing|Attempted to kill init' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -Eq 'Kernel panic|not syncing|Attempted to kill init' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -2942,7 +2862,7 @@ while :; do
     exit 2
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_BOOT_PROOF_FAILED' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_BOOT_PROOF_FAILED' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -2950,7 +2870,7 @@ while :; do
     exit 2
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_BOOT_PROOF_OK' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_BOOT_PROOF_OK' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -2958,7 +2878,7 @@ while :; do
     exit 0
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_TAILSCALE_PROBE_FAILED' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_TAILSCALE_PROBE_FAILED' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -2966,9 +2886,9 @@ while :; do
     exit 2
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_TAILSCALE_PROBE_OK' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_TAILSCALE_PROBE_OK' "\$console_log"; then
     if [ "$tailscale_host_ssh_probe" = "1" ]; then
-      tailscale_ip=$(sed -n 's/.*LAPUTA_TAILSCALE_PROBE_OK ip=\\([^ ]*\\).*/\\1/p' "$console_log" | tail -n 1 | tr -d '\r')
+      tailscale_ip=$(sed -n 's/.*LAPUTA_TAILSCALE_PROBE_OK ip=\\([^ ]*\\).*/\\1/p' "\$console_log" | tail -n 1 | tr -d '\r')
 
       if [ -z "$tailscale_ip" ]; then
         echo "tailscale-ssh-probe: missing probe ip" >> "$qemu_log"
@@ -3018,7 +2938,7 @@ while :; do
     exit 0
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_USERSPACE_E2E_FAILED' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_USERSPACE_E2E_FAILED' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -3026,7 +2946,7 @@ while :; do
     exit 2
   fi
 
-  if [ -f "$console_log" ] && grep -q 'LAPUTA_USERSPACE_E2E_LOGIN_SHELL' "$console_log"; then
+  if [ -f "\$console_log" ] && grep -q 'LAPUTA_USERSPACE_E2E_LOGIN_SHELL' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     [ -n "$tail_pid" ] && kill -TERM "$tail_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
@@ -3057,15 +2977,15 @@ while :; do
 
     if [ "$qemu_audio_proof" = "1" ]; then
       proof_selected=1
-      grep -q 'laputa-qemu audio ok' "$console_log" || proof_done=0
+      grep -q 'laputa-qemu audio ok' "\$console_log" || proof_done=0
     fi
 
     if [ "$qemu_mesa_proof" = "1" ]; then
       proof_selected=1
-      grep -q 'laputa-qemu mesa ok' "$console_log" || proof_done=0
+      grep -q 'laputa-qemu mesa ok' "\$console_log" || proof_done=0
     fi
 
-    if { [ "$proof_selected" = "0" ] && grep -q 'laputa-qemu debug done' "$console_log"; } || { [ "$proof_selected" = "1" ] && [ "$proof_done" = "1" ]; }; then
+    if { [ "$proof_selected" = "0" ] && grep -q 'laputa-qemu debug done' "\$console_log"; } || { [ "$proof_selected" = "1" ] && [ "$proof_done" = "1" ]; }; then
       kill -TERM "$qemu_pid" 2>/dev/null || true
       sleep 1
       kill -KILL "$qemu_pid" 2>/dev/null || true
@@ -3074,7 +2994,7 @@ while :; do
     fi
   fi
 
-  if [ "$qemu_visual_proof" != "1" ] && [ "$qemu_audio_proof" = "1" ] && grep -q 'laputa-qemu audio ok' "$console_log"; then
+  if [ "$qemu_visual_proof" != "1" ] && [ "$qemu_audio_proof" = "1" ] && grep -q 'laputa-qemu audio ok' "\$console_log"; then
     kill -TERM "$qemu_pid" 2>/dev/null || true
     sleep 1
     kill -KILL "$qemu_pid" 2>/dev/null || true
