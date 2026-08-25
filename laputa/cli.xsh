@@ -2,6 +2,7 @@
 use laputa.build as build
 use laputa.docker as docker
 use laputa.profile as profile
+use laputa.qemu as qemu
 use laputa.types as types
 
 type CliArgs = {command: Str, profile_name: Str, jobs: Int}
@@ -57,7 +58,7 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
 }
 
 ## Run the profile command through typed profile validation and Docker configuration.
-export proc dispatch(argv: List[Str]) [fs, process, env, error] {
+export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
   let value = profile.load(parsed.profile_name, fp"${root}/profiles")?
@@ -72,6 +73,17 @@ export proc dispatch(argv: List[Str]) [fs, process, env, error] {
   if parsed.command == "plan" {
     print f"profile ${value.name} ${profile.digest(value)?}"
     build.unavailable("plan")?
+    return
+  }
+
+  let outputs = build.outputs(docker_config.output_root)
+  if parsed.command == "test" {
+    qemu.run_test(qemu.qemu_config(root)?, value, outputs)?
+    return
+  }
+
+  if parsed.command == "boot" {
+    qemu.boot(qemu.qemu_config(root)?, value, outputs)?
     return
   }
 

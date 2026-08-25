@@ -2,7 +2,7 @@
 #!/bin/xsh
 use laputa.cli as laputa_cli
 
-proc main(...argv: List[Str]) [fs, process, env, error] {
+proc main(...argv: List[Str]) [fs, process, env, time, error] {
   laputa_cli.dispatch(argv)?
 }
 
