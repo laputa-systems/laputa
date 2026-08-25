@@ -36,24 +36,6 @@ def send_qmp_key(sock, qcode):
     time.sleep(0.04)
 
 
-def send_qmp_combo(sock, modifier, qcode):
-    mod = {"type": "qcode", "data": modifier}
-    key = {"type": "qcode", "data": qcode}
-    qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": mod, "down": True}}]})
-    time.sleep(0.04)
-    qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": key, "down": True}}]})
-    time.sleep(0.04)
-    qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": key, "down": False}}]})
-    time.sleep(0.04)
-    qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": mod, "down": False}}]})
-    time.sleep(0.04)
-
-
-def hmp_key(sock, key):
-    qmp_cmd(sock, "human-monitor-command", {"command-line": f"sendkey {key}"})
-    time.sleep(0.08)
-
-
 def with_qmp(sock_path, callback):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.connect(sock_path)
@@ -72,24 +54,14 @@ def screenshot(sock_path, shot):
 
 def input_proof(sock_path):
     def run(sock):
-        qmp_cmd(sock, "input-send-event", {"events": [
-            {"type": "abs", "data": {"axis": "x", "value": 16384}},
-            {"type": "abs", "data": {"axis": "y", "value": 16384}},
-        ]})
-        time.sleep(0.1)
-        qmp_cmd(sock, "input-send-event", {"events": [{"type": "btn", "data": {"button": "left", "down": True}}]})
-        time.sleep(0.1)
-        qmp_cmd(sock, "input-send-event", {"events": [{"type": "btn", "data": {"button": "left", "down": False}}]})
-        time.sleep(0.2)
         for key in ["l", "a", "p", "u", "t", "a", "ret"]:
             send_qmp_key(sock, key)
-        send_qmp_combo(sock, "ctrl", "d")
-        time.sleep(0.1)
-        for key in ["l", "a", "p", "u", "t", "a", "ret", "ctrl-d"]:
-            result = qmp_cmd(sock, "human-monitor-command", {"command-line": f"sendkey {key}"})
-            if result:
-                print(f"laputa-qemu-hmp-sendkey {key}: {result!r}")
-            time.sleep(0.08)
+        modifier = {"type": "qcode", "data": "ctrl"}
+        key = {"type": "qcode", "data": "d"}
+        qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": modifier, "down": True}}]})
+        qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": key, "down": True}}]})
+        qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": key, "down": False}}]})
+        qmp_cmd(sock, "input-send-event", {"events": [{"type": "key", "data": {"key": modifier, "down": False}}]})
 
     with_qmp(sock_path, run)
     print("laputa-qemu-qmp-input ok")
