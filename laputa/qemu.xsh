@@ -1,5 +1,6 @@
 ##! Structured QEMU construction and supervision for qemu-dwl-foot.
 use laputa.build as build
+use laputa.image as image
 use laputa.proof as proof
 use laputa.types as types
 
@@ -8,7 +9,7 @@ export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path}
 
 ## Return the stable root PARTUUID written by Laputa's GPT image module.
 export pure root_partuuid() -> Str {
-  "33333333-3333-3333-3333-333333333333"
+  image.image_root_partuuid()
 }
 
 ## Build the required ARM serial console command line for a profile mode.
