@@ -2594,7 +2594,7 @@ git commit -m "refactor: retire legacy laputa core orchestration"
 
 ---
 
-## Task 17: Rewrite Durable Documentation and CI
+## Task 17: Rewrite Durable Documentation
 
 **Repositories:** `packages`, `laputa`
 
@@ -2671,37 +2671,6 @@ LINUX.md
 ```
 
 Delete stale planning documents after preserving unimplemented requirements in focused documentation. Do not preserve chronology merely for history.
-
-## CI
-
-### `packages`
-
-Update `.github/workflows/laputa-package-publish.yml` to use:
-
-```text
-pm repo plan
-pm repo build
-pm repo publish
-```
-
-Restrict the migrated workflow to arm64/aarch64.
-
-Do not retain an amd64 matrix that invokes removed PM commands.
-
-### `laputa`
-
-Update `.github/workflows/laputa-validate.yml` to:
-
-1. install the pinned published aarch64 or appropriate host-check XSH tools;
-2. strict-check all new XSH modules;
-3. run profile unit tests;
-4. run PM fixture tests where practical;
-5. generate `qemu-dwl-foot` BuildPlan;
-6. verify runtime closure excludes build-only packages.
-
-Do not claim GitHub CI proves HVF QEMU. The actual QEMU acceptance gate remains the local macOS command.
-
-Retire or disable legacy amd64/bootstrap workflows that invoke removed commands. Do not port them during this aarch64-only effort.
 
 ### Commits
 
@@ -2944,4 +2913,3 @@ The work is complete only when all of the following are true:
 * No browser or real-hardware work was added.
 * Documentation reflects the resulting system rather than the migration history.
 * Both repositories are clean and contain coherent, reviewable commits.
-
