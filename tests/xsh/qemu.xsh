@@ -164,13 +164,26 @@ proc test_qemu_supervisor_rescans_final_qemu_log_after_screenshot(ctx: TestConte
 }
 
 proc test_generation_overlay_binds_guest_proof_after_run_mount() [fs, error] {
+  let hook_metadata = fs.metadata(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let hook = fs.read_text(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let builder = fs.read_text(p"laputa/container_build.xsh")?
   let guest = fs.read_text(p"guest/qemu-dwl-foot-proof.xsh")?
+  test.eq(hook_metadata.mode % 4096, 0o755)?
   test.ok("/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook)?
+  test.ok(guest.starts_with("#!/bin/xsh\n"))?
   test.ok("fs.install(source, target, 0o755" in hook)?
   test.ok("container_prepare_overlay" in builder)?
   test.ok("fs.install(guest_proof" in builder)?
+  test.ok(! ("process.which(" in guest))?
+  test.ok("/usr/bin/mdevd," in guest)?
+  test.ok("/usr/bin/mdevd-coldplug" in guest)?
+  test.ok("/usr/bin/seatd" in guest)?
+  test.ok("SEATD_VTBOUND: \"0\"" in guest)?
+  test.ok("SEATD_VTBOUND: \"0\"" in hook)?
+  test.ok("/usr/bin/dwl," in guest)?
+  test.ok("/usr/bin/foot -- /bin/xsh" in guest)?
+  test.ok("io.stdin_text()?" in guest)?
+  test.ok(! ("io.stdin().read_to_end()" in guest))?
   test.ok("mdevd-coldplug" in guest)?
   test.ok("seatd" in guest and "dwl" in guest and "foot" in guest)?
   test.ok("guest_wait_for(p\"/run/laputa-foot-read-ready\", \"foot\", 30)" in guest)?

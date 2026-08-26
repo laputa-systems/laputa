@@ -1,5 +1,5 @@
-##! Canonical in-guest dwl and foot keyboard-input proof for qemu-dwl-foot.
 #!/bin/xsh
+##! Canonical in-guest dwl and foot keyboard-input proof for qemu-dwl-foot.
 error GuestProofError = Failed(phase: Str, message: Str)
 
 proc guest_console(message: Str) [fs, error] {
@@ -34,24 +34,25 @@ proc guest_run_required(command: Command, phase: Str) [fs, process, error] {
 }
 
 proc main() [fs, process, time, error] {
-  let mdevd = process.which("mdevd")?
-  let coldplug = process.which("mdevd-coldplug")?
-  let seatd = process.which("seatd")?
-  let dwl = process.which("dwl")?
-  let foot = process.which("foot")?
   let _mdevd = spawn process.command_argv(
-    mdevd,
+    /usr/bin/mdevd,
     ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-C"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
-  guest_run_required(process.command_argv(coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")?
+  guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")?
 
   for device in [p"/dev/input/event0", p"/dev/input/event1"] {
     guest_wait_for(device, "input-devices", 20)?
   }
 
   fs.remove(p"/run/seatd.sock", missing_ok: true)?
-  let _seatd = spawn process.command_argv(seatd, ["seatd", "-g", "seat"], env: {PATH: "/usr/local/bin:/usr/bin:/bin"})?
+  # The serial-only QEMU proof has no virtual terminal.  An unbound seat is
+  # immediately active while still mediating the virtio DRM and input devices.
+  let _seatd = spawn process.command_argv(
+    /usr/bin/seatd,
+    ["seatd", "-g", "seat"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
+  )?
   guest_wait_for(p"/run/seatd.sock", "seatd", 20)?
   if ! fs.exists(p"/run/user/0")? {
     fs.mkdir(p"/run/user/0")?
@@ -64,14 +65,14 @@ proc main() [fs, process, time, error] {
     """#!/bin/xsh
 fs.write(p"/run/laputa-foot-read-ready", "ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
-let input = io.stdin().read_to_end()?.utf8()?
+let input = io.stdin_text()?
 fs.write(p"/run/laputa-foot-input.txt", input)?
 """,
   )?
   fs.chmod(p"/run/laputa-foot-read.xsh", 0o755)?
   let command = process.command_argv(
-    dwl,
-    ["dwl", "-s", f"${foot} /bin/xsh /run/laputa-foot-read.xsh"],
+    /usr/bin/dwl,
+    ["dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/laputa-foot-read.xsh"],
     env: {
       PATH: "/usr/local/bin:/usr/bin:/bin",
       XDG_RUNTIME_DIR: "/run/user/0",

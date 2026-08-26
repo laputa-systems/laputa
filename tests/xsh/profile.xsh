@@ -17,7 +17,7 @@ proc test_qemu_dwl_foot_profile_has_exact_runtime_intent() [fs, error] {
   test.ok(! (value.kernel_package in value.package_roots))?
   test.eq(value.kernel_path, p"boot/vmlinuz")?
   test.eq(value.session.interactive_argv, ["/usr/bin/dwl", "-s", "/usr/bin/foot /bin/xshi --no-config"])?
-  test.eq(value.session.proof_argv, ["/usr/bin/dwl", "-s", "/usr/bin/foot /bin/xsh /run/qemu-dwl-foot-proof.xsh"])?
+  test.eq(value.session.proof_argv, ["/usr/bin/dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/qemu-dwl-foot-proof.xsh"])?
   test.eq(value.qemu, {machine: "virt,accel=hvf,highmem=off", cpu: "host", smp: 2, memory: "1536M", width: 1280, height: 800})?
   test.eq(value.forbidden_packages, ["llvm-toolchain", "pkgconf", "cmake", "muon", "samurai", "m4", "flex", "bison", "wayland-dev", "wayland-protocols", "pixman-dev", "dbus", "systemd", "xwayland", "gtk", "pango", "pipewire", "pulseaudio", "python"])?
   test.eq(value.forbidden_sonames, ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"])?

@@ -21,7 +21,7 @@ export let profile: types.SystemProfile = {
     compositor: p"/usr/bin/dwl",
     terminal: p"/usr/bin/foot",
     interactive_argv: ["/usr/bin/dwl", "-s", "/usr/bin/foot /bin/xshi --no-config"],
-    proof_argv: ["/usr/bin/dwl", "-s", "/usr/bin/foot /bin/xsh /run/qemu-dwl-foot-proof.xsh"],
+    proof_argv: ["/usr/bin/dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/qemu-dwl-foot-proof.xsh"],
   },
   qemu: {
     machine: "virt,accel=hvf,highmem=off",

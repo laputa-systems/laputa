@@ -33,7 +33,14 @@ proc profile_start_interactive() [fs, process, time, error] {
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
   run $coldplug "-O" "4" ?
-  let _seatd = spawn process.command_argv(seatd, ["seatd", "-g", "seat"], env: {PATH: "/usr/local/bin:/usr/bin:/bin"})?
+  # This profile drives a serial-only virtio-GPU machine, so no tty0 exists to
+  # activate a VT-bound seat.  Keep seatd's DRM/input mediation but make its
+  # session active without a virtual terminal.
+  let _seatd = spawn process.command_argv(
+    seatd,
+    ["seatd", "-g", "seat"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
+  )?
   profile_wait_for(p"/run/seatd.sock", 20)?
   if ! fs.exists(p"/run/user/0")? {
     fs.mkdir(p"/run/user/0")?
