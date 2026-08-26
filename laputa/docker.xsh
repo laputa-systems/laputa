@@ -57,6 +57,9 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
 export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
+    # PM modules must resolve from the mounted checkout's source root.
+  # The finished rootfs may contain /usr/lib/pm, but it must never share the
+  # interpreter process used for planning, execution, or generation.
   var argv = [
     value.docker.display(),
     "run",
@@ -78,7 +81,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--workdir",
     "/src/packages",
     "--env",
-    "XSH_MODULE_PATH=/src/laputa:/src/packages",
+    "XSH_MODULE_PATH=/src/packages:/src/laputa",
     "--env",
     "PATH=/bin:/usr/bin",
   ]
@@ -92,7 +95,10 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
 
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
 export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
-  var argv = ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages"]
+  # The mounted checkout owns this PM invocation.  Mixing the image's pm.xsh
+  # entrypoint with checkout modules loads pm.types twice under the published
+  # runner's shared user-module namespace.
+  var argv = ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages"]
 
   for package_name in profile.package_roots {
     argv = argv.extend(["--root", package_name])

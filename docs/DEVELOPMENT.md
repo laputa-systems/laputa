@@ -17,7 +17,7 @@ Build the local debug XSH tools before invoking these commands if they do not ye
 
 ```bash
 cd "$HOME/d/laputa-systems/laputa"
-"$XSHT" check --strict \
+XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check --strict \
   laputa.xsh \
   laputa/*.xsh \
   profiles/*.xsh \
@@ -85,8 +85,11 @@ The final public Laputa CLI intentionally has no store command. Invoke the PM ve
 cd "$HOME/d/laputa-systems/laputa"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v1,dst=/artifacts,readonly \
+  --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
+  --workdir /src/packages \
+  --env XSH_MODULE_PATH=/src/packages \
   laputa-package-tools \
-  pm store verify --store /artifacts
+  /bin/xsh /src/packages/pm.xsh -- store verify --store /artifacts
 ```
 
 Every artifact must verify. This is `pm store verify --store STORE` running in the Docker build environment; it does not publish or mutate the repository.
@@ -98,8 +101,21 @@ cd "$HOME/d/laputa-systems/laputa"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v1,dst=/artifacts,readonly \
   --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \
+  --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
+  --workdir /src/packages \
+  --env XSH_MODULE_PATH=/src/packages \
   laputa-package-tools \
-  pm root inspect /profile/generation.json
+  /bin/xsh /src/packages/pm.xsh -- root inspect /profile/generation.json
 ```
 
 The generation's direct runtime roots must be `baselayout`, `xsh`, `laputa-pm`, `xinit`, `mdevd`, `seatd`, `dwl-minimal`, and `foot-minimal`. Build-only tools must be absent unless independently runtime-required: `llvm-toolchain`, `pkgconf`, `cmake`, `muon`, `samurai`, `m4`, `flex`, `bison`, `wayland-dev`, `wayland-protocols`, and `pixman-dev`.
+
+## Scope
+
+The core profile is aarch64-only. Browser automation, real hardware, IPv6,
+and Wi-Fi are not acceptance targets for this profile. Installer workflows are
+kept separate from the typed profile CLI; see the installer entrypoints in the
+root `Makefile` when working on that product.
+
+For QEMU requirements, output artifacts, QMP proof semantics, and failure
+marker diagnosis, see [QEMU proof](QEMU.md).

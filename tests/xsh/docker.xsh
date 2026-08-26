@@ -21,7 +21,7 @@ proc test_profile_plan_command_has_exact_direct_roots_and_kernel() [fs, error] {
   test.eq(
     docker.docker_pm_plan_argv(value),
     [
-      "/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages",
+      "/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages",
       "--root", "baselayout",
       "--root", "xsh",
       "--root", "laputa-pm",
@@ -65,6 +65,8 @@ proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
   test.ok(argv |> any .contains("dst=/output"))?
   test.ok(argv |> any .contains("laputa-artifacts-aarch64-v1"))?
   test.ok(argv |> any .contains("laputa-sources-aarch64-v1"))?
+  test.ok("XSH_MODULE_PATH=/src/packages:/src/laputa" in argv)?
+  test.ok(! (argv |> any .contains("XSH_MODULE_PATH=/src/laputa:/src/packages")))?
   test.ok(! (argv |> any .contains("amd64")))?
   test.ok(! (argv |> any .contains("x86_64")))?
 }

@@ -1,16 +1,15 @@
 ##! Native-arm64 profile execution: one saved PM plan becomes verified artifacts, a runtime generation, and atomic image outputs.
 #!/bin/xsh
+use laputa.container_output as container_output
 use laputa.image as image
-use pm.execute as pm_execute
-use pm.generation as pm_generation
-use pm.plan_json as pm_plan_json
-use pm.remote as pm_remote
-use pm.store as pm_store
-use pm.types as pm_types
+# This one facade keeps PM's typed values inside the mounted package checkout.
+# The installed `/usr/lib/pm` copy is deliberately not a candidate in this
+# process: the published runner gives duplicate module identities distinct tags.
+use pm.generation_adapter as pm_generation_adapter
 
-## This script intentionally does not import `laputa.types` or `laputa.profile`.
-## PM and Laputa each declare their supported-target tag; XSH's user-module runtime currently
-## shares tag symbols, so the host validates SystemProfile and passes this narrow JSON DTO.
+# This script intentionally does not import `laputa.types` or `laputa.profile`.
+# PM and Laputa each declare their supported-target tag; XSH's user-module runtime currently
+# shares tag symbols, so the host validates SystemProfile and passes this narrow JSON DTO.
 error ContainerBuildError = Failed(message: Str) : InvalidData
 
 type ContainerProfileBuildRequest = {
@@ -22,23 +21,6 @@ type ContainerProfileBuildRequest = {
   forbidden_packages: List[Str],
   forbidden_sonames: List[Str],
 }
-
-type ContainerGenerationArtifactDto = {package_name: Str, package_id: Str, artifact_key: Str}
-
-type ContainerGenerationPlanDto = {
-  format: Str,
-  target: Str,
-  build_plan_sha256: Str,
-  profile: Str,
-  overlay_sha256: Str,
-  replacements: List[Str],
-  runtime_roots: List[Str],
-  artifacts: List[ContainerGenerationArtifactDto],
-  generation_sha256: Str,
-}
-
-type ContainerArtifactMetadataFileDto = {path: Str, kind: Str, mode: Int, sha256: Str, target: Str}
-type ContainerArtifactMetadataDto = {name: Str, ver: Str, rel: Str, package_kind: Str, files: List[ContainerArtifactMetadataFileDto]}
 
 pure container_output_root() -> Path {
   p"/output"
@@ -60,8 +42,8 @@ pure container_generation_receipt_path() -> Path {
   fp"${container_output_root()}/generation.json"
 }
 
-pure container_generation_root(key: Str) -> Path {
-  fp"${container_output_root()}/generations/${key}"
+pure container_output_generation_parent() -> Path {
+  fp"${container_output_root()}/generations"
 }
 
 pure container_overlay_root(name: Str) -> Path {
@@ -92,18 +74,36 @@ pure container_disk_output() -> Path {
   fp"${container_output_root()}/disk.img"
 }
 
-pure container_generation_plan_dto(value: pm_types.GenerationPlan) -> ContainerGenerationPlanDto {
-  {
-    format: value.format,
-    target: pm_types.target_text(value.target),
-    build_plan_sha256: value.build_plan_sha256,
-    profile: value.profile.name,
-    overlay_sha256: value.profile.overlay_sha256,
-    replacements: value.profile.replacements,
-    runtime_roots: value.runtime_roots,
-    artifacts: [{package_name: item.package_name, package_id: item.package_id, artifact_key: item.artifact_key} for item in value.artifacts],
-    generation_sha256: value.generation_sha256,
-  }
+# `/output` is a host bind mount and may be case-folding (notably on macOS),
+# while the target ext4 generation is case-sensitive.  Keep every mutable root,
+# generation, and image path beneath the container-local temporary workspace;
+# only final regular artifacts and JSON manifests cross this boundary.
+pure container_work_build_plan(work: Path) -> Path {
+  fp"${work}/build-plan.json"
+}
+
+pure container_work_generation_parent(work: Path) -> Path {
+  fp"${work}/generations"
+}
+
+pure container_work_generation_plan(work: Path) -> Path {
+  fp"${work}/generation-plan.json"
+}
+
+pure container_work_generation_receipt(work: Path) -> Path {
+  fp"${work}/generation.json"
+}
+
+pure container_work_kernel(work: Path) -> Path {
+  fp"${work}/vmlinuz"
+}
+
+pure container_work_rootfs(work: Path) -> Path {
+  fp"${work}/rootfs.ext4"
+}
+
+pure container_work_disk(work: Path) -> Path {
+  fp"${work}/disk.img"
 }
 
 proc container_load_request() [fs, error] -> Result[ContainerProfileBuildRequest] {
@@ -139,58 +139,6 @@ proc container_prepare_overlay(request: ContainerProfileBuildRequest, work: Path
   overlay
 }
 
-proc container_load_generation_plan(request: ContainerProfileBuildRequest, overlay: Path) [fs, error] -> Result[pm_types.GenerationPlan] {
-  let value = pm_plan_json.read(container_build_plan_path())?
-  let profile = pm_generation.overlay_profile(overlay)?
-
-  if profile.name != request.name {
-    return Err(ContainerBuildError.Failed(f"overlay profile ${profile.name} does not match ${request.name}"))
-  }
-
-  pm_generation.plan_profile(value, request.runtime_roots, profile)
-}
-
-proc container_write_generation_plan(value: pm_types.GenerationPlan) [fs, error] {
-  fs.write_atomic(container_generation_plan_path(), json.encode(container_generation_plan_dto(value))? + "\n")?
-}
-
-proc container_publish_generation_receipt(root: Path, expected: pm_types.GenerationReceipt) [fs, error] {
-  let actual = pm_generation.read_generation_receipt(root)?
-
-  if actual != expected {
-    return Err(ContainerBuildError.Failed("completed generation receipt does not match its plan"))
-  }
-
-  fs.write_atomic(container_generation_receipt_path(), fs.read_text(fp"${root}/var/lib/laputa/generation.json")?)?
-}
-
-proc container_ensure_generation(value: pm_types.GenerationPlan, overlay: Path) [fs, error] -> Result[pm_types.GenerationReceipt] {
-  let root = container_generation_root(value.generation_sha256)
-
-  if fs.exists(root)? {
-    let receipt = pm_generation.read_generation_receipt(root)?
-    if receipt.generation_sha256 != value.generation_sha256 or receipt.build_plan_sha256 != value.build_plan_sha256 {
-      return Err(ContainerBuildError.Failed(f"existing generation ${value.generation_sha256} does not match the saved plan"))
-    }
-    pm_generation.verify_generation(root, receipt)?
-    container_publish_generation_receipt(root, receipt)?
-    return receipt
-  }
-
-  let receipt = pm_generation.compose(value, container_store_root(), root, overlay)?
-  pm_generation.verify_generation(root, receipt)?
-  container_publish_generation_receipt(root, receipt)?
-  receipt
-}
-
-proc container_require_no_forbidden_packages(receipt: pm_types.GenerationReceipt, request: ContainerProfileBuildRequest) [error] {
-  for artifact in receipt.artifacts {
-    if artifact.package_name in request.forbidden_packages {
-      return Err(ContainerBuildError.Failed(f"generation includes forbidden package ${artifact.package_name}"))
-    }
-  }
-}
-
 proc container_require_no_forbidden_sonames(root: Path, request: ContainerProfileBuildRequest) [fs, error] {
   for entry in fs.walk(root, hidden: true) {
     continue unless entry.kind == "file"
@@ -212,75 +160,81 @@ proc container_require_no_forbidden_sonames(root: Path, request: ContainerProfil
   }
 }
 
-proc container_find_kernel_node(value: pm_types.BuildPlan, request: ContainerProfileBuildRequest) [error] -> Result[pm_types.PlanNode] {
-  for node in value.nodes {
-    if node.name == request.kernel_package {
-      return node
-    }
+proc container_stage_build_plan(work: Path) [fs, error] -> Result[Path] {
+  let source = container_build_plan_path()
+  let staged = container_work_build_plan(work)
+
+  if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
+    return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: ${source}"))
   }
 
-  Err(ContainerBuildError.Failed(f"kernel package ${request.kernel_package} is not in the saved BuildPlan"))
+  fs.copy(source, staged)?
+
+  if hash.sha256(source)?.hex() != hash.sha256(staged)?.hex() {
+    return Err(ContainerBuildError.Failed("container-local BuildPlan staging does not match the saved manifest"))
+  }
+
+  staged
 }
 
-proc container_kernel_manifest_file(metadata: ContainerArtifactMetadataDto, request: ContainerProfileBuildRequest) [error] -> Result[ContainerArtifactMetadataFileDto] {
-  if metadata.name != request.kernel_package {
-    return Err(ContainerBuildError.Failed(f"kernel artifact metadata names ${metadata.name}, expected ${request.kernel_package}"))
-  }
-
-  for entry in metadata.files {
-    if entry.path == request.kernel_path and (entry.kind == "file" or entry.kind == "binary") and entry.sha256 != "" {
-      return entry
-    }
-  }
-
-  Err(ContainerBuildError.Failed(f"kernel artifact metadata does not declare ${request.kernel_path}"))
+proc container_extract_kernel(build_plan: Path, request: ContainerProfileBuildRequest, output: Path) [fs, error] {
+  pm_generation_adapter.generation_adapter_copy_manifest_file(
+    build_plan,
+    container_store_root(),
+    request.kernel_package,
+    fp"${request.kernel_path}",
+    output,
+  )?
 }
 
-proc container_extract_kernel(value: pm_types.BuildPlan, request: ContainerProfileBuildRequest) [fs, error] {
-  let node = container_find_kernel_node(value, request)?
-  let receipt = pm_store.lookup(container_store_root(), node.artifact_key)?
-
-  if receipt.package_name != request.kernel_package or receipt.package_id != node.package_id or receipt.key != node.artifact_key {
-    return Err(ContainerBuildError.Failed("kernel artifact receipt does not match the BuildPlan"))
-  }
-
-  let metadata = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(ContainerArtifactMetadataDto)?
-  let manifest = container_kernel_manifest_file(metadata, request)?
-  let handle = fs.tempdir()?
-  defer fs.close_root(handle)?
-  let extracted = fs.root_path(handle)?
-  archive.tar_extract(fp"${receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)?
-  let source = image.image_kernel_source(extracted, fp"${request.kernel_path}")?
-
-  if hash.sha256(source)?.hex() != manifest.sha256 {
-    return Err(ContainerBuildError.Failed(f"kernel payload digest does not match metadata for ${request.kernel_path}"))
-  }
-
-  image.image_copy_kernel(source, container_kernel_output())?
+proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, error] {
+  image.image_write_rootfs(root, p"/src/packages/repo/laputa-fs/files/mkfs.ext4.xsh", rootfs)?
+  image.write_disk(rootfs, disk)?
+  image.verify_disk(disk, fs.metadata(rootfs)?.size)?
 }
 
-proc container_build_images(root: Path) [fs, process, error] {
-  image.image_write_rootfs(root, p"/src/packages/repo/laputa-fs/files/mkfs.ext4.xsh", container_rootfs_output())?
-  image.write_disk(container_rootfs_output(), container_disk_output())?
-  image.verify_disk(container_disk_output(), fs.metadata(container_rootfs_output())?.size)?
+proc container_publish_execution(work: Path) [fs, error] {
+  # A previous implementation placed generations below `/output`.  That tree
+  # cannot represent all Linux target paths on a case-folding host, so remove
+  # only this obsolete generated staging location after the local result has
+  # passed every verification step.
+  fs.remove(container_output_generation_parent(), missing_ok: true)?
+
+  for item in [
+    {source: container_work_generation_plan(work), output: container_generation_plan_path()},
+    {source: container_work_generation_receipt(work), output: container_generation_receipt_path()},
+    {source: container_work_kernel(work), output: container_kernel_output()},
+    {source: container_work_rootfs(work), output: container_rootfs_output()},
+    {source: container_work_disk(work), output: container_disk_output()},
+  ] {
+    container_output.publish_final_file(item.source, item.output)?
+  }
 }
 
 proc container_execute_profile(request: ContainerProfileBuildRequest, jobs: Int) [fs, net, process, env, time, error] {
-  let plan_value = pm_plan_json.read(container_build_plan_path())?
-  let urls = pm_remote.load_repo_urls()?
-  let remote_repo = if urls.repo != "" { urls.repo } else { urls.public_repo }
-  let _ = pm_execute.build_plan(plan_value, container_package_root(), container_store_root(), remote_repo, jobs)?
   let handle = fs.tempdir()?
   defer fs.close_root(handle)?
-  let overlay = container_prepare_overlay(request, fs.root_path(handle)?)?
-  let generation = container_load_generation_plan(request, overlay)?
-  container_write_generation_plan(generation)?
-  let receipt = container_ensure_generation(generation, overlay)?
-  let root = container_generation_root(receipt.generation_sha256)
-  container_require_no_forbidden_packages(receipt, request)?
+  let work = fs.root_path(handle)?
+  let build_plan = container_stage_build_plan(work)?
+  let overlay = container_prepare_overlay(request, work)?
+  let generation = pm_generation_adapter.generation_adapter_execute_profile(
+    build_plan,
+    container_package_root(),
+    container_store_root(),
+    jobs,
+    request.runtime_roots,
+    request.name,
+    overlay,
+    container_work_generation_parent(work),
+    container_work_generation_plan(work),
+    container_work_generation_receipt(work),
+    request.forbidden_packages,
+  )?
+  let root = generation.generation_root
   container_require_no_forbidden_sonames(root, request)?
-  container_extract_kernel(plan_value, request)?
-  container_build_images(root)?
+  container_extract_kernel(build_plan, request, container_work_kernel(work))?
+  container_build_images(root, container_work_rootfs(work), container_work_disk(work))?
+  container_publish_execution(work)?
 }
 
 proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
@@ -300,8 +254,16 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
   if argv[0] == "plan" {
     let handle = fs.tempdir()?
     defer fs.close_root(handle)?
-    let overlay = container_prepare_overlay(request, fs.root_path(handle)?)?
-    container_write_generation_plan(container_load_generation_plan(request, overlay)?)?
+    let work = fs.root_path(handle)?
+    let overlay = container_prepare_overlay(request, work)?
+    pm_generation_adapter.generation_adapter_plan_profile(
+      container_build_plan_path(),
+      request.runtime_roots,
+      request.name,
+      overlay,
+      container_work_generation_plan(work),
+    )?
+    container_output.publish_final_file(container_work_generation_plan(work), container_generation_plan_path())?
     return
   }
 

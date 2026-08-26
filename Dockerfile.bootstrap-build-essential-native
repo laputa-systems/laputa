@@ -79,22 +79,14 @@ COPY --from=bootstrap-musl-source-mirror /src/.out/source-mirrors/ /
 FROM alpine-seed AS llvm-seed-root
 
 COPY --from=packages pm.xsh packages/pm.xsh
-COPY --from=packages pm/extensions.xsh packages/pm/extensions.xsh
-COPY --from=packages pm/local.xsh packages/pm/local.xsh
-COPY --from=packages pm/remote.xsh packages/pm/remote.xsh
-COPY --from=packages pm/sources.xsh packages/pm/sources.xsh
-COPY --from=packages pm/types.xsh packages/pm/types.xsh
-COPY --from=packages pm/util.xsh packages/pm/util.xsh
+COPY --from=packages pm/ packages/pm/
 COPY --from=packages repo/llvm-toolchain/ packages/repo/llvm-toolchain/
+COPY bootstrap-llvm-seed.xsh /src/bootstrap-llvm-seed.xsh
 
-RUN xsh packages/pm.xsh -- build \
-    /src/target/bootstrap-seed-repo \
-    /src/packages/repo/llvm-toolchain
-
-RUN XSH_PM_REPO=file:///src/target/bootstrap-seed-repo \
-    xsh packages/pm.xsh -- install \
-    /seed-root /tmp/pm-work-llvm-seed /tmp/pm-out-llvm-seed \
-    llvm-toolchain
+# This explicit prebuilt seed satisfies policy.aarch64_docker's external
+# bootstrap edge. The adapter verifies declared source bytes before invoking
+# the typed recipe build boundary; it is not a legacy pm build/install path.
+RUN xsh /src/bootstrap-llvm-seed.xsh -- /src/packages /seed-root
 
 RUN mkdir -p /seed-root/bin /seed-root/lib /seed-root/usr/bin /seed-root/usr/lib /seed-root/tmp && \
     chmod 1777 /seed-root/tmp && \
@@ -109,6 +101,8 @@ RUN mkdir -p /seed-root/bin /seed-root/lib /seed-root/usr/bin /seed-root/usr/lib
     ln -sf usr/bin/xinit /seed-root/init && \
     chroot /seed-root /bin/sh -c "let x = 1" && \
     chroot /seed-root /bin/xsh --help >/dev/null && \
+    chroot /seed-root /bin/xshi --help >/dev/null && \
+    chroot /seed-root /bin/xsht --help >/dev/null && \
     chroot /seed-root /usr/bin/cc --version >/dev/null
 
 FROM scratch AS bootstrap-musl

@@ -35,24 +35,56 @@ RUN mkdir -p /xsh-release/bin /xsh-release/usr/bin && \
 FROM scratch AS xsh-release
 COPY --from=xsh-release-builder /xsh-release/ /
 
-FROM xsh-release AS build-essential-native-installer
+# The executor identity fingerprints this complete pinned runner triplet. Keep
+# the reusable package-tools base honest before any recipe can start.
+FROM xsh-release AS build-essential-native-runners
+RUN ["/bin/xsh", "--help"]
+RUN ["/bin/xshi", "--help"]
+RUN ["/bin/xsht", "--help"]
+
+# `bootstrap_seed` is the verified output of Dockerfile.bootstrap-build-essential-native's
+# `llvm-seed-root` target. It supplies the explicit compiler bootstrap demanded by the
+# typed policy while the normal BuildPlan rebuilds all package artifacts.
+FROM xsh-release AS build-essential-native-bootstrap-contract
+COPY --from=bootstrap_seed /seed-root/ /
+RUN ["/bin/xsh", "--help"]
+RUN ["/bin/xshi", "--help"]
+RUN ["/bin/xsht", "--help"]
+RUN ["/usr/bin/cc", "--version"]
+
+FROM build-essential-native-bootstrap-contract AS build-essential-native-installer
 
 ARG LAPUTA_REPO_URL=https://laputa.17166969.xyz
 
 WORKDIR /src
 ENV PATH=/bin:/usr/bin
-ENV XSH_MODULE_PATH=/usr/lib/pm
+# The installer executes from the checked-out PM root below.  Keeping this
+# single module root avoids loading the same XSH module from both `/src` and
+# `/usr/lib/pm` in the pinned published runner.
+ENV XSH_MODULE_PATH=/src
 ENV XSH_PM_REPO=${LAPUTA_REPO_URL}
 
 COPY --from=packages pm.xsh /usr/lib/pm/pm.xsh
 COPY --from=packages pm/ /usr/lib/pm/pm/
-COPY export-remote-cache.xsh /usr/lib/pm/export-remote-cache.xsh
+# `pm repo build` fingerprints the checked-out PM source and requires a real
+# package repository as its execution root.  Keep that identity separate from
+# the installed `/usr/lib/pm` copy used by the final image.
+COPY --from=packages pm.xsh /src/pm.xsh
+COPY --from=packages pm/ /src/pm/
+COPY --from=packages repo/ /src/repo/
 COPY --from=packages repo/ca-certificates/files/cacert.pem /etc/ssl/certs/ca-certificates.crt
 COPY --from=packages repo/ca-certificates/files/cacert.pem /etc/ssl/cert.pem
 
-RUN ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "install", "/build-env", "/tmp/pm-work-build-env", "/tmp/pm-out-build-env", "baselayout", "ca-certificates", "zlib", "build-essential-native"]
-RUN ["/bin/xsh", "/usr/lib/pm/pm.xsh", "--", "install", "/rootfs", "/tmp/pm-work-rootfs", "/tmp/pm-out-rootfs", "baselayout", "ca-certificates", "zlib", "build-essential-native"]
-RUN ["/bin/xsh", "/usr/lib/pm/export-remote-cache.xsh", "--", "/tmp/pm-out-build-env", "/repo"]
+# This base is an immutable generation, not a legacy mutable `pm install`
+# root.  The same verified BuildPlan and Store compose both roots and publish
+# their exact artifacts for later package builds.
+RUN ["/usr/bin/mkdir", "-p", "/tmp"]
+RUN ["/bin/xsh", "/src/pm.xsh", "--", "repo", "plan", "--repo", "/src", "--root", "baselayout", "--root", "ca-certificates", "--root", "zlib", "--root", "build-essential-native", "--target", "aarch64-linux-musl", "--output", "/tmp/build-plan.json"]
+RUN ["/bin/xsh", "/src/pm.xsh", "--", "repo", "build", "/tmp/build-plan.json", "--store", "/tmp/artifacts", "--jobs", "1"]
+RUN ["/bin/xsh", "/src/pm.xsh", "--", "root", "compose", "/tmp/build-plan.json", "--store", "/tmp/artifacts", "--runtime-root", "baselayout", "--runtime-root", "ca-certificates", "--runtime-root", "zlib", "--runtime-root", "build-essential-native", "--output", "/build-env"]
+RUN ["/bin/xsh", "/src/pm.xsh", "--", "root", "compose", "/tmp/build-plan.json", "--store", "/tmp/artifacts", "--runtime-root", "baselayout", "--runtime-root", "ca-certificates", "--runtime-root", "zlib", "--runtime-root", "build-essential-native", "--output", "/rootfs"]
+ENV XSH_PM_REPO=file:///repo
+RUN ["/bin/xsh", "/src/pm.xsh", "--", "repo", "publish", "/tmp/build-plan.json", "--store", "/tmp/artifacts"]
 
 FROM scratch AS build-essential-native
 
