@@ -19,16 +19,19 @@ cd "$HOME/d/laputa-systems/laputa"
 "$XSH_HOST" laputa.xsh -- boot qemu-dwl-foot
 ```
 
+`test` and `boot` first build or refresh the active `current` system bundle.
 `test` is deterministic: it starts QEMU without an interactive display, uses
 QMP to inject `laputa` followed by EOF exactly once, waits for the bounded
 guest proof, and saves a deterministic screenshot. `boot` is the separate
 interactive Cocoa-display diagnostic command.
 
-The profile output directory is `target/laputa/qemu-dwl-foot` and contains
-`disk.img`, `rootfs.ext4`, `vmlinuz`, `generation.json`, `console.log`,
-`qemu.log`, and `screenshot.ppm`. Image construction stages generation/rootfs
-data on the container's Linux filesystem; only completed final artifacts are
-copied atomically to the host output mount.
+The profile output directory is `target/laputa/qemu-dwl-foot`. Each immutable
+system bundle is `builds/<system-key>/` and contains `build-plan.json`,
+`generation.json`, `disk.img`, `rootfs.ext4`, and `vmlinuz`. `current` is an
+atomic symlink to one complete bundle. `console.log`, `qemu.log`, and
+`screenshot.ppm` are proof outputs at the profile root. Image construction
+stages generation/rootfs data on the container's Linux filesystem; only a
+complete verified bundle is copied atomically to the host output mount.
 
 ## Proof contract
 

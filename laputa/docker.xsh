@@ -14,6 +14,35 @@ export type DockerConfig = {
   repo_url: Str,
 }
 
+let package_tools_contract_epoch = "laputa-package-tools-1"
+
+pure package_tools_dockerfile(value: DockerConfig) -> Path {
+  fp"${value.laputa_root}/Dockerfile.package-tools"
+}
+
+pure package_tools_bootstrap_helper(value: DockerConfig) -> Path {
+  fp"${value.laputa_root}/bootstrap-llvm-seed.xsh"
+}
+
+proc package_tools_tree_digest(root: Path) [fs, error] -> Result[Str] {
+  if ! fs.exists(root)? {
+    return Err(types.LaputaError.Docker(f"package-tools bootstrap input is missing ${root}"))
+  }
+
+  let metadata = fs.metadata(root)?
+  if metadata.kind == "file" {
+    return hash.sha256(root)?.hex()
+  }
+
+  var lines: List[Str] = []
+  for entry in fs.walk(root) |> where .kind == "file" {
+    lines = lines.push(f"${entry.path.strip_prefix(root)?.display()}\t${hash.sha256(entry.path)?.hex()}")
+  }
+
+  let sorted = lines |> sort
+  bytes.from_text(sorted.join("\n") + "\n").sha256().hex()
+}
+
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = (env.get(name) ?? "").trim()
   if value == "" {
@@ -42,17 +71,18 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     let _ = process.which(docker.display())?
   }
 
-  {
+  let base: DockerConfig = {
     docker,
     packages_root,
     laputa_root,
     xsh_root,
     output_root,
-    artifact_volume: "laputa-artifacts-aarch64-v1",
-    source_volume: "laputa-sources-aarch64-v1",
+    artifact_volume: "laputa-artifacts-aarch64-v2",
+    source_volume: "laputa-sources-aarch64-v2",
     image: "laputa-package-tools",
     repo_url: env_value("LAPUTA_REPO_URL", ""),
   }
+  {...base, image: ensure_package_tools(base)?}
 }
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
@@ -93,6 +123,122 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
   argv.push(value.image).extend(inner_argv)
 }
 
+## Construct the native-arm64 Docker build argv for the focused package-tools image.
+export pure package_tools_build_argv(value: DockerConfig, tag: Str) -> List[Str] {
+  [
+    value.docker.display(),
+    "build",
+    "--platform",
+    "linux/arm64",
+    "--file",
+    package_tools_dockerfile(value).display(),
+    "--build-context",
+    f"packages=${value.packages_root.display()}",
+    "--tag",
+    tag,
+    value.laputa_root.display(),
+  ]
+}
+
+## Construct the structured Docker image-inspection argv used by package-tools ensure.
+export pure package_tools_inspect_argv(value: DockerConfig, tag: Str) -> List[Str] {
+  [
+    value.docker.display(),
+    "image",
+    "inspect",
+    "--format",
+    "{{.Architecture}}",
+    tag,
+  ]
+}
+
+## Compute a key from only the focused package-tools bootstrap inputs.
+export proc package_tools_input_key(value: DockerConfig) [fs, env, error] -> Result[Str] {
+  let dockerfile = package_tools_dockerfile(value)
+  let bootstrap = package_tools_bootstrap_helper(value)
+
+  if ! fs.exists(dockerfile)? or fs.metadata(dockerfile)?.kind != "file" {
+    return Err(types.LaputaError.Docker(f"package-tools bootstrap contract is missing ${dockerfile}"))
+  }
+
+  if ! fs.exists(bootstrap)? or fs.metadata(bootstrap)?.kind != "file" {
+    return Err(types.LaputaError.Docker(f"package-tools bootstrap contract is missing ${bootstrap}"))
+  }
+
+  let body = f"""${package_tools_contract_epoch}
+dockerfile\t${hash.sha256(dockerfile)?.hex()}
+bootstrap-helper\t${hash.sha256(bootstrap)?.hex()}
+pm-entrypoint\t${package_tools_tree_digest(fp"${value.packages_root}/pm.xsh")?}
+pm-modules\t${package_tools_tree_digest(fp"${value.packages_root}/pm")?}
+llvm-seed-recipe\t${package_tools_tree_digest(fp"${value.packages_root}/repo/llvm-toolchain")?}
+xsh-release\t${env_value("XSH_RELEASE", "")}
+xsh-core-release\t${env_value("XSH_CORE_RELEASE", "")}
+architecture\tarm64
+"""
+  bytes.from_text(body).sha256().hex()
+}
+
+## Return the exact arm64-tagged image name for the focused package-tools inputs.
+export proc package_tools_image_tag(value: DockerConfig) [fs, env, error] -> Result[Str] {
+  f"laputa-package-tools:arm64-${package_tools_input_key(value)?}"
+}
+
+proc package_tools_image_architecture(value: DockerConfig, tag: Str) [fs, process, error] -> Result[Str] {
+  let handle = fs.tempdir()?
+  defer fs.close_root(handle)?
+  let work = fs.root_path(handle)?
+  let output = fp"${work}/architecture"
+  let status = process.run(
+    process.command_argv(
+      value.docker,
+      package_tools_inspect_argv(value, tag),
+      value.laputa_root,
+      stdout: output,
+    ),
+  )?
+
+  if ! status.ok {
+    return ""
+  }
+
+  if ! fs.exists(output)? {
+    return ""
+  }
+
+  fs.read_text(output)?
+}
+
+## Ensure the exact package-tools input image exists and is native arm64.
+export proc ensure_package_tools(value: DockerConfig) [fs, process, env, error] -> Result[Str] {
+  let tag = package_tools_image_tag(value)?
+  let architecture = package_tools_image_architecture(value, tag)?.trim()
+
+  if architecture != "" {
+    require_arm64_image_architecture(architecture)?
+    return tag
+  }
+
+  let built = process.run(
+    process.command_argv(
+      value.docker,
+      package_tools_build_argv(value, tag),
+      value.laputa_root,
+    ),
+  )?
+
+  if ! built.ok {
+    return Err(types.LaputaError.Docker(f"package-tools image build failed for ${tag}"))
+  }
+
+  let built_architecture = package_tools_image_architecture(value, tag)?.trim()
+  if built_architecture == "" {
+    return Err(types.LaputaError.Docker(f"package-tools image build did not produce ${tag}"))
+  }
+
+  require_arm64_image_architecture(built_architecture)?
+  tag
+}
+
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
 export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
   # The mounted checkout owns this PM invocation.  Mixing the image's pm.xsh
@@ -107,8 +253,6 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
   argv = argv.extend([
     "--root",
     profile.kernel_package,
-    "--target",
-    types.system_target_text(profile.target),
     "--output",
     "/output/build-plan.json",
   ])

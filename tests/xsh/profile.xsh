@@ -8,7 +8,6 @@ pure profiles_root() -> Path {
 
 proc test_qemu_dwl_foot_profile_has_exact_runtime_intent() [fs, error] {
   let value = profile.load("qemu-dwl-foot", profiles_root())?
-  test.eq(types.system_target_text(value.target), "aarch64-linux-musl")?
   test.eq(
     value.package_roots,
     ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd", "seatd", "dwl-minimal", "foot-minimal"],
@@ -16,9 +15,12 @@ proc test_qemu_dwl_foot_profile_has_exact_runtime_intent() [fs, error] {
   test.eq(value.kernel_package, "linux")?
   test.ok(! (value.kernel_package in value.package_roots))?
   test.eq(value.kernel_path, p"boot/vmlinuz")?
-  test.eq(value.session.interactive_argv, ["/usr/bin/dwl", "-s", "/usr/bin/foot /bin/xshi --no-config"])?
-  test.eq(value.session.proof_argv, ["/usr/bin/dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/qemu-dwl-foot-proof.xsh"])?
-  test.eq(value.qemu, {machine: "virt,accel=hvf,highmem=off", cpu: "host", smp: 2, memory: "1536M", width: 1280, height: 800})?
+  test.eq(value.qemu_machine, "virt,accel=hvf,highmem=off")?
+  test.eq(value.qemu_cpu, "host")?
+  test.eq(value.qemu_smp, 2)?
+  test.eq(value.qemu_memory, "1536M")?
+  test.eq(value.qemu_width, 1280)?
+  test.eq(value.qemu_height, 800)?
   test.eq(value.forbidden_packages, ["llvm-toolchain", "pkgconf", "cmake", "muon", "samurai", "m4", "flex", "bison", "wayland-dev", "wayland-protocols", "pixman-dev", "dbus", "systemd", "xwayland", "gtk", "pango", "pipewire", "pulseaudio", "python"])?
   test.eq(value.forbidden_sonames, ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"])?
 }
@@ -41,13 +43,15 @@ proc test_profile_load_rejects_unknown_and_path_names() [fs, error] {
 proc test_profile_validation_rejects_duplicate_or_invalid_roots() [error] {
   let valid: types.SystemProfile = {
     name: "valid",
-    target: types.Aarch64LinuxMusl,
     package_roots: ["one"],
     kernel_package: "linux",
     kernel_path: p"boot/vmlinuz",
-    session: {compositor: p"/usr/bin/dwl", terminal: p"/usr/bin/foot", interactive_argv: ["dwl"], proof_argv: ["dwl"]},
-    qemu: {machine: "virt", cpu: "host", smp: 1, memory: "512M", width: 1, height: 1},
-    proof: {success_markers: ["ok"], failure_markers: ["failed"], input_text: "x", screenshot_required: true},
+    qemu_machine: "virt",
+    qemu_cpu: "host",
+    qemu_smp: 1,
+    qemu_memory: "512M",
+    qemu_width: 1,
+    qemu_height: 1,
     forbidden_packages: [],
     forbidden_sonames: [],
   }
@@ -77,5 +81,5 @@ proc test_profile_validation_rejects_duplicate_or_invalid_roots() [error] {
 proc test_profile_digest_is_deterministic() [fs, error] {
   let value = profile.load("qemu-dwl-foot", profiles_root())?
   test.eq(profile.digest(value)?, profile.digest(value)?)?
-  test.ok(profile.digest(value)? != profile.digest({...value, qemu: {...value.qemu, smp: 3}})?)?
+  test.ok(profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?)?
 }

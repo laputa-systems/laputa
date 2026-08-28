@@ -27,11 +27,6 @@ export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
     return Err(types.LaputaError.Profile(f"invalid profile name ${value.name}"))
   }
 
-  match value.target {
-    Aarch64LinuxMusl => {}
-    UnsupportedSystemTarget => return Err(types.LaputaError.Profile(f"${value.name} has an unsupported target"))
-  }
-
   if value.package_roots.len() == 0 {
     return Err(types.LaputaError.Profile(f"${value.name} has no runtime package roots"))
   }
@@ -62,24 +57,8 @@ export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
     return Err(types.LaputaError.Profile(f"${value.name} has an invalid kernel manifest path"))
   }
 
-  if value.session.compositor.display() == "" or ! value.session.compositor.display().starts_with("/") {
-    return Err(types.LaputaError.Profile(f"${value.name} has an invalid compositor path"))
-  }
-
-  if value.session.terminal.display() == "" or ! value.session.terminal.display().starts_with("/") {
-    return Err(types.LaputaError.Profile(f"${value.name} has an invalid terminal path"))
-  }
-
-  if value.session.interactive_argv.len() == 0 or value.session.proof_argv.len() == 0 {
-    return Err(types.LaputaError.Profile(f"${value.name} must declare interactive and proof session arguments"))
-  }
-
-  if value.qemu.machine == "" or value.qemu.cpu == "" or value.qemu.smp <= 0 or value.qemu.memory == "" or value.qemu.width <= 0 or value.qemu.height <= 0 {
+  if value.qemu_machine == "" or value.qemu_cpu == "" or value.qemu_smp <= 0 or value.qemu_memory == "" or value.qemu_width <= 0 or value.qemu_height <= 0 {
     return Err(types.LaputaError.Profile(f"${value.name} has an invalid QEMU specification"))
-  }
-
-  if value.proof.success_markers.len() == 0 or value.proof.failure_markers.len() == 0 or value.proof.input_text == "" {
-    return Err(types.LaputaError.Profile(f"${value.name} has an incomplete guest proof contract"))
   }
 
   var forbidden_packages: Map[Bool] = {}
@@ -132,24 +111,15 @@ export proc digest(value: types.SystemProfile) [error] -> Result[Str] {
   validate(value)?
   let body = f"""laputa-system-profile-1
 name\t${value.name}
-target\t${types.system_target_text(value.target)}
 roots\t${value.package_roots.join(",")}
 kernel-package\t${value.kernel_package}
 kernel-path\t${value.kernel_path.display()}
-compositor\t${value.session.compositor.display()}
-terminal\t${value.session.terminal.display()}
-interactive\t${value.session.interactive_argv.join("\u{1f}")}
-proof\t${value.session.proof_argv.join("\u{1f}")}
-machine\t${value.qemu.machine}
-cpu\t${value.qemu.cpu}
-smp\t${value.qemu.smp}
-memory\t${value.qemu.memory}
-width\t${value.qemu.width}
-height\t${value.qemu.height}
-success\t${value.proof.success_markers.join("\u{1f}")}
-failure\t${value.proof.failure_markers.join("\u{1f}")}
-input\t${value.proof.input_text}
-screenshot\t${value.proof.screenshot_required}
+machine\t${value.qemu_machine}
+cpu\t${value.qemu_cpu}
+smp\t${value.qemu_smp}
+memory\t${value.qemu_memory}
+width\t${value.qemu_width}
+height\t${value.qemu_height}
 forbidden-packages\t${value.forbidden_packages.join(",")}
 forbidden-sonames\t${value.forbidden_sonames.join(",")}
 """

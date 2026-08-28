@@ -64,7 +64,7 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
     let token = argv[index]
 
     if token == "--jobs" or token == "-j" {
-      if command_name != "build" or index + 1 >= argv.len() {
+      if (command_name != "build" and command_name != "test" and command_name != "boot") or index + 1 >= argv.len() {
         return Err(types.LaputaError.Usage(f"invalid ${token} for laputa ${command_name}"))
       }
 
@@ -98,8 +98,14 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
       let outputs = build.plan_profile(docker.build_config(root, value.name)?, value)?
       print f"laputa plan ${value.name} ${profile.digest(value)?} ${outputs.build_plan}"
     }
-    LaputaTest => qemu.run_test(qemu.qemu_config(root)?, value, build.outputs(fp"${root}/target/laputa/${value.name}"))?
-    LaputaBoot => qemu.boot(qemu.qemu_config(root)?, value, build.outputs(fp"${root}/target/laputa/${value.name}"))?
+    LaputaTest => {
+      let outputs = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
+      qemu.run_test(qemu.qemu_config(root)?, value, outputs)?
+    }
+    LaputaBoot => {
+      let outputs = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
+      qemu.boot(qemu.qemu_config(root)?, value, outputs)?
+    }
     LaputaBuild => {
       let _ = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
       print f"laputa build ${value.name}: ok"

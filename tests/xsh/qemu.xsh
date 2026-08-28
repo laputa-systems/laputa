@@ -16,25 +16,15 @@ type SupervisorFixture = {
 pure fixture_profile() -> types.SystemProfile {
   {
     name: "qemu-dwl-foot",
-    target: types.Aarch64LinuxMusl,
     package_roots: ["baselayout"],
     kernel_package: "linux",
     kernel_path: p"boot/vmlinuz",
-    session: {compositor: p"/usr/bin/dwl", terminal: p"/usr/bin/foot", interactive_argv: ["dwl"], proof_argv: ["dwl"]},
-    qemu: {machine: "virt,accel=hvf,highmem=off", cpu: "host", smp: 2, memory: "1536M", width: 1280, height: 800},
-    proof: {
-      success_markers: ["LAPUTA_DWL_FOOT_PROOF_OK"],
-      failure_markers: [
-        "Kernel panic",
-        "not syncing",
-        "Attempted to kill init",
-        "Insufficient stack space",
-        "LAPUTA_DWL_FOOT_PROOF_FAILED",
-        "QEMU_FATAL",
-      ],
-      input_text: "laputa",
-      screenshot_required: true,
-    },
+    qemu_machine: "virt,accel=hvf,highmem=off",
+    qemu_cpu: "host",
+    qemu_smp: 2,
+    qemu_memory: "1536M",
+    qemu_width: 1280,
+    qemu_height: 800,
     forbidden_packages: [],
     forbidden_sonames: [],
   }
@@ -69,17 +59,16 @@ proc test_qemu_command_is_the_single_aarch64_hvf_contract() [error] {
 }
 
 proc test_console_markers_fail_before_success() [error] {
-  let value = fixture_profile().proof
-  for marker in value.failure_markers {
-    test.eq(proof.failure_marker(value, f"before ${marker} after"), marker)?
+  for marker in proof.failure_markers {
+    test.eq(proof.failure_marker(f"before ${marker} after"), marker)?
   }
-  test.ok(! proof.succeeded(value, "booting"))?
-  test.ok(proof.succeeded(value, "LAPUTA_DWL_FOOT_PROOF_OK"))?
-  match proof.verify_console(value, "LAPUTA_DWL_FOOT_PROOF_FAILED input") {
+  test.ok(! proof.succeeded("booting"))?
+  test.ok(proof.succeeded(proof.success_marker))?
+  match proof.verify_console("LAPUTA_DWL_FOOT_PROOF_FAILED input") {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match proof.verify_console(value, "LAPUTA_DWL_FOOT_PROOF_OK\nQEMU_FATAL after success") {
+  match proof.verify_console(f"${proof.success_marker}\nQEMU_FATAL after success") {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
@@ -88,6 +77,9 @@ proc test_console_markers_fail_before_success() [error] {
 proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
+  let bundle = fp"${outputs.builds}/fixture"
+  fs.mkdir(bundle, parents: true)?
+  fs.symlink(p"builds/fixture", outputs.current)?
   let fake_qemu = fp"${root}/fake-qemu.sh"
   let fake_qmp = fp"${root}/fake-qmp.sh"
   let attempt_one = fp"${root}/qmp-attempt-one"

@@ -274,8 +274,7 @@ proc main(...argv: List[Str]) [fs, net, error] {
 
   let laputa_files = [
     fp"Makefile",
-    fp"Dockerfile.build-essential-native",
-    fp"Dockerfile.bootstrap-build-essential-native",
+    fp"Dockerfile.package-tools",
     fp".github/workflows/laputa-validate.yml",
   ]
 

@@ -48,7 +48,7 @@ cd "$HOME/d/laputa-systems/laputa"
 "$XSH_HOST" laputa.xsh -- build qemu-dwl-foot --jobs 4
 ```
 
-The build resolves or imports exact package artifacts, composes an immutable generation, and atomically writes the profile image. A warm run reuses matching artifacts and preserves plan digest, generation digest, and image hash.
+The build resolves or imports exact package artifacts, composes an immutable generation, and atomically publishes one complete system bundle under `builds/<system-key>`. `current` is atomically switched to that bundle only after its plan, generation manifest, kernel, root filesystem, and disk image are all verified. A warm run reuses matching artifacts and preserves plan digest, generation digest, and image hash.
 
 ## Profile test
 
@@ -57,7 +57,7 @@ cd "$HOME/d/laputa-systems/laputa"
 "$XSH_HOST" laputa.xsh -- test qemu-dwl-foot
 ```
 
-Success is exactly `laputa test qemu-dwl-foot: ok`. The test uses QMP to inject deterministic input into the real foot terminal and validates console markers. Its output directory contains `console.log`, `qemu.log`, `screenshot.ppm`, `disk.img`, `vmlinuz`, and `generation.json`. A kernel panic marker is a test failure.
+`test` first produces or refreshes `current`, then uses QMP to inject deterministic input into the real foot terminal and validates console markers. Success is exactly `laputa test qemu-dwl-foot: ok`. The active bundle contains `disk.img`, `rootfs.ext4`, `vmlinuz`, `generation.json`, and `build-plan.json`; the profile root contains `console.log`, `qemu.log`, and `screenshot.ppm`. A kernel panic marker is a test failure.
 
 ## Interactive boot
 
@@ -84,7 +84,7 @@ The final public Laputa CLI intentionally has no store command. Invoke the PM ve
 ```bash
 cd "$HOME/d/laputa-systems/laputa"
 docker run --rm --platform linux/arm64 \
-  --mount type=volume,src=laputa-artifacts-aarch64-v1,dst=/artifacts,readonly \
+  --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
   --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
   --workdir /src/packages \
   --env XSH_MODULE_PATH=/src/packages \
@@ -94,18 +94,18 @@ docker run --rm --platform linux/arm64 \
 
 Every artifact must verify. This is `pm store verify --store STORE` running in the Docker build environment; it does not publish or mutate the repository.
 
-## Inspect a root generation
+## Inspect a generated system
 
 ```bash
 cd "$HOME/d/laputa-systems/laputa"
 docker run --rm --platform linux/arm64 \
-  --mount type=volume,src=laputa-artifacts-aarch64-v1,dst=/artifacts,readonly \
+  --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
   --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \
   --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
   --workdir /src/packages \
   --env XSH_MODULE_PATH=/src/packages \
   laputa-package-tools \
-  /bin/xsh /src/packages/pm.xsh -- root inspect /profile/generation.json
+  /bin/xsh /src/packages/pm.xsh -- generation inspect /profile/current/generation.json
 ```
 
 The generation's direct runtime roots must be `baselayout`, `xsh`, `laputa-pm`, `xinit`, `mdevd`, `seatd`, `dwl-minimal`, and `foot-minimal`. Build-only tools must be absent unless independently runtime-required: `llvm-toolchain`, `pkgconf`, `cmake`, `muon`, `samurai`, `m4`, `flex`, `bison`, `wayland-dev`, `wayland-protocols`, and `pixman-dev`.

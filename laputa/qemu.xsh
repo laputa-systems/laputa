@@ -53,13 +53,13 @@ export pure qemu_command_argv(
   [
     value.qemu.display(),
     "-M",
-    profile.qemu.machine,
+    profile.qemu_machine,
     "-cpu",
-    profile.qemu.cpu,
+    profile.qemu_cpu,
     "-smp",
-    f"${profile.qemu.smp}",
+    f"${profile.qemu_smp}",
     "-m",
-    profile.qemu.memory,
+    profile.qemu_memory,
     "-kernel",
     outputs.kernel.display(),
     "-append",
@@ -73,7 +73,7 @@ export pure qemu_command_argv(
     "-device",
     "virtio-net-pci,netdev=net0",
     "-device",
-    f"virtio-gpu-pci,xres=${profile.qemu.width},yres=${profile.qemu.height}",
+    f"virtio-gpu-pci,xres=${profile.qemu_width},yres=${profile.qemu_height}",
     "-device",
     "virtio-keyboard-pci",
     "-device",
@@ -158,10 +158,6 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
   if ! fs.exists(outputs.kernel)? or ! fs.exists(outputs.disk)? {
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
-  if profile.proof.input_text != "laputa" {
-    return Err(types.LaputaError.Profile("qemu-dwl-foot QMP helper requires proof input laputa"))
-  }
-
   fs.remove(outputs.console_log, missing_ok: true)?
   fs.remove(outputs.qemu_log, missing_ok: true)?
   fs.remove(outputs.qmp_socket, missing_ok: true)?
@@ -179,7 +175,7 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
 
   while qemu_process_live(launched.pid)? {
     let log_text = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-    let failed = proof.failure_marker(profile.proof, log_text)
+    let failed = proof.failure_marker(log_text)
     if failed != "" {
       qemu_stop(launched)?
       return Err(types.LaputaError.Profile(f"QEMU proof failed with ${failed}; inspect ${qemu_output_locations(outputs)}"))
@@ -193,16 +189,16 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
       injected = true
     }
 
-    if proof.succeeded(profile.proof, log_text) {
-      if profile.proof.screenshot_required and ! screenshot_taken {
+    if proof.succeeded(log_text) {
+      if ! screenshot_taken {
         qemu_qmp_retry(value, "screenshot", outputs.qmp_socket, outputs.screenshot)?
         screenshot_taken = true
       }
 
       qemu_stop(launched)?
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-      proof.verify_console(profile.proof, final_log)?
-      if profile.proof.screenshot_required and ! screenshot_is_valid(outputs.screenshot)? {
+      proof.verify_console(final_log)?
+      if ! screenshot_is_valid(outputs.screenshot)? {
         return Err(types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect ${qemu_output_locations(outputs)}"))
       }
 
@@ -221,7 +217,7 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
 
   let _ = wait launched?
   let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-  match proof.verify_console(profile.proof, final_log) {
+  match proof.verify_console(final_log) {
     Ok(_) => return Err(types.LaputaError.Profile(f"QEMU exited after guest proof before supervisor completion; inspect ${qemu_output_locations(outputs)}"))
     Err(_) => return Err(types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"))
   }

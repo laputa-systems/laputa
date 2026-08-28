@@ -12,15 +12,15 @@ permissions:
 
 env:
   XSH_RELEASE: release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
-  XSH_RELEASE_ARCH: x86_64
-  XSH_RELEASE_XSH_SHA256: 03e190c8ee15020b04b27e2066a7e53665452c9dce821bd0af80378ef664c746
-  XSH_RELEASE_XSHI_SHA256: 897b22cae065625179f8b2cb18c48828464eb1cd135f32da0e9358b237f3e195
-  XSH_RELEASE_XSHT_SHA256: 83ea617d6fc1a9f9e7908b292d51d8b263df15904d67d17b7c7f04d825a98a20
+  XSH_RELEASE_ARCH: aarch64
+  XSH_RELEASE_XSH_SHA256: bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
+  XSH_RELEASE_XSHI_SHA256: 5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
+  XSH_RELEASE_XSHT_SHA256: 86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
 
 jobs:
   scripts:
     name: Released XSH script checks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -48,21 +48,15 @@ jobs:
           done
           echo "/tmp/xsh-release/bin" >> "$GITHUB_PATH"
 
-      - name: Check PM entrypoint
+      - name: Strict-check PM and Laputa modules
         run: |
-          XSH_MODULE_PATH="$PWD/packages" \
-            xsh packages/pm.xsh -- list /tmp/laputa-pm-root /tmp/laputa-pm-work /tmp/laputa-pm-out
+          XSH_MODULE_PATH="$PWD/packages" xsht check --strict \
+            packages/pm.xsh packages/pm/*.xsh packages/tests/xsh/*.xsh
+          XSH_MODULE_PATH="$PWD:$PWD/packages" xsht check --strict \
+            laputa.xsh laputa/*.xsh profiles/*.xsh guest/*.xsh tests/xsh/*.xsh
 
-      - name: Check boot entrypoint
+      - name: Run focused Laputa tests
         run: |
-          set -euo pipefail
-          if xsh boot.xsh -- --bad > /tmp/boot.out 2> /tmp/boot.err; then
-            cat /tmp/boot.out
-            cat /tmp/boot.err >&2
-            exit 1
-          fi
-          grep -q "boot-usage" /tmp/boot.err
-
-      - name: Check proof stage entrypoint
-        run: |
-          xsh proof-stage.xsh -- /tmp/laputa-proof-stage-root
+          XSH_MODULE_PATH="$PWD:$PWD/packages" xsht test \
+            tests/xsh/cli.xsh tests/xsh/build.xsh tests/xsh/container_output.xsh \
+            tests/xsh/docker.xsh tests/xsh/profile.xsh tests/xsh/qemu.xsh

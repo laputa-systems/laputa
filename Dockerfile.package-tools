@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1.19
+#
+# This is the one current package-tools bootstrap boundary.  The caller builds
+# this image with `--platform linux/arm64`; the checked-out PM and Laputa trees
+# are supplied as mounted
+# inputs when the image is used, while this image contains only the runner,
+# bootstrap compiler, and host tools needed to build the declared graph.
+ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
+ARG XSH_RELEASE_ARCH=aarch64
+ARG XSH_RELEASE_XSH_SHA256=bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
+ARG XSH_RELEASE_XSHI_SHA256=5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
+ARG XSH_RELEASE_XSHT_SHA256=86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
+ARG XSH_CORE_SHA256=7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
+
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS xsh-runtime
+ARG XSH_RELEASE
+ARG XSH_RELEASE_ARCH
+ARG XSH_RELEASE_XSH_SHA256
+ARG XSH_RELEASE_XSHI_SHA256
+ARG XSH_RELEASE_XSHT_SHA256
+ARG XSH_CORE_SHA256
+
+# build-base is the small native substrate around the explicit LLVM seed.
+# e2fsprogs and util-linux provide the ext4/GPT host tools used by image
+# construction; the XSH mkfs.ext4.xsh helper remains in the mounted package
+# checkout and is therefore not copied into this bootstrap image.
+RUN apk add --no-cache build-base ca-certificates curl e2fsprogs util-linux xz zlib
+ADD --checksum=sha256:${XSH_RELEASE_XSH_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsh
+ADD --checksum=sha256:${XSH_RELEASE_XSHI_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xshi-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xshi
+ADD --checksum=sha256:${XSH_RELEASE_XSHT_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsht-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsht
+ADD --checksum=sha256:${XSH_CORE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/core-${XSH_RELEASE}.tar.xz /tmp/xsh-core.tar.xz
+RUN mkdir -p /usr/lib/xsh /usr/bin && \
+    cp /tmp/xsh /bin/xsh && \
+    cp /tmp/xshi /bin/xshi && \
+    cp /tmp/xsht /bin/xsht && \
+    chmod 0755 /bin/xsh /bin/xshi /bin/xsht && \
+    tar -C /usr/lib/xsh -xJf /tmp/xsh-core.tar.xz && \
+    find /usr/lib/xsh/core -type f -exec sed -i -e '1s|^#!/usr/local/bin/xsh|#!/bin/xsh|' -e '1s|^#!/usr/bin/env -S xsh|#!/bin/xsh|' {} + && \
+    for script in /usr/lib/xsh/core/*; do if [ -f "$script" ]; then command_name="$(/bin/busybox basename "$script")"; if [ "$command_name" != su ] && [ "$command_name" != sh ]; then /bin/busybox ln -sf ../lib/xsh/core/"${command_name}" /usr/bin/"${command_name}"; fi; fi; done && \
+    /bin/busybox rm /tmp/xsh /tmp/xshi /tmp/xsht /tmp/xsh-core.tar.xz
+
+# The helper uses the normal typed recipe/source boundary to materialize the
+# prebuilt aarch64 LLVM seed before any current PM BuildPlan runs.
+FROM xsh-runtime AS llvm-seed
+WORKDIR /src
+ENV PATH=/bin:/usr/bin
+ENV XSH_MODULE_PATH=/src/packages
+COPY --from=packages pm.xsh /src/packages/pm.xsh
+COPY --from=packages pm/ /src/packages/pm/
+COPY --from=packages repo/llvm-toolchain/ /src/packages/repo/llvm-toolchain/
+COPY bootstrap-llvm-seed.xsh /src/bootstrap-llvm-seed.xsh
+RUN ["/bin/xsh", "/src/bootstrap-llvm-seed.xsh", "--", "/src/packages", "/seed-root"]
+
+FROM xsh-runtime AS package-tools
+COPY --from=llvm-seed /seed-root/ /
+
+# Keep the runtime mounts explicit and stable.  `/src/packages` is the
+# authoritative checked-out PM tree and `/src/laputa` is the Laputa tree; both
+# are mounted read-only by laputa/docker.xsh for each structured PM command.
+RUN mkdir -p /src/packages /src/laputa /artifacts /sources /output && \
+    test -x /bin/xsh && test -x /bin/xshi && test -x /bin/xsht && \
+    test -x /usr/bin/cc && (test -x /sbin/mkfs.ext4 || test -x /usr/sbin/mkfs.ext4)
+WORKDIR /src/packages
+ENV PATH=/bin:/usr/bin
+ENV XSH_MODULE_PATH=/src/packages:/src/laputa
+ENV XSH_PM_TARGET_ARCH=aarch64
+RUN ["/bin/xsh", "--help"]
+RUN ["/bin/xshi", "--help"]
+RUN ["/bin/xsht", "--help"]
