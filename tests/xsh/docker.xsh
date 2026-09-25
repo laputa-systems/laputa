@@ -48,11 +48,11 @@ proc test_docker_rejects_non_arm64_runner_architecture() [error] {
 
 proc test_docker_places_optional_repository_configuration_before_image() [error] {
   let argv = docker.docker_command_argv({...fixture_config(), repo_url: "https://packages.example.test"}, [])
-  test.eq(argv[23], "--env")?
-  test.eq(argv[24], "XSH_PM_REPO=https://packages.example.test")?
   test.eq(argv[25], "--env")?
-  test.eq(argv[26], "XSH_PM_PUBLIC_REPO=https://packages.example.test")?
-  test.eq(argv[27], "laputa-package-tools")?
+  test.eq(argv[26], "XSH_PM_REPO=https://packages.example.test")?
+  test.eq(argv[27], "--env")?
+  test.eq(argv[28], "XSH_PM_PUBLIC_REPO=https://packages.example.test")?
+  test.eq(argv[29], "laputa-package-tools")?
 }
 
 proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
@@ -66,6 +66,7 @@ proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
   test.ok(argv |> any .contains("laputa-artifacts-aarch64-v2"))?
   test.ok(argv |> any .contains("laputa-sources-aarch64-v2"))?
   test.ok("XSH_MODULE_PATH=/src/packages:/src/laputa" in argv)?
+  test.ok("XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv)?
   test.ok(! (argv |> any .contains("XSH_MODULE_PATH=/src/laputa:/src/packages")))?
   test.ok(! (argv |> any .contains("amd64")))?
   test.ok(! (argv |> any .contains("x86_64")))?

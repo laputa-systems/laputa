@@ -129,6 +129,9 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "XSH_MODULE_PATH=/src/packages:/src/laputa",
     "--env",
     "PATH=/bin:/usr/bin",
+    # Bootstrap recipes need the container's compiler before its replacement artifact exists.
+    "--env",
+    "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
   ]
 
   if value.repo_url != "" {
