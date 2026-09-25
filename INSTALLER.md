@@ -4,6 +4,14 @@ This documents the current v1 installer architecture. The near-term target is a
 tiny arm64 installer image that installs a barebones Laputa system and is easy
 to exercise under QEMU.
 
+The standalone installer image route currently stops at its first package
+installation. `build-installer-image.xsh::install_remote_packages` invokes
+`pm install`, which the current typed PM CLI no longer provides. The builder's
+sequential root mutation and local tarball overlay must move to saved BuildPlans,
+verified artifacts, and immutable root composition before the image and QEMU
+smoke routes can pass. The `qemu-dwl-foot` profile uses that current PM path
+independently and has a passing build and QEMU proof.
+
 ## Current Shape
 
 - The primary tested installer is now a compact hybrid ISO artifact written
