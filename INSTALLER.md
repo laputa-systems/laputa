@@ -11,6 +11,9 @@ sequential root mutation and local tarball overlay must move to saved BuildPlans
 verified artifacts, and immutable root composition before the image and QEMU
 smoke routes can pass. The `qemu-dwl-foot` profile uses that current PM path
 independently and has a passing build and QEMU proof.
+The current PM planner resolves the installer's eight requested package roots,
+but selects local builds for all 24 nodes because those releases exceed the
+published mirror.
 
 ## Current Shape
 
