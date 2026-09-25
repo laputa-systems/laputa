@@ -640,7 +640,6 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   fs.write(target_image, "")?
   target_image.truncate(128 * 1024 * 1024)?
 
-  # TODO: use stderr: /dev/null once spawn supports it (see ../xsh/LANG.md)
   let installer = spawn process.command_argv(
     qemu,
     qemu_installer_args(
@@ -654,6 +653,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     ),
     cwd: root,
     env: {},
+    stderr: p"/dev/null",
   )?
 
   defer terminate_if_live(installer.pid)
@@ -672,12 +672,12 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
 
   time.sleep(3s)?
 
-  # TODO: use stderr: /dev/null once spawn supports it (see ../xsh/LANG.md)
   let target = spawn process.command_argv(
     qemu,
     qemu_target_args(arch, qemu_name, installer_kernel, target_cmdline, target_image, target_log, target_ssh_port),
     cwd: root,
     env: {},
+    stderr: p"/dev/null",
   )?
 
   defer terminate_if_live(target.pid)
