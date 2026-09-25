@@ -102,9 +102,10 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
 export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
-    # PM modules must resolve from the mounted checkout's source root.
+  # PM modules must resolve from the mounted checkout's source root.
   # The finished rootfs may contain /usr/lib/pm, but it must never share the
   # interpreter process used for planning, execution, or generation.
+  # Bootstrap recipes use the container's compiler before its replacement artifact exists.
   var argv = [
     value.docker.display(),
     "run",
@@ -129,7 +130,6 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "XSH_MODULE_PATH=/src/packages:/src/laputa",
     "--env",
     "PATH=/bin:/usr/bin",
-    # Bootstrap recipes need the container's compiler before its replacement artifact exists.
     "--env",
     "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
   ]

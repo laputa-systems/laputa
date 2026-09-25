@@ -44,6 +44,7 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
       LAPUTA_REPO_URL: repo_url,
       LAPUTA_ROOT: root.display(),
       XSH_HOST: xsh.display(),
+      XSH_MODULE_PATH: root.display(),
     }
   }
 
@@ -59,6 +60,7 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
       LAPUTA_REPO_URL: repo_url,
       LAPUTA_ROOT: root.display(),
       XSH_HOST: xsh.display(),
+      XSH_MODULE_PATH: root.display(),
     }
   }
 

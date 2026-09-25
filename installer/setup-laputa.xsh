@@ -1,4 +1,5 @@
 #!/bin/xsh
+use disk_selection
 error InstallerError = Failed(kind: Str, message: Str)
 
 let ESP_TYPE = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
@@ -190,7 +191,7 @@ proc print_disks(disks: List[Path]) [fs, error, io] {
 
 proc disk_has_partitions(disk: Path) [fs, error] -> Result[Bool] {
   for entry in fs.ls(fp"/sys/block/${disk.name}")? {
-    if entry.name.starts_with(disk.name) and fs.exists(fp"/sys/block/${disk.name}/${entry.name}/partition")? {
+    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(fp"/sys/block/${disk.name}/${entry.name}/partition")? {
       return true
     }
   }
@@ -206,23 +207,6 @@ proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
   }
 
   return Err(InstallerError.Failed("no-blank-disk", "no blank CI install disk found"))
-}
-
-proc ci_target_installed(disks: List[Path]) [fs, error] -> Result[Bool] {
-  for disk in disks {
-    for entry in fs.ls(fp"/sys/block/${disk.name}")? {
-      let partition_marker = fp"/sys/block/${disk.name}/${entry.name}/partition"
-      let uevent = fp"/sys/block/${disk.name}/${entry.name}/uevent"
-
-      if fs.exists(partition_marker)? and fs.exists(uevent)? {
-        if f"PARTUUID=${TARGET_ROOT_PARTUUID}" in fs.read_text(uevent)? {
-          return true
-        }
-      }
-    }
-  }
-
-  return false
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
@@ -618,7 +602,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
   print_disks(disks)?
 
-  if ci and disk_text == "" and ci_target_installed(disks)? {
+  if ci and disk_text == "" and disk_selection.ci_target_installed(p"/sys/block", disks, TARGET_ROOT_PARTUUID)? {
     write_stdout_line("Laputa CI target already installed.")?
     return
   }

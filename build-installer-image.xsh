@@ -1,7 +1,9 @@
 #!/bin/xsh
+use installer.package_roots_host as package_roots_host
+
 error InstallerBuildError = Failed(message: Str)
 
-proc env_value(name: Str, fallback: Str) [env] -> Str {
+proc installer_env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
   if value == "" {
@@ -12,7 +14,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${env_value(name, fallback.display())}"
+  return fp"${installer_env_value(name, fallback.display())}"
 }
 
 proc packages_root(root: Path) [fs, env, error] -> Result[Path] {
@@ -225,6 +227,14 @@ proc install_installer_tools(root: Path, rootfs: Path) [fs, env, error] {
     fp"${installer_root}/setup-laputa.xsh",
     fp"${rootfs}/usr/bin/setup-laputa",
     0o755,
+    parents: true,
+    overwrite: true,
+  )?
+
+  fs.install(
+    fp"${installer_root}/disk_selection.xsh",
+    fp"${rootfs}/usr/bin/disk_selection.xsh",
+    0o644,
     parents: true,
     overwrite: true,
   )?
@@ -478,6 +488,31 @@ proc assemble_installer(root: Path, work: Path, xsh: Path, repo_url: Str, arch: 
 
 proc assemble_tools(root: Path, work: Path, xsh: Path, repo_url: Str, arch: Str) [fs, process, env, error] {
   install_remote_packages(root, work, xsh, repo_url, arch, fp"${work}/rootfs-tools", "tools", ["xsh", "laputa-fs"])?
+}
+
+proc install_composed_root(bundle: Path, label: Str, output: Path) [fs, error] {
+  archive.tar_extract(fp"${bundle}/${label}-root.tar.gz", output, 0, "auto", true)?
+  # Image overlays change these roots after package composition, so a package
+  # generation receipt must not claim to describe the finished image.
+  fs.remove(fp"${output}/var/lib/laputa/generation.json", missing_ok: true)?
+  fs.remove(fp"${output}/var/lib/laputa/root.json", missing_ok: true)?
+}
+
+proc assemble_composed_roots(root: Path, work: Path, bundle: Path, qemu_smoke: Str) [fs, env, error] {
+  let target = fp"${work}/rootfs-target"
+  let installer = fp"${work}/rootfs-installer"
+  install_composed_root(bundle, "target", target)?
+  install_composed_root(bundle, "installer", installer)?
+  install_composed_root(bundle, "tools", fp"${work}/rootfs-tools")?
+
+  if qemu_smoke == "1" {
+    install_qemu_smoke_target_tools(root, target)?
+  }
+  ensure_dev_dirs(target)?
+  install_installer_tools(root, target)?
+  ensure_dev_dirs(installer)?
+  install_installer_tools(root, installer)?
+  install_live_filesystem_tools(root, installer)?
 }
 
 proc prune_runtime_root(rootfs: Path) [fs, error] {
@@ -1041,27 +1076,39 @@ proc build_filesystems(
 
 proc build_host() [fs, net, process, env, error, io] {
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let arch = normalize_installer_arch(env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
+  let arch = normalize_installer_arch(installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
   let work = installer_work_path(root, arch)?
   let iso = env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-${arch}.iso")?
   let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-${arch}.vmlinuz")?
-  let kernel_source_raw = env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
-  let repo_url = env_value("LAPUTA_REPO_URL", "https://laputa.17166969.xyz")
-  let linux_package_name = env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
+  let kernel_source_raw = installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
+  let repo_url = installer_env_value("LAPUTA_REPO_URL", "https://laputa.17166969.xyz")
+  let linux_package_name = installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
-  let qemu_smoke = env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
-  let qemu_authorized_key = env_value("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY", "")
+  let qemu_smoke = installer_env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
+  let qemu_authorized_key = installer_env_value("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY", "")
   let default_target_esp_mb = if arch == "x86_64" { "48" } else { "16" }
-  let target_esp_mb = env_value("LAPUTA_TARGET_ESP_MB", default_target_esp_mb)
-  let installer_root_mb = env_value("LAPUTA_INSTALLER_ROOT_MB", "")
-  let installer_ci = env_value("LAPUTA_INSTALLER_CI", "1")
+  let target_esp_mb = installer_env_value("LAPUTA_TARGET_ESP_MB", default_target_esp_mb)
+  let installer_root_mb = installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
+  let installer_ci = installer_env_value("LAPUTA_INSTALLER_CI", "1")
 
-  if env_value("LAPUTA_INSTALLER_LOCAL_XSH", "") != "" {
+  if installer_env_value("LAPUTA_INSTALLER_LOCAL_XSH", "") != "" {
     return Err(
       InstallerBuildError.Failed(
         "LAPUTA_INSTALLER_LOCAL_XSH was removed; installer builds package the pinned XSH release artifact",
       ),
     )
+  }
+
+  let package_bundle = if arch == "aarch64" {
+    package_roots_host.prepare(
+      root,
+      repo_url,
+      linux_package_name,
+      qemu_smoke == "1",
+      installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
+    )?
+  } else {
+    p""
   }
 
   fs.mkdir(work)?
@@ -1095,8 +1142,12 @@ proc build_host() [fs, net, process, env, error, io] {
 
   fs.mkdir(fp"${work}/rootfs-target")?
   fs.mkdir(fp"${work}/rootfs-installer")?
-  let linux_pkg = linux_tarball(work, repo_url, arch, linux_package_name)?
-  assemble_target(root, work, xsh, repo_url, arch, qemu_smoke, linux_pkg, linux_package_name)?
+  if arch == "aarch64" {
+    assemble_composed_roots(root, work, package_bundle, qemu_smoke)?
+  } else {
+    let linux_pkg = linux_tarball(work, repo_url, arch, linux_package_name)?
+    assemble_target(root, work, xsh, repo_url, arch, qemu_smoke, linux_pkg, linux_package_name)?
+  }
 
   if qemu_smoke == "1" {
     if qemu_authorized_key == "" {
@@ -1115,8 +1166,10 @@ proc build_host() [fs, net, process, env, error, io] {
     fs.copy(key_path, fp"${work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)?
   }
 
-  assemble_installer(root, work, xsh, repo_url, arch)?
-  assemble_tools(root, work, xsh, repo_url, arch)?
+  if arch != "aarch64" {
+    assemble_installer(root, work, xsh, repo_url, arch)?
+    assemble_tools(root, work, xsh, repo_url, arch)?
+  }
   prune_runtime_root(fp"${work}/rootfs-target")?
   prune_runtime_root(fp"${work}/rootfs-installer")?
   let packaged_kernel = fp"${work}/rootfs-target/boot/vmlinuz"

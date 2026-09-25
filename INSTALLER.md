@@ -1,19 +1,11 @@
 # Laputa Installer
 
-This documents the current v1 installer architecture. The near-term target is a
-tiny arm64 installer image that installs a barebones Laputa system and is easy
-to exercise under QEMU.
-
-The standalone installer image route currently stops at its first package
-installation. `build-installer-image.xsh::install_remote_packages` invokes
-`pm install`, which the current typed PM CLI no longer provides. The builder's
-sequential root mutation and local tarball overlay must move to saved BuildPlans,
-verified artifacts, and immutable root composition before the image and QEMU
-smoke routes can pass. The `qemu-dwl-foot` profile uses that current PM path
-independently and has a passing build and QEMU proof.
-The current PM planner resolves the installer's eight requested package roots,
-but selects local builds for all 24 nodes because those releases exceed the
-published mirror.
+This documents the current v1 installer architecture: a compact arm64 image
+that installs a barebones Laputa system and can be exercised under QEMU. The
+arm64 package roots come from one saved BuildPlan in the checked-out PM graph.
+The current plan selects local builds for every node because their releases
+exceed the published mirror. `qemu-dwl-foot` has a separate build and QEMU
+proof; it does not supply the installer's package roots or image policy.
 
 ## Current Shape
 
@@ -24,9 +16,9 @@ published mirror.
   harness boots the packaged kernel directly with `-kernel` and `-append`.
   Direct kernel boot is deliberate for v1 because UEFI fallback does not provide
   kernel `LoadOptions`.
-- The installer installs a published kernel package through PM from
-  `https://laputa.17166969.xyz`. Normal installer builds use `linux`; the
-  x86_64 QEMU harness uses `linux-virt-amd64` by default for faster amd64
+- The installer packages the selected kernel from the checked-out PM graph.
+  Normal arm64 builds use `linux`; the x86_64 QEMU harness uses
+  `linux-virt-amd64` by default for faster amd64
   installer iteration. `LAPUTA_INSTALLER_KERNEL_PACKAGE` selects another
   package, and `LAPUTA_INSTALLER_KERNEL_SOURCE` can override only the booted
   kernel file.
@@ -34,11 +26,9 @@ published mirror.
   selectors for the installer ISO's embedded GPT root partition and the
   installed target disk. Native `xinit` is `/init`; there is no generated early
   userspace shim in the installer harness.
-- Direct root boot without a separate initramfs currently depends on the kernel
-  carrying a tiny built-in default cpio payload that seeds `/dev/console`,
-  `/dev/null`, and `/dev/root`. This is kernel build input, not a QEMU
-  `-initrd`; once the fixed `linux` package is published the local kernel
-  override can be removed.
+- Direct root boot without a separate initramfs depends on the kernel carrying
+  a tiny built-in default cpio payload that seeds `/dev/console`, `/dev/null`,
+  and `/dev/root`. This is kernel build input, not a QEMU `-initrd`.
 - The installer test command line boots
   `root=PARTUUID=55555555-5555-5555-5555-555555555555`. The target smoke boot
   uses `root=PARTUUID=33333333-3333-3333-3333-333333333333`.
@@ -53,22 +43,22 @@ published mirror.
 
 ## Entry Points
 
-- `make installer-image`
+- `make installer-image-aarch64` (also `make installer-image`)
   builds the CI/autoinstall ISO at
-  `target/laputa-installer/laputa-installer-aarch64.iso` and extracts the
+  `target/laputa-installer-aarch64/laputa-installer-aarch64.iso` and extracts the
   matching kernel for direct QEMU boot proofs.
-- `make installer-qemu-test`
+- `make installer-qemu-test-aarch64` (also `make installer-qemu-test`)
   boots the hybrid installer ISO with a blank 128M virtio disk, waits for
   `LAPUTA_INSTALLER_CI_OK`, then boots the installed target disk with a
   QEMU-only Dropbear/key overlay. The host generates an ed25519 keypair, SSHes
   through QEMU user-mode port forwarding as `pazu`, checks `xinit status
   dropbear`, and runs a basic `xshi` command. Logs are captured at
-  `target/laputa-installer/qemu-installer.log` and
-  `target/laputa-installer/qemu-target.log`.
-  If `target/laputa-installer/local-linux-aarch64.Image` or
-  `target/laputa-installer/local-linux-x86_64.bzImage` exists, the harness
-  passes it as `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise the image builder
-  uses the kernel installed from the selected kernel package.
+  `target/laputa-installer-aarch64-qemu/qemu-installer.log` and
+  `target/laputa-installer-aarch64-qemu/qemu-target.log`.
+  If `target/laputa-installer-aarch64-qemu/local-linux-aarch64.Image` or the
+  corresponding `local-linux-x86_64.bzImage` in the x86_64 QEMU work directory
+  exists, the harness passes it as `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise
+  the image builder uses the kernel installed from the selected kernel package.
 - `make installer-qemu-manual`
   builds a non-CI image and starts interactive QEMU with stdio serial and no
   monitor, so `^C` interrupts QEMU. Inside the guest, run `setup-laputa`; for a
@@ -95,28 +85,28 @@ published mirror.
   `fsck.ext4` is still a minimal superblock smoke check, not a repairing
   checker.
 
-The installer rootfs and installed target are both valid Laputa PM roots.
-Published base packages are installed from the remote mirror. Local packages are
-built only for packages whose mirror copy is absent or must track this checkout:
-currently `xsh`, `xinit`, `laputa-pm`, and `laputa-fs`.
-The target and installer rootfs both include `baselayout`, `xsh`, `xinit`,
-the selected kernel package, `sudo-rs`, `laputa-pm`, and the
-integration-owned installer tools.
+`installer/package_roots_host.xsh` invokes the native arm64 Docker runner with
+the checked-out Linux XSH binary. `installer/package_roots_container.xsh` plans
+the union of requested package roots, saves and builds that plan in a named PM
+Store, and composes separate target, installer, and image-tools roots from its
+verified artifacts. The container publishes the plan and root archives as one
+atomic bundle. The target root includes the selected kernel and `sudo-rs`; the
+installer and tools roots contain `laputa-fs`. QEMU smoke adds Dropbear to the
+target root. Installer-specific files are overlaid after composition, so the
+resulting mutable image roots do not retain PM generation receipts.
 
-`build-installer-image.xsh` is a host-native XSH builder. It does not use
-Docker or Alpine boot tools. It creates sparse image files with native
-`Path.truncate`, builds a compact target-root tarball, copies the EFI fallback
+`build-installer-image.xsh` assembles the image on the host from those roots.
+It creates sparse image files with native `Path.truncate`, builds a compact
+target-root tarball, copies the EFI fallback
 kernel into the installer payload, autosizes the installer root image from its
 contents unless `LAPUTA_INSTALLER_ROOT_MB` is set, formats the installer root
 through `laputa-fs`, and writes a minimal hybrid ISO/GPT artifact directly with
 XSH byte APIs. Its ISO9660 view exposes the selected kernel, and
 its GPT view exposes the installer ext4 root partition with the same
 deterministic `PARTUUID` used by the QEMU harness.
-
-PM downloads remote package tarballs in parallel during installs and resolves
-package sources in parallel during builds, using one job per package/source.
-This is important for installer builds because the rootfs is assembled by
-installing published packages rather than rebuilding the world.
+`LAPUTA_INSTALLER_JOBS` controls the PM build concurrency (default 4). The
+x86_64 image builder still uses the older package-install route, which is not
+compatible with the current typed PM CLI.
 
 ## Kernel Size
 
@@ -143,6 +133,7 @@ amd64 installer kernel.
 2. In CI mode, chooses the first disk with no existing partitions; this avoids
    hard-coding QEMU's `vda`/`vdb` order. If the deterministic CI target root
    `PARTUUID` already exists, it treats the install as complete.
+   `installer/disk_selection.xsh` checks only partition directories in sysfs.
 3. Otherwise prompts unless `--disk` or `--auto` is supplied.
 4. Writes a GPT with ESP, swap, and root partitions using
    `linux.write_partition_table`.
