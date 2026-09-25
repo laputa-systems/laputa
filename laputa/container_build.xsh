@@ -34,10 +34,6 @@ pure container_store_root() -> Path {
   p"/artifacts"
 }
 
-pure container_source_cache_root() -> Path {
-  p"/sources"
-}
-
 pure container_package_root() -> Path {
   p"/src/packages"
 }
@@ -151,8 +147,6 @@ proc container_pm_repo_build(build_plan: Path, jobs: Int) [fs, net, process, env
     build_plan.display(),
     "--store",
     container_store_root().display(),
-    "--source-cache",
-    container_source_cache_root().display(),
     "--jobs",
     f"${jobs}",
   ])?
