@@ -498,21 +498,17 @@ proc install_composed_root(bundle: Path, label: Str, output: Path) [fs, error] {
   fs.remove(fp"${output}/var/lib/laputa/root.json", missing_ok: true)?
 }
 
-proc assemble_composed_roots(root: Path, work: Path, bundle: Path, qemu_smoke: Str) [fs, env, error] {
+proc assemble_composed_roots(root: Path, work: Path, bundle: Path) [fs, env, error] {
   let target = fp"${work}/rootfs-target"
   let installer = fp"${work}/rootfs-installer"
   install_composed_root(bundle, "target", target)?
   install_composed_root(bundle, "installer", installer)?
   install_composed_root(bundle, "tools", fp"${work}/rootfs-tools")?
 
-  if qemu_smoke == "1" {
-    install_qemu_smoke_target_tools(root, target)?
-  }
   ensure_dev_dirs(target)?
   install_installer_tools(root, target)?
   ensure_dev_dirs(installer)?
   install_installer_tools(root, installer)?
-  install_live_filesystem_tools(root, installer)?
 }
 
 proc prune_runtime_root(rootfs: Path) [fs, error] {
@@ -1143,7 +1139,7 @@ proc build_host() [fs, net, process, env, error, io] {
   fs.mkdir(fp"${work}/rootfs-target")?
   fs.mkdir(fp"${work}/rootfs-installer")?
   if arch == "aarch64" {
-    assemble_composed_roots(root, work, package_bundle, qemu_smoke)?
+    assemble_composed_roots(root, work, package_bundle)?
   } else {
     let linux_pkg = linux_tarball(work, repo_url, arch, linux_package_name)?
     assemble_target(root, work, xsh, repo_url, arch, qemu_smoke, linux_pkg, linux_package_name)?
