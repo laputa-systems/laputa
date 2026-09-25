@@ -4,6 +4,9 @@ use laputa.container_output as container_output
 use laputa.image as image
 use laputa.profile as system_profile
 use laputa.types as types
+use pm.generation as pm_generation
+use pm.plan_json as pm_plan_json
+use pm.types as pm_types
 
 error ContainerBuildError = Failed(message: Str) : InvalidData
 
@@ -45,10 +48,6 @@ pure container_package_root() -> Path {
 # only one complete, verified system bundle crosses this boundary.
 pure container_work_build_plan(work: Path) -> Path {
   fp"${work}/build-plan.json"
-}
-
-pure container_work_generation_plan(work: Path) -> Path {
-  fp"${work}/generation-plan.json"
 }
 
 pure container_work_generation_manifest(work: Path) -> Path {
@@ -159,48 +158,16 @@ proc container_pm_repo_build(build_plan: Path, jobs: Int) [fs, net, process, env
   ])?
 }
 
-proc container_pm_generation_manifest(
+proc container_generation_plan(
   build_plan: Path,
   profile: types.SystemProfile,
   overlay: Path,
-  output: Path,
-) [fs, process, error] {
-  var args = ["generation", "manifest", build_plan.display()]
-
-  for package_name in profile.package_roots {
-    args = args.extend(["--runtime-root", package_name])
+) [fs, error] -> Result[pm_types.GenerationPlan] {
+  let overlay_profile = pm_generation.overlay_profile(overlay)?
+  if overlay_profile.name != profile.name {
+    return Err(ContainerBuildError.Failed("generation overlay profile does not match the system profile"))
   }
-
-  args = args.extend([
-    "--profile",
-    profile.name,
-    "--overlay",
-    overlay.display(),
-    "--output",
-    output.display(),
-  ])
-  container_pm(args)?
-}
-
-proc container_pm_generation_compose(
-  build_plan: Path,
-  manifest: Path,
-  overlay: Path,
-  output: Path,
-) [fs, process, error] {
-  container_pm([
-    "generation",
-    "compose",
-    build_plan.display(),
-    "--manifest",
-    manifest.display(),
-    "--store",
-    container_store_root().display(),
-    "--overlay",
-    overlay.display(),
-    "--output",
-    output.display(),
-  ])?
+  pm_generation.plan_profile(pm_plan_json.read(build_plan)?, profile.package_roots, overlay_profile)?
 }
 
 # Extract only the profile-declared kernel from the exact artifact selected by the saved BuildPlan.
@@ -271,20 +238,13 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
   let work = fs.root_path(handle)?
   let build_plan = container_stage_build_plan(work)?
   let overlay = container_prepare_overlay(profile, work)?
+  let saved_generation_plan = pm_generation.read_generation_plan(container_generation_plan_path())?
+  if saved_generation_plan != container_generation_plan(build_plan, profile, overlay)? {
+    return Err(ContainerBuildError.Failed("saved generation plan differs from the current BuildPlan or overlay"))
+  }
   container_pm_repo_build(build_plan, jobs)?
-  container_pm_generation_manifest(
-    build_plan,
-    profile,
-    overlay,
-    container_work_generation_plan(work),
-  )?
-  container_pm_generation_compose(
-    build_plan,
-    container_work_generation_plan(work),
-    overlay,
-    fp"${work}/generation",
-  )?
   let root = fp"${work}/generation"
+  let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?
   let embedded_manifest = fp"${root}/var/lib/laputa/generation.json"
   if ! fs.exists(embedded_manifest)? or fs.metadata(embedded_manifest)?.kind != "file" {
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
@@ -312,13 +272,10 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
     defer fs.close_root(handle)?
     let work = fs.root_path(handle)?
     let overlay = container_prepare_overlay(profile, work)?
-    container_pm_generation_manifest(
-      container_build_plan_path(),
-      profile,
-      overlay,
-      container_work_generation_plan(work),
-    )?
-    container_output.publish_final_file(container_work_generation_plan(work), container_generation_plan_path())?
+    let generation_plan = container_generation_plan(container_build_plan_path(), profile, overlay)?
+    let staged = fp"${work}/generation-plan.json"
+    pm_generation.write_generation_plan(staged, generation_plan)?
+    container_output.publish_final_file(staged, container_generation_plan_path())?
     return
   }
 

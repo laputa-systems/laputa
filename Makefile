@@ -5,6 +5,8 @@
 XSH_SOURCE_ROOT ?= $(abspath $(CURDIR)/../xsh)
 XSH_HOST ?= $(XSH_SOURCE_ROOT)/target/debug/xsh
 LAPUTA_PACKAGES_ROOT ?= $(abspath $(CURDIR)/../packages)
+LAPUTA_LOCAL_XSH_BIN ?=
+LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR):$(LAPUTA_PACKAGES_ROOT)" LAPUTA_PACKAGES_ROOT="$(LAPUTA_PACKAGES_ROOT)" XSH_SOURCE_ROOT="$(XSH_SOURCE_ROOT)" LAPUTA_LOCAL_XSH_BIN="$(LAPUTA_LOCAL_XSH_BIN)"
 
 .PHONY: plan build test boot clean pm-test \
 	installer-image installer-image-aarch64 installer-image-amd64 installer-image-x86_64 \
@@ -12,19 +14,19 @@ LAPUTA_PACKAGES_ROOT ?= $(abspath $(CURDIR)/../packages)
 	installer-qemu-manual
 
 plan:
-	$(XSH_HOST) laputa.xsh -- plan qemu-dwl-foot
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-dwl-foot
 
 build:
-	$(XSH_HOST) laputa.xsh -- build qemu-dwl-foot
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-dwl-foot
 
 test:
-	$(XSH_HOST) laputa.xsh -- test qemu-dwl-foot
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-dwl-foot
 
 boot:
-	$(XSH_HOST) laputa.xsh -- boot qemu-dwl-foot
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-dwl-foot
 
 clean:
-	$(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
 
 pm-test:
 	$(MAKE) -C $(LAPUTA_PACKAGES_ROOT) test

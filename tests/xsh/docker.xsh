@@ -13,6 +13,7 @@ pure fixture_config() -> docker.DockerConfig {
     source_volume: "laputa-sources-aarch64-v2",
     image: "laputa-package-tools",
     repo_url: "",
+    container_xsh: docker.PinnedXsh,
   }
 }
 
@@ -70,6 +71,12 @@ proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
   test.ok(! (argv |> any .contains("x86_64")))?
 }
 
+proc test_local_xsh_binary_mount_is_explicit_and_read_only() [error] {
+  let value = {...fixture_config(), container_xsh: docker.CheckedOutXsh(p"/work/xsh/target/aarch64-unknown-linux-musl/debug/xsh")}
+  let argv = docker.docker_command_argv(value, ["/bin/xsh", "--help"])
+  test.ok(argv |> any .contains("src=/work/xsh/target/aarch64-unknown-linux-musl/debug/xsh,dst=/bin/xsh,readonly"))?
+}
+
 proc test_generation_projection_and_build_use_the_single_container_adapter() [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   test.eq(
@@ -101,6 +108,7 @@ proc package_tools_fixture(ctx: TestContext) [fs, error] -> Result[docker.Docker
     source_volume: "sources",
     image: "laputa-package-tools",
     repo_url: "",
+    container_xsh: docker.PinnedXsh,
   }
 }
 
@@ -126,6 +134,7 @@ proc test_package_tools_requires_the_focused_bootstrap_contract(ctx: TestContext
     source_volume: "sources",
     image: "laputa-package-tools",
     repo_url: "",
+    container_xsh: docker.PinnedXsh,
   }
 
   match docker.ensure_package_tools(value) {

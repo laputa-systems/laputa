@@ -7,6 +7,8 @@ Set the checkout roots when they differ from the standard sibling layout:
 ```bash
 export XSH_SOURCE_ROOT="$HOME/d/laputa-systems/xsh"
 export LAPUTA_PACKAGES_ROOT="$HOME/d/laputa-systems/packages"
+export LAPUTA_ROOT="$HOME/d/laputa-systems/laputa"
+export XSH_MODULE_PATH="$LAPUTA_ROOT:$LAPUTA_PACKAGES_ROOT"
 export XSH_HOST="$XSH_SOURCE_ROOT/target/debug/xsh"
 export XSHT="$XSH_SOURCE_ROOT/target/debug/xsht"
 ```
@@ -16,14 +18,20 @@ Build the local debug XSH tools before invoking these commands if they do not ye
 ## Static check
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check --strict \
   laputa.xsh \
-  laputa/*.xsh \
+  laputa/{build,cli,container_output,docker,image,profile,proof,qemu,types}.xsh \
   profiles/*.xsh \
   guest/*.xsh \
   tests/xsh/*.xsh
+XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check laputa/container_build.xsh
 ```
+
+`laputa/container_build.xsh` statically imports PM generation modules. Its
+non-strict check covers that combined graph while the first command keeps
+Laputa-owned modules under strict checking; the current PM graph emits strict
+`Any` warnings at its own JSON boundaries.
 
 The combined PM/Laputa import test uses the PM source graph, whose existing
 dynamic boundaries do not pass Laputa's strict check. Check and run it
@@ -43,8 +51,15 @@ make test
 
 ## Profile plan
 
+For a checked-out Linux XSH build, run `make xsh-local-bins` in
+`$LAPUTA_PACKAGES_ROOT` and set
+`LAPUTA_LOCAL_XSH_BIN="$XSH_SOURCE_ROOT/target/aarch64-unknown-linux-musl/debug/xsh"`.
+The Docker adapter mounts that binary read-only at `/bin/xsh` for profile
+commands; the package-tools image itself still comes from the pinned release.
+Leave the variable unset to test the published binary.
+
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- plan qemu-dwl-foot
 ```
 
@@ -53,7 +68,7 @@ The plan writes `target/laputa/qemu-dwl-foot/build-plan.json`. Running it twice 
 ## Profile build
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- build qemu-dwl-foot --jobs 4
 ```
 
@@ -62,7 +77,7 @@ The build resolves or imports exact package artifacts, composes an immutable gen
 ## Profile test
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- test qemu-dwl-foot
 ```
 
@@ -71,7 +86,7 @@ cd "$HOME/d/laputa-systems/laputa"
 ## Interactive boot
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- boot qemu-dwl-foot
 ```
 
@@ -80,7 +95,7 @@ This opens QEMU's Cocoa display and launches the normal dwl and foot session. It
 ## Clean profile outputs
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- clean qemu-dwl-foot
 ```
 
@@ -91,7 +106,7 @@ This removes only `target/laputa/qemu-dwl-foot`; it must not remove the immutabl
 The final public Laputa CLI intentionally has no store command. Invoke the PM verifier inside the Docker runner:
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
   --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
@@ -106,7 +121,7 @@ Every artifact must verify. This is `pm store verify --store STORE` running in t
 ## Inspect a generated system
 
 ```bash
-cd "$HOME/d/laputa-systems/laputa"
+cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
   --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \

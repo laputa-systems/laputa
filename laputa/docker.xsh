@@ -1,6 +1,9 @@
 ##! Native Linux arm64 Docker command construction for Laputa profile builds.
 use laputa.types as types
 
+## Select the published package-tools interpreter or a checked-out ARM64 debug binary.
+export type ContainerXsh = PinnedXsh | CheckedOutXsh(Path)
+
 ## The fixed host paths and named volumes mounted into the profile build container.
 export type DockerConfig = {
   docker: Path,
@@ -12,6 +15,7 @@ export type DockerConfig = {
   source_volume: Str,
   image: Str,
   repo_url: Str,
+  container_xsh: ContainerXsh,
 }
 
 let package_tools_contract_epoch = "laputa-package-tools-1"
@@ -71,6 +75,16 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     let _ = process.which(docker.display())?
   }
 
+  var container_xsh: ContainerXsh = PinnedXsh
+  let configured_binary = env_value("LAPUTA_LOCAL_XSH_BIN", "")
+  if configured_binary != "" {
+    let binary = path.absolute(fp"${configured_binary}")?
+    if ! fs.exists(binary)? or fs.metadata(binary)?.kind != "file" {
+      return Err(types.LaputaError.Docker(f"checked-out XSH binary is missing: ${binary}"))
+    }
+    container_xsh = CheckedOutXsh(binary)
+  }
+
   let base: DockerConfig = {
     docker,
     packages_root,
@@ -81,6 +95,7 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     source_volume: "laputa-sources-aarch64-v2",
     image: "laputa-package-tools",
     repo_url: env_value("LAPUTA_REPO_URL", ""),
+    container_xsh,
   }
   {...base, image: ensure_package_tools(base)?}
 }
@@ -118,6 +133,11 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
 
   if value.repo_url != "" {
     argv = argv.extend(["--env", f"XSH_PM_REPO=${value.repo_url}", "--env", f"XSH_PM_PUBLIC_REPO=${value.repo_url}"])
+  }
+
+  match value.container_xsh {
+    CheckedOutXsh(binary) => argv = argv.extend(["--mount", f"type=bind,src=${binary.display()},dst=/bin/xsh,readonly"])
+    PinnedXsh => {}
   }
 
   argv.push(value.image).extend(inner_argv)
