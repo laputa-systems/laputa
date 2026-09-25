@@ -1,9 +1,8 @@
 # syntax=docker/dockerfile:1.19
 #
-# This is the one current package-tools bootstrap boundary.  The caller builds
-# this image with `--platform linux/arm64`; the checked-out PM and Laputa trees
-# are supplied as mounted
-# inputs when the image is used, while this image contains only the runner,
+# This package-tools bootstrap image uses the caller's platform; the profile
+# builds with `--platform linux/arm64`. The checked-out PM and Laputa trees
+# are supplied as mounted inputs when the image is used. The image contains the runner,
 # bootstrap compiler, and host tools needed to build the declared graph.
 ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
 ARG XSH_RELEASE_ARCH=aarch64
@@ -11,6 +10,7 @@ ARG XSH_RELEASE_XSH_SHA256=bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba79
 ARG XSH_RELEASE_XSHI_SHA256=5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
 ARG XSH_RELEASE_XSHT_SHA256=86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
 ARG XSH_CORE_SHA256=7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
+ARG XSH_PM_TARGET_ARCH=aarch64
 
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS xsh-runtime
 ARG XSH_RELEASE
@@ -40,10 +40,12 @@ RUN mkdir -p /usr/lib/xsh /usr/bin && \
     /bin/busybox rm /tmp/xsh /tmp/xshi /tmp/xsht /tmp/xsh-core.tar.xz
 
 # The helper uses the normal typed recipe/source boundary to materialize the
-# prebuilt aarch64 LLVM seed before any current PM BuildPlan runs.
+# prebuilt target LLVM seed before any current PM BuildPlan runs.
 FROM xsh-runtime AS llvm-seed
+ARG XSH_PM_TARGET_ARCH
 WORKDIR /src
 ENV PATH=/bin:/usr/bin
+ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
 ENV XSH_MODULE_PATH=/src/packages
 COPY --from=packages pm.xsh /src/packages/pm.xsh
 COPY --from=packages pm/ /src/packages/pm/
@@ -52,6 +54,7 @@ COPY bootstrap-llvm-seed.xsh /src/bootstrap-llvm-seed.xsh
 RUN ["/bin/xsh", "/src/bootstrap-llvm-seed.xsh", "--", "/src/packages", "/seed-root"]
 
 FROM xsh-runtime AS package-tools
+ARG XSH_PM_TARGET_ARCH
 COPY --from=llvm-seed /seed-root/ /
 
 # Keep the runtime mounts explicit and stable.  `/src/packages` is the
@@ -63,7 +66,7 @@ RUN mkdir -p /src/packages /src/laputa /artifacts /sources /output && \
 WORKDIR /src/packages
 ENV PATH=/bin:/usr/bin
 ENV XSH_MODULE_PATH=/src/packages:/src/laputa
-ENV XSH_PM_TARGET_ARCH=aarch64
+ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
 RUN ["/bin/xsh", "--help"]
 RUN ["/bin/xshi", "--help"]
 RUN ["/bin/xsht", "--help"]
