@@ -87,7 +87,7 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
 export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
-  let value = profile.load(parsed.profile_name, fp"${root}/profiles")?
+  let value = profile.load_system_profile(parsed.profile_name, fp"${root}/profiles")?
 
   match parsed.command {
     LaputaClean => {
@@ -95,7 +95,7 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
       print f"laputa clean ${value.name}: ok"
     }
     LaputaPlan => {
-      let outputs = build.plan_profile(docker.build_config(root, value.name)?, value)?
+      let outputs = build.plan_system_profile(docker.build_config(root, value.name)?, value)?
       print f"laputa plan ${value.name} ${profile.digest(value)?} ${outputs.build_plan}"
     }
     LaputaTest => {

@@ -22,7 +22,7 @@ export proc valid_package_name(value: Str) [error] -> Result[Bool] {
 }
 
 ## Validate a complete profile before it is used to construct any build command.
-export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
+export proc validate_system_profile(value: types.SystemProfile) [error] -> Result[Unit] {
   if ! valid_profile_name(value.name)? {
     return Err(types.LaputaError.Profile(f"invalid profile name ${value.name}"))
   }
@@ -89,7 +89,7 @@ export proc validate(value: types.SystemProfile) [error] -> Result[Unit] {
 }
 
 ## Load one named profile from `profiles_root` and validate its typed export.
-export proc load(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile] {
+export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile] {
   if ! valid_profile_name(name)? {
     return Err(types.LaputaError.Profile(f"invalid profile name ${name}"))
   }
@@ -102,13 +102,13 @@ export proc load(name: Str, profiles_root: Path) [fs, error] -> Result[types.Sys
 
   let exports = module.load(source)?.require(SystemProfileModule)?
   let value = exports.profile
-  validate(value)?
+  validate_system_profile(value)?
   value
 }
 
 ## Compute a canonical digest from all semantic profile fields.
 export proc digest(value: types.SystemProfile) [error] -> Result[Str] {
-  validate(value)?
+  validate_system_profile(value)?
   let body = f"""laputa-system-profile-1
 name\t${value.name}
 roots\t${value.package_roots.join(",")}

@@ -17,7 +17,7 @@ pure fixture_config() -> docker.DockerConfig {
 }
 
 proc test_profile_plan_command_has_exact_direct_roots_and_kernel() [fs, error] {
-  let value = profile.load("qemu-dwl-foot", p"profiles")?
+  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   test.eq(
     docker.docker_pm_plan_argv(value),
     [
@@ -71,7 +71,7 @@ proc test_native_arm64_docker_command_mounts_only_declared_inputs() [error] {
 }
 
 proc test_generation_projection_and_build_use_the_single_container_adapter() [fs, error] {
-  let value = profile.load("qemu-dwl-foot", p"profiles")?
+  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   test.eq(
     docker.docker_generation_plan_argv(value),
     ["/bin/xsh", "/src/laputa/laputa/container_build.xsh", "--", "plan", "qemu-dwl-foot", "1"],

@@ -7,7 +7,7 @@ pure profiles_root() -> Path {
 }
 
 proc test_qemu_dwl_foot_profile_has_exact_runtime_intent() [fs, error] {
-  let value = profile.load("qemu-dwl-foot", profiles_root())?
+  let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
   test.eq(
     value.package_roots,
     ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd", "seatd", "dwl-minimal", "foot-minimal"],
@@ -26,15 +26,15 @@ proc test_qemu_dwl_foot_profile_has_exact_runtime_intent() [fs, error] {
 }
 
 proc test_profile_load_rejects_unknown_and_path_names() [fs, error] {
-  match profile.load("missing", profiles_root()) {
+  match profile.load_system_profile("missing", profiles_root()) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.load("../qemu-dwl-foot", profiles_root()) {
+  match profile.load_system_profile("../qemu-dwl-foot", profiles_root()) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.load("qemu-dwl-foot.xsh", profiles_root()) {
+  match profile.load_system_profile("qemu-dwl-foot.xsh", profiles_root()) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
@@ -55,31 +55,31 @@ proc test_profile_validation_rejects_duplicate_or_invalid_roots() [error] {
     forbidden_packages: [],
     forbidden_sonames: [],
   }
-  profile.validate(valid)?
-  match profile.validate({...valid, package_roots: ["one", "one"]}) {
+  profile.validate_system_profile(valid)?
+  match profile.validate_system_profile({...valid, package_roots: ["one", "one"]}) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.validate({...valid, package_roots: ["/one"]}) {
+  match profile.validate_system_profile({...valid, package_roots: ["/one"]}) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.validate({...valid, package_roots: ["linux"]}) {
+  match profile.validate_system_profile({...valid, package_roots: ["linux"]}) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.validate({...valid, forbidden_packages: ["/llvm-toolchain"]}) {
+  match profile.validate_system_profile({...valid, forbidden_packages: ["/llvm-toolchain"]}) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
-  match profile.validate({...valid, forbidden_sonames: ["libLLVM", "libLLVM"]}) {
+  match profile.validate_system_profile({...valid, forbidden_sonames: ["libLLVM", "libLLVM"]}) {
     Ok(_) => test.ok(false)?
     Err(_) => {}
   }
 }
 
 proc test_profile_digest_is_deterministic() [fs, error] {
-  let value = profile.load("qemu-dwl-foot", profiles_root())?
+  let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
   test.eq(profile.digest(value)?, profile.digest(value)?)?
   test.ok(profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?)?
 }

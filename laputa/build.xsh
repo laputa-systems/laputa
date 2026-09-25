@@ -47,7 +47,7 @@ export proc clean(output_root: Path) [fs, error] {
 }
 
 ## Generate the profile's exact BuildPlan and its runtime-only GenerationPlan through the native PM container.
-export proc plan_profile(value: docker.DockerConfig, profile: types.SystemProfile) [fs, process, error] -> Result[ProfileOutputs] {
+export proc plan_system_profile(value: docker.DockerConfig, profile: types.SystemProfile) [fs, process, error] -> Result[ProfileOutputs] {
   let result = outputs(value.output_root)
   docker.docker_plan(value, profile)?
 
@@ -66,7 +66,7 @@ export proc plan_profile(value: docker.DockerConfig, profile: types.SystemProfil
 
 ## Execute the already-explicit package plan, compose its immutable generation, and atomically publish disk outputs.
 export proc build_profile(value: docker.DockerConfig, profile: types.SystemProfile, jobs: Int) [fs, process, error] -> Result[ProfileOutputs] {
-  let result = plan_profile(value, profile)?
+  let result = plan_system_profile(value, profile)?
   docker.docker_profile_build(value, profile, jobs, result.build_log)?
 
   if ! fs.exists(result.current)? or fs.metadata(result.current)?.kind != "symlink" {

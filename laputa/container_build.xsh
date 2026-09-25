@@ -68,7 +68,7 @@ pure container_work_disk(work: Path) -> Path {
 }
 
 proc container_load_profile(name: Str) [fs, error] -> Result[types.SystemProfile] {
-  system_profile.load(name, p"/src/laputa/profiles")?
+  system_profile.load_system_profile(name, p"/src/laputa/profiles")?
 }
 
 proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, error] -> Result[Path] {
@@ -234,14 +234,14 @@ proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, 
 
 proc container_system_key(build_plan: Path, generation_manifest: Path, profile: types.SystemProfile) [fs, error] -> Result[Str] {
   let manifest = json.read(generation_manifest)?.require(Record)?
-  let generation_sha256: Str = manifest.get("generation_sha256")?
+  let generation_sha256: Str = manifest.get("generation_sha256")?.require(Str)?
   let plan_value = json.read(build_plan)?.require(Record)?
-  let nodes: List[Record] = plan_value.get("nodes")?
+  let nodes: List[Record] = plan_value.get("nodes")?.require(List[Record])?
   var kernel_key = ""
   for node in nodes {
-    let name: Str = node.get("name")?
+    let name: Str = node.get("name")?.require(Str)?
     if name == profile.kernel_package {
-      kernel_key = node.get("artifact_key")?
+      kernel_key = node.get("artifact_key")?.require(Str)?
     }
   }
   if generation_sha256.count_chars() != 64 or kernel_key.count_chars() != 64 {

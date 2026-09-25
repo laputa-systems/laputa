@@ -25,6 +25,15 @@ XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check --strict \
   tests/xsh/*.xsh
 ```
 
+The combined PM/Laputa import test uses the PM source graph, whose existing
+dynamic boundaries do not pass Laputa's strict check. Check and run it
+separately with the checked-out XSH tools:
+
+```bash
+XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check tests/integration/cross_consumer.xsh
+XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" test --jobs 1 tests/integration/cross_consumer.xsh
+```
+
 ## PM test
 
 ```bash
