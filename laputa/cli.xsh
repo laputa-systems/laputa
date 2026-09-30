@@ -6,7 +6,13 @@ use laputa.qemu as qemu
 use laputa.types as types
 
 ## The closed public Laputa command surface; all execution choices are explicit command data.
-export type LaputaCommand = LaputaPlan | LaputaBuild | LaputaTest | LaputaBoot | LaputaClean
+export enum LaputaCommand {
+    LaputaPlan,
+    LaputaBuild,
+    LaputaTest,
+    LaputaBoot,
+    LaputaClean,
+}
 
 ## The parsed command and its profile-owned execution parameters.
 export type CliArgs = {command: LaputaCommand, profile_name: Str, jobs: Int}
@@ -37,7 +43,11 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
   }
 
   if argv[0] != "plan" and argv[0] != "build" and argv[0] != "test" and argv[0] != "boot" and argv[0] != "clean" {
-    return Err(types.LaputaError.Usage(f"unknown laputa command ${argv[0]}\n\n${usage()}"))
+    return Err(
+      types.LaputaError.Usage(f"""unknown laputa command ${argv[0]}
+
+${usage()}"""),
+    )
   }
 
   var command: LaputaCommand = LaputaPlan
@@ -50,10 +60,15 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
   } else if argv[0] == "clean" {
     command = LaputaClean
   }
+
   let command_name = command_text(command)
 
   if argv.len() < 2 {
-    return Err(types.LaputaError.Usage(f"laputa ${command_name} requires a profile name\n\n${usage()}"))
+    return Err(
+      types.LaputaError.Usage(f"""laputa ${command_name} requires a profile name
+
+${usage()}"""),
+    )
   }
 
   let profile_name = argv[1]
@@ -64,20 +79,22 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
     let token = argv[index]
 
     if token == "--jobs" or token == "-j" {
-      if (command_name != "build" and command_name != "test" and command_name != "boot") or index + 1 >= argv.len() {
+      if command_name != "build" and command_name != "test" and command_name != "boot" or index + 1 >= argv.len() {
         return Err(types.LaputaError.Usage(f"invalid ${token} for laputa ${command_name}"))
       }
 
       jobs = argv[index + 1].parse_int()?
-      if jobs <= 0 {
-        return Err(types.LaputaError.Usage("--jobs must be positive"))
-      }
+      return Err(types.LaputaError.Usage("--jobs must be positive")) when jobs <= 0
 
       index += 2
       continue
     }
 
-    return Err(types.LaputaError.Usage(f"unexpected argument ${token}\n\n${usage()}"))
+    return Err(
+      types.LaputaError.Usage(f"""unexpected argument ${token}
+
+${usage()}"""),
+    )
   }
 
   {command, profile_name, jobs}

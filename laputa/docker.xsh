@@ -2,7 +2,7 @@
 use laputa.types as types
 
 ## Select the published package-tools interpreter or a checked-out ARM64 debug binary.
-export type ContainerXsh = PinnedXsh | CheckedOutXsh(Path)
+export enum ContainerXsh { PinnedXsh, CheckedOutXsh(Path) }
 
 ## The fixed host paths and named volumes mounted into the profile build container.
 export type DockerConfig = {
@@ -18,7 +18,7 @@ export type DockerConfig = {
   container_xsh: ContainerXsh,
 }
 
-let package_tools_contract_epoch = "laputa-package-tools-1"
+const package_tools_contract_epoch = "laputa-package-tools-1"
 
 pure package_tools_dockerfile(value: DockerConfig) -> Path {
   fp"${value.laputa_root}/Dockerfile.package-tools"
@@ -29,31 +29,26 @@ pure package_tools_bootstrap_helper(value: DockerConfig) -> Path {
 }
 
 proc package_tools_tree_digest(root: Path) [fs, error] -> Result[Str] {
-  if ! fs.exists(root)? {
+  guard fs.exists(root)? else {
     return Err(types.LaputaError.Docker(f"package-tools bootstrap input is missing ${root}"))
   }
 
   let metadata = fs.metadata(root)?
-  if metadata.kind == "file" {
-    return hash.sha256(root)?.hex()
-  }
+  return hash.sha256(root)?.hex() when metadata.kind == "file"
 
-  var lines: List[Str] = []
-  for entry in fs.walk(root) |> where .kind == "file" {
-    lines = lines.push(f"${entry.path.strip_prefix(root)?.display()}\t${hash.sha256(entry.path)?.hex()}")
-  }
-
+  var lines = [
+    f"${entry.path.strip_prefix(root)?.display()}\t${hash.sha256(entry.path)?.hex()}"
+    for entry in fs.files(root)
+  ]
   let sorted = lines |> sort
   bytes.from_text(sorted.join("\n") + "\n").sha256().hex()
 }
 
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = (env.get(name) ?? "").trim()
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 ## Resolve the allowed Docker configuration surface from the host environment.
@@ -82,21 +77,22 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     if ! fs.exists(binary)? or fs.metadata(binary)?.kind != "file" {
       return Err(types.LaputaError.Docker(f"checked-out XSH binary is missing: ${binary}"))
     }
+
     container_xsh = CheckedOutXsh(binary)
   }
 
-  let base: DockerConfig = {
-    docker,
-    packages_root,
-    laputa_root,
-    xsh_root,
-    output_root,
+  let base: DockerConfig = DockerConfig(
+    docker:,
+    packages_root:,
+    laputa_root:,
+    xsh_root:,
+    output_root:,
     artifact_volume: "laputa-artifacts-aarch64-v2",
     source_volume: "laputa-sources-aarch64-v2",
     image: "laputa-package-tools",
     repo_url: env_value("LAPUTA_REPO_URL", ""),
-    container_xsh,
-  }
+    container_xsh:,
+  )
   {...base, image: ensure_package_tools(base)?}
 }
 
@@ -208,8 +204,8 @@ export proc package_tools_image_tag(value: DockerConfig) [fs, env, error] -> Res
 
 proc package_tools_image_architecture(value: DockerConfig, tag: Str) [fs, process, error] -> Result[Str] {
   let handle = fs.tempdir()?
-  defer fs.close_root(handle)?
-  let work = fs.root_path(handle)?
+  defer handle.close()?
+  let work = handle.host_path()?
   let output = fp"${work}/architecture"
   let status = process.run(
     process.command_argv(
@@ -220,13 +216,9 @@ proc package_tools_image_architecture(value: DockerConfig, tag: Str) [fs, proces
     ),
   )?
 
-  if ! status.ok {
-    return ""
-  }
+  return "" unless status.ok
 
-  if ! fs.exists(output)? {
-    return ""
-  }
+  return "" unless fs.exists(output)?
 
   fs.read_text(output)?
 }
@@ -270,15 +262,10 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
   var argv = ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages"]
 
   for package_name in profile.package_roots {
-    argv = argv.extend(["--root", package_name])
+    argv += ["--root", package_name]
   }
 
-  argv = argv.extend([
-    "--root",
-    profile.kernel_package,
-    "--output",
-    "/output/build-plan.json",
-  ])
+  argv = argv.extend(["--root", profile.kernel_package, "--output", "/output/build-plan.json"])
   argv
 }
 
@@ -319,7 +306,7 @@ export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, er
 
 ## Reject an image architecture other than the native arm64 runner required for package planning and execution.
 export proc require_arm64_image_architecture(architecture: Str) [error] {
-  if architecture != "arm64" {
+  guard architecture == "arm64" else {
     return Err(types.LaputaError.Docker(f"Docker runner reports ${architecture}; native arm64 is required"))
   }
 }
@@ -370,8 +357,13 @@ export proc docker_generation_plan(value: DockerConfig, profile: types.SystemPro
 }
 
 ## Build one complete profile image through the native arm64 runner and keep its build log transactional.
-export proc docker_profile_build(value: DockerConfig, profile: types.SystemProfile, jobs: Int, log: Path) [fs, process, error] {
-  if jobs < 1 {
+export proc docker_profile_build(
+  value: DockerConfig,
+  profile: types.SystemProfile,
+  jobs: Int,
+  log: Path,
+) [fs, process, error] {
+  guard jobs >= 1 else {
     return Err(types.LaputaError.Usage("laputa build jobs must be positive"))
   }
 

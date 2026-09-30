@@ -9,7 +9,7 @@ pure pm_argv(args: List[Str]) -> List[Str] {
 }
 
 proc run_pm(args: List[Str]) [fs, process, error] {
-  let status = process.run(process.command_argv(p"/bin/xsh", pm_argv(args), p"/src/packages"))?
+  let status = process.run(process.command_argv(/bin/xsh, pm_argv(args), /src/packages))?
   if ! status.ok {
     return Err(InstallerPackageRootsError.Failed(f"PM failed: ${args.join(" ")}"))
   }
@@ -18,8 +18,9 @@ proc run_pm(args: List[Str]) [fs, process, error] {
 pure target_roots(kernel_package: Str, smoke: Bool) -> List[Str] {
   var roots = ["baselayout", "sudo-rs", "xsh", "xinit", "laputa-pm", "laputa-net", kernel_package]
   if smoke {
-    roots = roots.push("dropbear")
+    roots += ["dropbear"]
   }
+
   roots
 }
 
@@ -32,24 +33,46 @@ pure tools_roots() -> List[Str] {
 }
 
 pure plan_roots(kernel_package: Str, smoke: Bool) -> List[Str] {
-  var roots = ["baselayout", "sudo-rs", "xsh", "xinit", "laputa-pm", "laputa-net", "laputa-fs", kernel_package]
+  var roots = [
+    "baselayout",
+    "sudo-rs",
+    "xsh",
+    "xinit",
+    "laputa-pm",
+    "laputa-net",
+    "laputa-fs",
+    kernel_package,
+  ]
   if smoke {
-    roots = roots.push("dropbear")
+    roots += ["dropbear"]
   }
+
   roots
 }
 
 pure root_args(names: List[Str]) -> List[Str] {
   var args: List[Str] = []
   for name in names {
-    args = args.extend(["--runtime-root", name])
+    args += ["--runtime-root", name]
   }
+
   args
 }
 
 proc compose_archive(plan: Path, work: Path, label: Str, roots: List[Str]) [fs, process, error] -> Result[Path] {
   let generation = fp"${work}/${label}-generation"
-  run_pm(["root", "compose", plan.display(), "--store", "/artifacts"].extend(root_args(roots)).extend(["--output", generation.display()]))?
+  run_pm(
+    [
+      "root",
+      "compose",
+      plan.display(),
+      "--store",
+      "/artifacts",
+      @root_args(roots),
+      "--output",
+      generation.display(),
+    ],
+  )?
   let archive_path = fp"${work}/${label}-root.tar.gz"
   archive.tar_create(archive_path, generation, [p"."], compression: "gz")?
   archive_path
@@ -63,35 +86,60 @@ proc main(...argv: List[Str]) [fs, process, error] {
   let smoke = argv[0] == "1"
   let kernel_package = argv[1]
   let jobs = argv[2].parse_int()?
-  if jobs < 1 {
-    return Err(InstallerPackageRootsError.Failed("jobs must be positive"))
-  }
+  return Err(InstallerPackageRootsError.Failed("jobs must be positive")) when jobs < 1
 
   let handle = fs.tempdir()?
-  defer fs.close_root(handle)?
-  let work = fs.root_path(handle)?
+  defer handle.close()?
+  let work = handle.host_path()?
   let plan = fp"${work}/build-plan.json"
-  var plan_args = ["repo", "plan", "--repo", "/src/packages", "--target", "aarch64-linux-musl", "--output", plan.display()]
+  var plan_args = [
+    "repo",
+    "plan",
+    "--repo",
+    "/src/packages",
+    "--target",
+    "aarch64-linux-musl",
+    "--output",
+    plan.display(),
+  ]
   for name in plan_roots(kernel_package, smoke) {
-    plan_args = plan_args.extend(["--root", name])
+    plan_args += ["--root", name]
   }
+
   run_pm(plan_args)?
   run_pm(["repo", "build", plan.display(), "--store", "/artifacts", "--jobs", f"${jobs}"])?
 
   let target_archive = compose_archive(plan, work, "target", target_roots(kernel_package, smoke))?
   let installer_archive = compose_archive(plan, work, "installer", installer_roots())?
   let tools_archive = compose_archive(plan, work, "tools", tools_roots())?
-  let key = bytes.from_text(
-    f"installer-roots-1\n${hash.sha256(plan)?.hex()}\n${hash.sha256(target_archive)?.hex()}\n${hash.sha256(installer_archive)?.hex()}\n${hash.sha256(tools_archive)?.hex()}\n",
-  ).sha256().hex()
+  let key = bytes.from_text(f"""installer-roots-1
+${hash.sha256(plan)?.hex()}
+${hash.sha256(target_archive)?.hex()}
+${hash.sha256(installer_archive)?.hex()}
+${hash.sha256(tools_archive)?.hex()}
+""")
+    .sha256()
+    .hex()
   container_output.publish_bundle(
-    p"/output",
+    /output,
     key,
     [
-      {name: "build-plan.json", source: plan},
-      {name: "target-root.tar.gz", source: target_archive},
-      {name: "installer-root.tar.gz", source: installer_archive},
-      {name: "tools-root.tar.gz", source: tools_archive},
+      {
+        name: "build-plan.json",
+        source: plan,
+      },
+      {
+        name: "target-root.tar.gz",
+        source: target_archive,
+      },
+      {
+        name: "installer-root.tar.gz",
+        source: installer_archive,
+      },
+      {
+        name: "tools-root.tar.gz",
+        source: tools_archive,
+      },
     ],
   )?
 }

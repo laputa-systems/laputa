@@ -1,5 +1,4 @@
 ##! Inspect CI target partitions through the Linux block-device sysfs tree.
-
 ## Report whether any disk has a partition with the target PARTUUID.
 export proc ci_target_installed(sys_block: Path, disks: List[Path], target_partuuid: Str) [fs, error] -> Result[Bool] {
   for disk in disks {
@@ -10,13 +9,11 @@ export proc ci_target_installed(sys_block: Path, disks: List[Path], target_partu
         let uevent = fp"${block}/${entry.name}/uevent"
 
         if fs.exists(partition_marker)? and fs.exists(uevent)? {
-          if f"PARTUUID=${target_partuuid}" in fs.read_text(uevent)? {
-            return true
-          }
+          return true when f"PARTUUID=${target_partuuid}" in fs.read_text(uevent)?
         }
       }
     }
   }
 
-  return false
+  false
 }

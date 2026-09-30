@@ -6,59 +6,49 @@ type PackageSize = {name: Str, size: Int}
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${env_value(name, fallback.display())}"
+  fp"${env_value(name, fallback.display())}"
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
-  if arch == "amd64" {
-    return "x86_64"
-  }
+  return "x86_64" when arch == "amd64"
 
-  if arch == "arm64" {
-    return "aarch64"
-  }
+  return "aarch64" when arch == "arm64"
 
-  if arch == "aarch64" or arch == "x86_64" {
-    return arch
-  }
+  return arch when arch == "aarch64" or arch == "x86_64"
 
-  return Err(InstallerSizeError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerSizeError.Failed(f"unsupported installer arch ${arch}"))
 }
 
 pure kib(value: Int) -> Int {
-  return (value + 1024 - 1) / 1024
+  (value + 1024 - 1) / 1024
 }
 
 pure size_label(value: Int) -> Str {
-  return f"${kib(value)}K"
+  f"${kib(value)}K"
 }
 
 proc path_size(path_value: Path) [fs, error] -> Result[Int] {
-  if ! fs.exists(path_value)? {
+  guard fs.exists(path_value)? else {
     return 0
   }
 
   let meta = path_value.metadata()?
 
-  if meta.kind != "dir" {
-    return meta.size
-  }
+  return meta.size when meta.kind != "dir"
 
   var total = meta.size
 
-  for child in fs.ls(path_value)? {
+  for child in fs.children(path_value)? {
     total += path_size(child.path)?
   }
 
-  return total
+  total
 }
 
 proc print_path_size(label: Str, path_value: Path) [fs, error] {
@@ -70,29 +60,27 @@ proc print_path_size(label: Str, path_value: Path) [fs, error] {
 }
 
 proc package_size(rootfs: Path, manifest_path: Path) [fs, error] -> Result[Int] {
-  let manifest: List[Str] = json.read(manifest_path)?
+  let manifest = json.read(manifest_path)?.require(List[Str])?
   var total = 0
 
   for rel in manifest {
     total += path_size(fp"${rootfs}/${rel}")?
   }
 
-  return total
+  total
 }
 
 proc package_size_rows(rootfs: Path) [fs, error] -> Result[List[PackageSize]] {
   let db = fp"${rootfs}/var/lib/xsh-pm/packages"
   var rows: List[PackageSize] = []
 
-  if ! fs.exists(db)? {
-    return rows
-  }
+  return rows unless fs.exists(db)?
 
-  for entry in fs.ls(db)? |> where .kind == "dir" {
+  for entry in fs.children(db)? |> where .kind == "dir" {
     rows = rows.push({name: entry.name, size: package_size(rootfs, fp"${entry.path}/manifest.json")?})
   }
 
-  return rows |> sort-by .size
+  rows |> sort-by .size
 }
 
 proc print_package_sizes(label: Str, rootfs: Path) [fs, error] {

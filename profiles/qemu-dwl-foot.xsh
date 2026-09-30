@@ -2,7 +2,7 @@
 use laputa.types as types
 
 ## The direct package intent for a real dwl and foot system; dependencies are resolved by PM.
-export let profile: types.SystemProfile = {
+export let profile: types.SystemProfile = types.SystemProfile(
   name: "qemu-dwl-foot",
   package_roots: [
     "baselayout",
@@ -44,4 +44,4 @@ export let profile: types.SystemProfile = {
     "python",
   ],
   forbidden_sonames: ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"],
-}
+)

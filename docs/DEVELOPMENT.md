@@ -19,7 +19,7 @@ Build the local debug XSH tools before invoking these commands if they do not ye
 
 ```bash
 cd "$LAPUTA_ROOT"
-XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check --strict \
+XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check \
   laputa.xsh \
   laputa/{build,cli,container_output,docker,image,profile,proof,qemu,types}.xsh \
   profiles/*.xsh \
@@ -28,14 +28,26 @@ XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check --strict \
 XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check laputa/container_build.xsh
 ```
 
-`laputa/container_build.xsh` statically imports PM generation modules. Its
-non-strict check covers that combined graph while the first command keeps
-Laputa-owned modules under strict checking; the current PM graph emits strict
-`Any` warnings at its own JSON boundaries.
+`xsht check` validates dynamic boundaries by default; the `--strict` option
+has been removed. `laputa/container_build.xsh` statically imports PM generation
+modules, so its check also requires the checked-out PM graph to pass the current
+language contracts.
 
-The combined PM/Laputa import test uses the PM source graph, whose existing
-dynamic boundaries do not pass Laputa's strict check. Check and run it
-separately with the checked-out XSH tools:
+Run the top-level native test modules separately:
+
+```bash
+for test_module in tests/xsh/*.xsh; do
+  XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" test --jobs 1 "$test_module" || exit "$?"
+done
+```
+
+The `tests/xsh` directory filter also discovers the standalone
+`tests/xsh/fixtures/container-local-staging.xsh` script. That fixture requires
+the Linux container's `/src/packages` and `/output` mounts and must run through
+container verification instead of the host native-test gate.
+
+The combined PM/Laputa import test uses the PM source graph. Check and run it
+separately to distinguish package-owned diagnostics from Laputa-owned modules:
 
 ```bash
 XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check tests/integration/cross_consumer.xsh

@@ -138,9 +138,9 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
 proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
   bytes.concat(
     [
-      data.slice(offset: 0, length: offset),
+      data[..offset],
       replacement,
-      data.slice(offset: offset + replacement.len(), length: data.len() - offset - replacement.len()),
+      data[offset + replacement.len()..],
     ],
   )
 }
@@ -245,7 +245,7 @@ export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
   }
 
   let entry = bytes.read_at(image, 2 * sector_size, 128)?
-  let guid = entry.slice(offset: 16, length: 16)
+  let guid = entry[16..32]
   if guid != root_partition_guid()? {
     return Err(ImageError.Failed(f"${image} root partition GUID does not match ${image_root_partuuid()}"))
   }

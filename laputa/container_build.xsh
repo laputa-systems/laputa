@@ -88,19 +88,16 @@ proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemPro
   for entry in fs.walk(root, hidden: true) {
     continue unless entry.kind == "file"
 
-    match elf.inspect(entry.path) {
-      Ok(info) => {
-        if info.soname in profile.forbidden_sonames {
-          return Err(ContainerBuildError.Failed(f"generation provides forbidden SONAME ${info.soname}"))
-        }
+    if let Ok(info) = elf.inspect(entry.path) {
+      if info.soname in profile.forbidden_sonames {
+        return Err(ContainerBuildError.Failed(f"generation provides forbidden SONAME ${info.soname}"))
+      }
 
-        for soname in info.needed {
-          if soname in profile.forbidden_sonames {
-            return Err(ContainerBuildError.Failed(f"generation needs forbidden SONAME ${soname}"))
-          }
+      for soname in info.needed {
+        if soname in profile.forbidden_sonames {
+          return Err(ContainerBuildError.Failed(f"generation needs forbidden SONAME ${soname}"))
         }
       }
-      Err(_) => {}
     }
   }
 }
@@ -131,7 +128,7 @@ proc container_pm(args: List[Str]) [fs, process, error] {
     process.command_argv(
       p"/bin/xsh",
       container_pm_argv(args),
-      p"/src/packages",
+      container_package_root(),
     ),
   )?
 
@@ -195,12 +192,12 @@ proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, 
 
 proc container_system_key(build_plan: Path, generation_manifest: Path, profile: types.SystemProfile) [fs, error] -> Result[Str] {
   let manifest = json.read(generation_manifest)?.require(Record)?
-  let generation_sha256: Str = manifest.get("generation_sha256")?.require(Str)?
+  let generation_sha256: Str = manifest.get("generation_sha256")?.require()?
   let plan_value = json.read(build_plan)?.require(Record)?
-  let nodes: List[Record] = plan_value.get("nodes")?.require(List[Record])?
+  let nodes: List[Record] = plan_value.get("nodes")?.require()?
   var kernel_key = ""
   for node in nodes {
-    let name: Str = node.get("name")?.require(Str)?
+    let name: Str = node.get("name")?.require()?
     if name == profile.kernel_package {
       kernel_key = node.get("artifact_key")?.require(Str)?
     }
@@ -228,8 +225,8 @@ proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, 
 
 proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net, process, env, time, error] {
   let handle = fs.tempdir()?
-  defer fs.close_root(handle)?
-  let work = fs.root_path(handle)?
+  defer handle.close()?
+  let work = handle.host_path()?
   let build_plan = container_stage_build_plan(work)?
   let overlay = container_prepare_overlay(profile, work)?
   let saved_generation_plan = pm_generation.read_generation_plan(container_generation_plan_path())?
@@ -257,14 +254,12 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
 
   let profile = container_load_profile(argv[1])?
   let jobs = argv[2].parse_int()?
-  if jobs < 1 {
-    return Err(ContainerBuildError.Failed("jobs must be positive"))
-  }
+  return Err(ContainerBuildError.Failed("jobs must be positive")) when jobs < 1
 
   if argv[0] == "plan" {
     let handle = fs.tempdir()?
-    defer fs.close_root(handle)?
-    let work = fs.root_path(handle)?
+    defer handle.close()?
+    let work = handle.host_path()?
     let overlay = container_prepare_overlay(profile, work)?
     let generation_plan = container_generation_plan(container_build_plan_path(), profile, overlay)?
     let staged = fp"${work}/generation-plan.json"

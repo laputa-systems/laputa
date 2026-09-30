@@ -16,7 +16,9 @@ type SupervisorFixture = {
 pure fixture_profile() -> types.SystemProfile {
   {
     name: "qemu-dwl-foot",
-    package_roots: ["baselayout"],
+    package_roots: [
+      "baselayout",
+    ],
     kernel_package: "linux",
     kernel_path: p"boot/vmlinuz",
     qemu_machine: "virt,accel=hvf,highmem=off",
@@ -34,42 +36,55 @@ pure fixture_qemu() -> qemu.QemuConfig {
   {qemu: p"qemu-system-aarch64", python: p"python3", qmp_helper: p"boot/qmp-proof.py"}
 }
 
-proc test_qemu_command_is_the_single_aarch64_hvf_contract() [error] {
-  let test_argv = qemu.qemu_command_argv(fixture_qemu(), fixture_profile(), build.outputs(p"target/laputa/qemu-dwl-foot"), types.Test)
-  let interactive_argv = qemu.qemu_command_argv(fixture_qemu(), fixture_profile(), build.outputs(p"target/laputa/qemu-dwl-foot"), types.Interactive)
+test test_qemu_command_is_the_single_aarch64_hvf_contract [error] {
+  let test_argv = qemu.qemu_command_argv(
+    fixture_qemu(),
+    fixture_profile(),
+    build.outputs(p"target/laputa/qemu-dwl-foot"),
+    types.Test,
+  )
+  let interactive_argv = qemu.qemu_command_argv(
+    fixture_qemu(),
+    fixture_profile(),
+    build.outputs(p"target/laputa/qemu-dwl-foot"),
+    types.Interactive,
+  )
 
   for argv in [test_argv, interactive_argv] {
-    test.ok("virt,accel=hvf,highmem=off" in argv, "machine")?
-    test.ok("virtio-blk-device,drive=root" in argv, "root device")?
-    test.ok("virtio-net-pci,netdev=net0" in argv, "network")?
-    test.ok("virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu")?
-    test.ok("virtio-keyboard-pci" in argv, "keyboard")?
-    test.ok("virtio-tablet-pci" in argv, "tablet")?
-    test.ok("virtio-mouse-pci" in argv, "mouse")?
-    test.ok("-qmp" in argv, "qmp")?
-    test.ok("-no-reboot" in argv, "no reboot")?
-    test.ok(argv |> any .contains("root=PARTUUID=33333333-3333-3333-3333-333333333333"), "root partuuid")?
-    test.ok(! (argv |> any .contains("x86_64")), "no host architecture")?
+    assert "virt,accel=hvf,highmem=off" in argv, "machine"
+    assert "virtio-blk-device,drive=root" in argv, "root device"
+    assert "virtio-net-pci,netdev=net0" in argv, "network"
+    assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"
+    assert "virtio-keyboard-pci" in argv, "keyboard"
+    assert "virtio-tablet-pci" in argv, "tablet"
+    assert "virtio-mouse-pci" in argv, "mouse"
+    assert "-qmp" in argv, "qmp"
+    assert "-no-reboot" in argv, "no reboot"
+    assert argv |> any "root=PARTUUID=33333333-3333-3333-3333-333333333333" in ., "root partuuid"
+    assert ! (argv |> any "x86_64" in .), "no host architecture"
   }
 
-  test.ok("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Test), "test proof flag")?
-  test.ok(! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Interactive)), "interactive omits proof flag")?
-  test.ok("none" in test_argv, "headless test")?
-  test.ok("cocoa,zoom-to-fit=on,show-cursor=on" in interactive_argv, "cocoa interactive")?
+  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Test), "test proof flag"
+  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Interactive)), "interactive omits proof flag"
+  assert "none" in test_argv, "headless test"
+  assert "cocoa,zoom-to-fit=on,show-cursor=on" in interactive_argv, "cocoa interactive"
 }
 
-proc test_console_markers_fail_before_success() [error] {
+test test_console_markers_fail_before_success [error] {
   for marker in proof.failure_markers {
-    test.eq(proof.failure_marker(f"before ${marker} after"), marker)?
+    proof.failure_marker(f"before ${marker} after") == marker
   }
-  test.ok(! proof.succeeded("booting"))?
-  test.ok(proof.succeeded(proof.success_marker))?
+
+  ! proof.succeeded("booting")
+  proof.succeeded(proof.success_marker)
   match proof.verify_console("LAPUTA_DWL_FOOT_PROOF_FAILED input") {
-    Ok(_) => test.ok(false)?
+    Ok(_) => false
     Err(_) => {}
   }
-  match proof.verify_console(f"${proof.success_marker}\nQEMU_FATAL after success") {
-    Ok(_) => test.ok(false)?
+
+  match proof.verify_console(f"""${proof.success_marker}
+QEMU_FATAL after success""") {
+    Ok(_) => false
     Err(_) => {}
   }
 }
@@ -78,7 +93,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
   let bundle = fp"${outputs.builds}/fixture"
-  fs.mkdir(bundle, parents: true)?
+  fs.mkdir(bundle)?
   fs.symlink(p"builds/fixture", outputs.current)?
   let fake_qemu = fp"${root}/fake-qemu.sh"
   let fake_qmp = fp"${root}/fake-qmp.sh"
@@ -90,6 +105,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
 
   fs.write(outputs.kernel, "kernel")?
   fs.write(outputs.disk, "disk")?
+
   # This fake QEMU ignores TERM, proving managed cancellation escalates to KILL.
   fs.write(
     fake_qemu,
@@ -101,6 +117,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
       "while :; do sleep 1; done",
     ].join("\n") + "\n",
   )?
+
   # The failed first call makes the side-effect-free QMP readiness check retry.
   # The third call is the one proof input; the fourth writes screenshot evidence.
   fs.write(
@@ -118,7 +135,11 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
   fs.chmod(fake_qemu, 0o755)?
   fs.chmod(fake_qmp, 0o755)?
   {
-    config: {qemu: fake_qemu, python: fake_qmp, qmp_helper: fp"${root}/qmp-helper.py"},
+    config: {
+      qemu: fake_qemu,
+      python: fake_qmp,
+      qmp_helper: fp"${root}/qmp-helper.py",
+    },
     outputs,
     qmp_attempt_one: attempt_one,
     qmp_attempt_two: attempt_two,
@@ -127,57 +148,66 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
   }
 }
 
-proc test_screenshot_evidence_must_be_nonempty(ctx: TestContext) [fs, error] {
+test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-screenshot")?
   let screenshot = fp"${root}/screenshot.ppm"
   fs.write(screenshot, "")?
-  test.ok(! qemu.screenshot_is_valid(screenshot)?)?
-  fs.write(screenshot, "P6\n1 1\n255\nX")?
-  test.ok(qemu.screenshot_is_valid(screenshot)?)?
+  ! qemu.screenshot_is_valid(screenshot)?
+  fs.write(
+    screenshot,
+    """P6
+1 1
+255
+X""",
+  )?
+  qemu.screenshot_is_valid(screenshot)?
 }
 
-proc test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown(ctx: TestContext) [fs, process, time, error] {
+test test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
   qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
-  test.ok(fs.exists(fixture.qmp_attempt_one)?)?
-  test.ok(fs.exists(fixture.qmp_attempt_two)?)?
-  test.ok(fs.exists(fixture.qmp_attempt_three)?)?
-  test.eq(fs.read_text(fixture.input_record)?, "laputa\n")?
-  test.ok(qemu.screenshot_is_valid(fixture.outputs.screenshot)?)?
+  fs.exists(fixture.qmp_attempt_one)?
+  fs.exists(fixture.qmp_attempt_two)?
+  fs.exists(fixture.qmp_attempt_three)?
+  fs.read_text(fixture.input_record)? == """laputa
+"""
+  qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
-proc test_qemu_supervisor_rescans_final_qemu_log_after_screenshot(ctx: TestContext) [fs, process, time, error] {
+test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, true)?
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
     Ok(_) => test.fail("supervisor accepted QEMU fatal marker written with screenshot")?
     Err(_) => {}
   }
-  test.ok(qemu.screenshot_is_valid(fixture.outputs.screenshot)?)?
+
+  qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
-proc test_generation_overlay_binds_guest_proof_after_run_mount() [fs, error] {
+test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   let hook_metadata = fs.metadata(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let hook = fs.read_text(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let builder = fs.read_text(p"laputa/container_build.xsh")?
   let guest = fs.read_text(p"guest/qemu-dwl-foot-proof.xsh")?
-  test.eq(hook_metadata.mode % 4096, 0o755)?
-  test.ok("/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook)?
-  test.ok(guest.starts_with("#!/bin/xsh\n"))?
-  test.ok("fs.install(source, target, 0o755" in hook)?
-  test.ok("container_prepare_overlay" in builder)?
-  test.ok("fs.install(guest_proof" in builder)?
-  test.ok(! ("process.which(" in guest))?
-  test.ok("/usr/bin/mdevd," in guest)?
-  test.ok("/usr/bin/mdevd-coldplug" in guest)?
-  test.ok("/usr/bin/seatd" in guest)?
-  test.ok("SEATD_VTBOUND: \"0\"" in guest)?
-  test.ok("SEATD_VTBOUND: \"0\"" in hook)?
-  test.ok("/usr/bin/dwl," in guest)?
-  test.ok("/usr/bin/foot -- /bin/xsh" in guest)?
-  test.ok("io.stdin_text()?" in guest)?
-  test.ok(! ("io.stdin().read_to_end()" in guest))?
-  test.ok("mdevd-coldplug" in guest)?
-  test.ok("seatd" in guest and "dwl" in guest and "foot" in guest)?
-  test.ok("guest_wait_for(p\"/run/laputa-foot-read-ready\", \"foot\", 30)" in guest)?
-  test.ok("guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest)?
+  hook_metadata.mode % 4096 == 0o755
+  "/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook
+  guest.starts_with("""#!/bin/xsh
+""")
+  "fs.install(source, target, 0o755" in hook
+  "container_prepare_overlay" in builder
+  "fs.install(guest_proof" in builder
+  ! ("process.which(" in guest)
+  "/usr/bin/mdevd," in guest
+  "/usr/bin/mdevd-coldplug" in guest
+  "/usr/bin/seatd" in guest
+  "SEATD_VTBOUND: \"0\"" in guest
+  "SEATD_VTBOUND: \"0\"" in hook
+  "/usr/bin/dwl," in guest
+  "/usr/bin/foot -- /bin/xsh" in guest
+  "io.stdin_text()?" in guest
+  ! ("io.stdin().read_to_end()" in guest)
+  "mdevd-coldplug" in guest
+  "seatd" in guest and "dwl" in guest and "foot" in guest
+  "guest_wait_for(/run/laputa-foot-read-ready, \"foot\", 30)" in guest
+  "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
 }

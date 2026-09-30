@@ -43,6 +43,7 @@ proc main() [fs, process, time, error] {
     ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-C"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
+  let _ = _mdevd
   guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")?
 
   for device in [/dev/input/event0, /dev/input/event1] {
@@ -58,6 +59,7 @@ proc main() [fs, process, time, error] {
     ["seatd", "-g", "seat"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
   )?
+  let _ = _seatd
   guest_wait_for(/run/seatd.sock, "seatd", 20)?
   if ! fs.exists(/run/user/0)? {
     fs.mkdir(/run/user/0)?

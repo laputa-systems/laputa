@@ -2,10 +2,10 @@
 use laputa.types as types
 
 ## The marker emitted only after foot's reader receives the injected input.
-export let success_marker: Str = "LAPUTA_DWL_FOOT_PROOF_OK"
+export let success_marker = "LAPUTA_DWL_FOOT_PROOF_OK"
 
 ## Fatal kernel and guest markers that invalidate the one supported proof.
-export let failure_markers: List[Str] = [
+export let failure_markers = [
   "Kernel panic",
   "not syncing",
   "Attempted to kill init",
@@ -17,12 +17,10 @@ export let failure_markers: List[Str] = [
 ## Return the first configured failure marker found in `console`, if any.
 export pure failure_marker(console: Str) -> Str {
   for marker in failure_markers {
-    if marker in console {
-      return marker
-    }
+    return marker when marker in console
   }
 
-  return ""
+  ""
 }
 
 ## Return whether the guest has emitted every required success marker.

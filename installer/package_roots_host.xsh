@@ -16,12 +16,19 @@ proc local_xsh(root: Path) [fs, env, error] -> Result[Path] {
   if ! fs.exists(binary)? or fs.metadata(binary)?.kind != "file" {
     return Err(InstallerPackageHostError.Failed(f"native ARM64 XSH binary is missing: ${binary}"))
   }
+
   binary
 }
 
 ## Select a complete package bundle built by the native ARM64 runner.
-export proc prepare(root: Path, repo_url: Str, kernel_package: Str, smoke: Bool, jobs: Int) [fs, process, env, error] -> Result[Path] {
-  if jobs < 1 {
+export proc prepare(
+  root: Path,
+  repo_url: Str,
+  kernel_package: Str,
+  smoke: Bool,
+  jobs: Int,
+) [fs, process, env, error] -> Result[Path] {
+  guard jobs >= 1 else {
     return Err(InstallerPackageHostError.Failed("installer package jobs must be positive"))
   }
 
@@ -47,5 +54,6 @@ export proc prepare(root: Path, repo_url: Str, kernel_package: Str, smoke: Bool,
       return Err(InstallerPackageHostError.Failed(f"installer package bundle is missing ${name}"))
     }
   }
+
   bundle
 }

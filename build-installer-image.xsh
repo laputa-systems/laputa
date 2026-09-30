@@ -1,4 +1,5 @@
 #!/bin/xsh
+use installer.package_environment
 use installer.package_roots_host as package_roots_host
 
 error InstallerBuildError = Failed(message: Str)
@@ -6,53 +7,41 @@ error InstallerBuildError = Failed(message: Str)
 proc installer_env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${installer_env_value(name, fallback.display())}"
+  fp"${installer_env_value(name, fallback.display())}"
 }
 
 proc packages_root(root: Path) [fs, env, error] -> Result[Path] {
   let configured = env.get("LAPUTA_PACKAGES_ROOT") ?? ""
 
-  if configured.trim() != "" {
-    return fp"${configured}"
-  }
+  return fp"${configured}" when configured.trim() != ""
 
   let home = env.get("HOME") ?? ""
 
   if home != "" {
     let home_root = fp"${home}/d/laputa-systems/packages"
 
-    if fs.exists(home_root)? {
-      return home_root
-    }
+    return home_root when fs.exists(home_root)?
   }
 
   let sibling = fp"${root.parent}/packages"
 
-  if fs.exists(sibling)? {
-    return sibling
-  }
+  return sibling when fs.exists(sibling)?
 
-  if home != "" {
-    return fp"${home}/d/laputa-systems/packages"
-  }
+  return fp"${home}/d/laputa-systems/packages" when home != ""
 
-  return sibling
+  sibling
 }
 
 proc installer_work_path(root: Path, arch: Str) [env, error] -> Result[Path] {
   let raw = env.get("LAPUTA_INSTALLER_WORK") ?? ""
 
-  if raw.trim() != "" {
-    return fp"${raw}"
-  }
+  return fp"${raw}" when raw.trim() != ""
 
   fp"${root}/target/laputa-installer-${arch}"
 }
@@ -60,9 +49,7 @@ proc installer_work_path(root: Path, arch: Str) [env, error] -> Result[Path] {
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
   let status = process.run(process.command_argv(target, argv, cwd, envs))?
 
-  if status.ok {
-    return
-  }
+  return when status.ok
 
   if status.exited() {
     abort(status.exit_code()?)
@@ -77,19 +64,17 @@ proc run_pm(
   repo_url: Str,
   arch: Str,
   argv: List[Str],
-  extra_env: Record = {},
+  qemu_smoke: Str? = null,
 ) [fs, process, env, error] {
   let pm_root = packages_root(root)?
 
-  let envs = {
-    XSH_MODULE_PATH: pm_root.display(),
-    XSH_PM_REPO: repo_url,
-    XSH_PM_PUBLIC_REPO: repo_url,
-    XSH_PM_ARCH: arch,
-    ...extra_env,
+  let command_argv = ["xsh", fp"${pm_root}/pm.xsh".display(), "--"].extend(argv)
+  if qemu_smoke != null {
+    run_argv(xsh, command_argv, root, package_environment.smoke_environment(pm_root, repo_url, arch, qemu_smoke))?
+    return
   }
 
-  run_argv(xsh, ["xsh", fp"${pm_root}/pm.xsh".display(), "--"].extend(argv), root, envs)?
+  run_argv(xsh, command_argv, root, package_environment.environment(pm_root, repo_url, arch))?
 }
 
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
@@ -110,7 +95,7 @@ proc install_remote_packages(
   rootfs: Path,
   label: Str,
   packages: List[Str],
-  extra_env: Record = {},
+  qemu_smoke: Str? = null,
 ) [fs, process, env, error] {
   run_pm(
     root,
@@ -120,7 +105,7 @@ proc install_remote_packages(
     ["install", rootfs.display(), fp"${work}/pm-work-${label}".display(), fp"${work}/pm-out-${label}".display()].extend(
       packages,
     ),
-    extra_env,
+    qemu_smoke,
   )?
 }
 
@@ -130,23 +115,19 @@ proc install_remote_packages(
 proc overlay_local_packages(work: Path, arch: Str, rootfs: Path) [fs, env, error] {
   let local_pm = env.get("LAPUTA_LOCAL_PM_REPO") ?? ""
 
-  if local_pm == "" {
-    return
-  }
+  return when local_pm == ""
 
   let local_dir = fp"${local_pm.replace("file://", "")}"
   let index_path = fp"${local_dir}/index.json"
 
-  if ! fs.exists(index_path)? {
-    return
-  }
+  return unless fs.exists(index_path)?
 
-  let index: List[Record] = json.read(index_path)?
+  let index = json.read(index_path)?.require(List[Record])?
 
   for entry in index {
-    let name: Str = entry.get("name")?
-    let entry_arch: Str = entry.get("arch")?
-    let tarball_rel: Str = entry.get("tarball")?
+    let name = entry.get("name")?.require(Str)?
+    let entry_arch = entry.get("arch")?.require(Str)?
+    let tarball_rel = entry.get("tarball")?.require(Str)?
     continue when entry_arch != arch
     let tarball = fp"${local_dir}/${tarball_rel}"
     continue unless fs.exists(tarball)?
@@ -198,15 +179,11 @@ proc ensure_dev_dirs(rootfs: Path) [fs, error] {
 proc append_inittab_line(rootfs: Path, line: Str) [fs, error] {
   let inittab = fp"${rootfs}/etc/inittab"
 
-  if ! fs.exists(inittab)? {
-    return
-  }
+  return unless fs.exists(inittab)?
 
   var text = fs.read_text(inittab)?
 
-  if line in text {
-    return
-  }
+  return when line in text
 
   if ! text.ends_with("\n") {
     text = f"""${text}
@@ -299,39 +276,27 @@ proc install_qemu_smoke_target_tools(root: Path, rootfs: Path) [fs, env, error] 
 }
 
 pure normalize_installer_arch(arch: Str) -> Result[Str] {
-  if arch == "arm64" {
-    return "aarch64"
-  }
+  return "aarch64" when arch == "arm64"
 
-  if arch == "amd64" {
-    return "x86_64"
-  }
+  return "x86_64" when arch == "amd64"
 
-  if arch == "aarch64" or arch == "x86_64" {
-    return arch
-  }
+  return arch when arch == "aarch64" or arch == "x86_64"
 
-  return Err(InstallerBuildError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerBuildError.Failed(f"unsupported installer arch ${arch}"))
 }
 
 pure efi_boot_filename(arch: Str) -> Result[Str] {
-  if arch == "aarch64" {
-    return "BOOTAA64.EFI"
-  }
+  return "BOOTAA64.EFI" when arch == "aarch64"
 
-  if arch == "x86_64" {
-    return "BOOTX64.EFI"
-  }
+  return "BOOTX64.EFI" when arch == "x86_64"
 
-  return Err(InstallerBuildError.Failed(f"unsupported installer EFI arch ${arch}"))
+  Err(InstallerBuildError.Failed(f"unsupported installer EFI arch ${arch}"))
 }
 
 proc repo_url_for(repo_url: Str, rel: Str) [] -> Str {
-  if repo_url.ends_with("/") {
-    return f"${repo_url}${rel}"
-  }
+  return f"${repo_url}${rel}" when repo_url.ends_with("/")
 
-  return f"${repo_url}/${rel}"
+  f"${repo_url}/${rel}"
 }
 
 proc download_file(url: Str, dest: Path) [fs, net, error] {
@@ -354,21 +319,21 @@ proc download_file(url: Str, dest: Path) [fs, net, error] {
 proc linux_tarball(work: Path, repo_url: Str, arch: Str, package_name: Str) [fs, net, error] -> Result[Path] {
   let index_path = fp"${work}/remote-index.json"
   download_file(repo_url_for(repo_url, "index.json"), index_path)?
-  let rows: List[Record] = json.read(index_path)?
+  let rows = json.read(index_path)?.require(List[Record])?
 
   for row in rows {
-    let name: Str = row.get("name")?
-    let row_arch: Str = row.get("arch")?
+    let name = row.get("name")?.require(Str)?
+    let row_arch = row.get("arch")?.require(Str)?
 
     if name == package_name and row_arch == arch {
-      let tarball_rel: Str = row.get("tarball")?
+      let tarball_rel = row.get("tarball")?.require(Str)?
       let tarball = fp"${work}/${package_name}-${arch}.tar.gz"
       download_file(repo_url_for(repo_url, tarball_rel), tarball)?
       return tarball
     }
   }
 
-  return Err(InstallerBuildError.Failed(f"${package_name} package for ${arch} not found in ${repo_url}"))
+  Err(InstallerBuildError.Failed(f"${package_name} package for ${arch} not found in ${repo_url}"))
 }
 
 proc install_linux_minimal(rootfs: Path, tarball: Path, package_name: Str) [fs, error] {
@@ -390,7 +355,7 @@ proc install_linux_minimal(rootfs: Path, tarball: Path, package_name: Str) [fs, 
 }
 
 proc remove_tree(path_value: Path) [fs, error] {
-  if ! fs.exists(path_value)? {
+  guard fs.exists(path_value)? else {
     return
   }
 
@@ -401,7 +366,7 @@ proc remove_tree(path_value: Path) [fs, error] {
     return
   }
 
-  for child in fs.ls(path_value)? {
+  for child in fs.children(path_value)? {
     if child.kind == "dir" {
       remove_tree(child.path)?
     } else {
@@ -427,7 +392,7 @@ proc assemble_target(
   var packages = ["sudo-rs"]
 
   if qemu_smoke == "1" {
-    packages = packages.push("dropbear")
+    packages += ["dropbear"]
   }
 
   install_remote_packages(
@@ -439,7 +404,7 @@ proc assemble_target(
     rootfs,
     "target-runtime",
     packages,
-    {LAPUTA_INSTALLER_QEMU_SMOKE: qemu_smoke},
+    qemu_smoke,
   )?
 
   install_linux_minimal(rootfs, linux_pkg, linux_package_name)?
@@ -457,7 +422,7 @@ proc assemble_target(
     rootfs,
     "target-tools",
     ["xsh", "xinit", "laputa-pm", "laputa-net"],
-    {LAPUTA_INSTALLER_QEMU_SMOKE: qemu_smoke},
+    qemu_smoke,
   )?
 
   overlay_local_packages(work, arch, rootfs)?
@@ -492,6 +457,7 @@ proc assemble_tools(root: Path, work: Path, xsh: Path, repo_url: Str, arch: Str)
 
 proc install_composed_root(bundle: Path, label: Str, output: Path) [fs, error] {
   archive.tar_extract(fp"${bundle}/${label}-root.tar.gz", output, 0, "auto", true)?
+
   # Image overlays change these roots after package composition, so a package
   # generation receipt must not claim to describe the finished image.
   fs.remove(fp"${output}/var/lib/laputa/generation.json", missing_ok: true)?
@@ -527,49 +493,47 @@ proc prune_runtime_root(rootfs: Path) [fs, error] {
 }
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
-  return (value + divisor - 1) / divisor
+  (value + divisor - 1) / divisor
 }
 
 proc path_size(path_value: Path) [fs, error] -> Result[Int] {
-  if ! fs.exists(path_value)? {
+  guard fs.exists(path_value)? else {
     return 0
   }
 
   let meta = path_value.metadata()?
 
-  if meta.kind != "dir" {
-    return meta.size
-  }
+  return meta.size when meta.kind != "dir"
 
   var total = meta.size
 
-  for child in fs.ls(path_value)? {
+  for child in fs.children(path_value)? {
     total += path_size(child.path)?
   }
 
-  return total
+  total
 }
 
 proc installer_root_size_mb(rootfs: Path, override_mb: Str) [fs, error] -> Result[Int] {
-  if override_mb != "" {
+  guard override_mb == "" else {
     return override_mb.parse_int()?
   }
 
-  return ceil_div(path_size(rootfs)?, 1024 * 1024) + 4
+  ceil_div(path_size(rootfs)?, 1024 * 1024) + 4
 }
 
 proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
-  return bytes.concat(
+  bytes.concat(
     [
-      data.slice(offset: 0, length: offset),
+      data[..offset],
       replacement,
-      data.slice(offset: offset + replacement.len(), length: data.len() - offset - replacement.len()),
+      data[offset + replacement.len()..],
     ],
   )
 }
 
 proc put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
-  return put(data, offset, bytes.pack_le(value, width)?)?
+  put(data, offset, bytes.pack_le(value, width)?)?
 }
 
 proc gpt_name(name: Str) [error] -> Result[Bytes] {
@@ -583,7 +547,7 @@ proc gpt_name(name: Str) [error] -> Result[Bytes] {
   }
 
   let encoded = bytes.concat(parts)
-  return bytes.concat([encoded, bytes.zero(72 - encoded.len())?])
+  bytes.concat([encoded, bytes.zero(72 - encoded.len())?])
 }
 
 proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes] {
@@ -593,7 +557,7 @@ proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int,
   entry = put_le(entry, 32, start_lba, 8)?
   entry = put_le(entry, 40, end_lba, 8)?
   entry = put(entry, 56, gpt_name(name)?)?
-  return entry
+  entry
 }
 
 proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
@@ -604,7 +568,7 @@ proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
   sector = put_le(sector, 454, 1, 4)?
   sector = put_le(sector, 458, total_sectors - 1, 4)?
   sector = put(sector, 510, bytes.from_ints([85, 170])?)?
-  return sector
+  sector
 }
 
 proc gpt_header(
@@ -631,7 +595,7 @@ proc gpt_header(
   header = put_le(header, 80, entry_count, 4)?
   header = put_le(header, 84, entry_size, 4)?
   header = put_le(header, 88, entries_crc, 4)?
-  return put_le(header, 16, hash.crc32(header.slice(offset: 0, length: 92)), 4)?
+  put_le(header, 16, hash.crc32(header[..92]), 4)?
 }
 
 proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) [fs, error] {
@@ -733,7 +697,7 @@ type IsoInput = {source: Path, name: Str}
 type IsoFile = {source: Path, name: Str, extent: Int, size: Int}
 
 pure sector_count(size: Int, sector_size: Int) -> Int {
-  return ceil_div(size, sector_size)
+  ceil_div(size, sector_size)
 }
 
 proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
@@ -753,29 +717,27 @@ proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[
     parts = parts.push(value / divisor % 256)
   }
 
-  return put(data, offset, bytes.from_ints(parts)?)?
+  put(data, offset, bytes.from_ints(parts)?)?
 }
 
 proc put_both_16(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
   var out = put_le(data, offset, value, 2)?
   out = put_be(out, offset + 2, value, 2)?
-  return out
+  out
 }
 
 proc put_both_32(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
   var out = put_le(data, offset, value, 4)?
   out = put_be(out, offset + 4, value, 4)?
-  return out
+  out
 }
 
 proc fixed_ascii(text: Str, width: Int) [error] -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
-  if raw.len() > width {
-    return raw.slice(offset: 0, length: width)
-  }
+  return raw[..width] when raw.len() > width
 
-  return bytes.concat([raw, repeated_byte(32, width - raw.len())?])
+  bytes.concat([raw, repeated_byte(32, width - raw.len())?])
 }
 
 proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
@@ -783,19 +745,19 @@ proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
   var remaining = count
 
   while remaining > 0 {
-    values = values.push(value)
+    values += [value]
     remaining -= 1
   }
 
-  return bytes.from_ints(values)?
+  bytes.from_ints(values)?
 }
 
 proc iso_datetime_7() [error] -> Result[Bytes] {
-  return bytes.from_ints([126, 1, 1, 0, 0, 0, 0])?
+  bytes.from_ints([126, 1, 1, 0, 0, 0, 0])?
 }
 
 proc iso_datetime_17() [error] -> Result[Bytes] {
-  return bytes.concat([bytes.from_text("2026010100000000"), bytes.from_ints([0])?])
+  bytes.concat([bytes.from_text("2026010100000000"), bytes.from_ints([0])?])
 }
 
 proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) [error] -> Result[Bytes] {
@@ -810,15 +772,15 @@ proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) [erro
   out = put_both_16(out, 28, 1)?
   out = put(out, 32, bytes.from_ints([identifier.len()])?)?
   out = put(out, 33, identifier)?
-  return out
+  out
 }
 
 proc iso_file_record(file: IsoFile) [error] -> Result[Bytes] {
-  return iso_dir_record(file.extent, file.size, 0, bytes.from_text(file.name))?
+  iso_dir_record(file.extent, file.size, 0, bytes.from_text(file.name))?
 }
 
 proc iso_root_record(root_extent: Int, root_size: Int, self_id: Int) [error] -> Result[Bytes] {
-  return iso_dir_record(root_extent, root_size, 2, bytes.from_ints([self_id])?)?
+  iso_dir_record(root_extent, root_size, 2, bytes.from_ints([self_id])?)?
 }
 
 proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error] -> Result[Bytes] {
@@ -829,7 +791,7 @@ proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error
   }
 
   let body = bytes.concat(records)
-  return bytes.concat([body, bytes.zero(root_size - body.len())?])
+  bytes.concat([body, bytes.zero(root_size - body.len())?])
 }
 
 proc iso_path_table(root_extent: Int, big_endian: Bool) [error] -> Result[Bytes] {
@@ -845,7 +807,7 @@ proc iso_path_table(root_extent: Int, big_endian: Bool) [error] -> Result[Bytes]
   }
 
   out = put(out, 8, bytes.from_ints([0, 0])?)?
-  return out
+  out
 }
 
 proc iso_primary_descriptor(
@@ -886,7 +848,7 @@ proc iso_primary_descriptor(
   out = put(out, 863, bytes.from_ints([0])?)?
   out = put(out, 864, repeated_byte(48, 16)?)?
   out = put(out, 880, bytes.from_ints([0, 1])?)?
-  return out
+  out
 }
 
 proc iso_terminator() [error] -> Result[Bytes] {
@@ -894,7 +856,7 @@ proc iso_terminator() [error] -> Result[Bytes] {
   out = put(out, 0, bytes.from_ints([255])?)?
   out = put(out, 1, bytes.from_text("CD001"))?
   out = put(out, 6, bytes.from_ints([1])?)?
-  return out
+  out
 }
 
 proc iso_files(inputs: List[IsoInput], first_extent: Int) [fs, error] -> Result[List[IsoFile]] {
@@ -907,7 +869,7 @@ proc iso_files(inputs: List[IsoInput], first_extent: Int) [fs, error] -> Result[
     extent += sector_count(size, 2048)
   }
 
-  return files
+  files
 }
 
 proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) [fs, error] {
@@ -1166,6 +1128,7 @@ proc build_host() [fs, net, process, env, error, io] {
     assemble_installer(root, work, xsh, repo_url, arch)?
     assemble_tools(root, work, xsh, repo_url, arch)?
   }
+
   prune_runtime_root(fp"${work}/rootfs-target")?
   prune_runtime_root(fp"${work}/rootfs-installer")?
   let packaged_kernel = fp"${work}/rootfs-target/boot/vmlinuz"

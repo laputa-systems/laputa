@@ -1,26 +1,29 @@
 #!/bin/xsh
 use disk_selection
+
 error InstallerError = Failed(kind: Str, message: Str)
 
-let ESP_TYPE = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-let SWAP_TYPE = "0657FD6D-A4AB-43C4-84E5-0933C84B4F4F"
-let LINUX_TYPE = "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
-let TARGET_ROOT_PARTUUID = "33333333-3333-3333-3333-333333333333"
+type DiskParts = {esp: Path, swap: Path, root: Path}
+
+const ESP_TYPE = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
+const SWAP_TYPE = "0657FD6D-A4AB-43C4-84E5-0933C84B4F4F"
+const LINUX_TYPE = "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
+const TARGET_ROOT_PARTUUID = "33333333-3333-3333-3333-333333333333"
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
-  return (value + divisor - 1) / divisor
+  (value + divisor - 1) / divisor
 }
 
 pure align_up(value: Int, alignment: Int) -> Int {
-  return ceil_div(value, alignment) * alignment
+  ceil_div(value, alignment) * alignment
 }
 
 pure align_down(value: Int, alignment: Int) -> Int {
-  return value / alignment * alignment
+  value / alignment * alignment
 }
 
 pure is_disk_name(name: Str) -> Bool {
-  return ! name.starts_with("loop") and ! name.starts_with("ram") and ! name.starts_with("dm-")
+  ! name.starts_with("loop") and ! name.starts_with("ram") and ! name.starts_with("dm-")
 }
 
 pure partition_path(disk: Path, index: Int) -> Path {
@@ -30,33 +33,33 @@ pure partition_path(disk: Path, index: Int) -> Path {
     return fp"${disk.display()}p${index}"
   }
 
-  return fp"${disk.display()}${index}"
+  fp"${disk.display()}${index}"
 }
 
 pure prefix_octet(bits: Int) -> Int {
   if bits <= 0 {
-    return 0
+    0
   } else if bits >= 8 {
-    return 255
+    255
   } else if bits == 7 {
-    return 254
+    254
   } else if bits == 6 {
-    return 252
+    252
   } else if bits == 5 {
-    return 248
+    248
   } else if bits == 4 {
-    return 240
+    240
   } else if bits == 3 {
-    return 224
+    224
   } else if bits == 2 {
-    return 192
+    192
   } else {
-    return 128
+    128
   }
 }
 
 pure prefix_to_netmask(prefix_len: Int) -> Str {
-  return f"${prefix_octet(prefix_len)}.${prefix_octet(prefix_len - 8)}.${prefix_octet(prefix_len - 16)}.${prefix_octet(
+  f"${prefix_octet(prefix_len)}.${prefix_octet(prefix_len - 8)}.${prefix_octet(prefix_len - 16)}.${prefix_octet(
     prefix_len - 24,
   )}"
 }
@@ -79,7 +82,7 @@ proc usage() [fs, error, io] {
 }
 
 proc require_file(path_value: Path) [fs, error] {
-  if ! fs.exists(path_value)? {
+  guard fs.exists(path_value)? else {
     return Err(InstallerError.Failed("missing-file", path_value.display()))
   }
 }
@@ -87,9 +90,7 @@ proc require_file(path_value: Path) [fs, error] {
 proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
   let status = process.run(process.command_argv(target, argv, /, {}))?
 
-  if status.ok {
-    return
-  }
+  return when status.ok
 
   if status.exited() {
     abort(status.exit_code()?)
@@ -131,15 +132,11 @@ proc normalize_target_ownership(root: Path) [fs, error] {
 proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
   let public_key_path = fp"${root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
 
-  if ! fs.exists(public_key_path)? {
-    return false
-  }
+  return false unless fs.exists(public_key_path)?
 
   let public_key = fs.read_text(public_key_path)?.trim()
 
-  if public_key == "" {
-    return false
-  }
+  return false when public_key == ""
 
   let ssh_dir = fp"${root}/home/pazu/.ssh"
   let authorized_keys = fp"${ssh_dir}/authorized_keys"
@@ -160,7 +157,7 @@ proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
   fs.chgrp(authorized_keys, group.by_gid(1000)?)?
   fs.chmod(ssh_dir, 0o700)?
   fs.chmod(authorized_keys, 0o600)?
-  return true
+  true
 }
 
 proc list_disks() [process, error] -> Result[List[Path]] {
@@ -178,7 +175,7 @@ proc list_disks() [process, error] -> Result[List[Path]] {
     }
   }
 
-  return blank.extend(partitioned)
+  blank.extend(partitioned)
 }
 
 proc print_disks(disks: List[Path]) [fs, error, io] {
@@ -190,23 +187,25 @@ proc print_disks(disks: List[Path]) [fs, error, io] {
 }
 
 proc disk_has_partitions(disk: Path) [fs, error] -> Result[Bool] {
-  for entry in fs.ls(fp"/sys/block/${disk.name}")? {
-    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(fp"/sys/block/${disk.name}/${entry.name}/partition")? {
+  for entry in fs.children(fp"/sys/block/${disk.name}")? {
+    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(
+      fp"/sys/block/${disk.name}/${entry.name}/partition",
+    )? {
       return true
     }
   }
 
-  return false
+  false
 }
 
 proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
   for disk in disks {
-    if ! disk_has_partitions(disk)? {
+    guard disk_has_partitions(disk)? else {
       return disk
     }
   }
 
-  return Err(InstallerError.Failed("no-blank-disk", "no blank CI install disk found"))
+  Err(InstallerError.Failed("no-blank-disk", "no blank CI install disk found"))
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
@@ -214,20 +213,16 @@ proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
   let answer = io.stdin_line()?
   let trimmed = answer.trim()
 
-  if trimmed == "" {
-    return default_disk
-  }
+  return default_disk when trimmed == ""
 
-  return fp"${trimmed}"
+  fp"${trimmed}"
 }
 
 proc wait_for(path_value: Path) [fs, time, error] {
   var tries = 50
 
   while tries > 0 {
-    if fs.exists(path_value)? {
-      return
-    }
+    return when fs.exists(path_value)?
 
     time.sleep(100ms)?
     tries -= 1
@@ -270,13 +265,13 @@ proc installer_network_interfaces() [process, error] -> Result[Record] {
     address = "10.0.2.15"
   }
 
-  return {iface, address, netmask, gateway}
+  {iface, address, netmask, gateway}
 }
 
 proc target_static_interfaces() [process, error] -> Result[Str] {
   let netcfg = installer_network_interfaces()?
 
-  return f"""auto lo
+  f"""auto lo
 iface lo inet loopback
 
 auto ${netcfg.iface}
@@ -290,7 +285,7 @@ iface ${netcfg.iface} inet static
 proc target_dhcp_interfaces() [process, error] -> Result[Str] {
   let netcfg = installer_network_interfaces()?
 
-  return f"""auto lo
+  f"""auto lo
 iface lo inet loopback
 
 auto ${netcfg.iface}
@@ -299,29 +294,23 @@ iface ${netcfg.iface} inet dhcp
 }
 
 proc target_interfaces(network_method: Str) [process, error] -> Result[Str] {
-  if network_method == "static" {
-    return target_static_interfaces()?
-  }
+  return target_static_interfaces()? when network_method == "static"
 
-  return target_dhcp_interfaces()?
+  target_dhcp_interfaces()?
 }
 
 # Like Alpine setup, ask whether the target should use DHCP or a static address
 # and write that choice explicitly. Non-interactive (--ci) installs keep the
 # deterministic static configuration derived from the live network.
 proc prompt_network_method(ci: Bool) [fs, error, io] -> Result[Str] {
-  if ci {
-    return "static"
-  }
+  return "static" when ci
 
   write_text("Network configuration - [d]hcp or [s]tatic? [dhcp]: ")?
   let answer = io.stdin_line()?.trim().lower()
 
-  if answer == "s" or answer == "static" {
-    return "static"
-  }
+  return "static" when answer == "s" or answer == "static"
 
-  return "dhcp"
+  "dhcp"
 }
 
 proc write_target_config(
@@ -459,15 +448,13 @@ ${dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
 proc configured_ci_esp_bytes() [fs, error] -> Result[Int] {
   let path_value = /etc/laputa-installer/target-esp-mb
 
-  if ! fs.exists(path_value)? {
-    return 16 * 1024 * 1024
-  }
+  return 16 * 1024 * 1024 unless fs.exists(path_value)?
 
   let mb = fs.read_text(path_value)?.trim().parse_int()?
-  return mb * 1024 * 1024
+  mb * 1024 * 1024
 }
 
-proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Record] {
+proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[DiskParts] {
   let total_sectors = fs.read_text(fp"/sys/block/${disk.name}/size")?.trim().parse_int()?
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128 * 1024 * 1024 }
   let swap_bytes = if ci { 8 * 1024 * 1024 } else { linux.meminfo()?.total * 2 }
@@ -496,10 +483,10 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Rec
     {"index": 3, "start": ${root_start}, "end": ${root_end}, "type": "${LINUX_TYPE}", "uuid": "33333333-3333-3333-3333-333333333333", "name": "LAPUTA_ROOT"}
   ]
 }""",
-  )?
+  )?.require(Record)?
 
   linux.write_partition_table(disk, table)?
-  return {esp: partition_path(disk, 1), swap: partition_path(disk, 2), root: partition_path(disk, 3)}
+  DiskParts(esp: partition_path(disk, 1), swap: partition_path(disk, 2), root: partition_path(disk, 3))
 }
 
 proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
@@ -602,7 +589,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
   print_disks(disks)?
 
-  if ci and disk_text == "" and disk_selection.ci_target_installed(p"/sys/block", disks, TARGET_ROOT_PARTUUID)? {
+  if ci and disk_text == "" and disk_selection.ci_target_installed(/sys/block, disks, TARGET_ROOT_PARTUUID)? {
     write_stdout_line("Laputa CI target already installed.")?
     return
   }

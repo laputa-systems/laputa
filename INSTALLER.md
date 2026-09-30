@@ -108,6 +108,12 @@ deterministic `PARTUUID` used by the QEMU harness.
 x86_64 image builder still uses the older package-install route, which is not
 compatible with the current typed PM CLI.
 
+That legacy package-install route constructs subprocess environments through
+`installer/package_environment.xsh`. Repository and target values are strings;
+`LAPUTA_INSTALLER_QEMU_SMOKE` is omitted for calls without an explicit smoke
+flag and supplied as a string when requested. A missing flag must not become a
+present null environment value.
+
 ## Kernel Size
 
 The x86_64 production kernel is currently much larger than the aarch64 kernel.

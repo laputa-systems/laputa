@@ -16,11 +16,9 @@ export pure root_partuuid() -> Str {
 export pure kernel_cmdline(mode: types.QemuMode) -> Str {
   let base = f"earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0 ignore_loglevel devtmpfs.mount=1 root=PARTUUID=${root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 
-  if mode == types.Test {
-    return f"${base} LAPUTA_QEMU_DWL_FOOT_PROOF=1"
-  }
+  return f"${base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == types.Test
 
-  return base
+  base
 }
 
 ## Resolve only the documented host-side QEMU configuration surface.
@@ -113,9 +111,7 @@ proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p""
   }
 
   let status = process.run(process.command_argv(value.python, argv))?
-  if ! status.ok {
-    return Err(types.LaputaError.Docker(f"QMP ${mode} helper failed"))
-  }
+  return Err(types.LaputaError.Docker(f"QMP ${mode} helper failed")) unless status.ok
 }
 
 # Retry idempotent QMP readiness or screenshot requests while QEMU publishes
@@ -141,7 +137,8 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
 export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Result[Str] {
   let console = if fs.exists(console_log)? { fs.read_text(console_log)? } else { "" }
   let qemu = if fs.exists(qemu_log)? { fs.read_text(qemu_log)? } else { "" }
-  f"${console}\n${qemu}"
+  f"""${console}
+${qemu}"""
 }
 
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
@@ -154,10 +151,15 @@ pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
 }
 
 ## Run a bounded headless proof, inject input through QMP, and validate its output.
-export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, time, error] {
+export proc run_test(
+  value: QemuConfig,
+  profile: types.SystemProfile,
+  outputs: build.ProfileOutputs,
+) [fs, process, time, error] {
   if ! fs.exists(outputs.kernel)? or ! fs.exists(outputs.disk)? {
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
+
   fs.remove(outputs.console_log, missing_ok: true)?
   fs.remove(outputs.qemu_log, missing_ok: true)?
   fs.remove(outputs.qmp_socket, missing_ok: true)?
@@ -178,7 +180,9 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
     let failed = proof.failure_marker(log_text)
     if failed != "" {
       qemu_stop(launched)?
-      return Err(types.LaputaError.Profile(f"QEMU proof failed with ${failed}; inspect ${qemu_output_locations(outputs)}"))
+      return Err(
+        types.LaputaError.Profile(f"QEMU proof failed with ${failed}; inspect ${qemu_output_locations(outputs)}"),
+      )
     }
 
     # READY is printed by the guest only after dwl has launched foot's reader.
@@ -199,7 +203,9 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
       proof.verify_console(final_log)?
       if ! screenshot_is_valid(outputs.screenshot)? {
-        return Err(types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect ${qemu_output_locations(outputs)}"))
+        return Err(
+          types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect ${qemu_output_locations(outputs)}"),
+        )
       }
 
       print "laputa test qemu-dwl-foot: ok"
@@ -208,7 +214,9 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
 
     if elapsed >= 180 {
       qemu_stop(launched)?
-      return Err(types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"))
+      return Err(
+        types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"),
+      )
     }
 
     time.sleep(1s)?
@@ -218,8 +226,14 @@ export proc run_test(value: QemuConfig, profile: types.SystemProfile, outputs: b
   let _ = wait launched?
   let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
   match proof.verify_console(final_log) {
-    Ok(_) => return Err(types.LaputaError.Profile(f"QEMU exited after guest proof before supervisor completion; inspect ${qemu_output_locations(outputs)}"))
-    Err(_) => return Err(types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"))
+    Ok(_) => return Err(
+      types.LaputaError.Profile(
+        f"QEMU exited after guest proof before supervisor completion; inspect ${qemu_output_locations(outputs)}",
+      ),
+    )
+    Err(_) => return Err(
+      types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"),
+    )
   }
 }
 
@@ -229,7 +243,9 @@ export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
 
-  let status = process.run(process.command_argv(value.qemu, qemu_command_argv(value, profile, outputs, types.Interactive)))?
+  let status = process.run(
+    process.command_argv(value.qemu, qemu_command_argv(value, profile, outputs, types.Interactive)),
+  )?
   if ! status.ok {
     return Err(types.LaputaError.Docker("interactive QEMU exited unsuccessfully"))
   }

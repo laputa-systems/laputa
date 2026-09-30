@@ -53,7 +53,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
 
   var names: Map[Bool] = {}
   for item in files {
-    if item.name == "" or "/" in item.name or names.has(item.name) {
+    if item.name == "" or "/" in item.name or item.name in names {
       return Err(ContainerOutputError.Failed(f"invalid system bundle file name ${item.name}"))
     }
 

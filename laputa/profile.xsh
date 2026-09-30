@@ -11,19 +11,19 @@ export proc valid_profile_name(value: Str) [error] -> Result[Bool] {
     return false
   }
 
-  let name_re = regex.compile("^[a-z0-9][a-z0-9-]*$")?
+  let name_re = rx"^[a-z0-9][a-z0-9-]*$"
   name_re.matches(value)
 }
 
 ## Return whether `value` can name a package at a typed profile boundary.
 export proc valid_package_name(value: Str) [error] -> Result[Bool] {
-  let package_re = regex.compile("^[a-z0-9][a-z0-9+._-]*$")?
+  let package_re = rx"^[a-z0-9][a-z0-9+._-]*$"
   package_re.matches(value)
 }
 
 ## Validate a complete profile before it is used to construct any build command.
 export proc validate_system_profile(value: types.SystemProfile) [error] -> Result[Unit] {
-  if ! valid_profile_name(value.name)? {
+  guard valid_profile_name(value.name)? else {
     return Err(types.LaputaError.Profile(f"invalid profile name ${value.name}"))
   }
 
@@ -34,11 +34,11 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
   var roots: Map[Bool] = {}
 
   for package_name in value.package_roots {
-    if ! valid_package_name(package_name)? {
+    guard valid_package_name(package_name)? else {
       return Err(types.LaputaError.Profile(f"${value.name} has invalid package root ${package_name}"))
     }
 
-    if roots.get(package_name, false) {
+    if roots.get(package_name) ?? false {
       return Err(types.LaputaError.Profile(f"${value.name} names ${package_name} more than once"))
     }
 
@@ -49,8 +49,10 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     return Err(types.LaputaError.Profile(f"${value.name} has invalid kernel package ${value.kernel_package}"))
   }
 
-  if roots.get(value.kernel_package, false) {
-    return Err(types.LaputaError.Profile(f"${value.name} must select ${value.kernel_package} only as its kernel package"))
+  if roots.get(value.kernel_package) ?? false {
+    return Err(
+      types.LaputaError.Profile(f"${value.name} must select ${value.kernel_package} only as its kernel package"),
+    )
   }
 
   if value.kernel_path.display() == "" or value.kernel_path.display().starts_with("/") {
@@ -63,11 +65,11 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 
   var forbidden_packages: Map[Bool] = {}
   for package_name in value.forbidden_packages {
-    if ! valid_package_name(package_name)? {
+    guard valid_package_name(package_name)? else {
       return Err(types.LaputaError.Profile(f"${value.name} has invalid forbidden package ${package_name}"))
     }
 
-    if forbidden_packages.get(package_name, false) {
+    if forbidden_packages.get(package_name) ?? false {
       return Err(types.LaputaError.Profile(f"${value.name} names forbidden package ${package_name} more than once"))
     }
 
@@ -76,11 +78,11 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 
   var forbidden_sonames: Map[Bool] = {}
   for soname in value.forbidden_sonames {
-    if soname == "" or soname.contains("/") or soname.contains("\\") {
+    if soname == "" or "/" in soname or "\\" in soname {
       return Err(types.LaputaError.Profile(f"${value.name} has invalid forbidden SONAME ${soname}"))
     }
 
-    if forbidden_sonames.get(soname, false) {
+    if forbidden_sonames.get(soname) ?? false {
       return Err(types.LaputaError.Profile(f"${value.name} names forbidden SONAME ${soname} more than once"))
     }
 
@@ -90,7 +92,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 
 ## Load one named profile from `profiles_root` and validate its typed export.
 export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile] {
-  if ! valid_profile_name(name)? {
+  guard valid_profile_name(name)? else {
     return Err(types.LaputaError.Profile(f"invalid profile name ${name}"))
   }
 
