@@ -41,7 +41,7 @@ imports, structured process argv, explicit effects, and `?` at error
 boundaries. Public module exports share a global runtime symbol table, so use
 domain-qualified names where modules could collide.
 
-Start with the narrowest proof: `xsht check --strict` for changed modules, then
+Start with the narrowest proof: `xsht check` for changed modules, then
 their focused tests, then the Docker profile build, and finally QEMU. Do not
 run formatters, linters, pre-commit hooks, release XSH builds, or CI workflows;
 do not push. Record runner limitations precisely instead of weakening a typed
