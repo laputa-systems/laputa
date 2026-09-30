@@ -4,23 +4,19 @@ error InstallerReportError = Failed(message: Str)
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${env_value(name, fallback.display())}"
+  fp"${env_value(name, fallback.display())}"
 }
 
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
   let status = process.run(process.command_argv(target, argv, cwd, envs))?
 
-  if status.ok {
-    return
-  }
+  return when status.ok
 
   if status.exited() {
     abort(status.exit_code()?)
@@ -64,23 +60,17 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
     }
   }
 
-  return Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
-  if arch == "amd64" {
-    return "x86_64"
-  }
+  return "x86_64" when arch == "amd64"
 
-  if arch == "arm64" {
-    return "aarch64"
-  }
+  return "aarch64" when arch == "arm64"
 
-  if arch == "aarch64" or arch == "x86_64" {
-    return arch
-  }
+  return arch when arch == "aarch64" or arch == "x86_64"
 
-  return Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
 }
 
 proc build_installer(raw_arch: Str) [fs, process, env, error] {
@@ -102,7 +92,7 @@ proc build_installer(raw_arch: Str) [fs, process, env, error] {
 }
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
-  if argv.len() != 1 {
+  guard argv.len() == 1 else {
     return Err(InstallerReportError.Failed("usage: build-installer-common.xsh ARCH"))
   }
 

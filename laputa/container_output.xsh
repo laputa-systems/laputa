@@ -1,5 +1,4 @@
 ##! Atomic publication of final profile artifacts from container-local Linux staging to the host output bind mount.
-
 ## Publication failures at the local-container to host-output boundary.
 export error ContainerOutputError = Failed(message: Str) : InvalidData
 
@@ -14,6 +13,7 @@ proc bundle_verify_file(source: Path, output: Path) [fs, error] {
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
     return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: ${source}"))
   }
+
   if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or hash.sha256(source)?.hex() != hash.sha256(output)?.hex() {
     return Err(ContainerOutputError.Failed(f"bundle output does not match ${source}"))
   }
@@ -43,17 +43,20 @@ export proc publish_final_file(source: Path, output: Path) [fs, error] {
 ## as `current`. Existing completed bundles are reused only when every file
 ## exactly matches the newly verified local output.
 export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile]) [fs, error] {
-  if ! bundle_key_is_valid(key) {
+  guard bundle_key_is_valid(key) else {
     return Err(ContainerOutputError.Failed("system bundle key must be a lowercase SHA-256 digest"))
   }
+
   if files.len() == 0 {
     return Err(ContainerOutputError.Failed("system bundle must contain files"))
   }
+
   var names: Map[Bool] = {}
   for item in files {
-    if item.name == "" or item.name.contains("/") or names.has(item.name) {
+    if item.name == "" or "/" in item.name or names.has(item.name) {
       return Err(ContainerOutputError.Failed(f"invalid system bundle file name ${item.name}"))
     }
+
     names[item.name] = true
     if ! fs.exists(item.source)? or fs.metadata(item.source)?.kind != "file" or fs.metadata(item.source)?.size <= 0 {
       return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: ${item.source}"))
@@ -65,10 +68,13 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
   let temporary = fp"${builds}/.${key}.tmp"
   fs.mkdir(builds)?
   if fs.exists(final_dir)? {
-    if fs.metadata(final_dir)?.kind != "dir" {
+    guard fs.metadata(final_dir)?.kind == "dir" else {
       return Err(ContainerOutputError.Failed(f"completed bundle path is not a directory: ${final_dir}"))
     }
-    for item in files { bundle_verify_file(item.source, fp"${final_dir}/${item.name}")? }
+
+    for item in files {
+      bundle_verify_file(item.source, fp"${final_dir}/${item.name}")?
+    }
   } else {
     fs.remove(temporary, missing_ok: true)?
     defer fs.remove(temporary, missing_ok: true)?
@@ -79,6 +85,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
       bundle_verify_file(item.source, destination)?
       fs.fsync(destination)?
     }
+
     fs.rename(temporary, final_dir)?
   }
 

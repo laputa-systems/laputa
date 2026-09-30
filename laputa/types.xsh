@@ -1,7 +1,7 @@
 ##! Typed contracts for the single supported Laputa reference system.
 
 ## The execution mode selected for the reference QEMU system.
-export type QemuMode = Test | Interactive
+export enum QemuMode { Test , Interactive }
 
 ## The data-only description of the supported Laputa system profile.
 export type SystemProfile = {

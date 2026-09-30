@@ -4,23 +4,19 @@ error InstallerAarch64Error = Failed(message: Str)
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${env_value(name, fallback.display())}"
+  fp"${env_value(name, fallback.display())}"
 }
 
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
   let status = process.run(process.command_argv(target, argv, cwd, envs))?
 
-  if status.ok {
-    return
-  }
+  return when status.ok
 
   if status.exited() {
     abort(status.exit_code()?)

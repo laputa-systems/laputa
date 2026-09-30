@@ -4,15 +4,13 @@ error InstallerQemuError = Failed(message: Str)
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = env.get(name) ?? ""
 
-  if value == "" {
-    return fallback
-  }
+  return fallback when value == ""
 
-  return value
+  value
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  return fp"${env_value(name, fallback.display())}"
+  fp"${env_value(name, fallback.display())}"
 }
 
 proc parse_size(value: Str) [error] -> Result[Int] {
@@ -22,31 +20,23 @@ proc parse_size(value: Str) [error] -> Result[Int] {
     return trimmed.split("G")[0].parse_int()? * 1024 * 1024 * 1024
   }
 
-  if trimmed.ends_with("M") {
-    return trimmed.split("M")[0].parse_int()? * 1024 * 1024
-  }
+  return trimmed.split("M")[0].parse_int()? * 1024 * 1024 when trimmed.ends_with("M")
 
-  if trimmed.ends_with("K") {
-    return trimmed.split("K")[0].parse_int()? * 1024
-  }
+  return trimmed.split("K")[0].parse_int()? * 1024 when trimmed.ends_with("K")
 
-  return trimmed.parse_int()?
+  trimmed.parse_int()?
 }
 
 proc command_path(name: Str) [process, error] -> Result[Path] {
-  if "/" in name {
-    return fp"${name}"
-  }
+  return fp"${name}" when "/" in name
 
-  return process.which(name)?
+  process.which(name)?
 }
 
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
   let status = process.run(process.command_argv(target, argv, cwd, envs))?
 
-  if status.ok {
-    return
-  }
+  return when status.ok
 
   if status.exited() {
     abort(status.exit_code()?)
@@ -61,14 +51,14 @@ proc main() [fs, process, env, error] {
   let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-manual-aarch64.iso")?
   let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-aarch64.vmlinuz")?
   let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"${work}/laputa-target-manual.img")?
-  let target_size = parse_size(env_value("LAPUTA_INSTALLER_TARGET_SIZE", "1G"))?
+  let target_size = env_value("LAPUTA_INSTALLER_TARGET_SIZE", "1G") |> parse_size(_)?
 
   let kernel_cmdline = env_value(
+    "LAPUTA_KERNEL_CMDLINE",
+    "root=PARTUUID=55555555-5555-5555-5555-555555555555 rootfstype=ext4 rootwait rootdelay=2 rw console=ttyAMA0 console=tty0 loglevel=4 devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1",
+  ) |> env_value(
     "LAPUTA_INSTALLER_KERNEL_CMDLINE",
-    env_value(
-      "LAPUTA_KERNEL_CMDLINE",
-      "root=PARTUUID=55555555-5555-5555-5555-555555555555 rootfstype=ext4 rootwait rootdelay=2 rw console=ttyAMA0 console=tty0 loglevel=4 devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1",
-    ),
+    _,
   )
 
   let qemu_name = env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")

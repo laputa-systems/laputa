@@ -71,7 +71,7 @@ proc remove_tree(path_value: Path) [fs, error] {
     return
   }
 
-  for child in fs.ls(path_value)? {
+  for child in fs.children(path_value)? {
     if child.kind == "dir" {
       remove_tree(child.path)?
     } else {

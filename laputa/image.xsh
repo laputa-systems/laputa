@@ -6,10 +6,10 @@
 export error ImageError = Failed(message: Str) : InvalidData
 
 # The byte size of one GPT sector.
-let sector_size = 512
+const sector_size = 512
 
 # The first aligned sector assigned to the root filesystem.
-let root_start_lba = 2048
+const root_start_lba = 2048
 
 ## Return the root partition UUID shared by GPT and the ARM kernel command line.
 export pure image_root_partuuid() -> Str {
@@ -24,6 +24,7 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int] {
     if mebibytes <= 0 {
       return Err(ImageError.Failed(f"image size must be positive: ${value}"))
     }
+
     return mebibytes * 1024 * 1024
   }
 
@@ -31,19 +32,18 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int] {
   if byte_count <= 0 {
     return Err(ImageError.Failed(f"image size must be positive: ${value}"))
   }
-  return byte_count
+
+  byte_count
 }
 
 ## Calculate a graphical rootfs size from used bytes, rounded to MiB with a 256-MiB floor.
 export pure rootfs_size_bytes(used_bytes: Int) -> Int {
   let raw = used_bytes + used_bytes / 4 + 64 * 1024 * 1024
   let mib = 1024 * 1024
-  let rounded = ((raw + mib - 1) / mib) * mib
-  if rounded < 256 * mib {
-    return 256 * mib
-  }
+  let rounded = (raw + mib - 1) / mib * mib
+  return 256 * mib when rounded < 256 * mib
 
-  return rounded
+  rounded
 }
 
 ## Sum regular-file payload bytes in a verified immutable generation before allocating its ext4 image.
@@ -96,8 +96,7 @@ export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
 
 ## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.
 export proc image_write_rootfs(generation_root: Path, formatter: Path, output: Path) [fs, process, error] {
-  let used_bytes = image_generation_used_bytes(generation_root)?
-  let target_size = rootfs_size_bytes(used_bytes)
+  let target_size = image_generation_used_bytes(generation_root)? |> rootfs_size_bytes(_)
   let temporary = fp"${output}.tmp"
   fs.mkdir(output.parent)?
   fs.remove(temporary, missing_ok: true)?
@@ -105,7 +104,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
   fs.write(temporary, b"")?
   temporary.truncate(target_size)?
 
-  let xsh = p"/bin/xsh"
+  let xsh = /bin/xsh
   let status = process.run(
     process.command_argv(
       xsh,
@@ -160,6 +159,7 @@ proc gpt_name(name: Str) [error] -> Result[Bytes] {
     parts = parts.push(bytes.from_ints([bytes.unpack_le(raw, 1, offset: index)?, 0])?)
     index += 1
   }
+
   let encoded = bytes.concat(parts)
   bytes.concat([encoded, bytes.zero(72 - encoded.len())?])
 }
@@ -176,9 +176,10 @@ proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int,
 
 ## Construct a protective MBR covering the complete disk.
 export proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
-  if total_sectors <= 1 {
+  guard total_sectors > 1 else {
     return Err(ImageError.Failed("GPT disk needs at least two sectors"))
   }
+
   var sector = bytes.zero(sector_size)?
   sector = put(sector, 447, bytes.from_ints([0, 2, 0])?)?
   sector = put(sector, 450, bytes.from_ints([238])?)?
@@ -213,7 +214,7 @@ proc gpt_header(
   header = put_le(header, 80, entry_count, 4)?
   header = put_le(header, 84, entry_size, 4)?
   header = put_le(header, 88, entries_crc, 4)?
-  put_le(header, 16, hash.crc32(header.slice(offset: 0, length: 92)), 4)
+  put_le(header, 16, hash.crc32(header[..92]), 4)
 }
 
 # Returns the fixed Linux filesystem partition type GUID in GPT byte order.
@@ -232,19 +233,23 @@ export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
   if metadata.size <= rootfs_bytes {
     return Err(ImageError.Failed(f"disk image is too small: ${image}"))
   }
+
   let mbr = bytes.read_at(image, 510, 2)?
   if mbr != bytes.from_ints([85, 170])? {
     return Err(ImageError.Failed(f"${image} has no protective MBR signature"))
   }
+
   let header = bytes.read_at(image, sector_size, 8)?
   if header != bytes.from_text("EFI PART") {
     return Err(ImageError.Failed(f"${image} has no GPT header signature"))
   }
+
   let entry = bytes.read_at(image, 2 * sector_size, 128)?
   let guid = entry.slice(offset: 16, length: 16)
   if guid != root_partition_guid()? {
     return Err(ImageError.Failed(f"${image} root partition GUID does not match ${image_root_partuuid()}"))
   }
+
   let start = bytes.unpack_le(entry, 8, offset: 32)?
   let end = bytes.unpack_le(entry, 8, offset: 40)?
   if start != root_start_lba or end < start or (end - start + 1) * sector_size < rootfs_bytes {
@@ -258,6 +263,7 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   if rootfs_bytes <= 0 or rootfs_bytes % sector_size != 0 {
     return Err(ImageError.Failed(f"rootfs must be nonempty and sector aligned: ${rootfs}"))
   }
+
   let rootfs_sectors = rootfs_bytes / sector_size
   let entry_count = 128
   let entry_size = 128
@@ -269,6 +275,7 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   if root_end > last_usable {
     return Err(ImageError.Failed("root filesystem does not fit GPT disk layout"))
   }
+
   let backup_entries_lba = total_sectors - entry_sectors - 1
   let tmp = fp"${image}.tmp"
   fs.mkdir(image.parent)?
@@ -276,20 +283,50 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   defer fs.remove(tmp, missing_ok: true)?
   fs.write(tmp, b"")?
   tmp.truncate(total_sectors * sector_size)?
-  let entries = bytes.concat([
-    gpt_entry(root_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
-    bytes.zero(entry_count * entry_size - entry_size)?,
-  ])
+  let entries = bytes.concat(
+    [
+      gpt_entry(root_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
+      bytes.zero(entry_count * entry_size - entry_size)?,
+    ],
+  )
   let entries_crc = hash.crc32(entries)
   let disk_guid = bytes.zero(16)?
-  let primary_header = gpt_header(1, total_sectors - 1, first_usable, last_usable, disk_guid, 2, entry_count, entry_size, entries_crc)?
-  let backup_header = gpt_header(total_sectors - 1, 1, first_usable, last_usable, disk_guid, backup_entries_lba, entry_count, entry_size, entries_crc)?
+  let primary_header = gpt_header(
+    1,
+    total_sectors - 1,
+    first_usable,
+    last_usable,
+    disk_guid,
+    2,
+    entry_count,
+    entry_size,
+    entries_crc,
+  )?
+  let backup_header = gpt_header(
+    total_sectors - 1,
+    1,
+    first_usable,
+    last_usable,
+    disk_guid,
+    backup_entries_lba,
+    entry_count,
+    entry_size,
+    entries_crc,
+  )?
   let _ = bytes.write_at(tmp, 0, protective_mbr(total_sectors)?)?
   let _ = bytes.write_at(tmp, sector_size, primary_header)?
   let _ = bytes.write_at(tmp, 2 * sector_size, entries)?
   let _ = bytes.write_at(tmp, backup_entries_lba * sector_size, entries)?
   let _ = bytes.write_at(tmp, (total_sectors - 1) * sector_size, backup_header)?
-  let _ = bytes.copy_file(rootfs, tmp, source_offset: 0, dest_offset: root_start_lba * sector_size, length: rootfs_bytes, create: false, truncate: false)?
+  let _ = bytes.copy_file(
+    rootfs,
+    tmp,
+    source_offset: 0,
+    dest_offset: root_start_lba * sector_size,
+    length: rootfs_bytes,
+    create: false,
+    truncate: false,
+  )?
   fs.fsync(tmp)?
   verify_disk(tmp, rootfs_bytes)?
   fs.rename(tmp, image, overwrite: true)?

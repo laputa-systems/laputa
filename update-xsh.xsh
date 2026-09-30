@@ -14,7 +14,7 @@ error FindError = NotFound(message: Str)
 error UpdateXshError = ReleaseAsset(message: Str)
 
 proc parse_sha256_response(label: Str, status: Int, body: Str) [error] -> Result[Str] {
-  if status != 200 {
+  guard status == 200 else {
     return Err(UpdateXshError.ReleaseAsset(message: f"${label} checksum request returned HTTP ${status}"))
   }
 
@@ -25,18 +25,18 @@ proc parse_sha256_response(label: Str, status: Int, body: Str) [error] -> Result
   }
 
   let sha = words[0]
-  let sha_re = regex.compile("^[0-9a-f]{64}$")?
+  let sha_re = rx"^[0-9a-f]{64}$"
 
   if sha_re.captures(sha).len() == 0 {
     return Err(UpdateXshError.ReleaseAsset(message: f"${label} checksum response did not start with a sha256 digest"))
   }
 
-  return sha
+  sha
 }
 
 proc fetch_release_sha256(label: Str, url: Str) [net, error] -> Result[Str] {
   let resp = net.request({method: "GET", url: url})?
-  return parse_sha256_response(label, resp.status, resp.body.utf8()?)
+  parse_sha256_response(label, resp.status, resp.body.utf8()?)
 }
 
 proc fetch_new_hashes(tag: Str) [fs, net, error] -> Result[Hashes] {
@@ -66,7 +66,7 @@ proc fetch_new_hashes(tag: Str) [fs, net, error] -> Result[Hashes] {
   )?
   let core_url = f"https://github.com/laputa-systems/xsh/releases/download/${tag}/core-${tag}.sha256"
   let core = fetch_release_sha256("core scripts", core_url)?
-  return {
+  {
     aarch64_xsh,
     aarch64_xshi,
     aarch64_xsht,
@@ -78,9 +78,9 @@ proc fetch_new_hashes(tag: Str) [fs, net, error] -> Result[Hashes] {
 }
 
 proc replace_context_hashes(content: Str, hashes: Hashes) [error] -> Result[Str] {
-  let hash_re = regex.compile("[0-9a-f]{64}")?
+  let hash_re = rx"[0-9a-f]{64}"
   let lines = content.lines()
-  var result: List[Str] = []
+  var result = []
   var arch = "aarch64"
   var binary = "xsh"
 
@@ -122,72 +122,64 @@ proc replace_context_hashes(content: Str, hashes: Hashes) [error] -> Result[Str]
       l = l.replace(caps[0], new_hash)
     }
 
-    result = result.push(l)
+    result += [l]
   }
 
-  return result.join("\n")
+  result.join("\n")
 }
 
 proc find_old_tag(content: Str) [error] -> Result[Str] {
-  let tag_re = regex.compile("release-[0-9a-f]{40}")?
+  let tag_re = rx"release-[0-9a-f]{40}"
 
   for line in content.lines() {
     let caps = tag_re.captures(line)
 
-    if caps.len() >= 1 {
-      return caps[0]
-    }
+    return caps[0] when caps.len() >= 1
   }
 
-  return Err(FindError.NotFound(message: "no release tag found"))
+  Err(FindError.NotFound(message: "no release tag found"))
 }
 
 proc update_file(file: Path, tag: Str, commit: Str, hashes: Hashes) [fs, error] -> Result[Bool] {
-  if ! fs.exists(file)? {
+  guard fs.exists(file)? else {
     return false
   }
 
   let content = fs.read_text(file)?
   let old_tag = find_old_tag(content)?
 
-  if old_tag == tag {
-    return false
-  }
+  return false when old_tag == tag
 
   let old_commit = old_tag.replace("release-", "")
   var updated = content.replace(old_tag, tag)
   updated = updated.replace(old_commit, commit)
   updated = replace_context_hashes(updated, hashes)?
 
-  if updated == content {
-    return false
-  }
+  return false when updated == content
 
   fs.write(file, updated)?
-  return true
+  true
 }
 
 proc update_pkgbuild(file: Path, tag: Str, commit: Str, hashes: Hashes) [fs, error] -> Result[Bool] {
-  if ! fs.exists(file)? {
+  guard fs.exists(file)? else {
     return false
   }
 
   let content = fs.read_text(file)?
   let old_tag = find_old_tag(content)?
 
-  if old_tag == tag {
-    return false
-  }
+  return false when old_tag == tag
 
   let old_commit = old_tag.replace("release-", "")
   var updated = content.replace(old_tag, tag)
   updated = updated.replace(old_commit, commit)
-  let hash_re = regex.compile("[0-9a-f]{64}")?
+  let hash_re = rx"[0-9a-f]{64}"
   let rel_re = regex.compile("export let rel: Str = \"(\\d+)\"")?
   var arch = "aarch64"
   var binary = "xsh"
   var bumped = false
-  var new_lines: List[Str] = []
+  var new_lines = []
 
   for line in updated.lines() {
     var l = line
@@ -239,21 +231,19 @@ proc update_pkgbuild(file: Path, tag: Str, commit: Str, hashes: Hashes) [fs, err
       }
     }
 
-    new_lines = new_lines.push(l)
+    new_lines += [l]
   }
 
   updated = new_lines.join("\n")
 
-  if updated == content {
-    return false
-  }
+  return false when updated == content
 
   fs.write(file, updated)?
-  return true
+  true
 }
 
 proc main(...argv: List[Str]) [fs, net, error] {
-  if argv.len() != 1 {
+  guard argv.len() == 1 else {
     print "usage: update-xsh.xsh RELEASE-TAG"
     print "  e.g. update-xsh.xsh release-f46249e1647af0ffb9cc7abf6592218029c30ff1"
     return
