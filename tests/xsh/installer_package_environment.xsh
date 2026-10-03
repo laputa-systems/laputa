@@ -28,7 +28,7 @@ test test_installer_package_environment_crosses_the_process_boundary [fs, proces
     env: package_environment.environment(/work/packages, "file:///repository", "aarch64"),
     stdout: output,
   )
-  process.run(command)?.ok
+  assert process.run(command)?.ok
   let text = fs.read_text(output)?
   assert "XSH_PM_REPO=file:///repository" in text
   assert "XSH_PM_ARCH=aarch64" in text
@@ -39,6 +39,6 @@ test test_installer_package_environment_crosses_the_process_boundary [fs, proces
     env: package_environment.smoke_environment(/work/packages, "file:///repository", "aarch64", "0"),
     stdout: output,
   )
-  process.run(smoke_command)?.ok
+  assert process.run(smoke_command)?.ok
   assert "LAPUTA_INSTALLER_QEMU_SMOKE=0" in fs.read_text(output)?
 }
