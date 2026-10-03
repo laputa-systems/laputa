@@ -72,19 +72,19 @@ test test_qemu_command_is_the_single_aarch64_hvf_contract [error] {
 
 test test_console_markers_fail_before_success [error] {
   for marker in proof.failure_markers {
-    proof.failure_marker(f"before ${marker} after") == marker
+    assert proof.failure_marker(f"before ${marker} after") == marker
   }
 
-  ! proof.succeeded("booting")
-  proof.succeeded(proof.success_marker)
+  assert ! proof.succeeded("booting")
+  assert proof.succeeded(proof.success_marker)
   match proof.verify_console("LAPUTA_DWL_FOOT_PROOF_FAILED input") {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match proof.verify_console(f"""${proof.success_marker}
 QEMU_FATAL after success""") {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 }
@@ -152,7 +152,7 @@ test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-screenshot")?
   let screenshot = fp"${root}/screenshot.ppm"
   fs.write(screenshot, "")?
-  ! qemu.screenshot_is_valid(screenshot)?
+  assert ! qemu.screenshot_is_valid(screenshot)?
   fs.write(
     screenshot,
     """P6
@@ -160,18 +160,18 @@ test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
 255
 X""",
   )?
-  qemu.screenshot_is_valid(screenshot)?
+  assert qemu.screenshot_is_valid(screenshot)?
 }
 
 test test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
   qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
-  fs.exists(fixture.qmp_attempt_one)?
-  fs.exists(fixture.qmp_attempt_two)?
-  fs.exists(fixture.qmp_attempt_three)?
-  fs.read_text(fixture.input_record)? == """laputa
+  assert fs.exists(fixture.qmp_attempt_one)?
+  assert fs.exists(fixture.qmp_attempt_two)?
+  assert fs.exists(fixture.qmp_attempt_three)?
+  assert fs.read_text(fixture.input_record)? == """laputa
 """
-  qemu.screenshot_is_valid(fixture.outputs.screenshot)?
+  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
 test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, time, error] { |ctx|
@@ -181,7 +181,7 @@ test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, 
     Err(_) => {}
   }
 
-  qemu.screenshot_is_valid(fixture.outputs.screenshot)?
+  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
 test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
@@ -189,25 +189,25 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   let hook = fs.read_text(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let builder = fs.read_text(p"laputa/container_build.xsh")?
   let guest = fs.read_text(p"guest/qemu-dwl-foot-proof.xsh")?
-  hook_metadata.mode % 4096 == 0o755
-  "/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook
-  guest.starts_with("""#!/bin/xsh
+  assert hook_metadata.mode % 4096 == 0o755
+  assert "/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook
+  assert guest.starts_with("""#!/bin/xsh
 """)
-  "fs.install(source, target, 0o755" in hook
-  "container_prepare_overlay" in builder
-  "fs.install(guest_proof" in builder
-  ! ("process.which(" in guest)
-  "/usr/bin/mdevd," in guest
-  "/usr/bin/mdevd-coldplug" in guest
-  "/usr/bin/seatd" in guest
-  "SEATD_VTBOUND: \"0\"" in guest
-  "SEATD_VTBOUND: \"0\"" in hook
-  "/usr/bin/dwl," in guest
-  "/usr/bin/foot -- /bin/xsh" in guest
-  "io.stdin_text()?" in guest
-  ! ("io.stdin().read_to_end()" in guest)
-  "mdevd-coldplug" in guest
-  "seatd" in guest and "dwl" in guest and "foot" in guest
-  "guest_wait_for(/run/laputa-foot-read-ready, \"foot\", 30)" in guest
-  "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
+  assert "fs.install(source, target, 0o755" in hook
+  assert "container_prepare_overlay" in builder
+  assert "fs.install(guest_proof" in builder
+  assert ! ("process.which(" in guest)
+  assert "/usr/bin/mdevd," in guest
+  assert "/usr/bin/mdevd-coldplug" in guest
+  assert "/usr/bin/seatd" in guest
+  assert "SEATD_VTBOUND: \"0\"" in guest
+  assert "SEATD_VTBOUND: \"0\"" in hook
+  assert "/usr/bin/dwl," in guest
+  assert "/usr/bin/foot -- /bin/xsh" in guest
+  assert "io.stdin_text()?" in guest
+  assert ! ("io.stdin().read_to_end()" in guest)
+  assert "mdevd-coldplug" in guest
+  assert "seatd" in guest and "dwl" in guest and "foot" in guest
+  assert "guest_wait_for(/run/laputa-foot-read-ready, \"foot\", 30)" in guest
+  assert "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
 }

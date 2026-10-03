@@ -8,7 +8,7 @@ pure profiles_root() -> Path {
 
 test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
-  value.package_roots == [
+  assert value.package_roots == [
     "baselayout",
     "xsh",
     "laputa-pm",
@@ -18,16 +18,16 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "dwl-minimal",
     "foot-minimal",
   ]
-  value.kernel_package == "linux"
-  ! (value.kernel_package in value.package_roots)
-  value.kernel_path == p"boot/vmlinuz"
-  value.qemu_machine == "virt,accel=hvf,highmem=off"
-  value.qemu_cpu == "host"
-  value.qemu_smp == 2
-  value.qemu_memory == "1536M"
-  value.qemu_width == 1280
-  value.qemu_height == 800
-  value.forbidden_packages == [
+  assert value.kernel_package == "linux"
+  assert ! (value.kernel_package in value.package_roots)
+  assert value.kernel_path == p"boot/vmlinuz"
+  assert value.qemu_machine == "virt,accel=hvf,highmem=off"
+  assert value.qemu_cpu == "host"
+  assert value.qemu_smp == 2
+  assert value.qemu_memory == "1536M"
+  assert value.qemu_width == 1280
+  assert value.qemu_height == 800
+  assert value.forbidden_packages == [
     "llvm-toolchain",
     "pkgconf",
     "cmake",
@@ -48,22 +48,22 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "pulseaudio",
     "python",
   ]
-  value.forbidden_sonames == ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"]
+  assert value.forbidden_sonames == ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"]
 }
 
 test test_profile_load_rejects_unknown_and_path_names [fs, error] {
   match profile.load_system_profile("missing", profiles_root()) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.load_system_profile("../qemu-dwl-foot", profiles_root()) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.load_system_profile("qemu-dwl-foot.xsh", profiles_root()) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 }
@@ -85,33 +85,33 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
   )
   profile.validate_system_profile(valid)?
   match profile.validate_system_profile({...valid, package_roots: ["one", "one"]}) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.validate_system_profile({...valid, package_roots: ["/one"]}) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.validate_system_profile({...valid, package_roots: ["linux"]}) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.validate_system_profile({...valid, forbidden_packages: ["/llvm-toolchain"]}) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 
   match profile.validate_system_profile({...valid, forbidden_sonames: ["libLLVM", "libLLVM"]}) {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 }
 
 test test_profile_digest_is_deterministic [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
-  profile.digest(value)? == profile.digest(value)?
-  profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
+  assert profile.digest(value)? == profile.digest(value)?
+  assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
 }

@@ -22,6 +22,6 @@ test test_ci_target_installed_skips_non_partition_sysfs_entries [fs, error] { |c
 """,
   )?
 
-  disk_selection.ci_target_installed(root, [/dev/vda], "33333333-3333-3333-3333-333333333333")? == true
-  disk_selection.ci_target_installed(root, [/dev/vda], "44444444-4444-4444-4444-444444444444")? == false
+  assert disk_selection.ci_target_installed(root, [/dev/vda], "33333333-3333-3333-3333-333333333333")? == true
+  assert disk_selection.ci_target_installed(root, [/dev/vda], "44444444-4444-4444-4444-444444444444")? == false
 }

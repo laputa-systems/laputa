@@ -11,16 +11,16 @@ test test_publish_final_file_replaces_only_after_the_verified_copy [fs, error] {
   fs.write(output, "previous disk image")?
 
   container_output.publish_final_file(source, output)?
-  fs.read_text(output)? == "verified disk image"
+  assert fs.read_text(output)? == "verified disk image"
 
   fs.remove(source)?
 
   match container_output.publish_final_file(source, output) {
     Ok(_) => test.fail("missing local source unexpectedly replaced host output")?
-    Err(problem) => "source is missing or empty" in problem.message
+    Err(problem) => assert "source is missing or empty" in problem.message
   }
 
-  fs.read_text(output)? == "verified disk image"
+  assert fs.read_text(output)? == "verified disk image"
 }
 
 test test_publish_bundle_switches_current_only_after_a_complete_verified_directory [fs, error] { |ctx|
@@ -63,10 +63,10 @@ test test_publish_bundle_switches_current_only_after_a_complete_verified_directo
     },
   ]
   container_output.publish_bundle(root, key, files)?
-  fp"${root}/current".readlink()?.display() == f"builds/${key}"
-  fs.read_text(fp"${root}/current/disk.img")? == """disk.img
+  assert fp"${root}/current".readlink()?.display() == f"builds/${key}"
+  assert fs.read_text(fp"${root}/current/disk.img")? == """disk.img
 """
-  fs.exists(fp"${root}/builds/.${key}.tmp")? == false
+  assert fs.exists(fp"${root}/builds/.${key}.tmp")? == false
 
   fs.write(
     disk,
@@ -75,9 +75,9 @@ test test_publish_bundle_switches_current_only_after_a_complete_verified_directo
   )?
   match container_output.publish_bundle(root, key, files) {
     Ok(_) => test.fail("completed system bundle unexpectedly changed")?
-    Err(problem) => "bundle output does not match" in problem.message
+    Err(problem) => assert "bundle output does not match" in problem.message
   }
 
-  fs.read_text(fp"${root}/current/disk.img")? == """disk.img
+  assert fs.read_text(fp"${root}/current/disk.img")? == """disk.img
 """
 }

@@ -7,5 +7,5 @@ test test_pm_and_laputa_clis_share_one_runtime_namespace [fs, net, process, env,
     Ok(_) => test.fail("unknown PM command unexpectedly succeeded")?
     Err(problem) => { assert "unknown pm command" in problem.message, problem.message },
   }
-  "usage: laputa" in laputa_cli.usage()
+  assert "usage: laputa" in laputa_cli.usage()
 }

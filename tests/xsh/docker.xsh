@@ -19,7 +19,7 @@ pure fixture_config() -> docker.DockerConfig {
 
 test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
-  docker.docker_pm_plan_argv(value) == [
+  assert docker.docker_pm_plan_argv(value) == [
     "/bin/xsh",
     "/src/packages/pm.xsh",
     "--",
@@ -48,41 +48,41 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
     "--output",
     "/output/build-plan.json",
   ]
-  ! (docker.docker_pm_plan_argv(value) |> any "llvm-toolchain" in .)
+  assert ! (docker.docker_pm_plan_argv(value) |> any "llvm-toolchain" in .)
 }
 
 test test_docker_rejects_non_arm64_runner_architecture [error] {
   docker.require_arm64_image_architecture("arm64")?
   match docker.require_arm64_image_architecture("amd64") {
-    Ok(_) => false
+    Ok(_) => assert false
     Err(_) => {}
   }
 }
 
 test test_docker_places_optional_repository_configuration_before_image [error] {
   let argv = docker.docker_command_argv({...fixture_config(), repo_url: "https://packages.example.test"}, [])
-  argv[25] == "--env"
-  argv[26] == "XSH_PM_REPO=https://packages.example.test"
-  argv[27] == "--env"
-  argv[28] == "XSH_PM_PUBLIC_REPO=https://packages.example.test"
-  argv[29] == "laputa-package-tools"
+  assert argv[25] == "--env"
+  assert argv[26] == "XSH_PM_REPO=https://packages.example.test"
+  assert argv[27] == "--env"
+  assert argv[28] == "XSH_PM_PUBLIC_REPO=https://packages.example.test"
+  assert argv[29] == "laputa-package-tools"
 }
 
 test test_native_arm64_docker_command_mounts_only_declared_inputs [error] {
   let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "check"])
-  argv[0] == "docker"
-  "linux/arm64" in argv
-  argv |> any "/src/packages,readonly" in .
-  argv |> any "/src/laputa,readonly" in .
-  argv |> any "/usr/lib/xsh/core,readonly" in .
-  argv |> any "dst=/output" in .
-  argv |> any "laputa-artifacts-aarch64-v2" in .
-  argv |> any "laputa-sources-aarch64-v2" in .
-  "XSH_MODULE_PATH=/src/packages:/src/laputa" in argv
-  "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv
-  ! (argv |> any "XSH_MODULE_PATH=/src/laputa:/src/packages" in .)
-  ! (argv |> any "amd64" in .)
-  ! (argv |> any "x86_64" in .)
+  assert argv[0] == "docker"
+  assert "linux/arm64" in argv
+  assert argv |> any "/src/packages,readonly" in .
+  assert argv |> any "/src/laputa,readonly" in .
+  assert argv |> any "/usr/lib/xsh/core,readonly" in .
+  assert argv |> any "dst=/output" in .
+  assert argv |> any "laputa-artifacts-aarch64-v2" in .
+  assert argv |> any "laputa-sources-aarch64-v2" in .
+  assert "XSH_MODULE_PATH=/src/packages:/src/laputa" in argv
+  assert "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv
+  assert ! (argv |> any "XSH_MODULE_PATH=/src/laputa:/src/packages" in .)
+  assert ! (argv |> any "amd64" in .)
+  assert ! (argv |> any "x86_64" in .)
 }
 
 test test_local_xsh_binary_mount_is_explicit_and_read_only [error] {
@@ -91,12 +91,12 @@ test test_local_xsh_binary_mount_is_explicit_and_read_only [error] {
     container_xsh: docker.CheckedOutXsh(/work/xsh/target/aarch64-unknown-linux-musl/debug/xsh),
   }
   let argv = docker.docker_command_argv(value, ["/bin/xsh", "--help"])
-  argv |> any "src=/work/xsh/target/aarch64-unknown-linux-musl/debug/xsh,dst=/bin/xsh,readonly" in .
+  assert argv |> any "src=/work/xsh/target/aarch64-unknown-linux-musl/debug/xsh,dst=/bin/xsh,readonly" in .
 }
 
 test test_generation_projection_and_build_use_the_single_container_adapter [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
-  docker.docker_generation_plan_argv(value) == [
+  assert docker.docker_generation_plan_argv(value) == [
     "/bin/xsh",
     "/src/laputa/laputa/container_build.xsh",
     "--",
@@ -104,7 +104,7 @@ test test_generation_projection_and_build_use_the_single_container_adapter [fs, 
     "qemu-dwl-foot",
     "1",
   ]
-  docker.docker_profile_build_argv(value, 3) == [
+  assert docker.docker_profile_build_argv(value, 3) == [
     "/bin/xsh",
     "/src/laputa/laputa/container_build.xsh",
     "--",
@@ -161,14 +161,14 @@ test test_package_tools_input_key_and_tag_are_deterministic [fs, env, error] { |
   let value = package_tools_fixture(ctx)?
   let first = docker.package_tools_image_tag(value)?
   let second = docker.package_tools_image_tag(value)?
-  first == second
-  first.starts_with("laputa-package-tools:arm64-")
+  assert first == second
+  assert first.starts_with("laputa-package-tools:arm64-")
   fs.write(
     fp"${value.packages_root}/pm/cli.xsh",
     """changed pm module
 """,
   )?
-  (docker.package_tools_image_tag(value)? == first) == false
+  assert (docker.package_tools_image_tag(value)? == first) == false
 }
 
 test test_package_tools_requires_the_focused_bootstrap_contract [fs, process, env, error] { |ctx|
@@ -188,30 +188,30 @@ test test_package_tools_requires_the_focused_bootstrap_contract [fs, process, en
 
   match docker.ensure_package_tools(value) {
     Ok(_) => test.fail("missing Dockerfile.package-tools unexpectedly succeeded")?
-    Err(problem) => "Dockerfile.package-tools" in problem.message
+    Err(problem) => assert "Dockerfile.package-tools" in problem.message
   }
 }
 
 test test_package_tools_build_is_native_arm64_and_tagged [fs, error] { |ctx|
   let value = package_tools_fixture(ctx)?
   let argv = docker.package_tools_build_argv(value, "laputa-package-tools:arm64-test")
-  "linux/arm64" in argv
-  "laputa-package-tools:arm64-test" in argv
-  ! (argv |> any "amd64" in .)
-  ! (argv |> any "x86_64" in .)
+  assert "linux/arm64" in argv
+  assert "laputa-package-tools:arm64-test" in argv
+  assert ! (argv |> any "amd64" in .)
+  assert ! (argv |> any "x86_64" in .)
 }
 
 test test_package_tools_dockerfile_has_the_native_runtime_contract [fs, error] {
   let source = fs.read_text(p"Dockerfile.package-tools")?
-  "FROM alpine:3.21@sha256:" in source
-  "linux/arm64" in source
-  "/bin/xsh" in source
-  "bootstrap-llvm-seed.xsh" in source
-  "mkfs.ext4.xsh" in source
-  "e2fsprogs" in source
-  "util-linux" in source
-  "/src/packages" in source
-  "/src/laputa" in source
-  ! ("amd64" in source)
-  ! ("x86_64" in source)
+  assert "FROM alpine:3.21@sha256:" in source
+  assert "linux/arm64" in source
+  assert "/bin/xsh" in source
+  assert "bootstrap-llvm-seed.xsh" in source
+  assert "mkfs.ext4.xsh" in source
+  assert "e2fsprogs" in source
+  assert "util-linux" in source
+  assert "/src/packages" in source
+  assert "/src/laputa" in source
+  assert ! ("amd64" in source)
+  assert ! ("x86_64" in source)
 }
