@@ -42,7 +42,7 @@ proc ensure_dir(path_value: Path) [fs, error] {
 proc ensure_file(path_value: Path, kind: Str) [fs, error] {
   return when fs.exists(path_value)?
 
-  return Err(InstallerQemuTestError.Failed(kind, f"missing ${path_value.display()}"))
+  return Err(InstallerQemuTestError.Failed(kind, f"missing ${path_value}"))
 }
 
 proc remove_tree(path_value: Path) [fs, error] {
@@ -192,7 +192,7 @@ pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) 
     "-o",
     "StrictHostKeyChecking=no",
     "-o",
-    f"UserKnownHostsFile=${known_hosts.display()}",
+    f"UserKnownHostsFile=${known_hosts}",
     "-o",
     "GlobalKnownHostsFile=/dev/null",
     "-o",
@@ -325,7 +325,7 @@ pure qemu_accel_args(arch: Str) -> List[Str] {
 }
 
 pure qemu_console_args(log: Path) -> List[Str] {
-  ["-display", "none", "-serial", f"file:${log.display()}", "-monitor", "none"]
+  ["-display", "none", "-serial", f"file:${log}", "-monitor", "none"]
 }
 
 pure installer_cmdline_default(arch: Str) -> Str {
@@ -368,11 +368,11 @@ pure qemu_installer_args(
       "-append",
       installer_cmdline,
       "-drive",
-      f"if=none,id=installer,format=raw,file=${installer_iso.display()}",
+      f"if=none,id=installer,format=raw,file=${installer_iso}",
       "-device",
       qemu_block_device(arch, "installer"),
       "-drive",
-      f"if=none,id=target,format=raw,file=${target_image.display()}",
+      f"if=none,id=target,format=raw,file=${target_image}",
       "-device",
       qemu_block_device(arch, "target"),
       "-netdev",
@@ -411,7 +411,7 @@ pure qemu_target_args(
       "-append",
       target_cmdline,
       "-drive",
-      f"if=none,id=target,format=raw,file=${target_image.display()}",
+      f"if=none,id=target,format=raw,file=${target_image}",
       "-device",
       qemu_block_device(arch, "target"),
       "-netdev",

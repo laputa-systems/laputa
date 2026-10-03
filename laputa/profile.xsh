@@ -115,7 +115,7 @@ export proc digest(value: types.SystemProfile) [error] -> Result[Str] {
 name\t${value.name}
 roots\t${value.package_roots.join(",")}
 kernel-package\t${value.kernel_package}
-kernel-path\t${value.kernel_path.display()}
+kernel-path\t${value.kernel_path}
 machine\t${value.qemu_machine}
 cpu\t${value.qemu_cpu}
 smp\t${value.qemu_smp}

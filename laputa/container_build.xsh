@@ -180,7 +180,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
   ])?
 
   if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or fs.metadata(output)?.size <= 0 {
-    return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel ${profile.kernel_path.display()}"))
+    return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel ${profile.kernel_path}"))
   }
 }
 

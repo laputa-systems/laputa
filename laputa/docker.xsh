@@ -109,13 +109,13 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--platform",
     "linux/arm64",
     "--mount",
-    f"type=bind,src=${value.packages_root.display()},dst=/src/packages,readonly",
+    f"type=bind,src=${value.packages_root},dst=/src/packages,readonly",
     "--mount",
-    f"type=bind,src=${value.laputa_root.display()},dst=/src/laputa,readonly",
+    f"type=bind,src=${value.laputa_root},dst=/src/laputa,readonly",
     "--mount",
-    f"type=bind,src=${value.xsh_root.display()}/core,dst=/usr/lib/xsh/core,readonly",
+    f"type=bind,src=${value.xsh_root}/core,dst=/usr/lib/xsh/core,readonly",
     "--mount",
-    f"type=bind,src=${value.output_root.display()},dst=/output",
+    f"type=bind,src=${value.output_root},dst=/output",
     "--mount",
     f"type=volume,src=${value.artifact_volume},dst=/artifacts",
     "--mount",
@@ -135,7 +135,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
   }
 
   match value.container_xsh {
-    CheckedOutXsh(binary) => argv = argv.extend(["--mount", f"type=bind,src=${binary.display()},dst=/bin/xsh,readonly"])
+    CheckedOutXsh(binary) => argv = argv.extend(["--mount", f"type=bind,src=${binary},dst=/bin/xsh,readonly"])
     PinnedXsh => {}
   }
 
@@ -152,7 +152,7 @@ export pure package_tools_build_argv(value: DockerConfig, tag: Str) -> List[Str]
     "--file",
     package_tools_dockerfile(value).display(),
     "--build-context",
-    f"packages=${value.packages_root.display()}",
+    f"packages=${value.packages_root}",
     "--tag",
     tag,
     value.laputa_root.display(),

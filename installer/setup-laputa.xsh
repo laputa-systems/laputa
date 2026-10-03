@@ -30,10 +30,10 @@ pure partition_path(disk: Path, index: Int) -> Path {
   let name = disk.name
 
   if name.starts_with("nvme") or name.starts_with("mmcblk") {
-    return fp"${disk.display()}p${index}"
+    return fp"${disk}p${index}"
   }
 
-  fp"${disk.display()}${index}"
+  fp"${disk}${index}"
 }
 
 pure prefix_octet(bits: Int) -> Int {
@@ -182,7 +182,7 @@ proc print_disks(disks: List[Path]) [fs, error, io] {
   write_stdout_line("Available disks:")?
 
   for disk in disks {
-    write_stdout_line(f"  ${disk.display()}")?
+    write_stdout_line(f"  ${disk}")?
   }
 }
 
@@ -209,7 +209,7 @@ proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
-  write_text(f"Install to disk [${default_disk.display()}]: ")?
+  write_text(f"Install to disk [${default_disk}]: ")?
   let answer = io.stdin_line()?
   let trimmed = answer.trim()
 
@@ -470,7 +470,7 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Dis
   let root_end = root_start + root_sectors - 1
 
   if root_sectors <= 0 or root_end <= root_start {
-    return Err(InstallerError.Failed("disk-too-small", f"${disk.display()} is too small for Laputa"))
+    return Err(InstallerError.Failed("disk-too-small", f"${disk} is too small for Laputa"))
   }
 
   let table = json.decode(
@@ -494,7 +494,7 @@ proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
   require_file(/usr/bin/mkfs.vfat)?
   require_file(/usr/share/laputa-installer/target-root.tar.gz)?
   let network_method = prompt_network_method(ci)?
-  write_stdout_line(f"Installing Laputa to ${disk.display()}")?
+  write_stdout_line(f"Installing Laputa to ${disk}")?
   let parts = wipe_and_partition(disk, ci)?
   wait_for(parts.esp)?
   wait_for(parts.swap)?

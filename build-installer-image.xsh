@@ -1142,7 +1142,7 @@ proc build_host() [fs, net, process, env, error, io] {
   build_filesystems(root, work, xsh, arch, target_esp_mb, boot_kernel, installer_root_mb, installer_ci)?
   build_installer_iso(work, iso, kernel, arch)?
 
-  io.write_stdout(f"""${iso.display()}
+  io.write_stdout(f"""${iso}
 """)?
 }
 
