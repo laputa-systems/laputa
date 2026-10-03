@@ -168,7 +168,7 @@ test test_package_tools_input_key_and_tag_are_deterministic [fs, env, error] { |
     """changed pm module
 """,
   )?
-  assert (docker.package_tools_image_tag(value)? == first) == false
+  assert docker.package_tools_image_tag(value)? == first == false
 }
 
 test test_package_tools_requires_the_focused_bootstrap_contract [fs, process, env, error] { |ctx|

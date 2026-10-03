@@ -79,7 +79,7 @@ ${usage()}"""),
     let token = argv[index]
 
     if token == "--jobs" or token == "-j" {
-      if command_name != "build" and command_name != "test" and command_name != "boot" or index + 1 >= argv.len() {
+      if (command_name != "build" and command_name != "test" and command_name != "boot") or index + 1 >= argv.len() {
         return Err(types.LaputaError.Usage(f"invalid ${token} for laputa ${command_name}"))
       }
 
