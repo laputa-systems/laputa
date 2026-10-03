@@ -33,18 +33,19 @@ has been removed. `laputa/container_build.xsh` statically imports PM generation
 modules, so its check also requires the checked-out PM graph to pass the current
 language contracts.
 
-Run the top-level native test modules separately:
+Run the native test suite from the checkout root:
 
 ```bash
-for test_module in tests/xsh/*.xsh; do
-  XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" test --jobs 1 "$test_module" || exit "$?"
-done
+"$XSHT" test --jobs 2
 ```
 
-The `tests/xsh` directory filter also discovers the standalone
-`tests/xsh/fixtures/container-local-staging.xsh` script. That fixture requires
-the Linux container's `/src/packages` and `/output` mounts and must run through
-container verification instead of the host native-test gate.
+`xsht-config.ini` sets `module_path` to this checkout and the sibling
+`../packages`, so plain `xsht test` resolves `laputa.*` and PM imports, including
+`use` imports inside profiles loaded through `module.load`, without
+`XSH_MODULE_PATH`. It also excludes `tests/xsh/fixtures/`: the standalone
+`container-local-staging.xsh` script requires the Linux container's
+`/src/packages` and `/output` mounts and must run through container verification
+instead of the host native-test gate.
 
 The combined PM/Laputa import test uses the PM source graph. Check and run it
 separately to distinguish package-owned diagnostics from Laputa-owned modules:
