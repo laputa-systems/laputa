@@ -28,6 +28,15 @@ type Service = {
   readiness: Str,
 }
 
+# The one key every service record must declare. The remaining service-record
+# keys are optional, so they are validated one at a time by the `field_*`
+# helpers: a schema field cannot express an absent key.
+type ServiceIdentity = {name: Str}
+
+# An explicit `log` section must name its mode; its size and keep keys are
+# optional.
+type LogPolicy = {mode: Str}
+
 type ServiceFile = module {
   export let service: Record
   export optional proc start() [fs, process, env, error] -> Result[Unit]
@@ -37,6 +46,14 @@ type ServiceFile = module {
   export optional proc ready() [fs, process, env, time, error] -> Result[Bool]
   export optional proc status() [fs, process, env, error] -> Result[Str]
 }
+
+# Result of reaping one inittab child: the updated runtime table plus the
+# lifecycle event the death triggers ("poweroff" or "").
+type DeadMark = {runtime: List[RuntimeEntry], event: Str}
+
+# Accumulator for the depth-first start-order walk: names already planned and
+# the start order built so far.
+type StartPlan = {done: List[Str], out: List[Str]}
 
 type SavedStatus = {
   name: Str,
@@ -173,7 +190,7 @@ proc parse_inittab_line(line: Str, index: Int) [process, error] -> Result[Initta
     return Err(XinitError.Failed("init-inittab", f"line ${index}: unsupported action '${action}'"))
   }
 
-  let command = (fields |> drop(3)).join(":").trim()
+  let command = fields |> drop(3).join(":").trim()
 
   if command == "" {
     return Err(XinitError.Failed("init-inittab", f"line ${index}: missing command"))
@@ -300,7 +317,7 @@ proc spawn_entries(
   return out
 }
 
-proc mark_dead(entries: List[InittabEntry], runtime: List[RuntimeEntry], pid: Int) [error] -> Record {
+proc mark_dead(entries: List[InittabEntry], runtime: List[RuntimeEntry], pid: Int) [error] -> DeadMark {
   var out = runtime
   var event = ""
 
@@ -485,64 +502,66 @@ proc require_service_file(path_value: Path) [fs, error] {
   }
 }
 
+# Error context for a service-record key that failed validation. The service
+# file path and key name let an operator find the bad declaration.
+pure field_context(source: Path, field: Str) -> Str {
+  return f"${source.display()}: field `${field}`"
+}
+
+# Optional service-record keys. An absent key yields the fallback; a present
+# key must hold the declared type (a present null is a type error, not absence).
+proc field_str(raw: Record, field: Str, fallback: Str, source: Path) [error] -> Result[Str] {
+  if field not in raw {
+    return fallback
+  }
+
+  return raw.get(field)?.require(Str).context("xinit-service", field_context(source, field))?
+}
+
+proc field_int(raw: Record, field: Str, fallback: Int, source: Path) [error] -> Result[Int] {
+  if field not in raw {
+    return fallback
+  }
+
+  return raw.get(field)?.require(Int).context("xinit-service", field_context(source, field))?
+}
+
+proc field_str_list(raw: Record, field: Str, source: Path) [error] -> Result[List[Str]] {
+  if field not in raw {
+    return []
+  }
+
+  return raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, field))?
+}
+
+# A nested optional section (`restart`, `dependencies`, ...); absent reads as an
+# empty record so every key inside it takes its default.
+proc field_record(raw: Record, field: Str, source: Path) [error] -> Result[Record] {
+  if field not in raw {
+    let empty: Record = {}
+    return empty
+  }
+
+  return raw.get(field)?.require(Record).context("xinit-service", field_context(source, field))?
+}
+
 proc service_from_record(path_value: Path, raw: Record) [process, error] -> Result[Service] {
-  let checked = record.require(
-    raw,
-    {name: "Str"},
-    optional: {
-      kind: "Str",
-      command: "Command",
-      restart: "Record",
-      logging: "Str",
-      log: "Record",
-      targets: "List[Str]",
-      dependencies: "Record",
-      resources: "Record",
-      ready_timeout_ms: "Int",
-      stop_timeout_ms: "Int",
-      readiness: "Str",
-    },
-    source: path_value,
-  )?
+  let identity = raw.require(ServiceIdentity).context("xinit-service", field_context(path_value, "name"))?
+  let kind = field_str(raw, "kind", "longrun", path_value)?
 
-  let kind = if checked.has("kind") { checked.kind } else { "longrun" }
-
-  let command = if checked.has("command") {
-    checked.command
+  let command = if "command" in raw {
+    raw.get("command")?.require(Command).context("xinit-service", field_context(path_value, "command"))?
   } else {
     process.command_argv("/bin/true", ["true"])
   }
 
-  var restart_mode = if kind == "longrun" { "on_failure" } else { "never" }
-  var delay_ms = 1000
-  var max_delay_ms = 30000
-  var stable_after_ms = 10000
-
-  if checked.has("restart") {
-    let restart = record.require(
-      checked.restart,
-      {},
-      optional: {mode: "Str", delay_ms: "Int", max_delay_ms: "Int", stable_after_ms: "Int"},
-      source: path_value,
-    )?
-
-    if restart.has("mode") {
-      restart_mode = restart.mode
-    }
-
-    if restart.has("delay_ms") {
-      delay_ms = restart.delay_ms
-    }
-
-    if restart.has("max_delay_ms") {
-      max_delay_ms = restart.max_delay_ms
-    }
-
-    if restart.has("stable_after_ms") {
-      stable_after_ms = restart.stable_after_ms
-    }
-  }
-
+  let restart = field_record(raw, "restart", path_value)?
+  let restart_mode = field_str(restart, "mode", if kind == "longrun" { "on_failure" } else { "never" }, path_value)?
+  let delay_ms = field_int(restart, "delay_ms", 1000, path_value)?
+  let max_delay_ms = field_int(restart, "max_delay_ms", 30000, path_value)?
+  let stable_after_ms = field_int(restart, "stable_after_ms", 10000, path_value)?
+  let logging = field_str(raw, "logging", "", path_value)?
+  let log = field_record(raw, "log", path_value)?
   var log_mode = "append"
 
   # Built-in append logs are bounded by default: rotate `current` once it reaches
@@ -551,72 +570,33 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
   var log_max_size = 1048576
   var log_keep = 3
 
-  if checked.has("logging") {
-    log_mode = checked.logging
-  } else if checked.has("log") {
-    let log = record.require(checked.log, {mode: "Str"}, optional: {max_size: "Int", keep: "Int"}, source: path_value)?
-    log_mode = log.mode
+  if "logging" in raw {
+    log_mode = logging
+  } else if "log" in raw {
+    log_mode = log.require(LogPolicy).context("xinit-service", field_context(path_value, "log.mode"))?.mode
 
-    if log.has("max_size") {
-      log_max_size = log.max_size
-    }
-
-    if log.has("keep") {
-      log_keep = log.keep
-    }
+    log_max_size = field_int(log, "max_size", log_max_size, path_value)?
+    log_keep = field_int(log, "keep", log_keep, path_value)?
   }
 
   if log_mode == "off" {
     log_mode = "none"
   }
 
-  let targets = if checked.has("targets") { checked.targets } else { [] }
-  var need: List[Str] = []
-  var uses: List[Str] = []
-  var after: List[Str] = []
-  var before: List[Str] = []
-
-  if checked.has("dependencies") {
-    let deps = record.require(
-      checked.dependencies,
-      {},
-      optional: {need: "List[Str]", uses: "List[Str]", after: "List[Str]", before: "List[Str]"},
-      source: path_value,
-    )?
-
-    if deps.has("need") {
-      need = deps.need
-    }
-
-    if deps.has("uses") {
-      uses = deps.uses
-    }
-
-    if deps.has("after") {
-      after = deps.after
-    }
-
-    if deps.has("before") {
-      before = deps.before
-    }
-  }
-
-  var cpu_max = 0
-
-  if checked.has("resources") {
-    let resources = record.require(checked.resources, {}, optional: {cpu_max: "Int"}, source: path_value)?
-
-    if resources.has("cpu_max") {
-      cpu_max = resources.cpu_max
-    }
-  }
-
-  let ready_timeout_ms = if checked.has("ready_timeout_ms") { checked.ready_timeout_ms } else { 5000 }
-  let stop_timeout_ms = if checked.has("stop_timeout_ms") { checked.stop_timeout_ms } else { 200 }
-  let readiness = if checked.has("readiness") { checked.readiness } else { "auto" }
+  let targets = field_str_list(raw, "targets", path_value)?
+  let deps = field_record(raw, "dependencies", path_value)?
+  let need = field_str_list(deps, "need", path_value)?
+  let uses = field_str_list(deps, "uses", path_value)?
+  let after = field_str_list(deps, "after", path_value)?
+  let before = field_str_list(deps, "before", path_value)?
+  let resources = field_record(raw, "resources", path_value)?
+  let cpu_max = field_int(resources, "cpu_max", 0, path_value)?
+  let ready_timeout_ms = field_int(raw, "ready_timeout_ms", 5000, path_value)?
+  let stop_timeout_ms = field_int(raw, "stop_timeout_ms", 200, path_value)?
+  let readiness = field_str(raw, "readiness", "auto", path_value)?
 
   return {
-    name: checked.name,
+    name: identity.name,
     path: path_value,
     kind,
     command,
@@ -727,7 +707,7 @@ pure visit_plan(
   stack: List[Str],
   done: List[Str],
   out: List[Str],
-) -> Result[Record] {
+) -> Result[StartPlan] {
   if name in done {
     return {done, out}
   }
@@ -896,16 +876,16 @@ proc read_status(name: Str) [fs, process, env, error] -> Result[SavedStatus] {
   }
 
   let raw = json.read(path_value)?
-  let status_name: Str = json.get(raw, ["name"], name)
-  let desired: Str = json.get(raw, ["desired"], "down")
-  let state: Str = json.get(raw, ["state"], "down")
-  let pid: Int = json.get(raw, ["pid"], 0)
-  let supervisor_pid: Int = json.get(raw, ["supervisor_pid"], 0)
-  let log: Str = json.get(raw, ["log"], "append")
-  let restarts: Int = json.get(raw, ["restarts"], 0)
-  let ready: Bool = json.get(raw, ["ready"], state == "running")
-  let cgroup_path: Str = json.get(raw, ["cgroup_path"], "")
-  let start_time_ms: Int = json.get(raw, ["start_time_ms"], 0)
+  let status_name = json.get(raw, ["name"], name).require(Str)?
+  let desired = json.get(raw, ["desired"], "down").require(Str)?
+  let state = json.get(raw, ["state"], "down").require(Str)?
+  let pid = json.get(raw, ["pid"], 0).require(Int)?
+  let supervisor_pid = json.get(raw, ["supervisor_pid"], 0).require(Int)?
+  let log = json.get(raw, ["log"], "append").require(Str)?
+  let restarts = json.get(raw, ["restarts"], 0).require(Int)?
+  let ready = json.get(raw, ["ready"], state == "running").require(Bool)?
+  let cgroup_path = json.get(raw, ["cgroup_path"], "").require(Str)?
+  let start_time_ms = json.get(raw, ["start_time_ms"], 0).require(Int)?
 
   let status: SavedStatus = {
     name: status_name,
@@ -1018,7 +998,7 @@ proc wait_ready(service: Service) [fs, process, env, time, error] -> Result[Bool
   require_service_file(service.path)?
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
-  if ! loaded.has("ready") {
+  if "ready" not in loaded.keys() {
     return true
   }
 
@@ -1039,7 +1019,7 @@ proc run_start_proc(service: Service) [fs, process, env, error] -> Result[Bool] 
   require_service_file(service.path)?
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
-  if loaded.has("start") {
+  if "start" in loaded.keys() {
     loaded.start()?
     return true
   }
@@ -1051,7 +1031,7 @@ proc run_stop_proc(service: Service) [fs, process, env, time, error] -> Result[B
   require_service_file(service.path)?
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
-  if loaded.has("stop") {
+  if "stop" in loaded.keys() {
     loaded.stop()?
     return true
   }
@@ -1063,7 +1043,7 @@ proc run_reload_proc(service: Service) [fs, process, env, error] -> Result[Bool]
   require_service_file(service.path)?
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
-  if loaded.has("reload") {
+  if "reload" in loaded.keys() {
     loaded.reload()?
     return true
   }
@@ -1224,7 +1204,7 @@ proc scanner_active() [fs, process, env, error] -> Result[Bool] {
   }
 
   let raw = json.read(marker)?
-  let pid: Int = json.get(raw, ["pid"], 0)
+  let pid = json.get(raw, ["pid"], 0).require(Int)?
   return pid_alive(pid)
 }
 
@@ -1267,7 +1247,7 @@ proc running_dependents(name: Str) [fs, process, env, error] -> Result[List[Str]
   var out: List[Str] = []
 
   for service in services {
-    if service.name != name and required_dependencies(service).contains(name) {
+    if service.name != name and name in required_dependencies(service) {
       let status = read_status(service.name)?
 
       if status.state == "running" {
@@ -1355,7 +1335,7 @@ proc show_status(name: Str) [fs, process, env, error] {
       require_service_file(loaded.path)?
       let module_value = module.load(loaded.path)?.require(ServiceFile)?
 
-      if module_value.has("status") {
+      if "status" in module_value.keys() {
         let detail = module_value.status()?
 
         if detail != "" {
@@ -1641,7 +1621,7 @@ proc run_finish(unit: ServiceUnit) [fs, process, env, error] {
   require_service_file(unit.service.path)?
   let loaded = module.load(unit.service.path)?.require(ServiceFile)?
 
-  if loaded.has("finish") {
+  if "finish" in loaded.keys() {
     write_status(unit_saved_status(finishing_unit(unit)))?
     loaded.finish()?
   }
@@ -1660,9 +1640,7 @@ proc mark_unit_dead(
 
   run_finish(unit)?
 
-  let should_restart = unit.service.restart_mode == "always" or unit.service.restart_mode == "on_failure" and ! child_status.exited_with(
-    0,
-  )
+  let should_restart = unit.service.restart_mode == "always" or (unit.service.restart_mode == "on_failure" and ! child_status.exited_with(0))
 
   if ! should_restart {
     let stopped: ServiceUnit = {
@@ -2159,13 +2137,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed("xinit-control", "usage: xinit boot [TARGET]"))
     }
 
-    boot_target(parsed.args.get(0, "boot"))?
+    boot_target(parsed.args.get(0) ?? "boot")?
   } else if parsed.command == "scan" {
     if parsed.args.len() > 1 {
       return Err(XinitError.Failed("xinit-control", "usage: xinit scan [SERVICE|TARGET]"))
     }
 
-    scan_command(parsed.args.get(0, "boot"))?
+    scan_command(parsed.args.get(0) ?? "boot")?
   } else if parsed.command == "list" {
     if parsed.args.len() > 0 {
       return Err(XinitError.Failed("xinit-control", "usage: xinit list"))
@@ -2177,7 +2155,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed("xinit-control", "usage: xinit graph [SERVICE|TARGET]"))
     }
 
-    let target = parsed.args.get(0, "boot")
+    let target = parsed.args.get(0) ?? "boot"
     match load_service(target) {
       Ok(_) => graph_service(target)?
       Err(_) => graph_target(target)?
@@ -2187,7 +2165,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed("xinit-control", "usage: xinit <action> SERVICE"))
     }
 
-    control(parsed.action, parsed.service)?
+    control(parsed.action, parsed.get("service")?.require(Str)?)?
   } else if parsed.command == "check" {
     if parsed.args.len() > 1 {
       return Err(XinitError.Failed("xinit-control", "usage: xinit check [SERVICE|PATH]"))
@@ -2203,7 +2181,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed("xinit-control", "usage: xinit INITTAB"))
     }
 
-    run_pid1(parsed.inittab)?
+    run_pid1(parsed.get("inittab")?.require(Path)?)?
   }
 }
 

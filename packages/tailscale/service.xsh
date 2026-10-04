@@ -1,3 +1,4 @@
+##! xinit service module for the tailscaled daemon.
 pure restart_policy() -> Record {
   {mode: "always", delay_ms: 1000, max_delay_ms: 30000, stable_after_ms: 10000}
 }
@@ -37,6 +38,7 @@ let socket = env.path("XINIT_TAILSCALE_SOCKET", /run/tailscale/tailscaled.sock)?
 let userspace_networking = env.bool("XINIT_TAILSCALE_USERSPACE_NETWORKING", false)?
 let service_record = tailscale_service(state, socket, userspace_networking)
 
+## The xinit service record.
 export let service = {
   name: service_record.name,
   kind: "longrun",

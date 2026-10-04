@@ -1,3 +1,5 @@
+##! Example xinit service module with a readiness hook.
+## The xinit service record.
 export let service = {
   name: "demo",
   kind: "longrun",
@@ -25,6 +27,7 @@ export let service = {
   logging: "append",
 }
 
+## Reports readiness once the demo socket exists.
 export proc ready() [fs, process, env, time, error] -> Result[Bool] {
   return fs.exists(/run/demo.sock)?
 }

@@ -1,7 +1,9 @@
+##! xinit service module for the wpa_supplicant Wi-Fi facility.
 # The wpa_supplicant facility provider: a supervised longrun that manages
 # Wi-Fi association.  Services that need Wi-Fi can declare `need: ["wpa_supplicant"]`.
 # By default it manages all nl80211 wireless interfaces; override by setting
 # WPA_SUPPLICANT_ARGS in /etc/conf.d/wpa_supplicant.
+## The xinit service record.
 export let service = {
   name: "wpa_supplicant",
   kind: "longrun",

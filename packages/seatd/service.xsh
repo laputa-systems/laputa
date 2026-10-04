@@ -1,7 +1,9 @@
+##! xinit service module for the seatd seat manager.
 pure restart_policy() -> Record {
   {mode: "always", delay_ms: 1000, max_delay_ms: 30000, stable_after_ms: 10000}
 }
 
+## The xinit service record.
 export let service = {
   name: "seatd",
   kind: "longrun",
