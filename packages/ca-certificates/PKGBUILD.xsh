@@ -6,10 +6,10 @@ export const name = "ca-certificates"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2026.03.19"
+export const ver = "2026.09.25"
 
 ## Exported declaration `rel`.
-export const rel = "10"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b6e66569cc3d438dd5abe514d0df50005d570bfc96c14dca8f768d020cb96171",
+        sha256: "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505",
       },
     ],
   },
