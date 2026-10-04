@@ -6,10 +6,10 @@ export const name = "tailscale"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.96.4"
+export const ver = "1.102.4"
 
 ## Package recipe export.
-export const rel = "12"
+export const rel = "1"
 
 ## Package recipe export.
 export let deps = []
@@ -32,11 +32,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "a27249bc70d7b37a68f8be7f5c4507ea5f354e592dce43cb5d4f3e742b313c3c",
+        sha256: "9dd1e6a592a014bbaea0103167ffe299adeda4ba14e078ce9c2895364f6c4c3f",
       },
       {
         arch: "x86_64",
-        sha256: "a1cba18826b1f91cb25ef7f5b8259b5258339b42db7867af9269e21829ea78cc",
+        sha256: "50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9",
       },
     ],
   },
