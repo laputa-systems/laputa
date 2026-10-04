@@ -352,6 +352,10 @@ laputa/
   copy-paste.
 
 **Phase 4, Linux amd64 host (later):**
+- Kernel headers: libffi, libnl3, libevdev, mtdev, libudev-zero and wpa_supplicant list `linux` in `deps`, which pulls the kernel into runtime roots. They should take headers as a build-only dependency.
+- Unused build dependencies to drop: tailscale's build-host `llvm-toolchain`, foot's `utf8proc` (grapheme clustering disabled), and m4's `musl` (m4 is an XSH script).
+- The `packages/linux/tests` kbuild tests have no make target. On macOS they fail writing `/var/cache/laputa`; give them a target and a cache under `.out/`.
+
 - `pm/repo.xsh` publication hardcodes `aarch64` (payload, metadata and proof paths and the index `arch`); take the arch from the plan target before publishing x86_64;
 - the x86_64 seed;
 - cmake, linux and the rest of the world;
