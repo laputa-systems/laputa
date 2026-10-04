@@ -36,7 +36,9 @@ endif
 
 XSH_RELEASE_DIR := $(XSH_ROOT_ABS)/target/release
 ifeq ($(HOST_OS),Linux)
-XSH_BIN_DIR ?= $(if $(wildcard $(XSH_RELEASE_DIR)/xsh),$(XSH_RELEASE_DIR),$(HOST_TOOLS_DIR))
+# Only a complete release build counts: a partial one (say, cargo built xsh and
+# xsht for docs) would run PM's runners against a missing xshi.
+XSH_BIN_DIR ?= $(if $(and $(wildcard $(XSH_RELEASE_DIR)/xsh),$(wildcard $(XSH_RELEASE_DIR)/xshi),$(wildcard $(XSH_RELEASE_DIR)/xsht)),$(XSH_RELEASE_DIR),$(HOST_TOOLS_DIR))
 else
 XSH_BIN_DIR ?= $(XSH_RELEASE_DIR)
 endif
