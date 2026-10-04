@@ -145,6 +145,7 @@ proc execute_stage_local(
   # build_prepared_package creates a traced dynamic runner beside its recipe. Keep that implementation
   # detail inside this node's work tree so execution never writes the checkout or another node's recipe.
   let _ = fs.copy_tree(pkg.dir, recipe_dir, parents: true, overwrite: true)?
+  util.normalize_checkout_tree(recipe_dir)?
   let isolated_pkg = {...pkg, dir: recipe_dir}
   fs.mkdir(source)?
   # Package recipes may explicitly name repository-owned inputs (for example

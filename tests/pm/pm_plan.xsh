@@ -36,6 +36,19 @@ test test_package_build_fingerprint_is_repeatable_and_ignores_mtime [fs, env, er
   assert build_input(pkg)? == first
 }
 
+# Git records only whether a checkout file is executable, so the other mode
+# bits a clone gets (umask group-write, setgid inherited from a parent
+# directory) are host noise that must not change a key.
+test test_package_build_fingerprint_follows_only_the_checkout_executable_bit [fs, env, error] { |ctx|
+  let pkg = copied_package(ctx, "fingerprint-checkout-modes")?
+  let first = build_input(pkg)?
+  fs.chmod(fp"{pkg.dir}/files", 0o2775)?
+  fs.chmod(fp"{pkg.dir}/files/input.txt", 0o664)?
+  assert build_input(pkg)? == first
+  fs.chmod(fp"{pkg.dir}/files/input.txt", 0o775)?
+  assert build_input(pkg)? == first == false
+}
+
 test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-x86-source")?
   let source = pkg.upstream_sources[0]

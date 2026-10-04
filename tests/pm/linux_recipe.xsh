@@ -133,6 +133,23 @@ test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, n
   assert fs.exists(fp"{source}/usr/lib/init/rc.boot")?
 }
 
+test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "baselayout-checkout-modes")?
+  let package_dir = fp"{root}/baselayout"
+  let source = fp"{root}/source"
+  let _ = fs.copy_tree(p"packages/baselayout", package_dir, parents: true, overwrite: true)?
+  # A checkout below a setgid directory, under a group-writable umask.
+  fs.chmod(fp"{package_dir}/files/rootfs/usr", 0o2775)?
+  fs.chmod(fp"{package_dir}/files/rootfs/etc/passwd", 0o664)?
+  fs.mkdir(source)?
+
+  sources.stage_package_sources(recipe.load_package(package_dir)?, source)?
+
+  assert fs.metadata(fp"{source}/usr")?.mode % 4096 == 0o755
+  assert fs.metadata(fp"{source}/etc/passwd")?.mode % 4096 == 0o644
+  assert fs.metadata(fp"{source}/usr/lib/init/rc.boot")?.mode % 4096 == 0o755
+}
+
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |ctx|
   let pkg = recipe.load_package(p"packages/baselayout")?
   let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.file_kind_tree()]

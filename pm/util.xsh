@@ -323,3 +323,22 @@ export pure normalize_arch(arch: Str) -> Str {
 
   arch
 }
+
+# Git records only whether a file is executable. The other bits a clone gets
+# (group write from the umask, setgid inherited from a parent directory) are
+# host noise, so neither keys nor staged inputs may carry them.
+## The mode a checkout entry has in git's model: 0755 for a directory or an
+## executable file, 0644 for any other file.
+export pure checkout_mode(kind: Str, mode: Int) -> Int {
+  return 0o755 when kind == "dir" or mode % 512 / 64 % 2 == 1
+
+  0o644
+}
+
+## Give every file and directory below `root`, and `root` itself, its checkout mode. Symlinks have no mode of their own.
+export proc normalize_checkout_tree(root: Path) [fs, error] {
+  for entry in [{path: root, kind: "dir"}].extend([{path: found.path, kind: found.kind} for found in fs.walk(root, hidden: true)]) {
+    continue when entry.kind == "symlink"
+    fs.chmod(entry.path, checkout_mode(entry.kind, fs.metadata(entry.path)?.mode))?
+  }
+}

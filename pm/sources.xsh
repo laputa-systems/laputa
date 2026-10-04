@@ -271,6 +271,8 @@ proc stage_resolved_source(
   if source_kind == types.source_directory() or resolved.kind == "dir" {
     fs.mkdir(dest)?
     let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
+    # Directory sources are checkout trees (recipe files or repository inputs).
+    util.normalize_checkout_tree(dest)?
     return
   }
 
