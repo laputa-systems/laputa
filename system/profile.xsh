@@ -125,3 +125,8 @@ forbidden-sonames\t{value.forbidden_sonames.join(",")}
 """
   bytes.from_text(body).sha256().hex()
 }
+
+## The runtime packages of a generation that the profile forbids, in generation order.
+export pure forbidden_runtime_packages(value: types.SystemProfile, runtime_packages: List[Str]) -> List[Str] {
+  [name for name in runtime_packages if name in value.forbidden_packages]
+}

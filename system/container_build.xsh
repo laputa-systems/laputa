@@ -257,6 +257,15 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
     return Err(ContainerBuildError.Failed("saved generation plan differs from the current BuildPlan or overlay"))
   }
 
+  # A forbidden package in the runtime closure fails before anything builds.
+  let forbidden = system_profile.forbidden_runtime_packages(
+    profile,
+    [artifact.package_name for artifact in saved_generation_plan.artifacts],
+  )
+  if forbidden.len() > 0 {
+    return Err(ContainerBuildError.Failed(f"{profile.name} generation includes forbidden packages: {forbidden.join(", ")}"))
+  }
+
   container_pm_repo_build(build_plan, jobs)?
   let root = fp"{work}/generation"
   let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?

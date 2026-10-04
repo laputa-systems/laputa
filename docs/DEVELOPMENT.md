@@ -217,6 +217,6 @@ The generation's direct runtime roots are the profile's `package_roots`
 `mdevd`, `seatd`, `dwl-minimal`, and `foot-minimal`. Build-only tools such as
 `llvm-toolchain`, `pkgconf`, `cmake`, `muon`, `samurai`, `m4`, `flex`,
 `bison`, `wayland-dev`, `wayland-protocols`, and `pixman-dev` must be absent.
-The profile lists them in `forbidden_packages`, but the build enforces only
-`forbidden_sonames` (no generation file may provide or need one), so check
-the package list here.
+The profile lists them in `forbidden_packages`, and the build fails before
+building anything if the generation's runtime closure contains one. It also
+fails if any generation file provides or needs a `forbidden_sonames` entry.
