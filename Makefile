@@ -53,7 +53,7 @@ DEPLOY_HOST ?= oracle
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit clean \
+.PHONY: check lint test test-pm test-system test-xinit clean fetch \
 	profile-plan profile-build profile-test profile-boot profile-clean \
 	test-pm-native test-pm-docker test-pm-local-linux xsh-native xsh-local-bins xsh-builder-image update-checksums \
 	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
@@ -82,6 +82,15 @@ test-xinit:
 
 clean: mirror-clean
 	rm -rf .out target
+
+# The only networked step: every pinned upstream source the recipes use on
+# ARCH, sha256-verified into the content-addressed cache at
+# $(SOURCE_CACHE)/sha256/<hash>, which `make mirror` serves. Builds read that
+# cache or LAPUTA_MIRROR and never contact upstream hosts.
+ARCH ?= aarch64
+SOURCE_CACHE ?= $(CURDIR)/.cache/sources
+fetch:
+	$(HOST_XSH_ENV) LAPUTA_SOURCE_CACHE="$(SOURCE_CACHE)" $(XSH) pm.xsh -- sources fetch --repo . --all --target $(ARCH)-linux-musl
 
 # The typed profile CLI is the sole core-system orchestration surface.
 profile-plan:
@@ -192,7 +201,6 @@ mirror-build:
 # /sources/sha256/<hash>. No auth; loopback only.
 MIRROR_PORT ?= 3000
 MIRROR_DATA ?= $(CURDIR)/.out/mirror
-SOURCE_CACHE ?= $(CURDIR)/.cache/sources
 mirror:
 	mkdir -p "$(MIRROR_DATA)" "$(SOURCE_CACHE)/sha256"
 	cd $(MIRROR) && $(CARGO) run -j $(CARGO_JOBS) --locked --bin laputa-mirror -- --local "$(MIRROR_DATA)" --listen "127.0.0.1:$(MIRROR_PORT)" --sources "$(SOURCE_CACHE)"

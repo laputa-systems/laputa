@@ -6,11 +6,6 @@ export pure package_id(name: Str, ver: Str, rel: Str) -> Str {
   f"${name}-${ver}-${rel}"
 }
 
-## Exported PM declaration `package_arch_id`.
-export pure package_arch_id(arch: Str, name: Str, ver: Str, rel: Str) -> Str {
-  f"${arch}/${package_id(name, ver, rel)}"
-}
-
 ## Exported PM declaration `version_id`.
 export pure version_id(ver: Str, rel: Str) -> Str {
   f"${ver}-${rel}"
@@ -31,29 +26,9 @@ export pure remote_index_cache_path(out: Path) -> Path {
   fp"${out}/remote-index.json"
 }
 
-## Exported PM declaration `source_mirror_path_for_arch`.
-export pure source_mirror_path_for_arch(out: Path, pkg: types.Package, arch: Str) -> Path {
-  fp"${out}/source-mirrors/${package_id(pkg.name, pkg.ver, pkg.rel)}-${arch}.tar.bz2"
-}
-
-## Exported PM declaration `source_manifest_path_for_arch`.
-export pure source_manifest_path_for_arch(out: Path, pkg: types.Package, arch: Str) -> Path {
-  fp"${out}/source-mirrors/${package_id(pkg.name, pkg.ver, pkg.rel)}-${arch}.manifest.json"
-}
-
-## Exported PM declaration `proof_receipt_path`.
-export pure proof_receipt_path(out: Path, pkg: types.Package) -> Path {
-  fp"${out}/${package_id(pkg.name, pkg.ver, pkg.rel)}.proof.json"
-}
-
 ## Exported PM declaration `remote_tarball_name`.
 export pure remote_tarball_name(name: Str, ver: Str, rel: Str) -> Str {
   f"${package_id(name, ver, rel)}.tar.gz"
-}
-
-## Exported PM declaration `remote_source_name_for_arch`.
-export pure remote_source_name_for_arch(name: Str, ver: Str, rel: Str, arch: Str) -> Str {
-  f"${package_id(name, ver, rel)}-${arch}-src.tar.bz2"
 }
 
 ## Exported PM declaration `remote_binary_rel`.
@@ -76,11 +51,6 @@ export pure remote_proof_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
   fp"proofs/${arch}/${name}/${remote_metadata_name(name, ver, rel)}"
 }
 
-## Exported PM declaration `remote_source_rel_for_arch`.
-export pure remote_source_rel_for_arch(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"sources/${name}/${remote_source_name_for_arch(name, ver, rel, arch)}"
-}
-
 ## Exported PM declaration `ensure_relative_path`.
 export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path] {
   let normalized = path_value.normalize()
@@ -97,26 +67,6 @@ export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path] {
   }
 
   normalized
-}
-
-## Exported PM declaration `remote_cache_tarball_path`.
-export pure remote_cache_tarball_path(out: Path, pkg: types.RemotePackage) -> Result[Path] {
-  if pkg.tarball != "" {
-    let rel = ensure_relative_path(fp"${pkg.tarball}", "remote tarball")?
-    return fp"${out}/remote-cache/${rel}"
-  }
-
-  fp"${out}/remote-cache/${pkg.arch}/${pkg.name}/${remote_tarball_name(pkg.name, pkg.ver, pkg.rel)}"
-}
-
-## Exported PM declaration `remote_cache_metadata_path`.
-export pure remote_cache_metadata_path(out: Path, pkg: types.RemotePackage) -> Result[Path] {
-  if pkg.metadata != "" {
-    let rel = ensure_relative_path(fp"${pkg.metadata}", "remote metadata")?
-    return fp"${out}/remote-cache/${rel}"
-  }
-
-  fp"${out}/remote-cache/${pkg.arch}/${pkg.name}/${remote_metadata_name(pkg.name, pkg.ver, pkg.rel)}"
 }
 
 ## Exported PM declaration `is_file_url`.
@@ -168,63 +118,8 @@ export pure is_url_source(source: Str) -> Bool {
   "://" in source
 }
 
-## Exported PM declaration `is_git_source`.
-export pure is_git_source(source: Str) -> Bool {
-  source.starts_with("git+")
-}
-
-## Exported PM declaration `git_source_body`.
-export pure git_source_body(source: Str) -> Str {
-  if source.starts_with("git+") {
-    return source.replace("git+", "")
-  }
-
-  return source
-}
-
-## Exported PM declaration `git_source_url`.
-export pure git_source_url(source: Str) -> Str {
-  let body = git_source_body(source)
-  let hash_parts = body.split("#")
-  let before_hash = hash_parts[0]
-  let at_parts = before_hash.split("@")
-  return at_parts[0]
-}
-
-## Exported PM declaration `git_source_ref`.
-export pure git_source_ref(source: Str) -> Str {
-  let body = git_source_body(source)
-  let hash_parts = body.split("#")
-
-  if hash_parts.len() > 1 {
-    return hash_parts[1]
-  }
-
-  let at_parts = body.split("@")
-
-  if at_parts.len() > 1 {
-    return at_parts[1]
-  }
-
-  return ""
-}
-
-## Exported PM declaration `strip_git_ext`.
-export pure strip_git_ext(name: Str) -> Str {
-  if name.ends_with(".git") {
-    return name.split(".git")[0]
-  }
-
-  return name
-}
-
-## Exported PM declaration `source_basename`.
+## The file name a URL source stages under, without query or fragment.
 export pure source_basename(source: Str) -> Result[Str] {
-  if source.starts_with("git+") {
-    let parsed_path = fp"${git_source_url(source)}"
-    return strip_git_ext(parsed_path.name)
-  }
-
   let parsed_path = fp"${source.split("#")[0].split("?")[0]}"
   return parsed_path.name
 }
@@ -258,19 +153,6 @@ export pure source_stage_dir(src: Path, line: types.SourceLine) -> Path {
   return fp"${src}/${dest}"
 }
 
-## Exported PM declaration `source_cache_path`.
-export pure source_cache_path(work: Path, pkg: types.Package, line: types.SourceLine, source: Str) -> Result[Path] {
-  let name = source_basename(source)?
-  let root = fp"${work}/sources/${pkg.name}"
-  let dest = line.dest.normalize()
-
-  if dest.display() == "." {
-    return fp"${root}/${name}"
-  }
-
-  return fp"${root}/${dest}/${name}"
-}
-
 ## Exported PM declaration `goarch_for`.
 export pure goarch_for(arch: Str) -> Str {
   if arch == "aarch64" or arch == "arm64" {
@@ -284,41 +166,116 @@ export pure goarch_for(arch: Str) -> Str {
   return arch
 }
 
-## Exported PM declaration `source_vars`.
-export proc source_vars(source: Str, pkg: types.Package, arch: Str) [env, error] -> Result[Str] {
-  let version = pkg.ver.replace("+", ".").replace("-", ".").replace("_", ".")
-  let parts = version.split(".")
-  let major = parts.get(0) ?? ""
-  let minor = parts.get(1) ?? ""
-  let patch_part = parts.get(2) ?? ""
-  let ident = parts.get(3) ?? ""
-  let goarch = goarch_for(arch)
-  let build = build_arch()?
-  let build_goarch = goarch_for(build)
-  let source_target_triple = f"${arch}-linux-musl"
-  let source_build_triple = f"${build}-linux-musl"
-  var expanded = source
-  expanded = expanded.replace("VERSION", pkg.ver)
-  expanded = expanded.replace("RELEASE", pkg.rel)
-  expanded = expanded.replace("MAJOR", major)
-  expanded = expanded.replace("MINOR", minor)
-  expanded = expanded.replace("PATCH", patch_part)
-  expanded = expanded.replace("IDENT", ident)
-  expanded = expanded.replace("PACKAGE", pkg.name)
-  expanded = expanded.replace("TARGET_TRIPLE", source_target_triple)
-  expanded = expanded.replace("BUILD_TRIPLE", source_build_triple)
-  expanded = expanded.replace("TARGET_GOARCH", goarch)
-  expanded = expanded.replace("BUILD_GOARCH", build_goarch)
-  expanded = expanded.replace("TARGET_ARCH", arch)
-  expanded = expanded.replace("BUILD_ARCH", build)
-  expanded = expanded.replace("GOARCH", goarch)
-  expanded.replace("ARCH", arch)
+# Placeholders are whole uppercase words in a source string. Matching words
+# rather than substrings keeps names such as PATCH, PACKAGE, or SEARCH from
+# being rewritten through the ARCH or other placeholders they contain.
+const source_placeholder_word = rx"[A-Z]+"
+
+## Substitutes each whole-word placeholder in `source` from `values` in one pass.
+## A placeholder is a run of uppercase ASCII letters, or two such runs joined by
+## one `_` (`TARGET_ARCH`); lowercase letters, digits, and punctuation delimit it,
+## so `vVERSION` and `tailscale_VERSION_GOARCH` expand while `PATCHES` does not.
+## Substituted values are never rescanned.
+export pure expand_source_placeholders(source: Str, values: Map[Str]) -> Str {
+  let words = source_placeholder_word.find(source)
+  var expanded = ""
+  var cursor = 0
+  var index = 0
+
+  while index < words.len() {
+    let word = words[index]
+    var name = word.text
+    var end = word.end
+
+    if index + 1 < words.len() {
+      let next = words[index + 1]
+      let joined = f"${word.text}_${next.text}"
+
+      if next.start == word.end + 1 and source.byte_slice(word.end, 1) == "_" and joined in values {
+        name = joined
+        end = next.end
+        index += 1
+      }
+    }
+
+    if name in values {
+      expanded = expanded + source.byte_slice(cursor, word.start - cursor) + (values.get(name) ?? "")
+      cursor = end
+    }
+
+    index += 1
+  }
+
+  expanded + source.byte_slice(cursor)
 }
 
-## Exported PM declaration `paths_from_args`.
-export proc paths_from_args(raw: List[Str]) [error] -> Result[List[Path]] {
-  let paths = [fp"${item}" for item in raw]
-  paths
+## The placeholder values a recipe source string may name for one target and build architecture.
+export pure source_placeholder_values(pkg: types.Package, arch: Str, build: Str) -> Map[Str] {
+  let parts = pkg.ver.replace("+", ".").replace("-", ".").replace("_", ".").split(".")
+
+  {
+    VERSION: pkg.ver,
+    RELEASE: pkg.rel,
+    MAJOR: parts.get(0) ?? "",
+    MINOR: parts.get(1) ?? "",
+    PATCH: parts.get(2) ?? "",
+    IDENT: parts.get(3) ?? "",
+    PACKAGE: pkg.name,
+    TARGET_TRIPLE: f"${arch}-linux-musl",
+    BUILD_TRIPLE: f"${build}-linux-musl",
+    TARGET_GOARCH: goarch_for(arch),
+    BUILD_GOARCH: goarch_for(build),
+    TARGET_ARCH: arch,
+    BUILD_ARCH: build,
+    GOARCH: goarch_for(arch),
+    ARCH: arch,
+  }
+}
+
+## Expands a recipe source string for one target and build architecture.
+export pure expand_source(source: Str, pkg: types.Package, arch: Str, build: Str) -> Str {
+  expand_source_placeholders(source, source_placeholder_values(pkg, arch, build))
+}
+
+## True for repositories PM may write without a token: `file://` trees and the
+## loopback-only local mirror (`http://127.0.0.1[:PORT]` or `http://localhost[:PORT]`).
+export pure is_local_repo_url(url: Str) -> Bool {
+  is_file_url(url) or rx"^http://(127\.0\.0\.1|localhost)(:[0-9]+)?(/.*)?$".matches(url)
+}
+
+## Downloads one `http(s)://` or `file://` URL to `dest` and returns the failure
+## text, or "" on success. `dest` only ever holds complete bytes. net.download
+## follows redirects itself, so release hosts and mirrors that redirect need no
+## separate probe.
+export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, net, error] -> Result[Str] {
+  fs.mkdir(dest.parent)?
+
+  if is_file_url(url) {
+    let source = file_url_path(url)?
+
+    if ! fs.exists(source)? {
+      return f"${url}: missing file"
+    }
+
+    let partial = fp"${dest.parent}/.${dest.name}.partial"
+    fs.copy(source, partial, overwrite: true)?
+    fs.rename(partial, dest, overwrite: true)?
+    return ""
+  }
+
+  match net.download({
+    url,
+    dest,
+    atomic: true,
+    overwrite: true,
+    pool: "pm",
+    connect_timeout: 10s,
+    timeout,
+    fail_status: true,
+  }) {
+    Ok(_) => ""
+    Err(problem) => f"${url}: ${problem.message}"
+  }
 }
 
 ## Exported PM declaration `host_arch`.
@@ -358,12 +315,6 @@ export proc target_arch() [env, error] -> Result[Str] {
 ## Exported PM declaration `machine_arch`.
 export proc machine_arch() [env, error] -> Result[Str] {
   target_arch()?
-}
-
-## Exported PM declaration `target_triple`.
-export proc target_triple() [env, error] -> Result[Str] {
-  let arch = target_arch()?
-  return f"${arch}-linux-musl"
 }
 
 ## Exported PM declaration `normalize_arch`.

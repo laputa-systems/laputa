@@ -27,8 +27,9 @@ type RootComposeArgs = {input: Path, store: Path, runtime_roots: List[Str], outp
 type RootInspectArgs = {input: Path}
 type StoreVerifyArgs = {store: Path}
 type StoreExtractArgs = {input: Path, store: Path, package: Str, path: Path, output: Path}
+type SourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: List[types.Target]}
 
-enum PmCommand { Help(Str), RepoCheck(RepoCheckArgs), RepoPlan(RepoPlanArgs), RepoShow(RepoShowArgs), RepoBuild(RepoBuildArgs), RepoPublish(RepoPublishArgs), RepoChecksum(RepoPackagesArgs), RepoUpdateChecksums(RepoPackagesArgs), RepoSourceAudit(RepoPackagesArgs), RootCompose(RootComposeArgs), RootInspect(RootInspectArgs), StoreVerify(StoreVerifyArgs), StoreExtract(StoreExtractArgs) }
+enum PmCommand { Help(Str), RepoCheck(RepoCheckArgs), RepoPlan(RepoPlanArgs), RepoShow(RepoShowArgs), RepoBuild(RepoBuildArgs), RepoPublish(RepoPublishArgs), RepoChecksum(RepoPackagesArgs), RepoUpdateChecksums(RepoPackagesArgs), SourcesFetch(SourcesFetchArgs), RootCompose(RootComposeArgs), RootInspect(RootInspectArgs), StoreVerify(StoreVerifyArgs), StoreExtract(StoreExtractArgs) }
 
 type RepoCheckOptions = {repo: Str}
 type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], target: Str, output: Path}
@@ -40,6 +41,7 @@ type RootComposeOptions = {input: Path, store: Path, runtime_roots: List[Str], o
 type RootInspectOptions = {input: Path}
 type StoreVerifyOptions = {store: Path}
 type StoreExtractOptions = {input: Path, store: Path, package: Str, path: Path, output: Path}
+type SourcesFetchOptions = {repo: Str, all: Bool, packages: List[Str], targets: List[Str]}
 
 pure help_text() -> Str {
   """usage: pm COMMAND [OPTIONS]
@@ -52,7 +54,9 @@ repository commands:
   repo publish PLAN --store STORE
   repo checksum [--repo PATH] PACKAGE...
   repo update-checksums [--repo PATH] PACKAGE...
-  repo source-audit [--repo PATH] PACKAGE...
+
+source commands:
+  sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
 
 root commands:
   root compose PLAN --store STORE --runtime-root PACKAGE... --output GENERATION
@@ -76,7 +80,6 @@ pure repo_help_text() -> Str {
   publish PLAN --store STORE
   checksum [--repo PATH] PACKAGE...
   update-checksums [--repo PATH] PACKAGE...
-  source-audit [--repo PATH] PACKAGE...
 
 targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
 """
@@ -86,6 +89,19 @@ pure repo_plan_help_text() -> Str {
   """usage: pm repo plan [--repo PATH] (--all | --root PACKAGE...) [--target TARGET] --output PLAN
 
 targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
+"""
+}
+
+pure sources_help_text() -> Str {
+  """usage: pm sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
+
+Downloads every pinned upstream source the selected packages use on each
+target into the content-addressed source cache (LAPUTA_SOURCE_CACHE, default
+REPO/.cache/sources) and verifies its sha256. This is the only PM command that
+contacts upstream hosts; builds read the cache or the local mirror named by
+LAPUTA_MIRROR.
+
+targets: aarch64-linux-musl (default), x86_64-linux-musl
 """
 }
 
@@ -196,7 +212,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   let action = argv[1]
   let args = tail_after(argv, 2)
 
-  if action not in ["check", "plan", "show", "build", "publish", "checksum", "update-checksums", "source-audit"] {
+  if action not in ["check", "plan", "show", "build", "publish", "checksum", "update-checksums"] {
     return Err(types.PmError.Usage(f"unknown pm repo command ${action}"))
   }
 
@@ -278,9 +294,56 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     }
     "checksum" => return RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
     "update-checksums" => return RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
-    "source-audit" => return RepoSourceAudit(parse_repo_packages(args, "pm repo source-audit")?)
     _ => return Err(types.PmError.Usage(f"unknown pm repo command ${action}"))
   }
+}
+
+proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
+  if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
+    return Help(sources_help_text())
+  }
+
+  if argv[1] != "fetch" {
+    return Err(types.PmError.Usage(f"unknown pm sources command ${argv[1]}"))
+  }
+
+  let args = tail_after(argv, 2)
+
+  if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
+    return Help(sources_help_text())
+  }
+
+  var parsed: SourcesFetchOptions = {repo: "", all: false, packages: [], targets: []}
+  match cli.parse(
+    args,
+    {
+      repo: {form: "--repo PATH", default: ""},
+      all: {form: "--all", default: false},
+      targets: {form: "--target TARGET", repeated: true},
+      packages: {form: "...PACKAGE"},
+    },
+    "pm sources fetch",
+  ) {
+    Ok(value) => parsed = value
+    Err(problem) => return Err(problem)
+  }
+
+  if parsed.all == (parsed.packages.len() > 0) {
+    return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
+  }
+
+  let names = if parsed.targets.len() == 0 { ["aarch64-linux-musl"] } else { parsed.targets }
+  var targets: List[types.Target] = []
+
+  for name in names {
+    let target = types.parse_target(name)?
+
+    if target not in targets {
+      targets = targets.push(target)
+    }
+  }
+
+  SourcesFetch({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, packages: parsed.packages, targets})
 }
 
 proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
@@ -373,6 +436,7 @@ proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
 
   match argv[0] {
     "repo" => parse_repo_command(argv)?
+    "sources" => parse_sources_command(argv)?
     "root" => parse_root_command(argv)?
     "store" => parse_store_command(argv)?
     _ => return Err(types.PmError.Usage(f"unknown pm command ${argv[0]}"))
@@ -460,22 +524,16 @@ proc cli_executor_identity(repo_root: Path) [fs, process, env, error] -> Result[
   }
 }
 
+# Planning is offline unless XSH_PM_REPO names a package repository; offline
+# plans record the digest of an empty index.
 proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) [fs, net, env, time, error] -> Result[types.RemoteSnapshot] {
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
-  let offline = (env.get("XSH_PM_OFFLINE") ?? "") == "1"
-  let urls = remote.load_repo_urls()?
+  let repo_url = remote.repo_url()
 
-  if cache.exists()? {
-    index = remote.load_cached_remote_index(cache_root)?
-  } else if ! offline {
-    for endpoint in [urls.public_repo, urls.repo] {
-      continue when endpoint == ""
-      let fetched = remote.load_remote_index_from_repo(endpoint, cache_root)?
-
-      for entry in fetched {
-        index = remote.upsert_remote_package(index, entry)?
-      }
+  if repo_url != "" {
+    for entry in remote.load_remote_index_from_repo(repo_url, cache_root)? {
+      index = remote.upsert_remote_package(index, entry)?
     }
 
     remote.write_remote_index_cache(cache_root, index)?
@@ -486,7 +544,7 @@ proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) [fs, net, 
 
   for entry in index {
     continue unless entry.arch == types.pm_target_arch(target)
-    packages = packages.push(remote.plan_artifact_from_package_at_repo(entry, urls.repo, cache_root)?)
+    packages = packages.push(remote.plan_artifact_from_package_at_repo(entry, repo_url, cache_root)?)
   }
 
   {target, index_sha256, packages}
@@ -552,40 +610,69 @@ proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error
   if value.target == types.target_x86_64() and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
   }
-  let urls = remote.load_repo_urls()?
-  let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, urls.repo, args.jobs)?
+  let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, remote.repo_url(), args.jobs)?
   print "repo" "build" $result.plan_sha256 $result.artifacts.len() "artifacts"
 }
 
 proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
   let value = pm_plan_json.read(args.input)?
   let snapshot = repo.snapshot(value, args.store)?
-  let urls = remote.require_repo_url()?
+  let repo_url = remote.repo_url()
+
+  if repo_url == "" {
+    return Err(types.PmError.RemoteRepo("pm repo publish needs XSH_PM_REPO, for example http://127.0.0.1:3000 for the local mirror"))
+  }
+
   let work_handle = fs.tempdir()?
   defer work_handle.close()?
   let token = (env.get("LAPUTA_TOKEN") ?? "").trim()
-  repo.publish(snapshot, urls.repo, token, work_handle.host_path()?)?
+  repo.publish(snapshot, repo_url, token, work_handle.host_path()?)?
   print "repo" "publish" $value.plan_sha256 $snapshot.packages.len() "artifacts"
 }
 
 proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, process, env, time, error] {
-  let work_handle = fs.tempdir()?
-  defer work_handle.close()?
-  let work = work_handle.host_path()?
+  let cache_root = sources.source_cache_root(args.repo)?
 
   for pkg in selected_packages(args.repo, args.packages)? {
     if update {
-      local.update_package_checksums(work, pkg)?
+      local.update_package_checksums(cache_root, pkg)?
     } else {
-      local.print_package_checksums(work, pkg)?
+      local.print_package_checksums(cache_root, pkg)?
     }
   }
 }
 
-proc command_repo_source_audit(args: RepoPackagesArgs) [fs, env, error] {
-  # Source mirrors remain an explicit repository cache; this command neither resolves
-  # packages nor mutates a root generation.
-  sources.audit_source_mirrors(fp"${args.repo}/.out", selected_packages(args.repo, args.packages)?)?
+proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
+  let cache_root = sources.source_cache_root(args.repo)?
+  var items: List[sources.SourceFetchItem] = []
+  var seen: List[Str] = []
+
+  for target in args.targets {
+    let value = catalog.load_for_target(args.repo, target)?
+    let by_name = catalog.package_map(value)
+    var selected: List[types.Package] = []
+
+    if args.all {
+      selected = value.packages
+    } else {
+      for name in args.packages {
+        if ! (name in by_name) {
+          return Err(types.PmError.MissingDependency(f"package ${name} is not in ${args.repo}"))
+        }
+
+        selected = selected.push(by_name.get(name)?.require(types.Package)?)
+      }
+    }
+
+    for item in sources.source_fetch_items(selected, types.pm_target_arch(target))? {
+      if item.sha256 not in seen {
+        items = items.push(item)
+        seen = seen.push(item.sha256)
+      }
+    }
+  }
+
+  sources.fetch_sources(cache_root, items)?
 }
 
 proc command_root_compose(args: RootComposeArgs) [fs, error] {
@@ -632,7 +719,7 @@ proc handle(command: PmCommand) [fs, net, process, env, time, error] {
     RepoPublish(args) => command_repo_publish(args)?
     RepoChecksum(args) => command_repo_checksums(args, false)?
     RepoUpdateChecksums(args) => command_repo_checksums(args, true)?
-    RepoSourceAudit(args) => command_repo_source_audit(args)?
+    SourcesFetch(args) => command_sources_fetch(args)?
     RootCompose(args) => command_root_compose(args)?
     RootInspect(args) => command_root_inspect(args)?
     StoreVerify(args) => command_store_verify(args)?

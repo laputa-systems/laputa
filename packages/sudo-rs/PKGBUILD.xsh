@@ -1,7 +1,7 @@
 ##! Package recipe metadata and build operations.
 use pm.util as pm_util
 
-error SudoRsBuildError = MissingRustStd(path: Str)
+error SudoRsBuildError = MissingRustStd(path: Str) | MissingVendoredCrate(name: Str)
 
 ## Package recipe export.
 export let name = "sudo-rs"
@@ -19,8 +19,15 @@ export let rel = "16"
 export let deps = ["linux-pam", "gnu-stubs", "musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam", "ca-certificates"]
+export let mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam"]
 
+# The build is offline: every crate sudo-rs's shipped Cargo.lock pins is an
+# upstream source of its own, cached by `make fetch` and staged under vendor/,
+# and cargo reads that directory instead of crates.io. The crate entries are
+# exactly the `[[package]]` records with a `checksum` in the sudo-rs crate's
+# Cargo.lock (crates.io serves each `.crate` with that sha256), so they are what
+# `cargo vendor --locked` would produce. After a version bump, list the new
+# Cargo.lock's records here.
 ## Package recipe export.
 export let upstream_sources = [
   {
@@ -37,6 +44,40 @@ export let upstream_sources = [
       {
         arch: "x86_64",
         sha256: "3537fb3bdef870cacb354892e3fc76af7775e691570d49b402295c8fbef3656b",
+      },
+    ],
+  },
+  {
+    source: p"https://static.crates.io/crates/glob/glob-0.3.3.crate => vendor/glob-0.3.3",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "aarch64",
+        sha256: "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280",
+      },
+      {
+        arch: "x86_64",
+        sha256: "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280",
+      },
+    ],
+  },
+  {
+    source: p"https://static.crates.io/crates/libc/libc-0.2.183.crate => vendor/libc-0.2.183",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "aarch64",
+        sha256: "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d",
+      },
+      {
+        arch: "x86_64",
+        sha256: "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d",
       },
     ],
   },
@@ -109,6 +150,52 @@ proc stage_rustlib(source: Path, dest: Path) [fs, error] {
   }
 }
 
+type LockedCrate = {name: Str, version: Str, checksum: Str}
+
+# Reads the registry packages from Cargo.lock. Its `[[package]]` records are
+# flat `key = "value"` lines, so no TOML parser is needed.
+proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate]] {
+  var crates: List[LockedCrate] = []
+  var current: LockedCrate = {name: "", version: "", checksum: ""}
+
+  for raw in lockfile.read_text()?.lines().push("[[package]]") {
+    let line = raw.trim()
+
+    if line == "[[package]]" {
+      if current.checksum != "" {
+        crates = crates.push(current)
+      }
+
+      current = {name: "", version: "", checksum: ""}
+    } else if let [_, key, value] = rx"""^(name|version|checksum) = "([^"]*)"$""".captures(line) {
+      if key == "name" {
+        current = {...current, name: value}
+      } else if key == "version" {
+        current = {...current, version: value}
+      } else {
+        current = {...current, checksum: value}
+      }
+    }
+  }
+
+  crates
+}
+
+# Cargo's directory sources require `.cargo-checksum.json` beside each crate;
+# its `package` digest must match the Cargo.lock checksum, and an empty `files`
+# map skips per-file verification of the already sha256-verified crate.
+proc mark_vendored_crates(lockfile: Path, vendor: Path) [fs, error] {
+  for item in locked_registry_crates(lockfile)? {
+    let dir = fp"${vendor}/${item.name}-${item.version}"
+
+    if ! fs.exists(fp"${dir}/Cargo.toml")? {
+      return Err(SudoRsBuildError.MissingVendoredCrate(f"${item.name}-${item.version}"))
+    }
+
+    json.write(fp"${dir}/.cargo-checksum.json", {files: {}, package: item.checksum})?
+  }
+}
+
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let cargo = process.which("cargo")?
@@ -151,6 +238,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let aarch64_linker = if triple == "aarch64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
   let x86_64_linker = if triple == "x86_64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
+  mark_vendored_crates(p"Cargo.lock", p"vendor")?
   let current_path = env.get("PATH") ?? ""
   let cargo_path = f"${host_cc.parent}:${current_path}"
 
@@ -163,9 +251,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64_linker,
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: aarch64_rustflags,
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: x86_64_rustflags,
-    SSL_CERT_FILE: "/etc/ssl/certs/ca-certificates.crt",
   }) {
-    run $cargo build "--release" "--target" $triple "--bin" "sudo" "--bin" "su" ?
+    run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "sudo" "--bin" "su" ?
   } ?
 
   fs.install(fp"target/${triple}/release/sudo", fp"${dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)?

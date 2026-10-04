@@ -35,10 +35,14 @@ each recipe's capabilities. A missing optional hook remains a no-op; a present
 hook with incompatible parameters, result, export kind, or capabilities is
 rejected before invocation.
 
-`upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`,
-`directory`, or `git` materialization. A `SKIP` checksum is accepted only for a
-relative repository-local source. Source preparation is part of the package
-build identity.
+`upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`, or
+`directory` materialization. A URL source pins a sha256 per architecture; a
+`SKIP` checksum is accepted only for a relative repository-local source. Source
+strings may name the whole-word placeholders `VERSION`, `RELEASE`, `MAJOR`,
+`MINOR`, `PATCH`, `IDENT`, `PACKAGE`, `ARCH`, `GOARCH`, and their
+`TARGET_`/`BUILD_` forms (`pm/util.xsh::expand_source`); a word that merely
+contains one, such as `PATCHES`, is left alone. Source preparation is part of
+the package build identity.
 
 ## Commands
 
@@ -51,7 +55,7 @@ pm repo build PLAN --store STORE [-j N|--jobs N]
 pm repo publish PLAN --store STORE
 pm repo checksum [--repo PATH] PACKAGE...
 pm repo update-checksums [--repo PATH] PACKAGE...
-pm repo source-audit [--repo PATH] PACKAGE...
+pm sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
 
 pm root compose PLAN \
   --store STORE \
@@ -62,7 +66,9 @@ pm store verify --store STORE
 pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 ```
 
-`repo plan` is the only resolution boundary. It records the target, typed
+`repo plan` is the only resolution boundary. It is offline unless
+`XSH_PM_REPO` names a package repository (the local mirror, for example
+`http://127.0.0.1:3000`, or a `file://` tree); there is no default remote. It records the target, typed
 dependency graph, remote retrieval identity, build/proof inputs, executor
 identity, action reasons, and sorted artifact keys in an atomically written
 plan. `aarch64-linux-musl` remains the default build target.
@@ -83,8 +89,10 @@ never a plan or artifact key.
 
 `repo publish` selects the completed plan nodes from verified receipts, uploads
 immutable payload, metadata, and proof objects, then updates the index last.
-For network repositories it reads `LAPUTA_TOKEN` from the process environment;
-PM does not store credentials. `file://` repositories need no token.
+It publishes to `XSH_PM_REPO`. `file://` trees and the loopback local mirror
+(`http://127.0.0.1[:PORT]`, `http://localhost[:PORT]`) need no token and are
+sent none; any other remote needs `LAPUTA_TOKEN` from the process environment.
+PM does not store credentials.
 
 `root compose` selects only typed runtime edges from the saved plan and writes
 an immutable generation receipt. It never installs into a live root. `root
@@ -101,11 +109,23 @@ runtime closure and binds the overlay digest into its identity.
 typed plan before `compose` uses it; the saved plan must match the BuildPlan and
 overlay used for execution.
 
-## Source Mirrors
+## Sources
 
-Packages may keep source mirrors in a repository `.out/source-mirrors` cache.
-`repo source-audit` verifies that cache for its explicitly named packages.
-`source_mirror: false` keeps an input private to execution.
+URL sources are content-addressed. `pm sources fetch` (`make fetch`, with
+`ARCH=x86_64` for the other target) is the only command that contacts upstream
+hosts: it downloads every pinned URL source of the selected packages into
+`LAPUTA_SOURCE_CACHE` (default `.cache/sources`) as `sha256/<hash>`, at most four
+at a time with retries, verifies each digest before the entry appears, skips
+entries already present, and fails after reporting every dead URL and checksum
+mismatch. The local mirror serves the same layout at `/sources/sha256/<hash>`.
+
+A build resolves a URL source from that cache, else from
+`${LAPUTA_MIRROR}/sources/sha256/<hash>` (verified, then added to the cache),
+else it fails and names the missing source. Builds locate the cache through
+`LAPUTA_SOURCE_CACHE` or `XSH_PM_REPOSITORY_ROOT`. Artifact keys hash the
+recipe's source string and checksum, never where the bytes came from.
+`repo checksum` and `repo update-checksums` read upstream directly to compute new
+pins and add those bytes to the cache.
 
 ## Catalog and graph
 

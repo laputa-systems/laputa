@@ -58,7 +58,7 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   let stage_root = test.temp_dir(ctx, name: "linux-config-stage")?
   let source = fp"${stage_root}/source"
   fs.mkdir(source)?
-  sources.stage_package_sources(stage_root, {...original, upstream_sources: [config]}, source, true)?
+  sources.stage_package_sources({...original, upstream_sources: [config]}, source)?
   let staged = fp"${source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
   test.ok(staged.exists()?)?
 
@@ -90,7 +90,7 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
   let stage_root = test.temp_dir(ctx, name: "linux-x86-generated-inputs")?
   let source = fp"${stage_root}/source"
   fs.mkdir(source)?
-  sources.stage_package_sources(stage_root, {...original, upstream_sources: local_sources}, source, false)?
+  sources.stage_package_sources({...original, upstream_sources: local_sources}, source)?
 
   for name in required {
     test.ok(fs.exists(fp"${source}/${name}")?, f"missing staged ${name}")?
@@ -114,7 +114,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
     # `pkg.dir` intentionally points at an isolated recipe copy. Repository
     # inputs must still stage from the explicit repository root, not parent
     # traversal from that directory.
-    sources.stage_package_sources(root, pkg, source, false)?
+    sources.stage_package_sources(pkg, source)?
   } ?
 
   test.ok(fs.exists(fp"${source}/pm.xsh")?)?
@@ -130,7 +130,7 @@ test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, n
   let source = fp"${root}/source"
   fs.mkdir(source)?
 
-  sources.stage_package_sources(root, pkg, source, false)?
+  sources.stage_package_sources(pkg, source)?
 
   test.ok(fs.exists(fp"${source}/etc/passwd")?)?
   test.ok(fs.exists(fp"${source}/usr/lib/init/rc.boot")?)?
@@ -153,7 +153,7 @@ test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, p
   let source = fp"${root}/source"
   let dest = fp"${root}/dest"
   fs.mkdir(source)?
-  sources.stage_package_sources(root, pkg, source, false)?
+  sources.stage_package_sources(pkg, source)?
   recipe.call_build(pkg, source, dest)?
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
@@ -167,7 +167,7 @@ test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, proces
   let source = fp"${root}/source"
   let dest = fp"${root}/dest"
   fs.mkdir(source)?
-  sources.stage_package_sources(root, pkg, source, false)?
+  sources.stage_package_sources(pkg, source)?
   recipe.call_build(pkg, source, dest)?
 
   for hook in ["if-pre-up.d", "if-up.d", "if-down.d", "if-pre-down.d", "if-post-down.d"] {
@@ -190,7 +190,7 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
   let _ = fs.copy_tree(p"packages/baselayout", recipe_dir, parents: true, overwrite: true)?
   fs.mkdir(source)?
   let pkg = recipe.load_package(recipe_dir)?
-  sources.stage_package_sources(root, pkg, source, false)?
+  sources.stage_package_sources(pkg, source)?
   pm_build.build_prepared_package(recipe_dir, source, dest, archive_path)?
 
   if !fs.exists(fp"${dest}/dev")? {
