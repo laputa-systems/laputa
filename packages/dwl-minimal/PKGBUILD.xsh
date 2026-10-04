@@ -27,7 +27,7 @@ export const mkdeps_host = [
   "wlroots0.19-mesa",
   "pixman-dev",
   "libdrm",
-  "mesa-minimal",
+  "mesa",
   "libxkbcommon",
   "libinput",
 ]
