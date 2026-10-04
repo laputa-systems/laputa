@@ -9,10 +9,10 @@ export const name = "libevent"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.1.12-stable"
+export const ver = "2.1.13-stable"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "92e6de1be9ec176428fd2367677e61ceffc2ee1cb119035037a27d346b0403bb",
+        sha256: "f7e9383b8c0baa81b687e5b5eecc01beefaf1b19b64151d95ed61647fe7a315c",
       },
     ],
   },
@@ -188,7 +188,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libevent-2.1.so.7.0.1",
+    path: p"usr/lib/libevent-2.1.so.7.0.2",
     kind: "binary",
   },
   {
@@ -204,7 +204,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libevent_core-2.1.so.7.0.1",
+    path: p"usr/lib/libevent_core-2.1.so.7.0.2",
     kind: "binary",
   },
   {
@@ -220,7 +220,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libevent_extra-2.1.so.7.0.1",
+    path: p"usr/lib/libevent_extra-2.1.so.7.0.2",
     kind: "binary",
   },
   {
@@ -236,7 +236,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libevent_pthreads-2.1.so.7.0.1",
+    path: p"usr/lib/libevent_pthreads-2.1.so.7.0.2",
     kind: "binary",
   },
   {
@@ -282,7 +282,7 @@ proc create_unversioned_links() [fs, error] {
   let libdir = p"build/lib"
 
   for library_name in ["event_core", "event_extra", "event_pthreads", "event"] {
-    fs.symlink(fp"lib{library_name}-2.1.so.7.0.1", fp"{libdir}/lib{library_name}.so")?
+    fs.symlink(fp"lib{library_name}-2.1.so.7.0.2", fp"{libdir}/lib{library_name}.so")?
   }
 }
 
