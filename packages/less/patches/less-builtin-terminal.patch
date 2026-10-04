@@ -1,0 +1,845 @@
+--- /dev/null
++++ b/defines.h
+@@ -0,0 +1,150 @@
++/* Checked-in macOS/Linux definition file for less. */
++
++#ifndef LESS_DEFINES_H
++#define LESS_DEFINES_H
++
++#ifndef SECURE_COMPILE
++#define SECURE_COMPILE 0
++#endif
++
++#define SECURE          SECURE_COMPILE
++#define SHELL_ESCAPE    (!SECURE)
++#define EXAMINE         (!SECURE)
++#define TAB_COMPLETE_FILENAME (!SECURE)
++#define CMD_HISTORY     1
++#define HILITE_SEARCH   1
++#define EDITOR          (!SECURE)
++#define TAGS            (!SECURE)
++#define USERFILE        (!SECURE)
++#define GLOB            0
++#define PIPEC           (!SECURE && HAVE_POPEN)
++#define LOGFILE         (!SECURE)
++#define OSC8_LINK       1
++#define GNU_OPTIONS     1
++#define ONLY_RETURN     0
++
++#define LESSKEYFILE             ".less"
++#define LESSKEYFILE_SYS         SYSDIR "/sysless"
++#define DEF_LESSKEYINFILE       ".lesskey"
++#define LESSKEYINFILE_SYS       SYSDIR "/syslesskey"
++#define LESSHISTFILE            ".lesshst"
++
++#define MSDOS_COMPILER  0
++#define OS2             0
++#define PATHNAME_SEP    "/"
++
++#define HAVE_ANSI_PROTOS 1
++#define HAVE_CONST      1
++#define HAVE_VOID       1
++#define HAVE_TIME_T     1
++#define HAVE_SYS_TYPES_H 1
++#define HAVE_STDIO_H    1
++#define HAVE_FCNTL_H    1
++#define HAVE_UNISTD_H   1
++#define HAVE_CTYPE_H    1
++#define HAVE_LIMITS_H   1
++#define HAVE_STDINT_H   1
++#define HAVE_STDLIB_H   1
++#define HAVE_STRING_H   1
++#define HAVE_ERRNO_H    1
++#define HAVE_TIME_H     1
++#define HAVE_SYS_WAIT_H 1
++#define HAVE_SYS_IOCTL_H 1
++#define HAVE_TERMIOS_H  1
++#define HAVE_TERMIOS_FUNCS 1
++#define HAVE_TERMIO_H   0
++#define HAVE_SGSTAT_H   0
++#define HAVE_SYS_STREAM_H 0
++#define HAVE_SYS_PTEM_H 0
++#define HAVE_VALUES_H   0
++
++#define HAVE_PERROR     1
++#define HAVE_TIME       1
++#define HAVE_SHELL      1
++#define HAVE_DUP        1
++#define HAVE_MEMCPY     1
++#define HAVE_STRCHR     1
++#define HAVE_STRSTR     1
++#define HAVE_LESSKEYSRC 1
++#define HAVE_SNPRINTF   1
++#define HAVE_FILENO     1
++#define HAVE_STRERROR   1
++#define HAVE_ERRNO      1
++#define HAVE_SETTABLE_ERRNO 1
++#define HAVE_LOCALE     1
++#define HAVE_UPPER_LOWER 1
++#define HAVE_STAT       1
++#define HAVE_STAT_INO   1
++#define HAVE_FCHMOD     1
++#define HAVE_FSYNC      1
++#define HAVE_NANOSLEEP  1
++#define HAVE_POLL       1
++#define HAVE_POPEN      1
++#define HAVE_REALPATH   1
++#define HAVE_SIGPROCMASK 1
++#define HAVE_SIGEMPTYSET 1
++#define HAVE_SIGSETJMP  1
++#define HAVE_SIGSET_T   1
++#define HAVE_STRSIGNAL  1
++#define HAVE_SYSTEM     1
++#define HAVE_TTYNAME    1
++#define HAVE_USLEEP     1
++#define HAVE__SETJMP    1
++
++#if defined(__APPLE__)
++#define HAVE_SIGSETMASK 1
++#else
++#define HAVE_SIGSETMASK 0
++#endif
++
++#if defined(__has_include)
++#if __has_include(<stdckdint.h>)
++#define HAVE_STDCKDINT_H 1
++#else
++#define HAVE_STDCKDINT_H 0
++#endif
++#else
++#define HAVE_STDCKDINT_H 0
++#endif
++
++#define HAVE_WCTYPE     0
++#define HAVE_SYS_ERRLIST 0
++#define MUST_DEFINE_ERRNO 0
++
++#define HAVE_POSIX_REGCOMP 1
++#define HAVE_GNU_REGEX  0
++#define HAVE_PCRE       0
++#define HAVE_PCRE2      0
++#define HAVE_RE_COMP    0
++#define HAVE_REGCMP     0
++#define HAVE_V8_REGCOMP 0
++#define HAVE_REGEXEC2   0
++#define NO_REGEX        0
++
++#define HAVE_TERMINFO   0
++#define HAVE_TPARM2     0
++#define HAVE_TPARM8     0
++#define HAVE_TPARM9     0
++#define HAVE_TERMCAP_H  0
++#define HAVE_NCURSES_TERMCAP_H 0
++#define HAVE_NCURSESW_TERMCAP_H 0
++#define HAVE_OSPEED     0
++#define MUST_DEFINE_OSPEED 0
++#define USE_TERMCAP     0
++#define USE_TERMINFO    0
++
++#define EDIT_PGM        "vi"
++#define DEF_METACHARS   "; *?\t\n'\"()<>[]|&^`#\\$%=~{},"
++#define DEF_METAESCAPE  "\\"
++#define CMDBUF_SIZE     2048
++#define UNGOT_SIZE      200
++#define LINEBUF_SIZE    1024
++#define OUTBUF_SIZE     1024
++#define PROMPT_SIZE     2048
++#define TERMSBUF_SIZE   1024
++#define TAGLINE_SIZE    1024
++#define TABSTOP_MAX     128
++#define LINENUM_POOL    1024
++#define RETSIGTYPE      void
++
++#endif
+--- a/main.c
++++ b/main.c
+@@ -196,6 +196,9 @@
+ 	if (!isnullenv(str))
+ 		secure_allow_features &=~ parse_csl_bitmap(str,
+ 		    security_features, countof(security_features), "LESSSECURE_DISALLOW");
++#if !GLOB
++	secure_allow_features &= ~SF_GLOB;
++#endif
+ #endif
+ }
+ 
+--- a/output.c
++++ b/output.c
+@@ -479,7 +479,7 @@
+ 
+ /*
+  * Output a character.
+- * ch is int for compatibility with tputs.
++ * ch is int for compatibility with terminal output callbacks.
+  */
+ public int putchr(int ch)
+ {
+--- a/screen.c
++++ b/screen.c
+@@ -10,7 +10,7 @@
+ 
+ /*
+  * Routines which deal with the characteristics of the terminal.
+- * Uses termcap to be as terminal-independent as possible.
++ * Uses built-in xterm-compatible capabilities on Unix-like systems.
+  */
+ 
+ #include "less.h"
+@@ -68,38 +68,6 @@
+ #endif
+ #endif
+ 
+-#if HAVE_TERMINFO && !USE_TERMCAP
+-#define USE_TERMINFO 1
+-#endif
+-
+-#if USE_TERMINFO
+-#include <curses.h>
+-#include <term.h>
+-#if HAVE_TPARM2
+-#define LTPARM2(s,p1,p2) tparm(s, p1, p2)
+-#else
+-#if HAVE_TPARM8
+-#define LTPARM2(s,p1,p2) tparm(s, p1, p2, 0, 0, 0, 0, 0, 0)
+-#else
+-#if HAVE_TPARM9
+-#define LTPARM2(s,p1,p2) tparm(s, p1, p2, 0, 0, 0, 0, 0, 0, 0)
+-#else
+-#endif
+-#endif
+-#endif
+-#else
+-#if HAVE_NCURSESW_TERMCAP_H
+-#include <ncursesw/termcap.h>
+-#else
+-#if HAVE_NCURSES_TERMCAP_H
+-#include <ncurses/termcap.h>
+-#else
+-#if HAVE_TERMCAP_H
+-#include <termcap.h>
+-#endif
+-#endif
+-#endif
+-#endif
+ #ifdef _OSK
+ #include <signal.h>
+ #endif
+@@ -217,29 +185,9 @@
+ #else
+ 
+ /*
+- * These two variables are sometimes defined in,
+- * and needed by, the termcap library.
+- */
+-#if USE_TERMINFO
+-#undef HAVE_OSPEED
+-#else
+-#if MUST_DEFINE_OSPEED
+-extern short ospeed;    /* Terminal output baud rate */
+-extern char PC;         /* Pad character */
+-#endif
+-#ifdef _OSK
+-short ospeed;
+-char PC_, *UP, *BC;
+-#endif
+-#endif
+-
+-/*
+- * Strings passed to tputs() to do various terminal functions.
++ * Strings used to do various terminal functions.
+  */
+ static constant char
+-#if HAVE_OSPEED
+-	*sc_pad,                /* Pad string */
+-#endif
+ 	*sc_home,               /* Cursor home */
+ 	*sc_addline,            /* Add line, scroll down following lines */
+ 	*sc_lower_left,         /* Cursor to last line, first column */
+@@ -449,66 +397,6 @@
+ 				save_term = s;
+ 				saved_term = TRUE;
+ 			}
+-#if HAVE_OSPEED
+-			switch (cfgetospeed(&s))
+-			{
+-#ifdef B0
+-			case B0: ospeed = 0; break;
+-#endif
+-#ifdef B50
+-			case B50: ospeed = 1; break;
+-#endif
+-#ifdef B75
+-			case B75: ospeed = 2; break;
+-#endif
+-#ifdef B110
+-			case B110: ospeed = 3; break;
+-#endif
+-#ifdef B134
+-			case B134: ospeed = 4; break;
+-#endif
+-#ifdef B150
+-			case B150: ospeed = 5; break;
+-#endif
+-#ifdef B200
+-			case B200: ospeed = 6; break;
+-#endif
+-#ifdef B300
+-			case B300: ospeed = 7; break;
+-#endif
+-#ifdef B600
+-			case B600: ospeed = 8; break;
+-#endif
+-#ifdef B1200
+-			case B1200: ospeed = 9; break;
+-#endif
+-#ifdef B1800
+-			case B1800: ospeed = 10; break;
+-#endif
+-#ifdef B2400
+-			case B2400: ospeed = 11; break;
+-#endif
+-#ifdef B4800
+-			case B4800: ospeed = 12; break;
+-#endif
+-#ifdef B9600
+-			case B9600: ospeed = 13; break;
+-#endif
+-#ifdef EXTA
+-			case EXTA: ospeed = 14; break;
+-#endif
+-#ifdef EXTB
+-			case EXTB: ospeed = 15; break;
+-#endif
+-#ifdef B57600
+-			case B57600: ospeed = 16; break;
+-#endif
+-#ifdef B115200
+-			case B115200: ospeed = 17; break;
+-#endif
+-			default: ;
+-			}
+-#endif
+ 			erase_char = s.c_cc[VERASE];
+ #ifdef VERASE2
+ 			erase2_char = s.c_cc[VERASE2];
+@@ -595,9 +483,6 @@
+ 			save_term = s;
+ 			saved_term = TRUE;
+ 		}
+-#if HAVE_OSPEED
+-		ospeed = s.c_cflag & CBAUD;
+-#endif
+ 		erase_char = s.c_cc[VERASE];
+ 		kill_char = s.c_cc[VKILL];
+ #ifdef VWERASE
+@@ -649,9 +534,6 @@
+ 			save_term = s;
+ 			saved_term = TRUE;
+ 		}
+-#if HAVE_OSPEED
+-		ospeed = s.sg_ospeed;
+-#endif
+ 		erase_char = s.sg_erase;
+ 		kill_char = s.sg_kill;
+ 		werase_char = CONTROL('W');
+@@ -743,11 +625,132 @@
+ 
+ #if !MSDOS_COMPILER
+ 
+-/*
+- * Some glue to prevent calling termcap functions if tgetent() failed.
+- */
+ static lbool hardcopy;
+ 
++struct ltcap
++{
++	constant char *tiname;
++	constant char *tcname;
++	constant char *value;
++	int num;
++};
++
++static constant struct ltcap ltflags[] =
++{
++	{ "am",    "am", NULL, 1 },
++	{ "xenl",  "xn", NULL, 1 },
++	{ "bce",   "ut", NULL, 1 },
++	{ NULL,    NULL, NULL, 0 }
++};
++
++static constant struct ltcap ltnums[] =
++{
++	{ "xmc",   "sg", NULL, 0 },
++	{ NULL,    NULL, NULL, -1 }
++};
++
++/*
++ * xterm-256color's capabilities (ncurses terminfo.src), which foot, tmux,
++ * and the Linux console also accept. less sends smkx (application cursor
++ * mode) at startup, so cursor, Home, and End keys arrive in their SS3 form.
++ */
++static constant struct ltcap ltstrs[] =
++{
++	{ "clear", "cl", ESCS"[H" ESCS"[2J", -1 },
++	{ "el",    "ce", ESCS"[K", -1 },
++	{ "ed",    "cd", ESCS"[J", -1 },
++	{ "cup",   "cm", ESCS"[%i%p1%d;%p2%dH", -1 },
++	{ "home",  "ho", ESCS"[H", -1 },
++	{ "ll",    "ll", ESCS"[%i%p1%d;1H", -1 },
++	{ "cr",    "cr", "\r", -1 },
++	{ "il1",   "al", ESCS"[L", -1 },
++	{ "ri",    "sr", ESCS"M", -1 },
++	{ "smkx",  "ks", ESCS"[?1h" ESCS"=", -1 },
++	{ "rmkx",  "ke", ESCS"[?1l" ESCS">", -1 },
++	{ "smcup", "ti", ESCS"[?1049h" ESCS"[H", -1 },
++	{ "rmcup", "te", ESCS"[?1049l", -1 },
++	{ "flash", "vb", ESCS"[?5h" ESCS"[?5l", -1 },
++	{ "smso",  "so", ESCS"[7m", -1 },
++	{ "rmso",  "se", ESCS"[27m", -1 },
++	{ "smul",  "us", ESCS"[4m", -1 },
++	{ "rmul",  "ue", ESCS"[24m", -1 },
++	{ "bold",  "md", ESCS"[1m", -1 },
++	{ "blink", "mb", ESCS"[5m", -1 },
++	{ "sgr0",  "me", ESCS"[m", -1 },
++	{ "OTbc",  "bc", "\b", -1 },
++	{ "kent",  "@8", ESCS"OM", -1 },
++
++	{ "kcuf1", "kr", ESCS"OC", -1 },
++	{ "kcub1", "kl", ESCS"OD", -1 },
++	{ "kcuu1", "ku", ESCS"OA", -1 },
++	{ "kcud1", "kd", ESCS"OB", -1 },
++	{ "kpp",   "kP", ESCS"[5~", -1 },
++	{ "kPRV",  NULL, ESCS"[5;2~", -1 },
++	{ "kPRV5", NULL, ESCS"[5;5~", -1 },
++	{ "knp",   "kN", ESCS"[6~", -1 },
++	{ "kNXT",  NULL, ESCS"[6;2~", -1 },
++	{ "kNXT5", NULL, ESCS"[6;5~", -1 },
++	{ "khome", "kh", ESCS"OH", -1 },
++	{ "kend",  "@7", ESCS"OF", -1 },
++	{ "kich1", "kI", ESCS"[2~", -1 },
++	{ "kdch1", "kD", ESCS"[3~", -1 },
++	{ "kDC",   NULL, ESCS"[3;2~", -1 },
++	{ "kDC5",  NULL, ESCS"[3;5~", -1 },
++	{ "kbs",   "kb", "\177", -1 },
++	{ "kcbt",  "kB", ESCS"[Z", -1 },
++	{ "kHOM",  "#2", ESCS"[1;2H", -1 },
++	{ "kEND",  "#7", ESCS"[1;2F", -1 },
++	{ "kHOM5", NULL, ESCS"[1;5H", -1 },
++	{ "kEND5", NULL, ESCS"[1;5F", -1 },
++	{ "kRIT",  NULL, ESCS"[1;2C", -1 },
++	{ "kLFT",  NULL, ESCS"[1;2D", -1 },
++	{ "kUP",   NULL, ESCS"[1;2A", -1 },
++	{ "kDN",   NULL, ESCS"[1;2B", -1 },
++	{ "kRIT5", NULL, ESCS"[1;5C", -1 },
++	{ "kLFT5", NULL, ESCS"[1;5D", -1 },
++	{ "kUP5",  NULL, ESCS"[1;5A", -1 },
++	{ "kDN5",  NULL, ESCS"[1;5B", -1 },
++	{ "kf1",   "k1", ESCS"OP", -1 },
++	{ "ka1",   "K1", ESCS"Ow", -1 },
++	{ "ka2",   NULL, ESCS"Ox", -1 },
++	{ "ka3",   "K3", ESCS"Oy", -1 },
++	{ "kb1",   NULL, ESCS"Ot", -1 },
++	{ "kb2",   "K2", ESCS"Ou", -1 },
++	{ "kb3",   NULL, ESCS"Ov", -1 },
++	{ "kc1",   "K4", ESCS"Oq", -1 },
++	{ "kc2",   NULL, ESCS"Or", -1 },
++	{ "kc3",   "K5", ESCS"Os", -1 },
++	{ "kpMUL", NULL, ESCS"Oj", -1 },
++	{ "kpDIV", NULL, ESCS"Oo", -1 },
++	{ "kpSUB", NULL, ESCS"Om", -1 },
++	{ "kpADD", NULL, ESCS"Ok", -1 },
++	{ "kpDOT", NULL, ESCS"On", -1 },
++	{ "kpCMA", NULL, ESCS"Ol", -1 },
++	{ "kpZRO", NULL, ESCS"Op", -1 },
++
++	{ "MOUSE_START", "MOUSE_START", ESCS"[?1000h" ESCS"[?1002h" ESCS"[?1006h", -1 },
++	{ "MOUSE_END", "MOUSE_END", ESCS"[?1006l" ESCS"[?1002l" ESCS"[?1000l", -1 },
++	{ "BRACKETED_PASTE_START", "BRACKETED_PASTE_START", ESCS"[?2004h", -1 },
++	{ "BRACKETED_PASTE_END", "BRACKETED_PASTE_END", ESCS"[?2004l", -1 },
++	{ "SUSPEND", "SUSPEND", "", -1 },
++	{ "RESUME", "RESUME", "", -1 },
++	{ NULL, NULL, NULL, -1 }
++};
++
++static int ltcap_name_eq(constant struct ltcap *cap, constant char *tiname, constant char *tcname)
++{
++	return ((tiname != NULL && cap->tiname != NULL && strcmp(tiname, cap->tiname) == 0) ||
++	        (tcname != NULL && cap->tcname != NULL && strcmp(tcname, cap->tcname) == 0));
++}
++
++static constant struct ltcap * find_ltcap(constant struct ltcap *caps, constant char *tiname, constant char *tcname)
++{
++	for (; caps->tiname != NULL || caps->tcname != NULL; caps++)
++		if (ltcap_name_eq(caps, tiname, tcname))
++			return caps;
++	return NULL;
++}
++
+ static constant char * ltget_env(constant char *tiname, constant char *tcname)
+ {
+ 	char envname[64];
+@@ -790,54 +793,41 @@
+ static int ltgetflag(constant char *tiname, constant char *tcname)
+ {
+ 	constant char *s;
++	constant struct ltcap *cap;
+ 
+ 	if ((s = ltget_env(tiname, tcname)) != NULL)
+ 		return (*s != '\0' && *s != '0');
+ 	if (hardcopy)
+ 		return (0);
+-#if USE_TERMINFO
+-	return tiname == NULL ? 0 : tigetflag(tiname);
+-#else
+-	return tcname == NULL ? 0 : tgetflag(tcname);
+-#endif
++	cap = find_ltcap(ltflags, tiname, tcname);
++	return (cap == NULL ? 0 : cap->num);
+ }
+ 
+ static int ltgetnum(constant char *tiname, constant char *tcname)
+ {
+ 	constant char *s;
++	constant struct ltcap *cap;
+ 
+ 	if ((s = ltget_env(tiname, tcname)) != NULL)
+ 		return (atoi(s));
+ 	if (hardcopy)
+ 		return (-1);
+-#if USE_TERMINFO
+-	return tiname == NULL ? -1 : tigetnum(tiname);
+-#else
+-	return tcname == NULL ? -1 : tgetnum(tcname);
+-#endif
++	cap = find_ltcap(ltnums, tiname, tcname);
++	return (cap == NULL ? -1 : cap->num);
+ }
+ 
+ static constant char * ltgetstr(constant char *tiname, constant char *tcname, char **pp)
+ {
+ 	constant char *s;
++	constant struct ltcap *cap;
++	(void) pp;
+ 
+ 	if ((s = ltget_env(tiname, tcname)) != NULL)
+ 		return (s);
+ 	if (hardcopy)
+ 		return (NULL);
+-#if USE_TERMINFO
+-	(void) pp;
+-	if (tiname == NULL)
+-		return (NULL);
+-	s = tigetstr(tiname);
+-	if (s == (constant char *)-1)
+-		s = NULL;
+-	return (s);
+-#else
+-	if (tcname == NULL)
+-		return (NULL);
+-	return tgetstr(tcname, pp);
+-#endif
++	cap = find_ltcap(ltstrs, tiname, tcname);
++	return (cap == NULL ? NULL : cap->value);
+ }
+ #endif /* MSDOS_COMPILER */
+ 
+@@ -1406,11 +1396,91 @@
+ #if !MSDOS_COMPILER
+ static constant char *ltgoto(constant char *cap, int col, int line)
+ {
+-#if USE_TERMINFO
+-	return LTPARM2(cap, line, col);
+-#else
+-	return tgoto(cap, col, line);
+-#endif
++	static char buf[64];
++	char *out = buf;
++	char *end = buf + sizeof(buf) - 1;
++	int params[2];
++	int next_param = 0;
++	int stack[4];
++	int sp = 0;
++	int curr = 0;
++
++	params[0] = line;
++	params[1] = col;
++	while (*cap != '\0' && out < end)
++	{
++		if (*cap != '%')
++		{
++			*out++ = *cap++;
++			continue;
++		}
++		cap++;
++		switch (*cap++)
++		{
++		case '\0':
++			cap--;
++			break;
++		case '%':
++			*out++ = '%';
++			break;
++		case 'i':
++			params[0]++;
++			params[1]++;
++			break;
++		case 'r':
++		{
++			int t = params[0];
++			params[0] = params[1];
++			params[1] = t;
++			break;
++		}
++		case 'p':
++			if (*cap >= '1' && *cap <= '2' && sp < (int) (sizeof(stack) / sizeof(stack[0])))
++				stack[sp++] = params[*cap++ - '1'];
++			break;
++		case 'd':
++		case '2':
++		case '3':
++		{
++			char num[INT_STRLEN_BOUND(int)];
++			int width = cap[-1] == '2' ? 2 : cap[-1] == '3' ? 3 : 0;
++			if (sp > 0)
++				curr = stack[--sp];
++			else if (next_param < 2)
++				curr = params[next_param++];
++			if (width > 0)
++				SNPRINTF2(num, sizeof(num), "%0*d", width, curr);
++			else
++				SNPRINTF1(num, sizeof(num), "%d", curr);
++			if (end - out > (int) strlen(num))
++			{
++				strcpy(out, num);
++				out += strlen(out);
++			}
++			break;
++		}
++		case '.':
++			if (sp > 0)
++				curr = stack[--sp];
++			else if (next_param < 2)
++				curr = params[next_param++];
++			*out++ = (char) curr;
++			break;
++		case '+':
++			if (sp > 0)
++				curr = stack[--sp];
++			else if (next_param < 2)
++				curr = params[next_param++];
++			if (*cap != '\0')
++				curr += *cap++;
++			*out++ = (char) curr;
++			break;
++		default:
++			break;
++		}
++	}
++	*out = '\0';
++	return (buf);
+ }
+ #endif /* MSDOS_COMPILER */
+ 
+@@ -1436,30 +1506,29 @@
+ #endif /* MSDOS_COMPILER */
+ 
+ #if !MSDOS_COMPILER
+-/*
+- * Return the cost of displaying a termcap string.
+- * We use the trick of calling tputs, but as a char printing function
+- * we give it inc_costcount, which just increments "costcount".
+- * This tells us how many chars would be printed by using this string.
+- */
+-static int costcount;
+-
+-/*ARGSUSED*/
+-static int inc_costcount(int c)
+-{
+-	costcount++;
+-	return (c);
+-}
+-
+ static int cost(constant char *t)
+ {
+-	costcount = 0;
+-	tputs(t, sc_height, inc_costcount);
+-	return (costcount);
++	int n = 0;
++	while (t != NULL && *t != '\0')
++	{
++		if (t[0] == '$' && t[1] == '<')
++		{
++			t += 2;
++			while (*t != '\0' && *t != '>')
++				t++;
++			if (*t == '>')
++				t++;
++		} else
++		{
++			n++;
++			t++;
++		}
++	}
++	return (n);
+ }
+ 
+ /*
+- * Return the "best" of the two given termcap strings.
++ * Return the "best" of the two given terminal strings.
+  * The best, if both exist, is the one with the lower 
+  * cost (see cost() function).
+  */
+@@ -1500,7 +1569,7 @@
+ }
+ 
+ /*
+- * Get terminal capabilities from termcap or terminfo.
++ * Get terminal capabilities from environment overrides or built-ins.
+  */
+ static void get_term_info(void)
+ {
+@@ -1508,47 +1577,19 @@
+ 	constant char *t2;
+ 	constant char *term;
+ 	char *sp;
+-	/*
+-	 * Some termcap libraries assume termbuf is static
+-	 * (accessible after tgetent returns).
+-	 */
+-#if USE_TERMINFO
+-	int err;
+-#else
+-	static char termbuf[TERMBUF_SIZE];
+-#endif
+ 	static char sbuf[TERMSBUF_SIZE];
+ 
+-#if OS2
+-	/*
+-	 * Make sure the termcap database is available.
+-	 */
+-	constant char *cp = lgetenv("TERMCAP");
+-	if (isnullenv(cp))
+-	{
+-		char *termcap;
+-		if ((sp = homefile("termcap.dat")) != NULL)
+-		{
+-			termcap = (char *) ecalloc(strlen(sp)+9, sizeof(char));
+-			sprintf(termcap, "TERMCAP=%s", sp);
+-			free(sp);
+-			putenv(termcap);
+-		}
+-	}
+-#endif
+ 	/*
+ 	 * Find out what kind of terminal this is.
+ 	 */
+ 	if ((term = lgetenv("TERM")) == NULL && (term = getenv("TERM")) == NULL)
+ 		term = DEFAULT_TERM;
++	(void) term;
+ 	hardcopy = FALSE;
+-#if USE_TERMINFO
+-	if (setupterm(term, -1, &err) != OK || err != 1)
+-		hardcopy = TRUE;
+-#else
+-	if (tgetent(termbuf, term) != TGETENT_OK)
++#if LESSTEST
++	if (is_lesstest())
+ 		hardcopy = TRUE;
+-#endif
++#endif /*LESSTEST*/
+ 	if (!hardcopy && ltgetflag("hc", "hc"))
+ 		hardcopy = TRUE;
+ 
+@@ -1559,7 +1600,7 @@
+ 	no_alt_screen = ltgetflag("nrrmc", "NR");
+ 
+ 	/*
+-	 * Assumes termcap variable "sg" is the printing width of:
++	 * Assumes "sg"/"xmc" is the printing width of:
+ 	 * the standout sequence, the end standout sequence,
+ 	 * the underline sequence, the end underline sequence,
+ 	 * the boldface sequence, and the end boldface sequence.
+@@ -1589,12 +1630,6 @@
+ 	 */
+ 	sp = sbuf;
+ 
+-#if HAVE_OSPEED
+-	sc_pad = ltgetstr("pad", "pc", &sp);
+-	if (sc_pad != NULL)
+-		PC = *sc_pad;
+-#endif
+-
+ 	sc_s_keypad = ltgetstr("smkx", "ks", &sp);
+ 	if (sc_s_keypad == NULL)
+ 		sc_s_keypad = "";
+@@ -1970,19 +2005,8 @@
+ #endif
+ 
+ #if !MSDOS_COMPILER
+-static void do_tputs(constant char *str, int affcnt, int (*f_putc)(int))
+-{
+-#if LESSTEST
+-	if (is_lesstest() && f_putc == putchr)
+-		putstr(str);
+-	else
+-#endif /*LESSTEST*/
+-		tputs(str, affcnt, f_putc);
+-}
+-
+ /*
+- * Like tputs but we handle $<...> delay strings here because
+- * some implementations of tputs don't perform delays correctly.
++ * Output a terminal string and handle termcap-style $<...> delay strings.
+  */
+ static void ltputs(constant char *str, int affcnt, int (*f_putc)(int))
+ {
+@@ -1991,33 +2015,26 @@
+ 		constant char *obrac = strstr(str, "$<");
+ 		if (obrac != NULL)
+ 		{
+-			char str2[64];
+ 			size_t slen = ptr_diff(obrac, str);
+-			if (slen < sizeof(str2))
++			int delay;
++			while (slen-- > 0)
++				(*f_putc)(*str++);
++			str += 2;
++			delay = lstrtoic(str, &str, 10);
++			if (*str == '*')
+ 			{
+-				int delay;
+-				/* Output first part of string (before "$<"). */
+-				memcpy(str2, str, slen);
+-				str2[slen] = '\0';
+-				do_tputs(str2, affcnt, f_putc);
+-				str += slen + 2;
+-				/* Perform the delay. */
+-				delay = lstrtoic(str, &str, 10);
+-				if (*str == '*')
+-					if (ckd_mul(&delay, delay, affcnt))
+-						delay = INT_MAX;
+-				flush();
+-				sleep_ms(delay);
+-				/* Skip past closing ">" at end of delay string. */
+-				str = strstr(str, ">");
+-				if (str != NULL)
+-					str++;
+-				continue;
++				if (ckd_mul(&delay, delay, affcnt))
++					delay = INT_MAX;
++				str++;
+ 			}
++			flush();
++			sleep_ms(delay);
++			str = strstr(str, ">");
++			if (str != NULL)
++				str++;
++			continue;
+ 		}
+-		/* Pass the rest of the string to tputs and we're done. */
+-		do_tputs(str, affcnt, f_putc);
+-		break;
++		(*f_putc)(*str++);
+ 	}
+ }
+ #endif /* MSDOS_COMPILER */

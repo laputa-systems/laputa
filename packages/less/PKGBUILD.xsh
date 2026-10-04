@@ -9,10 +9,10 @@ export const name = "less"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "701"
+export const ver = "710"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -20,11 +20,14 @@ export const deps = ["musl"]
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain"]
 
-# Source is a fixed GitHub commit archive (no VERSION substitution needed).
+# The release tarball ships help.c and funcs.h already generated from
+# less.hlp and the sources (upstream's mkhelp.pl and mkfuncs.pl), so the build
+# needs neither perl nor a generator. The patch replaces configure's
+# defines.h and the curses/termcap layer: see the patch's screen.c table.
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/less/archive/0f176037c66cdeb038b39b0b71d9c291363c26ec.tar.gz",
+    source: p"https://www.greenwoodsoftware.com/less/less-VERSION.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -32,7 +35,20 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "846a3b60efa6199bcab518d0934bd83bded678d97e58e8202b55ce7192377f69",
+        sha256: "d1008fb78dcae1323ddab664bcb352a61f022b1b131bd8018548e021d975ec7a",
+      },
+    ],
+  },
+  {
+    source: p"patches/less-builtin-terminal.patch",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "ad4237310671f963852624f172e1d4dbc8612add922be1cada5684a6906729e5",
       },
     ],
   },
@@ -45,54 +61,18 @@ export const filetree = [{path: p"usr/bin/less", kind: "binary"}, {path: p"usr/l
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let target_arch = pm_util.target_arch()?
-  let build_arch = pm_util.build_arch()?
   let triple = f"{target_arch}-linux-musl"
-  let build_triple = f"{build_arch}-linux-musl"
-  var build_cc = cc
-  let cross_build = build_arch != target_arch
-  var build_task_env: Record = {}
 
-  if cross_build {
-    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
-    build_cc = fp"{build_root}/usr/bin/cc"
-
-    build_task_env = {
-      XSH_MAKE_NATIVE_CROSS: "0",
-      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{env.get("PATH") ?? ""}",
-      LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
-    }
-  }
+  # Laputa ships no curses library: the patch adds a checked-in defines.h in
+  # place of configure's and gives screen.c built-in xterm-compatible
+  # capabilities (LESS_TERMCAP_* still overrides each one).
+  let _ = patch.apply(p".", fs.read_text(p"less-builtin-terminal.patch")?, 1)?
 
   let cflags = ["-O2"]
   let defs = ["-DBINDIR=\"/usr/bin\"", "-DLIBEXECDIR=\"/usr/libexec\"", "-DSYSDIR=\"/etc\"", "-DSECURE_COMPILE=0"]
   let includes = ["-I."]
-  fs.mkdir(p"obj")?
 
-  let buildgen = make.c_program({
-    cc: build_cc,
-    triple: build_triple,
-    cflags,
-    defs: [],
-    includes,
-    root: p".",
-    sources: [p"buildgen.c"],
-    out_dir: p"obj/buildgen-objs",
-    out: p"obj/buildgen",
-    libs: [],
-    ldflags: [],
-    deps: [],
-  })
-
-  var buildgen_tasks = buildgen.tasks
-
-  if cross_build {
-    buildgen_tasks = [{...task, env: build_task_env} for task in buildgen_tasks]
-  }
-
-  make.run_tasks(buildgen_tasks, make.jobs()?)?
-  let less_hlp = p"less.hlp"
-  fs.write(p"help.c", run.text $buildgen.output "help" < ${less_hlp}?)?
-
+  # Makefile.in's OBJ list with REGEX_O empty (POSIX regcomp from libc).
   let less_srcs = [
     p"main.c",
     p"screen.c",
@@ -113,6 +93,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"jump.c",
     p"line.c",
     p"linenum.c",
+    p"lmsg.c",
     p"lsystem.c",
     p"mark.c",
     p"optfunc.c",
@@ -129,17 +110,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"ttyin.c",
     p"version.c",
     p"xbuf.c",
+    p"lesskey_parse.c",
   ]
-
-  var funcs_input = ""
-
-  for src in less_srcs {
-    funcs_input = f"{funcs_input}{src.read_text()?}"
-  }
-
-  fs.write(p"obj/less-srcs.c", funcs_input)?
-  let funcs_input_path = p"obj/less-srcs.c"
-  fs.write(p"funcs.h", run.text $buildgen.output "funcs" < ${funcs_input_path}?)?
 
   let less = make.c_program({
     cc,
@@ -148,7 +120,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     defs,
     includes,
     root: p".",
-    sources: less_srcs.push(p"lesskey_parse.c"),
+    sources: less_srcs,
     out_dir: p"obj/less-objs",
     out: p"obj/less",
     libs: [],
