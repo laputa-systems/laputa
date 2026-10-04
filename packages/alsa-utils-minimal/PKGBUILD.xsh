@@ -14,10 +14,14 @@ export let ver = "1.2.15.2"
 export let rel = "10"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "alsa-lib", "libudev-zero"]
+export let deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "alsa-lib"]
+export let mkdeps_host = ["llvm-toolchain"]
+
+## The minimal tools are a libc-only stand-in (stdio and string only); the
+## ALSA stack they stand in for is a runtime selection, not a build input.
+export let runtime_only_deps = ["alsa-lib", "libudev-zero"]
 
 ## Exported declaration `upstream_sources`.
 export let upstream_sources = [

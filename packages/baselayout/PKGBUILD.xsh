@@ -17,6 +17,9 @@ export let deps = []
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
 
+## The init scripts and `getent` are XSH scripts; they need the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
+
 ## Exported declaration `upstream_sources`.
 export let upstream_sources = [
   {

@@ -21,6 +21,10 @@ export let deps = ["musl"]
 ## Host-side build dependencies.
 export let mkdeps_host = []
 
+## The compiler driver wrappers are XSH scripts; they need the `xsh` runner at
+## runtime. Build roots get `xsh` from the executor substrate instead.
+export let runtime_only_deps = ["xsh"]
+
 ## Preserve upstream binaries without stripping.
 export let nostrip = true
 

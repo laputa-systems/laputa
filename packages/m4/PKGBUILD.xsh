@@ -17,6 +17,9 @@ export let deps = ["musl"]
 ## Package recipe export.
 export let mkdeps_host = []
 
+## `/usr/bin/m4` is an XSH script; it needs the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
+
 # m4 is implemented in pure XSH — no tarball, no compilation.
 ## Package recipe export.
 export let upstream_sources = [

@@ -21,12 +21,13 @@ export let mkdeps_host = []
 
 ## Package recipe export.
 ## The in-world XSH is the local seed `make seed` builds from XSH_ROOT, not a
-## published release and not compiled in-world. The seed directory is a
-## repository input, so its manifest and products are hashed into this
-## package's build key; the build verifies each product against the manifest.
+## published release and not compiled in-world. The target's seed directory is
+## a repository input, so its manifest and products are hashed into this
+## package's build key for that target only; the build verifies each product
+## against the manifest.
 export let upstream_sources = [
   {
-    source: p"repository/.out/seed => seed",
+    source: p"repository/.out/seed/ARCH => seed",
     kind: "auto",
     architectures: ["all"],
     checksums: [{arch: "all", sha256: "SKIP"}],
@@ -110,11 +111,11 @@ export let filetree = [
 const seed_products = ["xsh", "xshi", "xsht", "core.tar.xz"]
 
 proc verified_seed(arch: Str) [fs, error] -> Result[Path] {
-  let seed = fp"seed/{arch}"
+  let seed = p"seed"
   let manifest_path = fp"{seed}/manifest.json"
 
   if ! fs.exists(manifest_path)? {
-    return Err(XshPackageError.Source(f"the {arch} XSH seed is missing; run `make seed ARCH={arch}`"))
+    return Err(XshPackageError.Source(f"the {arch} XSH seed has no manifest; run `make seed ARCH={arch}`"))
   }
 
   let manifest = json.read(manifest_path)?.require(Record)?

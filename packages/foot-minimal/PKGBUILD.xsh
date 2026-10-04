@@ -25,9 +25,11 @@ export let deps = [
   "pixman",
   "fontconfig",
   "fcft-minimal",
-  "font-ttf-hack",
   "utf8proc",
 ]
+
+## The default config names the Hack font; fontconfig finds it at runtime.
+export let runtime_only_deps = ["font-ttf-hack"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = [

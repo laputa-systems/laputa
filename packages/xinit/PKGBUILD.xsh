@@ -12,7 +12,10 @@ export let ver = "1"
 export let rel = "9"
 
 ## Package recipe export.
-export let deps = ["xsh"]
+export let deps = []
+
+## The build installs xinit.xsh; PID 1 runs it with `xsh`.
+export let runtime_only_deps = ["xsh"]
 
 ## Package recipe export.
 export let mkdeps_host = []
