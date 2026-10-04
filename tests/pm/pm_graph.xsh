@@ -18,7 +18,13 @@ pure has_edge(edges: List[types.DependencyEdge], from: Str, to: Str, kind: types
   false
 }
 
-pure fixture_package(name: Str, deps: List[Str], mkdeps_host: List[Str], mkdeps_target: List[Str]) -> types.Package {
+pure fixture_package(
+  name: Str,
+  deps: List[Str],
+  mkdeps_host: List[Str],
+  mkdeps_target: List[Str],
+  runtime_only_deps: List[Str] = [],
+) -> types.Package {
   {
     dir: fp"packages/{name}",
     name,
@@ -26,6 +32,7 @@ pure fixture_package(name: Str, deps: List[Str], mkdeps_host: List[Str], mkdeps_
     rel: "1",
     kind: types.Meta,
     deps,
+    runtime_only_deps,
     mkdeps_host,
     mkdeps_target,
     upstream_sources: [],
@@ -136,4 +143,33 @@ test test_graph_resolution_is_repeatable [fs, env, error] {
   test.eq(first_edges, second_edges)?
   test.eq(first_levels, second_levels)?
   test.eq(graph.build_closure(first, ["app"], value)?, graph.build_closure(second, ["app"], value)?)?
+}
+
+# A runtime-only edge selects its target for runtime roots and for the plan
+# that must produce them, but is no build input: it orders no build, so it
+# may close a cycle with a build edge.
+test test_runtime_only_edge_selects_closures_without_ordering_builds [error] {
+  let runner = fixture_package("runner", [], [], [])
+  let service = fixture_package("service", [], [], [], runtime_only_deps: ["runner"])
+  let consumer = fixture_package("consumer", [], ["service"], [])
+  let value = catalog.from_packages(p".", [runner, service, consumer])?
+  let edges = graph.edges(value, policy.aarch64_docker())?
+  test.ok(has_edge(edges, "service", "runner", types.RuntimeOnly))?
+  test.eq(graph.runtime_closure(value, ["service"])?, ["runner", "service"])?
+  test.eq(graph.build_closure(value, ["consumer"], policy.aarch64_docker())?, ["consumer", "runner", "service"])?
+  test.eq(graph.topological_levels(["consumer", "runner", "service"], edges)?, [["runner", "service"], ["consumer"]])?
+
+  let cyclic_runner = fixture_package("runner", ["service"], [], [])
+  let cyclic = catalog.from_packages(p".", [cyclic_runner, service])?
+  let cyclic_edges = graph.edges(cyclic, policy.aarch64_docker())?
+  test.eq(graph.topological_levels(["runner", "service"], cyclic_edges)?, [["service"], ["runner"]])?
+}
+
+test test_catalog_rejects_missing_runtime_only_dependency [error] {
+  let service = fixture_package("service", [], [], [], runtime_only_deps: ["absent"])
+
+  match catalog.from_packages(p".", [service]) {
+    Ok(_) => test.fail("missing runtime-only dependency unexpectedly loaded")?
+    Err(problem) => assert "service depends on missing absent" in problem.message
+  }
 }

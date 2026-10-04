@@ -205,7 +205,9 @@ proc execute_publish_proof_cache(
 }
 
 # Runs the package proof against `payload` in a fresh root holding its runtime
-# closure, then writes the proof receipt to `proof`.
+# closure, then writes the proof receipt to `proof`. That closure follows
+# `deps` edges only: a runtime-only dependency orders no build, so it may not
+# exist yet when this node is proved. Generations compose it with the rest.
 proc execute_run_proof(
   context: ExecuteContext,
   node: types.PlanNode,

@@ -26,6 +26,7 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
     rel: "1",
     kind: types.Meta,
     deps: [],
+    runtime_only_deps: [],
     mkdeps_host: [],
     mkdeps_target: [],
     upstream_sources: [{source: fp"{url}", kind: types.Auto, architectures: ["all"], checksums: [{arch: "all", sha256}]}],

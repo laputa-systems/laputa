@@ -8,6 +8,7 @@ type PackageMetadata = {
   ver: Str,
   rel: Str,
   deps: List[Str],
+  runtime_only_deps: List[Str],
   mkdeps_host: List[Str],
   mkdeps_target: List[Str],
   upstream_sources: List[Record],
@@ -56,6 +57,20 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [erro
     }
 
     seen[dependency] = true
+  }
+}
+
+# A runtime-only dependency is excluded from build roots and artifact keys, so
+# a package the build also uses can never be runtime-only. Such a package is a
+# `deps` entry (installed into the build root and needed at runtime).
+proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [error] -> Result[Unit] {
+  validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)?
+  let build_dependencies = metadata.deps.extend(metadata.mkdeps_host).extend(metadata.mkdeps_target)
+
+  for dependency in metadata.runtime_only_deps {
+    if dependency in build_dependencies {
+      return package_contract_error(name, f"runtime_only_deps entry {dependency} is also a build dependency; a package the build uses belongs in deps")
+    }
   }
 }
 
@@ -223,6 +238,7 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
   let filetree: List[Record] = dynamic.get("filetree").context("package-load", pkgbuild.display())?.require(List[Record])?
   let has_build = "build" in dynamic.keys()
   var mkdeps_target: List[Str] = []
+  var runtime_only_deps: List[Str] = []
   let has_filetree_aarch64 = "filetree_aarch64" in dynamic.keys()
   let has_filetree_x86_64 = "filetree_x86_64" in dynamic.keys()
   var filetree_aarch64: List[Record] = []
@@ -230,6 +246,10 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
 
   if "mkdeps_target" in dynamic.keys() {
     mkdeps_target = dynamic.get("mkdeps_target")?.require(List[Str])?
+  }
+
+  if "runtime_only_deps" in dynamic.keys() {
+    runtime_only_deps = dynamic.get("runtime_only_deps")?.require(List[Str])?
   }
 
   if has_filetree_aarch64 {
@@ -262,6 +282,7 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
     ver,
     rel,
     deps,
+    runtime_only_deps,
     mkdeps_host,
     mkdeps_target,
     upstream_sources,
@@ -308,6 +329,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   validate_dependencies(name, "deps", metadata.deps)?
   validate_dependencies(name, "mkdeps_host", metadata.mkdeps_host)?
   validate_dependencies(name, "mkdeps_target", mkdeps_target)?
+  validate_runtime_only_dependencies(name, metadata)?
 
   if is_production_recipe_directory(dir) and dir.name != name {
     return Err(types.PmError.PackageContract(f"{name}: production recipe directory {dir.name} does not match package name"))
@@ -340,6 +362,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
     rel,
     kind,
     deps: metadata.deps,
+    runtime_only_deps: metadata.runtime_only_deps,
     mkdeps_host: metadata.mkdeps_host,
     mkdeps_target,
     upstream_sources,

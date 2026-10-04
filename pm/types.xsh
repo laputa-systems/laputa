@@ -9,7 +9,11 @@ export enum Target { Aarch64LinuxMusl, X86_64LinuxMusl, TargetReserved }
 export enum PackageKind { Payload, Meta }
 
 ## The semantic reason one package depends on another.
-export enum DependencyKind { Runtime, BuildHost, BuildTarget, Bootstrap }
+## `Runtime` dependencies are installed into the dependent's build root with
+## their runtime closure, so their artifact keys are artifact-key inputs.
+## `RuntimeOnly` dependencies are never installed into a build root and never
+## enter an artifact key; only root composition installs them.
+export enum DependencyKind { Runtime, RuntimeOnly, BuildHost, BuildTarget, Bootstrap }
 
 ## The source staging strategy selected by a recipe source record.
 export enum SourceKind { Auto, Archive, Zip, Cpio, SourceFile, Directory }
@@ -53,6 +57,11 @@ export pure package_meta() -> PackageKind {
 ## Return the runtime dependency edge kind.
 export pure dependency_runtime() -> DependencyKind {
   return Runtime
+}
+
+## Return the runtime-only dependency edge kind.
+export pure dependency_runtime_only() -> DependencyKind {
+  return RuntimeOnly
 }
 
 ## Return the host build dependency edge kind.
@@ -244,6 +253,7 @@ export pure parse_package_kind(raw: Str) -> Result[PackageKind] {
 export pure dependency_kind_text(kind: DependencyKind) -> Str {
   match kind {
     Runtime => return "runtime"
+    RuntimeOnly => return "runtime-only"
     BuildHost => return "build-host"
     BuildTarget => return "build-target"
     Bootstrap => return "bootstrap"
@@ -254,6 +264,7 @@ export pure dependency_kind_text(kind: DependencyKind) -> Str {
 export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind] {
   match raw {
     "runtime" => return Runtime
+    "runtime-only" => return RuntimeOnly
     "build-host" => return BuildHost
     "build-target" => return BuildTarget
     "bootstrap" => return Bootstrap
@@ -333,6 +344,7 @@ export type Package = {
   rel: Str,
   kind: PackageKind,
   deps: List[Str],
+  runtime_only_deps: List[Str],
   mkdeps_host: List[Str],
   mkdeps_target: List[Str],
   upstream_sources: List[UpstreamSource],
@@ -568,12 +580,15 @@ export type PackageIndex = {
 }
 
 ## A package advertised by a remote repository.
+## `deps` are the recipe's `deps`; `runtime_only_deps` are the further packages
+## a runtime root must install. Together they are the package's runtime set.
 export type RemotePackage = {
   arch: Str,
   name: Str,
   ver: Str,
   rel: Str,
   deps: List[Str],
+  runtime_only_deps: List[Str],
   mkdeps_host: List[Str],
   mkdeps_target: List[Str],
   sha256: Str,

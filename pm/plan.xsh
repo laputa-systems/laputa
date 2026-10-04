@@ -8,7 +8,8 @@ use util
 
 ## The durable on-disk and in-memory build-plan format.
 ## Format 2 artifact keys hash `BUILD_EPOCH` and no executor identity.
-export let format: Str = "laputa-build-plan-2"
+## Format 3 adds `runtime-only` dependencies, which order no build and are no key input.
+export let format: Str = "laputa-build-plan-3"
 
 pure plan_canonical_field(value: Str) -> Str {
   value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
@@ -43,14 +44,18 @@ pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
 # An artifact key names exactly the inputs that can change a payload: the
 # target, the package id, the recipe input digest (recipe files except
 # proof.xsh, source records and checksums, and repository inputs), the global
-# build epoch, and the key of every direct dependency.
+# build epoch, and the key of every direct build-input dependency.
 #
-# Every direct dependency, runtime ones included, is installed into the build
+# Every direct `deps` and `mkdeps_*` dependency is installed into the build
 # root together with its runtime closure: recipes link against libraries they
 # declare only in `deps` (musl in every C package, for example). Each direct
 # dependency key already covers that dependency's own runtime closure, so the
 # direct keys pin the complete build root. A metapackage has no build root,
 # but its artifact is its runtime selection, which the same keys pin.
+#
+# A `runtime_only_deps` dependency is never in a build root, so its key is
+# excluded: rebuilding it (a new XSH seed, say) rebuilds none of its
+# dependents. Its name stays a key input through the recipe digest.
 #
 # The executor (XSH runners, PM tree, core applets) is deliberately absent; it
 # is recorded as artifact provenance. `BUILD_EPOCH` is the explicit way to
@@ -71,6 +76,7 @@ proc artifact_key_for(
   ]
 
   for dependency in dependencies |> sort-by { |dependency| dependency_key(dependency) } {
+    continue unless graph.edge_orders_builds(dependency.kind)
     lines = lines.push(
       f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
     )
@@ -229,6 +235,8 @@ pure remote_is_exact(
     remote.proof_sha256 == proof_sha256
 }
 
+# Returns the build-input dependencies of one node. Their nodes are on earlier
+# levels, so their keys are already resolved.
 proc dependency_nodes(
   name: Str,
   edges: List[types.DependencyEdge],
@@ -238,7 +246,7 @@ proc dependency_nodes(
   var dependencies: List[types.PlanDependency] = []
 
   for edge in edges {
-    continue unless edge.from == name and edge.kind != types.dependency_bootstrap() and (selected.get(edge.to) ?? false)
+    continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
 
     if ! (edge.to in keys) {
       return Err(types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"))
@@ -250,6 +258,30 @@ proc dependency_nodes(
   dependencies |> sort-by { |dependency| dependency_key(dependency) }
 }
 
+# Adds each node's runtime-only dependencies once every key is resolved: they
+# order no build, so their nodes may sit on the same or a later level.
+proc with_runtime_only_dependencies(
+  nodes: List[types.PlanNode],
+  edges: List[types.DependencyEdge],
+  selected: Map[Bool],
+  keys: Map[Str],
+) [error] -> Result[List[types.PlanNode]] {
+  var result: List[types.PlanNode] = []
+
+  for node in nodes {
+    var dependencies = node.dependencies
+
+    for edge in edges {
+      continue unless edge.from == node.name and edge.kind == types.dependency_runtime_only() and (selected.get(edge.to) ?? false)
+      dependencies = dependencies.push({name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?})
+    }
+
+    result = result.push({...node, dependencies: dependencies |> sort-by { |dependency| dependency_key(dependency) }})
+  }
+
+  result
+}
+
 proc built_dependency_names(
   name: Str,
   edges: List[types.DependencyEdge],
@@ -259,7 +291,7 @@ proc built_dependency_names(
   var changed: List[Str] = []
 
   for edge in edges {
-    continue unless edge.from == name and edge.kind != types.dependency_bootstrap() and (selected.get(edge.to) ?? false)
+    continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
 
     if types.plan_action_is_build(actions.get(edge.to)?) {
       changed = changed.push(edge.to)
@@ -399,7 +431,7 @@ export proc resolve(
     repository_digest,
     remote_index_sha256: snapshot.index_sha256,
     build_epoch: policy.build_epoch,
-    nodes,
+    nodes: with_runtime_only_dependencies(nodes, edges, selected, keys)?,
     plan_sha256: "",
   }
   let plan_sha256 = fingerprint(bare)?
@@ -477,7 +509,7 @@ proc validate_node(
       return Err(types.PmError.PackageContract(f"build plan node {node.name} has unresolved dependency {dependency.name}"))
     }
 
-    if levels.get(dependency.name)? >= node.level {
+    if graph.edge_orders_builds(dependency.kind) and levels.get(dependency.name)? >= node.level {
       return Err(types.PmError.PackageContract(f"build plan node {node.name} is not dependency-first"))
     }
 

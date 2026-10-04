@@ -18,7 +18,7 @@ pure sorted_unique_names(names: List[Str]) -> List[Str] {
 }
 
 pure package_dependencies(pkg: types.Package) -> List[Str] {
-  pkg.deps.extend(pkg.mkdeps_host).extend(pkg.mkdeps_target)
+  pkg.deps.extend(pkg.runtime_only_deps).extend(pkg.mkdeps_host).extend(pkg.mkdeps_target)
 }
 
 proc make_catalog(

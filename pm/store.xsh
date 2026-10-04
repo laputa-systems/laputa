@@ -92,11 +92,18 @@ pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
   result
 }
 
-## Returns canonical artifact identities for every typed PlanNode dependency edge.
+## Returns canonical artifact identities for every build-input PlanNode dependency edge.
 ## A receipt does not serialize edge kinds: shared Runtime and BuildHost artifacts retain
 ## their first planned occurrence exactly once while PlanNode keeps the complete edge list.
+## Runtime-only edges are absent: they are no artifact-key input, so one artifact (and its
+## receipt) serves every plan whatever runtime-only artifacts that plan pairs with it.
+## Root composition reads them from the plan instead.
 export pure receipt_dependency_keys(node: types.PlanNode) -> List[Str] {
-  store_unique_artifact_keys([dependency.artifact_key for dependency in node.dependencies])
+  store_unique_artifact_keys([
+    dependency.artifact_key
+    for dependency in node.dependencies
+    if dependency.kind != types.dependency_runtime_only()
+  ])
 }
 
 ## Returns the canonical runtime-only subset of `receipt_dependency_keys`.

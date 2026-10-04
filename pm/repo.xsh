@@ -137,6 +137,7 @@ proc repo_publication_entry(value: types.RepoPublication, metadata: Path) [fs, e
     ver: node.ver,
     rel: node.rel,
     deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()],
+    runtime_only_deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()],
     mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
     mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
     sha256: if value.kind == types.package_meta() { "" } else { hash.sha256(value.payload)?.hex() },
@@ -157,7 +158,7 @@ proc repo_publication_entry(value: types.RepoPublication, metadata: Path) [fs, e
 }
 
 proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage) [] -> Bool {
-  left.arch == right.arch and left.name == right.name and left.ver == right.ver and left.rel == right.rel and left.deps == right.deps and left.mkdeps_host == right.mkdeps_host and left.mkdeps_target == right.mkdeps_target and left.sha256 == right.sha256 and left.size == right.size and left.tarball == right.tarball and left.metadata == right.metadata and left.metadata_sha256 == right.metadata_sha256 and left.artifact_key == right.artifact_key and left.recipe_sha256 == right.recipe_sha256 and left.executor_sha256 == right.executor_sha256 and left.proof_key == right.proof_key and left.proof_sha256 == right.proof_sha256 and left.proof == right.proof and left.proof_receipt_sha256 == right.proof_receipt_sha256 and left.source_sha256 == right.source_sha256 and left.metapackage == right.metapackage
+  left.arch == right.arch and left.name == right.name and left.ver == right.ver and left.rel == right.rel and left.deps == right.deps and left.runtime_only_deps == right.runtime_only_deps and left.mkdeps_host == right.mkdeps_host and left.mkdeps_target == right.mkdeps_target and left.sha256 == right.sha256 and left.size == right.size and left.tarball == right.tarball and left.metadata == right.metadata and left.metadata_sha256 == right.metadata_sha256 and left.artifact_key == right.artifact_key and left.recipe_sha256 == right.recipe_sha256 and left.executor_sha256 == right.executor_sha256 and left.proof_key == right.proof_key and left.proof_sha256 == right.proof_sha256 and left.proof == right.proof and left.proof_receipt_sha256 == right.proof_receipt_sha256 and left.source_sha256 == right.source_sha256 and left.metapackage == right.metapackage
 }
 
 proc repo_merge_publication(index: List[types.RemotePackage], entry: types.RemotePackage) [error] -> Result[RepoIndexMerge] {

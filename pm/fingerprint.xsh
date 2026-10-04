@@ -118,19 +118,27 @@ proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
 # recipe directory. Hash their complete declared file/tree contents so a PM
 # module edit changes laputa-pm's package build identity without recording an
 # absolute checkout path.
-proc repository_input_lines(repo_root: Path, pkg: types.Package) [fs, error] -> Result[List[Str]] {
+#
+# Only the sources the target stages are hashed, after the same placeholder
+# expansion staging applies, so `repository/.out/seed/ARCH` keys each target by
+# its own seed and another target's inputs never change this key. Builds are
+# native, so the build architecture is the target's.
+proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[List[Str]] {
+  let arch = types.pm_target_arch(target)
   var lines: List[Str] = []
 
   for source in pkg.upstream_sources {
+    continue unless arch in source.architectures or "all" in source.architectures
     let parsed = util.parse_source_line(source.source)?
+    let expanded = util.expand_source(parsed.source, pkg, arch, arch)
 
-    continue unless parsed.source.starts_with("repository/")
-    let relative = fp"{parsed.source.replace("repository/", "")}".normalize()
-    util.ensure_relative_path(relative, f"repository source {parsed.source}")?
+    continue unless expanded.starts_with("repository/")
+    let relative = fp"{expanded.replace("repository/", "")}".normalize()
+    util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 
     if ! fs.exists(input)? {
-      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {parsed.source} is missing"))
+      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
     }
 
     if fs.metadata(input)?.kind == "dir" {
@@ -171,6 +179,10 @@ export proc package_build_input(
     lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}")
   }
 
+  for dependency in pkg.runtime_only_deps {
+    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}")
+  }
+
   for dependency in pkg.mkdeps_host {
     lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}")
   }
@@ -191,7 +203,7 @@ export proc package_build_input(
   }
 
   lines = lines.extend(package_source_lines(pkg)?)
-  lines = lines.extend(repository_input_lines(repo_root, pkg)?)
+  lines = lines.extend(repository_input_lines(repo_root, pkg, target)?)
   digest_lines(lines)?
 }
 
