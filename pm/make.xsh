@@ -136,8 +136,19 @@ pure depfile_path(out: Path) -> Path {
   return fp"{out}.d"
 }
 
-pure argv_text(argv: List[Any]) -> List[Str] {
-  return [f"{arg}" for arg in argv]
+## Task argv is `List[Any]` because it mixes `Str` flags with `Path` operands
+## and lists are invariant. Words are validated here, once, as they become
+## process text; any other value is a malformed task.
+export pure argv_text(argv: List[Any]) -> Result[List[Str]] {
+  [argv_word(arg)? for arg in argv]
+}
+
+pure argv_word(arg: Any) -> Result[Str] {
+  match arg {
+    word is Str => Ok(word)
+    operand is Path => Ok(f"{operand}")
+    _ => Err(MakeError.InvalidTask(message: "make task argv words must be Str or Path"))
+  }
 }
 
 pure object_name_for_source(src: Path, ext: Str) -> Str {
@@ -307,7 +318,7 @@ export proc jobs() [env, error] -> Result[Int] {
 
 ## Exported PM declaration `effective_task_argv`.
 export proc effective_task_argv(raw_argv: List[Any], _: Record) [error] -> Result[List[Str]] {
-  argv_text(raw_argv)
+  argv_text(raw_argv)?
 }
 
 ## Exported PM declaration `effective_task_env`.

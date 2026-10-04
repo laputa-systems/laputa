@@ -1,4 +1,5 @@
 use kbuild
+use pm.make as make
 
 # Serialized report fields and analysis task fields checked by the native assertions.
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}
@@ -408,7 +409,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
     for task in archive_plan.tasks {
       if task.name == ".xsh-kbuild/obj/init/lib/helper.o" {
         saw_asm = true
-        let asm_argv = [f"{arg}" for arg in task.argv]
+        let asm_argv = make.argv_text(task.argv)?
         test.ok("-D__ASSEMBLY__" in asm_argv)?
         test.ok("-fno-PIE" in asm_argv)?
         test.ok("-DKASAN_SHADOW_SCALE_SHIFT=" in asm_argv)?
@@ -709,16 +710,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
 
     for index in range(serial.tasks.len()) {
       test.eq(parallel.tasks[index].name, serial.tasks[index].name)?
-      test.eq(
-        [
-          f"{arg}"
-          for arg in parallel.tasks[index].argv
-        ],
-        [
-          f"{arg}"
-          for arg in serial.tasks[index].argv
-        ],
-      )?
+      test.eq(make.argv_text(parallel.tasks[index].argv)?, make.argv_text(serial.tasks[index].argv)?)?
       test.eq(parallel.tasks[index].deps, serial.tasks[index].deps)?
     }
 
