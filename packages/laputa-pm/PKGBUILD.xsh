@@ -37,36 +37,11 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
+## PM's module set changes as PM evolves, so the modules ship as one tree.
 export let filetree = [
   {path: p"usr/bin/pm", kind: "file"},
   {path: p"usr/lib/pm/pm.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/build.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/catalog.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/cli.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/configure.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/elfdeps.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/env.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/execute.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/fingerprint.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/generation.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/generation_adapter.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/graph.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/local.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/make.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/meson.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/plan.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/plan_json.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/policy.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/proof.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/recipe.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/remote.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/repo.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/root.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/sources.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/store.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/target.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/types.xsh", kind: "file"},
-  {path: p"usr/lib/pm/pm/util.xsh", kind: "file"},
+  {path: p"usr/lib/pm/pm", kind: "tree"},
 ]
 
 ## Exported declaration `build`.

@@ -1,4 +1,7 @@
 ##! Behavior coverage for the local XSH seed and the content-keyed Laputa images.
+use pm.fingerprint as pm_fingerprint
+use pm.recipe as pm_recipe
+use pm.types as pm_types
 use seed.images as images
 use seed.xsh_seed as xsh_seed
 
@@ -164,4 +167,25 @@ test test_image_dockerfiles_take_only_local_inputs [fs, error] {
   assert ! ("http" in tools)
   assert ! ("COPY --from=seed" in tools)
   assert ! ("/src/packages" in tools)
+}
+
+# The `xsh` package is the seed: a rebuilt seed must change its build key even
+# though `.out/` is gitignored and the repository source uses `SKIP`.
+test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "xsh-package-key")?
+  fs.symlink(fp"${fs.cwd()?}/packages", fp"${root}/packages")?
+  let seed = xsh_seed.xsh_seed_dir(root, "aarch64")
+  fs.mkdir(fp"${seed}/core")?
+
+  for name in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json", "core/ls"] {
+    fs.write(fp"${seed}/${name}", f"first ${name}\n")?
+  }
+
+  let target = pm_types.parse_target("aarch64")?
+  let pkg = pm_recipe.load_package_for_target(fp"${root}/packages/xsh", target)?
+  let first = pm_fingerprint.package_build_input(root, pkg, target)?
+  assert pm_fingerprint.package_build_input(root, pkg, target)? == first
+
+  fs.write(fp"${seed}/xshi", "rebuilt xshi\n")?
+  assert pm_fingerprint.package_build_input(root, pkg, target)? != first
 }
