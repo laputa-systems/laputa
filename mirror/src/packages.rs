@@ -25,6 +25,10 @@ pub struct RemotePackage {
     pub metadata: String,
     pub source_sha256: String,
     pub metapackage: bool,
+    /// Fields the mirror does not interpret (artifact and proof identities)
+    /// survive the validate-and-rewrite of `index.json` unchanged.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 fn default_arch() -> String {
@@ -238,13 +242,7 @@ fn get(path: &str, headers: &HashMap<String, String>, state: &AppState) -> Respo
     if let Some(hash) = cached_source_hash(path) {
         return get_cached_source(hash, state);
     }
-    if let Some(key) = package_key(path) {
-        return get_object(&key, state);
-    }
-    if let Some(key) = source_key(path) {
-        return get_object(&key, state);
-    }
-    if let Some(key) = metadata_key(path) {
+    if let Some(key) = object_key(path) {
         return get_object(&key, state);
     }
     Response::not_found()
@@ -263,12 +261,15 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
         return put_upload_chunk(path, body, state);
     }
 
-    let Some(key) = package_key(path)
-        .or_else(|| source_key(path))
-        .or_else(|| metadata_key(path))
-    else {
+    let Some(key) = object_key(path) else {
         return Response::not_found();
     };
+    // `If-None-Match: *` publishes an immutable object only if it is absent.
+    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*")
+        && state.storage.object_size(&key).is_some()
+    {
+        return Response::json(412, r#"{"error":"object already exists"}"#);
+    }
 
     match state.storage.put(&key, body.to_vec(), content_type_for(&key)) {
         Ok(()) => Response::json(201, r#"{"ok":true}"#),
@@ -331,10 +332,7 @@ fn complete_chunked_upload(
     }
 
     let rel_path = format!("/{}", req.rel);
-    let Some(key) = package_key(&rel_path)
-        .or_else(|| source_key(&rel_path))
-        .or_else(|| metadata_key(&rel_path))
-    else {
+    let Some(key) = object_key(&rel_path) else {
         return Response::bad_request("invalid upload path");
     };
 
@@ -610,11 +608,28 @@ fn source_key(path: &str) -> Option<String> {
 }
 
 fn metadata_key(path: &str) -> Option<String> {
+    json_object_key("metadata", path)
+}
+
+fn proof_key(path: &str) -> Option<String> {
+    json_object_key("proofs", path)
+}
+
+/// Every object path the mirror stores: packages, sources, metadata
+/// sidecars, and proof receipts.
+fn object_key(path: &str) -> Option<String> {
+    package_key(path)
+        .or_else(|| source_key(path))
+        .or_else(|| metadata_key(path))
+        .or_else(|| proof_key(path))
+}
+
+fn json_object_key(prefix: &str, path: &str) -> Option<String> {
     let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-    if parts.len() != 4 || parts[0] != "metadata" {
+    if parts.len() != 4 || parts[0] != prefix {
         return None;
     }
-    validate_metadata_object_path(parts[1], parts[2], parts[3])
+    validate_json_object_path(prefix, parts[1], parts[2], parts[3])
 }
 
 fn validate_object_path(prefix: &str, name: &str, file: &str, source: bool) -> Option<String> {
@@ -649,7 +664,7 @@ fn validate_package_object_path(arch: &str, name: &str, file: &str) -> Option<St
     Some(format!("packages/{arch}/{name}/{file}"))
 }
 
-fn validate_metadata_object_path(arch: &str, name: &str, file: &str) -> Option<String> {
+fn validate_json_object_path(prefix: &str, arch: &str, name: &str, file: &str) -> Option<String> {
     if !valid_arch(arch) || !valid_pkg_name(name) || !file.ends_with(".json") {
         return None;
     }
@@ -659,7 +674,7 @@ fn validate_metadata_object_path(arch: &str, name: &str, file: &str) -> Option<S
     if !file.starts_with(&format!("{name}-")) {
         return None;
     }
-    Some(format!("metadata/{arch}/{name}/{file}"))
+    Some(format!("{prefix}/{arch}/{name}/{file}"))
 }
 
 fn valid_arch(arch: &str) -> bool {
@@ -737,7 +752,7 @@ fn valid_pkg_name(name: &str) -> bool {
 }
 
 fn content_type_for(key: &str) -> &'static str {
-    if key == "index.json" || key.starts_with("metadata/") {
+    if key == "index.json" || key.starts_with("metadata/") || key.starts_with("proofs/") {
         "application/json"
     } else {
         "application/octet-stream"
@@ -818,6 +833,7 @@ mod tests {
             metadata: "metadata/aarch64/zlib/zlib-1.3.2-5.json".to_string(),
             source_sha256: "b".repeat(64),
             metapackage: false,
+            extra: Default::default(),
         }];
         assert!(validate_index(&index).is_ok());
     }

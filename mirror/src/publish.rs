@@ -237,6 +237,7 @@ mod tests {
             metadata: String::new(),
             source_sha256: String::new(),
             metapackage: false,
+            extra: Default::default(),
         }
     }
 

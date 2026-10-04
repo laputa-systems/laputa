@@ -172,6 +172,7 @@ fn sample_index() -> Vec<packages::RemotePackage> {
         metadata: String::new(),
         source_sha256: db::sha256_hex(b"source"),
         metapackage: false,
+        extra: Default::default(),
     }]
 }
 
@@ -783,4 +784,44 @@ fn local_mode_streams_large_files_with_content_length() {
         assert!(head.contains("content-type: application/octet-stream"), "{path}: {head}");
         assert_eq!(body, package, "{path}");
     }
+}
+
+#[test]
+fn local_mode_publishes_proof_receipts_as_json() {
+    let state = make_local_state();
+    let proof = "proofs/aarch64/zlib/zlib-1.3.2-5.json";
+    let resp = packages::route("PUT", &format!("/{proof}"), &headers(&[]), br#"{"proof":1}"#, &state);
+    assert_eq!(resp.status, 201);
+    let resp = get(&state, &format!("/{proof}"));
+    assert_eq!(resp.content_type, "application/json");
+    assert_eq!(body_bytes(resp), br#"{"proof":1}"#);
+    for bad in ["/proofs/aarch64/zlib/../../x.json", "/proofs/arm/zlib/zlib-1.json", "/proofs/aarch64/zlib/zlib-1.tar.gz"] {
+        assert_eq!(packages::route("PUT", bad, &headers(&[]), b"{}", &state).status, 404, "{bad}");
+    }
+}
+
+#[test]
+fn if_none_match_star_refuses_to_replace_an_existing_object() {
+    let state = make_local_state();
+    let immutable = headers(&[("if-none-match", "*")]);
+    let path = format!("/{PACKAGE}");
+    assert_eq!(packages::route("PUT", &path, &immutable, b"first", &state).status, 201);
+    assert_eq!(packages::route("PUT", &path, &immutable, b"second", &state).status, 412);
+    assert_eq!(body_bytes(get(&state, &path)), b"first");
+    // Without the precondition a write replaces the object.
+    assert_eq!(packages::route("PUT", &path, &headers(&[]), b"third", &state).status, 201);
+    assert_eq!(body_bytes(get(&state, &path)), b"third");
+}
+
+#[test]
+fn index_rewrite_keeps_fields_the_mirror_does_not_interpret() {
+    let state = make_local_state();
+    let mut index = serde_json::to_value(sample_index()).unwrap();
+    index[0]["artifact_key"] = serde_json::json!("abc123");
+    index[0]["proof"] = serde_json::json!("proofs/aarch64/zlib/zlib-1.3.2-5.json");
+    let body = serde_json::to_vec(&index).unwrap();
+    assert_eq!(packages::route("PUT", "/index.json", &headers(&[]), &body, &state).status, 201);
+    let stored = body_json(&get(&state, "/index.json"));
+    assert_eq!(stored[0]["artifact_key"], "abc123");
+    assert_eq!(stored[0]["proof"], "proofs/aarch64/zlib/zlib-1.3.2-5.json");
 }
