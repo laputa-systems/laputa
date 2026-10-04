@@ -9,10 +9,10 @@ export const name = "utf8proc"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "2.10.0"
+export const ver = "2.12.0"
 
 ## Package recipe export.
-export const rel = "8"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "6f4f1b639daa6dca9f80bc5db1233e9cbaa31a67790887106160b33ef743f136",
+        sha256: "f564011d38b2888d583d510b08e69ffa15aa117155db1b9b49ef1dfe1fa25111",
       },
     ],
   },
@@ -44,6 +44,22 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/lib/cmake/utf8proc/utf8proc-config-version.cmake",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/cmake/utf8proc/utf8proc-config.cmake",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/cmake/utf8proc/utf8proc-targets-release.cmake",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/cmake/utf8proc/utf8proc-targets.cmake",
+    kind: "file",
+  },
+  {
     path: p"usr/lib/libutf8proc.so",
     kind: "symlink",
   },
@@ -52,7 +68,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libutf8proc.so.3.1.0",
+    path: p"usr/lib/libutf8proc.so.3.3.0",
     kind: "binary",
   },
   {
