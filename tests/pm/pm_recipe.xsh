@@ -2,6 +2,7 @@
 use pm.recipe
 use pm.sources
 use pm.types
+use pm.util
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
@@ -148,18 +149,23 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
     return
   }
 
+  # The host xsh stands in for cargo and rustc, so the target is the host's
+  # arch and the build arch is the other one, which keeps the proof on its
+  # cross-built path.
+  let target_arch = util.normalize_arch(system.uname()?.machine)
+  let build_arch = if target_arch == "aarch64" { "x86_64" } else { "aarch64" }
   let root = test.temp_dir(ctx, name: "cargo-proof-root")?
   let xsh = process.which("xsh")?
   fs.install(xsh, fp"{root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)?
   fs.install(xsh, fp"{root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)?
-  fs.mkdir(fp"{root}/usr/lib/rustlib/aarch64-unknown-linux-musl/lib")?
+  fs.mkdir(fp"{root}/usr/lib/rustlib/{target_arch}-unknown-linux-musl/lib")?
   let stderr_path = test.temp_path(ctx, name: "cargo-proof-stderr")
   let status = process.run(
     process.command_argv(
       xsh,
       ["xsh", "packages/cargo/proof.xsh", "--", root.display()],
       fs.cwd()?,
-      {XSH_PM_BUILD_ARCH: "x86_64", XSH_PM_TARGET_ARCH: "aarch64"},
+      {XSH_PM_BUILD_ARCH: build_arch, XSH_PM_TARGET_ARCH: target_arch},
       stderr: stderr_path,
     ),
   )?
