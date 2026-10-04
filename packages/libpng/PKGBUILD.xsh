@@ -9,10 +9,10 @@ export const name = "libpng"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.6.50"
+export const ver = "1.6.59"
 
 ## Exported declaration `rel`.
-export const rel = "10"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "zlib"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "4df396518620a7aa3651443e87d1b2862e4e88cad135a8b93423e01706232307",
+        sha256: "d80dd2a38a37f803cb9b6ac7b14bd6e74ddc3b654780a8380bdf93523fdb4389",
       },
     ],
   },
@@ -100,7 +100,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libpng16.so.16.50.0",
+    path: p"usr/lib/libpng16.so.16.59.0",
     kind: "binary",
   },
   {
@@ -113,6 +113,8 @@ export const filetree = [
   },
 ]
 
+error LibpngError = Patch(message: Str)
+
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
@@ -121,17 +123,18 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # CMake's legacy post-build symlink command fails under the XSH build root.
   # Install the unversioned development link after CMake installs the library.
-  var cmake_lists = p"CMakeLists.txt".read_text()?
+  let cmake_lists = p"CMakeLists.txt".read_text()?
 
-  cmake_lists = cmake_lists.replace(
-    r"""      create_symlink(libpng${CMAKE_SHARED_LIBRARY_SUFFIX} TARGET png_shared)
-      install(FILES "$<TARGET_LINKER_FILE_DIR:png_shared>/libpng${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  let post_build_symlink = r"""      create_symlink(${libpng_symlink_name} TARGET png_shared)
+      install(FILES "$<TARGET_LINKER_FILE_DIR:png_shared>/${libpng_symlink_name}"
               DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-""",
-    "",
-  )
+"""
 
-  fs.write(p"CMakeLists.txt", cmake_lists)?
+  if post_build_symlink not in cmake_lists {
+    return Err(LibpngError.Patch("CMakeLists.txt no longer creates libpng.so after the build"))?
+  }
+
+  fs.write(p"CMakeLists.txt", cmake_lists.replace(post_build_symlink, ""))?
 
   # CMake sees the executor architecture rather than the aarch64 compiler
   # target, so PNG_ARM_NEON is not an effective cache option here.  Set the
