@@ -51,13 +51,6 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
   parsed
 }
 
-proc docker_program() [process, env, error] -> Result[Path] {
-  let configured = (env.get("DOCKER") ?? "").trim()
-  return fp"{configured}" unless configured == ""
-
-  process.which("docker")?
-}
-
 ## Construct the offline smoke run: package-tools with the seed and the checkout mounted read-only.
 pure seed_smoke_argv(
   docker: Path,
@@ -100,7 +93,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   let value = xsh_seed.xsh_seed_arch(args.arch)?
   let xsh_root = path.absolute(fp"{args.xsh_root}")?
-  let docker = docker_program()?
+  let docker = images.docker_program()?
 
   match args.command {
     "fetch" => {

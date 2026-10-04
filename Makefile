@@ -40,6 +40,7 @@ PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
 .PHONY: check lint test test-pm test-system test-xinit clean distclean fetch fetch-seed seed seed-smoke \
+	plan build publish root \
 	profile-plan profile-build profile-test profile-boot profile-clean \
 	test-pm-native test-pm-docker xsh-native update-checksums \
 	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
@@ -88,6 +89,39 @@ seed:
 # Offline proof that the seed runs in package-tools with --network none.
 seed-smoke:
 	$(SEED) smoke $(SEED_ARGS)
+
+# Package builds on the seed (seed/world.xsh). `plan` and `build` run PM in
+# package-tools with --network none, the checkout and source cache read-only,
+# and the artifact store at .out/artifacts/$(ARCH); the plan lands in
+# .out/world/$(ARCH)/plan.json. Select PKGS="a b" (their closures), STOP=pre-cmake
+# (every package whose build closure needs neither cmake nor linux), or
+# neither (every package). The store is the build cache: an unchanged rebuild
+# reuses every artifact.
+#
+# Containers have no network, so only the host talks to the loopback mirror:
+# `publish` uploads the last plan's artifacts from the host, and `root`
+# imports PKGS from the mirror into a fresh store on the host, then composes,
+# inspects, and runs that root in an offline container
+# (.out/world/$(ARCH)/root/). Both need `make mirror` running.
+WORLD = $(HOST_XSH_ENV) $(XSH) seed/world_cli.xsh --
+PKGS ?=
+STOP ?=
+JOBS ?= 4
+MIRROR_URL ?= http://127.0.0.1:$(MIRROR_PORT)
+WORLD_SELECTION = $(foreach package,$(PKGS),--package $(package)) $(if $(STOP),--stop $(STOP))
+
+plan:
+	$(WORLD) plan --arch $(ARCH) $(WORLD_SELECTION)
+
+build:
+	$(WORLD) build --arch $(ARCH) --jobs $(JOBS) $(WORLD_SELECTION)
+
+publish:
+	$(WORLD) publish --arch $(ARCH) --repo $(MIRROR_URL)
+
+root:
+	rm -rf .out/world/$(ARCH)/root
+	$(WORLD) root --arch $(ARCH) --jobs $(JOBS) --repo $(MIRROR_URL) $(WORLD_SELECTION)
 
 # The only networked step: every pinned upstream source the recipes use on
 # ARCH (the LLVM seed included), sha256-verified into the content-addressed

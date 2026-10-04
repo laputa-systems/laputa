@@ -3,6 +3,7 @@ use pm.fingerprint as pm_fingerprint
 use pm.recipe as pm_recipe
 use pm.types as pm_types
 use seed.images as images
+use seed.world as world
 use seed.xsh_seed as xsh_seed
 
 test test_seed_arch_names_each_tool_target [error] {
@@ -189,4 +190,48 @@ test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
 
   fs.write(fp"{seed}/xshi", "rebuilt xshi\n")?
   assert pm_fingerprint.package_build_input(root, pkg, target)? != first
+}
+
+test test_world_selection_maps_packages_stop_lines_and_everything [error] {
+  assert world.world_selection_argv(["xsh", "m4"], "")? == ["--root", "xsh", "--root", "m4"]
+  assert world.world_selection_argv([], "pre-cmake")? == ["--all", "--without", "cmake", "--without", "linux"]
+  assert world.world_selection_argv([], "")? == ["--all"]
+
+  match world.world_selection_argv([], "pre-linux") {
+    Ok(_) => test.fail("an unknown stop line was accepted")?
+    Err(problem) => assert "unknown stop line pre-linux" in problem.message
+  }
+}
+
+test test_world_args_reject_ambiguous_or_incomplete_commands [error] {
+  let build = world.parse_world_args(["build", "--arch", "aarch64", "--stop", "pre-cmake", "--jobs", "2"])?
+  assert build.stop == "pre-cmake" and build.jobs == 2
+
+  for argv in [
+    ["build", "--arch", "aarch64", "--package", "xsh", "--stop", "pre-cmake"],
+    ["publish", "--arch", "aarch64"],
+    ["root", "--arch", "aarch64", "--repo", "http://127.0.0.1:3000"],
+    ["build", "--stop", "pre-cmake"],
+  ] {
+    match world.parse_world_args(argv) {
+      Ok(_) => test.fail(f"{argv.join(" ")} was accepted")?
+      Err(_) => {}
+    }
+  }
+}
+
+# Containers never get a network: the source cache arrives with the read-only
+# checkout, and only host processes reach the loopback mirror.
+test test_world_containers_are_offline_with_a_read_only_checkout [error] {
+  let value = xsh_seed.xsh_seed_arch("aarch64")?
+  let argv = world.world_container_argv(p"docker", /work/laputa, /s, value, "laputa-package-tools:aarch64-b", /work/laputa/.out/world/aarch64, /work/laputa/.out/artifacts/aarch64, ["/bin/xsh", "pm.xsh"])
+  assert [item for item in argv if item == "--network"].len() == 1
+  assert "none" in argv
+  assert "linux/arm64" in argv
+  assert "type=bind,src=/work/laputa,dst=/src/laputa,readonly" in argv
+  assert "type=bind,src=/s/xsh,dst=/bin/xsh,readonly" in argv
+  assert "type=bind,src=/work/laputa/.out/world/aarch64,dst=/output" in argv
+  assert "type=bind,src=/work/laputa/.out/artifacts/aarch64,dst=/artifacts" in argv
+  assert ! (argv |> any .starts_with("XSH_PM_REPO"))
+  assert argv[argv.len() - 2] == "/bin/xsh"
 }

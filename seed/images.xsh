@@ -23,6 +23,14 @@ export error SeedImageError = Missing(message: Str) : NotFound | Failed(message:
 const host_tools_contract_epoch = "laputa-host-tools-1"
 const package_tools_contract_epoch = "laputa-package-tools-2"
 
+## The Docker client: `DOCKER` when set, else `docker` on PATH.
+export proc docker_program() [process, env, error] -> Result[Path] {
+  let configured = (env.get("DOCKER") ?? "").trim()
+  return fp"{configured}" unless configured == ""
+
+  process.which("docker")?
+}
+
 ## The checked-in Dockerfile for the networked host-tools base.
 export pure host_tools_dockerfile(laputa_root: Path) -> Path {
   fp"{laputa_root}/seed/Dockerfile.host-tools"
