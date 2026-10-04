@@ -33,7 +33,7 @@ directory instead of S3, with no auth:
 
 ```sh
 laputa-mirror --local DATA_DIR [--listen 127.0.0.1:PORT] [--sources SOURCE_CACHE_DIR]
-make local DATA=.out/mirror SOURCES=.cache/sources PORT=3000
+make mirror     # from the monorepo root: .out/mirror, .cache/sources, port 3000
 ```
 
 - Objects live at `DATA_DIR/<key>` (for example
@@ -79,7 +79,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential curl pkg-config unzip dpkg-dev docker.io
 ```
 
-Install [Deno](https://deno.com) and [Node.js](https://nodejs.org/) for the frontend build. `make build-frontend` uses Deno to install the pinned pnpm CLI, then uses pnpm to install frontend dependencies and build the assets. The pnpm executable is stored under `target/pnpm`; Deno caches its package globally.
+Install [Deno](https://deno.com) and [Node.js](https://nodejs.org/) for the frontend build. `make mirror-frontend` (from the monorepo root) uses Deno to install the pinned pnpm CLI, then uses pnpm to install frontend dependencies and build the assets. The pnpm executable is stored under `target/pnpm`; Deno caches its package globally.
 
 Install Rust with rustup if it is not already present:
 
@@ -114,14 +114,13 @@ Do not configure `R2_PUBLIC_URL` for the tunnel-only setup.
 
 ## Build The Debian Package
 
-`make deb` builds release `x86_64-unknown-linux-musl` binaries inside a clean
+`make mirror-deb` (from the monorepo root) builds release `x86_64-unknown-linux-musl` binaries inside a clean
 Alpine Linux Docker container and packages them as `amd64`. Only the output
 binaries are persisted on the host; the Rust toolchain and build artifacts stay
 inside the ephemeral container.
 
 ```sh
-cd /path/to/laputa-systems/mirror
-make deb
+make mirror-deb
 ```
 
 The first build downloads the Rust toolchain and compiles all dependencies from
@@ -136,8 +135,8 @@ laputa-mirror_0.1.0_amd64.deb
 Deploy the package to the configured `oracle` host and restart the service:
 
 ```sh
-make deploy
-DEPLOY_HOST=another-host make deploy
+make mirror-deploy
+DEPLOY_HOST=another-host make mirror-deploy
 ```
 
 The target requires SSH access and passwordless or available `sudo` on the

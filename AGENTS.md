@@ -27,17 +27,21 @@ read `../xsh/AGENTS.md` before editing there or before writing `.xsh` here.
 ## Commands
 
 The root `Makefile` is the entry point. Host XSH tools default to
-`$(XSH_ROOT)/target/release/{xsh,xsht}`; PM tests need `XSH_MODULE_PATH` set
-to the checkout root because PM loads recipes and spawns runners at runtime,
-and the Makefile sets it.
+`$(XSH_ROOT)/target/release/{xsh,xsht}`; on Linux, when that build is absent,
+they are the static binaries `make host-xsh` puts in `.out/host/<arch>/`, so a
+Linux host needs only git, make, and Docker (see `README.md`). `ARCH` defaults
+to the host architecture. PM tests need `XSH_MODULE_PATH` set to the checkout
+root because PM loads recipes and spawns runners at runtime, and the Makefile
+sets it.
 
 | Command | Does |
 |---|---|
+| `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker (no host XSH or Rust); shares the seed's cargo target |
 | `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes) |
 | `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
 | `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
 | `make build [PKGS="a b" \| STOP=pre-cmake]`, `make plan` | PM plan and build in package-tools with `--network none` into `.out/artifacts/<arch>` (the build cache); `STOP=pre-cmake` is `repo plan --all --without cmake --without linux` |
-| `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground); publish builds the selection, then uploads it from the host |
+| `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground; on Linux built by `make host-mirror` in `xsh-test`, elsewhere run through cargo); publish builds the selection, then uploads it from the host |
 | `make root PKGS="…"` | import PKGS from the mirror on the host, compose the root offline in a container, check its ELF files load and its xsh runs |
 | `make seed-smoke`, `make test-pm-docker` | the seed in package-tools with `--network none`: offline plan plus a PM subset, or the full PM suite |
 | `make test` | `test-pm`, `test-system`, `test-xinit` native suites |

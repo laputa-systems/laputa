@@ -235,3 +235,53 @@ test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   assert ! (argv |> any .starts_with("XSH_PM_REPO"))
   assert argv[argv.len() - 2] == "/bin/xsh"
 }
+
+pure shell_word(item: Str) -> Str {
+  if " " in item { f"\"{item}\"" } else { item }
+}
+
+# The words before and after the build image: Docker options, then the cargo command.
+type ImageSplit = {docker: List[Str], cargo: List[Str]}
+
+pure split_at_image(words: List[Str]) -> ImageSplit {
+  var index = 0
+
+  while index < words.len() {
+    if words[index] == xsh_seed.xsh_seed_build_image {
+      return {docker: words[..index], cargo: words[index + 1..]}
+    }
+    index += 1
+  }
+
+  {docker: words, cargo: []}
+}
+
+# `make host-xsh` builds the host tools with plain Docker because no XSH exists
+# yet. It must stay the seed's cargo build for the host triple, or the two
+# stop sharing `.out/xsh-target` and a Linux host compiles XSH twice.
+test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process, error] {
+  let laputa_root = fs.cwd()?
+
+  for arch in ["aarch64", "x86_64"] {
+    let host_arch = f"HOST_ARCH={arch}"
+    let dry_run = run.text make -n --no-print-directory host-xsh HOST_OS=Linux $host_arch XSH_ROOT=/work/xsh ?
+    let commands = dry_run.replace("\\\n", " ").lines() |> where "cargo build" in .
+    assert commands.len() == 1
+    let made = split_at_image(commands[0].words())
+    let made_docker = made.docker.join(" ")
+
+    let seed_argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", laputa_root, /work/xsh, xsh_seed.xsh_seed_arch(arch)?, 4)?
+    let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words())
+    assert made.cargo == seed.cargo
+    assert seed.cargo.len() > 0
+
+    let seed_options = split_at_image(seed_argv).docker
+    var index = 0
+    while index + 1 < seed_options.len() {
+      if seed_options[index] in ["--env", "--mount", "--platform", "--network"] {
+        assert f"{seed_options[index]} {shell_word(seed_options[index + 1])}" in made_docker
+      }
+      index += 1
+    }
+  }
+}

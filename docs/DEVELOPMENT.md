@@ -86,7 +86,9 @@ no image. Image tags are content keys over each image's own inputs
 ## Local bootstrap
 
 The bootstrap needs no remote mirror and contacts the network only in
-`make fetch`. From a clean checkout on Apple Silicon (OrbStack, `linux/arm64`):
+`make fetch`. A Linux host without a Rust toolchain first runs `make host-xsh`
+(the sequence is in the root `README.md`). From a clean checkout on Apple
+Silicon (OrbStack, `linux/arm64`):
 
 ```bash
 cd "$LAPUTA_ROOT"
