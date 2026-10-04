@@ -9,10 +9,10 @@ export const name = "fontconfig"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.17.1"
+export const ver = "2.18.3"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "freetype", "expat"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "9f5cae93f4fffc1fbc05ae99cdfc708cd60dfd6612ffc0512827025c026fa541",
+        sha256: "4f7b554a38cdf78c033f666c8871f3749e14a094f65a07f630c91ed0b43d35e3",
       },
     ],
   },
@@ -44,7 +44,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "299726ec60bc7a06ce3e523c75aef6745cb94cec4450e8ad53817427a3f7c84b",
+        sha256: "379b8c9b6b9a46d0211be25298542a49691bdd0be0508e1b7d143b0857fd23a0",
       },
     ],
   },
@@ -57,7 +57,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "3286b76659e4b23c34d2d133a8356253ce8eafb1f37475f7aff560ebad6d5863",
+        sha256: "efcc1203e94b27fbf9296ad10a5c0e93f561a417767c4dd268f8c685fa4896ec",
       },
     ],
   },
@@ -70,7 +70,46 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b89ed7c4a85f411112db8e0377a509fc68e3a1532d0b668970b766e140187c60",
+        sha256: "71508125319069a75081953cd4d00c41fc7c9c77c2c9881a6e69b23f7fd97d34",
+      },
+    ],
+  },
+  {
+    source: p"files/generated/fcconst.h => generated",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "1cfb6ba5313d2683a747156f5b22fe74280fd37107e24ed0c0cc1661855629dd",
+      },
+    ],
+  },
+  {
+    source: p"files/generated/fcgenericfamily.h => generated",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "00364cb2458412c4ae6596180d42e5a8309f1b3aeaf353b4800ca074069a0c0c",
+      },
+    ],
+  },
+  {
+    source: p"files/generated/fcobjshash.h => generated",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "b351f54df41f4ae49b7bce469befca39af3c8308a004e7a8c12ed2e914aa98c4",
       },
     ],
   },
@@ -85,6 +124,7 @@ const conf_links = [
   "40-nonlatin.conf",
   "45-generic.conf",
   "45-latin.conf",
+  "48-guessfamily.conf",
   "48-spacing.conf",
   "49-sansserif.conf",
   "50-user.conf",
@@ -141,6 +181,10 @@ export const filetree = [
   },
   {
     path: p"etc/fonts/conf.d/45-latin.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"etc/fonts/conf.d/48-guessfamily.conf",
     kind: "symlink",
   },
   {
@@ -228,7 +272,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libfontconfig.so.1.16.0",
+    path: p"usr/lib/libfontconfig.so.1.17.0",
     kind: "binary",
   },
   {
@@ -417,79 +461,71 @@ export const filetree = [
   },
 ]
 
-proc write_alias_headers(head: Path, tail: Path, headers: List[Path]) [fs, error] {
-  let _ = headers
-  fs.write(head, "")?
-  fs.write(tail, "")?
+error FontconfigError = Patch(message: Str)
+
+proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
+  let text = fs.read_text(file)?
+
+  if old not in text {
+    return Err(FontconfigError.Patch(f"{file} no longer holds the block the recipe replaces"))?
+  }
+
+  fs.write(file, text.replace(old, new))?
 }
 
-proc write_fcobjshash() [fs, error] {
-  fs.write(
-    p"src/fcobjshash.h",
-    """#include <string.h>
-
-struct FcObjectTypeInfo {
-	const char *name;
-	int id;
-};
-
-static const struct FcObjectTypeInfo fc_object_type_info[] = {
-#define FC_OBJECT(NAME, Type, Cmp) { FC_##NAME, FC_##NAME##_OBJECT },
-#include "fcobjs.h"
-#undef FC_OBJECT
-};
-
-static unsigned int
-FcObjectTypeHash (register const char *str, register FC_GPERF_SIZE_T len)
-{
-	(void)str;
-	return (unsigned int)len;
+# Upstream's makealias.py emits hidden internal aliases for the public
+# symbols, an optimization only; empty headers build the same library with
+# PLT calls between its own functions.
+proc write_empty_alias_headers() [fs, error] {
+  for header in [p"fcalias.h", p"fcaliastail.h", p"fcftalias.h", p"fcftaliastail.h"] {
+    fs.write(header, "")?
+  }
 }
 
-static const struct FcObjectTypeInfo *
-FcObjectTypeLookup (register const char *str, register FC_GPERF_SIZE_T len)
-{
-	for (unsigned int i = 0; i < sizeof(fc_object_type_info) / sizeof(fc_object_type_info[0]); i++) {
-		if (strlen(fc_object_type_info[i].name) == len && memcmp(fc_object_type_info[i].name, str, len) == 0)
-			return &fc_object_type_info[i];
-	}
-	return 0;
-}
-""",
-  )?
-}
-
+# files/generated/ replaces upstream's Python and gperf build steps. Each
+# file is what the corresponding custom target in upstream's meson files
+# produces; regenerate them on the host from the unpacked source tree with
+# Python 3 and GNU gperf 3.3, where ORTHS is the orth_files list of
+# fc-lang/meson.build, in order:
+#   python3 fc-case/fc-case.py fc-case/CaseFolding.txt \
+#     --template fc-case/fccase.tmpl.h --output fccase.h
+#   python3 fc-lang/fc-lang.py ORTHS --template fc-lang/fclang.tmpl.h \
+#     --output fclang.h --directory fc-lang
+#   python3 conf.d/write-35-lang-normalize-conf.py LANGS 35-lang-normalize.conf
+#     (LANGS: ORTHS without `.orth` and without names holding `_`, joined by `,`)
+#   python3 fc-const/fc-const.py fc-const/fcconst.list src/fcobjs.h --output fcconst.h
+#   python3 fc-genericfamily/fc-genericfamily.py -d fc-genericfamily -o fcgenericfamily.gperf
+#   gperf --pic -m 100 fcgenericfamily.gperf --output-file fcgenericfamily.h
+# fcobjshash.h comes from src/fcobjshash.gperf.h preprocessed with -I. and
+# -Ifc-lang plus a fontconfig/fontconfig.h configured from its .h.in (cache
+# version 12, minimum compatible 9, snapshot 0, next 0):
+#   cc -E -P ... src/fcobjshash.gperf.h -o fcobjshash.gperf.h
+#   python3 src/cutout.py fcobjshash.gperf.h fcobjshash.gperf
+#   gperf --pic -m 100 fcobjshash.gperf --output-file fcobjshash.h
+# Run gperf in the directory holding its input so its output names no host path.
+# fcconst.h, fcgenericfamily.h, and fcobjshash.h go beside the sources in src/
+# that include them, where upstream relies on generated-header include paths.
 proc patch_generated_build_inputs() [fs, error] {
-  fs.remove(p"fc-case/fccase.h", missing_ok: true)?
-  fs.remove(p"fc-lang/fclang.h", missing_ok: true)?
-  fs.remove(p"conf.d/35-lang-normalize.conf", missing_ok: true)?
   fs.install(p"generated/fccase.h", p"fc-case/fccase.h", 0o644, overwrite: true)?
   fs.install(p"generated/fclang.h", p"fc-lang/fclang.h", 0o644, overwrite: true)?
+  fs.install(p"generated/fcconst.h", p"src/fcconst.h", 0o644, overwrite: true)?
+  fs.install(p"generated/fcgenericfamily.h", p"src/fcgenericfamily.h", 0o644, overwrite: true)?
+  fs.install(p"generated/fcobjshash.h", p"src/fcobjshash.h", 0o644, overwrite: true)?
   fs.install(p"generated/35-lang-normalize.conf", p"conf.d/35-lang-normalize.conf", 0o644, overwrite: true)?
-
-  write_alias_headers(
-    p"fcalias.h",
-    p"fcaliastail.h",
-    [p"fontconfig/fontconfig.h.in", p"src/fcdeprecate.h", p"fontconfig/fcprivate.h"],
-  )?
-
-  write_alias_headers(p"fcftalias.h", p"fcftaliastail.h", [p"fontconfig/fcfreetype.h"])?
-  write_fcobjshash()?
+  write_empty_alias_headers()?
   let meson = p"meson.build"
-  var text = meson.read_text()?
 
-  text = text.replace(
-    """    'rust_std=2021',
-""",
-    "",
-  )
+  replace_required(meson, """    'rust_std=2021',
+""", "")?
 
-  text = text.replace(
+  replace_required(
+    meson,
     "math_dep = cc.find_library('m', required: false)",
     "math_dep = declare_dependency(link_args: ['-lm'])",
-  )
+  )?
 
-  text = text.replace(
+  replace_required(
+    meson,
     """foreach check : check_sizeofs
   type = check[0]
   opts = check.length() > 1 ? check[1] : {}
@@ -522,43 +558,48 @@ foreach check : check_alignofs
   conf.set(conf_name, (type == 'void *' or type == 'double') ? 8 : cc.alignment(type))
 endforeach
 """,
-  )
+  )?
 
-  text = text.replace("python3 = import('python').find_installation()", "python3 = 'vendored-generated'")
-  text = text.replace("gperf = find_program('gperf')", "gperf = 'vendored-gperf'")
+  replace_required(meson, "python3 = import('python').find_installation()\n", "")?
 
-  text = text.replace(
+  # gperf 3.1 and later type lengths as size_t, as the vendored output does.
+  replace_required(
+    meson,
     """gperf = find_program('gperf', required: false)
 gperf_len_type = ''
 
 if gperf.found() and get_option('wrap_mode') != 'forcefallback'
   gperf_test_format = '''
-#include <string.h>
-const char * in_word_set(const char *, @0@);
-const char * s = "";
-int main(void) { return in_word_set(s, strlen(s)) != 0; }
-'''
+  #include <string.h>
+  const char * in_word_set(const char *, @0@);
+  @1@
+  '''
   gperf_snippet = run_command(gperf, '-L', 'ANSI-C', files('meson-cc-tests/gperf.txt'),
                               check: true).stdout()
-  foreach type: ['size_t', 'unsigned int']
+
+  foreach type : ['size_t', 'unsigned']
     if cc.compiles(gperf_test_format.format(type, gperf_snippet))
       gperf_len_type = type
       break
     endif
   endforeach
+
   if gperf_len_type == ''
     error('unable to determine gperf len type')
   endif
 else
+  # Fallback to subproject
   gperf = find_program('gperf')
+  # assume if we are compiling from the wrap, the size is just size_t
   gperf_len_type = 'size_t'
 endif
 """,
     """gperf_len_type = 'size_t'
 """,
-  )
+  )?
 
-  text = text.replace(
+  replace_required(
+    meson,
     """alias_headers = custom_target('alias_headers',
                               output: ['fcalias.h', 'fcaliastail.h'],
                               input: alias_input_headers,
@@ -574,15 +615,11 @@ ft_alias_headers = custom_target('ft_alias_headers',
     """alias_headers = files('fcalias.h', 'fcaliastail.h')
 ft_alias_headers = files('fcftalias.h', 'fcftaliastail.h')
 """,
-  )
+  )?
 
-  fs.write(meson, text)?
-  let src_meson = p"src/meson.build"
-
-  fs.write(
-    src_meson,
-    src_meson.read_text()?.replace(
-  """fcobjshash_h = cc.preprocess('fcobjshash.gperf.h', include_directories: incbase)
+  replace_required(
+    p"src/meson.build",
+    """fcobjshash_h = cc.preprocess('fcobjshash.gperf.h', include_directories: incbase)
 fcobjshash_gperf = custom_target(
   input: fcobjshash_h,
   output: 'fcobjshash.gperf',
@@ -590,53 +627,79 @@ fcobjshash_gperf = custom_target(
   build_by_default: true,
 )
 
-fcobjshash_h = custom_target('fcobjshash.h',
+fcobjshash_h = custom_target(
+  'fcobjshash.h',
   input: fcobjshash_gperf,
   output: 'fcobjshash.h',
-  command: [gperf, '--pic', '-m', '100', '@INPUT@', '--output-file', '@OUTPUT@']
+  command: [gperf, '--pic', '-m', '100', '@INPUT@', '--output-file', '@OUTPUT@'],
 )
 """,
-  """fcobjshash_h = files('fcobjshash.h')
+    """fcobjshash_h = files('fcobjshash.h')
 """,
-),
   )?
 
-  let fc_case_meson = p"fc-case/meson.build"
-
-  fs.write(
-    fc_case_meson,
-    fc_case_meson.read_text()?.replace(
-  """fccase_h = custom_target('fccase.h',
+  replace_required(
+    p"fc-case/meson.build",
+    """fccase_h = custom_target('fccase.h',
   output: 'fccase.h',
   input: ['CaseFolding.txt', 'fccase.tmpl.h'],
   command: [find_program('fc-case.py'), '@INPUT0@', '--template', '@INPUT1@', '--output', '@OUTPUT@'])
 """,
-  """fccase_h = files('fccase.h')
+    """fccase_h = files('fccase.h')
 """,
-),
   )?
 
-  let fc_lang_meson = p"fc-lang/meson.build"
-
-  fs.write(
-    fc_lang_meson,
-    fc_lang_meson.read_text()?.replace(
-  """fclang_h = custom_target('fclang.h',
+  replace_required(
+    p"fc-lang/meson.build",
+    """fclang_h = custom_target(
+  'fclang.h',
   output: ['fclang.h'],
   input: orth_files,
-  command: [find_program('fc-lang.py'), orth_files, '--template', files('fclang.tmpl.h')[0], '--output', '@OUTPUT@', '--directory', meson.current_source_dir()],
+  command: [
+    find_program('fc-lang.py'),
+    orth_files,
+    '--template',
+    files('fclang.tmpl.h')[0],
+    '--output',
+    '@OUTPUT@',
+    '--directory',
+    meson.current_source_dir(),
+  ],
   build_by_default: true,
 )
 """,
-  """fclang_h = files('fclang.h')
+    """fclang_h = files('fclang.h')
 """,
-),
   )?
 
-  let conf_meson = p"conf.d/meson.build"
-  var conf_text = conf_meson.read_text()?
+  # The fc-const target also writes a test-only source; tests are disabled.
+  replace_required(
+    p"fc-const/meson.build",
+    """fcconst_h = custom_target('fcconst.h',
+  output: 'fcconst.h',
+  input: ['fcconst.list', fcobjs_h],
+  command: [find_program('fc-const.py'), '@INPUT0@', '@INPUT1@', '--output', '@OUTPUT@'])
+test_const_name_c = custom_target('test_const_name.c',
+  output: 'test_const_name.c',
+  input: ['fcconst.list', fcobjs_h],
+  command: [find_program('fc-const.py'), '-t', '@INPUT0@', '@INPUT1@', '--output', '@OUTPUT@'])
+""",
+    """fcconst_h = files('../src/fcconst.h')
+""",
+  )?
 
-  conf_text = conf_text.replace(
+  let genericfamily_meson = p"fc-genericfamily/meson.build"
+  let genericfamily_text = fs.read_text(genericfamily_meson)?
+
+  if "command: [gperf, '--pic', '-m', '100', '@INPUT@', '--output-file', '@OUTPUT@']," not in genericfamily_text {
+    return Err(FontconfigError.Patch(f"{genericfamily_meson} no longer runs gperf on the generated families"))?
+  }
+
+  fs.write(genericfamily_meson, "fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")?
+  let conf_meson = p"conf.d/meson.build"
+
+  replace_required(
+    conf_meson,
     """custom_target('35-lang-normalize.conf',
   output: '35-lang-normalize.conf',
   command: [find_program('write-35-lang-normalize-conf.py'), ','.join(orths), '@OUTPUT@'],
@@ -648,18 +711,18 @@ fcobjshash_h = custom_target('fcobjshash.h',
              install_dir: fc_templatedir,
              install_tag: 'runtime')
 """,
-  )
+  )?
 
-  conf_text = conf_text.replace(
+  # The recipe links conf_links itself after install.
+  replace_required(
+    conf_meson,
     """meson.add_install_script('link_confs.py', fc_templatedir,
                          fc_configdir,
                          conf_links,
                          install_tag: 'runtime')
 """,
     "",
-  )
-
-  fs.write(conf_meson, conf_text)?
+  )?
 }
 
 ## Exported declaration `build`.
@@ -686,12 +749,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  for bin in ["fc-cat", "fc-conflist", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
+  for bin in ["fc-cat", "fc-conflist", "fc-genconf", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
     fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)?
   }
 
+  # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
+  # makes them, so they resolve in any root the package is installed into.
   for conf in conf_links {
-    fs.symlink(fp"../../share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")?
+    fs.symlink(fp"../../../usr/share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")?
   }
 
   fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
