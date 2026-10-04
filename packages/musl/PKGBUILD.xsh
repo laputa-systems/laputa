@@ -206,9 +206,13 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fs.write(p"include/bits/alltypes.h", at_lines.join("\n"))?
 
-  # Generate include/bits/syscall.h: rename __NR_* → SYS_*.
+  # Generate include/bits/syscall.h as musl's Makefile does: the __NR_* header
+  # as is, then a SYS_* copy of each __NR_ line (`sed -n s/__NR_/SYS_/p`).
+  # Programs use both names.
   let syscall_in = fs.read_text(fp"arch/{arch}/bits/syscall.h.in")?
-  fs.write(p"include/bits/syscall.h", syscall_in.replace("__NR_", "SYS_"))?
+  let sys_names = [line.replace("__NR_", "SYS_") for line in syscall_in.lines() if "__NR_" in line]
+  let base = if syscall_in.ends_with("\n") { syscall_in } else { syscall_in + "\n" }
+  fs.write(p"include/bits/syscall.h", base + sys_names.join("\n") + "\n")?
 
   # Generate src/internal/version.h (included by src/internal/version.c).
   # configure normally produces this from tools/version.sh + VERSION file.

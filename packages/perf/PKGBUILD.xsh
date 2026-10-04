@@ -567,9 +567,6 @@ pure perf_cflags(arch: PerfArch) -> List[Str] {
     f"-I{out}/libsymbol/include",
     f"-I{out}/libperf/include",
     f"-I{out}/",
-    # Not upstream: the temporary __NR_* names that write_musl_syscall_names restores.
-    "-include",
-    f"{out}/musl-syscall-nr.h",
   ]
 }
 
@@ -631,25 +628,6 @@ pure unit_cflags(obj: Str) -> List[Str] {
   }
 }
 
-# Temporary: the musl recipe writes bits/syscall.h with only the SYS_* names,
-# while upstream musl's header also carries the __NR_* names that perf-sys.h,
-# libperf, and the benchmarks call syscall() with. This header restores them
-# from the build root's SYS_* list; delete it, and its -include, once the musl
-# recipe emits both name sets.
-proc write_musl_syscall_names() [fs, env, error] {
-  let build_root = env.get("XSH_PM_BUILD_ROOT")?
-  var lines = ["#include <sys/syscall.h>"]
-
-  for line in fp"{build_root}/usr/include/bits/syscall.h".read_text()?.lines() {
-    let words = line.words()
-    continue unless words.len() == 3 and words[0] == "#define" and words[1].starts_with("SYS_")
-    let syscall = words[1].replace("SYS_", "")
-    lines += [f"#ifndef __NR_{syscall}", f"#define __NR_{syscall} SYS_{syscall}", "#endif"]
-  }
-
-  fs.write(fp"{out}/musl-syscall-nr.h", lines.join("\n") + "\n")?
-}
-
 # PERF-VERSION-GEN outside a git checkout writes the top Makefile's
 # `kernelversion`: VERSION.PATCHLEVEL.SUBLEVEL followed by EXTRAVERSION.
 proc write_perf_version_file() [fs, error] {
@@ -704,7 +682,6 @@ proc build_perf(cc: Path) [fs, process, env, error] -> Result[Path] {
   let triple = f"{target}-linux-musl"
   install_library_headers()?
   write_perf_version_file()?
-  write_musl_syscall_names()?
 
   let lib_cflags = [
     @extra_warnings,
