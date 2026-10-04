@@ -134,7 +134,7 @@ proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.T
 
     continue unless expanded.starts_with("repository/")
     let relative = fp"{expanded.replace("repository/", "")}".normalize()
-    util.ensure_relative_path(relative, f"repository source {expanded}")?
+    let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 
     if ! fs.exists(input)? {

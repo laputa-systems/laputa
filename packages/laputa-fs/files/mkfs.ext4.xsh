@@ -784,7 +784,7 @@ proc zero_image(image: Path, size: Int) [error] {
 
   while offset < size {
     let length = min_int(size - offset, chunk)
-    bytes.zero_at(image, offset, length)?
+    let _ = bytes.zero_at(image, offset, length)?
     offset += length
   }
 }

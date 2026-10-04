@@ -145,7 +145,7 @@ export proc build(dest: Path) [fs, error] {
   fs.mkdir(base)?
 
   for dir in [p"compat", p"geometry", p"keycodes", p"symbols", p"types"] {
-    fs.copy_tree(dir, fp"{base}/{dir.name}", parents: true, overwrite: true)?
+    let _ = fs.copy_tree(dir, fp"{base}/{dir.name}", parents: true, overwrite: true)?
   }
 
   fs.mkdir(fp"{base}/rules")?

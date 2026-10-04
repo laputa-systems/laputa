@@ -276,7 +276,7 @@ proc stage_resolved_source(
 
   if source_kind == types.source_directory() or resolved.kind == "dir" {
     fs.mkdir(dest)?
-    fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
+    let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
     return
   }
 
