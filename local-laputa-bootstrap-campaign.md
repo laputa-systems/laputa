@@ -336,6 +336,106 @@ Failures found and fixed, in order:
 - XSH: `.cargo/config.toml` forced rust-lld for the host musl triple, so host
   cargo could not link proc-macros. And a net test raced its own cancel.
 
+## Upgrade and new-package campaign (2026-10-04, wrapped up early)
+
+The goal was every package at its latest stable release (D13), the new
+packages below, and a fresh world build. Work ran in parallel agents in git
+worktrees sharing the artifact store, with heavy builds serialized on
+`.out/heavy.lock`. Everything listed as done is merged on master. At the last
+integration build, master built 82 packages and passed the canonical
+`qemu-dwl-foot` proof (KVM, kernel 7.2.9, real Mesa, wlroots 0.20).
+
+**Upgraded:**
+- every package to latest stable, except LLVM (D13) and mdevd (0.1.8.3's
+  tarball 404s);
+- kernel and linux-headers 7.2.9 (the x86 config normalized by Kconfig);
+- Rust 1.99, pkgconf 3.0.7, cmake 4.4.4, muon 0.7.0, tmux 3.7c (now works
+  under foot, linux and vt100), dropbear 2026.94, less 710;
+- the Wayland stack: wayland 1.26, wlroots 0.20.2, dwl 0.9, foot 1.28,
+  fontconfig 2.18.3.
+
+**New:**
+- real Mesa 26.2.4 (replaces the `mesa-minimal` shim; softpipe and virgl,
+  without LLVM);
+- `linux-headers` (byte-identical to `make headers_install`), perf;
+- libmnl, libnftnl, nftables; a real iptables 1.8.13 (the old recipe was a
+  stub);
+- wireless-regdb, amd-ucode (x86_64 only, via the new recipe `architectures`
+  field);
+- strace, libcap, tzdata, mandoc, man-pages, uv.
+
+**Fixed along the way** (each one in its commit message):
+- m4, bison and flex were silently broken. Five regex literals in `m4.xsh`
+  were damaged before the import. m4 is now GNU-compatible, bison and flex
+  output matches GNU, and their proofs compile real parsers.
+- musl now has `clone()` and installs both `__NR_*` and `SYS_*` names.
+- x86 `asm/stat.h` and six other headers were clobbered; both arches'
+  `CONFIG_CMDLINE` was truncated.
+- libevdev name lookups failed (unsorted tables); fontconfig never loaded its
+  conf.d rules; libva needed `../../build-root/usr/lib/libdl.so`; less's arrow
+  keys did not work; wpa_supplicant claimed WPA3 it could not do.
+- Proofs: linux-pam's checks could never fail, and DT_NEEDED paths are now
+  rejected.
+- Host mode bits leaked into keys and payloads; PM ordered `3.7c` before
+  `next-3.7`.
+
+**World build and PM improvements:**
+- The executor schedules by dependency, with one log per package and a
+  slowest-packages report; failures name the package and its log.
+- Container outputs are owned by the host user.
+- `make verify` runs the whole proof from `make clean`.
+- `pm store gc` and `make store-gc` remove unreferenced artifacts.
+- `repo plan --target` defaults to the host.
+- `forbidden_packages` is enforced, and `forbidden_sonames` now matches real
+  sonames.
+- The QMP socket path fits under any checkout; `make check` covers
+  extensionless XSH scripts.
+
+**XSH** (`../xsh`, local commits rebased onto origin/master, not pushed):
+- An ordinary `#` comment may sit between a doc block and its declaration.
+- The tar extractor strips hard-link targets.
+- `@CONST` can be spliced into `run`, and lowering errors give their reason.
+- `fs.remove` is documented as recursive (it always was).
+- A racy net test was fixed.
+- Earlier, now upstream: `fs.write_atomic` modes; the host musl linker.
+
+### Handoff: what is open
+
+- **Lanes still running at wrap-up:** XSH terminfo compiler and database,
+  real alsa-lib/alsa-utils builds (the current recipes are stubs that compile
+  nothing), and deno from source. Each is merged below if it landed;
+  otherwise its worktree branch holds the work.
+- **Upstream XSH regression (not ours):** on origin/master, a debug `xsh`
+  overflows an 8 MB stack running `dev/main.xsh`, so `cargo dev` segfaults
+  (exit 139). Release builds work: `target/release/xsh dev/main.xsh --
+  ...` runs the same driver. Repro: `cargo dev --help`. It passes with
+  `ulimit -s unlimited`.
+- **Not run on master after the last merges:** `make verify` (the clean-host
+  proof, including the installer QEMU proof). Run it before the next
+  milestone. It deletes `.out/`, so never run it while agents share the store.
+- **aarch64:** nothing was built or booted for aarch64 in either campaign.
+- **Vendored generator outputs that real tools could now replace:**
+  - Mesa's 9 parser/lexer files and perf's flex/bison files. bison works now
+    but is slow: m4 is XSH-interpreted (glsl_parser.yy takes 97 s).
+  - Making m4 faster, or keeping these vendored, is the trade-off.
+- **Deferred improvements:**
+  - one source of truth for duplicated pins (Rust dist date, kernel tarball);
+  - proof-only dependencies (`proof_deps`), so mandoc need not be a build
+    dependency of man-pages;
+  - a reproducibility check (rebuild and compare payload hashes);
+  - a Kconfig drift check for the config fragments;
+  - `pm repo outdated`;
+  - run makewhatis when composing a root;
+  - drop the now-redundant `find_library('m'/'rt')` workarounds (muon links
+    libc's aliases by name now).
+- **Smaller findings:**
+  - xinit accepts unknown service fields.
+  - The profile proof's screenshot is taken after foot exits.
+  - Kernel sound and WLAN are off, so alsa, wpa_supplicant and wireless-regdb
+    have no device to use in QEMU.
+  - The aarch64 kernel has PERF_EVENTS off.
+  - libudev-zero needs a `usb.ids` that hwdata doesn't ship.
+
 ## Decisions (settled 2026-10-03)
 
 - **D1. Fetch once, then offline.**
