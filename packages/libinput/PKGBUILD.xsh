@@ -9,10 +9,10 @@ export const name = "libinput"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.31.2"
+export const ver = "1.32.0"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
@@ -40,7 +40,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "507a40b8a74568ed7c2bd05acf2e15ee3d9f4703102dca86d4f6a804e73bf1f6",
+        sha256: "7dd6c1ca964c86eb6810ccd6639cda634e68bdca43bf3afec39e94e942fac8d4",
       },
     ],
   },
@@ -261,6 +261,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/share/libinput/50-system-eaecis.quirks",
+    kind: "file",
+  },
+  {
     path: p"usr/share/libinput/50-system-framework.quirks",
     kind: "file",
   },
@@ -306,6 +310,10 @@ export const filetree = [
   },
   {
     path: p"usr/share/libinput/50-system-minisforum.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-panasonic.quirks",
     kind: "file",
   },
   {
