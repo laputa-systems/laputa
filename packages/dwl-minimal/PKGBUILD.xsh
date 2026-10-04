@@ -9,13 +9,13 @@ export const name = "dwl-minimal"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "0.8"
+export const ver = "0.9"
 
 ## Exported declaration `rel`.
-export const rel = "11"
+export const rel = "1"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "wlroots0.19-mesa", "wayland-libs-server", "libxkbcommon", "libinput"]
+export const deps = ["musl", "wlroots0.20", "wayland-libs-server", "libxkbcommon", "libinput"]
 
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = [
@@ -24,7 +24,7 @@ export const mkdeps_host = [
   "wayland-dev",
   "wayland-protocols",
   "linux-headers",
-  "wlroots0.19-mesa",
+  "wlroots0.20",
   "pixman-dev",
   "libdrm",
   "mesa",
@@ -46,7 +46,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "3080087e7f613bf6a350934231fd9ed478d04cd2a2f30da8a96cdf2066f59412",
+        sha256: "635c1c352c32f2e69d7acf95053ed6178e8614b51485f221bae78255b0bf3e3d",
       },
     ],
   },
@@ -78,6 +78,7 @@ proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) [process
 proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) [fs, process, error] {
   let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
   run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h" ?
+  run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" "ext-image-copy-capture-v1-protocol.h" ?
   run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h" ?
   run $scanner "enum-header" "protocols/wlr-layer-shell-unstable-v1.xml" "wlr-layer-shell-unstable-v1-protocol.h" ?
   run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" "wlr-output-power-management-unstable-v1-protocol.h" ?
@@ -88,15 +89,18 @@ proc patch_startup() [fs, error] {
   let source = p"dwl.c"
   var text = source.read_text()?
 
-  text = text.replace(
+  text = replace_required(
+    text,
     """static void run(char *startup_cmd);
 """,
     """static void run(char *startup_cmd);
 static char **startup_argv(char *startup_cmd);
 """,
-  )
+    "the run() prototype",
+  )?
 
-  text = text.replace(
+  text = replace_required(
+    text,
     """void
 run(char *startup_cmd)
 """,
@@ -134,9 +138,11 @@ startup_argv(char *startup_cmd)
 void
 run(char *startup_cmd)
 """,
-  )
+    "run()",
+  )?
 
-  text = text.replace(
+  text = replace_required(
+    text,
     """	/* Now that the socket exists and the backend is started, run the startup command */
 	if (startup_cmd) {
 		int piperw[2];
@@ -170,9 +176,11 @@ run(char *startup_cmd)
 		}
 	}
 """,
-  )
+    "the startup command block",
+  )?
 
-  text = text.replace(
+  text = replace_required(
+    text,
     """else if (c == 'v')
 			die("dwl " VERSION);
 """,
@@ -181,7 +189,8 @@ run(char *startup_cmd)
 			return EXIT_SUCCESS;
 		}
 """,
-  )
+    "the -v option",
+  )?
 
   fs.write(source, text)?
 }
@@ -194,10 +203,25 @@ export pure config_without_unavailable_menu(config: Str) -> Str {
   lines.join("\n")
 }
 
+error DwlError = Patch(message: Str)
+
+pure replace_required(text: Str, old: Str, new: Str, what: Str) -> Result[Str] {
+  if old not in text {
+    return Err(DwlError.Patch(f"dwl's sources no longer hold {what}"))
+  }
+
+  text.replace(old, new)
+}
+
+# The runtime has no /bin/sh, so the configuration drops SHCMD and the
+# example scroll bindings that use it. dwl skips axis bindings without a
+# function, so one empty entry keeps the array nonempty without binding a
+# scroll direction.
 proc write_config() [fs, error] {
   var config = p"config.def.h".read_text()?
 
-  config = config.replace(
+  config = replace_required(
+    config,
     """/* helper for spawning shell commands in the pre dwm-5.0 fashion */
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
 
@@ -208,7 +232,20 @@ static const char *menucmd[] = { "wmenu-run", NULL };
     """/* commands */
 static const char *termcmd[] = { "/usr/bin/foot", NULL };
 """,
-  )
+    "the shell helper and default commands",
+  )?
+
+  config = replace_required(
+    config,
+    """static const Axis axes[] = {
+	{ MODKEY, AxisUp,   spawn, SHCMD("volume-up_EXAMPLE") },
+	{ MODKEY, AxisDown, spawn, SHCMD("volume-down_EXAMPLE") },
+};""",
+    """static const Axis axes[] = {
+	{ 0 },
+};""",
+    "the example scroll bindings",
+  )?
 
   config = config_without_unavailable_menu(config)
 
@@ -231,7 +268,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   let scanner = if cross_build { fp"{build_root}/usr/bin/wayland-scanner" } else { process.which("wayland-scanner")? }
-  let packages = ["wayland-server", "xkbcommon", "libinput", "wlroots-0.19"]
+  let packages = ["wayland-server", "xkbcommon", "libinput", "wlroots-0.20"]
   patch_startup()?
   write_config()?
 
@@ -259,9 +296,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "-O2",
     ].extend(pkg_cflags)
 
-    run $cc "-c" "dwl.c" "-o" "dwl.o" @cflags ?
-    run $cc "-c" "util.c" "-o" "util.o" @cflags ?
-    run $cc "dwl.o" "util.o" "-o" "dwl" @pkg_libs "-lm" ?
+    run $cc "dwl.c" "-o" "dwl" @cflags @pkg_libs "-lm" ?
   }?
 
   fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)?

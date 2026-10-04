@@ -3,16 +3,16 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Package recipe export.
-export const name = "wlroots0.19-mesa"
+export const name = "wlroots0.20"
 
 ## Explicit payload or metapackage classification.
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.19.3"
+export const ver = "0.20.2"
 
 ## Package recipe export.
-export const rel = "19"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = [
@@ -63,589 +63,582 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "a6ff89b64ea15e424d1b0db4a22145fccf5ec2ff2e7b8af0fa35e2ac8975986f",
+        sha256: "972c7ac44b17828f4702bfae7cd8347346a3fb5b2c1076cfa2c3fcedac5ec343",
       },
     ],
   },
 ]
 
-type PnpRecord = {id: Str, vendor: Str}
-
 ## Package recipe export.
 export const filetree = [
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/drm.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/drm.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/headless.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/headless.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/interface.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/interface.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/libinput.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/libinput.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/multi.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/multi.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/session.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/session.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/backend/wayland.h",
+    path: p"usr/include/wlroots-0.20/wlr/backend/wayland.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/config.h",
+    path: p"usr/include/wlroots-0.20/wlr/config.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_buffer.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_buffer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_ext_image_capture_source_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_ext_image_capture_source_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_keyboard.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_keyboard.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_output.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_output.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_pointer.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_pointer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_switch.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_switch.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_tablet_pad.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_tablet_pad.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_tablet_tool.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_tablet_tool.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/interfaces/wlr_touch.h",
+    path: p"usr/include/wlroots-0.20/wlr/interfaces/wlr_touch.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/allocator.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/allocator.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/color.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/color.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/dmabuf.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/dmabuf.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/drm_format_set.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/drm_format_set.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/drm_syncobj.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/drm_syncobj.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/egl.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/egl.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/gles2.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/gles2.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/interface.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/interface.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/pass.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/pass.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/pixman.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/pixman.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/swapchain.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/swapchain.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/wlr_renderer.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/wlr_renderer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/render/wlr_texture.h",
+    path: p"usr/include/wlroots-0.20/wlr/render/wlr_texture.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_alpha_modifier_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_alpha_modifier_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_buffer.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_buffer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_color_management_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_color_management_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_compositor.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_color_representation_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_content_type_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_compositor.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_cursor.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_content_type_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_cursor_shape_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_cursor.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_damage_ring.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_cursor_shape_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_data_control_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_damage_ring.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_data_device.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_data_control_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_drm.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_data_device.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_drm_lease_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_drm.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_export_dmabuf_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_drm_lease_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_ext_data_control_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_export_dmabuf_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_ext_foreign_toplevel_list_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_ext_data_control_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_ext_image_capture_source_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_ext_foreign_toplevel_list_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_ext_image_copy_capture_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_ext_image_capture_source_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_foreign_toplevel_management_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_ext_image_copy_capture_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_fractional_scale_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_ext_workspace_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_gamma_control_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_fixes.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_idle_inhibit_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_foreign_toplevel_management_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_idle_notify_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_fractional_scale_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_input_device.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_gamma_control_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_input_method_v2.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_idle_inhibit_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_keyboard.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_idle_notify_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_keyboard_group.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_input_device.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_input_method_v2.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_layer_shell_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_keyboard.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_linux_dmabuf_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_keyboard_group.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_linux_drm_syncobj_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_layer_shell_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output_layer.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_linux_dmabuf_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output_layout.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_linux_drm_syncobj_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output_management_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output_power_management_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output_layer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_output_swapchain_manager.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output_layout.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_pointer.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output_management_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_pointer_constraints_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output_power_management_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_pointer_gestures_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_output_swapchain_manager.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_presentation_time.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_pointer.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_primary_selection.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_pointer_constraints_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_primary_selection_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_pointer_gestures_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_relative_pointer_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_presentation_time.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_scene.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_primary_selection.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_screencopy_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_primary_selection_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_seat.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_relative_pointer_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_security_context_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_scene.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_server_decoration.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_screencopy_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_session_lock_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_seat.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_shm.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_security_context_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_single_pixel_buffer_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_server_decoration.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_subcompositor.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_session_lock_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_switch.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_shm.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_tablet_pad.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_single_pixel_buffer_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_tablet_tool.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_subcompositor.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_tablet_v2.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_switch.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_tearing_control_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_tablet_pad.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_text_input_v3.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_tablet_tool.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_touch.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_tablet_v2.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_transient_seat_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_tearing_control_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_viewporter.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_text_input_v3.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_virtual_keyboard_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_touch.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_virtual_pointer_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_transient_seat_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xcursor_manager.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_viewporter.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_activation_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_virtual_keyboard_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_decoration_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_virtual_pointer_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_dialog_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xcursor_manager.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_foreign_registry.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_activation_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_foreign_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_decoration_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_foreign_v2.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_dialog_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_output_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_foreign_registry.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_shell.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_foreign_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_system_bell_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_foreign_v2.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/types/wlr_xdg_toplevel_icon_v1.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_output_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/addon.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_shell.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/box.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_system_bell_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/edges.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_toplevel_icon_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/log.h",
+    path: p"usr/include/wlroots-0.20/wlr/types/wlr_xdg_toplevel_tag_v1.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/region.h",
+    path: p"usr/include/wlroots-0.20/wlr/util/addon.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/util/transform.h",
+    path: p"usr/include/wlroots-0.20/wlr/util/box.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/version.h",
+    path: p"usr/include/wlroots-0.20/wlr/util/edges.h",
     kind: "file",
   },
   {
-    path: p"usr/include/wlroots-0.19/wlr/xcursor.h",
+    path: p"usr/include/wlroots-0.20/wlr/util/log.h",
     kind: "file",
   },
   {
-    path: p"usr/lib/libwlroots-0.19.so",
+    path: p"usr/include/wlroots-0.20/wlr/util/region.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wlroots-0.20/wlr/util/transform.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wlroots-0.20/wlr/version.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wlroots-0.20/wlr/xcursor.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/libwlroots-0.20.so",
     kind: "binary",
   },
   {
-    path: p"usr/lib/pkgconfig/wlroots-0.19.pc",
+    path: p"usr/lib/pkgconfig/wlroots-0.20.pc",
     kind: "file",
   },
 ]
 
-pure c_string(text: Str) -> Str {
-  text.replace("\\", "\\\\").replace("\"", "\\\"")
+error WlrootsError = Generate(message: Str) | Patch(message: Str)
+
+proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
+  let text = fs.read_text(file)?
+
+  if old not in text {
+    return Err(WlrootsError.Patch(f"{file} no longer holds the block the recipe replaces"))?
+  }
+
+  fs.write(file, text.replace(old, new))?
 }
 
-pure c_multiline_string(text: Str) -> Str {
-  c_string(text).replace(
-    "\n",
-    """\\n"
-\"""",
-  )
-}
-
+# Port of render/gles2/shaders/embed.sh: the shader source as a
+# NUL-terminated byte array, one byte per line.
 proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
-  fs.write(
-    dest,
-    f"""static const char {symbol}[] =
-"{c_multiline_string(src.read_text()?)}";
-""",
-  )?
-}
+  var lines = [f"static const char {symbol}[] = {{"]
 
-proc write_shader_headers() [fs, error] {
-  write_shader_header(p"render/gles2/shaders/common.vert", p"render/gles2/shaders/common_vert_src.h", "common_vert_src")?
-  write_shader_header(p"render/gles2/shaders/quad.frag", p"render/gles2/shaders/quad_frag_src.h", "quad_frag_src")?
+  for line in src.read_bytes()?.dump("hex-u8").split("\n") {
+    let words = line.words()
+    var index = 1
 
-  write_shader_header(
-    p"render/gles2/shaders/tex_rgba.frag",
-    p"render/gles2/shaders/tex_rgba_frag_src.h",
-    "tex_rgba_frag_src",
-  )?
-
-  write_shader_header(
-    p"render/gles2/shaders/tex_rgbx.frag",
-    p"render/gles2/shaders/tex_rgbx_frag_src.h",
-    "tex_rgbx_frag_src",
-  )?
-
-  write_shader_header(
-    p"render/gles2/shaders/tex_external.frag",
-    p"render/gles2/shaders/tex_external_frag_src.h",
-    "tex_external_frag_src",
-  )?
-}
-
-proc write_pnpids(root: Str) [fs, error] {
-  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  var records: List[PnpRecord] = []
-
-  for line in pnp.read_text()?.split("\n") {
-    let trimmed = line.trim()
-
-    if trimmed != "" {
-      let words = trimmed.words()
-
-      if words.len() >= 2 and words[0].count_chars() == 3 {
-        records = records.push({id: words[0], vendor: trimmed.replace(words[0], "").trim()})
-      }
+    while index < words.len() {
+      lines = lines.push(f"\t0x{words[index]},")
+      index += 1
     }
   }
 
-  records = records |> sort-by .id
+  lines += ["\t0x00,", "};", ""]
+  fs.write(dest, lines.join("\n"))?
+}
+
+proc write_shader_headers() [fs, error] {
+  for name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
+    let symbol = f"{name.replace(".", "_")}_src"
+    write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)?
+  }
+}
+
+## Port of backend/drm/gen_pnpids.sh: a switch case per pnp.ids line, in file
+## order, with the vendor name as written. Like the script, a line whose first
+## field is not a three-character ID is an error.
+export pure pnpids_source(pnp_ids: Str) -> Result[Str] {
   var cases = []
 
-  for entry in records {
-    let chars = entry.id.split("")
+  for line in pnp_ids.split("\n") {
+    if let [_, id, vendor] = rx"^\s*(\S+)\s*(.*)$".captures(line) {
+      if id.byte_len() != 3 {
+        return Err(WlrootsError.Generate(f"pnp.ids holds an ID that is not three characters: {id}"))
+      }
 
-    if chars.len() == 3 {
       cases = cases.push(
-        f"    case PNP_ID('{c_string(chars[0])}', '{c_string(chars[1])}', '{c_string(chars[2])}'): return \"{c_string(entry.vendor)}\";",
+        f"\tcase PNP_ID('{id.byte_slice(0, 1)}', '{id.byte_slice(1, 1)}', '{id.byte_slice(2, 1)}'): return \"{vendor.trim()}\";",
       )
     }
   }
 
-  fs.write(
-    p"backend/drm/pnpids.c",
-    f"""#include "backend/drm/util.h"
+  f"""#include "backend/drm/util.h"
 
 #define PNP_ID(a, b, c) ((a & 0x1f) << 10) | ((b & 0x1f) << 5) | (c & 0x1f)
-const char *get_pnp_manufacturer(const char code[static 3]) {{{{
-	switch (PNP_ID(code[0], code[1], code[2])) {{{{
+const char *get_pnp_manufacturer(const char code[static 3]) {{
+	switch (PNP_ID(code[0], code[1], code[2])) {{
 {cases.join("\n")}
-	}}}}
+	}}
 	return NULL;
-}}}}
+}}
 #undef PNP_ID
-""",
-  )?
+"""
+}
+
+proc write_pnpids(root: Str) [fs, error] {
+  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
+  fs.write(p"backend/drm/pnpids.c", pnpids_source(pnp.read_text()?)?)?
 }
 
 proc patch_build(root: Str) [fs, error] {
   write_pnpids(root)?
   write_shader_headers()?
-  let meson = p"meson.build"
 
-  fs.write(
-    meson,
-    meson.read_text()?.replace(
-  """math = cc.find_library('m')
+  replace_required(
+    p"meson.build",
+    """math = cc.find_library('m')
 rt = cc.find_library('rt')""",
-  """# musl packages libm as a libc symlink and provides realtime interfaces in libc.
+    """# musl packages libm as a libc symlink and provides realtime interfaces in libc.
 math = declare_dependency(link_args: ['-lm'])
 rt = declare_dependency()""",
-),
   )?
 
-  let drm_meson = p"backend/drm/meson.build"
-
-  fs.write(
-    drm_meson,
-    drm_meson.read_text()?.replace(
-  """pnpids_c = custom_target(
+  replace_required(
+    p"backend/drm/meson.build",
+    """pnpids_c = custom_target(
 	'pnpids.c',
 	output: 'pnpids.c',
 	input: files(hwdata_dir / 'pnp.ids'),
@@ -654,53 +647,55 @@ rt = declare_dependency()""",
 	command: files('gen_pnpids.sh'),
 )
 """,
-  """pnpids_c = files('pnpids.c')
+    """pnpids_c = files('pnpids.c')
 """,
-),
   )?
 
-  let protocol_meson = p"protocol/meson.build"
-
-  fs.write(
-    protocol_meson,
-    protocol_meson.read_text()?.replace(
-  """	'xwayland-shell-v1': wl_protocol_dir / 'staging/xwayland-shell/xwayland-shell-v1.xml',
+  replace_required(
+    p"protocol/meson.build",
+    """	'xwayland-shell-v1': wl_protocol_dir / 'staging/xwayland-shell/xwayland-shell-v1.xml',
 """,
-  "",
-),
+    "",
   )?
 
-  let renderer = p"render/gles2/renderer.c"
-
-  fs.write(
-    renderer,
-    renderer.read_text()?.replace(
-  """#include "common_vert_src.h"
+  replace_required(
+    p"render/gles2/renderer.c",
+    """#include "common_vert_src.h"
 #include "quad_frag_src.h"
 #include "tex_rgba_frag_src.h"
 #include "tex_rgbx_frag_src.h"
 #include "tex_external_frag_src.h"
 """,
-  """#include "shaders/common_vert_src.h"
+    """#include "shaders/common_vert_src.h"
 #include "shaders/quad_frag_src.h"
 #include "shaders/tex_rgba_frag_src.h"
 #include "shaders/tex_rgbx_frag_src.h"
 #include "shaders/tex_external_frag_src.h"
 """,
-),
+  )?
+
+  # Temporary: mesa-minimal's gl2ext.h predates EXT_texture_norm16's RGB16
+  # format, which wlroots 0.20 lists. Khronos assigns it 0x8054. Remove this
+  # once wlroots builds against real Mesa headers.
+  replace_required(
+    p"render/gles2/pixel_format.c",
+    """#include <GLES2/gl2ext.h>
+""",
+    """#include <GLES2/gl2ext.h>
+#ifndef GL_RGB16_EXT
+#define GL_RGB16_EXT 0x8054
+#endif
+""",
   )?
 
   let shader_meson = p"render/gles2/shaders/meson.build"
 
-  fs.write(
-    shader_meson,
-    shader_meson.read_text()?.replace(
-  """embed = find_program('./embed.sh', native: true)
+  replace_required(shader_meson, """embed = find_program('./embed.sh', native: true)
+""", "")?
 
-""",
-  "",
-).replace(
-  """	wlr_files += custom_target(
+  replace_required(
+    shader_meson,
+    """	wlr_files += custom_target(
 		output,
 		command: [embed, var],
 		input: name,
@@ -709,18 +704,17 @@ rt = declare_dependency()""",
 		capture: true,
 	)
 """,
-  """	wlr_files += files(output)
+    """	wlr_files += files(output)
 """,
-),
   )?
 }
 
 proc prune_xwayland_headers(root: Path) [fs, error] {
-  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/server.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/shell.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/xwayland.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland", missing_ok: true)?
 }
 
 ## Package recipe export.

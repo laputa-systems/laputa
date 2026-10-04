@@ -260,7 +260,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
 }
 
 test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
-  let pkg = recipe.load_package(p"packages/wlroots0.19-mesa")?
+  let pkg = recipe.load_package(p"packages/wlroots0.20")?
   assert "seatd" in pkg.deps
 }
 
@@ -292,12 +292,12 @@ test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
     catalog_value,
     {target: types.target_aarch64(), index_sha256: "linux-recipe-empty-remote", packages: []},
     policy.aarch64_docker(),
-    ["wlroots0.19-mesa"],
+    ["wlroots0.20"],
     false,
   )?
   var found = false
   for node in plan_value.nodes {
-    continue unless node.name == "wlroots0.19-mesa"
+    continue unless node.name == "wlroots0.20"
     for dependency in node.dependencies {
       if dependency.name == "seatd" {
         assert dependency.kind == types.dependency_runtime()
