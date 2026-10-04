@@ -97,6 +97,13 @@ test test_recipe_rejects_invalid_source_kind [fs, env, error] {
   expect_contract_rejection(fixture("recipe-invalid-source-kind"), "invalid source kind")?
 }
 
+test test_recipe_rejects_cargo_vendor_source_without_a_destination [fs, env, error] {
+  match recipe.load_package(fixture("recipe-cargo-vendor-no-dest")) {
+    Ok(_) => test.fail("a crate set staged over the source root was accepted")?
+    Err(problem) => assert "needs a `=> DIR` destination" in problem.message
+  }
+}
+
 test test_recipe_rejects_invalid_file_kind [fs, env, error] {
   expect_contract_rejection(fixture("recipe-invalid-file-kind"), "invalid file kind")?
 }

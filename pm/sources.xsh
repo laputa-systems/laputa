@@ -211,6 +211,129 @@ export proc resolve_source(
   {path: local, kind: metadata.kind, name: local.name}
 }
 
+# A `cargo-vendor` source names a Cargo.lock. Its crates.io records are a
+# content-addressed crate set: each `checksum` is the sha256 crates.io serves
+# that `.crate` under, so `make fetch` caches every crate like any pinned URL
+# and a build stages them offline as a cargo directory source. Cargo.lock
+# names crates.io by its git index or, with the sparse protocol, its HTTP
+# index; both serve the same archives.
+const crates_io_lock_sources = ["registry+https://github.com/rust-lang/crates.io-index", "sparse+https://index.crates.io/"]
+
+# Crate names and versions become vendor directory names, so neither may
+# carry a path separator.
+const crate_name_pattern = rx"^[A-Za-z0-9_-]+$"
+const crate_version_pattern = rx"^[0-9A-Za-z.+-]+$"
+
+## One crates.io package a Cargo.lock pins, and the sha256 of its `.crate`.
+export type LockedCrate = {name: Str, version: Str, checksum: Str}
+
+type LockRecord = {name: Str, version: Str, source: Str, checksum: Str}
+
+# A locked crate resolved to its verified `.crate` archive.
+type ResolvedCrate = {item: LockedCrate, path: Path}
+
+pure empty_lock_record() -> LockRecord {
+  {name: "", version: "", source: "", checksum: ""}
+}
+
+# A record without `source` is a workspace or path package, built from the
+# staged tree. Any other source (git, another registry) has no
+# content-addressed download, so it fails here instead of reaching the
+# network during a build.
+pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[LockedCrate]] {
+  return [] when record.source == ""
+
+  let label = f"{lockfile.display()}: {record.name} {record.version}"
+
+  if record.source not in crates_io_lock_sources {
+    return Err(types.PmError.PackageContract(f"{label} comes from {record.source}; only crates.io crates can be vendored"))
+  }
+
+  if ! crate_name_pattern.matches(record.name) or ! crate_version_pattern.matches(record.version) {
+    return Err(types.PmError.PackageContract(f"{label} is not a valid crate name and version"))
+  }
+
+  if ! sha256_hex.matches(record.checksum) {
+    return Err(types.PmError.SourceChecksum(f"{label} has no sha256 checksum; regenerate the lockfile with current cargo"))
+  }
+
+  [{name: record.name, version: record.version, checksum: record.checksum}]
+}
+
+## Reads the crates.io packages a Cargo.lock pins, in file order. Its
+## `[[package]]` records are flat `key = "value"` lines, so no TOML parser is
+## needed.
+export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate]] {
+  var crates: List[LockedCrate] = []
+  var current = empty_lock_record()
+  var in_package = false
+
+  # The trailing header flushes the last record.
+  for raw in lockfile.read_text()?.lines().push("[end]") {
+    let line = raw.trim()
+
+    if line.starts_with("[") {
+      if in_package {
+        crates = crates.extend(lock_record_crates(lockfile, current)?)
+      }
+
+      in_package = line == "[[package]]"
+      current = empty_lock_record()
+    } else if in_package {
+      if let [_, key, value] = rx"""^(name|version|source|checksum) = "([^"]*)"$""".captures(line) {
+        if key == "name" {
+          current = {...current, name: value}
+        } else if key == "version" {
+          current = {...current, version: value}
+        } else if key == "source" {
+          current = {...current, source: value}
+        } else {
+          current = {...current, checksum: value}
+        }
+      }
+    }
+  }
+
+  crates
+}
+
+## The crates.io download of one locked crate.
+export pure crate_download_url(item: LockedCrate) -> Str {
+  f"https://static.crates.io/crates/{item.name}/{item.name}-{item.version}.crate"
+}
+
+# The lockfile is verified before it is trusted to name the crate set.
+proc resolve_locked_crates(
+  pkg: types.Package,
+  resolved: types.ResolvedSource,
+  checksum: Str,
+) [fs, net, env, error] -> Result[List[ResolvedCrate]] {
+  verify_source_checksum(resolved.path, checksum, resolved.kind)?
+  var crates: List[ResolvedCrate] = []
+
+  for item in cargo_lock_crates(resolved.path)? {
+    crates += [{item, path: resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?}]
+  }
+
+  crates
+}
+
+# Cargo's directory sources require `.cargo-checksum.json` beside each crate.
+# Its `package` digest must match the Cargo.lock checksum, and an empty `files`
+# map skips per-file verification of the already sha256-verified archive, so
+# a recipe may patch a vendored crate.
+proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) [fs, error] {
+  fs.remove(dest, missing_ok: true)?
+  fs.mkdir(dest)?
+
+  for entry in crates {
+    let dir = fp"{dest}/{entry.item.name}-{entry.item.version}"
+    # crates.io packs every crate under one `NAME-VERSION/` directory.
+    archive.tar_extract(entry.path, dir, 1, "auto", true)?
+    json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: entry.item.checksum})?
+  }
+}
+
 ## Exported PM declaration `verify_source_checksum`.
 export proc verify_source_checksum(source_path: Path, checksum: Str, kind: Str) [fs, error] {
   return when checksum == "SKIP"
@@ -261,12 +384,18 @@ proc stage_resolved_source(
   resolved: types.ResolvedSource,
   source_kind: types.SourceKind,
   checksum: Str,
+  crates: List[ResolvedCrate],
   src: Path,
 ) [fs, error] {
   let source_path = resolved.path
   let name = fp"{resolved.name}"
   verify_source_checksum(source_path, checksum, resolved.kind)?
   let dest = util.source_stage_dir(src, line)
+
+  if source_kind == types.source_cargo_vendor() {
+    stage_cargo_vendor(crates, dest)?
+    return
+  }
 
   if source_kind == types.source_directory() or resolved.kind == "dir" {
     fs.mkdir(dest)?
@@ -304,7 +433,8 @@ proc stage_resolved_source(
 }
 
 ## Resolves every source the target architecture selects, then stages them into `src`.
-## Resolution finishes first, so a missing cache entry fails before any extraction.
+## Resolution finishes first, so a missing cache entry (a vendored crate's
+## included) fails before any extraction.
 export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, error] {
   let arch = util.machine_arch()?
   let build = util.build_arch()?
@@ -315,11 +445,17 @@ export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, 
     let line = util.parse_source_line(source.source)?
     let checksum = source_checksum(source, arch)?
     let resolved = resolve_source(pkg, line, checksum, arch, build)?
-    staged = staged.push({line, resolved, kind: source.kind, checksum})
+    var crates: List[ResolvedCrate] = []
+
+    if source.kind == types.source_cargo_vendor() {
+      crates = resolve_locked_crates(pkg, resolved, checksum)?
+    }
+
+    staged = staged.push({line, resolved, kind: source.kind, checksum, crates})
   }
 
   for entry in staged {
-    stage_resolved_source(entry.line, entry.resolved, entry.kind, entry.checksum, src)?
+    stage_resolved_source(entry.line, entry.resolved, entry.kind, entry.checksum, entry.crates, src)?
   }
 }
 
@@ -495,17 +631,66 @@ export proc source_fetch_items(packages: List[types.Package], arch: Str) [error]
       let url = util.expand_source(line.source, pkg, arch, arch)
       continue unless util.is_url_source(url)
       let sha256 = pinned_url_sha256(pkg.name, url, source_checksum(source, arch)?)?
-      let empty: List[Str] = []
-      let existing = by_sha256.get(sha256) ?? {sha256, urls: empty, packages: empty}
-      by_sha256[sha256] = {
-        sha256,
-        urls: if url in existing.urls { existing.urls } else { existing.urls.push(url) },
-        packages: if pkg.name in existing.packages { existing.packages } else { existing.packages.push(pkg.name) },
+      by_sha256 = with_fetch_item(by_sha256, sha256, url, pkg.name)
+    }
+  }
+
+  sorted_fetch_items(by_sha256)
+}
+
+pure with_fetch_item(by_sha256: Map[SourceFetchItem], sha256: Str, url: Str, package_name: Str) -> Map[SourceFetchItem] {
+  let empty: List[Str] = []
+  let existing = by_sha256.get(sha256) ?? {sha256, urls: empty, packages: empty}
+  var updated = by_sha256
+  updated[sha256] = {
+    sha256,
+    urls: if url in existing.urls { existing.urls } else { existing.urls.push(url) },
+    packages: if package_name in existing.packages { existing.packages } else { existing.packages.push(package_name) },
+  }
+  updated
+}
+
+pure sorted_fetch_items(by_sha256: Map[SourceFetchItem]) -> List[SourceFetchItem] {
+  by_sha256.values() |> sort-by { |item| f"{item.packages[0]}\t{item.urls[0]}" }
+}
+
+## Collects the `.crate` downloads the `cargo-vendor` sources of `packages`
+## pin for `arch`, one item per sha256. A URL lockfile is read from the cache
+## at `root`, so `fetch_sources` must have cached the lockfiles first.
+export proc cargo_crate_fetch_items(
+  root: Path,
+  packages: List[types.Package],
+  arch: Str,
+) [fs, net, env, error] -> Result[List[SourceFetchItem]] {
+  var by_sha256: Map[SourceFetchItem] = {}
+
+  for pkg in packages {
+    for source in pkg.upstream_sources {
+      continue unless source_selected(source, arch) and source.kind == types.source_cargo_vendor()
+      let line = util.parse_source_line(source.source)?
+      let expanded = util.expand_source(line.source, pkg, arch, arch)
+      let checksum = source_checksum(source, arch)?
+      var lockfile = p""
+
+      if util.is_url_source(expanded) {
+        lockfile = source_cache_entry(root, pinned_url_sha256(pkg.name, expanded, checksum)?)
+
+        guard fs.exists(lockfile)? else {
+          return Err(types.PmError.SourceNotFound(f"{pkg.name} lockfile {expanded} is not in the source cache {root}"))
+        }
+      } else {
+        let resolved = resolve_source(pkg, line, checksum, arch, arch)?
+        verify_source_checksum(resolved.path, checksum, resolved.kind)?
+        lockfile = resolved.path
+      }
+
+      for item in cargo_lock_crates(lockfile)? {
+        by_sha256 = with_fetch_item(by_sha256, item.checksum, crate_download_url(item), pkg.name)
       }
     }
   }
 
-  by_sha256.values() |> sort-by { |item| f"{item.packages[0]}\t{item.urls[0]}" }
+  sorted_fetch_items(by_sha256)
 }
 
 # A dead host or a transient failure gets a few spaced retries. A checksum

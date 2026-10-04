@@ -131,6 +131,12 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
+  # A crate set replaces its destination directory, so it may not be the
+  # source root that other sources stage into.
+  if kind == types.source_cargo_vendor() and util.parse_source_line(source)?.dest.normalize().display() == "." {
+    return Err(types.PmError.PackageContract(f"{name}: cargo-vendor source {source} needs a `=> DIR` destination"))
+  }
+
   var architecture_seen: Map[Bool] = {}
 
   for architecture in architectures {

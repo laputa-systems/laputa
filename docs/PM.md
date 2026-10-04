@@ -65,8 +65,8 @@ each recipe's capabilities. A missing optional hook remains a no-op; a present
 hook with incompatible parameters, result, export kind, or capabilities is
 rejected before invocation.
 
-`upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`, or
-`directory` materialization. A URL source pins a sha256 per architecture; a
+`upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`,
+`directory`, or `cargo-vendor` materialization (see "Sources" below). A URL source pins a sha256 per architecture; a
 `SKIP` checksum is accepted only for a relative repository-local source. Source
 strings may name the whole-word placeholders `VERSION`, `RELEASE`, `MAJOR`,
 `MINOR`, `PATCH`, `IDENT`, `PACKAGE`, `ARCH`, `GOARCH`, and their
@@ -169,6 +169,21 @@ else it fails and names the missing source. Builds locate the cache through
 recipe's source string and checksum, never where the bytes came from.
 `repo checksum` and `repo update-checksums` read upstream directly to compute new
 pins and add those bytes to the cache.
+
+A `cargo-vendor` source names a Cargo.lock (a pinned URL or a recipe file) and
+a destination, `LOCK => vendor`. Its crates.io `[[package]]` records are a
+content-addressed crate set: each record's `checksum` is the sha256 crates.io
+serves `NAME-VERSION.crate` under, so the lockfile's own pin covers every
+crate and the artifact key needs nothing more. `pm sources fetch` caches the
+lockfile with the other URL sources, then reads it from the cache and fetches
+each `.crate` from `static.crates.io` into the same `sha256/<hash>` layout. A
+build resolves every crate like any URL source before staging anything, then
+extracts each into `DEST/NAME-VERSION/` with the `.cargo-checksum.json`
+cargo's directory sources need, so a recipe builds with `--offline --locked`
+and `source.crates-io.replace-with` naming a directory source at `DEST`.
+Records without `source` (workspace and path packages) are skipped; any other
+non-crates.io record is rejected, because it has no content address. The
+destination may not be the source root.
 
 ## Catalog and graph
 

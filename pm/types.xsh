@@ -29,6 +29,7 @@ export enum SourceKind {
     Cpio,
     SourceFile,
     Directory,
+    CargoVendor,
 }
 
 ## The expected on-disk kind for a declared package output path.
@@ -120,6 +121,11 @@ export pure source_file() -> SourceKind {
 ## Return a directory source staging kind.
 export pure source_directory() -> SourceKind {
   Directory
+}
+
+## Return the Cargo.lock crate-set staging kind.
+export pure source_cargo_vendor() -> SourceKind {
+  CargoVendor
 }
 
 ## Return the regular-file metadata kind.
@@ -287,6 +293,7 @@ export pure source_kind_text(kind: SourceKind) -> Str {
     Cpio => "cpio"
     SourceFile => "file"
     Directory => "directory"
+    CargoVendor => "cargo-vendor"
   }
 }
 
@@ -299,6 +306,7 @@ export pure parse_source_kind(raw: Str) -> Result[SourceKind] {
     "cpio" => Cpio
     "file" => SourceFile
     "directory" => Directory
+    "cargo-vendor" => CargoVendor
     _ => Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
   }
 }

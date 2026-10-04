@@ -715,10 +715,13 @@ proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, proc
   }
 }
 
+type FetchSelection = {packages: List[types.Package], arch: Str}
+
 proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
   let cache_root = sources.source_cache_root(args.repo)?
   var items: List[sources.SourceFetchItem] = []
   var seen: List[Str] = []
+  var selections: List[FetchSelection] = []
 
   for target in args.targets {
     let value = catalog.load_for_target(args.repo, target)?
@@ -743,9 +746,28 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
         seen = seen.push(item.sha256)
       }
     }
+
+    selections += [{packages: selected, arch: types.pm_target_arch(target)}]
   }
 
   sources.fetch_sources(cache_root, items)?
+
+  # A `cargo-vendor` source's crate set is named by its lockfile, which the
+  # first pass has just cached.
+  var crate_items: List[sources.SourceFetchItem] = []
+
+  for selection in selections {
+    for item in sources.cargo_crate_fetch_items(cache_root, selection.packages, selection.arch)? {
+      if item.sha256 not in seen {
+        crate_items += [item]
+        seen = seen.push(item.sha256)
+      }
+    }
+  }
+
+  if crate_items.len() > 0 {
+    sources.fetch_sources(cache_root, crate_items)?
+  }
 }
 
 proc command_root_compose(args: RootComposeArgs) [fs, error] {
