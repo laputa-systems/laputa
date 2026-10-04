@@ -154,15 +154,15 @@ proc install_pkg_config(dest: Path) [fs, error] {
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/alsa.pc",
     f"""prefix=/usr
-exec_prefix=${{{{prefix}}}}
-libdir=${{{{exec_prefix}}}}/lib
-includedir=${{{{prefix}}}}/include
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
 
 Name: alsa
 Description: Laputa minimal native ALSA userspace library
 Version: {ver}
-Libs: -L${{{{libdir}}}} -lasound
-Cflags: -I${{{{includedir}}}}
+Libs: -L${{libdir}} -lasound
+Cflags: -I${{includedir}}
 """,
   )?
 }

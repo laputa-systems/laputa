@@ -18,6 +18,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let header = fp"{root}/usr/include/alsa/asoundlib.h".read_text()?
   proof.ensure("#define SND_LIB_VERSION_STR \"1.2.16.1\"" in header, "proof-alsa-lib", "asoundlib.h reports another release")?
   proof.ensure("1.2.16.1" in fp"{root}/{lib}".read_bytes()?.strings(), "proof-alsa-lib", "libasound reports another release")?
+
+  # pkg-config expands ${name} references, so consumers get real paths.
+  let pc = fp"{root}/usr/lib/pkgconfig/alsa.pc".read_text()?
+  proof.ensure(r"Cflags: -I${includedir}" in pc, "proof-alsa-lib", "alsa.pc does not reference includedir")?
+  proof.ensure(r"Libs: -L${libdir} -lasound" in pc, "proof-alsa-lib", "alsa.pc does not reference libdir")?
   print "alsa-lib ok"
 }
 
