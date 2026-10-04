@@ -105,8 +105,12 @@ main(@args)?
     return Err(proof.ProofError.Failed("proof-cargo", f"unexpected cargo version: {cargo.trim()}"))
   }
 
-  if ! rustc.starts_with("rustc ") {
-    return Err(proof.ProofError.Failed("proof-cargo", f"unexpected rustc version: {rustc.trim()}"))
+  # The package is versioned by the Rust release, which rustc reports; cargo
+  # has its own version number.
+  let ver = proof.package_version(rootfs, "cargo")?
+
+  if ! rustc.starts_with(f"rustc {ver} ") {
+    return Err(proof.ProofError.Failed("proof-cargo", f"rustc --version reported {rustc.trim()}, expected {ver}"))
   }
 
   let hello = fp"{tmp}/target/{rust_triple}/release/cargo-proof-hello"
