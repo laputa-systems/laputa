@@ -8,10 +8,10 @@ export const name = "libevdev"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.13.6"
+export const ver = "1.13.7"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "54748fded25633399a8418d7c4c123fe365037c901b4389e0bf3dd7688fb1c7e",
+        sha256: "9294aaaff6829ab1581e6684f4c3ddc449fee563229e863353a4893f1a673f4b",
       },
     ],
   },
@@ -68,6 +68,12 @@ export const filetree = [
   },
 ]
 
+# The definitions from here through `write_event_names` port
+# libevdev/make-event-names.py, which writes event-names.h from the kernel's
+# input headers. The port follows the script's data model: each event class
+# maps a code value to the last name defined for it, the per-class maps are
+# printed by value, and every name lookup table is sorted by name, because
+# libevdev binary-searches those tables.
 pure event_prefixes() -> List[Str] {
   [
     "EV_",
@@ -87,6 +93,7 @@ pure event_prefixes() -> List[Str] {
   ]
 }
 
+# The script's code_prefixes, in the sorted order it prints them.
 pure code_prefixes() -> List[Str] {
   [
     "ABS_",
@@ -118,45 +125,48 @@ pure duplicate_defines() -> List[Str] {
   ]
 }
 
+pure ignored_prefixes() -> List[Str] {
+  ["SND_PROFILE_"]
+}
+
+# `prefix[:-1].lower()`: "INPUT_PROP_" names the `input_prop` class.
 pure attr_name(prefix: Str) -> Str {
-  prefix.replace("_", "")
-    .replace("INPUTPROP", "input_prop")
-    .replace("MTTOOL", "mt_tool")
-    .replace("EV", "ev")
-    .replace("REL", "rel")
-    .replace("ABS", "abs")
-    .replace("KEY", "key")
-    .replace("BTN", "btn")
-    .replace("LED", "led")
-    .replace("SND", "snd")
-    .replace("MSC", "msc")
-    .replace("SW", "sw")
-    .replace("FF", "ff")
-    .replace("SYN", "syn")
-    .replace("REP", "rep")
+  if let [_, stem] = rx"^(.*)_$".captures(prefix) {
+    return stem.lower()
+  }
+
+  prefix.lower()
 }
 
-pure lookup_prefix(event_name: Str) -> Str {
-  event_name.replace("EV_", "")
+# Python's `int(text, 0)`: decimal, or 0x/0o/0b prefixed. A decimal with a
+# leading zero is rejected, so such a define names no code.
+pure define_value(text: Str) -> Int {
+  return -1 when rx"^0[0-9]*[1-9][0-9]*$".captures(text) != []
+
+  return -1 when rx"^(0[xXoObB][0-9a-fA-F]+|[0-9]+)$".captures(text) == []
+
+  text.parse_int() ?? -1
 }
 
-pure has_event_prefix(prefix: Str) -> Bool {
-  f"{prefix}_" in event_prefixes()
+pure class_defs(defs: List[EventDef], attr: Str) -> List[EventDef] {
+  [item for item in defs |> where .attr == attr |> sort-by .value]
 }
 
-proc c_lines_for_bits(defs: List[EventDef], attr: Str, max_name: Str, include_buttons: Bool) [] -> Result[List[Str]] {
-  var lines = [f"static const char * const {attr}_map[{max_name} + 1] = {{"]
+pure has_class(defs: List[EventDef], attr: Str) -> Bool {
+  class_defs(defs, attr) != []
+}
 
-  for item in defs
-    |> where .attr == attr
-    |> sort-by .value {
+pure c_lines_for_bits(defs: List[EventDef], attr: Str) -> List[Str] {
+  return [] unless has_class(defs, attr)
+
+  var lines = [f"static const char * const {attr}_map[{attr.upper()}_MAX + 1] = {{"]
+
+  for item in class_defs(defs, attr) {
     lines = lines.push(f"    [{item.name}] = \"{item.name}\",")
   }
 
-  if include_buttons {
-    for item in defs
-      |> where .attr == "btn"
-      |> sort-by .value {
+  if attr == "key" {
+    for item in class_defs(defs, "btn") {
       lines = lines.push(f"    [{item.name}] = \"{item.name}\",")
     }
   }
@@ -164,78 +174,53 @@ proc c_lines_for_bits(defs: List[EventDef], attr: Str, max_name: Str, include_bu
   lines.push("};").push("")
 }
 
-proc c_lookup_lines(
-  defs: List[EventDef],
-  attr: Str,
-  include_button_aliases: Bool,
-  max_codes: Map[Int],
-) [] -> Result[List[Str]] {
-  var lookups = [{name: item.name, value: item.name} for item in defs if item.attr == attr]
-  if include_button_aliases {
-    lookups = lookups.push({name: "BTN_A", value: "BTN_A"})
-    lookups = lookups.push({name: "BTN_B", value: "BTN_B"})
-    lookups = lookups.push({name: "BTN_X", value: "BTN_X"})
-    lookups = lookups.push({name: "BTN_Y", value: "BTN_Y"})
+pure c_lookup_lines(defs: List[EventDef], attr: Str, max_codes: Map[Int]) -> List[Str] {
+  return [] unless has_class(defs, attr)
+
+  var names = class_defs(defs, attr)
+
+  if attr == "btn" {
+    for name in ["BTN_A", "BTN_B", "BTN_X", "BTN_Y"] {
+      names = names.push({attr, value: 0, name})
+    }
   }
 
-  let max_name = if attr == "input_prop" {
-    "INPUT_PROP_MAX"
-  } else if attr == "mt_tool" {
-    "MT_TOOL_MAX"
-  } else if attr == "ev" {
-    "EV_MAX"
-  } else if attr == "rel" {
-    "REL_MAX"
-  } else if attr == "abs" {
-    "ABS_MAX"
-  } else if attr == "key" {
-    "KEY_MAX"
-  } else if attr == "btn" {
-    "BTN_MAX"
-  } else if attr == "led" {
-    "LED_MAX"
-  } else if attr == "snd" {
-    "SND_MAX"
-  } else if attr == "msc" {
-    "MSC_MAX"
-  } else if attr == "sw" {
-    "SW_MAX"
-  } else if attr == "ff" {
-    "FF_MAX"
-  } else if attr == "syn" {
-    "SYN_MAX"
-  } else {
-    "REP_MAX"
+  let max_name = f"{attr.upper()}_MAX"
+
+  if max_name in duplicate_defines() {
+    names = names.push({attr, value: max_codes.get(max_name) ?? 0, name: max_name})
   }
 
-  if max_name in duplicate_defines() and max_name in max_codes {
-    lookups = lookups.push({name: max_name, value: max_name})
-  }
-
-  var lines = [f"    {{ .name = \"{item.name}\", .value = {item.value} }}," for item in lookups]
-  lines
+  [f"    {{ .name = \"{item.name}\", .value = {item.name} }}," for item in names |> sort-by .name]
 }
 
-proc collect_event_defs(path_value: Path) [fs, error] -> Result[EventDefinitions] {
-  var defs = []
+pure collect_event_defs(headers: List[Str]) -> EventDefinitions {
+  var defs: List[EventDef] = []
   var max_codes: Map[Int] = {}
 
-  for line in path_value.read_text()?.split("\n") {
-    let words = line.words()
+  for header in headers {
+    for line in header.split("\n") {
+      if let [_, event_name, value_text] = rx"^#define\s+(\w+)\s+(\w+)".captures(line) {
+        let value = define_value(value_text)
 
-    if words.len() >= 3 and words[0] == "#define" {
-      let event_name = words[1]
-      let value = words[2].parse_int() ?? -1
+        if value >= 0 {
+          var done = false
 
-      if value >= 0 {
-        for prefix in event_prefixes() {
-          if event_name.starts_with(prefix) {
-            if event_name.ends_with("_MAX") {
-              max_codes[event_name] = value
-            }
+          for prefix in event_prefixes() {
+            let ignored = [p for p in ignored_prefixes() if event_name.starts_with(p)] != []
 
-            if event_name not in duplicate_defines() {
-              defs = defs.push({attr: attr_name(prefix), value, name: event_name})
+            if ! done and event_name.starts_with(prefix) and ! ignored {
+              if event_name.ends_with("_MAX") {
+                max_codes[event_name] = value
+              }
+
+              if event_name in duplicate_defines() {
+                done = true
+              } else {
+                let attr = attr_name(prefix)
+                defs = [item for item in defs if ! (item.attr == attr and item.value == value)]
+                defs = defs.push({attr, value, name: event_name})
+              }
             }
           }
         }
@@ -246,70 +231,26 @@ proc collect_event_defs(path_value: Path) [fs, error] -> Result[EventDefinitions
   {defs, max_codes}
 }
 
-proc write_event_names() [fs, error] {
-  let input_h = p"include/linux/linux/input.h"
-  let input_event_codes_h = p"include/linux/linux/input-event-codes.h"
-  let first = collect_event_defs(input_h)?
-  let second = collect_event_defs(input_event_codes_h)?
-  let first_defs: List[EventDef] = first.defs
-  let second_defs: List[EventDef] = second.defs
-  var defs = first_defs.extend(second_defs)
-  var max_codes: Map[Int] = first.max_codes
-  let second_max = second.max_codes
+## event-names.h for the given input header texts, in the order
+## make-event-names.py reads them.
+export pure event_names_header(headers: List[Str]) -> Str {
+  let collected = collect_event_defs(headers)
+  let defs: List[EventDef] = collected.defs
+  let max_codes: Map[Int] = collected.max_codes
+  var lines = ["/* THIS FILE IS GENERATED, DO NOT EDIT */", "", "#ifndef EVENT_NAMES_H", "#define EVENT_NAMES_H", ""]
 
-  for key in [
-    "EV_MAX",
-    "REL_MAX",
-    "ABS_MAX",
-    "KEY_MAX",
-    "LED_MAX",
-    "SND_MAX",
-    "MSC_MAX",
-    "SW_MAX",
-    "FF_MAX",
-    "SYN_MAX",
-    "REP_MAX",
-    "INPUT_PROP_MAX",
-    "MT_TOOL_MAX",
-  ] {
-    if key in second_max {
-      max_codes[key] = second_max.get(key)?
+  for prefix in event_prefixes() {
+    if prefix != "BTN_" {
+      lines = lines.extend(c_lines_for_bits(defs, attr_name(prefix)))
     }
   }
 
-  var lines = ["/* THIS FILE IS GENERATED, DO NOT EDIT */", "", "#ifndef EVENT_NAMES_H", "#define EVENT_NAMES_H", ""]
-  lines = lines.extend(c_lines_for_bits(defs, "ev", "EV_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "rel", "REL_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "abs", "ABS_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "key", "KEY_MAX", true)?)
-  lines = lines.extend(c_lines_for_bits(defs, "led", "LED_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "snd", "SND_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "msc", "MSC_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "sw", "SW_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "ff", "FF_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "syn", "SYN_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "rep", "REP_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "input_prop", "INPUT_PROP_MAX", false)?)
-  lines = lines.extend(c_lines_for_bits(defs, "mt_tool", "MT_TOOL_MAX", false)?)
   lines += ["static const char * const * const event_type_map[EV_MAX + 1] = {"]
 
   for prefix in event_prefixes() {
-    if ! (prefix == "BTN_" or prefix == "EV_" or prefix == "INPUT_PROP_" or prefix == "MT_TOOL_") {
-      let key = prefix.replace("_", "")
-
-      let map_name = prefix.replace("_", "")
-        .replace("REL", "rel")
-        .replace("ABS", "abs")
-        .replace("KEY", "key")
-        .replace("LED", "led")
-        .replace("SND", "snd")
-        .replace("MSC", "msc")
-        .replace("SW", "sw")
-        .replace("FF", "ff")
-        .replace("SYN", "syn")
-        .replace("REP", "rep")
-
-      lines = lines.push(f"    [EV_{key}] = {map_name}_map,")
+    if prefix not in ["BTN_", "EV_", "INPUT_PROP_", "MT_TOOL_"] {
+      let attr = attr_name(prefix)
+      lines = lines.push(f"    [EV_{attr.upper()}] = {attr}_map,")
     }
   }
 
@@ -322,27 +263,21 @@ proc write_event_names() [fs, error] {
   lines = lines.push("#pragma GCC diagnostic ignored \"-Woverride-init\"")
   lines = lines.push("#endif")
   lines += ["static const int ev_max[EV_MAX + 1] = {"]
+  let ev_defs = class_defs(defs, "ev")
   var index = 0
-  let ev_max = max_codes.get("EV_MAX") ?? 31
 
-  while index <= ev_max {
-    var emitted = false
+  while index <= (max_codes.get("EV_MAX") ?? -1) {
+    var line = "    -1,"
 
-    for item in defs |> where .attr == "ev" {
-      if item.value == index {
-        let prefix = lookup_prefix(item.name)
-
-        if has_event_prefix(prefix) {
-          lines = lines.push(f"    {prefix}_MAX,")
-          emitted = true
+    for item in ev_defs |> where .value == index {
+      if let [_, class] = rx"^EV_(.*)$".captures(item.name) {
+        if f"{class}_" in event_prefixes() {
+          line = f"    {class}_MAX,"
         }
       }
     }
 
-    if ! emitted {
-      lines += ["    -1,"]
-    }
-
+    lines += [line]
     index += 1
   }
 
@@ -350,7 +285,7 @@ proc write_event_names() [fs, error] {
   lines = lines.push("#if __clang__")
   lines = lines.push("#pragma clang diagnostic pop /* \"-Winitializer-overrides\" */")
   lines = lines.push("#elif __GNUC__")
-  lines = lines.push("#pragma GCC diagnostic pop /* \"-Winitializer-overrides\" */")
+  lines = lines.push("#pragma GCC diagnostic pop /* \"-Woverride-init\" */")
   lines = lines.push("#endif")
   lines += [""]
   lines += ["struct name_entry {"]
@@ -359,23 +294,28 @@ proc write_event_names() [fs, error] {
   lines += ["};"]
   lines += [""]
   lines += ["static const struct name_entry tool_type_names[] = {"]
-  lines = lines.extend(c_lookup_lines(defs, "mt_tool", false, max_codes)?)
+  lines = lines.extend(c_lookup_lines(defs, "mt_tool", max_codes))
   lines = lines.push("};").push("")
   lines += ["static const struct name_entry ev_names[] = {"]
-  lines = lines.extend(c_lookup_lines(defs, "ev", false, max_codes)?)
+  lines = lines.extend(c_lookup_lines(defs, "ev", max_codes))
   lines = lines.push("};").push("")
   lines += ["static const struct name_entry code_names[] = {"]
 
   for prefix in code_prefixes() {
-    lines = lines.extend(c_lookup_lines(defs, attr_name(prefix), prefix == "BTN_", max_codes)?)
+    lines = lines.extend(c_lookup_lines(defs, attr_name(prefix), max_codes))
   }
 
   lines = lines.push("};").push("")
   lines += ["static const struct name_entry prop_names[] = {"]
-  lines = lines.extend(c_lookup_lines(defs, "input_prop", false, max_codes)?)
+  lines = lines.extend(c_lookup_lines(defs, "input_prop", max_codes))
   lines = lines.push("};").push("")
   lines = lines.push("#endif /* EVENT_NAMES_H */")
-  fs.write(p"event-names.h", lines.join("\n"))?
+  f"{lines.join("\n")}\n"
+}
+
+proc write_event_names() [fs, error] {
+  let headers = [p"include/linux/linux/input.h", p"include/linux/linux/input-event-codes.h"]
+  fs.write(p"event-names.h", event_names_header([header.read_text()? for header in headers]))?
 }
 
 proc patch_python_generator() [fs, error] {
