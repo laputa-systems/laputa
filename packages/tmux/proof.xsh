@@ -101,7 +101,62 @@ set -g focus-events on
     check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")?
   }?
 
-  print "tmux ok: config, pty capture, window creation, clean stop"
+  outer_terminals(rootfs, dynlinker, tmux, shell, tmp, config)?
+  print "tmux ok: config, pty capture, window creation, clean stop, attach under xterm-256color, foot, linux, tmux-256color"
+}
+
+# A client attached from foot (TERM=foot or xterm-256color), the Linux
+# console, a serial line, or a nested tmux must find its outer terminal's
+# capabilities without a terminfo database: tmux carries built-in entries
+# compiled from ncurses' terminfo.src. Each attach runs one pane command on a
+# real pty, and the client must draw it with that terminal's own sequences.
+proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp: Path, config: Path) [fs, process, env, error] {
+  let driver = proof.pty_driver(tmp)?
+  # The marker is assembled at run time so that only the pane's output, never
+  # the command text, can match it.
+  let pane = "let state = \"ok\"\nprint f\"tmux-attached-{state}\"\ntime.sleep(1s)?"
+
+  for term in ["xterm-256color", "foot", "linux", "tmux-256color"] {
+    let label = f"laputa-proof-{term}"
+    let out = fp"{tmp}/attach-{term}.out"
+
+    env ({
+      HOME: fp"{tmp}/home",
+      LD_LIBRARY_PATH: fp"{rootfs}/usr/lib",
+      TERM: term,
+      TMUX_TMPDIR: tmp,
+    }) {
+      let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
+      check(status.ok, "tmux-attach", f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}")?
+    }?
+
+    let screen = out.read_text()?
+
+    check("[exited]" in screen, "tmux-attach", f"client under TERM={term} did not report its session exiting: {screen}")?
+
+    # linux has no alternate screen and resets the cursor with its own
+    # cnorm; the others switch to the alternate screen.
+    if term == "linux" {
+      check("\x1b[?1049h" not in screen, "tmux-attach", "client used an alternate screen the linux console lacks")?
+      check("\x1b[?25h\x1b[?0c" in screen, "tmux-attach", "client did not use the linux console's cnorm")?
+    } else {
+      check("\x1b[?1049h" in screen, "tmux-attach", f"client under TERM={term} did not enter the alternate screen")?
+    }
+  }
+
+  # As with ncurses, a terminal tmux knows nothing about is refused.
+  env ({
+    HOME: fp"{tmp}/home",
+    LD_LIBRARY_PATH: fp"{rootfs}/usr/lib",
+    TERM: "laputa-unknown-terminal",
+    TMUX_TMPDIR: tmp,
+  }) {
+    let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
+    check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")?
+  }?
+
+  let refused = fp"{tmp}/unknown.out".read_text()?
+  check("missing or unsuitable terminal: laputa-unknown-terminal" in refused, "tmux-attach", f"unknown terminal not reported: {refused}")?
 }
 
 main(@args)?
