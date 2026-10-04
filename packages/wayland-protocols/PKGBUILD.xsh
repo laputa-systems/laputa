@@ -8,10 +8,10 @@ export const name = "wayland-protocols"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.45"
+export const ver = "1.49"
 
 ## Package recipe export.
-export const rel = "10"
+export const rel = "1"
 
 ## Package recipe export.
 export let deps = []
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "4d2b2a9e3e099d017dc8107bf1c334d27bb87d9e4aff19a0c8d856d17cd41ef0",
+        sha256: "ec4c8f74942d6dff7ace8b4ce4764f0ef9ff618a935d974ea77edee2ad240b14",
       },
     ],
   },
@@ -163,6 +163,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/share/wayland-protocols/staging/xdg-session-management/xdg-session-management-v1.xml",
+    kind: "file",
+  },
+  {
     path: p"usr/share/wayland-protocols/staging/xdg-system-bell/xdg-system-bell-v1.xml",
     kind: "file",
   },
@@ -264,33 +268,50 @@ export const filetree = [
   },
 ]
 
+error WaylandProtocolsError = Patch(message: Str)
+
+proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
+  let text = fs.read_text(file)?
+
+  if old not in text {
+    return Err(WaylandProtocolsError.Patch(f"{file} no longer holds the patched block"))?
+  }
+
+  fs.write(file, text.replace(old, new))?
+}
+
+# The package ships protocol XML only. When it finds wayland-scanner, upstream
+# generates and installs a C header per protocol; consumers run the scanner
+# themselves, so drop the scanner lookup and the generated headers.
 proc patch_generated_header_install() [fs, error] {
   let build_file = p"meson.build"
-  var text = fs.read_text(build_file)?
 
-  let scanner_old = """dep_scanner = dependency('wayland-scanner',
-    version: get_option('tests') ? '>=1.23.0' : '>=1.20.0',
+  replace_required(
+    build_file,
+    """dep_scanner = dependency('wayland-scanner',
+    version: get_option('tests') ? '>=1.25.0' : '>=1.22.90',
+    required: get_option('tests'),
     native: true,
     fallback: 'wayland'
 )
-prog_scanner = find_program(dep_scanner.get_variable(pkgconfig: 'wayland_scanner', internal: 'wayland_scanner'))
-"""
+if dep_scanner.found()
+	prog_scanner = find_program(dep_scanner.get_variable(pkgconfig: 'wayland_scanner', internal: 'wayland_scanner'))
+endif
+""",
+    "",
+  )?
 
-  if scanner_old in text {
-    fs.write(build_file, text.replace(scanner_old, ""))?
-  }
-
-  text = fs.read_text(build_file)?
-
-  let old = """include_dirs = []
-if dep_scanner.version().version_compare('>=1.22.90')
+  replace_required(
+    build_file,
+    """include_dirs = []
+headers = []
+if dep_scanner.found()
 	subdir('include/wayland-protocols')
 	include_dirs = ['include']
-endif"""
-
-  if old in text {
-    fs.write(build_file, text.replace(old, "include_dirs = []"))?
-  }
+endif""",
+    """include_dirs = []
+headers = []""",
+  )?
 }
 
 proc prune_x_compat_protocols(root: Path) [fs, error] {
