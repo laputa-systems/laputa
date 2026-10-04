@@ -71,6 +71,14 @@ export pure missing_elf_runtime_dependencies_with_allowed(
   }
 
   for soname in needed {
+    # A DT_NEEDED path comes from linking a library by its build-time path
+    # (one without a SONAME); the loader looks for that path, not a name, so
+    # no runtime root satisfies it.
+    if "/" in soname {
+      failures = failures.push({pkg: pkg_name, file: fp"", soname, provider: ""})
+      continue
+    }
+
     continue unless soname in providers
     let provider = providers.get(soname) ?? ""
 

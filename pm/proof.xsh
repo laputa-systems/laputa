@@ -81,6 +81,10 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
   if failures.len() > 0 {
     let first = failures[0]
 
+    if first.provider == "" {
+      return Err(ProofError.Failed(f"proof-{name}", f"{first.file} needs {first.soname} by its build-time path"))
+    }
+
     return Err(
       ProofError.Failed(
         f"proof-{name}",

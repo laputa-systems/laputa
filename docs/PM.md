@@ -246,7 +246,15 @@ payload once, directly into the root, after a metadata-only ownership check
 (`pm/root.xsh::trusted_preflight`). A proof root holds the payload's `deps`
 closure only: a runtime-only dependency may not be built yet when its
 dependent is proved, so package proofs never check its files. Recipes see the build root as both
-`LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`.
+`LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin` first on
+`PATH`, and `CC=cc` and `CXX=c++`, so build tools that pick a compiler by
+scoring every one they find (muon) still take the build root's over a host
+compiler later on `PATH`.
+
+Before a package's own proof runs, PM checks every ELF file it installs: a
+`DT_NEEDED` name another package in the proof root provides must come from the
+package's runtime closure, and no `DT_NEEDED` entry may be a path, which only
+a link against a SONAME-less library by its build-time path produces.
 
 ### Publication
 
@@ -310,7 +318,7 @@ PM behavior is covered by the focused modules under `tests/pm/`, one per
 owning module (`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`,
 `pm_graph_contracts.xsh`, `pm_make.xsh`, `pm_plan.xsh`, `pm_store.xsh`,
 `pm_root.xsh`, `pm_build.xsh`, `pm_execute.xsh`, `pm_publish.xsh`,
-`pm_sources.xsh`, `pm_generation.xsh`, `pm_cli.xsh`), plus
+`pm_sources.xsh`, `pm_generation.xsh`, `pm_elfdeps.xsh`, `pm_cli.xsh`), plus
 `repository_keys.xsh` for `repository/` source keys and recipe-specific
 modules (`linux_recipe.xsh`, `m4_recipe.xsh`, `dwl_recipe.xsh`, ...).
 `tests/pm/fixtures/` holds staged inputs, not tests.
