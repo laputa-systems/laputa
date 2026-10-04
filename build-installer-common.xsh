@@ -44,31 +44,11 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
     }
   }
 
-  if arch == "x86_64" {
-    return {
-      LAPUTA_INSTALLER_ARCH: "x86_64",
-      LAPUTA_INSTALLER_WORK: work.display(),
-      LAPUTA_INSTALLER_ISO: iso.display(),
-      LAPUTA_INSTALLER_KERNEL: kernel.display(),
-      LAPUTA_TARGET_ESP_MB: env_value("LAPUTA_TARGET_ESP_MB", "48"),
-      LAPUTA_INSTALLER_ROOT_MB: env_value("LAPUTA_INSTALLER_ROOT_MB", ""),
-      LAPUTA_INSTALLER_KERNEL_PACKAGE: env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux"),
-      LAPUTA_REPO_URL: repo_url,
-      LAPUTA_ROOT: root.display(),
-      XSH_HOST: xsh.display(),
-      XSH_MODULE_PATH: root.display(),
-    }
-  }
-
   Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
-  return "x86_64" when arch == "amd64"
-
-  return "aarch64" when arch == "arm64"
-
-  return arch when arch == "aarch64" or arch == "x86_64"
+  return "aarch64" when arch == "arm64" or arch == "aarch64"
 
   Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
 }

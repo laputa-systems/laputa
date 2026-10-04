@@ -17,9 +17,7 @@ proof; it does not supply the installer's package roots or image policy.
   Direct kernel boot is deliberate for v1 because UEFI fallback does not provide
   kernel `LoadOptions`.
 - The installer packages the selected kernel from the checked-out PM graph.
-  Normal arm64 builds use `linux`; the x86_64 QEMU harness uses
-  `linux-virt-amd64` by default for faster amd64
-  installer iteration. `LAPUTA_INSTALLER_KERNEL_PACKAGE` selects another
+  The default is `linux`; `LAPUTA_INSTALLER_KERNEL_PACKAGE` selects another
   package, and `LAPUTA_INSTALLER_KERNEL_SOURCE` can override only the booted
   kernel file.
 - QEMU boots the selected kernel directly with deterministic `PARTUUID=` root
@@ -55,8 +53,7 @@ proof; it does not supply the installer's package roots or image policy.
   dropbear`, and runs a basic `xshi` command. Logs are captured at
   `target/laputa-installer-aarch64-qemu/qemu-installer.log` and
   `target/laputa-installer-aarch64-qemu/qemu-target.log`.
-  If `target/laputa-installer-aarch64-qemu/local-linux-aarch64.Image` or the
-  corresponding `local-linux-x86_64.bzImage` in the x86_64 QEMU work directory
+  If `target/laputa-installer-aarch64-qemu/local-linux-aarch64.Image`
   exists, the harness passes it as `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise
   the image builder uses the kernel installed from the selected kernel package.
 - `make installer-qemu-manual`
@@ -104,15 +101,9 @@ through `laputa-fs`, and writes a minimal hybrid ISO/GPT artifact directly with
 XSH byte APIs. Its ISO9660 view exposes the selected kernel, and
 its GPT view exposes the installer ext4 root partition with the same
 deterministic `PARTUUID` used by the QEMU harness.
-`LAPUTA_INSTALLER_JOBS` controls the PM build concurrency (default 4). The
-x86_64 image builder still uses the older package-install route, which is not
-compatible with the current typed PM CLI.
-
-That legacy package-install route constructs subprocess environments through
-`installer/package_environment.xsh`. Repository and target values are strings;
-`LAPUTA_INSTALLER_QEMU_SMOKE` is omitted for calls without an explicit smoke
-flag and supplied as a string when requested. A missing flag must not become a
-present null environment value.
+`LAPUTA_INSTALLER_JOBS` controls the PM build concurrency (default 4). Only
+aarch64 installers build; the x86_64 remote-mirror install route was removed,
+and amd64 returns through the same container path parameterized by arch.
 
 ## Kernel Size
 
@@ -125,10 +116,6 @@ driver families such as DRM/i915, media tuners, sound, and USB. The amd64
 installer size penalty is amplified because the selected kernel is present as
 the ISO-visible direct-boot kernel, the EFI fallback kernel in the installer
 payload, and the target root's `/boot/vmlinuz`.
-
-`linux-virt-amd64` is the QEMU-oriented amd64 package for installer iteration.
-It is intentionally not an aarch64 package and is not the default production
-amd64 installer kernel.
 
 ## Install Flow
 
@@ -162,9 +149,8 @@ uses 2x detected memory for swap and fails if the target disk is too small.
   ISO media boot needs either a tiny EFI loader that passes LoadOptions, a
   real bootloader, or a kernel config choice that supplies a usable default
   command line without rebuilding for every installer iteration.
-- arm64/QEMU virt is the passing CI smoke path. x86_64/QEMU wiring exists, but
-  the published x86_64 kernel currently stops in early boot before installer
-  userspace.
+- arm64/QEMU virt is the only installer path. The QEMU harness keeps its
+  x86_64 machine parameters for the amd64 phase.
 - Networking is brought up with the XSH `ifup` applet when present, with the
   old minimal static IPv4 parser retained only as a fallback. The installed
   system receives the installer's address/netmask/gateway where possible, with

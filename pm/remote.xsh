@@ -30,63 +30,11 @@ pure default_repo_url() -> Str {
   "https://laputa.17166969.xyz"
 }
 
-proc dotenv_lookup(body: Str, name: Str) [] -> Str {
-  for raw in body.lines() {
-    let stripped = raw.trim()
-    continue when stripped == "" or stripped.starts_with("#")
-    let line = if stripped.starts_with("export ") { (stripped.split("export ").get(1) ?? "").trim() } else { stripped }
-
-    if line.starts_with(f"${name}=") {
-      let parts = line.split("=")
-      var value_parts = []
-      var part_index = 1
-
-      while part_index < parts.len() {
-        value_parts = value_parts.push(parts[part_index])
-        part_index += 1
-      }
-
-      return value_parts.join("=").trim().replace("\"", "").replace("'", "")
-    }
-  }
-
-  ""
-}
-
-proc load_dotenv_value(name: Str) [fs, error] -> Result[Str] {
-  if fs.exists(p".env")? {
-    let value = dotenv_lookup(fs.read_text(p".env")?, name)
-
-    if value != "" {
-      return value
-    }
-  }
-
-  match fs.gitroot() {
-    Ok(root) => {
-      let dotenv = fp"${root}/.env"
-
-      if fs.exists(dotenv)? {
-        return dotenv_lookup(fs.read_text(dotenv)?, name)
-      }
-    }
-    Err(_) => {}
-  }
-
-  ""
-}
-
-proc load_env_or_dotenv(names: List[Str]) [fs, env, error] -> Result[Str] {
+# Repository endpoints come only from the process environment; PM never reads
+# `.env` files.
+proc first_env_value(names: List[Str]) [env] -> Str {
   for name in names {
     let value = (env.get(name) ?? "").trim()
-
-    if value != "" {
-      return value
-    }
-  }
-
-  for name in names {
-    let value = load_dotenv_value(name)?.trim()
 
     if value != "" {
       return value
@@ -97,9 +45,9 @@ proc load_env_or_dotenv(names: List[Str]) [fs, env, error] -> Result[Str] {
 }
 
 ## Exported PM declaration `load_repo_urls`.
-export proc load_repo_urls() [fs, env, error] -> Result[types.RepoUrls] {
-  var repo = load_env_or_dotenv(["XSH_PM_REPO", "LAPUTA_REPO"])?
-  var public_repo = load_env_or_dotenv(["XSH_PM_PUBLIC_REPO", "R2_PUBLIC_URL"])?
+export proc load_repo_urls() [env, error] -> Result[types.RepoUrls] {
+  var repo = first_env_value(["XSH_PM_REPO", "LAPUTA_REPO"])
+  var public_repo = first_env_value(["XSH_PM_PUBLIC_REPO", "R2_PUBLIC_URL"])
 
   if repo == "" and public_repo == "" and (env.get("XSH_PM_OFFLINE") ?? "").trim() != "1" {
     repo = default_repo_url()
@@ -113,7 +61,7 @@ export proc load_repo_urls() [fs, env, error] -> Result[types.RepoUrls] {
 }
 
 ## Exported PM declaration `require_repo_url`.
-export proc require_repo_url() [fs, env, error] -> Result[types.RepoUrls] {
+export proc require_repo_url() [env, error] -> Result[types.RepoUrls] {
   let repo_urls = load_repo_urls()?
 
   if repo_urls.repo == "" {

@@ -1,5 +1,4 @@
 #!/bin/xsh
-use installer.package_environment
 use installer.package_roots_host as package_roots_host
 
 error InstallerBuildError = Failed(message: Str)
@@ -36,23 +35,6 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
   return Err(InstallerBuildError.Failed(f"${argv[0]} was signaled"))
 }
 
-proc run_pm(
-  root: Path,
-  xsh: Path,
-  repo_url: Str,
-  arch: Str,
-  argv: List[Str],
-  qemu_smoke: Str? = null,
-) [fs, process, env, error] {
-  let command_argv = ["xsh", fp"${root}/pm.xsh".display(), "--"].extend(argv)
-  if qemu_smoke != null {
-    run_argv(xsh, command_argv, root, package_environment.smoke_environment(root, repo_url, arch, qemu_smoke))?
-    return
-  }
-
-  run_argv(xsh, command_argv, root, package_environment.environment(root, repo_url, arch))?
-}
-
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
   run_argv(
     xsh,
@@ -60,86 +42,6 @@ proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, proce
     root,
     {XSH_MODULE_PATH: root.display(), XSH_UNIX_REAL: "1"},
   )?
-}
-
-proc install_remote_packages(
-  root: Path,
-  work: Path,
-  xsh: Path,
-  repo_url: Str,
-  arch: Str,
-  rootfs: Path,
-  label: Str,
-  packages: List[Str],
-  qemu_smoke: Str? = null,
-) [fs, process, env, error] {
-  run_pm(
-    root,
-    xsh,
-    repo_url,
-    arch,
-    ["install", rootfs.display(), fp"${work}/pm-work-${label}".display(), fp"${work}/pm-out-${label}".display()].extend(
-      packages,
-    ),
-    qemu_smoke,
-  )?
-}
-
-# Overlay locally built packages into rootfs after all remote packages are
-# installed.  PM currently uses only one repo for its index, so local packages
-# with a newer release must be applied after the remote install.
-proc overlay_local_packages(work: Path, arch: Str, rootfs: Path) [fs, env, error] {
-  let local_pm = env.get("LAPUTA_LOCAL_PM_REPO") ?? ""
-
-  return when local_pm == ""
-
-  let local_dir = fp"${local_pm.replace("file://", "")}"
-  let index_path = fp"${local_dir}/index.json"
-
-  return unless fs.exists(index_path)?
-
-  let index = json.read(index_path)?.require(List[Record])?
-
-  for entry in index {
-    let name = entry.get("name")?.require(Str)?
-    let entry_arch = entry.get("arch")?.require(Str)?
-    let tarball_rel = entry.get("tarball")?.require(Str)?
-    continue when entry_arch != arch
-    let tarball = fp"${local_dir}/${tarball_rel}"
-    continue unless fs.exists(tarball)?
-
-    # Extract to a temp dir, then copy into rootfs (handles symlinks).
-    let tmp_overlay = fp"${work}/.overlay-${name}"
-
-    if fs.exists(tmp_overlay)? {
-      remove_tree(tmp_overlay)?
-    }
-
-    fs.mkdir(tmp_overlay)?
-    archive.tar_extract(tarball, tmp_overlay, 0, "auto", true)?
-
-    for item in fs.walk(tmp_overlay, gitignore: false)? {
-      let rel = item.path.relative_to(tmp_overlay)
-      let target = fp"${rootfs}/${rel}"
-
-      if item.kind == "dir" {
-        fs.mkdir(target)?
-      } else if item.kind == "symlink" {
-        let link_target = item.path.readlink()?
-        fs.remove(target, missing_ok: true)?
-        fs.symlink(link_target, target)?
-      } else {
-        # Install as executable if the file lives under a bin/sbin directory
-        # or if the filename suggests it is an executable.
-        let rel_str = rel.display()
-        let is_exe = "/bin/" in rel_str or "/sbin/" in rel_str or rel_str.ends_with(".xsh")
-        let mode = if is_exe { 0o755 } else { 0o644 }
-        fs.install(item.path, target, mode, parents: true, overwrite: true)?
-      }
-    }
-
-    remove_tree(tmp_overlay)?
-  }
 }
 
 proc ensure_dev_dirs(rootfs: Path) [fs, error] {
@@ -219,40 +121,10 @@ proc install_installer_tools(root: Path, rootfs: Path) [fs, env, error] {
   append_inittab_line(rootfs, "ttyAMA0::respawn:/bin/xshi")?
 }
 
-proc install_live_filesystem_tools(root: Path, rootfs: Path) [fs, env, error] {
-  fs.install(
-    fp"${root}/packages/laputa-fs/files/mkfs.vfat.xsh",
-    fp"${rootfs}/usr/bin/mkfs.vfat",
-    0o755,
-    parents: true,
-    overwrite: true,
-  )?
-
-  fs.install(
-    fp"${root}/packages/laputa-fs/files/mkfs.ext4.xsh",
-    fp"${rootfs}/usr/bin/mkfs.ext4",
-    0o755,
-    parents: true,
-    overwrite: true,
-  )?
-}
-
-proc install_qemu_smoke_target_tools(root: Path, rootfs: Path) [fs, env, error] {
-  fs.install(
-    fp"${root}/packages/dropbear/service.xsh",
-    fp"${rootfs}/usr/lib/xinit/services/dropbear.xsh",
-    0o644,
-    parents: true,
-    overwrite: true,
-  )?
-}
-
+# Only aarch64 installers build from the local package graph today; other
+# architectures fail here instead of reaching an arch-specific path.
 pure normalize_installer_arch(arch: Str) -> Result[Str] {
-  return "aarch64" when arch == "arm64"
-
-  return "x86_64" when arch == "amd64"
-
-  return arch when arch == "aarch64" or arch == "x86_64"
+  return "aarch64" when arch == "arm64" or arch == "aarch64"
 
   Err(InstallerBuildError.Failed(f"unsupported installer arch ${arch}"))
 }
@@ -263,67 +135,6 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
   return "BOOTX64.EFI" when arch == "x86_64"
 
   Err(InstallerBuildError.Failed(f"unsupported installer EFI arch ${arch}"))
-}
-
-proc repo_url_for(repo_url: Str, rel: Str) [] -> Str {
-  return f"${repo_url}${rel}" when repo_url.ends_with("/")
-
-  f"${repo_url}/${rel}"
-}
-
-proc download_file(url: Str, dest: Path) [fs, net, error] {
-  let tmp = fp"${dest.parent}/.${dest.name}.tmp"
-  fs.remove(tmp, missing_ok: true)?
-
-  let response = net.download({
-    url,
-    dest: tmp,
-    atomic: true,
-    overwrite: true,
-    connect_timeout: 10s,
-    fail_status: true,
-  })?
-
-  fs.rename(tmp, dest, overwrite: true)?
-  let _ = response
-}
-
-proc linux_tarball(work: Path, repo_url: Str, arch: Str, package_name: Str) [fs, net, error] -> Result[Path] {
-  let index_path = fp"${work}/remote-index.json"
-  download_file(repo_url_for(repo_url, "index.json"), index_path)?
-  let rows = json.read(index_path)?.require(List[Record])?
-
-  for row in rows {
-    let name = row.get("name")?.require(Str)?
-    let row_arch = row.get("arch")?.require(Str)?
-
-    if name == package_name and row_arch == arch {
-      let tarball_rel = row.get("tarball")?.require(Str)?
-      let tarball = fp"${work}/${package_name}-${arch}.tar.gz"
-      download_file(repo_url_for(repo_url, tarball_rel), tarball)?
-      return tarball
-    }
-  }
-
-  Err(InstallerBuildError.Failed(f"${package_name} package for ${arch} not found in ${repo_url}"))
-}
-
-proc install_linux_minimal(rootfs: Path, tarball: Path, package_name: Str) [fs, error] {
-  archive.tar_extract(
-    tarball,
-    rootfs,
-    0,
-    "auto",
-    true,
-    [
-      p"boot/vmlinuz",
-      p"boot/vmlinuz-7.0.5",
-      p"usr/share/linux/config-7.0.5",
-      fp"var/lib/xsh-pm/packages/${package_name}/metadata.json",
-      fp"var/lib/xsh-pm/packages/${package_name}/manifest.json",
-      fp"var/lib/xsh-pm/packages/${package_name}/etcsums.json",
-    ],
-  )?
 }
 
 proc remove_tree(path_value: Path) [fs, error] {
@@ -347,84 +158,6 @@ proc remove_tree(path_value: Path) [fs, error] {
   }
 
   path_value.remove_dir()?
-}
-
-proc assemble_target(
-  root: Path,
-  work: Path,
-  xsh: Path,
-  repo_url: Str,
-  arch: Str,
-  qemu_smoke: Str,
-  linux_pkg: Path,
-  linux_package_name: Str,
-) [fs, process, env, error] {
-  let rootfs = fp"${work}/rootfs-target"
-  install_remote_packages(root, work, xsh, repo_url, arch, rootfs, "target-base", ["baselayout"])?
-  var packages = ["sudo-rs"]
-
-  if qemu_smoke == "1" {
-    packages += ["dropbear"]
-  }
-
-  install_remote_packages(
-    root,
-    work,
-    xsh,
-    repo_url,
-    arch,
-    rootfs,
-    "target-runtime",
-    packages,
-    qemu_smoke,
-  )?
-
-  install_linux_minimal(rootfs, linux_pkg, linux_package_name)?
-
-  if qemu_smoke == "1" {
-    install_qemu_smoke_target_tools(root, rootfs)?
-  }
-
-  install_remote_packages(
-    root,
-    work,
-    xsh,
-    repo_url,
-    arch,
-    rootfs,
-    "target-tools",
-    ["xsh", "xinit", "laputa-pm", "laputa-net"],
-    qemu_smoke,
-  )?
-
-  overlay_local_packages(work, arch, rootfs)?
-  ensure_dev_dirs(rootfs)?
-  install_installer_tools(root, rootfs)?
-}
-
-proc assemble_installer(root: Path, work: Path, xsh: Path, repo_url: Str, arch: Str) [fs, process, env, error] {
-  let rootfs = fp"${work}/rootfs-installer"
-  install_remote_packages(root, work, xsh, repo_url, arch, rootfs, "installer-base", ["baselayout"])?
-
-  install_remote_packages(
-    root,
-    work,
-    xsh,
-    repo_url,
-    arch,
-    rootfs,
-    "installer-tools",
-    ["xsh", "xinit", "laputa-pm", "laputa-fs", "laputa-net"],
-  )?
-
-  overlay_local_packages(work, arch, rootfs)?
-  ensure_dev_dirs(rootfs)?
-  install_installer_tools(root, rootfs)?
-  install_live_filesystem_tools(root, rootfs)?
-}
-
-proc assemble_tools(root: Path, work: Path, xsh: Path, repo_url: Str, arch: Str) [fs, process, env, error] {
-  install_remote_packages(root, work, xsh, repo_url, arch, fp"${work}/rootfs-tools", "tools", ["xsh", "laputa-fs"])?
 }
 
 proc install_composed_root(bundle: Path, label: Str, output: Path) [fs, error] {
@@ -1004,7 +737,7 @@ proc build_filesystems(
   )?
 }
 
-proc build_host() [fs, net, process, env, error, io] {
+proc build_host() [fs, process, env, error, io] {
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
   let arch = normalize_installer_arch(installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
   let work = installer_work_path(root, arch)?
@@ -1016,8 +749,7 @@ proc build_host() [fs, net, process, env, error, io] {
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
   let qemu_smoke = installer_env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
   let qemu_authorized_key = installer_env_value("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY", "")
-  let default_target_esp_mb = if arch == "x86_64" { "48" } else { "16" }
-  let target_esp_mb = installer_env_value("LAPUTA_TARGET_ESP_MB", default_target_esp_mb)
+  let target_esp_mb = installer_env_value("LAPUTA_TARGET_ESP_MB", "16")
   let installer_root_mb = installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
   let installer_ci = installer_env_value("LAPUTA_INSTALLER_CI", "1")
 
@@ -1029,17 +761,13 @@ proc build_host() [fs, net, process, env, error, io] {
     )
   }
 
-  let package_bundle = if arch == "aarch64" {
-    package_roots_host.prepare(
-      root,
-      repo_url,
-      linux_package_name,
-      qemu_smoke == "1",
-      installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
-    )?
-  } else {
-    p""
-  }
+  let package_bundle = package_roots_host.prepare(
+    root,
+    repo_url,
+    linux_package_name,
+    qemu_smoke == "1",
+    installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
+  )?
 
   fs.mkdir(work)?
 
@@ -1054,30 +782,13 @@ proc build_host() [fs, net, process, env, error, io] {
     fp"${work}/target-root.ext4",
     fp"${work}/target-esp.vfat",
     fp"${work}/linux-kernel",
-    fp"${work}/pm-work-target-base",
-    fp"${work}/pm-work-target-runtime",
-    fp"${work}/pm-work-target-tools",
-    fp"${work}/pm-work-installer-base",
-    fp"${work}/pm-work-installer-tools",
-    fp"${work}/pm-work-tools",
-    fp"${work}/pm-out-target-base",
-    fp"${work}/pm-out-target-runtime",
-    fp"${work}/pm-out-target-tools",
-    fp"${work}/pm-out-installer-base",
-    fp"${work}/pm-out-installer-tools",
-    fp"${work}/pm-out-tools",
   ] {
     remove_tree(path_value)?
   }
 
   fs.mkdir(fp"${work}/rootfs-target")?
   fs.mkdir(fp"${work}/rootfs-installer")?
-  if arch == "aarch64" {
-    assemble_composed_roots(root, work, package_bundle)?
-  } else {
-    let linux_pkg = linux_tarball(work, repo_url, arch, linux_package_name)?
-    assemble_target(root, work, xsh, repo_url, arch, qemu_smoke, linux_pkg, linux_package_name)?
-  }
+  assemble_composed_roots(root, work, package_bundle)?
 
   if qemu_smoke == "1" {
     if qemu_authorized_key == "" {
@@ -1094,11 +805,6 @@ proc build_host() [fs, net, process, env, error, io] {
 
     fs.mkdir(fp"${work}/rootfs-target/etc/laputa-installer")?
     fs.copy(key_path, fp"${work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)?
-  }
-
-  if arch != "aarch64" {
-    assemble_installer(root, work, xsh, repo_url, arch)?
-    assemble_tools(root, work, xsh, repo_url, arch)?
   }
 
   prune_runtime_root(fp"${work}/rootfs-target")?
@@ -1118,7 +824,7 @@ proc build_host() [fs, net, process, env, error, io] {
 """)?
 }
 
-proc main(...argv: List[Str]) [fs, net, process, env, error, io] {
+proc main(...argv: List[Str]) [fs, process, env, error, io] {
   if argv.len() > 0 {
     return Err(InstallerBuildError.Failed("build-installer-image.xsh does not accept subcommands"))
   }

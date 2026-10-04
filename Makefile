@@ -56,8 +56,7 @@ PNPM_ROOT ?= target/pnpm
 .PHONY: check lint test test-pm test-system test-xinit clean \
 	profile-plan profile-build profile-test profile-boot profile-clean \
 	test-pm-native test-pm-docker test-pm-local-linux xsh-native xsh-local-bins xsh-builder-image update-checksums \
-	installer-image installer-image-aarch64 installer-image-amd64 installer-image-x86_64 \
-	installer-qemu-test installer-qemu-test-aarch64 installer-qemu-test-amd64 installer-qemu-test-x86_64 \
+	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
 	installer-qemu-manual \
 	mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
 
@@ -175,20 +174,10 @@ installer-image: installer-image-aarch64
 installer-image-aarch64:
 	$(XSH_HOST) build-installer-aarch64.xsh
 
-installer-image-amd64:
-	$(XSH_HOST) build-installer-amd64.xsh
-
-installer-image-x86_64: installer-image-amd64
-
 installer-qemu-test: installer-qemu-test-aarch64
 
 installer-qemu-test-aarch64:
 	$(XSH_HOST) installer-qemu-test.xsh
-
-installer-qemu-test-amd64:
-	LAPUTA_INSTALLER_ARCH=x86_64 $(XSH_HOST) installer-qemu-test.xsh
-
-installer-qemu-test-x86_64: installer-qemu-test-amd64
 
 installer-qemu-manual:
 	$(XSH_HOST) installer-qemu-manual.xsh
