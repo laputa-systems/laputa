@@ -482,14 +482,7 @@ proc build_installer(
   ssh_pubkey: Path,
   xsh: Path,
 ) [fs, process, env, error] {
-  let kernel_package = env_value(
-    "LAPUTA_INSTALLER_KERNEL_PACKAGE",
-    if arch == "x86_64" {
-      "linux-virt-amd64"
-    } else {
-      "linux"
-    },
-  )
+  let kernel_package = env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
 
   var build_env: Record = {
     XSH_HOST: xsh.display(),

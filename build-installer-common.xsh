@@ -25,30 +25,26 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
   return Err(InstallerReportError.Failed(f"{argv[0]} was signaled"))
 }
 
-proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) [env, error] -> Result[Record] {
-  let repo_url = env_value("LAPUTA_REPO_URL", "https://laputa.17166969.xyz")
-
-  if arch == "aarch64" {
-    return {
-      LAPUTA_INSTALLER_ARCH: "aarch64",
-      LAPUTA_INSTALLER_WORK: work.display(),
-      LAPUTA_INSTALLER_ISO: iso.display(),
-      LAPUTA_INSTALLER_KERNEL: kernel.display(),
-      LAPUTA_TARGET_ESP_MB: env_value("LAPUTA_TARGET_ESP_MB", "16"),
-      LAPUTA_INSTALLER_ROOT_MB: env_value("LAPUTA_INSTALLER_ROOT_MB", ""),
-      LAPUTA_INSTALLER_KERNEL_PACKAGE: env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux"),
-      LAPUTA_REPO_URL: repo_url,
-      LAPUTA_ROOT: root.display(),
-      XSH_HOST: xsh.display(),
-      XSH_MODULE_PATH: root.display(),
-    }
+proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) [env] -> Record {
+  {
+    LAPUTA_INSTALLER_ARCH: arch,
+    LAPUTA_INSTALLER_WORK: work.display(),
+    LAPUTA_INSTALLER_ISO: iso.display(),
+    LAPUTA_INSTALLER_KERNEL: kernel.display(),
+    LAPUTA_TARGET_ESP_MB: env_value("LAPUTA_TARGET_ESP_MB", "16"),
+    LAPUTA_INSTALLER_ROOT_MB: env_value("LAPUTA_INSTALLER_ROOT_MB", ""),
+    LAPUTA_INSTALLER_KERNEL_PACKAGE: env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux"),
+    LAPUTA_REPO_URL: env_value("LAPUTA_REPO_URL", "http://127.0.0.1:3000"),
+    LAPUTA_ROOT: root.display(),
+    XSH_HOST: xsh.display(),
+    XSH_MODULE_PATH: root.display(),
   }
-
-  Err(InstallerReportError.Failed(f"unsupported installer arch {arch}"))
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
   return "aarch64" when arch == "arm64" or arch == "aarch64"
+
+  return "x86_64" when arch == "amd64" or arch == "x86_64"
 
   Err(InstallerReportError.Failed(f"unsupported installer arch {arch}"))
 }
@@ -60,7 +56,7 @@ proc build_installer(raw_arch: Str) [fs, process, env, error] {
   let iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
   let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
-  let envs = arch_envs(arch, root, work, iso, kernel, xsh)?
+  let envs = arch_envs(arch, root, work, iso, kernel, xsh)
   run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, envs)?
 
   run_argv(

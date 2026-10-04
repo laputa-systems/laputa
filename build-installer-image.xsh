@@ -75,7 +75,15 @@ proc append_inittab_line(rootfs: Path, line: Str) [fs, error] {
   )?
 }
 
-proc install_installer_tools(root: Path, rootfs: Path) [fs, env, error] {
+# The serial console QEMU's machine model provides: the PL011 UART on aarch64
+# virt, the 16550 UART on x86_64 pc.
+pure serial_console(arch: Str) -> Str {
+  return "ttyS0" when arch == "x86_64"
+
+  "ttyAMA0"
+}
+
+proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, error] {
   let installer_root = fp"{root}/installer"
 
   fs.install(
@@ -118,13 +126,13 @@ proc install_installer_tools(root: Path, rootfs: Path) [fs, env, error] {
     overwrite: true,
   )?
 
-  append_inittab_line(rootfs, "ttyAMA0::respawn:/bin/xshi")?
+  append_inittab_line(rootfs, f"{serial_console(arch)}::respawn:/bin/xshi")?
 }
 
-# Only aarch64 installers build from the local package graph today; other
-# architectures fail here instead of reaching an arch-specific path.
 pure normalize_installer_arch(arch: Str) -> Result[Str] {
   return "aarch64" when arch == "arm64" or arch == "aarch64"
+
+  return "x86_64" when arch == "amd64" or arch == "x86_64"
 
   Err(InstallerBuildError.Failed(f"unsupported installer arch {arch}"))
 }
@@ -160,33 +168,29 @@ proc remove_tree(path_value: Path) [fs, error] {
   path_value.remove_dir()?
 }
 
-proc install_composed_root(bundle: Path, label: Str, output: Path) [fs, error] {
-  archive.tar_extract(fp"{bundle}/{label}-root.tar.gz", output, 0, "auto", true)?
-
-  # Image overlays change these roots after package composition, so a package
-  # generation receipt must not claim to describe the finished image.
-  fs.remove(fp"{output}/var/lib/laputa/generation.json", missing_ok: true)?
-  fs.remove(fp"{output}/var/lib/laputa/root.json", missing_ok: true)?
+# Image overlays change these roots after package composition, so a package
+# generation receipt must not claim to describe the finished image.
+proc drop_generation_receipt(rootfs: Path) [fs, error] {
+  fs.remove(fp"{rootfs}/var/lib/laputa/generation.json", missing_ok: true)?
+  fs.remove(fp"{rootfs}/var/lib/laputa/root.json", missing_ok: true)?
 }
 
-proc assemble_composed_roots(root: Path, work: Path, bundle: Path) [fs, env, error] {
-  let target = fp"{work}/rootfs-target"
-  let installer = fp"{work}/rootfs-installer"
-  install_composed_root(bundle, "target", target)?
-  install_composed_root(bundle, "installer", installer)?
-  install_composed_root(bundle, "tools", fp"{work}/rootfs-tools")?
+proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) [fs, env, error] {
+  for rootfs in [roots.target, roots.installer, roots.tools] {
+    drop_generation_receipt(rootfs)?
+  }
 
-  ensure_dev_dirs(target)?
-  install_installer_tools(root, target)?
-  ensure_dev_dirs(installer)?
-  install_installer_tools(root, installer)?
+  ensure_dev_dirs(roots.target)?
+  install_installer_tools(root, roots.target, arch)?
+  ensure_dev_dirs(roots.installer)?
+  install_installer_tools(root, roots.installer, arch)?
 }
 
-proc prune_runtime_root(rootfs: Path) [fs, error] {
+proc prune_runtime_root(rootfs: Path, arch: Str) [fs, error] {
   fs.remove(fp"{rootfs}/boot/vmlinuz-7.0.5", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/include", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-aarch64.a", missing_ok: true)?
+  fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libcrypt.a", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libdl.a", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libm.a", missing_ok: true)?
@@ -201,19 +205,30 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
   (value + divisor - 1) / divisor
 }
 
-proc path_size(path_value: Path) [fs, error] -> Result[Int] {
-  guard fs.exists(path_value)? else {
-    return 0
-  }
+# laputa-fs's mkfs.ext4 layout: 4 KiB blocks in 32768-block groups, each of
+# which reserves its first 516 blocks (headers and the inode table), and files
+# mapped through indirect blocks of 1024 entries. Sizing from apparent bytes
+# plus a fixed slack fails once a root spans more than a group or two.
+const EXT4_BLOCK = 4096
+const EXT4_GROUP_BLOCKS = 32768
+const EXT4_GROUP_RESERVED = 516
 
+# Data and mapping blocks for one tree: whole blocks per file plus one
+# indirect block per 1024 data blocks and one for the double-indirect root,
+# and for a directory, its entries at their 264-byte worst case.
+proc tree_blocks(path_value: Path) [fs, error] -> Result[Int] {
   let meta = path_value.metadata()?
 
-  return meta.size when meta.kind != "dir"
+  if meta.kind != "dir" {
+    let data = ceil_div(meta.size, EXT4_BLOCK)
+    return data + ceil_div(data, 1024) + 1
+  }
 
-  var total = meta.size
+  let children = fs.children(path_value)?.collect()
+  var total = 1 + ceil_div(children.len() * 264, EXT4_BLOCK)
 
-  for child in fs.children(path_value)? {
-    total += path_size(child.path)?
+  for child in children {
+    total += if child.kind == "symlink" { 1 } else { tree_blocks(child.path)? }
   }
 
   total
@@ -224,7 +239,9 @@ proc installer_root_size_mb(rootfs: Path, override_mb: Str) [fs, error] -> Resul
     return override_mb.parse_int()?
   }
 
-  ceil_div(path_size(rootfs)?, 1024 * 1024) + 4
+  let data = tree_blocks(rootfs)?
+  let groups = ceil_div(data, EXT4_GROUP_BLOCKS - EXT4_GROUP_RESERVED)
+  ceil_div((data + groups * EXT4_GROUP_RESERVED) * EXT4_BLOCK, 1024 * 1024) + 1
 }
 
 proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
@@ -737,14 +754,14 @@ proc build_filesystems(
   )?
 }
 
-proc build_host() [fs, process, env, error, io] {
+proc build_host() [fs, net, process, env, time, error, io] {
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
   let arch = normalize_installer_arch(installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
   let work = installer_work_path(root, arch)?
   let iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
   let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   let kernel_source_raw = installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
-  let repo_url = installer_env_value("LAPUTA_REPO_URL", "https://laputa.17166969.xyz")
+  let repo_url = installer_env_value("LAPUTA_REPO_URL", "http://127.0.0.1:3000")
   let linux_package_name = installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
   let qemu_smoke = installer_env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
@@ -753,20 +770,18 @@ proc build_host() [fs, process, env, error, io] {
   let installer_root_mb = installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
   let installer_ci = installer_env_value("LAPUTA_INSTALLER_CI", "1")
 
-  let package_bundle = package_roots_host.prepare(
-    root,
-    repo_url,
-    linux_package_name,
-    qemu_smoke == "1",
-    installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
-  )?
-
+  let roots = package_roots_host.InstallerRoots(
+    target: fp"{work}/rootfs-target",
+    installer: fp"{work}/rootfs-installer",
+    tools: fp"{work}/rootfs-tools",
+  )
   fs.mkdir(work)?
 
   for path_value in [
-    fp"{work}/rootfs-target",
-    fp"{work}/rootfs-installer",
-    fp"{work}/rootfs-tools",
+    fp"{work}/packages",
+    roots.target,
+    roots.installer,
+    roots.tools,
     fp"{work}/esp",
     fp"{work}/laputa-installer-{arch}.img",
     fp"{work}/laputa-installer-manual-{arch}.img",
@@ -778,9 +793,17 @@ proc build_host() [fs, process, env, error, io] {
     remove_tree(path_value)?
   }
 
-  fs.mkdir(fp"{work}/rootfs-target")?
-  fs.mkdir(fp"{work}/rootfs-installer")?
-  assemble_composed_roots(root, work, package_bundle)?
+  package_roots_host.prepare(
+    root,
+    arch,
+    repo_url,
+    linux_package_name,
+    qemu_smoke == "1",
+    installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
+    fp"{work}/packages",
+    roots,
+  )?
+  overlay_composed_roots(root, roots, arch)?
 
   if qemu_smoke == "1" {
     if qemu_authorized_key == "" {
@@ -799,8 +822,8 @@ proc build_host() [fs, process, env, error, io] {
     fs.copy(key_path, fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)?
   }
 
-  prune_runtime_root(fp"{work}/rootfs-target")?
-  prune_runtime_root(fp"{work}/rootfs-installer")?
+  prune_runtime_root(roots.target, arch)?
+  prune_runtime_root(roots.installer, arch)?
   let packaged_kernel = fp"{work}/rootfs-target/boot/vmlinuz"
   let boot_kernel = if kernel_source_raw == "" { packaged_kernel } else { fp"{kernel_source_raw}" }
 
@@ -816,7 +839,7 @@ proc build_host() [fs, process, env, error, io] {
 """)?
 }
 
-proc main(...argv: List[Str]) [fs, process, env, error, io] {
+proc main(...argv: List[Str]) [fs, net, process, env, time, error, io] {
   if argv.len() > 0 {
     return Err(InstallerBuildError.Failed("build-installer-image.xsh does not accept subcommands"))
   }

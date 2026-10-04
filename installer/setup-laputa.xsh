@@ -62,9 +62,20 @@ pure prefix_to_netmask(prefix_len: Int) -> Str {
   f"{prefix_octet(prefix_len)}.{prefix_octet(prefix_len - 8)}.{prefix_octet(prefix_len - 16)}.{prefix_octet(prefix_len - 24)}"
 }
 
+# The serial console the QEMU harness reads, and the one the installed
+# system's login runs on: the PL011 UART on aarch64 virt, the 16550 UART on
+# x86_64 pc. The kernel's /dev/console may be tty0 instead.
+proc serial_console_name() [fs, error] -> Result[Str] {
+  return "ttyAMA0" when fs.exists(/dev/ttyAMA0)?
+
+  "ttyS0"
+}
+
 proc write_text(text: Str) [fs, error, io] {
-  if fs.exists(/dev/ttyAMA0)? {
-    fs.write(/dev/ttyAMA0, text)?
+  let serial = fp"/dev/{serial_console_name()?}"
+
+  if fs.exists(serial)? {
+    fs.write(serial, text)?
   } else {
     io.write_stdout(text)?
   }
@@ -400,9 +411,9 @@ main()?
   } else {
     write_file(
       fp"{root}/etc/inittab",
-      """::sysinit:/usr/lib/init/rc.boot
+      f"""::sysinit:/usr/lib/init/rc.boot
 ::once:/usr/lib/init/mdev.supervise
-ttyAMA0::respawn:/usr/bin/login -f pazu
+{serial_console_name()?}::respawn:/usr/bin/login -f pazu
 tty1::respawn:/usr/bin/login -f pazu
 ::restart:/usr/bin/xinit /etc/inittab
 ::shutdown:/usr/lib/init/rc.shutdown

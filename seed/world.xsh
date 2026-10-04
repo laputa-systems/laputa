@@ -235,8 +235,8 @@ proc world_build(container: WorldContainer, args: WorldArgs) [fs, process, error
   )?
 }
 
-# Runs PM in this host process against the loopback mirror.
-proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
+## Run PM in this host process against the loopback mirror.
+export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo}) {
     pm_cli.run_pm_cli(args)?
   }?
@@ -261,7 +261,8 @@ export pure world_root_dir(laputa_root: Path, arch: Str) -> Path {
 
 # The root's whole closure must come from the mirror: a node the mirror lacks
 # would build on the host, which is not a build environment.
-proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
+## Require every node of a host plan to be an exact mirror artifact.
+export proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   let value = pm_plan_json.read(plan)?
   let missing = [node.name for node in value.nodes if pm_types.plan_action_is_build(node.action)]
 

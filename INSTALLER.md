@@ -1,18 +1,19 @@
 # Laputa Installer
 
-This documents the current v1 installer architecture: a compact arm64 image
-that installs a barebones Laputa system and can be exercised under QEMU. The
-arm64 package roots come from one saved BuildPlan in the checked-out PM graph.
-The current plan selects local builds for every node because their releases
-exceed the published mirror. `qemu-dwl-foot` has a separate build and QEMU
-proof; it does not supply the installer's package roots or image policy.
+This documents the current v1 installer architecture: a compact aarch64 or
+x86_64 image that installs a barebones Laputa system and can be exercised under
+QEMU. Its package roots come from the local mirror, like `make root`'s, so the
+world must be built and published first (`make build`, `make mirror`, `make
+publish`). `qemu-dwl-foot` has a separate build and QEMU proof; it does not
+supply the installer's package roots or image policy.
 
 ## Current Shape
 
 - The primary tested installer is now a compact hybrid ISO artifact written
   directly by XSH. The raw GPT installer image path was removed; the ISO is the
   only installer artifact.
-- The image contains an ESP with `EFI/BOOT/BOOTAA64.EFI`, but the current QEMU
+- The image contains an ESP with `EFI/BOOT/BOOTAA64.EFI` (aarch64) or
+  `EFI/BOOT/BOOTX64.EFI` (x86_64), but the current QEMU
   harness boots the packaged kernel directly with `-kernel` and `-append`.
   Direct kernel boot is deliberate for v1 because UEFI fallback does not provide
   kernel `LoadOptions`.
@@ -41,21 +42,25 @@ proof; it does not supply the installer's package roots or image policy.
 
 ## Entry Points
 
-- `make installer-image-aarch64` (also `make installer-image`)
+Both targets take `ARCH` (the host's by default) and `MIRROR_URL` (the
+loopback mirror by default).
+
+- `make installer-image`
   builds the CI/autoinstall ISO at
-  `target/laputa-installer-aarch64/laputa-installer-aarch64.iso` and extracts the
+  `target/laputa-installer-ARCH/laputa-installer-ARCH.iso` and extracts the
   matching kernel for direct QEMU boot proofs.
-- `make installer-qemu-test-aarch64` (also `make installer-qemu-test`)
+- `make installer-qemu-test`
   boots the hybrid installer ISO with a blank 128M virtio disk, waits for
   `LAPUTA_INSTALLER_CI_OK`, then boots the installed target disk with a
   QEMU-only Dropbear/key overlay. The host generates an ed25519 keypair, SSHes
   through QEMU user-mode port forwarding as `pazu`, checks `xinit status
-  dropbear`, and runs a basic `xshi` command. Logs are captured at
-  `target/laputa-installer-aarch64-qemu/qemu-installer.log` and
-  `target/laputa-installer-aarch64-qemu/qemu-target.log`.
-  If `target/laputa-installer-aarch64-qemu/local-linux-aarch64.Image`
-  exists, the harness passes it as `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise
-  the image builder uses the kernel installed from the selected kernel package.
+  dropbear`, and runs a basic `xshi` command. x86_64 runs under KVM. Logs are
+  captured at `target/laputa-installer-ARCH-qemu/qemu-installer.log` and
+  `target/laputa-installer-ARCH-qemu/qemu-target.log`.
+  If `target/laputa-installer/local-linux-aarch64.Image` (or
+  `local-linux-x86_64.bzImage`) exists, the harness passes it as
+  `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise the image builder uses the
+  kernel installed from the selected kernel package.
 - `make installer-qemu-manual`
   builds a non-CI image and starts interactive QEMU with stdio serial and no
   monitor, so `^C` interrupts QEMU. Inside the guest, run `setup-laputa`; for a
@@ -71,8 +76,8 @@ proof; it does not supply the installer's package roots or image policy.
   native XSH APIs; there are no installer-specific C helper binaries. The CI
   image enables the hook with `/etc/laputa-installer/ci`.
 - `laputa-pm`
-  installs PM into `/usr/lib/pm` plus a `/usr/bin/pm` wrapper that defaults to
-  `https://laputa.17166969.xyz`.
+  installs PM into `/usr/lib/pm` plus a `/usr/bin/pm` wrapper. PM has no
+  default remote; `XSH_PM_REPO` names one.
 - `laputa-fs`
   owns the native filesystem tool surface used by the installer path:
   `mkfs.vfat`, `mkfs.ext4`, and `fsck.ext4`. `mkfs.vfat` writes the tiny
@@ -82,40 +87,36 @@ proof; it does not supply the installer's package roots or image policy.
   `fsck.ext4` is still a minimal superblock smoke check, not a repairing
   checker.
 
-`installer/package_roots_host.xsh` invokes the native arm64 Docker runner with
-the checked-out Linux XSH binary. `installer/package_roots_container.xsh` plans
-the union of requested package roots, saves and builds that plan in a named PM
-Store, and composes separate target, installer, and image-tools roots from its
-verified artifacts. The container publishes the plan and root archives as one
-atomic bundle. The target root includes the selected kernel and `sudo-rs`; the
-installer and tools roots contain `laputa-fs`. QEMU smoke adds Dropbear to the
-target root. Installer-specific files are overlaid after composition, so the
-resulting mutable image roots do not retain PM generation receipts.
+`installer/package_roots_host.xsh` plans the union of the requested package
+roots against the local mirror on the host, requires every node to be an exact
+mirror artifact, imports them into a fresh store under the work tree's
+`packages/`, and composes separate target, installer, and image-tools roots
+from that one plan. Composition is file extraction, so it runs on the host and
+no container writes into the work tree. The target root includes the selected
+kernel and `sudo-rs`; the installer and tools roots contain `laputa-fs`. QEMU
+smoke adds Dropbear to the target root. Installer-specific files are overlaid
+after composition, so the resulting mutable image roots do not retain PM
+generation receipts.
 
 `build-installer-image.xsh` assembles the image on the host from those roots.
 It creates sparse image files with native `Path.truncate`, builds a compact
 target-root tarball, copies the EFI fallback
 kernel into the installer payload, autosizes the installer root image from its
 contents unless `LAPUTA_INSTALLER_ROOT_MB` is set, formats the installer root
-through `laputa-fs`, and writes a minimal hybrid ISO/GPT artifact directly with
+through `laputa-fs` (sized from the root's block count in laputa-fs's ext4
+layout), and writes a minimal hybrid ISO/GPT artifact directly with
 XSH byte APIs. Its ISO9660 view exposes the selected kernel, and
 its GPT view exposes the installer ext4 root partition with the same
 deterministic `PARTUUID` used by the QEMU harness.
-`LAPUTA_INSTALLER_JOBS` controls the PM build concurrency (default 4). Only
-aarch64 installers build; the x86_64 remote-mirror install route was removed,
-and amd64 returns through the same container path parameterized by arch.
+`LAPUTA_INSTALLER_JOBS` controls the PM import concurrency (default 4).
 
 ## Kernel Size
 
-The x86_64 production kernel is currently much larger than the aarch64 kernel.
-Recent installer reports measured aarch64 `vmlinuz` at about 11M and x86_64
-`vmlinuz` at about 30M. On `threadripper`, Alpine's x86_64 LTS kernel image is
-about 14M, with much of its broad hardware support built as modules. Laputa's
-x86_64 kernel is monolithic for direct root boot and currently builds in broad
-driver families such as DRM/i915, media tuners, sound, and USB. The amd64
-installer size penalty is amplified because the selected kernel is present as
-the ISO-visible direct-boot kernel, the EFI fallback kernel in the installer
-payload, and the target root's `/boot/vmlinuz`.
+The kernel is present three times in an installer: as the ISO-visible
+direct-boot kernel, as the EFI fallback kernel in the installer payload, and
+as the target root's `/boot/vmlinuz`. The x86_64 kernel is monolithic for
+direct root boot and builds in broad driver families such as DRM/i915 and
+media tuners; its gzip-compressed bzImage is about 9.5M.
 
 ## Install Flow
 
@@ -136,7 +137,8 @@ payload, and the target root's `/boot/vmlinuz`.
 7. Mounts the target root, extracts the compact target-root tarball, mounts the
    ESP, and installs the fallback EFI kernel files.
 8. Writes target config: hostname, fstab, static networking, `pazu` user,
-   passwordless wheel sudo, and autologin on `ttyAMA0`/`tty1`.
+   passwordless wheel sudo, and autologin on the serial console (`ttyAMA0` on
+   aarch64, `ttyS0` on x86_64) and `tty1`.
 9. Unmounts target filesystems and asks for installer removal.
 
 CI mode forces an 8M swap partition so the 128M test disk can work. Normal mode
@@ -149,15 +151,16 @@ uses 2x detected memory for swap and fails if the target disk is too small.
   ISO media boot needs either a tiny EFI loader that passes LoadOptions, a
   real bootloader, or a kernel config choice that supplies a usable default
   command line without rebuilding for every installer iteration.
-- arm64/QEMU virt is the only installer path. The QEMU harness keeps its
-  x86_64 machine parameters for the amd64 phase.
+- The installer is proven under QEMU `virt` (aarch64) and `pc` with KVM
+  (x86_64) only.
 - Networking is brought up with the XSH `ifup` applet when present, with the
   old minimal static IPv4 parser retained only as a fallback. The installed
   system receives the installer's address/netmask/gateway where possible, with
   simple fallbacks.
 - The CI smoke test uses console markers, not a richer guest-control protocol.
-  Markers are written explicitly to `ttyAMA0` so QEMU automation does not depend
-  on the kernel's default console.
+  Markers are written explicitly to the serial console (`ttyAMA0` or `ttyS0`,
+  whichever exists) so QEMU automation does not depend on the kernel's default
+  console.
 - The native `mkfs.ext4` implementation deliberately supports only the Laputa
   installer/image-builder profile. It does not create an ext4 journal yet, so
   the output is closer to an ext2 revision-1 filesystem that the ext4 kernel
