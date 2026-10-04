@@ -1,4 +1,4 @@
-##! Exact semantic fingerprints for package inputs and executor identities.
+##! Exact semantic fingerprints for package inputs and executor provenance.
 use types
 use util
 
@@ -123,7 +123,6 @@ export proc package_build_input(
     f"package-kind\t${types.package_kind_text(pkg.kind)}",
     f"target\t${types.target_text(target)}",
     f"nostrip\t${pkg.nostrip}",
-    f"source-mirror\t${pkg.source_mirror}",
   ]
 
   for dependency in pkg.deps {
@@ -217,12 +216,14 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
   digest_lines(lines)?
 }
 
-## Hashes the three Linux XSH runner binaries under the executor identity format.
-export proc runners(xsh: Path, xshi: Path, xsht: Path) [fs, error] -> Result[Str] {
+## Digests an executor provenance record for receipts and repository metadata.
+export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str] {
   digest_lines([
-    "format\tlaputa-pm-executor-1",
-    f"runner\txsh\t${hash.sha256(xsh)?.hex()}",
-    f"runner\txshi\t${hash.sha256(xshi)?.hex()}",
-    f"runner\txsht\t${hash.sha256(xsht)?.hex()}",
+    f"format\t${canonical_field(value.format)}",
+    f"runner\txsh\t${canonical_field(value.xsh_sha256)}",
+    f"runner\txshi\t${canonical_field(value.xshi_sha256)}",
+    f"runner\txsht\t${canonical_field(value.xsht_sha256)}",
+    f"pm\t${canonical_field(value.pm_sha256)}",
+    f"core\t${canonical_field(value.core_sha256 ?? "none")}",
   ])?
 }

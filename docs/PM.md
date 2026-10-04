@@ -69,8 +69,8 @@ pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 `repo plan` is the only resolution boundary. It is offline unless
 `XSH_PM_REPO` names a package repository (the local mirror, for example
 `http://127.0.0.1:3000`, or a `file://` tree); there is no default remote. It records the target, typed
-dependency graph, remote retrieval identity, build/proof inputs, executor
-identity, action reasons, and sorted artifact keys in an atomically written
+dependency graph, remote retrieval identity, build/proof inputs, `BUILD_EPOCH`,
+action reasons, and sorted artifact keys in an atomically written
 plan. `aarch64-linux-musl` remains the default build target.
 `x86_64-linux-musl` can be planned and built on a native Linux x86_64 runner
 with target-specific source checksums, filetrees, remote index entries, and
@@ -150,16 +150,41 @@ a failed command cancels unfinished peers.
 ## Identity, store, and snapshots
 
 `pm/fingerprint.xsh` hashes canonical sorted input lines: recipe/package
-inputs, proof input, PM tree, core tree, and runner bytes. The plan digest and
-artifact/proof keys therefore exclude mtimes, absolute checkout paths, and
-`.git` state. A proof-only change changes the proof identity without rebuilding
-the payload.
+inputs and proof input. The plan digest and artifact/proof keys therefore
+exclude mtimes, absolute checkout paths, and `.git` state. A proof-only change
+changes the proof identity without rebuilding the payload.
 
-`pm/store.xsh` accepts only validated keys. It locks a key, stages the payload,
-verifies its inventory and proof, writes the receipt last, and atomically
-renames the final directory. Corrupt final artifacts are rejected rather than
-overwritten. `pm/repo.xsh` publishes only those verified plan receipts and
-updates a file or remote snapshot index last.
+An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
+package id, the recipe input digest (recipe files except `proof.xsh`, source
+records and checksums, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
+and the key of every direct dependency. Every direct dependency, runtime ones
+included, is installed into the build root with its runtime closure, because
+recipes link against libraries they declare only in `deps`; each dependency
+key covers that dependency's own closure. The executor (XSH runners, PM tree,
+core applets) is not a key input, so XSH and PM changes rebuild nothing. The
+executor that built an artifact is recorded as provenance in its metadata
+(`executor`) and receipt (`executor_sha256`). Bump `BUILD_EPOCH` to rebuild
+every package after an executor change that alters payloads; bump a recipe's
+`rel` to rebuild one package and its dependents. Executing a plan resolved at
+another `BUILD_EPOCH` is rejected.
+
+When a dependency is rebuilt, `repo plan` builds its dependents even if the
+remote index already holds their tuple; publishing them under the same tuple
+is the immutable-tuple conflict `repo publish` reports. A recipe tuple behind
+the remote's is rejected, because publishing it would move the index back.
+
+`pm/store.xsh` accepts only validated keys under `STORE/v2/`; older layouts
+are never read. It locks a key, stages the payload, records the payload digest
+computed once at staging plus metadata and proof hashes, writes the receipt
+last, and atomically renames the final directory. Lookups trust those
+commit-time hashes; `store verify` and `repo publish` re-hash every object.
+Final artifacts are never overwritten. `pm/repo.xsh` publishes only verified
+plan receipts and updates a file or remote snapshot index last.
+
+`repo build` composes each build and proof root by extracting every dependency
+payload once, directly into the root, after a metadata-only ownership check
+(`pm/root.xsh::trusted_preflight`). Recipes see the build root as both
+`LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`.
 
 ## Root composition
 

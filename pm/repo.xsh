@@ -13,25 +13,16 @@ type RepoArtifactMetadataDto = {name: Str, ver: Str, rel: Str}
 type RepoIndexMerge = {index: List[types.RemotePackage], already_published: Bool}
 type RepoPublishStage = {publication: types.RepoPublication, entry: types.RemotePackage, metadata: Path}
 
-proc repo_expected_executor_sha256(value: types.BuildPlan) [error] -> Result[Str] {
-  build_plan.executor_fingerprint(value.executor)?
-}
-
 proc repo_verify_node_receipt(
   value: types.BuildPlan,
   node: types.PlanNode,
   receipt: types.ArtifactReceipt,
 ) [error] {
-  let executor_sha256 = repo_expected_executor_sha256(value)?
   let dependency_keys = store.receipt_dependency_keys(node)
   let runtime_dependency_keys = store.receipt_runtime_dependency_keys(node)
 
   if receipt.key != node.artifact_key or receipt.target != value.target or receipt.package_name != node.name or receipt.package_id != node.package_id or receipt.recipe_sha256 != node.recipe_sha256 or receipt.dependency_keys != dependency_keys or receipt.runtime_dependency_keys != runtime_dependency_keys {
     return Err(types.PmError.PackageContract(f"artifact receipt ${node.artifact_key} does not match BuildPlan node ${node.package_id}"))
-  }
-
-  if ! build_plan.node_uses_legacy_remote_identity(value, node)? and receipt.executor_sha256 != executor_sha256 {
-    return Err(types.PmError.PackageContract(f"artifact receipt ${node.artifact_key} executor does not match BuildPlan node ${node.package_id}"))
   }
 
   if types.plan_action_is_build(node.action) {
@@ -65,7 +56,6 @@ proc repo_verified_proof_path(
   node: types.PlanNode,
   receipt: types.ArtifactReceipt,
 ) [fs, error] -> Result[Path] {
-  let payload = fp"${receipt.artifact_dir}/payload.tar.gz"
   let primary = fp"${receipt.artifact_dir}/proof.json"
 
   if receipt.origin == types.artifact_origin_remote() {
@@ -74,17 +64,17 @@ proc repo_verified_proof_path(
   }
 
   if receipt.proof_key == node.proof_key {
-    pm_proof.verify_artifact_receipt(primary, node, payload)?
+    pm_proof.verify_artifact_receipt(primary, node, receipt.payload_sha256)?
     return primary
   }
 
-  let reproved = fp"${store_root}/v1/proofs/${node.artifact_key}/${node.proof_key}.json"
+  let reproved = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
 
   if ! fs.exists(reproved)? {
     return Err(types.PmError.PackageTarball(f"${node.package_id} is missing proof ${node.proof_key}; execute the BuildPlan before publication"))
   }
 
-  pm_proof.verify_artifact_receipt(reproved, node, payload)?
+  pm_proof.verify_artifact_receipt(reproved, node, receipt.payload_sha256)?
   reproved
 }
 
@@ -94,7 +84,9 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
   var packages: List[types.RepoPublication] = []
 
   for node in value.nodes {
-    let receipt = store.lookup(store_root, node.artifact_key)?
+    # Publication leaves this Store, so re-hash every object instead of
+    # trusting commit-time hashes as builds do.
+    let receipt = store.verify_artifact(store_root, node.artifact_key)?
     repo_verify_node_receipt(value, node, receipt)?
     let kind = repo_package_kind(receipt, node)?
     let proof = repo_verified_proof_path(store_root, node, receipt)?
@@ -227,7 +219,7 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
     }
 
     if publication.receipt.origin == types.artifact_origin_built() {
-      pm_proof.verify_artifact_receipt(publication.proof, publication.node, publication.payload)?
+      pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)?
     }
 
     let metadata = repo_metadata_for_publication(publication, fp"${work}/metadata")?

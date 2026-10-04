@@ -1,4 +1,5 @@
 ##! Isolated package payload construction for the immutable plan executor.
+use fingerprint
 use local
 use pm.env as pm_env
 use recipe
@@ -131,20 +132,6 @@ proc seed_xsh_runners(root: Path, xsh: Path) [fs, error] {
   }
 }
 
-proc seed_chroot_device_paths(root: Path) [fs, error] {
-  fs.mkdir(fp"${root}/dev")?
-  let dev_null = fp"${root}/dev/null"
-
-  if ! fs.exists(dev_null)? {
-    fs.write(dev_null, "")?
-    fs.chmod(dev_null, 0o666)?
-  }
-
-  let dev_fd = fp"${root}/dev/fd"
-  fs.remove(dev_fd, missing_ok: true)?
-  fs.symlink(/proc/self/fd, dev_fd)?
-}
-
 ## Seeds the explicitly selected XSH/PM substrate into an executor-local mutable work root.
 ## Completed package roots remain immutable; this function never targets a generation root.
 export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
@@ -188,7 +175,6 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     }
   }
 
-  seed_chroot_device_paths(root)?
   fs.mkdir(fp"${root}/etc")?
 
   for name in ["resolv.conf", "hosts", "nsswitch.conf"] {
@@ -200,6 +186,21 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
       Ok(metadata) if metadata.kind == "symlink" => fs.write(dest, source.read_text()?)?
       _ => {}
     }
+  }
+}
+
+## Records the XSH runners, PM tree, and core applets that `seed_executor_substrate`
+## installs, as artifact provenance. Builds compute this once per execution.
+export proc executor_provenance() [fs, process, env, error] -> Result[types.ExecutorProvenance] {
+  let xsh = xsh_runner()?
+  let core = /usr/lib/xsh
+  {
+    format: "laputa-executor-provenance-1",
+    xsh_sha256: hash.sha256(direct_xsh_source(xsh, "xsh")?)?.hex(),
+    xshi_sha256: hash.sha256(direct_xsh_source(xsh, "xshi")?)?.hex(),
+    xsht_sha256: hash.sha256(direct_xsh_source(xsh, "xsht")?)?.hex(),
+    pm_sha256: fingerprint.pm_tree(pm_source_root()?)?,
+    core_sha256: if fs.exists(core)? { fingerprint.core_tree(core)? } else { null },
   }
 }
 

@@ -1,7 +1,6 @@
 ##! Explicit typed command boundary for immutable package planning, execution, publication, and generation composition.
 use catalog
 use execute as pm_execute
-use fingerprint as pm_fingerprint
 use generation
 use generation_adapter as pm_generation_adapter
 use graph
@@ -443,87 +442,6 @@ proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   }
 }
 
-proc cli_pm_source_root(repo_root: Path) [fs, env, error] -> Result[Path] {
-  if fs.exists(fp"${repo_root}/pm.xsh")? and fs.exists(fp"${repo_root}/pm")? {
-    return path.absolute(repo_root)?
-  }
-
-  for raw in (env.get("XSH_MODULE_PATH") ?? "").split(":") {
-    continue when raw == ""
-    let candidate = fp"${raw}"
-
-    if fs.exists(fp"${candidate}/pm.xsh")? and fs.exists(fp"${candidate}/pm")? {
-      return path.absolute(candidate)?
-    }
-  }
-
-  return Err(types.PmError.PackageContract("cannot locate PM source root for BuildPlan executor identity"))
-}
-
-proc cli_xsh_runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
-
-  if configured != "" {
-    return path.absolute(fp"${configured}")?
-  }
-
-  process.which("xsh")?
-}
-
-proc cli_core_root(pm_root: Path) [fs, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_CORE_ROOT") ?? "").trim()
-
-  if configured != "" {
-    let root = path.absolute(fp"${configured}")?
-
-    if fs.exists(root)? {
-      return root
-    }
-
-    return Err(types.PmError.PackageContract(f"XSH_CORE_ROOT ${root} is missing"))
-  }
-
-  # XSH is co-developed in its own checkout: XSH_ROOT names it, and the
-  # default is the sibling `../xsh` of the monorepo that holds pm.xsh.
-  let xsh_root = (env.get("XSH_ROOT") ?? "").trim()
-
-  if xsh_root != "" {
-    let root = path.absolute(fp"${xsh_root}/core")?
-
-    if fs.exists(root)? {
-      return root
-    }
-
-    return Err(types.PmError.PackageContract(f"XSH_ROOT core applets ${root} are missing"))
-  }
-
-  for candidate in [p"/usr/lib/xsh/core", fp"${pm_root.parent}/xsh/core"] {
-    if fs.exists(candidate)? {
-      return candidate
-    }
-  }
-
-  return Err(types.PmError.PackageContract("cannot locate XSH core applets for BuildPlan executor identity; set XSH_CORE_ROOT or XSH_ROOT"))
-}
-
-proc cli_executor_identity(repo_root: Path) [fs, process, env, error] -> Result[types.ExecutorIdentity] {
-  let pm_root = cli_pm_source_root(repo_root)?
-  let xsh = cli_xsh_runner()?
-  let xshi = fp"${xsh.parent}/xshi"
-  let xsht = fp"${xsh.parent}/xsht"
-
-  if ! fs.exists(xshi)? or ! fs.exists(xsht)? {
-    return Err(types.PmError.PackageContract(f"BuildPlan executor needs xsh, xshi, and xsht beside ${xsh}"))
-  }
-
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: pm_fingerprint.pm_tree(pm_root)?,
-    xsh_sha256: pm_fingerprint.runners(xsh, xshi, xsht)?,
-    core_sha256: pm_fingerprint.core_tree(cli_core_root(pm_root)?)?,
-  }
-}
-
 # Planning is offline unless XSH_PM_REPO names a package repository; offline
 # plans record the digest of an empty index.
 proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) [fs, net, env, time, error] -> Result[types.RemoteSnapshot] {
@@ -592,7 +510,6 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
     policy_value,
     args.roots,
     args.all,
-    cli_executor_identity(args.repo)?,
   )?
 
   # The durable DTO and atomic write are kept behind `write_plan` while the release

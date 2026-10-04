@@ -1,23 +1,16 @@
 ##! Behavior coverage for immutable BuildPlan execution through isolated artifact roots.
 use pm.catalog
 use pm.execute
+use pm.fingerprint
 use pm.local
 use pm.plan
+use pm.plan_json
 use pm.policy
 use pm.store
 use pm.types
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/${name}"
-}
-
-pure executor_identity() -> types.ExecutorIdentity {
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "pm-tree",
-    xsh_sha256: "xsh-runners",
-    core_sha256: "core-tree",
-  }
 }
 
 pure empty_remote_snapshot() -> types.RemoteSnapshot {
@@ -34,7 +27,7 @@ proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
 
 proc resolve_execute_plan_for_roots(repo_root: Path, roots: List[Str]) [fs, env, error] -> Result[types.BuildPlan] {
   let value = catalog.load(repo_root)?
-  plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), roots, false, executor_identity())?
+  plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), roots, false)?
 }
 
 proc resolve_execute_plan(repo_root: Path) [fs, env, error] -> Result[types.BuildPlan] {
@@ -146,11 +139,11 @@ proc exact_remote_snapshot(
   result: types.BuildResult,
   remote_root: Path,
 ) [fs, error] -> Result[types.RemoteSnapshot] {
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
   var packages: List[types.RemotePlanArtifact] = []
 
   for node in value.nodes {
     let receipt = receipt_named(result, node.name)?
+    let executor_sha256 = receipt.executor_sha256
     let tarball = fp"${remote_root}/packages/aarch64/${node.name}/${node.package_id}.tar.gz"
     let metadata = fp"${remote_root}/metadata/aarch64/${node.name}/${node.package_id}.json"
     fs.mkdir(tarball.parent)?
@@ -207,7 +200,17 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
     metadata_sha256: payload_hash,
     metadata_files: [{path: "usr/share/wire-package", kind: types.File, mode: 0o644, sha256: payload_hash, target: ""}],
   }
-  local.write_package_metadata(metadata, "x86_64", built)?
+  let executor: types.ExecutorProvenance = {
+    format: "laputa-executor-provenance-1",
+    xsh_sha256: payload_hash,
+    xshi_sha256: payload_hash,
+    xsht_sha256: payload_hash,
+    pm_sha256: payload_hash,
+    core_sha256: null,
+  }
+  local.write_package_metadata(metadata, "x86_64", built, executor)?
+  let recorded = json.read(metadata)?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
+  test.eq(recorded, executor)?
   let wire = json.read(metadata)?.require(local.PackageMetadataDto)?
   assert wire.arch == "x86_64"
   assert wire.package_kind == "payload"
@@ -236,7 +239,7 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
   let repo_root = copied_execute_repository(ctx, "execute-build-repo")?
   let value = resolve_execute_plan(repo_root)?
   let object_store = execute_store(ctx, "execute-build-store")?
-  let stale = fp"${object_store}/v1/tmp/${node_named(value, "execute-app")?.artifact_key}"
+  let stale = fp"${object_store}/v2/tmp/${node_named(value, "execute-app")?.artifact_key}"
   fs.mkdir(stale)?
   fs.write(fp"${stale}/partial", "interrupted build state")?
   let first = execute.build_plan(value, repo_root, object_store, "", 2)?
@@ -276,7 +279,6 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
     policy.x86_64_docker(),
     ["execute-app"],
     false,
-    executor_identity(),
   )?
   let object_store = execute_store(ctx, "execute-x86-store")?
   let result = execute.build_plan(value, repo_root, object_store, "", 2)?
@@ -304,7 +306,7 @@ test test_execute_reproofs_changed_proof_without_rebuilding_payload [fs, net, pr
   test.eq(reproved_app.proof_key == initial_app.proof_key, false)?
   let reproved = execute.build_plan(reproved_plan, repo_root, object_store, "", 2)?
   test.eq(receipt_named(reproved, "execute-app")?, initial_receipt)?
-  test.ok(fs.exists(fp"${object_store}/v1/proofs/${reproved_app.artifact_key}/${reproved_app.proof_key}.json")?)?
+  test.ok(fs.exists(store.reproof_receipt_path(object_store, reproved_app.artifact_key, reproved_app.proof_key))?)?
 }
 
 test test_execute_parallel_level_requires_published_dependency_receipts [fs, net, process, env, time, error] { |ctx|
@@ -406,7 +408,7 @@ test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution
   let remote_root = test.temp_dir(ctx, name: "execute-remote-objects")?
   let snapshot = exact_remote_snapshot(local_plan, local_result, remote_root)?
   let catalog_value = catalog.load(repo_root)?
-  let remote_plan = plan.resolve(catalog_value, snapshot, policy.aarch64_docker(), ["execute-app"], false, executor_identity())?
+  let remote_plan = plan.resolve(catalog_value, snapshot, policy.aarch64_docker(), ["execute-app"], false)?
   test.eq([types.plan_action_text(node.action) for node in remote_plan.nodes], ["reuse-remote", "reuse-remote", "reuse-remote"])?
 
   let imported_store = execute_store(ctx, "execute-remote-imported-store")?
@@ -448,11 +450,102 @@ main(@args)?
   let final_dir = store.artifact_path(healthy_store, healthy_app.artifact_key)
   fs.write(fp"${final_dir}/payload.tar.gz", "corrupt final payload")?
 
-  match execute.build_plan(healthy_plan, healthy_repo, healthy_store, "", 1) {
-    Ok(_) => test.fail("corrupt final artifact unexpectedly reused or overwritten")?
+  # Reuse trusts commit-time hashes and never overwrites a final artifact;
+  # explicit Store verification is what detects the corruption.
+  let reused = execute.build_plan(healthy_plan, healthy_repo, healthy_store, "", 1)?
+  test.eq(reused, healthy)?
+  test.eq(fs.read_text(fp"${final_dir}/payload.tar.gz")?, "corrupt final payload")?
+
+  match store.verify_artifact(healthy_store, healthy_app.artifact_key) {
+    Ok(_) => test.fail("corrupt final artifact unexpectedly verified")?
     Err(problem) => { assert "payload SHA-256 does not match receipt" in problem.message }
   }
+}
 
-  test.eq(fs.read_text(fp"${final_dir}/payload.tar.gz")?, "corrupt final payload")?
-  test.eq(receipt_named(healthy, "execute-app")?.key, healthy_app.artifact_key)?
+test test_execute_records_executor_provenance_outside_artifact_keys [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-provenance-repo")?
+  let value = resolve_execute_plan(repo_root)?
+  let result = execute.build_plan(value, repo_root, execute_store(ctx, "execute-provenance-store")?, "", 1)?
+
+  for receipt in result.artifacts {
+    let executor = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
+    test.eq(executor.format, "laputa-executor-provenance-1")?
+    test.eq(receipt.executor_sha256, fingerprint.executor_provenance_sha256(executor)?)?
+  }
+}
+
+test test_execute_rejects_plan_from_another_build_epoch [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-epoch-repo")?
+  let other_epoch = {...policy.aarch64_docker(), build_epoch: policy.BUILD_EPOCH + 1}
+  let value = plan.resolve(catalog.load(repo_root)?, empty_remote_snapshot(), other_epoch, ["execute-app"], false)?
+  let object_store = execute_store(ctx, "execute-epoch-store")?
+
+  match execute.build_plan(value, repo_root, object_store, "", 1) {
+    Ok(_) => test.fail("plan from another BUILD_EPOCH unexpectedly executed")?
+    Err(problem) => { assert f"resolved at BUILD_EPOCH ${policy.BUILD_EPOCH + 1}" in problem.message }
+  }
+
+  test.eq(fs.exists(fp"${object_store}/v2")?, false)?
+}
+
+type TraceSpanDto = {file: Str}
+type TraceEventDto = {kind: Str, name: Str?, source_span: TraceSpanDto?}
+
+# Counts `hash.sha256` calls per PM module in a JSONL trace.
+proc sha256_calls_by_module(trace: Path) [fs, error] -> Result[Map[Int]] {
+  var counts: Map[Int] = {}
+
+  for line in fs.read_text(trace)?.split("\n") {
+    continue when line.trim() == ""
+    let event = json.decode(line)?.require(TraceEventDto)?
+    continue unless event.kind == "module.call" and event.name == "hash.sha256"
+    let span = event.source_span
+    let module_name = if span == null { "unknown" } else { fp"${span.file}".name }
+    counts[module_name] = (counts.get(module_name) ?? 0) + 1
+  }
+
+  counts
+}
+
+# Each built payload is hashed exactly once (when staged); the Store hashes
+# only the small metadata and proof objects it records, and a rebuild that
+# reuses every artifact hashes nothing at all.
+test test_execute_hashes_each_payload_once_and_reuse_hashes_nothing [fs, process, env, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-hash-count-repo")?
+  let object_store = execute_store(ctx, "execute-hash-count-store")?
+  let plan_path = test.temp_path(ctx, name: "execute-hash-count-plan.json")
+  plan_json.write_plan(plan_path, resolve_execute_plan(repo_root)?)?
+  let source = r"""use pm.execute
+use pm.plan_json
+
+proc main(plan_path: Path, repo_root: Path, object_store: Path) [fs, net, process, env, time, error] {
+  let _ = execute.build_plan(plan_json.read(plan_path)?, repo_root, object_store, "", 1)?
+}
+
+main(@args)?
+"""
+  let modules = path.absolute(p".")?
+  var runs: List[Map[Int]] = []
+
+  for name in ["fresh", "reuse"] {
+    let trace = test.temp_path(ctx, name: f"execute-hash-count-${name}.jsonl")
+    let outcome = test.run_xsht_trace(
+      ctx,
+      source,
+      ["--raw", "--trace-format", "jsonl", "--trace-file", trace.display()],
+      [plan_path.display(), repo_root.display(), object_store.display()],
+      {XSH_MODULE_PATH: modules.display()},
+    )?
+    test.ok(outcome.success)?
+    runs = runs.push(sha256_calls_by_module(trace)?)
+  }
+
+  let fresh = runs[0]
+  test.eq(fresh.get("execute.xsh") ?? 0, 3)?
+  test.eq(fresh.get("store.xsh") ?? 0, 6)?
+  test.eq(fresh.get("proof.xsh") ?? 0, 0)?
+  test.eq(fresh.get("root.xsh") ?? 0, 0)?
+
+  let reuse = runs[1]
+  test.eq(reuse.keys() |> sort, [])?
 }

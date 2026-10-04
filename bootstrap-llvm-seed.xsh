@@ -16,7 +16,7 @@ proc main(repo_root: Path, dest: Path) [fs, net, process, env, time, error] {
   let src = fp"${work}/source"
 
   fs.mkdir(src)?
-  sources.prepare_package_source_tree(work, work, pkg, src, false, false, false)?
+  sources.prepare_package_source_tree(pkg, src)?
   recipe.call_prepare(pkg, src)?
   fs.remove(dest, missing_ok: true)?
   fs.mkdir(dest)?

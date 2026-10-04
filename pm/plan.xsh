@@ -2,11 +2,13 @@
 use catalog
 use fingerprint as pm_fingerprint
 use graph
+use policy as build_policy
 use types
 use util
 
 ## The durable on-disk and in-memory build-plan format.
-export let format: Str = "laputa-build-plan-1"
+## Format 2 artifact keys hash `BUILD_EPOCH` and no executor identity.
+export let format: Str = "laputa-build-plan-2"
 
 pure plan_canonical_field(value: Str) -> Str {
   value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
@@ -38,34 +40,34 @@ pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
   result
 }
 
-proc exact_executor_fingerprint(value: types.ExecutorIdentity) [error] -> Result[Str] {
-  plan_digest_lines([
-    "format\tlaputa-executor-identity-1",
-    f"executor-format\t${plan_canonical_field(value.format)}",
-    f"pm\t${plan_canonical_field(value.pm_sha256)}",
-    f"xsh\t${plan_canonical_field(value.xsh_sha256)}",
-    f"core\t${plan_canonical_field(value.core_sha256)}",
-  ])
-}
-
-## Computes the durable executor identity digest used by remote artifact metadata.
-export proc executor_fingerprint(value: types.ExecutorIdentity) [error] -> Result[Str] {
-  exact_executor_fingerprint(value)?
-}
-
+# An artifact key names exactly the inputs that can change a payload: the
+# target, the package id, the recipe input digest (recipe files except
+# proof.xsh, source records and checksums, and repository inputs), the global
+# build epoch, and the key of every direct dependency.
+#
+# Every direct dependency, runtime ones included, is installed into the build
+# root together with its runtime closure: recipes link against libraries they
+# declare only in `deps` (musl in every C package, for example). Each direct
+# dependency key already covers that dependency's own runtime closure, so the
+# direct keys pin the complete build root. A metapackage has no build root,
+# but its artifact is its runtime selection, which the same keys pin.
+#
+# The executor (XSH runners, PM tree, core applets) is deliberately absent; it
+# is recorded as artifact provenance. `BUILD_EPOCH` is the explicit way to
+# rebuild everything after an executor change that alters payloads.
 proc artifact_key_for(
   target: types.Target,
+  build_epoch: Int,
   package_id: Str,
   recipe_sha256: Str,
-  executor: types.ExecutorIdentity,
   dependencies: List[types.PlanDependency],
 ) [error] -> Result[Str] {
   var lines = [
-    "format\tlaputa-package-artifact-key-1",
+    "format\tlaputa-package-artifact-key-2",
+    f"build-epoch\t${build_epoch}",
     f"target\t${types.target_text(target)}",
     f"package\t${plan_canonical_field(package_id)}",
     f"recipe\t${plan_canonical_field(recipe_sha256)}",
-    f"executor\t${exact_executor_fingerprint(executor)?}",
   ]
 
   for dependency in dependencies |> sort-by { |dependency| dependency_key(dependency) } {
@@ -108,13 +110,22 @@ proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) [error]
   util.ensure_relative_path(durable, "plan recipe directory")?
 }
 
-proc repository_fingerprint(value: types.PackageCatalog, target: types.Target) [fs, error] -> Result[Str] {
+# Hashes each recipe once; resolution reuses these digests for its nodes.
+proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) [fs, error] -> Result[Map[Str]] {
+  var inputs: Map[Str] = {}
+
+  for pkg in value.packages {
+    inputs[pkg.name] = pm_fingerprint.package_build_input(value.root, absolute_recipe_package(value, pkg)?, target)?
+  }
+
+  inputs
+}
+
+proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) [error] -> Result[Str] {
   var lines = ["format\tlaputa-package-repository-1", f"target\t${types.target_text(target)}"]
 
-  for pkg in value.packages |> sort-by .name {
-    let source_pkg = absolute_recipe_package(value, pkg)?
-    let input = pm_fingerprint.package_build_input(value.root, source_pkg, target)?
-    lines = lines.push(f"package\t${plan_canonical_field(pkg.name)}\t${input}")
+  for name in recipe_inputs.keys() |> sort {
+    lines = lines.push(f"package\t${plan_canonical_field(name)}\t${recipe_inputs.get(name)?}")
   }
 
   plan_digest_lines(lines)?
@@ -201,21 +212,19 @@ proc require_supported_target(target: types.Target, label: Str) [error] {
   }
 }
 
-proc remote_is_exact(
+pure remote_is_exact(
   remote: types.RemotePlanArtifact,
   recipe_sha256: Str,
   proof_sha256: Str,
   artifact_key: Str,
   proof_key: Str,
-  executor: types.ExecutorIdentity,
-) [error] -> Result[Bool] {
+) -> Bool {
   if remote.artifact_key == "" {
     return false
   }
 
   remote.artifact_key == artifact_key and
     remote.recipe_sha256 == recipe_sha256 and
-    remote.executor_sha256 == exact_executor_fingerprint(executor)? and
     remote.proof_key == proof_key and
     remote.proof_sha256 == proof_sha256
 }
@@ -267,7 +276,6 @@ export proc resolve(
   policy: types.BuildPolicy,
   roots: List[Str],
   all: Bool,
-  identity: types.ExecutorIdentity,
 ) [fs, error] -> Result[types.BuildPlan] {
   require_supported_target(policy.target, "build policy")?
   require_supported_target(policy.build_target, "build policy")?
@@ -277,10 +285,7 @@ export proc resolve(
     return Err(types.PmError.PackageContract("remote snapshot target does not match build policy"))
   }
 
-  if identity.format != "laputa-pm-executor-1" {
-    return Err(types.PmError.PackageContract(f"unsupported executor identity ${identity.format}"))
-  }
-
+  require_build_epoch(policy.build_epoch, "build policy")?
   let canonical_roots = plan_sorted_unique_names(roots)
   let selected_roots = if all { catalog.package_names(value) } else { canonical_roots }
 
@@ -300,7 +305,8 @@ export proc resolve(
 
   let edges = graph.edges(value, policy)?
   let levels = graph.topological_levels(selected_names, edges)?
-  let repository_digest = repository_fingerprint(value, policy.target)?
+  let recipe_inputs = recipe_build_inputs(value, policy.target)?
+  let repository_digest = repository_fingerprint(policy.target, recipe_inputs)?
   var nodes: List[types.PlanNode] = []
   var keys: Map[Str] = {}
   var actions: Map[types.PlanAction] = {}
@@ -313,9 +319,9 @@ export proc resolve(
       let recipe_dir = durable_recipe_dir(value, pkg)?
       let package_id = util.package_id(pkg.name, pkg.ver, pkg.rel)
       let dependencies = dependency_nodes(name, edges, selected, keys)?
-      let recipe_sha256 = pm_fingerprint.package_build_input(value.root, source_pkg, policy.target)?
+      let recipe_sha256 = recipe_inputs.get(name)?
       let proof_sha256 = pm_fingerprint.package_proof_input(value.root, source_pkg)?
-      let local_artifact_key = artifact_key_for(policy.target, package_id, recipe_sha256, identity, dependencies)?
+      let local_artifact_key = artifact_key_for(policy.target, policy.build_epoch, package_id, recipe_sha256, dependencies)?
       let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256)?
       let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
       var artifact_key = local_artifact_key
@@ -327,6 +333,9 @@ export proc resolve(
       if candidate != null {
           let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
 
+          # A remote tuple newer than the recipe means this checkout is behind
+          # what was published; building and publishing it would move the
+          # repository index backwards.
           if tuple_order < 0 {
             return Err(
               types.PmError.PackageContract(
@@ -342,15 +351,14 @@ export proc resolve(
               f"local release is above remote ${util.version_id(candidate.ver, candidate.rel)}"
             }
             action = types.plan_action_build(reason)
-          } else if changed_dependencies.len() > 0 {
-            return Err(
-              types.PmError.PackageContract(
-                f"${name} dependencies changed (${changed_dependencies.join(", ")}); bump PKGBUILD.xsh rel above ${util.version_id(candidate.ver, candidate.rel)}",
-              ),
-            )
-          } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key, identity)? {
+          } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
             action = types.plan_action_reuse_remote("exact remote artifact")
             remote = candidate.retrieval
+          } else if changed_dependencies.len() > 0 {
+            # The remote tuple was built against other dependency artifacts.
+            # Build locally; publishing the result under the same tuple is an
+            # immutable-tuple conflict that `repo publish` reports.
+            action = types.plan_action_build(f"dependencies rebuilt (${changed_dependencies.join(", ")})")
           } else if candidate.artifact_key != "" {
             action = types.plan_action_build("remote artifact identity differs")
           } else {
@@ -390,7 +398,7 @@ export proc resolve(
     roots: selected_roots,
     repository_digest,
     remote_index_sha256: snapshot.index_sha256,
-    executor: identity,
+    build_epoch: policy.build_epoch,
     nodes,
     plan_sha256: "",
   }
@@ -398,13 +406,21 @@ export proc resolve(
   {...bare, plan_sha256}
 }
 
-proc validate_executor(value: types.ExecutorIdentity) [error] {
-  if value.format != "laputa-pm-executor-1" {
-    return Err(types.PmError.PackageContract(f"unsupported executor identity ${value.format}"))
+proc require_build_epoch(value: Int, label: Str) [error] {
+  if value < 1 {
+    return Err(types.PmError.PackageContract(f"${label} build epoch must be positive"))
   }
+}
 
-  if value.pm_sha256 == "" or value.xsh_sha256 == "" or value.core_sha256 == "" {
-    return Err(types.PmError.PackageContract("executor identity is incomplete"))
+## Rejects a plan resolved under a different `BUILD_EPOCH` than this PM's.
+## Its artifact keys belong to another epoch, so executing it would mix epochs in one Store.
+export proc require_current_build_epoch(value: types.BuildPlan) [error] {
+  if value.build_epoch != build_policy.BUILD_EPOCH {
+    return Err(
+      types.PmError.PackageContract(
+        f"build plan was resolved at BUILD_EPOCH ${value.build_epoch}, but this PM is at BUILD_EPOCH ${build_policy.BUILD_EPOCH}; re-run repo plan",
+      ),
+    )
   }
 }
 
@@ -477,7 +493,7 @@ proc validate_node(
     prior_dependency = dependency
   }
 
-  let expected_local = artifact_key_for(value.target, node.package_id, node.recipe_sha256, value.executor, node.dependencies)?
+  let expected_local = artifact_key_for(value.target, value.build_epoch, node.package_id, node.recipe_sha256, node.dependencies)?
 
   if types.plan_action_is_build(node.action) {
     if node.remote != null {
@@ -508,7 +524,7 @@ proc validate_node(
 }
 
 ## Reports whether one validated remote node uses the retrieval-derived legacy artifact identity.
-## Legacy metadata predates executor fingerprints, so its receipt is bound to verified metadata bytes instead.
+## Legacy metadata predates semantic artifact keys, so its key is bound to verified retrieval bytes instead.
 export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types.PlanNode) [error] -> Result[Bool] {
   if types.plan_action_is_build(node.action) {
     return false
@@ -519,7 +535,7 @@ export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types
   if retrieval == null {
     return false
   } else {
-    let expected_local = artifact_key_for(value.target, node.package_id, node.recipe_sha256, value.executor, node.dependencies)?
+    let expected_local = artifact_key_for(value.target, value.build_epoch, node.package_id, node.recipe_sha256, node.dependencies)?
 
     if node.artifact_key == expected_local {
       return false
@@ -536,7 +552,7 @@ proc validate_structure(value: types.BuildPlan) [error] {
   }
 
   require_supported_target(value.target, "build plan")?
-  validate_executor(value.executor)?
+  require_build_epoch(value.build_epoch, "build plan")?
 
   let canonical_roots = plan_sorted_unique_names(value.roots)
 
@@ -587,10 +603,7 @@ proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
     f"target\t${types.target_text(value.target)}",
     f"repository\t${plan_canonical_field(value.repository_digest)}",
     f"remote-index\t${plan_canonical_field(value.remote_index_sha256)}",
-    f"executor-format\t${plan_canonical_field(value.executor.format)}",
-    f"executor-pm\t${plan_canonical_field(value.executor.pm_sha256)}",
-    f"executor-xsh\t${plan_canonical_field(value.executor.xsh_sha256)}",
-    f"executor-core\t${plan_canonical_field(value.executor.core_sha256)}",
+    f"build-epoch\t${value.build_epoch}",
   ]
 
   for root in value.roots {

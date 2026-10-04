@@ -40,6 +40,9 @@ type RootReceiptDto = {
   root_sha256: Str,
 }
 type DecodedArtifactMetadata = {kind: types.PackageKind, entries: List[types.ArtifactEntry]}
+# A root plan plus each artifact's complete entry list, including directories
+# coalesced into an earlier owner, which payload verification still needs.
+type RootOwnership = {plan: types.RootPlan, artifact_entries: Map[List[types.RootEntry]]}
 
 pure root_receipt_path(output: Path) -> Path {
   fp"${output}/var/lib/laputa/root.json"
@@ -361,13 +364,16 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
 }
 
 proc root_verified_artifacts(artifacts: List[types.ArtifactReceipt]) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+  root_checked_artifacts([artifact_store.verify_receipt(artifact)? for artifact in artifacts])
+}
+
+# Checks key and package uniqueness and runtime-closure completeness of receipts as given.
+proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> Result[List[types.ArtifactReceipt]] {
   var verified: List[types.ArtifactReceipt] = []
   var keys: Map[Bool] = {}
   var names: Map[Bool] = {}
 
-  for artifact in artifacts {
-    let receipt = artifact_store.verify_receipt(artifact)?
-
+  for receipt in artifacts {
     if receipt.key in keys {
       return Err(types.PmError.PackageContract(f"duplicate artifact key ${receipt.key}"))
     }
@@ -571,13 +577,14 @@ proc root_read_receipt(output: Path) [fs, error] -> Result[types.RootReceipt] {
   value
 }
 
-## Builds and verifies the complete ownership, runtime closure, metadata, and payload contract before root mutation.
-export proc preflight(target: types.Target, artifacts: List[types.ArtifactReceipt]) [fs, error] -> Result[types.RootPlan] {
+# Plans path ownership from artifact metadata. Payload archives are read only
+# for legacy metadata, whose package-database entries live in the payload.
+proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt]) [fs, error] -> Result[RootOwnership] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("root preflight target is unsupported"))
   }
 
-  let verified = root_verified_artifacts(artifacts)?
+  var artifact_entries_by_key: Map[List[types.RootEntry]] = {}
   var planned_artifacts: List[types.RootArtifact] = []
   var entries: List[types.RootEntry] = []
   # Exact owners catch duplicate paths; the first owner below each prefix
@@ -667,9 +674,7 @@ export proc preflight(target: types.Target, artifacts: List[types.ArtifactReceip
       artifact_entries = artifact_entries.push(planned)
     }
 
-    if payload {
-      root_verify_payload_entries(receipt, artifact_entries)?
-    }
+    artifact_entries_by_key[receipt.key] = artifact_entries
   }
 
   let ordered_artifacts = planned_artifacts |> sort-by .package_name
@@ -682,7 +687,32 @@ export proc preflight(target: types.Target, artifacts: List[types.ArtifactReceip
     root_sha256: root_digest(target, ordered_artifacts, ordered_entries),
   }
   root_validate_plan(value)?
-  value
+  {plan: value, artifact_entries: artifact_entries_by_key}
+}
+
+## Builds and verifies the complete ownership, runtime closure, metadata, and payload contract before root mutation.
+export proc preflight(target: types.Target, artifacts: List[types.ArtifactReceipt]) [fs, error] -> Result[types.RootPlan] {
+  let verified = root_verified_artifacts(artifacts)?
+  let ownership = root_ownership(target, verified)?
+
+  for artifact in ownership.plan.artifacts {
+    if artifact.payload {
+      for receipt in verified {
+        if receipt.key == artifact.artifact_key {
+          root_verify_payload_entries(receipt, ownership.artifact_entries.get(receipt.key)?)?
+        }
+      }
+    }
+  }
+
+  ownership.plan
+}
+
+## Plans path ownership and runtime-closure completeness for receipts whose objects the
+## caller already trusts, such as Store lookups inside one build. Unlike `preflight`, it
+## neither re-hashes Store objects nor compares payload contents with their metadata.
+export proc trusted_preflight(target: types.Target, artifacts: List[types.ArtifactReceipt]) [fs, error] -> Result[types.RootPlan] {
+  root_ownership(target, root_checked_artifacts(artifacts)?)?.plan
 }
 
 ## Composes package artifacts into a verified root plan. The explicit `compose_artifacts` spelling
@@ -702,7 +732,8 @@ export proc compose_artifacts(output: Path, plan: types.RootPlan, artifacts: Lis
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
   fs.mkdir(temporary)?
-  let verified = root_verified_artifacts(artifacts)?
+  # preflight above verified these receipts and payloads.
+  let verified = root_checked_artifacts(artifacts)?
   var by_key: Map[types.ArtifactReceipt] = {}
 
   for artifact in verified {

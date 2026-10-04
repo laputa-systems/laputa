@@ -3,7 +3,7 @@ use plan as build_plan
 use types
 use util
 
-type ExecutorDto = {format: Str, pm_sha256: Str, xsh_sha256: Str, core_sha256: Str}
+type PlanFormatDto = {format: Str}
 type DependencyDto = {name: Str, kind: Str, artifact_key: Str}
 type RemoteDto = {arch: Str, tarball: Str, tarball_sha256: Str, metadata: Str, metadata_sha256: Str}
 type NodeDto = {
@@ -29,18 +29,9 @@ export type BuildPlanDto = {
   roots: List[Str],
   repository_digest: Str,
   remote_index_sha256: Str,
-  executor: ExecutorDto,
+  build_epoch: Int,
   nodes: List[NodeDto],
   plan_sha256: Str,
-}
-
-pure plan_json_executor_dto(value: types.ExecutorIdentity) -> ExecutorDto {
-  {
-    format: value.format,
-    pm_sha256: value.pm_sha256,
-    xsh_sha256: value.xsh_sha256,
-    core_sha256: value.core_sha256,
-  }
 }
 
 pure plan_json_dependency_dto(value: types.PlanDependency) -> DependencyDto {
@@ -95,7 +86,7 @@ pure plan_json_dto(value: types.BuildPlan) -> BuildPlanDto {
     roots: value.roots,
     repository_digest: value.repository_digest,
     remote_index_sha256: value.remote_index_sha256,
-    executor: plan_json_executor_dto(value.executor),
+    build_epoch: value.build_epoch,
     nodes: [plan_json_node_dto(node) for node in value.nodes],
     plan_sha256: value.plan_sha256,
   }
@@ -152,23 +143,9 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
     roots: value.roots,
     repository_digest: value.repository_digest,
     remote_index_sha256: value.remote_index_sha256,
-    executor: {
-      format: value.executor.format,
-      pm_sha256: value.executor.pm_sha256,
-      xsh_sha256: value.executor.xsh_sha256,
-      core_sha256: value.executor.core_sha256,
-    },
+    build_epoch: value.build_epoch,
     nodes,
     plan_sha256: value.plan_sha256,
-  }
-}
-
-proc plan_json_executor(value: ExecutorDto) [error] -> Result[types.ExecutorIdentity] {
-  {
-    format: value.format,
-    pm_sha256: value.pm_sha256,
-    xsh_sha256: value.xsh_sha256,
-    core_sha256: value.core_sha256,
   }
 }
 
@@ -235,7 +212,7 @@ proc plan_json_from_dto(value: BuildPlanDto) [error] -> Result[types.BuildPlan] 
     roots: value.roots,
     repository_digest: value.repository_digest,
     remote_index_sha256: value.remote_index_sha256,
-    executor: plan_json_executor(value.executor)?,
+    build_epoch: value.build_epoch,
     nodes,
     plan_sha256: value.plan_sha256,
   }
@@ -257,8 +234,17 @@ export proc write(path_value: Path, value: types.BuildPlan) [fs, error] {
 }
 
 ## Reads a build plan through its JSON DTO and verifies every durable invariant.
+## The format is checked before the DTO so a plan from another PM schema fails
+## with its format name instead of a missing-field error.
 export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan] {
-  let dto = json.read(path_value)?.require(BuildPlanDto)?
+  let raw = json.read(path_value)?
+  let format_field = raw.require(PlanFormatDto)?.format
+
+  if format_field != build_plan.format {
+    return Err(types.PmError.PackageContract(f"unsupported build plan format ${format_field}; this PM reads ${build_plan.format}, re-run repo plan"))
+  }
+
+  let dto = raw.require(BuildPlanDto)?
   let value = plan_json_from_dto(dto)?
   build_plan.validate(value)?
   value

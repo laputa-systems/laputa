@@ -7,16 +7,17 @@ native `linux/arm64` Docker adapter, image construction, and the QEMU proof.
 
 `pm repo plan` resolves one deterministic `BuildPlan`. Its semantic artifact
 keys include the package recipe inputs, `BUILD_EPOCH`, and exact dependency
-artifact keys. They deliberately exclude proof scripts, checkout state, runner
-fingerprints, remote-index state, and jobs. Bump `BUILD_EPOCH` only when PM/XSH
-build semantics can change a payload without recipe-input changes.
+artifact keys. They deliberately exclude proof scripts, checkout state, the
+XSH runners, PM tree, and core applets, remote-index state, and jobs. Bump
+`BUILD_EPOCH` only when PM/XSH build semantics can change a payload without
+recipe-input changes.
 
-The Store is `v2/sha256/<key>/` with only `payload.tar.gz` and `metadata.json`.
-Metadata is the package inventory, including file types and Linux modes. A
-cached source is revalidated against its declared checksum before use; source
-cache location is not artifact identity. Each build and publication invocation
-runs the current package proof, including warm and remote-reuse paths. Proof
-results are not stored.
+The Store is `v2/sha256/<key>/` with `artifact.json`, `payload.tar.gz`,
+`metadata.json`, and `proof.json`. Metadata is the package inventory, including
+file types and Linux modes, plus the executor provenance. A cached source is
+revalidated against its declared checksum before use; source cache location is
+not artifact identity. A changed proof re-proves an unchanged artifact and
+stores the result under `v2/proofs/<key>/`.
 
 `GenerationManifest` selects the runtime-only closure and is written unchanged
 to `/var/lib/laputa/generation.json`. The package-tools image is created on

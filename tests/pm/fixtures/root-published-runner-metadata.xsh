@@ -80,7 +80,7 @@ proc main() [fs, error] {
     dependencies: [],
     remote: null,
   }
-  let receipt = store.commit(types.target_aarch64(), store_root, node, {payload, metadata, proof, executor_sha256: digest("published executor")})?
+  let receipt = store.commit(types.target_aarch64(), store_root, node, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: digest("published executor")})?
   let plan = root.preflight(types.target_aarch64(), [receipt])?
 
   if plan.entries.len() != 4 or plan.entries[0].path != "usr/bin/demo" {
@@ -134,7 +134,7 @@ proc main() [fs, error] {
     types.target_aarch64(),
     store_root,
     shared_alpha_node,
-    {payload: shared_alpha_payload, metadata: shared_alpha_metadata, proof: shared_alpha_proof, executor_sha256: digest("published executor")},
+    {payload: shared_alpha_payload, payload_sha256: hash.sha256(shared_alpha_payload)?.hex(), metadata: shared_alpha_metadata, proof: shared_alpha_proof, executor_sha256: digest("published executor")},
   )?
 
   let shared_beta_stage = fp"${workspace}/shared-beta"
@@ -181,7 +181,7 @@ proc main() [fs, error] {
     types.target_aarch64(),
     store_root,
     shared_beta_node,
-    {payload: shared_beta_payload, metadata: shared_beta_metadata, proof: shared_beta_proof, executor_sha256: digest("published executor")},
+    {payload: shared_beta_payload, payload_sha256: hash.sha256(shared_beta_payload)?.hex(), metadata: shared_beta_metadata, proof: shared_beta_proof, executor_sha256: digest("published executor")},
   )?
   let shared_directories = root.preflight(types.target_aarch64(), [shared_beta, shared_alpha])?
 

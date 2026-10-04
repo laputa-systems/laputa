@@ -19,10 +19,12 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/share/execute-app.txt", kind: "file"}]
 
 ## Builds the application after both dependency roots are available.
+## Target files resolve through LAPUTA_ROOT and build tools through XSH_PM_BUILD_ROOT.
 export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
   let root = env("LAPUTA_ROOT")?
+  let build_root = env("XSH_PM_BUILD_ROOT")?
   let _ = fs.read_text(fp"${root}/usr/share/execute-dep.txt")?
-  let _ = fs.read_text(fp"${root}/usr/share/execute-tool.txt")?
+  let _ = fs.read_text(fp"${build_root}/usr/share/execute-tool.txt")?
 
   let target = fp"${dest}/usr/share/execute-app.txt"
   fs.mkdir(target.parent)?

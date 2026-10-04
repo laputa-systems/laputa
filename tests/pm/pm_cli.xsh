@@ -33,15 +33,6 @@ proc copied_repository(ctx: TestContext, name: Str) [fs, error] -> Result[Path] 
   root
 }
 
-pure cli_executor_identity() -> types.ExecutorIdentity {
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "cli-pm",
-    xsh_sha256: "cli-runners",
-    core_sha256: "cli-core",
-  }
-}
-
 pure cli_empty_remote() -> types.RemoteSnapshot {
   {target: types.target_aarch64(), index_sha256: "cli-empty-remote", packages: []}
 }
@@ -54,7 +45,6 @@ proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[P
     policy.aarch64_docker(),
     ["app"],
     false,
-    cli_executor_identity(),
   )?
   let overlay = test.temp_dir(ctx, name: "root-inspect-overlay")?
   fs.mkdir(fp"${overlay}/overlay")?
@@ -131,7 +121,6 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
     policy.aarch64_docker(),
     ["app"],
     false,
-    cli_executor_identity(),
   )?
   let selected = [node for node in build_plan.nodes if node.name == "runtime-lib"][0]
   let plan_path = test.temp_path(ctx, name: "store-extract-plan.json")
@@ -154,7 +143,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   let proof = fp"${stage}/proof.json"
   fs.write(proof, "proof\n")?
   let store_root = test.temp_dir(ctx, name: "store-extract-store")?
-  let _ = store.commit(types.target_aarch64(), store_root, selected, {payload, metadata, proof, executor_sha256: plan.executor_fingerprint(build_plan.executor)?})?
+  let _ = store.commit(types.target_aarch64(), store_root, selected, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: bytes.from_text("test executor").sha256().hex()})?
   let output = test.temp_path(ctx, name: "extracted-vmlinuz")
 
   let _ = pm_output([
@@ -297,4 +286,34 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   test.eq(status.ok, false)?
   let observed_output_10 = err.read_text()?
   assert "build plan digest does not match" in observed_output_10
+}
+
+# Artifact keys exclude the executor: a plan resolved through the CLI does not
+# change when the XSH runner bytes or a PM module change.
+test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, error] { |ctx|
+  let repository = copied_repository(ctx, "plan-executor-repository")?
+  let pm_copy = test.temp_dir(ctx, name: "plan-executor-pm")?
+  fs.copy(p"pm.xsh", fp"${pm_copy}/pm.xsh")?
+  let _ = fs.copy_tree(p"pm", fp"${pm_copy}/pm", parents: true, overwrite: true)?
+  let runners = test.temp_dir(ctx, name: "plan-executor-runners")?
+  let _ = fs.copy_tree(fixture("fingerprint-executor/runners"), runners, parents: true, overwrite: true)?
+  let xsh = runner()?
+  let entrypoint = fp"${pm_copy}/pm.xsh"
+  let declared_runner = fp"${runners}/xsh"
+  let cli_module = fp"${pm_copy}/pm/cli.xsh"
+  var plans: List[types.BuildPlan] = []
+
+  for revision in ["first", "second"] {
+    let output = test.temp_path(ctx, name: f"plan-executor-${revision}.json")
+    let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output ?
+    plans = plans.push(plan_json.read(output)?)
+
+    for name in ["xsh", "xshi", "xsht"] {
+      fs.write(fp"${runners}/${name}", f"rebuilt ${name} runner\n")?
+    }
+
+    fs.write(cli_module, cli_module.read_text()? + "\n# A PM revision that must not change any artifact key.\n")?
+  }
+
+  test.eq(plans[1], plans[0])?
 }

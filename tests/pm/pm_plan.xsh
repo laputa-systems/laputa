@@ -1,4 +1,4 @@
-##! Behavior coverage for exact package and executor semantic fingerprints.
+##! Behavior coverage for package fingerprints, artifact keys, and build-plan resolution.
 use pm.fingerprint
 use pm.recipe
 use pm.types
@@ -102,27 +102,10 @@ test test_core_tree_fingerprint_changes_for_applet [fs, error] { |ctx|
   test.eq(fingerprint.core_tree(fp"${root}/core")? == first, false)?
 }
 
-test test_runner_fingerprint_changes_for_runner_bytes [fs, error] { |ctx|
-  let root = copied_executor(ctx)?
-  let runners = fp"${root}/runners"
-  let first = fingerprint.runners(fp"${runners}/xsh", fp"${runners}/xshi", fp"${runners}/xsht")?
-  fs.write(fp"${runners}/xshi", "changed xshi\n")?
-  test.eq(fingerprint.runners(fp"${runners}/xsh", fp"${runners}/xshi", fp"${runners}/xsht")? == first, false)?
-}
-
 test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { |ctx|
   let first = copied_package(ctx, "fingerprint-checkout-a")?
   let second = copied_package(ctx, "fingerprint-checkout-b")?
   test.eq(build_input(first)?, build_input(second)?)
-}
-
-pure plan_executor_identity() -> types.ExecutorIdentity {
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "pm-tree",
-    xsh_sha256: "xsh-runners",
-    core_sha256: "core-tree",
-  }
 }
 
 pure empty_remote_snapshot() -> types.RemoteSnapshot {
@@ -146,7 +129,7 @@ proc resolve_plan(
   roots: List[Str],
   snapshot: types.RemoteSnapshot,
 ) [fs, error] -> Result[types.BuildPlan] {
-  plan.resolve(value, snapshot, policy.aarch64_docker(), roots, false, plan_executor_identity())?
+  plan.resolve(value, snapshot, policy.aarch64_docker(), roots, false)?
 }
 
 pure retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
@@ -175,7 +158,6 @@ pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieva
 
 proc exact_remote_snapshot(value: types.BuildPlan) [error] -> Result[types.RemoteSnapshot] {
   var packages: List[types.RemotePlanArtifact] = []
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
 
   for node in value.nodes {
     packages = packages.push({
@@ -185,7 +167,7 @@ proc exact_remote_snapshot(value: types.BuildPlan) [error] -> Result[types.Remot
       retrieval: retrieval_for(node.name, node.ver, node.rel),
       artifact_key: node.artifact_key,
       recipe_sha256: node.recipe_sha256,
-      executor_sha256,
+      executor_sha256: plan_test_sha256("remote executor"),
       proof_key: node.proof_key,
       proof_sha256: node.proof_sha256,
     })
@@ -240,8 +222,8 @@ test test_build_plan_is_deterministic_and_has_dependency_first_order [fs, env, e
 
 test test_build_plan_all_roots_are_canonical [fs, env, error] { |ctx|
   let value = plan_catalog(ctx, "plan-all")?
-  let first = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["target-sdk", "app"], true, plan_executor_identity())?
-  let second = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["app"], true, plan_executor_identity())?
+  let first = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["target-sdk", "app"], true)?
+  let second = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["app"], true)?
   test.eq(first, second)?
   test.eq(first.roots, ["app", "host-tool", "runtime-lib", "target-sdk"])?
 }
@@ -310,19 +292,46 @@ test test_build_plan_reports_tuple_reasons_and_rejects_behind_remote [fs, env, e
   }
 }
 
-test test_build_plan_propagates_dependency_keys [fs, env, error] { |ctx|
-  let value = plan_catalog(ctx, "plan-propagation")?
-  let initial = resolve_plan(value, ["app"], empty_remote_snapshot())?
-  var changed: List[types.Package] = []
+proc with_release(value: types.PackageCatalog, name: Str, rel: Str) [error] -> Result[types.PackageCatalog] {
+  catalog.from_packages(value.root, [if pkg.name == name { {...pkg, rel} } else { pkg } for pkg in value.packages])?
+}
 
-  for pkg in value.packages {
-    changed = changed.push(if pkg.name == "runtime-lib" { {...pkg, rel: "2"} } else { pkg })
+proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) [error] -> Result[List[Str]] {
+  var changed: List[Str] = []
+
+  for node in before.nodes {
+    if node_named(after, node.name)?.artifact_key != node.artifact_key {
+      changed = changed.push(node.name)
+    }
   }
 
-  let changed_catalog = catalog.from_packages(value.root, changed)?
-  let rebuilt = resolve_plan(changed_catalog, ["app"], empty_remote_snapshot())?
-  test.eq(node_named(initial, "runtime-lib")?.artifact_key == node_named(rebuilt, "runtime-lib")?.artifact_key, false)?
-  test.eq(node_named(initial, "app")?.artifact_key == node_named(rebuilt, "app")?.artifact_key, false)?
+  changed |> sort
+}
+
+# Every direct dependency, runtime ones included, is installed into a build
+# root, so a release bump changes exactly the package and its dependents.
+test test_release_bump_changes_exactly_the_package_and_its_dependents [fs, env, error] { |ctx|
+  let value = plan_catalog(ctx, "plan-propagation")?
+  let initial = resolve_plan(value, ["app"], empty_remote_snapshot())?
+
+  for name in ["host-tool", "target-sdk", "runtime-lib"] {
+    let bumped = resolve_plan(with_release(value, name, "2")?, ["app"], empty_remote_snapshot())?
+    test.eq(changed_key_names(initial, bumped)?, [name, "app"] |> sort)?
+  }
+
+  let app_bumped = resolve_plan(with_release(value, "app", "2")?, ["app"], empty_remote_snapshot())?
+  test.eq(changed_key_names(initial, app_bumped)?, ["app"])?
+}
+
+test test_build_epoch_changes_every_artifact_key_and_nothing_else [fs, env, error] { |ctx|
+  let value = plan_catalog(ctx, "plan-build-epoch")?
+  let current = resolve_plan(value, ["app"], empty_remote_snapshot())?
+  let next_policy = {...policy.aarch64_docker(), build_epoch: policy.BUILD_EPOCH + 1}
+  let next = plan.resolve(value, empty_remote_snapshot(), next_policy, ["app"], false)?
+  test.eq(current.build_epoch, policy.BUILD_EPOCH)?
+  test.eq(next.build_epoch, policy.BUILD_EPOCH + 1)?
+  test.eq(changed_key_names(current, next)?, [node.name for node in current.nodes] |> sort)?
+  test.eq([node.recipe_sha256 for node in next.nodes], [node.recipe_sha256 for node in current.nodes])?
 }
 
 test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error] { |ctx|
@@ -354,27 +363,24 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
   }
 }
 
-test test_build_plan_requires_release_bump_for_changed_dependency [fs, env, error] { |ctx|
-  let value = plan_catalog(ctx, "plan-release-bump")?
-  let initial = resolve_plan(value, ["app"], empty_remote_snapshot())?
-  let snapshot = exact_remote_snapshot(initial)?
-  let runtime = node_named(initial, "runtime-lib")?
-  let changed_runtime = {
-    name: runtime.name,
-    ver: runtime.ver,
-    rel: runtime.rel,
-    retrieval: retrieval_for(runtime.name, runtime.ver, runtime.rel),
-    artifact_key: "changed-remote-artifact",
-    recipe_sha256: runtime.recipe_sha256,
-    executor_sha256: plan.executor_fingerprint(initial.executor)?,
-    proof_key: runtime.proof_key,
-    proof_sha256: runtime.proof_sha256,
-  }
+# A dependent whose dependency is rebuilt is rebuilt locally without a release
+# bump; publishing it under the remote's tuple is a `repo publish` conflict.
+test test_build_plan_rebuilds_dependents_of_rebuilt_dependencies [fs, env, error] { |ctx|
+  let value = plan_catalog(ctx, "plan-dependency-rebuild")?
+  let snapshot = exact_remote_snapshot(resolve_plan(value, ["app"], empty_remote_snapshot())?)?
+  let rebuilt = resolve_plan(with_release(value, "runtime-lib", "2")?, ["app"], snapshot)?
+  test.eq(types.plan_action_reason(node_named(rebuilt, "runtime-lib")?.action), "local release is above remote 1-1")?
+  test.eq(types.plan_action_text(node_named(rebuilt, "app")?.action), "build")?
+  test.eq(types.plan_action_reason(node_named(rebuilt, "app")?.action), "dependencies rebuilt (runtime-lib)")?
+  test.eq(types.plan_action_text(node_named(rebuilt, "host-tool")?.action), "reuse-remote")?
 
-  match resolve_plan(value, ["app"], snapshot_replace(snapshot, "runtime-lib", changed_runtime)) {
-    Ok(_) => test.fail("dependent without release bump unexpectedly reused")?
-    Err(problem) => { assert "app dependencies changed (runtime-lib); bump PKGBUILD.xsh rel" in problem.message }
+  # Remote executor provenance never decides reuse.
+  let other_executor = {
+    ...snapshot,
+    packages: [{...artifact, executor_sha256: plan_test_sha256("other executor")} for artifact in snapshot.packages],
   }
+  let reused = resolve_plan(value, ["app"], other_executor)?
+  test.eq([types.plan_action_text(node.action) for node in reused.nodes], ["reuse-remote", "reuse-remote", "reuse-remote", "reuse-remote"])?
 }
 
 test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |ctx|
@@ -388,7 +394,7 @@ test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |
   let original = path_value.read_text()?
   test.eq(repeat_path.read_text()?, original)?
   test.eq(original, fixture("plans/basic-aarch64.json").read_text()?)?
-  fs.write(path_value, original.replace("laputa-build-plan-1", "unknown-build-plan"))?
+  fs.write(path_value, original.replace(plan.format, "unknown-build-plan"))?
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("unknown plan format unexpectedly loaded")?
@@ -441,7 +447,7 @@ test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, 
   let value = plan_catalog(ctx, "plan-target")?
   let unsupported = {...policy.aarch64_docker(), target: types.TargetReserved}
 
-  match plan.resolve(value, empty_remote_snapshot(), unsupported, ["app"], false, plan_executor_identity()) {
+  match plan.resolve(value, empty_remote_snapshot(), unsupported, ["app"], false) {
     Ok(_) => test.fail("unsupported target unexpectedly planned")?
     Err(problem) => { assert "unsupported target" in problem.message }
   }

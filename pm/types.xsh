@@ -344,20 +344,26 @@ export type Package = {
 ## The sorted local package definitions and externally available names used for one graph resolution.
 export type PackageCatalog = {root: Path, packages: List[Package], remote_names: List[Str]}
 
-## Target and bootstrap rules that determine a package graph's build semantics.
+## Target, bootstrap, and build-epoch rules that determine a package graph's build semantics.
 export type BuildPolicy = {
   target: Target,
   build_target: Target,
   native_build: Bool,
   bootstrap_seeds: List[BootstrapSeedRule],
+  build_epoch: Int,
 }
 
-## The exact PM and XSH substrate that executes a build plan.
-export type ExecutorIdentity = {
+## The XSH runners, PM tree, and core applets that built an artifact.
+## This is provenance recorded in artifact metadata, never an artifact-key input:
+## XSH and PM are co-developed, and rebuilding the world on every change to them
+## would make that impractical. `core_sha256` is null when no core was seeded.
+export type ExecutorProvenance = {
   format: Str,
-  pm_sha256: Str,
   xsh_sha256: Str,
-  core_sha256: Str,
+  xshi_sha256: Str,
+  xsht_sha256: Str,
+  pm_sha256: Str,
+  core_sha256: Str?,
 }
 
 ## Immutable retrieval coordinates for an artifact reused from a remote snapshot.
@@ -371,6 +377,7 @@ export type RemoteRetrieval = {
 
 ## Remote artifact identity as observed while resolving one selected snapshot.
 ## Empty semantic fields represent legacy metadata and use the retrieval identity instead.
+## `executor_sha256` is provenance only and never decides reuse.
 export type RemotePlanArtifact = {
   name: Str,
   ver: Str,
@@ -415,6 +422,8 @@ export type PlanNode = {
 export type ArtifactEntry = {path: Str, kind: FileKind, mode: Int, sha256: Str, target: Str}
 
 ## The completed, verified contents of one immutable package artifact directory.
+## `executor_sha256` records which executor built or published the artifact; it is
+## provenance and never part of the artifact's identity.
 export type ArtifactReceipt = {
   format: Str,
   key: Str,
@@ -434,8 +443,10 @@ export type ArtifactReceipt = {
 }
 
 ## Files produced by a completed package build before immutable-store publication.
-## The executor digest is staged explicitly because PlanNode carries only its artifact key.
-export type StagedArtifact = {payload: Path, metadata: Path, proof: Path, executor_sha256: Str}
+## `payload_sha256` is the digest computed once when the payload was produced or
+## downloaded; the Store records it instead of hashing the payload again.
+## `executor_sha256` is the provenance digest of the executor that built it.
+export type StagedArtifact = {payload: Path, payload_sha256: Str, metadata: Path, proof: Path, executor_sha256: Str}
 
 ## One selected package artifact in a deterministic root-composition plan.
 export type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payload: Bool}
@@ -477,7 +488,7 @@ export type BuildPlan = {
   roots: List[Str],
   repository_digest: Str,
   remote_index_sha256: Str,
-  executor: ExecutorIdentity,
+  build_epoch: Int,
   nodes: List[PlanNode],
   plan_sha256: Str,
 }

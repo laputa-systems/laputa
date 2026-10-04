@@ -116,7 +116,6 @@ test-pm-native: xsh-native
 	    PATH="$(XSH_NATIVE_BIN_DIR):$$PATH" \
 	    XSH_HOST="$(XSH_NATIVE_BIN_DIR)/xsh" \
 	    XSH_MODULE_PATH="$(CURDIR)" \
-	    XSH_PM_BUILD_CHROOT=0 \
 	    "$(XSH_NATIVE_BIN_DIR)/xsht" test --cov --cov-json "target/coverage/pm-native/$$name.json" "$$suite"; \
 	done
 
@@ -161,9 +160,7 @@ test-pm-local-linux: xsh-local-bins
 	docker run --rm \
 	    --platform $(LAPUTA_DOCKER_PLATFORM) \
 	    -e XSH_HOST=/work/target/$(XSH_LOCAL_TRIPLE)/debug/xsh \
-	    -e XSH_CORE_ROOT=/work/core \
 	    -e XSH_MODULE_PATH=/src/laputa \
-	    -e XSH_PM_BUILD_CHROOT=0 \
 	    -v "$(XSH_ROOT_ABS)":/work:ro \
 	    -v "$(CURDIR)":/src/laputa \
 	    -w /src/laputa \
