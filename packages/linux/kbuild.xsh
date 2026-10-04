@@ -184,11 +184,11 @@ type ItemResult = {plan: KbuildPlan, dirs: List[Path], entries: List[Path]}
 
 pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   let re = regex.compile(pattern)?
-  return re.captures(text)
+  re.captures(text)
 }
 
 pure empty_plan() -> KbuildPlan {
-  return {
+  {
     dirs: [],
     objects: [],
     lib_objects: [],
@@ -199,7 +199,7 @@ pure empty_plan() -> KbuildPlan {
 }
 
 pure default_discover_options() -> DiscoverOptions {
-  return {
+  {
     progress: false,
     progress_every: 100,
     jobs: 1,
@@ -213,11 +213,9 @@ pure default_discover_options() -> DiscoverOptions {
 export pure planner_jobs() -> Int {
   let count = cpu.count()
 
-  if count < 1 {
-    return 1
-  }
+  return 1 when count < 1
 
-  return count
+  count
 }
 
 proc root_vars(srcarch: Str) [] -> Map[Str] {
@@ -234,7 +232,7 @@ proc root_vars(srcarch: Str) [] -> Map[Str] {
     vars["BITS"] = "64"
   }
 
-  return vars
+  vars
 }
 
 proc global_vars(srcarch: Str) [] -> Map[Str] {
@@ -245,7 +243,7 @@ proc global_vars(srcarch: Str) [] -> Map[Str] {
     vars["BITS"] = "64"
   }
 
-  return vars
+  vars
 }
 
 proc kbuild_vars_for_dir(dir: Path, srcarch: Str) [] -> Map[Str] {
@@ -253,55 +251,47 @@ proc kbuild_vars_for_dir(dir: Path, srcarch: Str) [] -> Map[Str] {
   var vars = if dir_key == "." { root_vars(srcarch) } else { global_vars(srcarch) }
   vars["src"] = dir_key
   vars["obj"] = dir_key
-  return vars
+  vars
 }
 
 pure path_key(path_value: Path) -> Str {
   let key = path_value.display()
 
-  if key == "" {
-    return "."
-  }
+  return "." when key == ""
 
-  return key
+  key
 }
 
 pure has_plan_path(paths: List[Path], path_value: Path) -> Bool {
   let key = path_key(path_value)
 
   for item in paths {
-    if path_key(item) == key {
-      return true
-    }
+    return true when path_key(item) == key
   }
 
-  return false
+  false
 }
 
 pure add_dir(plan: KbuildPlan, dir: Path) -> KbuildPlan {
-  if has_plan_path(plan.dirs, dir) {
-    return plan
-  }
+  return plan when has_plan_path(plan.dirs, dir)
 
   var dirs = plan.dirs
-  dirs = dirs.push(dir)
-  return {...plan, dirs: dirs}
+  dirs += [dir]
+  {...plan, dirs: dirs}
 }
 
 pure add_object(plan: KbuildPlan, obj: Path) -> KbuildPlan {
-  return add_object_at(plan, obj, object_dir(obj))
+  add_object_at(plan, obj, object_dir(obj))
 }
 
 pure add_object_at(plan: KbuildPlan, obj: Path, owner: Path) -> KbuildPlan {
-  if has_plan_path(plan.objects, obj) {
-    return plan
-  }
+  return plan when has_plan_path(plan.objects, obj)
 
   var objects = plan.objects
-  objects = objects.push(obj)
+  objects += [obj]
   var owners = plan.archive_owners
   owners = owners.push({object: obj, dir: owner})
-  return {
+  {
     ...plan,
     objects: objects,
     archive_owners: owners,
@@ -309,15 +299,13 @@ pure add_object_at(plan: KbuildPlan, obj: Path, owner: Path) -> KbuildPlan {
 }
 
 pure add_lib_object_at(plan: KbuildPlan, obj: Path, owner: Path) -> KbuildPlan {
-  if has_plan_path(plan.lib_objects, obj) {
-    return plan
-  }
+  return plan when has_plan_path(plan.lib_objects, obj)
 
   var objects = plan.lib_objects
-  objects = objects.push(obj)
+  objects += [obj]
   var owners = plan.archive_owners
   owners = owners.push({object: obj, dir: owner})
-  return {
+  {
     ...plan,
     lib_objects: objects,
     archive_owners: owners,
@@ -328,24 +316,22 @@ pure add_composite(plan: KbuildPlan, composite: CompositeObject) -> KbuildPlan {
   let key = path_key(composite.object)
 
   for item in plan.composites {
-    if path_key(item.object) == key {
-      return plan
-    }
+    return plan when path_key(item.object) == key
   }
 
   var composites = plan.composites
-  composites = composites.push(composite)
-  return {...plan, composites: composites}
+  composites += [composite]
+  {...plan, composites: composites}
 }
 
 pure add_unsupported(plan: KbuildPlan, message: Str) -> KbuildPlan {
   var unsupported = plan.unsupported
-  unsupported = unsupported.push(message)
-  return {...plan, unsupported: unsupported}
+  unsupported += [message]
+  {...plan, unsupported: unsupported}
 }
 
 proc merge_plan(base: KbuildPlan, addition: KbuildPlan) [] -> KbuildPlan {
-  return {
+  {
     dirs: base.dirs.extend(addition.dirs),
     objects: base.objects.extend(addition.objects),
     lib_objects: base.lib_objects.extend(addition.lib_objects),
@@ -358,23 +344,19 @@ proc merge_plan(base: KbuildPlan, addition: KbuildPlan) [] -> KbuildPlan {
 pure archive_owner_key(owners: Map[Str], obj: Path) -> Path {
   let object_key = path_key(obj)
   let default_owner = path_key(object_dir(obj))
-  return fp"{owners.get(object_key) ?? default_owner}"
+  fp"{owners.get(object_key) ?? default_owner}"
 }
 
 pure join_rel(dir: Path, item: Str) -> Path {
-  if path_key(dir) == "." {
-    return normalize_rel_path(fp"{item}")
-  }
+  return normalize_rel_path(fp"{item}") when path_key(dir) == "."
 
-  return normalize_rel_path(fp"{dir}/{item}")
+  normalize_rel_path(fp"{dir}/{item}")
 }
 
 pure join_root(root: Path, rel: Path) -> Path {
-  if path_key(rel) == "." {
-    return root
-  }
+  return root when path_key(rel) == "."
 
-  return fp"{root}/{rel}"
+  fp"{root}/{rel}"
 }
 
 pure normalize_rel_path(path_value: Path) -> Path {
@@ -391,23 +373,19 @@ pure normalize_rel_path(path_value: Path) -> Path {
       continue
     }
 
-    parts = parts.push(part)
+    parts += [part]
   }
 
-  if parts.len() == 0 {
-    return p"."
-  }
+  return p"." when parts.len() == 0
 
-  return fp"{parts.join("/")}"
+  fp"{parts.join("/")}"
 }
 
 ## Exported declaration `write_text_if_changed`.
 export proc write_text_if_changed(path_value: Path, data: Str) [fs, error] {
   path_value.parent.mkdir()?
 
-  if path_value.exists()? and path_value.read_text()? == data {
-    return
-  }
+  return when path_value.exists()? and path_value.read_text()? == data
 
   fs.write(path_value, data)?
 }
@@ -420,40 +398,32 @@ export proc copy_text_if_changed(source: Path, dest: Path) [fs, error] {
 pure dirname_for_item(dir: Path, item: Str) -> Path {
   let caps = regex_captures(item, "^(.*)/$") ?? []
 
-  if caps.len() >= 2 {
-    return join_rel(dir, caps[1])
-  }
+  return join_rel(dir, caps[1]) when caps.len() >= 2
 
-  return join_rel(dir, item)
+  join_rel(dir, item)
 }
 
 pure clean_config_value(raw: Str) -> Str {
-  return raw.trim().replace("\"", "")
+  raw.trim().replace("\"", "")
 }
 
 pure config_header_value(value: Str) -> Str {
-  if value == "y" or value == "m" {
-    return "1"
-  }
+  return "1" when value == "y" or value == "m"
 
   match value.parse_int() {
     Ok(_) => return value
     Err(_) => {}
   }
 
-  if value.starts_with("0x") {
-    return value
-  }
+  return value when value.starts_with("0x")
 
-  return f"\"{value}\""
+  f"\"{value}\""
 }
 
 pure config_auto_line(name: Str, value: Str) -> Str {
-  if value == "y" {
-    return f"CONFIG_{name}=y"
-  }
+  return f"CONFIG_{name}=y" when value == "y"
 
-  return f"CONFIG_{name}={value}"
+  f"CONFIG_{name}={value}"
 }
 
 ## Exported declaration `load_config`.
@@ -476,21 +446,19 @@ export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig] {
     }
   }
 
-  return {enabled: enabled, values: values}
+  {enabled: enabled, values: values}
 }
 
 pure empty_kconfig() -> Kconfig {
   let enabled: Map[Bool] = {}
   let values: Map[Str] = {}
-  return {enabled: enabled, values: values}
+  {enabled: enabled, values: values}
 }
 
 proc load_config_if_present(path_value: Path) [fs, error] -> Result[Kconfig] {
-  if path_value.exists()? {
-    return load_config(path_value)?
-  }
+  return load_config(path_value)? when path_value.exists()?
 
-  return empty_kconfig()
+  empty_kconfig()
 }
 
 ## Exported declaration `write_config_headers`.
@@ -751,7 +719,7 @@ export proc generate_arm64_cpucap_defs(root: Path) [fs, error] {
   }
 
   lines = lines.push(f"#define ARM64_NCAPS {cap}")
-  lines = lines.push("")
+  lines += [""]
   lines = lines.push("#endif /* __ASM_CPUCAP_DEFS_H */")
   fs.mkdir(fp"{root}/arch/arm64/include/generated/asm")?
 
@@ -763,15 +731,13 @@ export proc generate_arm64_cpucap_defs(root: Path) [fs, error] {
 }
 
 pure config_value(config: Kconfig, name: Str) -> Str {
-  return config.values.get(name) ?? ""
+  config.values.get(name) ?? ""
 }
 
 pure expand_subst(raw: Str, config: Kconfig) -> Str {
   let marker = "$(subst m,y,$(CONFIG_"
 
-  if ! (marker in raw) {
-    return raw
-  }
+  return raw unless marker in raw
 
   let chunks = raw.split(marker)
   var out = chunks[0]
@@ -793,15 +759,13 @@ pure expand_subst(raw: Str, config: Kconfig) -> Str {
     }
   }
 
-  return out
+  out
 }
 
 pure expand_config_refs(raw: Str, config: Kconfig) -> Str {
   let marker = "$(CONFIG_"
 
-  if ! (marker in raw) {
-    return raw
-  }
+  return raw unless marker in raw
 
   let chunks = raw.split(marker)
   var out = chunks[0]
@@ -816,15 +780,13 @@ pure expand_config_refs(raw: Str, config: Kconfig) -> Str {
     }
   }
 
-  return out
+  out
 }
 
 pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
   let marker = "$("
 
-  if ! (marker in raw) {
-    return raw
-  }
+  return raw unless marker in raw
 
   let chunks = raw.split(marker)
   var out = chunks[0]
@@ -839,15 +801,13 @@ pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
     }
   }
 
-  return out
+  out
 }
 
 pure expand_braced_config_refs(raw: Str, config: Kconfig) -> Str {
   let marker = "\${CONFIG_"
 
-  if ! (marker in raw) {
-    return raw
-  }
+  return raw unless marker in raw
 
   let chunks = raw.split(marker)
   var out = chunks[0]
@@ -862,13 +822,11 @@ pure expand_braced_config_refs(raw: Str, config: Kconfig) -> Str {
     }
   }
 
-  return out
+  out
 }
 
 pure expand_vars(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str {
-  if ! ("$(" in raw) and ! ("\${CONFIG_" in raw) {
-    return raw
-  }
+  return raw when ! ("$(" in raw) and ! ("\${CONFIG_" in raw)
 
   if ! ("$(subst m,y,$(CONFIG_" in raw) and ! ("$(CONFIG_" in raw) and ! ("$(SRCARCH)" in raw) and ! ("\${CONFIG_" in raw) {
     return expand_make_vars(raw, vars)
@@ -876,12 +834,10 @@ pure expand_vars(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str
 
   var out = expand_braced_config_refs(expand_subst(raw, config).replace("$(SRCARCH)", srcarch), config)
 
-  if ! ("$(" in out) {
-    return out
-  }
+  return out unless "$(" in out
 
   out = expand_config_refs(out, config)
-  return expand_make_vars(out, vars)
+  expand_make_vars(out, vars)
 }
 
 proc logical_lines(body: Str) [] -> List[Str] {
@@ -892,7 +848,7 @@ proc logical_lines(body: Str) [] -> List[Str] {
       let trimmed = raw.trim()
 
       if trimmed != "" {
-        direct = direct.push(trimmed)
+        direct += [trimmed]
       }
     }
 
@@ -928,7 +884,7 @@ proc logical_lines(body: Str) [] -> List[Str] {
     lines = lines.push(current.trim())
   }
 
-  return lines
+  lines
 }
 
 proc included_kbuild_lines(
@@ -938,28 +894,24 @@ proc included_kbuild_lines(
   config: Kconfig,
   srcarch: Str,
 ) [fs, error] -> Result[List[Str]] {
-  if ! line.starts_with("include ") {
+  guard line.starts_with("include ") else {
     return []
   }
 
   let raw_spec = (line.split("include ").get(1) ?? "").trim()
 
-  if "$(objtree)" in raw_spec {
-    return []
-  }
+  return [] when "$(objtree)" in raw_spec
 
   let spec = expand_vars(raw_spec, vars, config, srcarch)
 
-  if spec == "" or " " in spec or "$(" in spec or spec.starts_with("/") {
-    return []
-  }
+  return [] when spec == "" or " " in spec or "$(" in spec or spec.starts_with("/")
 
   let rel = normalize_rel_path(fp"{spec}")
-  return logical_lines(join_root(root, rel).read_text()?)
+  logical_lines(join_root(root, rel).read_text()?)
 }
 
 pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) -> ParsedAssignment {
-  return {
+  {
     lhs: line.byte_slice(0, index).trim(),
     op: marker,
     rhs: line.byte_slice(index + marker_len).trim(),
@@ -969,53 +921,37 @@ pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) ->
 pure parse_assignment(line: Str) -> Result[ParsedAssignment] {
   let append_index = line.find("+=") ?? -1
 
-  if append_index >= 0 {
-    return parse_assignment_at(line, "+=", 2, append_index)
-  }
+  return parse_assignment_at(line, "+=", 2, append_index) when append_index >= 0
 
   let simple_index = line.find(":=") ?? -1
 
-  if simple_index >= 0 {
-    return parse_assignment_at(line, ":=", 2, simple_index)
-  }
+  return parse_assignment_at(line, ":=", 2, simple_index) when simple_index >= 0
 
   let conditional_index = line.find("?=") ?? -1
 
-  if conditional_index >= 0 {
-    return parse_assignment_at(line, "?=", 2, conditional_index)
-  }
+  return parse_assignment_at(line, "?=", 2, conditional_index) when conditional_index >= 0
 
   let assignment_index = line.find("=") ?? -1
 
-  if assignment_index >= 0 {
-    return parse_assignment_at(line, "=", 1, assignment_index)
-  }
+  return parse_assignment_at(line, "=", 1, assignment_index) when assignment_index >= 0
 
-  return Err(ScriptError.Failed("kbuild-skip-line", line))
+  Err(ScriptError.Failed("kbuild-skip-line", line))
 }
 
 pure active_obj_lhs(expanded: Str) -> Bool {
-  return expanded == "obj-y" or expanded == "lib-y" or expanded == "subdir-y"
+  expanded == "obj-y" or expanded == "lib-y" or expanded == "subdir-y"
 }
 
 pure active_var_lhs(expanded: Str) -> Str {
-  if expanded == "KVM" {
-    return expanded
-  }
+  return expanded when expanded == "KVM"
 
-  if expanded.ends_with("-y") {
-    return expanded
-  }
+  return expanded when expanded.ends_with("-y")
 
-  if expanded.ends_with("-objs") {
-    return expanded
-  }
+  return expanded when expanded.ends_with("-objs")
 
-  if expanded.ends_with("_files") {
-    return expanded
-  }
+  return expanded when expanded.ends_with("_files")
 
-  return ""
+  ""
 }
 
 proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Str {
@@ -1025,7 +961,7 @@ proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
     return config_value(config, expanded.replace("CONFIG_", ""))
   }
 
-  return expanded
+  expanded
 }
 
 proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Result[Bool] {
@@ -1038,18 +974,14 @@ proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig,
   let rest = line.split(prefix).get(1) ?? ""
   let parts = rest.split(",")
 
-  if parts.len() < 2 {
-    return Err(ScriptError.Failed("kbuild-not-conditional", line))
-  }
+  return Err(ScriptError.Failed("kbuild-not-conditional", line)) when parts.len() < 2
 
   let left = conditional_value(parts[0].trim(), vars, config, srcarch)
   let right = expand_vars(parts |> drop(1).join(",").replace(")", "").trim(), vars, config, srcarch)
 
-  if keyword == "ifeq" {
-    return left == right
-  }
+  return left == right when keyword == "ifeq"
 
-  return left != right
+  left != right
 }
 
 proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Result[Bool] {
@@ -1064,28 +996,24 @@ proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
   if line.starts_with("ifdef ") {
     let parts = line.fields()
 
-    if parts.len() >= 2 {
-      return conditional_value(parts[1], vars, config, srcarch) != ""
-    }
+    return conditional_value(parts[1], vars, config, srcarch) != "" when parts.len() >= 2
   }
 
   if line.starts_with("ifndef ") {
     let parts = line.fields()
 
-    if parts.len() >= 2 {
-      return conditional_value(parts[1], vars, config, srcarch) == ""
-    }
+    return conditional_value(parts[1], vars, config, srcarch) == "" when parts.len() >= 2
   }
 
-  return Err(ScriptError.Failed("kbuild-not-conditional", line))
+  Err(ScriptError.Failed("kbuild-not-conditional", line))
 }
 
 pure active_conditional(stack: List[Bool]) -> Bool {
-  return stack[stack.len() - 1]
+  stack[stack.len() - 1]
 }
 
 pure object_stem(item: Str) -> Str {
-  return item.replace(".o", "")
+  item.replace(".o", "")
 }
 
 pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
@@ -1093,7 +1021,7 @@ pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
     return f"{object_stem(item)}.pi.o"
   }
 
-  return item
+  item
 }
 
 proc composite_members(dir: Path, item: Str, vars: Map[Str]) [] -> List[Path] {
@@ -1112,7 +1040,7 @@ proc composite_members(dir: Path, item: Str, vars: Map[Str]) [] -> List[Path] {
     }
   }
 
-  return unique_paths(members)
+  unique_paths(members)
 }
 
 stream active_objects_for_dir(dir: Path, vars: Map[Str]) [] -> Stream[Path] {
@@ -1127,13 +1055,13 @@ stream active_objects_for_dir(dir: Path, vars: Map[Str]) [] -> Stream[Path] {
       let obj = join_rel(dir, active_item)
 
       if ! has_plan_path(objects, obj) {
-        objects = objects.push(obj)
+        objects += [obj]
         yield obj
       }
 
       for member in composite_members(dir, active_item, vars) {
         if ! has_plan_path(objects, member) {
-          objects = objects.push(member)
+          objects += [member]
           yield member
         }
       }
@@ -1142,7 +1070,7 @@ stream active_objects_for_dir(dir: Path, vars: Map[Str]) [] -> Stream[Path] {
 
   for obj in extra_objects_for_dir(dir) {
     if ! has_plan_path(objects, obj) {
-      objects = objects.push(obj)
+      objects += [obj]
       yield obj
     }
   }
@@ -1153,11 +1081,11 @@ pure extra_objects_for_dir(dir: Path) -> List[Path] {
     return [join_rel(dir, "vdso64-image.o")]
   }
 
-  return []
+  []
 }
 
 pure plan_objects(plan: KbuildPlan) -> List[Path] {
-  return plan.objects.extend(plan.lib_objects)
+  plan.objects.extend(plan.lib_objects)
 }
 
 proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) [fs, error] -> Result[Map[Str]] {
@@ -1174,12 +1102,9 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) [fs, err
     if line.starts_with("ifeq ") or line.starts_with("ifneq ") or line.starts_with("ifdef ") or line.starts_with(
       "ifndef ",
     ) {
-      match eval_conditional(line, vars, config, srcarch) {
-        Ok(active) => {
-          active_stack = active_stack.push(active_conditional(active_stack) and active)
-          continue
-        }
-        Err(_) => {}
+      if let Ok(active) = eval_conditional(line, vars, config, srcarch) {
+        active_stack = active_stack.push(active_conditional(active_stack) and active)
+        continue
       }
     }
 
@@ -1202,38 +1127,35 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) [fs, err
 
     if line.starts_with("include ") {
       let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = lines |> take(line_index).extend(included).extend(lines |> drop(line_index))
+      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
       continue
     }
 
-    match parse_assignment(line) {
-      Ok(assign) => {
-        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-        let lhs = active_var_lhs(expanded_lhs)
+    if let Ok(assign) = parse_assignment(line) {
+      let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+      let lhs = active_var_lhs(expanded_lhs)
 
-        if lhs != "" {
-          if path_key(dir) == "arch/x86/boot/startup" and lhs == "obj-y" and assign.rhs.starts_with(
-            "$(patsubst %.o,%.pi.o,$(obj-y))",
-          ) {
-            var rewritten = [object_item_for_dir(dir, item) for item in (vars.get("obj-y") ?? "").fields()]
-            vars[lhs] = rewritten.join(" ")
-            continue
-          }
+      if lhs != "" {
+        if path_key(dir) == "arch/x86/boot/startup" and lhs == "obj-y" and assign.rhs.starts_with(
+          "$(patsubst %.o,%.pi.o,$(obj-y))",
+        ) {
+          var rewritten = [object_item_for_dir(dir, item) for item in (vars.get("obj-y") ?? "").fields()]
+          vars[lhs] = rewritten.join(" ")
+          continue
+        }
 
-          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+        let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-          if assign.op == "+=" {
-            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-            vars[lhs] = rhs
-          }
+        if assign.op == "+=" {
+          vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
+        } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
+          vars[lhs] = rhs
         }
       }
-      Err(_) => {}
     }
   }
 
-  return vars
+  vars
 }
 
 pure object_cflags_lhs(expanded: Str) -> Str {
@@ -1241,7 +1163,7 @@ pure object_cflags_lhs(expanded: Str) -> Str {
     return expanded.replace("CFLAGS_", "")
   }
 
-  return ""
+  ""
 }
 
 proc kbuild_compile_flags_for_dir(
@@ -1252,9 +1174,10 @@ proc kbuild_compile_flags_for_dir(
 ) [fs, error] -> Result[Map[List[Str]]] {
   var file = p""
 
-  match kbuild_file(join_root(root, dir)) {
-    Ok(value) => file = value
-    Err(_) => return map.empty()
+  if let Ok(value) = kbuild_file(join_root(root, dir)) {
+    file = value
+  } else {
+    return map.empty()
   }
 
   var vars = kbuild_vars_for_dir(dir, srcarch)
@@ -1275,12 +1198,9 @@ proc kbuild_compile_flags_for_dir(
     if line.starts_with("ifeq ") or line.starts_with("ifneq ") or line.starts_with("ifdef ") or line.starts_with(
       "ifndef ",
     ) {
-      match eval_conditional(line, vars, config, srcarch) {
-        Ok(active) => {
-          active_stack = active_stack.push(active_conditional(active_stack) and active)
-          continue
-        }
-        Err(_) => {}
+      if let Ok(active) = eval_conditional(line, vars, config, srcarch) {
+        active_stack = active_stack.push(active_conditional(active_stack) and active)
+        continue
       }
     }
 
@@ -1303,53 +1223,50 @@ proc kbuild_compile_flags_for_dir(
 
     if line.starts_with("include ") {
       let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = lines |> take(line_index).extend(included).extend(lines |> drop(line_index))
+      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
       continue
     }
 
-    match parse_assignment(line) {
-      Ok(assign) => {
-        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-        let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+    if let Ok(assign) = parse_assignment(line) {
+      let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+      let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-        if expanded_lhs == "subdir-ccflags-y" or expanded_lhs == "ccflags-y" {
-          let rhs_flags = rhs.fields()
+      if expanded_lhs == "subdir-ccflags-y" or expanded_lhs == "ccflags-y" {
+        let rhs_flags = rhs.fields()
 
-          if assign.op == "+=" {
-            subdir_flags = subdir_flags.extend(rhs_flags)
-          } else if assign.op != "?=" or subdir_flags.len() == 0 {
-            subdir_flags = rhs_flags
-          }
-
-          continue
+        if assign.op == "+=" {
+          subdir_flags += rhs_flags
+        } else if assign.op != "?=" or subdir_flags.len() == 0 {
+          subdir_flags = rhs_flags
         }
 
-        let object_name = object_cflags_lhs(expanded_lhs)
+        continue
+      }
 
-        if object_name != "" {
-          let key = path_key(join_rel(dir, object_name))
-          let current = flags.get(key) ?? []
+      let object_name = object_cflags_lhs(expanded_lhs)
 
-          if assign.op == "+=" {
-            flags[key] = current.extend(rhs.fields())
-          } else if assign.op != "?=" or current.len() == 0 {
-            flags[key] = rhs.fields()
-          }
+      if object_name != "" {
+        let key = path_key(join_rel(dir, object_name))
+        let current = flags.get(key) ?? []
 
-          continue
+        if assign.op == "+=" {
+          flags[key] = current.extend(rhs.fields())
+        } else if assign.op != "?=" or current.len() == 0 {
+          flags[key] = rhs.fields()
         }
 
-        let lhs = active_var_lhs(expanded_lhs)
+        continue
+      }
 
-        if lhs != "" {
-          if assign.op == "+=" {
-            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-            vars[lhs] = rhs
-          }
+      let lhs = active_var_lhs(expanded_lhs)
+
+      if lhs != "" {
+        if assign.op == "+=" {
+          vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
+        } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
+          vars[lhs] = rhs
         }
       }
-      Err(_) => {}
     }
   }
 
@@ -1357,7 +1274,7 @@ proc kbuild_compile_flags_for_dir(
     flags["*"] = subdir_flags
   }
 
-  return flags
+  flags
 }
 
 proc kbuild_compile_flags_for_dirs(
@@ -1381,18 +1298,18 @@ proc kbuild_compile_flags_for_dirs(
     by_dir[path_key(dir)] = kbuild_compile_flags_for_dir(root, dir, config, srcarch)?
   }
 
-  return by_dir
+  by_dir
 }
 
 pure compile_flags_cache_format() -> Str {
-  return "linux-kbuild-compile-flags-v2"
+  "linux-kbuild-compile-flags-v2"
 }
 
 pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlagsEntry] {
   var entries: List[CompileFlagsEntry] = []
 
   for dir_key in flags.keys() {
-    let empty_dir_flags: Map[List[Str]] = map.empty()
+    let empty_dir_flags: Map[List[Str]] = {}
     let dir_flags = flags.get(dir_key) ?? empty_dir_flags
 
     for object_key in dir_flags.keys() {
@@ -1400,19 +1317,19 @@ pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlag
     }
   }
 
-  return entries
+  entries
 }
 
 pure compile_flags_from_cache_entries(entries: List[CompileFlagsEntry]) -> Result[Map[Map[List[Str]]]] {
   var flags: Map[Map[List[Str]]] = {}
 
   for entry in entries {
-    let empty_dir_flags: Map[List[Str]] = map.empty()
+    let empty_dir_flags: Map[List[Str]] = {}
     let dir_flags = (flags.get(entry.dir) ?? empty_dir_flags).set(entry.object, entry.flags)
     flags[entry.dir] = dir_flags
   }
 
-  return flags
+  flags
 }
 
 proc compile_flags_fingerprint(
@@ -1427,7 +1344,7 @@ proc compile_flags_fingerprint(
     }
   let config_hash = if config_path.exists()? { hash.sha256(config_path)?.hex() } else { "missing" }
 
-  return f"""format {compile_flags_cache_format()}
+  f"""format {compile_flags_cache_format()}
 srcarch {srcarch}
 config {config_hash}
 dirs {dirs.len()}
@@ -1451,7 +1368,7 @@ proc read_compile_flags_cache(path_value: Path, fingerprint: Str) [fs, error] ->
     return Err(ScriptError.Failed("kbuild-compile-flags-cache-stale", "compile flags cache fingerprint mismatch"))
   }
 
-  return compile_flags_from_cache_entries(cache.flags)?
+  compile_flags_from_cache_entries(cache.flags)?
 }
 
 proc write_compile_flags_cache(path_value: Path, fingerprint: Str, flags: Map[Map[List[Str]]]) [fs, error] {
@@ -1524,15 +1441,15 @@ proc cached_kbuild_compile_flags_for_dirs(
   write_compile_flags_cache(local_cache_path, fingerprint, flags)?
   cache_dir.mkdir()?
   write_compile_flags_cache(stable_cache_path, fingerprint, flags)?
-  return flags
+  flags
 }
 
 pure kbuild_compile_flags_for_object(by_dir: Map[Map[List[Str]]], obj: Path) -> List[Str] {
   let dir_key = path_key(object_dir(obj))
-  let empty_dir_flags: Map[List[Str]] = map.empty()
+  let empty_dir_flags: Map[List[Str]] = {}
   let dir_flags = by_dir.get(dir_key) ?? empty_dir_flags
   let object_flags = dir_flags.get(path_key(obj)) ?? []
-  return (dir_flags.get("*") ?? []).extend(object_flags)
+  (dir_flags.get("*") ?? []).extend(object_flags)
 }
 
 ## Exported declaration `augment_missing_composites`.
@@ -1559,7 +1476,7 @@ export proc augment_missing_composites(
               let current = missing_by_dir.get(dir_key) ?? []
 
               if current.len() == 0 {
-                dirs = dirs.push(dir)
+                dirs += [dir]
               }
 
               missing_by_dir[dir_key] = current.push(obj)
@@ -1586,17 +1503,12 @@ export proc augment_missing_composites(
       {dir: dir, composites: found}
     }
 
-  var composites_by_dir: Map[List[CompositeObject]] = {}
-
-  for scan in scans {
-    composites_by_dir[path_key(scan.dir)] = scan.composites
-  }
-
+  var composites_by_dir: Map[List[CompositeObject]] = {[path_key(scan.dir)]: scan.composites for scan in scans}
   for dir in dirs {
     composites = composites.extend(composites_by_dir.get(path_key(dir)) ?? [])
   }
 
-  return {...plan, composites: composites}
+  {...plan, composites: composites}
 }
 
 ## Exported declaration `prune_inactive_objects`.
@@ -1623,7 +1535,7 @@ export proc prune_inactive_objects(
   var objects = [obj for obj in plan.objects if active.get(path_key(obj)) ?? false]
   var composites = [composite for composite in plan.composites if active.get(path_key(composite.object)) ?? false]
   var lib_objects = [obj for obj in plan.lib_objects if active.get(path_key(obj)) ?? false]
-  return {...plan, objects: objects, lib_objects: lib_objects, composites: composites}
+  {...plan, objects: objects, lib_objects: lib_objects, composites: composites}
 }
 
 ## Exported declaration `refresh_plan_dirs`.
@@ -1661,7 +1573,7 @@ export proc refresh_plan_dirs(
     var composites = []
 
     for obj in active_objects_for_dir(dir, vars) {
-      objects = objects.push(obj)
+      objects += [obj]
       let members = composite_members(dir, obj.name, vars)
 
       if members.len() > 0 {
@@ -1687,12 +1599,12 @@ export proc refresh_plan_dirs(
 """,
     )?
 
-    dirs_all = dirs_all.push(dir)
+    dirs_all += [dir]
     objects_all = objects_all.extend(objects_by_dir.get(path_key(dir)) ?? [])
     composites_all = composites_all.extend(composites_by_dir.get(path_key(dir)) ?? [])
   }
 
-  return normalize_plan({...next, dirs: dirs_all, objects: objects_all, composites: composites_all})
+  normalize_plan({...next, dirs: dirs_all, objects: objects_all, composites: composites_all})
 }
 
 ## Exported declaration `refresh_x86_kernel_config_objects`.
@@ -1704,206 +1616,206 @@ export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan)
     config,
     "FREEZER",
   ) == "y" {
-    dirs = dirs.push(p"kernel")
+    dirs += [p"kernel"]
   }
 
   if config_value(config, "TIME_NS") == "y" {
-    dirs = dirs.push(p"kernel/time")
+    dirs += [p"kernel/time"]
   }
 
   if config_value(config, "MEMCG") == "y" {
-    dirs = dirs.push(p"mm")
+    dirs += [p"mm"]
   }
 
   if config_value(config, "KVM_GUEST") == "y" {
-    objects = objects.push(p"arch/x86/kernel/kvm.o")
-    objects = objects.push(p"arch/x86/kernel/kvmclock.o")
+    objects += [p"arch/x86/kernel/kvm.o"]
+    objects += [p"arch/x86/kernel/kvmclock.o"]
   }
 
   if config_value(config, "PARAVIRT") == "y" {
-    objects = objects.push(p"arch/x86/kernel/paravirt.o")
-    objects = objects.push(p"arch/x86/kernel/paravirt-spinlocks.o")
+    objects += [p"arch/x86/kernel/paravirt.o"]
+    objects += [p"arch/x86/kernel/paravirt-spinlocks.o"]
   }
 
   if config_value(config, "PARAVIRT_CLOCK") == "y" {
-    objects = objects.push(p"arch/x86/kernel/pvclock.o")
+    objects += [p"arch/x86/kernel/pvclock.o"]
   }
 
   if config_value(config, "HYPERVISOR_GUEST") == "y" {
-    objects = objects.push(p"arch/x86/kernel/cpu/vmware.o")
-    objects = objects.push(p"arch/x86/kernel/cpu/hypervisor.o")
-    objects = objects.push(p"arch/x86/kernel/cpu/mshyperv.o")
+    objects += [p"arch/x86/kernel/cpu/vmware.o"]
+    objects += [p"arch/x86/kernel/cpu/hypervisor.o"]
+    objects += [p"arch/x86/kernel/cpu/mshyperv.o"]
   }
 
   if config_value(config, "WIRELESS") == "y" {
-    dirs = dirs.push(p"net/wireless")
+    dirs += [p"net/wireless"]
   }
 
   if config_value(config, "MAC80211") == "y" {
-    dirs = dirs.push(p"net/mac80211")
+    dirs += [p"net/mac80211"]
   }
 
   if config_value(config, "VHOST_MENU") == "y" {
-    dirs = dirs.push(p"drivers/vhost")
+    dirs += [p"drivers/vhost"]
   }
 
   if config_value(config, "VSOCKETS") == "y" {
-    dirs = dirs.push(p"net/vmw_vsock")
+    dirs += [p"net/vmw_vsock"]
   }
 
   if config_value(config, "BRIDGE") == "y" {
-    dirs = dirs.push(p"net/bridge")
+    dirs += [p"net/bridge"]
   }
 
   if config_value(config, "BRIDGE_NETFILTER") == "y" or config_value(config, "NF_TABLES_BRIDGE") == "y" {
-    dirs = dirs.push(p"net/bridge/netfilter")
+    dirs += [p"net/bridge/netfilter"]
   }
 
   if config_value(config, "NF_TABLES") == "y" {
-    dirs = dirs.push(p"net/netfilter")
-    dirs = dirs.push(p"net/ipv4/netfilter")
-    dirs = dirs.push(p"net/ipv6/netfilter")
+    dirs += [p"net/netfilter"]
+    dirs += [p"net/ipv4/netfilter"]
+    dirs += [p"net/ipv6/netfilter"]
   }
 
   if config_value(config, "XFRM") == "y" {
-    dirs = dirs.push(p"net/xfrm")
-    dirs = dirs.push(p"net/ipv4")
-    dirs = dirs.push(p"net/ipv6")
+    dirs += [p"net/xfrm"]
+    dirs += [p"net/ipv4"]
+    dirs += [p"net/ipv6"]
   }
 
   if config_value(config, "MACVLAN") == "y" or config_value(config, "TAP") == "y" or config_value(config, "VETH") == "y" {
-    dirs = dirs.push(p"drivers/net")
+    dirs += [p"drivers/net"]
   }
 
   if config_value(config, "BT") == "y" {
-    dirs = dirs.push(p"net/bluetooth")
-    dirs = dirs.push(p"drivers/bluetooth")
+    dirs += [p"net/bluetooth"]
+    dirs += [p"drivers/bluetooth"]
   }
 
   if config_value(config, "NEW_LEDS") == "y" {
-    dirs = dirs.push(p"drivers/leds")
-    dirs = dirs.push(p"drivers/leds/trigger")
+    dirs += [p"drivers/leds"]
+    dirs += [p"drivers/leds/trigger"]
   }
 
   if config_value(config, "BTRFS_FS") == "y" {
-    dirs = dirs.push(p"fs/btrfs")
+    dirs += [p"fs/btrfs"]
   }
 
   if config_value(config, "FS_POSIX_ACL") == "y" {
-    dirs = dirs.push(p"fs")
+    dirs += [p"fs"]
   }
 
   if config_value(config, "FUSE_FS") == "y" {
-    dirs = dirs.push(p"fs/fuse")
+    dirs += [p"fs/fuse"]
   }
 
   if config_value(config, "OVERLAY_FS") == "y" {
-    dirs = dirs.push(p"fs/overlayfs")
+    dirs += [p"fs/overlayfs"]
   }
 
   if config_value(config, "BPF_SYSCALL") == "y" {
-    dirs = dirs.push(p"kernel/bpf")
+    dirs += [p"kernel/bpf"]
   }
 
   if config_value(config, "BPF_JIT") == "y" {
-    dirs = dirs.push(p"arch/x86/net")
+    dirs += [p"arch/x86/net"]
   }
 
   if config_value(config, "BINARY_PRINTF") == "y" {
-    dirs = dirs.push(p"lib")
+    dirs += [p"lib"]
   }
 
   if config_value(config, "TASKS_RCU") == "y" or config_value(config, "TASKS_TRACE_RCU") == "y" {
-    dirs = dirs.push(p"kernel/rcu")
+    dirs += [p"kernel/rcu"]
   }
 
   if config_value(config, "BPF_STREAM_PARSER") == "y" or config_value(config, "NET_SOCK_MSG") == "y" {
-    dirs = dirs.push(p"net/core")
-    dirs = dirs.push(p"net/ipv4")
-    dirs = dirs.push(p"net/ipv6")
+    dirs += [p"net/core"]
+    dirs += [p"net/ipv4"]
+    dirs += [p"net/ipv6"]
   }
 
   if config_value(config, "CGROUPS") == "y" {
-    dirs = dirs.push(p"kernel/cgroup")
+    dirs += [p"kernel/cgroup"]
   }
 
   if config_value(config, "PM") == "y" {
-    dirs = dirs.push(p"kernel/power")
+    dirs += [p"kernel/power"]
   }
 
   if config_value(config, "DMA_OPS_HELPERS") == "y" {
-    dirs = dirs.push(p"kernel/dma")
+    dirs += [p"kernel/dma"]
   }
 
   if config_value(config, "ACPI_SLEEP") == "y" {
-    dirs = dirs.push(p"arch/x86/kernel/acpi")
+    dirs += [p"arch/x86/kernel/acpi"]
   }
 
   if config_value(config, "CPU_FREQ") == "y" {
-    dirs = dirs.push(p"drivers/cpufreq")
+    dirs += [p"drivers/cpufreq"]
   }
 
   if config_value(config, "INTEL_IDLE") == "y" {
-    dirs = dirs.push(p"drivers/idle")
+    dirs += [p"drivers/idle"]
   }
 
   if config_value(config, "IOMMU_SUPPORT") == "y" {
-    dirs = dirs.push(p"drivers/iommu")
+    dirs += [p"drivers/iommu"]
   }
 
   if config_value(config, "GENERIC_PT") == "y" or config_value(config, "AMD_IOMMU") == "y" or config_value(
     config,
     "INTEL_IOMMU",
   ) == "y" {
-    dirs = dirs.push(p"drivers/iommu/generic_pt/fmt")
+    dirs += [p"drivers/iommu/generic_pt/fmt"]
   }
 
   if config_value(config, "INTEL_IOMMU") == "y" or config_value(config, "DMAR_TABLE") == "y" or config_value(
     config,
     "IRQ_REMAP",
   ) == "y" {
-    dirs = dirs.push(p"drivers/iommu/intel")
+    dirs += [p"drivers/iommu/intel"]
   }
 
   if config_value(config, "AMD_IOMMU") == "y" {
-    dirs = dirs.push(p"drivers/iommu/amd")
+    dirs += [p"drivers/iommu/amd"]
   }
 
   if config_value(config, "VFIO") == "y" {
-    dirs = dirs.push(p"drivers/vfio")
+    dirs += [p"drivers/vfio"]
   }
 
   if config_value(config, "VFIO_PCI") == "y" {
-    dirs = dirs.push(p"drivers/vfio/pci")
+    dirs += [p"drivers/vfio/pci"]
   }
 
   if config_value(config, "INPUT_MOUSEDEV") == "y" or config_value(config, "INPUT_JOYDEV") == "y" {
-    dirs = dirs.push(p"drivers/input")
+    dirs += [p"drivers/input"]
   }
 
   if config_value(config, "INPUT_MISC") == "y" and config_value(config, "INPUT_UINPUT") == "y" {
-    dirs = dirs.push(p"drivers/input/misc")
+    dirs += [p"drivers/input/misc"]
   }
 
   if config_value(config, "USB_VIDEO_CLASS") == "y" {
-    dirs = dirs.push(p"drivers/media/usb/uvc")
-    dirs = dirs.push(p"drivers/media/common")
+    dirs += [p"drivers/media/usb/uvc"]
+    dirs += [p"drivers/media/common"]
   }
 
   if config_value(config, "SND_USB_AUDIO") == "y" {
-    dirs = dirs.push(p"sound/usb")
+    dirs += [p"sound/usb"]
   }
 
   if config_value(config, "CRYPTO_LIB_ARC4") == "y" {
-    dirs = dirs.push(p"lib/crypto")
+    dirs += [p"lib/crypto"]
   }
 
   if config_value(config, "CRYPTO_ECDH") == "y" {
-    dirs = dirs.push(p"crypto")
+    dirs += [p"crypto"]
   }
 
   if config_value(config, "SND") == "y" {
-    dirs = dirs.push(p"sound/core")
+    dirs += [p"sound/core"]
   }
 
   var next = plan
@@ -1965,7 +1877,7 @@ export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan)
     )
   }
 
-  return next
+  next
 }
 
 ## Exported declaration `refresh_plan_composite_members`.
@@ -2003,7 +1915,7 @@ export proc refresh_plan_composite_members(
       composites = composites.push(refreshed.get(key)?)
       seen[key] = true
     } else {
-      composites = composites.push(composite)
+      composites += [composite]
     }
   }
 
@@ -2016,7 +1928,7 @@ export proc refresh_plan_composite_members(
   }
 
   var top_objects = [obj for obj in plan.objects if ! (member_paths.get(path_key(obj)) ?? false)]
-  return normalize_plan({...plan, objects: top_objects, composites: composites})
+  normalize_plan({...plan, objects: top_objects, composites: composites})
 }
 
 ## Exported declaration `refresh_arm64_kernel_config_objects`.
@@ -2024,22 +1936,20 @@ export proc refresh_arm64_kernel_config_objects(config: Kconfig, plan: KbuildPla
   var objects: List[Path] = []
 
   if config_value(config, "VFIO") == "y" {
-    objects = objects.push(p"drivers/vfio/vfio.o")
+    objects += [p"drivers/vfio/vfio.o"]
   }
 
   if config_value(config, "VFIO_PCI_CORE") == "y" {
-    objects = objects.push(p"drivers/vfio/pci/vfio-pci-core.o")
+    objects += [p"drivers/vfio/pci/vfio-pci-core.o"]
   }
 
   if config_value(config, "VFIO_PCI") == "y" {
-    objects = objects.push(p"drivers/vfio/pci/vfio-pci.o")
+    objects += [p"drivers/vfio/pci/vfio-pci.o"]
   }
 
-  if objects.len() == 0 {
-    return plan
-  }
+  return plan when objects.len() == 0
 
-  return refresh_plan_composite_members(p".", config, plan, "arm64", objects)?
+  refresh_plan_composite_members(p".", config, plan, "arm64", objects)?
 }
 
 ## Exported declaration `add_plan_objects`.
@@ -2050,7 +1960,7 @@ export proc add_plan_objects(plan: KbuildPlan, objects: List[Path]) [] -> Kbuild
     next = add_object(next, obj)
   }
 
-  return next
+  next
 }
 
 proc apply_item(
@@ -2061,9 +1971,7 @@ proc apply_item(
   as_lib: Bool = false,
   build_plan: Bool = true,
 ) [] -> ItemResult {
-  if item == "" {
-    return {plan: plan, dirs: [], entries: []}
-  }
+  return {plan: plan, dirs: [], entries: []} when item == ""
 
   if "$(" in item {
     let next = if build_plan { add_unsupported(plan, f"{path_key(dir)}: unresolved token {item}") } else { plan }
@@ -2096,7 +2004,7 @@ proc apply_item(
   }
 
   let next = if build_plan { add_unsupported(plan, f"{path_key(dir)}: unsupported token {item}") } else { plan }
-  return {plan: next, dirs: [], entries: []}
+  {plan: next, dirs: [], entries: []}
 }
 
 proc apply_words(
@@ -2128,32 +2036,28 @@ proc apply_words(
     entries = entries.extend(applied.entries)
   }
 
-  return {plan: current, dirs: dirs, entries: entries}
+  {plan: current, dirs: dirs, entries: entries}
 }
 
 proc kbuild_file(dir_abs: Path) [fs, error] -> Result[Path] {
   var has_makefile = false
 
   for entry in fs.children(dir_abs, stat: false, ordered: false)? {
-    if entry.name == "Kbuild" {
-      return fp"{dir_abs}/Kbuild"
-    }
+    return fp"{dir_abs}/Kbuild" when entry.name == "Kbuild"
 
     if entry.name == "Makefile" {
       has_makefile = true
     }
   }
 
-  if has_makefile {
-    return fp"{dir_abs}/Makefile"
-  }
+  return fp"{dir_abs}/Makefile" when has_makefile
 
-  return Err(ScriptError.Failed("kbuild-missing", f"missing Kbuild or Makefile in {dir_abs}"))
+  Err(ScriptError.Failed("kbuild-missing", f"missing Kbuild or Makefile in {dir_abs}"))
 }
 
 proc read_kbuild_source(dir_abs: Path) [fs, error] -> Result[KbuildSource] {
   let file = kbuild_file(dir_abs)?
-  return {file: file, body: file.read_text()?}
+  {file: file, body: file.read_text()?}
 }
 
 proc emit_discover_progress(root: Path, options: DiscoverOptions, state: DiscoverState, rel: Path) [fs, error] {
@@ -2227,15 +2131,13 @@ endif""" in body or body.starts_with("else") or body.starts_with("endif") {
     return 2
   }
 
-  if "$(" in body or "\${CONFIG_" in body {
-    return 1
-  }
+  return 1 when "$(" in body or "\${CONFIG_" in body
 
-  return 0
+  0
 }
 
 pure maybe_plan_assignment(line: Str) -> Bool {
-  return line.starts_with("obj") or line.starts_with("lib") or line.starts_with("subdir") or line.starts_with("KVM") or "-y" in line or "-objs" in line or "_files" in line or "$(" in line
+  line.starts_with("obj") or line.starts_with("lib") or line.starts_with("subdir") or line.starts_with("KVM") or "-y" in line or "-objs" in line or "_files" in line or "$(" in line
 }
 
 proc scan_simple_kbuild(
@@ -2265,29 +2167,26 @@ proc scan_simple_kbuild(
     ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
       "subdir-asflags-",
     ) and ! line.starts_with("subdir-rustflags-") {
-      match parse_assignment(line) {
-        Ok(assign) => {
-          let lhs = assign.lhs
+      if let Ok(assign) = parse_assignment(line) {
+        let lhs = assign.lhs
 
-          if active_obj_lhs(lhs) {
-            if lhs == "lib-y" {
-              lib_rhs = lib_rhs.push(assign.rhs)
-            } else if lhs == "subdir-y" {
-              for item in assign.rhs.fields() {
-                child_dirs = child_dirs.push(join_rel(rel, item))
-              }
-            } else {
-              object_rhs = object_rhs.push(assign.rhs)
+        if active_obj_lhs(lhs) {
+          if lhs == "lib-y" {
+            lib_rhs = lib_rhs.push(assign.rhs)
+          } else if lhs == "subdir-y" {
+            for item in assign.rhs.fields() {
+              child_dirs = child_dirs.push(join_rel(rel, item))
             }
-          } else if active_var_lhs(lhs) != "" {
-            if assign.op == "+=" {
-              mutable_vars[lhs] = f"{mutable_vars.get(lhs) ?? ""} {assign.rhs}".trim()
-            } else if assign.op != "?=" or (mutable_vars.get(lhs) ?? "") == "" {
-              mutable_vars[lhs] = assign.rhs
-            }
+          } else {
+            object_rhs = object_rhs.push(assign.rhs)
+          }
+        } else if active_var_lhs(lhs) != "" {
+          if assign.op == "+=" {
+            mutable_vars[lhs] = f"{mutable_vars.get(lhs) ?? ""} {assign.rhs}".trim()
+          } else if assign.op != "?=" or (mutable_vars.get(lhs) ?? "") == "" {
+            mutable_vars[lhs] = assign.rhs
           }
         }
-        Err(_) => {}
       }
     }
   }
@@ -2305,7 +2204,7 @@ proc scan_simple_kbuild(
         plan = add_object(plan, obj)
       }
 
-      entries = entries.push(obj)
+      entries += [obj]
     }
   }
 
@@ -2315,7 +2214,7 @@ proc scan_simple_kbuild(
     child_dirs = child_dirs.extend(applied.dirs)
   }
 
-  return {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
 }
 
 proc scan_flat_kbuild(
@@ -2345,34 +2244,31 @@ proc scan_flat_kbuild(
     ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
       "subdir-asflags-",
     ) and ! line.starts_with("subdir-rustflags-") {
-      match parse_assignment(line) {
-        Ok(assign) => {
-          let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-          let lhs = active_var_lhs(expanded_lhs)
+      if let Ok(assign) = parse_assignment(line) {
+        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+        let lhs = active_var_lhs(expanded_lhs)
 
-          if active_obj_lhs(expanded_lhs) {
-            let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+        if active_obj_lhs(expanded_lhs) {
+          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-            if expanded_lhs == "lib-y" {
-              lib_rhs = lib_rhs.push(rhs)
-            } else if expanded_lhs == "subdir-y" {
-              for item in rhs.fields() {
-                child_dirs = child_dirs.push(join_rel(rel, item))
-              }
-            } else {
-              object_rhs = object_rhs.push(rhs)
+          if expanded_lhs == "lib-y" {
+            lib_rhs += [rhs]
+          } else if expanded_lhs == "subdir-y" {
+            for item in rhs.fields() {
+              child_dirs = child_dirs.push(join_rel(rel, item))
             }
-          } else if lhs != "" {
-            let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+          } else {
+            object_rhs += [rhs]
+          }
+        } else if lhs != "" {
+          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-            if assign.op == "+=" {
-              vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-            } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-              vars[lhs] = rhs
-            }
+          if assign.op == "+=" {
+            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
+          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
+            vars[lhs] = rhs
           }
         }
-        Err(_) => {}
       }
     }
   }
@@ -2390,7 +2286,7 @@ proc scan_flat_kbuild(
         plan = add_object(plan, obj)
       }
 
-      entries = entries.push(obj)
+      entries += [obj]
     }
   }
 
@@ -2400,7 +2296,7 @@ proc scan_flat_kbuild(
     child_dirs = child_dirs.extend(applied.dirs)
   }
 
-  return {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
 }
 
 proc scan_discover_dir(
@@ -2414,12 +2310,9 @@ proc scan_discover_dir(
   let dir_abs = join_root(root, rel)
   let source_result = read_kbuild_source(dir_abs)
 
-  match source_result {
-    Err(err) => {
-      let plan = add_unsupported(add_dir(empty_plan(), rel), err.message)
-      return {dir: rel, plan: plan, child_dirs: [], entries: []}
-    }
-    Ok(_) => {}
+  if let Err(err) = source_result {
+    let plan = add_unsupported(add_dir(empty_plan(), rel), err.message)
+    return {dir: rel, plan: plan, child_dirs: [], entries: []}
   }
 
   let source = source_result?
@@ -2432,9 +2325,7 @@ proc scan_discover_dir(
 
   let scanner_kind = kbuild_scanner_kind(source.body)
 
-  if scanner_kind == 0 {
-    return scan_simple_kbuild(root, rel, lines, srcarch, options)
-  }
+  return scan_simple_kbuild(root, rel, lines, srcarch, options) when scanner_kind == 0
 
   if scanner_kind == 1 {
     return scan_flat_kbuild(root, rel, config, lines, srcarch, options)
@@ -2461,12 +2352,9 @@ proc scan_discover_dir(
     if line.starts_with("ifeq ") or line.starts_with("ifneq ") or line.starts_with("ifdef ") or line.starts_with(
       "ifndef ",
     ) {
-      match eval_conditional(line, vars, config, srcarch) {
-        Ok(active) => {
-          active_stack = active_stack.push(active_conditional(active_stack) and active)
-          continue
-        }
-        Err(_) => {}
+      if let Ok(active) = eval_conditional(line, vars, config, srcarch) {
+        active_stack = active_stack.push(active_conditional(active_stack) and active)
+        continue
       }
     }
 
@@ -2489,7 +2377,7 @@ proc scan_discover_dir(
 
     if line.starts_with("include ") {
       let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = lines |> take(line_index).extend(included).extend(lines |> drop(line_index))
+      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
       continue
     }
 
@@ -2498,34 +2386,31 @@ proc scan_discover_dir(
     ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
       "subdir-asflags-",
     ) and ! line.starts_with("subdir-rustflags-") {
-      match parse_assignment(line) {
-        Ok(assign) => {
-          let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-          let lhs = active_var_lhs(expanded_lhs)
+      if let Ok(assign) = parse_assignment(line) {
+        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+        let lhs = active_var_lhs(expanded_lhs)
 
-          if active_obj_lhs(expanded_lhs) {
-            let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+        if active_obj_lhs(expanded_lhs) {
+          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-            if expanded_lhs == "lib-y" {
-              lib_rhs = lib_rhs.push(rhs)
-            } else if expanded_lhs == "subdir-y" {
-              for item in rhs.fields() {
-                child_dirs = child_dirs.push(join_rel(rel, item))
-              }
-            } else {
-              object_rhs = object_rhs.push(rhs)
+          if expanded_lhs == "lib-y" {
+            lib_rhs += [rhs]
+          } else if expanded_lhs == "subdir-y" {
+            for item in rhs.fields() {
+              child_dirs = child_dirs.push(join_rel(rel, item))
             }
-          } else if lhs != "" {
-            let rhs = expand_vars(assign.rhs, vars, config, srcarch)
+          } else {
+            object_rhs += [rhs]
+          }
+        } else if lhs != "" {
+          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-            if assign.op == "+=" {
-              vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-            } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-              vars[lhs] = rhs
-            }
+          if assign.op == "+=" {
+            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
+          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
+            vars[lhs] = rhs
           }
         }
-        Err(_) => {}
       }
     }
   }
@@ -2543,7 +2428,7 @@ proc scan_discover_dir(
         plan = add_object(plan, obj)
       }
 
-      entries = entries.push(obj)
+      entries += [obj]
     }
   }
 
@@ -2553,7 +2438,7 @@ proc scan_discover_dir(
     child_dirs = child_dirs.extend(applied.dirs)
   }
 
-  return {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
 }
 
 proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) [] -> List[Path] {
@@ -2565,11 +2450,11 @@ proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) [] -> List[Path] {
 
     if ! (local_seen.get(key) ?? false) {
       local_seen[key] = true
-      unique = unique.push(path_value)
+      unique += [path_value]
     }
   }
 
-  return unique
+  unique
 }
 
 proc scan_discover_batch_serial(
@@ -2586,7 +2471,7 @@ proc scan_discover_batch_serial(
     scans = scans.push(scan_discover_dir(root, dir, config, srcarch, options)?)
   }
 
-  return scans
+  scans
 }
 
 proc scan_discover_batch_parallel(
@@ -2610,17 +2495,12 @@ export proc scan_record_for_dir(
   dir: Path,
 ) [fs, error] -> Result[ScanRecord] {
   let scan = scan_discover_dir(root, dir, config, srcarch, default_discover_options())?
-  return local_record_record(scan, "")
+  local_record_record(scan, "")
 }
 
 ## Exported declaration `plan_from_record_values`.
 export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result[KbuildPlan] {
-  var scan_by_dir: Map[ScanRecord] = {}
-
-  for item in records {
-    scan_by_dir[item.dir] = item
-  }
-
+  var scan_by_dir: Map[ScanRecord] = {item.dir: item for item in records}
   var seen: Map[Bool] = {}
   var frontier = [p"."]
   var plan_dirs: List[Path] = []
@@ -2636,12 +2516,7 @@ export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result
 
     for dir in pending {
       let scan = scan_by_dir.get(path_key(dir))?
-      let dirs = scan.plan.dirs
-      let objects = scan.plan.objects
-      let lib_objects = scan.plan.lib_objects
-      let archive_owners = scan.plan.archive_owners
-      let composites = scan.plan.composites
-      let unsupported = scan.plan.unsupported
+      let {plan: {dirs, objects, lib_objects, archive_owners, composites, unsupported, ..}, ..} = scan
 
       for item in dirs {
         plan_dirs = plan_dirs.push(fp"{item}")
@@ -2656,21 +2531,21 @@ export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result
       }
 
       for owner in archive_owners {
-        plan_archive_owners = plan_archive_owners.push(owner)
+        plan_archive_owners += [owner]
       }
 
       for composite in composites {
-        plan_composites = plan_composites.push(composite)
+        plan_composites += [composite]
       }
 
       for item in unsupported {
-        plan_unsupported = plan_unsupported.push(item)
+        plan_unsupported += [item]
       }
 
       for child in scan.child_dirs {
         let child_path = fp"{child}"
         if ! (seen.get(path_key(child_path)) ?? false) {
-          frontier = frontier.push(child_path)
+          frontier += [child_path]
         }
       }
     }
@@ -2719,7 +2594,7 @@ proc discover_records_process_pool(
 
   for index in range(worker_count) {
     let output_path = fp"{prefix}-output-{index}.json"
-    output_paths = output_paths.push(output_path)
+    output_paths += [output_path]
     let command = process.command_argv(
       xsh_bin,
       [
@@ -2739,7 +2614,7 @@ proc discover_records_process_pool(
 
   let statuses = wait handles?
   for status in statuses {
-    if ! status.exited_with(0) {
+    guard status.exited_with(0) else {
       return Err(ScriptError.Failed("kbuild-process-pool", "a discovery worker failed"))
     }
   }
@@ -2753,10 +2628,10 @@ proc discover_records_process_pool(
   var records: List[ScanRecord] = []
   for output_path in output_paths {
     let batch = json.read(output_path)?.require(List[ScanRecord])?
-    records = records.extend(batch)
+    records += batch
   }
 
-  return plan_from_record_values(records)?
+  plan_from_record_values(records)?
 }
 
 ## Exported declaration `discover_plan_with_process_pool`.
@@ -2768,7 +2643,7 @@ export proc discover_plan_with_process_pool(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, time, error] -> Result[KbuildPlan] {
-  return discover_records_process_pool(root, config, srcarch, options, xsh_bin, worker)?
+  discover_records_process_pool(root, config, srcarch, options, xsh_bin, worker)?
 }
 
 proc discover_scans(
@@ -2818,7 +2693,7 @@ proc discover_scans(
 
       for child in scan.child_dirs {
         if ! (seen.get(path_key(child)) ?? false) {
-          frontier = frontier.push(child)
+          frontier += [child]
         }
       }
     }
@@ -2828,17 +2703,15 @@ proc discover_scans(
     }
   }
 
-  return {records: scans, plan: aggregate}
+  {records: scans, plan: aggregate}
 }
 
 pure aggregate_barriers(dir: Path) -> AggregateBarriers {
   let key = path_key(dir)
 
-  if key == "." {
-    return {builtin_archive: p"built-in.a", module_order: p"modules.order"}
-  }
+  return {builtin_archive: p"built-in.a", module_order: p"modules.order"} when key == "."
 
-  return {
+  {
     builtin_archive: fp"{key}/built-in.a",
     module_order: fp"{key}/modules.order",
   }
@@ -2858,20 +2731,20 @@ proc discover_local_record_graph(
     barriers[key] = aggregate_barriers(scan.dir)
   }
 
-  return {records: scans.records, barriers: barriers, plan: scans.plan}
+  {records: scans.records, barriers: barriers, plan: scans.plan}
 }
 
 pure local_record_cache_path(root: Path) -> Path {
-  return fp"{root}/.xsh-kbuild-local-records.json"
+  fp"{root}/.xsh-kbuild-local-records.json"
 }
 
 proc local_record_cache_key(config: Path, srcarch: Str) [fs, error] -> Result[Str] {
   let config_hash = if config.exists()? { hash.sha256(config)?.hex() } else { "missing" }
-  return bytes.from_text(f"linux-local-records-v1\t{srcarch}\t{config_hash}").sha256().hex()
+  bytes.from_text(f"linux-local-records-v1\t{srcarch}\t{config_hash}").sha256().hex()
 }
 
 pure local_record_record(scan: DirScan, file_hash: Str) -> ScanRecord {
-  return {
+  {
     dir: path_key(scan.dir),
     file_hash: file_hash,
     plan: plan_record(scan.plan),
@@ -2881,7 +2754,7 @@ pure local_record_record(scan: DirScan, file_hash: Str) -> ScanRecord {
 }
 
 proc local_record_from_record(item: ScanRecord) [error] -> Result[DirScan] {
-  return {
+  {
     dir: fp"{item.dir}",
     plan: {
       dirs: paths_from_strings(item.plan.dirs)?,
@@ -2907,7 +2780,7 @@ proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: Loc
     records = records.push(local_record_record(scan, hash.sha256(file)?.hex()))
   }
 
-  json.write(cache, LocalRecordCache(format: "linux-local-records-v1", key: key, records: records))?
+  json.write(cache, LocalRecordCache(format: "linux-local-records-v1", key:, records:))?
 }
 
 proc read_local_record_graph(root: Path, config: Path, srcarch: Str) [fs, error] -> Result[LocalRecordGraph] {
@@ -2955,7 +2828,7 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) [fs, error]
     plan = merge_plan(plan, record_map.get(key)?.plan)
   }
 
-  return {records: record_map, barriers: barriers, plan: plan}
+  {records: record_map, barriers: barriers, plan: plan}
 }
 
 proc merge_discovered_scans_with_options(
@@ -2967,17 +2840,15 @@ proc merge_discovered_scans_with_options(
 ) [fs, error] -> Result[DiscoverState] {
   let rel_key = path_key(rel)
 
-  if state.seen.get(rel_key) ?? false {
-    return state
-  }
+  return state when state.seen.get(rel_key) ?? false
 
   let scan = scan_by_dir.get(rel_key)?
 
-  var next: DiscoverState = {
+  var next: DiscoverState = DiscoverState(
     plan: merge_plan(state.plan, scan.plan),
     seen: state.seen.set(rel_key, true),
     visited: state.visited + 1,
-  }
+  )
 
   emit_merge_progress(root, options, next, rel)?
 
@@ -2986,7 +2857,7 @@ proc merge_discovered_scans_with_options(
     next = child_next
   }
 
-  return next
+  next
 }
 
 proc merge_local_record_graph_with_options(
@@ -2998,16 +2869,14 @@ proc merge_local_record_graph_with_options(
 ) [fs, error] -> Result[DiscoverState] {
   let rel_key = path_key(rel)
 
-  if state.seen.get(rel_key) ?? false {
-    return state
-  }
+  return state when state.seen.get(rel_key) ?? false
 
   let scan = graph.records.get(rel_key)?
-  let next: DiscoverState = {
+  let next: DiscoverState = DiscoverState(
     plan: merge_plan(state.plan, scan.plan),
     seen: state.seen.set(rel_key, true),
     visited: state.visited + 1,
-  }
+  )
 
   if options.progress {
     let barriers = graph.barriers.get(rel_key)?
@@ -3022,12 +2891,12 @@ proc merge_local_record_graph_with_options(
     merged = merge_local_record_graph_with_options(root, options, graph, child, merged)?
   }
 
-  return merged
+  merged
 }
 
 ## Exported declaration `discover_plan`.
 export proc discover_plan(root: Path, config: Kconfig, srcarch: Str = "arm64") [fs, error] -> Result[KbuildPlan] {
-  return discover_plan_with_options(root, config, srcarch, default_discover_options())
+  discover_plan_with_options(root, config, srcarch, default_discover_options())
 }
 
 ## Exported declaration `discover_plan_with_options`.
@@ -3042,12 +2911,11 @@ export proc discover_plan_with_options(
 
   if options.local_records {
     if options.local_record_cache {
-      match read_local_record_graph(root, fp"{root}/.config", srcarch) {
-        Ok(cached) => local_graph = cached
-        Err(_) => {
-          local_graph = discover_local_record_graph(root, config, srcarch, options)?
-          write_local_record_graph(root, fp"{root}/.config", srcarch, local_graph)?
-        }
+      if let Ok(cached) = read_local_record_graph(root, fp"{root}/.config", srcarch) {
+        local_graph = cached
+      } else {
+        local_graph = discover_local_record_graph(root, config, srcarch, options)?
+        write_local_record_graph(root, fp"{root}/.config", srcarch, local_graph)?
       }
     } else {
       local_graph = discover_local_record_graph(root, config, srcarch, options)?
@@ -3086,11 +2954,11 @@ export proc discover_plan_with_options(
     f"xsh-kbuild-discover-complete {plan.dirs.len()} dirs {plan.objects.len()} objects {plan.composites.len()} composites",
   )?
 
-  return plan
+  plan
 }
 
 pure path_strings(paths: List[Path]) -> List[Str] {
-  return [path_key(path_value) for path_value in paths]
+  [path_key(path_value) for path_value in paths]
 }
 
 proc paths_from_strings(items: List[Str]) [error] -> Result[List[Path]] {
@@ -3106,11 +2974,11 @@ proc unique_paths(paths: List[Path]) [] -> List[Path] {
 
     if ! (seen.get(key) ?? false) {
       seen[key] = true
-      unique = unique.push(path_value)
+      unique += [path_value]
     }
   }
 
-  return unique
+  unique
 }
 
 proc unique_composites(composites: List[CompositeObject]) [] -> List[CompositeObject] {
@@ -3122,22 +2990,17 @@ proc unique_composites(composites: List[CompositeObject]) [] -> List[CompositeOb
 
     if ! (seen.get(key) ?? false) {
       seen[key] = true
-      unique = unique.push(composite)
+      unique += [composite]
     }
   }
 
-  return unique
+  unique
 }
 
 proc normalize_plan(plan: KbuildPlan) [] -> KbuildPlan {
   let lib_objects = unique_paths(plan.lib_objects)
-  var lib_object_seen: Map[Bool] = {}
-
-  for obj in lib_objects {
-    lib_object_seen[path_key(obj)] = true
-  }
-
-  return {
+  var lib_object_seen = {[path_key(obj)]: true for obj in lib_objects}
+  {
     dirs: unique_paths(plan.dirs),
     objects: [obj for obj in unique_paths(plan.objects) if ! (lib_object_seen.get(path_key(obj)) ?? false)],
     lib_objects: lib_objects,
@@ -3148,35 +3011,28 @@ proc normalize_plan(plan: KbuildPlan) [] -> KbuildPlan {
 }
 
 proc sorted_paths(paths: List[Path]) [] -> List[Path] {
-  return paths |> sort-by .display()
+  paths |> sort-by .display()
 }
 
 pure composite_records(composites: List[CompositeObject]) -> List[CompositeRecord] {
-  return [{object: path_key(item.object), members: path_strings(item.members)} for item in composites]
+  [{object: path_key(item.object), members: path_strings(item.members)} for item in composites]
 }
 
 proc composites_from_records(items: List[CompositeRecord]) [error] -> Result[List[CompositeObject]] {
-  var composites: List[CompositeObject] = []
-
-  for item in items {
-    composites = composites.push({object: fp"{item.object}", members: paths_from_strings(item.members)?})
-  }
-
-  return composites
+  var composites: List[CompositeObject] = [
+    {object: fp"{item.object}", members: paths_from_strings(item.members)?}
+    for item in items
+  ]
+  composites
 }
 
 proc archive_owners_from_records(items: List[ArchiveOwnerRecord]) [error] -> Result[List[ArchiveOwner]] {
-  var owners: List[ArchiveOwner] = []
-
-  for item in items {
-    owners = owners.push({object: fp"{item.object}", dir: fp"{item.dir}"})
-  }
-
-  return owners
+  var owners: List[ArchiveOwner] = [{object: fp"{item.object}", dir: fp"{item.dir}"} for item in items]
+  owners
 }
 
 pure plan_record(plan: KbuildPlan) -> PlanRecord {
-  return {
+  {
     dirs: path_strings(plan.dirs),
     objects: path_strings(plan.objects),
     lib_objects: path_strings(plan.lib_objects),
@@ -3219,7 +3075,7 @@ pure discovered_plan_text(plan: KbuildPlan) -> Str {
 """
   }
 
-  return out
+  out
 }
 
 ## Exported declaration `write_discovered_plan`.
@@ -3231,9 +3087,7 @@ export proc write_discovered_plan(plan: KbuildPlan, out: Path) [fs, error] {
 export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildPlan] {
   let text = path_value.read_text()?
 
-  if ! text.trim().starts_with("{") {
-    return read_discovered_plan_text(path_value)
-  }
+  return read_discovered_plan_text(path_value) unless text.trim().starts_with("{")
 
   let stored = json.read(path_value)?.require(Record)?
   let dirs = stored.get("dirs")?.require(List[Str])?
@@ -3247,7 +3101,7 @@ export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildP
   let composites = if "composites" in stored { stored.get("composites")?.require(List[CompositeRecord])? } else { [] }
   let unsupported = if "unsupported" in stored { stored.get("unsupported")?.require(List[Str])? } else { [] }
 
-  return {
+  {
     dirs: unique_paths(paths_from_strings(dirs)?),
     objects: unique_paths(paths_from_strings(objects)?),
     lib_objects: unique_paths(paths_from_strings(lib_objects)?),
@@ -3290,7 +3144,7 @@ export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan] 
     }
   }
 
-  return {
+  {
     dirs: paths_from_strings(dirs)?,
     objects: paths_from_strings(objects)?,
     lib_objects: paths_from_strings(lib_objects)?,
@@ -3302,7 +3156,7 @@ export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan] 
 
 ## Exported declaration `read_discovered_plan_text`.
 export proc read_discovered_plan_text(path_value: Path) [fs, error] -> Result[KbuildPlan] {
-  return parse_discovered_plan_text(path_value.read_text()?)
+  parse_discovered_plan_text(path_value.read_text()?)
 }
 
 proc fingerprint_dir_line(root: Path, dir: Path) [fs, error] -> Result[Str] {
@@ -3316,14 +3170,14 @@ proc fingerprint_dir_line(root: Path, dir: Path) [fs, error] -> Result[Str] {
     Err(err) => line = f"{path_key(dir)} missing {err.message}"
   }
 
-  return line
+  line
 }
 
 ## Exported declaration `plan_fingerprint`.
 export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str] {
   let _ = root
 
-  return f"""format linux-kbuild-plan-fingerprint-v9
+  f"""format linux-kbuild-plan-fingerprint-v9
 config {hash.sha256(config_path)?.hex()}
 dirs {plan.dirs.len()}
 objects {plan.objects.len()}
@@ -3351,12 +3205,12 @@ pure task_records(tasks: List[make.MakeTask]) -> Result[List[ArchiveTaskRecord]]
 }
 
 pure archive_plan_report_format() -> Str {
-  return "linux-archive-plan-v4"
+  "linux-archive-plan-v4"
 }
 
 ## Exported declaration `archive_plan_summary_path`.
 export pure archive_plan_summary_path(report_path: Path) -> Path {
-  return fp"{report_path}.summary"
+  fp"{report_path}.summary"
 }
 
 pure duplicate_task_outputs(tasks: List[make.MakeTask]) -> List[Path] {
@@ -3370,7 +3224,7 @@ pure duplicate_task_outputs(tasks: List[make.MakeTask]) -> List[Path] {
 
       if outputs.get(key) ?? false {
         if ! has_plan_path(duplicates, output) {
-          duplicates = duplicates.push(output)
+          duplicates += [output]
         }
       } else {
         outputs[key] = true
@@ -3378,7 +3232,7 @@ pure duplicate_task_outputs(tasks: List[make.MakeTask]) -> List[Path] {
     }
   }
 
-  return duplicates
+  duplicates
 }
 
 ## Exported declaration `write_archive_plan_summary`.
@@ -3424,15 +3278,13 @@ export proc write_archive_plan_report(archive_plan: BuiltinArchivePlan, out: Pat
 }
 
 proc path_from_string(item: Str) [error] -> Result[Path] {
-  if item == "" {
-    return p""
-  }
+  return p"" when item == ""
 
-  return fp"{item}"
+  fp"{item}"
 }
 
 proc task_from_record(item: ArchiveTaskRecord) [error] -> Result[make.MakeTask] {
-  return {
+  {
     name: item.name,
     outputs: paths_from_strings(item.outputs)?,
     inputs: paths_from_strings(item.inputs)?,
@@ -3453,7 +3305,7 @@ proc read_archive_plan_record(path_value: Path, stale_message: Str) [fs, error] 
     return Err(ScriptError.Failed("kbuild-archive-plan-cache-stale", stale_message))
   }
 
-  return stored
+  stored
 }
 
 proc read_archive_plan_tasks(path_value: Path) [fs, error] -> Result[List[make.MakeTask]] {
@@ -3465,7 +3317,7 @@ proc archive_plan_from_summary(
   summary: ArchivePlanSummaryFile,
   tasks: List[make.MakeTask],
 ) [error] -> Result[BuiltinArchivePlan] {
-  return {
+  {
     tasks: tasks,
     task_specs: [],
     task_count: summary.task_count,
@@ -3481,57 +3333,47 @@ proc archive_plan_from_summary(
 export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan] {
   let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
   let tasks = [task_from_record(row)? for row in stored.require(ArchivePlanTasksFile)?.tasks]
-  return archive_plan_from_summary(stored.require(ArchivePlanSummaryFile)?, tasks)?
+  archive_plan_from_summary(stored.require()?, tasks)?
 }
 
 ## Exported declaration `read_archive_plan_summary`.
 export proc read_archive_plan_summary(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan] {
   let stored = read_archive_plan_record(path_value, "archive plan summary has stale format")?
-  return archive_plan_from_summary(stored.require(ArchivePlanSummaryFile)?, [])?
+  archive_plan_from_summary(stored.require()?, [])?
 }
 
 ## Exported declaration `read_archive_plan_object_outputs`.
 export proc read_archive_plan_object_outputs(path_value: Path) [fs, error] -> Result[List[Path]] {
   let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
-  var outputs: List[Path] = []
-
-  for row in stored.require(ArchivePlanTasksFile)?.tasks {
-    for item in row.outputs {
-      if item.ends_with(".o") {
-        outputs = outputs.push(path_from_string(item)?)
-      }
-    }
-  }
-
-  return outputs
+  var outputs: List[Path] = [
+    path_from_string(item)?
+    for row in stored.require(ArchivePlanTasksFile)?.tasks
+    for item in row.outputs
+    if item.ends_with(".o")
+  ]
+  outputs
 }
 
 pure task_has_output(task: make.MakeTask, output: Path) -> Bool {
   let key = path_key(output)
 
   for item in task.outputs {
-    if path_key(item) == key {
-      return true
-    }
+    return true when path_key(item) == key
   }
 
-  return false
+  false
 }
 
 pure find_task_name_by_output(tasks: List[make.MakeTask], output: Path) -> Result[Str] {
   for task in tasks {
-    if task_has_output(task, output) {
-      return task.name
-    }
+    return task.name when task_has_output(task, output)
   }
 
-  return Err(ScriptError.Failed("kbuild-task-output-missing", f"no archive-plan task produces {output}"))
+  Err(ScriptError.Failed("kbuild-task-output-missing", f"no archive-plan task produces {output}"))
 }
 
 proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[Bool]) [] -> Map[Bool] {
-  if selected.get(target) ?? false {
-    return selected
-  }
+  return selected when selected.get(target) ?? false
 
   var next = selected.set(target, true)
 
@@ -3539,17 +3381,12 @@ proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[
     next = collect_task_closure(task_deps, dep, next)
   }
 
-  return next
+  next
 }
 
 proc archive_task_deps_by_name(tasks: List[make.MakeTask]) [] -> Map[List[Str]] {
-  var by_name: Map[List[Str]] = {}
-
-  for task in tasks {
-    by_name[task.name] = task.deps
-  }
-
-  return by_name
+  var by_name = {task.name: task.deps for task in tasks}
+  by_name
 }
 
 ## Exported declaration `select_archive_tasks_outputs`.
@@ -3602,45 +3439,35 @@ export proc write_plan(
   let config = load_config(config_path)?
   let plan = discover_plan(root, config, srcarch)?
   write_discovered_plan(plan, out)?
-  return plan
+  plan
 }
 
 pure obj_out_path(obj: Path) -> Path {
-  return fp".xsh-kbuild/obj/{obj}"
+  fp".xsh-kbuild/obj/{obj}"
 }
 
 pure composite_for(composites: List[CompositeObject], obj: Path) -> Result[CompositeObject] {
   let key = path_key(obj)
 
   for composite in composites {
-    if path_key(composite.object) == key {
-      return composite
-    }
+    return composite when path_key(composite.object) == key
   }
 
-  return Err(ScriptError.Failed("kbuild-not-composite", f"{key} is not a composite object"))
+  Err(ScriptError.Failed("kbuild-not-composite", f"{key} is not a composite object"))
 }
 
 proc composite_map(composites: List[CompositeObject]) [] -> Map[CompositeObject] {
-  var mapped: Map[CompositeObject] = {}
-
-  for composite in composites {
-    mapped[path_key(composite.object)] = composite
-  }
-
-  return mapped
+  var mapped: Map[CompositeObject] = {[path_key(composite.object)]: composite for composite in composites}
+  mapped
 }
 
 proc composite_member_map(composites: List[CompositeObject]) [] -> Map[CompositeObject] {
-  var mapped: Map[CompositeObject] = {}
-
-  for composite in composites {
-    for member in composite.members {
-      mapped[path_key(member)] = composite
-    }
+  var mapped: Map[CompositeObject] = {
+    [path_key(member)]: composite
+    for composite in composites
+    for member in composite.members
   }
-
-  return mapped
+  mapped
 }
 
 proc source_for_object(obj: Path) [fs, error] -> Result[Path] {
@@ -3656,39 +3483,33 @@ proc source_for_object(obj: Path) [fs, error] -> Result[Path] {
   }
 
   if path_key(obj) == "arch/x86/kernel/head.o" {
-    candidates = candidates.push(p"arch/x86/kernel/head_64.o")
+    candidates += [p"arch/x86/kernel/head_64.o"]
   }
 
   for candidate in candidates {
     let c_src = candidate.with_ext("c")
 
-    if c_src.exists()? {
-      return c_src
-    }
+    return c_src when c_src.exists()?
 
     let asm_src = candidate.with_ext("S")
 
-    if asm_src.exists()? {
-      return asm_src
-    }
+    return asm_src when asm_src.exists()?
 
     let raw_asm_src = candidate.with_ext("s")
 
-    if raw_asm_src.exists()? {
-      return raw_asm_src
-    }
+    return raw_asm_src when raw_asm_src.exists()?
   }
 
-  return Err(ScriptError.Failed("kbuild-missing-source", f"missing source for {obj}"))
+  Err(ScriptError.Failed("kbuild-missing-source", f"missing source for {obj}"))
 }
 
 pure is_asm_source(src: Path) -> Bool {
   let name = src.display()
-  return name.ends_with(".S") or name.ends_with(".s")
+  name.ends_with(".S") or name.ends_with(".s")
 }
 
 pure asm_keeps_forced_include(arg: Str) -> Bool {
-  return arg in [
+  arg in [
     "include/linux/compiler-version.h",
     "./include/linux/compiler-version.h",
     "include/linux/kconfig.h",
@@ -3719,14 +3540,14 @@ proc asm_includes(args: List[Str]) [] -> List[Str] {
       continue
     }
 
-    filtered = filtered.push(arg)
+    filtered += [arg]
   }
 
-  return filtered.push("-include").push("./include/generated/asm-offsets.h")
+  filtered.push("-include").push("./include/generated/asm-offsets.h")
 }
 
 proc asm_cflags(_: List[Str]) [] -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-D__ASSEMBLY__",
     "-D__ASSEMBLER__",
@@ -3739,11 +3560,11 @@ proc asm_cflags(_: List[Str]) [] -> List[Str] {
 }
 
 pure object_key_from_out(out: Path) -> Str {
-  return out.display().replace(".xsh-kbuild/obj/", "").replace(".o", "")
+  out.display().replace(".xsh-kbuild/obj/", "").replace(".o", "")
 }
 
 pure object_base_name_from_out(out: Path) -> Str {
-  return out.name.replace(".o", "").replace("-", "_")
+  out.name.replace(".o", "").replace("-", "_")
 }
 
 pure kbuild_object_defs_for_module(out: Path, mod_out: Path) -> List[Str] {
@@ -3763,9 +3584,7 @@ pure kbuild_object_defs_for_module(out: Path, mod_out: Path) -> List[Str] {
     return base.extend(["-D_LINUX", "-DBUILDING_ACPICA"])
   }
 
-  if modfile.starts_with("drivers/gpu/drm/i915/") {
-    return base.push("-DI915")
-  }
+  return base.push("-DI915") when modfile.starts_with("drivers/gpu/drm/i915/")
 
   if modfile.starts_with("arch/arm64/kvm/hyp/nvhe/") or modfile.ends_with(".nvhe") {
     return base.extend(["-D__KVM_NVHE_HYPERVISOR__", "-D__DISABLE_EXPORTS", "-D__DISABLE_TRACE_MMIO__"])
@@ -3775,15 +3594,15 @@ pure kbuild_object_defs_for_module(out: Path, mod_out: Path) -> List[Str] {
     return base.push("-D__KVM_VHE_HYPERVISOR__")
   }
 
-  return base
+  base
 }
 
 pure is_pi_output(out: Path) -> Bool {
-  return "/arch/arm64/kernel/pi/" in out.display()
+  "/arch/arm64/kernel/pi/" in out.display()
 }
 
 pure is_x86_startup_pi_base_output(out: Path) -> Bool {
-  return "/arch/x86/boot/startup/" in out.display()
+  "/arch/x86/boot/startup/" in out.display()
 }
 
 proc pi_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
@@ -3804,9 +3623,7 @@ proc pi_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
     )
   }
 
-  if ! is_pi_output(out) {
-    return args
-  }
+  return args unless is_pi_output(out)
 
   var out_args = [arg for arg in args if arg != "-fno-function-sections" and arg != "-fno-data-sections"]
 
@@ -3826,41 +3643,39 @@ proc pi_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
   )
 
   if out.name == "map_range.o" {
-    out_args = out_args.push("-mstrict-align")
+    out_args += ["-mstrict-align"]
   }
 
-  return out_args
+  out_args
 }
 
 proc object_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
-  if ! out.display().ends_with("/crypto/jitterentropy.o") {
+  guard out.display().ends_with("/crypto/jitterentropy.o") else {
     return args
   }
 
   var out_args = args
-  return out_args.push("-O0")
+  out_args.push("-O0")
 }
 
 proc pi_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
   if is_x86_startup_pi_base_output(out) {
     var out_args = args
-    out_args = out_args.push("-include")
+    out_args += ["-include"]
     return out_args.push("include/linux/hidden.h")
   }
 
-  if ! is_pi_output(out) {
-    return args
-  }
+  return args unless is_pi_output(out)
 
   var out_args = args
-  out_args = out_args.push("-I./scripts/dtc/libfdt")
-  out_args = out_args.push("-include")
-  return out_args.push("include/linux/hidden.h")
+  out_args += ["-I./scripts/dtc/libfdt"]
+  out_args += ["-include"]
+  out_args.push("include/linux/hidden.h")
 }
 
 proc trace_compile_includes(args: List[Str], src: Path) [] -> List[Str] {
   var out_args = args
-  return out_args.push(f"-I./{src.parent}")
+  out_args.push(f"-I./{src.parent}")
 }
 
 proc arch_local_compile_includes(args: List[Str], src: Path, triple: Str) [] -> List[Str] {
@@ -3868,49 +3683,47 @@ proc arch_local_compile_includes(args: List[Str], src: Path, triple: Str) [] -> 
   var out_args = args
 
   if triple == "x86_64-linux-gnu" {
-    out_args = out_args.push("-I./arch/x86/include/asm/trace")
+    out_args += ["-I./arch/x86/include/asm/trace"]
   }
 
   if dir.starts_with("arch/x86/kvm/") or dir == "arch/x86/kvm" or dir == "virt/kvm" {
-    out_args = out_args.push("-I./arch/x86/kvm")
+    out_args += ["-I./arch/x86/kvm"]
   }
 
   if triple == "aarch64-linux-gnu" and (dir.starts_with("arch/arm64/kvm/hyp/") or dir == "arch/arm64/kvm/hyp" or dir == "arch/arm64/kvm") {
-    out_args = out_args.push("-I./arch/arm64/kvm/hyp/include")
-    out_args = out_args.push("-I./arch/arm64/kvm")
+    out_args += ["-I./arch/arm64/kvm/hyp/include"]
+    out_args += ["-I./arch/arm64/kvm"]
   }
 
   if dir.starts_with("drivers/gpu/drm/i915/") {
-    out_args = out_args.push("-I./drivers/gpu/drm/i915")
-    out_args = out_args.push("-I./drivers/gpu/drm/i915/display")
-    out_args = out_args.push("-I./drivers/gpu/drm/i915/gem")
-    out_args = out_args.push("-I./drivers/gpu/drm/i915/gt")
+    out_args += ["-I./drivers/gpu/drm/i915"]
+    out_args += ["-I./drivers/gpu/drm/i915/display"]
+    out_args += ["-I./drivers/gpu/drm/i915/gem"]
+    out_args += ["-I./drivers/gpu/drm/i915/gt"]
   }
 
   if dir == "drivers/media/dvb-frontends" {
-    out_args = out_args.push("-I./drivers/media/tuners")
-    out_args = out_args.push("-I./drivers/media/usb/dvb-usb-v2")
+    out_args += ["-I./drivers/media/tuners"]
+    out_args += ["-I./drivers/media/usb/dvb-usb-v2"]
   }
 
   if dir == "drivers/media/tuners" {
-    out_args = out_args.push("-I./drivers/media/dvb-frontends")
+    out_args += ["-I./drivers/media/dvb-frontends"]
   }
 
   if dir == "drivers/media/v4l2-core" {
-    out_args = out_args.push("-I./drivers/media/dvb-frontends")
-    out_args = out_args.push("-I./drivers/media/tuners")
+    out_args += ["-I./drivers/media/dvb-frontends"]
+    out_args += ["-I./drivers/media/tuners"]
   }
 
   if dir == "drivers/media/spi" {
-    out_args = out_args.push("-I./drivers/media/dvb-frontends/cxd2880")
+    out_args += ["-I./drivers/media/dvb-frontends/cxd2880"]
   }
 
-  if dir != "lib/crypto" and dir != "lib/crc" {
-    return out_args
-  }
+  return out_args when dir != "lib/crypto" and dir != "lib/crc"
 
   let local_arch = if triple == "x86_64-linux-gnu" { "x86" } else { "arm64" }
-  return out_args.push(f"-I./{dir}/{local_arch}")
+  out_args.push(f"-I./{dir}/{local_arch}")
 }
 
 proc libfdt_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
@@ -3921,17 +3734,17 @@ proc libfdt_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
     return out_args.push("-I./scripts/dtc/libfdt")
   }
 
-  return args
+  args
 }
 
 proc version_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
   if object_key_from_out(out) == "init/version" or path_key(out) == "init/version-timestamp.o" {
     var out_args = args
-    out_args = out_args.push("-include")
+    out_args += ["-include"]
     return out_args.push("init/utsversion-tmp.h")
   }
 
-  return args
+  args
 }
 
 ## Exported declaration `compile_kbuild_task`.
@@ -3945,7 +3758,7 @@ export proc compile_kbuild_task(
   out: Path,
   deps: List[Str] = [],
 ) [] -> make.MakeTask {
-  return compile_kbuild_task_for_module(cc, triple, cflags, defs, includes, src, out, out, deps)
+  compile_kbuild_task_for_module(cc, triple, cflags, defs, includes, src, out, out, deps)
 }
 
 proc compile_kbuild_task_for_module(
@@ -3973,7 +3786,7 @@ proc compile_kbuild_task_for_module(
   let task_cflags = if is_asm_source(src) { asm_cflags(compile_cflags) } else { compile_cflags }
   let task_defs = defs.extend(kbuild_object_defs_for_module(out, mod_out))
   let task_includes = if is_asm_source(src) { asm_includes(object_includes) } else { object_includes }
-  return make.compile_c_task(cc, triple, task_cflags, task_defs, task_includes, src, out, deps)
+  make.compile_c_task(cc, triple, task_cflags, task_defs, task_includes, src, out, deps)
 }
 
 proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) [env] -> make.MakeTask {
@@ -3982,12 +3795,12 @@ proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) [en
   var argv = ["llvm-objcopy", "--prefix-symbols=__pi_", "--remove-section=.note.gnu.property"]
 
   if out.name.starts_with("lib-") {
-    argv = argv.push("--prefix-alloc-sections=.init")
+    argv += ["--prefix-alloc-sections=.init"]
   }
 
   argv = argv.extend([input.display(), out.display()])
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4009,43 +3822,35 @@ proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) [en
 }
 
 pure pi_relacheck_path() -> Path {
-  return p".xsh-kbuild/host/arch/arm64/kernel/pi/relacheck"
+  p".xsh-kbuild/host/arch/arm64/kernel/pi/relacheck"
 }
 
 proc host_build_cc() [env] -> Path {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
 
-  if root != "" {
-    return fp"{root}/usr/bin/cc"
-  }
+  return fp"{root}/usr/bin/cc" when root != ""
 
-  return p"cc"
+  p"cc"
 }
 
 proc host_build_path() [env] -> Str {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
   let current = env.get("PATH") ?? ""
 
-  if root != "" {
-    return f"{root}/usr/lib/llvm-toolchain/bin:{root}/usr/bin:{current}"
-  }
+  return f"{root}/usr/lib/llvm-toolchain/bin:{root}/usr/bin:{current}" when root != ""
 
-  return current
+  current
 }
 
 proc host_build_ld_library_path() [env] -> Str {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
   let current = env.get("LD_LIBRARY_PATH") ?? ""
 
-  if root == "" {
-    return current
-  }
+  return current when root == ""
 
-  if current == "" {
-    return f"{root}/usr/lib:{root}/usr/lib/llvm23/lib"
-  }
+  return f"{root}/usr/lib:{root}/usr/lib/llvm23/lib" when current == ""
 
-  return f"{root}/usr/lib:{root}/usr/lib/llvm23/lib:{current}"
+  f"{root}/usr/lib:{root}/usr/lib/llvm23/lib:{current}"
 }
 
 proc pi_relacheck_build_task(cc: Path) [env] -> make.MakeTask {
@@ -4056,7 +3861,7 @@ proc pi_relacheck_build_task(cc: Path) [env] -> make.MakeTask {
   let src = p"arch/arm64/kernel/pi/relacheck.c"
   let out = pi_relacheck_path()
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4094,7 +3899,7 @@ proc pi_relacheck_build_task(cc: Path) [env] -> make.MakeTask {
 proc pi_relacheck_task(relacheck: Path, input: Path, original: Path, deps: List[Str]) [] -> make.MakeTask {
   let stamp = fp"{input}.relacheck.cmd"
 
-  return {
+  {
     name: f"{input}:relacheck",
     outputs: [
       stamp,
@@ -4226,19 +4031,15 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
 }
 
 pure dir_archive(dir: Path) -> Path {
-  if path_key(dir) == "." {
-    return p".xsh-kbuild/built-in.a"
-  }
+  return p".xsh-kbuild/built-in.a" when path_key(dir) == "."
 
-  return fp".xsh-kbuild/{dir}/built-in.a"
+  fp".xsh-kbuild/{dir}/built-in.a"
 }
 
 pure dir_lib_archive(dir: Path) -> Path {
-  if path_key(dir) == "." {
-    return p".xsh-kbuild/lib.a"
-  }
+  return p".xsh-kbuild/lib.a" when path_key(dir) == "."
 
-  return fp".xsh-kbuild/{dir}/lib.a"
+  fp".xsh-kbuild/{dir}/lib.a"
 }
 
 proc insert_archive_before(
@@ -4256,56 +4057,52 @@ proc insert_archive_before(
 
   for obj in objs {
     if ! inserted and path_key(obj) == marker_key {
-      out_objs = out_objs.push(archive_path)
-      out_deps = out_deps.push(dep)
+      out_objs += [archive_path]
+      out_deps += [dep]
       inserted = true
     }
 
-    out_objs = out_objs.push(obj)
+    out_objs += [obj]
     out_deps = out_deps.push(deps[index])
     index += 1
   }
 
   if ! inserted {
-    out_objs = out_objs.push(archive_path)
-    out_deps = out_deps.push(dep)
+    out_objs += [archive_path]
+    out_deps += [dep]
   }
 
-  return {objs: out_objs, deps: out_deps}
+  {objs: out_objs, deps: out_deps}
 }
 
 pure object_dir(obj: Path) -> Path {
-  if ! ("/" in obj.display()) {
+  guard "/" in obj.display() else {
     return p"."
   }
 
-  return obj.parent
+  obj.parent
 }
 
 pure archive_parent_key(key: Str) -> Str {
-  if key == "arch/x86/boot/startup" {
-    return "arch/x86"
-  }
+  return "arch/x86" when key == "arch/x86/boot/startup"
 
-  if key == "drivers/iommu/generic_pt/fmt" {
-    return "drivers/iommu"
-  }
+  return "drivers/iommu" when key == "drivers/iommu/generic_pt/fmt"
 
   if key == "." or ! ("/" in key) or (key.starts_with("arch/") and key.split("/").len() == 2) {
     return "."
   }
 
   let parts = key.split("/")
-  return parts |> take(parts.len() - 1).join("/")
+  parts |> take(parts.len() - 1).join("/")
 }
 
 pure is_known_generated_object(obj: Path) -> Bool {
   let key = path_key(obj)
-  return key.ends_with(".pi.o") or key.ends_with(".dtb.o") or key == "lib/crypto/powerpc/aesp8-ppc.o" or key == "lib/crypto/arm/sha256-core.o" or key == "lib/crypto/arm64/sha256-core.o" or key == "lib/crypto/arm/sha512-core.o" or key == "lib/crypto/arm64/sha512-core.o"
+  key.ends_with(".pi.o") or key.ends_with(".dtb.o") or key == "lib/crypto/powerpc/aesp8-ppc.o" or key == "lib/crypto/arm/sha256-core.o" or key == "lib/crypto/arm64/sha256-core.o" or key == "lib/crypto/arm/sha512-core.o" or key == "lib/crypto/arm64/sha512-core.o"
 }
 
 pure is_pi_object(obj: Path) -> Bool {
-  return path_key(obj).ends_with(".pi.o")
+  path_key(obj).ends_with(".pi.o")
 }
 
 pure archive_object_cflags_from_extra(cflags: List[Str], extra_flags: List[Str], obj: Path) -> List[Str] {
@@ -4314,33 +4111,29 @@ pure archive_object_cflags_from_extra(cflags: List[Str], extra_flags: List[Str],
     return efi_libstub_cflags(base)
   }
 
-  return base
+  base
 }
 
 pure pi_base_name(obj: Path) -> Str {
-  return obj.name.replace(".pi.o", "")
+  obj.name.replace(".pi.o", "")
 }
 
 pure pi_base_object(obj: Path) -> Path {
-  return join_rel(object_dir(obj), f"{pi_base_name(obj)}.o")
+  join_rel(object_dir(obj), f"{pi_base_name(obj)}.o")
 }
 
 pure pi_source(obj: Path) -> Path {
   let base = pi_base_name(obj)
 
-  if base.starts_with("lib-") {
-    return fp"lib/{base.replace("lib-", "")}.c"
-  }
+  return fp"lib/{base.replace("lib-", "")}.c" when base.starts_with("lib-")
 
-  return join_rel(object_dir(obj), f"{base}.c")
+  join_rel(object_dir(obj), f"{base}.c")
 }
 
 pure abi_enabled(abi: Str, abis: List[Str]) -> Bool {
-  if abis.len() == 0 {
-    return true
-  }
+  return true when abis.len() == 0
 
-  return abi in abis
+  abi in abis
 }
 
 pure syscall_line(nr: Int, native: Str, compat: Str, noreturn: Str) -> Result[Str] {
@@ -4348,19 +4141,13 @@ pure syscall_line(nr: Int, native: Str, compat: Str, noreturn: Str) -> Result[St
     return f"__SYSCALL_COMPAT_NORETURN({nr}, {native}, {compat})"
   }
 
-  if noreturn == "noreturn" {
-    return f"__SYSCALL_NORETURN({nr}, {native})"
-  }
+  return f"__SYSCALL_NORETURN({nr}, {native})" when noreturn == "noreturn"
 
-  if compat != "" {
-    return f"__SYSCALL_WITH_COMPAT({nr}, {native}, {compat})"
-  }
+  return f"__SYSCALL_WITH_COMPAT({nr}, {native}, {compat})" when compat != ""
 
-  if native != "" {
-    return f"__SYSCALL({nr}, {native})"
-  }
+  return f"__SYSCALL({nr}, {native})" when native != ""
 
-  return f"__SYSCALL({nr}, sys_ni_syscall)"
+  f"__SYSCALL({nr}, sys_ni_syscall)"
 }
 
 ## Exported declaration `generate_syscall_table`.
@@ -4555,7 +4342,7 @@ export proc generate_offsets_header(asm_path: Path, out: Path, header_guard: Str
           let body = caps[1].trim()
 
           if body == "" {
-            lines = lines.push("")
+            lines += [""]
           } else {
             let parts = body.fields()
             let name = parts.get(0) ?? ""
@@ -4572,7 +4359,7 @@ export proc generate_offsets_header(asm_path: Path, out: Path, header_guard: Str
     }
   }
 
-  lines = lines.push("")
+  lines += [""]
   lines = lines.push("#endif")
 
   write_text_if_changed(
@@ -4591,7 +4378,7 @@ export proc image_argv_task(
 ) [env] -> make.MakeTask {
   let tool_path = host_build_path()
 
-  return {
+  {
     name: image.display(),
     outputs: [
       image,
@@ -4625,7 +4412,7 @@ export proc image_argv_task(
 
 ## Exported declaration `image_task`.
 export proc image_task(objcopy: Path, vmlinux: Path, image: Path, deps: List[Str] = []) [env] -> make.MakeTask {
-  return image_argv_task([objcopy.display()], vmlinux, image, deps)
+  image_argv_task([objcopy.display()], vmlinux, image, deps)
 }
 
 proc x86_compressed_vmlinux_bin_task(
@@ -4634,7 +4421,7 @@ proc x86_compressed_vmlinux_bin_task(
   out: Path,
   deps: List[Str] = [],
 ) [] -> make.MakeTask {
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4672,7 +4459,7 @@ export proc vmlinux_archive_argv_task(
     argv = argv.push(input.display())
   }
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4693,7 +4480,7 @@ export proc vmlinux_archive_argv_task(
 
 ## Exported declaration `vmlinux_archive_task`.
 export proc vmlinux_archive_task(ar: Path, inputs: List[Path], out: Path, deps: List[Str] = []) [env] -> make.MakeTask {
-  return vmlinux_archive_argv_task([ar.display()], inputs, out, deps)
+  vmlinux_archive_argv_task([ar.display()], inputs, out, deps)
 }
 
 ## Exported declaration `vmlinux_o_task`.
@@ -4705,7 +4492,7 @@ export proc vmlinux_o_task(
   out: Path,
   deps: List[Str] = [],
 ) [env] -> make.MakeTask {
-  return vmlinux_o_argv_task([ld.display()], kbuild_ldflags, kernel_archive, libs, out, deps)
+  vmlinux_o_argv_task([ld.display()], kbuild_ldflags, kernel_archive, libs, out, deps)
 }
 
 ## Exported declaration `vmlinux_o_argv_task`.
@@ -4719,7 +4506,7 @@ export proc vmlinux_o_argv_task(
 ) [env] -> make.MakeTask {
   let tool_path = host_build_path()
   var argv = ld_argv
-  argv = argv.extend(kbuild_ldflags)
+  argv += kbuild_ldflags
 
   argv = argv.extend(
     ["-r", "-o", out.display(), "--whole-archive", kernel_archive.display(), "--no-whole-archive", "--start-group"],
@@ -4729,9 +4516,9 @@ export proc vmlinux_o_argv_task(
     argv = argv.push(lib.display())
   }
 
-  argv = argv.push("--end-group")
+  argv += ["--end-group"]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4765,7 +4552,7 @@ export proc vmlinux_unstripped_task(
   out: Path,
   deps: List[Str] = [],
 ) [env] -> make.MakeTask {
-  return vmlinux_unstripped_argv_task(
+  vmlinux_unstripped_argv_task(
     [ld.display()],
     kbuild_ldflags,
     ldflags_vmlinux,
@@ -4794,7 +4581,7 @@ export proc vmlinux_unstripped_argv_task(
 ) [env] -> make.MakeTask {
   let tool_path = host_build_path()
   var argv = ld_argv
-  argv = argv.extend(kbuild_ldflags).extend(ldflags_vmlinux)
+  argv = [@argv, @kbuild_ldflags, @ldflags_vmlinux]
   argv = argv.extend(["--script", linker_script.display(), "-o", out.display()])
 
   argv = argv.extend(
@@ -4812,9 +4599,9 @@ export proc vmlinux_unstripped_argv_task(
     argv = argv.push(lib.display())
   }
 
-  argv = argv.push("--end-group")
+  argv += ["--end-group"]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4856,7 +4643,7 @@ export pure arm64_vmlinux_ldflags(config: Kconfig) -> List[Str] {
     with_build_id
   }
 
-  return with_relr.push("--orphan-handling=warn")
+  with_relr.push("--orphan-handling=warn")
 }
 
 ## Exported declaration `vmlinux_strip_argv_task`.
@@ -4868,7 +4655,7 @@ export proc vmlinux_strip_argv_task(
 ) [env] -> make.MakeTask {
   let tool_path = host_build_path()
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -4901,7 +4688,7 @@ export proc vmlinux_strip_task(
   out: Path,
   deps: List[Str] = [],
 ) [env] -> make.MakeTask {
-  return vmlinux_strip_argv_task([objcopy.display()], unstripped, out, deps)
+  vmlinux_strip_argv_task([objcopy.display()], unstripped, out, deps)
 }
 
 proc x86_vmlinux_strip_argv_task(
@@ -4910,7 +4697,7 @@ proc x86_vmlinux_strip_argv_task(
   out: Path,
   deps: List[Str] = [],
 ) [] -> make.MakeTask {
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -5030,19 +4817,17 @@ export pure x86_vmlinux_ldflags(config: Kconfig) -> List[Str] {
     with_build_id
   }
 
-  return with_relocs.push("--orphan-handling=warn")
+  with_relocs.push("--orphan-handling=warn")
 }
 
 proc vmlinux_x86_archive_inputs(link_inputs: List[Path]) [] -> List[Path] {
-  if link_inputs.len() > 0 {
-    return link_inputs
-  }
+  return link_inputs when link_inputs.len() > 0
 
-  return [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/x86/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
+  [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/x86/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
 }
 
 pure efi_libstub_stems_x86() -> List[Str] {
-  return [
+  [
     "alignedmem",
     "efi-stub-helper",
     "file",
@@ -5066,15 +4851,11 @@ pure efi_libstub_stems_x86() -> List[Str] {
 }
 
 pure efi_libstub_source_x86(stem: Str) -> Path {
-  if stem.starts_with("lib-") {
-    return fp"lib/{stem.replace("lib-", "")}.c"
-  }
+  return fp"lib/{stem.replace("lib-", "")}.c" when stem.starts_with("lib-")
 
-  if stem == "x86-stub" {
-    return fp"drivers/firmware/efi/libstub/x86-stub.c"
-  }
+  return fp"drivers/firmware/efi/libstub/x86-stub.c" when stem == "x86-stub"
 
-  return fp"drivers/firmware/efi/libstub/{stem}.c"
+  fp"drivers/firmware/efi/libstub/{stem}.c"
 }
 
 proc gzip_store_bytes(data: Bytes) [error] -> Result[Bytes] {
@@ -5104,13 +4885,13 @@ proc gzip_store_bytes(data: Bytes) [error] -> Result[Bytes] {
     parts = parts.push(bytes.from_ints([final])?)
     parts = parts.push(bytes.pack_le(chunk_len, 2)?)
     parts = parts.push(bytes.pack_le(65535 - chunk_len, 2)?)
-    parts = parts.push(data.slice(offset: offset, length: chunk_len))
+    parts = parts.push(data.slice(offset:, length: chunk_len))
     offset += chunk_len
   }
 
   parts = parts.push(bytes.pack_le(hash.crc32(data), 4)?)
   parts = parts.push(bytes.pack_le(data.len() % 4294967296, 4)?)
-  return bytes.concat(parts)
+  bytes.concat(parts)
 }
 
 proc write_gzip_store(input: Path, out: Path) [fs, error] {
@@ -5141,9 +4922,7 @@ proc append_x86_relocs(relocs: Path, input: Path, out: Path) [fs, process, error
 }
 
 proc write_x86_voffset_header(nm: Path, input: Path) [fs, process, error] {
-  let symbol_re = regex.compile(
-    "^([0-9a-fA-F]+) [ABbCDGRSTtVW] (_text|__start_rodata|_sinittext|__inittext_end|__bss_start|_end)$",
-  )?
+  let symbol_re = rx"^([0-9a-fA-F]+) [ABbCDGRSTtVW] (_text|__start_rodata|_sinittext|__inittext_end|__bss_start|_end)$"
 
   let symbols = run.text $nm $input ?
   var lines: List[Str] = []
@@ -5168,9 +4947,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) [fs, process, error] {
 }
 
 proc write_x86_zoffset_header(nm: Path, input: Path) [fs, process, error] {
-  let symbol_re = regex.compile(
-    "^([0-9a-fA-F]+) [a-zA-Z] (startup_32|efi.._stub_entry|efi(32)?_pe_entry|input_data|kernel_info|_end|_ehead|_text|_e?data|_e?sbat|z_.*)$",
-  )?
+  let symbol_re = rx"^([0-9a-fA-F]+) [a-zA-Z] (startup_32|efi.._stub_entry|efi(32)?_pe_entry|input_data|kernel_info|_end|_ehead|_text|_e?data|_e?sbat|z_.*)$"
 
   let symbols = run.text $nm $input ?
   var lines: List[Str] = []
@@ -5195,7 +4972,7 @@ proc write_x86_zoffset_header(nm: Path, input: Path) [fs, process, error] {
 }
 
 pure x86_compressed_cflags() -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-m64",
     "-O2",
@@ -5227,7 +5004,7 @@ pure x86_compressed_cflags() -> List[Str] {
 }
 
 pure x86_compressed_includes() -> List[Str] {
-  return [
+  [
     "-nostdinc",
     "-I./arch/x86/boot/compressed",
     "-I./arch/x86/boot",
@@ -5249,7 +5026,7 @@ pure x86_compressed_includes() -> List[Str] {
 }
 
 pure x86_linker_script_includes() -> List[Str] {
-  return [
+  [
     "-nostdinc",
     "-I./arch/x86/boot/compressed",
     "-I./arch/x86/boot",
@@ -5267,7 +5044,7 @@ pure x86_linker_script_includes() -> List[Str] {
 }
 
 pure x86_setup_cflags() -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-std=gnu11",
     "-fms-extensions",
@@ -5299,7 +5076,7 @@ pure x86_setup_cflags() -> List[Str] {
 }
 
 pure x86_setup_includes() -> List[Str] {
-  return [
+  [
     "-nostdinc",
     "-I./arch/x86/boot",
     "-I./arch/x86/include",
@@ -5329,8 +5106,11 @@ proc preprocess_x86_boot_lds(cc: Path, source: Path, out: Path, includes: List[S
     "-Ux86_64",
     "-E",
     "-P",
-  ].extend(includes)
-    .extend([source.display(), "-o", out.display()])
+    @includes,
+    source.display(),
+    "-o",
+    out.display(),
+  ]
 
   run $cc ${argv |> drop(1)} ?
 }
@@ -5460,7 +5240,7 @@ proc build_x86_compressed_kernel(
       task = {...task, inputs: task.inputs.push(kernel_gz)}
     }
 
-    tasks = tasks.push(task)
+    tasks += [task]
     objects = objects.push(item.object)
   }
 
@@ -5487,7 +5267,7 @@ proc build_x86_compressed_kernel(
   }
 
   argv = argv.push(efi_lib.display())
-  argv = argv.push(".xsh-kbuild/arch/x86/boot/startup/lib.a")
+  argv += [".xsh-kbuild/arch/x86/boot/startup/lib.a"]
   run $ld ${argv |> drop(1)} ?
   write_x86_zoffset_header(nm, compressed_vmlinux)?
   make.run_tasks([image_task(objcopy, compressed_vmlinux, boot_vmlinux_bin)], 1)?
@@ -5632,7 +5412,7 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) [fs, process, env, error] 
     let item_defs = if item.asm { ["-D__DISABLE_EXPORTS", "-D_SETUP"] } else { [] }
     let item_triple = if item.asm { "i386-linux-gnu" } else { "x86_64-linux-gnu" }
     let task = compile_kbuild_task(cc, item_triple, item_cflags, item_defs, includes, item.source, item.object)
-    tasks = tasks.push(task)
+    tasks += [task]
     objects = objects.push(item.object)
   }
 
@@ -5708,7 +5488,7 @@ export proc build_scratch_x86_final(
     p".vmlinux.export.o",
   )
 
-  tasks = tasks.push(export_task)
+  tasks += [export_task]
 
   let version_task = compile_kbuild_task(
     cc,
@@ -5720,7 +5500,7 @@ export proc build_scratch_x86_final(
     p"init/version-timestamp.o",
   )
 
-  tasks = tasks.push(version_task)
+  tasks += [version_task]
   var stub_objs: List[Path] = []
   var stub_deps: List[Str] = []
 
@@ -5740,22 +5520,22 @@ export proc build_scratch_x86_final(
     )
 
     let copy_task = efi_stubcopy_task_x86(obj, stub, [compile_task.name])
-    tasks = tasks.push(compile_task)
-    tasks = tasks.push(copy_task)
-    stub_objs = stub_objs.push(stub)
+    tasks += [compile_task]
+    tasks += [copy_task]
+    stub_objs += [stub]
     stub_deps = stub_deps.push(copy_task.name)
   }
 
   let efi_archive = efi_libstub_archive_task(ar_argv, stub_objs, efi_lib, stub_deps)
-  tasks = tasks.push(efi_archive)
+  tasks += [efi_archive]
   var support_objs: List[Path] = []
   var support_deps: List[Str] = []
 
   for obj in final_support_lib_sources() {
     let src = source_for_object(obj)?
     let task = compile_kbuild_task(cc, "x86_64-linux-gnu", final_support_cflags(cflags, obj), defs, includes, src, obj)
-    tasks = tasks.push(task)
-    support_objs = support_objs.push(obj)
+    tasks += [task]
+    support_objs += [obj]
     support_deps = support_deps.push(task.name)
   }
 
@@ -5771,14 +5551,14 @@ export proc build_scratch_x86_final(
     ubsan_stubs,
   )
 
-  tasks = tasks.push(ubsan_task)
-  support_objs = support_objs.push(ubsan_stubs)
+  tasks += [ubsan_task]
+  support_objs += [ubsan_stubs]
   support_deps = support_deps.push(ubsan_task.name)
   let support_archive = efi_libstub_archive_task(ar_argv, support_objs, support_lib, support_deps)
-  tasks = tasks.push(support_archive)
+  tasks += [support_archive]
   let archive_inputs = vmlinux_x86_archive_inputs(link_inputs)
   let archive_task = vmlinux_archive_argv_task(ar_argv, archive_inputs, vmlinux_a, [])
-  tasks = tasks.push(archive_task)
+  tasks += [archive_task]
 
   let linked_task = vmlinux_unstripped_argv_task(
     ld_argv,
@@ -5794,8 +5574,8 @@ export proc build_scratch_x86_final(
   )
 
   let strip_task = x86_vmlinux_strip_argv_task(objcopy_argv, unstripped, vmlinux, [linked_task.name])
-  tasks = tasks.push(linked_task)
-  tasks = tasks.push(strip_task)
+  tasks += [linked_task]
+  tasks += [strip_task]
   make.run_tasks(tasks, jobs_count)?
   build_x86_compressed_kernel(cc, unstripped, vmlinux, efi_lib, jobs_count)?
   build_x86_setup_image(cc, jobs_count)?
@@ -5812,7 +5592,7 @@ export proc write_minimal_vmlinux_export(root: Path) [fs, error] {
 }
 
 pure efi_libstub_stems() -> List[Str] {
-  return [
+  [
     "alignedmem",
     "arm64-stub",
     "arm64",
@@ -5850,7 +5630,7 @@ pure efi_libstub_stems() -> List[Str] {
 }
 
 pure final_support_lib_sources() -> List[Path] {
-  return [
+  [
     p"lib/fdt.o",
     p"lib/fdt_addresses.o",
     p"lib/fdt_empty_tree.o",
@@ -5863,15 +5643,13 @@ pure final_support_lib_sources() -> List[Path] {
 }
 
 pure efi_libstub_source(stem: Str) -> Path {
-  if stem.starts_with("lib-") {
-    return fp"lib/{stem.replace("lib-", "")}.c"
-  }
+  return fp"lib/{stem.replace("lib-", "")}.c" when stem.starts_with("lib-")
 
-  return fp"drivers/firmware/efi/libstub/{stem}.c"
+  fp"drivers/firmware/efi/libstub/{stem}.c"
 }
 
 pure efi_libstub_cflags(cflags: List[Str]) -> List[Str] {
-  return cflags.extend(
+  cflags.extend(
     [
       "-fpie",
       "-fno-unwind-tables",
@@ -5890,7 +5668,7 @@ pure efi_libstub_cflags(cflags: List[Str]) -> List[Str] {
 }
 
 pure efi_libstub_cflags_x86(cflags: List[Str]) -> List[Str] {
-  return cflags.extend(
+  cflags.extend(
     [
       "-mcmodel=small",
       "-m64",
@@ -5921,7 +5699,7 @@ pure efi_libstub_cflags_x86(cflags: List[Str]) -> List[Str] {
 
 pure final_support_cflags(cflags: List[Str], out: Path) -> List[Str] {
   let _ = out
-  return cflags.extend(["-I./scripts/dtc/libfdt", "-fno-sanitize=undefined"])
+  cflags.extend(["-I./scripts/dtc/libfdt", "-fno-sanitize=undefined"])
 }
 
 ## Exported declaration `write_ubsan_stubs`.
@@ -5966,7 +5744,7 @@ void __ubsan_handle_alignment_assumption_abort(void) {}
 proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) [env] -> make.MakeTask {
   let tool_path = host_build_path()
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -5995,7 +5773,7 @@ proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) [env] -> make.Ma
 proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) [env] -> make.MakeTask {
   let tool_path = host_build_path()
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -6032,7 +5810,7 @@ proc efi_libstub_archive_task(
     argv = argv.push(input.display())
   }
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -6052,7 +5830,7 @@ proc efi_libstub_archive_task(
 }
 
 proc vmlinux_archive_inputs() [] -> List[Path] {
-  return [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/arm64/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
+  [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/arm64/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
 }
 
 ## Exported declaration `build_scratch_arm64_final`.
@@ -6095,7 +5873,7 @@ export proc build_scratch_arm64_final(
     p".vmlinux.export.o",
   )
 
-  tasks = tasks.push(export_task)
+  tasks += [export_task]
 
   let version_task = compile_kbuild_task(
     cc,
@@ -6107,7 +5885,7 @@ export proc build_scratch_arm64_final(
     p"init/version-timestamp.o",
   )
 
-  tasks = tasks.push(version_task)
+  tasks += [version_task]
   var stub_objs: List[Path] = []
   var stub_deps: List[Str] = []
 
@@ -6127,22 +5905,22 @@ export proc build_scratch_arm64_final(
     )
 
     let copy_task = efi_stubcopy_task(obj, stub, [compile_task.name])
-    tasks = tasks.push(compile_task)
-    tasks = tasks.push(copy_task)
-    stub_objs = stub_objs.push(stub)
+    tasks += [compile_task]
+    tasks += [copy_task]
+    stub_objs += [stub]
     stub_deps = stub_deps.push(copy_task.name)
   }
 
   let efi_archive = efi_libstub_archive_task(ar_argv, stub_objs, efi_lib, stub_deps)
-  tasks = tasks.push(efi_archive)
+  tasks += [efi_archive]
   var support_objs: List[Path] = []
   var support_deps: List[Str] = []
 
   for obj in final_support_lib_sources() {
     let src = source_for_object(obj)?
     let task = compile_kbuild_task(cc, "aarch64-linux-gnu", final_support_cflags(cflags, obj), defs, includes, src, obj)
-    tasks = tasks.push(task)
-    support_objs = support_objs.push(obj)
+    tasks += [task]
+    support_objs += [obj]
     support_deps = support_deps.push(task.name)
   }
 
@@ -6158,13 +5936,13 @@ export proc build_scratch_arm64_final(
     ubsan_stubs,
   )
 
-  tasks = tasks.push(ubsan_task)
-  support_objs = support_objs.push(ubsan_stubs)
+  tasks += [ubsan_task]
+  support_objs += [ubsan_stubs]
   support_deps = support_deps.push(ubsan_task.name)
   let support_archive = efi_libstub_archive_task(ar_argv, support_objs, support_lib, support_deps)
-  tasks = tasks.push(support_archive)
+  tasks += [support_archive]
   let archive_task = vmlinux_archive_argv_task(ar_argv, vmlinux_archive_inputs(), vmlinux_a, [])
-  tasks = tasks.push(archive_task)
+  tasks += [archive_task]
 
   let linked_task = vmlinux_unstripped_argv_task(
     ld_argv,
@@ -6181,9 +5959,9 @@ export proc build_scratch_arm64_final(
 
   let strip_task = vmlinux_strip_argv_task(objcopy_argv, unstripped, vmlinux, [linked_task.name])
   let img_task = image_argv_task(objcopy_argv, vmlinux, image, [strip_task.name])
-  tasks = tasks.push(linked_task)
-  tasks = tasks.push(strip_task)
-  tasks = tasks.push(img_task)
+  tasks += [linked_task]
+  tasks += [strip_task]
+  tasks += [img_task]
   make.run_tasks(tasks, jobs_count)?
 }
 
@@ -6255,7 +6033,7 @@ export proc build_builtin_archives(
   jobs_count: Int,
 ) [fs, process, env, time, error] -> Result[List[Path]] {
   let archive_plan = plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
-  return run_builtin_archive_plan(archive_plan, jobs_count)
+  run_builtin_archive_plan(archive_plan, jobs_count)
 }
 
 ## Exported declaration `run_builtin_archive_plan`.
@@ -6277,15 +6055,13 @@ export proc run_builtin_archive_plan(
   }
 
   make.run_tasks(archive_plan.tasks, jobs_count)?
-  return archive_plan.archives
+  archive_plan.archives
 }
 
 proc x86_jump_label_helper_source() [fs, error] -> Result[Path] {
-  if p"x86-jump-label-patch.c".exists()? {
-    return p"x86-jump-label-patch.c"
-  }
+  return p"x86-jump-label-patch.c" when p"x86-jump-label-patch.c".exists()?
 
-  return Err(ScriptError.Failed("kbuild-x86-jump-label-helper", "missing x86-jump-label-patch.c"))
+  Err(ScriptError.Failed("kbuild-x86-jump-label-helper", "missing x86-jump-label-patch.c"))
 }
 
 proc x86_jump_label_helper() [fs, process, error] -> Result[Path] {
@@ -6294,7 +6070,7 @@ proc x86_jump_label_helper() [fs, process, error] -> Result[Path] {
   let source = x86_jump_label_helper_source()?
   helper.parent.mkdir()?
   run $cc "-O2" "-std=c11" "-Wall" "-Wextra" "-o" $helper $source ?
-  return helper
+  helper
 }
 
 pure parse_jump_label_helper_summary(line: Str) -> JumpLabelPatchResult {
@@ -6320,7 +6096,7 @@ pure parse_jump_label_helper_summary(line: Str) -> JumpLabelPatchResult {
     index += 1
   }
 
-  return {scanned, objects, patches}
+  {scanned, objects, patches}
 }
 
 ## Exported declaration `patch_x86_jump_label_outputs`.
@@ -6335,28 +6111,19 @@ export proc patch_x86_jump_label_outputs(outputs: List[Path]) [fs, process, erro
     f"xsh-kbuild-x86-jump-label-scan complete {summary.scanned} objects {summary.patches} patches",
   )?
 
-  return summary
+  summary
 }
 
 pure has_archive_output(task: make.MakeTask) -> Bool {
   for output in task.outputs {
-    if output.display().ends_with(".a") {
-      return true
-    }
+    return true when output.display().ends_with(".a")
   }
 
-  return false
+  false
 }
 
 pure archive_rerun_tasks(tasks: List[make.MakeTask]) -> List[make.MakeTask] {
-  var archive_names: Map[Bool] = {}
-
-  for task in tasks {
-    if has_archive_output(task) {
-      archive_names[task.name] = true
-    }
-  }
-
+  var archive_names = {task.name: true for task in tasks if has_archive_output(task)}
   var rerun: List[make.MakeTask] = []
 
   for task in tasks {
@@ -6365,7 +6132,7 @@ pure archive_rerun_tasks(tasks: List[make.MakeTask]) -> List[make.MakeTask] {
     rerun = rerun.push({...task, deps})
   }
 
-  return rerun
+  rerun
 }
 
 proc rerun_x86_jump_label_archives(tasks: List[make.MakeTask], jobs_count: Int) [fs, process, env, error] {
@@ -6380,16 +6147,12 @@ export proc patch_x86_jump_label_archive_plan(
   archive_plan: BuiltinArchivePlan,
   jobs_count: Int,
 ) [fs, process, env, error] {
-  var outputs: List[Path] = []
-
-  for task in archive_plan.tasks {
-    for output in task.outputs {
-      if output.display().ends_with(".o") {
-        outputs = outputs.push(output)
-      }
-    }
-  }
-
+  var outputs: List[Path] = [
+    output
+    for task in archive_plan.tasks
+    for output in task.outputs
+    if output.display().ends_with(".o")
+  ]
   let result = patch_x86_jump_label_outputs(outputs)?
 
   if result.patches > 0 {
@@ -6405,7 +6168,7 @@ export proc run_x86_builtin_archive_plan(
 ) [fs, process, env, error] -> Result[List[Path]] {
   let archives = run_builtin_archive_plan(archive_plan, jobs_count)?
   patch_x86_jump_label_archive_plan(archive_plan, jobs_count)?
-  return archives
+  archives
 }
 
 proc archive_plan_progress(message: Str) [fs, error] {
@@ -6422,7 +6185,7 @@ proc archive_plan_timing_start(stage: Str) [env, time] -> Int {
     return time.now()
   }
 
-  return 0
+  0
 }
 
 proc archive_plan_timing_done(stage: Str, start: Int) [env, time] {
@@ -6442,7 +6205,7 @@ pure skip_planned_object(config: Kconfig, obj: Path) -> Bool {
     return true
   }
 
-  return false
+  false
 }
 
 pure archive_analysis_record_for_object(
@@ -6456,7 +6219,7 @@ pure archive_analysis_record_for_object(
   let key = path_key(obj)
 
   if key in composites_by_object {
-    let default_composite: CompositeObject = {object: obj, members: []}
+    let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
     let composite = composites_by_object.get(key) ?? default_composite
     return {
       object: key,
@@ -6474,7 +6237,7 @@ pure archive_analysis_record_for_object(
   }
 
   let flags_object = if pi { pi_base_object(obj) } else { obj }
-  return {
+  {
     object: key,
     owner: path_key(owner),
     library: library,
@@ -6487,7 +6250,7 @@ pure archive_analysis_record_for_object(
 }
 
 pure archive_analysis_plan_context(plan: KbuildPlan) -> ArchivePlanContext {
-  return {
+  {
     dirs: path_strings(plan.dirs),
     objects: path_strings(plan.objects),
     lib_objects: path_strings(plan.lib_objects),
@@ -6513,8 +6276,7 @@ proc archive_analysis_plan_context_slice(
   start: Int,
   end: Int,
 ) [error] -> Result[ArchivePlanContext] {
-  let object_values = context.objects
-  let lib_object_values = context.lib_objects
+  let {objects: object_values, lib_objects: lib_object_values, ..} = context
   let object_count = object_values.len()
   let object_start = if start < object_count { start } else { object_count }
   let object_end = if end < object_count { end } else { object_count }
@@ -6526,23 +6288,16 @@ proc archive_analysis_plan_context_slice(
   let lib_objects = lib_object_values
     |> drop(lib_start)
     |> take(lib_end - lib_start)
-  var selected: Map[Bool] = {}
-
-  for obj in objects {
-    selected[obj] = true
-  }
-
+  var selected: Map[Bool] = {obj: true for obj in objects}
   for obj in lib_objects {
     selected[obj] = true
   }
 
-  var archive_owners: List[ArchiveOwnerRecord] = []
-  for owner in context.archive_owners {
-    if selected.get(owner.object) ?? false {
-      archive_owners = archive_owners.push(owner)
-    }
-  }
-
+  var archive_owners: List[ArchiveOwnerRecord] = [
+    owner
+    for owner in context.archive_owners
+    if selected.get(owner.object) ?? false
+  ]
   var composites: List[CompositeRecord] = []
   for composite in context.composites {
     var selected_member = selected.get(composite.object) ?? false
@@ -6553,11 +6308,11 @@ proc archive_analysis_plan_context_slice(
     }
 
     if selected_member {
-      composites = composites.push(composite)
+      composites += [composite]
     }
   }
 
-  return {
+  {
     dirs: [],
     objects: objects,
     lib_objects: lib_objects,
@@ -6567,7 +6322,7 @@ proc archive_analysis_plan_context_slice(
 }
 
 proc archive_analysis_plan_from_context(context: ArchivePlanContext) [error] -> Result[KbuildPlan] {
-  return {
+  {
     dirs: paths_from_strings(context.dirs)?,
     objects: paths_from_strings(context.objects)?,
     lib_objects: paths_from_strings(context.lib_objects)?,
@@ -6587,7 +6342,7 @@ pure archive_analysis_raw_item(
   let key = path_key(obj)
 
   if key in composites_by_object {
-    let default_composite: CompositeObject = {object: obj, members: []}
+    let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
     let composite = composites_by_object.get(key) ?? default_composite
     return {
       object: key,
@@ -6601,7 +6356,7 @@ pure archive_analysis_raw_item(
     }
   }
 
-  return {
+  {
     object: key,
     owner: path_key(owner),
     library: library,
@@ -6621,12 +6376,10 @@ proc archive_analysis_slice_items(
 ) [error] -> Result[List[ArchiveAnalysisItem]] {
   let composites_by_object = composite_map(plan.composites)
   let composite_members_by_object = composite_member_map(plan.composites)
-  var archive_owner_by_object: Map[Str] = {}
-
-  for owner in plan.archive_owners {
-    archive_owner_by_object[path_key(owner.object)] = path_key(owner.dir)
+  var archive_owner_by_object = {
+    [path_key(owner.object)]: path_key(owner.dir)
+    for owner in plan.archive_owners
   }
-
   let object_count = plan.objects.len()
   var items: List[ArchiveAnalysisItem] = []
   var index = start
@@ -6659,7 +6412,7 @@ proc archive_analysis_slice_items(
     index += 1
   }
 
-  return items
+  items
 }
 
 proc archive_analysis_items_with_compile_flags(
@@ -6683,7 +6436,7 @@ proc archive_analysis_items_with_compile_flags(
     })
   }
 
-  return enriched
+  enriched
 }
 
 proc archive_analysis_flag_entries_for_plan_range(
@@ -6713,7 +6466,7 @@ proc archive_analysis_flag_entries_for_plan_range(
 
     if path_key(obj) in composites_by_object {
       let object_key = path_key(obj)
-      let default_composite: CompositeObject = {object: obj, members: []}
+      let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
       let composite = composites_by_object.get(object_key) ?? default_composite
       for member in composite.members {
         dirs[path_key(object_dir(member))] = true
@@ -6724,15 +6477,12 @@ proc archive_analysis_flag_entries_for_plan_range(
     index += 1
   }
 
-  var filtered: List[CompileFlagsEntry] = []
-
-  for entry in flag_entries {
-    if (entry.object == "*" and (dirs.get(entry.dir) ?? false)) or (objects.get(entry.object) ?? false) {
-      filtered = filtered.push(entry)
-    }
-  }
-
-  return filtered
+  var filtered: List[CompileFlagsEntry] = [
+    entry
+    for entry in flag_entries
+    if (entry.object == "*" and (dirs.get(entry.dir) ?? false)) or (objects.get(entry.object) ?? false)
+  ]
+  filtered
 }
 
 ## Exported declaration `analyze_archive_plan_slice`.
@@ -6755,7 +6505,7 @@ export proc analyze_archive_plan_slice(
   let compile_flags_by_dir = compile_flags_from_cache_entries(relevant_flags)?
   let items = archive_analysis_slice_items(plan, config, 0, end - start)?
   let enriched = archive_analysis_items_with_compile_flags(items, compile_flags_by_dir)?
-  return analyze_archive_items_impl(enriched, cc, triple, cflags, defs, includes, emit_task_specs)?
+  analyze_archive_items_impl(enriched, cc, triple, cflags, defs, includes, emit_task_specs)?
 }
 
 proc archive_analysis_items(
@@ -6766,12 +6516,10 @@ proc archive_analysis_items(
   let maps_start = archive_plan_timing_start("item-maps")
   let composites_by_object = composite_map(plan.composites)
   let composite_members_by_object = composite_member_map(plan.composites)
-  var archive_owner_by_object: Map[Str] = {}
-
-  for owner in plan.archive_owners {
-    archive_owner_by_object[path_key(owner.object)] = path_key(owner.dir)
+  var archive_owner_by_object = {
+    [path_key(owner.object)]: path_key(owner.dir)
+    for owner in plan.archive_owners
   }
-
   archive_plan_timing_done("item-maps", maps_start)
 
   let object_items_start = archive_plan_timing_start("item-objects")
@@ -6808,7 +6556,7 @@ proc archive_analysis_items(
 
   archive_plan_timing_done("item-objects", object_items_start)
 
-  return items
+  items
 }
 
 proc archive_analysis_items_for_plan(
@@ -6826,7 +6574,7 @@ proc archive_analysis_items_for_plan(
       "arm64"
     },
   )?
-  return archive_analysis_items(plan, config, compile_flags_by_dir)?
+  archive_analysis_items(plan, config, compile_flags_by_dir)?
 }
 
 pure archive_analysis_result(
@@ -6842,7 +6590,7 @@ pure archive_analysis_result(
   generated_objects: List[Path],
   missing_sources: List[Path],
 ) -> ArchiveAnalysisResult {
-  return {
+  {
     object: object,
     owner: owner,
     library: library,
@@ -6888,7 +6636,7 @@ proc archive_compile_task_spec(
     let task_includes = if is_asm_source(source) { asm_includes(object_includes) } else { object_includes }
     let depfile = fp"{out}.d"
     var argv: List[Str] = [cc.display(), "-target", triple, "-c"]
-    argv = argv.extend(task_cflags).extend(task_defs).extend(task_includes)
+    argv = [@argv, @task_cflags, @task_defs, @task_includes]
     argv = argv.extend([source.display(), "-o", out.display(), "-MMD", "-MP", "-MF", depfile.display()])
 
     return {
@@ -6901,7 +6649,7 @@ proc archive_compile_task_spec(
     }
   }
 
-  return {
+  {
     kind: "compile",
     object: path_key(object),
     source: source.display(),
@@ -6923,12 +6671,7 @@ proc analyze_archive_items_impl(
   var results: List[ArchiveAnalysisResult] = []
 
   for item in items {
-    let object_key = item.object
-    let owner_key = item.owner
-    let library = item.library
-    let pi = item.pi
-    let composite_key = item.composite
-    let flags = item.flags
+    let {object: object_key, owner: owner_key, library, pi, composite: composite_key, flags, ..} = item
     let obj = fp"{object_key}"
     var task_specs: List[Record] = []
     var task_count = 0
@@ -6940,8 +6683,7 @@ proc analyze_archive_items_impl(
     var missing_sources: List[Path] = []
 
     if composite_key != "" {
-      let member_objects = item.member_objects
-      let member_flags = item.member_flags
+      let {member_objects, member_flags, ..} = item
       let composite_out = obj_out_path(fp"{composite_key}")
 
       var member_index = 0
@@ -6949,33 +6691,30 @@ proc analyze_archive_items_impl(
         let member_cflags = member_flags.get(member_index) ?? []
         let member = fp"{member_key}"
 
-        match source_for_object(member) {
-          Ok(source) => {
-            let member_out = obj_out_path(member)
-            let task_spec = archive_compile_task_spec(
-              member,
-              source,
-              member_out,
-              composite_out,
-              member_cflags,
-              cc,
-              triple,
-              cflags,
-              defs,
-              includes,
-              emit_task_specs,
-            )?
-            task_specs = task_specs.push(task_spec)
-            task_count += 1
-            archive_outputs = archive_outputs.push(member_out)
-            archive_deps = archive_deps.push(member_out.display())
-          }
-          Err(_) => {
-            if is_known_generated_object(member) {
-              generated_objects = generated_objects.push(member)
-            } else {
-              missing_sources = missing_sources.push(member)
-            }
+        if let Ok(source) = source_for_object(member) {
+          let member_out = obj_out_path(member)
+          let task_spec = archive_compile_task_spec(
+            member,
+            source,
+            member_out,
+            composite_out,
+            member_cflags,
+            cc,
+            triple,
+            cflags,
+            defs,
+            includes,
+            emit_task_specs,
+          )?
+          task_specs += [task_spec]
+          task_count += 1
+          archive_outputs += [member_out]
+          archive_deps = archive_deps.push(member_out.display())
+        } else {
+          if is_known_generated_object(member) {
+            generated_objects += [member]
+          } else {
+            missing_sources += [member]
           }
         }
 
@@ -7002,7 +6741,7 @@ proc analyze_archive_items_impl(
         )?
         has_pi = true
         task_count += 3
-        archive_outputs = archive_outputs.push(out)
+        archive_outputs += [out]
         archive_deps = archive_deps.push(f"{out}:relacheck")
         task_specs = task_specs.push({
           kind: "pi",
@@ -7013,40 +6752,37 @@ proc analyze_archive_items_impl(
           base_task: base_task_spec,
         })
       } else {
-        generated_objects = generated_objects.push(obj)
+        generated_objects += [obj]
       }
     } else {
-      match source_for_object(obj) {
-        Ok(source) => {
-          let out = obj_out_path(obj)
-          let task_spec = archive_compile_task_spec(
-            obj,
-            source,
-            out,
-            out,
-            flags,
-            cc,
-            triple,
-            cflags,
-            defs,
-            includes,
-            emit_task_specs,
-          )?
-          task_specs = task_specs.push(task_spec)
-          task_count += 1
-          archive_outputs = archive_outputs.push(out)
-          archive_deps = archive_deps.push(out.display())
-        }
-        Err(_) => {
-          let out = obj_out_path(obj)
+      if let Ok(source) = source_for_object(obj) {
+        let out = obj_out_path(obj)
+        let task_spec = archive_compile_task_spec(
+          obj,
+          source,
+          out,
+          out,
+          flags,
+          cc,
+          triple,
+          cflags,
+          defs,
+          includes,
+          emit_task_specs,
+        )?
+        task_specs += [task_spec]
+        task_count += 1
+        archive_outputs += [out]
+        archive_deps = archive_deps.push(out.display())
+      } else {
+        let out = obj_out_path(obj)
 
-          if out.exists()? {
-            link_inputs = link_inputs.push(out)
-          } else if is_known_generated_object(obj) {
-            generated_objects = generated_objects.push(obj)
-          } else {
-            missing_sources = missing_sources.push(obj)
-          }
+        if out.exists()? {
+          link_inputs += [out]
+        } else if is_known_generated_object(obj) {
+          generated_objects += [obj]
+        } else {
+          missing_sources += [obj]
         }
       }
     }
@@ -7068,7 +6804,7 @@ proc analyze_archive_items_impl(
     )
   }
 
-  return results
+  results
 }
 
 # Caller-built items may use the legacy `members: [{object, flags}]` composite shape.
@@ -7085,22 +6821,22 @@ proc archive_analysis_item_from_record(item: Record) [error] -> Result[ArchiveAn
     [member.get("flags")?.require(List[Str])? for member in members]
   }
 
-  return {
-    object: item.get("object")?.require(Str)?,
-    owner: item.get("owner")?.require(Str)?,
-    library: item.get("library")?.require(Bool)?,
-    pi: item.get("pi")?.require(Bool)?,
-    composite: item.get("composite")?.require(Str)?,
+  {
+    object: item.get("object")?.require()?,
+    owner: item.get("owner")?.require()?,
+    library: item.get("library")?.require()?,
+    pi: item.get("pi")?.require()?,
+    composite: item.get("composite")?.require()?,
     member_objects,
     member_flags,
-    flags: item.get("flags")?.require(List[Str])?,
+    flags: item.get("flags")?.require()?,
   }
 }
 
 ## Exported declaration `analyze_archive_items`.
 export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
-  return analyze_archive_items_impl(typed_items, p".", "", [], [], [], false)?
+  analyze_archive_items_impl(typed_items, p".", "", [], [], [], false)?
 }
 
 ## Exported declaration `analyze_archive_items_with_task_specs`.
@@ -7112,16 +6848,14 @@ export proc analyze_archive_items_with_task_specs(
   defs: List[Str],
   includes: List[Str],
 ) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
-  return analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, true)?
+  analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, true)?
 }
 
 pure archive_analysis_worker_count(requested: Int, item_count: Int) -> Int {
-  if item_count == 0 {
-    return 0
-  }
+  return 0 when item_count == 0
 
   let bounded = if requested < 1 { 1 } else if requested > 16 { 16 } else { requested }
-  return if bounded > item_count { item_count } else { bounded }
+  if bounded > item_count { item_count } else { bounded }
 }
 
 proc archive_analysis_process_pool(
@@ -7173,19 +6907,19 @@ proc archive_analysis_process_pool(
       input_path,
       ArchiveAnalysisInput(
         context: context_path.display(),
-        start: start,
-        end: end,
+        start:,
+        end:,
         flags: flags_path.display(),
-        emit_task_specs: emit_task_specs,
+        emit_task_specs:,
         cc: cc.display(),
-        triple: triple,
-        cflags: cflags,
-        defs: defs,
-        includes: includes,
+        triple:,
+        cflags:,
+        defs:,
+        includes:,
       ),
     )?
-    input_paths = input_paths.push(input_path)
-    output_paths = output_paths.push(output_path)
+    input_paths += [input_path]
+    output_paths += [output_path]
 
     let command = process.command_argv(
       xsh_bin,
@@ -7202,7 +6936,7 @@ proc archive_analysis_process_pool(
 
   let statuses = wait handles?
   for status in statuses {
-    if ! status.exited_with(0) {
+    guard status.exited_with(0) else {
       return Err(ScriptError.Failed("kbuild-archive-analysis-pool", "an archive-analysis worker failed"))
     }
   }
@@ -7210,17 +6944,17 @@ proc archive_analysis_process_pool(
   var results: List[ArchiveAnalysisResult] = []
   for output_path in output_paths {
     let worker_results = json.read(output_path)?.require(List[ArchiveAnalysisResult])?
-    results = results.extend(worker_results)
+    results += worker_results
   }
 
-  return results
+  results
 }
 
 pure archive_compile_task_from_spec(spec: ArchiveCompileTaskSpec) -> make.MakeTask {
   let source = fp"{spec.source}"
   let output = fp"{spec.output}"
 
-  return {
+  {
     name: output.display(),
     outputs: [
       output,
@@ -7258,17 +6992,10 @@ proc assemble_builtin_archive_plan(
   var pi_relacheck_added = false
 
   for result in analysis_results {
-    let owner_key = result.owner
-    let library = result.library
-    let result_tasks = result.tasks
-    let result_task_count = result.task_count
-    let result_archive_outputs = result.archive_outputs
-    let result_archive_deps = result.archive_deps
-    let result_has_pi = result.has_pi
-    let result_link_inputs = result.link_inputs
+    let {owner: owner_key, library, tasks: result_tasks, task_count: result_task_count, archive_outputs: result_archive_outputs, archive_deps: result_archive_deps, has_pi: result_has_pi, link_inputs: result_link_inputs, ..} = result
 
     if ! materialize_tasks {
-      deferred_task_specs = deferred_task_specs.extend(result_tasks)
+      deferred_task_specs += result_tasks
     }
 
     if materialize_tasks {
@@ -7307,7 +7034,7 @@ proc assemble_builtin_archive_plan(
           let input_key = path_key(out)
           if ! (link_input_seen.get(input_key) ?? false) {
             link_input_seen[input_key] = true
-            link_inputs = link_inputs.push(out)
+            link_inputs += [out]
           }
 
           objects_by_dir = objects_by_dir.push(owner_key, out)
@@ -7324,7 +7051,7 @@ proc assemble_builtin_archive_plan(
           let input_key = path_key(out)
           if ! (link_input_seen.get(input_key) ?? false) {
             link_input_seen[input_key] = true
-            link_inputs = link_inputs.push(out)
+            link_inputs += [out]
           }
 
           if library {
@@ -7348,7 +7075,7 @@ proc assemble_builtin_archive_plan(
       var output_index = 0
       for output in result_archive_outputs {
         let output_path = fp"{output}"
-        link_inputs = link_inputs.push(output_path)
+        link_inputs += [output_path]
         let dep = result_archive_deps.get(output_index) ?? ""
 
         if library {
@@ -7372,7 +7099,7 @@ proc assemble_builtin_archive_plan(
       let input_key = path_key(input_path)
       if ! (link_input_seen.get(input_key) ?? false) {
         link_input_seen[input_key] = true
-        link_inputs = link_inputs.push(input_path)
+        link_inputs += [input_path]
       }
 
       if library {
@@ -7468,7 +7195,7 @@ proc assemble_builtin_archive_plan(
       }
 
       task_count += 1
-      archives = archives.push(lib_archive)
+      archives += [lib_archive]
     }
 
     var objs = objects_by_dir.get(dir_key) ?? []
@@ -7487,7 +7214,7 @@ proc assemble_builtin_archive_plan(
           marker_dep = child_archive.display()
           has_marker_archive = true
         } else {
-          child_archives = child_archives.push(child_archive)
+          child_archives += [child_archive]
         }
       }
     }
@@ -7505,7 +7232,7 @@ proc assemble_builtin_archive_plan(
     }
 
     for child_archive in child_archives {
-      objs = objs.push(child_archive)
+      objs += [child_archive]
       deps = deps.push(child_archive.display())
     }
 
@@ -7516,7 +7243,7 @@ proc assemble_builtin_archive_plan(
       }
 
       task_count += 1
-      archives = archives.push(built_archive)
+      archives += [built_archive]
     }
   }
 
@@ -7524,7 +7251,7 @@ proc assemble_builtin_archive_plan(
 
   archive_plan_progress(f"xsh-kbuild-archive-plan complete {task_count} tasks {archives.len()} archives")?
 
-  return {
+  {
     tasks: if materialize_tasks { tasks } else { [] },
     task_specs: if materialize_tasks { [] } else { deferred_task_specs },
     task_count: task_count,
@@ -7556,7 +7283,7 @@ export proc plan_builtin_archives(
     includes,
     emit_task_specs,
   )?
-  return assemble_builtin_archive_plan(plan, cc, results)
+  assemble_builtin_archive_plan(plan, cc, results)
 }
 
 # Archive analysis is isolated at a process boundary because source probes and
@@ -7576,7 +7303,7 @@ export proc plan_builtin_archives_with_analysis_workers(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, env, time, error] -> Result[BuiltinArchivePlan] {
-  if analysis_jobs <= 1 {
+  guard analysis_jobs > 1 else {
     return plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
   }
 
@@ -7613,5 +7340,5 @@ export proc plan_builtin_archives_with_analysis_workers(
   let merge_start = archive_plan_timing_start("merge")
   let archive_plan = assemble_builtin_archive_plan(plan, cc, results)?
   archive_plan_timing_done("merge", merge_start)
-  return archive_plan
+  archive_plan
 }

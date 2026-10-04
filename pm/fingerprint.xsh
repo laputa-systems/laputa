@@ -14,9 +14,7 @@ pure ignored_tree_path(rel: Path) -> Bool {
 }
 
 pure package_input_path(rel: Path) -> Bool {
-  if ignored_tree_path(rel) or rel.name == "proof.xsh" {
-    return false
-  }
+  return false when ignored_tree_path(rel) or rel.name == "proof.xsh"
 
   let key = rel.display()
   rel.name.ends_with(".xsh") or key == "files" or key.starts_with("files/") or key == "patches" or key.starts_with(
@@ -30,10 +28,10 @@ proc tree_entry_line(root: Path, path_value: Path, prefix: Str) [fs, error] -> R
   let label = canonical_field(rel.display())
 
   match metadata.kind {
-    "file" => return f"{prefix}\tfile\t{label}\t{metadata.mode % 4096}\t{hash.sha256(path_value)?.hex()}"
-    "symlink" => return f"{prefix}\tsymlink\t{label}\t{metadata.mode % 4096}\t{canonical_field(path_value.readlink()?.display())}"
-    "dir" => return f"{prefix}\tdir\t{label}\t{metadata.mode % 4096}"
-    _ => return f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
+    "file" => f"{prefix}\tfile\t{label}\t{metadata.mode % 4096}\t{hash.sha256(path_value)?.hex()}"
+    "symlink" => f"{prefix}\tsymlink\t{label}\t{metadata.mode % 4096}\t{canonical_field(path_value.readlink()?.display())}"
+    "dir" => f"{prefix}\tdir\t{label}\t{metadata.mode % 4096}"
+    _ => f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
   }
 }
 
@@ -46,18 +44,14 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
   var all_checksum = ""
 
   for checksum in source.checksums {
-    if checksum.arch == arch {
-      return checksum.sha256
-    }
+    return checksum.sha256 when checksum.arch == arch
 
     if checksum.arch == "all" {
       all_checksum = checksum.sha256
     }
   }
 
-  if all_checksum != "" {
-    return all_checksum
-  }
+  return all_checksum when all_checksum != ""
 
   Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
 }
@@ -65,21 +59,15 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
 # Returns whether a relative symlink target, resolved lexically from the link's
 # own directory, stays inside the tree that contains the link at `rel`.
 pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
-  if target == "" or target.starts_with("/") {
-    return false
-  }
+  return false when target == "" or target.starts_with("/")
 
   var depth = rel.display().split("/").len() - 1
 
   for component in target.split("/") {
-    if component == "" or component == "." {
-      continue
-    }
+    continue when component == "" or component == "."
 
     if component == ".." {
-      if depth == 0 {
-        return false
-      }
+      return false when depth == 0
 
       depth -= 1
     } else {
@@ -269,7 +257,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str] {
 
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
 export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
-  if ! fs.exists(core_root)? {
+  guard fs.exists(core_root)? else {
     return Err(types.PmError.PackageContract(f"{core_root} is missing"))
   }
 

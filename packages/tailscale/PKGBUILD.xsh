@@ -1,28 +1,28 @@
 ##! Package recipe metadata and build operations.
 ## Package recipe export.
-export let name = "tailscale"
+export const name = "tailscale"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.96.4"
+export const ver = "1.96.4"
 
 ## Package recipe export.
-export let rel = "12"
+export const rel = "12"
 
 ## Package recipe export.
 export let deps = []
 
 ## The build only installs the prebuilt static binaries and the service
 ## module; tailscaled drives iptables and runs under xinit at runtime.
-export let runtime_only_deps = ["iptables", "xinit"]
+export const runtime_only_deps = ["iptables", "xinit"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://pkgs.tailscale.com/stable/tailscale_VERSION_GOARCH.tgz",
     kind: "auto",
@@ -60,7 +60,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/tailscale",
     kind: "binary",

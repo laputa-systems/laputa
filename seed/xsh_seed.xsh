@@ -171,9 +171,7 @@ export pure xsh_seed_cargo_fetch_argv(docker: Path, laputa_root: Path, xsh_root:
 proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, error] {
   let status = process.run(process.command_argv(docker, argv, cwd))?
 
-  if ! status.ok {
-    return Err(SeedError.Failed(f"{what} failed"))
-  }
+  return Err(SeedError.Failed(f"{what} failed")) unless status.ok
 }
 
 proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, error] -> Result[Bool] {
@@ -188,7 +186,7 @@ proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, er
 
 proc xsh_seed_require_checkout(xsh_root: Path) [fs, error] {
   for required in [fp"{xsh_root}/Cargo.lock", fp"{xsh_root}/Dockerfile.test", fp"{xsh_root}/core"] {
-    if ! fs.exists(required)? {
+    guard fs.exists(required)? else {
       return Err(SeedError.Missing(f"XSH_ROOT is not an XSH checkout: {required} is missing"))
     }
   }
@@ -228,7 +226,7 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
 }
 
 proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) [fs, process, error] {
-  if ! xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root)? {
+  guard xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root)? else {
     return Err(SeedError.Missing(f"Docker image {xsh_seed_build_image} is missing; run `make fetch`"))
   }
 
@@ -257,7 +255,7 @@ export pure xsh_seed_core_install_path(relative_source: Path) -> Path {
 
 proc xsh_seed_core_sources(xsh_root: Path) [fs, error] -> Result[List[Path]] {
   let core = fp"{xsh_root}/core"
-  var sources: List[Path] = []
+  var sources = []
 
   for entry in fs.walk(core, hidden: true)? {
     if entry.kind == "file" and entry.path.ext() == "xsh" {
@@ -284,7 +282,7 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
   let handle = fs.tempdir()?
   defer handle.close()?
   let stage = handle.host_path()?
-  var entries: List[Path] = []
+  var entries = []
 
   for relative in sources {
     let installed = xsh_seed_core_install_path(relative)
@@ -302,13 +300,11 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
 # Replace a product only when its bytes changed, so an unchanged rebuild keeps
 # the seed directory, and with it the `xsh` package key, byte-identical.
 proc xsh_seed_publish_binary(source: Path, dest: Path) [fs, error] {
-  if ! fs.exists(source)? {
+  guard fs.exists(source)? else {
     return Err(SeedError.Missing(f"cargo did not produce {source}"))
   }
 
-  if fs.exists(dest)? and hash.sha256(dest)?.hex() == hash.sha256(source)?.hex() {
-    return
-  }
+  return when fs.exists(dest)? and hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
 
   let temporary = fp"{dest}.tmp"
   fs.install(source, temporary, 0o755, parents: true, overwrite: true)?
@@ -378,11 +374,7 @@ export proc xsh_seed_build(
     archive.tar_extract(core_archive, out, 0, "xz", true)?
   }
 
-  var files: Map[Str] = {}
-  for product in xsh_seed_binaries {
-    files[product] = hash.sha256(fp"{out}/{product}")?.hex()
-  }
-
+  var files: Map[Str] = {product: hash.sha256(fp"{out}/{product}")?.hex() for product in xsh_seed_binaries}
   files["core.tar.xz"] = hash.sha256(core_archive)?.hex()
 
   let dirty = xsh_seed_git_text(xsh_root, ["status", "--porcelain"])? != ""
@@ -419,7 +411,7 @@ export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result
     return Err(SeedError.Failed(f"{manifest} has format {format}; run `make seed`"))
   }
 
-  let files: Record = value.get("files")?.require(Record)?
+  let files = value.get("files")?.require(Record)?
   for name in xsh_seed_binaries.push("core.tar.xz") {
     let expected: Str = files.get(name)?.require()?
     let file = fp"{out}/{name}"
@@ -440,7 +432,7 @@ export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result
 ## Binaries and core applets come from one seed directory, so a container
 ## never pairs one XSH build's interpreter with another build's applets.
 export pure xsh_seed_mount_argv(seed: Path) -> List[Str] {
-  var argv: List[Str] = []
+  var argv = []
 
   for product in xsh_seed_binaries {
     argv = argv.extend(["--mount", f"type=bind,src={seed}/{product},dst=/bin/{product},readonly"])

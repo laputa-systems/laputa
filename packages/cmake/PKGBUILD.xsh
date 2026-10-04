@@ -6,25 +6,25 @@ use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 ## Exported declaration `name`.
-export let name = "cmake"
+export const name = "cmake"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "4.3.1"
+export const ver = "4.3.1"
 
 ## Exported declaration `rel`.
-export let rel = "18"
+export const rel = "18"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "llvm-toolchain"]
+export const deps = ["musl", "llvm-toolchain"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "samurai"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://cmake.org/files/vMAJOR.MINOR/cmake-VERSION.tar.gz",
     kind: "auto",
@@ -80,7 +80,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr",
     kind: "tree",

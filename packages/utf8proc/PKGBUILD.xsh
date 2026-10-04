@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Package recipe export.
-export let name = "utf8proc"
+export const name = "utf8proc"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "2.10.0"
+export const ver = "2.10.0"
 
 ## Package recipe export.
-export let rel = "8"
+export const rel = "8"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/JuliaStrings/utf8proc/archive/vVERSION.tar.gz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/utf8proc.h",
     kind: "file",

@@ -3,22 +3,22 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "libinput"
+export const name = "libinput"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.31.2"
+export const ver = "1.31.2"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
+export const deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "linux",
   "muon",
@@ -30,7 +30,7 @@ export let mkdeps_host = [
 ]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/libinput/libinput/-/archive/VERSION/libinput-VERSION.tar.gz",
     kind: "auto",
@@ -47,7 +47,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/libinput",
     kind: "binary",

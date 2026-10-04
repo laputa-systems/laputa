@@ -1,15 +1,15 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "baselayout"
+export const name = "baselayout"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1"
+export const ver = "1"
 
 ## Exported declaration `rel`.
-export let rel = "15"
+export const rel = "15"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -18,10 +18,10 @@ export let deps = []
 export let mkdeps_host = []
 
 ## The init scripts and `getent` are XSH scripts; they need the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"files/rootfs",
     kind: "auto",
@@ -40,7 +40,7 @@ export let upstream_sources = [
 ## Exported declaration `filetree`.
 ## Empty mount and state directories are payload, not ambient host state. In
 ## particular, the kernel mounts devtmpfs before PID 1 can create /dev.
-export let filetree = [
+export const filetree = [
   {
     path: p"boot",
     kind: "tree",

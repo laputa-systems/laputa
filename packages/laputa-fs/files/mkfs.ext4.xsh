@@ -2,12 +2,12 @@
 ##! XSH module `mkfs.ext4` package and build operations.
 error Ext4ToolError = Failed(kind: Str, message: Str)
 
-let BLOCK_SIZE = 4096
-let BLOCKS_PER_GROUP = 32768
-let INODES_PER_GROUP = 8192
-let INODE_SIZE = 256
-let INODE_TABLE_BLOCKS = 512
-let FIXED_TIME = 1700000000
+const BLOCK_SIZE = 4096
+const BLOCKS_PER_GROUP = 32768
+const INODES_PER_GROUP = 8192
+const INODE_SIZE = 256
+const INODE_TABLE_BLOCKS = 512
+const FIXED_TIME = 1700000000
 
 type ExtEntry = {
   rel: Str,
@@ -41,23 +41,21 @@ type BlockResult = {used: Map[Bool], next: Int, block: Int}
 type DirItem = {inode: Int, name: Str, kind: Str}
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
-  if value == 0 {
-    return 0
-  }
+  return 0 when value == 0
 
-  return (value + divisor - 1) / divisor
+  (value + divisor - 1) / divisor
 }
 
 pure align4(value: Int) -> Int {
-  return ceil_div(value, 4) * 4
+  ceil_div(value, 4) * 4
 }
 
 pure min_int(left: Int, right: Int) -> Int {
-  if left < right {
+  guard left >= right else {
     return left
   }
 
-  return right
+  right
 }
 
 proc bit_value(bit: Int) [] -> Int {
@@ -69,11 +67,11 @@ proc bit_value(bit: Int) [] -> Int {
     index += 1
   }
 
-  return value
+  value
 }
 
 proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
-  return bytes.concat(
+  bytes.concat(
     [
       data.slice(offset: 0, length: offset),
       replacement,
@@ -83,26 +81,24 @@ proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] 
 }
 
 proc put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
-  return put(data, offset, bytes.pack_le(value, width)?)?
+  put(data, offset, bytes.pack_le(value, width)?)?
 }
 
 proc fixed_text(text: Str, width: Int) [error] -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
-  if raw.len() >= width {
-    return raw.slice(offset: 0, length: width)
-  }
+  return raw.slice(offset: 0, length: width) when raw.len() >= width
 
-  return bytes.concat([raw, bytes.zero(width - raw.len())?])
+  bytes.concat([raw, bytes.zero(width - raw.len())?])
 }
 
 pure metadata_reserved(block: Int) -> Bool {
-  return block % BLOCKS_PER_GROUP < 4 + INODE_TABLE_BLOCKS
+  block % BLOCKS_PER_GROUP < 4 + INODE_TABLE_BLOCKS
 }
 
 proc reserve_metadata_blocks(total_blocks: Int, groups: Int) [] -> Map[Bool] {
   let _ = [total_blocks, groups]
-  return map.empty()
+  map.empty()
 }
 
 proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error] -> Result[List[ExtEntry]] {
@@ -141,7 +137,7 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error]
     }
   }
 
-  return out
+  out
 }
 
 proc assign_inodes(entries: List[ExtEntry]) [] -> List[ExtEntry] {
@@ -153,21 +149,17 @@ proc assign_inodes(entries: List[ExtEntry]) [] -> List[ExtEntry] {
     index += 1
   }
 
-  return out
+  out
 }
 
 proc inode_for(entries: List[ExtEntry], rel: Str) [] -> Int {
-  if rel == "" {
-    return 2
-  }
+  return 2 when rel == ""
 
   for entry in entries {
-    if entry.rel == rel {
-      return entry.inode
-    }
+    return entry.inode when entry.rel == rel
   }
 
-  return 2
+  2
 }
 
 proc dir_links(entries: List[ExtEntry], rel: Str) [] -> Int {
@@ -179,29 +171,23 @@ proc dir_links(entries: List[ExtEntry], rel: Str) [] -> Int {
     }
   }
 
-  return links
+  links
 }
 
 proc dir_file_type(kind: Str) [error] -> Result[Int] {
-  if kind == "file" {
-    return 1
-  }
+  return 1 when kind == "file"
 
-  if kind == "dir" {
-    return 2
-  }
+  return 2 when kind == "dir"
 
-  if kind == "symlink" {
-    return 7
-  }
+  return 7 when kind == "symlink"
 
-  return Err(Ext4ToolError.Failed("bad-dir-kind", kind))
+  Err(Ext4ToolError.Failed("bad-dir-kind", kind))
 }
 
 proc dirent(item: DirItem, rec_len: Int) [error] -> Result[Bytes] {
   let name = bytes.from_text(item.name)
 
-  return bytes.concat(
+  bytes.concat(
     [
       bytes.pack_le(item.inode, 4)?,
       bytes.pack_le(rec_len, 2)?,
@@ -221,11 +207,11 @@ proc dir_items(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode:
     }
   }
 
-  return items
+  items
 }
 
 proc min_dirent_len(item: DirItem) [] -> Int {
-  return align4(8 + bytes.from_text(item.name).len())
+  align4(8 + bytes.from_text(item.name).len())
 }
 
 proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: Int) [error] -> Result[Bytes] {
@@ -268,21 +254,21 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
     blocks = blocks.push(bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?]))
   }
 
-  return bytes.concat(blocks)
+  bytes.concat(blocks)
 }
 
 proc allocate_block(used: Map[Bool], next: Int, total_blocks: Int) [error] -> Result[BlockResult] {
   var cursor = next
 
   while cursor < total_blocks {
-    if ! metadata_reserved(cursor) {
+    guard metadata_reserved(cursor) else {
       return {used, next: cursor + 1, block: cursor}
     }
 
     cursor += 1
   }
 
-  return Err(Ext4ToolError.Failed("full", "image is full"))
+  Err(Ext4ToolError.Failed("full", "image is full"))
 }
 
 proc next_data_block(cursor: Int) [] -> Int {
@@ -292,7 +278,7 @@ proc next_data_block(cursor: Int) [] -> Int {
     block += 1
   }
 
-  return block
+  block
 }
 
 proc skip_data_blocks(cursor: Int, count: Int) [] -> Int {
@@ -308,7 +294,7 @@ proc skip_data_blocks(cursor: Int, count: Int) [] -> Int {
     }
   }
 
-  return block
+  block
 }
 
 proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) [error] -> Result[AllocResult] {
@@ -352,7 +338,7 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
   let metadata_blocks = (if single != 0 { 1 } else { 0 }) + (if double != 0 { 1 } else { 0 }) + indirects.len()
   let blocks = []
 
-  return {
+  {
     used: current_used,
     next: current_next,
     alloc: {
@@ -375,7 +361,7 @@ proc write_block(image: Path, block: Int, data: Bytes) [error] {
 
 proc u32_block(values: List[Int]) [error] -> Result[Bytes] {
   var parts = [bytes.pack_le(value, 4)? for value in values]
-  return bytes.concat(parts)
+  bytes.concat(parts)
 }
 
 proc data_block_at(alloc: ExtAlloc, index: Int) [] -> Int {
@@ -384,9 +370,7 @@ proc data_block_at(alloc: ExtAlloc, index: Int) [] -> Int {
 
   while true {
     if ! metadata_reserved(block) {
-      if seen == index {
-        return block
-      }
+      return block when seen == index
 
       seen += 1
     }
@@ -394,7 +378,7 @@ proc data_block_at(alloc: ExtAlloc, index: Int) [] -> Int {
     block += 1
   }
 
-  return 0
+  0
 }
 
 proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int] {
@@ -405,7 +389,7 @@ proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int
   while values.len() < length and seen < alloc.count {
     if ! metadata_reserved(block) {
       if seen >= offset {
-        values = values.push(block)
+        values += [block]
       }
 
       seen += 1
@@ -414,7 +398,7 @@ proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int
     block += 1
   }
 
-  return values
+  values
 }
 
 proc write_indirect_blocks(image: Path, alloc: ExtAlloc) [error] {
@@ -427,7 +411,7 @@ proc write_indirect_blocks(image: Path, alloc: ExtAlloc) [error] {
     var offset = 1036
 
     for indirect in alloc.indirects {
-      double_ptrs = double_ptrs.push(indirect)
+      double_ptrs += [indirect]
       let end = min_int(offset + 1024, alloc.count)
       write_block(image, indirect, u32_block(data_blocks_slice(alloc, offset, end - offset))?)?
       offset = end
@@ -460,7 +444,7 @@ proc allocate_bytes(
   }
 
   write_indirect_blocks(image, result.alloc)?
-  return result
+  result
 }
 
 proc allocate_file(
@@ -493,9 +477,9 @@ proc allocate_file(
     let copied = bytes.copy_file(
       source,
       image,
-      source_offset: source_offset,
+      source_offset:,
       dest_offset: first * BLOCK_SIZE,
-      length: length,
+      length:,
       create: false,
       truncate: false,
     )?
@@ -507,7 +491,7 @@ proc allocate_file(
   }
 
   write_indirect_blocks(image, result.alloc)?
-  return result
+  result
 }
 
 proc inode_bytes(
@@ -548,7 +532,7 @@ proc inode_bytes(
     out = put_le(out, 92, alloc.double, 4)?
   }
 
-  return out
+  out
 }
 
 proc write_inode(image: Path, inode: Int, data: Bytes) [error] {
@@ -574,7 +558,7 @@ proc group_desc(
   out = put_le(out, 12, free_blocks, 2)?
   out = put_le(out, 14, free_inodes, 2)?
   out = put_le(out, 16, used_dirs, 2)?
-  return out
+  out
 }
 
 proc superblock(
@@ -633,7 +617,7 @@ proc superblock(
   )?
 
   out = put(out, 120, fixed_text(label, 16)?)?
-  return out
+  out
 }
 
 proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) [error] -> Result[Bytes] {
@@ -654,11 +638,11 @@ proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) [err
       bit += 1
     }
 
-    out = out.push(value)
+    out += [value]
     byte_index += 1
   }
 
-  return bytes.from_ints(out)?
+  bytes.from_ints(out)?
 }
 
 proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) [error] -> Result[Bytes] {
@@ -680,11 +664,11 @@ proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) [error] -> Result[Byte
       bit += 1
     }
 
-    out = out.push(value)
+    out += [value]
     byte_index += 1
   }
 
-  return bytes.from_ints(out)?
+  bytes.from_ints(out)?
 }
 
 proc used_dirs_in_group(entries: List[ExtEntry], group_index: Int) [] -> Int {
@@ -696,7 +680,7 @@ proc used_dirs_in_group(entries: List[ExtEntry], group_index: Int) [] -> Int {
     }
   }
 
-  return count
+  count
 }
 
 proc write_headers(
@@ -792,9 +776,7 @@ proc zero_image(image: Path, size: Int) [error] {
 proc image_size(image: Path) [fs, error] -> Result[Int] {
   let size = image.metadata()?.size
 
-  if size > 0 {
-    return size
-  }
+  return size when size > 0
 
   let sectors_path = fp"/sys/class/block/{image.name}/size"
 
@@ -802,7 +784,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
     return fs.read_text(sectors_path)?.trim().parse_int()? * 512
   }
 
-  return size
+  size
 }
 
 proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
@@ -837,8 +819,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
 
   for entry in entries {
     if entry.kind == "dir" {
-      let parent_inode = inode_for(entries, entry.parent)
-      let data = dir_data(entries, entry.rel, entry.inode, parent_inode)?
+      let data = inode_for(entries, entry.parent) |> dir_data(entries, entry.rel, entry.inode, _)?
       result = allocate_bytes(image, used, next, total_blocks, data)?
       used = result.used
       next = result.next

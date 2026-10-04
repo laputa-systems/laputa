@@ -18,7 +18,7 @@ export error ProofError = Failed(kind: Str, message: Str)
 
 ## Exported PM declaration `ensure`.
 export proc ensure(condition: Bool, kind: Str, message: Str) [error] {
-  if ! condition {
+  guard condition else {
     return Err(ProofError.Failed(kind, message))
   }
 }
@@ -33,15 +33,13 @@ proc package_dependency_map(root: Path) [fs, error] -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
   let packages_db = fp"{root}/var/lib/xsh-pm/packages"
 
-  if ! fs.exists(packages_db)? {
-    return package_deps
-  }
+  return package_deps unless fs.exists(packages_db)?
 
   for entry in fs.children(packages_db) |> where .kind == "dir" {
     let metadata_path = fp"{entry.path}/metadata.json"
 
     if fs.exists(metadata_path)? {
-      let metadata: Record = json.read(metadata_path)?.require(Record)?
+      let metadata = json.read(metadata_path)?.require(Record)?
       var deps: List[Str] = []
 
       if "deps" in metadata {
@@ -87,15 +85,11 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
 
 ## Exported PM declaration `elf_machine_name`.
 export pure elf_machine_name(arch: Str) -> Str {
-  if arch == "aarch64" {
-    return "AArch64"
-  }
+  return "AArch64" when arch == "aarch64"
 
-  if arch == "x86_64" {
-    return "X86-64"
-  }
+  return "X86-64" when arch == "x86_64"
 
-  return arch
+  arch
 }
 
 ## Exported PM declaration `readelf_tool`.
@@ -103,20 +97,15 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path] {
   let host_readelf = /usr/bin/readelf
   let host_llvm_readelf = /usr/bin/llvm-readelf
 
-  if fs.exists(host_readelf)? {
-    return host_readelf
+  return host_readelf when fs.exists(host_readelf)?
+
+  return host_llvm_readelf when fs.exists(host_llvm_readelf)?
+
+  if let Ok(tool) = process.which("readelf") {
+    return tool
   }
 
-  if fs.exists(host_llvm_readelf)? {
-    return host_llvm_readelf
-  }
-
-  match process.which("readelf") {
-    Ok(tool) => return tool
-    Err(_) => {}
-  }
-
-  return process.which("llvm-readelf")?
+  process.which("llvm-readelf")?
 }
 
 ## Exported PM declaration `target_elf`.
@@ -135,14 +124,10 @@ proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
   if configured != "" {
     let selected = fp"{configured}"
 
-    if fs.exists(selected)? {
-      return selected
-    }
+    return selected when fs.exists(selected)?
   }
 
-  if fs.exists(/bin/xsh)? {
-    return /bin/xsh
-  }
+  return /bin/xsh when fs.exists(/bin/xsh)?
 
   process.which("xsh")?
 }
@@ -191,8 +176,6 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 
     return Err(types.PmError.ExtensionFailed(f"package proof for {pkg.name} was signaled"))
   }
-
-  return Ok()
 }
 
 ## Writes the deterministic proof receipt that binds a proof input to one exact payload artifact.

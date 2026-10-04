@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Package recipe export.
-export let name = "zlib"
+export const name = "zlib"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.3.2"
+export const ver = "1.3.2"
 
 ## Package recipe export.
-export let rel = "13"
+export const rel = "13"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://zlib.net/fossils/zlib-VERSION.tar.gz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/zconf.h",
     kind: "file",

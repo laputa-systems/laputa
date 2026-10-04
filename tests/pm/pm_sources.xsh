@@ -11,9 +11,7 @@ const sha256_of_empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991
 proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
-  if configured != "" {
-    return path.absolute(fp"{configured}")?
-  }
+  return path.absolute(fp"{configured}")? when configured != ""
 
   process.which("xsh")?
 }
@@ -89,7 +87,7 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
   }?
 
-  test.eq(fs.read_text(fp"{src}/hello.txt")?, "hello from the cache\n")?
+  assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
 }
 
 test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error] { |ctx|
@@ -107,8 +105,8 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
   }?
 
-  test.eq(fs.read_text(fp"{src}/hello.txt")?, "hello from the cache\n")?
-  test.eq(hash.sha256(sources.source_cache_entry(cache, tarball.sha256))?.hex(), tarball.sha256)?
+  assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
+  assert hash.sha256(sources.source_cache_entry(cache, tarball.sha256))?.hex() == tarball.sha256
 }
 
 test test_missing_url_source_without_a_mirror_says_to_run_make_fetch [fs, net, env, error] { |ctx|
@@ -123,7 +121,7 @@ test test_missing_url_source_without_a_mirror_says_to_run_make_fetch [fs, net, e
     )?
   }?
 
-  test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
+  assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
 
 test test_unreachable_http_mirror_is_asked_by_content_address [fs, net, env, error] { |ctx|
@@ -138,7 +136,7 @@ test test_unreachable_http_mirror_is_asked_by_content_address [fs, net, env, err
     )?
   }?
 
-  test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
+  assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
 
 test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env, error] { |ctx|
@@ -158,7 +156,7 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
     )?
   }?
 
-  test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
+  assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
 
 test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] { |ctx|
@@ -179,7 +177,7 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
     )?
   }?
 
-  test.eq(fs.children(src)? |> count(), 0)?
+  assert (fs.children(src)? |> count()) == 0
 }
 
 test test_url_sources_must_pin_a_sha256 [error] {
@@ -193,30 +191,18 @@ test test_url_sources_must_pin_a_sha256 [error] {
     Err(problem) => assert "malformed sha256" in problem.message
   }
 
-  test.eq(sources.mirror_source_url("http://127.0.0.1:3000/", "abc"), "http://127.0.0.1:3000/sources/sha256/abc")?
+  assert sources.mirror_source_url("http://127.0.0.1:3000/", "abc") == "http://127.0.0.1:3000/sources/sha256/abc"
 }
 
 test test_source_placeholders_expand_only_as_whole_words [error] {
   let pkg = {...url_package("", sha256_of_empty), name: "tailscale", ver: "1.96.4"}
 
-  test.eq(
-    util.expand_source("https://h/tailscale_VERSION_GOARCH.tgz", pkg, "aarch64", "aarch64"),
-    "https://h/tailscale_1.96.4_arm64.tgz",
-  )?
-  test.eq(
-    util.expand_source("https://h/vMAJOR.MINOR/x-VERSION-ARCH.tar.xz", pkg, "x86_64", "x86_64"),
-    "https://h/v1.96/x-1.96.4-x86_64.tar.xz",
-  )?
-  test.eq(
-    util.expand_source("TARGET_ARCH BUILD_ARCH TARGET_TRIPLE", pkg, "x86_64", "aarch64"),
-    "x86_64 aarch64 x86_64-linux-musl",
-  )?
+  assert util.expand_source("https://h/tailscale_VERSION_GOARCH.tgz", pkg, "aarch64", "aarch64") == "https://h/tailscale_1.96.4_arm64.tgz"
+  assert util.expand_source("https://h/vMAJOR.MINOR/x-VERSION-ARCH.tar.xz", pkg, "x86_64", "x86_64") == "https://h/v1.96/x-1.96.4-x86_64.tar.xz"
+  assert util.expand_source("TARGET_ARCH BUILD_ARCH TARGET_TRIPLE", pkg, "x86_64", "aarch64") == "x86_64 aarch64 x86_64-linux-musl"
   # Words that merely contain a placeholder stay as written.
-  test.eq(
-    util.expand_source("PATCHES/SEARCH/ARCHIVE/PACKAGES", pkg, "aarch64", "aarch64"),
-    "PATCHES/SEARCH/ARCHIVE/PACKAGES",
-  )?
-  test.eq(util.expand_source("PATCH-PACKAGE", pkg, "aarch64", "aarch64"), "4-tailscale")?
+  assert util.expand_source("PATCHES/SEARCH/ARCHIVE/PACKAGES", pkg, "aarch64", "aarch64") == "PATCHES/SEARCH/ARCHIVE/PACKAGES"
+  assert util.expand_source("PATCH-PACKAGE", pkg, "aarch64", "aarch64") == "4-tailscale"
   # Substituted values are not rescanned for placeholders.
   test.eq(util.expand_source("VERSION", {...pkg, ver: "ARCH"}, "aarch64", "aarch64"), "ARCH")?
 }
@@ -282,7 +268,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   let argv = ["sources", "fetch", "--repo", repository.display(), "--all", "--target", "aarch64-linux-musl"]
 
   let first = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- @argv ?
-  test.eq(first.status.ok, false)?
+  assert first.status.ok == false
   assert "fetched" in first.stderr
   assert "dead fetchdemo" in first.stderr
   assert "gone.txt: missing file" in first.stderr
@@ -290,8 +276,8 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   assert "0 cached" in first.stdout
   assert "1 fetched" in first.stdout
   assert "2 failed" in first.stdout
-  test.eq(fs.read_text(sources.source_cache_entry(cache, good_sha256))?, "good bytes\n")?
-  test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
+  assert fs.read_text(sources.source_cache_entry(cache, good_sha256))? == "good bytes\n"
+  assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 
   let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository fetchdemo ?
   assert "1 cached" in second.stdout
@@ -316,8 +302,8 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
     output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo ?
   } ?
 
-  test.eq(output.trim(), f"fetchdemo {new_sha256}")?
-  test.eq(fs.read_text(sources.source_cache_entry(cache, new_sha256))?, "new upstream bytes\n")?
+  assert output.trim() == f"fetchdemo {new_sha256}"
+  assert fs.read_text(sources.source_cache_entry(cache, new_sha256))? == "new upstream bytes\n"
   # The download is staged in a private temporary directory, never the caller's cwd.
-  test.eq(fs.children(cwd)? |> count(), 0)?
+  assert (fs.children(cwd)? |> count()) == 0
 }

@@ -3,7 +3,7 @@ use PKGBUILD-shared as PKGBUILD_shared
 use kbuild
 
 pure x86_kbuild_cflags() -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-std=gnu11",
     "-Wall",
@@ -54,7 +54,7 @@ pure x86_kbuild_cflags() -> List[Str] {
 }
 
 pure x86_kbuild_includes() -> List[Str] {
-  return [
+  [
     "-nostdinc",
     "-I./arch/x86/include",
     "-I./arch/x86/include/generated",
@@ -74,7 +74,7 @@ pure x86_kbuild_includes() -> List[Str] {
 }
 
 pure x86_vdso_cflags() -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-std=gnu11",
     "-Wall",
@@ -116,12 +116,12 @@ pure x86_vdso_base(cc: Path) -> List[Str] {
   )
 
   let with_includes = with_flags.extend(x86_kbuild_includes())
-  return with_includes.extend(["-I./arch/x86/entry/vdso", "-I."])
+  with_includes.extend(["-I./arch/x86/entry/vdso", "-I."])
 }
 
 proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
-  let symbol_re = regex.compile("^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$")?
-  let leading_zero_re = regex.compile("^00*")?
+  let symbol_re = rx"^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$"
+  let leading_zero_re = rx"^00*"
   let symbols = run.text $nm "arch/x86/entry/vdso/vdso64/vdso64.so.dbg" ?
   var out = ""
 
@@ -204,7 +204,7 @@ proc build_x86_vdso(cc: Path) [fs, process, env, error] {
     PKGBUILD_shared.emit_kbuild_progress(f"xsh-kbuild-x86-vdso compile {item.object}")?
 
     PKGBUILD_shared.run_native_command(
-      base.extend(asm_args).extend(["-c", item.source.display(), "-o", item.object.display()]),
+      [@base, @asm_args, "-c", item.source.display(), "-o", item.object.display()],
     )?
   }
 
@@ -227,7 +227,7 @@ proc build_x86_vdso(cc: Path) [fs, process, env, error] {
       ),
     )?
 
-    linked_objects = linked_objects.push("arch/x86/entry/vdso/vdso64/vsgx.o")
+    linked_objects += ["arch/x86/entry/vdso/vdso64/vsgx.o"]
   }
 
   PKGBUILD_shared.emit_kbuild_progress("xsh-kbuild-x86-vdso link vdso64.so.dbg")?
@@ -251,8 +251,10 @@ proc build_x86_vdso(cc: Path) [fs, process, env, error] {
       "max-page-size=4096",
       "-T",
       lds.display(),
-    ].extend(linked_objects)
-      .extend(["-o", "arch/x86/entry/vdso/vdso64/vdso64.so.dbg"]),
+      @linked_objects,
+      "-o",
+      "arch/x86/entry/vdso/vdso64/vdso64.so.dbg",
+    ],
   )?
 
   PKGBUILD_shared.emit_kbuild_progress("xsh-kbuild-x86-vdso strip vdso64.so")?
@@ -336,7 +338,7 @@ proc generate_x86_kvm_asm_offsets_header(cc: Path) [fs, process, env, error] {
   let asm_out = p".xsh-kbuild/generated/kvm-asm-offsets.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
   let with_flags = base.extend(x86_kbuild_cflags())
-  let with_includes = with_flags.extend(x86_kbuild_includes()).extend(["-I./arch/x86/kvm"])
+  let with_includes = [@with_flags, @x86_kbuild_includes(), "-I./arch/x86/kvm"]
 
   let argv = with_includes.extend(
     [
@@ -404,7 +406,7 @@ proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: 
     lines = lines.push(f"\t[{index}] = \"{value}\",")
   }
 
-  return lines.push("};")
+  lines.push("};")
 }
 
 proc generate_x86_capflags_source() [fs, error] {
@@ -412,9 +414,9 @@ proc generate_x86_capflags_source() [fs, error] {
   let vmxfeature = p"arch/x86/include/asm/vmxfeatures.h"
   var lines = ["#ifndef _ASM_X86_CPUFEATURES_H", "#include <asm/cpufeatures.h>", "#endif", ""]
   lines = lines.extend(x86_capflag_array("x86_cap_flags", "NCAPINTS*32", "X86_FEATURE_", "", cpufeature)?)
-  lines = lines.push("")
+  lines += [""]
   lines = lines.extend(x86_capflag_array("x86_bug_flags", "NBUGINTS*32", "X86_BUG_", "NCAPINTS*32", cpufeature)?)
-  lines = lines.push("")
+  lines += [""]
   lines = lines.push("#ifdef CONFIG_X86_VMX_FEATURE_NAMES")
   lines = lines.push("#ifndef _ASM_X86_VMXFEATURES_H")
   lines = lines.push("#include <asm/vmxfeatures.h>")
@@ -438,7 +440,7 @@ pure realmode_object_paths(objects: List[Str]) -> List[Str] {
 }
 
 proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, error] {
-  let symbol_re = regex.compile("^([0-9a-fA-F]+) [ABCDGRSTVW] (.+)$")?
+  let symbol_re = rx"^([0-9a-fA-F]+) [ABCDGRSTVW] (.+)$"
   let paths = realmode_object_paths(objects)
   let symbols = run.text $nm @paths ?
   var lines: List[Str] = []
@@ -446,8 +448,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   for raw in symbols.lines() {
     let caps = symbol_re.captures(raw)
 
-    if caps.len() >= 3 {
-      let name = caps[2]
+    if let [_, _, name, ..] = caps {
       lines = lines.push(f"pa_{name} = {name};")
     }
   }
@@ -458,7 +459,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
 
   for line in sorted {
     if line != previous {
-      unique = unique.push(line)
+      unique += [line]
       previous = line
     }
   }

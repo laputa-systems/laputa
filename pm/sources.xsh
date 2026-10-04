@@ -31,9 +31,7 @@ export pure ensure_source_dest(dest: Path) -> Result[Unit] {
 ## Exported PM declaration `source_checksum`.
 export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> Result[Str] {
   for checksum in source.checksums {
-    if checksum.arch == arch or checksum.arch == "all" {
-      return checksum.sha256
-    }
+    return checksum.sha256 when checksum.arch == arch or checksum.arch == "all"
   }
 
   Err(types.PmError.SourceChecksum(f"no checksum for {source.source} on {arch}"))
@@ -51,9 +49,7 @@ const sha256_hex = rx"^[0-9a-f]{64}$"
 export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path] {
   let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
 
-  if configured != "" {
-    return path.absolute(fp"{configured}")?
-  }
+  return path.absolute(fp"{configured}")? when configured != ""
 
   fp"{repo_root}/.cache/sources"
 }
@@ -121,24 +117,18 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
   defer fs.unlock(lock)?
 
-  if fs.exists(entry)? {
-    return Cached
-  }
+  return Cached when fs.exists(entry)?
 
   let partial = fp"{partial_dir}/{sha256}"
   fs.remove(partial, missing_ok: true)?
   defer fs.remove(partial, missing_ok: true)?
   let failure = util.download_file(url, partial)?
 
-  if failure != "" {
-    return Unavailable(failure)
-  }
+  return Unavailable(failure) when failure != ""
 
   let actual = hash.sha256(partial)?.hex()
 
-  if actual != sha256 {
-    return Mismatch(f"{url}: expected sha256 {sha256}, got {actual}")
-  }
+  return Mismatch(f"{url}: expected sha256 {sha256}, got {actual}") when actual != sha256
 
   let size = fs.metadata(partial)?.size
   fs.rename(partial, entry)?
@@ -150,9 +140,7 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, en
   let root = build_source_cache_root()?
   let entry = source_cache_entry(root, sha256)
 
-  if fs.exists(entry)? {
-    return entry
-  }
+  return entry when fs.exists(entry)?
 
   let mirror = (env.get("LAPUTA_MIRROR") ?? "").trim()
 
@@ -198,9 +186,7 @@ export proc resolve_source(
   if util.is_url_source(source) {
     let name = util.source_basename(source)?
 
-    if name == "" {
-      return Err(types.PmError.SourceName(f"URL has no file name: {source}"))
-    }
+    return Err(types.PmError.SourceName(f"URL has no file name: {source}")) when name == ""
 
     return {path: resolve_url_source(pkg.name, source, checksum)?, kind: "file", name}
   }
@@ -227,9 +213,7 @@ export proc resolve_source(
 
 ## Exported PM declaration `verify_source_checksum`.
 export proc verify_source_checksum(source_path: Path, checksum: Str, kind: Str) [fs, error] {
-  if checksum == "SKIP" {
-    return
-  }
+  return when checksum == "SKIP"
 
   if kind == "dir" or kind == "git" {
     return Err(types.PmError.SourceChecksum(f"{source_path} must use SKIP because it is not a regular file"))
@@ -240,9 +224,7 @@ export proc verify_source_checksum(source_path: Path, checksum: Str, kind: Str) 
 
 pure first_archive_path_component(path_value: Path) -> Str {
   for part in path_value.display().split("/") {
-    if part != "" and part != "." {
-      return part
-    }
+    return part when part != "" and part != "."
   }
 
   ""
@@ -267,9 +249,7 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
     }
   }
 
-  if saw_entry {
-    return 1
-  }
+  return 1 when saw_entry
 
   0
 }
@@ -413,14 +393,14 @@ export proc generate_checksums_for(
     let expanded = util.expand_source(line.source, pkg, arch, build)
 
     if stored == "SKIP" {
-      generated = generated.push("SKIP")
+      generated += ["SKIP"]
     } else if util.is_url_source(expanded) {
       generated = generated.push(upstream_sha256(cache_root, pkg.name, expanded)?)
     } else {
       let resolved = resolve_source(pkg, line, stored, arch, build)?
 
       if resolved.kind == "dir" {
-        generated = generated.push("SKIP")
+        generated += ["SKIP"]
       } else {
         generated = generated.push(hash.sha256(resolved.path)?.hex())
       }
@@ -463,7 +443,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
 
     if ! in_sources and trimmed.starts_with("export let upstream_sources = [") {
       in_sources = true
-      output = output.push(line)
+      output += [line]
       continue
     }
 
@@ -488,7 +468,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
       }
     }
 
-    output = output.push(line)
+    output += [line]
   }
 
   if ! found or value_index != values.len() {
@@ -529,9 +509,7 @@ export proc source_fetch_items(packages: List[types.Package], arch: Str) [error]
 # A dead host or a transient failure gets a few spaced retries. A checksum
 # mismatch or a missing `file://` path is deterministic, so neither is retried.
 proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error] -> Result[SourceFetchOutcome] {
-  if fs.exists(source_cache_entry(root, item.sha256))? {
-    return Cached
-  }
+  return Cached when fs.exists(source_cache_entry(root, item.sha256))?
 
   var unavailable: List[Str] = []
   var mismatched: List[Str] = []
@@ -551,7 +529,7 @@ proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error]
       match outcome {
         Unavailable(detail) => last_failure = detail
         Mismatch(detail) => {
-          mismatched = mismatched.push(detail)
+          mismatched += [detail]
           last_failure = ""
           break
         }
@@ -560,13 +538,11 @@ proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error]
     }
 
     if last_failure != "" {
-      unavailable = unavailable.push(last_failure)
+      unavailable += [last_failure]
     }
   }
 
-  if mismatched.len() > 0 {
-    return Mismatch(mismatched.extend(unavailable).join("; "))
-  }
+  return Mismatch(mismatched.extend(unavailable).join("; ")) when mismatched.len() > 0
 
   Unavailable(unavailable.join("; "))
 }
@@ -613,7 +589,7 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
     }
   }
 
-  print "sources" "summary" $cached "cached" $fetched "fetched" $fetched_bytes "bytes" ${failures.len()} "failed" "cache" $root
+  print "sources" "summary" $cached "cached" $fetched "fetched" $fetched_bytes "bytes" failures.len() "failed" "cache" $root
 
   for failure in failures {
     eprint $failure

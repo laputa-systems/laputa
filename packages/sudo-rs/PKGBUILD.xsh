@@ -4,22 +4,22 @@ use pm.util as pm_util
 error SudoRsBuildError = MissingRustStd(path: Str) | MissingVendoredCrate(name: Str)
 
 ## Package recipe export.
-export let name = "sudo-rs"
+export const name = "sudo-rs"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.2.13"
+export const ver = "0.2.13"
 
 ## Package recipe export.
-export let rel = "16"
+export const rel = "16"
 
 ## Package recipe export.
-export let deps = ["linux-pam", "gnu-stubs", "musl"]
+export const deps = ["linux-pam", "gnu-stubs", "musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam"]
+export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam"]
 
 # The build is offline: every crate sudo-rs's shipped Cargo.lock pins is an
 # upstream source of its own, cached by `make fetch` and staged under vendor/,
@@ -29,7 +29,7 @@ export let mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam"]
 # `cargo vendor --locked` would produce. After a version bump, list the new
 # Cargo.lock's records here.
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://static.crates.io/crates/sudo-rs/sudo-rs-VERSION.crate",
     kind: "auto",
@@ -101,7 +101,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/su",
     kind: "binary",
@@ -117,15 +117,11 @@ export let filetree = [
 ]
 
 pure rust_triple(arch: Str) -> Str {
-  if arch == "aarch64" or arch == "arm64" {
-    return "aarch64-unknown-linux-musl"
-  }
+  return "aarch64-unknown-linux-musl" when arch == "aarch64" or arch == "arm64"
 
-  if arch == "amd64" {
-    return "x86_64-unknown-linux-musl"
-  }
+  return "x86_64-unknown-linux-musl" when arch == "amd64"
 
-  return f"{arch}-unknown-linux-musl"
+  f"{arch}-unknown-linux-musl"
 }
 
 proc stage_rustlib(source: Path, dest: Path) [fs, error] {
@@ -156,14 +152,14 @@ type LockedCrate = {name: Str, version: Str, checksum: Str}
 # flat `key = "value"` lines, so no TOML parser is needed.
 proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate]] {
   var crates: List[LockedCrate] = []
-  var current: LockedCrate = {name: "", version: "", checksum: ""}
+  var current: LockedCrate = LockedCrate(name: "", version: "", checksum: "")
 
   for raw in lockfile.read_text()?.lines().push("[[package]]") {
     let line = raw.trim()
 
     if line == "[[package]]" {
       if current.checksum != "" {
-        crates = crates.push(current)
+        crates += [current]
       }
 
       current = {name: "", version: "", checksum: ""}
@@ -219,7 +215,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let staged_rustlib = fp"{target_root}/usr/lib/rustlib/{triple}"
 
   if ! fs.exists(fp"{staged_rustlib}/lib")? {
-    if ! fs.exists(target_rustlib)? {
+    guard fs.exists(target_rustlib)? else {
       return Err(SudoRsBuildError.MissingRustStd(target_rustlib.display()))
     }
 

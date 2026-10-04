@@ -19,7 +19,7 @@ pure test_generation_sha256(value: Str) -> Str {
 }
 
 proc copied_generation_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"{root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
@@ -105,7 +105,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
   let metadata = fp"{stage}/metadata.json"
   let proof = fp"{stage}/proof.json"
   let init_directory = fp"{contents}/usr/lib/init/rc.d"
-  fs.mkdir(init_directory, parents: true)?
+  fs.mkdir(init_directory)?
   fs.chmod(init_directory, 0o755)?
   archive.tar_create(payload, contents, [p"."], compression: "gz")?
   json.write(
@@ -137,7 +137,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
 }
 
 proc empty_overlay(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
-  let overlay = test.temp_dir(ctx, name: name)?
+  let overlay = test.temp_dir(ctx, name:)?
   fs.mkdir(fp"{overlay}/overlay")?
   fp"{overlay}/overlay"
 }
@@ -153,18 +153,18 @@ test test_generation_runtime_closure_excludes_build_toolchain [fs, env, error] {
   let build_value = generation_build_plan(ctx, "generation-runtime-plan")?
   let overlay = empty_overlay(ctx, "generation-runtime-overlay")?
   let value = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?
-  test.eq(value.runtime_roots, ["app"])?
-  test.eq([artifact.package_name for artifact in value.artifacts], ["app", "runtime-lib"])?
+  assert value.runtime_roots == ["app"]
+  assert [artifact.package_name for artifact in value.artifacts] == ["app", "runtime-lib"]
 
   let store_root = test.temp_dir(ctx, name: "generation-runtime-store")?
   stage_generation_artifacts(ctx, build_value, store_root)?
   let output = fp"{test.temp_dir(ctx, name: "generation-runtime-output")?}/root"
   let receipt = generation.compose(value, store_root, output, overlay)?
-  test.eq([artifact.package_name for artifact in receipt.artifacts], ["app", "runtime-lib"])?
-  test.eq(fp"{output}/usr/share/app".read_text()?, "payload app\n")?
-  test.eq(fp"{output}/usr/share/runtime-lib".read_text()?, "payload runtime-lib\n")?
-  test.eq(fs.exists(fp"{output}/usr/share/host-tool")?, false)?
-  test.eq(fs.exists(fp"{output}/usr/share/target-sdk")?, false)?
+  assert [artifact.package_name for artifact in receipt.artifacts] == ["app", "runtime-lib"]
+  assert fp"{output}/usr/share/app".read_text()? == "payload app\n"
+  assert fp"{output}/usr/share/runtime-lib".read_text()? == "payload runtime-lib\n"
+  assert fs.exists(fp"{output}/usr/share/host-tool")? == false
+  assert fs.exists(fp"{output}/usr/share/target-sdk")? == false
   generation.verify_generation(output, receipt)?
 }
 
@@ -180,17 +180,17 @@ test test_generation_x86_64_plan_and_composition_preserve_target [fs, env, error
   )?
   let overlay = empty_overlay(ctx, "generation-x86-overlay")?
   let planned = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?
-  test.eq(types.target_text(planned.target), "x86_64-linux-musl")?
+  assert types.target_text(planned.target) == "x86_64-linux-musl"
   let plan_path = test.temp_path(ctx, name: "generation-x86-plan.json")
   generation.write_generation_plan(plan_path, planned)?
-  test.eq(generation.read_generation_plan(plan_path)?, planned)?
+  assert generation.read_generation_plan(plan_path)? == planned
 
   let store_root = test.temp_dir(ctx, name: "generation-x86-store")?
   stage_generation_artifacts(ctx, build_value, store_root)?
   let output = fp"{test.temp_dir(ctx, name: "generation-x86-output")?}/root"
   let receipt = generation.compose(planned, store_root, output, overlay)?
-  test.eq(types.target_text(receipt.target), "x86_64-linux-musl")?
-  test.eq(generation.read_generation_receipt(output)?, receipt)?
+  assert types.target_text(receipt.target) == "x86_64-linux-musl"
+  assert generation.read_generation_receipt(output)? == receipt
   generation.verify_generation(output, receipt)?
 }
 
@@ -200,16 +200,18 @@ test test_generation_plan_and_receipt_are_deterministic_for_root_order_and_dupli
   let overlay_sha256 = generation.overlay_digest(overlay)?
   let first = generation.plan(build_value, ["runtime-lib", "app", "app"], overlay_sha256)?
   let second = generation.plan(build_value, ["app", "runtime-lib"], overlay_sha256)?
-  test.eq(first, second)?
-  test.eq(first.runtime_roots, ["app", "runtime-lib"])?
+  assert first == second
+  assert first.runtime_roots == ["app", "runtime-lib"]
 
   let store_root = test.temp_dir(ctx, name: "generation-deterministic-store")?
   stage_generation_artifacts(ctx, build_value, store_root)?
   let first_output = fp"{test.temp_dir(ctx, name: "generation-deterministic-first")?}/root"
   let second_output = fp"{test.temp_dir(ctx, name: "generation-deterministic-second")?}/root"
-  test.eq(
-    generation.compose(first, store_root, first_output, overlay)?,
-    generation.compose(second, store_root, second_output, overlay)?,
+  assert generation.compose(first, store_root, first_output, overlay)? == generation.compose(
+    second,
+    store_root,
+    second_output,
+    overlay,
   )?
 }
 
@@ -223,7 +225,7 @@ test test_generation_plan_json_round_trips_and_rejects_changed_identity [fs, env
   )?
   let path_value = test.temp_path(ctx, name: "generation-plan.json")
   generation.write_generation_plan(path_value, planned)?
-  test.eq(generation.read_generation_plan(path_value)?, planned)?
+  assert generation.read_generation_plan(path_value)? == planned
 
   let dto = json.read(path_value)?.require(generation.GenerationPlanDto)?
   json.write(
@@ -243,7 +245,7 @@ test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutati
   let missing_store = test.temp_dir(ctx, name: "generation-missing-store")?
   let missing_output = fp"{test.temp_dir(ctx, name: "generation-missing-output")?}/root"
   expect_generation_error(ctx, generation.compose(value, missing_store, missing_output, overlay), "is missing")?
-  test.eq(fs.exists(missing_output)?, false)?
+  assert fs.exists(missing_output)? == false
 
   let corrupt_store = test.temp_dir(ctx, name: "generation-corrupt-store")?
   stage_generation_artifacts(ctx, build_value, corrupt_store)?
@@ -255,7 +257,7 @@ test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutati
     generation.compose(value, corrupt_store, corrupt_output, overlay),
     "payload SHA-256 does not match receipt",
   )?
-  test.eq(fs.exists(corrupt_output)?, false)?
+  assert fs.exists(corrupt_output)? == false
 }
 
 test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env, error] { |ctx|
@@ -273,9 +275,9 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
   let value = generation.plan_profile(build_value, ["app"], profile)?
   let output = fp"{test.temp_dir(ctx, name: "generation-overlay-output")?}/root"
   let receipt = generation.compose(value, store_root, output, overlay)?
-  test.eq(receipt.profile.name, "qemu-dwl-foot")?
-  test.eq(fp"{output}/etc/profile".read_text()?, "profile configuration\n")?
-  test.eq(fs.exists(fp"{output}/overlay.json")?, false)?
+  assert receipt.profile.name == "qemu-dwl-foot"
+  assert fp"{output}/etc/profile".read_text()? == "profile configuration\n"
+  assert fs.exists(fp"{output}/overlay.json")? == false
 
   let conflict_overlay = empty_overlay(ctx, "generation-conflict-overlay")?
   fs.mkdir(fp"{conflict_overlay}/usr/share")?
@@ -287,7 +289,7 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
     generation.compose(conflict, store_root, conflict_output, conflict_overlay),
     "conflicts with package app",
   )?
-  test.eq(fs.exists(conflict_output)?, false)?
+  assert fs.exists(conflict_output)? == false
 
   json.write(
     fp"{conflict_overlay}/overlay.json",
@@ -301,7 +303,7 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
   let replacement = generation.plan_profile(build_value, ["app"], replacement_profile)?
   let replacement_output = fp"{test.temp_dir(ctx, name: "generation-replacement-output")?}/root"
   let _ = generation.compose(replacement, store_root, replacement_output, conflict_overlay)?
-  test.eq(fp"{replacement_output}/usr/share/app".read_text()?, "replaced app\n")?
+  assert fp"{replacement_output}/usr/share/app".read_text()? == "replaced app\n"
 }
 
 test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects_conflicts [fs, env, error] { |ctx|
@@ -314,19 +316,19 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
   # profile's overlay digest remains explicit receipt provenance.
   let overlay = empty_overlay(ctx, "generation-baselayout-overlay")?
   let hook_directory = fp"{overlay}/usr/lib/init/rc.d"
-  fs.mkdir(hook_directory, parents: true)?
+  fs.mkdir(hook_directory)?
   fs.chmod(hook_directory, 0o755)?
   fs.write(fp"{hook_directory}/laputa-test.boot", "profile hook\n")?
   let profile = generation.overlay_profile(overlay)?
   let value = generation.plan_profile(build_value, ["baselayout"], profile)?
   let output = fp"{test.temp_dir(ctx, name: "generation-baselayout-output")?}/root"
   let receipt = generation.compose(value, store_root, output, overlay)?
-  test.eq(receipt.profile.overlay_sha256, generation.overlay_digest(overlay)?)?
-  test.eq(fp"{output}/usr/lib/init/rc.d/laputa-test.boot".read_text()?, "profile hook\n")?
+  assert receipt.profile.overlay_sha256 == generation.overlay_digest(overlay)?
+  assert fp"{output}/usr/lib/init/rc.d/laputa-test.boot".read_text()? == "profile hook\n"
   generation.verify_generation(output, receipt)?
 
   let file_conflict = empty_overlay(ctx, "generation-baselayout-file-conflict")?
-  fs.mkdir(fp"{file_conflict}/usr/lib/init", parents: true)?
+  fs.mkdir(fp"{file_conflict}/usr/lib/init")?
   fs.write(fp"{file_conflict}/usr/lib/init/rc.d", "not a directory\n")?
   let file_plan = generation.plan(build_value, ["baselayout"], generation.overlay_digest(file_conflict)?)?
   let file_output = fp"{test.temp_dir(ctx, name: "generation-baselayout-file-output")?}/root"
@@ -335,11 +337,11 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
     generation.compose(file_plan, store_root, file_output, file_conflict),
     "incompatible directory type or mode metadata",
   )?
-  test.eq(fs.exists(file_output)?, false)?
+  assert fs.exists(file_output)? == false
 
   let mode_conflict = empty_overlay(ctx, "generation-baselayout-mode-conflict")?
   let mode_directory = fp"{mode_conflict}/usr/lib/init/rc.d"
-  fs.mkdir(mode_directory, parents: true)?
+  fs.mkdir(mode_directory)?
   fs.chmod(mode_directory, 0o700)?
   let mode_plan = generation.plan(build_value, ["baselayout"], generation.overlay_digest(mode_conflict)?)?
   let mode_output = fp"{test.temp_dir(ctx, name: "generation-baselayout-mode-output")?}/root"
@@ -348,7 +350,7 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
     generation.compose(mode_plan, store_root, mode_output, mode_conflict),
     "incompatible directory type or mode metadata",
   )?
-  test.eq(fs.exists(mode_output)?, false)?
+  assert fs.exists(mode_output)? == false
 }
 
 # Artifact keys exclude the executor, so a package can be rebuilt under the
@@ -370,15 +372,15 @@ test test_generation_follows_artifact_keys_not_releases [fs, env, error] { |ctx|
 
   let before = generation.plan(first, ["app"], test_generation_sha256("overlay"))?
   let after = generation.plan(rebuilt, ["app"], test_generation_sha256("overlay"))?
-  test.eq([artifact.package_id for artifact in after.artifacts], [artifact.package_id for artifact in before.artifacts])?
-  test.ok(after.generation_sha256 != before.generation_sha256)?
+  assert [artifact.package_id for artifact in after.artifacts] == [artifact.package_id for artifact in before.artifacts]
+  assert after.generation_sha256 != before.generation_sha256
 
-  let before_keys: Map[Str] = {artifact.package_name: artifact.artifact_key for artifact in before.artifacts}
+  let before_keys = {artifact.package_name: artifact.artifact_key for artifact in before.artifacts}
   let changed = [
     artifact.package_name
     for artifact in after.artifacts
     if before_keys.get(artifact.package_name)? != artifact.artifact_key
   ]
   # runtime-lib and app, which builds against it.
-  test.eq(changed, ["app", "runtime-lib"])?
+  assert changed == ["app", "runtime-lib"]
 }

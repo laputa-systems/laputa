@@ -8,11 +8,9 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 }
 
 proc read_if_exists(file_path: Path) [fs, error] -> Result[Str] {
-  if fs.exists(file_path)? {
-    return fs.read_text(file_path)?
-  }
+  return fs.read_text(file_path)? when fs.exists(file_path)?
 
-  return ""
+  ""
 }
 
 proc ensure_status_ok(status: Status, label: Str, err_path: Path, artifacts: Path) [fs, error] {
@@ -84,7 +82,7 @@ start:
   }?
 }
 
-proc main(build_env: Path = /build-env, artifacts: Path = /tmp/laputa-native-m4-bison-proof) [fs, process, env, error] {
+proc main(build_env = /build-env, artifacts = /tmp/laputa-native-m4-bison-proof) [fs, process, env, error] {
   let m4_bin = /usr/bin/m4
   let packaged_m4 = fp"{build_env}/usr/bin/m4"
   let bison_data = fp"{build_env}/usr/share/bison"

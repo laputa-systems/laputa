@@ -26,7 +26,7 @@ pure elf_interpreter(program_headers: Str) -> Str {
 }
 
 pure elf_needed(dynamic: Str) -> List[Str] {
-  var needed: List[Str] = []
+  var needed = []
 
   for line in dynamic.lines() {
     continue unless "(NEEDED)" in line
@@ -39,14 +39,11 @@ pure elf_needed(dynamic: Str) -> List[Str] {
 }
 
 pure needed_sonames(elves: List[ElfReport]) -> List[Str] {
-  var seen: Map[Bool] = {}
-
-  for report in elves {
-    for soname in report.needed {
-      seen[soname] = true
-    }
+  var seen = {
+    soname: true
+    for report in elves
+    for soname in report.needed
   }
-
   seen.keys() |> sort
 }
 
@@ -57,11 +54,11 @@ proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport
 
   let headers = run.text readelf -lW $file ?
   let dynamic = run.text readelf -dW $file ?
-  let report: ElfReport = {
+  let report: ElfReport = ElfReport(
     path: f"/{file.strip_prefix(root)?.display()}",
     interpreter: elf_interpreter(headers),
     needed: elf_needed(dynamic),
-  }
+  )
   report
 }
 
@@ -75,15 +72,15 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   var compose_args = ["root", "compose", plan, "--store", store, "--output", root.display()]
 
   for name in runtime_roots {
-    compose_args = compose_args.extend(["--runtime-root", name])
+    compose_args += ["--runtime-root", name]
   }
 
   run /bin/xsh /src/laputa/pm.xsh -- @compose_args ?
   run /bin/xsh /src/laputa/pm.xsh -- root inspect $root ?
 
-  var files: List[Str] = []
+  var files = []
   var elves: List[ElfReport] = []
-  var failures: List[Str] = []
+  var failures = []
 
   for entry in fs.files(root, hidden: true)? {
     files = files.push(f"/{entry.path.strip_prefix(root)?.display()}")
@@ -91,7 +88,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     let found = elf_report(root, entry.path)?
     guard found != null else { continue }
     let report: ElfReport = found
-    elves = elves.push(report)
+    elves += [report]
 
     if report.interpreter != "" and report.interpreter != musl_interpreter {
       failures = failures.push(f"{report.path} requests interpreter {report.interpreter}")

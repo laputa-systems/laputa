@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "freetype"
+export const name = "freetype"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.14.1"
+export const ver = "2.14.1"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "zlib", "libpng"]
+export const deps = ["musl", "zlib", "libpng"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "pkgconf", "zlib", "libpng"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "pkgconf", "zlib", "libpng"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://download-mirror.savannah.gnu.org/releases/freetype/freetype-VERSION.tar.xz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/freetype2/dlg/dlg.h",
     kind: "file",

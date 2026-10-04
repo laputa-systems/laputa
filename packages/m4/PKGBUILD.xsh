@@ -1,28 +1,28 @@
 ##! Package recipe metadata and build operations.
 ## Package recipe export.
-export let name = "m4"
+export const name = "m4"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.0"
+export const ver = "1.0"
 
 ## Package recipe export.
-export let rel = "10"
+export const rel = "10"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
 export let mkdeps_host = []
 
 ## `/usr/bin/m4` is an XSH script; it needs the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 # m4 is implemented in pure XSH — no tarball, no compilation.
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"files/m4.xsh",
     kind: "auto",
@@ -39,7 +39,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [{path: p"usr/bin/m4", kind: "file"}]
+export const filetree = [{path: p"usr/bin/m4", kind: "file"}]
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {

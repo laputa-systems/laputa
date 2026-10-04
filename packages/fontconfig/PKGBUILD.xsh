@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "fontconfig"
+export const name = "fontconfig"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.17.1"
+export const ver = "2.17.1"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "freetype", "expat"]
+export const deps = ["musl", "freetype", "expat"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "freetype", "expat"]
+export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "freetype", "expat"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/VERSION/fontconfig-VERSION.tar.xz",
     kind: "auto",
@@ -76,7 +76,7 @@ export let upstream_sources = [
   },
 ]
 
-let conf_links = [
+const conf_links = [
   "10-scale-bitmap-fonts.conf",
   "10-yes-antialias.conf",
   "11-lcdfilter-default.conf",
@@ -102,7 +102,7 @@ let conf_links = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"etc/fonts/conf.d/10-hinting-slight.conf",
     kind: "symlink",

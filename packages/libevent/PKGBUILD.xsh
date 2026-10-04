@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "libevent"
+export const name = "libevent"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.1.12-stable"
+export const ver = "2.1.12-stable"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/libevent/libevent/releases/download/release-VERSION/libevent-VERSION.tar.gz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/event_rpcgen.py",
     kind: "file",

@@ -5,31 +5,31 @@ use pm.util as pm_util
 error MuslError = Failed(message: Str)
 
 ## Package name.
-export let name = "musl"
+export const name = "musl"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Upstream musl version.
-export let ver = "1.2.6"
+export const ver = "1.2.6"
 
 ## Package release revision.
-export let rel = "16"
+export const rel = "16"
 
 ## Runtime package dependencies.
 export let deps = []
 
 ## Host-side build dependencies.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## `ldd` is an XSH wrapper; it needs the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Preserve upstream binaries without stripping.
-export let nostrip = true
+export const nostrip = true
 
 ## Upstream source archives and checksums.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://musl.libc.org/releases/musl-VERSION.tar.gz",
     kind: "auto",
@@ -49,7 +49,7 @@ export let upstream_sources = [
   },
 ]
 
-let filetree_common = [
+const filetree_common = [
   {
     path: p"usr",
     kind: "tree",
@@ -131,7 +131,7 @@ export let filetree = filetree_aarch64
 
 pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   let re = regex.compile(pattern)?
-  return re.captures(text)
+  re.captures(text)
 }
 
 proc compiler_rt_builtins(arch: Str) [fs, error] -> Result[List[Path]] {
@@ -146,9 +146,7 @@ proc compiler_rt_builtins(arch: Str) [fs, error] -> Result[List[Path]] {
   ]
 
   for candidate in candidates {
-    if fs.exists(candidate)? {
-      return [candidate]
-    }
+    return [candidate] when fs.exists(candidate)?
   }
 
   []
@@ -202,7 +200,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       at_lines = at_lines.push(f"#define __DEFINED_union_{uname}")
       at_lines = at_lines.push("#endif")
     } else {
-      at_lines = at_lines.push(line)
+      at_lines += [line]
     }
   }
 
@@ -285,16 +283,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   # excluded — their arch version is compiled instead.
   # fs.children is non-recursive here intentionally: src/{subsystem}/{arch}/*.c files
   # at two levels deep must not be included (they are wrong-arch implementations).
-  var libc_srcs = []
-
-  for subsys in fs.children(p"src")? |> where .kind == "dir" {
-    for e in fs.children(subsys.path)? |> where .ext == "c" {
-      if ! (e.name.replace(".c", "") in arch_stems) {
-        libc_srcs = libc_srcs.push(e.path)
-      }
-    }
-  }
-
+  var libc_srcs = [
+    e.path
+    for subsys in fs.children(p"src")? |> where .kind == "dir"
+    for e in fs.children(subsys.path)? |> where .ext == "c"
+    if ! (e.name.replace(".c", "") in arch_stems)
+  ]
   # src/malloc/mallocng/*.c — the default malloc implementation (two levels deep).
   for e in fs.children(p"src/malloc/mallocng")? |> where .ext == "c" {
     libc_srcs = libc_srcs.push(e.path)
@@ -345,12 +339,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   var all_so_deps = lobj_deps
 
   for obj in ldso_objs {
-    all_so_objs = all_so_objs.push(obj)
+    all_so_objs += [obj]
   }
 
-  all_so_deps = all_so_deps.extend(ldso_deps)
+  all_so_deps += ldso_deps
   let builtins = compiler_rt_builtins(arch)?
-  all_so_objs = all_so_objs.extend(builtins)
+  all_so_objs += builtins
 
   let so_ldflags = [
     "-shared",
@@ -366,10 +360,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   so_argv = [@so_argv, @so_ldflags]
 
   for obj in all_so_objs {
-    so_argv = so_argv.push(obj)
+    so_argv += [obj]
   }
 
-  so_argv = so_argv.extend(["-o", libc_so])
+  so_argv += ["-o", libc_so]
 
   tasks = tasks.push({
     name: libc_so.display(),
@@ -397,7 +391,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let out = fp"obj/{src_name}.o"
     let task = make.compile_c_task(cc, triple, crt_cflags, [], includes, src, out)
     crt_tasks = crt_tasks.push({...task, stamp: p""})
-    crt_outs = crt_outs.push(out)
+    crt_outs += [out]
   }
 
   for src_name in ["Scrt1", "rcrt1"] {
@@ -405,7 +399,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let out = fp"obj/{src_name}.o"
     let task = make.compile_lo_task(cc, triple, crt_cflags, [], includes, src, out)
     crt_tasks = crt_tasks.push({...task, stamp: p""})
-    crt_outs = crt_outs.push(out)
+    crt_outs += [out]
   }
 
   make.run_tasks(crt_tasks, make.jobs()?)?

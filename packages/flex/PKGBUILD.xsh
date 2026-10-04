@@ -4,28 +4,28 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "flex"
+export const name = "flex"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.6.4"
+export const ver = "2.6.4"
 
 ## Exported declaration `rel`.
-export let rel = "13"
+export const rel = "13"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "m4"]
+export const deps = ["musl", "m4"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## The installed flex helper is an XSH script; it needs the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/westes/flex/releases/download/vVERSION/flex-VERSION.tar.gz",
     kind: "auto",
@@ -55,7 +55,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/flex",
     kind: "binary",

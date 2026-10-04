@@ -137,7 +137,7 @@ export pure is_url_source(source: Str) -> Bool {
 ## The file name a URL source stages under, without query or fragment.
 export pure source_basename(source: Str) -> Result[Str] {
   let parsed_path = fp"{source.split("#")[0].split("?")[0]}"
-  return parsed_path.name
+  parsed_path.name
 }
 
 ## Exported PM declaration `parse_source_line`.
@@ -145,41 +145,31 @@ export pure parse_source_line(raw: Path) -> Result[types.SourceLine] {
   let raw_text = raw.display()
   let spaced = raw_text.split(" => ")
 
-  if spaced.len() > 1 {
-    return {source: spaced[0].trim(), dest: fp"{spaced[1].trim()}"}
-  }
+  return {source: spaced[0].trim(), dest: fp"{spaced[1].trim()}"} when spaced.len() > 1
 
   let tight = raw_text.split("=>")
 
-  if tight.len() > 1 {
-    return {source: tight[0].trim(), dest: fp"{tight[1].trim()}"}
-  }
+  return {source: tight[0].trim(), dest: fp"{tight[1].trim()}"} when tight.len() > 1
 
-  return {source: raw_text, dest: p"."}
+  {source: raw_text, dest: p"."}
 }
 
 ## Exported PM declaration `source_stage_dir`.
 export pure source_stage_dir(src: Path, line: types.SourceLine) -> Path {
   let dest = line.dest.normalize()
 
-  if dest.display() == "." {
-    return src
-  }
+  return src when dest.display() == "."
 
-  return fp"{src}/{dest}"
+  fp"{src}/{dest}"
 }
 
 ## Exported PM declaration `goarch_for`.
 export pure goarch_for(arch: Str) -> Str {
-  if arch == "aarch64" or arch == "arm64" {
-    return "arm64"
-  }
+  return "arm64" when arch == "aarch64" or arch == "arm64"
 
-  if arch == "x86_64" {
-    return "amd64"
-  }
+  return "amd64" when arch == "x86_64"
 
-  return arch
+  arch
 }
 
 # Placeholders are whole uppercase words in a source string. Matching words
@@ -269,9 +259,7 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
   if is_file_url(url) {
     let source = file_url_path(url)?
 
-    if ! fs.exists(source)? {
-      return f"{url}: missing file"
-    }
+    return f"{url}: missing file" unless fs.exists(source)?
 
     let partial = fp"{dest.parent}/.{dest.name}.partial"
     fs.copy(source, partial, overwrite: true)?
@@ -304,9 +292,7 @@ export proc host_arch() [env, error] -> Result[Str] {
 export proc build_arch() [env, error] -> Result[Str] {
   let override = (env.get("XSH_PM_BUILD_ARCH") ?? "").trim()
 
-  if override != "" {
-    return normalize_arch(override)
-  }
+  return normalize_arch(override) when override != ""
 
   host_arch()?
 }
@@ -315,15 +301,11 @@ export proc build_arch() [env, error] -> Result[Str] {
 export proc target_arch() [env, error] -> Result[Str] {
   let target_override = (env.get("XSH_PM_TARGET_ARCH") ?? "").trim()
 
-  if target_override != "" {
-    return normalize_arch(target_override)
-  }
+  return normalize_arch(target_override) when target_override != ""
 
   let legacy_override = (env.get("XSH_PM_ARCH") ?? "").trim()
 
-  if legacy_override != "" {
-    return normalize_arch(legacy_override)
-  }
+  return normalize_arch(legacy_override) when legacy_override != ""
 
   host_arch()?
 }
@@ -335,13 +317,9 @@ export proc machine_arch() [env, error] -> Result[Str] {
 
 ## Exported PM declaration `normalize_arch`.
 export pure normalize_arch(arch: Str) -> Str {
-  if arch == "arm64" {
-    return "aarch64"
-  }
+  return "aarch64" when arch == "arm64"
 
-  if arch == "amd64" {
-    return "x86_64"
-  }
+  return "x86_64" when arch == "amd64"
 
   arch
 }

@@ -5,28 +5,28 @@ use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 ## Package recipe export.
-export let name = "mdevd"
+export const name = "mdevd"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.1.8.2"
+export const ver = "0.1.8.2"
 
 ## Package recipe export.
-export let rel = "8"
+export const rel = "8"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
-export let runtime_only_deps = ["xinit"]
+export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://skarnet.org/software/mdevd/mdevd-VERSION.tar.gz",
     kind: "auto",
@@ -69,7 +69,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/mdevd",
     kind: "binary",
@@ -143,7 +143,7 @@ proc read_sysdeps(path_value: Path) [fs, error] -> Result[Map[Str]] {
     }
   }
 
-  return sysdeps
+  sysdeps
 }
 
 proc write_skalibs_sysdeps(target: Str) [fs, error] {
@@ -323,7 +323,7 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
       }
     }
 
-    lines = lines.push("")
+    lines += [""]
   }
 
   lines = lines.push("#endif")
@@ -372,7 +372,7 @@ proc append_type_template(
   type_caps: Str,
   bits: Int,
 ) [fs, error] -> Result[List[Str]] {
-  return parts.push(gen_types_internal(header_template.read_text()?, type_name, type_caps, bits))
+  parts.push(gen_types_internal(header_template.read_text()?, type_name, type_caps, bits))
 }
 
 proc write_types_h(sysdeps: Map[Str]) [fs, error] {
@@ -496,7 +496,7 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, erro
   })
 
   make.run_tasks(skarnet.tasks, make.jobs()?)?
-  return skarnet_archive
+  skarnet_archive
 }
 
 ## Package recipe export.

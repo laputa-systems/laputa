@@ -3,28 +3,28 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "libva"
+export const name = "libva"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.22.0"
+export const ver = "2.22.0"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "libdrm", "wayland-libs-client"]
+export const deps = ["musl", "libdrm", "wayland-libs-client"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libdrm", "wayland-dev"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libdrm", "wayland-dev"]
 
 ## Exported declaration `mkdeps_target`.
-export let mkdeps_target = ["wayland-dev"]
+export const mkdeps_target = ["wayland-dev"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/intel/libva/releases/download/VERSION/libva-VERSION.tar.bz2",
     kind: "auto",
@@ -41,7 +41,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/va/va.h",
     kind: "file",

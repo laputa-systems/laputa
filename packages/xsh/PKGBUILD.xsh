@@ -2,16 +2,16 @@
 use pm.util as pm_util
 
 ## Package recipe export.
-export let name = "xsh"
+export const name = "xsh"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.0.0"
+export const ver = "0.0.0"
 
 ## Package recipe export.
-export let rel = "16"
+export const rel = "16"
 
 ## Package recipe export.
 export let deps = []
@@ -25,7 +25,7 @@ export let mkdeps_host = []
 ## a repository input, so its manifest and products are hashed into this
 ## package's build key for that target only; the build verifies each product
 ## against the manifest.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"repository/.out/seed/ARCH => seed",
     kind: "auto",
@@ -42,14 +42,14 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let nostrip = true
+export const nostrip = true
 
 error XshPackageError = Source(message: Str)
 
 ## Package recipe export.
 ## Core applets live under one tree so a new XSH applet needs no recipe edit
 ## for its script; its `usr/bin` symlink must still be declared here.
-export let filetree = [
+export const filetree = [
   {path: p"usr/bin/basename", kind: "symlink"},
   {path: p"usr/bin/cat", kind: "symlink"},
   {path: p"usr/bin/chgrp", kind: "symlink"},
@@ -126,10 +126,10 @@ proc verified_seed(arch: Str) [fs, error] -> Result[Path] {
   }
 
   let manifest = json.read(manifest_path)?.require(Record)?
-  let files: Record = manifest.get("files")?.require(Record)?
+  let files = manifest.get("files")?.require(Record)?
 
   for product in seed_products {
-    let expected: Str = files.get(product)?.require(Str)?
+    let expected: Str = files.get(product)?.require()?
     let actual = hash.sha256(fp"{seed}/{product}")?.hex()
 
     if actual != expected {

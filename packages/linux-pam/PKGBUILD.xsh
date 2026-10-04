@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Package recipe export.
-export let name = "linux-pam"
+export const name = "linux-pam"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.7.2"
+export const ver = "1.7.2"
 
 ## Package recipe export.
-export let rel = "9"
+export const rel = "9"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/linux-pam/linux-pam/releases/download/vVERSION/Linux-PAM-VERSION.tar.xz",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"etc/pam.d/su",
     kind: "file",

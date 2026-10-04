@@ -2,25 +2,25 @@
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "cargo"
+export const name = "cargo"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.95.0"
+export const ver = "1.95.0"
 
 ## Exported declaration `rel`.
-export let rel = "10"
+export const rel = "10"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "llvm-toolchain", "gnu-stubs"]
+export const deps = ["musl", "llvm-toolchain", "gnu-stubs"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://static.rust-lang.org/dist/2026-04-16/cargo-VERSION-ARCH-unknown-linux-musl.tar.xz => cargo",
     kind: "auto",
@@ -75,9 +75,9 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `nostrip`.
-export let nostrip = true
+export const nostrip = true
 
-let filetree_common = [
+const filetree_common = [
   {
     path: p"usr",
     kind: "tree",
@@ -328,13 +328,9 @@ export let filetree_x86_64 = filetree_common.extend(
 export let filetree = filetree_aarch64
 
 pure rust_dist_arch(arch: Str) -> Str {
-  if arch == "arm64" {
-    return "aarch64"
-  }
+  return "aarch64" when arch == "arm64"
 
-  if arch == "amd64" {
-    return "x86_64"
-  }
+  return "x86_64" when arch == "amd64"
 
   arch
 }

@@ -1,15 +1,13 @@
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs: Path = /rootfs) [fs, process, error] {
+proc main(rootfs = /rootfs) [fs, process, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-m4"
   fs.remove(tmp, missing_ok: true)?
   fs.mkdir(tmp)?
   defer fs.remove(tmp, missing_ok: true)?
   let m4 = fp"{rootfs}/usr/bin/m4"
 
-  if ! fs.exists(m4)? {
-    return Err(ScriptError.Failed("proof-m4", f"missing m4: {m4}"))?
-  }
+  return Err(ScriptError.Failed("proof-m4", f"missing m4: {m4}"))? unless fs.exists(m4)?
 
   fs.write(
     fp"{tmp}/test.m4",

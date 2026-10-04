@@ -1,15 +1,15 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "laputa-net"
+export const name = "laputa-net"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1"
+export const ver = "1"
 
 ## Exported declaration `rel`.
-export let rel = "11"
+export const rel = "11"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -20,10 +20,10 @@ export let mkdeps_host = []
 ## The build only installs the service module and interface config. At runtime
 ## xinit runs the service, which drives the xsh core applets ifup/ifdown, and
 ## wpa_supplicant provides Wi-Fi association for wireless interfaces.
-export let runtime_only_deps = ["wpa_supplicant", "xinit", "xsh"]
+export const runtime_only_deps = ["wpa_supplicant", "xinit", "xsh"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"service.xsh",
     kind: "auto",
@@ -53,7 +53,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"etc/network/if-down.d",
     kind: "tree",

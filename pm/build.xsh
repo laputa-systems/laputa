@@ -12,20 +12,16 @@ proc pm_source_root() [fs, env, error] -> Result[Path] {
   for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 
-    if fs.exists(fp"{root}/pm.xsh")? and fs.exists(fp"{root}/pm")? {
-      return root
-    }
+    return root when fs.exists(fp"{root}/pm.xsh")? and fs.exists(fp"{root}/pm")?
   }
 
-  if fs.exists(p"pm.xsh")? and fs.exists(p"pm")? {
-    return path.absolute(p".")?
-  }
+  return path.absolute(p".")? when fs.exists(p"pm.xsh")? and fs.exists(p"pm")?
 
   /usr/lib/pm
 }
 
 pure seeded_shell_script() -> Str {
-  return r"""#!/bin/xsh
+  r"""#!/bin/xsh
 error ShError = Failed(message: Str)
 
 proc build_shell_run_argv(argv: List[Str]) [process, error] {
@@ -76,14 +72,10 @@ proc xsh_runner() [fs, process, env, error] -> Result[Path] {
   if host != "" {
     let host_path = fp"{host}"
 
-    if fs.exists(host_path)? {
-      return host_path
-    }
+    return host_path when fs.exists(host_path)?
   }
 
-  if fs.exists(/bin/xsh)? {
-    return /bin/xsh
-  }
+  return /bin/xsh when fs.exists(/bin/xsh)?
 
   process.which("xsh")?
 }
@@ -95,22 +87,18 @@ proc regular_xsh_source(xsh: Path) [fs, error] -> Result[Path] {
   while depth < 16 {
     let metadata = fs.metadata(source)?
 
-    if metadata.kind != "symlink" {
-      return source
-    }
+    return source when metadata.kind != "symlink"
 
     let target = source.readlink()?
     source = if target.display().starts_with("/") { target } else { fp"{source.parent}/{target}" }
     depth += 1
   }
 
-  return Err(types.PmError.PackageContract(f"{xsh} has too many symlink levels"))
+  Err(types.PmError.PackageContract(f"{xsh} has too many symlink levels"))
 }
 
 proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
-  if name == "xsh" {
-    return regular_xsh_source(xsh)
-  }
+  return regular_xsh_source(xsh) when name == "xsh"
 
   let sibling = fp"{xsh.parent}/{name}"
   if ! fs.exists(sibling)? {
@@ -208,13 +196,9 @@ proc xsht_runner() [fs, process, env, error] -> Result[Path] {
   let xsh = xsh_runner()?
   let sibling = fp"{xsh.parent}/xsht"
 
-  if fs.exists(sibling)? {
-    return sibling
-  }
+  return sibling when fs.exists(sibling)?
 
-  if fs.exists(/bin/xsht)? {
-    return /bin/xsht
-  }
+  return /bin/xsht when fs.exists(/bin/xsht)?
 
   process.which("xsht")?
 }

@@ -42,7 +42,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs] {
     return Err(xsh_seed.SeedError.Usage(world_usage()))
   }
 
-  var parsed: WorldArgs = {command: argv[0], arch: "", packages: [], stop: "", jobs: 4, repo: ""}
+  var parsed: WorldArgs = WorldArgs(command: argv[0], arch: "", packages: [], stop: "", jobs: 4, repo: "")
   var index = 1
 
   while index < argv.len() {
@@ -96,20 +96,18 @@ export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[
     var argv: List[Str] = []
 
     for name in packages {
-      argv = argv.extend(["--root", name])
+      argv += ["--root", name]
     }
 
     return argv
   }
 
-  if stop == "" {
-    return ["--all"]
-  }
+  return ["--all"] when stop == ""
 
   var argv = ["--all"]
 
   for name in world_stop_line(stop)? {
-    argv = argv.extend(["--without", name])
+    argv += ["--without", name]
   }
 
   argv
@@ -146,19 +144,16 @@ export pure world_container_argv(
     "none",
     "--mount",
     f"type=bind,src={laputa_root},dst=/src/laputa,readonly",
-  ].extend(xsh_seed.xsh_seed_mount_argv(seed))
-    .extend(
-      [
-        "--mount",
-        f"type=bind,src={output},dst=/output",
-        "--mount",
-        f"type=bind,src={store},dst=/artifacts",
-        "--workdir",
-        "/src/laputa",
-        tag,
-      ],
-    )
-    .extend(inner)
+    @xsh_seed.xsh_seed_mount_argv(seed),
+    "--mount",
+    f"type=bind,src={output},dst=/output",
+    "--mount",
+    f"type=bind,src={store},dst=/artifacts",
+    "--workdir",
+    "/src/laputa",
+    tag,
+    @inner,
+  ]
 }
 
 type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str}
@@ -213,8 +208,17 @@ proc world_plan(container: WorldContainer, args: WorldArgs) [fs, process, error]
     world_dir(laputa_root, args.arch),
     world_store(laputa_root, args.arch),
     pm_argv(
-      ["repo", "plan", "--repo", "/src/laputa"].extend(selection)
-        .extend(["--target", pm_target(container.value), "--output", "/output/plan.json"]),
+      [
+        "repo",
+        "plan",
+        "--repo",
+        "/src/laputa",
+        @selection,
+        "--target",
+        pm_target(container.value),
+        "--output",
+        "/output/plan.json",
+      ],
     ),
     "repo plan",
   )?
@@ -284,13 +288,22 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
   var selection: List[Str] = []
 
   for name in args.packages {
-    selection = selection.extend(["--root", name])
+    selection += ["--root", name]
   }
 
   host_pm(
     args.repo,
-    ["repo", "plan", "--repo", laputa_root.display()].extend(selection)
-      .extend(["--target", pm_target(container.value), "--output", plan.display()]),
+    [
+      "repo",
+      "plan",
+      "--repo",
+      laputa_root.display(),
+      @selection,
+      "--target",
+      pm_target(container.value),
+      "--output",
+      plan.display(),
+    ],
   )?
   require_mirror_plan(plan, args.repo)?
   host_pm(args.repo, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{args.jobs}"])?

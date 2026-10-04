@@ -10,23 +10,17 @@ use pm.util as pm_util
 proc package_arch() [env, error] -> Result[Str] {
   let arch = pm_util.target_arch()?
 
-  if arch == "aarch64" or arch == "x86_64" {
-    return arch
-  }
+  return arch when arch == "aarch64" or arch == "x86_64"
 
-  return Err(kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {arch}"))
+  Err(kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {arch}"))
 }
 
 pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
-  if package_arch_value == "aarch64" {
-    return "arm64"
-  }
+  return "arm64" when package_arch_value == "aarch64"
 
-  if package_arch_value == "x86_64" {
-    return "x86"
-  }
+  return "x86" when package_arch_value == "x86_64"
 
-  return Err(
+  Err(
     kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
@@ -36,31 +30,25 @@ pure kernel_config_fragments_for(package_arch_value: Str) -> Result[List[Path]] 
     return [p"files/config/aarch64/base-aarch64.fragment"]
   }
 
-  if package_arch_value == "x86_64" {
-    return [p"files/config/x86_64/base-x86_64.fragment"]
-  }
+  return [p"files/config/x86_64/base-x86_64.fragment"] when package_arch_value == "x86_64"
 
-  return Err(
+  Err(
     kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
 pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
-  if package_arch_value == "aarch64" {
-    return p"arch/arm64/boot/Image"
-  }
+  return p"arch/arm64/boot/Image" when package_arch_value == "aarch64"
 
-  if package_arch_value == "x86_64" {
-    return p"arch/x86/boot/bzImage"
-  }
+  return p"arch/x86/boot/bzImage" when package_arch_value == "x86_64"
 
-  return Err(
+  Err(
     kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
 proc install_headers_from(root: Path, source: Path, target: Path) [fs, error] {
-  if ! fs.exists(source)? {
+  guard fs.exists(source)? else {
     return
   }
 
@@ -119,7 +107,7 @@ proc build_cc() [fs, process, env, error] -> Result[Path] {
     return cc
   }
 
-  return process.which("cc")?
+  process.which("cc")?
 }
 
 proc main(dest: Path) [fs, process, env, time, error] {

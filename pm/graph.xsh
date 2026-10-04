@@ -8,7 +8,7 @@ pure graph_sorted_unique_names(names: List[Str]) -> List[Str] {
 
   for name in names |> sort {
     if ! (seen.get(name) ?? false) {
-      unique = unique.push(name)
+      unique += [name]
       seen[name] = true
     }
   }
@@ -84,9 +84,7 @@ pure index_in_path(trail: List[Str], name: Str) -> Int {
   var index = 0
 
   while index < trail.len() {
-    if trail[index] == name {
-      return index
-    }
+    return index when trail[index] == name
 
     index += 1
   }
@@ -118,23 +116,19 @@ pure cycle_from(
 
     let nested = cycle_from(dependency, selected, dependency_edges, trail.push(dependency))
 
-    if nested.len() > 0 {
-      return nested
-    }
+    return nested when nested.len() > 0
   }
 
   []
 }
 
 pure find_cycle(selected_names: List[Str], dependency_edges: List[types.DependencyEdge]) -> List[Str] {
-  let selected: Map[Bool] = {name: true for name in selected_names}
+  let selected = {name: true for name in selected_names}
 
   for name in selected_names {
     let cycle = cycle_from(name, selected, dependency_edges, [name])
 
-    if cycle.len() > 0 {
-      return cycle
-    }
+    return cycle when cycle.len() > 0
   }
 
   []
@@ -165,7 +159,7 @@ proc closure_from_edges(
 
       for dependency in direct_dependencies(name, kind_edges) {
         if ! (included.get(dependency) ?? false) {
-          pending = pending.push(dependency)
+          pending += [dependency]
         }
       }
     }
@@ -188,7 +182,7 @@ export proc edges(
 
   for pkg in catalog.packages {
     for edge in package_edges(pkg, value) {
-      result = result.push(edge)
+      result += [edge]
       declared_pairs[edge_key(edge.from, edge.to)] = true
     }
   }
@@ -227,7 +221,7 @@ export proc topological_levels(
   dependency_edges: List[types.DependencyEdge],
 ) [error] -> Result[List[List[Str]]] {
   let selected_names = graph_sorted_unique_names(selected)
-  let selected_map: Map[Bool] = {name: true for name in selected_names}
+  let selected_map = {name: true for name in selected_names}
   let local_edges = [
     edge
     for edge in dependency_edges
@@ -248,21 +242,18 @@ export proc topological_levels(
   var emitted_count = 0
 
   while emitted_count < selected_names.len() {
-    var ready: List[Str] = []
-
-    for name in selected_names {
-      if ! (emitted.get(name) ?? false) and (unresolved.get(name) ?? 0) == 0 {
-        ready = ready.push(name)
-      }
-    }
-
+    var ready = [
+      name
+      for name in selected_names
+      if ! (emitted.get(name) ?? false) and (unresolved.get(name) ?? 0) == 0
+    ]
     if ready.len() == 0 {
       let cycle = find_cycle(selected_names, local_edges)
       let rendered = if cycle.len() > 0 { cycle.join(" -> ") } else { selected_names.join(", ") }
       return Err(types.PmError.DependencyCycle(f"package dependency cycle: {rendered}"))
     }
 
-    levels = levels.push(ready)
+    levels += [ready]
 
     for name in ready {
       emitted[name] = true
@@ -318,7 +309,7 @@ export proc packages_buildable_without(
   let local_names = {pkg.name: true for pkg in catalog.packages}
 
   for name in excluded {
-    if ! (local_names.get(name) ?? false) {
+    guard local_names.get(name) ?? false else {
       return Err(types.PmError.MissingDependency(f"excluded package {name} is not in the catalog"))
     }
   }

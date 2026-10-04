@@ -155,9 +155,7 @@ proc generation_adapter_completed_build(expected: types.BuildPlan, actual: types
 
 proc generation_adapter_find_node(value: types.BuildPlan, package_name: Str) [error] -> Result[types.PlanNode] {
   for node in value.nodes {
-    if node.name == package_name {
-      return node
-    }
+    return node when node.name == package_name
   }
 
   Err(GenerationAdapterError.Failed(f"package {package_name} is not in the saved BuildPlan"))

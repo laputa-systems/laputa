@@ -5,28 +5,28 @@ use pm.target as target
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "bison"
+export const name = "bison"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "3.8.2"
+export const ver = "3.8.2"
 
 ## Exported declaration `rel`.
-export let rel = "11"
+export const rel = "11"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## The `yacc` wrapper is an XSH script; it needs the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://mirrors.kernel.org/gnu/bison/bison-VERSION.tar.xz",
     kind: "auto",
@@ -56,7 +56,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/bison",
     kind: "binary",
@@ -719,7 +719,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       var generated = line.replace("__always_inline", "inline _GL_ATTRIBUTE_ALWAYS_INLINE")
       generated = generated.replace("__glibc_likely", "_GL_LIKELY")
       generated = generated.replace("__glibc_unlikely", "_GL_UNLIKELY")
-      scratch_lines = scratch_lines.push(generated)
+      scratch_lines += [generated]
     }
   }
 
@@ -834,19 +834,19 @@ getprogname (void)
     }
   }
 
-  lib_sources = lib_sources.push(p"lib/rawmemchr.c")
-  lib_sources = lib_sources.push(p"lib/error.c")
-  lib_sources = lib_sources.push(p"lib/obstack.c")
-  lib_sources = lib_sources.push(p"lib/obstack_printf.c")
-  lib_sources = lib_sources.push(p"lib/asnprintf.c")
-  lib_sources = lib_sources.push(p"lib/printf-args.c")
-  lib_sources = lib_sources.push(p"lib/printf-parse.c")
-  lib_sources = lib_sources.push(p"lib/vasnprintf.c")
-  lib_sources = lib_sources.push(p"lib/get-errno.c")
-  lib_sources = lib_sources.push(p"lib/setlocale-lock.c")
-  lib_sources = lib_sources.push(p"lib/chdir-long.c")
-  lib_sources = lib_sources.push(p"lib/path-join.c")
-  lib_sources = lib_sources.push(p"lib/xsh-getprogname.c")
+  lib_sources += [p"lib/rawmemchr.c"]
+  lib_sources += [p"lib/error.c"]
+  lib_sources += [p"lib/obstack.c"]
+  lib_sources += [p"lib/obstack_printf.c"]
+  lib_sources += [p"lib/asnprintf.c"]
+  lib_sources += [p"lib/printf-args.c"]
+  lib_sources += [p"lib/printf-parse.c"]
+  lib_sources += [p"lib/vasnprintf.c"]
+  lib_sources += [p"lib/get-errno.c"]
+  lib_sources += [p"lib/setlocale-lock.c"]
+  lib_sources += [p"lib/chdir-long.c"]
+  lib_sources += [p"lib/path-join.c"]
+  lib_sources += [p"lib/xsh-getprogname.c"]
 
   # Compile bison's src/*.c (scanners and parsers are pre-generated in tarball)
   let src_sources = make.discover_sources(

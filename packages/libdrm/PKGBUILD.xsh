@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Exported declaration `name`.
-export let name = "libdrm"
+export const name = "libdrm"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.4.127"
+export const ver = "2.4.127"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "libudev-zero"]
+export const deps = ["musl", "libudev-zero"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libudev-zero"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libudev-zero"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://dri.freedesktop.org/libdrm/libdrm-VERSION.tar.xz",
     kind: "auto",
@@ -39,7 +39,7 @@ export let upstream_sources = [
 type Modifier = {vendor: Str, mod: Str, name: Str}
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/libdrm/amdgpu_drm.h",
     kind: "file",
@@ -155,9 +155,7 @@ proc write_format_modifier_table() [fs, error] {
   for line in header.read_text()?.split("\n") {
     let words = line.words()
 
-    if words.len() >= 2 {
-      let modifier_name = words[1]
-
+    if let [_, modifier_name, ..] = words {
       if modifier_name.starts_with("I915_FORMAT_MOD_") {
         intel = intel.push(modifier_name.replace("I915_FORMAT_MOD_", ""))
       } else if modifier_name.starts_with("DRM_FORMAT_MOD_VENDOR_") {
@@ -166,8 +164,7 @@ proc write_format_modifier_table() [fs, error] {
         let entry = modifier_name.replace("DRM_FORMAT_MOD_", "")
         let parts = entry.split("_")
 
-        if parts.len() >= 2 {
-          let vendor = parts[0]
+        if let [vendor, _, ..] = parts {
           let mod = entry.replace(f"{vendor}_", "")
 
           if ! (vendor == "ARM" and (mod == "TYPE_AFBC" or mod == "TYPE_MISC" or mod == "TYPE_AFRC")) {
@@ -193,14 +190,14 @@ proc write_format_modifier_table() [fs, error] {
     body = body.push(f"    {{ DRM_MODIFIER({mod.vendor}, {mod.mod}, {mod.name}) }},")
   }
 
-  body = body.push("};")
-  body = body.push("static const struct drmFormatModifierVendorInfo drm_format_modifier_vendor_table[] = {")
+  body += ["};"]
+  body += ["static const struct drmFormatModifierVendorInfo drm_format_modifier_vendor_table[] = {"]
 
   for vendor in vendors {
     body = body.push(f"    {{ DRM_FORMAT_MOD_VENDOR_{vendor}, \"{vendor}\" }},")
   }
 
-  body = body.push("};")
+  body += ["};"]
   fs.write(p"generated_static_table_fourcc.h", body.join("\n"))?
 }
 

@@ -125,15 +125,15 @@ export type CMultiTarget = {
 }
 
 pure has_path(path_value: Path) -> Bool {
-  return path_value.display() != ""
+  path_value.display() != ""
 }
 
 pure stamp_path(out: Path) -> Path {
-  return fp"{out}.cmd"
+  fp"{out}.cmd"
 }
 
 pure depfile_path(out: Path) -> Path {
-  return fp"{out}.d"
+  fp"{out}.d"
 }
 
 ## Task argv is `List[Any]` because it mixes `Str` flags with `Path` operands
@@ -152,7 +152,7 @@ pure argv_word(arg: Any) -> Result[Str] {
 }
 
 pure object_name_for_source(src: Path, ext: Str) -> Str {
-  return src.display()
+  src.display()
     .replace("/", "_")
     .replace(".cxx", ext)
     .replace(".cpp", ext)
@@ -167,26 +167,19 @@ pure object_path_for_source(src: Path, out_dir: Path, ext: Str) -> Path {
 }
 
 pure source_is_cxx(src: Path) -> Bool {
-  return src.ext == "cxx" or src.ext == "cpp" or src.ext == "cc"
+  src.ext == "cxx" or src.ext == "cpp" or src.ext == "cc"
 }
 
 pure source_path(root: Path, src: Path) -> Path {
-  if root.display() == "" or root.display() == "." {
-    return src
-  }
+  return src when root.display() == "" or root.display() == "."
 
-  return fp"{root}/{src}"
+  fp"{root}/{src}"
 }
 
 ## Exported PM declaration `task_deps`.
 export pure task_deps(tasks: List[MakeTask], outputs: List[Path]) -> List[Str] {
-  var wanted: Map[Bool] = {}
-
-  for output in outputs {
-    wanted[output.display()] = true
-  }
-
-  return [task.name for task in tasks if task.outputs.len() > 0 and (wanted.get(task.outputs[0].display()) ?? false)]
+  var wanted = {[output.display()]: true for output in outputs}
+  [task.name for task in tasks if task.outputs.len() > 0 and (wanted.get(task.outputs[0].display()) ?? false)]
 }
 
 proc pkg_config_words(
@@ -194,13 +187,10 @@ proc pkg_config_words(
   mode: Str,
   packages: List[Str],
 ) [process, env, error] -> Result[List[Str]] {
-  let pkg_config_path = pc.pkg_config_path
-  let pkg_config_libdir = pc.pkg_config_libdir
-  let pkg_config_sysroot = pc.pkg_config_sysroot
-  let ld_library_path = pc.ld_library_path
+  let {pkg_config_path, pkg_config_libdir, pkg_config_sysroot, ld_library_path, ..} = pc
   let pkg_config = pc.pkg_config.display()
   let out = run.text LD_LIBRARY_PATH=$ld_library_path PKG_CONFIG=$pkg_config PKG_CONFIG_LIBDIR=$pkg_config_libdir PKG_CONFIG_PATH=$pkg_config_path PKG_CONFIG_SYSROOT_DIR=$pkg_config_sysroot $pc.pkg_config $mode @packages ?
-  return out.words()
+  out.words()
 }
 
 ## Compiler and linker arguments returned by pkg-config.
@@ -210,7 +200,7 @@ export type PkgConfigFlags = {cflags: List[Str], libs: List[Str]}
 export proc pkg_config_flags(packages: List[Str]) [process, env, error] -> Result[PkgConfigFlags] {
   let pc = pm_env.pkg_config_context()?
 
-  return {
+  {
     cflags: pkg_config_words(pc, "--cflags", packages)?,
     libs: pkg_config_words(pc, "--libs", packages)?,
   }
@@ -220,12 +210,10 @@ pure path_in_list(path_value: Path, paths: List[Path]) -> Bool {
   let text = path_value.display()
 
   for candidate in paths {
-    if candidate.display() == text {
-      return true
-    }
+    return true when candidate.display() == text
   }
 
-  return false
+  false
 }
 
 ## Exported PM declaration `discover_sources`.
@@ -242,10 +230,10 @@ export proc discover_sources(
     continue unless entry.ext in extensions
     let rel = entry.path.relative_to(source_root)
     continue when path_in_list(rel, exclude)
-    sources = sources.push(rel)
+    sources += [rel]
   }
 
-  return sources
+  sources
 }
 
 ## Exported PM declaration `install_header_tree`.
@@ -273,7 +261,7 @@ pure parse_jobs(value: Str, source: Str) -> Result[Int] {
     return Err(MakeError.InvalidJobs(message: f"{source} must be a positive integer"))
   }
 
-  return parsed
+  parsed
 }
 
 pure makeflags_jobs(flags: Str) -> Result[Int] {
@@ -302,18 +290,16 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
     index += 1
   }
 
-  return cpu.count()
+  cpu.count()
 }
 
 ## Exported PM declaration `jobs`.
 export proc jobs() [env, error] -> Result[Int] {
   let value = env.get("MAKEFLAGS") ?? ""
 
-  if value == "" {
-    return cpu.count()
-  }
+  return cpu.count() when value == ""
 
-  return makeflags_jobs(value)?
+  makeflags_jobs(value)?
 }
 
 ## Exported PM declaration `effective_task_argv`.
@@ -327,7 +313,7 @@ export proc effective_task_env(_: List[Any], task_env: Record) [error] -> Result
 }
 
 proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
-  if jobs_count <= 0 {
+  guard jobs_count > 0 else {
     return Err(MakeError.InvalidJobs(message: "job count must be positive"))
   }
 
@@ -366,7 +352,7 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
 
   for task in tasks {
     for dep in task.deps {
-      if ! (names.get(dep) ?? false) {
+      guard names.get(dep) ?? false else {
         return Err(MakeError.MissingDependency(message: f"make task '{task.name}' depends on missing task '{dep}'"))
       }
     }
@@ -374,15 +360,13 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
 }
 
 pure dep_path(cwd: Path, dep: Str) -> Path {
-  if dep.starts_with("/") {
-    return fp"{dep}"
-  }
+  return fp"{dep}" when dep.starts_with("/")
 
-  return fp"{cwd}/{dep}"
+  fp"{cwd}/{dep}"
 }
 
 proc depfile_inputs(depfile: Path, cwd: Path) [fs, error] -> Result[List[Path]] {
-  if ! depfile.exists()? {
+  guard depfile.exists()? else {
     let deps = []
     return deps
   }
@@ -412,17 +396,17 @@ proc all_inputs(task: MakeTask) [fs, error] -> Result[List[Path]] {
     inputs = inputs.extend(depfile_inputs(task.depfile, task.cwd)?)
   }
 
-  return inputs
+  inputs
 }
 
 proc output_missing(task: MakeTask) [fs, error] -> Result[Bool] {
   for output in task.outputs {
-    if ! output.exists()? {
+    guard output.exists()? else {
       return true
     }
   }
 
-  return false
+  false
 }
 
 proc oldest_output_mtime(outputs: List[Path]) [fs, error] -> Result[Int] {
@@ -436,31 +420,27 @@ proc oldest_output_mtime(outputs: List[Path]) [fs, error] -> Result[Int] {
     }
   }
 
-  return oldest
+  oldest
 }
 
 proc input_newer(task: MakeTask) [fs, error] -> Result[Bool] {
-  if task.outputs.len() == 0 {
-    return true
-  }
+  return true when task.outputs.len() == 0
 
   let oldest_output = oldest_output_mtime(task.outputs)?
 
   for input in all_inputs(task)? {
-    if ! input.exists()? {
+    guard input.exists()? else {
       return true
     }
 
-    if input.metadata()?.modified > oldest_output {
-      return true
-    }
+    return true when input.metadata()?.modified > oldest_output
   }
 
-  return false
+  false
 }
 
 proc command_signature(task: MakeTask) [fs, env, error] -> Result[Str] {
-  return json.encode({
+  json.encode({
     argv: effective_task_argv(task.argv, task.env)?,
     cwd: task.cwd.display(),
     env: effective_task_env(task.argv, task.env)?,
@@ -468,31 +448,23 @@ proc command_signature(task: MakeTask) [fs, env, error] -> Result[Str] {
 }
 
 proc stamp_changed(task: MakeTask) [fs, env, error] -> Result[Bool] {
-  if ! has_path(task.stamp) {
+  guard has_path(task.stamp) else {
     return false
   }
 
-  if ! task.stamp.exists()? {
-    return true
-  }
+  return true unless task.stamp.exists()?
 
-  return task.stamp.read_text()? != command_signature(task)?
+  task.stamp.read_text()? != command_signature(task)?
 }
 
 proc should_run(task: MakeTask) [fs, env, error] -> Result[Bool] {
-  if output_missing(task)? {
-    return true
-  }
+  return true when output_missing(task)?
 
-  if stamp_changed(task)? {
-    return true
-  }
+  return true when stamp_changed(task)?
 
-  if has_path(task.depfile) and ! task.depfile.exists()? {
-    return true
-  }
+  return true when has_path(task.depfile) and ! task.depfile.exists()?
 
-  return input_newer(task)?
+  input_newer(task)?
 }
 
 proc prepare_task_dirs(task: MakeTask) [fs, error] {
@@ -519,11 +491,11 @@ proc spawn_task(task: MakeTask) [fs, process, env, error] -> Result[RunningTask]
   let task_argv = effective_task_argv(task.argv, task.env)?
   let task_env = effective_task_env(task.argv, task.env)?
   let handle = spawn process.command_argv(task_argv[0], task_argv, cwd: task.cwd, env: task_env)?
-  return {task: task, handle: handle}
+  {task: task, handle: handle}
 }
 
 pure completed_index_key(index: Int) -> Str {
-  return f"{index}"
+  f"{index}"
 }
 
 proc remove_running_indices(running: List[RunningTask], completed_indices: Map[Bool]) [] -> List[RunningTask] {
@@ -532,13 +504,13 @@ proc remove_running_indices(running: List[RunningTask], completed_indices: Map[B
 
   for row in running {
     if ! (completed_indices.get(completed_index_key(index)) ?? false) {
-      next = next.push(row)
+      next += [row]
     }
 
     index += 1
   }
 
-  return next
+  next
 }
 
 proc cancel_running_uncompleted(running: List[RunningTask], completed_indices: Map[Bool]) [process] {
@@ -580,15 +552,13 @@ proc emit_dynamic_state(
 }
 
 pure should_log_dynamic_progress(tasks_count: Int, event_count: Int, running_count: Int, jobs_count: Int) -> Bool {
-  if tasks_count <= 100 {
+  guard tasks_count > 100 else {
     return true
   }
 
-  if event_count % 100 == 0 {
-    return true
-  }
+  return true when event_count % 100 == 0
 
-  return running_count < jobs_count
+  running_count < jobs_count
 }
 
 ## Exported PM declaration `run_tasks`.
@@ -678,7 +648,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
             remaining_deps[dependent] = remaining
 
             if remaining == 0 {
-              ready = ready.push(dependent)
+              ready += [dependent]
             }
           }
         }
@@ -721,13 +691,13 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
         return Err(MakeError.CommandFailed(message: f"make task '{row.task.name}' failed"))
       }
 
-      completed_tasks = completed_tasks.push(row)
+      completed_tasks += [row]
     }
 
     running = remove_running_indices(running, completed_indices)
 
     for row in completed_tasks {
-      pending_stamps = pending_stamps.push(row)
+      pending_stamps += [row]
       done[row.task.name] = true
       done_count += 1
 
@@ -736,7 +706,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
         remaining_deps[dependent] = remaining
 
         if remaining == 0 {
-          ready = ready.push(dependent)
+          ready += [dependent]
         }
       }
 
@@ -792,7 +762,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
               remaining_deps[dependent] = remaining
 
               if remaining == 0 {
-                ready = ready.push(dependent)
+                ready += [dependent]
               }
             }
           }
@@ -849,9 +819,9 @@ export proc compile_lo_task(
   let depfile = depfile_path(out)
   var argv: List[Any] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC"]
   argv = [@argv, @cflags, @defs, @includes]
-  argv = argv.extend([src, "-o", out, "-MMD", "-MP", "-MF", depfile])
+  argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -886,11 +856,11 @@ export proc compile_lo_tasks(
   for src in sources {
     let out = object_path_for_source(src, out_dir, ".lo")
     let task = compile_lo_task(toolchain, triple, cflags, defs, includes, source_path(root, src), out, deps)
-    tasks = tasks.push(task)
-    objects = objects.push(out)
+    tasks += [task]
+    objects += [out]
   }
 
-  return {tasks, objects, deps: [task.name for task in tasks]}
+  {tasks, objects, deps: [task.name for task in tasks]}
 }
 
 ## Exported PM declaration `compile_asm_lo_task`.
@@ -905,7 +875,7 @@ export proc compile_asm_lo_task(
   var argv: List[Any] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC", "-Wa,--noexecstack"]
   argv = [@argv, @includes, src, "-o", out]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -938,11 +908,11 @@ export proc compile_asm_lo_tasks(
   for src in sources {
     let out = object_path_for_source(src, out_dir, ".lo")
     let task = compile_asm_lo_task(toolchain, triple, includes, source_path(root, src), out, deps)
-    tasks = tasks.push(task)
-    objects = objects.push(out)
+    tasks += [task]
+    objects += [out]
   }
 
-  return {tasks, objects, deps: [task.name for task in tasks]}
+  {tasks, objects, deps: [task.name for task in tasks]}
 }
 
 ## Exported PM declaration `compile_cxx_task`.
@@ -960,9 +930,9 @@ export proc compile_cxx_task(
   let depfile = depfile_path(out)
   var argv: List[Any] = ["c++", "-target", triple, "-c"]
   argv = [@argv, @cflags, @defs, @includes]
-  argv = argv.extend([src, "-o", out, "-MMD", "-MP", "-MF", depfile])
+  argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -997,11 +967,11 @@ export proc compile_cxx_tasks(
   for src in sources {
     let out = object_path_for_source(src, out_dir, ".o")
     let task = compile_cxx_task(toolchain, triple, cflags, defs, includes, source_path(root, src), out, deps)
-    tasks = tasks.push(task)
-    objects = objects.push(out)
+    tasks += [task]
+    objects += [out]
   }
 
-  return {tasks, objects, deps: [task.name for task in tasks]}
+  {tasks, objects, deps: [task.name for task in tasks]}
 }
 
 ## Exported PM declaration `compile_c_task`.
@@ -1018,9 +988,9 @@ export proc compile_c_task(
   let depfile = depfile_path(out)
   var argv: List[Any] = [toolchain, "-target", triple, "-c"]
   argv = [@argv, @cflags, @defs, @includes]
-  argv = argv.extend([src, "-o", out, "-MMD", "-MP", "-MF", depfile])
+  argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -1055,11 +1025,11 @@ export proc compile_c_tasks(
   for src in sources {
     let out = object_path_for_source(src, out_dir, ".o")
     let task = compile_c_task(toolchain, triple, cflags, defs, includes, source_path(root, src), out, deps)
-    tasks = tasks.push(task)
-    objects = objects.push(out)
+    tasks += [task]
+    objects += [out]
   }
 
-  return {tasks, objects, deps: [task.name for task in tasks]}
+  {tasks, objects, deps: [task.name for task in tasks]}
 }
 
 ## Exported PM declaration `compile_mixed_tasks`.
@@ -1086,11 +1056,11 @@ export proc compile_mixed_tasks(
       compile_c_task(toolchain, triple, cflags, defs, includes, source_path(root, src), out, deps)
     }
 
-    tasks = tasks.push(task)
-    objects = objects.push(out)
+    tasks += [task]
+    objects += [out]
   }
 
-  return {tasks, objects, deps: [task.name for task in tasks]}
+  {tasks, objects, deps: [task.name for task in tasks]}
 }
 
 ## Exported PM declaration `c_program`.
@@ -1117,7 +1087,7 @@ export proc c_program(spec: CProgram) [] -> CTarget {
     compiled.deps,
   )
 
-  return {
+  {
     tasks: compiled.tasks.push(link),
     objects: compiled.objects,
     deps: compiled.deps.push(link.name),
@@ -1149,7 +1119,7 @@ export proc c_shared_library(spec: CSharedLibrary) [] -> CTarget {
     compiled.deps,
   )
 
-  return {
+  {
     tasks: compiled.tasks.push(link),
     objects: compiled.objects,
     deps: compiled.deps.push(link.name),
@@ -1173,7 +1143,7 @@ export proc c_static_library(spec: CStaticLibrary) [] -> CTarget {
 
   let archive_task = link_archive_task(spec.cc, compiled.objects, spec.out, compiled.deps)
 
-  return {
+  {
     tasks: compiled.tasks.push(archive_task),
     objects: compiled.objects,
     deps: compiled.deps.push(archive_task.name),
@@ -1228,7 +1198,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
     var needs_cxx_link = true in [source_is_cxx(src) for src in target.sources]
 
     for group_name in target.groups {
-      if ! (group_name in groups) {
+      guard group_name in groups else {
         return Err(
           MakeError.MissingDependency(
             message: f"target '{target.name}' references missing source group '{group_name}'",
@@ -1265,12 +1235,12 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
       link_executable_task(spec.cc, spec.triple, objects, target.libs, target.ldflags, target.out, target_deps)
     }
 
-    tasks = tasks.push(link)
+    tasks += [link]
     outputs[target.name] = target.out
     deps = deps.push(link.name)
   }
 
-  return {tasks, groups, outputs, deps}
+  {tasks, groups, outputs, deps}
 }
 
 ## Exported PM declaration `link_shared_task`.
@@ -1287,7 +1257,7 @@ export proc link_shared_task(
   var argv: List[Any] = ["cc", "-target", triple, "-shared", f"-Wl,-soname,{soname}"]
   argv = [@argv, @ldflags, @objs, "-o", out]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -1316,7 +1286,7 @@ export proc link_executable_cxx_task(
   var argv: List[Any] = ["c++", "-target", triple]
   argv = [@argv, @objs, @libs, @ldflags, "-o", out]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -1347,7 +1317,7 @@ export proc link_executable_task(
   var argv: List[Any] = ["cc", "-target", triple]
   argv = [@argv, @objs, @libs, @ldflags, "-o", out]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -1368,7 +1338,7 @@ export proc link_archive_task(toolchain: Path, objs: List[Path], out: Path, deps
   var argv: List[Any] = ["ar", "rcs", out]
   argv = [@argv, @objs]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,

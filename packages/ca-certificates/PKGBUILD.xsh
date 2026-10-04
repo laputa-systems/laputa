@@ -1,15 +1,15 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "ca-certificates"
+export const name = "ca-certificates"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2026.03.19"
+export const ver = "2026.03.19"
 
 ## Exported declaration `rel`.
-export let rel = "10"
+export const rel = "10"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -18,10 +18,10 @@ export let deps = []
 export let mkdeps_host = []
 
 ## `/usr/bin/update-certdata` is an XSH script; it needs the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"files/cacert.pem",
     kind: "auto",
@@ -51,7 +51,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"etc/ssl/cert.pem",
     kind: "symlink",

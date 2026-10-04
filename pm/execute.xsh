@@ -71,9 +71,7 @@ proc execute_require_receipt(
 }
 
 proc execute_receipt(context: ExecuteContext, key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
-  if key in context.published {
-    return context.published.get(key)?
-  }
+  return context.published.get(key)? when key in context.published
 
   store.lookup(context.store_root, key)
 }
@@ -91,17 +89,15 @@ proc execute_receipt_closure(
     let key = pending[index]
     index += 1
 
-    if seen.get(key) ?? false {
-      continue
-    }
+    continue when seen.get(key) ?? false
 
     let receipt = execute_receipt(context, key)?
     seen[key] = true
-    receipts = receipts.push(receipt)
+    receipts += [receipt]
 
     for runtime_key in receipt.runtime_dependency_keys |> sort {
       if ! (seen.get(runtime_key) ?? false) {
-        pending = pending.push(runtime_key)
+        pending += [runtime_key]
       }
     }
   }
@@ -116,7 +112,7 @@ proc execute_receipt_closure(
 # as `usr`, so extraction merges into what earlier payloads created.
 proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) [fs, error] {
   let root_plan = pm_root.trusted_preflight(target, artifacts)?
-  let payload_keys: Map[Bool] = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
+  let payload_keys = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
   fs.mkdir(root)?
 
   for receipt in artifacts {
@@ -184,12 +180,7 @@ proc execute_stage_local(
   }
 }
 
-proc execute_publish_proof_cache(
-  store_root: Path,
-  node: types.PlanNode,
-  payload_sha256: Str,
-  proof: Path,
-) [fs, error] -> Result[Unit] {
+proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload_sha256: Str, proof: Path) [fs, error] {
   pm_proof.verify_artifact_receipt(proof, node, payload_sha256)?
   let cached = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
   fs.mkdir(cached.parent)?
@@ -198,7 +189,7 @@ proc execute_publish_proof_cache(
 
   if fs.exists(cached)? {
     pm_proof.verify_artifact_receipt(cached, node, payload_sha256)?
-    return Ok()
+    return
   }
 
   let temporary = fp"{cached}.tmp"
@@ -206,7 +197,6 @@ proc execute_publish_proof_cache(
   defer fs.remove(temporary, missing_ok: true)?
   fs.copy(proof, temporary, overwrite: true)?
   fs.rename(temporary, cached)?
-  return Ok()
 }
 
 # Runs the package proof against `payload` in a fresh root holding its runtime
@@ -220,13 +210,13 @@ proc execute_run_proof(
   payload: Path,
   payload_sha256: Str,
   proof: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] {
   # Metapackages select an already-proved dependency closure. They own neither
   # a payload archive nor a proof program, but still receive an immutable proof
   # receipt that binds this exact selector node to its opaque Store marker.
   if pkg.kind == types.package_meta() {
     pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
-    return Ok()
+    return
   }
 
   let runtime_keys = [
@@ -248,7 +238,6 @@ proc execute_run_proof(
     pm_proof.run_artifact_proof(proof_root, pkg)?
   }?
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
-  return Ok()
 }
 
 proc execute_build_local(
@@ -296,9 +285,7 @@ proc execute_existing_local(
   execute_require_receipt(context.plan, node, receipt)?
 
   # The proof key binds the package, the artifact key, and the proof input.
-  if receipt.proof_key == node.proof_key {
-    return receipt
-  }
+  return receipt when receipt.proof_key == node.proof_key
 
   let cached = store.reproof_receipt_path(context.store_root, node.artifact_key, node.proof_key)
 
@@ -320,7 +307,7 @@ proc execute_remote_node(
   context: ExecuteContext,
   node: types.PlanNode,
 ) [fs, net, error] -> Result[types.ArtifactReceipt] {
-  if node.remote == null {
+  guard node.remote != null else {
     return Err(
       types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"),
     )
@@ -346,11 +333,9 @@ proc execute_node(
   # Keep action dispatch out of a constructor-pattern boundary.  The pinned
   # published runner parses qualified tag patterns differently from the newer
   # host checker; the typed predicate is stable across both runners.
-  if types.plan_action_is_build(node.action) {
-    return execute_build_local(context, node)
-  }
+  return execute_build_local(context, node) when types.plan_action_is_build(node.action)
 
-  return execute_remote_node(context, node)
+  execute_remote_node(context, node)
 }
 
 # The published runner erases `par-map`'s result element schema, including
@@ -379,14 +364,14 @@ proc execute_parallel_level_worker(
   match execute_node(context, node) {
     Ok(_) => {
       fs.write(execute_parallel_level_ok_marker(status, node), "ok\n")?
-      return Ok()
+      return
     }
     Err(problem) => {
       fs.write(execute_parallel_level_error_marker(status, node), problem.message + "\n")?
       # The parent reconstructs and propagates this failure only after every
       # worker has joined. Returning success here avoids an erased par-map
       # result becoming a runner-dependent control-flow boundary.
-      return Ok()
+      return
     }
   }
 }
@@ -421,7 +406,7 @@ proc execute_parallel_level(
   fs.mkdir(status)?
 
   let _ = nodes
-    |> par-map(jobs: jobs) { |node|
+    |> par-map(jobs:) { |node|
       execute_parallel_level_worker(context, node, status)?
       # The value is deliberately ignored: only its completion/error behavior
       # matters, and the published runner erases the par-map element schema.
@@ -455,9 +440,7 @@ export proc build_plan(
   build_plan.validate(plan_value)?
   build_plan.require_current_build_epoch(plan_value)?
 
-  if jobs < 1 {
-    return Err(types.PmError.Usage("build jobs must be at least one"))
-  }
+  return Err(types.PmError.Usage("build jobs must be at least one")) when jobs < 1
 
   var context: ExecuteContext = {
     plan: plan_value,
@@ -506,7 +489,7 @@ export proc build_plan(
       let receipt = completed[position]
       execute_require_receipt(plan_value, level_nodes[position], receipt)?
       published[receipt.key] = receipt
-      artifacts = artifacts.push(receipt)
+      artifacts += [receipt]
       position += 1
     }
 
@@ -516,10 +499,10 @@ export proc build_plan(
   # Keep the receipt list concrete at the public executor boundary. The
   # generated profile adapter crosses this boundary in a separate module and
   # must never receive an unparameterized List from the published runner.
-  let result: types.BuildResult = {
+  let result: types.BuildResult = types.BuildResult(
     format: "laputa-build-result-1",
     plan_sha256: plan_value.plan_sha256,
-    artifacts,
-  }
-  return result
+    artifacts:,
+  )
+  result
 }

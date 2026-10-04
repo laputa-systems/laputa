@@ -16,16 +16,14 @@ export proc build_jobs() [env, error] -> Result[Int] {
     return parsed
   }
 
-  return make.jobs()
+  make.jobs()
 }
 
 ## Exported declaration `archive_analysis_jobs`.
 export proc archive_analysis_jobs() [env, error] -> Result[Int] {
   let raw = env.get("XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS") ?? ""
 
-  if raw == "" {
-    return 8
-  }
+  return 8 when raw == ""
 
   let parsed = raw.parse_int()?
 
@@ -38,7 +36,7 @@ export proc archive_analysis_jobs() [env, error] -> Result[Int] {
     )
   }
 
-  return parsed
+  parsed
 }
 
 ## Exported declaration `discover_options_from_env`.
@@ -47,7 +45,7 @@ export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOp
   let jobs_text = env.get("XSH_LINUX_KBUILD_DISCOVER_JOBS") ?? ""
   let jobs_count = if jobs_text == "" { build_jobs()? } else { jobs_text.parse_int()? }
 
-  return {
+  {
     progress: (env.get("XSH_LINUX_KBUILD_PROGRESS") ?? "") == "1",
     progress_every: every_text.parse_int()?,
     jobs: jobs_count,
@@ -76,7 +74,7 @@ proc staged_recipe_helper(name: Str) [fs, env, error] -> Result[Path] {
     return Err(kbuild.ScriptError.Failed("linux-recipe-helper", f"missing staged recipe helper: {helper}"))
   }
 
-  return helper
+  helper
 }
 
 ## Exported declaration `discover_package_plan`.
@@ -97,7 +95,7 @@ export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] 
     )?
   }
 
-  return kbuild.discover_plan_with_options(p".", config, srcarch, options)?
+  kbuild.discover_plan_with_options(p".", config, srcarch, options)?
 }
 
 ## Exported declaration `write_materialized_outputs`.
@@ -117,9 +115,7 @@ export proc write_materialized_outputs(outputs: List[Path]) [fs, error] {
 export proc requested_stop_after() [env, error] -> Result[Str] {
   let requested = env.get("XSH_LINUX_KBUILD_STOP_AFTER") ?? ""
 
-  if requested == "" {
-    return ""
-  }
+  return "" when requested == ""
 
   if requested not in ["prepare", "discover", "plan", "compile", "link"] {
     return Err(
@@ -130,7 +126,7 @@ export proc requested_stop_after() [env, error] -> Result[Str] {
     )
   }
 
-  return requested
+  requested
 }
 
 ## Exported declaration `stop_after`.
@@ -147,7 +143,7 @@ export proc timing_start(stage: Str) [env, time] -> Int {
     return time.now()
   }
 
-  return 0
+  0
 }
 
 ## Exported declaration `timing_done`.
@@ -192,7 +188,7 @@ proc archive_plan_cache_fingerprint(
   cflags: List[Str],
   includes: List[Str],
 ) [fs, error] -> Result[Str] {
-  return f"""format linux-archive-plan-cache-v1
+  f"""format linux-archive-plan-cache-v1
 srcarch {srcarch}
 triple {triple}
 plan
@@ -205,11 +201,11 @@ includes
 }
 
 proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) [fs, error] -> Result[Bool] {
-  if ! path_value.exists()? {
+  guard path_value.exists()? else {
     return false
   }
 
-  return path_value.read_text()?.trim() == fingerprint.trim()
+  path_value.read_text()?.trim() == fingerprint.trim()
 }
 
 proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) [fs, error] {
@@ -221,7 +217,7 @@ proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) [fs, err
 }
 
 proc copy_archive_plan_cache(source: Path, dest: Path) [fs, error] {
-  if ! source.exists()? {
+  guard source.exists()? else {
     return
   }
 
@@ -370,7 +366,7 @@ export proc cached_archive_plan(
     f"xsh-kbuild-archive-plan {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs {archive_plan.generated_objects.len()} generated {archive_plan.missing_sources.len()} missing",
   )?
 
-  return archive_plan
+  archive_plan
 }
 
 ## Exported declaration `cached_package_plan`.
@@ -600,14 +596,14 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   )?
 
   emit_plan_if_enabled(plan)?
-  return plan
+  plan
 }
 
 ## Exported declaration `add_extra_objects_from_env`.
 export proc add_extra_objects_from_env(plan: kbuild.KbuildPlan) [env, error] -> Result[kbuild.KbuildPlan] {
   let raw = (env.get("XSH_LINUX_KBUILD_EXTRA_OBJECTS") ?? "").replace(",", " ")
   var objects = [fp"{item}" for item in raw.words()]
-  return kbuild.add_plan_objects(plan, objects)
+  kbuild.add_plan_objects(plan, objects)
 }
 
 proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
@@ -630,7 +626,7 @@ proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
     )
   }
 
-  return outputs
+  outputs
 }
 
 ## Exported declaration `run_targeted_kbuild_outputs`.
@@ -713,12 +709,10 @@ export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path] {
   if build_root != "" {
     let tool = fp"{build_root}/usr/bin/{name}"
 
-    if fs.exists(tool)? {
-      return tool
-    }
+    return tool when fs.exists(tool)?
   }
 
-  return process.which(name)?
+  process.which(name)?
 }
 
 ## Exported declaration `run_native_command`.

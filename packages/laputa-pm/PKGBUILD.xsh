@@ -1,21 +1,21 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "laputa-pm"
+export const name = "laputa-pm"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1"
+export const ver = "1"
 
 ## Exported declaration `rel`.
-export let rel = "15"
+export const rel = "15"
 
 ## Exported declaration `deps`.
 export let deps = []
 
 ## The build installs PM sources and an XSH wrapper; both need `xsh` at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
@@ -24,7 +24,7 @@ export let mkdeps_host = []
 ## The package manager is an explicit repository input. The executor stages
 ## this declared root through XSH_PM_REPOSITORY_ROOT before the recipe is
 ## isolated, so package builds never depend on `../../` traversal.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"repository/pm.xsh",
     kind: "auto",
@@ -55,7 +55,7 @@ export let upstream_sources = [
 
 ## Exported declaration `filetree`.
 ## PM's module set changes as PM evolves, so the modules ship as one tree.
-export let filetree = [
+export const filetree = [
   {path: p"usr/bin/pm", kind: "file"},
   {path: p"usr/lib/pm/pm.xsh", kind: "file"},
   {path: p"usr/lib/pm/pm", kind: "tree"},

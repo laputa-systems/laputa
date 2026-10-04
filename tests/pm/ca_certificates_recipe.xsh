@@ -2,7 +2,7 @@
 
 proc runner() [process, env, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
-  if configured != "" { return fp"{configured}" }
+  return fp"{configured}" when configured != ""
   process.which("xsh")?
 }
 
@@ -17,7 +17,7 @@ test ca_certificate_proof_preserves_empty_dependencies_and_rejects_invalid_metad
   helper.write("https://curl.se/ca/cacert.pem")?
   helper.chmod(0o755)?
   let xsh = runner()?
-  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr: stderr)
+  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
   json.write(metadata, {deps: [], extension: {source: "fixture"}})?
   assert process.run(command)?.ok
   json.write(metadata, {deps: ["unexpected-runtime"]})?

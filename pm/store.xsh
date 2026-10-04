@@ -28,7 +28,7 @@ type RemoteMetadataDto = {name: Str, ver: Str, rel: Str}
 type ReceiptFormatDto = {format: Str}
 
 ## The receipt format this Store writes and reads.
-export let receipt_format: Str = "laputa-package-artifact-2"
+export const receipt_format = "laputa-package-artifact-2"
 
 # The layout directory is versioned with the artifact-key format. Keys of an
 # older format live under their own directory (`v1/`), which this PM never
@@ -70,7 +70,7 @@ pure sha256_text_is_valid(value: Str) -> Bool {
 }
 
 proc require_sha256(value: Str, label: Str) [error] {
-  if ! sha256_text_is_valid(value) {
+  guard sha256_text_is_valid(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
@@ -86,7 +86,7 @@ pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
   for key in keys {
     if ! (key in seen) {
       seen[key] = true
-      result = result.push(key)
+      result += [key]
     }
   }
 
@@ -160,7 +160,7 @@ proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) [error] -> 
 }
 
 proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
-  if value.format != receipt_format {
+  guard value.format == receipt_format else {
     return Err(types.PmError.PackageContract(f"unsupported artifact receipt format {value.format}"))
   }
 
@@ -236,7 +236,7 @@ proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.Arti
     )
   }
 
-  let value = receipt_from_dto(raw.require(ArtifactReceiptDto)?, dir)?
+  let value = receipt_from_dto(raw.require()?, dir)?
   validate_receipt(value, expected_key)?
 
   if ! fs.exists(payload_path(dir))? or ! fs.exists(metadata_path(dir))? or ! fs.exists(proof_path(dir))? {
@@ -390,9 +390,7 @@ proc fetch_remote_object(
   require_sha256(expected_sha256, f"remote {label} SHA-256")?
   let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote {label}")?, cache_path)?
 
-  if failure != "" {
-    return Err(types.PmError.RemoteFetch(failure))
-  }
+  return Err(types.PmError.RemoteFetch(failure)) when failure != ""
 
   let actual = hash.sha256(cache_path)?.hex()
 
@@ -410,9 +408,9 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) [fs, error] ->
   }
 
   # Legacy package metadata did not record an executor digest. Its verified metadata digest is a stable fallback.
-  let raw: Record = json.read(metadata)?.require(Record)?
+  let raw = json.read(metadata)?.require(Record)?
   let value: Str = if "executor_sha256" in raw {
-    raw.get("executor_sha256")?.require(Str)?
+    raw.get("executor_sha256")?.require()?
   } else {
     hash.sha256(metadata)?.hex()
   }
@@ -462,7 +460,7 @@ proc remote_staged_artifact(
     return remote_staged_artifact_for(node, retrieval, remote_repo, cache)
   }
 
-  return Err(types.PmError.PackageContract(f"remote artifact {node.package_id} has no retrieval coordinates"))
+  Err(types.PmError.PackageContract(f"remote artifact {node.package_id} has no retrieval coordinates"))
 }
 
 ## Returns the canonical final directory for an artifact key. `path` is reserved by XSH's standard module namespace, so `artifact_path` is the strict-safe spelling.
@@ -555,14 +553,12 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
 export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactReceipt]] {
   let objects = object_root(root)
 
-  if ! fs.exists(objects)? {
-    return []
-  }
+  return [] unless fs.exists(objects)?
 
   var receipts: List[types.ArtifactReceipt] = []
 
   for entry in fs.children(objects)? |> sort-by .name {
-    if entry.kind != "dir" {
+    guard entry.kind == "dir" else {
       return Err(types.PmError.PackageContract(f"artifact store object {entry.path} is not a directory"))
     }
 

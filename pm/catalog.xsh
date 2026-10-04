@@ -9,7 +9,7 @@ pure sorted_unique_names(names: List[Str]) -> List[Str] {
 
   for name in names |> sort {
     if ! (seen.get(name) ?? false) {
-      unique = unique.push(name)
+      unique += [name]
       seen[name] = true
     }
   }
@@ -18,7 +18,7 @@ pure sorted_unique_names(names: List[Str]) -> List[Str] {
 }
 
 pure package_dependencies(pkg: types.Package) -> List[Str] {
-  pkg.deps.extend(pkg.runtime_only_deps).extend(pkg.mkdeps_host).extend(pkg.mkdeps_target)
+  [@pkg.deps, @pkg.runtime_only_deps, @pkg.mkdeps_host, @pkg.mkdeps_target]
 }
 
 proc make_catalog(
@@ -29,12 +29,7 @@ proc make_catalog(
   let sorted_packages = packages |> sort-by .name
   let available_remote_names = sorted_unique_names(remote_names)
   var local_names: Map[Bool] = {}
-  var available_names: Map[Bool] = {}
-
-  for name in available_remote_names {
-    available_names[name] = true
-  }
-
+  var available_names: Map[Bool] = {name: true for name in available_remote_names}
   for pkg in sorted_packages {
     if pkg.name in local_names {
       return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
@@ -46,7 +41,7 @@ proc make_catalog(
 
   for pkg in sorted_packages {
     for dependency in package_dependencies(pkg) {
-      if ! (dependency in available_names) {
+      guard dependency in available_names else {
         return Err(types.PmError.MissingDependency(f"{pkg.name} depends on missing {dependency}"))
       }
     }

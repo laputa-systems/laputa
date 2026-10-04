@@ -2,28 +2,28 @@
 use pm.env as pm_env
 
 ## Package recipe export.
-export let name = "seatd"
+export const name = "seatd"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.9.3"
+export const ver = "0.9.3"
 
 ## Package recipe export.
-export let rel = "8"
+export const rel = "8"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
-export let runtime_only_deps = ["xinit"]
+export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/kennylevinsen/seatd/archive/refs/tags/VERSION.tar.gz",
     kind: "auto",
@@ -53,7 +53,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/seatd",
     kind: "binary",

@@ -1,27 +1,27 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "laputa-fs"
+export const name = "laputa-fs"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1"
+export const ver = "1"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
 export let deps = []
 
 ## The build installs XSH scripts; they need the `xsh` runner at runtime.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"files/mkfs.vfat.xsh",
     kind: "auto",
@@ -77,7 +77,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/fsck.ext4",
     kind: "file",

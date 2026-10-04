@@ -1,12 +1,12 @@
 ##! Native-arm64 profile execution: one saved PM plan becomes verified artifacts, a runtime generation, and atomic image outputs.
 #!/bin/xsh
+use pm.generation as pm_generation
+use pm.plan_json as pm_plan_json
+use pm.types as pm_types
 use system.container_output as container_output
 use system.image as image
 use system.profile as system_profile
 use system.types as types
-use pm.generation as pm_generation
-use pm.plan_json as pm_plan_json
-use pm.types as pm_types
 
 error ContainerBuildError = Failed(message: Str) : InvalidData
 

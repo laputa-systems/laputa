@@ -25,8 +25,8 @@ test test_build_prepared_metapackage_has_no_payload_or_package_database [fs, pro
 
   test.eq(built.manifest, [])?
   test.eq(built.metadata_files, [])?
-  test.eq(fs.exists(fp"{dest}/var/lib/xsh-pm/packages/recipe-valid-meta")?, false)?
-  test.eq(payload.read_text()?, "laputa metapackage payload marker\n")?
+  assert fs.exists(fp"{dest}/var/lib/xsh-pm/packages/recipe-valid-meta")? == false
+  assert payload.read_text()? == "laputa metapackage payload marker\n"
 }
 
 test test_build_prepared_archives_every_empty_directory_recorded_in_metadata [fs, process, env, error] { |ctx|
@@ -39,7 +39,7 @@ test test_build_prepared_archives_every_empty_directory_recorded_in_metadata [fs
   let pkg = recipe.load_package(pkg_dir)?
   let built = local.load_built_package_from_dest(pkg, "recipe-empty-parent-1.0.0-1", payload, dest)?
 
-  test.ok("usr/share" in [entry.path for entry in built.metadata_files])?
+  assert "usr/share" in [entry.path for entry in built.metadata_files]
   archive.tar_extract(payload, extracted)?
-  test.eq(fs.metadata(fp"{extracted}/usr/share")?.kind, "dir")?
+  assert fs.metadata(fp"{extracted}/usr/share")?.kind == "dir"
 }

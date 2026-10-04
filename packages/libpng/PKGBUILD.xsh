@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "libpng"
+export const name = "libpng"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.6.50"
+export const ver = "1.6.50"
 
 ## Exported declaration `rel`.
-export let rel = "10"
+export const rel = "10"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "zlib"]
+export const deps = ["musl", "zlib"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "zlib"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "zlib"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://download.sourceforge.net/libpng/libpng-VERSION.tar.xz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/libpng16/png.h",
     kind: "file",

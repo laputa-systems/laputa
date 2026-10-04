@@ -113,16 +113,14 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
       }
     }
 
-    var dependencies: List[Record] = []
-
-    for dependency in node.dependencies {
-      dependencies = dependencies.push({
+    var dependencies: List[Record] = [
+      {
         name: dependency.name,
         kind: types.dependency_kind_text(dependency.kind),
         artifact_key: dependency.artifact_key,
-      })
-    }
-
+      }
+      for dependency in node.dependencies
+    ]
     nodes = nodes.push({
       name: node.name,
       ver: node.ver,
@@ -172,12 +170,10 @@ proc plan_json_remote(value: RemoteDto) [error] -> Result[types.RemoteRetrieval]
 }
 
 proc plan_json_node(value: NodeDto) [error] -> Result[types.PlanNode] {
-  var dependencies: List[types.PlanDependency] = []
-
-  for dependency in value.dependencies {
-    dependencies = dependencies.push(plan_json_dependency(dependency)?)
-  }
-
+  var dependencies: List[types.PlanDependency] = [
+    plan_json_dependency(dependency)?
+    for dependency in value.dependencies
+  ]
   var remote: types.RemoteRetrieval? = null
 
   let retrieval = value.remote
@@ -204,12 +200,7 @@ proc plan_json_node(value: NodeDto) [error] -> Result[types.PlanNode] {
 }
 
 proc plan_json_from_dto(value: BuildPlanDto) [error] -> Result[types.BuildPlan] {
-  var nodes: List[types.PlanNode] = []
-
-  for node in value.nodes {
-    nodes = nodes.push(plan_json_node(node)?)
-  }
-
+  var nodes: List[types.PlanNode] = [plan_json_node(node)? for node in value.nodes]
   {
     format: value.format,
     target: types.parse_target(value.target)?,

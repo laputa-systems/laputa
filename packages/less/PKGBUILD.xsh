@@ -3,26 +3,26 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "less"
+export const name = "less"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "701"
+export const ver = "701"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 # Source is a fixed GitHub commit archive (no VERSION substitution needed).
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/laputa-systems/less/archive/0f176037c66cdeb038b39b0b71d9c291363c26ec.tar.gz",
     kind: "auto",
@@ -39,7 +39,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [{path: p"usr/bin/less", kind: "binary"}, {path: p"usr/libexec/less-osc8-open", kind: "file"}]
+export const filetree = [{path: p"usr/bin/less", kind: "binary"}, {path: p"usr/libexec/less-osc8-open", kind: "file"}]
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {

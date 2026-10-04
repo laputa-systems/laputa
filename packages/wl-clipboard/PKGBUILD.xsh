@@ -4,22 +4,22 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Package recipe export.
-export let name = "wl-clipboard"
+export const name = "wl-clipboard"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "2.3.0"
+export const ver = "2.3.0"
 
 ## Package recipe export.
-export let rel = "8"
+export const rel = "8"
 
 ## Package recipe export.
-export let deps = ["musl", "wayland-libs-client"]
+export const deps = ["musl", "wayland-libs-client"]
 
 ## Package recipe export.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "muon",
   "samurai",
@@ -30,10 +30,10 @@ export let mkdeps_host = [
 ]
 
 ## Package recipe export.
-export let mkdeps_target = ["wayland-dev", "wayland-protocols"]
+export const mkdeps_target = ["wayland-dev", "wayland-protocols"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/bugaevc/wl-clipboard/archive/refs/tags/vVERSION.tar.gz",
     kind: "auto",
@@ -50,7 +50,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [{path: p"usr/bin/wl-copy", kind: "binary"}, {path: p"usr/bin/wl-paste", kind: "binary"}]
+export const filetree = [{path: p"usr/bin/wl-copy", kind: "binary"}, {path: p"usr/bin/wl-paste", kind: "binary"}]
 
 proc patch_optional_installs() [fs, error] {
   fs.write(p"data/meson.build", "")?

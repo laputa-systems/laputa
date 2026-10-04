@@ -64,7 +64,7 @@ pure generation_sha256_text_is_valid(value: Str) -> Bool {
 }
 
 proc generation_require_sha256(value: Str, label: Str) [error] {
-  if ! generation_sha256_text_is_valid(value) {
+  guard generation_sha256_text_is_valid(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
@@ -79,7 +79,7 @@ pure generation_sorted_unique(values: List[Str]) -> List[Str] {
 
   for value in values |> sort {
     if ! (seen.get(value) ?? false) {
-      result = result.push(value)
+      result += [value]
       seen[value] = true
     }
   }
@@ -117,9 +117,7 @@ proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
       return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
     }
 
-    if component == "." {
-      continue
-    }
+    continue when component == "."
 
     if component == ".." {
       if depth == 0 {
@@ -179,7 +177,7 @@ proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
 }
 
 proc generation_validate_plan(value: types.GenerationPlan) [error] {
-  if value.format != generation_format() {
+  guard value.format == generation_format() else {
     return Err(types.PmError.PackageContract(f"unsupported generation plan format {value.format}"))
   }
 
@@ -221,7 +219,7 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
   }
 
   for root in value.runtime_roots {
-    if ! (root in names) {
+    guard root in names else {
       return Err(types.PmError.PackageContract(f"generation runtime root {root} is not selected"))
     }
   }
@@ -235,12 +233,7 @@ proc generation_runtime_artifacts(
   value: types.BuildPlan,
   runtime_roots: List[Str],
 ) [error] -> Result[List[types.GenerationArtifact]] {
-  var nodes: Map[types.PlanNode] = {}
-
-  for node in value.nodes {
-    nodes[node.name] = node
-  }
-
+  var nodes: Map[types.PlanNode] = {node.name: node for node in value.nodes}
   var selected: Map[Bool] = {}
   var pending = runtime_roots
   var pending_index = 0
@@ -250,15 +243,13 @@ proc generation_runtime_artifacts(
     let name = pending[pending_index]
     pending_index += 1
 
-    if selected.get(name) ?? false {
-      continue
-    }
+    continue when selected.get(name) ?? false
 
     if ! (name in nodes) {
       return Err(types.PmError.MissingDependency(f"generation runtime root {name} is not in the BuildPlan"))
     }
 
-    let node: types.PlanNode = nodes.get(name)?.require(types.PlanNode)?
+    let node: types.PlanNode = nodes.get(name)?
     selected[name] = true
     artifacts = artifacts.push({package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key})
 
@@ -304,15 +295,15 @@ export proc plan_profile(
     return Err(types.PmError.Usage("generation plan needs one or more runtime roots"))
   }
 
-  let bare: types.GenerationPlan = {
+  let bare: types.GenerationPlan = types.GenerationPlan(
     format: generation_format(),
     target: value.target,
     build_plan_sha256: value.plan_sha256,
-    profile,
+    profile:,
     runtime_roots: roots,
     artifacts: generation_runtime_artifacts(value, roots)?,
     generation_sha256: "",
-  }
+  )
   let planned = {...bare, generation_sha256: generation_digest(bare)?}
   generation_validate_plan(planned)?
   planned
@@ -384,7 +375,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
 
 ## Computes the canonical content identity of a profile overlay, including its explicit `overlay.json` policy metadata.
 export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
-  if ! fs.exists(overlay_root)? {
+  guard fs.exists(overlay_root)? else {
     return generation_empty_overlay_sha256()
   }
 
@@ -501,9 +492,7 @@ proc generation_preflight_overlay(
 
     for package_entry in root_plan.entries {
       if entry.path == package_entry.path {
-        if generation_same_directory_metadata(entry, package_entry) {
-          continue
-        }
+        continue when generation_same_directory_metadata(entry, package_entry)
 
         if package_entry.kind == types.file_kind_tree() or entry.kind == "dir" {
           return Err(
@@ -541,7 +530,7 @@ proc generation_preflight_overlay(
   }
 
   for replacement in profile.replacements {
-    if ! (replacement in used_replacements) {
+    guard replacement in used_replacements else {
       return Err(
         types.PmError.PackageContract(f"generation profile replacement {replacement} does not replace a package file"),
       )
@@ -566,12 +555,12 @@ proc generation_store_artifacts(
     }
 
     keys[receipt.key] = true
-    receipts = receipts.push(receipt)
+    receipts += [receipt]
   }
 
   for receipt in receipts {
     for dependency_key in receipt.runtime_dependency_keys {
-      if ! (dependency_key in keys) {
+      guard dependency_key in keys else {
         return Err(
           types.PmError.MissingDependency(
             f"generation artifact {receipt.package_name} is missing runtime artifact {dependency_key}",
@@ -590,7 +579,7 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
 
     if entry.kind == "dir" {
       if fs.exists(destination)? {
-        if fs.metadata(destination)?.kind != "dir" {
+        guard fs.metadata(destination)?.kind == "dir" else {
           return Err(
             types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
           )
@@ -656,7 +645,7 @@ proc generation_receipt_from_dto(value: GenerationReceiptDto) [error] -> Result[
 }
 
 proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
-  let receipt_plan: types.GenerationPlan = {
+  let receipt_plan: types.GenerationPlan = types.GenerationPlan(
     format: generation_format(),
     target: value.target,
     build_plan_sha256: value.build_plan_sha256,
@@ -664,7 +653,7 @@ proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
     runtime_roots: value.runtime_roots,
     artifacts: value.artifacts,
     generation_sha256: value.generation_sha256,
-  }
+  )
 
   if value.format != generation_receipt_format() {
     return Err(types.PmError.PackageContract(f"unsupported generation receipt format {value.format}"))

@@ -2,29 +2,29 @@
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "dropbear"
+export const name = "dropbear"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2025.89"
+export const ver = "2025.89"
 
 ## Exported declaration `rel`.
-export let rel = "16"
+export const rel = "16"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "zlib"]
+export const deps = ["musl", "zlib"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
-export let runtime_only_deps = ["xinit"]
+export const runtime_only_deps = ["xinit"]
 
 # Source is a git commit (no VERSION substitution needed).
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/mkj/dropbear/archive/f5d44406ef2952ca69a68d59c6b0f7f0ff777305.tar.gz",
     kind: "auto",
@@ -54,7 +54,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/dbclient",
     kind: "binary",
@@ -158,14 +158,14 @@ proc ifndef_wrapped_defines(source: Path) [fs, error] -> Result[Str] {
 
     if words.len() >= 3 and words[0] == "#define" {
       lines = lines.push(f"#ifndef {words[1]}")
-      lines = lines.push(line)
+      lines += [line]
       lines = lines.push("#endif")
     } else {
-      lines = lines.push(line)
+      lines += [line]
     }
   }
 
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 ## Exported declaration `build`.
@@ -180,13 +180,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   # find zlib headers and libs. Matches the YSH PKGBUILD's $kr variable.
   var kr = ""
 
-  match env.Str.LAPUTA_ROOT {
-    Ok(v) => {
-      if v != "/" {
-        kr = v
-      }
+  if let Ok(v) = env.Str.LAPUTA_ROOT {
+    if v != "/" {
+      kr = v
     }
-    Err(_) => {}
   }
 
   # Feature overrides: disable password auth (no libcrypt in musl), drop-privs
@@ -308,11 +305,7 @@ Local customisation goes in localoptions.h
   let key_stems = ["dropbearkey"]
   let convert_stems = ["dropbearconvert", "keyimport", "signkey_ossh"]
 
-  let all_dropbear_stems = common_stems.extend(clisvr_stems)
-    .extend(svr_stems)
-    .extend(cli_stems)
-    .extend(key_stems)
-    .extend(convert_stems)
+  let all_dropbear_stems = [@common_stems, @clisvr_stems, @svr_stems, @cli_stems, @key_stems, @convert_stems]
 
   let defs = [
     "-DHAVE_CONFIG_H",

@@ -4,7 +4,7 @@ use kbuild
 use pm.make as make
 
 pure native_kbuild_cflags() -> List[Str] {
-  return [
+  [
     "-D__KERNEL__",
     "-DCONFIG_CC_HAS_K_CONSTRAINT=1",
     "-std=gnu11",
@@ -49,7 +49,7 @@ pure native_kbuild_cflags() -> List[Str] {
 }
 
 pure native_kbuild_includes() -> List[Str] {
-  return [
+  [
     "-nostdinc",
     "-I./arch/arm64/include",
     "-I./arch/arm64/include/generated",
@@ -72,7 +72,7 @@ proc write_native_asm_offsets(cc: Path) [fs, process, env, error] {
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
   fs.mkdir(asm_out.parent)?
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
-  argv = argv.extend(native_kbuild_cflags()).extend(native_kbuild_includes())
+  argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv = argv.extend(["-S", "-o", asm_out.display(), "arch/arm64/kernel/asm-offsets.c"])
   PKGBUILD_shared.run_native_command(argv)?
   kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")?
@@ -82,15 +82,15 @@ proc write_native_hyp_constants(cc: Path) [fs, process, env, error] {
   let asm_out = p".xsh-kbuild/generated/hyp-constants.s"
   fs.mkdir(asm_out.parent)?
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
-  argv = argv.extend(native_kbuild_cflags()).extend(native_kbuild_includes())
-  argv = argv.push("-I./arch/arm64/kvm/hyp/include")
+  argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
+  argv += ["-I./arch/arm64/kvm/hyp/include"]
   argv = argv.extend(["-S", "-o", asm_out.display(), "arch/arm64/kvm/hyp/hyp-constants.c"])
   PKGBUILD_shared.run_native_command(argv)?
   kbuild.generate_offsets_header(asm_out, p"arch/arm64/kvm/hyp_constants.h", "__HYP_CONSTANTS_H__")?
 }
 
 pure native_vdso_cflags() -> List[Str] {
-  return (native_kbuild_cflags() |> where . != "-mgeneral-regs-only").extend(
+  (native_kbuild_cflags() |> where . != "-mgeneral-regs-only").extend(
     ["-fno-builtin", "-ffixed-x18", "-DDISABLE_BRANCH_PROFILING", "-DBUILD_VDSO"],
   )
 }
@@ -100,12 +100,12 @@ pure native_vdso_cc_base(cc: Path) -> List[Str] {
     native_vdso_cflags(),
   )
 
-  return with_flags.extend(native_kbuild_includes())
+  with_flags.extend(native_kbuild_includes())
 }
 
 proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
-  let symbol_re = regex.compile("^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$")?
-  let leading_zero_re = regex.compile("^00*")?
+  let symbol_re = rx"^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$"
+  let leading_zero_re = rx"^00*"
   let symbols = run.text $nm "arch/arm64/kernel/vdso/vdso.so.dbg" ?
   var out = ""
 
@@ -221,7 +221,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
 }
 
 pure native_nvhe_cflags() -> List[Str] {
-  return native_kbuild_cflags().extend(
+  native_kbuild_cflags().extend(
     [
       "-D__KVM_NVHE_HYPERVISOR__",
       "-D__DISABLE_EXPORTS",
@@ -235,7 +235,7 @@ pure native_nvhe_cflags() -> List[Str] {
 }
 
 pure native_nvhe_includes() -> List[Str] {
-  return native_kbuild_includes().extend(
+  native_kbuild_includes().extend(
     ["-I./arch/arm64/kvm", "-I./arch/arm64/kvm/hyp", "-I./arch/arm64/kvm/hyp/include", "-I./arch/arm64/kvm/hyp/nvhe"],
   )
 }
@@ -243,7 +243,7 @@ pure native_nvhe_includes() -> List[Str] {
 type NvheObject = {source: Path, out: Path}
 
 pure native_nvhe_objects() -> List[NvheObject] {
-  return [
+  [
     {
       source: p"arch/arm64/kvm/hyp/nvhe/timer-sr.c",
       out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/nvhe/timer-sr.nvhe.o",
@@ -384,7 +384,7 @@ pure native_nvhe_objects() -> List[NvheObject] {
 }
 
 pure display_paths(paths: List[Path]) -> List[Str] {
-  return [item.display() for item in paths]
+  [item.display() for item in paths]
 }
 
 proc build_native_nvhe_helper(cc: Path) [fs, process, env, error] -> Result[Path] {
@@ -395,13 +395,13 @@ proc build_native_nvhe_helper(cc: Path) [fs, process, env, error] -> Result[Path
     [cc.display(), "-O2", "-I./include", "-o", out.display(), "arch/arm64/kvm/hyp/nvhe/gen-hyprel.c"],
   )?
 
-  return out
+  out
 }
 
 proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env, error] {
   fs.mkdir(out.parent)?
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
-  argv = argv.extend(native_nvhe_cflags()).extend(native_nvhe_includes())
+  argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
 
   argv = argv.extend(
     [
@@ -438,9 +438,9 @@ proc nvhe_ld_task(
     argv = argv.extend(["-T", linker_script.display()])
   }
 
-  argv = argv.extend(["-o", out.display()]).extend(display_paths(inputs))
+  argv = [@argv, "-o", out.display(), @display_paths(inputs)]
 
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -456,7 +456,7 @@ proc nvhe_ld_task(
 }
 
 proc nvhe_objcopy_task(objcopy: Path, input: Path, out: Path, deps: List[Str]) [] -> make.MakeTask {
-  return {
+  {
     name: out.display(),
     outputs: [
       out,
@@ -533,7 +533,7 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
 
 ## Exported declaration `build_scratch`.
 export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, time, error] {
-  if srcarch != "arm64" {
+  guard srcarch == "arm64" else {
     return Err(
       kbuild.ScriptError.Failed(
         "linux-native-kbuild-unsupported-arch",

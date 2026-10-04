@@ -1,18 +1,18 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "libseat"
+export const name = "libseat"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "meta"
+export const package_kind = "meta"
 
 ## Exported declaration `ver`.
-export let ver = "0.9.3"
+export const ver = "0.9.3"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["seatd"]
+export const deps = ["seatd"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []

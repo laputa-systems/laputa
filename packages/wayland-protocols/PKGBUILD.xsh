@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Package recipe export.
-export let name = "wayland-protocols"
+export const name = "wayland-protocols"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.45"
+export const ver = "1.45"
 
 ## Package recipe export.
-export let rel = "10"
+export const rel = "10"
 
 ## Package recipe export.
 export let deps = []
 
 ## Package recipe export.
-export let mkdeps_host = ["muon", "pkgconf", "wayland-dev"]
+export const mkdeps_host = ["muon", "pkgconf", "wayland-dev"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/VERSION/downloads/wayland-protocols-VERSION.tar.xz",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/share/pkgconfig/wayland-protocols.pc",
     kind: "file",

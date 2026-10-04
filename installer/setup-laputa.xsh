@@ -31,9 +31,7 @@ pure is_disk_name(name: Str) -> Bool {
 pure partition_path(disk: Path, index: Int) -> Path {
   let name = disk.name
 
-  if name.starts_with("nvme") or name.starts_with("mmcblk") {
-    return fp"{disk}p{index}"
-  }
+  return fp"{disk}p{index}" when name.starts_with("nvme") or name.starts_with("mmcblk")
 
   fp"{disk}{index}"
 }

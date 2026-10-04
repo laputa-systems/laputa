@@ -26,7 +26,7 @@ proc repo_verify_node_receipt(value: types.BuildPlan, node: types.PlanNode, rece
   }
 
   if types.plan_action_is_build(node.action) {
-    if receipt.origin != types.artifact_origin_built() {
+    guard receipt.origin == types.artifact_origin_built() else {
       return Err(
         types.PmError.PackageContract(f"BuildPlan build node {node.package_id} is not a locally proved artifact"),
       )
@@ -40,7 +40,7 @@ proc repo_verify_node_receipt(value: types.BuildPlan, node: types.PlanNode, rece
 
 proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) [fs, error] -> Result[types.PackageKind] {
   let metadata = fp"{receipt.artifact_dir}/metadata.json"
-  let raw: Record = json.read(metadata)?.require(Record)?
+  let raw = json.read(metadata)?.require(Record)?
   let core = raw.require(RepoArtifactMetadataDto)?
 
   if core.name != node.name or core.ver != node.ver or core.rel != node.rel {
@@ -48,7 +48,7 @@ proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) [fs
   }
 
   if "package_kind" in raw {
-    return types.parse_package_kind(raw.get("package_kind")?.require(Str)?)
+    return types.parse_package_kind(raw.get("package_kind")?.require()?)
   }
 
   # Package-kind fields appeared after legacy remote metadata. Its omitted form was payload.
@@ -200,9 +200,7 @@ proc repo_merge_publication(
 
   for existing in index {
     if existing.arch == entry.arch and existing.name == entry.name {
-      if repo_same_publication(existing, entry) {
-        return {index, already_published: true}
-      }
+      return {index, already_published: true} when repo_same_publication(existing, entry)
 
       if build_plan.plan_compare_version_release(entry.ver, entry.rel, existing.ver, existing.rel) < 0 {
         return Err(
@@ -212,15 +210,15 @@ proc repo_merge_publication(
         )
       }
 
-      updated = updated.push(entry)
+      updated += [entry]
       replaced = true
     } else {
-      updated = updated.push(existing)
+      updated += [existing]
     }
   }
 
   if ! replaced {
-    updated = updated.push(entry)
+    updated += [entry]
   }
 
   {index: updated |> sort-by { |item| f"{item.arch}\t{item.name}" }, already_published: false}
@@ -287,7 +285,7 @@ export proc publish(
     if merged.already_published {
       print ${stage.entry.arch} ${stage.entry.name} util.version_id(stage.entry.ver, stage.entry.rel) "already-published"
     } else {
-      pending = pending.push(stage)
+      pending += [stage]
     }
   }
 

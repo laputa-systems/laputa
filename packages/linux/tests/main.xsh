@@ -135,12 +135,10 @@ mmu-$(CONFIG_MMU) := highmem.o memory.o
 
 pure contains_path(paths: List[Path], target: Str) -> Bool {
   for path_value in paths {
-    if path_value.display() == target {
-      return true
-    }
+    return true when path_value.display() == target
   }
 
-  return false
+  false
 }
 
 pure composite_has_member(plan: kbuild.KbuildPlan, object: Str, member: Str) -> Bool {
@@ -150,7 +148,7 @@ pure composite_has_member(plan: kbuild.KbuildPlan, object: Str, member: Str) -> 
     }
   }
 
-  return false
+  false
 }
 
 test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
@@ -158,40 +156,40 @@ test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
   write_fixture(root)?
   let config = kbuild.load_config(fp"{root}/.config")?
   let plan = kbuild.discover_plan(root, config, "arm64")?
-  test.ok(contains_path(plan.dirs, "."))?
-  test.ok(contains_path(plan.dirs, "init"))?
-  test.ok(contains_path(plan.dirs, "init/lib"))?
-  test.ok(contains_path(plan.dirs, "block"))?
-  test.ok(contains_path(plan.dirs, "net"))?
-  test.ok(contains_path(plan.dirs, "arch/arm64/kernel"))?
-  test.eq(contains_path(plan.dirs, "unused"), false)?
-  test.ok(contains_path(plan.objects, "core.o"))?
-  test.eq(contains_path(plan.objects, "wrong-precedence.o"), false)?
-  test.ok(contains_path(plan.lib_objects, "libhelper.o"))?
-  test.ok(contains_path(plan.objects, "combo.o"))?
-  test.eq(plan.composites.len(), 4)?
-  test.eq(plan.composites[0].object.display(), "combo.o")?
-  test.ok(contains_path(plan.composites[0].members, "combo-a.o"))?
-  test.ok(contains_path(plan.composites[0].members, "combo-b.o"))?
-  test.ok(contains_path(plan.objects, "hyperv.o"))?
-  test.ok(contains_path(plan.objects, "conditional.o"))?
-  test.eq(contains_path(plan.objects, "skipped.o"), false)?
-  test.ok(contains_path(plan.objects, "init/main.o"))?
-  test.ok(contains_path(plan.objects, "init/lib/helper.o"))?
-  test.ok(contains_path(plan.objects, "block/blk-core.o"))?
-  test.ok(contains_path(plan.objects, "net/ipv4.o"))?
-  test.ok(contains_path(plan.objects, "arch/arm64/kernel/head.o"))?
-  test.ok(contains_path(plan.objects, "fs/proc/proc.o"))?
-  test.ok(contains_path(plan.objects, "fs/ramfs/ramfs.o"))?
-  test.ok(contains_path(plan.objects, "mm/mm.o"))?
-  test.eq(contains_path(plan.objects, "fs/proc/nommu.o"), false)?
-  test.eq(contains_path(plan.objects, "fs/proc/task_nommu.o"), false)?
-  test.eq(contains_path(plan.objects, "fs/ramfs/file-nommu.o"), false)?
-  test.eq(contains_path(plan.objects, "mm/nommu.o"), false)?
-  test.ok(composite_has_member(plan, "fs/proc/proc.o", "fs/proc/task_mmu.o"))?
-  test.ok(composite_has_member(plan, "fs/ramfs/ramfs.o", "fs/ramfs/file-mmu.o"))?
-  test.ok(composite_has_member(plan, "fs/devpts/devpts.o", "fs/devpts/inode.o"))?
-  test.eq(plan.unsupported.len(), 0)?
+  assert contains_path(plan.dirs, ".")
+  assert contains_path(plan.dirs, "init")
+  assert contains_path(plan.dirs, "init/lib")
+  assert contains_path(plan.dirs, "block")
+  assert contains_path(plan.dirs, "net")
+  assert contains_path(plan.dirs, "arch/arm64/kernel")
+  assert contains_path(plan.dirs, "unused") == false
+  assert contains_path(plan.objects, "core.o")
+  assert contains_path(plan.objects, "wrong-precedence.o") == false
+  assert contains_path(plan.lib_objects, "libhelper.o")
+  assert contains_path(plan.objects, "combo.o")
+  assert plan.composites.len() == 4
+  assert plan.composites[0].object.display() == "combo.o"
+  assert contains_path(plan.composites[0].members, "combo-a.o")
+  assert contains_path(plan.composites[0].members, "combo-b.o")
+  assert contains_path(plan.objects, "hyperv.o")
+  assert contains_path(plan.objects, "conditional.o")
+  assert contains_path(plan.objects, "skipped.o") == false
+  assert contains_path(plan.objects, "init/main.o")
+  assert contains_path(plan.objects, "init/lib/helper.o")
+  assert contains_path(plan.objects, "block/blk-core.o")
+  assert contains_path(plan.objects, "net/ipv4.o")
+  assert contains_path(plan.objects, "arch/arm64/kernel/head.o")
+  assert contains_path(plan.objects, "fs/proc/proc.o")
+  assert contains_path(plan.objects, "fs/ramfs/ramfs.o")
+  assert contains_path(plan.objects, "mm/mm.o")
+  assert contains_path(plan.objects, "fs/proc/nommu.o") == false
+  assert contains_path(plan.objects, "fs/proc/task_nommu.o") == false
+  assert contains_path(plan.objects, "fs/ramfs/file-nommu.o") == false
+  assert contains_path(plan.objects, "mm/nommu.o") == false
+  assert composite_has_member(plan, "fs/proc/proc.o", "fs/proc/task_mmu.o")
+  assert composite_has_member(plan, "fs/ramfs/ramfs.o", "fs/ramfs/file-mmu.o")
+  assert composite_has_member(plan, "fs/devpts/devpts.o", "fs/devpts/inode.o")
+  assert plan.unsupported.len() == 0
 }
 
 test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
@@ -216,7 +214,7 @@ test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
   )?
   kbuild.write_discovered_plan(default_plan, default_out)?
   kbuild.write_discovered_plan(local_plan, local_out)?
-  test.eq(default_out.read_text()?, local_out.read_text()?)?
+  assert default_out.read_text()? == local_out.read_text()?
 }
 
 test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
@@ -233,7 +231,7 @@ test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
   }
   let first = kbuild.discover_plan_with_options(root, config, "arm64", options)?
   let second = kbuild.discover_plan_with_options(root, config, "arm64", options)?
-  test.eq(first.objects.len(), second.objects.len())?
+  assert first.objects.len() == second.objects.len()
 
   let root_kbuild = fp"{root}/Kbuild"
   let original = root_kbuild.read_text()?
@@ -243,7 +241,7 @@ test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
 """,
   )?
   let third = kbuild.discover_plan_with_options(root, config, "arm64", options)?
-  test.ok(contains_path(third.objects, "cached.o"))?
+  assert contains_path(third.objects, "cached.o")
 }
 
 test test_kbuild_writes_text_plan [fs, error] { |ctx|
@@ -252,10 +250,10 @@ test test_kbuild_writes_text_plan [fs, error] { |ctx|
   write_fixture(root)?
   let plan = kbuild.write_plan(root, fp"{root}/.config", out, "arm64")?
   let stored = out.read_text()?
-  test.ok("obj\tinit/main.o" in stored)?
+  assert "obj\tinit/main.o" in stored
   let loaded = kbuild.read_discovered_plan(out)?
-  test.eq(loaded.objects.len(), plan.objects.len())?
-  test.ok(contains_path(loaded.objects, "init/main.o"))?
+  assert loaded.objects.len() == plan.objects.len()
+  assert contains_path(loaded.objects, "init/main.o")
 }
 
 test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
@@ -388,46 +386,44 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
       ],
     )?
 
-    test.eq(archive_plan.missing_sources.len(), 0)?
-    test.eq(archive_plan.generated_objects.len(), 0)?
-    test.eq(archive_plan.tasks.len(), 29)?
-    test.ok(contains_path(archive_plan.archives, ".xsh-kbuild/built-in.a"))?
-    test.ok(contains_path(archive_plan.archives, ".xsh-kbuild/lib.a"))?
-    test.ok(contains_path(archive_plan.archives, ".xsh-kbuild/init/built-in.a"))?
-    test.ok(contains_path(archive_plan.archives, ".xsh-kbuild/init/lib/built-in.a"))?
+    assert archive_plan.missing_sources.len() == 0
+    assert archive_plan.generated_objects.len() == 0
+    assert archive_plan.tasks.len() == 29
+    assert contains_path(archive_plan.archives, ".xsh-kbuild/built-in.a")
+    assert contains_path(archive_plan.archives, ".xsh-kbuild/lib.a")
+    assert contains_path(archive_plan.archives, ".xsh-kbuild/init/built-in.a")
+    assert contains_path(archive_plan.archives, ".xsh-kbuild/init/lib/built-in.a")
     let report = fp"{root}/archive-plan.json"
     kbuild.write_archive_plan_report(archive_plan, report)?
     let stored = json.read(report)?.require(ArchivePlanReport)?
-    let task_count = stored.task_count
-    let tasks = stored.tasks
-    test.eq(task_count, archive_plan.tasks.len())?
-    test.eq(tasks.len(), archive_plan.tasks.len())?
+    let {task_count, tasks, ..} = stored
+    assert task_count == archive_plan.tasks.len()
+    assert tasks.len() == archive_plan.tasks.len()
     let first = tasks[0]
-    let argv = first.argv
-    let outputs = first.outputs
-    test.ok(argv.len() > 0)?
-    test.ok(outputs.len() > 0)?
+    let {argv, outputs, ..} = first
+    assert argv.len() > 0
+    assert outputs.len() > 0
     var saw_asm = false
 
     for task in archive_plan.tasks {
       if task.name == ".xsh-kbuild/obj/init/lib/helper.o" {
         saw_asm = true
         let asm_argv = make.argv_text(task.argv)?
-        test.ok("-D__ASSEMBLY__" in asm_argv)?
-        test.ok("-fno-PIE" in asm_argv)?
-        test.ok("-DKASAN_SHADOW_SCALE_SHIFT=" in asm_argv)?
-        test.ok("-nostdinc" in asm_argv)?
-        test.ok("include/linux/compiler-version.h" in asm_argv)?
-        test.ok("include/linux/kconfig.h" in asm_argv)?
-        test.eq("-O2" in asm_argv, false)?
-        test.eq("-mgeneral-regs-only" in asm_argv, false)?
-        test.eq("-mbranch-protection=pac-ret" in asm_argv, false)?
-        test.eq("include/generated/utsversion.h" in asm_argv, false)?
-        test.ok("include/linux/compiler_types.h" in asm_argv)?
+        assert "-D__ASSEMBLY__" in asm_argv
+        assert "-fno-PIE" in asm_argv
+        assert "-DKASAN_SHADOW_SCALE_SHIFT=" in asm_argv
+        assert "-nostdinc" in asm_argv
+        assert "include/linux/compiler-version.h" in asm_argv
+        assert "include/linux/kconfig.h" in asm_argv
+        assert "-O2" in asm_argv == false
+        assert "-mgeneral-regs-only" in asm_argv == false
+        assert "-mbranch-protection=pac-ret" in asm_argv == false
+        assert "include/generated/utsversion.h" in asm_argv == false
+        assert "include/linux/compiler_types.h" in asm_argv
       }
     }
 
-    test.ok(saw_asm)?
+    assert saw_asm
   } ?
 }
 
@@ -487,11 +483,11 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
 
       if task.name == relacheck_task_name {
         saw_check_task = true
-        test.ok(relacheck in task.argv)?
-        test.ok(pi_object.display() in task.argv)?
-        test.ok(fp"{pi_object}.relacheck.cmd" in task.outputs)?
-        test.ok(pi_object.display() in task.deps)?
-        test.ok(relacheck in task.deps)?
+        assert relacheck in task.argv
+        assert pi_object.display() in task.argv
+        assert fp"{pi_object}.relacheck.cmd" in task.outputs
+        assert pi_object.display() in task.deps
+        assert relacheck in task.deps
       }
 
       if task.name == ".xsh-kbuild/arch/arm64/kernel/pi/built-in.a" {
@@ -499,9 +495,9 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
       }
     }
 
-    test.ok(saw_build_task)?
-    test.ok(saw_check_task)?
-    test.ok(saw_archive_dep)?
+    assert saw_build_task
+    assert saw_check_task
+    assert saw_archive_dep
   } ?
 }
 
@@ -563,8 +559,8 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
   )?
 
   kbuild.run_archive_plan_output(plan, second, 1)?
-  test.eq(first.read_text()?, "first")?
-  test.eq(second.read_text()?, "firstsecond")?
+  assert first.read_text()? == "first"
+  assert second.read_text()? == "firstsecond"
 }
 
 test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
@@ -576,7 +572,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
 """,
   )?
 
-  let plan: kbuild.KbuildPlan = {
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
       p".",
     ],
@@ -588,14 +584,14 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
     archive_owners: [],
     composites: [],
     unsupported: [],
-  }
+  )
 
   cd root {
     let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
-    test.eq(archive_plan.missing_sources.len(), 1)?
-    test.eq(archive_plan.generated_objects.len(), 0)?
-    test.ok(contains_path(archive_plan.missing_sources, "missing.o"))?
-    test.eq(archive_plan.archives.len(), 1)?
+    assert archive_plan.missing_sources.len() == 1
+    assert archive_plan.generated_objects.len() == 0
+    assert contains_path(archive_plan.missing_sources, "missing.o")
+    assert archive_plan.archives.len() == 1
   } ?
 }
 
@@ -639,16 +635,16 @@ test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
         },
       ],
     )?.require(List[ArchiveAnalysisResult])?
-    test.eq(results.len(), 2)?
-    test.eq(results[0].object, "first.o")?
-    test.eq(results[1].object, "second.o")?
+    assert results.len() == 2
+    assert results[0].object == "first.o"
+    assert results[1].object == "second.o"
 
     let first_tasks = results[0].tasks
     let second_tasks = results[1].tasks
-    test.eq(first_tasks[0].source, "first.c")?
-    test.eq(second_tasks[0].source, "second.c")?
-    test.eq(first_tasks[0].flags, ["-DFIRST"])?
-    test.eq(second_tasks[0].flags, ["-DSECOND"])?
+    assert first_tasks[0].source == "first.c"
+    assert second_tasks[0].source == "second.c"
+    assert first_tasks[0].flags == ["-DFIRST"]
+    assert second_tasks[0].flags == ["-DSECOND"]
   } ?
 }
 
@@ -669,7 +665,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
 """,
   )?
 
-  let plan: kbuild.KbuildPlan = {
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
       p".",
     ],
@@ -690,7 +686,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
     ],
     composites: [],
     unsupported: [],
-  }
+  )
 
   cd root {
     let serial = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
@@ -705,16 +701,16 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       xsh_bin,
       worker,
     )?
-    test.eq(parallel.archives, serial.archives)?
-    test.eq(parallel.link_inputs, serial.link_inputs)?
-    test.eq(parallel.generated_objects, serial.generated_objects)?
-    test.eq(parallel.missing_sources, serial.missing_sources)?
-    test.eq(parallel.tasks.len(), serial.tasks.len())?
+    assert parallel.archives == serial.archives
+    assert parallel.link_inputs == serial.link_inputs
+    assert parallel.generated_objects == serial.generated_objects
+    assert parallel.missing_sources == serial.missing_sources
+    assert parallel.tasks.len() == serial.tasks.len()
 
     for index in range(serial.tasks.len()) {
-      test.eq(parallel.tasks[index].name, serial.tasks[index].name)?
-      test.eq(make.argv_text(parallel.tasks[index].argv)?, make.argv_text(serial.tasks[index].argv)?)?
-      test.eq(parallel.tasks[index].deps, serial.tasks[index].deps)?
+      assert parallel.tasks[index].name == serial.tasks[index].name
+      assert make.argv_text(parallel.tasks[index].argv)? == make.argv_text(serial.tasks[index].argv)?
+      assert parallel.tasks[index].deps == serial.tasks[index].deps
     }
 
     env ({
@@ -732,15 +728,15 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
         xsh_bin,
         worker,
       )?
-      test.eq(compact_parallel.archives, compact_serial.archives)?
-      test.eq(compact_parallel.link_inputs, compact_serial.link_inputs)?
-      test.eq(compact_parallel.generated_objects, compact_serial.generated_objects)?
-      test.eq(compact_parallel.missing_sources, compact_serial.missing_sources)?
-      test.eq(compact_parallel.task_count, compact_serial.task_count)?
-      test.eq(compact_parallel.task_specs, compact_serial.task_specs)?
-      test.eq(compact_parallel.tasks.len(), 0)?
-      test.eq(compact_serial.tasks.len(), 0)?
-      test.ok(compact_parallel.task_specs.len() > 0)?
+      assert compact_parallel.archives == compact_serial.archives
+      assert compact_parallel.link_inputs == compact_serial.link_inputs
+      assert compact_parallel.generated_objects == compact_serial.generated_objects
+      assert compact_parallel.missing_sources == compact_serial.missing_sources
+      assert compact_parallel.task_count == compact_serial.task_count
+      assert compact_parallel.task_specs == compact_serial.task_specs
+      assert compact_parallel.tasks.len() == 0
+      assert compact_serial.tasks.len() == 0
+      assert compact_parallel.task_specs.len() > 0
     }?
   } ?
 }
@@ -756,7 +752,7 @@ int mmu(void) { return 0; }
 """,
   )?
 
-  let plan: kbuild.KbuildPlan = {
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
       p"arch/x86/kvm",
     ],
@@ -774,7 +770,7 @@ int mmu(void) { return 0; }
       },
     ],
     unsupported: [],
-  }
+  )
 
   cd root {
     let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
@@ -783,11 +779,11 @@ int mmu(void) { return 0; }
     for task in archive_plan.tasks {
       if task.name == ".xsh-kbuild/obj/arch/x86/kvm/mmu/mmu.o" {
         saw_mmu = true
-        test.ok("-I./arch/x86/kvm" in task.argv)?
+        assert "-I./arch/x86/kvm" in task.argv
       }
     }
 
-    test.ok(saw_mmu)?
+    assert saw_mmu
   } ?
 }
 
@@ -822,7 +818,7 @@ CFLAGS_intel.o := -I$(src)
 """,
   )?
 
-  let plan: kbuild.KbuildPlan = {
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
       p"sound/hda/common",
       p"sound/hda/controllers",
@@ -835,7 +831,7 @@ CFLAGS_intel.o := -I$(src)
     archive_owners: [],
     composites: [],
     unsupported: [],
-  }
+  )
 
   cd root {
     let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
@@ -845,18 +841,18 @@ CFLAGS_intel.o := -I$(src)
     for task in archive_plan.tasks {
       if task.name == ".xsh-kbuild/obj/sound/hda/common/controller.o" {
         saw_controller = true
-        test.ok("-I./sound/hda/common" in task.argv)?
+        assert "-I./sound/hda/common" in task.argv
       }
 
       if task.name == ".xsh-kbuild/obj/sound/hda/controllers/intel.o" {
         saw_intel = true
-        test.ok("-I./sound/hda/controllers" in task.argv)?
-        test.ok("-I./sound/hda/controllers/../common" in task.argv)?
+        assert "-I./sound/hda/controllers" in task.argv
+        assert "-I./sound/hda/controllers/../common" in task.argv
       }
     }
 
-    test.ok(saw_controller)?
-    test.ok(saw_intel)?
+    assert saw_controller
+    assert saw_intel
   } ?
 }
 
@@ -899,14 +895,11 @@ test test_kbuild_generates_syscall_table [fs, error] { |ctx|
 
   kbuild.generate_syscall_table(table, out, ["common", "64"])?
 
-  test.eq(
-    out.read_text()?,
-    """__SYSCALL(0, sys_read)
+  assert out.read_text()? == """__SYSCALL(0, sys_read)
 __SYSCALL(1, sys_ni_syscall)
 __SYSCALL_WITH_COMPAT(2, sys_open, compat_sys_open)
 __SYSCALL_NORETURN(3, sys_exit)
-""",
-  )?
+"""
 
   kbuild.generate_syscall_numbers(table, numbers, "_ASM_UNISTD_H", "__NR_syscalls", "", ["common", "64"])?
   let observed_output_1 = numbers.read_text()?
@@ -932,9 +925,7 @@ test test_kbuild_generates_offsets_header [fs, error] { |ctx|
 
   kbuild.generate_offsets_header(asm_path, out, "__ASM_OFFSETS_H__")?
 
-  test.eq(
-    out.read_text()?,
-    """#ifndef __ASM_OFFSETS_H__
+  assert out.read_text()? == """#ifndef __ASM_OFFSETS_H__
 #define __ASM_OFFSETS_H__
 /*
  * DO NOT MODIFY.
@@ -947,8 +938,7 @@ test test_kbuild_generates_offsets_header [fs, error] { |ctx|
 #define BAR 16 /* sizeof(struct demo) */
 
 #endif
-""",
-  )?
+"""
 }
 
 test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
@@ -970,9 +960,9 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let archive_task = kbuild.vmlinux_archive_task(ar, [built_in, arch_lib], vmlinux_a)
   test.eq(archive_task.argv, ["/usr/bin/ar", "cDPrST", vmlinux_a.display(), built_in.display(), arch_lib.display()])?
   let reloc = kbuild.vmlinux_o_task(ld, ["-EL", "-maarch64elf"], vmlinux_a, [efi_lib], vmlinux_o)
-  test.ok("--whole-archive" in reloc.argv)?
-  test.ok("--start-group" in reloc.argv)?
-  test.ok(efi_lib in reloc.inputs)?
+  assert "--whole-archive" in reloc.argv
+  assert "--start-group" in reloc.argv
+  assert efi_lib in reloc.inputs
 
   let linked = kbuild.vmlinux_unstripped_task(
     ld,
@@ -986,21 +976,24 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
     unstripped,
   )
 
-  test.ok("--script" in linked.argv)?
-  test.ok(version_obj in linked.inputs)?
+  assert "--script" in linked.argv
+  assert version_obj in linked.inputs
   let stripped = kbuild.vmlinux_strip_task(objcopy, unstripped, vmlinux)
-  test.ok("--remove-section=.modinfo" in stripped.argv)?
+  assert "--remove-section=.modinfo" in stripped.argv
   let image_task = kbuild.image_task(objcopy, vmlinux, image)
   test.eq(image_task.argv.get(1)?, "-O")?
   test.eq(image_task.argv.get(2)?, "binary")?
   let llvm_image_task = kbuild.image_argv_task(["llvm-objcopy"], vmlinux, image)
   test.eq(llvm_image_task.argv.get(0)?, "llvm-objcopy")?
-  let nonrel_config: kbuild.Kconfig = {enabled: map.empty(), values: map.empty().set("RELR", "y")}
+  let nonrel_config: kbuild.Kconfig = kbuild.Kconfig(enabled: map.empty(), values: {["RELR"]: "y"})
   let nonrel_flags = kbuild.arm64_vmlinux_ldflags(nonrel_config)
-  test.eq("-shared" in nonrel_flags, false)?
-  test.ok("--pack-dyn-relocs=relr" in nonrel_flags)?
-  let rel_config: kbuild.Kconfig = {enabled: map.empty(), values: map.empty().set("RELOCATABLE", "y").set("RELR", "y")}
+  assert "-shared" in nonrel_flags == false
+  assert "--pack-dyn-relocs=relr" in nonrel_flags
+  let rel_config: kbuild.Kconfig = kbuild.Kconfig(
+    enabled: map.empty(),
+    values: {["RELOCATABLE"]: "y", ["RELR"]: "y"},
+  )
   let rel_flags = kbuild.arm64_vmlinux_ldflags(rel_config)
-  test.ok("-shared" in rel_flags)?
-  test.ok("--no-apply-dynamic-relocs" in rel_flags)?
+  assert "-shared" in rel_flags
+  assert "--no-apply-dynamic-relocs" in rel_flags
 }

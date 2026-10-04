@@ -29,7 +29,7 @@ test recipe_hooks_dispatch_each_supported_capability_set [fs, process, env, erro
     filesystem_processes_environment: "fs, process, env, error",
   }
   for {key: name, value: effects} in capabilities {
-    let dir = test.temp_dir(ctx, name: name)?
+    let dir = test.temp_dir(ctx, name:)?
     let pkg = hook_package(dir)
     fp"{dir}/PKGBUILD.xsh".write(f"""##! Hook capability fixture.
 error HookProbe = Reached(message: Str)
@@ -81,7 +81,7 @@ test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, p
     export_kind: "export let build = 7",
   }
   for {key: name, value: declaration} in incompatible {
-    let dir = test.temp_dir(ctx, name: name)?
+    let dir = test.temp_dir(ctx, name:)?
     fp"{dir}/PKGBUILD.xsh".write(
       f"##! Incompatible hook fixture.\n## Exposes an incompatible build hook.\n{declaration}\n",
     )?

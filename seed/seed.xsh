@@ -20,11 +20,11 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }
 
-  var parsed: SeedArgs = {command: argv[0], arch: "", xsh_root: "", jobs: 4, suites: []}
+  var parsed: SeedArgs = SeedArgs(command: argv[0], arch: "", xsh_root: "", jobs: 4, suites: [])
   var index = 1
 
   while index < argv.len() {
-    if ! argv[index].starts_with("--") {
+    guard argv[index].starts_with("--") else {
       parsed = {...parsed, suites: parsed.suites.push(argv[index])}
       index += 1
       continue
@@ -71,21 +71,18 @@ pure seed_smoke_argv(
     "none",
     "--mount",
     f"type=bind,src={laputa_root},dst=/src/laputa,readonly",
-  ].extend(xsh_seed.xsh_seed_mount_argv(seed))
-    .extend(
-      [
-        "--workdir",
-        "/src/laputa",
-        "--env",
-        "XSH_PM_OFFLINE=1",
-        tag,
-        "/bin/xsh",
-        "/src/laputa/seed/smoke.xsh",
-        "--",
-        value.arch,
-      ],
-    )
-    .extend(suites)
+    @xsh_seed.xsh_seed_mount_argv(seed),
+    "--workdir",
+    "/src/laputa",
+    "--env",
+    "XSH_PM_OFFLINE=1",
+    tag,
+    "/bin/xsh",
+    "/src/laputa/seed/smoke.xsh",
+    "--",
+    value.arch,
+    @suites,
+  ]
 }
 
 proc main(...argv: List[Str]) [fs, process, env, error] {

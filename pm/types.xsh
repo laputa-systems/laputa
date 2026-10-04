@@ -44,290 +44,283 @@ export enum ArtifactOrigin { Built, Remote }
 # constructor namespace lookup while preserving nominal enum identity.
 ## Return the aarch64 build target without a qualified union-tag expression.
 export pure target_aarch64() -> Target {
-  return Aarch64LinuxMusl
+  Aarch64LinuxMusl
 }
 
 ## Return the x86_64 build target without a qualified union-tag expression.
 export pure target_x86_64() -> Target {
-  return X86_64LinuxMusl
+  X86_64LinuxMusl
 }
 
 ## Return the internal unsupported-target sentinel.
 export pure target_reserved() -> Target {
-  return TargetReserved
+  TargetReserved
 }
 
 ## Return the package kind that owns a payload.
 export pure package_payload() -> PackageKind {
-  return Payload
+  Payload
 }
 
 ## Return the package kind that owns no payload.
 export pure package_meta() -> PackageKind {
-  return Meta
+  Meta
 }
 
 ## Return the runtime dependency edge kind.
 export pure dependency_runtime() -> DependencyKind {
-  return Runtime
+  Runtime
 }
 
 ## Return the runtime-only dependency edge kind.
 export pure dependency_runtime_only() -> DependencyKind {
-  return RuntimeOnly
+  RuntimeOnly
 }
 
 ## Return the host build dependency edge kind.
 export pure dependency_build_host() -> DependencyKind {
-  return BuildHost
+  BuildHost
 }
 
 ## Return the target build dependency edge kind.
 export pure dependency_build_target() -> DependencyKind {
-  return BuildTarget
+  BuildTarget
 }
 
 ## Return the policy-provided bootstrap edge kind.
 export pure dependency_bootstrap() -> DependencyKind {
-  return Bootstrap
+  Bootstrap
 }
 
 ## Return automatic source-kind inference.
 export pure source_auto() -> SourceKind {
-  return Auto
+  Auto
 }
 
 ## Return archive source staging.
 export pure source_archive() -> SourceKind {
-  return Archive
+  Archive
 }
 
 ## Return ZIP source staging.
 export pure source_zip() -> SourceKind {
-  return Zip
+  Zip
 }
 
 ## Return CPIO source staging.
 export pure source_cpio() -> SourceKind {
-  return Cpio
+  Cpio
 }
 
 ## Return a single-file source staging kind.
 export pure source_file() -> SourceKind {
-  return SourceFile
+  SourceFile
 }
 
 ## Return a directory source staging kind.
 export pure source_directory() -> SourceKind {
-  return Directory
+  Directory
 }
 
 ## Return the regular-file metadata kind.
 export pure file_kind_file() -> FileKind {
-  return File
+  File
 }
 
 ## Return the ELF/binary metadata kind.
 export pure file_kind_binary() -> FileKind {
-  return Binary
+  Binary
 }
 
 ## Return the symlink metadata kind.
 export pure file_kind_symlink() -> FileKind {
-  return Symlink
+  Symlink
 }
 
 ## Return the directory-tree metadata kind.
 export pure file_kind_tree() -> FileKind {
-  return Tree
+  Tree
 }
 
 ## Construct the local-build action with its durable reason.
 export pure plan_action_build(reason: Str) -> PlanAction {
-  return Build(reason)
+  Build(reason)
 }
 
 ## Construct the remote-reuse action with its durable reason.
 export pure plan_action_reuse_remote(reason: Str) -> PlanAction {
-  return ReuseRemote(reason)
+  ReuseRemote(reason)
 }
 
 ## Return the local-build artifact origin.
 export pure artifact_origin_built() -> ArtifactOrigin {
-  return Built
+  Built
 }
 
 ## Return the imported-remote artifact origin.
 export pure artifact_origin_remote() -> ArtifactOrigin {
-  return Remote
+  Remote
 }
 
 ## Renders a target as its stable external text form.
 export pure target_text(target: Target) -> Str {
   match target {
-    Aarch64LinuxMusl => return "aarch64-linux-musl"
-    X86_64LinuxMusl => return "x86_64-linux-musl"
-    TargetReserved => return ""
+    Aarch64LinuxMusl => "aarch64-linux-musl"
+    X86_64LinuxMusl => "x86_64-linux-musl"
+    TargetReserved => ""
   }
 }
 
 ## Returns the package architecture selected by a supported target.
 export pure pm_target_arch(target: Target) -> Str {
   match target {
-    Aarch64LinuxMusl => return "aarch64"
-    X86_64LinuxMusl => return "x86_64"
-    TargetReserved => return ""
+    Aarch64LinuxMusl => "aarch64"
+    X86_64LinuxMusl => "x86_64"
+    TargetReserved => ""
   }
 }
 
 ## Decodes a supported target from a public text boundary.
 export pure parse_target(raw: Str) -> Result[Target] {
   match raw {
-    "aarch64-linux-musl" => return Aarch64LinuxMusl
-    "aarch64" => return Aarch64LinuxMusl
-    "arm64" => return Aarch64LinuxMusl
-    "arm64-linux-musl" => return Aarch64LinuxMusl
-    "x86_64-linux-musl" => return X86_64LinuxMusl
-    "x86_64" => return X86_64LinuxMusl
-    "amd64" => return X86_64LinuxMusl
-    "amd64-linux-musl" => return X86_64LinuxMusl
-    _ => return Err(PmError.PackageContract(f"unsupported target {raw}"))
+    "aarch64-linux-musl" | "aarch64" | "arm64" | "arm64-linux-musl" => Aarch64LinuxMusl
+    "x86_64-linux-musl" | "x86_64" | "amd64" | "amd64-linux-musl" => X86_64LinuxMusl
+    _ => Err(PmError.PackageContract(f"unsupported target {raw}"))
   }
 }
 
 ## Renders one build-plan action for its JSON-facing data-transfer record.
 export pure plan_action_text(action: PlanAction) -> Str {
   match action {
-    Build(_) => return "build"
-    ReuseRemote(_) => return "reuse-remote"
+    Build(_) => "build"
+    ReuseRemote(_) => "reuse-remote"
   }
 }
 
 ## Returns the explanation carried by one build-plan action.
 export pure plan_action_reason(action: PlanAction) -> Str {
   match action {
-    Build(reason) => return reason
-    ReuseRemote(reason) => return reason
+    Build(reason) | ReuseRemote(reason) => reason
   }
 }
 
 ## Returns whether a plan action executes a local build.
 export pure plan_action_is_build(action: PlanAction) -> Bool {
   match action {
-    Build(_) => return true
-    ReuseRemote(_) => return false
+    Build(_) => true
+    ReuseRemote(_) => false
   }
 }
 
 ## Decodes one build-plan action at a JSON boundary.
 export pure parse_plan_action(raw: Str, reason: Str) -> Result[PlanAction] {
   match raw {
-    "build" => return Build(reason)
-    "reuse-remote" => return ReuseRemote(reason)
-    _ => return Err(PmError.PackageContract(f"invalid build-plan action {raw}"))
+    "build" => Build(reason)
+    "reuse-remote" => ReuseRemote(reason)
+    _ => Err(PmError.PackageContract(f"invalid build-plan action {raw}"))
   }
 }
 
 ## Renders an artifact origin for its JSON-facing receipt record.
 export pure artifact_origin_text(origin: ArtifactOrigin) -> Str {
   match origin {
-    Built => return "built"
-    Remote => return "remote"
+    Built => "built"
+    Remote => "remote"
   }
 }
 
 ## Decodes an artifact origin at the durable receipt boundary.
 export pure parse_artifact_origin(raw: Str) -> Result[ArtifactOrigin] {
   match raw {
-    "built" => return Built
-    "remote" => return Remote
-    _ => return Err(PmError.PackageContract(f"invalid artifact origin {raw}"))
+    "built" => Built
+    "remote" => Remote
+    _ => Err(PmError.PackageContract(f"invalid artifact origin {raw}"))
   }
 }
 
 ## Renders a package kind for recipe and repository metadata.
 export pure package_kind_text(kind: PackageKind) -> Str {
   match kind {
-    Payload => return "payload"
-    Meta => return "meta"
+    Payload => "payload"
+    Meta => "meta"
   }
 }
 
 ## Decodes a package kind at the recipe metadata boundary.
 export pure parse_package_kind(raw: Str) -> Result[PackageKind] {
   match raw {
-    "payload" => return Payload
-    "meta" => return Meta
-    _ => return Err(PmError.PackageContract(f"invalid package kind {raw}"))
+    "payload" => Payload
+    "meta" => Meta
+    _ => Err(PmError.PackageContract(f"invalid package kind {raw}"))
   }
 }
 
 ## Renders a dependency kind for serialized graph records.
 export pure dependency_kind_text(kind: DependencyKind) -> Str {
   match kind {
-    Runtime => return "runtime"
-    RuntimeOnly => return "runtime-only"
-    BuildHost => return "build-host"
-    BuildTarget => return "build-target"
-    Bootstrap => return "bootstrap"
+    Runtime => "runtime"
+    RuntimeOnly => "runtime-only"
+    BuildHost => "build-host"
+    BuildTarget => "build-target"
+    Bootstrap => "bootstrap"
   }
 }
 
 ## Decodes a dependency kind at a serialized graph boundary.
 export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind] {
   match raw {
-    "runtime" => return Runtime
-    "runtime-only" => return RuntimeOnly
-    "build-host" => return BuildHost
-    "build-target" => return BuildTarget
-    "bootstrap" => return Bootstrap
-    _ => return Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
+    "runtime" => Runtime
+    "runtime-only" => RuntimeOnly
+    "build-host" => BuildHost
+    "build-target" => BuildTarget
+    "bootstrap" => Bootstrap
+    _ => Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
   }
 }
 
 ## Renders a source kind for legacy recipe metadata and source staging.
 export pure source_kind_text(kind: SourceKind) -> Str {
   match kind {
-    Auto => return "auto"
-    Archive => return "archive"
-    Zip => return "zip"
-    Cpio => return "cpio"
-    SourceFile => return "file"
-    Directory => return "directory"
+    Auto => "auto"
+    Archive => "archive"
+    Zip => "zip"
+    Cpio => "cpio"
+    SourceFile => "file"
+    Directory => "directory"
   }
 }
 
 ## Decodes a source kind before a recipe enters typed PM code.
 export pure parse_source_kind(raw: Str) -> Result[SourceKind] {
   match raw {
-    "auto" => return Auto
-    "archive" => return Archive
-    "zip" => return Zip
-    "cpio" => return Cpio
-    "file" => return SourceFile
-    "directory" => return Directory
-    _ => return Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
+    "auto" => Auto
+    "archive" => Archive
+    "zip" => Zip
+    "cpio" => Cpio
+    "file" => SourceFile
+    "directory" => Directory
+    _ => Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
   }
 }
 
 ## Renders a file kind for legacy package metadata and output validation.
 export pure file_kind_text(kind: FileKind) -> Str {
   match kind {
-    File => return "file"
-    Binary => return "binary"
-    Symlink => return "symlink"
-    Tree => return "tree"
+    File => "file"
+    Binary => "binary"
+    Symlink => "symlink"
+    Tree => "tree"
   }
 }
 
 ## Decodes a file kind before a recipe enters typed PM code.
 export pure parse_file_kind(raw: Str) -> Result[FileKind] {
   match raw {
-    "file" => return File
-    "binary" => return Binary
-    "symlink" => return Symlink
-    "tree" => return Tree
-    _ => return Err(PmError.PackageContract(f"invalid filetree kind {raw}"))
+    "file" => File
+    "binary" => Binary
+    "symlink" => Symlink
+    "tree" => Tree
+    _ => Err(PmError.PackageContract(f"invalid filetree kind {raw}"))
   }
 }
 

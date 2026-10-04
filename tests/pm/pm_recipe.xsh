@@ -23,30 +23,30 @@ proc assert_local_source_checksums(package: Str) [fs, env, error] {
     continue unless raw.starts_with("files/")
     let staged = fp"packages/{package}/{raw}"
     let expected = sources.source_checksum(source, "aarch64")?
-    test.eq(hash.sha256(staged)?.hex(), expected)?
+    assert hash.sha256(staged)?.hex() == expected
   }
 }
 
 test test_recipe_loads_valid_payload_with_relative_skip_checksum [fs, env, error] {
   let pkg = recipe.load_package(fixture("recipe-valid-payload"))?
-  test.eq(pkg.kind, types.Payload)?
-  test.eq(pkg.upstream_sources.len(), 1)?
-  test.eq(pkg.upstream_sources[0].kind, types.Auto)?
-  test.eq(pkg.upstream_sources[0].checksums[0].sha256, "SKIP")?
-  test.eq(pkg.filetree[0].kind, types.File)?
+  assert pkg.kind == types.Payload
+  assert pkg.upstream_sources.len() == 1
+  assert pkg.upstream_sources[0].kind == types.Auto
+  assert pkg.upstream_sources[0].checksums[0].sha256 == "SKIP"
+  assert pkg.filetree[0].kind == types.File
 }
 
 test test_recipe_loads_valid_metapackage [fs, env, error] {
   let pkg = recipe.load_package(fixture("recipe-valid-meta"))?
-  test.eq(pkg.kind, types.Meta)?
+  assert pkg.kind == types.Meta
   test.eq(pkg.filetree, [])?
 }
 
 test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, error] {
   let pkg = recipe.load_package(p"packages/linux")?
-  test.eq(pkg.name, "linux")?
-  test.eq(pkg.ver, "7.0.5")?
-  test.eq(pkg.kind, types.Payload)?
+  assert pkg.name == "linux"
+  assert pkg.ver == "7.0.5"
+  assert pkg.kind == types.Payload
 }
 
 test test_ca_certificates_local_sources_match_declared_checksums [fs, env, error] {
@@ -138,12 +138,12 @@ test test_recipe_loads_every_migrated_production_recipe [fs, env, error] {
   for entry in fs.children(p"packages")? {
     continue unless entry.kind == "dir"
     let pkg = recipe.load_package(entry.path)?
-    test.eq(pkg.name, entry.name)?
+    assert pkg.name == entry.name
   }
 }
 
 test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, error] { |ctx|
-  if system.uname()?.sysname != "Linux" {
+  guard system.uname()?.sysname == "Linux" else {
     test.skip("cargo's ELF proof runs in the pinned Linux build environment")
     return
   }
@@ -167,7 +167,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
 }
 
 test test_wpa_proof_runs_binary_with_composed_libraries [fs, process, env, error] { |ctx|
-  if system.uname()?.sysname != "Linux" {
+  guard system.uname()?.sysname == "Linux" else {
     test.skip("the WPA proof runs a Linux executable")
     return
   }
@@ -175,10 +175,10 @@ test test_wpa_proof_runs_binary_with_composed_libraries [fs, process, env, error
   let root = test.temp_dir(ctx, name: "wpa-proof-root")?
   let xsh = process.which("xsh")?
   let bin = fp"{root}/usr/bin/wpa_supplicant"
-  fs.mkdir(fp"{root}/usr/bin", parents: true)?
-  fs.mkdir(fp"{root}/usr/lib/xinit/services", parents: true)?
-  fs.mkdir(fp"{root}/etc/wpa_supplicant", parents: true)?
-  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant", parents: true)?
+  fs.mkdir(fp"{root}/usr/bin")?
+  fs.mkdir(fp"{root}/usr/lib/xinit/services")?
+  fs.mkdir(fp"{root}/etc/wpa_supplicant")?
+  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")?
   fs.write(
     bin,
     f"""#!{xsh}
@@ -210,7 +210,7 @@ main(@args)?
 }
 
 proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) [fs, error] -> Result[Path] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
   fs.write(
     fp"{dir}/PKGBUILD.xsh",
@@ -240,8 +240,8 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
     "export let deps = [\"lib\"]\nexport let mkdeps_host = [\"tool\"]\nexport let runtime_only_deps = [\"service\"]",
   )?
   let pkg = recipe.load_package(valid)?
-  test.eq(pkg.runtime_only_deps, ["service"])?
-  test.eq(pkg.deps, ["lib"])?
+  assert pkg.runtime_only_deps == ["service"]
+  assert pkg.deps == ["lib"]
 
   let omitted = write_runtime_only_recipe(
     ctx,

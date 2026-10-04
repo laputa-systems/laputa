@@ -14,16 +14,14 @@ pure path_basename_text(path_value: Path) -> Str {
 
 pure path_may_provide_library(rel_path: Path) -> Bool {
   let text = rel_path.display()
-  return (text.starts_with("lib/") or text.starts_with("usr/lib/")) and ".so" in path_basename_text(rel_path)
+  (text.starts_with("lib/") or text.starts_with("usr/lib/")) and ".so" in path_basename_text(rel_path)
 }
 
 ## Exported PM declaration `elf_info_mentions_musl`.
 export pure elf_info_mentions_musl(needed: List[Str], interpreter: Str) -> Bool {
-  if "ld-musl-" in interpreter {
-    return true
-  }
+  return true when "ld-musl-" in interpreter
 
-  return "libc.so" in needed
+  "libc.so" in needed
 }
 
 ## Exported PM declaration `runtime_dependency_closure`.
@@ -54,12 +52,7 @@ export pure missing_elf_runtime_dependencies(
   interpreter: Str,
   providers: Map[Str],
 ) -> List[ElfDependencyFailure] {
-  var allowed: Map[Bool] = {}
-
-  for dep in deps {
-    allowed[dep] = true
-  }
-
+  var allowed = {dep: true for dep in deps}
   missing_elf_runtime_dependencies_with_allowed(pkg_name, allowed, needed, interpreter, providers)
 }
 
@@ -94,9 +87,7 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
   var providers: Map[Str] = {}
   let packages_db = util.packages_db_path(root)
 
-  if ! fs.exists(packages_db)? {
-    return providers
-  }
+  return providers unless fs.exists(packages_db)?
 
   let entries = fs.children(packages_db)
     |> where .kind == "dir"
@@ -110,18 +101,15 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
       continue unless path_value.exists()?
       continue unless fs.metadata(path_value)?.kind == "file"
 
-      match elf.inspect(path_value) {
-        Ok(info) => {
-          if info.soname != "" {
-            providers[info.soname] = entry.name
-          } else if path_may_provide_library(rel_path) {
-            providers[path_basename_text(rel_path)] = entry.name
-          }
+      if let Ok(info) = elf.inspect(path_value) {
+        if info.soname != "" {
+          providers[info.soname] = entry.name
+        } else if path_may_provide_library(rel_path) {
+          providers[path_basename_text(rel_path)] = entry.name
         }
-        Err(_) => {
-          if path_may_provide_library(rel_path) {
-            providers[path_basename_text(rel_path)] = entry.name
-          }
+      } else {
+        if path_may_provide_library(rel_path) {
+          providers[path_basename_text(rel_path)] = entry.name
         }
       }
     }
@@ -138,23 +126,20 @@ export proc installed_file_elf_dependency_failures(
   path_value: Path,
   providers: Map[Str],
 ) [fs, error] -> Result[List[ElfDependencyFailure]] {
-  if fs.metadata(path_value)?.kind == "symlink" {
-    return []
-  }
+  return [] when fs.metadata(path_value)?.kind == "symlink"
 
-  match elf.inspect(path_value) {
-    Ok(info) => {
-      var failures = missing_elf_runtime_dependencies_with_allowed(
-        pkg_name,
-        allowed,
-        info.needed,
-        info.interpreter,
-        providers,
-      )
+  if let Ok(info) = elf.inspect(path_value) {
+    var failures = missing_elf_runtime_dependencies_with_allowed(
+      pkg_name,
+      allowed,
+      info.needed,
+      info.interpreter,
+      providers,
+    )
 
-      failures = [{pkg: failure.pkg, file: rel_path, soname: failure.soname, provider: failure.provider} for failure in failures]
-      failures
-    }
-    Err(_) => []
+    failures = [{pkg: failure.pkg, file: rel_path, soname: failure.soname, provider: failure.provider} for failure in failures]
+    failures
+  } else {
+    []
   }
 }

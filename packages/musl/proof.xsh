@@ -9,38 +9,30 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 }
 
 pure musl_ldso_name(arch: Str) -> Str {
-  if arch == "aarch64" {
-    return "ld-musl-aarch64.so.1"
-  }
+  return "ld-musl-aarch64.so.1" when arch == "aarch64"
 
-  return f"ld-musl-{arch}.so.1"
+  f"ld-musl-{arch}.so.1"
 }
 
 pure elf_machine_name(arch: Str) -> Str {
-  if arch == "aarch64" {
-    return "AArch64"
-  }
+  return "AArch64" when arch == "aarch64"
 
-  if arch == "x86_64" {
-    return "X86-64"
-  }
+  return "X86-64" when arch == "x86_64"
 
-  return arch
+  arch
 }
 
 proc build_root_path() [env, error] -> Result[Path] {
   let build_root_value = (env.get("XSH_PM_BUILD_ROOT") ?? "").trim()
   ensure(build_root_value != "", "proof-musl", "XSH_PM_BUILD_ROOT is required for native-cross proof")?
-  return fp"{build_root_value}"
+  fp"{build_root_value}"
 }
 
 proc cross_cc(default_cc: Path, build_arch: Str, target_arch: Str) [env, error] -> Result[Path] {
-  if build_arch == target_arch {
-    return default_cc
-  }
+  return default_cc when build_arch == target_arch
 
   let build_root = build_root_path()?
-  return fp"{build_root}/usr/lib/llvm23/bin/clang-23"
+  fp"{build_root}/usr/lib/llvm23/bin/clang-23"
 }
 
 proc compile_hello(

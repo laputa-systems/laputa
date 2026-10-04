@@ -1,18 +1,18 @@
 ##! Behavior coverage for package fingerprints, artifact keys, and build-plan resolution.
-use pm.fingerprint
-use pm.recipe
-use pm.types
 use pm.catalog
+use pm.fingerprint
 use pm.plan
 use pm.plan_json
 use pm.policy
+use pm.recipe
+use pm.types
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
 }
 
 proc copied_package(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.Package] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("fingerprint-package"), dir, parents: true, overwrite: true)?
   recipe.load_package(dir)?
 }
@@ -30,10 +30,10 @@ proc build_input(pkg: types.Package) [fs, error] -> Result[Str] {
 test test_package_build_fingerprint_is_repeatable_and_ignores_mtime [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-repeat")?
   let first = build_input(pkg)?
-  test.eq(build_input(pkg)?, first)?
+  assert build_input(pkg)? == first
   let helper = fp"{pkg.dir}/helper.xsh"
   fs.write(helper, helper.read_text()?)?
-  test.eq(build_input(pkg)?, first)?
+  assert build_input(pkg)? == first
 }
 
 test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx|
@@ -52,8 +52,8 @@ test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx
     upstream_sources: [{...source, checksums: [arm_checksum, {...x86_checksum, sha256: "changed-x86"}]}],
   }
 
-  test.eq(fingerprint.package_build_input(p".", arm_changed, types.target_x86_64())?, baseline)?
-  test.eq(fingerprint.package_build_input(p".", x86_changed, types.target_x86_64())? == baseline, false)?
+  assert fingerprint.package_build_input(p".", arm_changed, types.target_x86_64())? == baseline
+  assert fingerprint.package_build_input(p".", x86_changed, types.target_x86_64())? == baseline == false
 }
 
 test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx|
@@ -61,28 +61,28 @@ test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx
   let first = build_input(pkg)?
   let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
   fs.write(pkgbuild, pkgbuild.read_text()?.replace("1.0.0", "1.0.1"))?
-  test.eq(build_input(pkg)? == first, false)?
+  assert build_input(pkg)? == first == false
 }
 
 test test_package_build_fingerprint_changes_for_helper_module [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-helper")?
   let first = build_input(pkg)?
   fs.write(fp"{pkg.dir}/helper.xsh", "changed helper\n")?
-  test.eq(build_input(pkg)? == first, false)?
+  assert build_input(pkg)? == first == false
 }
 
 test test_package_build_fingerprint_changes_for_files_tree [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-files")?
   let first = build_input(pkg)?
   fs.write(fp"{pkg.dir}/files/input.txt", "changed input\n")?
-  test.eq(build_input(pkg)? == first, false)?
+  assert build_input(pkg)? == first == false
 }
 
 test test_package_build_fingerprint_changes_for_service [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-service")?
   let first = build_input(pkg)?
   fs.write(fp"{pkg.dir}/service.xsh", "changed service\n")?
-  test.eq(build_input(pkg)? == first, false)?
+  assert build_input(pkg)? == first == false
 }
 
 test test_proof_fingerprint_is_independent_from_build_input [fs, env, error] { |ctx|
@@ -90,22 +90,22 @@ test test_proof_fingerprint_is_independent_from_build_input [fs, env, error] { |
   let build_before = build_input(pkg)?
   let proof_before = fingerprint.package_proof_input(p".", pkg)?
   fs.write(fp"{pkg.dir}/proof.xsh", "changed proof\n")?
-  test.eq(build_input(pkg)?, build_before)?
-  test.eq(fingerprint.package_proof_input(p".", pkg)? == proof_before, false)?
+  assert build_input(pkg)? == build_before
+  assert fingerprint.package_proof_input(p".", pkg)? == proof_before == false
 }
 
 test test_pm_tree_fingerprint_changes_for_implementation [fs, error] { |ctx|
   let root = copied_executor(ctx)?
   let first = fingerprint.pm_tree(root)?
   fs.write(fp"{root}/pm/build.xsh", "changed implementation\n")?
-  test.eq(fingerprint.pm_tree(root)? == first, false)?
+  assert fingerprint.pm_tree(root)? == first == false
 }
 
 test test_core_tree_fingerprint_changes_for_applet [fs, error] { |ctx|
   let root = copied_executor(ctx)?
   let first = fingerprint.core_tree(fp"{root}/core")?
   fs.write(fp"{root}/core/applet.xsh", "changed applet\n")?
-  test.eq(fingerprint.core_tree(fp"{root}/core")? == first, false)?
+  assert fingerprint.core_tree(fp"{root}/core")? == first == false
 }
 
 test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { |ctx|
@@ -120,7 +120,7 @@ test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, erro
   let pkg = copied_package(ctx, "fingerprint-symlinks")?
   let first = build_input(pkg)?
   fs.symlink(p"input.txt", fp"{pkg.dir}/files/inside.txt")?
-  test.eq(build_input(pkg)? == first, false)?
+  assert build_input(pkg)? == first == false
 
   for target in [../../pm, /etc, p"files/../../outside.xsh"] {
     let link = fp"{pkg.dir}/escape"
@@ -139,7 +139,7 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 }
 
 proc copied_plan_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"{root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
@@ -183,10 +183,8 @@ pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieva
 }
 
 proc exact_remote_snapshot(value: types.BuildPlan) [error] -> Result[types.RemoteSnapshot] {
-  var packages: List[types.RemotePlanArtifact] = []
-
-  for node in value.nodes {
-    packages = packages.push({
+  var packages: List[types.RemotePlanArtifact] = [
+    {
       name: node.name,
       ver: node.ver,
       rel: node.rel,
@@ -196,20 +194,18 @@ proc exact_remote_snapshot(value: types.BuildPlan) [error] -> Result[types.Remot
       executor_sha256: plan_test_sha256("remote executor"),
       proof_key: node.proof_key,
       proof_sha256: node.proof_sha256,
-    })
-  }
-
+    }
+    for node in value.nodes
+  ]
   {target: value.target, index_sha256: "remote-index", packages}
 }
 
 proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanNode] {
   for node in value.nodes {
-    if node.name == name {
-      return node
-    }
+    return node when node.name == name
   }
 
-  return Err(types.PmError.PackageContract(f"missing plan node {name}"))
+  Err(types.PmError.PackageContract(f"missing plan node {name}"))
 }
 
 pure snapshot_replace(
@@ -238,26 +234,26 @@ test test_build_plan_is_deterministic_and_has_dependency_first_order [fs, env, e
   let value = plan_catalog(ctx, "plan-deterministic")?
   let first = resolve_plan(value, ["app"], empty_remote_snapshot())?
   let second = resolve_plan(value, ["app"], empty_remote_snapshot())?
-  test.eq(first, second)?
-  test.eq(first.roots, ["app"])?
-  test.eq([node.name for node in first.nodes], ["host-tool", "runtime-lib", "target-sdk", "app"])?
-  test.eq([node.level for node in first.nodes], [0, 0, 0, 1])?
-  test.eq(types.plan_action_text(node_named(first, "app")?.action), "build")?
-  test.eq(types.plan_action_reason(node_named(first, "app")?.action), "new package")?
+  assert first == second
+  assert first.roots == ["app"]
+  assert [node.name for node in first.nodes] == ["host-tool", "runtime-lib", "target-sdk", "app"]
+  assert [node.level for node in first.nodes] == [0, 0, 0, 1]
+  assert types.plan_action_text(node_named(first, "app")?.action) == "build"
+  assert types.plan_action_reason(node_named(first, "app")?.action) == "new package"
 }
 
 test test_build_plan_all_roots_are_canonical [fs, env, error] { |ctx|
   let value = plan_catalog(ctx, "plan-all")?
   let first = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["target-sdk", "app"], true)?
   let second = plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), ["app"], true)?
-  test.eq(first, second)?
-  test.eq(first.roots, ["app", "host-tool", "runtime-lib", "target-sdk"])?
+  assert first == second
+  assert first.roots == ["app", "host-tool", "runtime-lib", "target-sdk"]
 }
 
 test test_build_plan_is_checkout_independent [fs, env, error] { |ctx|
   let first = resolve_plan(plan_catalog(ctx, "plan-checkout-a")?, ["app"], empty_remote_snapshot())?
   let second = resolve_plan(plan_catalog(ctx, "plan-checkout-b")?, ["app"], empty_remote_snapshot())?
-  test.eq(first, second)?
+  assert first == second
 }
 
 test test_build_plan_reuses_exact_remote_and_carries_retrieval [fs, env, error] { |ctx|
@@ -265,10 +261,10 @@ test test_build_plan_reuses_exact_remote_and_carries_retrieval [fs, env, error] 
   let initial = resolve_plan(value, ["app"], empty_remote_snapshot())?
   let reused = resolve_plan(value, ["app"], exact_remote_snapshot(initial)?)?
   let app = node_named(reused, "app")?
-  test.eq(types.plan_action_text(app.action), "reuse-remote")?
-  test.eq(types.plan_action_reason(app.action), "exact remote artifact")?
-  test.ok(app.remote != null)?
-  test.eq(app.artifact_key, node_named(initial, "app")?.artifact_key)?
+  assert types.plan_action_text(app.action) == "reuse-remote"
+  assert types.plan_action_reason(app.action) == "exact remote artifact"
+  assert app.remote != null
+  assert app.artifact_key == node_named(initial, "app")?.artifact_key
 }
 
 test test_build_plan_marks_only_retrieval_derived_remote_keys_as_legacy [fs, env, error] { |ctx|
@@ -295,8 +291,8 @@ test test_build_plan_marks_only_retrieval_derived_remote_keys_as_legacy [fs, env
     packages: legacy_packages,
   }
   let resolved = resolve_plan(value, ["app"], legacy)?
-  test.ok(plan.node_uses_legacy_remote_identity(resolved, node_named(resolved, "app")?)?)?
-  test.eq(plan.node_uses_legacy_remote_identity(initial, app)?, false)?
+  assert plan.node_uses_legacy_remote_identity(resolved, node_named(resolved, "app")?)?
+  assert plan.node_uses_legacy_remote_identity(initial, app)? == false
 }
 
 test test_build_plan_reports_tuple_reasons_and_rejects_behind_remote [fs, env, error] { |ctx|
@@ -309,14 +305,8 @@ test test_build_plan_reports_tuple_reasons_and_rejects_behind_remote [fs, env, e
   let newer = snapshot_replace(snapshot, "runtime-lib", {...remote, ver: "2"})
   let version_build = resolve_plan(value, ["runtime-lib"], older)?
   let release_build = resolve_plan(value, ["runtime-lib"], lower_release)?
-  test.eq(
-    types.plan_action_reason(node_named(version_build, "runtime-lib")?.action),
-    "local version differs from remote 0-1",
-  )?
-  test.eq(
-    types.plan_action_reason(node_named(release_build, "runtime-lib")?.action),
-    "local release is above remote 1-0",
-  )?
+  assert types.plan_action_reason(node_named(version_build, "runtime-lib")?.action) == "local version differs from remote 0-1"
+  assert types.plan_action_reason(node_named(release_build, "runtime-lib")?.action) == "local release is above remote 1-0"
 
   match resolve_plan(value, ["runtime-lib"], newer) {
     Ok(_) => test.fail("behind remote tuple unexpectedly planned")?
@@ -329,14 +319,11 @@ proc with_release(value: types.PackageCatalog, name: Str, rel: Str) [error] -> R
 }
 
 proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) [error] -> Result[List[Str]] {
-  var changed: List[Str] = []
-
-  for node in before.nodes {
-    if node_named(after, node.name)?.artifact_key != node.artifact_key {
-      changed = changed.push(node.name)
-    }
-  }
-
+  var changed = [
+    node.name
+    for node in before.nodes
+    if node_named(after, node.name)?.artifact_key != node.artifact_key
+  ]
   changed |> sort
 }
 
@@ -348,11 +335,11 @@ test test_release_bump_changes_exactly_the_package_and_its_dependents [fs, env, 
 
   for name in ["host-tool", "target-sdk", "runtime-lib"] {
     let bumped = resolve_plan(with_release(value, name, "2")?, ["app"], empty_remote_snapshot())?
-    test.eq(changed_key_names(initial, bumped)?, [name, "app"] |> sort)?
+    assert changed_key_names(initial, bumped)? == ([name, "app"] |> sort)
   }
 
   let app_bumped = resolve_plan(with_release(value, "app", "2")?, ["app"], empty_remote_snapshot())?
-  test.eq(changed_key_names(initial, app_bumped)?, ["app"])?
+  assert changed_key_names(initial, app_bumped)? == ["app"]
 }
 
 test test_build_epoch_changes_every_artifact_key_and_nothing_else [fs, env, error] { |ctx|
@@ -360,10 +347,10 @@ test test_build_epoch_changes_every_artifact_key_and_nothing_else [fs, env, erro
   let current = resolve_plan(value, ["app"], empty_remote_snapshot())?
   let next_policy = {...policy.aarch64_docker(), build_epoch: policy.BUILD_EPOCH + 1}
   let next = plan.resolve(value, empty_remote_snapshot(), next_policy, ["app"], false)?
-  test.eq(current.build_epoch, policy.BUILD_EPOCH)?
-  test.eq(next.build_epoch, policy.BUILD_EPOCH + 1)?
-  test.eq(changed_key_names(current, next)?, [node.name for node in current.nodes] |> sort)?
-  test.eq([node.recipe_sha256 for node in next.nodes], [node.recipe_sha256 for node in current.nodes])?
+  assert current.build_epoch == policy.BUILD_EPOCH
+  assert next.build_epoch == policy.BUILD_EPOCH + 1
+  assert changed_key_names(current, next)? == ([node.name for node in current.nodes] |> sort)
+  assert [node.recipe_sha256 for node in next.nodes] == [node.recipe_sha256 for node in current.nodes]
 }
 
 test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error] { |ctx|
@@ -384,8 +371,8 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
   let resolved = resolve_plan(value, ["app"], empty_remote_snapshot())?
   let app = node_named(resolved, "app")?
   let runtime_edges = [dependency for dependency in app.dependencies if dependency.name == "runtime-lib"]
-  test.eq([types.dependency_kind_text(dependency.kind) for dependency in runtime_edges], ["build-host", "runtime"])?
-  test.eq(runtime_edges[0].artifact_key, runtime_edges[1].artifact_key)?
+  assert [types.dependency_kind_text(dependency.kind) for dependency in runtime_edges] == ["build-host", "runtime"]
+  assert runtime_edges[0].artifact_key == runtime_edges[1].artifact_key
 
   let repeated = {...app, dependencies: app.dependencies.push(app.dependencies[0])}
   let malformed = {...resolved, nodes: [if node.name == "app" { repeated } else { node } for node in resolved.nodes]}
@@ -405,10 +392,10 @@ test test_build_plan_rebuilds_dependents_of_rebuilt_dependencies [fs, env, error
   let value = plan_catalog(ctx, "plan-dependency-rebuild")?
   let snapshot = exact_remote_snapshot(resolve_plan(value, ["app"], empty_remote_snapshot())?)?
   let rebuilt = resolve_plan(with_release(value, "runtime-lib", "2")?, ["app"], snapshot)?
-  test.eq(types.plan_action_reason(node_named(rebuilt, "runtime-lib")?.action), "local release is above remote 1-1")?
-  test.eq(types.plan_action_text(node_named(rebuilt, "app")?.action), "build")?
-  test.eq(types.plan_action_reason(node_named(rebuilt, "app")?.action), "dependencies rebuilt (runtime-lib)")?
-  test.eq(types.plan_action_text(node_named(rebuilt, "host-tool")?.action), "reuse-remote")?
+  assert types.plan_action_reason(node_named(rebuilt, "runtime-lib")?.action) == "local release is above remote 1-1"
+  assert types.plan_action_text(node_named(rebuilt, "app")?.action) == "build"
+  assert types.plan_action_reason(node_named(rebuilt, "app")?.action) == "dependencies rebuilt (runtime-lib)"
+  assert types.plan_action_text(node_named(rebuilt, "host-tool")?.action) == "reuse-remote"
 
   # Remote executor provenance never decides reuse.
   let other_executor = {
@@ -416,13 +403,12 @@ test test_build_plan_rebuilds_dependents_of_rebuilt_dependencies [fs, env, error
     packages: [{...artifact, executor_sha256: plan_test_sha256("other executor")} for artifact in snapshot.packages],
   }
   let reused = resolve_plan(value, ["app"], other_executor)?
-  test.eq(
-    [
-      types.plan_action_text(node.action)
-      for node in reused.nodes
-    ],
-    ["reuse-remote", "reuse-remote", "reuse-remote", "reuse-remote"],
-  )?
+  assert [types.plan_action_text(node.action) for node in reused.nodes] == [
+    "reuse-remote",
+    "reuse-remote",
+    "reuse-remote",
+    "reuse-remote",
+  ]
 }
 
 test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |ctx|
@@ -431,11 +417,11 @@ test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |
   let repeat_path = fp"{test.temp_dir(ctx, name: "plan-json-repeat")?}/basic-aarch64.json"
   plan_json.write_plan(path_value, value)?
   plan_json.write_plan(repeat_path, value)?
-  test.eq(plan_json.read(path_value)?, value)?
+  assert plan_json.read(path_value)? == value
 
   let original = path_value.read_text()?
-  test.eq(repeat_path.read_text()?, original)?
-  test.eq(original, fixture("plans/basic-aarch64.json").read_text()?)?
+  assert repeat_path.read_text()? == original
+  assert original == fixture("plans/basic-aarch64.json").read_text()?
   fs.write(path_value, original.replace(plan.format, "unknown-build-plan"))?
 
   match plan_json.read(path_value) {
@@ -475,7 +461,7 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
       let dependency = dependencies[0]
       nodes = nodes.push({...node, dependencies: [{...dependency, artifact_key: "tampered"}]})
     } else {
-      nodes = nodes.push(node)
+      nodes += [node]
     }
   }
 
@@ -488,8 +474,8 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
 }
 
 test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, env, error] { |ctx|
-  test.eq(types.parse_target("arm64")?, types.Aarch64LinuxMusl)?
-  test.eq(types.parse_target("amd64")?, types.X86_64LinuxMusl)?
+  assert types.parse_target("arm64")? == types.Aarch64LinuxMusl
+  assert types.parse_target("amd64")? == types.X86_64LinuxMusl
   let value = plan_catalog(ctx, "plan-target")?
   let unsupported = {...policy.aarch64_docker(), target: types.TargetReserved}
 
@@ -537,15 +523,16 @@ proc runtime_only_plan_catalog(ctx: TestContext, name: Str) [fs, env, error] -> 
 test test_runtime_only_dependency_is_planned_but_neither_ordered_nor_keyed [fs, env, error] { |ctx|
   let value = runtime_only_plan_catalog(ctx, "plan-runtime-only")?
   let initial = resolve_plan(value, ["consumer"], empty_remote_snapshot())?
-  test.eq(
-    [
-      node.name
-      for node in initial.nodes
-    ],
-    ["host-tool", "runtime-lib", "service", "target-sdk", "app", "consumer"],
-  )?
+  assert [node.name for node in initial.nodes] == [
+    "host-tool",
+    "runtime-lib",
+    "service",
+    "target-sdk",
+    "app",
+    "consumer",
+  ]
   let service = node_named(initial, "service")?
-  test.eq(service.level, 0)?
+  assert service.level == 0
   test.eq(
     service.dependencies,
     [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}],
@@ -553,24 +540,24 @@ test test_runtime_only_dependency_is_planned_but_neither_ordered_nor_keyed [fs, 
 
   let path_value = fp"{test.temp_dir(ctx, name: "plan-runtime-only-json")?}/plan.json"
   plan_json.write_plan(path_value, initial)?
-  test.eq(plan_json.read(path_value)?, initial)?
+  assert plan_json.read(path_value)? == initial
 
   # Rebuilding a runtime-only dependency rebuilds none of its dependents.
   let app_bumped = resolve_plan(with_release(value, "app", "2")?, ["consumer"], empty_remote_snapshot())?
-  test.eq(changed_key_names(initial, app_bumped)?, ["app"])?
-  test.eq(node_named(app_bumped, "service")?.dependencies[0].artifact_key, node_named(app_bumped, "app")?.artifact_key)?
+  assert changed_key_names(initial, app_bumped)? == ["app"]
+  assert node_named(app_bumped, "service")?.dependencies[0].artifact_key == node_named(app_bumped, "app")?.artifact_key
 
   # A build dependency still cascades through its build dependents only.
   let lib_bumped = resolve_plan(with_release(value, "runtime-lib", "2")?, ["consumer"], empty_remote_snapshot())?
-  test.eq(changed_key_names(initial, lib_bumped)?, ["app", "runtime-lib"])?
+  assert changed_key_names(initial, lib_bumped)? == ["app", "runtime-lib"]
   let service_bumped = resolve_plan(with_release(value, "service", "2")?, ["consumer"], empty_remote_snapshot())?
-  test.eq(changed_key_names(initial, service_bumped)?, ["consumer", "service"])?
+  assert changed_key_names(initial, service_bumped)? == ["consumer", "service"]
 
   # An exact remote dependent stays reusable when its runtime-only dependency is rebuilt.
   let rebuilt = resolve_plan(with_release(value, "app", "2")?, ["consumer"], exact_remote_snapshot(initial)?)?
-  test.eq(types.plan_action_text(node_named(rebuilt, "app")?.action), "build")?
-  test.eq(types.plan_action_text(node_named(rebuilt, "service")?.action), "reuse-remote")?
-  test.eq(types.plan_action_text(node_named(rebuilt, "consumer")?.action), "reuse-remote")?
+  assert types.plan_action_text(node_named(rebuilt, "app")?.action) == "build"
+  assert types.plan_action_text(node_named(rebuilt, "service")?.action) == "reuse-remote"
+  assert types.plan_action_text(node_named(rebuilt, "consumer")?.action) == "reuse-remote"
 }
 
 test test_runtime_only_dependency_may_close_a_cycle [fs, env, error] { |ctx|
@@ -578,7 +565,7 @@ test test_runtime_only_dependency_may_close_a_cycle [fs, env, error] { |ctx|
   write_plan_metapackage(root, "service", "export let deps = []\nexport let runtime_only_deps = [\"runner\"]")?
   write_plan_metapackage(root, "runner", "export let deps = [\"service\"]")?
   let resolved = resolve_plan(catalog.load(root)?, ["runner"], empty_remote_snapshot())?
-  test.eq([node.name for node in resolved.nodes], ["service", "runner"])?
-  test.eq([dependency.kind for dependency in node_named(resolved, "service")?.dependencies], [types.RuntimeOnly])?
+  assert [node.name for node in resolved.nodes] == ["service", "runner"]
+  assert [dependency.kind for dependency in node_named(resolved, "service")?.dependencies] == [types.RuntimeOnly]
   plan.validate(resolved)?
 }

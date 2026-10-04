@@ -14,7 +14,7 @@ const seed_independent = ["dropbear", "laputa-fs", "laputa-net", "laputa-pm", "t
 # disposable root that holds a fixture seed for each target.
 proc repository_with_seeds(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   let checkout = fs.cwd()?
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
 
   for entry in ["packages", "pm", "pm.xsh", "xinit"] {
     fs.symlink(fp"{checkout}/{entry}", fp"{root}/{entry}")?
@@ -50,20 +50,8 @@ proc plan_repository(root: Path, target: types.Target) [fs, env, error] -> Resul
 }
 
 proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) [error] -> Result[List[Str]] {
-  var keys: Map[Str] = {}
-
-  for node in after.nodes {
-    keys[node.name] = node.artifact_key
-  }
-
-  var changed: List[Str] = []
-
-  for node in before.nodes {
-    if keys.get(node.name)? != node.artifact_key {
-      changed = changed.push(node.name)
-    }
-  }
-
+  var keys = {node.name: node.artifact_key for node in after.nodes}
+  var changed = [node.name for node in before.nodes if keys.get(node.name)? != node.artifact_key]
   changed |> sort
 }
 
@@ -80,11 +68,11 @@ test test_seed_rebuild_changes_only_the_xsh_key [fs, env, error] { |ctx|
   let before = plan_repository(root, types.target_aarch64())?
 
   for name in seed_independent {
-    test.ok(name in [node.name for node in before.nodes])?
+    assert name in [node.name for node in before.nodes]
   }
 
   rebuild_seed(root, "aarch64")?
-  test.eq(changed_key_names(before, plan_repository(root, types.target_aarch64())?)?, ["xsh"])?
+  assert changed_key_names(before, plan_repository(root, types.target_aarch64())?)? == ["xsh"]
 }
 
 test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
@@ -94,7 +82,7 @@ test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
 
   rebuild_seed(root, "x86_64")?
   test.eq(changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)?, [])?
-  test.eq(changed_key_names(x86_before, plan_repository(root, types.target_x86_64())?)?, ["xsh"])?
+  assert changed_key_names(x86_before, plan_repository(root, types.target_x86_64())?)? == ["xsh"]
 }
 
 test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, env, error] { |ctx|
@@ -105,12 +93,12 @@ test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, en
 
   # dropbear links zlib, so a zlib rebuild rebuilds it.
   let zlib = plan_for(with_release(value, "zlib", "999")?, types.target_aarch64(), roots)?
-  test.ok("zlib" in changed_key_names(before, zlib)?)?
-  test.ok("dropbear" in changed_key_names(before, zlib)?)?
+  assert "zlib" in changed_key_names(before, zlib)?
+  assert "dropbear" in changed_key_names(before, zlib)?
 
   # Service modules only run under xinit; an xinit rebuild rebuilds xinit alone.
   let xinit = plan_for(with_release(value, "xinit", "999")?, types.target_aarch64(), roots)?
-  test.eq(changed_key_names(before, xinit)?, ["xinit"])?
+  assert changed_key_names(before, xinit)? == ["xinit"]
 }
 
 test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ctx|
@@ -123,12 +111,12 @@ test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ct
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?
 
   let tailscale = generation_names(generation.plan(value, ["tailscale"], overlay)?)
-  test.eq(tailscale, ["iptables", "musl", "tailscale", "xinit", "xsh"])?
+  assert tailscale == ["iptables", "musl", "tailscale", "xinit", "xsh"]
 
   let network = generation_names(generation.plan(value, ["laputa-net"], overlay)?)
   for name in ["wpa_supplicant", "xinit", "xsh"] {
-    test.ok(name in network)?
+    assert name in network
   }
 
-  test.ok("font-ttf-hack" in generation_names(generation.plan(value, ["foot-minimal"], overlay)?))?
+  assert "font-ttf-hack" in generation_names(generation.plan(value, ["foot-minimal"], overlay)?)
 }

@@ -1,11 +1,11 @@
 ##! Behavior coverage for explicit typed repository planning commands.
-use pm.plan_json
-use pm.types
 use pm.catalog
 use pm.generation
 use pm.plan
+use pm.plan_json
 use pm.policy
 use pm.store
+use pm.types
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
@@ -14,9 +14,7 @@ pure fixture(name: Str) -> Path {
 proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
-  if configured != "" {
-    return path.absolute(fp"{configured}")?
-  }
+  return path.absolute(fp"{configured}")? when configured != ""
 
   process.which("xsh")?
 }
@@ -26,7 +24,7 @@ proc module_root() [fs, error] -> Result[Path] {
 }
 
 proc copied_repository(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"{root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
@@ -106,7 +104,7 @@ test test_final_cli_rejects_removed_legacy_command [fs, process, env, error] { |
   let err = test.temp_path(ctx, name: "legacy-command.err")
   let status = pm_status(["build-set", "repo"], err)?
 
-  test.eq(status.ok, false)?
+  assert status.ok == false
   let observed_output_1 = err.read_text()?
   assert "unknown pm command build-set" in observed_output_1
 }
@@ -188,7 +186,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
       output.display(),
     ],
   )?
-  test.eq(output.read_text()?, "kernel payload\n")?
+  assert output.read_text()? == "kernel payload\n"
 
   fs.write(output, "previous output\n")?
   let error_output = test.temp_path(ctx, name: "store-extract-error.txt")
@@ -208,10 +206,10 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
     ],
     error_output,
   )?
-  test.eq(missing.ok, false)?
+  assert missing.ok == false
   let observed_output_2 = error_output.read_text()?
   assert "artifact metadata does not declare boot/missing" in observed_output_2
-  test.eq(output.read_text()?, "previous output\n")?
+  assert output.read_text()? == "previous output\n"
 
   let traversal = pm_status(
     [
@@ -229,10 +227,10 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
     ],
     error_output,
   )?
-  test.eq(traversal.ok, false)?
+  assert traversal.ok == false
   let observed_output_3 = error_output.read_text()?
   assert "store extraction path must stay relative" in observed_output_3
-  test.eq(output.read_text()?, "previous output\n")?
+  assert output.read_text()? == "previous output\n"
 }
 
 test test_root_inspect_accepts_published_generation_receipt_file [fs, process, env, error] { |ctx|
@@ -258,7 +256,7 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
   let output = fp"{root}/out/plan.json"
 
   let missing_selection = pm_status(["repo", "plan", "--repo", root.display(), "--output", output.display()], err)?
-  test.eq(missing_selection.ok, false)?
+  assert missing_selection.ok == false
   let observed_output_4 = err.read_text()?
   assert "requires exactly one of --all or one-or-more --root" in observed_output_4
 
@@ -266,12 +264,12 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
     ["repo", "plan", "--repo", root.display(), "--all", "--root", "app", "--output", output.display()],
     err,
   )?
-  test.eq(both.ok, false)?
+  assert both.ok == false
   let observed_output_5 = err.read_text()?
   assert "requires exactly one of --all or one-or-more --root" in observed_output_5
 
   let missing_output = pm_status(["repo", "plan", "--repo", root.display(), "--root", "app"], err)?
-  test.eq(missing_output.ok, false)?
+  assert missing_output.ok == false
   let observed_output_6 = err.read_text()?
   assert "missing required argument --output" in observed_output_6
 
@@ -290,7 +288,7 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
     ],
     err,
   )?
-  test.eq(unsupported_target.ok, false)?
+  assert unsupported_target.ok == false
   let observed_output_7 = err.read_text()?
   assert "unsupported target sparc64-linux-musl" in observed_output_7
 }
@@ -303,21 +301,21 @@ test test_repo_plan_without_selects_packages_that_build_before_the_excluded_ones
     ["repo", "plan", "--repo", root.display(), "--all", "--without", "host-tool", "--output", output.display()],
   )?
   let value = plan_json.read(output)?
-  test.eq(value.roots, ["runtime-lib", "target-sdk"])?
-  test.eq([node.name for node in value.nodes] |> sort, ["runtime-lib", "target-sdk"])?
+  assert value.roots == ["runtime-lib", "target-sdk"]
+  assert ([node.name for node in value.nodes] |> sort) == ["runtime-lib", "target-sdk"]
 
   let with_roots = pm_status(
     ["repo", "plan", "--repo", root.display(), "--root", "app", "--without", "host-tool", "--output", output.display()],
     err,
   )?
-  test.eq(with_roots.ok, false)?
+  assert with_roots.ok == false
   assert "--without requires --all" in err.read_text()?
 
   let unknown = pm_status(
     ["repo", "plan", "--repo", root.display(), "--all", "--without", "absent", "--output", output.display()],
     err,
   )?
-  test.eq(unknown.ok, false)?
+  assert unknown.ok == false
   assert "excluded package absent is not in the catalog" in err.read_text()?
 }
 
@@ -342,7 +340,7 @@ test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |c
     err,
   )?
 
-  test.eq(status.ok, false)?
+  assert status.ok == false
   let observed_output_8 = err.read_text()?
   assert "unexpected positional argument" in observed_output_8
 }
@@ -354,8 +352,8 @@ test test_repo_plan_writes_and_show_renders_verified_fields [fs, process, env, e
   let value = plan_json.read(output)?
   let shown = pm_output(["repo", "show", output.display()])?
 
-  test.ok(output.exists()?)?
-  test.eq(value.target, types.target_aarch64())?
+  assert output.exists()?
+  assert value.target == types.target_aarch64()
   assert "level 1 app build" in planned
   assert "level 1 app build" in shown
   assert "new package" in shown
@@ -384,21 +382,19 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
   let arm = plan_json.read(arm_output)?
   let x86 = plan_json.read(x86_output)?
 
-  test.eq(types.target_text(x86.target), "x86_64-linux-musl")?
-  test.eq(arm.nodes.len(), x86.nodes.len())?
-  test.eq(arm.nodes[0].artifact_key == x86.nodes[0].artifact_key, false)?
+  assert types.target_text(x86.target) == "x86_64-linux-musl"
+  assert arm.nodes.len() == x86.nodes.len()
+  assert arm.nodes[0].artifact_key == x86.nodes[0].artifact_key == false
 
-  if system.uname()?.sysname == "Linux" and system.uname()?.machine == "x86_64" {
-    return
-  }
+  return when system.uname()?.sysname == "Linux" and system.uname()?.machine == "x86_64"
 
   let store = fp"{root}/store"
   let err = test.temp_path(ctx, name: "repo-x86-build.err")
   let build_status = pm_status(["repo", "build", x86_output.display(), "--store", store.display()], err)?
-  test.eq(build_status.ok, false)?
+  assert build_status.ok == false
   let observed_output_9 = err.read_text()?
   assert "repo build requires a native Linux x86_64 runner" in observed_output_9
-  test.eq(store.exists()?, false)?
+  assert store.exists()? == false
 }
 
 test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
@@ -410,7 +406,7 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   let err = test.temp_path(ctx, name: "repo-corrupt.err")
   let status = pm_status(["repo", "show", output.display()], err)?
 
-  test.eq(status.ok, false)?
+  assert status.ok == false
   let observed_output_10 = err.read_text()?
   assert "build plan digest does not match" in observed_output_10
 }
@@ -442,5 +438,5 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
     fs.write(cli_module, cli_module.read_text()? + "\n# A PM revision that must not change any artifact key.\n")?
   }
 
-  test.eq(plans[1], plans[0])?
+  assert plans[1] == plans[0]
 }

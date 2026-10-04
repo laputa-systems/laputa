@@ -24,27 +24,27 @@ type PackageMetadata = {
   source_mirror: Bool,
 }
 
-proc package_contract_error(pkg: Str, message: Str) [error] -> Result[Unit] {
+proc package_contract_error(pkg: Str, message: Str) [error] {
   return Err(types.PmError.PackageContract(f"{pkg}: {message}"))
 }
 
-proc validate_package_name(name: Str) [error] -> Result[Unit] {
-  let pattern = regex.compile("^[a-z0-9][a-z0-9+._-]*$")?
+proc validate_package_name(name: Str) [error] {
+  let pattern = rx"^[a-z0-9][a-z0-9+._-]*$"
 
   if ! pattern.matches(name) {
     return package_contract_error(name, "name must match [a-z0-9][a-z0-9+._-]*")
   }
 }
 
-proc validate_positive_release(name: Str, rel: Str) [error] -> Result[Unit] {
-  let pattern = regex.compile("^[1-9][0-9]*$")?
+proc validate_positive_release(name: Str, rel: Str) [error] {
+  let pattern = rx"^[1-9][0-9]*$"
 
   if ! pattern.matches(rel) {
     return package_contract_error(name, "rel must be a positive decimal string")
   }
 }
 
-proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [error] -> Result[Unit] {
+proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [error] {
   var seen: Map[Bool] = {}
 
   for dependency in dependencies {
@@ -63,9 +63,9 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [erro
 # A runtime-only dependency is excluded from build roots and artifact keys, so
 # a package the build also uses can never be runtime-only. Such a package is a
 # `deps` entry (installed into the build root and needed at runtime).
-proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [error] -> Result[Unit] {
+proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [error] {
   validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)?
-  let build_dependencies = metadata.deps.extend(metadata.mkdeps_host).extend(metadata.mkdeps_target)
+  let build_dependencies = [@metadata.deps, @metadata.mkdeps_host, @metadata.mkdeps_target]
 
   for dependency in metadata.runtime_only_deps {
     if dependency in build_dependencies {
@@ -79,12 +79,12 @@ proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [e
 
 proc source_is_repository_local(source: Path) [] -> Bool {
   let raw = source.display()
-  return ! util.is_url_source(raw) and ! raw.starts_with("/")
+  ! util.is_url_source(raw) and ! raw.starts_with("/")
 }
 
 proc decode_source_checksum(name: Str, raw: Record) [error] -> Result[types.SourceChecksum] {
-  let arch: Str = raw.get("arch")?.require(Str)?
-  let sha256: Str = raw.get("sha256")?.require(Str)?
+  let arch: Str = raw.get("arch")?.require()?
+  let sha256: Str = raw.get("sha256")?.require()?
 
   if arch != "aarch64" and arch != "all" and arch != "x86_64" {
     return Err(types.PmError.PackageContract(f"{name}: checksum has invalid architecture {arch}"))
@@ -98,11 +98,11 @@ proc decode_source_checksum(name: Str, raw: Record) [error] -> Result[types.Sour
 }
 
 proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.UpstreamSource] {
-  let source: Path = raw.get("source")?.require(Path)?
-  let raw_kind: Str = raw.get("kind")?.require(Str)?
+  let source: Path = raw.get("source")?.require()?
+  let raw_kind: Str = raw.get("kind")?.require()?
   let kind = types.parse_source_kind(raw_kind)?
-  let architectures: List[Str] = raw.get("architectures")?.require(List[Str])?
-  let raw_checksums: List[Record] = raw.get("checksums")?.require(List[Record])?
+  let architectures: List[Str] = raw.get("architectures")?.require()?
+  let raw_checksums: List[Record] = raw.get("checksums")?.require()?
 
   if architectures.len() == 0 {
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
@@ -141,7 +141,7 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
     }
 
     checksum_seen[checksum.arch] = true
-    checksums = checksums.push(checksum)
+    checksums += [checksum]
   }
 
   for target_arch in ["aarch64", "x86_64"] {
@@ -167,8 +167,8 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
 }
 
 proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileTreeEntry] {
-  let path_value: Path = raw.get("path")?.require(Path)?
-  let raw_kind: Str = raw.get("kind")?.require(Str)?
+  let path_value: Path = raw.get("path")?.require()?
+  let raw_kind: Str = raw.get("kind")?.require()?
   let kind = types.parse_file_kind(raw_kind)?
   let normalized = path_value.normalize()
   let raw_path = path_value.display()
@@ -185,12 +185,7 @@ proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileT
 }
 
 proc decode_upstream_sources(name: Str, raw_sources: List[Record]) [error] -> Result[List[types.UpstreamSource]] {
-  var sources: List[types.UpstreamSource] = []
-
-  for raw_source in raw_sources {
-    sources = sources.push(decode_upstream_source(name, raw_source)?)
-  }
-
+  var sources: List[types.UpstreamSource] = [decode_upstream_source(name, raw_source)? for raw_source in raw_sources]
   sources
 }
 
@@ -207,7 +202,7 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) [error] -> Result[Lis
     }
 
     seen[path_text] = true
-    entries = entries.push(entry)
+    entries += [entry]
   }
 
   entries
@@ -218,9 +213,7 @@ pure select_filetree(metadata: PackageMetadata, arch: Str) -> List[Record] {
     return metadata.filetree_aarch64
   }
 
-  if arch == "x86_64" and metadata.has_filetree_x86_64 {
-    return metadata.filetree_x86_64
-  }
+  return metadata.filetree_x86_64 when arch == "x86_64" and metadata.has_filetree_x86_64
 
   metadata.filetree
 }
@@ -231,13 +224,13 @@ proc is_production_recipe_directory(dir: Path) [] -> Bool {
 
 proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
   let dynamic = module.load(pkgbuild)?
-  let name: Str = dynamic.get("name").context("package-load", pkgbuild.display())?.require(Str)?
-  let ver: Str = dynamic.get("ver").context("package-load", pkgbuild.display())?.require(Str)?
-  let rel: Str = dynamic.get("rel").context("package-load", pkgbuild.display())?.require(Str)?
-  let deps: List[Str] = dynamic.get("deps").context("package-load", pkgbuild.display())?.require(List[Str])?
-  let mkdeps_host: List[Str] = dynamic.get("mkdeps_host").context("package-load", pkgbuild.display())?.require(List[Str])?
-  let upstream_sources: List[Record] = dynamic.get("upstream_sources").context("package-load", pkgbuild.display())?.require(List[Record])?
-  let filetree: List[Record] = dynamic.get("filetree").context("package-load", pkgbuild.display())?.require(List[Record])?
+  let name: Str = dynamic.get("name").context("package-load", pkgbuild.display())?.require()?
+  let ver: Str = dynamic.get("ver").context("package-load", pkgbuild.display())?.require()?
+  let rel: Str = dynamic.get("rel").context("package-load", pkgbuild.display())?.require()?
+  let deps: List[Str] = dynamic.get("deps").context("package-load", pkgbuild.display())?.require()?
+  let mkdeps_host: List[Str] = dynamic.get("mkdeps_host").context("package-load", pkgbuild.display())?.require()?
+  let upstream_sources: List[Record] = dynamic.get("upstream_sources").context("package-load", pkgbuild.display())?.require()?
+  let filetree: List[Record] = dynamic.get("filetree").context("package-load", pkgbuild.display())?.require()?
   let has_build = "build" in dynamic.keys()
   var mkdeps_target: List[Str] = []
   var runtime_only_deps: List[Str] = []
@@ -315,12 +308,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   }
 
   let metadata = decode_metadata(pkgbuild).context("package-load", pkgbuild.display())?
-  let name = metadata.name
-  let ver = metadata.ver
-  let rel = metadata.rel
-  let mkdeps_target = metadata.mkdeps_target
-  let nostrip = metadata.nostrip
-  let source_mirror = metadata.source_mirror
+  let {name, ver, rel, mkdeps_target, nostrip, source_mirror, ..} = metadata
 
   validate_package_name(name)?
 
@@ -353,7 +341,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   let filetree = decode_filetree(name, select_filetree(metadata, arch))?
 
   if kind == types.package_payload() {
-    if ! metadata.has_build {
+    guard metadata.has_build else {
       return Err(types.PmError.PackageContract(f"{name}: payload package must export build"))
     }
 
@@ -400,30 +388,21 @@ proc dynamic_recipe_path(pkg: types.Package) [fs, error] -> Result[Path] {
 export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error] {
   let dynamic = module.load(dynamic_recipe_path(pkg)?)?
 
-  if ! ("prepare" in dynamic.keys()) { return }
+  return unless "prepare" in dynamic.keys()
 
-  match dynamic.require(hooks.PrepareFilesystem) {
-    Ok(filesystem_hook) => {
-      filesystem_hook.prepare(src)?
-      return
-    }
-    Err(_) => {}
+  if let Ok(filesystem_hook) = dynamic.require(hooks.PrepareFilesystem) {
+    filesystem_hook.prepare(src)?
+    return
   }
 
-  match dynamic.require(hooks.PrepareFilesystemEnvironment) {
-    Ok(environment_hook) => {
-      environment_hook.prepare(src)?
-      return
-    }
-    Err(_) => {}
+  if let Ok(environment_hook) = dynamic.require(hooks.PrepareFilesystemEnvironment) {
+    environment_hook.prepare(src)?
+    return
   }
 
-  match dynamic.require(hooks.PrepareProcessesEnvironment) {
-    Ok(process_hook) => {
-      process_hook.prepare(src)?
-      return
-    }
-    Err(_) => {}
+  if let Ok(process_hook) = dynamic.require(hooks.PrepareProcessesEnvironment) {
+    process_hook.prepare(src)?
+    return
   }
 
   let prepare_hook = dynamic.require(hooks.PrepareFilesystemProcessesEnvironment)?
@@ -432,9 +411,7 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
 
 ## Invokes the required payload `build` procedure through the dynamic recipe boundary.
 export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, env, error] {
-  if pkg.kind == types.package_meta() {
-    return
-  }
+  return when pkg.kind == types.package_meta()
 
   let dynamic = module.load(dynamic_recipe_path(pkg)?)?
 
@@ -442,28 +419,19 @@ export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, 
     return Err(types.PmError.PackageContract(f"{pkg.name}: payload package lost its build procedure"))
   }
 
-  match dynamic.require(hooks.BuildFilesystem) {
-    Ok(filesystem_hook) => {
-      cd src { filesystem_hook.build(dest)? } ?
-      return
-    }
-    Err(_) => {}
+  if let Ok(filesystem_hook) = dynamic.require(hooks.BuildFilesystem) {
+    cd src { filesystem_hook.build(dest)? } ?
+    return
   }
 
-  match dynamic.require(hooks.BuildFilesystemEnvironment) {
-    Ok(environment_hook) => {
-      cd src { environment_hook.build(dest)? } ?
-      return
-    }
-    Err(_) => {}
+  if let Ok(environment_hook) = dynamic.require(hooks.BuildFilesystemEnvironment) {
+    cd src { environment_hook.build(dest)? } ?
+    return
   }
 
-  match dynamic.require(hooks.BuildProcessesEnvironment) {
-    Ok(process_hook) => {
-      cd src { process_hook.build(dest)? } ?
-      return
-    }
-    Err(_) => {}
+  if let Ok(process_hook) = dynamic.require(hooks.BuildProcessesEnvironment) {
+    cd src { process_hook.build(dest)? } ?
+    return
   }
 
   let build_hook = dynamic.require(hooks.BuildFilesystemProcessesEnvironment)?

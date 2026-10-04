@@ -10,7 +10,7 @@ proc main(rootfs: Path = /rootfs) [fs, error] {
     fp"{rootfs}/usr/lib/libgcc_s.so",
     fp"{rootfs}/usr/lib/libgcc_s.so.1",
   ] {
-    if ! fs.exists(path_value)? {
+    guard fs.exists(path_value)? else {
       return Err(ProofError.Failed("proof-gnu-stubs", f"missing {path_value.strip_prefix(rootfs)?.display()}"))
     }
   }

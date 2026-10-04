@@ -1,15 +1,15 @@
 ##! Package recipe metadata and build operations.
 ## Package recipe export.
-export let name = "tllist"
+export const name = "tllist"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.1.0"
+export const ver = "1.1.0"
 
 ## Package recipe export.
-export let rel = "9"
+export const rel = "9"
 
 ## Package recipe export.
 export let deps = []
@@ -18,7 +18,7 @@ export let deps = []
 export let mkdeps_host = []
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://codeberg.org/dnkl/tllist/archive/VERSION.tar.gz",
     kind: "auto",
@@ -35,7 +35,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/tllist.h",
     kind: "file",

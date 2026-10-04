@@ -2,25 +2,25 @@
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "alsa-lib"
+export const name = "alsa-lib"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.2.15.3"
+export const ver = "1.2.15.3"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://www.alsa-project.org/files/pub/lib/alsa-lib-VERSION.tar.bz2",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/alsa/asoundlib.h",
     kind: "file",

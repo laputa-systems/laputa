@@ -2,25 +2,25 @@
 use pm.make as make
 
 ## Package recipe export.
-export let name = "mesa-minimal"
+export const name = "mesa-minimal"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "24.2.8"
+export const ver = "24.2.8"
 
 ## Package recipe export.
-export let rel = "27"
+export const rel = "27"
 
 ## Package recipe export.
-export let deps = ["musl", "libdrm", "wayland-libs-client", "wayland-libs-server", "libffi"]
+export const deps = ["musl", "libdrm", "wayland-libs-client", "wayland-libs-server", "libffi"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "linux", "pkgconf", "libdrm", "wayland-dev", "libffi"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "pkgconf", "libdrm", "wayland-dev", "libffi"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"files/source-marker.txt => .",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/EGL/egl.h",
     kind: "file",
@@ -1069,9 +1069,9 @@ proc install_pkg_config(dest: Path) [fs, error] {
       libs: "-lgbm",
     },
   ] {
-    let pc_name: Str = pc.get("name")?
-    let desc: Str = pc.get("desc")?
-    let libs: Str = pc.get("libs")?
+    let pc_name = pc.get("name")?
+    let desc = pc.get("desc")?
+    let libs = pc.get("libs")?
 
     fs.write(
       fp"{dest}/usr/lib/pkgconfig/{pc_name}.pc",

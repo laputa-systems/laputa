@@ -3,25 +3,25 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "libffi"
+export const name = "libffi"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "3.5.2"
+export const ver = "3.5.2"
 
 ## Exported declaration `rel`.
-export let rel = "10"
+export const rel = "10"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "linux"]
+export const deps = ["musl", "linux"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "linux"]
+export const mkdeps_host = ["llvm-toolchain", "linux"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/libffi/libffi/releases/download/vVERSION/libffi-VERSION.tar.gz",
     kind: "auto",
@@ -40,7 +40,7 @@ export let upstream_sources = [
 type LibffiTarget = {target: Str, dir: Str, sources: List[Str]}
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/Makefile.am",
     kind: "file",
@@ -105,7 +105,7 @@ pure libffi_target(machine: Str) -> LibffiTarget {
     }
   }
 
-  return {target: "AARCH64", dir: "aarch64", sources: ["src/aarch64/ffi.c", "src/aarch64/sysv.S"]}
+  {target: "AARCH64", dir: "aarch64", sources: ["src/aarch64/ffi.c", "src/aarch64/sysv.S"]}
 }
 
 proc write_generated_headers(target: LibffiTarget) [fs, error] {

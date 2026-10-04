@@ -2,10 +2,10 @@
 use system.types as types
 
 ## The marker emitted only after foot's reader receives the injected input.
-export let success_marker = "LAPUTA_DWL_FOOT_PROOF_OK"
+export const success_marker = "LAPUTA_DWL_FOOT_PROOF_OK"
 
 ## Fatal kernel and guest markers that invalidate the one supported proof.
-export let failure_markers = [
+export const failure_markers = [
   "Kernel panic",
   "not syncing",
   "Attempted to kill init",

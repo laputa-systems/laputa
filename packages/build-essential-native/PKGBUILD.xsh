@@ -1,18 +1,18 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "build-essential-native"
+export const name = "build-essential-native"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "meta"
+export const package_kind = "meta"
 
 ## Exported declaration `ver`.
-export let ver = "1"
+export const ver = "1"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = [
+export const deps = [
   "ca-certificates",
   "musl",
   "zlib",

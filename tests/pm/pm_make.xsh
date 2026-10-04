@@ -5,7 +5,7 @@ type TaskOutput = {arguments: List[Str], environment: Str}
 
 proc task_runner() [process, env, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
-  if configured != "" { return fp"{configured}" }
+  return fp"{configured}" when configured != ""
   process.which("xsh")?
 }
 

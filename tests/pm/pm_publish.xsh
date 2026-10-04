@@ -36,7 +36,7 @@ pure publish_empty_remote() -> types.RemoteSnapshot {
 }
 
 proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"{root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
@@ -69,22 +69,18 @@ proc publish_repository_once(
 
 proc index_row(index: List[types.RemotePackage], name: Str) [error] -> Result[types.RemotePackage] {
   for entry in index {
-    if entry.name == name {
-      return entry
-    }
+    return entry when entry.name == name
   }
 
-  return Err(types.PmError.PackageContract(f"missing index row {name}"))
+  Err(types.PmError.PackageContract(f"missing index row {name}"))
 }
 
 proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanNode] {
   for node in value.nodes {
-    if node.name == name {
-      return node
-    }
+    return node when node.name == name
   }
 
-  return Err(types.PmError.PackageContract(f"missing published node {name}"))
+  Err(types.PmError.PackageContract(f"missing published node {name}"))
 }
 
 proc stage_plan_artifacts(
@@ -157,7 +153,7 @@ test test_snapshot_defaults_only_omitted_legacy_package_kind_to_payload [fs, env
   let legacy = repo.snapshot(value, legacy_store)?
 
   for publication in legacy.packages {
-    test.eq(publication.kind, types.package_payload())?
+    assert publication.kind == types.package_payload()
   }
 
   let invalid_store = test.temp_dir(ctx, name: "publish-invalid-package-kind-store")?
@@ -198,38 +194,32 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   repo.publish(snapshot, remote_url, "", work)?
 
   let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
-  test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "target-sdk"])?
+  assert [entry.name for entry in index] == ["app", "host-tool", "runtime-lib", "target-sdk"]
   let app = node_named(value, "app")?
   let entry = index[0]
-  test.eq(entry.artifact_key, app.artifact_key)?
-  test.eq(entry.proof_key, app.proof_key)?
-  test.eq(entry.proof_sha256, app.proof_sha256)?
-  test.ok(entry.metadata_sha256 != "")?
-  test.eq(entry.tarball, pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key).display())?
-  test.eq(entry.tarball, f"packages/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}.tar.gz")?
-  test.eq(
-    entry.metadata,
-    f"metadata/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json",
-  )?
-  test.eq(
-    entry.proof,
-    f"proofs/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json",
-  )?
-  test.ok(fp"{remote_root}/{entry.tarball}".exists()?)?
-  test.ok(fp"{remote_root}/{entry.metadata}".exists()?)?
-  test.ok(fp"{remote_root}/{entry.proof}".exists()?)?
+  assert entry.artifact_key == app.artifact_key
+  assert entry.proof_key == app.proof_key
+  assert entry.proof_sha256 == app.proof_sha256
+  assert entry.metadata_sha256 != ""
+  assert entry.tarball == pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key).display()
+  assert entry.tarball == f"packages/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}.tar.gz"
+  assert entry.metadata == f"metadata/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json"
+  assert entry.proof == f"proofs/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json"
+  assert fp"{remote_root}/{entry.tarball}".exists()?
+  assert fp"{remote_root}/{entry.metadata}".exists()?
+  assert fp"{remote_root}/{entry.proof}".exists()?
   let metadata = json.read(fp"{remote_root}/{entry.metadata}")?.require(PublishedMetadataDto)?
   assert metadata.additional_metadata.source == "recipe"
-  test.eq(metadata.target, "aarch64-linux-musl")?
-  test.eq(metadata.artifact_key, app.artifact_key)?
-  test.eq(metadata.recipe_sha256, app.recipe_sha256)?
-  test.eq(metadata.executor_sha256, publish_executor_sha256())?
-  test.eq(metadata.proof_key, app.proof_key)?
-  test.eq(metadata.proof_sha256, app.proof_sha256)?
+  assert metadata.target == "aarch64-linux-musl"
+  assert metadata.artifact_key == app.artifact_key
+  assert metadata.recipe_sha256 == app.recipe_sha256
+  assert metadata.executor_sha256 == publish_executor_sha256()
+  assert metadata.proof_key == app.proof_key
+  assert metadata.proof_sha256 == app.proof_sha256
 
   let first_index = fs.read_text(fp"{remote_root}/index.json")?
   repo.publish(snapshot, remote_url, "", work)?
-  test.eq(fs.read_text(fp"{remote_root}/index.json")?, first_index)?
+  assert fs.read_text(fp"{remote_root}/index.json")? == first_index
 }
 
 # The index keeps `deps` as the recipe declares them and lists runtime-only
@@ -279,12 +269,12 @@ export let filetree = []
   )?
 
   let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
-  test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "service", "target-sdk"])?
+  assert [entry.name for entry in index] == ["app", "host-tool", "runtime-lib", "service", "target-sdk"]
 
   for entry in index {
     if entry.name == "service" {
-      test.eq(entry.deps, ["runtime-lib"])?
-      test.eq(entry.runtime_only_deps, ["app"])?
+      assert entry.deps == ["runtime-lib"]
+      assert entry.runtime_only_deps == ["app"]
     } else {
       test.eq(entry.runtime_only_deps, [])?
     }
@@ -311,10 +301,8 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   }
 
   let unchanged_index = fs.read_text(fp"{remote_root}/index.json")?
-  test.eq(unchanged_index, "[]")?
-  test.ok(
-    fp"{remote_root}/{pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key)}".exists()?,
-  )?
+  assert unchanged_index == "[]"
+  assert fp"{remote_root}/{pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key)}".exists()?
 
   let clean_remote = test.temp_dir(ctx, name: "publish-tuple-conflict-remote")?
   let clean_work = test.temp_dir(ctx, name: "publish-tuple-conflict-work")?
@@ -327,7 +315,7 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   # The index row is a mutable pointer: republishing the verified snapshot
   # points it back at the same immutable objects.
   repo.publish(snapshot, clean_url, "", clean_work)?
-  test.eq(fs.read_text(fp"{clean_remote}/index.json")?, published)?
+  assert fs.read_text(fp"{clean_remote}/index.json")? == published
 }
 
 # Artifact keys exclude the executor, so a new seed or PM rebuilds a package
@@ -346,12 +334,12 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
 
   let old_app = node_named(first, "app")?
   let new_app = node_named(second, "app")?
-  test.ok(old_app.artifact_key != new_app.artifact_key)?
-  test.eq(index_row(after, "app")?.artifact_key, new_app.artifact_key)?
-  test.eq(index_row(after, "app")?.rel, "1")?
+  assert old_app.artifact_key != new_app.artifact_key
+  assert index_row(after, "app")?.artifact_key == new_app.artifact_key
+  assert index_row(after, "app")?.rel == "1"
 
   for name in ["host-tool", "runtime-lib", "target-sdk"] {
-    test.eq(index_row(after, name)?, index_row(before, name)?)?
+    assert index_row(after, name)? == index_row(before, name)?
   }
 
   # The earlier objects stay published and unchanged beside the new ones.
@@ -359,18 +347,15 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
   let new_row = index_row(after, "app")?
 
   for rel in [old_row.tarball, old_row.metadata, old_row.proof, new_row.tarball, new_row.metadata, new_row.proof] {
-    test.ok(fp"{remote_root}/{rel}".exists()?)?
+    assert fp"{remote_root}/{rel}".exists()?
   }
 
-  test.eq(hash.sha256(fp"{remote_root}/{old_row.tarball}")?.hex(), old_row.sha256)?
+  assert hash.sha256(fp"{remote_root}/{old_row.tarball}")?.hex() == old_row.sha256
 
   # Publishing the first build again moves the row back; its objects already exist.
   fs.write(recipe, fs.read_text(recipe)?.replace("# A rebuild input without a rel bump.\n", ""))?
   let _ = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-revert")?
-  test.eq(
-    index_row(remote.load_remote_index_from(fp"{remote_root}/index.json")?, "app")?.artifact_key,
-    old_app.artifact_key,
-  )?
+  assert index_row(remote.load_remote_index_from(fp"{remote_root}/index.json")?, "app")?.artifact_key == old_app.artifact_key
 }
 
 test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, error] { |ctx|
@@ -390,7 +375,7 @@ test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, e
     Err(problem) => assert "aarch64/app 1-1 is behind remote 1-2" in problem.message
   }
 
-  test.eq(fs.read_text(fp"{remote_root}/index.json")?, published)?
+  assert fs.read_text(fp"{remote_root}/index.json")? == published
 }
 
 # Publication takes the arch from the plan target: object paths, index rows
@@ -406,7 +391,7 @@ test test_publish_x86_64_plan_uses_its_target_arch [fs, net, env, time, error] {
     false,
   )?
   let store_root = test.temp_dir(ctx, name: "publish-x86-store")?
-  stage_plan_artifacts(ctx, value, store_root, target: target)?
+  stage_plan_artifacts(ctx, value, store_root, target:)?
   let remote_root = test.temp_dir(ctx, name: "publish-x86-remote")?
   repo.publish(
     repo.snapshot(value, store_root)?,
@@ -416,28 +401,36 @@ test test_publish_x86_64_plan_uses_its_target_arch [fs, net, env, time, error] {
   )?
 
   let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
-  test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "target-sdk"])?
+  assert [entry.name for entry in index] == ["app", "host-tool", "runtime-lib", "target-sdk"]
 
   for entry in index {
     let node = node_named(value, entry.name)?
-    test.eq(entry.arch, "x86_64")?
-    test.eq(
-      entry.tarball,
-      pm_util.remote_binary_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key).display(),
-    )?
-    test.eq(
-      entry.metadata,
-      pm_util.remote_metadata_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key, node.proof_key).display(),
-    )?
-    test.eq(
-      entry.proof,
-      pm_util.remote_proof_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key, node.proof_key).display(),
-    )?
-    test.ok(fp"{remote_root}/{entry.tarball}".exists()?)?
-    test.ok(fp"{remote_root}/{entry.proof}".exists()?)?
+    assert entry.arch == "x86_64"
+    assert entry.tarball == pm_util.remote_binary_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key)
+      .display()
+    assert entry.metadata == pm_util.remote_metadata_rel(
+      "x86_64",
+      node.name,
+      node.ver,
+      node.rel,
+      node.artifact_key,
+      node.proof_key,
+    )
+      .display()
+    assert entry.proof == pm_util.remote_proof_rel(
+      "x86_64",
+      node.name,
+      node.ver,
+      node.rel,
+      node.artifact_key,
+      node.proof_key,
+    )
+      .display()
+    assert fp"{remote_root}/{entry.tarball}".exists()?
+    assert fp"{remote_root}/{entry.proof}".exists()?
     let metadata = json.read(fp"{remote_root}/{entry.metadata}")?.require(PublishedArchDto)?
-    test.eq(metadata.arch, "x86_64")?
-    test.eq(metadata.target, "x86_64-linux-musl")?
+    assert metadata.arch == "x86_64"
+    assert metadata.target == "x86_64-linux-musl"
   }
 }
 
@@ -457,9 +450,9 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     metapackage: false,
   })?
   let legacy_plan = remote.plan_artifact_from_package(legacy)?
-  test.eq(legacy.artifact_key, "")?
-  test.eq(legacy_plan.artifact_key, "")?
-  test.ok(legacy_plan.retrieval.metadata_sha256 != "")?
+  assert legacy.artifact_key == ""
+  assert legacy_plan.artifact_key == ""
+  assert legacy_plan.retrieval.metadata_sha256 != ""
 
   let legacy_remote = test.temp_dir(ctx, name: "publish-legacy-metadata-remote")?
   let legacy_metadata = fp"{legacy_remote}/metadata/aarch64/legacy/legacy-1-1.json"
@@ -470,7 +463,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     f"file://{legacy_remote}",
     test.temp_dir(ctx, name: "publish-legacy-metadata-cache")?,
   )?
-  test.eq(hydrated_legacy.retrieval.metadata_sha256, hash.sha256(legacy_metadata)?.hex())?
+  assert hydrated_legacy.retrieval.metadata_sha256 == hash.sha256(legacy_metadata)?.hex()
 
   let modern = remote.decode_remote_package({
     arch: "aarch64",
@@ -498,8 +491,8 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
   # Index rows written before runtime-only dependencies existed declare none.
   test.eq(modern.runtime_only_deps, [])?
   let modern_plan = remote.plan_artifact_from_package(modern)?
-  test.eq(modern_plan.artifact_key, "artifact")?
-  test.eq(modern_plan.retrieval.metadata_sha256, "metadata")?
+  assert modern_plan.artifact_key == "artifact"
+  assert modern_plan.retrieval.metadata_sha256 == "metadata"
 
   let value = publish_plan(ctx, "publish-legacy-import-repo")?
   let node = node_named(value, "app")?
@@ -528,7 +521,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-import-cache")?,
   )?
-  test.eq(imported.origin, types.Remote)?
+  assert imported.origin == types.Remote
 }
 
 test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import [fs, net, env, error] { |ctx|
@@ -560,7 +553,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
     f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-hash-cache")?,
   )?
-  test.eq(hydrated.retrieval.metadata_sha256, hash.sha256(metadata)?.hex())?
+  assert hydrated.retrieval.metadata_sha256 == hash.sha256(metadata)?.hex()
 
   let remote_node = {...node, action: types.ReuseRemote("legacy remote artifact"), remote: hydrated.retrieval}
   let imported = store.import_remote(
@@ -570,7 +563,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
     f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-hash-import-cache")?,
   )?
-  test.eq(imported.metadata_sha256, hydrated.retrieval.metadata_sha256)?
+  assert imported.metadata_sha256 == hydrated.retrieval.metadata_sha256
 
   fs.write(metadata, "changed legacy metadata")?
 
@@ -619,7 +612,7 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
   repo.publish(snapshot, local_mirror, "", work)?
 
   let uploads = test.calls(ctx, "net.upload")
-  test.eq(uploads.len(), snapshot.packages.len() * 3 + 1)?
+  assert uploads.len() == snapshot.packages.len() * 3 + 1
 
   for upload in uploads {
     let headers = upload.args.get("headers")?.require(List[NetHeader])?

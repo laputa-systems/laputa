@@ -4,19 +4,19 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "foot-minimal"
+export const name = "foot-minimal"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.27.0"
+export const ver = "1.27.0"
 
 ## Exported declaration `rel`.
-export let rel = "11"
+export const rel = "11"
 
 ## Exported declaration `deps`.
-export let deps = [
+export const deps = [
   "musl",
   "wayland-libs-client",
   "wayland-libs-cursor",
@@ -29,10 +29,10 @@ export let deps = [
 ]
 
 ## The default config names the Hack font; fontconfig finds it at runtime.
-export let runtime_only_deps = ["font-ttf-hack"]
+export const runtime_only_deps = ["font-ttf-hack"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "linux",
   "pkgconf",
@@ -49,10 +49,10 @@ export let mkdeps_host = [
 ]
 
 ## Exported declaration `mkdeps_target`.
-export let mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev", "tllist"]
+export const mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev", "tllist"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://codeberg.org/dnkl/foot/archive/VERSION.tar.gz",
     kind: "auto",
@@ -121,7 +121,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [{path: p"etc/xdg/foot/foot.ini", kind: "file"}, {path: p"usr/bin/foot", kind: "binary"}]
+export const filetree = [{path: p"etc/xdg/foot/foot.ini", kind: "file"}, {path: p"usr/bin/foot", kind: "binary"}]
 
 proc write_version_header() [fs, error] {
   fs.write(

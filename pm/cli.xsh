@@ -175,15 +175,11 @@ proc current_pm_repo_root() [fs, error] -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
-    if fs.exists(fp"{dir}/pm.xsh")? and fs.exists(fp"{dir}/packages")? {
-      return dir
-    }
+    return dir when fs.exists(fp"{dir}/pm.xsh")? and fs.exists(fp"{dir}/packages")?
 
     let parent = dir.parent
 
-    if parent.display() == dir.display() {
-      return p""
-    }
+    return p"" when parent.display() == dir.display()
 
     dir = parent
   }
@@ -212,15 +208,13 @@ proc execution_repo_root() [fs, error] -> Result[Path] {
 }
 
 proc resolve_repo_root(raw: Str) [fs, error] -> Result[Path] {
-  if raw == "" {
-    return repo_default_root()?
-  }
+  return repo_default_root()? when raw == ""
 
   path.absolute(fp"{raw}")?
 }
 
 proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[RepoPackagesArgs] {
-  var parsed: RepoPackagesOptions = {repo: "", packages: []}
+  var parsed: RepoPackagesOptions = RepoPackagesOptions(repo: "", packages: [])
 
   match cli.parse(
     args,
@@ -259,23 +253,23 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
 
   match action {
     "check" => {
-      var parsed: RepoCheckOptions = {repo: ""}
+      var parsed: RepoCheckOptions = RepoCheckOptions(repo: "")
       match cli.parse(args, {repo: {form: "--repo PATH", default: ""}}, "pm repo check") {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
       }
 
-      return RepoCheck({repo: resolve_repo_root(parsed.repo)?})
+      RepoCheck({repo: resolve_repo_root(parsed.repo)?})
     }
     "plan" => {
-      var parsed: RepoPlanOptions = {
+      var parsed: RepoPlanOptions = RepoPlanOptions(
         repo: "",
         all: false,
         roots: [],
         without: [],
         target: "aarch64-linux-musl",
         output: p"",
-      }
+      )
       match cli.parse(
         args,
         {
@@ -301,7 +295,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
       }
 
       let _ = types.parse_target(parsed.target)?
-      return RepoPlan({
+      RepoPlan({
         repo: resolve_repo_root(parsed.repo)?,
         all: parsed.all,
         roots: parsed.roots,
@@ -311,16 +305,16 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
       })
     }
     "show" => {
-      var parsed: RepoShowOptions = {input: p""}
+      var parsed: RepoShowOptions = RepoShowOptions(input: p"")
       match cli.parse(args, {input: {form: "PLAN", kind: "Path", required: true}}, "pm repo show") {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
       }
 
-      return RepoShow({input: parsed.input})
+      RepoShow({input: parsed.input})
     }
     "build" => {
-      var parsed: RepoBuildOptions = {input: p"", store: p"", jobs: cpu.count()}
+      var parsed: RepoBuildOptions = RepoBuildOptions(input: p"", store: p"", jobs: cpu.count())
       match cli.parse(
         args,
         {
@@ -334,10 +328,10 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Err(problem) => return Err(problem)
       }
 
-      return RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs})
+      RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs})
     }
     "publish" => {
-      var parsed: RepoPublishOptions = {input: p"", store: p""}
+      var parsed: RepoPublishOptions = RepoPublishOptions(input: p"", store: p"")
       match cli.parse(
         args,
         {
@@ -350,11 +344,11 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Err(problem) => return Err(problem)
       }
 
-      return RepoPublish({input: parsed.input, store: parsed.store})
+      RepoPublish({input: parsed.input, store: parsed.store})
     }
-    "checksum" => return RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
-    "update-checksums" => return RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
-    _ => return Err(types.PmError.Usage(f"unknown pm repo command {action}"))
+    "checksum" => RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
+    "update-checksums" => RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
+    _ => Err(types.PmError.Usage(f"unknown pm repo command {action}"))
   }
 }
 
@@ -373,7 +367,7 @@ proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     return Help(sources_help_text())
   }
 
-  var parsed: SourcesFetchOptions = {repo: "", all: false, packages: [], targets: []}
+  var parsed: SourcesFetchOptions = SourcesFetchOptions(repo: "", all: false, packages: [], targets: [])
   match cli.parse(
     args,
     {
@@ -399,7 +393,7 @@ proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     let target = types.parse_target(name)?
 
     if target not in targets {
-      targets = targets.push(target)
+      targets += [target]
     }
   }
 
@@ -423,7 +417,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   if action == "compose" {
-    var parsed: RootComposeOptions = {input: p"", store: p"", runtime_roots: [], output: p""}
+    var parsed: RootComposeOptions = RootComposeOptions(input: p"", store: p"", runtime_roots: [], output: p"")
     match cli.parse(
       args,
       {
@@ -447,7 +441,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
     )
   }
 
-  var parsed: RootInspectOptions = {input: p""}
+  var parsed: RootInspectOptions = RootInspectOptions(input: p"")
   match cli.parse(args, {input: {form: "GENERATION", kind: "Path", required: true}}, "pm root inspect") {
     Ok(value) => parsed = value
     Err(problem) => return Err(problem)
@@ -462,7 +456,13 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   if argv[1] == "extract" {
-    var extracted: StoreExtractOptions = {input: p"", store: p"", package: "", path: p"", output: p""}
+    var extracted: StoreExtractOptions = StoreExtractOptions(
+      input: p"",
+      store: p"",
+      package: "",
+      path: p"",
+      output: p"",
+    )
     match cli.parse(
       tail_after(argv, 2),
       {
@@ -491,7 +491,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
     return Err(types.PmError.Usage(f"unknown pm store command {argv[1]}"))
   }
 
-  var parsed: StoreVerifyOptions = {store: p""}
+  var parsed: StoreVerifyOptions = StoreVerifyOptions(store: p"")
   match cli.parse(
     tail_after(argv, 2),
     {store: {form: "--store STORE", kind: "Path", required: true}},
@@ -505,16 +505,14 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
 }
 
 proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
-  if argv.len() == 0 or argv[0] in ["-h", "--help", "help"] {
-    return Help(help_text())
-  }
+  return Help(help_text()) when argv.len() == 0 or argv[0] in ["-h", "--help", "help"]
 
   match argv[0] {
     "repo" => parse_repo_command(argv)?
     "sources" => parse_sources_command(argv)?
     "root" => parse_root_command(argv)?
     "store" => parse_store_command(argv)?
-    _ => return Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
+    _ => Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
   }
 }
 
@@ -562,7 +560,7 @@ proc selected_packages(repo_root: Path, names: List[Str]) [fs, env, error] -> Re
       return Err(types.PmError.MissingDependency(f"package {name} is not in {repo_root}"))
     }
 
-    let listed: types.Package = by_name.get(name)?.require(types.Package)?
+    let listed: types.Package = by_name.get(name)?
     selected = selected.push(recipe.load_package(fp"{repo_root}/{listed.dir}")?)
     seen[name] = true
   }
@@ -623,7 +621,7 @@ proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error
   }
 
   let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, remote.repo_url(), args.jobs)?
-  print "repo" "build" $result.plan_sha256 $result.artifacts.len() "artifacts"
+  print "repo" "build" $result.plan_sha256 result.artifacts.len() "artifacts"
 }
 
 proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
@@ -641,7 +639,7 @@ proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
   defer work_handle.close()?
   let token = (env.get("LAPUTA_TOKEN") ?? "").trim()
   repo.publish(snapshot, repo_url, token, work_handle.host_path()?)?
-  print "repo" "publish" $value.plan_sha256 $snapshot.packages.len() "artifacts"
+  print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
 }
 
 proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, process, env, time, error] {
@@ -670,17 +668,17 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
       selected = value.packages
     } else {
       for name in args.packages {
-        if ! (name in by_name) {
+        guard name in by_name else {
           return Err(types.PmError.MissingDependency(f"package {name} is not in {args.repo}"))
         }
 
-        selected = selected.push(by_name.get(name)?.require(types.Package)?)
+        selected = selected.push(by_name.get(name)?)
       }
     }
 
     for item in sources.source_fetch_items(selected, types.pm_target_arch(target))? {
       if item.sha256 not in seen {
-        items = items.push(item)
+        items += [item]
         seen = seen.push(item.sha256)
       }
     }

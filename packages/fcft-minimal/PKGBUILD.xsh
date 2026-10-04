@@ -3,22 +3,22 @@ use pm.env as pm_env
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "fcft-minimal"
+export const name = "fcft-minimal"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "3.3.3"
+export const ver = "3.3.3"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "fontconfig", "freetype", "pixman"]
+export const deps = ["musl", "fontconfig", "freetype", "pixman"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "muon",
   "samurai",
@@ -30,10 +30,10 @@ export let mkdeps_host = [
 ]
 
 ## Exported declaration `mkdeps_target`.
-export let mkdeps_target = ["pixman-dev", "tllist"]
+export const mkdeps_target = ["pixman-dev", "tllist"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://codeberg.org/dnkl/fcft/archive/VERSION.tar.gz",
     kind: "auto",
@@ -76,7 +76,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/fcft/fcft.h",
     kind: "file",

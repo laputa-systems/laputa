@@ -1,15 +1,15 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "hwdata"
+export const name = "hwdata"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "0.400"
+export const ver = "0.400"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -18,7 +18,7 @@ export let deps = []
 export let mkdeps_host = []
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/vcrhonek/hwdata/archive/refs/tags/vVERSION.tar.gz",
     kind: "auto",
@@ -35,7 +35,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/share/hwdata/pci.ids",
     kind: "file",

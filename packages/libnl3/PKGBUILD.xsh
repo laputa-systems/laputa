@@ -3,25 +3,25 @@ use pm.make as make
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "libnl3"
+export const name = "libnl3"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "3.11.0"
+export const ver = "3.11.0"
 
 ## Exported declaration `rel`.
-export let rel = "5"
+export const rel = "5"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "linux"]
+export const deps = ["musl", "linux"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-3.11.0.tar.gz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr",
     kind: "tree",

@@ -15,7 +15,7 @@ proc verify_package_metadata(rootfs: Path) [fs, error] {
   ensure(deps.len() == 0, "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")?
 }
 
-proc main(rootfs: Path = /rootfs) [fs, error] {
+proc main(rootfs = /rootfs) [fs, error] {
   let bundle = fp"{rootfs}/etc/ssl/certs/ca-certificates.crt"
   let helper = fp"{rootfs}/usr/bin/update-certdata"
   ensure(fs.exists(bundle)?, "ca-certificates-bundle", "missing /etc/ssl/certs/ca-certificates.crt")?

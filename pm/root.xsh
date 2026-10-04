@@ -61,7 +61,7 @@ pure root_sha256_text_is_valid(value: Str) -> Bool {
 }
 
 proc root_require_sha256(value: Str, label: Str) [error] {
-  if ! root_sha256_text_is_valid(value) {
+  guard root_sha256_text_is_valid(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
@@ -90,9 +90,7 @@ proc root_validate_symlink_target(path_value: Str, target: Str) [error] {
       return Err(types.PmError.PackageContract(f"symlink {path_value} has an invalid target {target}"))
     }
 
-    if component == "." {
-      continue
-    }
+    continue when component == "."
 
     if component == ".." {
       if depth == 0 {
@@ -128,7 +126,7 @@ proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
   }
 
   if value.kind == types.file_kind_file() or value.kind == types.file_kind_binary() {
-    if value.target != "" {
+    guard value.target == "" else {
       return Err(types.PmError.PackageContract(f"file {value.path} must not have a symlink target"))
     }
 
@@ -138,7 +136,7 @@ proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
       return Err(types.PmError.PackageContract(f"directory {value.path} must not have a hash or target"))
     }
   } else if value.kind == types.file_kind_symlink() {
-    if value.mode != 0o777 {
+    guard value.mode == 0o777 else {
       return Err(types.PmError.PackageContract(f"symlink {value.path} must have mode 0777"))
     }
 
@@ -207,14 +205,11 @@ proc root_legacy_package_db_entries(
   }
 
   let stored_etcsums = json.decode(etcsums_file.body.utf8()?)?.require(List[types.EtcSum])?
-  var expected_etcsums: List[types.EtcSum] = []
-
-  for entry in payload_entries {
-    if util.is_etc_file(fp"{entry.path}") and (entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary()) {
-      expected_etcsums = expected_etcsums.push({path: entry.path, sha256: entry.sha256})
-    }
-  }
-
+  var expected_etcsums: List[types.EtcSum] = [
+    {path: entry.path, sha256: entry.sha256}
+    for entry in payload_entries
+    if util.is_etc_file(fp"{entry.path}") and (entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary())
+  ]
   if stored_etcsums != expected_etcsums {
     return Err(
       types.PmError.PackageContract(
@@ -241,7 +236,7 @@ proc root_legacy_package_db_entries(
 }
 
 proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Result[DecodedArtifactMetadata] {
-  let raw: Record = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(Record)?
+  let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(Record)?
   let dto = raw.require(ArtifactMetadataDto)?
   let expected_id = util.package_id(dto.name, dto.ver, dto.rel)
 
@@ -268,7 +263,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Resul
     }
 
     seen[entry.path] = true
-    entries = entries.push(entry)
+    entries += [entry]
   }
 
   if ! ("package_kind" in raw) {
@@ -282,7 +277,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Resul
       }
 
       seen[entry.path] = true
-      entries = entries.push(entry)
+      entries += [entry]
     }
   }
 
@@ -293,7 +288,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Resul
   {kind, entries: entries |> sort-by .path}
 }
 
-proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] -> Result[Unit] {
+proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] {
   let root_handle = fs.open_root(root)?
   defer root_handle.close()
   let rel = fp"{entry.path}"
@@ -308,7 +303,7 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] -> Res
       return Err(types.PmError.PackageContract(f"root symlink {entry.path} does not match metadata"))
     }
 
-    return Ok()
+    return
   }
 
   # Do not let an absent declaration escape as an unlabelled fs-root-stat
@@ -321,7 +316,7 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] -> Res
   let meta = root_handle.metadata(rel)?
 
   if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
-    if meta.mode % 4096 != entry.mode {
+    guard meta.mode % 4096 == entry.mode else {
       return Err(types.PmError.PackageContract(f"root entry {entry.path} mode does not match metadata"))
     }
 
@@ -333,8 +328,6 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] -> Res
       return Err(types.PmError.PackageContract(f"root directory {entry.path} does not match metadata"))
     }
   }
-
-  return Ok()
 }
 
 # Directories are structural paths, not exclusive file ownership. Identical declarations
@@ -416,12 +409,12 @@ proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> R
 
     keys[receipt.key] = true
     names[receipt.package_name] = true
-    verified = verified.push(receipt)
+    verified += [receipt]
   }
 
   for receipt in verified {
     for dependency_key in receipt.runtime_dependency_keys {
-      if ! (dependency_key in keys) {
+      guard dependency_key in keys else {
         return Err(
           types.PmError.MissingDependency(f"{receipt.package_name} runtime dependency artifact {dependency_key} is absent"),
         )
@@ -451,7 +444,7 @@ pure root_digest(target: types.Target, artifacts: List[types.RootArtifact], entr
 }
 
 proc root_validate_plan(value: types.RootPlan) [error] {
-  if value.format != "laputa-root-plan-1" {
+  guard value.format == "laputa-root-plan-1" else {
     return Err(types.PmError.PackageContract(f"unsupported root plan format {value.format}"))
   }
 
@@ -543,13 +536,13 @@ proc root_receipt_from_dto(value: RootReceiptDto) [error] -> Result[types.RootRe
 }
 
 proc root_validate_receipt(value: types.RootReceipt) [error] {
-  let plan: types.RootPlan = {
+  let plan: types.RootPlan = types.RootPlan(
     format: "laputa-root-plan-1",
     target: value.target,
     artifacts: value.artifacts,
     entries: value.entries,
     root_sha256: value.root_sha256,
-  }
+  )
 
   if value.format != "laputa-root-1" {
     return Err(types.PmError.PackageContract(f"unsupported root receipt format {value.format}"))
@@ -583,7 +576,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
       return
     }
 
-    fs.mkdir(destination, parents: true)?
+    fs.mkdir(destination)?
     fs.chmod(destination, entry.mode)?
     root_verify_entry_at(output, entry)?
     return
@@ -595,7 +588,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
     )
   }
 
-  fs.mkdir(destination.parent, parents: true)?
+  fs.mkdir(destination.parent)?
 
   if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
     fs.copy(source, destination)?
@@ -645,7 +638,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
   var first_descendants: Map[types.RootEntry] = {}
 
   for receipt in verified {
-    if receipt.target != target {
+    guard receipt.target == target else {
       return Err(
         types.PmError.PackageContract(f"artifact {receipt.package_name} target does not match {types.target_text(target)}"),
       )
@@ -662,7 +655,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
     var artifact_entries: List[types.RootEntry] = []
 
     for entry in metadata.entries {
-      let planned: types.RootEntry = {
+      let planned: types.RootEntry = types.RootEntry(
         package_name: receipt.package_name,
         package_id: receipt.package_id,
         artifact_key: receipt.key,
@@ -671,7 +664,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
         mode: entry.mode,
         sha256: entry.sha256,
         target: entry.target,
-      }
+      )
 
       var coalesced = false
 
@@ -727,7 +720,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
           )
         }
 
-        entries = entries.push(planned)
+        entries += [planned]
         owners[planned.path] = planned
         prefix = ""
         index = 0
@@ -742,7 +735,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
         }
       }
 
-      artifact_entries = artifact_entries.push(planned)
+      artifact_entries += [planned]
     }
 
     artifact_entries_by_key[receipt.key] = artifact_entries
@@ -750,13 +743,13 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
 
   let ordered_artifacts = planned_artifacts |> sort-by .package_name
   let ordered_entries = entries |> sort-by .path
-  let value: types.RootPlan = {
+  let value: types.RootPlan = types.RootPlan(
     format: "laputa-root-plan-1",
-    target,
+    target:,
     artifacts: ordered_artifacts,
     entries: ordered_entries,
     root_sha256: root_digest(target, ordered_artifacts, ordered_entries),
-  }
+  )
   root_validate_plan(value)?
   {plan: value, artifact_entries: artifact_entries_by_key}
 }
@@ -815,12 +808,7 @@ export proc compose_artifacts(
   fs.mkdir(temporary)?
   # preflight above verified these receipts and payloads.
   let verified = root_checked_artifacts(artifacts)?
-  var by_key: Map[types.ArtifactReceipt] = {}
-
-  for artifact in verified {
-    by_key[artifact.key] = artifact
-  }
-
+  var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
   for artifact in plan.artifacts {
     if artifact.payload {
       let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]

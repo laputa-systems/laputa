@@ -10,31 +10,31 @@ export type PkgConfigContext = {
 }
 
 ## Exported PM declaration `prefix`.
-export let prefix = /usr
+export const prefix = /usr
 
 ## Exported PM declaration `sysconfdir`.
-export let sysconfdir = /etc
+export const sysconfdir = /etc
 
 ## Exported PM declaration `localstatedir`.
-export let localstatedir = /var
+export const localstatedir = /var
 
 ## Exported PM declaration `libdir_name`.
-export let libdir_name = "lib"
+export const libdir_name = "lib"
 
 ## Exported PM declaration `libexecdir_name`.
-export let libexecdir_name = "libexec"
+export const libexecdir_name = "libexec"
 
 ## Exported PM declaration `bindir`.
-export let bindir = /usr/bin
+export const bindir = /usr/bin
 
 ## Exported PM declaration `includedir`.
-export let includedir = /usr/include
+export const includedir = /usr/include
 
 ## Exported PM declaration `libdir`.
-export let libdir = /usr/lib
+export const libdir = /usr/lib
 
 ## Exported PM declaration `mandir`.
-export let mandir = /usr/share/man
+export const mandir = /usr/share/man
 
 ## Exported PM declaration `meson_prefix_arg`.
 export pure meson_prefix_arg() -> Str {

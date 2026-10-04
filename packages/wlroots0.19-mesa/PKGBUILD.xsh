@@ -3,19 +3,19 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Package recipe export.
-export let name = "wlroots0.19-mesa"
+export const name = "wlroots0.19-mesa"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.19.3"
+export const ver = "0.19.3"
 
 ## Package recipe export.
-export let rel = "19"
+export const rel = "19"
 
 ## Package recipe export.
-export let deps = [
+export const deps = [
   "musl",
   "wayland-libs-server",
   "wayland-libs-client",
@@ -31,7 +31,7 @@ export let deps = [
 ]
 
 ## Package recipe export.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "linux",
   "muon",
@@ -50,10 +50,10 @@ export let mkdeps_host = [
 ]
 
 ## Package recipe export.
-export let mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev"]
+export const mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/VERSION/wlroots-VERSION.tar.gz",
     kind: "auto",
@@ -72,7 +72,7 @@ export let upstream_sources = [
 type PnpRecord = {id: Str, vendor: Str}
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/wlroots-0.19/wlr/backend.h",
     kind: "file",

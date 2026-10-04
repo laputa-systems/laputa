@@ -2,25 +2,25 @@
 use pm.util as pm_util
 
 ## Package recipe export.
-export let name = "muon"
+export const name = "muon"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.5.0"
+export const ver = "0.5.0"
 
 ## Package recipe export.
-export let rel = "10"
+export const rel = "10"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "samurai"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/muon-build/muon/archive/refs/tags/VERSION.tar.gz",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [{path: p"usr/bin/muon", kind: "binary"}]
+export const filetree = [{path: p"usr/bin/muon", kind: "binary"}]
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {

@@ -1,27 +1,27 @@
 ##! XSH module `PKGBUILD` package and build operations.
 ## Package recipe export.
-export let name = "alsa-ucm-conf"
+export const name = "alsa-ucm-conf"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.2.15.3"
+export const ver = "1.2.15.3"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
 export let deps = []
 
 ## UCM configuration is data that alsa-lib reads at runtime; the build copies it.
-export let runtime_only_deps = ["alsa-lib"]
+export const runtime_only_deps = ["alsa-lib"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://www.alsa-project.org/files/pub/lib/alsa-ucm-conf-VERSION.tar.bz2",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr",
     kind: "tree",

@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Exported declaration `name`.
-export let name = "libdisplay-info"
+export const name = "libdisplay-info"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "0.3.0"
+export const ver = "0.3.0"
 
 ## Exported declaration `rel`.
-export let rel = "9"
+export const rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "hwdata"]
+export const deps = ["musl", "hwdata"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "hwdata"]
+export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "hwdata"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/emersion/libdisplay-info/-/releases/VERSION/downloads/libdisplay-info-VERSION.tar.xz",
     kind: "auto",
@@ -39,7 +39,7 @@ export let upstream_sources = [
 type PnpRecord = {id: Str, name: Str}
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/libdisplay-info/cta.h",
     kind: "file",

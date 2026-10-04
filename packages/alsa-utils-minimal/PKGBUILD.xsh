@@ -2,29 +2,29 @@
 use pm.make as make
 
 ## Exported declaration `name`.
-export let name = "alsa-utils-minimal"
+export const name = "alsa-utils-minimal"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.2.15.2"
+export const ver = "1.2.15.2"
 
 ## Exported declaration `rel`.
-export let rel = "10"
+export const rel = "10"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## The minimal tools are a libc-only stand-in (stdio and string only); the
 ## ALSA stack they stand in for is a runtime selection, not a build input.
-export let runtime_only_deps = ["alsa-lib", "libudev-zero"]
+export const runtime_only_deps = ["alsa-lib", "libudev-zero"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://www.alsa-project.org/files/pub/utils/alsa-utils-VERSION.tar.bz2",
     kind: "auto",
@@ -41,7 +41,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/bin/alsactl",
     kind: "binary",

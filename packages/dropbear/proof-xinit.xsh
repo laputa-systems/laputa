@@ -11,12 +11,10 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
   for line in body.lines() {
     let trimmed = line.trim()
 
-    if trimmed.starts_with("ssh-") {
-      return trimmed
-    }
+    return trimmed when trimmed.starts_with("ssh-")
   }
 
-  return Err(ScriptError.Failed("dropbear-public-key", "dropbearkey did not print an SSH public key"))
+  Err(ScriptError.Failed("dropbear-public-key", "dropbearkey did not print an SSH public key"))
 }
 
 proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
@@ -42,9 +40,7 @@ proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
 proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) [fs, process, error] {
   let device_path = fp"{rootfs}/dev/{name}"
 
-  if fs.exists(device_path)? {
-    return
-  }
+  return when fs.exists(device_path)?
 
   fs.mkdir(device_path.parent)?
   let mknod = process.which("mknod")?
@@ -54,7 +50,7 @@ proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) [fs, process
 pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_key: Path, port: Int) -> Command {
   let port_text = f"{port}"
 
-  return process.command_argv(
+  process.command_argv(
     timeout_bin,
     [
       timeout_bin.display(),
@@ -75,12 +71,11 @@ pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_ke
 proc dropbear_auth_logged(rootfs: Path, chroot: Path) [process] -> Bool {
   var logged = false
 
-  match run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
-    Ok(body) => logged = "Pubkey auth succeeded" in body
-    Err(_) => {}
+  if let Ok(body) = run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
+    logged = "Pubkey auth succeeded" in body
   }
 
-  return logged
+  logged
 }
 
 proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries: Int) [process, time, error] {
@@ -89,9 +84,7 @@ proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries
   while remaining > 0 {
     let status = process.run(command)?
 
-    if status.ok or dropbear_auth_logged(rootfs, chroot) {
-      return
-    }
+    return when status.ok or dropbear_auth_logged(rootfs, chroot)
 
     time.sleep(100ms)?
     remaining -= 1
@@ -128,25 +121,27 @@ proc live_dropbear_diagnostics(port: Int) [process, error] -> Result[Str] {
   let ports = process.port(port)? |> map f"{.pid}:{.protocol}:{.local}:{.state}:{.argv}"
   let default_ports = process.port(22)? |> map f"{.pid}:{.protocol}:{.local}:{.state}:{.argv}"
 
-  return f"events=[{child_events.join(" | ")}] processes=[{processes.join(" | ")}] ports=[{ports.join(" | ")}] default_ports=[{default_ports.join(" | ")}]"
+  f"events=[{child_events.join(" | ")}] processes=[{processes.join(" | ")}] ports=[{ports.join(" | ")}] default_ports=[{default_ports.join(" | ")}]"
 }
 
 pure status_summary(status: Status) -> Str {
   if status.exited() {
-    match status.exit_code() {
-      Ok(code) => return f"exit:{code}"
-      Err(_) => return "exit:unknown"
+    if let Ok(code) = status.exit_code() {
+      return f"exit:{code}"
+    } else {
+      return "exit:unknown"
     }
   }
 
   if status.signaled() {
-    match status.signal_number() {
-      Ok(signal) => return f"signal:{signal}"
-      Err(_) => return "signal:unknown"
+    if let Ok(signal) = status.signal_number() {
+      return f"signal:{signal}"
+    } else {
+      return "signal:unknown"
     }
   }
 
-  return status.kind
+  status.kind
 }
 
 proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time, error] -> Result[Str] {
@@ -155,20 +150,17 @@ proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time,
   while remaining > 0 {
     let result = run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear
 
-    match result {
-      Ok(body) => {
-        if body.trim() != "" {
-          return body
-        }
+    if let Ok(body) = result {
+      guard body.trim() == "" else {
+        return body
       }
-      Err(_) => {}
     }
 
     time.sleep(100ms)?
     remaining -= 1
   }
 
-  return Err(ScriptError.Failed("dropbear-log", "xinit did not write dropbear log content"))
+  Err(ScriptError.Failed("dropbear-log", "xinit did not write dropbear log content"))
 }
 
 proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) [process, env, error] {
@@ -194,7 +186,7 @@ proc print_direct_dropbear_probe(rootfs: Path, chroot: Path, port: Int, label: S
   }
 }
 
-proc main(rootfs: Path = /rootfs, port: Int = 22222) [fs, process, env, time, error] {
+proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let os = system.uname()?
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let dbclient = fp"{rootfs}/usr/bin/dbclient"

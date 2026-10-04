@@ -7,9 +7,7 @@ proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
   if source_root != "" {
     let staged = fp"{source_root}/.laputa-inputs/{input}"
 
-    if staged.exists()? {
-      return staged
-    }
+    return staged when staged.exists()?
   }
 
   let recipe_root = (env.get("XSH_PM_RECIPE_DIR") ?? "").trim()
@@ -17,12 +15,10 @@ proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
   if recipe_root != "" {
     let copied = fp"{recipe_root}/{input}"
 
-    if copied.exists()? {
-      return copied
-    }
+    return copied when copied.exists()?
   }
 
-  return Err(
+  Err(
     kbuild.ScriptError.Failed(
       "linux-config-fragment-missing",
       f"missing kernel config fragment {input} from staged source or typed recipe directory",
@@ -33,12 +29,7 @@ proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
 ## Resolves declared Linux config inputs from verified source staging or the copied typed recipe.
 ## It deliberately never interprets an input relative to the build process cwd.
 export proc resolve_config_fragments(inputs: List[Path]) [fs, env, error] -> Result[List[Path]] {
-  var fragments: List[Path] = []
-
-  for input in inputs {
-    fragments = fragments.push(resolved_fragment_input(input)?)
-  }
-
+  var fragments = [resolved_fragment_input(input)? for input in inputs]
   fragments
 }
 
@@ -48,7 +39,7 @@ proc render_fragments(fragments: List[Path]) [fs, error] -> Result[Str] {
 """
 
   for fragment in fragments {
-    if ! fragment.exists()? {
+    guard fragment.exists()? else {
       return Err(
         kbuild.ScriptError.Failed("linux-config-fragment-missing", f"missing kernel config fragment {fragment}"),
       )
@@ -58,7 +49,7 @@ proc render_fragments(fragments: List[Path]) [fs, error] -> Result[Str] {
 """
   }
 
-  return out
+  out
 }
 
 ## Exported declaration `write_resolved_config`.

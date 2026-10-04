@@ -3,25 +3,25 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Package recipe export.
-export let name = "pixman"
+export const name = "pixman"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "0.46.4"
+export const ver = "0.46.4"
 
 ## Package recipe export.
-export let rel = "10"
+export const rel = "10"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain", "muon", "pkgconf", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "muon", "pkgconf", "samurai"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://xorg.freedesktop.org/releases/individual/lib/pixman-VERSION.tar.xz",
     kind: "auto",
@@ -38,7 +38,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/lib/libpixman-1.so.0",
     kind: "symlink",

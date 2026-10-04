@@ -16,20 +16,15 @@ type StateQualifier = {states: List[Str], pattern: Str}
 
 pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   let re = regex.compile(pattern)?
-  return re.captures(text)
+  re.captures(text)
 }
 
 pure take_char(text: Str) -> Result[TextRest] {
-  match regex_captures(text, "(?s)^(.)(.*)") {
-    Ok(c) => {
-      if c.len() >= 3 {
-        return {content: c[1], rest: c[2]}
-      }
-    }
-    Err(_) => {}
+  if let Ok(c) = regex_captures(text, "(?s)^(.)(.*)") {
+    return {content: c[1], rest: c[2]} when c.len() >= 3
   }
 
-  return {content: "", rest: ""}
+  {content: "", rest: ""}
 }
 
 proc drop_prefix(text: Str, prefix: Str) [error] -> Result[Str] {
@@ -43,11 +38,11 @@ proc drop_prefix(text: Str, prefix: Str) [error] -> Result[Str] {
     cur = next_cur.rest
   }
 
-  return cur
+  cur
 }
 
 pure c_quote(text: Str) -> Str {
-  return text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+  text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
 }
 
 proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
@@ -90,20 +85,15 @@ proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
     }
   }
 
-  return out
+  out
 }
 
 proc strip_quotes(pattern: Str) [error] -> Result[Str] {
-  match regex_captures(pattern, "(?s)^\"(.*)\"$") {
-    Ok(c) => {
-      if c.len() >= 2 {
-        return lex_literal_to_regex(c[1])
-      }
-    }
-    Err(_) => {}
+  if let Ok(c) = regex_captures(pattern, "(?s)^\"(.*)\"$") {
+    return lex_literal_to_regex(c[1]) when c.len() >= 2
   }
 
-  return pattern
+  pattern
 }
 
 proc expand_definitions(pattern: Str, defs: Map[Str]) [error] -> Result[Str] {
@@ -113,7 +103,7 @@ proc expand_definitions(pattern: Str, defs: Map[Str]) [error] -> Result[Str] {
     out = out.replace(f"{{{name}}}", f"({defs.get(name) ?? ""})")
   }
 
-  return out
+  out
 }
 
 proc parse_definitions(text: Str) [error] -> Result[Map[Str]] {
@@ -123,17 +113,14 @@ proc parse_definitions(text: Str) [error] -> Result[Map[Str]] {
     let line = raw.trim()
     continue when line == "" or line.starts_with("%")
 
-    match regex_captures(line, "^([A-Za-z_][A-Za-z0-9_]*)[ \t]+(.+)$") {
-      Ok(c) => {
-        if c.len() >= 3 {
-          defs[c[1]] = c[2].trim()
-        }
+    if let Ok(c) = regex_captures(line, "^([A-Za-z_][A-Za-z0-9_]*)[ \t]+(.+)$") {
+      if c.len() >= 3 {
+        defs[c[1]] = c[2].trim()
       }
-      Err(_) => {}
     }
   }
 
-  return defs
+  defs
 }
 
 proc parse_start_conditions(text: Str) [error] -> Result[List[Str]] {
@@ -155,7 +142,7 @@ proc parse_start_conditions(text: Str) [error] -> Result[List[Str]] {
     }
   }
 
-  return states
+  states
 }
 
 proc parse_exclusive_start_conditions(text: Str) [error] -> Result[List[Str]] {
@@ -177,7 +164,7 @@ proc parse_exclusive_start_conditions(text: Str) [error] -> Result[List[Str]] {
     }
   }
 
-  return states
+  states
 }
 
 proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
@@ -215,25 +202,22 @@ proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
     }
   }
 
-  return Err(ToolError.Failed("lex", f"missing action for rule: {raw}"))
+  Err(ToolError.Failed("lex", f"missing action for rule: {raw}"))
 }
 
 proc split_state_qualifier(pattern: Str) [error] -> Result[StateQualifier] {
-  match regex_captures(pattern, "^<([^>]+)>(.+)$") {
-    Ok(c) => {
-      if c.len() >= 3 {
-        let states = c[1].split(",")
-          |> map .trim()
-          |> where . != ""
+  if let Ok(c) = regex_captures(pattern, "^<([^>]+)>(.+)$") {
+    if c.len() >= 3 {
+      let states = c[1].split(",")
+        |> map .trim()
+        |> where . != ""
 
-        return {states, pattern: c[2]}
-      }
+      return {states, pattern: c[2]}
     }
-    Err(_) => {}
   }
 
   let states = []
-  return {states, pattern}
+  {states, pattern}
 }
 
 proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
@@ -269,11 +253,9 @@ proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
     }
   }
 
-  if rules.len() == 0 {
-    return Err(ToolError.Failed("lex", "no rules found"))
-  }
+  return Err(ToolError.Failed("lex", "no rules found")) when rules.len() == 0
 
-  return rules
+  rules
 }
 
 proc reject_unsupported_options(text: Str) [error] {
@@ -287,9 +269,7 @@ proc reject_unsupported_options(text: Str) [error] {
 }
 
 pure upstream_flex_source_reason(text: Str) -> Str {
-  if "<<EOF>>" in text {
-    return "flex.xsh delegates EOF-rule scanners to upstream flex"
-  }
+  return "flex.xsh delegates EOF-rule scanners to upstream flex" when "<<EOF>>" in text
 
   if "YY_USER_ACTION" in text {
     return "flex.xsh delegates scanners with YY_USER_ACTION to upstream flex"
@@ -303,21 +283,20 @@ pure upstream_flex_source_reason(text: Str) -> Str {
     return "flex.xsh delegates scanners using flex buffer mutation APIs to upstream flex"
   }
 
-  return ""
+  ""
 }
 
 proc upstream_disabled() [env] -> Bool {
-  return (env.get("XSH_FLEX_NO_UPSTREAM") ?? "") == "1"
+  (env.get("XSH_FLEX_NO_UPSTREAM") ?? "") == "1"
 }
 
 proc run_upstream_flex(argv: List[Str], reason: Str) [process, env, error] {
-  if upstream_disabled() {
-    return Err(ToolError.Failed("unsupported", reason))
-  }
+  return Err(ToolError.Failed("unsupported", reason)) when upstream_disabled()
 
-  match process.which("flex") {
-    Ok(bin) => run $bin @argv ?
-    Err(_) => return Err(ToolError.Failed("unsupported", reason))
+  if let Ok(bin) = process.which("flex") {
+    run $bin @argv ?
+  } else {
+    return Err(ToolError.Failed("unsupported", reason))
   }
 }
 
@@ -344,20 +323,15 @@ proc parse_lex_file(source: Str) [error] -> Result[LexProgram] {
     i = i + 1
   }
 
-  return {rules: parse_rules(parts[1], defs)?, user_code, states, exclusive}
+  {rules: parse_rules(parts[1], defs)?, user_code, states, exclusive}
 }
 
 proc extract_c_block(text: Str) [error] -> Result[Str] {
-  match regex_captures(text, "(?s)%\\{(.*?)%\\}") {
-    Ok(c) => {
-      if c.len() >= 2 {
-        return c[1]
-      }
-    }
-    Err(_) => {}
+  if let Ok(c) = regex_captures(text, "(?s)%\\{(.*?)%\\}") {
+    return c[1] when c.len() >= 2
   }
 
-  return ""
+  ""
 }
 
 proc lex_user_code(source: Str) [error] -> Result[Str] {
@@ -374,7 +348,7 @@ proc lex_user_code(source: Str) [error] -> Result[Str] {
     i = i + 1
   }
 
-  return user_code
+  user_code
 }
 
 proc generate_linux_stub(source: Str) [error] -> Result[Str] {
@@ -389,7 +363,7 @@ proc generate_linux_stub(source: Str) [error] -> Result[Str] {
   let states = parse_start_conditions(parts[0])?
   let state_defines = generate_state_defines(states)?
 
-  return f"""#include <stdio.h>
+  f"""#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -486,14 +460,12 @@ proc state_id(state: Str, states: List[Str]) [error] -> Result[Int] {
   var i = 0
 
   while i < states.len() {
-    if states[i] == state {
-      return i + 1
-    }
+    return i + 1 when states[i] == state
 
     i = i + 1
   }
 
-  return -1
+  -1
 }
 
 proc generate_state_defines(states: List[Str]) [error] -> Result[Str] {
@@ -505,7 +477,7 @@ proc generate_state_defines(states: List[Str]) [error] -> Result[Str] {
     i = i + 1
   }
 
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 proc generate_exclusive_table(states: List[Str], exclusive: List[Str]) [error] -> Result[Str] {
@@ -515,7 +487,7 @@ proc generate_exclusive_table(states: List[Str], exclusive: List[Str]) [error] -
     values = values.push(if state in exclusive { "1" } else { "0" })
   }
 
-  return values.join(", ")
+  values.join(", ")
 }
 
 proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Result[Str] {
@@ -539,7 +511,7 @@ proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Res
     lines = lines.push(f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},")
   }
 
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 proc generate_actions(rules: List[LexRule]) [error] -> Result[Str] {
@@ -551,15 +523,13 @@ proc generate_actions(rules: List[LexRule]) [error] -> Result[Str] {
     i = i + 1
   }
 
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 pure generated_main(user_code: Str) -> Str {
-  if " main(" in user_code or "int main(" in user_code {
-    return ""
-  }
+  return "" when " main(" in user_code or "int main(" in user_code
 
-  return """
+  """
 #ifndef YY_NO_MAIN
 int main(void) {
   return yylex();
@@ -575,7 +545,7 @@ proc generate_c(rules: List[LexRule], user_code: Str, states: List[Str], exclusi
   let state_defines = generate_state_defines(states)?
   let exclusive_table = generate_exclusive_table(states, exclusive)?
 
-  return f"""#include <regex.h>
+  f"""#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -791,7 +761,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
     }
   }
 
-  return {
+  {
     input,
     output,
     to_stdout,

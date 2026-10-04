@@ -3,22 +3,22 @@ use pm.env as pm_env
 use pm.util as pm_util
 
 ## Exported declaration `name`.
-export let name = "dwl-minimal"
+export const name = "dwl-minimal"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "0.8"
+export const ver = "0.8"
 
 ## Exported declaration `rel`.
-export let rel = "11"
+export const rel = "11"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "wlroots0.19-mesa", "wayland-libs-server", "libxkbcommon", "libinput"]
+export const deps = ["musl", "wlroots0.19-mesa", "wayland-libs-server", "libxkbcommon", "libinput"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = [
+export const mkdeps_host = [
   "llvm-toolchain",
   "pkgconf",
   "wayland-dev",
@@ -33,10 +33,10 @@ export let mkdeps_host = [
 ]
 
 ## Exported declaration `mkdeps_target`.
-export let mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev"]
+export const mkdeps_target = ["wayland-dev", "wayland-protocols", "pixman-dev"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://codeberg.org/dwl/dwl/archive/vVERSION.tar.gz",
     kind: "auto",
@@ -53,25 +53,21 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
+export const filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
 
 proc sysroot_path(root: Str, raw: Str) [fs, error] -> Result[Path] {
   let path_value = fp"{raw.trim()}"
 
-  if fs.exists(path_value)? {
-    return path_value
-  }
+  return path_value when fs.exists(path_value)?
 
-  if root != "" and root != "/" and raw.starts_with("/") {
-    return fp"{root}{raw.trim()}"
-  }
+  return fp"{root}{raw.trim()}" when root != "" and root != "/" and raw.starts_with("/")
 
   path_value
 }
 
 proc pkg_config_flags(pkg_config: Path, mode: Str, packages: List[Str]) [process, error] -> Result[List[Str]] {
   let out = run.text $pkg_config $mode @packages ?
-  return out.words()
+  out.words()
 }
 
 proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) [process, error] -> Result[Str] {
@@ -194,14 +190,7 @@ run(char *startup_cmd)
 ## runtime profile. Keep the keyboard array nonempty and retain foot's direct
 ## terminal binding.
 export pure config_without_unavailable_menu(config: Str) -> Str {
-  var lines: List[Str] = []
-
-  for line in config.split("\n") {
-    if "menucmd" not in line {
-      lines = lines.push(line)
-    }
-  }
-
+  var lines = [line for line in config.split("\n") if "menucmd" not in line]
   lines.join("\n")
 }
 

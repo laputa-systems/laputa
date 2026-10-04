@@ -1,15 +1,15 @@
 ##! Regression coverage for Linux recipe modules that must parse under the published runner.
-use pm.fingerprint
+use packages.linux.PKGBUILD-shared as linux_shared
+use packages.linux.linux_config
 use pm.build as pm_build
 use pm.catalog
+use pm.fingerprint
 use pm.plan
 use pm.policy
 use pm.recipe
 use pm.sources
 use pm.types
 use pm.util
-use packages.linux.linux_config
-use packages.linux.PKGBUILD-shared as linux_shared
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/linux-recipe/{name}"
@@ -18,9 +18,7 @@ pure fixture(name: Str) -> Path {
 proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
-  if configured != "" {
-    return path.absolute(fp"{configured}")?
-  }
+  return path.absolute(fp"{configured}")? when configured != ""
 
   process.which("xsh")?
 }
@@ -31,12 +29,10 @@ proc module_root() [fs, error] -> Result[Path] {
 
 proc linux_config_source(pkg: types.Package) [error] -> Result[types.UpstreamSource] {
   for source in pkg.upstream_sources {
-    if source.source.display().starts_with("files/config/aarch64/") {
-      return source
-    }
+    return source when source.source.display().starts_with("files/config/aarch64/")
   }
 
-  return Err(types.PmError.PackageContract("linux is missing its aarch64 config input"))
+  Err(types.PmError.PackageContract("linux is missing its aarch64 config input"))
 }
 
 test test_linux_kbuild_modules_parse_and_preserve_job_error_branch [fs, process, env, error] { |ctx|
@@ -45,9 +41,9 @@ test test_linux_kbuild_modules_parse_and_preserve_job_error_branch [fs, process,
   let modules = module_root()?
   let script = fixture("published-runner-shared.xsh")
   let success = run.status XSH_MODULE_PATH=$modules XSH_LINUX_KBUILD_JOBS="1" $xsh $script 2> $stderr ?
-  test.ok(success.ok)?
+  assert success.ok
   let failure = run.status XSH_MODULE_PATH=$modules XSH_LINUX_KBUILD_JOBS="0" $xsh $script 2> $stderr ?
-  test.eq(failure.ok, false)?
+  assert failure.ok == false
   let observed_output_1 = stderr.read_text()?
   assert "linux-kbuild-jobs" in observed_output_1
 }
@@ -60,7 +56,7 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   fs.mkdir(source)?
   sources.stage_package_sources({...original, upstream_sources: [config]}, source)?
   let staged = fp"{source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
-  test.ok(staged.exists()?)?
+  assert staged.exists()?
 
   let copied_root = test.temp_dir(ctx, name: "linux-config-fingerprint")?
   let copied = fp"{copied_root}/packages/linux"
@@ -69,7 +65,7 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   let first = fingerprint.package_build_input(copied_root, before, types.target_aarch64())?
   fs.write(fp"{copied}/files/config/aarch64/base-aarch64.fragment", "# changed staged config input\n")?
   let after = recipe.load_package(copied)?
-  test.eq(fingerprint.package_build_input(copied_root, after, types.target_aarch64())? == first, false)?
+  assert fingerprint.package_build_input(copied_root, after, types.target_aarch64())? == first == false
 }
 
 test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, process, env, time, error] { |ctx|
@@ -86,7 +82,7 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
     for input in original.upstream_sources
     if input.source.name in required
   ]
-  test.eq(local_sources.len(), required.len())?
+  assert local_sources.len() == required.len()
 
   let stage_root = test.temp_dir(ctx, name: "linux-x86-generated-inputs")?
   let source = fp"{stage_root}/source"
@@ -118,11 +114,11 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
     sources.stage_package_sources(pkg, source)?
   } ?
 
-  test.ok(fs.exists(fp"{source}/pm.xsh")?)?
-  test.ok(fs.exists(fp"{source}/pm/execute.xsh")?)?
+  assert fs.exists(fp"{source}/pm.xsh")?
+  assert fs.exists(fp"{source}/pm/execute.xsh")?
   fs.write(fp"{root}/pm/execute.xsh", "changed PM executor input\n")?
   let second = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
-  test.eq(second == first, false)?
+  assert second == first == false
 }
 
 test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, net, process, env, time, error] { |ctx|
@@ -133,8 +129,8 @@ test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, n
 
   sources.stage_package_sources(pkg, source)?
 
-  test.ok(fs.exists(fp"{source}/etc/passwd")?)?
-  test.ok(fs.exists(fp"{source}/usr/lib/init/rc.boot")?)?
+  assert fs.exists(fp"{source}/etc/passwd")?
+  assert fs.exists(fp"{source}/usr/lib/init/rc.boot")?
 }
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |ctx|
@@ -144,7 +140,7 @@ test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error]
   # The kernel mounts devtmpfs before `/init`; the remaining mount points must
   # also be present before rc.boot performs its explicit mounts and fstab pass.
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    test.ok(required in trees)?
+    assert required in trees
   }
 }
 
@@ -158,7 +154,7 @@ test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, p
   recipe.call_build(pkg, source, dest)?
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    test.eq(fs.metadata(fp"{dest}/{required}")?.kind, "dir")?
+    assert fs.metadata(fp"{dest}/{required}")?.kind == "dir"
   }
 }
 
@@ -173,8 +169,8 @@ test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, proces
 
   for hook in ["if-pre-up.d", "if-up.d", "if-down.d", "if-pre-down.d", "if-post-down.d"] {
     let relative = fp"etc/network/{hook}"
-    test.ok({path: relative, kind: types.file_kind_tree()} in pkg.filetree)?
-    test.eq(fs.metadata(fp"{dest}/{relative}")?.kind, "dir")?
+    assert {path: relative, kind: types.file_kind_tree()} in pkg.filetree
+    assert fs.metadata(fp"{dest}/{relative}")?.kind == "dir"
     for entry in fs.children(fp"{dest}/{relative}")? {
       test.fail(f"network hook directory contains {entry.name}")?
     }
@@ -205,7 +201,7 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
       test.fail(f"baselayout archive is missing {required}")?
     }
 
-    test.eq(fs.metadata(fp"{extracted}/{required}")?.kind, "dir")?
+    assert fs.metadata(fp"{extracted}/{required}")?.kind == "dir"
   }
 }
 
@@ -238,7 +234,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
       [xsh.display(), "packages/xsh/proof.xsh", "--", root.display()],
       cwd: modules,
       env: {XSH_MODULE_PATH: modules.display()},
-      stderr: stderr,
+      stderr:,
     ),
   )?
   if ! status.ok {
@@ -248,7 +244,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
 
 test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
   let pkg = recipe.load_package(p"packages/wlroots0.19-mesa")?
-  test.ok("seatd" in pkg.deps)?
+  assert "seatd" in pkg.deps
 }
 
 # Planning the real repository keys the `xsh` package by the local XSH seed, a
@@ -287,13 +283,13 @@ test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
     continue unless node.name == "wlroots0.19-mesa"
     for dependency in node.dependencies {
       if dependency.name == "seatd" {
-        test.eq(dependency.kind, types.dependency_runtime())?
+        assert dependency.kind == types.dependency_runtime()
         found = true
       }
     }
   }
 
-  test.ok(found)?
+  assert found
 }
 
 test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_missing [fs, env, error] { |ctx|
@@ -313,7 +309,7 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
   }) {
     cd unrelated {
       let resolved = linux_config.resolve_config_fragments([p"files/config/aarch64/base-aarch64.fragment"])?
-      test.eq(resolved, [staged])?
+      assert resolved == [staged]
     } ?
   }?
 
@@ -339,7 +335,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   fs.mkdir(source)?
   fs.write(fp"{source}/.config", "")?
   fs.write(fp"{source}/Kbuild", "obj-y += one.o\n")?
-  test.ok(worker.exists()?)?
+  assert worker.exists()?
 
   env ({
     XSH_PM_SOURCE_DIR: source.display(),
@@ -348,7 +344,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   }) {
     cd source {
       let plan = linux_shared.discover_package_plan("arm64")?
-      test.ok(p"one.o" in plan.objects)?
+      assert p"one.o" in plan.objects
     } ?
   }?
 }

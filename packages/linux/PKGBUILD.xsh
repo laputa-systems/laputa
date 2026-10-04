@@ -1,28 +1,28 @@
 ##! Linux package metadata and the dynamic recipe boundary.
 
 ## Exported declaration `name`.
-export let name = "linux"
+export const name = "linux"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "7.0.5"
+export const ver = "7.0.5"
 
 ## Exported declaration `rel`.
-export let rel = "36"
+export const rel = "36"
 
 ## Exported declaration `deps`.
-export let deps: List[Str] = []
+export const deps: List[Str] = []
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "flex", "bison"]
+export const mkdeps_host = ["llvm-toolchain", "flex", "bison"]
 
 ## Exported declaration `nostrip`.
-export let nostrip = true
+export const nostrip = true
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.5.tar.xz",
     kind: "auto",
@@ -208,7 +208,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [{path: p"boot", kind: "tree"}, {path: p"usr", kind: "tree"}]
+export const filetree = [{path: p"boot", kind: "tree"}, {path: p"usr", kind: "tree"}]
 
 ## The PM dynamic loader reads this metadata on every catalog scan.  The
 ## Kbuild program is deliberately executed in a child XSH process instead of

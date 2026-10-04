@@ -10,67 +10,57 @@ type YaccOptions = {input: Str, output: Str, defines: Bool, defines_file: Str, v
 
 pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   let re = regex.compile(pattern)?
-  return re.captures(text)
+  re.captures(text)
 }
 
 pure take_char(text: Str) -> Result[TextRest] {
-  match regex_captures(text, "(?s)^(.)(.*)") {
-    Ok(c) => {
-      if c.len() >= 3 {
-        return {content: c[1], rest: c[2]}
-      }
-    }
-    Err(_) => {}
+  if let Ok(c) = regex_captures(text, "(?s)^(.)(.*)") {
+    return {content: c[1], rest: c[2]} when c.len() >= 3
   }
 
-  return {content: "", rest: ""}
+  {content: "", rest: ""}
 }
 
 pure literal_code(token: Str) -> Int {
-  return match token {
-    "'\\n'" => 10,
-    "'\\t'" => 9,
-    "' '" => 32,
-    "'!'" => 33,
-    "'\"'" => 34,
-    "'#'" => 35,
-    "'$'" => 36,
-    "'%'" => 37,
-    "'&'" => 38,
-    "'('" => 40,
-    "')'" => 41,
-    "'*'" => 42,
-    "'+'" => 43,
-    "','" => 44,
-    "'-'" => 45,
-    "'.'" => 46,
-    "'/'" => 47,
-    "':'" => 58,
-    "';'" => 59,
-    "'<'" => 60,
-    "'='" => 61,
-    "'>'" => 62,
-    "'?'" => 63,
-    "'['" => 91,
-    "']'" => 93,
-    "'{'" => 123,
-    "'|'" => 124,
-    "'}'" => 125,
-    _ => -1,
+  match token {
+    "'\\n'" => 10
+    "'\\t'" => 9
+    "' '" => 32
+    "'!'" => 33
+    "'\"'" => 34
+    "'#'" => 35
+    "'$'" => 36
+    "'%'" => 37
+    "'&'" => 38
+    "'('" => 40
+    "')'" => 41
+    "'*'" => 42
+    "'+'" => 43
+    "','" => 44
+    "'-'" => 45
+    "'.'" => 46
+    "'/'" => 47
+    "':'" => 58
+    "';'" => 59
+    "'<'" => 60
+    "'='" => 61
+    "'>'" => 62
+    "'?'" => 63
+    "'['" => 91
+    "']'" => 93
+    "'{'" => 123
+    "'|'" => 124
+    "'}'" => 125
+    _ => -1
   }
 }
 
 proc extract_prologue(text: Str) [error] -> Result[Str] {
-  match regex_captures(text, "(?s)%\\{(.*)%\\}") {
-    Ok(c) => {
-      if c.len() >= 2 {
-        return c[1]
-      }
-    }
-    Err(_) => {}
+  if let Ok(c) = regex_captures(text, "(?s)%\\{(.*)%\\}") {
+    return c[1] when c.len() >= 2
   }
 
-  return ""
+  ""
 }
 
 proc parse_tokens(decls: Str) [error] -> Result[Map[Int]] {
@@ -101,7 +91,7 @@ proc parse_tokens(decls: Str) [error] -> Result[Map[Int]] {
     }
   }
 
-  return tokens
+  tokens
 }
 
 proc parse_token_names(decls: Str) [error] -> Result[List[Str]] {
@@ -118,13 +108,13 @@ proc parse_token_names(decls: Str) [error] -> Result[List[Str]] {
         continue when word.starts_with("<") or word.starts_with("'")
 
         if word not in names {
-          names = names.push(word)
+          names += [word]
         }
       }
     }
   }
 
-  return names
+  names
 }
 
 pure unsupported_declaration(decls: Str) -> Str {
@@ -144,21 +134,20 @@ pure unsupported_declaration(decls: Str) -> Str {
     }
   }
 
-  return ""
+  ""
 }
 
 proc upstream_disabled() [env] -> Bool {
-  return (env.get("XSH_BISON_NO_UPSTREAM") ?? "") == "1"
+  (env.get("XSH_BISON_NO_UPSTREAM") ?? "") == "1"
 }
 
 proc run_upstream_bison(argv: List[Str], reason: Str) [process, env, error] {
-  if upstream_disabled() {
-    return Err(ToolError.Failed("unsupported", reason))
-  }
+  return Err(ToolError.Failed("unsupported", reason)) when upstream_disabled()
 
-  match process.which("bison") {
-    Ok(bin) => run $bin @argv ?
-    Err(_) => return Err(ToolError.Failed("unsupported", reason))
+  if let Ok(bin) = process.which("bison") {
+    run $bin @argv ?
+  } else {
+    return Err(ToolError.Failed("unsupported", reason))
   }
 }
 
@@ -169,23 +158,21 @@ pure parse_start_symbol(decls: Str, fallback: Str) -> Str {
     if line.starts_with("%start") {
       let words = line.split(" ") |> where . != ""
 
-      if words.len() >= 2 {
-        return words[1]
-      }
+      return words[1] when words.len() >= 2
     }
   }
 
-  return fallback
+  fallback
 }
 
 proc remove_actions(text: Str) [error] -> Result[Str] {
-  let re = regex.compile("(?s)\\{[^{}]*\\}")?
-  return re.replace(text, " ")
+  let re = rx"(?s)\{[^{}]*\}"
+  re.replace(text, " ")
 }
 
 proc remove_comments(text: Str) [error] -> Result[Str] {
-  let re = regex.compile("(?s)/\\*.*?\\*/")?
-  return re.replace(text, " ")
+  let re = rx"(?s)/\*.*?\*/"
+  re.replace(text, " ")
 }
 
 proc parse_rules(text: Str) [error] -> Result[List[GrammarRule]] {
@@ -212,15 +199,13 @@ proc parse_rules(text: Str) [error] -> Result[List[GrammarRule]] {
     } else if lhs == "" {
       pending_lhs = item
     } else {
-      rhs = rhs.push(item)
+      rhs += [item]
     }
   }
 
-  if rules.len() == 0 {
-    return Err(ToolError.Failed("yacc", "no grammar rules found"))
-  }
+  return Err(ToolError.Failed("yacc", "no grammar rules found")) when rules.len() == 0
 
-  return rules
+  rules
 }
 
 proc nonterminals(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
@@ -232,32 +217,28 @@ proc nonterminals(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
     }
   }
 
-  return names
+  names
 }
 
 pure token_code_expr(symbol: Str, tokens: Map[Int]) -> Str {
-  if symbol in tokens {
-    return f"{tokens.get(symbol) ?? 0}"
-  }
+  return f"{tokens.get(symbol) ?? 0}" when symbol in tokens
 
   let lit = literal_code(symbol)
 
-  if lit >= 0 {
-    return f"{lit}"
-  }
+  return f"{lit}" when lit >= 0
 
-  return symbol
+  symbol
 }
 
 proc generate_token_defines(tokens: Map[Int]) [error] -> Result[Str] {
   var lines = [f"#define {name} {tokens.get(name) ?? 0}" for name in tokens.keys() if ! name.starts_with("'")]
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 proc generate_header(tokens: Map[Int]) [error] -> Result[Str] {
   let defines = generate_token_defines(tokens)?
 
-  return f"""#ifndef XSH_YY_TAB_H
+  f"""#ifndef XSH_YY_TAB_H
 #define XSH_YY_TAB_H
 {defines}
 int yyparse(void);
@@ -268,9 +249,7 @@ int yyparse(void);
 proc extract_union_body(decls: Str) [error] -> Result[Str] {
   let parts = decls.split("%union")
 
-  if parts.len() < 2 {
-    return "int token;"
-  }
+  return "int token;" when parts.len() < 2
 
   var cur = parts[1]
 
@@ -292,9 +271,7 @@ proc extract_union_body(decls: Str) [error] -> Result[Str] {
         } else if next.content == "}" {
           depth = depth - 1
 
-          if depth == 0 {
-            return body
-          }
+          return body when depth == 0
 
           body = f"{body}{next.content}"
         } else {
@@ -304,11 +281,11 @@ proc extract_union_body(decls: Str) [error] -> Result[Str] {
     }
   }
 
-  return "int token;"
+  "int token;"
 }
 
 pure has_locations(decls: Str) -> Bool {
-  return "%locations" in decls
+  "%locations" in decls
 }
 
 proc token_enum_lines(names: List[Str]) [error] -> Result[List[Str]] {
@@ -323,7 +300,7 @@ proc token_enum_lines(names: List[Str]) [error] -> Result[List[Str]] {
     i = i + 1
   }
 
-  return lines
+  lines
 }
 
 proc generate_linux_header(decls: Str, tokens: Map[Int]) [error] -> Result[Str] {
@@ -354,7 +331,7 @@ extern YYLTYPE yylloc;
     ""
   }
 
-  return f"""#ifndef XSH_YY_TAB_H
+  f"""#ifndef XSH_YY_TAB_H
 #define XSH_YY_TAB_H
 
 #ifndef YYDEBUG
@@ -392,21 +369,21 @@ int yyparse(void);
 }
 
 proc output_header_name(output: Str) [error] -> Result[Str] {
-  return fp"{output}".name.replace(".c", ".h")
+  fp"{output}".name.replace(".c", ".h")
 }
 
 pure is_kconfig_parser(decls: Str) -> Bool {
-  return "\"lkc.h\"" in decls
+  "\"lkc.h\"" in decls
 }
 
 pure is_dtc_parser(decls: Str) -> Bool {
-  return "\"dtc.h\"" in decls
+  "\"dtc.h\"" in decls
 }
 
 proc generate_kconfig_stub_c(output: Str, prologue: Str, epilogue: Str) [error] -> Result[Str] {
   let header = output_header_name(output)?
 
-  return f"""{prologue}
+  f"""{prologue}
 
 #include "{header}"
 
@@ -882,7 +859,7 @@ YYLTYPE yylloc = { 1, 1, 1, 1 };
     ""
   }
 
-  return f"""{prologue}
+  f"""{prologue}
 
 #include "{header}"
 
@@ -1095,9 +1072,7 @@ proc generate_linux_stub_c(output: Str, decls: Str, prologue: Str, epilogue: Str
     return generate_kconfig_stub_c(output, prologue, epilogue)?
   }
 
-  if is_dtc_parser(decls) {
-    return generate_dtc_stub_c(output, decls, prologue, epilogue)?
-  }
+  return generate_dtc_stub_c(output, decls, prologue, epilogue)? when is_dtc_parser(decls)
 
   let header = output_header_name(output)?
 
@@ -1109,7 +1084,7 @@ YYLTYPE yylloc = { 1, 1, 1, 1 };
     ""
   }
 
-  return f"""{prologue}
+  f"""{prologue}
 
 #include "{header}"
 
@@ -1130,19 +1105,17 @@ proc index_of(names: List[Str], name: Str) [error] -> Int {
   var i = 0
 
   while i < names.len() {
-    if names[i] == name {
-      return i
-    }
+    return i when names[i] == name
 
     i = i + 1
   }
 
-  return -1
+  -1
 }
 
 proc generate_int_array(name: Str, values: List[Str]) [error] -> Result[Str] {
   let body = if values.len() == 0 { "0" } else { values.join(", ") }
-  return f"static const int {name}[] = {{ {body} }};"
+  f"static const int {name}[] = {{ {body} }};"
 }
 
 proc rule_lhs_values(rules: List[GrammarRule], names: List[Str]) [error] -> Result[List[Str]] {
@@ -1158,7 +1131,7 @@ proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]
     offset = offset + rule.rhs.len()
   }
 
-  return values
+  values
 }
 
 proc rule_rhs_len_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
@@ -1180,16 +1153,16 @@ proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: 
     }
   }
 
-  return values
+  values
 }
 
 proc generate_rule_tables(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) [error] -> Result[Str] {
-  let lhs = generate_int_array("yy_rule_lhs", rule_lhs_values(rules, names)?)?
-  let rhs_start = generate_int_array("yy_rule_rhs_start", rule_rhs_start_values(rules)?)?
-  let rhs_len = generate_int_array("yy_rule_rhs_len", rule_rhs_len_values(rules)?)?
-  let rhs_symbols = generate_int_array("yy_rule_rhs_symbols", rule_rhs_symbol_values(rules, names, tokens)?)?
+  let lhs = rule_lhs_values(rules, names)? |> generate_int_array("yy_rule_lhs", _)?
+  let rhs_start = rule_rhs_start_values(rules)? |> generate_int_array("yy_rule_rhs_start", _)?
+  let rhs_len = rule_rhs_len_values(rules)? |> generate_int_array("yy_rule_rhs_len", _)?
+  let rhs_symbols = rule_rhs_symbol_values(rules, names, tokens)? |> generate_int_array("yy_rule_rhs_symbols", _)?
 
-  return f"""{lhs}
+  f"""{lhs}
 {rhs_start}
 {rhs_len}
 {rhs_symbols}"""
@@ -1205,7 +1178,7 @@ proc generate_verbose_report(rules: List[GrammarRule], start: Str) [error] -> Re
     i = i + 1
   }
 
-  return lines.join("\n")
+  lines.join("\n")
 }
 
 proc generate_c(
@@ -1220,11 +1193,9 @@ proc generate_c(
   let tables = generate_rule_tables(rules, names, tokens)?
   let start_id = index_of(names, start)
 
-  if start_id < 0 {
-    return Err(ToolError.Failed("yacc", f"unknown start symbol: {start}"))
-  }
+  return Err(ToolError.Failed("yacc", f"unknown start symbol: {start}")) when start_id < 0
 
-  return f"""#include <stdio.h>
+  f"""#include <stdio.h>
 #include <stdlib.h>
 {defines}
 
@@ -1491,11 +1462,9 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
     }
   }
 
-  if input == "" {
-    return Err(ToolError.Failed("usage", "missing grammar file"))
-  }
+  return Err(ToolError.Failed("usage", "missing grammar file")) when input == ""
 
-  return {
+  {
     input,
     output,
     defines,

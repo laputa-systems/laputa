@@ -4,32 +4,32 @@ use pm.util as pm_util
 error LlvmToolchainError = Failed(message: Str)
 
 ## Package name.
-export let name = "llvm-toolchain"
+export const name = "llvm-toolchain"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Upstream LLVM version.
-export let ver = "23.1.0-rc2"
+export const ver = "23.1.0-rc2"
 
 ## Package release revision.
-export let rel = "14"
+export const rel = "14"
 
 ## Runtime package dependencies.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Host-side build dependencies.
 export let mkdeps_host = []
 
 ## The compiler driver wrappers are XSH scripts; they need the `xsh` runner at
 ## runtime. Build roots get `xsh` from the executor substrate instead.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Preserve upstream binaries without stripping.
-export let nostrip = true
+export const nostrip = true
 
 ## Upstream source archives and checksums.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-VERSION-6eb5fb9/clang+llvm-VERSION-ARCH-linux-musl.tar.xz => llvm-prebuilt",
     kind: "auto",
@@ -50,7 +50,7 @@ export let upstream_sources = [
 ]
 
 ## Installed package file tree.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr",
     kind: "tree",
@@ -162,11 +162,9 @@ export let filetree = [
 ]
 
 pure bool_literal(value: Bool) -> Str {
-  if value {
-    return "true"
-  }
+  return "true" when value
 
-  return "false"
+  "false"
 }
 
 pure xsh_wrapper_source(real: Path, clang: Bool, cxx: Bool) -> Str {
@@ -471,7 +469,7 @@ env ({
 main(@args)?
 """
 
-  return wrapper_template.replace("__REAL__", real.display())
+  wrapper_template.replace("__REAL__", real.display())
     .replace("__CLANG__", bool_literal(clang))
     .replace(
       "__CXX__",
@@ -490,7 +488,7 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
 }
 
 proc require_file(path_value: Path, label: Str) [fs, error] {
-  if ! fs.exists(path_value)? {
+  guard fs.exists(path_value)? else {
     return Err(LlvmToolchainError.Failed(f"missing {label}: {path_value}"))
   }
 }
@@ -507,9 +505,7 @@ proc require_executable(path_value: Path, label: Str) [fs, error] {
 proc install_tool_alias(bin: Path, tool_name: Str, target: Str) [fs, error] {
   let link = fp"{bin}/{tool_name}"
 
-  if fs.exists(link)? {
-    return
-  }
+  return when fs.exists(link)?
 
   require_file(fp"{bin}/{target}", target)?
   fs.symlink(fp"{target}", link)?

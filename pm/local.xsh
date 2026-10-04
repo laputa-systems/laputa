@@ -37,7 +37,7 @@ export proc load_manifest(db: Path) [fs, error] -> Result[List[Path]] {
   var manifest = []
 
   if fs.exists(fp"{db}/manifest.json")? {
-    let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require(List[Str])?
+    let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require()?
 
     for rel_text in stored {
       manifest = manifest.push(fp"{rel_text}")
@@ -88,7 +88,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     if entry.kind == types.file_kind_tree() {
-      if fs.metadata(fp"{dest}/{entry.path}")?.kind != "dir" {
+      guard fs.metadata(fp"{dest}/{entry.path}")?.kind == "dir" else {
         return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
       }
     }
@@ -135,7 +135,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     if declared_kind == types.file_kind_symlink() {
-      if actual_kind != "symlink" {
+      guard actual_kind == "symlink" else {
         return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a symlink, found {actual_kind}"))
       }
 
@@ -173,9 +173,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
   }
 
-  if pkg.nostrip or binaries.len() == 0 {
-    return
-  }
+  return when pkg.nostrip or binaries.len() == 0
 
   let strip = process.which("llvm-strip")?
 
@@ -191,15 +189,12 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
   defer root_handle.close()
 
   for rel_path in manifest {
-    match root_handle.readlink(rel_path) {
-      Ok(target) => {
-        files = files.push(
-          {path: rel_path.display(), kind: types.file_kind_symlink(), mode: 0o777, sha256: "", target: target.display()},
-        )
+    if let Ok(target) = root_handle.readlink(rel_path) {
+      files = files.push(
+        {path: rel_path.display(), kind: types.file_kind_symlink(), mode: 0o777, sha256: "", target: target.display()},
+      )
 
-        continue
-      }
-      Err(_) => {}
+      continue
     }
 
     let meta = root_handle.metadata(rel_path)?
@@ -265,7 +260,7 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
 
     if ! (key in unique) {
       unique[key] = true
-      canonical = canonical.push(entry)
+      canonical += [entry]
     }
   }
 
@@ -320,8 +315,8 @@ export proc write_package_metadata(
   fs.mkdir(path_value.parent)?
   let manifest = collect_manifest_text(item.manifest)?
 
-  let metadata: PackageMetadataDto = {
-    arch,
+  let metadata: PackageMetadataDto = PackageMetadataDto(
+    arch:,
     name: item.pkg.name,
     ver: item.pkg.ver,
     rel: item.pkg.rel,
@@ -329,8 +324,11 @@ export proc write_package_metadata(
     runtime_only_deps: item.pkg.runtime_only_deps,
     mkdeps_host: item.pkg.mkdeps_host,
     mkdeps_target: item.pkg.mkdeps_target,
-    filetree: [{path: entry.path.display(), kind: types.file_kind_text(entry.kind)} for entry in item.pkg.filetree],
-    manifest,
+    filetree: [
+      {path: entry.path.display(), kind: types.file_kind_text(entry.kind)}
+      for entry in item.pkg.filetree
+    ],
+    manifest:,
     metadata_sha256: item.metadata_sha256,
     package_kind: types.package_kind_text(item.pkg.kind),
     files: [
@@ -343,7 +341,7 @@ export proc write_package_metadata(
       }
       for entry in item.metadata_files
     ],
-  }
+  )
   json.write(path_value, {...metadata, executor})?
 }
 
@@ -399,7 +397,7 @@ export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[
     }
 
     seen[pkg.name] = true
-    packages = packages.push(pkg)
+    packages += [pkg]
   }
 
   packages
@@ -428,11 +426,11 @@ export proc load_built_package_from_dest(
 
   let db = util.package_db_path(dest, pkg.name)
   let manifest = load_manifest(db)?
-  let etcsums: List[types.EtcSum] = json.read(fp"{db}/etcsums.json")?.require(List[types.EtcSum])?
+  let etcsums: List[types.EtcSum] = json.read(fp"{db}/etcsums.json")?.require()?
   let metadata_files = collect_artifact_entries(dest, pkg.filetree)?
   let metadata_sha256 = metadata_files_sha256(pkg, metadata_files)?
 
-  return {
+  {
     pkg,
     id,
     tarball,

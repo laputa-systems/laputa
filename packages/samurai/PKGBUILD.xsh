@@ -2,25 +2,25 @@
 use pm.make as make
 
 ## Package recipe export.
-export let name = "samurai"
+export const name = "samurai"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1.2"
+export const ver = "1.2"
 
 ## Package recipe export.
-export let rel = "10"
+export const rel = "10"
 
 ## Package recipe export.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export let mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain"]
 
 ## Package recipe export.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/michaelforney/samurai/releases/download/VERSION/samurai-VERSION.tar.gz",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let filetree = [{path: p"usr/bin/ninja", kind: "symlink"}, {path: p"usr/bin/samu", kind: "binary"}]
+export const filetree = [{path: p"usr/bin/ninja", kind: "symlink"}, {path: p"usr/bin/samu", kind: "binary"}]
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {

@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Exported declaration `name`.
-export let name = "expat"
+export const name = "expat"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "2.7.3"
+export const ver = "2.7.3"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/libexpat/libexpat/releases/download/R_2_7_3/expat-VERSION.tar.xz",
     kind: "auto",
@@ -37,7 +37,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/expat.h",
     kind: "file",

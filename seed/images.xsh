@@ -148,9 +148,7 @@ export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error]
 proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, error] {
   let status = process.run(process.command_argv(docker, argv, cwd))?
 
-  if ! status.ok {
-    return Err(SeedImageError.Failed(f"{what} failed"))
-  }
+  return Err(SeedImageError.Failed(f"{what} failed")) unless status.ok
 }
 
 ## Construct the networked host-tools build.
@@ -177,9 +175,7 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   let tag = host_tools_tag(laputa_root, value)?
   let saved = host_tools_saved_image(laputa_root, value)?
 
-  if fs.exists(saved)? {
-    return
-  }
+  return when fs.exists(saved)?
 
   if ! image_exists(docker, tag, laputa_root)? {
     docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")?

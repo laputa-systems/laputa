@@ -9,32 +9,26 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 }
 
 pure elf_machine_name(arch: Str) -> Str {
-  if arch == "aarch64" {
-    return "AArch64"
-  }
+  return "AArch64" when arch == "aarch64"
 
-  if arch == "x86_64" {
-    return "X86-64"
-  }
+  return "X86-64" when arch == "x86_64"
 
-  return arch
+  arch
 }
 
 proc build_root_path() [env, error] -> Result[Path] {
   let build_root_value = (env.get("XSH_PM_BUILD_ROOT") ?? "").trim()
   ensure(build_root_value != "", "proof-llvm-toolchain", "XSH_PM_BUILD_ROOT is required for native-cross proof")?
-  return fp"{build_root_value}"
+  fp"{build_root_value}"
 }
 
 proc proof_readelf_path(root: Path) [fs, env, error] -> Result[Path] {
   let target_readelf = fp"{root}/usr/bin/readelf"
 
-  if fs.exists(target_readelf)? {
-    return target_readelf
-  }
+  return target_readelf when fs.exists(target_readelf)?
 
   let build_root = build_root_path()?
-  return fp"{build_root}/usr/bin/readelf"
+  fp"{build_root}/usr/bin/readelf"
 }
 
 proc ensure_file(path_value: Path, label: Str) [fs, error] {

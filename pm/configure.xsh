@@ -23,7 +23,7 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
         out_lines = out_lines.push(f"/* #undef {varname} */")
       }
     } else {
-      out_lines = out_lines.push(line)
+      out_lines += [line]
     }
   }
 

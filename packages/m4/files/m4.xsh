@@ -43,7 +43,7 @@ pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
 
 # ── state helpers ─────────────────────────────────────────────────────────────
 pure sg(st: Map[Str], k: Str, d: Str) -> Str {
-  return st.get(k) ?? d
+  st.get(k) ?? d
 }
 
 pure si(st: Map[Str], k: Str, d: Int) -> Int {
@@ -255,7 +255,7 @@ proc collect_quoted(rem: Str, oq: Str, cq: Str) [error] -> Result[TextRest] {
 
   var cur = drop_prefix(rem, oq)?
   var depth = 1
-  var content_parts: List[Str] = []
+  var content_parts = []
 
   while cur != "" {
     if cq != "" and cur.starts_with(cq) {
@@ -308,7 +308,7 @@ proc collect_args_raw(rem: Str, oq: Str, cq: Str) [error] -> Result[RawRest] {
 
   var pdepth = 1
   var qdepth = 0
-  var raw_parts: List[Str] = []
+  var raw_parts = []
 
   while cur != "" {
     if qdepth == 0 and cur.starts_with("(") {
@@ -397,10 +397,10 @@ proc collect_args_raw(rem: Str, oq: Str, cq: Str) [error] -> Result[RawRest] {
 
 # Split raw arg text on top-level commas.
 proc split_args(raw: Str, oq: Str, cq: Str) [error] -> Result[List[Str]] {
-  var margs: List[Str] = []
+  var margs = []
   var qdepth = 0
   var pdepth = 0
-  var cur_arg_parts: List[Str] = []
+  var cur_arg_parts = []
   var cur = raw
 
   while cur != "" {
@@ -505,7 +505,7 @@ proc subst_args(body: Str, name: Str, margs: List[Str], oq: Str, cq: Str) [error
   }
 
   let all = margs.join(",")
-  var quoted: List[Str] = []
+  var quoted = []
 
   for arg in margs {
     if oq == "" or cq == "" {
@@ -565,12 +565,12 @@ pure strip_outer_square_quote(text: Str) -> Str {
 }
 
 pure strip_outer_square_quotes(text: Str) -> Str {
-  strip_outer_square_quote(strip_outer_square_quote(strip_outer_square_quote(text)))
+  strip_outer_square_quote(strip_outer_square_quote(text)) |> strip_outer_square_quote(_)
 }
 
 pure b4_percent_value(st: Map[Str], varname: Str, fallback: Str) -> Str {
   if mac_defined(st, f"b4_percent_define({varname})") {
-    return strip_outer_square_quotes(mac_get(st, f"b4_percent_define({varname})"))
+    return mac_get(st, f"b4_percent_define({varname})") |> strip_outer_square_quotes(_)
   }
 
   fallback
@@ -579,7 +579,7 @@ pure b4_percent_value(st: Map[Str], varname: Str, fallback: Str) -> Str {
 pure b4_symbol_field_raw(st: Map[Str], num: Str, field: Str) -> Str {
   let key = f"b4_symbol({num}, {field})"
 
-  return strip_outer_square_quotes(mac_get(st, key)) when mac_defined(st, key)
+  return mac_get(st, key) |> strip_outer_square_quotes(_) when mac_defined(st, key)
 
   ""
 }
@@ -711,7 +711,7 @@ enum yysymbol_kind_t
   while i < count {
     let comma = if i + 1 == count { "" } else { "," }
     let name = b4_symbol_lookup(st, f"{i}", "kind_base")
-    let comment = b4_comment_text(b4_symbol_lookup(st, f"{i}", "tag"))
+    let comment = b4_symbol_lookup(st, f"{i}", "tag") |> b4_comment_text(_)
     let padded = format_field(name, 42, false)
 
     out = f"""{out}{padded} = {i}{comma} {comment}
@@ -753,7 +753,7 @@ enum yytokentype
 
       let name = b4_symbol_id_name(st, f"{i}")
       let code = b4_symbol_lookup(st, f"{i}", "code")
-      let comment = b4_comment_text(b4_symbol_lookup(st, f"{i}", "tag"))
+      let comment = b4_symbol_lookup(st, f"{i}", "tag") |> b4_comment_text(_)
       let padded = format_field(name, 34, false)
       out = f"{out}{comma}  {padded} = {code} {comment}"
       first = false
@@ -942,7 +942,7 @@ proc call_builtin(name: Str, margs: List[Str], st: Map[Str]) [fs, process, env, 
 
   if name == "b4_value_type_setup" {
     if mac_defined(st, "b4_percent_define(api.value.type)") {
-      let value = strip_outer_square_quotes(mac_get(st, "b4_percent_define(api.value.type)"))
+      let value = mac_get(st, "b4_percent_define(api.value.type)") |> strip_outer_square_quotes(_)
 
       if value == "union" or value == "union-directive" or value == "variant" or value == "yystype" {
         return {text: "", st: mac_set(st, "b4_percent_define_kind(api.value.type)", "keyword")}
@@ -974,7 +974,7 @@ proc call_builtin(name: Str, margs: List[Str], st: Map[Str]) [fs, process, env, 
     let kind_type = b4_percent_value(s2, "api.value.type", "int")
 
     let type_kind = if mac_defined(s2, "b4_percent_define_kind(api.value.type)") {
-      strip_outer_square_quotes(mac_get(s2, "b4_percent_define_kind(api.value.type)"))
+      mac_get(s2, "b4_percent_define_kind(api.value.type)") |> strip_outer_square_quotes(_)
     } else {
       "code"
     }
@@ -1074,7 +1074,7 @@ typedef {kind_type} YYSTYPE;
   if name == "b4_header_if" {
     let yes = if margs.len() >= 1 { margs[0] } else { "" }
     let no = if margs.len() >= 2 { margs[1] } else { "" }
-    let flag = strip_outer_square_quotes(mac_get(st, "b4_header_flag"))
+    let flag = mac_get(st, "b4_header_flag") |> strip_outer_square_quotes(_)
     return {text: if flag == "1" { yes } else { no }, st}
   }
 
@@ -1097,7 +1097,7 @@ typedef {kind_type} YYSTYPE;
 
       if expected == current {
         if expected == "simple" and "b4_api_PREFIX[DEBUG" in selected {
-          let token_table = strip_outer_square_quotes(mac_get(st, "b4_token_table_flag"))
+          let token_table = mac_get(st, "b4_token_table_flag") |> strip_outer_square_quotes(_)
           return {text: f"YYDEBUG || {token_table}", st}
         }
 
@@ -1192,8 +1192,8 @@ typedef {kind_type} YYSTYPE;
 
     return {
       text: if mac_defined(s2, f"b4_percent_define({varname})") {
-        strip_outer_square_quotes(
-          mac_get(s2, f"b4_percent_define({varname})"),
+        mac_get(s2, f"b4_percent_define({varname})") |> strip_outer_square_quotes(
+          _,
         )
       } else {
         fallback
@@ -1212,8 +1212,8 @@ typedef {kind_type} YYSTYPE;
 
     return {
       text: if mac_defined(st, f"b4_percent_define_kind({varname})") {
-        strip_outer_square_quotes(
-          mac_get(st, f"b4_percent_define_kind({varname})"),
+        mac_get(st, f"b4_percent_define_kind({varname})") |> strip_outer_square_quotes(
+          _,
         )
       } else {
         "keyword"
@@ -1315,7 +1315,7 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
         result = cur_args[3]
         done = true
       } else {
-        var rest: List[Str] = []
+        var rest = []
         var ri = 3
 
         while ri < cur_args.len() {
@@ -1413,7 +1413,7 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
   if name == "substr" {
     let s = if margs.len() >= 1 { margs[0] } else { "" }
     let from = (if margs.len() >= 2 { margs[1].trim() } else { "0" }).parse_int()?
-    var chars: List[Str] = []
+    var chars = []
     var r = s
 
     while r != "" {
@@ -1466,8 +1466,8 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
     let s = if margs.len() >= 1 { margs[0] } else { "" }
     let frm = if margs.len() >= 2 { margs[1] } else { "" }
     let too = if margs.len() >= 3 { margs[2] } else { "" }
-    var from_ch: List[Str] = []
-    var to_ch: List[Str] = []
+    var from_ch = []
+    var to_ch = []
     var tmp = frm
 
     while tmp != "" {
@@ -1698,7 +1698,7 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
       return {text: "", st}
     }
 
-    var parts: List[Str] = []
+    var parts = []
     var shift_index = 1
 
     while shift_index < margs.len() {
@@ -1740,7 +1740,7 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
 
   if name == "builtin" {
     let target = if margs.len() >= 1 { margs[0] } else { "" }
-    var iargs: List[Str] = []
+    var iargs = []
     var ii = 1
 
     while ii < margs.len() {
@@ -1753,7 +1753,7 @@ b4_percent_define_flag_if([{varname}], [$1], [$2])"""
 
   if name == "indir" {
     let target = if margs.len() >= 1 { margs[0] } else { "" }
-    var iargs: List[Str] = []
+    var iargs = []
     var ii = 1
 
     while ii < margs.len() {
@@ -1925,7 +1925,7 @@ proc call_conditional_builtin(
 
     return expand_raw_arg(cur_args, 3, cur_st) when cur_args.len() == 4
 
-    var rest: List[Str] = []
+    var rest = []
     var ri = 3
 
     while ri < cur_args.len() {
@@ -2010,8 +2010,8 @@ proc expand_full(input: Str, st: Map[Str]) [fs, process, env, error, io] -> Resu
               }
             } else if mac_defined(cur_st, word) {
               # Collect arguments if '(' immediately follows
-              var call_args: List[Str] = []
-              var raw_list: List[Str] = []
+              var call_args = []
+              var raw_list = []
 
               if rem.starts_with("(") {
                 let ar = collect_args_raw(rem, oq, cq)?
@@ -2167,9 +2167,9 @@ proc parse_define_arg(def: Str) [error] -> Result[List[Str]] {
 
 # ── main ─────────────────────────────────────────────────────────────────────
 proc main(margs: List[Str] = []) [fs, process, env, error, io] {
-  var include_paths: List[Str] = []
-  var defines: List[List[Str]] = []
-  var files: List[Str] = []
+  var include_paths = []
+  var defines = []
+  var files = []
   var prefix = false
   let tokens = cli.tokens(margs, ["I", "D"])?
 

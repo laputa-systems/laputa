@@ -1,21 +1,21 @@
 ##! Package recipe metadata and build operations.
 ## Package recipe export.
-export let name = "xinit"
+export const name = "xinit"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Package recipe export.
-export let ver = "1"
+export const ver = "1"
 
 ## Package recipe export.
-export let rel = "9"
+export const rel = "9"
 
 ## Package recipe export.
 export let deps = []
 
 ## The build installs xinit.xsh; PID 1 runs it with `xsh`.
-export let runtime_only_deps = ["xsh"]
+export const runtime_only_deps = ["xsh"]
 
 ## Package recipe export.
 export let mkdeps_host = []
@@ -23,7 +23,7 @@ export let mkdeps_host = []
 ## Package recipe export.
 ## xinit lives in this monorepo; the executor stages it through
 ## XSH_PM_REPOSITORY_ROOT, and the recipe fingerprint hashes its content.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"repository/xinit/xinit.xsh",
     kind: "auto",
@@ -40,10 +40,10 @@ export let upstream_sources = [
 ]
 
 ## Package recipe export.
-export let nostrip = true
+export const nostrip = true
 
 ## Package recipe export.
-export let filetree = [
+export const filetree = [
   {
     path: p"init",
     kind: "symlink",

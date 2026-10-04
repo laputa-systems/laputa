@@ -12,8 +12,7 @@ let mount_dev = linux.mount("dev", /dev, fstype: "devtmpfs", options: ["mode=075
 
 if "devpts" in fs.read_text(/proc/filesystems)? {
   match linux.mount("devpts", /dev/pts, fstype: "devpts", options: ["mode=0620", "gid=5", "nosuid", "noexec"]) {
-    Ok(_) => {}
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 }
 
@@ -23,8 +22,7 @@ if fs.exists(/etc/hostname)? {
   let hostname = fs.read_text(/etc/hostname)?.trim()
 
   match unix.set_hostname(hostname) {
-    Ok(_) => {}
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 }
 

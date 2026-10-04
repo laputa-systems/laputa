@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Exported declaration `name`.
-export let name = "libevdev"
+export const name = "libevdev"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.13.6"
+export const ver = "1.13.6"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "linux"]
+export const deps = ["musl", "linux"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf"]
+export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-VERSION/libevdev-libevdev-VERSION.tar.gz",
     kind: "auto",
@@ -41,7 +41,7 @@ type EventDef = {attr: Str, value: Int, name: Str}
 type EventDefinitions = {defs: List[EventDef], max_codes: Map[Int]}
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/libevdev-1.0/libevdev/libevdev-uinput.h",
     kind: "file",
@@ -161,7 +161,7 @@ proc c_lines_for_bits(defs: List[EventDef], attr: Str, max_name: Str, include_bu
     }
   }
 
-  return lines.push("};").push("")
+  lines.push("};").push("")
 }
 
 proc c_lookup_lines(
@@ -255,7 +255,7 @@ proc write_event_names() [fs, error] {
   let second_defs: List[EventDef] = second.defs
   var defs = first_defs.extend(second_defs)
   var max_codes: Map[Int] = first.max_codes
-  let second_max: Map[Int] = second.max_codes
+  let second_max = second.max_codes
 
   for key in [
     "EV_MAX",
@@ -291,7 +291,7 @@ proc write_event_names() [fs, error] {
   lines = lines.extend(c_lines_for_bits(defs, "rep", "REP_MAX", false)?)
   lines = lines.extend(c_lines_for_bits(defs, "input_prop", "INPUT_PROP_MAX", false)?)
   lines = lines.extend(c_lines_for_bits(defs, "mt_tool", "MT_TOOL_MAX", false)?)
-  lines = lines.push("static const char * const * const event_type_map[EV_MAX + 1] = {")
+  lines += ["static const char * const * const event_type_map[EV_MAX + 1] = {"]
 
   for prefix in event_prefixes() {
     if ! (prefix == "BTN_" or prefix == "EV_" or prefix == "INPUT_PROP_" or prefix == "MT_TOOL_") {
@@ -321,7 +321,7 @@ proc write_event_names() [fs, error] {
   lines = lines.push("#pragma GCC diagnostic push")
   lines = lines.push("#pragma GCC diagnostic ignored \"-Woverride-init\"")
   lines = lines.push("#endif")
-  lines = lines.push("static const int ev_max[EV_MAX + 1] = {")
+  lines += ["static const int ev_max[EV_MAX + 1] = {"]
   var index = 0
   let ev_max = max_codes.get("EV_MAX") ?? 31
 
@@ -340,38 +340,38 @@ proc write_event_names() [fs, error] {
     }
 
     if ! emitted {
-      lines = lines.push("    -1,")
+      lines += ["    -1,"]
     }
 
     index += 1
   }
 
-  lines = lines.push("};")
+  lines += ["};"]
   lines = lines.push("#if __clang__")
   lines = lines.push("#pragma clang diagnostic pop /* \"-Winitializer-overrides\" */")
   lines = lines.push("#elif __GNUC__")
   lines = lines.push("#pragma GCC diagnostic pop /* \"-Winitializer-overrides\" */")
   lines = lines.push("#endif")
-  lines = lines.push("")
-  lines = lines.push("struct name_entry {")
-  lines = lines.push("    const char *name;")
-  lines = lines.push("    unsigned int value;")
-  lines = lines.push("};")
-  lines = lines.push("")
-  lines = lines.push("static const struct name_entry tool_type_names[] = {")
+  lines += [""]
+  lines += ["struct name_entry {"]
+  lines += ["    const char *name;"]
+  lines += ["    unsigned int value;"]
+  lines += ["};"]
+  lines += [""]
+  lines += ["static const struct name_entry tool_type_names[] = {"]
   lines = lines.extend(c_lookup_lines(defs, "mt_tool", false, max_codes)?)
   lines = lines.push("};").push("")
-  lines = lines.push("static const struct name_entry ev_names[] = {")
+  lines += ["static const struct name_entry ev_names[] = {"]
   lines = lines.extend(c_lookup_lines(defs, "ev", false, max_codes)?)
   lines = lines.push("};").push("")
-  lines = lines.push("static const struct name_entry code_names[] = {")
+  lines += ["static const struct name_entry code_names[] = {"]
 
   for prefix in code_prefixes() {
     lines = lines.extend(c_lookup_lines(defs, attr_name(prefix), prefix == "BTN_", max_codes)?)
   }
 
   lines = lines.push("};").push("")
-  lines = lines.push("static const struct name_entry prop_names[] = {")
+  lines += ["static const struct name_entry prop_names[] = {"]
   lines = lines.extend(c_lookup_lines(defs, "input_prop", false, max_codes)?)
   lines = lines.push("};").push("")
   lines = lines.push("#endif /* EVENT_NAMES_H */")

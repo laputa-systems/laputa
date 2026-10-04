@@ -2,25 +2,25 @@
 use pm.env as pm_env
 
 ## Exported declaration `name`.
-export let name = "libxkbcommon"
+export const name = "libxkbcommon"
 
 ## Explicit payload or metapackage classification.
-export let package_kind = "payload"
+export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export let ver = "1.11.0"
+export const ver = "1.11.0"
 
 ## Exported declaration `rel`.
-export let rel = "8"
+export const rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["musl", "xkeyboard-config"]
+export const deps = ["musl", "xkeyboard-config"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "xkeyboard-config"]
+export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "xkeyboard-config"]
 
 ## Exported declaration `upstream_sources`.
-export let upstream_sources = [
+export const upstream_sources = [
   {
     source: p"https://github.com/xkbcommon/libxkbcommon/archive/xkbcommon-VERSION.tar.gz",
     kind: "auto",
@@ -63,7 +63,7 @@ export let upstream_sources = [
 ]
 
 ## Exported declaration `filetree`.
-export let filetree = [
+export const filetree = [
   {
     path: p"usr/include/xkbcommon/xkbcommon-compat.h",
     kind: "file",
