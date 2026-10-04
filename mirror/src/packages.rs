@@ -25,8 +25,9 @@ pub struct RemotePackage {
     pub metadata: String,
     pub source_sha256: String,
     pub metapackage: bool,
-    /// The artifact key that names this row's payload object. Empty only in
-    /// legacy rows published before content-addressed object names.
+    /// The artifact key that names this row's payload object. Legacy rows,
+    /// which point at objects published before content-addressed names, may
+    /// omit it.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub artifact_key: String,
     /// The proof key that, with the artifact key, names the metadata and
@@ -756,11 +757,12 @@ fn validate_index(index: &[RemotePackage]) -> Result<(), String> {
                 return Err(format!("invalid metapackage fields for {}", pkg.name));
             }
         }
-        if !pkg.artifact_key.is_empty() {
+        if names_content_addressed_objects(pkg) {
             validate_content_addressed_row(pkg)?;
             continue;
         }
-        // Legacy rows, published before artifact keys named objects.
+        // Legacy rows point at objects published before content-addressed
+        // names, which can no longer be written.
         if !pkg.metapackage {
             if package_key(&format!("/{}", pkg.tarball)).is_none() {
                 return Err(format!("invalid tarball path for {}", pkg.name));
@@ -787,8 +789,14 @@ fn validate_index(index: &[RemotePackage]) -> Result<(), String> {
     Ok(())
 }
 
-/// A row that carries an artifact key names exactly the content-addressed
-/// objects of that key and its proof key.
+fn names_content_addressed_objects(pkg: &RemotePackage) -> bool {
+    [&pkg.tarball, &pkg.metadata, &pkg.proof]
+        .into_iter()
+        .any(|object| !object.is_empty() && publishable_object_key(&format!("/{object}")).is_some())
+}
+
+/// A row that names any content-addressed object names exactly the objects
+/// of its artifact key and proof key.
 fn validate_content_addressed_row(pkg: &RemotePackage) -> Result<(), String> {
     if !valid_lower_sha256(&pkg.artifact_key) || !valid_lower_sha256(&pkg.proof_key) {
         return Err(format!("invalid artifact or proof key for {}", pkg.name));

@@ -165,7 +165,8 @@ proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage
 # named by artifact and proof key, so replacing a row never touches published
 # bytes. A rebuild under the same ver-rel (a different artifact key) replaces
 # the row; a row behind the remote's ver-rel is refused, because publishing it
-# would move the index backwards.
+# would move the index backwards. The same keys with different bytes (another
+# store's payload or executor) fail at the immutable object upload instead.
 proc repo_merge_publication(index: List[types.RemotePackage], entry: types.RemotePackage) [error] -> Result[RepoIndexMerge] {
   var updated: List[types.RemotePackage] = []
   var replaced = false
@@ -182,13 +183,6 @@ proc repo_merge_publication(index: List[types.RemotePackage], entry: types.Remot
             f"{entry.arch}/{entry.name} {util.version_id(entry.ver, entry.rel)} is behind remote {util.version_id(existing.ver, existing.rel)}; bump PKGBUILD.xsh rel explicitly",
           ),
         )
-      }
-
-      # Same artifact and proof keys name the same immutable objects, so a
-      # row that differs anyway (another store's payload bytes or executor)
-      # cannot be published beside it.
-      if existing.artifact_key == entry.artifact_key and existing.proof_key == entry.proof_key {
-        return Err(types.PmError.PackageConflict(f"remote {entry.arch}/{entry.name} already publishes artifact {entry.artifact_key} with different content"))
       }
 
       updated = updated.push(entry)
@@ -245,8 +239,8 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
     stages = stages.push({publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata})
   }
 
-  # This is the sole remote-index read. It establishes behind-remote rows and
-  # artifact conflicts before any object upload.
+  # This is the sole remote-index read. It rejects rows behind the remote
+  # before any object upload.
   var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
   var pending: List[RepoPublishStage] = []
 

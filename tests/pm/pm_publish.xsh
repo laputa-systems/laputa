@@ -288,13 +288,14 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   let clean_work = test.temp_dir(ctx, name: "publish-tuple-conflict-work")?
   let clean_url = f"file://{clean_remote}"
   repo.publish(snapshot, clean_url, "", clean_work)?
+  let published = fs.read_text(fp"{clean_remote}/index.json")?
   let raw = remote.load_remote_index_from(fp"{clean_remote}/index.json")?
   fs.write(fp"{clean_remote}/index.json", json.encode([{...raw[0], sha256: "different tuple bytes"}])? + "\n")?
 
-  match repo.publish(snapshot, clean_url, "", clean_work) {
-    Ok(_) => test.fail("conflicting artifact unexpectedly published")?
-    Err(problem) => assert "already publishes artifact" in problem.message
-  }
+  # The index row is a mutable pointer: republishing the verified snapshot
+  # points it back at the same immutable objects.
+  repo.publish(snapshot, clean_url, "", clean_work)?
+  test.eq(fs.read_text(fp"{clean_remote}/index.json")?, published)?
 }
 
 # Artifact keys exclude the executor, so a new seed or PM rebuilds a package

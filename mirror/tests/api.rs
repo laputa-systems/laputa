@@ -885,13 +885,16 @@ fn index_rows_must_name_their_artifact_key_objects() {
         assert_eq!(put_index(&state, &index).status, 400, "{label}");
     }
 
-    // A legacy row without an artifact key keeps its legacy object names.
+    // Legacy rows point at tuple-named objects published before
+    // content-addressed names, with or without artifact keys.
     let mut legacy = sample_index();
+    legacy[0].tarball = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".into();
+    legacy[0].metadata = "metadata/aarch64/zlib/zlib-1.3.2-5.json".into();
+    legacy[0].proof = "proofs/aarch64/zlib/zlib-1.3.2-5.json".into();
+    assert_eq!(put_index(&state, &legacy).status, 201);
     legacy[0].artifact_key = String::new();
     legacy[0].proof_key = String::new();
     legacy[0].proof = String::new();
-    legacy[0].tarball = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".into();
-    legacy[0].metadata = "metadata/aarch64/zlib/zlib-1.3.2-5.json".into();
     assert_eq!(put_index(&state, &legacy).status, 201);
 }
 
