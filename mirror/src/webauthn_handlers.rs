@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use webauthn_minimal::{AuthChallenge, RegChallenge, RegistrationMode, StoredCredential};
 
-use crate::AppState;
+use crate::AuthState;
 use crate::packages::{Response, session_cookie};
 
 static AUTH_HTML: &str = include_str!("../static/auth.html");
@@ -13,7 +13,7 @@ pub fn auth_page() -> Response {
 }
 
 /// Returns (username, user_id) for the authenticated browser session, or None.
-fn session_user(headers: &HashMap<String, String>, state: &AppState) -> Option<(String, String)> {
+fn session_user(headers: &HashMap<String, String>, state: &AuthState) -> Option<(String, String)> {
     let cookie = session_cookie(headers)?;
     let db = state.db.lock().unwrap();
     let username = db.verify_browser_session(&cookie).ok()??;
@@ -23,7 +23,7 @@ fn session_user(headers: &HashMap<String, String>, state: &AppState) -> Option<(
 
 /// POST /auth/register/options
 /// Body: {"username":"josh"}
-pub fn register_options(body: &[u8], state: &AppState) -> Response {
+pub fn register_options(body: &[u8], state: &AuthState) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
         username: String,
@@ -74,7 +74,7 @@ pub fn register_options(body: &[u8], state: &AppState) -> Response {
 
 /// POST /auth/register/verify
 /// Body: {"session_id":"...","credential":{...}}
-pub fn register_verify(body: &[u8], state: &AppState) -> Response {
+pub fn register_verify(body: &[u8], state: &AuthState) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
         session_id: String,
@@ -159,7 +159,7 @@ pub fn register_verify(body: &[u8], state: &AppState) -> Response {
 }
 
 /// POST /auth/authenticate/options
-pub fn authenticate_options(state: &AppState) -> Response {
+pub fn authenticate_options(state: &AuthState) -> Response {
     let (user_id, creds) = {
         let db = state.db.lock().unwrap();
 
@@ -208,7 +208,7 @@ pub fn authenticate_options(state: &AppState) -> Response {
 
 /// POST /auth/authenticate/verify
 /// Body: {"session_id":"...","credential":{...}}
-pub fn authenticate_verify(body: &[u8], state: &AppState) -> Response {
+pub fn authenticate_verify(body: &[u8], state: &AuthState) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
         session_id: String,
@@ -323,7 +323,7 @@ pub fn authenticate_verify(body: &[u8], state: &AppState) -> Response {
 
 /// GET /auth/poll?session={id}
 /// Returns token once (status 200), then 202 while pending, 404 if not found.
-pub fn poll_session(query: &str, state: &AppState) -> Response {
+pub fn poll_session(query: &str, state: &AuthState) -> Response {
     let session_id = query
         .split('&')
         .find_map(|p| p.strip_prefix("session="))
@@ -348,7 +348,7 @@ pub fn poll_session(query: &str, state: &AppState) -> Response {
 }
 
 /// GET /auth/logout invalidates browser session, clears cookie, redirects to /.
-pub fn logout(headers: &HashMap<String, String>, state: &AppState) -> Response {
+pub fn logout(headers: &HashMap<String, String>, state: &AuthState) -> Response {
     if let Some(cookie) = session_cookie(headers) {
         let _ = state.db.lock().unwrap().invalidate_browser_session(&cookie);
     }
@@ -356,7 +356,7 @@ pub fn logout(headers: &HashMap<String, String>, state: &AppState) -> Response {
 }
 
 /// GET /auth/settings token management page; requires browser session.
-pub fn settings_page(headers: &HashMap<String, String>, state: &AppState) -> Response {
+pub fn settings_page(headers: &HashMap<String, String>, state: &AuthState) -> Response {
     let (username, user_id) = match session_user(headers, state) {
         Some(u) => u,
         None => return Response::redirect("/auth"),
@@ -481,7 +481,7 @@ pub fn settings_page(headers: &HashMap<String, String>, state: &AppState) -> Res
 pub fn create_token_api(
     body: &[u8],
     headers: &HashMap<String, String>,
-    state: &AppState,
+    state: &AuthState,
 ) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
@@ -520,7 +520,7 @@ pub fn create_token_api(
 pub fn delete_token_api(
     body: &[u8],
     headers: &HashMap<String, String>,
-    state: &AppState,
+    state: &AuthState,
 ) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
@@ -551,12 +551,12 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn make_session_cookie(value: &str, state: &AppState) -> String {
+fn make_session_cookie(value: &str, state: &AuthState) -> String {
     let secure = if state.secure_cookies { "; Secure" } else { "" };
     format!("laputa_mirror_session={value}; HttpOnly; SameSite=Strict; Path=/{secure}")
 }
 
-fn clear_session_cookie(state: &AppState) -> String {
+fn clear_session_cookie(state: &AuthState) -> String {
     let secure = if state.secure_cookies { "; Secure" } else { "" };
     format!("laputa_mirror_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0{secure}")
 }

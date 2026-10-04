@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::AppState;
+use crate::AuthState;
 
-pub fn authenticated(headers: &HashMap<String, String>, state: &AppState) -> bool {
+pub fn authenticated(headers: &HashMap<String, String>, state: &AuthState) -> bool {
     let Some(token) = extract_bearer(headers) else {
         return false;
     };

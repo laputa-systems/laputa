@@ -7,7 +7,7 @@
 
 use std::sync::{Arc, Mutex, RwLock};
 
-use laputa_mirror::{AppState, db::Db, s3::Storage};
+use laputa_mirror::{Access, AppState, AuthState, db::Db, s3::Storage};
 
 const PORT: u16 = 3000;
 const USER: &str = "demo";
@@ -15,16 +15,19 @@ const USER: &str = "demo";
 fn main() {
     let origin = format!("http://localhost:{PORT}");
     let state = Arc::new(AppState {
-        s3: Storage::memory(),
-        db: Mutex::new(Db::open(":memory:").expect("in-memory auth db")),
-        webauthn: webauthn_minimal::RelyingParty::new("localhost", &origin, "Laputa Mirror Demo"),
-        jwks: None,
-        allowed_users: vec![USER.to_string()],
+        storage: Storage::memory(),
+        access: Access::Authenticated(AuthState {
+            db: Mutex::new(Db::open(":memory:").expect("in-memory auth db")),
+            webauthn: webauthn_minimal::RelyingParty::new("localhost", &origin, "Laputa Mirror Demo"),
+            jwks: None,
+            allowed_users: vec![USER.to_string()],
+            secure_cookies: false,
+        }),
         index: RwLock::new(Vec::new()),
         upload_dir: std::env::temp_dir().join("laputa-mirror-demo-uploads"),
         index_lock: Mutex::new(()),
-        secure_cookies: false,
         r2_public_url: None,
+        source_cache: None,
     });
 
     let server = tiny_http::Server::http(("127.0.0.1", PORT)).expect("failed to bind");

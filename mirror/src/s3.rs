@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use graviola::hashing::hmac::Hmac;
@@ -273,9 +273,87 @@ fn content_type_or_default(content_type: &str) -> &str {
     }
 }
 
-/// Storage backend: S3 or in-memory for tests.
+/// A directory holding objects at `<root>/<key>`, for the local mirror.
+///
+/// Writes go to a dot-named temp file in the destination directory and are renamed
+/// into place, so readers see either the previous object or the complete new one.
+/// Keys arrive validated by the router; `path` re-checks them anyway because a bad
+/// key here would read or write outside `root`.
+pub struct FsStore {
+    root: PathBuf,
+}
+
+impl FsStore {
+    /// The file for `key`. Rejects absolute keys, empty, `.` and `..` segments, and
+    /// dot-named segments, which are reserved for temp files and the upload dir.
+    fn path(&self, key: &str) -> Result<PathBuf, String> {
+        let mut path = self.root.clone();
+        for segment in key.split('/') {
+            if segment.is_empty()
+                || segment.starts_with('.')
+                || segment.contains('\\')
+                || segment.contains('\0')
+            {
+                return Err(format!("unsafe storage key {key:?}"));
+            }
+            path.push(segment);
+        }
+        Ok(path)
+    }
+
+    /// Open `key` for streaming, with its length; `None` if it does not exist.
+    pub fn open(&self, key: &str) -> Result<Option<(File, u64)>, String> {
+        open_file(&self.path(key)?)
+    }
+
+    fn write_atomic(
+        &self,
+        key: &str,
+        write: impl FnOnce(&mut File) -> io::Result<()>,
+    ) -> Result<(), String> {
+        let path = self.path(key)?;
+        let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+            return Err(format!("unsafe storage key {key:?}"));
+        };
+        fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        let temp = dir.join(format!(
+            ".{}.{}.tmp",
+            name.to_string_lossy(),
+            uuid::Uuid::new_v4().simple()
+        ));
+        let result = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+            .and_then(|mut file| {
+                write(&mut file)?;
+                file.sync_all()
+            })
+            .and_then(|()| fs::rename(&temp, &path));
+        result.map_err(|e| {
+            let _ = fs::remove_file(&temp);
+            format!("write {}: {e}", path.display())
+        })
+    }
+}
+
+/// Open a regular file for streaming, with its length; `None` if nothing is there.
+pub fn open_file(path: &Path) -> Result<Option<(File, u64)>, String> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("open {}: {e}", path.display())),
+    };
+    let metadata = file
+        .metadata()
+        .map_err(|e| format!("metadata {}: {e}", path.display()))?;
+    Ok(metadata.is_file().then(|| (file, metadata.len())))
+}
+
+/// Storage backend: S3 in production, a directory in local mode, or in-memory for tests.
 pub enum Storage {
     S3(S3Bucket),
+    Fs(FsStore),
     Memory(RwLock<HashMap<String, Vec<u8>>>),
 }
 
@@ -296,6 +374,10 @@ impl Storage {
         })
     }
 
+    pub fn fs(root: impl Into<PathBuf>) -> Self {
+        Self::Fs(FsStore { root: root.into() })
+    }
+
     pub fn memory() -> Self {
         Self::Memory(RwLock::new(HashMap::new()))
     }
@@ -304,6 +386,7 @@ impl Storage {
     pub fn object_size(&self, key: &str) -> Option<u64> {
         match self {
             Self::Memory(map) => map.read().unwrap().get(key).map(|b| b.len() as u64),
+            Self::Fs(store) => fs_read(store.open(key)).map(|(_, length)| length),
             Self::S3(bucket) => {
                 let reply = bucket
                     .request("HEAD", key, None, Payload::Bytes(&[]))
@@ -323,6 +406,17 @@ impl Storage {
                 let reply = bucket.request("GET", key, None, Payload::Bytes(&[])).ok()?;
                 (reply.status == 200).then_some(reply.body)
             }
+            Self::Fs(store) => {
+                let (mut file, _) = fs_read(store.open(key))?;
+                let mut body = Vec::new();
+                match file.read_to_end(&mut body) {
+                    Ok(_) => Some(body),
+                    Err(e) => {
+                        tracing::error!("read {key}: {e}");
+                        None
+                    }
+                }
+            }
             Self::Memory(map) => map.read().unwrap().get(key).cloned(),
         }
     }
@@ -335,6 +429,7 @@ impl Storage {
                 Some(content_type_or_default(content_type)),
                 Payload::Bytes(&body),
             )?),
+            Self::Fs(store) => store.write_atomic(key, |file| io::Write::write_all(file, &body)),
             Self::Memory(map) => {
                 map.write().unwrap().insert(key.to_string(), body);
                 Ok(())
@@ -362,6 +457,9 @@ impl Storage {
                     },
                 )?)
             }
+            Self::Fs(store) => store.write_atomic(key, |file| {
+                io::copy(&mut File::open(path)?, file).map(|_| ())
+            }),
             Self::Memory(_) => {
                 let body =
                     std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
@@ -385,9 +483,18 @@ impl Storage {
     fn presign_url(&self, method: &str, key: &str, expires_secs: u64) -> Option<String> {
         match self {
             Self::S3(bucket) => Some(bucket.presign(method, key, expires_secs, &Timestamp::now())),
-            Self::Memory(_) => None,
+            Self::Fs(_) | Self::Memory(_) => None,
         }
     }
+}
+
+/// Collapse an `FsStore::open` result into the `Option` the `Storage` read API
+/// returns, logging real I/O errors so they are not mistaken for a missing object.
+fn fs_read(opened: Result<Option<(File, u64)>, String>) -> Option<(File, u64)> {
+    opened.unwrap_or_else(|e| {
+        tracing::error!("{e}");
+        None
+    })
 }
 
 #[cfg(test)]

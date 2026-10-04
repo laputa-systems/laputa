@@ -4,9 +4,9 @@ use std::io::{BufReader, BufWriter, Write};
 
 use serde::{Deserialize, Serialize};
 
-use crate::AppState;
 use crate::auth;
 use crate::s3;
+use crate::{Access, AppState, AuthState};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RemotePackage {
@@ -34,8 +34,14 @@ fn default_arch() -> String {
 pub struct Response {
     pub status: u16,
     pub content_type: &'static str,
-    pub body: Vec<u8>,
+    pub body: Body,
     pub extra_headers: Vec<(&'static str, String)>,
+}
+
+pub enum Body {
+    Bytes(Vec<u8>),
+    /// Streamed from disk with its length known up front.
+    File { file: File, length: u64 },
 }
 
 impl Response {
@@ -43,7 +49,7 @@ impl Response {
         Self {
             status,
             content_type: "application/json",
-            body: body.as_bytes().to_vec(),
+            body: Body::Bytes(body.as_bytes().to_vec()),
             extra_headers: vec![],
         }
     }
@@ -52,7 +58,7 @@ impl Response {
         Self {
             status,
             content_type: "application/json",
-            body,
+            body: Body::Bytes(body),
             extra_headers: vec![],
         }
     }
@@ -61,7 +67,7 @@ impl Response {
         Self {
             status: 200,
             content_type: "text/html; charset=utf-8",
-            body,
+            body: Body::Bytes(body),
             extra_headers: vec![],
         }
     }
@@ -70,7 +76,7 @@ impl Response {
         Self {
             status: 200,
             content_type: "application/octet-stream",
-            body,
+            body: Body::Bytes(body),
             extra_headers: vec![],
         }
     }
@@ -79,7 +85,7 @@ impl Response {
         Self {
             status: 302,
             content_type: "text/plain",
-            body: vec![],
+            body: Body::Bytes(vec![]),
             extra_headers: vec![("Location", location.to_string())],
         }
     }
@@ -88,7 +94,7 @@ impl Response {
         Self {
             status: 404,
             content_type: "text/plain",
-            body: b"Not Found".to_vec(),
+            body: Body::Bytes(b"Not Found".to_vec()),
             extra_headers: vec![],
         }
     }
@@ -111,8 +117,8 @@ impl Response {
     }
 }
 
-pub fn load_index(s3: &s3::Storage) -> Option<Vec<RemotePackage>> {
-    let bytes = s3.get("index.json")?;
+pub fn load_index(storage: &s3::Storage) -> Option<Vec<RemotePackage>> {
+    let bytes = storage.get("index.json")?;
     serde_json::from_slice(&bytes).ok()
 }
 
@@ -129,26 +135,58 @@ pub fn route(
         return static_asset(asset);
     }
 
+    if path == "/auth" || path.starts_with("/auth?") || path.starts_with("/auth/") {
+        return match &state.access {
+            Access::Authenticated(auth) => auth_route(method, path, headers, body, auth),
+            Access::Open => Response::not_found(),
+        };
+    }
+
     match method {
         "GET" => get(path, headers, state),
         "PUT" => put(path, headers, body, state),
+        "POST" if path.starts_with("/_uploads/") && path.ends_with("/complete") => {
+            complete_chunked_upload(path, headers, body, state)
+        }
+        _ => Response::not_found(),
+    }
+}
+
+/// The passkey, browser-session and token routes, which exist only in production.
+fn auth_route(
+    method: &str,
+    path: &str,
+    headers: &HashMap<String, String>,
+    body: &[u8],
+    auth: &AuthState,
+) -> Response {
+    use crate::webauthn_handlers as wh;
+    match method {
+        "GET" if path == "/auth" || path.starts_with("/auth?") => wh::auth_page(),
+        "GET" if path.starts_with("/auth/poll") => {
+            let query = path.find('?').map(|i| &path[i + 1..]).unwrap_or("");
+            wh::poll_session(query, auth)
+        }
+        "GET" if path == "/auth/logout" => wh::logout(headers, auth),
+        "GET" if path == "/auth/settings" => wh::settings_page(headers, auth),
         "POST" => match path {
-            "/auth/register/options" => crate::webauthn_handlers::register_options(body, state),
-            "/auth/register/verify" => crate::webauthn_handlers::register_verify(body, state),
-            "/auth/authenticate/options" => crate::webauthn_handlers::authenticate_options(state),
-            "/auth/authenticate/verify" => {
-                crate::webauthn_handlers::authenticate_verify(body, state)
-            }
-            "/auth/tokens" => crate::webauthn_handlers::create_token_api(body, headers, state),
-            "/auth/tokens/delete" => {
-                crate::webauthn_handlers::delete_token_api(body, headers, state)
-            }
-            path if path.starts_with("/_uploads/") && path.ends_with("/complete") => {
-                complete_chunked_upload(path, headers, body, state)
-            }
+            "/auth/register/options" => wh::register_options(body, auth),
+            "/auth/register/verify" => wh::register_verify(body, auth),
+            "/auth/authenticate/options" => wh::authenticate_options(auth),
+            "/auth/authenticate/verify" => wh::authenticate_verify(body, auth),
+            "/auth/tokens" => wh::create_token_api(body, headers, auth),
+            "/auth/tokens/delete" => wh::delete_token_api(body, headers, auth),
             _ => Response::not_found(),
         },
         _ => Response::not_found(),
+    }
+}
+
+/// Whether this request may write objects, the index, or upload chunks.
+fn may_write(headers: &HashMap<String, String>, state: &AppState) -> bool {
+    match &state.access {
+        Access::Authenticated(auth) => auth::authenticated(headers, auth),
+        Access::Open => true,
     }
 }
 
@@ -167,7 +205,7 @@ fn static_asset(asset: &str) -> Response {
         Some(Ok(body)) => Response {
             status: 200,
             content_type,
-            body,
+            body: Body::Bytes(body),
             extra_headers: vec![],
         },
         _ => Response::not_found(),
@@ -197,18 +235,8 @@ fn get(path: &str, headers: &HashMap<String, String>, state: &AppState) -> Respo
     if path == "/index.json" {
         return get_index(state);
     }
-    if path == "/auth" || path.starts_with("/auth?") {
-        return crate::webauthn_handlers::auth_page();
-    }
-    if path.starts_with("/auth/poll") {
-        let query = path.find('?').map(|i| &path[i + 1..]).unwrap_or("");
-        return crate::webauthn_handlers::poll_session(query, state);
-    }
-    if path == "/auth/logout" {
-        return crate::webauthn_handlers::logout(headers, state);
-    }
-    if path == "/auth/settings" {
-        return crate::webauthn_handlers::settings_page(headers, state);
+    if let Some(hash) = cached_source_hash(path) {
+        return get_cached_source(hash, state);
     }
     if let Some(key) = package_key(path) {
         return get_object(&key, state);
@@ -223,7 +251,7 @@ fn get(path: &str, headers: &HashMap<String, String>, state: &AppState) -> Respo
 }
 
 fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppState) -> Response {
-    if !auth::authenticated(headers, state) {
+    if !may_write(headers, state) {
         return Response::unauthorized();
     }
 
@@ -242,7 +270,7 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
         return Response::not_found();
     };
 
-    match state.s3.put(&key, body.to_vec(), content_type_for(&key)) {
+    match state.storage.put(&key, body.to_vec(), content_type_for(&key)) {
         Ok(()) => Response::json(201, r#"{"ok":true}"#),
         Err(e) => {
             tracing::error!("object upload failed for {key}: {e}");
@@ -276,7 +304,7 @@ fn complete_chunked_upload(
     body: &[u8],
     state: &AppState,
 ) -> Response {
-    if !auth::authenticated(headers, state) {
+    if !may_write(headers, state) {
         return Response::unauthorized();
     }
 
@@ -338,7 +366,7 @@ fn complete_chunked_upload(
     }
     drop(out);
 
-    match state.s3.put_file(&key, &assembled, content_type_for(&key)) {
+    match state.storage.put_file(&key, &assembled, content_type_for(&key)) {
         Ok(()) => {
             let _ = std::fs::remove_dir_all(&dir);
             Response::json(201, r#"{"ok":true}"#)
@@ -397,7 +425,7 @@ fn put_index(body: &[u8], state: &AppState) -> Response {
     };
 
     let _index_guard = state.index_lock.lock().unwrap();
-    if let Err(e) = state.s3.put("index.json", bytes, "application/json") {
+    if let Err(e) = state.storage.put("index.json", bytes, "application/json") {
         tracing::error!("index upload failed: {e}");
         return Response::error("index upload failed");
     }
@@ -409,37 +437,80 @@ fn get_object(key: &str, state: &AppState) -> Response {
     if let Some(base) = &state.r2_public_url {
         return Response::redirect(&format!("{base}/{key}"));
     }
-    if let Some(url) = state.s3.presign_get(key, 300) {
+    if let Some(url) = state.storage.presign_get(key, 300) {
         return Response::redirect(&url);
     }
-    match state.s3.get(key) {
+    if let s3::Storage::Fs(store) = &state.storage {
+        return file_response(store.open(key), content_type_for(key));
+    }
+    match state.storage.get(key) {
         Some(bytes) => Response {
             status: 200,
             content_type: content_type_for(key),
-            body: bytes,
+            body: Body::Bytes(bytes),
             extra_headers: vec![],
         },
         None => Response::not_found(),
     }
 }
 
-fn root_index(headers: &HashMap<String, String>, state: &AppState) -> Response {
-    let username = session_cookie(headers).and_then(|t| {
-        state
-            .db
-            .lock()
-            .unwrap()
-            .verify_browser_session(&t)
-            .ok()
-            .flatten()
-    });
+/// `/sources/sha256/<64 lowercase hex>`, the content-addressed source route. Other
+/// names under `/sources/sha256/` fall through to the per-package source route, so
+/// a malformed hash is a 404 like any other unknown path.
+fn cached_source_hash(path: &str) -> Option<&str> {
+    let hash = path.strip_prefix("/sources/sha256/")?;
+    let lowercase_hex = hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    (hash.len() == 64 && lowercase_hex).then_some(hash)
+}
 
-    let userbar = match &username {
-        Some(name) => format!(
-            "<span class=userbar>{} <a href=\"/auth/settings\">(settings)</a> &middot; <a href=\"/auth/logout\">sign out</a></span>",
-            html_escape(name),
-        ),
-        None => "<a href=\"/auth\" class=signin>sign in</a>".to_string(),
+/// Serves `<source_cache>/sha256/<hash>`, the layout PM's source cache uses.
+fn get_cached_source(hash: &str, state: &AppState) -> Response {
+    let Some(dir) = &state.source_cache else {
+        return Response::not_found();
+    };
+    let path = dir.join("sha256").join(hash);
+    file_response(s3::open_file(&path), "application/octet-stream")
+}
+
+fn file_response(
+    opened: Result<Option<(File, u64)>, String>,
+    content_type: &'static str,
+) -> Response {
+    match opened {
+        Ok(Some((file, length))) => Response {
+            status: 200,
+            content_type,
+            body: Body::File { file, length },
+            extra_headers: vec![],
+        },
+        Ok(None) => Response::not_found(),
+        Err(e) => {
+            tracing::error!("{e}");
+            Response::error("read failed")
+        }
+    }
+}
+
+fn root_index(headers: &HashMap<String, String>, state: &AppState) -> Response {
+    let userbar = match &state.access {
+        Access::Authenticated(auth) => {
+            let username = session_cookie(headers).and_then(|t| {
+                auth.db
+                    .lock()
+                    .unwrap()
+                    .verify_browser_session(&t)
+                    .ok()
+                    .flatten()
+            });
+            match &username {
+                Some(name) => format!(
+                    "<span class=userbar>{} <a href=\"/auth/settings\">(settings)</a> &middot; <a href=\"/auth/logout\">sign out</a></span>",
+                    html_escape(name),
+                ),
+                None => "<a href=\"/auth\" class=signin>sign in</a>".to_string(),
+            }
+        }
+        Access::Open => String::new(),
     };
 
     let mut packages = state.index.read().unwrap().clone();

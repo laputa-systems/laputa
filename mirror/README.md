@@ -19,6 +19,35 @@ origin path. With this tunnel-only setup, leave `R2_PUBLIC_URL` unset so package
 downloads are served through `laputa-mirror` instead of redirecting clients to a
 public R2 URL.
 
+## Local Mode
+
+For local development and offline bootstraps, run the mirror against a
+directory instead of S3, with no auth:
+
+```sh
+laputa-mirror --local DATA_DIR [--listen 127.0.0.1:PORT] [--sources SOURCE_CACHE_DIR]
+make local DATA=.out/mirror SOURCES=.cache/sources PORT=3000
+```
+
+- Objects live at `DATA_DIR/<key>` (for example
+  `DATA_DIR/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz`). Writes land in a temp
+  file beside the object and are renamed into place, so readers never see a
+  partial object. Chunked uploads stage under `DATA_DIR/.uploads`.
+- Reads and writes need no token; a client may send none. `PUT` objects and
+  `index.json`, and chunked uploads, all work unauthenticated.
+- `GET` streams objects from disk with `Content-Length`; nothing redirects.
+- `--sources DIR` serves `DIR/sha256/<hash>` read-only at
+  `/sources/sha256/<hash>`, where `<hash>` is 64 lowercase hex digits. Other
+  names, missing files and writes return 404.
+- `--listen` defaults to `127.0.0.1:3000` and must be a loopback IP address.
+  There is no flag to bind elsewhere: anyone who can reach the port can
+  publish.
+- `/auth` routes return 404. No database, WebAuthn, JWT or S3 settings are
+  read; the production environment variables are ignored.
+
+Running `laputa-mirror` with no arguments is production mode, configured from
+the environment as described below.
+
 ## Architecture
 
 ```text

@@ -58,7 +58,7 @@ PNPM_ROOT ?= target/pnpm
 	test-pm-native test-pm-docker test-pm-local-linux xsh-native xsh-local-bins xsh-builder-image update-checksums \
 	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
 	installer-qemu-manual \
-	mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
+	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
 
 # xsht-config.ini owns the module path and the excluded fixture and mirror trees.
 check:
@@ -186,6 +186,16 @@ installer-qemu-manual:
 # rust-toolchain.toml applies.
 mirror-build:
 	cd $(MIRROR) && $(CARGO) build -j $(CARGO_JOBS) --locked
+
+# Local-only mirror on http://127.0.0.1:$(MIRROR_PORT): packages under
+# .out/mirror (derived), the fetched source cache served read-only at
+# /sources/sha256/<hash>. No auth; loopback only.
+MIRROR_PORT ?= 3000
+MIRROR_DATA ?= $(CURDIR)/.out/mirror
+SOURCE_CACHE ?= $(CURDIR)/.cache/sources
+mirror:
+	mkdir -p "$(MIRROR_DATA)" "$(SOURCE_CACHE)/sha256"
+	cd $(MIRROR) && $(CARGO) run -j $(CARGO_JOBS) --locked --bin laputa-mirror -- --local "$(MIRROR_DATA)" --listen "127.0.0.1:$(MIRROR_PORT)" --sources "$(SOURCE_CACHE)"
 
 mirror-test:
 	cd $(MIRROR) && $(CARGO) test -j $(CARGO_JOBS) --locked
