@@ -9,10 +9,10 @@ export const name = "wayland-dev"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.24.0"
+export const ver = "1.26.0"
 
 ## Package recipe export.
-export const rel = "10"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl", "expat", "wayland-libs-client", "wayland-libs-server", "wayland-libs-cursor"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "82892487a01ad67b334eca83b54317a7c86a03a89cfadacfef5211f11a5d0536",
+        sha256: "64176eaa46e4969903e286f8e5ef8331affc17fdf03ac9b58381d2b23162b7a3",
       },
     ],
   },
