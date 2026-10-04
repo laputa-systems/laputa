@@ -1,4 +1,5 @@
 ##! Behavior coverage for the typed package-recipe boundary.
+use pm.catalog
 use pm.recipe
 use pm.sources
 use pm.types
@@ -309,4 +310,78 @@ test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
   let x86 = target.lp64_musl_abi("x86_64")
   assert x86.signed_wchar_t
   assert x86.wchar_t_suffix == "\"INT\""
+}
+
+# Writes a metapackage recipe into `repo`'s packages directory. `extra` is
+# appended exports, such as an `architectures` list.
+proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) [fs, error] -> Result[Path] {
+  let dir = fp"{repo}/packages/{name}"
+  fs.mkdir(dir)?
+  fs.write(
+    fp"{dir}/PKGBUILD.xsh",
+    f"""##! Package architecture fixture recipe.
+## Fixture export.
+export let name = "{name}"
+## Fixture export.
+export let package_kind = "meta"
+## Fixture export.
+export let ver = "1"
+## Fixture export.
+export let rel = "1"
+## Fixture export.
+export let deps = {deps}
+## Fixture export.
+export let mkdeps_host = []
+## Fixture export.
+export let upstream_sources = []
+## Fixture export.
+export let filetree = []
+{extra}
+""",
+  )?
+  dir
+}
+
+test test_recipe_architectures_default_to_every_target_and_reject_invalid_lists [fs, env, error] { |ctx|
+  let repo = test.temp_dir(ctx, name: "recipe-architectures")?
+  let omitted = write_arch_recipe(repo, "arch-omitted", "[]", "")?
+  assert recipe.load_package(omitted)?.architectures == ["aarch64", "x86_64"]
+
+  let x86_only = write_arch_recipe(repo, "arch-x86-only", "[]", "## Fixture export.\nexport let architectures = [\"x86_64\"]")?
+  assert recipe.load_package_for_target(x86_only, types.target_aarch64())?.architectures == ["x86_64"]
+
+  for case in [
+    {list: "[]", message: "architectures must name at least one target architecture"},
+    {list: "[\"all\"]", message: "architectures has unsupported architecture all"},
+    {list: "[\"x86_64\", \"x86_64\"]", message: "architectures repeats x86_64"},
+  ] {
+    let dir = write_arch_recipe(
+      test.temp_dir(ctx, name: "recipe-architectures-invalid")?,
+      "arch-invalid",
+      "[]",
+      f"## Fixture export.\nexport let architectures = {case.list}",
+    )?
+
+    match recipe.load_package(dir) {
+      Ok(_) => test.fail(f"architectures {case.list} unexpectedly loaded")?
+      Err(problem) => assert case.message in problem.message
+    }
+  }
+}
+
+test test_catalog_omits_a_package_outside_its_architectures_and_rejects_its_dependents [fs, env, error] { |ctx|
+  let repo = test.temp_dir(ctx, name: "catalog-architectures")?
+  let _ = write_arch_recipe(repo, "x86-firmware", "[]", "## Fixture export.\nexport let architectures = [\"x86_64\"]")?
+  let _ = write_arch_recipe(repo, "everywhere", "[]", "")?
+
+  assert catalog.package_names(catalog.load_for_target(repo, types.target_x86_64())?) == ["everywhere", "x86-firmware"]
+  assert catalog.package_names(catalog.load_for_target(repo, types.target_aarch64())?) == ["everywhere"]
+
+  let _ = write_arch_recipe(repo, "needs-firmware", "[\"x86-firmware\"]", "")?
+  assert catalog.load_for_target(repo, types.target_x86_64())?.packages.len() == 3
+
+  match catalog.load_for_target(repo, types.target_aarch64()) {
+    Ok(_) => test.fail("a dependency on an x86_64-only package unexpectedly loaded for aarch64")?
+    Err(problem) => assert "needs-firmware depends on x86-firmware, which does not exist for aarch64" in problem.message
+  }
 }

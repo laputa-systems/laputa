@@ -241,6 +241,7 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
     filetree: [{path: p"usr/share/wire-package", kind: types.File}],
     nostrip: false,
     source_mirror: false,
+    architectures: ["aarch64", "x86_64"],
   )
   let payload_hash = bytes.from_text("payload").sha256().hex()
   let built: types.BuiltPackage = types.BuiltPackage(

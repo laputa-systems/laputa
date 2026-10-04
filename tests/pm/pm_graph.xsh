@@ -37,6 +37,7 @@ pure fixture_package(
     filetree: [],
     nostrip: false,
     source_mirror: false,
+    architectures: ["aarch64", "x86_64"],
   }
 }
 

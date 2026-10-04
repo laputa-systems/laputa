@@ -12,6 +12,8 @@ Recipes live at `packages/<package>/PKGBUILD.xsh` and export:
 
 - `name: Str`, `ver: Str`, and positive `rel: Str`;
 - `package_kind: "payload" | "meta"`;
+- optional `architectures: List[Str]`, the targets (`aarch64`, `x86_64`) the
+  package exists for;
 - `deps`, `mkdeps_host`, and optional `mkdeps_target` and `runtime_only_deps`;
 - `upstream_sources` and `filetree`;
 - `build(dest: Path)` for payload packages.
@@ -28,6 +30,13 @@ one of `deps`, `mkdeps_*`, and `runtime_only_deps`; one the build uses belongs
 in `deps`. A build tool's own runtime needs stay `deps` when dependents run it
 at build time (`flex` needs `m4`), except `xsh`, which the executor substrate
 seeds into every build root.
+
+A recipe without `architectures` exists for every target. One that names a
+subset (CPU microcode for one vendor's x86 parts, say) is left out of the
+catalog for any other target, so `--all` never plans it there, a `--root` on
+it finds no recipe, and a package that depends on it fails to load for that
+target. A per-source `architectures` list only selects that source's inputs;
+it does not remove the package.
 
 A package that compiles against the kernel's userspace API headers takes
 `linux-headers` as a build dependency, never `linux`. `linux-headers` installs

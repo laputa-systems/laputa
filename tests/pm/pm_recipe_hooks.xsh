@@ -17,6 +17,7 @@ pure hook_package(dir: Path) -> types.Package {
     filetree: [],
     nostrip: false,
     source_mirror: false,
+    architectures: ["aarch64", "x86_64"],
   }
 }
 

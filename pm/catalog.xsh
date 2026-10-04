@@ -77,7 +77,8 @@ export pure package_map(value: types.PackageCatalog) -> Map[types.Package] {
   {pkg.name: pkg for pkg in value.packages}
 }
 
-## Discovers every recipe with filetrees selected by the explicit plan target.
+## Discovers every recipe that exists for the explicit plan target, with filetrees selected by it.
+## A package whose `architectures` excludes the target is omitted, and a package depending on one fails.
 export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -> Result[types.PackageCatalog] {
   let absolute_root = path.absolute(root)?
   let recipe_root = fp"{absolute_root}/packages"
@@ -86,15 +87,33 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
     return Err(types.PmError.PackageContract(f"{absolute_root} does not contain packages"))
   }
 
+  let arch = types.pm_target_arch(target)
   var packages: List[types.Package] = []
+  var excluded: Map[Bool] = {}
 
   for entry in fs.children(recipe_root)? |> sort-by .name {
     continue unless entry.kind == "dir"
     continue unless fs.exists(fp"{entry.path}/PKGBUILD.xsh")?
 
     let pkg = recipe.load_package_for_target(entry.path, target)?
+
+    if arch not in pkg.architectures {
+      excluded[pkg.name] = true
+      continue
+    }
+
     let durable_dir = pkg.dir.relative_to(absolute_root)
     packages = packages.push({...pkg, dir: durable_dir})
+  }
+
+  for pkg in packages {
+    for dependency in package_dependencies(pkg) {
+      if dependency in excluded {
+        return Err(
+          types.PmError.PackageContract(f"{pkg.name} depends on {dependency}, which does not exist for {arch}"),
+        )
+      }
+    }
   }
 
   make_catalog(absolute_root, packages, [])?

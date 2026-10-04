@@ -45,6 +45,7 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
     filetree: [],
     nostrip: false,
     source_mirror: false,
+    architectures: ["aarch64", "x86_64"],
   }
 }
 

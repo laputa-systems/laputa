@@ -7,6 +7,7 @@ type PackageMetadata = {
   name: Str,
   ver: Str,
   rel: Str,
+  architectures: List[Str],
   deps: List[Str],
   runtime_only_deps: List[Str],
   mkdeps_host: List[Str],
@@ -41,6 +42,28 @@ proc validate_positive_release(name: Str, rel: Str) [error] {
 
   if ! pattern.matches(rel) {
     return package_contract_error(name, "rel must be a positive decimal string")
+  }
+}
+
+# A package architecture list names each supported target at most once and
+# never `all`: omitting the export is the one way to say every target.
+proc validate_package_architectures(name: Str, architectures: List[Str]) [error] {
+  if architectures.len() == 0 {
+    return package_contract_error(name, "architectures must name at least one target architecture")
+  }
+
+  var seen: Map[Bool] = {}
+
+  for architecture in architectures {
+    if architecture != "aarch64" and architecture != "x86_64" {
+      return package_contract_error(name, f"architectures has unsupported architecture {architecture}")
+    }
+
+    if architecture in seen {
+      return package_contract_error(name, f"architectures repeats {architecture}")
+    }
+
+    seen[architecture] = true
   }
 }
 
@@ -243,6 +266,13 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
     mkdeps_target = dynamic.get("mkdeps_target")?.require(List[Str])?
   }
 
+  # A recipe without an `architectures` export exists for every supported target.
+  var architectures = ["aarch64", "x86_64"]
+
+  if "architectures" in dynamic.keys() {
+    architectures = dynamic.get("architectures")?.require(List[Str])?
+  }
+
   if "runtime_only_deps" in dynamic.keys() {
     runtime_only_deps = dynamic.get("runtime_only_deps")?.require(List[Str])?
   }
@@ -276,6 +306,7 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
     name,
     ver,
     rel,
+    architectures,
     deps,
     runtime_only_deps,
     mkdeps_host,
@@ -317,6 +348,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   }
 
   validate_positive_release(name, rel)?
+  validate_package_architectures(name, metadata.architectures)?
   validate_dependencies(name, "deps", metadata.deps)?
   validate_dependencies(name, "mkdeps_host", metadata.mkdeps_host)?
   validate_dependencies(name, "mkdeps_target", mkdeps_target)?
@@ -358,6 +390,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
     ver,
     rel,
     kind,
+    architectures: metadata.architectures,
     deps: metadata.deps,
     runtime_only_deps: metadata.runtime_only_deps,
     mkdeps_host: metadata.mkdeps_host,

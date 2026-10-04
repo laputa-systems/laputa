@@ -343,12 +343,15 @@ export type DependencyEdge = {from: Str, to: Str, kind: DependencyKind}
 export type BootstrapSeedRule = {package: Str, dependency: Str, native_only: Bool, reason: Str}
 
 ## A normalized package definition loaded by the package manager.
+## `architectures` names the target architectures the package exists for; a
+## catalog loaded for any other target omits it.
 export type Package = {
   dir: Path,
   name: Str,
   ver: Str,
   rel: Str,
   kind: PackageKind,
+  architectures: List[Str],
   deps: List[Str],
   runtime_only_deps: List[Str],
   mkdeps_host: List[Str],
