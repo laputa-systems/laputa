@@ -10,10 +10,10 @@ export const name = "sudo-rs"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.2.13"
+export const ver = "0.2.15"
 
 ## Package recipe export.
-export const rel = "16"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["linux-pam", "gnu-stubs", "musl"]
@@ -39,16 +39,16 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "3537fb3bdef870cacb354892e3fc76af7775e691570d49b402295c8fbef3656b",
+        sha256: "2feba7868bd3c057f8362302112d00a18fd6ff458baa3c779c9254b761052a87",
       },
       {
         arch: "x86_64",
-        sha256: "3537fb3bdef870cacb354892e3fc76af7775e691570d49b402295c8fbef3656b",
+        sha256: "2feba7868bd3c057f8362302112d00a18fd6ff458baa3c779c9254b761052a87",
       },
     ],
   },
   {
-    source: p"https://static.crates.io/crates/glob/glob-0.3.3.crate => vendor/glob-0.3.3",
+    source: p"https://static.crates.io/crates/glob/glob-0.3.4.crate => vendor/glob-0.3.4",
     kind: "auto",
     architectures: [
       "all",
@@ -56,16 +56,16 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280",
+        sha256: "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b",
       },
       {
         arch: "x86_64",
-        sha256: "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280",
+        sha256: "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b",
       },
     ],
   },
   {
-    source: p"https://static.crates.io/crates/libc/libc-0.2.183.crate => vendor/libc-0.2.183",
+    source: p"https://static.crates.io/crates/libc/libc-0.2.189.crate => vendor/libc-0.2.189",
     kind: "auto",
     architectures: [
       "all",
@@ -73,16 +73,16 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d",
+        sha256: "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
       },
       {
         arch: "x86_64",
-        sha256: "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d",
+        sha256: "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
       },
     ],
   },
   {
-    source: p"https://static.rust-lang.org/dist/2026-04-16/rust-std-1.95.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
+    source: p"https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
     architectures: [
       "all",
@@ -90,11 +90,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "f6710416ed9a7d5cf2a15efa761eb79a1deeb43f9961bbe05cc97bec4ef9064a",
+        sha256: "ea8fd309578a09c9e12401621a470e6d6b1047f25933207fb8a39d66647d4561",
       },
       {
         arch: "x86_64",
-        sha256: "aee540abf132920f791ef781489851a078d69dff493fb628d49c1d573f92bb3a",
+        sha256: "b106b0aa4565cc3525fd3161c69203a9e39044e6e6b4d618f261c3eeda14ad50",
       },
     ],
   },

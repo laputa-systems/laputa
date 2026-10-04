@@ -68,8 +68,10 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     sudo = run.text fp"{rootfs}/usr/bin/sudo" "--version" ?
   }?
 
-  if ! ("sudo-rs" in sudo or "Sudo version" in sudo or "sudo " in sudo) {
-    return Err(SudoRsProofError.Failed("proof-sudo-rs", f"unexpected sudo version: {sudo.trim()}"))
+  let ver = proof.package_version(rootfs, "sudo-rs")?
+
+  if f"sudo-rs {ver}" not in sudo {
+    return Err(SudoRsProofError.Failed("proof-sudo-rs", f"sudo --version reported {sudo.trim()}, expected sudo-rs {ver}"))
   }
 
   print "sudo-rs ok"
