@@ -8,7 +8,7 @@ additional recipe metadata survives that augmentation unchanged.
 
 ## Package Contract
 
-Recipes live at `repo/<package>/PKGBUILD.xsh` and export:
+Recipes live at `packages/<package>/PKGBUILD.xsh` and export:
 
 - `name: Str`, `ver: Str`, and positive `rel: Str`;
 - `package_kind: "payload" | "meta"`;
@@ -28,6 +28,14 @@ one of `deps`, `mkdeps_*`, and `runtime_only_deps`; one the build uses belongs
 in `deps`. A build tool's own runtime needs stay `deps` when dependents run it
 at build time (`flex` needs `m4`), except `xsh`, which the executor substrate
 seeds into every build root.
+
+A package that compiles against the kernel's userspace API headers takes
+`linux-headers` as a build dependency, never `linux`. `linux-headers` installs
+those headers from the pinned kernel tarball without a compiler, through an
+XSH port of the kernel's `headers_install`, and its output matches `make
+headers_install` byte for byte. `linux` ships only the kernel image and
+config, so a kernel config or Kbuild change rebuilds only the kernel, and no
+runtime root pulls in the kernel through a library.
 
 Payload recipes also carry `proof.xsh`. Metapackages declare no payload
 `filetree`; they may contain dependencies only. `filetree` is the exact output
@@ -85,15 +93,18 @@ pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 
 `--without PACKAGE` (with `--all` only) plans every package whose build
 closure contains no excluded package, and records that set as the plan's
-roots; `--all --without cmake --without linux` is the macOS bootstrap's
-`STOP=pre-cmake` selection. `repo plan` is the only resolution boundary. It is offline unless
-`XSH_PM_REPO` names a package repository (the local mirror, for example
-`http://127.0.0.1:3000`, or a `file://` tree); there is no default remote. It records the target, typed
-dependency graph, remote retrieval identity, build/proof inputs, `BUILD_EPOCH`,
-action reasons, and sorted artifact keys in an atomically written
-plan. `aarch64-linux-musl` remains the default build target.
-`x86_64-linux-musl` can be planned and built on a native Linux x86_64 runner
-with target-specific source checksums, filetrees, remote index entries, and
+roots; `--all --without cmake --without linux` is the `STOP=pre-cmake`
+selection of `make build`. `repo plan` is the only resolution boundary. It is
+offline unless `XSH_PM_REPO` names a package repository (the local mirror, for
+example `http://127.0.0.1:3000`, or a `file://` tree); there is no default
+remote. It records the target, typed dependency graph, remote retrieval
+identity, build/proof inputs, `BUILD_EPOCH`, action reasons, and sorted
+artifact keys in an atomically written plan.
+
+Without `--target`, PM targets `aarch64-linux-musl`; the make targets and the
+profile CLI always pass the target for `ARCH` or the host. `x86_64-linux-musl`
+is planned anywhere and built on a native Linux x86_64 runner, with
+target-specific source checksums, filetrees, remote index entries, and
 artifact keys. On other hosts, `repo build` rejects x86_64 before creating a
 store. Artifact receipts can carry either
 target and reject cross-target reuse of the same key. Root preflight and
@@ -103,7 +114,7 @@ artifacts. The executor preserves x86_64 through recipe selection, build
 metadata, proofs, receipts, and root composition.
 
 `repo build` discovers the repository only by walking to a directory containing
-both `pm.xsh` and `repo/`. It executes the saved plan with `pm/execute.xsh`;
+both `pm.xsh` and `packages/`. It executes the saved plan with `pm/execute.xsh`;
 artifact-store receipts are the sole resume state. `-j` changes scheduling only,
 never a plan or artifact key.
 
@@ -153,8 +164,8 @@ pins and add those bytes to the cache.
 
 `pm/catalog.xsh` is the repository-wide typed catalog boundary. It rejects
 duplicate package names and malformed recipes before resolution.
-`pm/policy.xsh` contains the explicit aarch64 bootstrap exceptions, while
-`pm/graph.xsh` resolves stable runtime, runtime-only, build-host, and
+`pm/policy.xsh` holds the explicit bootstrap exceptions (the same seed rules
+for both targets), while `pm/graph.xsh` resolves stable runtime, runtime-only, build-host, and
 build-target edges. The graph never adds an implicit package-manager
 dependency. Its sorted topological levels and typed edge kinds are persisted
 in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
@@ -181,6 +192,13 @@ a failed command cancels unfinished peers.
 inputs and proof input. The plan digest and artifact/proof keys therefore
 exclude mtimes, absolute checkout paths, and `.git` state. A proof-only change
 changes the proof identity without rebuilding the payload.
+
+Checkout entries (recipe trees and `repository/` and directory sources) are
+hashed and staged in git's mode model (`pm/util.xsh::checkout_mode`): 0755
+for directories and executable files, 0644 for other files, and symlinks by
+target alone. Mode bits beyond the executable bit, such as the umask's group
+write or a setgid inherited from a parent directory, are host noise, so the
+same checkout gets the same keys and payload modes on every host.
 
 An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
 package id, the recipe input digest (recipe files except `proof.xsh`, source
@@ -269,23 +287,28 @@ including setuid helpers; symlink metadata remains fixed at `0o777`.
 
 ## Scope
 
-PM builds aarch64 Linux-musl packages through the existing runner and x86_64
-Linux-musl packages on a native Linux x86_64 runner. The shell-compatible
+PM builds aarch64 and x86_64 Linux-musl packages. The make targets and the
+profile CLI run it in package-tools on the host's native Docker platform, and
+PM itself refuses to build x86_64 anywhere but a native Linux x86_64 runner.
+The shell-compatible
 surface is limited to packages whose declared runtime capability requires it;
 package construction itself uses typed XSH process and filesystem boundaries.
 
 ## Verification
 
-PM behavior is covered by the focused modules under `tests/xsh/`:
-`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`, `pm_graph_contracts.xsh`,
-`pm_make.xsh`, `pm_plan.xsh`, `pm_store.xsh`,
-`pm_root.xsh`, `pm_execute.xsh`, `pm_publish.xsh`, `pm_generation.xsh`, and
-`pm_cli.xsh`.
+PM behavior is covered by the focused modules under `tests/pm/`, one per
+owning module (`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`,
+`pm_graph_contracts.xsh`, `pm_make.xsh`, `pm_plan.xsh`, `pm_store.xsh`,
+`pm_root.xsh`, `pm_build.xsh`, `pm_execute.xsh`, `pm_publish.xsh`,
+`pm_sources.xsh`, `pm_generation.xsh`, `pm_cli.xsh`), plus
+`repository_keys.xsh` for `repository/` source keys and recipe-specific
+modules (`linux_recipe.xsh`, `m4_recipe.xsh`, `dwl_recipe.xsh`, ...).
+`tests/pm/fixtures/` holds staged inputs, not tests.
 
 The isolated `pm_graph_contracts.xsh` module covers nominal plan-action identity,
 dependency-first ordering, selection boundaries, and cycle errors without
-loading recipes or starting package builds. Run it against the checked-out
-debug tools with `../xsh/target/debug/xsht test --jobs 1 tests/xsh/pm_graph_contracts.xsh`.
+loading recipes or starting package builds
+(`$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`).
 `pm_recipe_hooks.xsh` likewise exercises checked hook dispatch, absence, rejected
 contracts, and cwd restoration with temporary fixtures. These host checks do not
 validate Linux package execution. `pm_make.xsh`
@@ -297,7 +320,10 @@ literal source operands and rejection of directory inputs. `parser_generators.xs
 checks Bison token definitions, Flex definition expansion, generated output paths,
 and missing-input diagnostics independently of Linux build modules.
 
-Run a host-native suite with `make test-native XSH_ROOT=$HOME/d/laputa-systems/xsh`.
-`make test-pm-docker` runs the same suite on Linux with the local XSH seed
-(`make seed`) inside the package-tools image, offline. There is no published
-runner pin: the seed is always the current `XSH_ROOT` checkout.
+`make test-pm` runs the suite with the host tools. `make test-pm-native` runs
+it against `XSH_ROOT`'s debug build with coverage, and `make test-pm-docker`
+runs it with the local XSH seed (`make seed`) inside the package-tools image,
+offline. There is no published runner pin: the seed is always the current
+`XSH_ROOT` checkout. The kernel recipe's Kbuild tests and linux-headers'
+`headers_install` tests live beside those recipes and run with
+`make test-linux`.

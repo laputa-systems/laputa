@@ -37,8 +37,6 @@ Control commands use these paths by default:
 - `XINIT_RUN_DIR`, default `/run/xinit`.
 - `XINIT_LOG_ROOT`, default `/var/log`.
 
-`XINIT_LIB` is ignored for compatibility with older environments.
-
 ## Inittab
 
 Each non-empty line is:
@@ -81,6 +79,9 @@ ttyAMA0::poweroff:/bin/xshi --no-config
 tty1::respawn:/bin/getty 38400 tty1
 ```
 
+The serial console is `ttyAMA0` on aarch64 `virt` (PL011) and `ttyS0` on
+x86_64.
+
 ## Minimal Hooks
 
 - `docs/minimal-rc.boot.xsh`
@@ -91,9 +92,9 @@ tty1::respawn:/bin/getty 38400 tty1
 Service files live under `/usr/lib/xinit/services` by default. A file named
 `demo.xsh` is loaded by `xinit start demo` or `xinit supervise demo`.
 
-Each file exports one `service` record. This is a hard break from the older
-`services` list format. See `docs/demo-service.xsh` for a minimal service
-module.
+Each file exports one `service` record. See `docs/demo-service.xsh` for a
+minimal service module, and `packages/*/service.xsh` in the Laputa checkout
+for the installed ones.
 
 ```xsh
 export let service = {
@@ -206,10 +207,11 @@ implemented yet.
 
 Cgroups v2 support `resources: {cpu_max: N}` for service process-tree CPU
 quota. `N` is a percentage of one CPU, matching `run --cpumax`. Linux enforces
-the limit with cgroups v2; macOS accepts it as a no-op. V1 still rejects
-arbitrary cgroup policy and reserved fields: `delegate`, `slice`, non-empty
-`cgroup`, non-empty `cgroup_path`, and memory, pids, or CPU-weight resource
-fields.
+the limit with cgroups v2; macOS accepts it as a no-op. No other cgroup
+policy is supported (`delegate`, `slice`, `cgroup`, `cgroup_path`, or memory,
+pids, and CPU-weight resources). xinit reads only the service fields named
+here and does not reject others, so `xinit check` accepts such fields and
+they have no effect.
 
 `boot` starts all services that declare the selected target, with `boot` as the
 default target. `start` plans dependencies first, starts them, then starts the

@@ -33,12 +33,17 @@ supply the installer's package roots or image policy.
   uses `root=PARTUUID=33333333-3333-3333-3333-333333333333`.
 - There is still no bootloader. The ISO includes an ESP fallback kernel, but
   standalone EFI media boot still needs a way to pass a kernel command line.
-- `xinit` has an XSH implementation in the upstream XSH repo at
-  `core/xinit.xsh`; the Laputa `xinit` package is wired to install that script.
-  Installer images build-install the local `xsh`/`xinit` package definitions,
-  which package the pinned upstream release artifact for the target arch.
-  `XSH_HOST` may point at a local host runner for executing the image builder,
-  but target rootfs contents still come from PM packages.
+  Both kernels carry a built-in command line naming
+  `root=PARTLABEL=LAPUTA_ROOT`, the installed target's root partition (a
+  bootloader's arguments append to it on x86_64 and replace it on aarch64).
+  The installer ISO's root partition is `LAPUTA_INSTALLER_ROOT`, so the
+  built-in line does not boot the media.
+- The `xinit` package installs this checkout's `xinit/xinit.xsh` as
+  `/usr/bin/xinit`, with `/init` linking to it, and the `xsh` package
+  installs the local XSH seed (`make seed`) for the target arch. Both reach
+  the installer through the mirror like every other package. The image
+  builder runs on the host's XSH (`XSH_HOST`), but target rootfs contents come
+  only from PM packages.
 
 ## Entry Points
 
