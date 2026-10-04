@@ -4820,8 +4820,16 @@ export pure x86_vmlinux_ldflags(config: Kconfig) -> List[Str] {
   with_relocs.push("--orphan-handling=warn")
 }
 
-proc vmlinux_x86_archive_inputs(link_inputs: List[Path]) [] -> List[Path] {
-  return link_inputs when link_inputs.len() > 0
+# On x86 the EFI stub library links only into the compressed boot image
+# (`build_x86_compressed_kernel` takes its own lib.a), never into vmlinux: its
+# objects carry private copies of lib/ helpers such as vsnprintf and
+# skip_spaces without the symbol prefix arm64 gives them, so whole-archiving
+# them into vmlinux.a defines those symbols twice.
+## The archives and objects whole-archived into the x86 vmlinux.a.
+export pure vmlinux_x86_archive_inputs(link_inputs: List[Path]) -> List[Path] {
+  if link_inputs.len() > 0 {
+    return [input for input in link_inputs if ! path_key(input).starts_with(".xsh-kbuild/obj/drivers/firmware/efi/libstub/")]
+  }
 
   [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/x86/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
 }

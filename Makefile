@@ -84,12 +84,12 @@ DEPLOY_HOST ?= oracle
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit clean distclean fetch fetch-seed seed seed-smoke \
+.PHONY: check lint test test-pm test-system test-xinit test-linux clean distclean fetch fetch-seed seed seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	profile-plan profile-build profile-test profile-boot profile-clean \
 	test-pm-native test-pm-docker xsh-native update-checksums \
-	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
+	installer-image installer-qemu-test \
 	installer-qemu-manual \
 	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
 
@@ -100,7 +100,7 @@ check: need-xsh
 lint: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit
 
-test: test-pm test-system test-xinit
+test: test-pm test-system test-xinit test-linux
 
 test-pm: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/pm
@@ -112,6 +112,13 @@ test-system: need-xsh
 
 test-xinit: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
+
+# The kbuild tests write the stable archive-plan cache, which defaults to
+# /var/cache/laputa/linux-kbuild; keep it under .out/, which `make clean` owns.
+LINUX_KBUILD_CACHE := $(CURDIR)/.out/cache/linux-kbuild
+test-linux: need-xsh
+	mkdir -p "$(LINUX_KBUILD_CACHE)"
+	$(HOST_XSH_ENV) XSH_LINUX_KBUILD_PLAN_CACHE_DIR="$(LINUX_KBUILD_CACHE)" $(XSHT) test packages/linux/tests
 
 # All derived state: .out/ (seed, artifact store, cargo target, image
 # contexts), target/ (profile and installer outputs), mirror build outputs,
@@ -310,15 +317,14 @@ update-checksums: need-xsh
 	@printf '%s\n' $(PKGDIRS) | xargs -n 1 -P $(UPDATE_CHECKSUM_JOBS) sh -c 'pkg="$$1"; name="$${pkg#packages/}"; XSH_MODULE_PATH="$(CURDIR)" $(XSH) pm.xsh -- repo update-checksums --repo . "$$name"' sh
 
 # Installer workflows are not part of the qemu-dwl-foot profile lifecycle.
-installer-image: installer-image-aarch64
+# Both import ARCH's installer roots from the local mirror, so they need
+# `make mirror` running and `make publish` done; the QEMU proof builds its own
+# smoke-mode image, then installs and boots it (KVM on x86_64).
+installer-image: need-xsh
+	$(HOST_XSH_ENV) LAPUTA_REPO_URL="$(MIRROR_URL)" $(XSH_HOST) build-installer-common.xsh -- $(ARCH)
 
-installer-image-aarch64:
-	$(XSH_HOST) build-installer-aarch64.xsh
-
-installer-qemu-test: installer-qemu-test-aarch64
-
-installer-qemu-test-aarch64:
-	$(XSH_HOST) installer-qemu-test.xsh
+installer-qemu-test: need-xsh
+	$(HOST_XSH_ENV) LAPUTA_REPO_URL="$(MIRROR_URL)" LAPUTA_INSTALLER_ARCH=$(ARCH) $(XSH_HOST) installer-qemu-test.xsh
 
 installer-qemu-manual:
 	$(XSH_HOST) installer-qemu-manual.xsh
@@ -337,8 +343,19 @@ mirror: $(MIRROR_SERVER_DEPS)
 	mkdir -p "$(MIRROR_DATA)" "$(SOURCE_CACHE)/sha256"
 	$(MIRROR_SERVER) --local "$(MIRROR_DATA)" --listen "127.0.0.1:$(MIRROR_PORT)" --sources "$(SOURCE_CACHE)"
 
+# Linux hosts test the mirror in `xsh-test` the way `host-mirror` builds it,
+# offline from the crates `make fetch` stores, so no host Rust is needed.
+ifeq ($(HOST_OS),Linux)
+mirror-test:
+	mkdir -p "$(MIRROR_CARGO_TARGET)"
+	$(HOST_CARGO_BUILD) --env RUSTUP_TOOLCHAIN=$(MIRROR_TOOLCHAIN) \
+	    --mount type=bind,src=$(CURDIR)/$(MIRROR),dst=/work,readonly \
+	    --mount type=bind,src=$(MIRROR_CARGO_TARGET),dst=/target \
+	    $(XSH_TEST_IMAGE) cargo test --locked --offline -j $(CARGO_JOBS) --target $(HOST_TRIPLE)
+else
 mirror-test:
 	cd $(MIRROR) && $(CARGO) test -j $(CARGO_JOBS) --locked
+endif
 
 mirror-build-x86_64-musl:
 	mkdir -p $(MIRROR)/target/docker-output

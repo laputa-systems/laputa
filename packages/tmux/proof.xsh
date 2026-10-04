@@ -11,10 +11,8 @@ proc check(condition: Bool, kind: Str, message: Str) [error] {
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let os = system.uname()?
-  let root = if rootfs.display() == "/" { / } else { rootfs }
-  let dynlinker = fp"{root}usr/lib/ld-musl-{os.machine}.so.1"
-  let shell = fp"{root}usr/bin/sh"
-  let tmux = fp"{root}usr/bin/tmux"
+  let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
+  let tmux = fp"{rootfs}/usr/bin/tmux"
   proof.target_elf(rootfs, p"usr/bin/tmux", "tmux")?
   let build_arch = pm_util.build_arch()?
   let target_arch = pm_util.target_arch()?
@@ -32,13 +30,16 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
     Err(_) => {}
   }
 
+  # The session shell is the runner's static xshi. tmux's runtime closure
+  # holds no shell (xsh, which owns /usr/bin/sh, is runtime-only and stays out
+  # of proof roots), and the proof is about tmux, not the shell it hosts.
+  let shell = process.which("xshi")?
   let tmp = /tmp/tmux-proof
   fs.mkdir(tmp)?
   let label = "laputa-proof"
   let config = fp"{tmp}/tmux.conf"
   fs.mkdir(fp"{tmp}/home")?
   check(fs.exists(dynlinker)?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")?
-  check(fs.exists(shell)?, "tmux-proof", f"missing rootfs shell: {shell}")?
   check(fs.exists(tmux)?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")?
 
   fs.write(
@@ -54,7 +55,7 @@ set -g focus-events on
 
   env ({
     HOME: fp"{tmp}/home",
-    LD_LIBRARY_PATH: fp"{root}usr/lib",
+    LD_LIBRARY_PATH: fp"{rootfs}/usr/lib",
     PS1: "laputa$ ",
     SHELL: shell,
     TERM: "tmux-256color",

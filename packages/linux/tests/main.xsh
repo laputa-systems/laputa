@@ -650,7 +650,7 @@ test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
 
 test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-analysis-pool")?
-  let worker = path.absolute(p"kbuild-archive-analysis-worker.xsh")?
+  let worker = path.absolute(p"packages/linux/kbuild-archive-analysis-worker.xsh")?
   let xsh_bin = process.which("xsh")?
   fs.write(fp"{root}/.config", "")?
   fs.write(fp"{root}/Kbuild", "")?
@@ -939,6 +939,18 @@ test test_kbuild_generates_offsets_header [fs, error] { |ctx|
 
 #endif
 """
+}
+
+test test_kbuild_x86_vmlinux_archive_leaves_out_efi_stub [error] {
+  let inputs = [
+    p".xsh-kbuild/obj/lib/cmdline.o",
+    p".xsh-kbuild/obj/drivers/firmware/efi/libstub/lib-cmdline.o",
+    p".xsh-kbuild/obj/drivers/firmware/efi/efi.o",
+  ]
+  test.eq(
+    kbuild.vmlinux_x86_archive_inputs(inputs),
+    [p".xsh-kbuild/obj/lib/cmdline.o", p".xsh-kbuild/obj/drivers/firmware/efi/efi.o"],
+  )?
 }
 
 test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
