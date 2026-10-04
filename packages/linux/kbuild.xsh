@@ -4975,7 +4975,6 @@ pure x86_setup_cflags() -> List[Str] {
     "-Wno-gnu",
     "-Wno-microsoft-anon-tag",
     "-D_SETUP",
-    "-DSVGA_MODE=NORMAL_VGA",
     "-fno-asynchronous-unwind-tables",
   ]
 }
@@ -5314,7 +5313,10 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) [fs, process, env, error] 
     },
   ] {
     let item_cflags = if item.asm { base_cflags.push("-D__ASSEMBLY__") } else { base_cflags }
-    let item_defs = if item.asm { ["-D__DISABLE_EXPORTS", "-D_SETUP"] } else { [] }
+    # Assembler tasks keep only defines, not cflags. header.S's vid_mode
+    # defaults to ASK_VGA, which stops a direct `-kernel` boot at a 30 s
+    # video-mode prompt; upstream builds the setup with SVGA_MODE=NORMAL_VGA.
+    let item_defs = if item.asm { ["-D__DISABLE_EXPORTS", "-D_SETUP", "-DSVGA_MODE=NORMAL_VGA"] } else { [] }
     let item_triple = if item.asm { "i386-linux-gnu" } else { "x86_64-linux-gnu" }
     let task = compile_kbuild_task(cc, item_triple, item_cflags, item_defs, includes, item.source, item.object)
     tasks += [task]
