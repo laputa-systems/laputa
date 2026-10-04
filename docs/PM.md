@@ -65,7 +65,7 @@ module path.
 
 ```text
 pm repo check [--repo PATH]
-pm repo plan [--repo PATH] (--all | --root PACKAGE...) \
+pm repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) \
   [--target TARGET] --output PLAN
 pm repo show PLAN
 pm repo build PLAN --store STORE [-j N|--jobs N]
@@ -83,7 +83,10 @@ pm store verify --store STORE
 pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 ```
 
-`repo plan` is the only resolution boundary. It is offline unless
+`--without PACKAGE` (with `--all` only) plans every package whose build
+closure contains no excluded package, and records that set as the plan's
+roots; `--all --without cmake --without linux` is the macOS bootstrap's
+`STOP=pre-cmake` selection. `repo plan` is the only resolution boundary. It is offline unless
 `XSH_PM_REPO` names a package repository (the local mirror, for example
 `http://127.0.0.1:3000`, or a `file://` tree); there is no default remote. It records the target, typed
 dependency graph, remote retrieval identity, build/proof inputs, `BUILD_EPOCH`,
@@ -155,7 +158,9 @@ dependency. Its sorted topological levels and typed edge kinds are persisted
 in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
 (roots compose them), but runtime-only and bootstrap edges order no build, so
 a runtime-only edge may close a cycle; plan format 3 records them as
-`runtime-only` node dependencies.
+`runtime-only` node dependencies. A bootstrap edge names a build input a seed
+substitutes, so it selects no package either: planning `musl` does not pull in
+`zlib`, and through it `cmake`.
 The native Docker adapter passes `XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23`
 for `gnu-stubs`: its LLVM edge is a bootstrap seed, so the recipe must use the
 preseeded compiler while the replacement LLVM package is built.

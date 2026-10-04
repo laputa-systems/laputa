@@ -173,3 +173,39 @@ test test_catalog_rejects_missing_runtime_only_dependency [error] {
     Err(problem) => assert "service depends on missing absent" in problem.message
   }
 }
+
+# A bootstrap edge names a build input the seed substitutes, so it selects
+# nothing: planning the dependent must not pull in the seed's replacement.
+test test_bootstrap_edge_selects_no_package [error] {
+  let tool = fixture_package("tool", [], [], [])
+  let replacement = fixture_package("replacement", [], ["tool"], [])
+  let app = fixture_package("app", [], ["replacement"], [])
+  let value = catalog.from_packages(p".", [tool, replacement, app])?
+  let seeded = {
+    ...policy.aarch64_docker(),
+    bootstrap_seeds: [{package: "app", dependency: "replacement", native_only: false, reason: "seeded"}],
+  }
+  test.ok(has_edge(graph.edges(value, seeded)?, "app", "replacement", types.Bootstrap))?
+  test.eq(graph.build_closure(value, ["app"], seeded)?, ["app"])?
+  test.eq(graph.build_closure(value, ["app"], policy.aarch64_docker())?, ["app", "replacement", "tool"])?
+}
+
+test test_packages_buildable_without_drops_every_dependent_of_an_excluded_package [error] {
+  let kernel = fixture_package("kernel", [], [], [])
+  let builder = fixture_package("builder", [], [], [])
+  let headers = fixture_package("headers", [], ["kernel"], [])
+  let library = fixture_package("library", [], ["builder"], [])
+  let runner = fixture_package("runner", [], [], [])
+  let service = fixture_package("service", [], [], [], runtime_only_deps: ["headers"])
+  let tool = fixture_package("tool", ["library"], [], [], runtime_only_deps: ["runner"])
+  let value = catalog.from_packages(p".", [kernel, builder, headers, library, runner, service, tool])?
+  let selected = graph.packages_buildable_without(value, ["kernel"], policy.aarch64_docker())?
+  # A runtime-only edge counts: a plan for `service` must produce `headers`.
+  test.eq(selected, ["builder", "library", "runner", "tool"])?
+  test.eq(graph.packages_buildable_without(value, ["kernel", "builder"], policy.aarch64_docker())?, ["runner"])?
+
+  match graph.packages_buildable_without(value, ["absent"], policy.aarch64_docker()) {
+    Ok(_) => test.fail("an unknown excluded package was accepted")?
+    Err(problem) => assert "excluded package absent is not in the catalog" in problem.message
+  }
+}

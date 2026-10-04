@@ -17,7 +17,7 @@ use types
 use util
 
 type RepoCheckArgs = {repo: Path}
-type RepoPlanArgs = {repo: Path, all: Bool, roots: List[Str], target: Str, output: Path}
+type RepoPlanArgs = {repo: Path, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
 type RepoShowArgs = {input: Path}
 type RepoBuildArgs = {input: Path, store: Path, jobs: Int}
 type RepoPublishArgs = {input: Path, store: Path}
@@ -31,7 +31,7 @@ type SourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: Li
 enum PmCommand { Help(Str), RepoCheck(RepoCheckArgs), RepoPlan(RepoPlanArgs), RepoShow(RepoShowArgs), RepoBuild(RepoBuildArgs), RepoPublish(RepoPublishArgs), RepoChecksum(RepoPackagesArgs), RepoUpdateChecksums(RepoPackagesArgs), SourcesFetch(SourcesFetchArgs), RootCompose(RootComposeArgs), RootInspect(RootInspectArgs), StoreVerify(StoreVerifyArgs), StoreExtract(StoreExtractArgs) }
 
 type RepoCheckOptions = {repo: Str}
-type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], target: Str, output: Path}
+type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
 type RepoShowOptions = {input: Path}
 type RepoBuildOptions = {input: Path, store: Path, jobs: Int}
 type RepoPublishOptions = {input: Path, store: Path}
@@ -47,7 +47,7 @@ pure help_text() -> Str {
 
 repository commands:
   repo check [--repo PATH]
-  repo plan [--repo PATH] (--all | --root PACKAGE...) [--target TARGET] --output PLAN
+  repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   repo show PLAN
   repo build PLAN --store STORE [-j N|--jobs N]
   repo publish PLAN --store STORE
@@ -73,7 +73,7 @@ pure repo_help_text() -> Str {
   """usage: pm repo COMMAND [OPTIONS]
 
   check [--repo PATH]
-  plan [--repo PATH] (--all | --root PACKAGE...) [--target TARGET] --output PLAN
+  plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   show PLAN
   build PLAN --store STORE [-j N|--jobs N]
   publish PLAN --store STORE
@@ -85,7 +85,11 @@ targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
 }
 
 pure repo_plan_help_text() -> Str {
-  """usage: pm repo plan [--repo PATH] (--all | --root PACKAGE...) [--target TARGET] --output PLAN
+  """usage: pm repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
+
+--without PACKAGE drops from --all every package whose build closure needs
+PACKAGE (and PACKAGE itself): `--all --without cmake --without linux` plans
+everything that builds before cmake and linux exist.
 
 targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
 """
@@ -229,13 +233,14 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
       return RepoCheck({repo: resolve_repo_root(parsed.repo)?})
     }
     "plan" => {
-      var parsed: RepoPlanOptions = {repo: "", all: false, roots: [], target: "aarch64-linux-musl", output: p""}
+      var parsed: RepoPlanOptions = {repo: "", all: false, roots: [], without: [], target: "aarch64-linux-musl", output: p""}
       match cli.parse(
         args,
         {
           repo: {form: "--repo PATH", default: ""},
           all: {form: "--all", default: false},
           roots: {form: "--root PACKAGE", repeated: true},
+          without: {form: "--without PACKAGE", repeated: true},
           target: {form: "--target TARGET", default: "aarch64-linux-musl"},
           output: {form: "--output PLAN", kind: "Path", required: true},
         },
@@ -249,8 +254,12 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         return Err(types.PmError.Usage("pm repo plan requires exactly one of --all or one-or-more --root"))
       }
 
+      if parsed.without.len() > 0 and ! parsed.all {
+        return Err(types.PmError.Usage("pm repo plan --without requires --all"))
+      }
+
       let _ = types.parse_target(parsed.target)?
-      return RepoPlan({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, roots: parsed.roots, target: parsed.target, output: parsed.output})
+      return RepoPlan({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, roots: parsed.roots, without: parsed.without, target: parsed.target, output: parsed.output})
     }
     "show" => {
       var parsed: RepoShowOptions = {input: p""}
@@ -504,12 +513,27 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
   let cache_handle = fs.tempdir()?
   defer cache_handle.close()?
   let cache_root = cache_handle.host_path()?
+  let catalog_value = catalog.load_for_target(args.repo, target)?
+  var roots = args.roots
+  var all = args.all
+
+  # `--all --without` plans an explicit root set: every package that builds
+  # without the excluded ones, so the plan records exactly what it selected.
+  if args.without.len() > 0 {
+    roots = graph.packages_buildable_without(catalog_value, args.without, policy_value)?
+    all = false
+
+    if roots.len() == 0 {
+      return Err(types.PmError.Usage(f"no package builds without {args.without.join(", ")}"))
+    }
+  }
+
   let value = pm_plan.resolve(
-    catalog.load_for_target(args.repo, target)?,
+    catalog_value,
     remote_snapshot_for_plan(cache_root, target)?,
     policy_value,
-    args.roots,
-    args.all,
+    roots,
+    all,
   )?
 
   # The durable DTO and atomic write are kept behind `write_plan` while the release

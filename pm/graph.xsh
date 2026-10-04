@@ -264,24 +264,55 @@ export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [er
   closure(catalog, roots, [types.dependency_runtime(), types.dependency_runtime_only()])?
 }
 
+# A bootstrap edge names a build input the seed substitutes (the container's
+# LLVM for musl), so it selects nothing: a plan for musl must not pull in zlib
+# and, through zlib, cmake.
+pure build_closure_kinds() -> List[types.DependencyKind] {
+  [
+    types.dependency_runtime(),
+    types.dependency_runtime_only(),
+    types.dependency_build_host(),
+    types.dependency_build_target(),
+  ]
+}
+
 ## Resolves every package a plan for the selected roots must produce: their build inputs
-## (runtime, host-build, target-build, and bootstrap edges) and the runtime-only
-## dependencies root composition installs beside them.
+## (runtime, host-build, and target-build edges) and the runtime-only dependencies root
+## composition installs beside them. Bootstrap edges select no package.
 export proc build_closure(
   catalog: types.PackageCatalog,
   roots: List[Str],
   value: types.BuildPolicy,
 ) [error] -> Result[List[Str]] {
-  closure_from_edges(
-    catalog,
-    roots,
-    [
-      types.dependency_runtime(),
-      types.dependency_runtime_only(),
-      types.dependency_build_host(),
-      types.dependency_build_target(),
-      types.dependency_bootstrap(),
-    ],
-    edges(catalog, value)?,
-  )?
+  closure_from_edges(catalog, roots, build_closure_kinds(), edges(catalog, value)?)?
+}
+
+## Returns, in name order, every local package whose `build_closure` contains none of
+## `excluded`: the packages a plan can produce before any excluded package exists.
+## The macOS bootstrap stops before `cmake` and `linux` with this selection.
+export proc packages_buildable_without(
+  catalog: types.PackageCatalog,
+  excluded: List[Str],
+  value: types.BuildPolicy,
+) [error] -> Result[List[Str]] {
+  let local_names = {pkg.name: true for pkg in catalog.packages}
+
+  for name in excluded {
+    if ! (local_names.get(name) ?? false) {
+      return Err(types.PmError.MissingDependency(f"excluded package {name} is not in the catalog"))
+    }
+  }
+
+  let dependency_edges = edges(catalog, value)?
+  var selected: List[Str] = []
+
+  for pkg in catalog.packages {
+    let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
+
+    if [name for name in closure if name in excluded].len() == 0 {
+      selected = selected.push(pkg.name)
+    }
+  }
+
+  graph_sorted_unique_names(selected)
 }

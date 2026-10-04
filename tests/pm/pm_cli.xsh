@@ -88,13 +88,14 @@ test test_repo_help_is_explicit [fs, process, env, error] { |ctx|
   let repository = pm_output(["repo", "--help"])?
   let plan = pm_output(["repo", "plan", "--help"])?
 
-  assert "repo plan [--repo PATH] (--all | --root PACKAGE...) [--target TARGET] --output PLAN" in top
+  assert "repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN" in top
   assert "x86_64-linux-musl (native Linux runner)" in plan
   assert "repo build PLAN --store STORE" in top
   assert "root compose PLAN --store STORE --runtime-root PACKAGE... --output GENERATION" in top
   assert "world-plan" not in top
   assert "checksum [--repo PATH] PACKAGE..." in repository
-  assert "repo plan [--repo PATH] (--all | --root PACKAGE...)" in plan
+  assert "repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...)" in plan
+  assert "--without PACKAGE drops from --all" in plan
 }
 
 test test_final_cli_rejects_removed_legacy_command [fs, process, env, error] { |ctx|
@@ -214,6 +215,24 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
   test.eq(unsupported_target.ok, false)?
   let observed_output_7 = err.read_text()?
   assert "unsupported target sparc64-linux-musl" in observed_output_7
+}
+
+test test_repo_plan_without_selects_packages_that_build_before_the_excluded_ones [fs, process, env, error] { |ctx|
+  let root = copied_repository(ctx, "repo-without")?
+  let err = test.temp_path(ctx, name: "repo-without.err")
+  let output = fp"{root}/out/plan.json"
+  let _ = pm_output(["repo", "plan", "--repo", root.display(), "--all", "--without", "host-tool", "--output", output.display()])?
+  let value = plan_json.read(output)?
+  test.eq(value.roots, ["runtime-lib", "target-sdk"])?
+  test.eq([node.name for node in value.nodes] |> sort, ["runtime-lib", "target-sdk"])?
+
+  let with_roots = pm_status(["repo", "plan", "--repo", root.display(), "--root", "app", "--without", "host-tool", "--output", output.display()], err)?
+  test.eq(with_roots.ok, false)?
+  assert "--without requires --all" in err.read_text()?
+
+  let unknown = pm_status(["repo", "plan", "--repo", root.display(), "--all", "--without", "absent", "--output", output.display()], err)?
+  test.eq(unknown.ok, false)?
+  assert "excluded package absent is not in the catalog" in err.read_text()?
 }
 
 test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |ctx|
