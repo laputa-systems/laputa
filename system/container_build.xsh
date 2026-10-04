@@ -1,8 +1,9 @@
-##! Native-arm64 profile execution: one saved PM plan becomes verified artifacts, a runtime generation, and atomic image outputs.
+##! Native profile execution: one saved PM plan becomes verified artifacts, a runtime generation, and atomic image outputs.
 #!/bin/xsh
 use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
 use pm.types as pm_types
+use pm.util as pm_util
 use system.container_output as container_output
 use system.image as image
 use system.profile as system_profile
@@ -81,6 +82,9 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, er
 
   let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
   fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)?
+  # The overlay is a checkout tree: only git's modes may reach the image, not
+  # host bits such as a setgid directory (which new subdirectories inherit).
+  pm_util.normalize_checkout_tree(overlay)?
   overlay
 }
 

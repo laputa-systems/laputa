@@ -59,7 +59,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     return Err(types.LaputaError.Profile(f"{value.name} has an invalid kernel manifest path"))
   }
 
-  if value.qemu_machine == "" or value.qemu_cpu == "" or value.qemu_smp <= 0 or value.qemu_memory == "" or value.qemu_width <= 0 or value.qemu_height <= 0 {
+  if value.qemu_smp <= 0 or value.qemu_memory == "" or value.qemu_width <= 0 or value.qemu_height <= 0 {
     return Err(types.LaputaError.Profile(f"{value.name} has an invalid QEMU specification"))
   }
 
@@ -116,8 +116,6 @@ name\t{value.name}
 roots\t{value.package_roots.join(",")}
 kernel-package\t{value.kernel_package}
 kernel-path\t{value.kernel_path}
-machine\t{value.qemu_machine}
-cpu\t{value.qemu_cpu}
 smp\t{value.qemu_smp}
 memory\t{value.qemu_memory}
 width\t{value.qemu_width}

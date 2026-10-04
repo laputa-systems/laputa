@@ -94,8 +94,12 @@ PNPM_ROOT ?= target/pnpm
 	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
 
 # xsht-config.ini owns the module path and the excluded fixture and mirror trees.
+# xsht finds only *.xsh files; XSH programs installed under other names (boot
+# hooks, rootfs commands such as getent) are found by their shebang.
+XSH_SHEBANG_SCRIPTS = $(shell git grep -l -e '^\#!/bin/xsh' -- ':!*.xsh' ':!tests/pm/fixtures')
 check: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) check
+	$(HOST_XSH_ENV) $(XSHT) check $(XSH_SHEBANG_SCRIPTS)
 
 lint: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit

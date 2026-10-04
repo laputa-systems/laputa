@@ -9,7 +9,7 @@ proc profile_wait_for(path_value: Path, seconds: Int) [fs, time, error] {
   var elapsed = 0
   while ! fs.exists(path_value)? {
     if elapsed >= seconds {
-      return Err(ProfileBootError.Failed(f"qemu-dwl-foot boot hook timed out waiting for ${path_value}"))
+      return Err(ProfileBootError.Failed(f"qemu-dwl-foot boot hook timed out waiting for {path_value}"))
     }
     time.sleep(1s)?
     elapsed += 1

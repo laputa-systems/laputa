@@ -21,8 +21,6 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
   assert value.kernel_package == "linux"
   assert ! (value.kernel_package in value.package_roots)
   assert value.kernel_path == p"boot/vmlinuz"
-  assert value.qemu_machine == "virt,accel=hvf,highmem=off"
-  assert value.qemu_cpu == "host"
   assert value.qemu_smp == 2
   assert value.qemu_memory == "1536M"
   assert value.qemu_width == 1280
@@ -82,8 +80,6 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
     package_roots: ["one"],
     kernel_package: "linux",
     kernel_path: p"boot/vmlinuz",
-    qemu_machine: "virt",
-    qemu_cpu: "host",
     qemu_smp: 1,
     qemu_memory: "512M",
     qemu_width: 1,

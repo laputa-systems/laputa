@@ -3,14 +3,13 @@
 ## The execution mode selected for the reference QEMU system.
 export enum QemuMode { Test, Interactive }
 
-## The data-only description of the supported Laputa system profile.
+## The data-only description of the supported Laputa system profile. The
+## QEMU machine, CPU, and accelerator belong to the host (`system.qemu`).
 export type SystemProfile = {
   name: Str,
   package_roots: List[Str],
   kernel_package: Str,
   kernel_path: Path,
-  qemu_machine: Str,
-  qemu_cpu: Str,
   qemu_smp: Int,
   qemu_memory: Str,
   qemu_width: Int,

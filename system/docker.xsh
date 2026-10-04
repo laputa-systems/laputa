@@ -1,4 +1,4 @@
-##! Native Linux arm64 Docker command construction for Laputa profile builds.
+##! Native Linux Docker command construction for Laputa profile builds.
 use seed.images as images
 use seed.xsh_seed as xsh_seed
 use system.types as types
@@ -6,8 +6,12 @@ use system.types as types
 ## The fixed host paths mounted into the profile build container.
 ## `laputa_root` is the monorepo checkout: PM, recipes, profiles, and system modules.
 ## `seed` is the verified local XSH seed; `artifact_root` is the PM artifact store under `.out/`.
+## `arch` is the PM target architecture, built natively on `platform`, the host's Docker platform;
+## the seed, store, and image all match it.
 export type DockerConfig = {
   docker: Path,
+  arch: Str,
+  platform: Str,
   laputa_root: Path,
   seed: Path,
   output_root: Path,
@@ -15,9 +19,6 @@ export type DockerConfig = {
   image: Str,
   repo_url: Str,
 }
-
-# The profile builds the aarch64 reference system on a native arm64 runner.
-const profile_seed_arch = "aarch64"
 
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = (env.get(name) ?? "").trim()
@@ -33,8 +34,8 @@ export pure artifact_store_root(laputa_root: Path, arch: Str) -> Path {
   fp"{laputa_root}/.out/artifacts/{arch}"
 }
 
-## Resolve the allowed Docker configuration surface from the host environment.
-export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
+## Resolve the allowed Docker configuration surface for building `profile_name` natively for `arch`.
+export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, process, env, error] -> Result[DockerConfig] {
   let docker = fp"{env_value("DOCKER", "docker")}"
   let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 
@@ -42,14 +43,16 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
     let _ = process.which(docker.display())?
   }
 
-  let seed = xsh_seed.xsh_seed_require(laputa_root, profile_seed_arch)?
-  let arch = xsh_seed.xsh_seed_arch(profile_seed_arch)?
-  let artifact_root = artifact_store_root(laputa_root, profile_seed_arch)
+  let seed_arch = xsh_seed.xsh_seed_arch(arch)?
+  let seed = xsh_seed.xsh_seed_require(laputa_root, arch)?
+  let artifact_root = artifact_store_root(laputa_root, arch)
   fs.mkdir(artifact_root)?
 
-  let image = images.ensure_package_tools(docker, laputa_root, arch)?
+  let image = images.ensure_package_tools(docker, laputa_root, seed_arch)?
   DockerConfig(
     docker:,
+    arch:,
+    platform: seed_arch.docker_platform,
     laputa_root:,
     seed:,
     output_root:,
@@ -59,7 +62,7 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
   )
 }
 
-## Construct an exact native-arm64 Docker invocation for an inner PM command.
+## Construct an exact native-platform Docker invocation for an inner PM command.
 export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
   # PM modules must resolve from the mounted checkout's source root.
   # The finished rootfs may contain /usr/lib/pm, but it must never share the
@@ -70,7 +73,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "run",
     "--rm",
     "--platform",
-    "linux/arm64",
+    value.platform,
     "--mount",
     f"type=bind,src={value.laputa_root},dst=/src/laputa,readonly",
     @xsh_seed.xsh_seed_mount_argv(value.seed),
@@ -96,7 +99,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
 }
 
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
-export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
+export pure docker_pm_plan_argv(profile: types.SystemProfile, arch: Str) -> List[Str] {
   # The mounted checkout owns this PM invocation.  Mixing the image's pm.xsh
   # entrypoint with checkout modules loads pm.types twice under the published
   # runner's shared user-module namespace.
@@ -106,13 +109,13 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
     argv += ["--root", package_name]
   }
 
-  argv = argv.extend(["--root", profile.kernel_package, "--output", "/output/build-plan.json"])
+  argv = argv.extend(["--root", profile.kernel_package, "--target", f"{arch}-linux-musl", "--output", "/output/build-plan.json"])
   argv
 }
 
-## Construct the complete native-arm64 Docker invocation for a profile BuildPlan without encoding a second package closure.
+## Construct the complete native-platform Docker invocation for a profile BuildPlan without encoding a second package closure.
 export pure docker_plan_command_argv(value: DockerConfig, profile: types.SystemProfile) -> List[Str] {
-  docker_command_argv(value, docker_pm_plan_argv(profile))
+  docker_command_argv(value, docker_pm_plan_argv(profile, value.arch))
 }
 
 ## Construct the typed in-container generation-plan projection without executing or composing artifacts.
@@ -145,22 +148,22 @@ export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, er
   process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root)
 }
 
-## Reject an image architecture other than the native arm64 runner required for package planning and execution.
-export proc require_arm64_image_architecture(architecture: Str) [error] {
-  guard architecture == "arm64" else {
-    return Err(types.LaputaError.Docker(f"Docker runner reports {architecture}; native arm64 is required"))
+## Reject an image whose architecture is not the configured native platform's.
+export proc require_image_architecture(platform: Str, architecture: Str) [error] {
+  guard f"linux/{architecture}" == platform else {
+    return Err(types.LaputaError.Docker(f"Docker runner reports {architecture}; native {platform} is required"))
   }
 }
 
-## Reject Docker images that are not a native arm64 execution substrate.
-export proc verify_arm64_image(value: DockerConfig) [process, error] {
+## Reject Docker images that are not the native execution substrate.
+export proc verify_image_architecture(value: DockerConfig) [process, error] {
   let output = run.text $value.docker image inspect --format "{{.Architecture}}" $value.image ?
-  require_arm64_image_architecture(output.trim())?
+  require_image_architecture(value.platform, output.trim())?
 }
 
-## Run a profile-owned Docker command only after the runner image proves it is arm64.
+## Run a profile-owned Docker command only after the runner image proves it is native.
 export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] {
-  verify_arm64_image(value)?
+  verify_image_architecture(value)?
   let status = process.run(command(value, inner_argv)?)?
 
   if ! status.ok {
@@ -170,7 +173,7 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
 
 ## Run a profile build while atomically replacing its log only after Docker exits successfully.
 export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
-  verify_arm64_image(value)?
+  verify_image_architecture(value)?
   let temporary = fp"{log}.tmp"
   fs.mkdir(log.parent)?
   fs.remove(temporary, missing_ok: true)?
@@ -187,17 +190,17 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   fs.rename(temporary, log, overwrite: true)?
 }
 
-## Run the sole profile PM-plan adapter through the checked native arm64 runner.
+## Run the sole profile PM-plan adapter through the checked native runner.
 export proc docker_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
-  docker_run(value, docker_pm_plan_argv(profile))?
+  docker_run(value, docker_pm_plan_argv(profile, value.arch))?
 }
 
-## Project one saved BuildPlan to its typed generation plan through the native arm64 runner.
+## Project one saved BuildPlan to its typed generation plan through the native runner.
 export proc docker_generation_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
   docker_run(value, docker_generation_plan_argv(profile))?
 }
 
-## Build one complete profile image through the native arm64 runner and keep its build log transactional.
+## Build one complete profile image through the native runner and keep its build log transactional.
 export proc docker_profile_build(
   value: DockerConfig,
   profile: types.SystemProfile,

@@ -16,8 +16,6 @@ export let profile: types.SystemProfile = types.SystemProfile(
   ],
   kernel_package: "linux",
   kernel_path: p"boot/vmlinuz",
-  qemu_machine: "virt,accel=hvf,highmem=off",
-  qemu_cpu: "host",
   qemu_smp: 2,
   qemu_memory: "1536M",
   qemu_width: 1280,

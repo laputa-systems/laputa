@@ -1,10 +1,12 @@
-##! Behavior coverage for native arm64 Docker command construction.
+##! Behavior coverage for native Docker command construction.
 use system.docker as docker
 use system.profile as profile
 
 pure fixture_config() -> docker.DockerConfig {
   {
     docker: p"docker",
+    arch: "aarch64",
+    platform: "linux/arm64",
     laputa_root: /work/laputa,
     seed: /work/laputa/.out/seed/aarch64,
     output_root: /work/laputa/target/laputa/qemu-dwl-foot,
@@ -16,7 +18,7 @@ pure fixture_config() -> docker.DockerConfig {
 
 test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
-  assert docker.docker_pm_plan_argv(value) == [
+  assert docker.docker_pm_plan_argv(value, "x86_64") == [
     "/bin/xsh",
     "/src/laputa/pm.xsh",
     "--",
@@ -42,17 +44,23 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
     "foot-minimal",
     "--root",
     "linux",
+    "--target",
+    "x86_64-linux-musl",
     "--output",
     "/output/build-plan.json",
   ]
-  assert ! (docker.docker_pm_plan_argv(value) |> any "llvm-toolchain" in .)
+  assert ! (docker.docker_pm_plan_argv(value, "x86_64") |> any "llvm-toolchain" in .)
 }
 
-test test_docker_rejects_non_arm64_runner_architecture [error] {
-  docker.require_arm64_image_architecture("arm64")?
-  match docker.require_arm64_image_architecture("amd64") {
-    Ok(_) => assert false
-    Err(_) => {}
+test test_docker_rejects_a_runner_image_of_another_architecture [error] {
+  docker.require_image_architecture("linux/arm64", "arm64")?
+  docker.require_image_architecture("linux/amd64", "amd64")?
+
+  for mismatch in [["linux/arm64", "amd64"], ["linux/amd64", "arm64"]] {
+    match docker.require_image_architecture(mismatch[0], mismatch[1]) {
+      Ok(_) => test.fail(f"{mismatch[1]} image accepted for {mismatch[0]}")?
+      Err(_) => {}
+    }
   }
 }
 
@@ -65,7 +73,7 @@ test test_docker_places_optional_repository_configuration_before_image [error] {
   assert ! (argv |> any "XSH_PM_PUBLIC_REPO" in .)
 }
 
-test test_native_arm64_docker_command_mounts_only_declared_inputs [error] {
+test test_native_docker_command_mounts_only_declared_inputs [error] {
   let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "check"])
   assert argv[0] == "docker"
   assert "linux/arm64" in argv
@@ -108,4 +116,19 @@ test test_generation_projection_and_build_use_the_single_container_adapter [fs, 
     "qemu-dwl-foot",
     "3",
   ]
+}
+
+test test_x86_64_docker_command_uses_the_amd64_platform_and_store [error] {
+  let config = {
+    ...fixture_config(),
+    arch: "x86_64",
+    platform: "linux/amd64",
+    seed: /work/laputa/.out/seed/x86_64,
+    artifact_root: docker.artifact_store_root(/work/laputa, "x86_64"),
+  }
+  let argv = docker.docker_command_argv(config, ["/bin/xsh", "--help"])
+  assert "linux/amd64" in argv
+  assert ! (argv |> any "arm64" in .)
+  assert "type=bind,src=/work/laputa/.out/artifacts/x86_64,dst=/artifacts" in argv
+  assert "type=bind,src=/work/laputa/.out/seed/x86_64/core,dst=/usr/lib/xsh/core,readonly" in argv
 }

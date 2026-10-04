@@ -32,7 +32,8 @@ export pure command_text(command: LaputaCommand) -> Str {
 export pure usage() -> Str {
   """usage: laputa <plan|build|test|boot|clean> qemu-dwl-foot [--jobs N]
 
-Build and test the one supported aarch64-linux-musl reference system.
+Build and test the one supported reference system natively for this host:
+aarch64 under HVF on macOS, aarch64 or x86_64 under KVM on Linux.
 """
 }
 
@@ -105,6 +106,9 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
   let value = profile.load_system_profile(parsed.profile_name, fp"{root}/profiles")?
+  # The image is built in native Docker and booted with hardware acceleration,
+  # so its architecture is always the host's.
+  let target = qemu.host_qemu_target()?
 
   match parsed.command {
     LaputaClean => {
@@ -112,19 +116,19 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
       print f"laputa clean {value.name}: ok"
     }
     LaputaPlan => {
-      let outputs = build.plan_system_profile(docker.build_config(root, value.name)?, value)?
+      let outputs = build.plan_system_profile(docker.build_config(root, value.name, target.arch)?, value)?
       print f"laputa plan {value.name} {profile.digest(value)?} {outputs.build_plan}"
     }
     LaputaTest => {
-      let outputs = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
-      qemu.run_test(qemu.qemu_config(root)?, value, outputs)?
+      let outputs = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?
+      qemu.run_test(qemu.qemu_config(root, target)?, value, outputs)?
     }
     LaputaBoot => {
-      let outputs = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
-      qemu.boot(qemu.qemu_config(root)?, value, outputs)?
+      let outputs = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?
+      qemu.boot(qemu.qemu_config(root, target)?, value, outputs)?
     }
     LaputaBuild => {
-      let _ = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
+      let _ = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?
       print f"laputa build {value.name}: ok"
     }
   }

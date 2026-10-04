@@ -42,7 +42,7 @@ test test_kernel_manifest_path_is_relative_existing_and_nonempty [fs, error] { |
 }
 
 test test_gpt_partuuid_matches_the_qemu_kernel_command_line [error] {
-  assert f"root=PARTUUID={image.image_root_partuuid()}" in qemu.kernel_cmdline(types.Test)
+  assert f"root=PARTUUID={image.image_root_partuuid()}" in qemu.kernel_cmdline(qemu.qemu_target("Linux", "x86_64")?, types.Test)
 }
 
 test test_generation_size_counts_payload_and_incomplete_disk_preserves_final [fs, error] { |ctx|

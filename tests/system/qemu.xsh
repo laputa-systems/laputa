@@ -21,8 +21,6 @@ pure fixture_profile() -> types.SystemProfile {
     ],
     kernel_package: "linux",
     kernel_path: p"boot/vmlinuz",
-    qemu_machine: "virt,accel=hvf,highmem=off",
-    qemu_cpu: "host",
     qemu_smp: 2,
     qemu_memory: "1536M",
     qemu_width: 1280,
@@ -32,42 +30,79 @@ pure fixture_profile() -> types.SystemProfile {
   }
 }
 
-pure fixture_qemu() -> qemu.QemuConfig {
-  {qemu: p"qemu-system-aarch64", python: p"python3", qmp_helper: p"boot/qmp-proof.py"}
+proc fixture_qemu(os: Str, arch: Str) [error] -> Result[qemu.QemuConfig] {
+  let target = qemu.qemu_target(os, arch)?
+  {qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target}
 }
 
-test test_qemu_command_is_the_single_aarch64_hvf_contract [error] {
-  let test_argv = qemu.qemu_command_argv(
-    fixture_qemu(),
-    fixture_profile(),
-    build.outputs(p"target/laputa/qemu-dwl-foot"),
-    types.Test,
-  )
-  let interactive_argv = qemu.qemu_command_argv(
-    fixture_qemu(),
-    fixture_profile(),
-    build.outputs(p"target/laputa/qemu-dwl-foot"),
-    types.Interactive,
-  )
+proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
+  let outputs = build.outputs(p"target/laputa/qemu-dwl-foot")
+  [
+    qemu.qemu_command_argv(config, fixture_profile(), outputs, types.Test),
+    qemu.qemu_command_argv(config, fixture_profile(), outputs, types.Interactive),
+  ]
+}
 
-  for argv in [test_argv, interactive_argv] {
+proc assert_profile_devices(argv: List[Str]) [error] {
+  assert "virtio-net-pci,netdev=net0" in argv, "network"
+  assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"
+  assert "virtio-keyboard-pci" in argv, "keyboard"
+  assert "virtio-tablet-pci" in argv, "tablet"
+  assert "virtio-mouse-pci" in argv, "mouse"
+  assert "-qmp" in argv, "qmp"
+  assert "-no-reboot" in argv, "no reboot"
+  assert argv |> any "root=PARTUUID=33333333-3333-3333-3333-333333333333" in ., "root partuuid"
+}
+
+test test_qemu_command_on_macos_is_aarch64_under_hvf [error] {
+  let config = fixture_qemu("Darwin", "aarch64")?
+  let pair = command_pair(config)?
+
+  for argv in pair {
+    assert argv[0] == "qemu-system-aarch64"
     assert "virt,accel=hvf,highmem=off" in argv, "machine"
     assert "virtio-blk-device,drive=root" in argv, "root device"
-    assert "virtio-net-pci,netdev=net0" in argv, "network"
-    assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"
-    assert "virtio-keyboard-pci" in argv, "keyboard"
-    assert "virtio-tablet-pci" in argv, "tablet"
-    assert "virtio-mouse-pci" in argv, "mouse"
-    assert "-qmp" in argv, "qmp"
-    assert "-no-reboot" in argv, "no reboot"
-    assert argv |> any "root=PARTUUID=33333333-3333-3333-3333-333333333333" in ., "root partuuid"
-    assert ! (argv |> any "x86_64" in .), "no host architecture"
+    assert argv |> any "console=ttyAMA0" in ., "pl011 console"
+    assert ! (argv |> any "x86_64" in .), "no other architecture"
+    assert_profile_devices(argv)?
   }
 
-  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Test), "test proof flag"
-  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(types.Interactive)), "interactive omits proof flag"
-  assert "none" in test_argv, "headless test"
-  assert "cocoa,zoom-to-fit=on,show-cursor=on" in interactive_argv, "cocoa interactive"
+  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test), "test proof flag"
+  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Interactive)), "interactive omits proof flag"
+  assert "none" in pair[0], "headless test"
+  assert "cocoa,zoom-to-fit=on,show-cursor=on" in pair[1], "cocoa interactive"
+}
+
+test test_qemu_command_on_linux_x86_64_is_q35_under_kvm [error] {
+  let config = fixture_qemu("Linux", "x86_64")?
+  let pair = command_pair(config)?
+
+  for argv in pair {
+    assert argv[0] == "qemu-system-x86_64"
+    assert "q35,accel=kvm" in argv, "machine"
+    assert argv |> any . == "-vga", "virtio-gpu is the only display"
+    assert "host" in argv, "cpu"
+    assert "virtio-blk-pci,drive=root" in argv, "root device"
+    assert argv |> any "console=ttyS0" in ., "16550 console"
+    assert ! (argv |> any "ttyAMA0" in .), "no PL011 console"
+    assert_profile_devices(argv)?
+  }
+
+  assert "none" in pair[0], "headless test"
+  assert ! ("cocoa,zoom-to-fit=on,show-cursor=on" in pair[1]), "no cocoa on Linux"
+}
+
+test test_qemu_target_runs_on_linux_aarch64_under_kvm_and_rejects_other_hosts [error] {
+  let target = qemu.qemu_target("Linux", "aarch64")?
+  assert target.machine == "virt,accel=kvm"
+  assert target.block_device == "virtio-blk-device"
+
+  for host in [["Darwin", "x86_64"], ["FreeBSD", "x86_64"]] {
+    match qemu.qemu_target(host[0], host[1]) {
+      Ok(_) => test.fail(f"{host[0]} {host[1]} unexpectedly has a QEMU target")?
+      Err(_) => {}
+    }
+  }
 }
 
 test test_console_markers_fail_before_success [error] {
@@ -139,6 +174,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
       qemu: fake_qemu,
       python: fake_qmp,
       qmp_helper: fp"{root}/qmp-helper.py",
+      target: qemu.qemu_target("Linux", "x86_64")?,
     },
     outputs,
     qmp_attempt_one: attempt_one,
@@ -210,4 +246,18 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   assert "seatd" in guest and "dwl" in guest and "foot" in guest
   assert "guest_wait_for(/run/laputa-foot-read-ready, \"foot\", 30)" in guest
   assert "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
+}
+
+# A QEMU that dies at startup (a missing device model, say) stays an unreaped
+# child until the supervisor waits for it, so liveness must not count it. A
+# supervisor that does would wait out its 180 s proof timeout, past xsht's
+# per-test limit.
+test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, time, error] { |ctx|
+  let fixture = supervisor_fixture(ctx, false)?
+  fs.write(fixture.config.qemu, "#!/bin/sh\necho 'qemu: device model missing' >&2\nexit 1\n")?
+
+  match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
+    Ok(_) => test.fail("supervisor accepted a QEMU that exited at startup")?
+    Err(problem) => assert "QEMU exited before qemu-dwl-foot proof" in problem.message, problem.message
+  }
 }

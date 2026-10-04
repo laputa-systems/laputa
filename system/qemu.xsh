@@ -4,17 +4,96 @@ use system.image as image
 use system.proof as proof
 use system.types as types
 
-## The host executable and QMP helper used by a QEMU invocation.
-export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path}
+## The host half of a QEMU invocation, which the profile does not choose: the
+## guest machine with its hardware accelerator and board options, the CPU
+## model, the serial console arguments, the root disk transport, and the
+## interactive display.
+export type QemuTarget = {
+  arch: Str,
+  qemu_name: Str,
+  machine: Str,
+  machine_args: List[Str],
+  cpu: Str,
+  console: Str,
+  block_device: Str,
+  interactive_display: List[Str],
+}
+
+## The host executable, QMP helper, and host target used by a QEMU invocation.
+export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: QemuTarget}
+
+# aarch64 virt has a PL011 UART and virtio-mmio block devices; x86_64 q35 has a
+# 16550 UART and virtio-pci, and a default VGA adapter that `-vga none`
+# removes: the virtio GPU must be the only display, or QEMU's screendump
+# captures the VGA text console instead of the compositor. Linux hosts take
+# QEMU's default interactive display.
+## The QEMU target for a host: the guest is the host's architecture, so the
+## image runs under HVF on macOS and KVM on Linux.
+export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget] {
+  let arm_console = "earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0"
+
+  if os == "Darwin" and arch == "aarch64" {
+    return {
+      arch,
+      qemu_name: "qemu-system-aarch64",
+      machine: "virt,accel=hvf,highmem=off",
+      machine_args: [],
+      cpu: "host",
+      console: arm_console,
+      block_device: "virtio-blk-device",
+      interactive_display: ["-display", "cocoa,zoom-to-fit=on,show-cursor=on"],
+    }
+  }
+
+  if os == "Linux" and arch == "aarch64" {
+    return {
+      arch,
+      qemu_name: "qemu-system-aarch64",
+      machine: "virt,accel=kvm",
+      machine_args: [],
+      cpu: "host",
+      console: arm_console,
+      block_device: "virtio-blk-device",
+      interactive_display: [],
+    }
+  }
+
+  if os == "Linux" and arch == "x86_64" {
+    return {
+      arch,
+      qemu_name: "qemu-system-x86_64",
+      machine: "q35,accel=kvm",
+      machine_args: ["-vga", "none"],
+      cpu: "host",
+      console: "earlyprintk=serial console=ttyS0",
+      block_device: "virtio-blk-pci",
+      interactive_display: [],
+    }
+  }
+
+  Err(types.LaputaError.Profile(f"no QEMU target for {os} {arch}; qemu-dwl-foot runs natively on macOS aarch64 or Linux aarch64/x86_64"))
+}
+
+## The running host's QEMU target.
+export proc host_qemu_target() [env, error] -> Result[QemuTarget] {
+  let os = system.uname()?
+  let arch = match os.machine {
+    "arm64" | "aarch64" => "aarch64"
+    "amd64" | "x86_64" => "x86_64"
+    other => other
+  }
+
+  qemu_target(os.sysname, arch)?
+}
 
 ## Return the stable root PARTUUID written by Laputa's GPT image module.
 export pure root_partuuid() -> Str {
   image.image_root_partuuid()
 }
 
-## Build the required ARM serial console command line for a profile mode.
-export pure kernel_cmdline(mode: types.QemuMode) -> Str {
-  let base = f"earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0 ignore_loglevel devtmpfs.mount=1 root=PARTUUID={root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
+## Build the serial-console kernel command line for a host target and profile mode.
+export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode) -> Str {
+  let base = f"{target.console} ignore_loglevel devtmpfs.mount=1 root=PARTUUID={root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 
   return f"{base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == types.Test
 
@@ -22,9 +101,10 @@ export pure kernel_cmdline(mode: types.QemuMode) -> Str {
 }
 
 ## Resolve only the documented host-side QEMU configuration surface.
-export proc qemu_config(laputa_root: Path) [fs, process, env, error] -> Result[QemuConfig] {
-  let raw_qemu = (env.get("QEMU_SYSTEM_AARCH64") ?? "qemu-system-aarch64").trim()
-  let qemu = if raw_qemu == "" { process.which("qemu-system-aarch64")? } else { fp"{raw_qemu}" }
+export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig] {
+  # QEMU_SYSTEM_AARCH64 or QEMU_SYSTEM_X86_64 names a specific binary.
+  let raw_qemu = (env.get(f"QEMU_SYSTEM_{target.arch.upper()}") ?? "").trim()
+  let qemu = if raw_qemu == "" { process.which(target.qemu_name)? } else { fp"{raw_qemu}" }
   let python = process.which("python3")?
   let qmp_helper = fp"{laputa_root}/boot/qmp-proof.py"
 
@@ -32,7 +112,7 @@ export proc qemu_config(laputa_root: Path) [fs, process, env, error] -> Result[Q
     return Err(types.LaputaError.Profile(f"missing QMP helper {qmp_helper}"))
   }
 
-  {qemu, python, qmp_helper}
+  {qemu, python, qmp_helper, target}
 }
 
 ## Construct an exact QEMU argv without a shell command boundary.
@@ -42,18 +122,16 @@ export pure qemu_command_argv(
   outputs: build.ProfileOutputs,
   mode: types.QemuMode,
 ) -> List[Str] {
-  let display = if mode == types.Test {
-    "none"
-  } else {
-    "cocoa,zoom-to-fit=on,show-cursor=on"
-  }
+  let target = value.target
+  let display = if mode == types.Test { ["-display", "none"] } else { target.interactive_display }
 
   [
     value.qemu.display(),
     "-M",
-    profile.qemu_machine,
+    target.machine,
+    @target.machine_args,
     "-cpu",
-    profile.qemu_cpu,
+    target.cpu,
     "-smp",
     f"{profile.qemu_smp}",
     "-m",
@@ -61,11 +139,11 @@ export pure qemu_command_argv(
     "-kernel",
     outputs.kernel.display(),
     "-append",
-    kernel_cmdline(mode),
+    kernel_cmdline(target, mode),
     "-drive",
     f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on",
     "-device",
-    "virtio-blk-device,drive=root",
+    f"{target.block_device},drive=root",
     "-netdev",
     "user,id=net0",
     "-device",
@@ -80,8 +158,7 @@ export pure qemu_command_argv(
     "virtio-mouse-pci",
     "-qmp",
     f"unix:{outputs.qmp_socket},server,nowait",
-    "-display",
-    display,
+    @display,
     "-serial",
     "stdio",
     "-no-reboot",
@@ -95,12 +172,15 @@ proc qemu_stop(launched: ProcessHandle) [process, error] {
   launched.cancel(signal: "TERM", kill_after: 5s)?
 }
 
-# Returns whether the spawned QEMU group leader is still live without a shell watcher.
+# Returns whether the spawned QEMU group leader is still running, without a
+# shell watcher. An exited QEMU stays a zombie (status `Z`) until it is
+# reaped, and signal 0 still reaches a zombie, so the process table decides.
 proc qemu_process_live(pid: Int) [process, error] -> Result[Bool] {
-  match process.kill(pid, signal: "0") {
-    Ok(_) => true
-    Err(_) => false
+  for entry in process.list()? |> where .pid == pid {
+    return entry.status != "Z"
   }
+
+  false
 }
 
 # Invokes the retained focused Python QMP helper with structured arguments.
@@ -237,7 +317,7 @@ export proc run_test(
   }
 }
 
-## Run the profile's normal Cocoa session and return its real QEMU exit status.
+## Run the profile's normal interactive session and return its real QEMU exit status.
 export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, error] {
   if ! fs.exists(outputs.kernel)? or ! fs.exists(outputs.disk)? {
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
