@@ -753,14 +753,6 @@ proc build_host() [fs, process, env, error, io] {
   let installer_root_mb = installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
   let installer_ci = installer_env_value("LAPUTA_INSTALLER_CI", "1")
 
-  if installer_env_value("LAPUTA_INSTALLER_LOCAL_XSH", "") != "" {
-    return Err(
-      InstallerBuildError.Failed(
-        "LAPUTA_INSTALLER_LOCAL_XSH was removed; installer builds package the pinned XSH release artifact",
-      ),
-    )
-  }
-
   let package_bundle = package_roots_host.prepare(
     root,
     repo_url,

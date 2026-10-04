@@ -1,72 +1,46 @@
-# syntax=docker/dockerfile:1.19
+# check=skip=InvalidDefaultArgInFrom
+# The offline package-tools image: the host-tools base plus the prebuilt LLVM
+# seed. seed/images.xsh builds it with `--network none` and tags it with a
+# content key; the profile builds use `--platform linux/arm64`.
 #
-# This package-tools bootstrap image uses the caller's platform; the profile
-# builds with `--platform linux/arm64`. The checked-out monorepo is supplied
-# as a mounted input when the image is used. The image contains the runner,
-# bootstrap compiler, and host tools needed to build the declared graph.
-ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
-ARG XSH_RELEASE_ARCH=aarch64
-ARG XSH_RELEASE_XSH_SHA256=bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
-ARG XSH_RELEASE_XSHI_SHA256=5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
-ARG XSH_RELEASE_XSHT_SHA256=86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
-ARG XSH_CORE_SHA256=7040377b294b165fde676f6b808d32ee5d5dc0f2cc84dd6d1350974d22989c95
-ARG XSH_PM_TARGET_ARCH=aarch64
+# The image bakes no XSH, PM, or recipes. Containers mount the seed XSH at
+# /bin/{xsh,xshi,xsht} with its core applets at /usr/lib/xsh/core, and the
+# checkout read-only at /src/laputa, so neither an XSH nor a PM change
+# rebuilds this image.
+#
+# Inputs:
+#   HOST_TOOLS_IMAGE   the loaded laputa-host-tools tag
+#   context `seed`     .out/seed/<arch>, the local XSH seed
+#   context `sources`  a staged source cache holding sha256/<llvm archive digest>
+#   main context       the checkout (PM, the llvm-toolchain recipe, the helper)
+ARG HOST_TOOLS_IMAGE
 
-FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS xsh-runtime
-ARG XSH_RELEASE
-ARG XSH_RELEASE_ARCH
-ARG XSH_RELEASE_XSH_SHA256
-ARG XSH_RELEASE_XSHI_SHA256
-ARG XSH_RELEASE_XSHT_SHA256
-ARG XSH_CORE_SHA256
-
-# build-base is the small native substrate around the explicit LLVM seed.
-# e2fsprogs and util-linux provide the ext4/GPT host tools used by image
-# construction; the XSH mkfs.ext4.xsh helper remains in the mounted package
-# checkout and is therefore not copied into this bootstrap image.
-RUN apk add --no-cache build-base ca-certificates curl e2fsprogs util-linux xz zlib
-ADD --checksum=sha256:${XSH_RELEASE_XSH_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsh-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsh
-ADD --checksum=sha256:${XSH_RELEASE_XSHI_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xshi-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xshi
-ADD --checksum=sha256:${XSH_RELEASE_XSHT_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/xsht-${XSH_RELEASE}-${XSH_RELEASE_ARCH}-linux-musl /tmp/xsht
-ADD --checksum=sha256:${XSH_CORE_SHA256} https://github.com/laputa-systems/xsh/releases/download/${XSH_RELEASE}/core-${XSH_RELEASE}.tar.xz /tmp/xsh-core.tar.xz
-RUN mkdir -p /usr/lib/xsh /usr/bin && \
-    cp /tmp/xsh /bin/xsh && \
-    cp /tmp/xshi /bin/xshi && \
-    cp /tmp/xsht /bin/xsht && \
-    chmod 0755 /bin/xsh /bin/xshi /bin/xsht && \
-    tar -C /usr/lib/xsh -xJf /tmp/xsh-core.tar.xz && \
-    find /usr/lib/xsh/core -type f -exec sed -i -e '1s|^#!/usr/local/bin/xsh|#!/bin/xsh|' -e '1s|^#!/usr/bin/env -S xsh|#!/bin/xsh|' {} + && \
-    for script in /usr/lib/xsh/core/*; do if [ -f "$script" ]; then command_name="$(/bin/busybox basename "$script")"; if [ "$command_name" != su ] && [ "$command_name" != sh ]; then /bin/busybox ln -sf ../lib/xsh/core/"${command_name}" /usr/bin/"${command_name}"; fi; fi; done && \
-    /bin/busybox rm /tmp/xsh /tmp/xshi /tmp/xsht /tmp/xsh-core.tar.xz
-
-# The helper uses the normal typed recipe/source boundary to materialize the
-# prebuilt target LLVM seed before any current PM BuildPlan runs.
-FROM xsh-runtime AS llvm-seed
+# The helper uses the typed recipe boundary to materialize the prebuilt
+# target LLVM seed before any PM BuildPlan runs. The seed XSH and the checkout
+# are bind mounts, so neither lands in a layer.
+FROM ${HOST_TOOLS_IMAGE} AS llvm-seed
 ARG XSH_PM_TARGET_ARCH
-WORKDIR /src
-ENV PATH=/bin:/usr/bin
+ENV PATH=/opt/xsh-seed:/bin:/usr/bin
 ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
 ENV XSH_MODULE_PATH=/src/laputa
-COPY pm.xsh /src/laputa/pm.xsh
-COPY pm/ /src/laputa/pm/
-COPY packages/llvm-toolchain/ /src/laputa/packages/llvm-toolchain/
-COPY bootstrap-llvm-seed.xsh /src/bootstrap-llvm-seed.xsh
-RUN ["/bin/xsh", "/src/bootstrap-llvm-seed.xsh", "--", "/src/laputa", "/seed-root"]
+RUN --mount=type=bind,from=seed,target=/opt/xsh-seed \
+    --mount=type=bind,from=sources,target=/sources \
+    --mount=type=bind,target=/src/laputa \
+    ["/opt/xsh-seed/xsh", "/src/laputa/bootstrap-llvm-seed.xsh", "--", "/src/laputa", "/sources", "/seed-root"]
 
-FROM xsh-runtime AS package-tools
+FROM ${HOST_TOOLS_IMAGE} AS package-tools
 ARG XSH_PM_TARGET_ARCH
 COPY --from=llvm-seed /seed-root/ /
 
-# Keep the runtime mounts explicit and stable.  `/src/laputa` is the
+# Keep the runtime mounts explicit and stable. `/src/laputa` is the
 # authoritative checked-out monorepo (PM, recipes, profiles, system modules);
 # system/docker.xsh mounts it read-only for each structured PM command.
-RUN mkdir -p /src/laputa /artifacts /sources /output && \
-    test -x /bin/xsh && test -x /bin/xshi && test -x /bin/xsht && \
+RUN mkdir -p /src/laputa /artifacts /output /usr/lib/xsh/core && \
     test -x /usr/bin/cc && (test -x /sbin/mkfs.ext4 || test -x /usr/sbin/mkfs.ext4)
 WORKDIR /src/laputa
-ENV PATH=/bin:/usr/bin
+# Core applets precede /usr/bin as their /usr/bin symlinks did in installed
+# roots; Alpine's /bin tools keep precedence.
+ENV PATH=/bin:/usr/lib/xsh/core:/usr/bin
 ENV XSH_MODULE_PATH=/src/laputa
 ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
-RUN ["/bin/xsh", "--help"]
-RUN ["/bin/xshi", "--help"]
-RUN ["/bin/xsht", "--help"]
+ENV XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23

@@ -11,40 +11,26 @@ XSH_BIN_DIR ?= $(XSH_ROOT_ABS)/target/release
 XSH ?= $(XSH_BIN_DIR)/xsh
 XSHT ?= $(XSH_BIN_DIR)/xsht
 XSH_HOST ?= $(XSH)
-LAPUTA_LOCAL_XSH_BIN ?=
 CARGO ?= cargo
 CARGO_JOBS ?= 4
 
 HOST_XSH_ENV = PATH="$(XSH_BIN_DIR):$$PATH" XSH_HOST="$(XSH_HOST)" XSH_ROOT="$(XSH_ROOT_ABS)" XSH_MODULE_PATH="$(CURDIR)"
-LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR)" XSH_ROOT="$(XSH_ROOT_ABS)" LAPUTA_LOCAL_XSH_BIN="$(LAPUTA_LOCAL_XSH_BIN)"
+LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR)" XSH_ROOT="$(XSH_ROOT_ABS)"
 
-LAPUTA_DOCKER_PLATFORM ?= linux/arm64
-XSH_TEST_IMAGE ?= laputa-pm-test
-XSH_BUILD_IMAGE ?= xsh-test
-XSH_RELEASE ?= release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
+# The seed and image architecture. The macOS bootstrap builds aarch64; a Linux
+# amd64 host passes ARCH=x86_64.
+ARCH ?= aarch64
+SEED = $(HOST_XSH_ENV) $(XSH) seed/seed.xsh --
+SEED_ARGS = --arch $(ARCH) --xsh-root "$(XSH_ROOT_ABS)"
 PKGDIRS ?= $(sort $(patsubst %/PKGBUILD.xsh,%,$(wildcard packages/*/PKGBUILD.xsh)))
 PM_TESTS := $(sort $(wildcard tests/pm/*.xsh))
 UPDATE_CHECKSUM_JOBS ?= 8
-
-ifeq ($(LAPUTA_DOCKER_PLATFORM),linux/amd64)
-XSH_LOCAL_TRIPLE ?= x86_64-unknown-linux-musl
-XSH_RELEASE_ARCH ?= x86_64
-XSH_RELEASE_XSH_SHA256 ?= 03e190c8ee15020b04b27e2066a7e53665452c9dce821bd0af80378ef664c746
-XSH_RELEASE_XSHI_SHA256 ?= 897b22cae065625179f8b2cb18c48828464eb1cd135f32da0e9358b237f3e195
-XSH_RELEASE_XSHT_SHA256 ?= 83ea617d6fc1a9f9e7908b292d51d8b263df15904d67d17b7c7f04d825a98a20
-XSH_LOCAL_RUSTFLAGS_VAR := CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS
-else
-XSH_LOCAL_TRIPLE ?= aarch64-unknown-linux-musl
-XSH_RELEASE_ARCH ?= aarch64
-XSH_RELEASE_XSH_SHA256 ?= bc9117b8ac70c726002835e7ab1eaff0d45ede7b067bc85ddba7971eb8b8ffbb
-XSH_RELEASE_XSHI_SHA256 ?= 5cf2f028fd0f0e6cbae213d7037e28e1aa92ca74768c5fce5e300d9725014bb6
-XSH_RELEASE_XSHT_SHA256 ?= 86c2d1ac329702c0def779adb47640f84cdda9466630e2c98681750fc037a2e2
-XSH_LOCAL_RUSTFLAGS_VAR := CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS
-endif
-
-XSH_LOCAL_RUSTFLAGS ?= -C target-feature=+crt-static -C link-arg=--defsym=__isoc23_sscanf=sscanf -C link-arg=--defsym=__isoc23_strtol=strtol
-XSH_LOCAL_BIN_DIR ?= $(XSH_ROOT_ABS)/target/$(XSH_LOCAL_TRIPLE)/debug
 XSH_NATIVE_BIN_DIR ?= $(XSH_ROOT_ABS)/target/debug
+
+# Docker state Laputa creates; `make clean` removes exactly these.
+LAPUTA_IMAGE_REPOSITORIES := laputa-host-tools laputa-package-tools
+# Legacy named volumes from before the artifact store moved under .out/.
+LEGACY_LAPUTA_VOLUMES := laputa-artifacts-aarch64-v2 laputa-sources-aarch64-v2
 
 MIRROR := mirror
 DEB_ARCH ?= amd64
@@ -53,9 +39,9 @@ DEPLOY_HOST ?= oracle
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit clean fetch \
+.PHONY: check lint test test-pm test-system test-xinit clean distclean fetch fetch-seed seed seed-smoke \
 	profile-plan profile-build profile-test profile-boot profile-clean \
-	test-pm-native test-pm-docker test-pm-local-linux xsh-native xsh-local-bins xsh-builder-image update-checksums \
+	test-pm-native test-pm-docker xsh-native update-checksums \
 	installer-image installer-image-aarch64 installer-qemu-test installer-qemu-test-aarch64 \
 	installer-qemu-manual \
 	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
@@ -80,17 +66,43 @@ test-system:
 test-xinit:
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
 
+# All derived state: .out/ (seed, artifact store, cargo target, image
+# contexts), target/ (profile and installer outputs), mirror build outputs,
+# and Laputa's Docker images and legacy volumes. Fetched inputs in .cache/
+# survive; `xsh-test` belongs to XSH and survives too.
 clean: mirror-clean
 	rm -rf .out target
+	@images="$$(docker image ls --quiet $(foreach repository,$(LAPUTA_IMAGE_REPOSITORIES),--filter reference=$(repository)) | sort -u)"; \
+	    if [ -n "$$images" ]; then docker image rm --force $$images; fi
+	docker volume rm --force $(LEGACY_LAPUTA_VOLUMES)
+
+distclean: clean
+	rm -rf .cache
+
+# Offline: static musl xsh/xshi/xsht and core.tar.xz from XSH_ROOT under
+# .out/seed/$(ARCH), then the package-tools image. Incremental through the
+# cargo target dir in .out/xsh-target.
+seed:
+	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS)
+
+# Offline proof that the seed runs in package-tools with --network none.
+seed-smoke:
+	$(SEED) smoke $(SEED_ARGS)
 
 # The only networked step: every pinned upstream source the recipes use on
-# ARCH, sha256-verified into the content-addressed cache at
-# $(SOURCE_CACHE)/sha256/<hash>, which `make mirror` serves. Builds read that
-# cache or LAPUTA_MIRROR and never contact upstream hosts.
-ARCH ?= aarch64
+# ARCH (the LLVM seed included), sha256-verified into the content-addressed
+# cache at $(SOURCE_CACHE)/sha256/<hash>, which `make mirror` serves, plus the
+# seed inputs. Builds read that cache or LAPUTA_MIRROR and never contact
+# upstream hosts.
 SOURCE_CACHE ?= $(CURDIR)/.cache/sources
-fetch:
+fetch: fetch-seed
 	$(HOST_XSH_ENV) LAPUTA_SOURCE_CACHE="$(SOURCE_CACHE)" $(XSH) pm.xsh -- sources fetch --repo . --all --target $(ARCH)-linux-musl
+
+# The networked seed inputs: XSH's crates for XSH_ROOT's Cargo.lock in
+# .cache/cargo, the xsh-test image (XSH's Dockerfile.test), and the
+# host-tools base saved under .cache/images/.
+fetch-seed:
+	$(SEED) fetch $(SEED_ARGS)
 
 # The typed profile CLI is the sole core-system orchestration surface.
 profile-plan:
@@ -122,54 +134,9 @@ test-pm-native: xsh-native
 xsh-native:
 	$(CARGO) build -j $(CARGO_JOBS) --manifest-path "$(XSH_ROOT_ABS)/Cargo.toml" -p xsh -p xshi -p xsht --bin xsh --bin xshi --bin xsht
 
-# PM suite in a scratch image built from pinned published XSH release binaries.
+# The full PM suite inside package-tools with the seed mounted, offline.
 test-pm-docker:
-	docker build \
-	    --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    --build-arg XSH_RELEASE=$(XSH_RELEASE) \
-	    --build-arg XSH_RELEASE_ARCH=$(XSH_RELEASE_ARCH) \
-	    --build-arg XSH_RELEASE_XSH_SHA256=$(XSH_RELEASE_XSH_SHA256) \
-	    --build-arg XSH_RELEASE_XSHI_SHA256=$(XSH_RELEASE_XSHI_SHA256) \
-	    --build-arg XSH_RELEASE_XSHT_SHA256=$(XSH_RELEASE_XSHT_SHA256) \
-	    -t $(XSH_TEST_IMAGE) \
-	    -f Dockerfile.pm-test \
-	    .
-	@mkdir -p target/coverage/pm
-	@set -eu; for suite in $(PM_TESTS); do \
-	    name=$${suite##*/}; name=$${name%.xsh}; \
-	    docker run --rm \
-	        --platform $(LAPUTA_DOCKER_PLATFORM) \
-	        -v "$(CURDIR)":/src/laputa \
-	        $(XSH_TEST_IMAGE) \
-	        xsht test --cov --cov-json "target/coverage/pm/$$name.json" "$$suite"; \
-	done
-
-xsh-local-bins: xsh-builder-image
-	docker run --rm \
-	    --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    -e $(XSH_LOCAL_RUSTFLAGS_VAR)='$(XSH_LOCAL_RUSTFLAGS)' \
-	    -v "$(XSH_ROOT_ABS)":/work \
-	    -v "$(XSH_ROOT_ABS)/target/$(XSH_LOCAL_TRIPLE)":/work/target/$(XSH_LOCAL_TRIPLE) \
-	    -w /work \
-	    $(XSH_BUILD_IMAGE) \
-	    sh -c 'cargo build -j $(CARGO_JOBS) --target $(XSH_LOCAL_TRIPLE) -p xsh -p xshi -p xsht --no-default-features --features "xsh/native-tests xsh/net xsh/tools xsht/native-tests" --bin xsh --bin xshi --bin xsht'
-
-# PM suite against checked-out Linux debug XSH binaries in XSH's pinned test image.
-test-pm-local-linux: xsh-local-bins
-	@mkdir -p target/coverage/pm-local-linux
-	docker run --rm \
-	    --platform $(LAPUTA_DOCKER_PLATFORM) \
-	    -e XSH_HOST=/work/target/$(XSH_LOCAL_TRIPLE)/debug/xsh \
-	    -e XSH_MODULE_PATH=/src/laputa \
-	    -v "$(XSH_ROOT_ABS)":/work:ro \
-	    -v "$(CURDIR)":/src/laputa \
-	    -w /src/laputa \
-	    $(XSH_BUILD_IMAGE) \
-	    sh -c 'set -eu; export PATH="/work/target/$(XSH_LOCAL_TRIPLE)/debug:$$PATH"; for suite in $(PM_TESTS); do name=$${suite##*/}; name=$${name%.xsh}; xsht test --jobs 1 --cov --cov-json "target/coverage/pm-local-linux/$$name.json" "$$suite"; done'
-
-xsh-builder-image:
-	docker image inspect $(XSH_BUILD_IMAGE) >/dev/null 2>&1 || \
-	    docker build --platform $(LAPUTA_DOCKER_PLATFORM) -t $(XSH_BUILD_IMAGE) -f "$(XSH_ROOT_ABS)/Dockerfile.test" "$(XSH_ROOT_ABS)"
+	$(SEED) smoke $(SEED_ARGS) tests/pm
 
 update-checksums:
 	@printf '%s\n' $(PKGDIRS) | xargs -n 1 -P $(UPDATE_CHECKSUM_JOBS) sh -c 'pkg="$$1"; name="$${pkg#packages/}"; XSH_MODULE_PATH="$(CURDIR)" $(XSH) pm.xsh -- repo update-checksums --repo . "$$name"' sh

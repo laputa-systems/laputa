@@ -21,8 +21,10 @@ stores the result under `v2/proofs/<key>/`.
 
 `GenerationManifest` selects the runtime-only closure and is written unchanged
 to `/var/lib/laputa/generation.json`. The package-tools image is created on
-demand from `Dockerfile.package-tools`: pinned aarch64 XSH/core, the explicit
-LLVM seed, and the minimal native build/image substrate.
+demand from `Dockerfile.package-tools` without network: the saved
+`laputa-host-tools` base (pinned Alpine and its native build/image substrate)
+plus the explicit LLVM seed. It holds no XSH; containers mount the local seed
+from `.out/seed/aarch64`, binaries and core together.
 
 Laputa constructs and verifies the kernel, ext4 root filesystem, and GPT disk
 inside Linux, then publishes all of them as one immutable

@@ -3,23 +3,6 @@ use system.docker as docker
 
 error InstallerPackageHostError = Failed(message: Str) : InvalidData
 
-proc local_xsh(root: Path) [fs, env, error] -> Result[Path] {
-  let configured_root = (env.get("XSH_ROOT") ?? "").trim()
-  let xsh_root = if configured_root == "" { fp"${root.parent}/xsh" } else { fp"${configured_root}" }
-  let configured_binary = (env.get("LAPUTA_LOCAL_XSH_BIN") ?? "").trim()
-  let binary = if configured_binary == "" {
-    fp"${xsh_root}/target/aarch64-unknown-linux-musl/debug/xsh"
-  } else {
-    fp"${configured_binary}"
-  }
-
-  if ! fs.exists(binary)? or fs.metadata(binary)?.kind != "file" {
-    return Err(InstallerPackageHostError.Failed(f"native ARM64 XSH binary is missing: ${binary}"))
-  }
-
-  binary
-}
-
 ## Select a complete package bundle built by the native ARM64 runner.
 export proc prepare(
   root: Path,
@@ -32,9 +15,8 @@ export proc prepare(
     return Err(InstallerPackageHostError.Failed("installer package jobs must be positive"))
   }
 
-  let binary = local_xsh(root)?
   let base = docker.build_config(root, "installer-aarch64-packages")?
-  let config = {...base, repo_url, container_xsh: docker.CheckedOutXsh(binary)}
+  let config = {...base, repo_url}
   docker.docker_run(
     config,
     [

@@ -1,0 +1,11 @@
+# The networked base under laputa-package-tools: the digest-pinned Alpine
+# image and its apk toolchain, nothing else. `make fetch` builds it once and
+# saves it to .cache/images/; later runs load the saved tar offline. apk is
+# unpinned, so rebuilding this file's image can drift; the saved tar is the
+# stable copy. Its tag is a content key over this file (seed/images.xsh).
+#
+# build-base is the small native substrate around the explicit LLVM seed.
+# e2fsprogs and util-linux provide the ext4/GPT host tools used by image
+# construction; the XSH mkfs.ext4.xsh helper stays in the mounted checkout.
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+RUN apk add --no-cache build-base ca-certificates curl e2fsprogs util-linux xz zlib

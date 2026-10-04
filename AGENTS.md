@@ -19,6 +19,7 @@ read `../xsh/AGENTS.md` before editing there or before writing `.xsh` here.
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 installer image and its QEMU harness (separate from the profile CLI) |
 | `xinit/` | `xinit.xsh`, Laputa's pure-XSH PID 1 and service manager, with tests and docs |
 | `mirror/` | Rust package mirror server, a host tool (not a Laputa package) |
+| `seed/`, `Dockerfile.package-tools`, `bootstrap-llvm-seed.xsh` | local XSH seed build and the content-keyed host-tools and package-tools images |
 | `tests/pm/`, `tests/system/`, `tests/integration/` | native XSH tests; `*/fixtures/` are staged inputs, not tests |
 | `docs/` | PM, packaging, development, QEMU, and infrastructure notes |
 | `.out/`, `.cache/` | derived state and fetched inputs (gitignored) |
@@ -33,12 +34,14 @@ and the Makefile sets it.
 | Command | Does |
 |---|---|
 | `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes) |
-| `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`) |
+| `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
+| `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
+| `make seed-smoke`, `make test-pm-docker` | the seed in package-tools with `--network none`: offline plan plus a PM subset, or the full PM suite |
 | `make test` | `test-pm`, `test-system`, `test-xinit` native suites |
 | `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` inside `mirror/` |
 | `make profile-{plan,build,test,boot,clean}` | the typed profile CLI in native `linux/arm64` Docker |
 | `make installer-image`, `make installer-qemu-test` | aarch64 installer image and QEMU proof |
-| `make clean` | remove derived state (`.out/`, `target/`, mirror frontend outputs) |
+| `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images); `make distclean` also removes `.cache/` |
 
 Start with the narrowest proof: `xsht check` on changed modules, then their
 focused tests (`xsht test tests/pm/pm_plan.xsh`), then the Docker profile
@@ -77,10 +80,12 @@ build, and QEMU last. Use `cargo -j 4` and run one test suite at a time.
 ## System profile
 
 - Use the typed CLI, never a handwritten package closure or mutable world root.
-- The Docker adapter mounts this checkout read-only at `/src/laputa`, uses
-  native `linux/arm64`, and named artifact and source volumes. Stage builds on
-  the container's Linux filesystem and copy only complete, atomic final outputs
-  to the host mount. Do not remove a named volume without an explicit request.
+- The Docker adapter mounts this checkout read-only at `/src/laputa` (the
+  source cache included), the local XSH seed at `/bin/{xsh,xshi,xsht}` and
+  `/usr/lib/xsh/core`, and the artifact store `.out/artifacts/<arch>` at
+  `/artifacts`, on native `linux/arm64`. No image bakes XSH or PM. Stage
+  builds on the container's Linux filesystem and copy only complete, atomic
+  final outputs to the host mount.
 
 ## xinit
 

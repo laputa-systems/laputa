@@ -250,8 +250,30 @@ test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
   test.ok("seatd" in pkg.deps)?
 }
 
+# Planning the real repository keys the `xsh` package by the local XSH seed, a
+# derived input under `.out/` that only `make seed` produces. Plan a disposable
+# root that shares the checked-in recipes and repository inputs and holds a
+# fixture seed instead.
+proc repository_with_fixture_seed(ctx: TestContext) [fs, error] -> Result[Path] {
+  let checkout = fs.cwd()?
+  let root = test.temp_dir(ctx, name: "repository-with-seed")?
+
+  for name in ["packages", "pm", "pm.xsh", "xinit"] {
+    fs.symlink(fp"${checkout}/${name}", fp"${root}/${name}")?
+  }
+
+  let seed = fp"${root}/.out/seed/aarch64"
+  fs.mkdir(seed)?
+
+  for name in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json"] {
+    fs.write(fp"${seed}/${name}", f"fixture ${name}\n")?
+  }
+
+  root
+}
+
 test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
-  let catalog_value = catalog.load(p".")?
+  let catalog_value = catalog.load(repository_with_fixture_seed(ctx)?)?
   let plan_value = plan.resolve(
     catalog_value,
     {target: types.target_aarch64(), index_sha256: "linux-recipe-empty-remote", packages: []},

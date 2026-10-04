@@ -1,48 +1,23 @@
 ##! Native Linux arm64 Docker command construction for Laputa profile builds.
+use seed.images as images
+use seed.xsh_seed as xsh_seed
 use system.types as types
 
-## Select the published package-tools interpreter or a checked-out ARM64 debug binary.
-export enum ContainerXsh { PinnedXsh, CheckedOutXsh(Path) }
-
-## The fixed host paths and named volumes mounted into the profile build container.
+## The fixed host paths mounted into the profile build container.
 ## `laputa_root` is the monorepo checkout: PM, recipes, profiles, and system modules.
+## `seed` is the verified local XSH seed; `artifact_root` is the PM artifact store under `.out/`.
 export type DockerConfig = {
   docker: Path,
   laputa_root: Path,
-  xsh_root: Path,
+  seed: Path,
   output_root: Path,
-  artifact_volume: Str,
-  source_volume: Str,
+  artifact_root: Path,
   image: Str,
   repo_url: Str,
-  container_xsh: ContainerXsh,
 }
 
-const package_tools_contract_epoch = "laputa-package-tools-1"
-
-pure package_tools_dockerfile(value: DockerConfig) -> Path {
-  fp"${value.laputa_root}/Dockerfile.package-tools"
-}
-
-pure package_tools_bootstrap_helper(value: DockerConfig) -> Path {
-  fp"${value.laputa_root}/bootstrap-llvm-seed.xsh"
-}
-
-proc package_tools_tree_digest(root: Path) [fs, error] -> Result[Str] {
-  guard fs.exists(root)? else {
-    return Err(types.LaputaError.Docker(f"package-tools bootstrap input is missing ${root}"))
-  }
-
-  let metadata = fs.metadata(root)?
-  return hash.sha256(root)?.hex() when metadata.kind == "file"
-
-  var lines = [
-    f"${entry.path.strip_prefix(root)?.display()}\t${hash.sha256(entry.path)?.hex()}"
-    for entry in fs.files(root)
-  ]
-  let sorted = lines |> sort
-  bytes.from_text(sorted.join("\n") + "\n").sha256().hex()
-}
+# The profile builds the aarch64 reference system on a native arm64 runner.
+const profile_seed_arch = "aarch64"
 
 proc env_value(name: Str, fallback: Str) [env] -> Str {
   let value = (env.get(name) ?? "").trim()
@@ -51,43 +26,37 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
   value
 }
 
+## The bind-mounted PM artifact store for one architecture. A bind mount keeps
+## every artifact under `.out/`, which `make clean` owns; artifacts are large
+## sequential files, where bind-mount I/O matches a named volume.
+export pure artifact_store_root(laputa_root: Path, arch: Str) -> Path {
+  fp"${laputa_root}/.out/artifacts/${arch}"
+}
+
 ## Resolve the allowed Docker configuration surface from the host environment.
 export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
-  let xsh_root = fp"${env_value("XSH_ROOT", fp"${laputa_root.parent}/xsh".display())}"
   let docker = fp"${env_value("DOCKER", "docker")}"
   let output_root = fp"${laputa_root}/target/laputa/${profile_name}"
-
-  if ! fs.exists(xsh_root)? or ! fs.exists(fp"${xsh_root}/core")? {
-    return Err(types.LaputaError.Docker(f"XSH source checkout with core/ does not exist: ${xsh_root}"))
-  }
 
   if ! fs.exists(docker)? {
     let _ = process.which(docker.display())?
   }
 
-  var container_xsh: ContainerXsh = PinnedXsh
-  let configured_binary = env_value("LAPUTA_LOCAL_XSH_BIN", "")
-  if configured_binary != "" {
-    let binary = path.absolute(fp"${configured_binary}")?
-    if ! fs.exists(binary)? or fs.metadata(binary)?.kind != "file" {
-      return Err(types.LaputaError.Docker(f"checked-out XSH binary is missing: ${binary}"))
-    }
+  let seed = xsh_seed.xsh_seed_require(laputa_root, profile_seed_arch)?
+  let arch = xsh_seed.xsh_seed_arch(profile_seed_arch)?
+  let artifact_root = artifact_store_root(laputa_root, profile_seed_arch)
+  fs.mkdir(artifact_root)?
 
-    container_xsh = CheckedOutXsh(binary)
-  }
-
-  let base: DockerConfig = DockerConfig(
+  let image = images.ensure_package_tools(docker, laputa_root, arch)?
+  DockerConfig(
     docker:,
     laputa_root:,
-    xsh_root:,
+    seed:,
     output_root:,
-    artifact_volume: "laputa-artifacts-aarch64-v2",
-    source_volume: "laputa-sources-aarch64-v2",
-    image: "laputa-package-tools",
+    artifact_root:,
+    image:,
     repo_url: env_value("LAPUTA_REPO_URL", ""),
-    container_xsh:,
   )
-  {...base, image: ensure_package_tools(base)?}
 }
 
 ## Construct an exact native-arm64 Docker invocation for an inner PM command.
@@ -104,144 +73,26 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "linux/arm64",
     "--mount",
     f"type=bind,src=${value.laputa_root},dst=/src/laputa,readonly",
-    "--mount",
-    f"type=bind,src=${value.xsh_root}/core,dst=/usr/lib/xsh/core,readonly",
+  ].extend(xsh_seed.xsh_seed_mount_argv(value.seed)).extend([
     "--mount",
     f"type=bind,src=${value.output_root},dst=/output",
     "--mount",
-    f"type=volume,src=${value.artifact_volume},dst=/artifacts",
-    "--mount",
-    f"type=volume,src=${value.source_volume},dst=/sources",
+    f"type=bind,src=${value.artifact_root},dst=/artifacts",
     "--workdir",
     "/src/laputa",
     "--env",
     "XSH_MODULE_PATH=/src/laputa",
     "--env",
-    "PATH=/bin:/usr/bin",
+    "PATH=/bin:/usr/lib/xsh/core:/usr/bin",
     "--env",
     "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
-  ]
+  ])
 
   if value.repo_url != "" {
-    argv = argv.extend(["--env", f"XSH_PM_REPO=${value.repo_url}", "--env", f"XSH_PM_PUBLIC_REPO=${value.repo_url}"])
-  }
-
-  match value.container_xsh {
-    CheckedOutXsh(binary) => argv = argv.extend(["--mount", f"type=bind,src=${binary},dst=/bin/xsh,readonly"])
-    PinnedXsh => {}
+    argv = argv.extend(["--env", f"XSH_PM_REPO=${value.repo_url}"])
   }
 
   argv.push(value.image).extend(inner_argv)
-}
-
-## Construct the native-arm64 Docker build argv for the focused package-tools image.
-export pure package_tools_build_argv(value: DockerConfig, tag: Str) -> List[Str] {
-  [
-    value.docker.display(),
-    "build",
-    "--platform",
-    "linux/arm64",
-    "--file",
-    package_tools_dockerfile(value).display(),
-    "--tag",
-    tag,
-    value.laputa_root.display(),
-  ]
-}
-
-## Construct the structured Docker image-inspection argv used by package-tools ensure.
-export pure package_tools_inspect_argv(value: DockerConfig, tag: Str) -> List[Str] {
-  [
-    value.docker.display(),
-    "image",
-    "inspect",
-    "--format",
-    "{{.Architecture}}",
-    tag,
-  ]
-}
-
-## Compute a key from only the focused package-tools bootstrap inputs.
-export proc package_tools_input_key(value: DockerConfig) [fs, env, error] -> Result[Str] {
-  let dockerfile = package_tools_dockerfile(value)
-  let bootstrap = package_tools_bootstrap_helper(value)
-
-  if ! fs.exists(dockerfile)? or fs.metadata(dockerfile)?.kind != "file" {
-    return Err(types.LaputaError.Docker(f"package-tools bootstrap contract is missing ${dockerfile}"))
-  }
-
-  if ! fs.exists(bootstrap)? or fs.metadata(bootstrap)?.kind != "file" {
-    return Err(types.LaputaError.Docker(f"package-tools bootstrap contract is missing ${bootstrap}"))
-  }
-
-  let body = f"""${package_tools_contract_epoch}
-dockerfile\t${hash.sha256(dockerfile)?.hex()}
-bootstrap-helper\t${hash.sha256(bootstrap)?.hex()}
-pm-entrypoint\t${package_tools_tree_digest(fp"${value.laputa_root}/pm.xsh")?}
-pm-modules\t${package_tools_tree_digest(fp"${value.laputa_root}/pm")?}
-llvm-seed-recipe\t${package_tools_tree_digest(fp"${value.laputa_root}/packages/llvm-toolchain")?}
-xsh-release\t${env_value("XSH_RELEASE", "")}
-xsh-core-release\t${env_value("XSH_CORE_RELEASE", "")}
-architecture\tarm64
-"""
-  bytes.from_text(body).sha256().hex()
-}
-
-## Return the exact arm64-tagged image name for the focused package-tools inputs.
-export proc package_tools_image_tag(value: DockerConfig) [fs, env, error] -> Result[Str] {
-  f"laputa-package-tools:arm64-${package_tools_input_key(value)?}"
-}
-
-proc package_tools_image_architecture(value: DockerConfig, tag: Str) [fs, process, error] -> Result[Str] {
-  let handle = fs.tempdir()?
-  defer handle.close()?
-  let work = handle.host_path()?
-  let output = fp"${work}/architecture"
-  let status = process.run(
-    process.command_argv(
-      value.docker,
-      package_tools_inspect_argv(value, tag),
-      value.laputa_root,
-      stdout: output,
-    ),
-  )?
-
-  return "" unless status.ok
-
-  return "" unless fs.exists(output)?
-
-  fs.read_text(output)?
-}
-
-## Ensure the exact package-tools input image exists and is native arm64.
-export proc ensure_package_tools(value: DockerConfig) [fs, process, env, error] -> Result[Str] {
-  let tag = package_tools_image_tag(value)?
-  let architecture = package_tools_image_architecture(value, tag)?.trim()
-
-  if architecture != "" {
-    require_arm64_image_architecture(architecture)?
-    return tag
-  }
-
-  let built = process.run(
-    process.command_argv(
-      value.docker,
-      package_tools_build_argv(value, tag),
-      value.laputa_root,
-    ),
-  )?
-
-  if ! built.ok {
-    return Err(types.LaputaError.Docker(f"package-tools image build failed for ${tag}"))
-  }
-
-  let built_architecture = package_tools_image_architecture(value, tag)?.trim()
-  if built_architecture == "" {
-    return Err(types.LaputaError.Docker(f"package-tools image build did not produce ${tag}"))
-  }
-
-  require_arm64_image_architecture(built_architecture)?
-  tag
 }
 
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
