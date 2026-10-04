@@ -84,7 +84,7 @@ DEPLOY_HOST ?= oracle
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit test-linux clean distclean fetch fetch-seed seed seed-smoke \
+.PHONY: check lint test test-pm test-system test-xinit test-linux verify clean distclean fetch fetch-seed seed seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	profile-plan profile-build profile-test profile-boot profile-clean \
@@ -127,6 +127,13 @@ test-linux: need-xsh
 	mkdir -p "$(LINUX_KBUILD_TEST_CACHE)"
 	$(HOST_XSH_ENV) XSH_LINUX_KBUILD_PLAN_CACHE_DIR="$(LINUX_KBUILD_TEST_CACHE)" $(XSHT) test packages/linux/tests
 	$(HOST_XSH_ENV) $(XSHT) test packages/linux-headers/tests
+
+# The whole host proof from `make clean`: host tools, fetch, seed, the world,
+# publish, root, the installer image and its QEMU proof, the qemu-dwl-foot
+# proof, check, the native suites, mirror-test, and a no-op rebuild, one step
+# at a time. Logs and the timing table go to .out/verify/.
+verify: need-xsh
+	$(HOST_XSH_ENV) $(XSH) seed/verify.xsh -- $(ARCH)
 
 # All derived state: .out/ (seed, artifact store, cargo target, image
 # contexts), target/ (profile and installer outputs), mirror build outputs,
