@@ -59,44 +59,44 @@ proc write_tool_source() [fs, error] {
 #include <string.h>
 
 static const char *base_name(const char *path)
-{{
+{{{{
     const char *base = strrchr(path, '/');
     return base == 0 ? path : base + 1;
-}}
+}}}}
 
 int main(int argc, char **argv)
-{{
+{{{{
     const char *name = argc > 0 && argv[0] != 0 ? base_name(argv[0]) : "aplay";
 
-    if (strcmp(name, "aplay") == 0) {{
-        if (argc >= 2 && strcmp(argv[1], "--version") == 0) {{
-            printf("aplay: version ${ver}\\n");
+    if (strcmp(name, "aplay") == 0) {{{{
+        if (argc >= 2 && strcmp(argv[1], "--version") == 0) {{{{
+            printf("aplay: version {ver}\\n");
             return 0;
-        }}
+        }}}}
         fprintf(stderr, "aplay: audio device playback is not implemented in Laputa's minimal native ALSA tools\\n");
         return 1;
-    }}
+    }}}}
 
-    if (strcmp(name, "amixer") == 0) {{
-        if (argc >= 2 && strcmp(argv[1], "--version") == 0) {{
-            printf("amixer version ${ver}\\n");
+    if (strcmp(name, "amixer") == 0) {{{{
+        if (argc >= 2 && strcmp(argv[1], "--version") == 0) {{{{
+            printf("amixer version {ver}\\n");
             return 0;
-        }}
+        }}}}
         fprintf(stderr, "amixer: mixer control is not implemented in Laputa's minimal native ALSA tools\\n");
         return 1;
-    }}
+    }}}}
 
-    if (strcmp(name, "alsactl") == 0) {{
-        if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {{
-            printf("alsactl version ${ver}\\n");
+    if (strcmp(name, "alsactl") == 0) {{{{
+        if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {{{{
+            printf("alsactl version {ver}\\n");
             return 0;
-        }}
+        }}}}
         fprintf(stderr, "alsactl: state management is not implemented in Laputa's minimal native ALSA tools\\n");
         return 1;
-    }}
+    }}}}
 
     return 1;
-}}
+}}}}
 """,
   )?
 }
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
   write_tool_source()?
 
   let tool = make.c_program({
@@ -126,6 +126,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(tool.tasks, make.jobs()?)?
 
   for tool_name in ["aplay", "amixer", "alsactl"] {
-    fs.install(tool.output, fp"${dest}/usr/bin/${tool_name}", 0o755, parents: true, overwrite: true)?
+    fs.install(tool.output, fp"{dest}/usr/bin/{tool_name}", 0o755, parents: true, overwrite: true)?
   }
 }

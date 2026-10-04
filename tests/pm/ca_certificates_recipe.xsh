@@ -2,16 +2,16 @@
 
 proc runner() [env, process, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
-  if configured != "" { return fp"${configured}" }
+  if configured != "" { return fp"{configured}" }
   process.which("xsh")?
 }
 
 test ca_certificate_proof_preserves_empty_dependencies_and_rejects_invalid_metadata [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "certificate proof")?
-  let bundle = fp"${root}/etc/ssl/certs/ca-certificates.crt"
-  let helper = fp"${root}/usr/bin/update-certdata"
-  let metadata = fp"${root}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
-  let stderr = fp"${root}/proof.stderr"
+  let bundle = fp"{root}/etc/ssl/certs/ca-certificates.crt"
+  let helper = fp"{root}/usr/bin/update-certdata"
+  let metadata = fp"{root}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
+  let stderr = fp"{root}/proof.stderr"
   for file in [bundle, helper, metadata] { file.parent.mkdir()? }
   bundle.write("-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")?
   helper.write("https://curl.se/ca/cacert.pem")?

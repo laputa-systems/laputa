@@ -31,7 +31,7 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
     }
 
     if index + 1 >= argv.len() {
-      return Err(xsh_seed.SeedError.Usage(f"${argv[index]} needs a value\n\n${seed_usage()}"))
+      return Err(xsh_seed.SeedError.Usage(f"{argv[index]} needs a value\n\n{seed_usage()}"))
     }
 
     let value = argv[index + 1]
@@ -39,7 +39,7 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
       "--arch" => parsed = {...parsed, arch: value}
       "--xsh-root" => parsed = {...parsed, xsh_root: value}
       "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
-      _ => return Err(xsh_seed.SeedError.Usage(f"unknown option ${argv[index]}\n\n${seed_usage()}"))
+      _ => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{seed_usage()}"))
     }
     index += 2
   }
@@ -53,7 +53,7 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
 
 proc docker_program() [process, env, error] -> Result[Path] {
   let configured = (env.get("DOCKER") ?? "").trim()
-  return fp"${configured}" unless configured == ""
+  return fp"{configured}" unless configured == ""
 
   process.which("docker")?
 }
@@ -76,7 +76,7 @@ pure seed_smoke_argv(
     "--network",
     "none",
     "--mount",
-    f"type=bind,src=${laputa_root},dst=/src/laputa,readonly",
+    f"type=bind,src={laputa_root},dst=/src/laputa,readonly",
   ].extend(xsh_seed.xsh_seed_mount_argv(seed)).extend([
     "--workdir",
     "/src/laputa",
@@ -94,12 +94,12 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   let args = parse_seed_args(argv)?
   let laputa_root = fs.cwd()?
 
-  if ! fs.exists(fp"${laputa_root}/pm.xsh")? or ! fs.exists(fp"${laputa_root}/packages")? {
-    return Err(xsh_seed.SeedError.Usage(f"run seed.xsh from the Laputa checkout root, not ${laputa_root}"))
+  if ! fs.exists(fp"{laputa_root}/pm.xsh")? or ! fs.exists(fp"{laputa_root}/packages")? {
+    return Err(xsh_seed.SeedError.Usage(f"run seed.xsh from the Laputa checkout root, not {laputa_root}"))
   }
 
   let value = xsh_seed.xsh_seed_arch(args.arch)?
-  let xsh_root = path.absolute(fp"${args.xsh_root}")?
+  let xsh_root = path.absolute(fp"{args.xsh_root}")?
   let docker = docker_program()?
 
   match args.command {
@@ -110,8 +110,8 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
     "build" => {
       xsh_seed.xsh_seed_build(docker, laputa_root, xsh_root, value, args.jobs)?
       let tag = images.ensure_package_tools(docker, laputa_root, value)?
-      print f"seed ${xsh_seed.xsh_seed_dir(laputa_root, value.arch)}"
-      print f"image ${tag}"
+      print f"seed {xsh_seed.xsh_seed_dir(laputa_root, value.arch)}"
+      print f"image {tag}"
     }
     _ => {
       let seed = xsh_seed.xsh_seed_require(laputa_root, value.arch)?
@@ -121,7 +121,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
       )?
 
       if ! status.ok {
-        return Err(xsh_seed.SeedError.Failed(f"seed smoke test failed in ${tag}"))
+        return Err(xsh_seed.SeedError.Failed(f"seed smoke test failed in {tag}"))
       }
     }
   }

@@ -24,7 +24,7 @@ type PackageMetadata = {
 }
 
 proc package_contract_error(pkg: Str, message: Str) [error] -> Result[Unit] {
-  return Err(types.PmError.PackageContract(f"${pkg}: ${message}"))
+  return Err(types.PmError.PackageContract(f"{pkg}: {message}"))
 }
 
 proc validate_package_name(name: Str) [error] -> Result[Unit] {
@@ -48,11 +48,11 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [erro
 
   for dependency in dependencies {
     if dependency in seen {
-      return package_contract_error(name, f"${label} contains duplicate dependency ${dependency}")
+      return package_contract_error(name, f"{label} contains duplicate dependency {dependency}")
     }
 
     if dependency == name {
-      return package_contract_error(name, f"${label} may not depend on itself")
+      return package_contract_error(name, f"{label} may not depend on itself")
     }
 
     seen[dependency] = true
@@ -69,11 +69,11 @@ proc decode_source_checksum(name: Str, raw: Record) [error] -> Result[types.Sour
   let sha256: Str = raw.get("sha256")?.require(Str)?
 
   if arch != "aarch64" and arch != "all" and arch != "x86_64" {
-    return Err(types.PmError.PackageContract(f"${name}: checksum has invalid architecture ${arch}"))
+    return Err(types.PmError.PackageContract(f"{name}: checksum has invalid architecture {arch}"))
   }
 
   if sha256 == "" {
-    return Err(types.PmError.PackageContract(f"${name}: checksum for ${arch} is empty"))
+    return Err(types.PmError.PackageContract(f"{name}: checksum for {arch} is empty"))
   }
 
   {arch, sha256}
@@ -87,20 +87,20 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
   let raw_checksums: List[Record] = raw.get("checksums")?.require(List[Record])?
 
   if architectures.len() == 0 {
-    return Err(types.PmError.PackageContract(f"${name}: upstream source ${source} has no target architectures"))
+    return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
   var architecture_seen: Map[Bool] = {}
 
   for architecture in architectures {
     if architecture in architecture_seen {
-      return Err(types.PmError.PackageContract(f"${name}: upstream source ${source} repeats architecture ${architecture}"))
+      return Err(types.PmError.PackageContract(f"{name}: upstream source {source} repeats architecture {architecture}"))
     }
 
     if architecture != "aarch64" and architecture != "x86_64" and architecture != "all" {
       return Err(
         types.PmError.PackageContract(
-          f"${name}: upstream source ${source} has unsupported architecture ${architecture}",
+          f"{name}: upstream source {source} has unsupported architecture {architecture}",
         ),
       )
     }
@@ -115,11 +115,11 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
     let checksum = decode_source_checksum(name, raw_checksum)?
 
     if checksum.arch in checksum_seen {
-      return Err(types.PmError.PackageContract(f"${name}: upstream source ${source} repeats ${checksum.arch} checksum"))
+      return Err(types.PmError.PackageContract(f"{name}: upstream source {source} repeats {checksum.arch} checksum"))
     }
 
     if checksum.sha256 == "SKIP" and ! source_is_repository_local(source) {
-      return Err(types.PmError.PackageContract(f"${name}: remote source ${source} may not use SKIP"))
+      return Err(types.PmError.PackageContract(f"{name}: remote source {source} may not use SKIP"))
     }
 
     checksum_seen[checksum.arch] = true
@@ -139,7 +139,7 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
     if applicable_checksums != 1 {
       return Err(
         types.PmError.PackageContract(
-          f"${name}: upstream source ${source} needs exactly one ${target_arch} or all checksum",
+          f"{name}: upstream source {source} needs exactly one {target_arch} or all checksum",
         ),
       )
     }
@@ -156,11 +156,11 @@ proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileT
   let raw_path = path_value.display()
 
   if raw_path == "" or normalized.display() == "" or normalized.display() == "." {
-    return Err(types.PmError.PackageContract(f"${name}: filetree path must be nonempty"))
+    return Err(types.PmError.PackageContract(f"{name}: filetree path must be nonempty"))
   }
 
   if raw_path != normalized.display() or raw_path.starts_with("/") or raw_path == ".." or raw_path.starts_with("../") or "/../" in raw_path {
-    return Err(types.PmError.PackageContract(f"${name}: filetree path ${raw_path} must be normalized and relative"))
+    return Err(types.PmError.PackageContract(f"{name}: filetree path {raw_path} must be normalized and relative"))
   }
 
   {path: normalized, kind}
@@ -185,7 +185,7 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) [error] -> Result[Lis
     let path_text = entry.path.display()
 
     if path_text in seen {
-      return Err(types.PmError.PackageContract(f"${name}: filetree repeats ${path_text}"))
+      return Err(types.PmError.PackageContract(f"{name}: filetree repeats {path_text}"))
     }
 
     seen[path_text] = true
@@ -284,10 +284,10 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   if arch == "" {
     return Err(types.PmError.PackageContract("recipe target is unsupported"))
   }
-  let pkgbuild = fp"${dir}/PKGBUILD.xsh"
+  let pkgbuild = fp"{dir}/PKGBUILD.xsh"
 
   if ! fs.exists(pkgbuild)? {
-    return Err(types.PmError.PackageContract(f"${dir} does not contain PKGBUILD.xsh"))
+    return Err(types.PmError.PackageContract(f"{dir} does not contain PKGBUILD.xsh"))
   }
 
   let metadata = decode_metadata(pkgbuild).context("package-load", pkgbuild.display())?
@@ -301,7 +301,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   validate_package_name(name)?
 
   if ver == "" {
-    return Err(types.PmError.PackageContract(f"${name}: ver must be nonempty"))
+    return Err(types.PmError.PackageContract(f"{name}: ver must be nonempty"))
   }
 
   validate_positive_release(name, rel)?
@@ -310,11 +310,11 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   validate_dependencies(name, "mkdeps_target", mkdeps_target)?
 
   if is_production_recipe_directory(dir) and dir.name != name {
-    return Err(types.PmError.PackageContract(f"${name}: production recipe directory ${dir.name} does not match package name"))
+    return Err(types.PmError.PackageContract(f"{name}: production recipe directory {dir.name} does not match package name"))
   }
 
   if is_production_recipe_directory(dir) and ! metadata.has_package_kind {
-    return Err(types.PmError.PackageContract(f"${name}: production recipe must export package_kind"))
+    return Err(types.PmError.PackageContract(f"{name}: production recipe must export package_kind"))
   }
 
   let kind = if metadata.has_package_kind { types.parse_package_kind(metadata.package_kind)? } else { types.package_payload() }
@@ -323,14 +323,14 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
 
   if kind == types.package_payload() {
     if ! metadata.has_build {
-      return Err(types.PmError.PackageContract(f"${name}: payload package must export build"))
+      return Err(types.PmError.PackageContract(f"{name}: payload package must export build"))
     }
 
-    if ! fs.exists(fp"${dir}/proof.xsh")? {
-      return Err(types.PmError.PackageContract(f"${name}: payload package must contain proof.xsh"))
+    if ! fs.exists(fp"{dir}/proof.xsh")? {
+      return Err(types.PmError.PackageContract(f"{name}: payload package must contain proof.xsh"))
     }
   } else if filetree.len() > 0 {
-    return Err(types.PmError.PackageContract(f"${name}: metapackage may not declare payload filetree entries"))
+    return Err(types.PmError.PackageContract(f"{name}: metapackage may not declare payload filetree entries"))
   }
 
   {
@@ -355,10 +355,10 @@ export proc load_package(dir: Path) [fs, env, error] -> Result[types.Package] {
 }
 
 proc dynamic_recipe_path(pkg: types.Package) [fs, error] -> Result[Path] {
-  let pkgbuild = fp"${pkg.dir}/PKGBUILD.xsh"
+  let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
 
   if ! fs.exists(pkgbuild)? {
-    return Err(types.PmError.PackageContract(f"${pkg.name}: dynamic recipe is unavailable at ${pkgbuild}"))
+    return Err(types.PmError.PackageContract(f"{pkg.name}: dynamic recipe is unavailable at {pkgbuild}"))
   }
 
   pkgbuild
@@ -398,7 +398,7 @@ export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, 
   let dynamic = module.load(dynamic_recipe_path(pkg)?)?
 
   if ! ("build" in dynamic.keys()) {
-    return Err(types.PmError.PackageContract(f"${pkg.name}: payload package lost its build procedure"))
+    return Err(types.PmError.PackageContract(f"{pkg.name}: payload package lost its build procedure"))
   }
 
   match dynamic.require(hooks.BuildFilesystem) {

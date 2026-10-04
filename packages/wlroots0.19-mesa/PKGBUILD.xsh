@@ -550,8 +550,8 @@ pure c_multiline_string(text: Str) -> Str {
 proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
   fs.write(
     dest,
-    f"""static const char ${symbol}[] =
-"${c_multiline_string(src.read_text()?)}";
+    f"""static const char {symbol}[] =
+"{c_multiline_string(src.read_text()?)}";
 """,
   )?
 }
@@ -580,7 +580,7 @@ proc write_shader_headers() [fs, error] {
 }
 
 proc write_pnpids(root: Str) [fs, error] {
-  let pnp = fp"${root}/usr/share/hwdata/pnp.ids"
+  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
   var records: List[PnpRecord] = []
 
   for line in pnp.read_text()?.split("\n") {
@@ -603,9 +603,7 @@ proc write_pnpids(root: Str) [fs, error] {
 
     if chars.len() == 3 {
       cases = cases.push(
-        f"    case PNP_ID('${c_string(chars[0])}', '${c_string(chars[1])}', '${c_string(chars[2])}'): return \"${c_string(
-          entry.vendor,
-        )}\";",
+        f"    case PNP_ID('{c_string(chars[0])}', '{c_string(chars[1])}', '{c_string(chars[2])}'): return \"{c_string(entry.vendor)}\";",
       )
     }
   }
@@ -615,12 +613,12 @@ proc write_pnpids(root: Str) [fs, error] {
     f"""#include "backend/drm/util.h"
 
 #define PNP_ID(a, b, c) ((a & 0x1f) << 10) | ((b & 0x1f) << 5) | (c & 0x1f)
-const char *get_pnp_manufacturer(const char code[static 3]) {{
-	switch (PNP_ID(code[0], code[1], code[2])) {{
-${cases.join("\n")}
-	}}
+const char *get_pnp_manufacturer(const char code[static 3]) {{{{
+	switch (PNP_ID(code[0], code[1], code[2])) {{{{
+{cases.join("\n")}
+	}}}}
 	return NULL;
-}}
+}}}}
 #undef PNP_ID
 """,
   )?
@@ -718,23 +716,23 @@ rt = declare_dependency()""",
 }
 
 proc prune_xwayland_headers(root: Path) [fs, error] {
-  fs.remove(fp"${root}/usr/include/wlroots-0.19/wlr/xwayland.h", missing_ok: true)?
-  fs.remove(fp"${root}/usr/include/wlroots-0.19/wlr/xwayland/server.h", missing_ok: true)?
-  fs.remove(fp"${root}/usr/include/wlroots-0.19/wlr/xwayland/shell.h", missing_ok: true)?
-  fs.remove(fp"${root}/usr/include/wlroots-0.19/wlr/xwayland/xwayland.h", missing_ok: true)?
-  fs.remove(fp"${root}/usr/include/wlroots-0.19/wlr/xwayland", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/server.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/shell.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland/xwayland.h", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.19/wlr/xwayland", missing_ok: true)?
 }
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
   let native_scanner = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if native_scanner {
-    f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib:${pc.ld_library_path}"
+    f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib:{pc.ld_library_path}"
   } else {
     pc.ld_library_path
   }
@@ -754,11 +752,11 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if native_scanner {
       let ninja = p"build/build.ninja"
-      let scanner_text = fp"${build_root}/usr/bin/wayland-scanner".display()
+      let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"${build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
       fs.write(ninja, ninja_text)?
     }
 

@@ -26,11 +26,11 @@ proc read_input_file(filepath: Str) [fs, error] -> Result[Str] {
   # `fp"${...}"` is a literal-path form in the pinned published runner: it
   # resolves a dynamic operand as the current directory. Convert CLI text
   # explicitly so m4 reads the requested file, never its cwd.
-  let input = fp"${filepath}"
+  let input = fp"{filepath}"
   let metadata = fs.metadata(input)?
 
   if metadata.kind != "file" {
-    return Err(ScriptError.Failed("m4-input", f"cannot read non-file input: ${filepath}"))
+    return Err(ScriptError.Failed("m4-input", f"cannot read non-file input: {filepath}"))
   }
 
   fs.read_text(input)
@@ -81,7 +81,7 @@ proc preview_text(text: Str, limit: Int) [error] -> Result[Str] {
 
   while cur != "" and count < limit {
     let ch = take_char(cur)?
-    out = f"${out}${ch.content}"
+    out = f"{out}{ch.content}"
     cur = ch.rest
     count = count + 1
   }
@@ -94,7 +94,7 @@ pure repeat_space(count: Int) -> Str {
     return ""
   }
 
-  f" ${repeat_space(count - 1)}"
+  f" {repeat_space(count - 1)}"
 }
 
 proc take_chars(text: Str, limit: Int) [error] -> Result[Str] {
@@ -104,7 +104,7 @@ proc take_chars(text: Str, limit: Int) [error] -> Result[Str] {
 
   while cur != "" and count < limit {
     let ch = take_char(cur)?
-    out = f"${out}${ch.content}"
+    out = f"{out}{ch.content}"
     cur = ch.rest
     count = count + 1
   }
@@ -119,9 +119,9 @@ pure format_field(value: Str, width: Int, left: Bool) -> Str {
 
   let pad = repeat_space(missing)
 
-  return f"${value}${pad}" when left
+  return f"{value}{pad}" when left
 
-  f"${pad}${value}"
+  f"{pad}{value}"
 }
 
 proc take_literal_chunk(text: Str, oq: Str, cs: Str) [error] -> Result[TextRest] {
@@ -164,7 +164,7 @@ proc take_literal_chunk(text: Str, oq: Str, cs: Str) [error] -> Result[TextRest]
     }
 
     let ch = take_char(cur)?
-    out = f"${out}${ch.content}"
+    out = f"{out}{ch.content}"
     cur = ch.rest
   }
 
@@ -186,7 +186,7 @@ proc take_undefined_tail(text: Str, oq: Str, cs: Str, st: Map[Str]) [error] -> R
 
         return {content: out, rest: cur} when mac_defined(st, word)
 
-        out = f"${out}${word}"
+        out = f"{out}{word}"
         cur = id[2]
         continue
       }
@@ -195,11 +195,11 @@ proc take_undefined_tail(text: Str, oq: Str, cs: Str, st: Map[Str]) [error] -> R
     let chunk = take_literal_chunk(cur, oq, cs)?
 
     if chunk.content != "" {
-      out = f"${out}${chunk.content}"
+      out = f"{out}{chunk.content}"
       cur = chunk.rest
     } else {
       let ch = take_char(cur)?
-      out = f"${out}${ch.content}"
+      out = f"{out}{ch.content}"
       cur = ch.rest
     }
   }
@@ -214,27 +214,27 @@ pure emit(chunk: Str, st: Map[Str]) -> Map[Str] {
   if cd == "-1" or chunk == "" {
     st
   } else {
-    let k = f"div:${cd}"
+    let k = f"div:{cd}"
     let prev = sg(st, k, "")
-    st.set(k, f"${prev}${chunk}")
+    st.set(k, f"{prev}{chunk}")
   }
 }
 
 pure mac_get(st: Map[Str], name: Str) -> Str {
-  sg(st, f"mac:${name}", "")
+  sg(st, f"mac:{name}", "")
 }
 
 pure mac_exists(st: Map[Str], name: Str) -> Bool {
-  f"mac:${name}" in st
+  f"mac:{name}" in st
 }
 
 pure mac_set(st: Map[Str], name: Str, body: Str) -> Map[Str] {
-  st.set(f"mac:${name}", body)
+  st.set(f"mac:{name}", body)
 }
 
 pure mac_unset(st: Map[Str], name: Str) -> Map[Str] {
   # XSH Map has no delete; overwrite with sentinel that mac_exists filters.
-  st.set(f"mac:${name}", "\0UNDEF\0")
+  st.set(f"mac:{name}", "\0UNDEF\0")
 }
 
 pure mac_defined(st: Map[Str], name: Str) -> Bool {
@@ -250,7 +250,7 @@ pure mac_defined(st: Map[Str], name: Str) -> Bool {
 # Returns Map with "content" and "rest".
 proc collect_quoted(rem: Str, oq: Str, cq: Str) [error] -> Result[TextRest] {
   guard rem.starts_with(oq) else {
-    return Err(ScriptError.Failed("m4", f"expected ${oq}"))
+    return Err(ScriptError.Failed("m4", f"expected {oq}"))
   }
 
   var cur = drop_prefix(rem, oq)?
@@ -294,7 +294,7 @@ proc collect_quoted(rem: Str, oq: Str, cq: Str) [error] -> Result[TextRest] {
     }
   }
 
-  Err(ScriptError.Failed("m4", f"unterminated quote ${oq}...${cq} near ${preview_text(rem, 120)?}"))
+  Err(ScriptError.Failed("m4", f"unterminated quote {oq}...{cq} near {preview_text(rem, 120)?}"))
 }
 
 # Collect raw argument text from rem starting after '('.
@@ -392,7 +392,7 @@ proc collect_args_raw(rem: Str, oq: Str, cq: Str) [error] -> Result[RawRest] {
     }
   }
 
-  Err(ScriptError.Failed("m4", f"unmatched paren near ${preview_text(raw_parts.join(""), 120)?}"))
+  Err(ScriptError.Failed("m4", f"unmatched paren near {preview_text(raw_parts.join(""), 120)?}"))
 }
 
 # Split raw arg text on top-level commas.
@@ -494,11 +494,11 @@ proc split_args(raw: Str, oq: Str, cq: Str) [error] -> Result[List[Str]] {
 proc subst_args(body: Str, name: Str, margs: List[Str], oq: Str, cq: Str) [error] -> Result[Str] {
   var r = body
   r = r.replace("$0", name)
-  r = r.replace("$#", f"${margs.len()}")
+  r = r.replace("$#", f"{margs.len()}")
   var i = 1
 
   while i <= 9 {
-    let ph = f"$${i}"
+    let ph = f"\${i}"
     let val = if i <= margs.len() { margs[i - 1] } else { "" }
     r = r.replace(ph, val)
     i = i + 1
@@ -511,7 +511,7 @@ proc subst_args(body: Str, name: Str, margs: List[Str], oq: Str, cq: Str) [error
     if oq == "" or cq == "" {
       quoted += [arg]
     } else {
-      quoted = quoted.push(f"${oq}${oq}${arg}${cq}${cq}")
+      quoted = quoted.push(f"{oq}{oq}{arg}{cq}{cq}")
     }
   }
 
@@ -537,7 +537,7 @@ proc basic_replacement_to_rust(replacement: Str) [error] -> Result[Str] {
   var i = 1
 
   while i <= 9 {
-    r = r.replace(f"\\${i}", f"$${i}")
+    r = r.replace(f"\\{i}", f"\${i}")
     i = i + 1
   }
 
@@ -569,15 +569,15 @@ pure strip_outer_square_quotes(text: Str) -> Str {
 }
 
 pure b4_percent_value(st: Map[Str], varname: Str, fallback: Str) -> Str {
-  if mac_defined(st, f"b4_percent_define(${varname})") {
-    return strip_outer_square_quotes(mac_get(st, f"b4_percent_define(${varname})"))
+  if mac_defined(st, f"b4_percent_define({varname})") {
+    return strip_outer_square_quotes(mac_get(st, f"b4_percent_define({varname})"))
   }
 
   fallback
 }
 
 pure b4_symbol_field_raw(st: Map[Str], num: Str, field: Str) -> Str {
-  let key = f"b4_symbol(${num}, ${field})"
+  let key = f"b4_symbol({num}, {field})"
 
   return strip_outer_square_quotes(mac_get(st, key)) when mac_defined(st, key)
 
@@ -617,7 +617,7 @@ pure b4_symbol_id_name(st: Map[Str], num: Str) -> Str {
     .replace("}", "_")
     .replace(";", "_")
 
-  return f"symbol_${num}" when tag == ""
+  return f"symbol_{num}" when tag == ""
 
   tag
 }
@@ -625,9 +625,9 @@ pure b4_symbol_id_name(st: Map[Str], num: Str) -> Str {
 pure b4_symbol_kind_base(st: Map[Str], num: Str) -> Str {
   let prefix = b4_percent_value(st, "api.symbol.prefix", "YYSYMBOL_")
 
-  return f"${prefix}YYEMPTY" when num == "-2"
+  return f"{prefix}YYEMPTY" when num == "-2"
 
-  f"${prefix}${b4_symbol_id_name(st, num)}"
+  f"{prefix}{b4_symbol_id_name(st, num)}"
 }
 
 pure b4_symbol_lookup(st: Map[Str], num: Str, field: Str) -> Str {
@@ -666,7 +666,7 @@ pure b4_symbol_lookup(st: Map[Str], num: Str, field: Str) -> Str {
 
 pure b4_comment_text(text: Str) -> Str {
   let body = text.replace("/*", "/ *").replace("*/", "* /").replace("[", "").replace("]", "")
-  f"/* ${body} */"
+  f"/* {body} */"
 }
 
 pure b4_parse_error_kind(st: Map[Str]) -> Str {
@@ -703,24 +703,24 @@ enum yysymbol_kind_t
 
   let empty_name = b4_symbol_lookup(st, "empty", "kind_base")
 
-  out = f"""${out}  ${empty_name} = -2,
+  out = f"""{out}  {empty_name} = -2,
 """
 
   var i = 0
 
   while i < count {
     let comma = if i + 1 == count { "" } else { "," }
-    let name = b4_symbol_lookup(st, f"${i}", "kind_base")
-    let comment = b4_comment_text(b4_symbol_lookup(st, f"${i}", "tag"))
+    let name = b4_symbol_lookup(st, f"{i}", "kind_base")
+    let comment = b4_comment_text(b4_symbol_lookup(st, f"{i}", "tag"))
     let padded = format_field(name, 42, false)
 
-    out = f"""${out}${padded} = ${i}${comma} ${comment}
+    out = f"""{out}{padded} = {i}{comma} {comment}
 """
 
     i = i + 1
   }
 
-  f"""${out}};
+  f"""{out}}};
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 """
 }
@@ -740,8 +740,8 @@ enum yytokentype
   var i = 0
 
   while i < count {
-    let is_token = b4_symbol_lookup(st, f"${i}", "is_token") == "1"
-    let raw_id = b4_symbol_field_raw(st, f"${i}", "id")
+    let is_token = b4_symbol_lookup(st, f"{i}", "is_token") == "1"
+    let raw_id = b4_symbol_field_raw(st, f"{i}", "id")
 
     if is_token and (i <= 2 or raw_id != "") {
       let comma = if first {
@@ -751,19 +751,19 @@ enum yytokentype
 """
       }
 
-      let name = b4_symbol_id_name(st, f"${i}")
-      let code = b4_symbol_lookup(st, f"${i}", "code")
-      let comment = b4_comment_text(b4_symbol_lookup(st, f"${i}", "tag"))
+      let name = b4_symbol_id_name(st, f"{i}")
+      let code = b4_symbol_lookup(st, f"{i}", "code")
+      let comment = b4_comment_text(b4_symbol_lookup(st, f"{i}", "tag"))
       let padded = format_field(name, 34, false)
-      out = f"${out}${comma}  ${padded} = ${code} ${comment}"
+      out = f"{out}{comma}  {padded} = {code} {comment}"
       first = false
     }
 
     i = i + 1
   }
 
-  f"""${out}
-};
+  f"""{out}
+}};
 typedef enum yytokentype yytoken_kind_t;
 #endif
 """
@@ -771,14 +771,14 @@ typedef enum yytokentype yytoken_kind_t;
 
 proc copy_macro(st: Map[Str], src: Str, dst: Str) [error] -> Result[Map[Str]] {
   let src_body = mac_get(st, src)
-  let dst_body = if src_body == "BUILTIN" { f"BUILTIN:${normalize_builtin_name(src)}" } else { src_body }
+  let dst_body = if src_body == "BUILTIN" { f"BUILTIN:{normalize_builtin_name(src)}" } else { src_body }
   var s2 = mac_set(st, dst, dst_body)
-  let depth = si(st, f"pdepth:${src}", 0)
-  s2[f"pdepth:${dst}"] = f"${depth}"
+  let depth = si(st, f"pdepth:{src}", 0)
+  s2[f"pdepth:{dst}"] = f"{depth}"
   var i = 0
 
   while i < depth {
-    s2[f"pval:${dst}:${i}"] = sg(st, f"pval:${src}:${i}", "")
+    s2[f"pval:{dst}:{i}"] = sg(st, f"pval:{src}:{i}", "")
     i = i + 1
   }
 
@@ -809,29 +809,29 @@ proc call_builtin(name: Str, margs: List[Str], st: Map[Str]) [fs, process, env, 
   if name == "defn" {
     let n = if margs.len() >= 1 { margs[0] } else { "" }
     let b = mac_get(st, n)
-    return {text: f"${oq}${b}${cq}", st}
+    return {text: f"{oq}{b}{cq}", st}
   }
 
   if name == "pushdef" {
     let n = if margs.len() >= 1 { margs[0] } else { "" }
     let b = if margs.len() >= 2 { margs[1] } else { "" }
-    let depth = si(st, f"pdepth:${n}", 0)
+    let depth = si(st, f"pdepth:{n}", 0)
     let old = mac_get(st, n)
-    var s2 = st.set(f"pval:${n}:${depth}", old)
-    s2[f"pdepth:${n}"] = f"${depth + 1}"
+    var s2 = st.set(f"pval:{n}:{depth}", old)
+    s2[f"pdepth:{n}"] = f"{depth + 1}"
     s2 = mac_set(s2, n, b)
     return {text: "", st: s2}
   }
 
   if name == "popdef" {
     let n = if margs.len() >= 1 { margs[0] } else { "" }
-    let depth = si(st, f"pdepth:${n}", 0)
+    let depth = si(st, f"pdepth:{n}", 0)
     var s2 = st
 
     if depth > 0 {
       let nd = depth - 1
-      let saved = sg(st, f"pval:${n}:${nd}", "")
-      s2[f"pdepth:${n}"] = f"${nd}"
+      let saved = sg(st, f"pval:{n}:{nd}", "")
+      s2[f"pdepth:{n}"] = f"{nd}"
       s2 = mac_set(s2, n, saved)
     } else {
       s2 = mac_unset(s2, n)
@@ -885,12 +885,12 @@ proc call_builtin(name: Str, margs: List[Str], st: Map[Str]) [fs, process, env, 
 
     while (step > 0 and i <= last) or (step < 0 and i >= last) {
       if varname != "" {
-        s2 = mac_set(s2, varname, f"${i}")
+        s2 = mac_set(s2, varname, f"{i}")
       }
 
       let expanded = expand_for_arg(body, s2)?
       s2 = expanded.st
-      out = f"${out}${expanded.text}"
+      out = f"{out}{expanded.text}"
       i = i + step
     }
 
@@ -986,9 +986,9 @@ proc call_builtin(name: Str, margs: List[Str], st: Map[Str]) [fs, process, env, 
         text: f"""/* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
-{
-${members}
-};
+{{
+{members}
+}};
 typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
@@ -1002,7 +1002,7 @@ typedef union YYSTYPE YYSTYPE;
       return {
         text: f"""/* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef ${kind_type} YYSTYPE;
+typedef {kind_type} YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif
@@ -1033,11 +1033,11 @@ typedef ${kind_type} YYSTYPE;
     let num = if margs.len() >= 2 { strip_outer_square_quotes(margs[1]) } else { "" }
     let explicit_type = if margs.len() >= 3 { strip_outer_square_quotes(margs[2]) } else { "" }
 
-    return {text: f"(${value}.${explicit_type})", st} when explicit_type != ""
+    return {text: f"({value}.{explicit_type})", st} when explicit_type != ""
 
     if num != "" and b4_symbol_lookup(st, num, "has_type") == "1" {
       let type_name = b4_symbol_lookup(st, num, "type")
-      return {text: f"(${value}.${type_name})", st}
+      return {text: f"({value}.{type_name})", st}
     }
 
     return {text: value, st}
@@ -1055,7 +1055,7 @@ typedef ${kind_type} YYSTYPE;
     let num = if margs.len() >= 3 { strip_outer_square_quotes(margs[2]) } else { "" }
     let explicit_type = if margs.len() >= 4 { strip_outer_square_quotes(margs[3]) } else { "" }
     let idx = pos - len
-    return call_builtin("b4_symbol_value", [f"(*(yyvsp + ${idx}))", num, explicit_type], st)?
+    return call_builtin("b4_symbol_value", [f"(*(yyvsp + {idx}))", num, explicit_type], st)?
   }
 
   if name == "b4_symbol_if" {
@@ -1098,7 +1098,7 @@ typedef ${kind_type} YYSTYPE;
       if expected == current {
         if expected == "simple" and "b4_api_PREFIX[DEBUG" in selected {
           let token_table = strip_outer_square_quotes(mac_get(st, "b4_token_table_flag"))
-          return {text: f"YYDEBUG || ${token_table}", st}
+          return {text: f"YYDEBUG || {token_table}", st}
         }
 
         return {text: selected, st}
@@ -1142,8 +1142,8 @@ typedef ${kind_type} YYSTYPE;
       },
     )
 
-    let macro_name = f"b4_${flag.replace(".", "_").replace("-", "_")}_if"
-    let body = f"b4_flag_if([${flag}], [$1], [$2])"
+    let macro_name = f"b4_{flag.replace(".", "_").replace("-", "_")}_if"
+    let body = f"b4_flag_if([{flag}], [$1], [$2])"
     return {text: "", st: mac_set(st, macro_name, body)}
   }
 
@@ -1153,8 +1153,8 @@ typedef ${kind_type} YYSTYPE;
     let no = if margs.len() >= 3 { margs[2] } else { "" }
 
     let value = strip_outer_square_quotes(
-      if mac_defined(st, f"b4_${flag}_flag") {
-        mac_get(st, f"b4_${flag}_flag")
+      if mac_defined(st, f"b4_{flag}_flag") {
+        mac_get(st, f"b4_{flag}_flag")
       } else {
         "0"
       },
@@ -1168,32 +1168,32 @@ typedef ${kind_type} YYSTYPE;
 
     return {text: "", st} when varname == "api.header.include"
 
-    return {text: "", st} when mac_defined(st, f"b4_percent_define(${varname})")
+    return {text: "", st} when mac_defined(st, f"b4_percent_define({varname})")
 
     let value = strip_outer_square_quotes(if margs.len() >= 2 { margs[1] } else { "" })
     let kind = strip_outer_square_quotes(if margs.len() >= 3 and margs[2] != "" { margs[2] } else { "keyword" })
-    var s2 = mac_set(st, f"b4_percent_define(${varname})", value)
-    s2 = mac_set(s2, f"b4_percent_define_kind(${varname})", kind)
+    var s2 = mac_set(st, f"b4_percent_define({varname})", value)
+    s2 = mac_set(s2, f"b4_percent_define_kind({varname})", kind)
 
     s2 = mac_set(
       s2,
-      f"b4_percent_define_loc(${varname})",
+      f"b4_percent_define_loc({varname})",
       "[[<skeleton default value>:-1.-1]], [[<skeleton default value>:-1.-1]]",
     )
 
-    s2 = mac_set(s2, f"b4_percent_define_syncline(${varname})", "")
+    s2 = mac_set(s2, f"b4_percent_define_syncline({varname})", "")
     return {text: "", st: s2}
   }
 
   if name == "b4_percent_define_get" {
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
     let fallback = strip_outer_square_quotes(if margs.len() >= 2 { margs[1] } else { "" })
-    let s2 = mac_set(st, f"b4_percent_define_bison_variables(${varname})", "")
+    let s2 = mac_set(st, f"b4_percent_define_bison_variables({varname})", "")
 
     return {
-      text: if mac_defined(s2, f"b4_percent_define(${varname})") {
+      text: if mac_defined(s2, f"b4_percent_define({varname})") {
         strip_outer_square_quotes(
-          mac_get(s2, f"b4_percent_define(${varname})"),
+          mac_get(s2, f"b4_percent_define({varname})"),
         )
       } else {
         fallback
@@ -1204,16 +1204,16 @@ typedef ${kind_type} YYSTYPE;
 
   if name == "b4_percent_define_use" {
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
-    return {text: "", st: mac_set(st, f"b4_percent_define_bison_variables(${varname})", "")}
+    return {text: "", st: mac_set(st, f"b4_percent_define_bison_variables({varname})", "")}
   }
 
   if name == "b4_percent_define_get_kind" {
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
 
     return {
-      text: if mac_defined(st, f"b4_percent_define_kind(${varname})") {
+      text: if mac_defined(st, f"b4_percent_define_kind({varname})") {
         strip_outer_square_quotes(
-          mac_get(st, f"b4_percent_define_kind(${varname})"),
+          mac_get(st, f"b4_percent_define_kind({varname})"),
         )
       } else {
         "keyword"
@@ -1226,8 +1226,8 @@ typedef ${kind_type} YYSTYPE;
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
 
     return {
-      text: if mac_defined(st, f"b4_percent_define_loc(${varname})") {
-        mac_get(st, f"b4_percent_define_loc(${varname})")
+      text: if mac_defined(st, f"b4_percent_define_loc({varname})") {
+        mac_get(st, f"b4_percent_define_loc({varname})")
       } else {
         ""
       },
@@ -1239,10 +1239,10 @@ typedef ${kind_type} YYSTYPE;
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
 
     return {
-      text: if mac_defined(st, f"b4_percent_define_syncline(${varname})") {
+      text: if mac_defined(st, f"b4_percent_define_syncline({varname})") {
         mac_get(
           st,
-          f"b4_percent_define_syncline(${varname})",
+          f"b4_percent_define_syncline({varname})",
         )
       } else {
         ""
@@ -1259,7 +1259,7 @@ typedef ${kind_type} YYSTYPE;
     let varname = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
     let yes = if margs.len() >= 2 { margs[1] } else { "" }
     let no = if margs.len() >= 3 { margs[2] } else { "" }
-    return {text: if mac_defined(st, f"b4_percent_define(${varname})") { yes } else { no }, st}
+    return {text: if mac_defined(st, f"b4_percent_define({varname})") { yes } else { no }, st}
   }
 
   if name == "b4_percent_define_flag_if" {
@@ -1268,8 +1268,8 @@ typedef ${kind_type} YYSTYPE;
     let no = if margs.len() >= 3 { margs[2] } else { "" }
 
     let value = strip_outer_square_quotes(
-      if mac_defined(st, f"b4_percent_define(${varname})") {
-        mac_get(st, f"b4_percent_define(${varname})")
+      if mac_defined(st, f"b4_percent_define({varname})") {
+        mac_get(st, f"b4_percent_define({varname})")
       } else {
         "false"
       },
@@ -1281,10 +1281,10 @@ typedef ${kind_type} YYSTYPE;
   if name == "b4_percent_define_if_define" {
     let short_name = strip_outer_square_quotes(if margs.len() >= 1 { margs[0] } else { "" })
     let varname = strip_outer_square_quotes(if margs.len() >= 2 and margs[1] != "" { margs[1] } else { short_name })
-    let macro_name = f"b4_${short_name.replace(".", "_").replace("-", "_")}_if"
+    let macro_name = f"b4_{short_name.replace(".", "_").replace("-", "_")}_if"
 
-    let body = f"""b4_percent_define_default([${varname}], [[false]])dnl
-b4_percent_define_flag_if([${varname}], [$1], [$2])"""
+    let body = f"""b4_percent_define_default([{varname}], [[false]])dnl
+b4_percent_define_flag_if([{varname}], [$1], [$2])"""
 
     return {text: "", st: mac_set(st, macro_name, body)}
   }
@@ -1359,11 +1359,11 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
       let n = t.trim()
 
       if n != "" {
-        let content = sg(s2, f"div:${n}", "")
+        let content = sg(s2, f"div:{n}", "")
 
         if content != "" {
           s2 = emit(content, s2)
-          s2[f"div:${n}"] = ""
+          s2[f"div:{n}"] = ""
         }
       }
     }
@@ -1407,7 +1407,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
       }
     }
 
-    return {text: f"${count}", st}
+    return {text: f"{count}", st}
   }
 
   if name == "substr" {
@@ -1432,7 +1432,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     let end_idx = if idx + len_arg > total { total } else { idx + len_arg }
 
     while idx < end_idx {
-      result = f"${result}${chars[idx]}"
+      result = f"{result}{chars[idx]}"
       idx = idx + 1
     }
 
@@ -1459,7 +1459,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
       }
     }
 
-    return {text: f"${pos}", st}
+    return {text: f"{pos}", st}
   }
 
   if name == "translit" {
@@ -1509,9 +1509,9 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
         }
 
         if found_i >= 0 and found_i < to_ch.len() {
-          result = f"${result}${to_ch[found_i]}"
+          result = f"{result}{to_ch[found_i]}"
         } else if found_i < 0 {
-          result = f"${result}${ch}"
+          result = f"{result}{ch}"
         }
       } else {
         cur = ""
@@ -1552,7 +1552,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
 
         while ri <= 9 {
           if ri < c.len() {
-            t = t.replace(f"\\${ri}", c[ri])
+            t = t.replace(f"\\{ri}", c[ri])
           }
 
           ri = ri + 1
@@ -1563,7 +1563,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
         return {text: "", st}
       }
     } else {
-      let anchored_pat = f"(?s)^${pat}"
+      let anchored_pat = f"(?s)^{pat}"
 
       match regex.compile(anchored_pat) {
         Ok(_) => {}
@@ -1589,7 +1589,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
         }
       }
 
-      return {text: f"${pos}", st}
+      return {text: f"{pos}", st}
     }
   }
 
@@ -1601,18 +1601,18 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
 
     while cur != "" {
       if cur.starts_with("%%") {
-        result = f"${result}%"
+        result = f"{result}%"
         cur = drop_prefix(drop_prefix(cur, "%")?, "%")?
       } else if cur.starts_with("%.*s") and ai + 1 < margs.len() {
         let limit = margs[ai].trim().parse_int()?
-        result = f"${result}${take_chars(margs[ai + 1], limit)?}"
+        result = f"{result}{take_chars(margs[ai + 1], limit)?}"
         ai = ai + 2
         cur = drop_prefix(drop_prefix(drop_prefix(drop_prefix(cur, "%")?, ".")?, "*")?, "s")?
       } else {
         if let Ok(c) = regex_captures(cur, "(?s)^%(-?)(\\*)s(.*)") {
           if c.len() >= 4 and ai + 1 < margs.len() {
             let width = margs[ai].trim().parse_int()?
-            result = f"${result}${format_field(margs[ai + 1], width, c[1] == "-")}"
+            result = f"{result}{format_field(margs[ai + 1], width, c[1] == "-")}"
             ai = ai + 2
             cur = c[3]
             continue
@@ -1622,7 +1622,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
         if let Ok(c) = regex_captures(cur, "(?s)^%(-?)([0-9]+)s(.*)") {
           if c.len() >= 4 and ai < margs.len() {
             let width = c[2].parse_int()?
-            result = f"${result}${format_field(margs[ai], width, c[1] == "-")}"
+            result = f"{result}{format_field(margs[ai], width, c[1] == "-")}"
             ai = ai + 1
             cur = c[3]
             continue
@@ -1631,7 +1631,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
 
         if let Ok(c) = regex_captures(cur, "(?s)^%[-]?[sdiouxXeEfFgGaAcp](.*)") {
           if c.len() >= 2 and ai < margs.len() {
-            result = f"${result}${margs[ai]}"
+            result = f"{result}{margs[ai]}"
             ai = ai + 1
             cur = c[1]
             continue
@@ -1639,7 +1639,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
         }
 
         let ch = take_char(cur)?
-        result = f"${result}${ch.content}"
+        result = f"{result}{ch.content}"
         cur = ch.rest
       }
     }
@@ -1651,7 +1651,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     let expr = if margs.len() >= 1 { margs[0].trim() } else { "0" }
 
     match expr.parse_int() {
-      Ok(n) => return {text: f"${n}", st}
+      Ok(n) => return {text: f"{n}", st}
       Err(_) => {
         # Simple binary operations only
         if let Ok(c) = regex_captures(expr, "(?s)^\\s*(-?\\d+)\\s*([+\\-\\*\\/\\%])\\s*(-?\\d+)\\s*$") {
@@ -1675,7 +1675,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
             a % b
           }
 
-          return {text: f"${result}", st}
+          return {text: f"{result}", st}
         } else {
           return {text: "0", st}
         }
@@ -1685,12 +1685,12 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
 
   if name == "incr" {
     let n = (if margs.len() >= 1 { margs[0] } else { "0" }).trim().parse_int()?
-    return {text: f"${n + 1}", st}
+    return {text: f"{n + 1}", st}
   }
 
   if name == "decr" {
     let n = (if margs.len() >= 1 { margs[0] } else { "0" }).trim().parse_int()?
-    return {text: f"${n - 1}", st}
+    return {text: f"{n - 1}", st}
   }
 
   if name == "shift" {
@@ -1702,7 +1702,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     var shift_index = 1
 
     while shift_index < margs.len() {
-      parts = parts.push(f"${oq}${margs[shift_index]}${cq}")
+      parts = parts.push(f"{oq}{margs[shift_index]}{cq}")
       shift_index = shift_index + 1
     }
 
@@ -1723,12 +1723,12 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
   if name == "m4wrap" {
     let wrap_text = if margs.len() >= 1 { margs[0] } else { "" }
     let prev = sg(st, "wrap", "")
-    return {text: "", st: st.set("wrap", f"${prev}${wrap_text}")}
+    return {text: "", st: st.set("wrap", f"{prev}{wrap_text}")}
   }
 
   if name == "dumpdef" {
     for arg in margs {
-      eprint f"${arg}: ${mac_get(st, arg)}"
+      eprint f"{arg}: {mac_get(st, arg)}"
     }
 
     return {text: "", st}
@@ -1778,12 +1778,12 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
   if name == "include" or name == "sinclude" {
     let filepath = if margs.len() >= 1 { margs[0] } else { "" }
     let paths_str = sg(st, "include_paths", "")
-    var found_path = fp"${filepath}"
+    var found_path = fp"{filepath}"
     var found = false
 
     for p in paths_str.split("\n") {
       if p != "" {
-        let cand = fp"${p}/${filepath}"
+        let cand = fp"{p}/{filepath}"
 
         if fs.exists(cand)? and fs.metadata(cand)?.kind == "file" {
           found_path = cand
@@ -1793,7 +1793,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     }
 
     if ! found {
-      let cand = fp"${filepath}"
+      let cand = fp"{filepath}"
 
       if fs.exists(cand)? and fs.metadata(cand)?.kind == "file" {
         found_path = cand
@@ -1804,7 +1804,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     if ! found {
       return {text: "", st} when name == "sinclude"
 
-      return Err(ScriptError.Failed("m4-include", f"cannot open: ${filepath}"))
+      return Err(ScriptError.Failed("m4-include", f"cannot open: {filepath}"))
     }
 
     let content = fs.read_text(found_path)?
@@ -1847,7 +1847,7 @@ b4_percent_define_flag_if([${varname}], [$1], [$2])"""
     ?$""",
     ) {
       if c.len() >= 2 {
-        io.write_stdout(f"""${c[1]}@
+        io.write_stdout(f"""{c[1]}@
     """)?
 
         return {text: "", st: st.set("sysval", "0")}
@@ -2057,18 +2057,18 @@ proc expand_full(input: Str, st: Map[Str]) [fs, process, env, error, io] -> Resu
                 let expanded_body = subst_args(body, word, call_args, oq, cq)?
 
                 # Re-scan: prepend expansion to rem rather than recursing
-                rem = f"${expanded_body}${rem}"
+                rem = f"{expanded_body}{rem}"
               }
 
               cur_st = result.st
 
               if result.text != "" {
                 # Re-scan the built-in's return text
-                rem = f"${result.text}${rem}"
+                rem = f"{result.text}{rem}"
               }
             } else {
               let tail = take_undefined_tail(rem, oq, cs, cur_st)?
-              cur_st = emit(f"${word}${tail.content}", cur_st)
+              cur_st = emit(f"{word}{tail.content}", cur_st)
               rem = tail.rest
             }
           } else {
@@ -2093,7 +2093,7 @@ proc expand_full(input: Str, st: Map[Str]) [fs, process, env, error, io] -> Resu
     }
   }
 
-  {text: sg(cur_st, f"div:{sg(cur_st, 'cur_div', '0')}", ""), st: cur_st}
+  {text: sg(cur_st, f"div:{{sg(cur_st, 'cur_div', '0')}}", ""), st: cur_st}
 }
 
 # ── built-in registration ─────────────────────────────────────────────────────
@@ -2151,7 +2151,7 @@ proc register_builtins(st: Map[Str], prefix: Bool) [error] -> Result[Map[Str]] {
       s = mac_set(s, n, "BUILTIN")
     }
 
-    s = mac_set(s, f"m4_${n}", "BUILTIN")
+    s = mac_set(s, f"m4_{n}", "BUILTIN")
   }
 
   s
@@ -2219,7 +2219,7 @@ proc main(margs: List[Str] = []) [fs, process, env, error, io] {
     st = mac_set(st, n, v)
 
     if prefix {
-      st = mac_set(st, f"m4_${n}", v)
+      st = mac_set(st, f"m4_{n}", v)
     }
   }
 

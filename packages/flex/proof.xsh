@@ -5,15 +5,15 @@ use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  let flex = fp"${rootfs}/usr/bin/flex"
-  let lex = fp"${rootfs}/usr/bin/lex"
+  let flex = fp"{rootfs}/usr/bin/flex"
+  let lex = fp"{rootfs}/usr/bin/lex"
 
   if ! fs.exists(flex)? {
-    return Err(ScriptError.Failed("proof-flex", f"missing flex: ${flex}"))?
+    return Err(ScriptError.Failed("proof-flex", f"missing flex: {flex}"))?
   }
 
   if ! fs.exists(lex)? {
-    return Err(ScriptError.Failed("proof-flex", f"missing lex symlink: ${lex}"))?
+    return Err(ScriptError.Failed("proof-flex", f"missing lex symlink: {lex}"))?
   }
 
   proof.target_elf(rootfs, p"usr/bin/flex", "flex")?
@@ -22,7 +22,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     let out = run.text $flex "--version" ?
 
     if "flex " not in out {
-      return Err(ScriptError.Failed("proof-flex", f"flex --version: ${out.trim()}"))?
+      return Err(ScriptError.Failed("proof-flex", f"flex --version: {out.trim()}"))?
     }
 
     let line = out.trim().split("\n")[0]

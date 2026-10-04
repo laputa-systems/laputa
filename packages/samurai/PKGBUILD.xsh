@@ -43,7 +43,7 @@ export let filetree = [{path: p"usr/bin/ninja", kind: "symlink"}, {path: p"usr/b
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
 
   # samurai has a simple hand-written Makefile; compile all .c files directly.
   # Source list from the Makefile's OBJ variable.
@@ -82,6 +82,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(samu.tasks, make.jobs()?)?
 
   # Install binary and ninja symlink.
-  fs.install(samu.output, fp"${dest}/usr/bin/samu", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"samu", fp"${dest}/usr/bin/ninja")?
+  fs.install(samu.output, fp"{dest}/usr/bin/samu", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"samu", fp"{dest}/usr/bin/ninja")?
 }

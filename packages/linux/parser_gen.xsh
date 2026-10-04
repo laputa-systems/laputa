@@ -9,7 +9,7 @@ export proc bison_tool() [env, error] -> Result[Path] {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
 
   if root != "" {
-    return fp"${root}/usr/lib/pm/repo/bison/files/bison.xsh"
+    return fp"{root}/usr/lib/pm/repo/bison/files/bison.xsh"
   }
 
   return /usr/lib/pm/repo/bison/files/bison.xsh
@@ -20,7 +20,7 @@ export proc flex_tool() [env, error] -> Result[Path] {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
 
   if root != "" {
-    return fp"${root}/usr/lib/pm/repo/flex/files/flex.xsh"
+    return fp"{root}/usr/lib/pm/repo/flex/files/flex.xsh"
   }
 
   return /usr/lib/pm/repo/flex/files/flex.xsh
@@ -96,7 +96,7 @@ export proc parser_generator(name: Str) [env, error] -> Result[ParserGen] {
     }
   }
 
-  return Err(ParserGenError.Failed("linux-parser-generator", f"unknown parser generator '${name}'"))
+  return Err(ParserGenError.Failed("linux-parser-generator", f"unknown parser generator '{name}'"))
 }
 
 ## Exported declaration `remove_outputs`.
@@ -127,14 +127,14 @@ export proc run_generator(spec: ParserGen) [fs, process, error] {
     return Err(
       ParserGenError.Failed(
         "linux-parser-generator",
-        f"generator failed for ${spec.name}: ${spec.tool} ${spec.argv.join(" ")}",
+        f"generator failed for {spec.name}: {spec.tool} {spec.argv.join(" ")}",
       ),
     )
   }
 
   for out in spec.outputs {
     if ! out.exists()? {
-      return Err(ParserGenError.Failed("linux-parser-generator", f"${spec.name} did not write ${out}"))
+      return Err(ParserGenError.Failed("linux-parser-generator", f"{spec.name} did not write {out}"))
     }
   }
 }

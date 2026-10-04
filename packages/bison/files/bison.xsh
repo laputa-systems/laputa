@@ -237,20 +237,20 @@ proc nonterminals(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
 
 pure token_code_expr(symbol: Str, tokens: Map[Int]) -> Str {
   if symbol in tokens {
-    return f"${tokens.get(symbol) ?? 0}"
+    return f"{tokens.get(symbol) ?? 0}"
   }
 
   let lit = literal_code(symbol)
 
   if lit >= 0 {
-    return f"${lit}"
+    return f"{lit}"
   }
 
   return symbol
 }
 
 proc generate_token_defines(tokens: Map[Int]) [error] -> Result[Str] {
-  var lines = [f"#define ${name} ${tokens.get(name) ?? 0}" for name in tokens.keys() if ! name.starts_with("'")]
+  var lines = [f"#define {name} {tokens.get(name) ?? 0}" for name in tokens.keys() if ! name.starts_with("'")]
   return lines.join("\n")
 }
 
@@ -259,7 +259,7 @@ proc generate_header(tokens: Map[Int]) [error] -> Result[Str] {
 
   return f"""#ifndef XSH_YY_TAB_H
 #define XSH_YY_TAB_H
-${defines}
+{defines}
 int yyparse(void);
 #endif
 """
@@ -288,7 +288,7 @@ proc extract_union_body(decls: Str) [error] -> Result[Str] {
 
         if next.content == "{" {
           depth = depth + 1
-          body = f"${body}${next.content}"
+          body = f"{body}{next.content}"
         } else if next.content == "}" {
           depth = depth - 1
 
@@ -296,9 +296,9 @@ proc extract_union_body(decls: Str) [error] -> Result[Str] {
             return body
           }
 
-          body = f"${body}${next.content}"
+          body = f"{body}{next.content}"
         } else {
-          body = f"${body}${next.content}"
+          body = f"{body}{next.content}"
         }
       }
     }
@@ -318,7 +318,7 @@ proc token_enum_lines(names: List[Str]) [error] -> Result[List[Str]] {
 
   while i < names.len() {
     let comma = if i + 1 < names.len() { "," } else { "" }
-    lines = lines.push(f"    ${names[i]} = ${code}${comma}")
+    lines = lines.push(f"    {names[i]} = {code}{comma}")
     code = code + 1
     i = i + 1
   }
@@ -367,23 +367,23 @@ extern int yydebug;
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
   enum yytokentype
-  {
-${enum_body}
-  };
+  {{
+{enum_body}
+  }};
   typedef enum yytokentype yytoken_kind_t;
 #endif
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
-{
-${union_body}
-};
+{{
+{union_body}
+}};
 typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
-extern YYSTYPE yylval;${location}
+extern YYSTYPE yylval;{location}
 
 int yyparse(void);
 
@@ -392,7 +392,7 @@ int yyparse(void);
 }
 
 proc output_header_name(output: Str) [error] -> Result[Str] {
-  return fp"${output}".name.replace(".c", ".h")
+  return fp"{output}".name.replace(".c", ".h")
 }
 
 pure is_kconfig_parser(decls: Str) -> Bool {
@@ -406,9 +406,9 @@ pure is_dtc_parser(decls: Str) -> Bool {
 proc generate_kconfig_stub_c(output: Str, prologue: Str, epilogue: Str) [error] -> Result[Str] {
   let header = output_header_name(output)?
 
-  return f"""${prologue}
+  return f"""{prologue}
 
-#include "${header}"
+#include "{header}"
 
 extern FILE *yyin;
 extern int cur_lineno;
@@ -419,233 +419,233 @@ int yynerrs;
 YYSTYPE yylval;
 
 static char *xsh_trim(char *s)
-{
-  while (*s && isspace((unsigned char)*s)) {
+{{
+  while (*s && isspace((unsigned char)*s)) {{
     s++;
-  }
+  }}
 
   char *end = s + strlen(s);
-  while (end > s && isspace((unsigned char)end[-1])) {
+  while (end > s && isspace((unsigned char)end[-1])) {{
     *--end = 0;
-  }
+  }}
 
   return s;
-}
+}}
 
 static bool xsh_starts_with(const char *s, const char *prefix)
-{
+{{
   size_t n = strlen(prefix);
   return strncmp(s, prefix, n) == 0 && (s[n] == 0 || isspace((unsigned char)s[n]));
-}
+}}
 
 static char *xsh_next_word(char *s)
-{
+{{
   s = xsh_trim(s);
   char *end = s;
 
-  while (*end && !isspace((unsigned char)*end)) {
+  while (*end && !isspace((unsigned char)*end)) {{
     end++;
-  }
+  }}
 
   *end = 0;
   return s;
-}
+}}
 
 static char *xsh_dup_prompt(char *s)
-{
+{{
   char *start = strchr(s, '"');
-  if (!start) {
+  if (!start) {{
     return NULL;
-  }
+  }}
 
   start++;
   char *end = strchr(start, '"');
-  if (!end) {
+  if (!end) {{
     return NULL;
-  }
+  }}
 
   size_t n = (size_t)(end - start);
   char *out = malloc(n + 1);
-  if (!out) {
+  if (!out) {{
     return NULL;
-  }
+  }}
 
   memcpy(out, start, n);
   out[n] = 0;
   return out;
-}
+}}
 
 static void xsh_parse_kconfig_stream(FILE *in);
 
 static char *xsh_expand_vars(const char *s)
-{
+{{
   size_t cap = strlen(s) + 1;
   char *out = malloc(cap);
   size_t len = 0;
 
-  if (!out) {
+  if (!out) {{
     return NULL;
-  }
+  }}
 
   out[0] = 0;
 
-  for (const char *p = s; *p; p++) {
+  for (const char *p = s; *p; p++) {{
     const char *piece = p;
     size_t piece_len = 1;
     char name[128];
 
-    if (p[0] == '$' && p[1] == '(') {
+    if (p[0] == '$' && p[1] == '(') {{
       const char *end = strchr(p + 2, ')');
-      if (end && (size_t)(end - (p + 2)) < sizeof(name)) {
+      if (end && (size_t)(end - (p + 2)) < sizeof(name)) {{
         memcpy(name, p + 2, (size_t)(end - (p + 2)));
         name[end - (p + 2)] = 0;
         piece = getenv(name);
-        if (!piece) {
+        if (!piece) {{
           piece = "";
-        }
+        }}
         piece_len = strlen(piece);
         p = end;
-      }
-    }
+      }}
+    }}
 
-    if (len + piece_len + 1 > cap) {
-      while (len + piece_len + 1 > cap) {
+    if (len + piece_len + 1 > cap) {{
+      while (len + piece_len + 1 > cap) {{
         cap *= 2;
-      }
+      }}
       char *grown = realloc(out, cap);
-      if (!grown) {
+      if (!grown) {{
         free(out);
         return NULL;
-      }
+      }}
       out = grown;
-    }
+    }}
 
     memcpy(out + len, piece, piece_len);
     len += piece_len;
     out[len] = 0;
-  }
+  }}
 
   return out;
-}
+}}
 
 static char *xsh_split_if(char *s)
-{
-  for (char *p = s; *p; p++) {
-    if (!isspace((unsigned char)*p)) {
+{{
+  for (char *p = s; *p; p++) {{
+    if (!isspace((unsigned char)*p)) {{
       continue;
-    }
+    }}
 
     char *word = xsh_trim(p);
-    if (strncmp(word, "if", 2) == 0 && (word[2] == 0 || isspace((unsigned char)word[2]))) {
+    if (strncmp(word, "if", 2) == 0 && (word[2] == 0 || isspace((unsigned char)word[2]))) {{
       *p = 0;
       return xsh_trim(word + 2);
-    }
-  }
+    }}
+  }}
 
   return NULL;
-}
+}}
 
 static struct expr *xsh_expr_from_word(char *word)
-{
+{{
   word = xsh_trim(word);
   char *name = xsh_next_word(word);
 
-  if (strcmp(name, "y") == 0) {
+  if (strcmp(name, "y") == 0) {{
     return expr_alloc_symbol(&symbol_yes);
-  }
-  if (strcmp(name, "m") == 0) {
+  }}
+  if (strcmp(name, "m") == 0) {{
     return expr_alloc_symbol(&symbol_mod);
-  }
-  if (strcmp(name, "n") == 0) {
+  }}
+  if (strcmp(name, "n") == 0) {{
     return expr_alloc_symbol(&symbol_no);
-  }
-  if (*name) {
+  }}
+  if (*name) {{
     return expr_alloc_symbol(sym_lookup(name, 0));
-  }
+  }}
 
   return expr_alloc_symbol(&symbol_no);
-}
+}}
 
 static struct expr *xsh_expr_from_words(char *words)
-{
+{{
   words = xsh_trim(words);
   struct expr *expr = NULL;
   enum expr_type op = E_AND;
   bool negate = false;
 
-  while (*words) {
+  while (*words) {{
     words = xsh_trim(words);
 
-    if (words[0] == '&' && words[1] == '&') {
+    if (words[0] == '&' && words[1] == '&') {{
       op = E_AND;
       words += 2;
       continue;
-    }
-    if (words[0] == '|' && words[1] == '|') {
+    }}
+    if (words[0] == '|' && words[1] == '|') {{
       op = E_OR;
       words += 2;
       continue;
-    }
-    if (*words == '(' || *words == ')') {
+    }}
+    if (*words == '(' || *words == ')') {{
       words++;
       continue;
-    }
-    if (*words == '!') {
+    }}
+    if (*words == '!') {{
       negate = !negate;
       words++;
       continue;
-    }
+    }}
 
     char *start = words;
-    while (*words && !isspace((unsigned char)*words) && *words != '&' && *words != '|' && *words != ')') {
+    while (*words && !isspace((unsigned char)*words) && *words != '&' && *words != '|' && *words != ')') {{
       words++;
-    }
+    }}
     char saved = *words;
     *words = 0;
 
     struct expr *term = xsh_expr_from_word(start);
-    if (negate) {
+    if (negate) {{
       term = expr_alloc_one(E_NOT, term);
       negate = false;
-    }
+    }}
 
-    if (!expr) {
+    if (!expr) {{
       expr = term;
-    } else if (op == E_OR) {
+    }} else if (op == E_OR) {{
       expr = expr_alloc_or(expr, term);
-    } else {
+    }} else {{
       expr = expr_alloc_and(expr, term);
-    }
+    }}
 
-    if (!saved) {
+    if (!saved) {{
       break;
-    }
+    }}
     *words = saved;
-  }
+  }}
 
   return expr ? expr : expr_alloc_symbol(&symbol_yes);
-}
+}}
 
 static void xsh_add_prompt_from_line(enum prop_type type, char *s)
-{
+{{
   char *prompt = xsh_dup_prompt(s);
-  if (prompt) {
+  if (prompt) {{
     menu_add_prompt(type, prompt, NULL);
-  }
-}
+  }}
+}}
 
 static void xsh_add_default_from_line(char *s, int type)
-{
+{{
   char *cond = xsh_split_if(s);
   struct expr *dep = cond ? xsh_expr_from_words(cond) : NULL;
   menu_add_expr(P_DEFAULT, xsh_expr_from_words(s), dep);
-  if (type != S_UNKNOWN) {
+  if (type != S_UNKNOWN) {{
     menu_set_type(type);
-  }
-}
+  }}
+}}
 
 static void xsh_parse_kconfig_stream(FILE *in)
-{
+{{
   char line[4096];
   struct symbol *current = NULL;
   FILE *saved_yyin = yyin;
@@ -653,79 +653,79 @@ static void xsh_parse_kconfig_stream(FILE *in)
 
   yyin = in;
 
-  while (fgets(line, sizeof(line), in)) {
+  while (fgets(line, sizeof(line), in)) {{
     cur_lineno++;
 
-    if (skipping_help) {
-      if (line[0] == ' ' || line[0] == '	') {
+    if (skipping_help) {{
+      if (line[0] == ' ' || line[0] == '	') {{
         continue;
-      }
+      }}
       skipping_help = false;
-    }
+    }}
 
     char *s = xsh_trim(line);
 
-    if (*s == 0 || *s == '#') {
+    if (*s == 0 || *s == '#') {{
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "source")) {
+    if (xsh_starts_with(s, "source")) {{
       char *name = xsh_dup_prompt(s);
-      if (name) {
+      if (name) {{
         char *expanded = xsh_expand_vars(name);
         FILE *child = expanded ? zconf_fopen(expanded) : NULL;
-        if (child) {
+        if (child) {{
           xsh_parse_kconfig_stream(child);
           fclose(child);
-        }
+        }}
         free(expanded);
         free(name);
-      }
+      }}
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "mainmenu")) {
+    if (xsh_starts_with(s, "mainmenu")) {{
       xsh_add_prompt_from_line(P_MENU, s);
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "menu")) {
+    if (xsh_starts_with(s, "menu")) {{
       menu_add_entry(NULL, M_MENU);
       xsh_add_prompt_from_line(P_MENU, s);
       menu_add_menu();
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "endmenu")) {
+    if (xsh_starts_with(s, "endmenu")) {{
       menu_end_menu();
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "if")) {
+    if (xsh_starts_with(s, "if")) {{
       menu_add_entry(NULL, M_IF);
       menu_add_dep(xsh_expr_from_words(s + strlen("if")), NULL);
       menu_add_menu();
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "endif")) {
+    if (xsh_starts_with(s, "endif")) {{
       menu_end_menu();
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "comment")) {
+    if (xsh_starts_with(s, "comment")) {{
       menu_add_entry(NULL, M_COMMENT);
       xsh_add_prompt_from_line(P_COMMENT, s);
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "choice")) {
+    if (xsh_starts_with(s, "choice")) {{
       struct symbol *sym = sym_lookup(NULL, 0);
       menu_add_entry(sym, M_CHOICE);
       menu_set_type(S_BOOLEAN);
@@ -734,140 +734,140 @@ static void xsh_parse_kconfig_stream(FILE *in)
       current_choice = current_entry;
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "endchoice")) {
+    if (xsh_starts_with(s, "endchoice")) {{
       current_choice = NULL;
       menu_end_menu();
       current = NULL;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "config")) {
+    if (xsh_starts_with(s, "config")) {{
       char *name = xsh_next_word(s + strlen("config"));
       current = sym_lookup(name, 0);
       menu_add_entry(current, M_NORMAL);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "menuconfig")) {
+    if (xsh_starts_with(s, "menuconfig")) {{
       char *name = xsh_next_word(s + strlen("menuconfig"));
       current = sym_lookup(name, 0);
       menu_add_entry(current, M_MENU);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "bool")) {
+    if (xsh_starts_with(s, "bool")) {{
       menu_set_type(S_BOOLEAN);
       xsh_add_prompt_from_line(P_PROMPT, s);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "tristate")) {
+    if (xsh_starts_with(s, "tristate")) {{
       menu_set_type(S_TRISTATE);
       xsh_add_prompt_from_line(P_PROMPT, s);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "int")) {
+    if (xsh_starts_with(s, "int")) {{
       menu_set_type(S_INT);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "hex")) {
+    if (xsh_starts_with(s, "hex")) {{
       menu_set_type(S_HEX);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "string")) {
+    if (xsh_starts_with(s, "string")) {{
       menu_set_type(S_STRING);
       xsh_add_prompt_from_line(P_PROMPT, s);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "prompt")) {
+    if (xsh_starts_with(s, "prompt")) {{
       xsh_add_prompt_from_line(P_PROMPT, s);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "depends on")) {
+    if (xsh_starts_with(s, "depends on")) {{
       char *cond = xsh_split_if(s + strlen("depends on"));
       menu_add_dep(xsh_expr_from_words(s + strlen("depends on")), cond ? xsh_expr_from_words(cond) : NULL);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "default")) {
+    if (xsh_starts_with(s, "default")) {{
       xsh_add_default_from_line(s + strlen("default"), S_UNKNOWN);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "def_bool")) {
+    if (xsh_starts_with(s, "def_bool")) {{
       xsh_add_default_from_line(s + strlen("def_bool"), S_BOOLEAN);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "def_tristate")) {
+    if (xsh_starts_with(s, "def_tristate")) {{
       xsh_add_default_from_line(s + strlen("def_tristate"), S_TRISTATE);
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "select")) {
+    if (xsh_starts_with(s, "select")) {{
       char *rest = s + strlen("select");
       char *cond = xsh_split_if(rest);
       char *name = xsh_next_word(rest);
-      if (*name) {
+      if (*name) {{
         menu_add_symbol(P_SELECT, sym_lookup(name, 0), cond ? xsh_expr_from_words(cond) : NULL);
-      }
+      }}
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "imply")) {
+    if (xsh_starts_with(s, "imply")) {{
       char *rest = s + strlen("imply");
       char *cond = xsh_split_if(rest);
       char *name = xsh_next_word(rest);
-      if (*name) {
+      if (*name) {{
         menu_add_symbol(P_IMPLY, sym_lookup(name, 0), cond ? xsh_expr_from_words(cond) : NULL);
-      }
+      }}
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "range")) {
+    if (xsh_starts_with(s, "range")) {{
       char *rest = s + strlen("range");
       char *cond = xsh_split_if(rest);
       char *low = xsh_next_word(rest);
       char *high = xsh_next_word(rest + strlen(low) + 1);
-      if (*low && *high) {
+      if (*low && *high) {{
         menu_add_expr(P_RANGE, expr_alloc_comp(E_RANGE, sym_lookup(low, 0), sym_lookup(high, 0)), cond ? xsh_expr_from_words(cond) : NULL);
-      }
+      }}
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "visible if")) {
+    if (xsh_starts_with(s, "visible if")) {{
       menu_add_visibility(xsh_expr_from_words(s + strlen("visible if")));
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "option modules")) {
+    if (xsh_starts_with(s, "option modules")) {{
       modules_sym = current;
       continue;
-    }
+    }}
 
-    if (xsh_starts_with(s, "help") || xsh_starts_with(s, "---help---")) {
+    if (xsh_starts_with(s, "help") || xsh_starts_with(s, "---help---")) {{
       skipping_help = true;
       continue;
-    }
-  }
+    }}
+  }}
 
   yyin = saved_yyin;
-}
+}}
 
 int yyparse(void)
-{
+{{
   xsh_parse_kconfig_stream(yyin);
   return yynerrs ? 1 : 0;
-}
+}}
 
-${epilogue}
+{epilogue}
 """
 }
 
@@ -882,167 +882,167 @@ YYLTYPE yylloc = { 1, 1, 1, 1 };
     ""
   }
 
-  return f"""${prologue}
+  return f"""{prologue}
 
-#include "${header}"
+#include "{header}"
 
 int yydebug;
 int yynerrs;
 YYSTYPE yylval;
-${location_global}
+{location_global}
 extern FILE *yyin;
 
 static char *xsh_trim(char *s)
-{
-  while (*s && isspace((unsigned char)*s)) {
+{{
+  while (*s && isspace((unsigned char)*s)) {{
     s++;
-  }
+  }}
 
   char *end = s + strlen(s);
-  while (end > s && isspace((unsigned char)end[-1])) {
+  while (end > s && isspace((unsigned char)end[-1])) {{
     *--end = 0;
-  }
+  }}
 
   return s;
-}
+}}
 
 static void xsh_strip_line_comment(char *s)
-{
+{{
   char *comment = strstr(s, "//");
-  if (comment) {
+  if (comment) {{
     *comment = 0;
-  }
-}
+  }}
+}}
 
 static bool xsh_starts_with(const char *s, const char *prefix)
-{
+{{
   size_t n = strlen(prefix);
   return strncmp(s, prefix, n) == 0;
-}
+}}
 
 static struct data xsh_parse_dtc_value(char *value)
-{
+{{
   value = xsh_trim(value);
 
-  if (*value == '"') {
+  if (*value == '"') {{
     struct data data = empty_data;
     char *p = value;
 
-    while ((p = strchr(p, '"')) != NULL) {
+    while ((p = strchr(p, '"')) != NULL) {{
       p++;
       char *end = strchr(p, '"');
-      if (!end) {
+      if (!end) {{
         break;
-      }
+      }}
 
       data = data_merge(data, data_copy_escape_string(p, (int)(end - p)));
       p = end + 1;
-    }
+    }}
 
     return data;
-  }
+  }}
 
-  if (*value == '<') {
+  if (*value == '<') {{
     struct data data = empty_data;
     char *p = value + 1;
 
-    while (*p && *p != '>') {
-      while (*p && (isspace((unsigned char)*p) || *p == ',')) {
+    while (*p && *p != '>') {{
+      while (*p && (isspace((unsigned char)*p) || *p == ',')) {{
         p++;
-      }
-      if (!*p || *p == '>') {
+      }}
+      if (!*p || *p == '>') {{
         break;
-      }
+      }}
 
       char *end = p;
       unsigned long word = strtoul(p, &end, 0);
-      if (end == p) {
+      if (end == p) {{
         break;
-      }
+      }}
 
       data = data_append_cell(data, (cell_t)word);
       p = end;
-    }
+    }}
 
     return data;
-  }
+  }}
 
-  if (*value == '[') {
+  if (*value == '[') {{
     struct data data = empty_data;
     char *p = value + 1;
 
-    while (*p && *p != ']') {
-      while (*p && isspace((unsigned char)*p)) {
+    while (*p && *p != ']') {{
+      while (*p && isspace((unsigned char)*p)) {{
         p++;
-      }
-      if (!*p || *p == ']') {
+      }}
+      if (!*p || *p == ']') {{
         break;
-      }
+      }}
 
       char *end = p;
       unsigned long byte = strtoul(p, &end, 16);
-      if (end == p) {
+      if (end == p) {{
         break;
-      }
+      }}
 
       data = data_append_byte(data, (uint8_t)byte);
       p = end;
-    }
+    }}
 
     return data;
-  }
+  }}
 
   return empty_data;
-}
+}}
 
 static struct property *xsh_parse_dtc_property(char *s)
-{
+{{
   char *semi = strchr(s, ';');
-  if (!semi) {
+  if (!semi) {{
     return NULL;
-  }
+  }}
   *semi = 0;
 
   char *eq = strchr(s, '=');
-  if (!eq) {
+  if (!eq) {{
     char *name = xsh_trim(s);
     return *name ? build_property(name, empty_data, NULL) : NULL;
-  }
+  }}
 
   *eq = 0;
   char *name = xsh_trim(s);
   char *value = xsh_trim(eq + 1);
 
-  if (!*name) {
+  if (!*name) {{
     return NULL;
-  }
+  }}
 
   return build_property(name, xsh_parse_dtc_value(value), NULL);
-}
+}}
 
 static char *xsh_dtc_node_name(char *s)
-{
-  char *brace = strchr(s, '{');
-  if (!brace) {
+{{
+  char *brace = strchr(s, '{{');
+  if (!brace) {{
     return NULL;
-  }
+  }}
   *brace = 0;
 
   char *name = xsh_trim(s);
   char *label = strchr(name, ':');
-  if (label) {
+  if (label) {{
     name = xsh_trim(label + 1);
-  }
+  }}
 
-  if (*name == 0 || strcmp(name, "/") == 0) {
+  if (*name == 0 || strcmp(name, "/") == 0) {{
     return NULL;
-  }
+  }}
 
   return name;
-}
+}}
 
 int yyparse(void)
-{
+{{
   char line[4096];
   struct node *root = name_node(build_node(NULL, NULL, NULL), "");
   struct node *stack[64];
@@ -1050,43 +1050,43 @@ int yyparse(void)
 
   stack[0] = root;
 
-  while (fgets(line, sizeof(line), yyin)) {
+  while (fgets(line, sizeof(line), yyin)) {{
     xsh_strip_line_comment(line);
     char *s = xsh_trim(line);
 
-    if (*s == 0 || xsh_starts_with(s, "/dts-v1/") || xsh_starts_with(s, "/plugin/")) {
+    if (*s == 0 || xsh_starts_with(s, "/dts-v1/") || xsh_starts_with(s, "/plugin/")) {{
       continue;
-    }
+    }}
 
-    if (strchr(s, '{')) {
+    if (strchr(s, '{{')) {{
       char *name = xsh_dtc_node_name(s);
-      if (name && depth + 1 < (int)(sizeof(stack) / sizeof(stack[0]))) {
+      if (name && depth + 1 < (int)(sizeof(stack) / sizeof(stack[0]))) {{
         struct node *child = name_node(build_node(NULL, NULL, NULL), name);
         add_child(stack[depth], child);
         depth++;
         stack[depth] = child;
-      }
+      }}
       continue;
-    }
+    }}
 
-    if (strchr(s, '}')) {
-      if (depth > 0) {
+    if (strchr(s, '}}')) {{
+      if (depth > 0) {{
         depth--;
-      }
+      }}
       continue;
-    }
+    }}
 
     struct property *prop = xsh_parse_dtc_property(s);
-    if (prop) {
+    if (prop) {{
       add_property(stack[depth], prop);
-    }
-  }
+    }}
+  }}
 
   parser_output = build_dt_info(DTSF_V1, NULL, root, guess_boot_cpuid(root));
   return 0;
-}
+}}
 
-${epilogue}
+{epilogue}
 """
 }
 
@@ -1109,20 +1109,20 @@ YYLTYPE yylloc = { 1, 1, 1, 1 };
     ""
   }
 
-  return f"""${prologue}
+  return f"""{prologue}
 
-#include "${header}"
+#include "{header}"
 
 int yydebug;
 int yynerrs;
 YYSTYPE yylval;
-${location_global}
+{location_global}
 int yyparse(void)
-{
+{{
   return 0;
-}
+}}
 
-${epilogue}
+{epilogue}
 """
 }
 
@@ -1142,11 +1142,11 @@ proc index_of(names: List[Str], name: Str) [error] -> Int {
 
 proc generate_int_array(name: Str, values: List[Str]) [error] -> Result[Str] {
   let body = if values.len() == 0 { "0" } else { values.join(", ") }
-  return f"static const int ${name}[] = { ${body} };"
+  return f"static const int {name}[] = {{ {body} }};"
 }
 
 proc rule_lhs_values(rules: List[GrammarRule], names: List[Str]) [error] -> Result[List[Str]] {
-  [f"${index_of(names, rule.lhs)}" for rule in rules]
+  [f"{index_of(names, rule.lhs)}" for rule in rules]
 }
 
 proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
@@ -1154,7 +1154,7 @@ proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]
   var offset = 0
 
   for rule in rules {
-    values = values.push(f"${offset}")
+    values = values.push(f"{offset}")
     offset = offset + rule.rhs.len()
   }
 
@@ -1162,7 +1162,7 @@ proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]
 }
 
 proc rule_rhs_len_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
-  [f"${rule.rhs.len()}" for rule in rules]
+  [f"{rule.rhs.len()}" for rule in rules]
 }
 
 proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) [error] -> Result[List[Str]] {
@@ -1173,7 +1173,7 @@ proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: 
       let nt = index_of(names, item)
 
       if nt >= 0 {
-        values = values.push(f"${0 - nt - 1}")
+        values = values.push(f"{0 - nt - 1}")
       } else {
         values = values.push(token_code_expr(item, tokens))
       }
@@ -1189,19 +1189,19 @@ proc generate_rule_tables(rules: List[GrammarRule], names: List[Str], tokens: Ma
   let rhs_len = generate_int_array("yy_rule_rhs_len", rule_rhs_len_values(rules)?)?
   let rhs_symbols = generate_int_array("yy_rule_rhs_symbols", rule_rhs_symbol_values(rules, names, tokens)?)?
 
-  return f"""${lhs}
-${rhs_start}
-${rhs_len}
-${rhs_symbols}"""
+  return f"""{lhs}
+{rhs_start}
+{rhs_len}
+{rhs_symbols}"""
 }
 
 proc generate_verbose_report(rules: List[GrammarRule], start: Str) [error] -> Result[Str] {
-  var lines = ["Grammar", "", f"start: ${start}", "", "Rules"]
+  var lines = ["Grammar", "", f"start: {start}", "", "Rules"]
   var i = 0
 
   for rule in rules {
     let rhs = if rule.rhs.len() == 0 { "/* empty */" } else { rule.rhs.join(" ") }
-    lines = lines.push(f"${i}: ${rule.lhs}: ${rhs}")
+    lines = lines.push(f"{i}: {rule.lhs}: {rhs}")
     i = i + 1
   }
 
@@ -1221,14 +1221,14 @@ proc generate_c(
   let start_id = index_of(names, start)
 
   if start_id < 0 {
-    return Err(ToolError.Failed("yacc", f"unknown start symbol: ${start}"))
+    return Err(ToolError.Failed("yacc", f"unknown start symbol: {start}"))
   }
 
   return f"""#include <stdio.h>
 #include <stdlib.h>
-${defines}
+{defines}
 
-${prologue}
+{prologue}
 
 int yylex(void);
 void yyerror(const char *message);
@@ -1237,174 +1237,174 @@ static int *yy_tokens;
 static int yy_count;
 static int yy_cap;
 
-${tables}
+{tables}
 
-#define YY_RULE_COUNT ${rules.len()}
-#define YY_START_SYMBOL ${start_id}
+#define YY_RULE_COUNT {rules.len()}
+#define YY_START_SYMBOL {start_id}
 
-struct yy_item {
+struct yy_item {{
   int rule;
   int dot;
   int start;
-};
+}};
 
-struct yy_set {
+struct yy_set {{
   struct yy_item *items;
   int count;
   int cap;
-};
+}};
 
-static int yy_add_item(struct yy_set *set, int rule, int dot, int start) {
-  for (int i = 0; i < set->count; i++) {
+static int yy_add_item(struct yy_set *set, int rule, int dot, int start) {{
+  for (int i = 0; i < set->count; i++) {{
     struct yy_item item = set->items[i];
-    if (item.rule == rule && item.dot == dot && item.start == start) {
+    if (item.rule == rule && item.dot == dot && item.start == start) {{
       return 1;
-    }
-  }
+    }}
+  }}
 
-  if (set->count + 1 >= set->cap) {
+  if (set->count + 1 >= set->cap) {{
     int next_cap = set->cap == 0 ? 32 : set->cap * 2;
     struct yy_item *next = realloc(set->items, sizeof(struct yy_item) * (size_t)next_cap);
-    if (!next) {
+    if (!next) {{
       return 0;
-    }
+    }}
     set->items = next;
     set->cap = next_cap;
-  }
+  }}
 
   set->items[set->count].rule = rule;
   set->items[set->count].dot = dot;
   set->items[set->count].start = start;
   set->count++;
   return 1;
-}
+}}
 
-static int yy_push(int tok) {
-  if (yy_count + 1 >= yy_cap) {
+static int yy_push(int tok) {{
+  if (yy_count + 1 >= yy_cap) {{
     int next_cap = yy_cap == 0 ? 64 : yy_cap * 2;
     int *next = realloc(yy_tokens, sizeof(int) * (size_t)next_cap);
-    if (!next) {
+    if (!next) {{
       return 0;
-    }
+    }}
     yy_tokens = next;
     yy_cap = next_cap;
-  }
+  }}
   yy_tokens[yy_count++] = tok;
   return 1;
-}
+}}
 
-static int yy_rhs_symbol(int rule, int dot) {
+static int yy_rhs_symbol(int rule, int dot) {{
   return yy_rule_rhs_symbols[yy_rule_rhs_start[rule] + dot];
-}
+}}
 
-static void yy_free_chart(struct yy_set *chart, int count) {
-  if (!chart) {
+static void yy_free_chart(struct yy_set *chart, int count) {{
+  if (!chart) {{
     return;
-  }
+  }}
 
-  for (int i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {{
     free(chart[i].items);
-  }
+  }}
   free(chart);
-}
+}}
 
-static int yy_accepts(void) {
+static int yy_accepts(void) {{
   int n = yy_count;
   struct yy_set *chart = calloc((size_t)n + 1, sizeof(struct yy_set));
-  if (!chart) {
+  if (!chart) {{
     return -1;
-  }
+  }}
 
-  for (int rule = 0; rule < YY_RULE_COUNT; rule++) {
+  for (int rule = 0; rule < YY_RULE_COUNT; rule++) {{
     if (yy_rule_lhs[rule] == YY_START_SYMBOL &&
-        !yy_add_item(&chart[0], rule, 0, 0)) {
+        !yy_add_item(&chart[0], rule, 0, 0)) {{
       yy_free_chart(chart, n + 1);
       return -1;
-    }
-  }
+    }}
+  }}
 
-  for (int k = 0; k <= n; k++) {
-    for (int i = 0; i < chart[k].count; i++) {
+  for (int k = 0; k <= n; k++) {{
+    for (int i = 0; i < chart[k].count; i++) {{
       struct yy_item item = chart[k].items[i];
       int len = yy_rule_rhs_len[item.rule];
 
-      if (item.dot < len) {
+      if (item.dot < len) {{
         int sym = yy_rhs_symbol(item.rule, item.dot);
 
-        if (sym < 0) {
+        if (sym < 0) {{
           int nt = -sym - 1;
 
-          for (int rule = 0; rule < YY_RULE_COUNT; rule++) {
+          for (int rule = 0; rule < YY_RULE_COUNT; rule++) {{
             if (yy_rule_lhs[rule] == nt &&
-                !yy_add_item(&chart[k], rule, 0, k)) {
+                !yy_add_item(&chart[k], rule, 0, k)) {{
               yy_free_chart(chart, n + 1);
               return -1;
-            }
-          }
-        } else if (k < n && yy_tokens[k] == sym) {
-          if (!yy_add_item(&chart[k + 1], item.rule, item.dot + 1, item.start)) {
+            }}
+          }}
+        }} else if (k < n && yy_tokens[k] == sym) {{
+          if (!yy_add_item(&chart[k + 1], item.rule, item.dot + 1, item.start)) {{
             yy_free_chart(chart, n + 1);
             return -1;
-          }
-        }
-      } else {
+          }}
+        }}
+      }} else {{
         int nt = yy_rule_lhs[item.rule];
 
-        for (int j = 0; j < chart[item.start].count; j++) {
+        for (int j = 0; j < chart[item.start].count; j++) {{
           struct yy_item origin = chart[item.start].items[j];
 
           if (origin.dot < yy_rule_rhs_len[origin.rule] &&
               yy_rhs_symbol(origin.rule, origin.dot) == -nt - 1 &&
-              !yy_add_item(&chart[k], origin.rule, origin.dot + 1, origin.start)) {
+              !yy_add_item(&chart[k], origin.rule, origin.dot + 1, origin.start)) {{
             yy_free_chart(chart, n + 1);
             return -1;
-          }
-        }
-      }
-    }
-  }
+          }}
+        }}
+      }}
+    }}
+  }}
 
-  for (int i = 0; i < chart[n].count; i++) {
+  for (int i = 0; i < chart[n].count; i++) {{
     struct yy_item item = chart[n].items[i];
     if (item.start == 0 &&
         yy_rule_lhs[item.rule] == YY_START_SYMBOL &&
-        item.dot == yy_rule_rhs_len[item.rule]) {
+        item.dot == yy_rule_rhs_len[item.rule]) {{
       yy_free_chart(chart, n + 1);
       return 1;
-    }
-  }
+    }}
+  }}
 
   yy_free_chart(chart, n + 1);
   return 0;
-}
+}}
 
-int yyparse(void) {
+int yyparse(void) {{
   int tok = yylex();
-  while (tok != 0) {
-    if (!yy_push(tok)) {
+  while (tok != 0) {{
+    if (!yy_push(tok)) {{
       yyerror("out of memory");
       return 2;
-    }
+    }}
     tok = yylex();
-  }
+  }}
 
   int accepted = yy_accepts();
-  if (accepted < 0) {
+  if (accepted < 0) {{
     yyerror("out of memory");
     free(yy_tokens);
     yy_tokens = NULL;
     yy_count = 0;
     yy_cap = 0;
     return 2;
-  }
+  }}
 
-  if (accepted) {
+  if (accepted) {{
     free(yy_tokens);
     yy_tokens = NULL;
     yy_count = 0;
     yy_cap = 0;
     return 0;
-  }
+  }}
 
   yyerror("syntax error");
   free(yy_tokens);
@@ -1412,13 +1412,13 @@ int yyparse(void) {
   yy_count = 0;
   yy_cap = 0;
   return 1;
-}
+}}
 
-void yyerror(const char *message) {
+void yyerror(const char *message) {{
   fprintf(stderr, "%s\\n", message);
-}
+}}
 
-${epilogue}
+{epilogue}
 """
 }
 
@@ -1478,7 +1478,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
       prefix = token.value
 
       if ! output_set {
-        output = f"${prefix}.tab.c"
+        output = f"{prefix}.tab.c"
       }
     } else if token.name == "p" or token.name == "name-prefix" {
       let _ = token.value
@@ -1487,7 +1487,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
     } else if token.name == "v" or token.name == "verbose" {
       verbose = true
     } else {
-      return Err(ToolError.Failed("usage", f"unsupported option: ${token.name}"))
+      return Err(ToolError.Failed("usage", f"unsupported option: {token.name}"))
     }
   }
 
@@ -1507,7 +1507,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
 
 proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let opt = parse_options(argv)?
-  let source = fs.read_text(fp"${opt.input}")?
+  let source = fs.read_text(fp"{opt.input}")?
   let parts = source.split("%%")
 
   if parts.len() < 2 {
@@ -1523,11 +1523,11 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
 
   if unsupported != "" {
     if upstream_disabled() {
-      fs.write(fp"${opt.output}", generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)?
+      fs.write(fp"{opt.output}", generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)?
 
       if opt.defines {
         let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-        fs.write(fp"${header}", generate_linux_header(decls, tokens)?)?
+        fs.write(fp"{header}", generate_linux_header(decls, tokens)?)?
       }
 
       return
@@ -1540,16 +1540,16 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let rules = parse_rules(grammar)?
   let start = parse_start_symbol(decls, rules[0].lhs)
   let code = generate_c(tokens, rules, start, prologue, epilogue)?
-  let out = fp"${opt.output}"
+  let out = fp"{opt.output}"
   fs.write(out, code)?
 
   if opt.defines {
     let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-    fs.write(fp"${header}", generate_header(tokens)?)?
+    fs.write(fp"{header}", generate_header(tokens)?)?
   }
 
   if opt.verbose {
-    fs.write(fp"${opt.prefix}.output", generate_verbose_report(rules, start)?)?
+    fs.write(fp"{opt.prefix}.output", generate_verbose_report(rules, start)?)?
   }
 }
 

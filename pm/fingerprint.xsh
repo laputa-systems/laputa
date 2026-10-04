@@ -26,10 +26,10 @@ proc tree_entry_line(root: Path, path_value: Path, prefix: Str) [fs, error] -> R
   let label = canonical_field(rel.display())
 
   match metadata.kind {
-    "file" => return f"${prefix}\tfile\t${label}\t${metadata.mode % 4096}\t${hash.sha256(path_value)?.hex()}"
-    "symlink" => return f"${prefix}\tsymlink\t${label}\t${metadata.mode % 4096}\t${canonical_field(path_value.readlink()?.display())}"
-    "dir" => return f"${prefix}\tdir\t${label}\t${metadata.mode % 4096}"
-    _ => return f"${prefix}\t${metadata.kind}\t${label}\t${metadata.mode % 4096}\t${metadata.size}"
+    "file" => return f"{prefix}\tfile\t{label}\t{metadata.mode % 4096}\t{hash.sha256(path_value)?.hex()}"
+    "symlink" => return f"{prefix}\tsymlink\t{label}\t{metadata.mode % 4096}\t{canonical_field(path_value.readlink()?.display())}"
+    "dir" => return f"{prefix}\tdir\t{label}\t{metadata.mode % 4096}"
+    _ => return f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
   }
 }
 
@@ -55,7 +55,7 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
     return all_checksum
   }
 
-  Err(types.PmError.PackageContract(f"${source.source} has no checksum for ${arch}"))
+  Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
 }
 
 proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
@@ -83,12 +83,12 @@ proc repository_input_lines(repo_root: Path, pkg: types.Package) [fs, error] -> 
     let parsed = util.parse_source_line(source.source)?
 
     continue unless parsed.source.starts_with("repository/")
-    let relative = fp"${parsed.source.replace("repository/", "")}".normalize()
-    util.ensure_relative_path(relative, f"repository source ${parsed.source}")?
-    let input = fp"${repo_root}/${relative}"
+    let relative = fp"{parsed.source.replace("repository/", "")}".normalize()
+    util.ensure_relative_path(relative, f"repository source {parsed.source}")?
+    let input = fp"{repo_root}/{relative}"
 
     if ! fs.exists(input)? {
-      return Err(types.PmError.PackageContract(f"${pkg.name}: repository source ${parsed.source} is missing"))
+      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {parsed.source} is missing"))
     }
 
     if fs.metadata(input)?.kind == "dir" {
@@ -119,33 +119,33 @@ export proc package_build_input(
 
   var lines = [
     "format\tlaputa-package-build-input-1",
-    f"package\t${canonical_field(pkg.name)}\t${canonical_field(pkg.ver)}\t${canonical_field(pkg.rel)}",
-    f"package-kind\t${types.package_kind_text(pkg.kind)}",
-    f"target\t${types.target_text(target)}",
-    f"nostrip\t${pkg.nostrip}",
+    f"package\t{canonical_field(pkg.name)}\t{canonical_field(pkg.ver)}\t{canonical_field(pkg.rel)}",
+    f"package-kind\t{types.package_kind_text(pkg.kind)}",
+    f"target\t{types.target_text(target)}",
+    f"nostrip\t{pkg.nostrip}",
   ]
 
   for dependency in pkg.deps {
-    lines = lines.push(f"dependency\t${types.dependency_kind_text(types.dependency_runtime())}\t${canonical_field(dependency)}")
+    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}")
   }
 
   for dependency in pkg.mkdeps_host {
-    lines = lines.push(f"dependency\t${types.dependency_kind_text(types.dependency_build_host())}\t${canonical_field(dependency)}")
+    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}")
   }
 
   for dependency in pkg.mkdeps_target {
-    lines = lines.push(f"dependency\t${types.dependency_kind_text(types.dependency_build_target())}\t${canonical_field(dependency)}")
+    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_target())}\t{canonical_field(dependency)}")
   }
 
   for source in pkg.upstream_sources {
     continue unless types.pm_target_arch(target) in source.architectures or "all" in source.architectures
     lines = lines.push(
-      f"source\t${canonical_field(source.source.display())}\t${types.source_kind_text(source.kind)}\t${canonical_field(applicable_checksum(source, target)?)}",
+      f"source\t{canonical_field(source.source.display())}\t{types.source_kind_text(source.kind)}\t{canonical_field(applicable_checksum(source, target)?)}",
     )
   }
 
   for entry in pkg.filetree {
-    lines = lines.push(f"filetree\t${canonical_field(entry.path.display())}\t${types.file_kind_text(entry.kind)}")
+    lines = lines.push(f"filetree\t{canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}")
   }
 
   lines = lines.extend(package_source_lines(pkg)?)
@@ -154,10 +154,10 @@ export proc package_build_input(
 }
 
 proc pm_proof_module(pm_root: Path) [fs, error] -> Result[Str] {
-  let proof = fp"${pm_root}/pm/proof.xsh"
+  let proof = fp"{pm_root}/pm/proof.xsh"
 
   if ! fs.exists(proof)? {
-    return Err(types.PmError.PackageContract(f"${proof} is missing"))
+    return Err(types.PmError.PackageContract(f"{proof} is missing"))
   }
 
   hash.sha256(proof)?.hex()
@@ -165,23 +165,23 @@ proc pm_proof_module(pm_root: Path) [fs, error] -> Result[Str] {
 
 ## Hashes proof-only inputs independently from build inputs so an unchanged artifact can be re-proved.
 export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str] {
-  let proof = fp"${pkg.dir}/proof.xsh"
+  let proof = fp"{pkg.dir}/proof.xsh"
   let proof_sha256 = if fs.exists(proof)? { hash.sha256(proof)?.hex() } else { "missing" }
   digest_lines([
     "format\tlaputa-package-proof-input-1",
-    f"package\t${canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
-    f"proof\t${proof_sha256}",
-    f"pm-proof\t${pm_proof_module(repo_root)?}",
+    f"package\t{canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
+    f"proof\t{proof_sha256}",
+    f"pm-proof\t{pm_proof_module(repo_root)?}",
   ])?
 }
 
 ## Hashes the PM entrypoint and every implementation module below `pm/`.
 export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str] {
-  let entrypoint = fp"${pm_root}/pm.xsh"
-  let modules = fp"${pm_root}/pm"
+  let entrypoint = fp"{pm_root}/pm.xsh"
+  let modules = fp"{pm_root}/pm"
 
   if ! fs.exists(entrypoint)? or ! fs.exists(modules)? {
-    return Err(types.PmError.PackageContract(f"${pm_root} is not a PM source root"))
+    return Err(types.PmError.PackageContract(f"{pm_root} is not a PM source root"))
   }
 
   var lines = ["format\tlaputa-pm-tree-1", tree_entry_line(pm_root, entrypoint, "pm")?]
@@ -200,7 +200,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str] {
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
 export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
   if ! fs.exists(core_root)? {
-    return Err(types.PmError.PackageContract(f"${core_root} is missing"))
+    return Err(types.PmError.PackageContract(f"{core_root} is missing"))
   }
 
   var lines = ["format\tlaputa-core-tree-1"]
@@ -219,11 +219,11 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
 ## Digests an executor provenance record for receipts and repository metadata.
 export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str] {
   digest_lines([
-    f"format\t${canonical_field(value.format)}",
-    f"runner\txsh\t${canonical_field(value.xsh_sha256)}",
-    f"runner\txshi\t${canonical_field(value.xshi_sha256)}",
-    f"runner\txsht\t${canonical_field(value.xsht_sha256)}",
-    f"pm\t${canonical_field(value.pm_sha256)}",
-    f"core\t${canonical_field(value.core_sha256 ?? "none")}",
+    f"format\t{canonical_field(value.format)}",
+    f"runner\txsh\t{canonical_field(value.xsh_sha256)}",
+    f"runner\txshi\t{canonical_field(value.xshi_sha256)}",
+    f"runner\txsht\t{canonical_field(value.xsht_sha256)}",
+    f"pm\t{canonical_field(value.pm_sha256)}",
+    f"core\t{canonical_field(value.core_sha256 ?? "none")}",
   ])?
 }

@@ -10,7 +10,7 @@ use pm.store
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 pure empty_remote_snapshot() -> types.RemoteSnapshot {
@@ -19,9 +19,9 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 
 proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("execute/packages"), fp"${root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"${root}/pm")?
-  fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
+  let _ = fs.copy_tree(fixture("execute/packages"), fp"{root}/packages", parents: true, overwrite: true)?
+  fs.mkdir(fp"{root}/pm")?
+  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
   root
 }
 
@@ -41,7 +41,7 @@ proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanN
     }
   }
 
-  return Err(types.PmError.PackageContract(f"missing execute plan node ${name}"))
+  return Err(types.PmError.PackageContract(f"missing execute plan node {name}"))
 }
 
 proc receipt_named(value: types.BuildResult, name: Str) [error] -> Result[types.ArtifactReceipt] {
@@ -51,7 +51,7 @@ proc receipt_named(value: types.BuildResult, name: Str) [error] -> Result[types.
     }
   }
 
-  return Err(types.PmError.PackageContract(f"missing execute result artifact ${name}"))
+  return Err(types.PmError.PackageContract(f"missing execute result artifact {name}"))
 }
 
 proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
@@ -59,10 +59,10 @@ proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
 }
 
 proc write_execute_metapackage(repo_root: Path) [fs, error] {
-  let package = fp"${repo_root}/packages/execute-meta"
+  let package = fp"{repo_root}/packages/execute-meta"
   fs.mkdir(package)?
   fs.write(
-    fp"${package}/PKGBUILD.xsh",
+    fp"{package}/PKGBUILD.xsh",
     """##! Executor metapackage fixture without a payload proof.
 ## Package name.
 export let name = "execute-meta"
@@ -87,10 +87,10 @@ export let filetree = []
 }
 
 proc write_execute_leaf(repo_root: Path) [fs, error] {
-  let package = fp"${repo_root}/packages/execute-leaf"
+  let package = fp"{repo_root}/packages/execute-leaf"
   fs.mkdir(package)?
   fs.write(
-    fp"${package}/PKGBUILD.xsh",
+    fp"{package}/PKGBUILD.xsh",
     r"""##! Executor fixture that must not start until execute-app publishes.
 ## Package name.
 export let name = "execute-leaf"
@@ -114,18 +114,18 @@ export let filetree = [{path: p"usr/share/execute-leaf.txt", kind: "file"}]
 ## Builds only after the application payload is available.
 export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
   let root = env("LAPUTA_ROOT")?
-  let _ = fs.read_text(fp"${root}/usr/share/execute-app.txt")?
-  let target = fp"${dest}/usr/share/execute-leaf.txt"
+  let _ = fs.read_text(fp"{root}/usr/share/execute-app.txt")?
+  let target = fp"{dest}/usr/share/execute-leaf.txt"
   fs.mkdir(target.parent)?
   fs.write(target, "leaf\\n")?
 }
 """,
   )?
-  fp"${package}/proof.xsh".write(r"""
+  fp"{package}/proof.xsh".write(r"""
 error ProofError = MissingPayload
 
 proc main(root: Path = /rootfs) [fs, error] {
-  if ! fs.exists(fp"${root}/usr/share/execute-leaf.txt")? {
+  if ! fs.exists(fp"{root}/usr/share/execute-leaf.txt")? {
     return Err(ProofError.MissingPayload)
   }
 }
@@ -144,12 +144,12 @@ proc exact_remote_snapshot(
   for node in value.nodes {
     let receipt = receipt_named(result, node.name)?
     let executor_sha256 = receipt.executor_sha256
-    let tarball = fp"${remote_root}/packages/aarch64/${node.name}/${node.package_id}.tar.gz"
-    let metadata = fp"${remote_root}/metadata/aarch64/${node.name}/${node.package_id}.json"
+    let tarball = fp"{remote_root}/packages/aarch64/{node.name}/{node.package_id}.tar.gz"
+    let metadata = fp"{remote_root}/metadata/aarch64/{node.name}/{node.package_id}.json"
     fs.mkdir(tarball.parent)?
     fs.mkdir(metadata.parent)?
-    fs.copy(fp"${receipt.artifact_dir}/payload.tar.gz", tarball, overwrite: true)?
-    let raw = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+    fs.copy(fp"{receipt.artifact_dir}/payload.tar.gz", tarball, overwrite: true)?
+    let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     fs.write(metadata, json.encode({...raw, executor_sha256})? + "\n")?
     packages = packages.push({
       name: node.name,
@@ -175,7 +175,7 @@ proc exact_remote_snapshot(
 
 test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_file_modes [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "execute-metadata-wire")?
-  let metadata = fp"${root}/metadata.json"
+  let metadata = fp"{root}/metadata.json"
   let pkg: types.Package = {
     dir: root,
     name: "wire-package",
@@ -194,7 +194,7 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
   let built: types.BuiltPackage = {
     pkg,
     id: "wire-package-1.0.0-1",
-    tarball: fp"${root}/payload.tar.gz",
+    tarball: fp"{root}/payload.tar.gz",
     manifest: [p"usr/share/wire-package"],
     etcsums: [],
     metadata_sha256: payload_hash,
@@ -239,16 +239,16 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
   let repo_root = copied_execute_repository(ctx, "execute-build-repo")?
   let value = resolve_execute_plan(repo_root)?
   let object_store = execute_store(ctx, "execute-build-store")?
-  let stale = fp"${object_store}/v2/tmp/${node_named(value, "execute-app")?.artifact_key}"
+  let stale = fp"{object_store}/v2/tmp/{node_named(value, "execute-app")?.artifact_key}"
   fs.mkdir(stale)?
-  fs.write(fp"${stale}/partial", "interrupted build state")?
+  fs.write(fp"{stale}/partial", "interrupted build state")?
   let first = execute.build_plan(value, repo_root, object_store, "", 2)?
   test.eq([node.name for node in value.nodes], ["execute-dep", "execute-tool", "execute-app"])?
   test.eq([receipt.package_name for receipt in first.artifacts], ["execute-dep", "execute-tool", "execute-app"])?
   test.eq([receipt.origin for receipt in first.artifacts], [types.Built, types.Built, types.Built])?
   test.ok(fs.exists(store.artifact_path(object_store, node_named(value, "execute-app")?.artifact_key))?)?
   test.eq(fs.exists(stale)?, false)?
-  test.eq(fs.exists(fp"${repo_root}/packages/execute-app/run-package-build.xsh")?, false)?
+  test.eq(fs.exists(fp"{repo_root}/packages/execute-app/run-package-build.xsh")?, false)?
 
   # Jobs are a scheduler choice, never a build-plan or artifact-key input.
   let second = execute.build_plan(value, repo_root, object_store, "", 3)?
@@ -257,7 +257,7 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
 
 test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-x86-repo")?
-  let pkgbuild = fp"${repo_root}/packages/execute-dep/PKGBUILD.xsh"
+  let pkgbuild = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
   fs.write(
     pkgbuild,
     pkgbuild.read_text()?.replace(
@@ -265,7 +265,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
       "export let filetree = []\n## Target-specific declared output.\nexport let filetree_x86_64 = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
     ),
   )?
-  let proof = fp"${repo_root}/packages/execute-app/proof.xsh"
+  let proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     proof,
     proof.read_text()?.replace(
@@ -285,7 +285,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
 
   for receipt in result.artifacts {
     test.eq(receipt.target, types.target_x86_64())?
-    let metadata = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+    let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     test.eq(metadata.arch, "x86_64")?
   }
   test.eq([receipt.package_name for receipt in result.artifacts], ["execute-dep", "execute-tool", "execute-app"])?
@@ -298,7 +298,7 @@ test test_execute_reproofs_changed_proof_without_rebuilding_payload [fs, net, pr
   let built = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_app = node_named(initial, "execute-app")?
   let initial_receipt = receipt_named(built, "execute-app")?
-  let proof_path = fp"${repo_root}/packages/execute-app/proof.xsh"
+  let proof_path = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(proof_path, proof_path.read_text()? + "\n# proof revision only\n")?
   let reproved_plan = resolve_execute_plan(repo_root)?
   let reproved_app = node_named(reproved_plan, "execute-app")?
@@ -313,7 +313,7 @@ test test_execute_parallel_level_requires_published_dependency_receipts [fs, net
   let repo_root = copied_execute_repository(ctx, "execute-level-barrier-repo")?
   write_execute_leaf(repo_root)?
   let object_store = execute_store(ctx, "execute-level-barrier-store")?
-  let app_proof = fp"${repo_root}/packages/execute-app/proof.xsh"
+  let app_proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     app_proof,
     """error ProofError = Failed(message: Str)
@@ -351,7 +351,7 @@ test test_execute_rebuilds_changed_recipe_and_dependents [fs, net, process, env,
   let _ = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_dep = node_named(initial, "execute-dep")?
   let initial_app = node_named(initial, "execute-app")?
-  let pkgbuild = fp"${repo_root}/packages/execute-dep/PKGBUILD.xsh"
+  let pkgbuild = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
   fs.write(pkgbuild, pkgbuild.read_text()?.replace("dependency\\n", "dependency revision two\\n"))?
   let changed = resolve_execute_plan(repo_root)?
   let changed_dep = node_named(changed, "execute-dep")?
@@ -370,7 +370,7 @@ test test_execute_rebuilds_when_package_source_input_changes [fs, net, process, 
   let initial = resolve_execute_plan(repo_root)?
   let _ = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_app = node_named(initial, "execute-app")?
-  fs.write(fp"${repo_root}/packages/execute-app/files/input.txt", "source revision two\n")?
+  fs.write(fp"{repo_root}/packages/execute-app/files/input.txt", "source revision two\n")?
   let changed = resolve_execute_plan(repo_root)?
   let changed_app = node_named(changed, "execute-app")?
   test.eq(changed_app.artifact_key == initial_app.artifact_key, false)?
@@ -387,17 +387,17 @@ test test_execute_metapackage_keeps_opaque_marker_and_proves_runtime_dependencie
   let result = execute.build_plan(value, repo_root, object_store, "", 1)?
   let dependency = receipt_named(result, "execute-dep")?
   let meta = receipt_named(result, "execute-meta")?
-  let meta_metadata = json.read(fp"${meta.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+  let meta_metadata = json.read(fp"{meta.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
   let files = meta_metadata.files
 
   # No meta proof script exists. Success therefore proves the executor did not
   # attempt to extract or run the opaque marker, while its runtime dependency
   # still completed the regular proof path first.
-  test.eq(fs.read_text(fp"${meta.artifact_dir}/payload.tar.gz")?, "laputa metapackage payload marker\n")?
+  test.eq(fs.read_text(fp"{meta.artifact_dir}/payload.tar.gz")?, "laputa metapackage payload marker\n")?
   test.eq(meta_metadata.package_kind, "meta")?
   test.eq(files, [])?
-  test.ok(fs.exists(fp"${meta.artifact_dir}/proof.json")?)?
-  test.ok(fs.exists(fp"${dependency.artifact_dir}/proof.json")?)?
+  test.ok(fs.exists(fp"{meta.artifact_dir}/proof.json")?)?
+  test.ok(fs.exists(fp"{dependency.artifact_dir}/proof.json")?)?
 }
 
 test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution [fs, net, process, env, time, error] { |ctx|
@@ -412,7 +412,7 @@ test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution
   test.eq([types.plan_action_text(node.action) for node in remote_plan.nodes], ["reuse-remote", "reuse-remote", "reuse-remote"])?
 
   let imported_store = execute_store(ctx, "execute-remote-imported-store")?
-  let imported = execute.build_plan(remote_plan, repo_root, imported_store, f"file://${remote_root}", 1)?
+  let imported = execute.build_plan(remote_plan, repo_root, imported_store, f"file://{remote_root}", 1)?
   test.eq([receipt.origin for receipt in imported.artifacts], [types.Remote, types.Remote, types.Remote])?
   test.eq([receipt.key for receipt in imported.artifacts], [node.artifact_key for node in remote_plan.nodes])?
 }
@@ -420,7 +420,7 @@ test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution
 test test_execute_proof_failure_and_corrupt_final_never_publish_replacement [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-proof-failure-repo")?
   let object_store = execute_store(ctx, "execute-proof-failure-store")?
-  let proof_path = fp"${repo_root}/packages/execute-app/proof.xsh"
+  let proof_path = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     proof_path,
     """error ProofError = Failed(message: Str)
@@ -448,13 +448,13 @@ main(@args)?
   let healthy = execute.build_plan(healthy_plan, healthy_repo, healthy_store, "", 1)?
   let healthy_app = node_named(healthy_plan, "execute-app")?
   let final_dir = store.artifact_path(healthy_store, healthy_app.artifact_key)
-  fs.write(fp"${final_dir}/payload.tar.gz", "corrupt final payload")?
+  fs.write(fp"{final_dir}/payload.tar.gz", "corrupt final payload")?
 
   # Reuse trusts commit-time hashes and never overwrites a final artifact;
   # explicit Store verification is what detects the corruption.
   let reused = execute.build_plan(healthy_plan, healthy_repo, healthy_store, "", 1)?
   test.eq(reused, healthy)?
-  test.eq(fs.read_text(fp"${final_dir}/payload.tar.gz")?, "corrupt final payload")?
+  test.eq(fs.read_text(fp"{final_dir}/payload.tar.gz")?, "corrupt final payload")?
 
   match store.verify_artifact(healthy_store, healthy_app.artifact_key) {
     Ok(_) => test.fail("corrupt final artifact unexpectedly verified")?
@@ -468,7 +468,7 @@ test test_execute_records_executor_provenance_outside_artifact_keys [fs, net, pr
   let result = execute.build_plan(value, repo_root, execute_store(ctx, "execute-provenance-store")?, "", 1)?
 
   for receipt in result.artifacts {
-    let executor = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
+    let executor = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
     test.eq(executor.format, "laputa-executor-provenance-1")?
     test.eq(receipt.executor_sha256, fingerprint.executor_provenance_sha256(executor)?)?
   }
@@ -482,10 +482,10 @@ test test_execute_rejects_plan_from_another_build_epoch [fs, net, process, env, 
 
   match execute.build_plan(value, repo_root, object_store, "", 1) {
     Ok(_) => test.fail("plan from another BUILD_EPOCH unexpectedly executed")?
-    Err(problem) => { assert f"resolved at BUILD_EPOCH ${policy.BUILD_EPOCH + 1}" in problem.message }
+    Err(problem) => { assert f"resolved at BUILD_EPOCH {policy.BUILD_EPOCH + 1}" in problem.message }
   }
 
-  test.eq(fs.exists(fp"${object_store}/v2")?, false)?
+  test.eq(fs.exists(fp"{object_store}/v2")?, false)?
 }
 
 type TraceSpanDto = {file: Str}
@@ -500,7 +500,7 @@ proc sha256_calls_by_module(trace: Path) [fs, error] -> Result[Map[Int]] {
     let event = json.decode(line)?.require(TraceEventDto)?
     continue unless event.kind == "module.call" and event.name == "hash.sha256"
     let span = event.source_span
-    let module_name = if span == null { "unknown" } else { fp"${span.file}".name }
+    let module_name = if span == null { "unknown" } else { fp"{span.file}".name }
     counts[module_name] = (counts.get(module_name) ?? 0) + 1
   }
 
@@ -528,7 +528,7 @@ main(@args)?
   var runs: List[Map[Int]] = []
 
   for name in ["fresh", "reuse"] {
-    let trace = test.temp_path(ctx, name: f"execute-hash-count-${name}.jsonl")
+    let trace = test.temp_path(ctx, name: f"execute-hash-count-{name}.jsonl")
     let outcome = test.run_xsht_trace(
       ctx,
       source,

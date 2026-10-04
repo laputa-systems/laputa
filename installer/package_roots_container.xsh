@@ -11,7 +11,7 @@ pure pm_argv(args: List[Str]) -> List[Str] {
 proc run_pm(args: List[Str]) [fs, process, error] {
   let status = process.run(process.command_argv(/bin/xsh, pm_argv(args), /src/laputa))?
   if ! status.ok {
-    return Err(InstallerPackageRootsError.Failed(f"PM failed: ${args.join(" ")}"))
+    return Err(InstallerPackageRootsError.Failed(f"PM failed: {args.join(" ")}"))
   }
 }
 
@@ -60,7 +60,7 @@ pure root_args(names: List[Str]) -> List[Str] {
 }
 
 proc compose_archive(plan: Path, work: Path, label: Str, roots: List[Str]) [fs, process, error] -> Result[Path] {
-  let generation = fp"${work}/${label}-generation"
+  let generation = fp"{work}/{label}-generation"
   run_pm(
     [
       "root",
@@ -73,7 +73,7 @@ proc compose_archive(plan: Path, work: Path, label: Str, roots: List[Str]) [fs, 
       generation.display(),
     ],
   )?
-  let archive_path = fp"${work}/${label}-root.tar.gz"
+  let archive_path = fp"{work}/{label}-root.tar.gz"
   archive.tar_create(archive_path, generation, [p"."], compression: "gz")?
   archive_path
 }
@@ -91,7 +91,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   let handle = fs.tempdir()?
   defer handle.close()?
   let work = handle.host_path()?
-  let plan = fp"${work}/build-plan.json"
+  let plan = fp"{work}/build-plan.json"
   var plan_args = [
     "repo",
     "plan",
@@ -107,16 +107,16 @@ proc main(...argv: List[Str]) [fs, process, error] {
   }
 
   run_pm(plan_args)?
-  run_pm(["repo", "build", plan.display(), "--store", "/artifacts", "--jobs", f"${jobs}"])?
+  run_pm(["repo", "build", plan.display(), "--store", "/artifacts", "--jobs", f"{jobs}"])?
 
   let target_archive = compose_archive(plan, work, "target", target_roots(kernel_package, smoke))?
   let installer_archive = compose_archive(plan, work, "installer", installer_roots())?
   let tools_archive = compose_archive(plan, work, "tools", tools_roots())?
   let key = bytes.from_text(f"""installer-roots-1
-${hash.sha256(plan)?.hex()}
-${hash.sha256(target_archive)?.hex()}
-${hash.sha256(installer_archive)?.hex()}
-${hash.sha256(tools_archive)?.hex()}
+{hash.sha256(plan)?.hex()}
+{hash.sha256(target_archive)?.hex()}
+{hash.sha256(installer_archive)?.hex()}
+{hash.sha256(tools_archive)?.hex()}
 """)
     .sha256()
     .hex()

@@ -187,7 +187,7 @@ proc plan_json_node(value: NodeDto) [error] -> Result[types.PlanNode] {
     ver: value.ver,
     rel: value.rel,
     package_id: value.package_id,
-    recipe_dir: util.ensure_relative_path(fp"${value.recipe_dir}", "plan recipe directory")?,
+    recipe_dir: util.ensure_relative_path(fp"{value.recipe_dir}", "plan recipe directory")?,
     recipe_sha256: value.recipe_sha256,
     proof_sha256: value.proof_sha256,
     artifact_key: value.artifact_key,
@@ -241,7 +241,7 @@ export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan] {
   let format_field = raw.require(PlanFormatDto)?.format
 
   if format_field != build_plan.format {
-    return Err(types.PmError.PackageContract(f"unsupported build plan format ${format_field}; this PM reads ${build_plan.format}, re-run repo plan"))
+    return Err(types.PmError.PackageContract(f"unsupported build plan format {format_field}; this PM reads {build_plan.format}, re-run repo plan"))
   }
 
   let dto = raw.require(BuildPlanDto)?

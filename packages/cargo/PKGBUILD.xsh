@@ -344,22 +344,22 @@ export proc build(dest: Path) [fs, env, error] {
   let arch = rust_dist_arch(pm_util.target_arch()?)
   var cargo_src = p"cargo/cargo"
   var rustc_src = p"rustc/rustc"
-  var rust_std_src = fp"rust-std/rust-std-${arch}-unknown-linux-musl"
+  var rust_std_src = fp"rust-std/rust-std-{arch}-unknown-linux-musl"
 
   if ! fs.exists(cargo_src)? {
-    cargo_src = fp"cargo/cargo-${ver}-${arch}-unknown-linux-musl/cargo"
+    cargo_src = fp"cargo/cargo-{ver}-{arch}-unknown-linux-musl/cargo"
   }
 
   if ! fs.exists(rustc_src)? {
-    rustc_src = fp"rustc/rustc-${ver}-${arch}-unknown-linux-musl/rustc"
+    rustc_src = fp"rustc/rustc-{ver}-{arch}-unknown-linux-musl/rustc"
   }
 
   if ! fs.exists(rust_std_src)? {
-    rust_std_src = fp"rust-std/rust-std-${ver}-${arch}-unknown-linux-musl/rust-std-${arch}-unknown-linux-musl"
+    rust_std_src = fp"rust-std/rust-std-{ver}-{arch}-unknown-linux-musl/rust-std-{arch}-unknown-linux-musl"
   }
 
-  var copied = fs.copy_tree(cargo_src, fp"${dest}/usr", parents: true, overwrite: true)?
-  copied = fs.copy_tree(rustc_src, fp"${dest}/usr", parents: true, overwrite: true)?
-  copied = fs.copy_tree(rust_std_src, fp"${dest}/usr", parents: true, overwrite: true)?
+  var copied = fs.copy_tree(cargo_src, fp"{dest}/usr", parents: true, overwrite: true)?
+  copied = fs.copy_tree(rustc_src, fp"{dest}/usr", parents: true, overwrite: true)?
+  copied = fs.copy_tree(rust_std_src, fp"{dest}/usr", parents: true, overwrite: true)?
   let _ = copied
 }

@@ -44,11 +44,11 @@ pure generation_receipt_format() -> Str {
 }
 
 pure generation_overlay_config_path(overlay_root: Path) -> Path {
-  fp"${overlay_root}/overlay.json"
+  fp"{overlay_root}/overlay.json"
 }
 
 pure generation_receipt_path(output_root: Path) -> Path {
-  fp"${output_root}/var/lib/laputa/generation.json"
+  fp"{output_root}/var/lib/laputa/generation.json"
 }
 
 pure generation_empty_overlay_sha256() -> Str {
@@ -61,7 +61,7 @@ pure generation_sha256_text_is_valid(value: Str) -> Bool {
 
 proc generation_require_sha256(value: Str, label: Str) [error] {
   if ! generation_sha256_text_is_valid(value) {
-    return Err(types.PmError.PackageContract(f"${label} must be a lowercase SHA-256 digest"))
+    return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
 
@@ -85,32 +85,32 @@ pure generation_sorted_unique(values: List[Str]) -> List[Str] {
 
 proc generation_require_profile_name(value: Str) [error] {
   if value == "" or "/" in value or "\\" in value or "\n" in value {
-    return Err(types.PmError.PackageContract(f"generation profile name is invalid: ${value}"))
+    return Err(types.PmError.PackageContract(f"generation profile name is invalid: {value}"))
   }
 }
 
 proc generation_require_overlay_path(value: Str, label: Str) [error] {
   if value == "" or value == "." {
-    return Err(types.PmError.PackageContract(f"${label} must not be empty"))
+    return Err(types.PmError.PackageContract(f"{label} must not be empty"))
   }
 
-  let normalized = util.ensure_relative_path(fp"${value}", label)?
+  let normalized = util.ensure_relative_path(fp"{value}", label)?
 
   if normalized.display() != value {
-    return Err(types.PmError.PackageContract(f"${label} must be canonical and relative: ${value}"))
+    return Err(types.PmError.PackageContract(f"{label} must be canonical and relative: {value}"))
   }
 }
 
 proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
   if target == "" or target.starts_with("/") {
-    return Err(types.PmError.PackageContract(f"overlay symlink ${path_value} has an invalid target ${target}"))
+    return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
   }
 
   var depth = path_value.split("/").len() - 1
 
   for component in target.split("/") {
     if component == "" {
-      return Err(types.PmError.PackageContract(f"overlay symlink ${path_value} has an invalid target ${target}"))
+      return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
     }
 
     if component == "." {
@@ -119,7 +119,7 @@ proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
 
     if component == ".." {
       if depth == 0 {
-        return Err(types.PmError.PackageContract(f"overlay symlink ${path_value} escapes the generation: ${target}"))
+        return Err(types.PmError.PackageContract(f"overlay symlink {path_value} escapes the generation: {target}"))
       }
 
       depth -= 1
@@ -142,7 +142,7 @@ proc generation_validate_profile(value: types.GenerationProfile) [error] {
     generation_require_overlay_path(replacement, "generation profile replacement")?
 
     if replacement == "overlay.json" or replacement == "var/lib/laputa/generation.json" or replacement == "var/lib/laputa/root.json" {
-      return Err(types.PmError.PackageContract(f"generation profile may not replace reserved ${replacement}"))
+      return Err(types.PmError.PackageContract(f"generation profile may not replace reserved {replacement}"))
     }
   }
 }
@@ -150,24 +150,24 @@ proc generation_validate_profile(value: types.GenerationProfile) [error] {
 proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
   var lines = [
     "format\tlaputa-generation-fingerprint-1",
-    f"generation-format\t${generation_canonical_field(value.format)}",
-    f"target\t${types.target_text(value.target)}",
-    f"build-plan\t${value.build_plan_sha256}",
-    f"profile\t${generation_canonical_field(value.profile.name)}",
-    f"overlay\t${value.profile.overlay_sha256}",
+    f"generation-format\t{generation_canonical_field(value.format)}",
+    f"target\t{types.target_text(value.target)}",
+    f"build-plan\t{value.build_plan_sha256}",
+    f"profile\t{generation_canonical_field(value.profile.name)}",
+    f"overlay\t{value.profile.overlay_sha256}",
   ]
 
   for root in value.runtime_roots {
-    lines = lines.push(f"runtime-root\t${generation_canonical_field(root)}")
+    lines = lines.push(f"runtime-root\t{generation_canonical_field(root)}")
   }
 
   for replacement in value.profile.replacements {
-    lines = lines.push(f"replacement\t${generation_canonical_field(replacement)}")
+    lines = lines.push(f"replacement\t{generation_canonical_field(replacement)}")
   }
 
   for artifact in value.artifacts {
     lines = lines.push(
-      f"artifact\t${generation_canonical_field(artifact.package_name)}\t${generation_canonical_field(artifact.package_id)}\t${artifact.artifact_key}",
+      f"artifact\t{generation_canonical_field(artifact.package_name)}\t{generation_canonical_field(artifact.package_id)}\t{artifact.artifact_key}",
     )
   }
 
@@ -176,7 +176,7 @@ proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
 
 proc generation_validate_plan(value: types.GenerationPlan) [error] {
   if value.format != generation_format() {
-    return Err(types.PmError.PackageContract(f"unsupported generation plan format ${value.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported generation plan format {value.format}"))
   }
 
   if types.pm_target_arch(value.target) == "" {
@@ -201,10 +201,10 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
       return Err(types.PmError.PackageContract("generation artifact package identity is incomplete"))
     }
 
-    generation_require_sha256(artifact.artifact_key, f"generation artifact ${artifact.package_name} key")?
+    generation_require_sha256(artifact.artifact_key, f"generation artifact {artifact.package_name} key")?
 
     if artifact.package_name in names or artifact.artifact_key in keys {
-      return Err(types.PmError.PackageContract(f"generation plan repeats artifact ${artifact.package_name}"))
+      return Err(types.PmError.PackageContract(f"generation plan repeats artifact {artifact.package_name}"))
     }
 
     if prior_name != "" and artifact.package_name < prior_name {
@@ -218,7 +218,7 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
 
   for root in value.runtime_roots {
     if ! (root in names) {
-      return Err(types.PmError.PackageContract(f"generation runtime root ${root} is not selected"))
+      return Err(types.PmError.PackageContract(f"generation runtime root {root} is not selected"))
     }
   }
 
@@ -251,7 +251,7 @@ proc generation_runtime_artifacts(
     }
 
     if ! (name in nodes) {
-      return Err(types.PmError.MissingDependency(f"generation runtime root ${name} is not in the BuildPlan"))
+      return Err(types.PmError.MissingDependency(f"generation runtime root {name} is not in the BuildPlan"))
     }
 
     let node: types.PlanNode = nodes.get(name)?.require(types.PlanNode)?
@@ -366,7 +366,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
   let dto = json.read(config)?.require(OverlayConfigDto)?
 
   if dto.format != "laputa-generation-overlay-1" {
-    return Err(types.PmError.PackageContract(f"unsupported generation overlay format ${dto.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported generation overlay format {dto.format}"))
   }
 
   let profile = {name: dto.profile, overlay_sha256: overlay_digest(overlay_root)?, replacements: dto.replacements}
@@ -381,7 +381,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
   }
 
   if fs.metadata(overlay_root)?.kind != "dir" {
-    return Err(types.PmError.PackageContract(f"generation overlay ${overlay_root} must be a directory"))
+    return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
   var lines = ["format\tlaputa-generation-overlay-1"]
@@ -399,15 +399,15 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
-      lines = lines.push(f"file\t${generation_canonical_field(relative)}\t${mode}\t${hash.sha256(entry.path)?.hex()}")
+      lines = lines.push(f"file\t{generation_canonical_field(relative)}\t{mode}\t{hash.sha256(entry.path)?.hex()}")
     } else if metadata.kind == "dir" {
-      lines = lines.push(f"dir\t${generation_canonical_field(relative)}\t${mode}")
+      lines = lines.push(f"dir\t{generation_canonical_field(relative)}\t{mode}")
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
       generation_validate_symlink_target(relative, target)?
-      lines = lines.push(f"symlink\t${generation_canonical_field(relative)}\t${mode}\t${generation_canonical_field(target)}")
+      lines = lines.push(f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}")
     } else {
-      return Err(types.PmError.PackageContract(f"generation overlay has unsupported ${metadata.kind} ${relative}"))
+      return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }
   }
 
@@ -416,7 +416,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
 
 proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[GenerationOverlayEntry]] {
   if ! fs.exists(overlay_root)? or fs.metadata(overlay_root)?.kind != "dir" {
-    return Err(types.PmError.PackageContract(f"generation overlay ${overlay_root} must be a directory"))
+    return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
   var entries: List[GenerationOverlayEntry] = []
@@ -442,7 +442,7 @@ proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[G
       generation_validate_symlink_target(relative, target)?
       entries = entries.push({path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target})
     } else {
-      return Err(types.PmError.PackageContract(f"generation overlay has unsupported ${metadata.kind} ${relative}"))
+      return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }
   }
 
@@ -481,7 +481,7 @@ proc generation_preflight_overlay(
 
   for entry in entries {
     if entry.path == "var/lib/laputa/root.json" or entry.path == "var/lib/laputa/generation.json" {
-      return Err(types.PmError.PackageContract(f"generation overlay may not own reserved ${entry.path}"))
+      return Err(types.PmError.PackageContract(f"generation overlay may not own reserved {entry.path}"))
     }
 
     for package_entry in root_plan.entries {
@@ -493,35 +493,35 @@ proc generation_preflight_overlay(
         if package_entry.kind == types.file_kind_tree() or entry.kind == "dir" {
           return Err(
             types.PmError.PackageConflict(
-              f"generation overlay ${entry.path} has incompatible directory type or mode metadata with package ${package_entry.package_name}",
+              f"generation overlay {entry.path} has incompatible directory type or mode metadata with package {package_entry.package_name}",
             ),
           )
         }
 
         if entry.path not in profile.replacements {
-          return Err(types.PmError.PackageConflict(f"generation overlay ${entry.path} conflicts with package ${package_entry.package_name}"))
+          return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts with package {package_entry.package_name}"))
         }
 
         if ! generation_replacement_preserves_file_metadata(entry, package_entry) {
           return Err(
             types.PmError.PackageConflict(
-              f"generation overlay replacement ${entry.path} must preserve package file type and mode",
+              f"generation overlay replacement {entry.path} must preserve package file type and mode",
             ),
           )
         }
 
         used_replacements[entry.path] = true
-      } else if entry.path.starts_with(f"${package_entry.path}/") and package_entry.kind != types.file_kind_tree() {
-        return Err(types.PmError.PackageConflict(f"generation overlay ${entry.path} conflicts below package file ${package_entry.path}"))
-      } else if package_entry.path.starts_with(f"${entry.path}/") and entry.kind != "dir" {
-        return Err(types.PmError.PackageConflict(f"generation overlay ${entry.path} conflicts above package path ${package_entry.path}"))
+      } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.file_kind_tree() {
+        return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"))
+      } else if package_entry.path.starts_with(f"{entry.path}/") and entry.kind != "dir" {
+        return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts above package path {package_entry.path}"))
       }
     }
   }
 
   for replacement in profile.replacements {
     if ! (replacement in used_replacements) {
-      return Err(types.PmError.PackageContract(f"generation profile replacement ${replacement} does not replace a package file"))
+      return Err(types.PmError.PackageContract(f"generation profile replacement {replacement} does not replace a package file"))
     }
   }
 }
@@ -537,7 +537,7 @@ proc generation_store_artifacts(
     let receipt = artifact_store.lookup(store_root, artifact.artifact_key)?
 
     if receipt.target != value.target or receipt.package_name != artifact.package_name or receipt.package_id != artifact.package_id or receipt.key != artifact.artifact_key {
-      return Err(types.PmError.PackageContract(f"generation artifact ${artifact.package_name} does not match its verified Store receipt"))
+      return Err(types.PmError.PackageContract(f"generation artifact {artifact.package_name} does not match its verified Store receipt"))
     }
 
     keys[receipt.key] = true
@@ -547,7 +547,7 @@ proc generation_store_artifacts(
   for receipt in receipts {
     for dependency_key in receipt.runtime_dependency_keys {
       if ! (dependency_key in keys) {
-        return Err(types.PmError.MissingDependency(f"generation artifact ${receipt.package_name} is missing runtime artifact ${dependency_key}"))
+        return Err(types.PmError.MissingDependency(f"generation artifact {receipt.package_name} is missing runtime artifact {dependency_key}"))
       }
     }
   }
@@ -557,12 +557,12 @@ proc generation_store_artifacts(
 
 proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlayEntry]) [fs, error] {
   for entry in entries {
-    let destination = fp"${output_root}/${entry.path}"
+    let destination = fp"{output_root}/{entry.path}"
 
     if entry.kind == "dir" {
       if fs.exists(destination)? {
         if fs.metadata(destination)?.kind != "dir" {
-          return Err(types.PmError.PackageConflict(f"generation overlay directory ${entry.path} cannot replace a non-directory"))
+          return Err(types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"))
         }
       } else {
         fs.mkdir(destination)?
@@ -580,9 +580,9 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
         fs.copy(entry.source, destination)?
         fs.chmod(destination, entry.mode)?
       } else if entry.kind == "symlink" {
-        fs.symlink(fp"${entry.target}", destination)?
+        fs.symlink(fp"{entry.target}", destination)?
       } else {
-        return Err(types.PmError.PackageContract(f"generation overlay has invalid entry ${entry.path}"))
+        return Err(types.PmError.PackageContract(f"generation overlay has invalid entry {entry.path}"))
       }
     }
   }
@@ -636,7 +636,7 @@ proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
   }
 
   if value.format != generation_receipt_format() {
-    return Err(types.PmError.PackageContract(f"unsupported generation receipt format ${value.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported generation receipt format {value.format}"))
   }
 
   generation_require_sha256(value.root_sha256, "generation root_sha256")?
@@ -702,10 +702,10 @@ export proc compose(
   generation_preflight_overlay(entries, root_plan, value.profile)?
 
   if fs.exists(output_root)? {
-    return Err(types.PmError.PackageConflict(f"immutable generation ${output_root} already exists"))
+    return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 
-  let temporary = fp"${output_root}.tmp"
+  let temporary = fp"{output_root}.tmp"
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
   let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?

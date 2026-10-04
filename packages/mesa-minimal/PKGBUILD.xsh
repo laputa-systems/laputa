@@ -573,12 +573,12 @@ int gbm_bo_get_plane_count(struct gbm_bo *bo) { (void)bo; return 1; }
 }
 
 proc install_headers(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/include/EGL")?
-  fs.mkdir(fp"${dest}/usr/include/GLES2")?
-  fs.mkdir(fp"${dest}/usr/include/KHR")?
+  fs.mkdir(fp"{dest}/usr/include/EGL")?
+  fs.mkdir(fp"{dest}/usr/include/GLES2")?
+  fs.mkdir(fp"{dest}/usr/include/KHR")?
 
   fs.write(
-    fp"${dest}/usr/include/KHR/khrplatform.h",
+    fp"{dest}/usr/include/KHR/khrplatform.h",
     """#ifndef __khrplatform_h_
 #define __khrplatform_h_
 typedef signed char khronos_int8_t;
@@ -602,7 +602,7 @@ typedef float khronos_float_t;
   )?
 
   fs.write(
-    fp"${dest}/usr/include/EGL/egl.h",
+    fp"{dest}/usr/include/EGL/egl.h",
     """#ifndef __egl_h_
 #define __egl_h_
 #include <KHR/khrplatform.h>
@@ -763,7 +763,7 @@ EGLBoolean eglReleaseThread(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/EGL/eglext.h",
+    fp"{dest}/usr/include/EGL/eglext.h",
     """#ifndef __eglext_h_
 #define __eglext_h_
 #define EGL_EGLEXT_VERSION 20210604
@@ -773,7 +773,7 @@ EGLBoolean eglReleaseThread(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/EGL/eglplatform.h",
+    fp"{dest}/usr/include/EGL/eglplatform.h",
     """#ifndef __eglplatform_h_
 #define __eglplatform_h_
 #include <KHR/khrplatform.h>
@@ -782,7 +782,7 @@ EGLBoolean eglReleaseThread(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/GLES2/gl2.h",
+    fp"{dest}/usr/include/GLES2/gl2.h",
     """#ifndef __gl2_h_
 #define __gl2_h_
 #include <KHR/khrplatform.h>
@@ -984,7 +984,7 @@ void glFinish(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/GLES2/gl2ext.h",
+    fp"{dest}/usr/include/GLES2/gl2ext.h",
     """#ifndef __gl2ext_h_
 #define __gl2ext_h_
 #include <GLES2/gl2.h>
@@ -993,7 +993,7 @@ void glFinish(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/GLES2/gl2platform.h",
+    fp"{dest}/usr/include/GLES2/gl2platform.h",
     """#ifndef __gl2platform_h_
 #define __gl2platform_h_
 #include <KHR/khrplatform.h>
@@ -1002,7 +1002,7 @@ void glFinish(void);
   )?
 
   fs.write(
-    fp"${dest}/usr/include/gbm.h",
+    fp"{dest}/usr/include/gbm.h",
     """#ifndef LAPUTA_GBM_H
 #define LAPUTA_GBM_H
 #include <stdint.h>
@@ -1050,7 +1050,7 @@ int gbm_bo_get_plane_count(struct gbm_bo *bo);
 }
 
 proc install_pkg_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   for pc in [
     {
@@ -1074,17 +1074,17 @@ proc install_pkg_config(dest: Path) [fs, error] {
     let libs: Str = pc.get("libs")?
 
     fs.write(
-      fp"${dest}/usr/lib/pkgconfig/${pc_name}.pc",
+      fp"{dest}/usr/lib/pkgconfig/{pc_name}.pc",
       f"""prefix=/usr
-exec_prefix=\${{prefix}}
-libdir=\${{exec_prefix}}/lib
-includedir=\${{prefix}}/include
+exec_prefix=${{{{prefix}}}}
+libdir=${{{{exec_prefix}}}}/lib
+includedir=${{{{prefix}}}}/include
 
-Name: ${pc_name}
-Description: ${desc}
-Version: ${ver}
-Libs: -L\${{libdir}} ${libs}
-Cflags: -I\${{includedir}}
+Name: {pc_name}
+Description: {desc}
+Version: {ver}
+Libs: -L${{{{libdir}}}} {libs}
+Cflags: -I${{{{includedir}}}}
 """,
     )?
   }
@@ -1094,7 +1094,7 @@ Cflags: -I\${{includedir}}
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
   let cflags = ["-std=c99", "-Wall", "-Wextra"]
   write_sources()?
 
@@ -1144,15 +1144,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(egl.tasks.extend(gles.tasks).extend(gbm.tasks), make.jobs()?)?
-  fs.install(egl.output, fp"${dest}/usr/lib/libEGL.so.1.0.0", 0o755, parents: true, overwrite: true)?
-  fs.install(gles.output, fp"${dest}/usr/lib/libGLESv2.so.2.0.0", 0o755, parents: true, overwrite: true)?
-  fs.install(gbm.output, fp"${dest}/usr/lib/libgbm.so.1.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libEGL.so.1.0.0", fp"${dest}/usr/lib/libEGL.so.1")?
-  fs.symlink(p"libEGL.so.1.0.0", fp"${dest}/usr/lib/libEGL.so")?
-  fs.symlink(p"libGLESv2.so.2.0.0", fp"${dest}/usr/lib/libGLESv2.so.2")?
-  fs.symlink(p"libGLESv2.so.2.0.0", fp"${dest}/usr/lib/libGLESv2.so")?
-  fs.symlink(p"libgbm.so.1.0.0", fp"${dest}/usr/lib/libgbm.so.1")?
-  fs.symlink(p"libgbm.so.1.0.0", fp"${dest}/usr/lib/libgbm.so")?
+  fs.install(egl.output, fp"{dest}/usr/lib/libEGL.so.1.0.0", 0o755, parents: true, overwrite: true)?
+  fs.install(gles.output, fp"{dest}/usr/lib/libGLESv2.so.2.0.0", 0o755, parents: true, overwrite: true)?
+  fs.install(gbm.output, fp"{dest}/usr/lib/libgbm.so.1.0.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libEGL.so.1.0.0", fp"{dest}/usr/lib/libEGL.so.1")?
+  fs.symlink(p"libEGL.so.1.0.0", fp"{dest}/usr/lib/libEGL.so")?
+  fs.symlink(p"libGLESv2.so.2.0.0", fp"{dest}/usr/lib/libGLESv2.so.2")?
+  fs.symlink(p"libGLESv2.so.2.0.0", fp"{dest}/usr/lib/libGLESv2.so")?
+  fs.symlink(p"libgbm.so.1.0.0", fp"{dest}/usr/lib/libgbm.so.1")?
+  fs.symlink(p"libgbm.so.1.0.0", fp"{dest}/usr/lib/libgbm.so")?
   install_headers(dest)?
   install_pkg_config(dest)?
 }

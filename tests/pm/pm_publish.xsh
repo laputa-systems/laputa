@@ -20,7 +20,7 @@ type PublishedMetadataDto = {
 }
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 pure publish_executor_sha256() -> Str {
@@ -33,9 +33,9 @@ pure publish_empty_remote() -> types.RemoteSnapshot {
 
 proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"${root}/pm")?
-  fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
+  fs.mkdir(fp"{root}/pm")?
+  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
   root
 }
 
@@ -52,7 +52,7 @@ proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanN
     }
   }
 
-  return Err(types.PmError.PackageContract(f"missing published node ${name}"))
+  return Err(types.PmError.PackageContract(f"missing published node {name}"))
 }
 
 proc stage_plan_artifacts(
@@ -66,11 +66,11 @@ proc stage_plan_artifacts(
   let executor_sha256 = publish_executor_sha256()
 
   for node in value.nodes {
-    let staged_root = test.temp_dir(ctx, name: f"publish-stage-${node.name}")?
-    let payload = fp"${staged_root}/payload.tar.gz"
-    let metadata = fp"${staged_root}/metadata.json"
-    let proof = fp"${staged_root}/proof.json"
-    fs.write(payload, f"payload ${node.package_id}\n")?
+    let staged_root = test.temp_dir(ctx, name: f"publish-stage-{node.name}")?
+    let payload = fp"{staged_root}/payload.tar.gz"
+    let metadata = fp"{staged_root}/metadata.json"
+    let proof = fp"{staged_root}/proof.json"
+    fs.write(payload, f"payload {node.package_id}\n")?
     let payload_sha256 = hash.sha256(payload)?.hex()
     if include_package_kind {
       json.write(metadata, {
@@ -105,7 +105,7 @@ proc stage_plan_artifacts(
 
 proc expect_snapshot_error(ctx: TestContext, value: types.BuildPlan, store_root: Path, expected: Str) [fs, error] {
   match repo.snapshot(value, store_root) {
-    Ok(_) => test.fail(f"${expected}: snapshot unexpectedly succeeded")?
+    Ok(_) => test.fail(f"{expected}: snapshot unexpectedly succeeded")?
     Err(problem) => assert expected in problem.message
   }
 }
@@ -137,13 +137,13 @@ test test_snapshot_rejects_missing_unproved_and_corrupt_plan_artifacts [fs, env,
   let incomplete_store = test.temp_dir(ctx, name: "publish-incomplete-store")?
   stage_plan_artifacts(ctx, value, incomplete_store)?
   let incomplete_app = node_named(value, "app")?
-  fs.remove(fp"${store.artifact_path(incomplete_store, incomplete_app.artifact_key)}/metadata.json")?
+  fs.remove(fp"{store.artifact_path(incomplete_store, incomplete_app.artifact_key)}/metadata.json")?
   expect_snapshot_error(ctx, value, incomplete_store, "incomplete")?
 
   let corrupt_store = test.temp_dir(ctx, name: "publish-corrupt-store")?
   stage_plan_artifacts(ctx, value, corrupt_store)?
   let app = node_named(value, "app")?
-  fs.write(fp"${store.artifact_path(corrupt_store, app.artifact_key)}/payload.tar.gz", "corrupt payload")?
+  fs.write(fp"{store.artifact_path(corrupt_store, app.artifact_key)}/payload.tar.gz", "corrupt payload")?
   expect_snapshot_error(ctx, value, corrupt_store, "payload SHA-256 does not match receipt")?
 }
 
@@ -154,10 +154,10 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   let snapshot = repo.snapshot(value, store_root)?
   let remote_root = test.temp_dir(ctx, name: "publish-file-remote")?
   let work = test.temp_dir(ctx, name: "publish-file-work")?
-  let remote_url = f"file://${remote_root}"
+  let remote_url = f"file://{remote_root}"
   repo.publish(snapshot, remote_url, "", work)?
 
-  let index = remote.load_remote_index_from(fp"${remote_root}/index.json")?
+  let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
   test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "target-sdk"])?
   let app = node_named(value, "app")?
   let entry = index[0]
@@ -165,10 +165,10 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   test.eq(entry.proof_key, app.proof_key)?
   test.eq(entry.proof_sha256, app.proof_sha256)?
   test.ok(entry.metadata_sha256 != "")?
-  test.ok(fp"${remote_root}/${entry.tarball}".exists()?)?
-  test.ok(fp"${remote_root}/${entry.metadata}".exists()?)?
-  test.ok(fp"${remote_root}/${entry.proof}".exists()?)?
-  let metadata = json.read(fp"${remote_root}/${entry.metadata}")?.require(PublishedMetadataDto)?
+  test.ok(fp"{remote_root}/{entry.tarball}".exists()?)?
+  test.ok(fp"{remote_root}/{entry.metadata}".exists()?)?
+  test.ok(fp"{remote_root}/{entry.proof}".exists()?)?
+  let metadata = json.read(fp"{remote_root}/{entry.metadata}")?.require(PublishedMetadataDto)?
   assert metadata.additional_metadata.source == "recipe"
   test.eq(metadata.target, "aarch64-linux-musl")?
   test.eq(metadata.artifact_key, app.artifact_key)?
@@ -177,9 +177,9 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   test.eq(metadata.proof_key, app.proof_key)?
   test.eq(metadata.proof_sha256, app.proof_sha256)?
 
-  let first_index = fs.read_text(fp"${remote_root}/index.json")?
+  let first_index = fs.read_text(fp"{remote_root}/index.json")?
   repo.publish(snapshot, remote_url, "", work)?
-  test.eq(fs.read_text(fp"${remote_root}/index.json")?, first_index)?
+  test.eq(fs.read_text(fp"{remote_root}/index.json")?, first_index)?
 }
 
 test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, env, time, error] { |ctx|
@@ -189,28 +189,28 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   let snapshot = repo.snapshot(value, store_root)?
   let remote_root = test.temp_dir(ctx, name: "publish-conflict-remote")?
   let work = test.temp_dir(ctx, name: "publish-conflict-work")?
-  let remote_url = f"file://${remote_root}"
+  let remote_url = f"file://{remote_root}"
   let app = node_named(value, "app")?
-  let blocked_metadata = fp"${remote_root}/metadata/aarch64/${app.name}/${app.package_id}.json"
+  let blocked_metadata = fp"{remote_root}/metadata/aarch64/{app.name}/{app.package_id}.json"
   fs.mkdir(blocked_metadata.parent)?
   fs.write(blocked_metadata, "different immutable metadata")?
-  json.write(fp"${remote_root}/index.json", [])?
+  json.write(fp"{remote_root}/index.json", [])?
 
   match repo.publish(snapshot, remote_url, "", work) {
     Ok(_) => test.fail("conflicting immutable metadata unexpectedly published")?
     Err(problem) => assert "already exists with different bytes" in problem.message
   }
 
-  let unchanged_index = fs.read_text(fp"${remote_root}/index.json")?
+  let unchanged_index = fs.read_text(fp"{remote_root}/index.json")?
   test.eq(unchanged_index, "[]")?
-  test.ok(fp"${remote_root}/packages/aarch64/${app.name}/${app.package_id}.tar.gz".exists()?)?
+  test.ok(fp"{remote_root}/packages/aarch64/{app.name}/{app.package_id}.tar.gz".exists()?)?
 
   let clean_remote = test.temp_dir(ctx, name: "publish-tuple-conflict-remote")?
   let clean_work = test.temp_dir(ctx, name: "publish-tuple-conflict-work")?
-  let clean_url = f"file://${clean_remote}"
+  let clean_url = f"file://{clean_remote}"
   repo.publish(snapshot, clean_url, "", clean_work)?
-  let raw = remote.load_remote_index_from(fp"${clean_remote}/index.json")?
-  fs.write(fp"${clean_remote}/index.json", json.encode([{...raw[0], sha256: "different tuple bytes"}])? + "\n")?
+  let raw = remote.load_remote_index_from(fp"{clean_remote}/index.json")?
+  fs.write(fp"{clean_remote}/index.json", json.encode([{...raw[0], sha256: "different tuple bytes"}])? + "\n")?
 
   match repo.publish(snapshot, clean_url, "", clean_work) {
     Ok(_) => test.fail("conflicting immutable tuple unexpectedly published")?
@@ -239,12 +239,12 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
   test.ok(legacy_plan.retrieval.metadata_sha256 != "")?
 
   let legacy_remote = test.temp_dir(ctx, name: "publish-legacy-metadata-remote")?
-  let legacy_metadata = fp"${legacy_remote}/metadata/aarch64/legacy/legacy-1-1.json"
+  let legacy_metadata = fp"{legacy_remote}/metadata/aarch64/legacy/legacy-1-1.json"
   fs.mkdir(legacy_metadata.parent)?
   json.write(legacy_metadata, {name: "legacy", ver: "1", rel: "1"})?
   let hydrated_legacy = remote.plan_artifact_from_package_at_repo(
     legacy,
-    f"file://${legacy_remote}",
+    f"file://{legacy_remote}",
     test.temp_dir(ctx, name: "publish-legacy-metadata-cache")?,
   )?
   test.eq(hydrated_legacy.retrieval.metadata_sha256, hash.sha256(legacy_metadata)?.hex())?
@@ -279,8 +279,8 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
   let value = publish_plan(ctx, "publish-legacy-import-repo")?
   let node = node_named(value, "app")?
   let remote_root = test.temp_dir(ctx, name: "publish-legacy-import-remote")?
-  let payload = fp"${remote_root}/packages/aarch64/app/app-1-1.tar.gz"
-  let metadata = fp"${remote_root}/metadata/aarch64/app/app-1-1.json"
+  let payload = fp"{remote_root}/packages/aarch64/app/app-1-1.tar.gz"
+  let metadata = fp"{remote_root}/metadata/aarch64/app/app-1-1.json"
   fs.mkdir(payload.parent)?
   fs.mkdir(metadata.parent)?
   fs.write(payload, "legacy remote payload")?
@@ -300,7 +300,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
         metadata_sha256: hash.sha256(metadata)?.hex(),
       },
     },
-    f"file://${remote_root}",
+    f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-import-cache")?,
   )?
   test.eq(imported.origin, types.Remote)?
@@ -310,8 +310,8 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
   let value = publish_plan(ctx, "publish-legacy-hash-repo")?
   let node = node_named(value, "app")?
   let remote_root = test.temp_dir(ctx, name: "publish-legacy-hash-remote")?
-  let payload = fp"${remote_root}/packages/aarch64/app/app-1-1.tar.gz"
-  let metadata = fp"${remote_root}/metadata/aarch64/app/app-1-1.json"
+  let payload = fp"{remote_root}/packages/aarch64/app/app-1-1.tar.gz"
+  let metadata = fp"{remote_root}/metadata/aarch64/app/app-1-1.json"
   fs.mkdir(payload.parent)?
   fs.mkdir(metadata.parent)?
   fs.write(payload, "legacy hash payload")?
@@ -332,7 +332,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
   })?
   let hydrated = remote.plan_artifact_from_package_at_repo(
     legacy,
-    f"file://${remote_root}",
+    f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-hash-cache")?,
   )?
   test.eq(hydrated.retrieval.metadata_sha256, hash.sha256(metadata)?.hex())?
@@ -342,7 +342,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
     types.target_aarch64(),
     test.temp_dir(ctx, name: "publish-legacy-hash-store")?,
     remote_node,
-    f"file://${remote_root}",
+    f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-hash-import-cache")?,
   )?
   test.eq(imported.metadata_sha256, hydrated.retrieval.metadata_sha256)?
@@ -353,7 +353,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
     types.target_aarch64(),
     test.temp_dir(ctx, name: "publish-legacy-hash-corrupt-store")?,
     remote_node,
-    f"file://${remote_root}",
+    f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-hash-corrupt-cache")?,
   ) {
     Ok(_) => test.fail("changed legacy metadata unexpectedly imported")?
@@ -385,8 +385,8 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
   test.mock(
     ctx,
     "net.request",
-    {url: f"${local_mirror}/index.json"},
-    Ok({status: 404, reason: "Not Found", bytes: 0, headers: [], url: f"${local_mirror}/index.json", body: b""}),
+    {url: f"{local_mirror}/index.json"},
+    Ok({status: 404, reason: "Not Found", bytes: 0, headers: [], url: f"{local_mirror}/index.json", body: b""}),
   )?
   # Three immutable objects per package, then the index.
   test.mock(ctx, "net.upload", {method: "PUT"}, Ok(created), snapshot.packages.len() * 3 + 1)?

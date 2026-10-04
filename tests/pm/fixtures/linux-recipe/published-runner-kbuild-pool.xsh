@@ -7,8 +7,8 @@ proc main() [fs, process, env, time, error] {
   let source = p"/tmp/linux-kbuild-pool/source"
   let _ = fs.copy_tree(p"/src/packages/linux", recipe, parents: true, overwrite: true)?
   fs.mkdir(source)?
-  fs.write(fp"${source}/.config", "")?
-  fs.write(fp"${source}/Kbuild", "obj-y += one.o\n")?
+  fs.write(fp"{source}/.config", "")?
+  fs.write(fp"{source}/Kbuild", "obj-y += one.o\n")?
 
   env ({
     XSH_PM_SOURCE_DIR: source.display(),

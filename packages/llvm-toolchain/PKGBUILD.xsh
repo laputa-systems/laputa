@@ -233,10 +233,10 @@ proc sysroot_arg(argv: List[Str]) [env, error] -> Result[Path] {
 
 proc rooted(root: Path, rel: Str) [] -> Path {
   if root.display() == "/" {
-    return fp"/\${rel}"
+    return fp"/{rel}"
   }
 
-  fp"\${root}/\${rel}"
+  fp"{root}/{rel}"
 }
 
 proc source_like(arg: Str) [] -> Bool {
@@ -355,7 +355,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   if ! is_clang {
 env ({
-      LD_LIBRARY_PATH: f"/usr/lib:/usr/lib/llvm23/lib:/lib:\${env.get("LD_LIBRARY_PATH") ?? ""}",
+      LD_LIBRARY_PATH: f"/usr/lib:/usr/lib/llvm23/lib:/lib:{env.get("LD_LIBRARY_PATH") ?? ""}",
     }) {
       run \$real @argv ?
     } ?
@@ -371,8 +371,8 @@ env ({
   let startfiles = default_startfiles(argv)
   var exec_args = [
     "--no-default-config",
-    f"--target=\${arch}-linux-musl",
-    f"--sysroot=\${sysroot.display()}",
+    f"--target={arch}-linux-musl",
+    f"--sysroot={sysroot.display()}",
     "-resource-dir",
     resource_dir.display(),
   ]
@@ -382,7 +382,7 @@ env ({
 
     if is_cxx {
       exec_args = exec_args.extend(["-isystem", rooted(sysroot, "usr/lib/llvm23/include/c++/v1").display()])
-      let cxx_target = rooted(sysroot, f"usr/lib/llvm23/include/\${arch}-linux-musl/c++/v1")
+      let cxx_target = rooted(sysroot, f"usr/lib/llvm23/include/{arch}-linux-musl/c++/v1")
 
       if fs.exists(cxx_target)? {
         exec_args = exec_args.extend(["-isystem", cxx_target.display()])
@@ -447,7 +447,7 @@ env ({
     exec_args = exec_args.push("-lc")
   }
 
-  let builtins = rooted(sysroot, f"usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-\${arch}.a")
+  let builtins = rooted(sysroot, f"usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a")
 
   if linking and runtime and fs.exists(builtins)? {
     exec_args = exec_args.push(builtins.display())
@@ -458,7 +458,7 @@ env ({
   }
 
   env ({
-    LD_LIBRARY_PATH: f"/usr/lib:/usr/lib/llvm23/lib:/lib:\${env.get("LD_LIBRARY_PATH") ?? ""}",
+    LD_LIBRARY_PATH: f"/usr/lib:/usr/lib/llvm23/lib:/lib:{env.get("LD_LIBRARY_PATH") ?? ""}",
   }) {
     run \$real @exec_args ?
   } ?
@@ -478,7 +478,7 @@ main(@args)?
 }
 
 proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) [fs, error] {
-  let path_value = fp"${dest}/usr/bin/${wrapper_name}"
+  let path_value = fp"{dest}/usr/bin/{wrapper_name}"
   fs.mkdir(path_value.parent())?
   fs.remove(path_value, missing_ok: true)?
   fs.write(path_value, xsh_wrapper_source(real, clang, cxx))?
@@ -487,7 +487,7 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
 
 proc require_file(path_value: Path, label: Str) [fs, error] {
   if ! fs.exists(path_value)? {
-    return Err(LlvmToolchainError.Failed(f"missing ${label}: ${path_value}"))
+    return Err(LlvmToolchainError.Failed(f"missing {label}: {path_value}"))
   }
 }
 
@@ -496,25 +496,25 @@ proc require_executable(path_value: Path, label: Str) [fs, error] {
   let meta = fs.metadata(path_value)?
 
   if meta.mode % 0o1000 == 0 {
-    return Err(LlvmToolchainError.Failed(f"${label} is not executable: ${path_value}"))
+    return Err(LlvmToolchainError.Failed(f"{label} is not executable: {path_value}"))
   }
 }
 
 proc install_tool_alias(bin: Path, tool_name: Str, target: Str) [fs, error] {
-  let link = fp"${bin}/${tool_name}"
+  let link = fp"{bin}/{tool_name}"
 
   if fs.exists(link)? {
     return
   }
 
-  require_file(fp"${bin}/${target}", target)?
-  fs.symlink(fp"${target}", link)?
+  require_file(fp"{bin}/{target}", target)?
+  fs.symlink(fp"{target}", link)?
 }
 
 proc install_prebuilt_tree(dest: Path) [fs, env, error] {
   let arch = pm_util.target_arch()?
   let source = p"llvm-prebuilt"
-  let target = fp"${dest}/usr/lib/llvm23"
+  let target = fp"{dest}/usr/lib/llvm23"
 
   if ! fs.exists(source)? {
     return Err(LlvmToolchainError.Failed("missing staged LLVM prebuilt tree"))
@@ -522,7 +522,7 @@ proc install_prebuilt_tree(dest: Path) [fs, env, error] {
 
   fs.remove(target, missing_ok: true)?
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
-  let bin = fp"${target}/bin"
+  let bin = fp"{target}/bin"
   install_tool_alias(bin, "clang-23", "clang")?
   install_tool_alias(bin, "clang++", "clang")?
   install_tool_alias(bin, "ld.lld", "lld")?
@@ -540,11 +540,11 @@ proc install_prebuilt_tree(dest: Path) [fs, env, error] {
     "llvm-readelf",
     "llvm-strip",
   ] {
-    require_executable(fp"${bin}/${tool}", tool)?
+    require_executable(fp"{bin}/{tool}", tool)?
   }
 
-  require_file(fp"${target}/lib/clang/23/include/stddef.h", "Clang resource headers")?
-  require_file(fp"${target}/lib/clang/23/lib/linux/libclang_rt.builtins-${arch}.a", "compiler-rt builtins")?
+  require_file(fp"{target}/lib/clang/23/include/stddef.h", "Clang resource headers")?
+  require_file(fp"{target}/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")?
 }
 
 ## Install target-specific compiler wrapper links.
@@ -564,7 +564,7 @@ export proc install_wrappers(dest: Path) [fs, error] {
   write_wrapper(dest, "strip", /usr/lib/llvm23/bin/llvm-strip)?
 
   for tool in ["ar", "ranlib", "nm", "objcopy", "objdump", "readelf", "strip"] {
-    write_wrapper(dest, f"llvm-${tool}", fp"/usr/lib/llvm23/bin/llvm-${tool}")?
+    write_wrapper(dest, f"llvm-{tool}", fp"/usr/lib/llvm23/bin/llvm-{tool}")?
   }
 }
 

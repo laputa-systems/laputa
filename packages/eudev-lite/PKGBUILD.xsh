@@ -59,22 +59,22 @@ proc write_udev_stub() [fs, error] {
 #include <string.h>
 
 static int wants_version(int argc, char **argv)
-{{
+{{{{
     return argc >= 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0);
-}}
+}}}}
 
 int main(int argc, char **argv)
-{{
+{{{{
     const char *name = argc > 0 && argv[0] != 0 ? argv[0] : "udevadm";
     const char *base = strrchr(name, '/');
 
     if (base != 0)
         name = base + 1;
 
-    if (wants_version(argc, argv)) {{
-        printf("${ver}\\n");
+    if (wants_version(argc, argv)) {{{{
+        printf("{ver}\\n");
         return 0;
-    }}
+    }}}}
 
     if (strcmp(name, "udevd") == 0 || strcmp(name, "systemd-udevd") == 0)
         return 0;
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "%s: Laputa currently packages a minimal native udev command surface\\n", name);
     return 1;
-}}
+}}}}
 """,
   )?
 }
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
   write_udev_stub()?
 
   let udev = make.c_program({
@@ -112,11 +112,11 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(udev.tasks, make.jobs()?)?
-  fs.install(udev.output, fp"${dest}/usr/bin/udevadm", 0o755, parents: true, overwrite: true)?
-  fs.install(udev.output, fp"${dest}/usr/bin/udevd", 0o755, parents: true, overwrite: true)?
-  fs.install(udev.output, fp"${dest}/usr/lib/udev/systemd-udevd", 0o755, parents: true, overwrite: true)?
-  fs.mkdir(fp"${dest}/run")?
-  fs.mkdir(fp"${dest}/run/udev")?
-  fs.mkdir(fp"${dest}/usr/lib/udev")?
-  fs.mkdir(fp"${dest}/usr/lib/udev/rules.d")?
+  fs.install(udev.output, fp"{dest}/usr/bin/udevadm", 0o755, parents: true, overwrite: true)?
+  fs.install(udev.output, fp"{dest}/usr/bin/udevd", 0o755, parents: true, overwrite: true)?
+  fs.install(udev.output, fp"{dest}/usr/lib/udev/systemd-udevd", 0o755, parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/run")?
+  fs.mkdir(fp"{dest}/run/udev")?
+  fs.mkdir(fp"{dest}/usr/lib/udev")?
+  fs.mkdir(fp"{dest}/usr/lib/udev/rules.d")?
 }

@@ -14,9 +14,9 @@ export pure root_partuuid() -> Str {
 
 ## Build the required ARM serial console command line for a profile mode.
 export pure kernel_cmdline(mode: types.QemuMode) -> Str {
-  let base = f"earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0 ignore_loglevel devtmpfs.mount=1 root=PARTUUID=${root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
+  let base = f"earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0 ignore_loglevel devtmpfs.mount=1 root=PARTUUID={root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 
-  return f"${base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == types.Test
+  return f"{base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == types.Test
 
   base
 }
@@ -24,12 +24,12 @@ export pure kernel_cmdline(mode: types.QemuMode) -> Str {
 ## Resolve only the documented host-side QEMU configuration surface.
 export proc qemu_config(laputa_root: Path) [fs, process, env, error] -> Result[QemuConfig] {
   let raw_qemu = (env.get("QEMU_SYSTEM_AARCH64") ?? "qemu-system-aarch64").trim()
-  let qemu = if raw_qemu == "" { process.which("qemu-system-aarch64")? } else { fp"${raw_qemu}" }
+  let qemu = if raw_qemu == "" { process.which("qemu-system-aarch64")? } else { fp"{raw_qemu}" }
   let python = process.which("python3")?
-  let qmp_helper = fp"${laputa_root}/boot/qmp-proof.py"
+  let qmp_helper = fp"{laputa_root}/boot/qmp-proof.py"
 
   if ! fs.exists(qmp_helper)? {
-    return Err(types.LaputaError.Profile(f"missing QMP helper ${qmp_helper}"))
+    return Err(types.LaputaError.Profile(f"missing QMP helper {qmp_helper}"))
   }
 
   {qemu, python, qmp_helper}
@@ -55,7 +55,7 @@ export pure qemu_command_argv(
     "-cpu",
     profile.qemu_cpu,
     "-smp",
-    f"${profile.qemu_smp}",
+    f"{profile.qemu_smp}",
     "-m",
     profile.qemu_memory,
     "-kernel",
@@ -63,7 +63,7 @@ export pure qemu_command_argv(
     "-append",
     kernel_cmdline(mode),
     "-drive",
-    f"if=none,id=root,format=raw,file=${outputs.disk},snapshot=on",
+    f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on",
     "-device",
     "virtio-blk-device,drive=root",
     "-netdev",
@@ -71,7 +71,7 @@ export pure qemu_command_argv(
     "-device",
     "virtio-net-pci,netdev=net0",
     "-device",
-    f"virtio-gpu-pci,xres=${profile.qemu_width},yres=${profile.qemu_height}",
+    f"virtio-gpu-pci,xres={profile.qemu_width},yres={profile.qemu_height}",
     "-device",
     "virtio-keyboard-pci",
     "-device",
@@ -79,7 +79,7 @@ export pure qemu_command_argv(
     "-device",
     "virtio-mouse-pci",
     "-qmp",
-    f"unix:${outputs.qmp_socket},server,nowait",
+    f"unix:{outputs.qmp_socket},server,nowait",
     "-display",
     display,
     "-serial",
@@ -111,7 +111,7 @@ proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p""
   }
 
   let status = process.run(process.command_argv(value.python, argv))?
-  return Err(types.LaputaError.Docker(f"QMP ${mode} helper failed")) unless status.ok
+  return Err(types.LaputaError.Docker(f"QMP {mode} helper failed")) unless status.ok
 }
 
 # Retry idempotent QMP readiness or screenshot requests while QEMU publishes
@@ -129,7 +129,7 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
     }
   }
 
-  return Err(types.LaputaError.Docker(f"QMP ${mode} helper did not become ready"))
+  return Err(types.LaputaError.Docker(f"QMP {mode} helper did not become ready"))
 }
 
 ## Combine QEMU's serial console and stderr log before scanning proof markers:
@@ -137,8 +137,8 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
 export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Result[Str] {
   let console = if fs.exists(console_log)? { fs.read_text(console_log)? } else { "" }
   let qemu = if fs.exists(qemu_log)? { fs.read_text(qemu_log)? } else { "" }
-  f"""${console}
-${qemu}"""
+  f"""{console}
+{qemu}"""
 }
 
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
@@ -147,7 +147,7 @@ export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool] {
 }
 
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
-  f"console=${outputs.console_log}; qemu-log=${outputs.qemu_log}; screenshot=${outputs.screenshot}"
+  f"console={outputs.console_log}; qemu-log={outputs.qemu_log}; screenshot={outputs.screenshot}"
 }
 
 ## Run a bounded headless proof, inject input through QMP, and validate its output.
@@ -181,7 +181,7 @@ export proc run_test(
     if failed != "" {
       qemu_stop(launched)?
       return Err(
-        types.LaputaError.Profile(f"QEMU proof failed with ${failed}; inspect ${qemu_output_locations(outputs)}"),
+        types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
@@ -204,7 +204,7 @@ export proc run_test(
       proof.verify_console(final_log)?
       if ! screenshot_is_valid(outputs.screenshot)? {
         return Err(
-          types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect ${qemu_output_locations(outputs)}"),
+          types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
         )
       }
 
@@ -215,7 +215,7 @@ export proc run_test(
     if elapsed >= 180 {
       qemu_stop(launched)?
       return Err(
-        types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"),
+        types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
@@ -228,11 +228,11 @@ export proc run_test(
   match proof.verify_console(final_log) {
     Ok(_) => return Err(
       types.LaputaError.Profile(
-        f"QEMU exited after guest proof before supervisor completion; inspect ${qemu_output_locations(outputs)}",
+        f"QEMU exited after guest proof before supervisor completion; inspect {qemu_output_locations(outputs)}",
       ),
     )
     Err(_) => return Err(
-      types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect ${qemu_output_locations(outputs)}"),
+      types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
     )
   }
 }

@@ -18,9 +18,9 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
 
       if varname in defines {
         let value = defines.get(varname)?
-        out_lines = out_lines.push(f"#define ${varname} ${value}")
+        out_lines = out_lines.push(f"#define {varname} {value}")
       } else {
-        out_lines = out_lines.push(f"/* #undef ${varname} */")
+        out_lines = out_lines.push(f"/* #undef {varname} */")
       }
     } else {
       out_lines = out_lines.push(line)
@@ -41,7 +41,7 @@ export proc substitute(in_path: Path, out_path: Path, vars: List[List[Str]]) [fs
   for pair in vars {
     let key = pair[0]
     let value = pair[1]
-    content = content.replace(f"@${key}@", value)
+    content = content.replace(f"@{key}@", value)
   }
 
   fs.mkdir(out_path.parent)?

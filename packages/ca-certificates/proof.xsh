@@ -8,16 +8,16 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 }
 
 proc verify_package_metadata(rootfs: Path) [fs, error] {
-  let metadata_path = fp"${rootfs}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
+  let metadata_path = fp"{rootfs}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
   ensure(fs.exists(metadata_path)?, "ca-certificates-metadata", "missing package metadata")?
   let metadata = json.read(metadata_path)?.require(Record)?
   let deps = metadata.get("deps")?.require(List[Str])?
-  ensure(deps.len() == 0, "ca-certificates-deps", f"expected no runtime deps, got ${deps.join(" ")}")?
+  ensure(deps.len() == 0, "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")?
 }
 
 proc main(rootfs: Path = /rootfs) [fs, error] {
-  let bundle = fp"${rootfs}/etc/ssl/certs/ca-certificates.crt"
-  let helper = fp"${rootfs}/usr/bin/update-certdata"
+  let bundle = fp"{rootfs}/etc/ssl/certs/ca-certificates.crt"
+  let helper = fp"{rootfs}/usr/bin/update-certdata"
   ensure(fs.exists(bundle)?, "ca-certificates-bundle", "missing /etc/ssl/certs/ca-certificates.crt")?
   ensure(fs.executable(helper)?, "ca-certificates-helper", "missing executable /usr/bin/update-certdata")?
   let body = bundle.read_text()?
@@ -31,7 +31,7 @@ proc main(rootfs: Path = /rootfs) [fs, error] {
   )?
 
   verify_package_metadata(rootfs)?
-  print f"ca-certificates ok: ${cert_count} PEM certificates"
+  print f"ca-certificates ok: {cert_count} PEM certificates"
 }
 
 main(@args)?

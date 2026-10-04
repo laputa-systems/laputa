@@ -137,7 +137,7 @@ proc current_pm_repo_root() [fs, error] -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
-    if fs.exists(fp"${dir}/pm.xsh")? and fs.exists(fp"${dir}/packages")? {
+    if fs.exists(fp"{dir}/pm.xsh")? and fs.exists(fp"{dir}/packages")? {
       return dir
     }
 
@@ -178,7 +178,7 @@ proc resolve_repo_root(raw: Str) [fs, error] -> Result[Path] {
     return repo_default_root()?
   }
 
-  path.absolute(fp"${raw}")?
+  path.absolute(fp"{raw}")?
 }
 
 proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[RepoPackagesArgs] {
@@ -197,7 +197,7 @@ proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[Re
   }
 
   if parsed.packages.len() == 0 {
-    return Err(types.PmError.Usage(f"${command} requires one-or-more PACKAGE arguments"))
+    return Err(types.PmError.Usage(f"{command} requires one-or-more PACKAGE arguments"))
   }
 
   {repo: resolve_repo_root(parsed.repo)?, packages: parsed.packages}
@@ -212,7 +212,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   let args = tail_after(argv, 2)
 
   if action not in ["check", "plan", "show", "build", "publish", "checksum", "update-checksums"] {
-    return Err(types.PmError.Usage(f"unknown pm repo command ${action}"))
+    return Err(types.PmError.Usage(f"unknown pm repo command {action}"))
   }
 
   if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
@@ -293,7 +293,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     }
     "checksum" => return RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
     "update-checksums" => return RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
-    _ => return Err(types.PmError.Usage(f"unknown pm repo command ${action}"))
+    _ => return Err(types.PmError.Usage(f"unknown pm repo command {action}"))
   }
 }
 
@@ -303,7 +303,7 @@ proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   }
 
   if argv[1] != "fetch" {
-    return Err(types.PmError.Usage(f"unknown pm sources command ${argv[1]}"))
+    return Err(types.PmError.Usage(f"unknown pm sources command {argv[1]}"))
   }
 
   let args = tail_after(argv, 2)
@@ -354,7 +354,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
   let args = tail_after(argv, 2)
 
   if action not in ["compose", "inspect"] {
-    return Err(types.PmError.Usage(f"unknown pm root command ${action}"))
+    return Err(types.PmError.Usage(f"unknown pm root command {action}"))
   }
 
   if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
@@ -417,7 +417,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   if argv[1] != "verify" {
-    return Err(types.PmError.Usage(f"unknown pm store command ${argv[1]}"))
+    return Err(types.PmError.Usage(f"unknown pm store command {argv[1]}"))
   }
 
   var parsed: StoreVerifyOptions = {store: p""}
@@ -438,7 +438,7 @@ proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     "sources" => parse_sources_command(argv)?
     "root" => parse_root_command(argv)?
     "store" => parse_store_command(argv)?
-    _ => return Err(types.PmError.Usage(f"unknown pm command ${argv[0]}"))
+    _ => return Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
   }
 }
 
@@ -476,15 +476,15 @@ proc selected_packages(repo_root: Path, names: List[Str]) [fs, env, error] -> Re
 
   for name in names {
     if name in seen {
-      return Err(types.PmError.Usage(f"package ${name} was selected more than once"))
+      return Err(types.PmError.Usage(f"package {name} was selected more than once"))
     }
 
     if ! (name in by_name) {
-      return Err(types.PmError.MissingDependency(f"package ${name} is not in ${repo_root}"))
+      return Err(types.PmError.MissingDependency(f"package {name} is not in {repo_root}"))
     }
 
     let listed: types.Package = by_name.get(name)?.require(types.Package)?
-    selected = selected.push(recipe.load_package(fp"${repo_root}/${listed.dir}")?)
+    selected = selected.push(recipe.load_package(fp"{repo_root}/{listed.dir}")?)
     seen[name] = true
   }
 
@@ -574,7 +574,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
     } else {
       for name in args.packages {
         if ! (name in by_name) {
-          return Err(types.PmError.MissingDependency(f"package ${name} is not in ${args.repo}"))
+          return Err(types.PmError.MissingDependency(f"package {name} is not in {args.repo}"))
         }
 
         selected = selected.push(by_name.get(name)?.require(types.Package)?)
@@ -623,7 +623,7 @@ proc command_store_verify(args: StoreVerifyArgs) [fs, error] {
 
 proc command_store_extract(args: StoreExtractArgs) [fs, error] {
   pm_generation_adapter.generation_adapter_copy_manifest_file(args.input, args.store, args.package, args.path, args.output)?
-  print f"store extract ${args.package} ${args.path}"
+  print f"store extract {args.package} {args.path}"
 }
 
 proc handle(command: PmCommand) [fs, net, process, env, time, error] {

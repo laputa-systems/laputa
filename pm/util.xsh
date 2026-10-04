@@ -3,52 +3,52 @@ use types
 
 ## Exported PM declaration `package_id`.
 export pure package_id(name: Str, ver: Str, rel: Str) -> Str {
-  f"${name}-${ver}-${rel}"
+  f"{name}-{ver}-{rel}"
 }
 
 ## Exported PM declaration `version_id`.
 export pure version_id(ver: Str, rel: Str) -> Str {
-  f"${ver}-${rel}"
+  f"{ver}-{rel}"
 }
 
 ## Exported PM declaration `packages_db_path`.
 export pure packages_db_path(root: Path) -> Path {
-  fp"${root}/var/lib/xsh-pm/packages"
+  fp"{root}/var/lib/xsh-pm/packages"
 }
 
 ## Exported PM declaration `package_db_path`.
 export pure package_db_path(root: Path, name: Str) -> Path {
-  fp"${packages_db_path(root)}/${name}"
+  fp"{packages_db_path(root)}/{name}"
 }
 
 ## Exported PM declaration `remote_index_cache_path`.
 export pure remote_index_cache_path(out: Path) -> Path {
-  fp"${out}/remote-index.json"
+  fp"{out}/remote-index.json"
 }
 
 ## Exported PM declaration `remote_tarball_name`.
 export pure remote_tarball_name(name: Str, ver: Str, rel: Str) -> Str {
-  f"${package_id(name, ver, rel)}.tar.gz"
+  f"{package_id(name, ver, rel)}.tar.gz"
 }
 
 ## Exported PM declaration `remote_binary_rel`.
 export pure remote_binary_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"packages/${arch}/${name}/${remote_tarball_name(name, ver, rel)}"
+  fp"packages/{arch}/{name}/{remote_tarball_name(name, ver, rel)}"
 }
 
 ## Exported PM declaration `remote_metadata_name`.
 export pure remote_metadata_name(name: Str, ver: Str, rel: Str) -> Str {
-  f"${package_id(name, ver, rel)}.json"
+  f"{package_id(name, ver, rel)}.json"
 }
 
 ## Exported PM declaration `remote_metadata_rel`.
 export pure remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"metadata/${arch}/${name}/${remote_metadata_name(name, ver, rel)}"
+  fp"metadata/{arch}/{name}/{remote_metadata_name(name, ver, rel)}"
 }
 
 ## Exported PM declaration `remote_proof_rel`.
 export pure remote_proof_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"proofs/${arch}/${name}/${remote_metadata_name(name, ver, rel)}"
+  fp"proofs/{arch}/{name}/{remote_metadata_name(name, ver, rel)}"
 }
 
 ## Exported PM declaration `ensure_relative_path`.
@@ -57,12 +57,12 @@ export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path] {
   let text = normalized.display()
 
   if text.starts_with("/") {
-    return Err(types.PmError.SourceDestination(f"${label} must stay relative: ${path_value}"))
+    return Err(types.PmError.SourceDestination(f"{label} must stay relative: {path_value}"))
   }
 
   for component in text.split("/") {
     if component == ".." {
-      return Err(types.PmError.SourceDestination(f"${label} must stay relative: ${path_value}"))
+      return Err(types.PmError.SourceDestination(f"{label} must stay relative: {path_value}"))
     }
   }
 
@@ -76,17 +76,17 @@ export pure is_file_url(url: Str) -> Bool {
 
 ## Exported PM declaration `file_url_path`.
 export pure file_url_path(url: Str) -> Result[Path] {
-  fp"${url.replace("file://", "")}"
+  fp"{url.replace("file://", "")}"
 }
 
 ## Exported PM declaration `repo_file_path`.
 export pure repo_file_path(repo: Str, rel: Path) -> Result[Path] {
-  fp"${file_url_path(repo)?}/${ensure_relative_path(rel, "repo path")?}"
+  fp"{file_url_path(repo)?}/{ensure_relative_path(rel, "repo path")?}"
 }
 
 ## Exported PM declaration `repo_url_for`.
 export pure repo_url_for(repo: Str, rel: Path) -> Result[Str] {
-  f"${repo}/${ensure_relative_path(rel, "repo path")?.display()}"
+  f"{repo}/{ensure_relative_path(rel, "repo path")?.display()}"
 }
 
 ## Exported PM declaration `is_tar_source`.
@@ -120,7 +120,7 @@ export pure is_url_source(source: Str) -> Bool {
 
 ## The file name a URL source stages under, without query or fragment.
 export pure source_basename(source: Str) -> Result[Str] {
-  let parsed_path = fp"${source.split("#")[0].split("?")[0]}"
+  let parsed_path = fp"{source.split("#")[0].split("?")[0]}"
   return parsed_path.name
 }
 
@@ -130,13 +130,13 @@ export pure parse_source_line(raw: Path) -> Result[types.SourceLine] {
   let spaced = raw_text.split(" => ")
 
   if spaced.len() > 1 {
-    return {source: spaced[0].trim(), dest: fp"${spaced[1].trim()}"}
+    return {source: spaced[0].trim(), dest: fp"{spaced[1].trim()}"}
   }
 
   let tight = raw_text.split("=>")
 
   if tight.len() > 1 {
-    return {source: tight[0].trim(), dest: fp"${tight[1].trim()}"}
+    return {source: tight[0].trim(), dest: fp"{tight[1].trim()}"}
   }
 
   return {source: raw_text, dest: p"."}
@@ -150,7 +150,7 @@ export pure source_stage_dir(src: Path, line: types.SourceLine) -> Path {
     return src
   }
 
-  return fp"${src}/${dest}"
+  return fp"{src}/{dest}"
 }
 
 ## Exported PM declaration `goarch_for`.
@@ -189,7 +189,7 @@ export pure expand_source_placeholders(source: Str, values: Map[Str]) -> Str {
 
     if index + 1 < words.len() {
       let next = words[index + 1]
-      let joined = f"${word.text}_${next.text}"
+      let joined = f"{word.text}_{next.text}"
 
       if next.start == word.end + 1 and source.byte_slice(word.end, 1) == "_" and joined in values {
         name = joined
@@ -221,8 +221,8 @@ export pure source_placeholder_values(pkg: types.Package, arch: Str, build: Str)
     PATCH: parts.get(2) ?? "",
     IDENT: parts.get(3) ?? "",
     PACKAGE: pkg.name,
-    TARGET_TRIPLE: f"${arch}-linux-musl",
-    BUILD_TRIPLE: f"${build}-linux-musl",
+    TARGET_TRIPLE: f"{arch}-linux-musl",
+    BUILD_TRIPLE: f"{build}-linux-musl",
     TARGET_GOARCH: goarch_for(arch),
     BUILD_GOARCH: goarch_for(build),
     TARGET_ARCH: arch,
@@ -254,10 +254,10 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
     let source = file_url_path(url)?
 
     if ! fs.exists(source)? {
-      return f"${url}: missing file"
+      return f"{url}: missing file"
     }
 
-    let partial = fp"${dest.parent}/.${dest.name}.partial"
+    let partial = fp"{dest.parent}/.{dest.name}.partial"
     fs.copy(source, partial, overwrite: true)?
     fs.rename(partial, dest, overwrite: true)?
     return ""
@@ -274,7 +274,7 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
     fail_status: true,
   }) {
     Ok(_) => ""
-    Err(problem) => f"${url}: ${problem.message}"
+    Err(problem) => f"{url}: {problem.message}"
   }
 }
 

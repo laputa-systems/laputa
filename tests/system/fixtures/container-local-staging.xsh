@@ -10,9 +10,9 @@ proc main() [fs, process, error] {
   defer fs.remove(workspace, missing_ok: true)?
   defer fs.remove(output, missing_ok: true)?
 
-  let root = fp"${workspace}/generation"
-  let upper = fp"${root}/usr/include/linux/netfilter/xt_CONNMARK.h"
-  let lower = fp"${root}/usr/include/linux/netfilter/xt_connmark.h"
+  let root = fp"{workspace}/generation"
+  let upper = fp"{root}/usr/include/linux/netfilter/xt_CONNMARK.h"
+  let lower = fp"{root}/usr/include/linux/netfilter/xt_connmark.h"
   fs.mkdir(upper.parent)?
   fs.write(
     upper,
@@ -31,17 +31,17 @@ proc main() [fs, process, error] {
     return error.fail("container-local generation did not retain both case-distinct Linux headers")
   }
 
-  let staged_rootfs = fp"${workspace}/rootfs.ext4"
+  let staged_rootfs = fp"{workspace}/rootfs.ext4"
   image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, staged_rootfs)?
 
   if ! fs.exists(staged_rootfs)? or fs.metadata(staged_rootfs)?.size <= 0 {
     return error.fail("container-local image was not produced from the staged generation")
   }
 
-  let final_rootfs = fp"${output}/rootfs.ext4"
+  let final_rootfs = fp"{output}/rootfs.ext4"
   container_output.publish_final_file(staged_rootfs, final_rootfs)?
 
-  if ! fs.exists(final_rootfs)? or fs.exists(fp"${output}/generation")? or fs.exists(fp"${output}/generations")? {
+  if ! fs.exists(final_rootfs)? or fs.exists(fp"{output}/generation")? or fs.exists(fp"{output}/generations")? {
     return error.fail("host output contains staging state instead of only final image artifacts")
   }
 

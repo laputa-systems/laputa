@@ -14,7 +14,7 @@ proc package_arch() [env, error] -> Result[Str] {
     return arch
   }
 
-  return Err(kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch ${arch}"))
+  return Err(kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {arch}"))
 }
 
 pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
@@ -27,7 +27,7 @@ pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
   }
 
   return Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch ${package_arch_value}"),
+    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -41,7 +41,7 @@ pure kernel_config_fragments_for(package_arch_value: Str) -> Result[List[Path]] 
   }
 
   return Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch ${package_arch_value}"),
+    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -55,7 +55,7 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
   }
 
   return Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch ${package_arch_value}"),
+    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -71,7 +71,7 @@ proc install_headers_from(root: Path, source: Path, target: Path) [fs, error] {
 
     fs.install(
       entry.path,
-      fp"${root}/${target}/${header_rel}",
+      fp"{root}/{target}/{header_rel}",
       0o644,
       parents: true,
       overwrite: true,
@@ -83,8 +83,8 @@ proc install_uapi_headers(dest: Path, srcarch: Str) [fs, error] {
   install_headers_from(dest, p"include/uapi/linux", p"usr/include/linux")?
   install_headers_from(dest, p"include/generated/uapi/linux", p"usr/include/linux")?
   install_headers_from(dest, p"include/uapi/asm-generic", p"usr/include/asm-generic")?
-  install_headers_from(dest, fp"arch/${srcarch}/include/uapi/asm", p"usr/include/asm")?
-  install_headers_from(dest, fp"arch/${srcarch}/include/generated/uapi/asm", p"usr/include/asm")?
+  install_headers_from(dest, fp"arch/{srcarch}/include/uapi/asm", p"usr/include/asm")?
+  install_headers_from(dest, fp"arch/{srcarch}/include/generated/uapi/asm", p"usr/include/asm")?
 }
 
 proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, env, time, error] {
@@ -101,7 +101,7 @@ proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, en
   return Err(
     kbuild.ScriptError.Failed(
       "linux-native-kbuild-unsupported-arch",
-      f"native scratch Kbuild final link is only implemented for arm64 and x86; ${srcarch} needs new arch support",
+      f"native scratch Kbuild final link is only implemented for arm64 and x86; {srcarch} needs new arch support",
     ),
   )
 }
@@ -110,10 +110,10 @@ proc build_cc() [fs, process, env, error] -> Result[Path] {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
 
   if root != "" {
-    let cc = fp"${root}/usr/bin/cc"
+    let cc = fp"{root}/usr/bin/cc"
 
     if ! fs.exists(cc)? {
-      return Err(kbuild.ScriptError.Failed("linux-build-cc", f"missing build-root compiler: ${cc}"))?
+      return Err(kbuild.ScriptError.Failed("linux-build-cc", f"missing build-root compiler: {cc}"))?
     }
 
     return cc
@@ -140,9 +140,9 @@ proc main(dest: Path) [fs, process, env, time, error] {
   PKGBUILD_shared.timing_done("kbuild", kbuild_start)
   let install_start = PKGBUILD_shared.timing_start("install")
   let image = kernel_image_for(arch)?
-  fs.install(image, fp"${dest}/boot/vmlinuz-${version}", 0o644, parents: true, overwrite: true)?
-  fs.install(image, fp"${dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)?
-  fs.install(p".config", fp"${dest}/usr/share/linux/config-${version}", 0o644, parents: true, overwrite: true)?
+  fs.install(image, fp"{dest}/boot/vmlinuz-{version}", 0o644, parents: true, overwrite: true)?
+  fs.install(image, fp"{dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)?
+  fs.install(p".config", fp"{dest}/usr/share/linux/config-{version}", 0o644, parents: true, overwrite: true)?
   install_uapi_headers(dest, srcarch)?
   PKGBUILD_shared.timing_done("install", install_start)
   PKGBUILD_shared.timing_done("package-total", package_start)

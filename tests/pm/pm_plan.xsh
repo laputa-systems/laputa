@@ -8,7 +8,7 @@ use pm.plan_json
 use pm.policy
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 proc copied_package(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.Package] {
@@ -31,7 +31,7 @@ test test_package_build_fingerprint_is_repeatable_and_ignores_mtime [fs, env, er
   let pkg = copied_package(ctx, "fingerprint-repeat")?
   let first = build_input(pkg)?
   test.eq(build_input(pkg)?, first)?
-  let helper = fp"${pkg.dir}/helper.xsh"
+  let helper = fp"{pkg.dir}/helper.xsh"
   fs.write(helper, helper.read_text()?)?
   test.eq(build_input(pkg)?, first)?
 }
@@ -53,7 +53,7 @@ test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx
 test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-pkgbuild")?
   let first = build_input(pkg)?
-  let pkgbuild = fp"${pkg.dir}/PKGBUILD.xsh"
+  let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
   fs.write(pkgbuild, pkgbuild.read_text()?.replace("1.0.0", "1.0.1"))?
   test.eq(build_input(pkg)? == first, false)?
 }
@@ -61,21 +61,21 @@ test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx
 test test_package_build_fingerprint_changes_for_helper_module [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-helper")?
   let first = build_input(pkg)?
-  fs.write(fp"${pkg.dir}/helper.xsh", "changed helper\n")?
+  fs.write(fp"{pkg.dir}/helper.xsh", "changed helper\n")?
   test.eq(build_input(pkg)? == first, false)?
 }
 
 test test_package_build_fingerprint_changes_for_files_tree [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-files")?
   let first = build_input(pkg)?
-  fs.write(fp"${pkg.dir}/files/input.txt", "changed input\n")?
+  fs.write(fp"{pkg.dir}/files/input.txt", "changed input\n")?
   test.eq(build_input(pkg)? == first, false)?
 }
 
 test test_package_build_fingerprint_changes_for_service [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-service")?
   let first = build_input(pkg)?
-  fs.write(fp"${pkg.dir}/service.xsh", "changed service\n")?
+  fs.write(fp"{pkg.dir}/service.xsh", "changed service\n")?
   test.eq(build_input(pkg)? == first, false)?
 }
 
@@ -83,7 +83,7 @@ test test_proof_fingerprint_is_independent_from_build_input [fs, env, error] { |
   let pkg = copied_package(ctx, "fingerprint-proof")?
   let build_before = build_input(pkg)?
   let proof_before = fingerprint.package_proof_input(p".", pkg)?
-  fs.write(fp"${pkg.dir}/proof.xsh", "changed proof\n")?
+  fs.write(fp"{pkg.dir}/proof.xsh", "changed proof\n")?
   test.eq(build_input(pkg)?, build_before)?
   test.eq(fingerprint.package_proof_input(p".", pkg)? == proof_before, false)?
 }
@@ -91,15 +91,15 @@ test test_proof_fingerprint_is_independent_from_build_input [fs, env, error] { |
 test test_pm_tree_fingerprint_changes_for_implementation [fs, error] { |ctx|
   let root = copied_executor(ctx)?
   let first = fingerprint.pm_tree(root)?
-  fs.write(fp"${root}/pm/build.xsh", "changed implementation\n")?
+  fs.write(fp"{root}/pm/build.xsh", "changed implementation\n")?
   test.eq(fingerprint.pm_tree(root)? == first, false)?
 }
 
 test test_core_tree_fingerprint_changes_for_applet [fs, error] { |ctx|
   let root = copied_executor(ctx)?
-  let first = fingerprint.core_tree(fp"${root}/core")?
-  fs.write(fp"${root}/core/applet.xsh", "changed applet\n")?
-  test.eq(fingerprint.core_tree(fp"${root}/core")? == first, false)?
+  let first = fingerprint.core_tree(fp"{root}/core")?
+  fs.write(fp"{root}/core/applet.xsh", "changed applet\n")?
+  test.eq(fingerprint.core_tree(fp"{root}/core")? == first, false)?
 }
 
 test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { |ctx|
@@ -114,9 +114,9 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 
 proc copied_plan_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"${root}/pm")?
-  fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
+  fs.mkdir(fp"{root}/pm")?
+  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
   root
 }
 
@@ -135,10 +135,10 @@ proc resolve_plan(
 pure retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    tarball: f"packages/aarch64/${name}/${name}-${ver}-${rel}.tar.gz",
-    tarball_sha256: f"payload-${name}-${ver}-${rel}",
-    metadata: f"metadata/aarch64/${name}/${name}-${ver}-${rel}.json",
-    metadata_sha256: f"metadata-${name}-${ver}-${rel}",
+    tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
+    tarball_sha256: f"payload-{name}-{ver}-{rel}",
+    metadata: f"metadata/aarch64/{name}/{name}-{ver}-{rel}.json",
+    metadata_sha256: f"metadata-{name}-{ver}-{rel}",
   }
 }
 
@@ -149,10 +149,10 @@ pure plan_test_sha256(value: Str) -> Str {
 pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    tarball: f"packages/aarch64/${name}/${name}-${ver}-${rel}.tar.gz",
-    tarball_sha256: plan_test_sha256(f"legacy payload ${name}-${ver}-${rel}"),
-    metadata: f"metadata/aarch64/${name}/${name}-${ver}-${rel}.json",
-    metadata_sha256: plan_test_sha256(f"legacy metadata ${name}-${ver}-${rel}"),
+    tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
+    tarball_sha256: plan_test_sha256(f"legacy payload {name}-{ver}-{rel}"),
+    metadata: f"metadata/aarch64/{name}/{name}-{ver}-{rel}.json",
+    metadata_sha256: plan_test_sha256(f"legacy metadata {name}-{ver}-{rel}"),
   }
 }
 
@@ -183,7 +183,7 @@ proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanN
     }
   }
 
-  return Err(types.PmError.PackageContract(f"missing plan node ${name}"))
+  return Err(types.PmError.PackageContract(f"missing plan node {name}"))
 }
 
 pure snapshot_replace(
@@ -195,7 +195,7 @@ pure snapshot_replace(
 }
 
 proc expect_plan_rejection(ctx: TestContext, value: types.BuildPlan, expected: Str) [fs, error] {
-  let path_value = fp"${test.temp_dir(ctx, name: "invalid-plan")?}/plan.json"
+  let path_value = fp"{test.temp_dir(ctx, name: "invalid-plan")?}/plan.json"
   plan_json.write_plan(path_value, value)?
   let raw = json.read(path_value)?.require(plan_json.BuildPlanDto)?
   let nodes = raw.nodes
@@ -203,7 +203,7 @@ proc expect_plan_rejection(ctx: TestContext, value: types.BuildPlan, expected: S
   fs.write(path_value, json.encode(duplicate)?)?
 
   match plan_json.read(path_value) {
-    Ok(_) => test.fail(f"${expected}: malformed plan unexpectedly loaded")?
+    Ok(_) => test.fail(f"{expected}: malformed plan unexpectedly loaded")?
     Err(problem) => { assert expected in problem.message }
   }
 }
@@ -358,7 +358,7 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
     Ok(_) => test.fail("same-kind duplicate dependency unexpectedly validated")?
     Err(problem) => {
       let problem_message = problem.message
-      assert f"repeats ${types.dependency_kind_text(app.dependencies[0].kind)} dependency ${app.dependencies[0].name}" in problem_message
+      assert f"repeats {types.dependency_kind_text(app.dependencies[0].kind)} dependency {app.dependencies[0].name}" in problem_message
     }
   }
 }
@@ -385,8 +385,8 @@ test test_build_plan_rebuilds_dependents_of_rebuilt_dependencies [fs, env, error
 
 test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |ctx|
   let value = resolve_plan(plan_catalog(ctx, "plan-json")?, ["app"], empty_remote_snapshot())?
-  let path_value = fp"${test.temp_dir(ctx, name: "plan-json-out")?}/basic-aarch64.json"
-  let repeat_path = fp"${test.temp_dir(ctx, name: "plan-json-repeat")?}/basic-aarch64.json"
+  let path_value = fp"{test.temp_dir(ctx, name: "plan-json-out")?}/basic-aarch64.json"
+  let repeat_path = fp"{test.temp_dir(ctx, name: "plan-json-repeat")?}/basic-aarch64.json"
   plan_json.write_plan(path_value, value)?
   plan_json.write_plan(repeat_path, value)?
   test.eq(plan_json.read(path_value)?, value)?
@@ -415,7 +415,7 @@ test test_build_plan_json_rejects_duplicate_nodes [fs, env, error] { |ctx|
 
 test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ctx|
   let value = resolve_plan(plan_catalog(ctx, "plan-dependency-key")?, ["app"], empty_remote_snapshot())?
-  let path_value = fp"${test.temp_dir(ctx, name: "plan-dependency-key")?}/plan.json"
+  let path_value = fp"{test.temp_dir(ctx, name: "plan-dependency-key")?}/plan.json"
   plan_json.write_plan(path_value, value)?
   let raw = json.read(path_value)?.require(plan_json.BuildPlanDto)?
   let original_nodes = raw.nodes

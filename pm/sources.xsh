@@ -13,14 +13,14 @@ pure sources_is_repository_input(source: Str) -> Bool {
 
 proc sources_repository_input_path(source: Str) [fs, env, error] -> Result[Path] {
   let root = (env.get("XSH_PM_REPOSITORY_ROOT") ?? "").trim()
-  let relative = fp"${source.replace("repository/", "")}".normalize()
+  let relative = fp"{source.replace("repository/", "")}".normalize()
 
   if root == "" {
-    return Err(types.PmError.PackageContract(f"repository source ${source} needs XSH_PM_REPOSITORY_ROOT"))
+    return Err(types.PmError.PackageContract(f"repository source {source} needs XSH_PM_REPOSITORY_ROOT"))
   }
 
-  let _ = util.ensure_relative_path(relative, f"repository source ${source}")?
-  fp"${root}/${relative}"
+  let _ = util.ensure_relative_path(relative, f"repository source {source}")?
+  fp"{root}/{relative}"
 }
 
 ## Exported PM declaration `ensure_source_dest`.
@@ -36,7 +36,7 @@ export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> 
     }
   }
 
-  Err(types.PmError.SourceChecksum(f"no checksum for ${source.source} on ${arch}"))
+  Err(types.PmError.SourceChecksum(f"no checksum for {source.source} on {arch}"))
 }
 
 # URL sources are content-addressed: `make fetch` (`pm sources fetch`) is the
@@ -52,10 +52,10 @@ export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path] 
   let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
 
   if configured != "" {
-    return path.absolute(fp"${configured}")?
+    return path.absolute(fp"{configured}")?
   }
 
-  fp"${repo_root}/.cache/sources"
+  fp"{repo_root}/.cache/sources"
 }
 
 # Builds name their package repository through XSH_PM_REPOSITORY_ROOT, the same
@@ -68,12 +68,12 @@ proc build_source_cache_root() [fs, env, error] -> Result[Path] {
     return Err(types.PmError.SourceNotFound("URL sources need LAPUTA_SOURCE_CACHE or XSH_PM_REPOSITORY_ROOT to locate the source cache"))
   }
 
-  source_cache_root(fp"${repo_root}")?
+  source_cache_root(fp"{repo_root}")?
 }
 
 ## The cache entry for one sha256, the layout the local mirror serves at `/sources/sha256/<hash>`.
 export pure source_cache_entry(root: Path, sha256: Str) -> Path {
-  fp"${root}/sha256/${sha256}"
+  fp"{root}/sha256/{sha256}"
 }
 
 ## The local mirror URL for one cached source.
@@ -84,17 +84,17 @@ export pure mirror_source_url(mirror: Str, sha256: Str) -> Str {
     base = base.byte_slice(0, base.byte_len() - 1)
   }
 
-  f"${base}/sources/sha256/${sha256}"
+  f"{base}/sources/sha256/{sha256}"
 }
 
 ## Validates the pin a URL source is cached under. `SKIP` is only for repository-local sources.
 export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Result[Str] {
   if checksum == "SKIP" {
-    return Err(types.PmError.SourceChecksum(f"${package_name} URL source ${url} must pin a sha256; SKIP is only for repository-local sources"))
+    return Err(types.PmError.SourceChecksum(f"{package_name} URL source {url} must pin a sha256; SKIP is only for repository-local sources"))
   }
 
   if ! sha256_hex.matches(checksum) {
-    return Err(types.PmError.SourceChecksum(f"${package_name} URL source ${url} has a malformed sha256 ${checksum}"))
+    return Err(types.PmError.SourceChecksum(f"{package_name} URL source {url} has a malformed sha256 {checksum}"))
   }
 
   checksum
@@ -106,18 +106,18 @@ export enum SourceFetchOutcome { Cached, Fetched(Int), Unavailable(Str), Mismatc
 ## Downloads `url` into the cache entry for `sha256`, publishing only verified bytes.
 export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome] {
   let entry = source_cache_entry(root, sha256)
-  let partial_dir = fp"${root}/partial"
+  let partial_dir = fp"{root}/partial"
   fs.mkdir(entry.parent)?
   fs.mkdir(partial_dir)?
   # Packages built in parallel can share one source, so one writer fills an entry.
-  let lock = fs.lock(fp"${partial_dir}/${sha256}.lock")?
+  let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
   defer fs.unlock(lock)?
 
   if fs.exists(entry)? {
     return Cached
   }
 
-  let partial = fp"${partial_dir}/${sha256}"
+  let partial = fp"{partial_dir}/{sha256}"
   fs.remove(partial, missing_ok: true)?
   defer fs.remove(partial, missing_ok: true)?
   let failure = util.download_file(url, partial)?
@@ -129,7 +129,7 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   let actual = hash.sha256(partial)?.hex()
 
   if actual != sha256 {
-    return Mismatch(f"${url}: expected sha256 ${sha256}, got ${actual}")
+    return Mismatch(f"{url}: expected sha256 {sha256}, got {actual}")
   }
 
   let size = fs.metadata(partial)?.size
@@ -150,15 +150,15 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, en
 
   if mirror == "" {
     return Err(
-      types.PmError.SourceNotFound(f"${package_name} source ${url} (sha256 ${sha256}) is not in the source cache ${root}; run `make fetch`, or set LAPUTA_MIRROR to a local mirror that serves it"),
+      types.PmError.SourceNotFound(f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root}; run `make fetch`, or set LAPUTA_MIRROR to a local mirror that serves it"),
     )
   }
 
   match fill_source_cache_entry(root, sha256, mirror_source_url(mirror, sha256))? {
     Cached => entry
     Fetched(_) => entry
-    Unavailable(detail) => Err(types.PmError.DownloadFailed(f"${package_name} source ${url} (sha256 ${sha256}) is not in the source cache ${root} or the mirror: ${detail}; run `make fetch`"))
-    Mismatch(detail) => Err(types.PmError.SourceChecksum(f"${package_name} source ${url} from the mirror: ${detail}"))
+    Unavailable(detail) => Err(types.PmError.DownloadFailed(f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root} or the mirror: {detail}; run `make fetch`"))
+    Mismatch(detail) => Err(types.PmError.SourceChecksum(f"{package_name} source {url} from the mirror: {detail}"))
   }
 }
 
@@ -178,20 +178,20 @@ export proc resolve_source(
   let source = util.expand_source(line.source, pkg, arch, build)
 
   if source == "" {
-    return Err(types.PmError.SourceName(f"${pkg.name} has an empty source"))
+    return Err(types.PmError.SourceName(f"{pkg.name} has an empty source"))
   }
 
   if util.is_url_source(source) {
     let name = util.source_basename(source)?
 
     if name == "" {
-      return Err(types.PmError.SourceName(f"URL has no file name: ${source}"))
+      return Err(types.PmError.SourceName(f"URL has no file name: {source}"))
     }
 
     return {path: resolve_url_source(pkg.name, source, checksum)?, kind: "file", name}
   }
 
-  let source_path = fp"${source}"
+  let source_path = fp"{source}"
   var local = source_path
 
   if sources_is_repository_input(source) {
@@ -200,11 +200,11 @@ export proc resolve_source(
     # Recipe-local paths are durable package inputs, including explicit parent
     # inputs such as laputa-pm's checked-in PM entrypoint.  Normalize after
     # anchoring to the typed recipe directory so no process cwd participates.
-    local = fp"${pkg.dir}/${source_path}".normalize()
+    local = fp"{pkg.dir}/{source_path}".normalize()
   }
 
   if ! fs.exists(local)? {
-    return Err(types.PmError.SourceNotFound(f"${pkg.name} source not found: ${source}"))
+    return Err(types.PmError.SourceNotFound(f"{pkg.name} source not found: {source}"))
   }
 
   let metadata = fs.metadata(local)?
@@ -218,7 +218,7 @@ export proc verify_source_checksum(source_path: Path, checksum: Str, kind: Str) 
   }
 
   if kind == "dir" or kind == "git" {
-    return Err(types.PmError.SourceChecksum(f"${source_path} must use SKIP because it is not a regular file"))
+    return Err(types.PmError.SourceChecksum(f"{source_path} must use SKIP because it is not a regular file"))
   }
 
   hash.verify_file(source_path, sha256: checksum)?
@@ -270,7 +270,7 @@ proc stage_resolved_source(
   src: Path,
 ) [fs, error] {
   let source_path = resolved.path
-  let name = fp"${resolved.name}"
+  let name = fp"{resolved.name}"
   verify_source_checksum(source_path, checksum, resolved.kind)?
   let dest = util.source_stage_dir(src, line)
 
@@ -302,7 +302,7 @@ proc stage_resolved_source(
   }
 
   fs.mkdir(dest)?
-  fs.install(source_path, fp"${dest}/${name}", 0o644, parents: true, overwrite: true)?
+  fs.install(source_path, fp"{dest}/{name}", 0o644, parents: true, overwrite: true)?
 }
 
 ## Resolves every source the target architecture selects, then stages them into `src`.
@@ -357,22 +357,22 @@ export proc prepare_package_source_tree(pkg: types.Package, src: Path) [fs, net,
 # pin has no cache entry yet. The downloaded bytes enter the cache under the
 # digest they produce, so the next build finds them.
 proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) [fs, net, error] -> Result[Str] {
-  let partial_dir = fp"${cache_root}/partial"
+  let partial_dir = fp"{cache_root}/partial"
   fs.mkdir(partial_dir)?
   let scratch = fs.tempdir()?
   defer scratch.close()?
-  let download = fp"${scratch.host_path()?}/download"
+  let download = fp"{scratch.host_path()?}/download"
   let failure = util.download_file(url, download)?
 
   if failure != "" {
-    return Err(types.PmError.DownloadFailed(f"${package_name}: ${failure}"))
+    return Err(types.PmError.DownloadFailed(f"{package_name}: {failure}"))
   }
 
   let digest = hash.sha256(download)?.hex()
   let entry = source_cache_entry(cache_root, digest)
 
   if ! fs.exists(entry)? {
-    let partial = fp"${partial_dir}/${digest}.checksum"
+    let partial = fp"{partial_dir}/{digest}.checksum"
     fs.mkdir(entry.parent)?
     fs.copy(download, partial, overwrite: true)?
     fs.rename(partial, entry, overwrite: true)?
@@ -421,7 +421,7 @@ export proc collect_checksum_updates(
 ) [fs, net, env, error] -> Result[List[types.ChecksumUpdate]] {
   let arch = util.machine_arch()?
   let generated = generate_checksums_for(cache_root, pkg, arch)?
-  [{field: f"upstream_sources:${arch}", values: generated}]
+  [{field: f"upstream_sources:{arch}", values: generated}]
 }
 
 ## Exported PM declaration `write_checksum_field`.
@@ -429,14 +429,14 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
   let field_parts = field.split(":")
 
   if field_parts.len() != 2 or field_parts[0] != "upstream_sources" {
-    return Err(types.PmError.ChecksumField(f"unsupported checksum field ${field}"))
+    return Err(types.PmError.ChecksumField(f"unsupported checksum field {field}"))
   }
 
   let arch = field_parts[1]
-  let pkgbuild = fp"${pkg.dir}/PKGBUILD.xsh"
+  let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
   let body = fs.read_text(pkgbuild)?
   let lines = body.split("\n")
-  let has_arch_specific = f"arch: \"${arch}\"" in body
+  let has_arch_specific = f"arch: \"{arch}\"" in body
   var output = []
   var in_sources = false
   var found = false
@@ -454,10 +454,10 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
     if in_sources {
       if trimmed == "]" {
         in_sources = false
-      } else if (f"arch: \"${arch}\"" in line or (! has_arch_specific and "arch: \"all\"" in line)) and "sha256: \"" in line {
+      } else if (f"arch: \"{arch}\"" in line or (! has_arch_specific and "arch: \"all\"" in line)) and "sha256: \"" in line {
         if value_index >= values.len() {
           return Err(
-            types.PmError.ChecksumField(f"${pkgbuild} has fewer ${arch} checksum entries than expected"),
+            types.PmError.ChecksumField(f"{pkgbuild} has fewer {arch} checksum entries than expected"),
           )
         }
 
@@ -465,7 +465,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
         let parts = line.split(marker)
         let old = (parts.get(1) ?? "").split("\"").get(0) ?? ""
         let value = values.get(value_index)?
-        output = output.push(line.replace(f"${old}\"", f"${value}\""))
+        output = output.push(line.replace(f"{old}\"", f"{value}\""))
         value_index += 1
         found = true
         continue
@@ -476,7 +476,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
   }
 
   if ! found or value_index != values.len() {
-    return Err(types.PmError.ChecksumField(f"${pkgbuild} has no complete ${arch} checksum field"))
+    return Err(types.PmError.ChecksumField(f"{pkgbuild} has no complete {arch} checksum field"))
   }
 
   fs.write_atomic(pkgbuild, output.join("\n"))?
@@ -507,7 +507,7 @@ export proc source_fetch_items(packages: List[types.Package], arch: Str) [error]
     }
   }
 
-  by_sha256.values() |> sort-by { |item| f"${item.packages[0]}\t${item.urls[0]}" }
+  by_sha256.values() |> sort-by { |item| f"{item.packages[0]}\t{item.urls[0]}" }
 }
 
 # A dead host or a transient failure gets a few spaced retries. A checksum
@@ -556,14 +556,14 @@ proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error]
 }
 
 pure source_fetch_label(item: SourceFetchItem) -> Str {
-  f"${item.packages.join(",")} ${item.urls[0]}"
+  f"{item.packages.join(",")} {item.urls[0]}"
 }
 
 ## Downloads every item missing from the cache with at most four transfers in
 ## flight, verifies each sha256, and reports every dead URL and checksum
 ## mismatch together before failing.
 export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, time, error] {
-  fs.mkdir(fp"${root}/sha256")?
+  fs.mkdir(fp"{root}/sha256")?
 
   # par-map workers do not forward stdout, so progress goes to flushed stderr.
   let results = items |> par-map(jobs: 4) { |item|
@@ -592,8 +592,8 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
         fetched += 1
         fetched_bytes += size
       }
-      Unavailable(detail) => failures = failures.push(f"dead ${result.item.packages.join(",")}: ${detail}")
-      Mismatch(detail) => failures = failures.push(f"mismatch ${result.item.packages.join(",")}: ${detail}")
+      Unavailable(detail) => failures = failures.push(f"dead {result.item.packages.join(",")}: {detail}")
+      Mismatch(detail) => failures = failures.push(f"mismatch {result.item.packages.join(",")}: {detail}")
     }
   }
 
@@ -604,6 +604,6 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
   }
 
   if failures.len() > 0 {
-    return Err(types.PmError.DownloadFailed(f"${failures.len()} pinned source(s) could not be fetched"))
+    return Err(types.PmError.DownloadFailed(f"{failures.len()} pinned source(s) could not be fetched"))
   }
 }

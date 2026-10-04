@@ -40,34 +40,34 @@ proc write_file(path_value: Path, text: Str) [fs, error] {
 
 export proc build(dest: Path) [fs, error] -> Result[Unit] {
   write_file(
-    fp"${dest}/etc/inittab",
+    fp"{dest}/etc/inittab",
     """::sysinit:/usr/lib/init/rc.boot
 ::shutdown:/usr/lib/init/rc.shutdown
 """,
   )?
 
   write_file(
-    fp"${dest}/etc/rc.conf",
+    fp"{dest}/etc/rc.conf",
     """HOSTNAME=laputa
 """,
   )?
 
   write_file(
-    fp"${dest}/usr/lib/init/rc.boot",
+    fp"{dest}/usr/lib/init/rc.boot",
     """#!/bin/xsh
 print "boot"
 """,
   )?
 
   write_file(
-    fp"${dest}/usr/lib/init/rc.shutdown",
+    fp"{dest}/usr/lib/init/rc.shutdown",
     """#!/bin/xsh
 print "shutdown"
 """,
   )?
 
   write_file(
-    fp"${dest}/usr/lib/init/rc.lib",
+    fp"{dest}/usr/lib/init/rc.lib",
     """#!/bin/xsh
 export proc rc_log(...parts: List[Str]) {
   print parts.join(" ")

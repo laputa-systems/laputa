@@ -95,7 +95,7 @@ pure c_string(text: Str) -> Str {
 }
 
 proc write_pnp_table(root: Str) [fs, error] {
-  let pnp = fp"${root}/usr/share/hwdata/pnp.ids"
+  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
   var records: List[PnpRecord] = []
 
   for line in pnp.read_text()?.split("\n") {
@@ -115,7 +115,7 @@ proc write_pnp_table(root: Str) [fs, error] {
   records = records |> sort-by .id
 
   var cases = [
-    f"    if (strcmp(key, \"${c_string(entry.id)}\") == 0) return \"${c_string(entry.name)}\";"
+    f"    if (strcmp(key, \"{c_string(entry.id)}\") == 0) return \"{c_string(entry.name)}\";"
     for entry in records
   ]
 
@@ -130,10 +130,10 @@ pnp_id_table(const char *key);
 
 const char *
 pnp_id_table(const char *key)
-{{
-${case_text}
+{{{{
+{case_text}
     return NULL;
-}}
+}}}}
 """,
   )?
 }
@@ -170,7 +170,7 @@ subdir('test')
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let root = env.get("LAPUTA_ROOT") ?? "/"
   patch_generators(root)?

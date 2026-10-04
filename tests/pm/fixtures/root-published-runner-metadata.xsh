@@ -11,15 +11,15 @@ proc main() [fs, error] {
   let workspace = p"/tmp/laputa-root-published-metadata"
   fs.remove(workspace, missing_ok: true)?
   defer fs.remove(workspace, missing_ok: true)?
-  let stage = fp"${workspace}/stage"
-  let contents = fp"${stage}/contents"
-  let payload = fp"${stage}/payload.tar.gz"
-  let metadata = fp"${stage}/metadata.json"
-  let proof = fp"${stage}/proof.json"
-  let store_root = fp"${workspace}/store"
-  fs.mkdir(fp"${contents}/usr/bin", parents: true)?
-  fs.write(fp"${contents}/usr/bin/demo", "published root metadata\n")?
-  fs.chmod(fp"${contents}/usr/bin/demo", 0o755)?
+  let stage = fp"{workspace}/stage"
+  let contents = fp"{stage}/contents"
+  let payload = fp"{stage}/payload.tar.gz"
+  let metadata = fp"{stage}/metadata.json"
+  let proof = fp"{stage}/proof.json"
+  let store_root = fp"{workspace}/store"
+  fs.mkdir(fp"{contents}/usr/bin", parents: true)?
+  fs.write(fp"{contents}/usr/bin/demo", "published root metadata\n")?
+  fs.chmod(fp"{contents}/usr/bin/demo", 0o755)?
   # This is the legacy remote metadata shape: it has an exact payload inventory
   # but predates `package_kind` and its package DB was appended to the archive.
   fs.write(
@@ -44,12 +44,12 @@ proc main() [fs, error] {
       }],
     })? + "\n",
   )?
-  let database = fp"${contents}/var/lib/xsh-pm/packages/demo"
+  let database = fp"{contents}/var/lib/xsh-pm/packages/demo"
   fs.mkdir(database, parents: true)?
-  fs.write(fp"${database}/manifest.json", json.encode(["usr/bin/demo"])?)?
-  fs.write(fp"${database}/etcsums.json", json.encode([])?)?
+  fs.write(fp"{database}/manifest.json", json.encode(["usr/bin/demo"])?)?
+  fs.write(fp"{database}/etcsums.json", json.encode([])?)?
   fs.write(
-    fp"${database}/metadata.json",
+    fp"{database}/metadata.json",
     json.encode({
       name: "demo",
       ver: "1.0.0",
@@ -90,15 +90,15 @@ proc main() [fs, error] {
   # Distinct payloads may both declare the same structural directories. The
   # receipt keeps the lexically first package as their single deterministic
   # owner, while the path-specific metadata must still agree exactly.
-  let shared_alpha_stage = fp"${workspace}/shared-alpha"
-  let shared_alpha_contents = fp"${shared_alpha_stage}/contents"
-  let shared_alpha_payload = fp"${shared_alpha_stage}/payload.tar.gz"
-  let shared_alpha_metadata = fp"${shared_alpha_stage}/metadata.json"
-  let shared_alpha_proof = fp"${shared_alpha_stage}/proof.json"
-  fs.mkdir(fp"${shared_alpha_contents}/usr/share", parents: true)?
-  fs.chmod(fp"${shared_alpha_contents}/usr", 0o755)?
-  fs.chmod(fp"${shared_alpha_contents}/usr/share", 0o755)?
-  fs.write(fp"${shared_alpha_contents}/usr/share/alpha", "alpha\n")?
+  let shared_alpha_stage = fp"{workspace}/shared-alpha"
+  let shared_alpha_contents = fp"{shared_alpha_stage}/contents"
+  let shared_alpha_payload = fp"{shared_alpha_stage}/payload.tar.gz"
+  let shared_alpha_metadata = fp"{shared_alpha_stage}/metadata.json"
+  let shared_alpha_proof = fp"{shared_alpha_stage}/proof.json"
+  fs.mkdir(fp"{shared_alpha_contents}/usr/share", parents: true)?
+  fs.chmod(fp"{shared_alpha_contents}/usr", 0o755)?
+  fs.chmod(fp"{shared_alpha_contents}/usr/share", 0o755)?
+  fs.write(fp"{shared_alpha_contents}/usr/share/alpha", "alpha\n")?
   archive.tar_create(shared_alpha_payload, shared_alpha_contents, [p"."], compression: "gz")?
   fs.write(
     shared_alpha_metadata,
@@ -137,15 +137,15 @@ proc main() [fs, error] {
     {payload: shared_alpha_payload, payload_sha256: hash.sha256(shared_alpha_payload)?.hex(), metadata: shared_alpha_metadata, proof: shared_alpha_proof, executor_sha256: digest("published executor")},
   )?
 
-  let shared_beta_stage = fp"${workspace}/shared-beta"
-  let shared_beta_contents = fp"${shared_beta_stage}/contents"
-  let shared_beta_payload = fp"${shared_beta_stage}/payload.tar.gz"
-  let shared_beta_metadata = fp"${shared_beta_stage}/metadata.json"
-  let shared_beta_proof = fp"${shared_beta_stage}/proof.json"
-  fs.mkdir(fp"${shared_beta_contents}/usr/share", parents: true)?
-  fs.chmod(fp"${shared_beta_contents}/usr", 0o755)?
-  fs.chmod(fp"${shared_beta_contents}/usr/share", 0o755)?
-  fs.write(fp"${shared_beta_contents}/usr/share/beta", "beta\n")?
+  let shared_beta_stage = fp"{workspace}/shared-beta"
+  let shared_beta_contents = fp"{shared_beta_stage}/contents"
+  let shared_beta_payload = fp"{shared_beta_stage}/payload.tar.gz"
+  let shared_beta_metadata = fp"{shared_beta_stage}/metadata.json"
+  let shared_beta_proof = fp"{shared_beta_stage}/proof.json"
+  fs.mkdir(fp"{shared_beta_contents}/usr/share", parents: true)?
+  fs.chmod(fp"{shared_beta_contents}/usr", 0o755)?
+  fs.chmod(fp"{shared_beta_contents}/usr/share", 0o755)?
+  fs.write(fp"{shared_beta_contents}/usr/share/beta", "beta\n")?
   archive.tar_create(shared_beta_payload, shared_beta_contents, [p"."], compression: "gz")?
   fs.write(
     shared_beta_metadata,
@@ -189,11 +189,11 @@ proc main() [fs, error] {
     or [entry.package_name for entry in shared_directories.entries if entry.kind == types.file_kind_tree()] != ["shared-alpha", "shared-alpha"] {
     return error.fail("published root preflight did not coalesce identical shared directories")
   }
-  let shared_output = fp"${workspace}/shared-root"
+  let shared_output = fp"{workspace}/shared-root"
   let shared_receipt = root.compose_artifacts(shared_output, shared_directories, [shared_beta, shared_alpha])?
 
-  if fp"${shared_output}/usr/share/alpha".read_text()? != "alpha\n"
-    or fp"${shared_output}/usr/share/beta".read_text()? != "beta\n" {
+  if fp"{shared_output}/usr/share/alpha".read_text()? != "alpha\n"
+    or fp"{shared_output}/usr/share/beta".read_text()? != "beta\n" {
     return error.fail("published root composition did not merge preflighted payload files")
   }
 

@@ -15,7 +15,7 @@ pure remote_auth_headers(token: Str) -> List[NetHeader] {
     return []
   }
 
-  [{name: "Authorization", value: f"Bearer ${token}"}]
+  [{name: "Authorization", value: f"Bearer {token}"}]
 }
 
 ## Copies one repository object to `dest`; returns the failure text, or "" on success.
@@ -40,7 +40,7 @@ export proc net_put_file(url: Str, source: Path, token: Str) [net, error] {
   })?
 
   if response.status < 200 or response.status >= 300 {
-    return Err(types.PmError.RemoteUpload(f"failed to upload ${source.name}"))
+    return Err(types.PmError.RemoteUpload(f"failed to upload {source.name}"))
   }
 }
 
@@ -74,10 +74,10 @@ export proc upload_immutable_repo_file(repo: Str, rel: Path, source: Path, token
     }
 
     if response.status == 409 or response.status == 412 {
-      return Err(types.PmError.PackageConflict(f"immutable remote object ${rel} already exists"))
+      return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists"))
     }
 
-    return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object ${rel}: HTTP ${response.status}"))
+    return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object {rel}: HTTP {response.status}"))
   }
 
   let dest = util.repo_file_path(repo, rel)?
@@ -87,10 +87,10 @@ export proc upload_immutable_repo_file(repo: Str, rel: Path, source: Path, token
       return false
     }
 
-    return Err(types.PmError.PackageConflict(f"immutable remote object ${rel} already exists with different bytes"))
+    return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
   }
 
-  let temporary = fp"${dest.parent}/.${dest.name}.tmp"
+  let temporary = fp"{dest.parent}/.{dest.name}.tmp"
   fs.mkdir(dest.parent)?
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
@@ -132,7 +132,7 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) [fs, net, error] -> R
   }
 
   if response.status < 200 or response.status >= 300 {
-    return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP ${response.status}"))
+    return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP {response.status}"))
   }
 
   let body = response.body.utf8()?
@@ -225,7 +225,7 @@ export proc write_remote_index_to_repo(
 
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, p"index.json")?
-    let temporary = fp"${dest.parent}/.${dest.name}.tmp"
+    let temporary = fp"{dest.parent}/.{dest.name}.tmp"
     fs.mkdir(dest.parent)?
     fs.remove(temporary, missing_ok: true)?
     defer fs.remove(temporary, missing_ok: true)?
@@ -266,27 +266,27 @@ export proc upsert_remote_package(
 pure legacy_snapshot_digest(value: types.RemotePackage) -> Str {
   var lines = [
     "format\tlaputa-legacy-remote-entry-1",
-    f"arch\t${value.arch}",
-    f"name\t${value.name}",
-    f"ver\t${value.ver}",
-    f"rel\t${value.rel}",
-    f"sha256\t${value.sha256}",
-    f"tarball\t${value.tarball}",
-    f"metadata\t${value.metadata}",
-    f"source-sha256\t${value.source_sha256}",
-    f"metapackage\t${value.metapackage}",
+    f"arch\t{value.arch}",
+    f"name\t{value.name}",
+    f"ver\t{value.ver}",
+    f"rel\t{value.rel}",
+    f"sha256\t{value.sha256}",
+    f"tarball\t{value.tarball}",
+    f"metadata\t{value.metadata}",
+    f"source-sha256\t{value.source_sha256}",
+    f"metapackage\t{value.metapackage}",
   ]
 
   for dependency in value.deps |> sort {
-    lines = lines.push(f"runtime\t${dependency}")
+    lines = lines.push(f"runtime\t{dependency}")
   }
 
   for dependency in value.mkdeps_host |> sort {
-    lines = lines.push(f"build-host\t${dependency}")
+    lines = lines.push(f"build-host\t{dependency}")
   }
 
   for dependency in value.mkdeps_target |> sort {
-    lines = lines.push(f"build-target\t${dependency}")
+    lines = lines.push(f"build-target\t{dependency}")
   }
 
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
@@ -298,7 +298,7 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
   let populated = [field for field in fields if field != ""]
 
   if populated.len() != 0 and populated.len() != fields.len() {
-    return Err(types.PmError.PackageContract(f"remote package ${value.name} has a partial immutable identity"))
+    return Err(types.PmError.PackageContract(f"remote package {value.name} has a partial immutable identity"))
   }
 
   let fallback = legacy_snapshot_digest(value)
@@ -339,7 +339,7 @@ proc remote_legacy_metadata_rel(value: types.RemotePackage) [error] -> Result[Pa
     value.metadata
   }
 
-  util.ensure_relative_path(fp"${raw}", f"remote metadata for ${value.name}")?
+  util.ensure_relative_path(fp"{raw}", f"remote metadata for {value.name}")?
 }
 
 ## Resolves the omitted metadata hash in a legacy index into the exact retrieval bytes recorded in a BuildPlan.
@@ -354,11 +354,11 @@ export proc plan_artifact_from_package_at_repo(
   }
 
   if repo == "" {
-    return Err(types.PmError.RemoteRepo(f"legacy remote package ${value.name} needs a repository URL to hash its metadata"))
+    return Err(types.PmError.RemoteRepo(f"legacy remote package {value.name} needs a repository URL to hash its metadata"))
   }
 
   let rel = remote_legacy_metadata_rel(value)?
-  let cache_path = fp"${cache}/legacy-metadata/${bytes.from_text(rel.display()).sha256().hex()}.json"
+  let cache_path = fp"{cache}/legacy-metadata/{bytes.from_text(rel.display()).sha256().hex()}.json"
   let failure = try_fetch_repo_file(repo, rel, cache_path)?
 
   if failure != "" {

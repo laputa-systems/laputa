@@ -10,9 +10,9 @@ use util
 # /usr/lib/pm on an installed system.
 proc pm_source_root() [fs, env, error] -> Result[Path] {
   for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
-    let root = fp"${entry}"
+    let root = fp"{entry}"
 
-    if fs.exists(fp"${root}/pm.xsh")? and fs.exists(fp"${root}/pm")? {
+    if fs.exists(fp"{root}/pm.xsh")? and fs.exists(fp"{root}/pm")? {
       return root
     }
   }
@@ -37,7 +37,7 @@ proc build_shell_run_argv(argv: List[Str]) [process, error] {
 
   if ! status.ok {
     let rendered = argv.join(" ")
-    Err(ShError.Failed(message: f"command failed: ${rendered}"))?
+    Err(ShError.Failed(message: f"command failed: {rendered}"))?
   }
 }
 
@@ -74,7 +74,7 @@ proc xsh_runner() [fs, process, env, error] -> Result[Path] {
   let host = (env.get("XSH_HOST") ?? "").trim()
 
   if host != "" {
-    let host_path = fp"${host}"
+    let host_path = fp"{host}"
 
     if fs.exists(host_path)? {
       return host_path
@@ -100,11 +100,11 @@ proc regular_xsh_source(xsh: Path) [fs, error] -> Result[Path] {
     }
 
     let target = source.readlink()?
-    source = if target.display().starts_with("/") { target } else { fp"${source.parent}/${target}" }
+    source = if target.display().starts_with("/") { target } else { fp"{source.parent}/{target}" }
     depth += 1
   }
 
-  return Err(types.PmError.PackageContract(f"${xsh} has too many symlink levels"))
+  return Err(types.PmError.PackageContract(f"{xsh} has too many symlink levels"))
 }
 
 proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
@@ -112,21 +112,21 @@ proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
     return regular_xsh_source(xsh)
   }
 
-  let sibling = fp"${xsh.parent}/${name}"
+  let sibling = fp"{xsh.parent}/{name}"
   if ! fs.exists(sibling)? {
-    return Err(types.PmError.PackageContract(f"missing direct XSH release binary ${sibling}"))
+    return Err(types.PmError.PackageContract(f"missing direct XSH release binary {sibling}"))
   }
 
   regular_xsh_source(sibling)
 }
 
 proc seed_xsh_runners(root: Path, xsh: Path) [fs, error] {
-  let bin = fp"${root}/bin"
+  let bin = fp"{root}/bin"
   fs.mkdir(bin)?
 
   for name in ["xsh", "xshi", "xsht"] {
     let source = direct_xsh_source(xsh, name)?
-    let dest = fp"${bin}/${name}"
+    let dest = fp"{bin}/{name}"
     fs.remove(dest, missing_ok: true)?
     fs.install(source, dest, 0o755, parents: true, overwrite: true)?
   }
@@ -139,31 +139,31 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   seed_xsh_runners(root, xsh)?
 
   if fs.exists(/usr/lib/xsh)? {
-    let _ = fs.copy_tree(/usr/lib/xsh, fp"${root}/usr/lib/xsh", parents: true, overwrite: true)?
+    let _ = fs.copy_tree(/usr/lib/xsh, fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
   }
 
   let pm_root = pm_source_root()?
-  fs.install(fp"${pm_root}/pm.xsh", fp"${root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)?
-  fs.remove(fp"${root}/usr/lib/pm/pm", missing_ok: true)?
-  let _ = fs.copy_tree(fp"${pm_root}/pm", fp"${root}/usr/lib/pm/pm", parents: true, overwrite: true)?
+  fs.install(fp"{pm_root}/pm.xsh", fp"{root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)?
+  fs.remove(fp"{root}/usr/lib/pm/pm", missing_ok: true)?
+  let _ = fs.copy_tree(fp"{pm_root}/pm", fp"{root}/usr/lib/pm/pm", parents: true, overwrite: true)?
 
-  for sh in [fp"${root}/usr/bin/sh", fp"${root}/bin/sh"] {
+  for sh in [fp"{root}/usr/bin/sh", fp"{root}/bin/sh"] {
     fs.mkdir(sh.parent)?
     fs.remove(sh, missing_ok: true)?
     fs.write(sh, seeded_shell_script())?
     fs.chmod(sh, 0o755)?
   }
 
-  for tmp in [fp"${root}/tmp", fp"${root}/var/tmp"] {
+  for tmp in [fp"{root}/tmp", fp"{root}/var/tmp"] {
     fs.mkdir(tmp)?
     fs.chmod(tmp, 0o1777)?
   }
 
-  fs.mkdir(fp"${root}/proc")?
+  fs.mkdir(fp"{root}/proc")?
 
   for name in ["cpuinfo", "meminfo"] {
-    let source = fp"/proc/${name}"
-    let dest = fp"${root}/proc/${name}"
+    let source = fp"/proc/{name}"
+    let dest = fp"{root}/proc/{name}"
 
     match fs.metadata(source) {
       Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
@@ -175,11 +175,11 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     }
   }
 
-  fs.mkdir(fp"${root}/etc")?
+  fs.mkdir(fp"{root}/etc")?
 
   for name in ["resolv.conf", "hosts", "nsswitch.conf"] {
-    let source = fp"/etc/${name}"
-    let dest = fp"${root}/etc/${name}"
+    let source = fp"/etc/{name}"
+    let dest = fp"{root}/etc/{name}"
 
     match fs.metadata(source) {
       Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
@@ -206,7 +206,7 @@ export proc executor_provenance() [fs, process, env, error] -> Result[types.Exec
 
 proc xsht_runner() [fs, process, env, error] -> Result[Path] {
   let xsh = xsh_runner()?
-  let sibling = fp"${xsh.parent}/xsht"
+  let sibling = fp"{xsh.parent}/xsht"
 
   if fs.exists(sibling)? {
     return sibling
@@ -235,7 +235,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
     return
   }
 
-  let makeflags = env.get("MAKEFLAGS") ?? f"-s -j${cpu.count()}"
+  let makeflags = env.get("MAKEFLAGS") ?? f"-s -j{cpu.count()}"
 
   env ({
     DESTDIR: dest,
@@ -262,7 +262,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
     MAKEFLAGS: makeflags,
     SHELL: "/bin/xshi",
   }) {
-    let runner = fp"${pkg_dir}/run-package-build.xsh"
+    let runner = fp"{pkg_dir}/run-package-build.xsh"
     let runner_text = """use pm.recipe
 
 proc main(pkg_dir: Path, src: Path, dest: Path) [fs, process, env, error] {
@@ -277,7 +277,7 @@ main(@args)?
 """
 
     fs.write(runner, runner_text)?
-    let trace_path = fp"${pkg_dir.parent}/run-package-build.trace"
+    let trace_path = fp"{pkg_dir.parent}/run-package-build.trace"
     let xsht = xsht_runner()?
     let status = process.run(
       process.command_argv(
@@ -298,10 +298,10 @@ main(@args)?
 
     if ! status.ok {
       if status.exited() {
-        return Err(types.PmError.ExtensionFailed(f"package build for ${pkg.name} exited with status ${status.exit_code()?}"))
+        return Err(types.PmError.ExtensionFailed(f"package build for {pkg.name} exited with status {status.exit_code()?}"))
       }
 
-      return Err(types.PmError.ExtensionFailed(f"package build for ${pkg.name} was signaled"))
+      return Err(types.PmError.ExtensionFailed(f"package build for {pkg.name} was signaled"))
     }
   } ?
 

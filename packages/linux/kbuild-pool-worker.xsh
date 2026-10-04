@@ -3,12 +3,12 @@
 use kbuild
 
 proc main(...argv: List[Str]) [fs, time, error] {
-  let root = fp"${argv[0]}"
-  let config = kbuild.load_config(fp"${argv[1]}")?
+  let root = fp"{argv[0]}"
+  let config = kbuild.load_config(fp"{argv[1]}")?
   let srcarch = argv[2]
-  let state_path = fp"${argv[3]}"
-  let lock_path = fp"${argv[4]}"
-  let output_path = fp"${argv[5]}"
+  let state_path = fp"{argv[3]}"
+  let lock_path = fp"{argv[4]}"
+  let output_path = fp"{argv[5]}"
   var records: List[kbuild.ScanRecord] = []
 
   while true {
@@ -41,7 +41,7 @@ proc main(...argv: List[Str]) [fs, time, error] {
     )?
     fs.unlock(lock)?
 
-    let scan_result = kbuild.scan_record_for_dir(root, config, srcarch, fp"${dir}")
+    let scan_result = kbuild.scan_record_for_dir(root, config, srcarch, fp"{dir}")
     match scan_result {
       Ok(scan) => {
         records = records.push(scan)

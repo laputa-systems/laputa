@@ -140,23 +140,23 @@ pure lookup_prefix(event_name: Str) -> Str {
 }
 
 pure has_event_prefix(prefix: Str) -> Bool {
-  f"${prefix}_" in event_prefixes()
+  f"{prefix}_" in event_prefixes()
 }
 
 proc c_lines_for_bits(defs: List[EventDef], attr: Str, max_name: Str, include_buttons: Bool) [] -> Result[List[Str]] {
-  var lines = [f"static const char * const ${attr}_map[${max_name} + 1] = {"]
+  var lines = [f"static const char * const {attr}_map[{max_name} + 1] = {{"]
 
   for item in defs
     |> where .attr == attr
     |> sort-by .value {
-    lines = lines.push(f"    [${item.name}] = \"${item.name}\",")
+    lines = lines.push(f"    [{item.name}] = \"{item.name}\",")
   }
 
   if include_buttons {
     for item in defs
       |> where .attr == "btn"
       |> sort-by .value {
-      lines = lines.push(f"    [${item.name}] = \"${item.name}\",")
+      lines = lines.push(f"    [{item.name}] = \"{item.name}\",")
     }
   }
 
@@ -211,7 +211,7 @@ proc c_lookup_lines(
     lookups = lookups.push({name: max_name, value: max_name})
   }
 
-  var lines = [f"    { .name = \"${item.name}\", .value = ${item.value} }," for item in lookups]
+  var lines = [f"    {{ .name = \"{item.name}\", .value = {item.value} }}," for item in lookups]
   lines
 }
 
@@ -308,7 +308,7 @@ proc write_event_names() [fs, error] {
         .replace("SYN", "syn")
         .replace("REP", "rep")
 
-      lines = lines.push(f"    [EV_${key}] = ${map_name}_map,")
+      lines = lines.push(f"    [EV_{key}] = {map_name}_map,")
     }
   }
 
@@ -332,7 +332,7 @@ proc write_event_names() [fs, error] {
         let prefix = lookup_prefix(item.name)
 
         if has_event_prefix(prefix) {
-          lines = lines.push(f"    ${prefix}_MAX,")
+          lines = lines.push(f"    {prefix}_MAX,")
           emitted = true
         }
       }
@@ -413,7 +413,7 @@ dep_rt = declare_dependency()""",
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   patch_python_generator()?
 
@@ -434,5 +434,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     } ?
   } ?
 
-  fs.remove(fp"${dest}/usr/share/man", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
 }

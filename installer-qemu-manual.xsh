@@ -10,7 +10,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"${env_value(name, fallback.display())}"
+  fp"{env_value(name, fallback.display())}"
 }
 
 proc parse_size(value: Str) [error] -> Result[Int] {
@@ -28,7 +28,7 @@ proc parse_size(value: Str) [error] -> Result[Int] {
 }
 
 proc command_path(name: Str) [process, error] -> Result[Path] {
-  return fp"${name}" when "/" in name
+  return fp"{name}" when "/" in name
 
   process.which(name)?
 }
@@ -42,15 +42,15 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
     abort(status.exit_code()?)
   }
 
-  return Err(InstallerQemuError.Failed(f"${argv[0]} was signaled"))
+  return Err(InstallerQemuError.Failed(f"{argv[0]} was signaled"))
 }
 
 proc main() [fs, process, env, error] {
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let work = env_path("LAPUTA_INSTALLER_WORK", fp"${root}/target/laputa-installer")?
-  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-manual-aarch64.iso")?
-  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-aarch64.vmlinuz")?
-  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"${work}/laputa-target-manual.img")?
+  let work = env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer")?
+  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-manual-aarch64.iso")?
+  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-aarch64.vmlinuz")?
+  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-manual.img")?
   let target_size = env_value("LAPUTA_INSTALLER_TARGET_SIZE", "1G") |> parse_size(_)?
 
   let kernel_cmdline = env_value(
@@ -65,7 +65,7 @@ proc main() [fs, process, env, error] {
   let qemu = command_path(qemu_name)?
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
   let kernel_source_raw = env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
-  let local_kernel = fp"${root}/target/laputa-installer/local-linux-aarch64.Image"
+  let local_kernel = fp"{root}/target/laputa-installer/local-linux-aarch64.Image"
 
   let kernel_source = if kernel_source_raw != "" {
     kernel_source_raw
@@ -96,7 +96,7 @@ proc main() [fs, process, env, error] {
     }
   }
 
-  run_argv(xsh, ["xsh", fp"${root}/build-installer-image.xsh".display()], root, build_env)?
+  run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)?
   let installer_iso_meta = installer_iso.metadata()?
   let installer_kernel_meta = installer_kernel.metadata()?
   let _ = {installer_iso_meta, installer_kernel_meta}
@@ -123,11 +123,11 @@ proc main() [fs, process, env, error] {
       "-append",
       kernel_cmdline,
       "-drive",
-      f"if=none,id=installer,format=raw,file=${installer_iso}",
+      f"if=none,id=installer,format=raw,file={installer_iso}",
       "-device",
       "virtio-blk-device,drive=installer",
       "-drive",
-      f"if=none,id=target,format=raw,file=${target_image}",
+      f"if=none,id=target,format=raw,file={target_image}",
       "-device",
       "virtio-blk-device,drive=target",
       "-netdev",

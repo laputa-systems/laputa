@@ -34,22 +34,22 @@ proc execute_load_package(
   node: types.PlanNode,
   repo_root: Path,
 ) [fs, env, error] -> Result[types.Package] {
-  let relative = util.ensure_relative_path(node.recipe_dir, f"plan recipe directory for ${node.name}")?
-  let pkg = recipe.load_package_for_target(fp"${repo_root}/${relative}", plan_value.target)?
+  let relative = util.ensure_relative_path(node.recipe_dir, f"plan recipe directory for {node.name}")?
+  let pkg = recipe.load_package_for_target(fp"{repo_root}/{relative}", plan_value.target)?
 
   if pkg.name != node.name or pkg.ver != node.ver or pkg.rel != node.rel or util.package_id(pkg.name, pkg.ver, pkg.rel) != node.package_id {
-    return Err(types.PmError.PackageContract(f"recipe ${node.recipe_dir} does not match plan node ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"recipe {node.recipe_dir} does not match plan node {node.package_id}"))
   }
 
   # A recipe edited after planning would be built under a key naming other
   # inputs. Re-fingerprinting the recipe costs milliseconds next to the
   # recipe load itself, so it is checked rather than trusted.
   if fingerprint.package_build_input(repo_root, pkg, plan_value.target)? != node.recipe_sha256 {
-    return Err(types.PmError.PackageContract(f"recipe build input changed after plan creation for ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"recipe build input changed after plan creation for {node.package_id}"))
   }
 
   if fingerprint.package_proof_input(repo_root, pkg)? != node.proof_sha256 {
-    return Err(types.PmError.PackageContract(f"recipe proof input changed after plan creation for ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"recipe proof input changed after plan creation for {node.package_id}"))
   }
 
   pkg
@@ -64,7 +64,7 @@ proc execute_require_receipt(
   let expected_runtime_dependencies = store.receipt_runtime_dependency_keys(node)
 
   if receipt.target != plan_value.target or receipt.key != node.artifact_key or receipt.package_name != node.name or receipt.package_id != node.package_id or receipt.recipe_sha256 != node.recipe_sha256 or receipt.dependency_keys != expected_dependencies or receipt.runtime_dependency_keys != expected_runtime_dependencies {
-    return Err(types.PmError.PackageContract(f"stored artifact ${node.artifact_key} does not match plan node ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"stored artifact {node.artifact_key} does not match plan node {node.package_id}"))
   }
 }
 
@@ -116,7 +116,7 @@ proc execute_compose_root(target: types.Target, root: Path, artifacts: List[type
 
   for receipt in artifacts {
     if receipt.key in payload_keys {
-      archive.tar_extract(fp"${receipt.artifact_dir}/payload.tar.gz", root, 0, "auto", true)?
+      archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", root, 0, "auto", true)?
     }
   }
 }
@@ -131,16 +131,16 @@ proc execute_stage_local(
   let executor = context.executor
 
   if executor == null {
-    return Err(types.PmError.PackageContract(f"build of ${node.package_id} has no executor provenance"))
+    return Err(types.PmError.PackageContract(f"build of {node.package_id} has no executor provenance"))
   }
 
   let target_arch = types.pm_target_arch(context.plan.target)
-  let recipe_dir = fp"${work}/recipe"
-  let source = fp"${work}/source"
-  let dest = fp"${work}/dest"
-  let payload = fp"${work}/payload.tar.gz"
-  let metadata = fp"${work}/metadata.json"
-  let proof = fp"${work}/proof.json"
+  let recipe_dir = fp"{work}/recipe"
+  let source = fp"{work}/source"
+  let dest = fp"{work}/dest"
+  let payload = fp"{work}/payload.tar.gz"
+  let metadata = fp"{work}/metadata.json"
+  let proof = fp"{work}/proof.json"
   # build_prepared_package creates a traced dynamic runner beside its recipe. Keep that implementation
   # detail inside this node's work tree so execution never writes the checkout or another node's recipe.
   let _ = fs.copy_tree(pkg.dir, recipe_dir, parents: true, overwrite: true)?
@@ -162,7 +162,7 @@ proc execute_stage_local(
   env ({
     LAPUTA_ROOT: build_root.display(),
     XSH_PM_BUILD_ROOT: build_root.display(),
-    PATH: f"${build_root}/bin:${build_root}/usr/bin:${env.get("PATH") ?? ""}",
+    PATH: f"{build_root}/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     pm_build.build_prepared_package(recipe_dir, source, dest, payload)?
@@ -188,7 +188,7 @@ proc execute_publish_proof_cache(
   pm_proof.verify_artifact_receipt(proof, node, payload_sha256)?
   let cached = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
   fs.mkdir(cached.parent)?
-  let lock = fs.lock(fp"${cached.parent}/${node.proof_key}.lock")?
+  let lock = fs.lock(fp"{cached.parent}/{node.proof_key}.lock")?
   defer fs.unlock(lock)?
 
   if fs.exists(cached)? {
@@ -196,7 +196,7 @@ proc execute_publish_proof_cache(
     return Ok()
   }
 
-  let temporary = fp"${cached}.tmp"
+  let temporary = fp"{cached}.tmp"
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
   fs.copy(proof, temporary, overwrite: true)?
@@ -228,7 +228,7 @@ proc execute_run_proof(
   defer root_handle.close()?
   # A proof root is a target runtime closure only: no executor substrate, so
   # the proof cannot pass on files the runner happens to provide.
-  let proof_root = fp"${root_handle.host_path()?}/proof-root"
+  let proof_root = fp"{root_handle.host_path()?}/proof-root"
   execute_compose_root(context.plan.target, proof_root, runtime_artifacts)?
   archive.tar_extract(payload, proof_root, 0, "auto", true)?
   env ({
@@ -245,7 +245,7 @@ proc execute_build_local(context: ExecuteContext, node: types.PlanNode) [fs, net
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
   let work = root_handle.host_path()?
-  let build_root = fp"${work}/build-root"
+  let build_root = fp"{work}/build-root"
 
   if pkg.kind == types.package_meta() {
     # Selectors have no build sandbox; their declared dependencies are ordered
@@ -292,15 +292,15 @@ proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) [fs, 
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
-  let proof = fp"${root_handle.host_path()?}/proof.json"
-  execute_run_proof(context, node, pkg, fp"${receipt.artifact_dir}/payload.tar.gz", receipt.payload_sha256, proof)?
+  let proof = fp"{root_handle.host_path()?}/proof.json"
+  execute_run_proof(context, node, pkg, fp"{receipt.artifact_dir}/payload.tar.gz", receipt.payload_sha256, proof)?
   execute_publish_proof_cache(context.store_root, node, receipt.payload_sha256, proof)?
   receipt
 }
 
 proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) [fs, net, error] -> Result[types.ArtifactReceipt] {
   if node.remote == null {
-    return Err(types.PmError.PackageContract(f"remote plan node ${node.package_id} has no immutable retrieval coordinates"))
+    return Err(types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"))
   }
 
   let cache_handle = fs.tempdir()?
@@ -335,11 +335,11 @@ proc execute_node(context: ExecuteContext, node: types.PlanNode) [fs, net, proce
 # retains worker error propagation on runners that leave par-map errors
 # in-band, while Store receipt-last publication remains the level boundary.
 pure execute_parallel_level_ok_marker(status: Path, node: types.PlanNode) -> Path {
-  fp"${status}/${node.artifact_key}.ok"
+  fp"{status}/{node.artifact_key}.ok"
 }
 
 pure execute_parallel_level_error_marker(status: Path, node: types.PlanNode) -> Path {
-  fp"${status}/${node.artifact_key}.error"
+  fp"{status}/{node.artifact_key}.error"
 }
 
 proc execute_parallel_level_worker(
@@ -374,11 +374,11 @@ proc execute_parallel_level_require_workers(
 
     if fs.exists(error_marker)? {
       let message = fs.read_text(error_marker)?.trim()
-      return Err(types.PmError.ExtensionFailed(f"parallel executor node ${node.package_id} failed: ${message}"))
+      return Err(types.PmError.ExtensionFailed(f"parallel executor node {node.package_id} failed: {message}"))
     }
 
     if !fs.exists(execute_parallel_level_ok_marker(status, node))? {
-      return Err(types.PmError.PackageContract(f"parallel executor node ${node.package_id} did not report completion"))
+      return Err(types.PmError.PackageContract(f"parallel executor node {node.package_id} did not report completion"))
     }
   }
 }
@@ -394,7 +394,7 @@ proc execute_parallel_level(
 ) [fs, net, process, env, time, error] -> Result[List[types.ArtifactReceipt]] {
   let handle = fs.tempdir()?
   defer handle.close()?
-  let status = fp"${handle.host_path()?}/parallel-level-status"
+  let status = fp"{handle.host_path()?}/parallel-level-status"
   fs.mkdir(status)?
 
   let _ = nodes

@@ -142,16 +142,16 @@ proc write_embedded_dtd() [fs, error] {
     var index = 1
 
     while index < words.len() {
-      values = values.push(f"0x${words[index]},")
+      values = values.push(f"0x{words[index]},")
       index += 1
     }
   }
 
   fs.write(
     p"src/wayland.dtd.h",
-    f"""static const char wayland_dtd[] = {{
-	${values.join(" ")}
-}};
+    f"""static const char wayland_dtd[] = {{{{
+	{values.join(" ")}
+}}}};
 """,
   )?
 }
@@ -217,7 +217,7 @@ else
 wayland_scanner_for_build = wayland_scanner
 endif
 """,
-  f"""wayland_scanner_for_build = find_program('${native_scanner}')
+  f"""wayland_scanner_for_build = find_program('{native_scanner}')
 """,
 ),
     )?
@@ -227,12 +227,12 @@ endif
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
 
   let native_scanner = if pm_util.build_arch()? != pm_util.target_arch()? and build_root != "" {
-    f"${build_root}/usr/bin/wayland-scanner"
+    f"{build_root}/usr/bin/wayland-scanner"
   } else {
     ""
   }
@@ -249,14 +249,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Ddocumentation=false" "-Ddtd_validation=false" "-Dtests=false" "build" ?
 
     if native_scanner != "" {
-      let native_scanner_path = fp"${fs.cwd()?}/build/wayland-scanner-native"
-      let clang = fp"${build_root}/usr/lib/llvm23/bin/clang-23"
+      let native_scanner_path = fp"{fs.cwd()?}/build/wayland-scanner-native"
+      let clang = fp"{build_root}/usr/lib/llvm23/bin/clang-23"
 
       env ({
-        PATH: f"${build_root}/usr/lib/llvm-toolchain/bin:${build_root}/usr/bin:${env.get("PATH") ?? ""}",
-        LD_LIBRARY_PATH: f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib",
+        PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
+        LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
       }) {
-        run $clang "-o" $native_scanner_path "src/scanner.c" "src/wayland-util.c" "-Ibuild" "-Ibuild/src" "-Isrc" f"-I${build_root}/usr/include" f"-L${build_root}/usr/lib" f"-Wl,-rpath,${build_root}/usr/lib" "-lexpat" ?
+        run $clang "-o" $native_scanner_path "src/scanner.c" "src/wayland-util.c" "-Ibuild" "-Ibuild/src" "-Isrc" f"-I{build_root}/usr/include" f"-L{build_root}/usr/lib" f"-Wl,-rpath,{build_root}/usr/lib" "-lexpat" ?
       } ?
 
       let ninja = p"build/build.ninja"
@@ -264,11 +264,11 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja_text = ninja.read_text()?
 
       let ninja_text_build_root = ninja_text.replace(
-        f" -- ${build_root}/usr/bin/wayland-scanner ",
-        f" -- ${scanner_text} ",
+        f" -- {build_root}/usr/bin/wayland-scanner ",
+        f" -- {scanner_text} ",
       )
 
-      fs.write(ninja, ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- ${scanner_text} "))?
+      fs.write(ninja, ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))?
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -280,7 +280,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     } ?
   } ?
 
-  for entry in fs.children(fp"${dest}/usr/lib")? {
+  for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") {
       fs.remove(entry.path, missing_ok: true)?
     }

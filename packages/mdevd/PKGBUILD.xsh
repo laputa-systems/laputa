@@ -117,17 +117,15 @@ pure bytes_for_bits(bits: Int) -> Int {
 pure gen_types_internal(text: Str, type_name: Str, type_caps: Str, bits: Int) -> Str {
   text.replace("@type@", type_name)
     .replace("@TYPE@", type_caps)
-    .replace("@BITS@", f"${bits}")
+    .replace("@BITS@", f"{bits}")
     .replace(
       "@BYTES@",
-      f"${bytes_for_bits(
-        bits,
-      )}",
+      f"{bytes_for_bits(bits)}",
     )
 }
 
 pure gen_bits_template(text: Str, bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str) -> Str {
-  text.replace("@BITS@", f"${bits}")
+  text.replace("@BITS@", f"{bits}")
     .replace("@DFMT@", dfmt)
     .replace("@OFMT@", ofmt)
     .replace("@XFMT@", xfmt)
@@ -153,20 +151,20 @@ proc write_skalibs_sysdeps(target: Str) [fs, error] {
   fs.mkdir(sysdeps)?
 
   fs.write(
-    fp"${sysdeps}/target",
-    f"""${target}
+    fp"{sysdeps}/target",
+    f"""{target}
 """,
   )?
 
-  fs.write(fp"${sysdeps}/pthread.lib", "")?
-  fs.write(fp"${sysdeps}/socket.lib", "")?
-  fs.write(fp"${sysdeps}/spawn.lib", "")?
-  fs.write(fp"${sysdeps}/sysclock.lib", "")?
-  fs.write(fp"${sysdeps}/timer.lib", "")?
-  fs.write(fp"${sysdeps}/util.lib", "")?
+  fs.write(fp"{sysdeps}/pthread.lib", "")?
+  fs.write(fp"{sysdeps}/socket.lib", "")?
+  fs.write(fp"{sysdeps}/spawn.lib", "")?
+  fs.write(fp"{sysdeps}/sysclock.lib", "")?
+  fs.write(fp"{sysdeps}/timer.lib", "")?
+  fs.write(fp"{sysdeps}/util.lib", "")?
 
   fs.write(
-    fp"${sysdeps}/sysdeps",
+    fp"{sysdeps}/sysdeps",
     """clockrt: yes
 clockmon: yes
 clockboot: yes
@@ -288,7 +286,7 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
     "#define SYSDEPS_H",
     "",
     "#undef SKALIBS_TARGET",
-    f"#define SKALIBS_TARGET \"${target}\"",
+    f"#define SKALIBS_TARGET \"{target}\"",
     "",
   ]
 
@@ -299,28 +297,28 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
     let value = words[1]
 
     if key.starts_with("SIGNED") {
-      lines = lines.push(f"#undef SKALIBS_HASUN${key}")
-      lines = lines.push(f"#undef SKALIBS_HAS${key}")
+      lines = lines.push(f"#undef SKALIBS_HASUN{key}")
+      lines = lines.push(f"#undef SKALIBS_HAS{key}")
 
       if value == "yes" {
-        lines = lines.push(f"#define SKALIBS_HAS${key}")
+        lines = lines.push(f"#define SKALIBS_HAS{key}")
       } else {
-        lines = lines.push(f"#define SKALIBS_HASUN${key}")
+        lines = lines.push(f"#define SKALIBS_HASUN{key}")
       }
     } else if key.starts_with("SIZEOF") {
-      lines = lines.push(f"#undef SKALIBS_${key}")
-      lines = lines.push(f"#define SKALIBS_${key} ${value}")
+      lines = lines.push(f"#undef SKALIBS_{key}")
+      lines = lines.push(f"#define SKALIBS_{key} {value}")
     } else {
       if value == "yes" {
-        lines = lines.push(f"#undef SKALIBS_HAS${key}")
-        lines = lines.push(f"#define SKALIBS_HAS${key}")
+        lines = lines.push(f"#undef SKALIBS_HAS{key}")
+        lines = lines.push(f"#define SKALIBS_HAS{key}")
       } else if value == "no" {
-        lines = lines.push(f"#undef SKALIBS_HAS${key}")
+        lines = lines.push(f"#undef SKALIBS_HAS{key}")
       } else {
-        lines = lines.push(f"#undef SKALIBS_${key}")
+        lines = lines.push(f"#undef SKALIBS_{key}")
 
         if value != "none" {
-          lines = lines.push(f"#define SKALIBS_${key} \"${value}\"")
+          lines = lines.push(f"#define SKALIBS_{key} \"{value}\"")
         }
       }
     }
@@ -356,15 +354,15 @@ proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sy
     return Err(ScriptError.Failed("skalibs-gen-bits", "unsupported non-little-endian target"))
   }
 
-  parts = parts.push(fp"skalibs/src/headers/uint${bits}-bswap".read_text()?)
+  parts = parts.push(fp"skalibs/src/headers/uint{bits}-bswap".read_text()?)
   parts = parts.push(gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits))
   parts = parts.push(gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt))
   parts = parts.push(gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits))
-  fs.write(fp"skalibs/src/include/skalibs/uint${bits}.h", parts.join(""))?
+  fs.write(fp"skalibs/src/include/skalibs/uint{bits}.h", parts.join(""))?
 }
 
 proc sysdep_bits(sysdeps: Map[Str], type_name: Str) [error] -> Result[Int] {
-  sysdeps.get(f"sizeof${type_name}")?.parse_int()? * 8
+  sysdeps.get(f"sizeof{type_name}")?.parse_int()? * 8
 }
 
 proc append_type_template(
@@ -381,13 +379,13 @@ proc write_types_h(sysdeps: Map[Str]) [fs, error] {
   var parts = [p"skalibs/src/headers/types-header".read_text()?]
 
   for type_name in ["short", "int", "long"] {
-    let bits = sysdep_bits(sysdeps, f"u${type_name}")?
+    let bits = sysdep_bits(sysdeps, f"u{type_name}")?
 
     parts = append_type_template(
       parts,
       p"skalibs/src/headers/unsigned-template",
-      f"u${type_name}",
-      f"U${upper_ascii(type_name)}",
+      f"u{type_name}",
+      f"U{upper_ascii(type_name)}",
       bits,
     )?
 
@@ -397,7 +395,7 @@ proc write_types_h(sysdeps: Map[Str]) [fs, error] {
   for type_name in ["size", "uid", "gid", "pid", "time", "dev", "ino"] {
     let bits = sysdep_bits(sysdeps, type_name)?
 
-    let header_template = if (sysdeps.get(f"signed${type_name}") ?? "") == "yes" {
+    let header_template = if (sysdeps.get(f"signed{type_name}") ?? "") == "yes" {
       p"skalibs/src/headers/signed-template"
     } else {
       p"skalibs/src/headers/unsigned-template"
@@ -420,7 +418,7 @@ proc generate_skalibs_headers(target: Str) [fs, error] {
 
   fs.write(
     p"skalibs/src/include/skalibs/ip46.h",
-    f"${p"skalibs/src/headers/ip46-header".read_text()?}${p"skalibs/src/headers/ip46-with".read_text()?}${p"skalibs/src/headers/ip46-footer".read_text()?}",
+    f"{p"skalibs/src/headers/ip46-header".read_text()?}{p"skalibs/src/headers/ip46-with".read_text()?}{p"skalibs/src/headers/ip46-footer".read_text()?}",
   )?
 }
 
@@ -430,7 +428,7 @@ proc write_mdevd_config() [fs, error] {
     f"""#ifndef MDEVD_CONFIG_H
 #define MDEVD_CONFIG_H
 
-#define MDEVD_VERSION "${ver}"
+#define MDEVD_VERSION "{ver}"
 #define MDEVD_BINPREFIX ""
 #define MDEVD_EXTBINPREFIX ""
 #define MDEVD_EXTLIBEXECPREFIX "/usr/libexec/mdevd/"
@@ -505,8 +503,8 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, erro
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
-  let target = f"${arch}-alpine-linux-musl"
+  let triple = f"{arch}-linux-musl"
+  let target = f"{arch}-alpine-linux-musl"
   fs.mkdir(p"laputa-headers/linux")?
 
   fs.write(
@@ -593,7 +591,7 @@ struct sockaddr_nl {
   make.run_tasks(multi.tasks, make.jobs()?)?
   let mdevd_bin = multi.outputs.get("mdevd")?
   let coldplug_bin = multi.outputs.get("mdevd-coldplug")?
-  fs.install(mdevd_bin, fp"${dest}/usr/bin/mdevd", 0o755, parents: true, overwrite: true)?
-  fs.install(coldplug_bin, fp"${dest}/usr/bin/mdevd-coldplug", 0o755, parents: true, overwrite: true)?
-  fs.install(p"service.xsh", fp"${dest}/usr/lib/xinit/services/mdevd.xsh", 0o644, parents: true, overwrite: true)?
+  fs.install(mdevd_bin, fp"{dest}/usr/bin/mdevd", 0o755, parents: true, overwrite: true)?
+  fs.install(coldplug_bin, fp"{dest}/usr/bin/mdevd-coldplug", 0o755, parents: true, overwrite: true)?
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/mdevd.xsh", 0o644, parents: true, overwrite: true)?
 }

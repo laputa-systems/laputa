@@ -61,7 +61,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
   let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes"]
   let defs = ["-D_XOPEN_SOURCE=700", "-D__user="]
   let includes = []
@@ -83,13 +83,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(libudev.tasks, make.jobs()?)?
-  fs.install(libudev.output, fp"${dest}/usr/lib/libudev.so.1", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libudev.so.1", fp"${dest}/usr/lib/libudev.so")?
-  fs.install(p"udev.h", fp"${dest}/usr/include/libudev.h", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.install(libudev.output, fp"{dest}/usr/lib/libudev.so.1", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libudev.so.1", fp"{dest}/usr/lib/libudev.so")?
+  fs.install(p"udev.h", fp"{dest}/usr/include/libudev.h", 0o644, parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   fs.write(
-    fp"${dest}/usr/lib/pkgconfig/libudev.pc",
+    fp"{dest}/usr/lib/pkgconfig/libudev.pc",
     """prefix=/usr
 exec_prefix=\${prefix}
 libdir=\${exec_prefix}/lib

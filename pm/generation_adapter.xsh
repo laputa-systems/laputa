@@ -56,7 +56,7 @@ proc generation_adapter_plan(
   let profile = pm_generation.overlay_profile(overlay_root)?
 
   if profile.name != profile_name {
-    return Err(GenerationAdapterError.Failed(f"overlay profile ${profile.name} does not match ${profile_name}"))
+    return Err(GenerationAdapterError.Failed(f"overlay profile {profile.name} does not match {profile_name}"))
   }
 
   let generation = pm_generation.plan_profile(build_plan, runtime_roots, profile)?
@@ -71,7 +71,7 @@ proc generation_adapter_publish_receipt(root: Path, expected: types.GenerationRe
     return Err(GenerationAdapterError.Failed("completed generation receipt does not match its plan"))
   }
 
-  fs.write_atomic(output, fs.read_text(fp"${root}/var/lib/laputa/generation.json")?)?
+  fs.write_atomic(output, fs.read_text(fp"{root}/var/lib/laputa/generation.json")?)?
 }
 
 proc generation_adapter_ensure_generation(
@@ -81,12 +81,12 @@ proc generation_adapter_ensure_generation(
   overlay_root: Path,
   receipt_output: Path,
 ) [fs, error] -> Result[types.GenerationReceipt] {
-  let root = fp"${output_parent}/${value.generation_sha256}"
+  let root = fp"{output_parent}/{value.generation_sha256}"
 
   if fs.exists(root)? {
     let receipt = pm_generation.read_generation_receipt(root)?
     if receipt.generation_sha256 != value.generation_sha256 or receipt.build_plan_sha256 != value.build_plan_sha256 {
-      return Err(GenerationAdapterError.Failed(f"existing generation ${value.generation_sha256} does not match the saved plan"))
+      return Err(GenerationAdapterError.Failed(f"existing generation {value.generation_sha256} does not match the saved plan"))
     }
     pm_generation.verify_generation(root, receipt)?
     generation_adapter_publish_receipt(root, receipt, receipt_output)?
@@ -102,7 +102,7 @@ proc generation_adapter_ensure_generation(
 proc generation_adapter_require_no_forbidden_packages(receipt: types.GenerationReceipt, forbidden_packages: List[Str]) [error] {
   for artifact in receipt.artifacts {
     if artifact.package_name in forbidden_packages {
-      return Err(GenerationAdapterError.Failed(f"generation includes forbidden package ${artifact.package_name}"))
+      return Err(GenerationAdapterError.Failed(f"generation includes forbidden package {artifact.package_name}"))
     }
   }
 }
@@ -140,7 +140,7 @@ proc generation_adapter_find_node(value: types.BuildPlan, package_name: Str) [er
     }
   }
 
-  Err(GenerationAdapterError.Failed(f"package ${package_name} is not in the saved BuildPlan"))
+  Err(GenerationAdapterError.Failed(f"package {package_name} is not in the saved BuildPlan"))
 }
 
 proc generation_adapter_manifest_file(
@@ -150,7 +150,7 @@ proc generation_adapter_manifest_file(
 ) [error] -> Result[GenerationAdapterMetadataFileDto] {
   let path_text = package_path.display()
   if metadata.name != package_name {
-    return Err(GenerationAdapterError.Failed(f"artifact metadata names ${metadata.name}, expected ${package_name}"))
+    return Err(GenerationAdapterError.Failed(f"artifact metadata names {metadata.name}, expected {package_name}"))
   }
 
   for entry in metadata.files {
@@ -159,7 +159,7 @@ proc generation_adapter_manifest_file(
     }
   }
 
-  Err(GenerationAdapterError.Failed(f"artifact metadata does not declare ${path_text}"))
+  Err(GenerationAdapterError.Failed(f"artifact metadata does not declare {path_text}"))
 }
 
 ## Copies one manifest-declared payload file only after its Store receipt and payload digest agree with the saved BuildPlan.
@@ -183,22 +183,22 @@ export proc generation_adapter_copy_manifest_file(
     return Err(GenerationAdapterError.Failed("artifact receipt does not match the BuildPlan"))
   }
 
-  let metadata = json.read(fp"${receipt.artifact_dir}/metadata.json")?.require(GenerationAdapterMetadataDto)?
+  let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(GenerationAdapterMetadataDto)?
   let manifest = generation_adapter_manifest_file(metadata, package_name, relative_path)?
   let handle = fs.tempdir()?
   defer handle.close()?
   let extracted = handle.host_path()?
-  archive.tar_extract(fp"${receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)?
-  let source = fp"${extracted}/${relative_path}"
+  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)?
+  let source = fp"{extracted}/{relative_path}"
 
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
-    return Err(GenerationAdapterError.Failed(f"artifact payload does not contain ${relative_path}"))
+    return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
   }
   if hash.sha256(source)?.hex() != manifest.sha256 {
-    return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for ${relative_path}"))
+    return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for {relative_path}"))
   }
 
-  let temporary = fp"${output}.tmp"
+  let temporary = fp"{output}.tmp"
   fs.mkdir(output.parent)?
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
@@ -227,7 +227,7 @@ export proc generation_adapter_execute_profile(
   let generation = generation_adapter_plan(build_plan_path, runtime_roots, profile_name, overlay_root, generation_plan_output)?
   let receipt = generation_adapter_ensure_generation(generation, store_root, output_parent, overlay_root, generation_receipt_output)?
   generation_adapter_require_no_forbidden_packages(receipt, forbidden_packages)?
-  {generation_root: fp"${output_parent}/${receipt.generation_sha256}"}
+  {generation_root: fp"{output_parent}/{receipt.generation_sha256}"}
 }
 
 ## Projects a saved BuildPlan to a generation-plan DTO without executing package artifacts.

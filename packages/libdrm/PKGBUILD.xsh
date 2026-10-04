@@ -168,7 +168,7 @@ proc write_format_modifier_table() [fs, error] {
 
         if parts.len() >= 2 {
           let vendor = parts[0]
-          let mod = entry.replace(f"${vendor}_", "")
+          let mod = entry.replace(f"{vendor}_", "")
 
           if ! (vendor == "ARM" and (mod == "TYPE_AFBC" or mod == "TYPE_MISC" or mod == "TYPE_AFRC")) {
             modifiers = modifiers.push({vendor, mod, name: mod})
@@ -186,18 +186,18 @@ proc write_format_modifier_table() [fs, error] {
   ]
 
   for mod in intel {
-    body = body.push(f"    { DRM_MODIFIER_INTEL(${mod}, ${mod}) },")
+    body = body.push(f"    {{ DRM_MODIFIER_INTEL({mod}, {mod}) }},")
   }
 
   for mod in modifiers {
-    body = body.push(f"    { DRM_MODIFIER(${mod.vendor}, ${mod.mod}, ${mod.name}) },")
+    body = body.push(f"    {{ DRM_MODIFIER({mod.vendor}, {mod.mod}, {mod.name}) }},")
   }
 
   body = body.push("};")
   body = body.push("static const struct drmFormatModifierVendorInfo drm_format_modifier_vendor_table[] = {")
 
   for vendor in vendors {
-    body = body.push(f"    { DRM_FORMAT_MOD_VENDOR_${vendor}, \"${vendor}\" },")
+    body = body.push(f"    {{ DRM_FORMAT_MOD_VENDOR_{vendor}, \"{vendor}\" }},")
   }
 
   body = body.push("};")
@@ -227,7 +227,7 @@ format_mod_static_table = custom_target(
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   patch_python_generator()?
 

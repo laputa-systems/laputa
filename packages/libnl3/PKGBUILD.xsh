@@ -76,9 +76,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.mkdir(objs)?
 
   # Generate include/netlink/version.h from version.h.in
-  fs.mkdir(fp"${src}/include/netlink")?
-  let version_h = fp"${src}/include/netlink/version.h"
-  let version_in = fp"${src}/include/netlink/version.h.in"
+  fs.mkdir(fp"{src}/include/netlink")?
+  let version_h = fp"{src}/include/netlink/version.h"
+  let version_in = fp"{src}/include/netlink/version.h.in"
 
   if ! fs.exists(version_h)? and fs.exists(version_in)? {
     let tmpl = fs.read_text(version_in)?
@@ -95,14 +95,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   # Generate include/config.h (minimal — configure would produce this)
-  let config_h = fp"${src}/include/config.h"
+  let config_h = fp"{src}/include/config.h"
 
   if ! fs.exists(config_h)? {
     let cfg_body = f"""#ifndef LIBNL_CONFIG_H
 #define LIBNL_CONFIG_H
-#define PACKAGE_STRING "libnl ${ver}"
+#define PACKAGE_STRING "libnl {ver}"
 #define PACKAGE_NAME "libnl"
-#define PACKAGE_VERSION "${ver}"
+#define PACKAGE_VERSION "{ver}"
 #define SYSCONFDIR "/etc"
 #define PACKAGE_URL "http://www.infradead.org/~tgr/libnl/"
 #define PACKAGE "libnl-3-11-0"
@@ -135,22 +135,22 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   let cc = process.which("cc")?
-  let triple = f"${env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
+  let triple = f"{env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
 
   # Pre-create install directories.
-  fs.mkdir(fp"${dest}/usr")?
-  fs.mkdir(fp"${dest}/usr/lib")?
-  fs.mkdir(fp"${dest}/usr/include")?
+  fs.mkdir(fp"{dest}/usr")?
+  fs.mkdir(fp"{dest}/usr/lib")?
+  fs.mkdir(fp"{dest}/usr/include")?
   var cflags = ["-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
   var defs = []
 
   var includes = [
     "-I",
-    fp"${src}/include".display(),
+    fp"{src}/include".display(),
     "-I",
-    fp"${src}/include/linux-private".display(),
+    fp"{src}/include/linux-private".display(),
     "-I",
-    fp"${src}/lib".display(),
+    fp"{src}/lib".display(),
     "-I",
     src.display(),
   ]
@@ -178,8 +178,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # genl source files for libnl-genl-3.so
   let genl_sources = [p"lib/genl/ctrl.c", p"lib/genl/family.c", p"lib/genl/genl.c", p"lib/genl/mngt.c"]
-  let core_so = fp"${dest}/usr/lib/libnl-3.so.200.26.0"
-  let genl_so = fp"${dest}/usr/lib/libnl-genl-3.so.200.26.0"
+  let core_so = fp"{dest}/usr/lib/libnl-3.so.200.26.0"
+  let genl_so = fp"{dest}/usr/lib/libnl-genl-3.so.200.26.0"
 
   let core = make.c_shared_library({
     cc,
@@ -217,19 +217,19 @@ export proc build(dest: Path) [fs, process, env, error] {
   for lib in [core_so, genl_so] {
     let basename = lib.name
     let parts = basename.split(".so.")
-    let soname = f"${parts[0]}.so.${parts[1].split(".")[0]}"
-    let linker = f"${parts[0]}.so"
-    fs.symlink(fp"${basename}", fp"${dest}/usr/lib/${soname}")?
-    fs.symlink(fp"${soname}", fp"${dest}/usr/lib/${linker}")?
+    let soname = f"{parts[0]}.so.{parts[1].split(".")[0]}"
+    let linker = f"{parts[0]}.so"
+    fs.symlink(fp"{basename}", fp"{dest}/usr/lib/{soname}")?
+    fs.symlink(fp"{soname}", fp"{dest}/usr/lib/{linker}")?
   }
 
   # Stub missing kernel header.  linux/filter.h (UAPI) includes linux/compiler.h
   # which is a kernel-internal header not exported to userspace.
-  let linux_hdrs = fp"${dest}/usr/include/linux"
+  let linux_hdrs = fp"{dest}/usr/include/linux"
   fs.mkdir(linux_hdrs)?
 
   fs.write(
-    fp"${linux_hdrs}/compiler.h",
+    fp"{linux_hdrs}/compiler.h",
     """#ifndef _UAPI_LINUX_COMPILER_H
 #define _UAPI_LINUX_COMPILER_H
 #define __user
@@ -259,9 +259,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   )?
 
   # Install public headers at /usr/include/netlink/
-  let usr_include = fp"${dest}/usr/include"
+  let usr_include = fp"{dest}/usr/include"
   fs.mkdir(usr_include)?
-  let headers_src = fp"${src}/include/netlink"
-  let headers_dest = fp"${dest}/usr/include/netlink"
+  let headers_src = fp"{src}/include/netlink"
+  let headers_dest = fp"{dest}/usr/include/netlink"
   make.install_header_tree(headers_src, headers_dest, [p"version.h.in"])?
 }

@@ -83,7 +83,7 @@ test test_native_arm64_docker_command_mounts_only_declared_inputs [error] {
 test test_container_xsh_and_core_come_from_one_seed [error] {
   let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "--help"])
   for product in ["xsh", "xshi", "xsht"] {
-    assert f"type=bind,src=/work/laputa/.out/seed/aarch64/${product},dst=/bin/${product},readonly" in argv
+    assert f"type=bind,src=/work/laputa/.out/seed/aarch64/{product},dst=/bin/{product},readonly" in argv
   }
   assert "type=bind,src=/work/laputa/.out/seed/aarch64/core,dst=/usr/lib/xsh/core,readonly" in argv
   assert ! (argv |> any "/work/xsh" in .)

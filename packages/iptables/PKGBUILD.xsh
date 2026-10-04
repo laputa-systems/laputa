@@ -71,26 +71,26 @@ proc write_iptables_stub() [fs, error] {
 #include <string.h>
 
 static int is_version_arg(const char *arg)
-{{
+{{{{
     return strcmp(arg, "--version") == 0 || strcmp(arg, "-V") == 0;
-}}
+}}}}
 
 int main(int argc, char **argv)
-{{
+{{{{
     const char *name = argc > 0 && argv[0] != 0 ? argv[0] : "iptables";
     const char *base = strrchr(name, '/');
 
     if (base != 0)
         name = base + 1;
 
-    if (argc >= 2 && is_version_arg(argv[1])) {{
-        printf("%s v${ver} (legacy)\\n", name);
+    if (argc >= 2 && is_version_arg(argv[1])) {{{{
+        printf("%s v{ver} (legacy)\\n", name);
         return 0;
-    }}
+    }}}}
 
     fprintf(stderr, "%s: Laputa currently packages a minimal native iptables command surface\\n", name);
     return 1;
-}}
+}}}}
 """,
   )?
 }
@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
   write_iptables_stub()?
 
   let iptables = make.c_program({
@@ -120,6 +120,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(iptables.tasks, make.jobs()?)?
 
   for tool_name in ["iptables", "ip6tables", "iptables-save", "ip6tables-save", "iptables-restore", "ip6tables-restore"] {
-    fs.install(iptables.output, fp"${dest}/usr/bin/${tool_name}", 0o755, parents: true, overwrite: true)?
+    fs.install(iptables.output, fp"{dest}/usr/bin/{tool_name}", 0o755, parents: true, overwrite: true)?
   }
 }

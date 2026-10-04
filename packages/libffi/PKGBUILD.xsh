@@ -141,20 +141,20 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_UNISTD_H 1
-${target_defines}#define LIBFFI_GNU_SYMBOL_VERSIONING 1
+{target_defines}#define LIBFFI_GNU_SYMBOL_VERSIONING 1
 #define LT_OBJDIR ".libs/"
 #define PACKAGE "libffi"
 #define PACKAGE_BUGREPORT "http://github.com/libffi/libffi/issues"
 #define PACKAGE_NAME "libffi"
-#define PACKAGE_STRING "libffi ${ver}"
+#define PACKAGE_STRING "libffi {ver}"
 #define PACKAGE_TARNAME "libffi"
 #define PACKAGE_URL ""
-#define PACKAGE_VERSION "${ver}"
+#define PACKAGE_VERSION "{ver}"
 #define SIZEOF_DOUBLE 8
 #define SIZEOF_LONG_DOUBLE 16
 #define SIZEOF_SIZE_T 8
 #define STDC_HEADERS 1
-#define VERSION "${ver}"
+#define VERSION "{ver}"
 
 #ifdef HAVE_HIDDEN_VISIBILITY_ATTRIBUTE
 #ifdef LIBFFI_ASM
@@ -186,7 +186,7 @@ ${target_defines}#define LIBFFI_GNU_SYMBOL_VERSIONING 1
     .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", "0")
 
   fs.write(p"include/ffi.h", ffi_h)?
-  fs.install(fp"src/${target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)?
+  fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)?
 }
 
 proc write_version_script() [fs, error] {
@@ -263,7 +263,7 @@ LIBFFI_GO_CLOSURE_8.0 {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
   let target = libffi_target(arch)
   let cflags = ["-O2", "-Wall", "-fexceptions"]
   let defs = ["-DHAVE_CONFIG_H"]
@@ -283,7 +283,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     defs,
     includes,
     root: p".",
-    sources: [fp"${src}" for src in srcs],
+    sources: [fp"{src}" for src in srcs],
     out_dir: p"obj",
     out: p"obj/libffi.so.8.2.0",
     soname: "libffi.so.8",
@@ -292,24 +292,24 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(libffi.tasks, make.jobs()?)?
-  fs.install(libffi.output, fp"${dest}/usr/lib/libffi.so.8.2.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libffi.so.8.2.0", fp"${dest}/usr/lib/libffi.so.8")?
-  fs.symlink(p"libffi.so.8.2.0", fp"${dest}/usr/lib/libffi.so")?
-  make.install_header_tree(p"include", fp"${dest}/usr/include")?
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.2.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libffi.so.8.2.0", fp"{dest}/usr/lib/libffi.so.8")?
+  fs.symlink(p"libffi.so.8.2.0", fp"{dest}/usr/lib/libffi.so")?
+  make.install_header_tree(p"include", fp"{dest}/usr/include")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   fs.write(
-    fp"${dest}/usr/lib/pkgconfig/libffi.pc",
+    fp"{dest}/usr/lib/pkgconfig/libffi.pc",
     f"""prefix=/usr
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
 
 Name: libffi
 Description: Library supporting Foreign Function Interfaces
-Version: ${ver}
-Libs: -L\${libdir} -lffi
-Cflags: -I\${includedir}
+Version: {ver}
+Libs: -L${{libdir}} -lffi
+Cflags: -I${{includedir}}
 """,
   )?
 }

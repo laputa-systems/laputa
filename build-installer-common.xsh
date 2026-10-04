@@ -10,7 +10,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"${env_value(name, fallback.display())}"
+  fp"{env_value(name, fallback.display())}"
 }
 
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
@@ -22,7 +22,7 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
     abort(status.exit_code()?)
   }
 
-  return Err(InstallerReportError.Failed(f"${argv[0]} was signaled"))
+  return Err(InstallerReportError.Failed(f"{argv[0]} was signaled"))
 }
 
 proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) [env, error] -> Result[Record] {
@@ -44,28 +44,28 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
     }
   }
 
-  Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerReportError.Failed(f"unsupported installer arch {arch}"))
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
   return "aarch64" when arch == "arm64" or arch == "aarch64"
 
-  Err(InstallerReportError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerReportError.Failed(f"unsupported installer arch {arch}"))
 }
 
 proc build_installer(raw_arch: Str) [fs, process, env, error] {
   let arch = normalize_arch(raw_arch)?
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let work = env_path("LAPUTA_INSTALLER_WORK", fp"${root}/target/laputa-installer-${arch}")?
-  let iso = env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-${arch}.iso")?
-  let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-${arch}.vmlinuz")?
+  let work = env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?
+  let iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
+  let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
   let envs = arch_envs(arch, root, work, iso, kernel, xsh)?
-  run_argv(xsh, ["xsh", fp"${root}/build-installer-image.xsh".display()], root, envs)?
+  run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, envs)?
 
   run_argv(
     xsh,
-    ["xsh", fp"${root}/installer-size.xsh".display(), "--", arch, work.display(), iso.display(), kernel.display()],
+    ["xsh", fp"{root}/installer-size.xsh".display(), "--", arch, work.display(), iso.display(), kernel.display()],
     root,
     {LAPUTA_ROOT: root.display()},
   )?

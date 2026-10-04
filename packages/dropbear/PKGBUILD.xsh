@@ -154,7 +154,7 @@ proc ifndef_wrapped_defines(source: Path) [fs, error] -> Result[Str] {
     let words = line.words()
 
     if words.len() >= 3 and words[0] == "#define" {
-      lines = lines.push(f"#ifndef ${words[1]}")
+      lines = lines.push(f"#ifndef {words[1]}")
       lines = lines.push(line)
       lines = lines.push("#endif")
     } else {
@@ -170,7 +170,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let src = fs.cwd()?
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
 
   # LAPUTA_ROOT: prefix where musl/zlib deps are installed (empty = system /usr).
   # Set to /build-env or /rootfs in the Makefile test target so configure can
@@ -198,7 +198,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # sub-makes (libtomcrypt) don't get -I flags, so copy to src/ too
   fs.write(p"src/localoptions.h", local_opts)?
-  let ldflags = f"-L${kr}/usr/lib"
+  let ldflags = f"-L{kr}/usr/lib"
   write_config_h()?
   let default_options_guard = ifndef_wrapped_defines(p"src/default_options.h")?
 
@@ -209,7 +209,7 @@ Generated from src/default_options.h
 Local customisation goes in localoptions.h
 */
 
-${default_options_guard}
+{default_options_guard}
 """,
   )?
 
@@ -319,13 +319,13 @@ ${default_options_guard}
     "-DDROPBEAR_CLIENT",
   ]
 
-  let includes = ["-I.", "-I./src", "-I./libtommath", "-I./libtomcrypt/src/headers", f"-I${kr}/usr/include"]
+  let includes = ["-I.", "-I./src", "-I./libtommath", "-I./libtomcrypt/src/headers", f"-I{kr}/usr/include"]
   let dropbear_cflags = ["-W", "-Wall", "-Wno-pointer-sign", "-Os", "-fPIC"]
   let ltc_cflags = ["-W", "-Wall", "-Wno-pointer-sign", "-Os", "-DLTC_SOURCE", "-fPIC"]
   let ltm_cflags = ["-O3", "-funroll-loops", "-fomit-frame-pointer", "-fPIC"]
   let _ = all_dropbear_stems
-  let ltc_root = fp"${src}/libtomcrypt/src"
-  let ltm_root = fp"${src}/libtommath"
+  let ltc_root = fp"{src}/libtomcrypt/src"
+  let ltm_root = fp"{src}/libtommath"
 
   let ltc_sources = [
     entry.path.relative_to(ltc_root)
@@ -386,7 +386,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in common_stems],
+    sources: [fp"{stem}.c" for stem in common_stems],
     out_dir: p"",
     deps: [],
   }, {
@@ -395,7 +395,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in clisvr_stems],
+    sources: [fp"{stem}.c" for stem in clisvr_stems],
     out_dir: p"",
     deps: [],
   }, {
@@ -404,7 +404,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in svr_stems],
+    sources: [fp"{stem}.c" for stem in svr_stems],
     out_dir: p"",
     deps: [],
   }, {
@@ -413,7 +413,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in cli_stems],
+    sources: [fp"{stem}.c" for stem in cli_stems],
     out_dir: p"",
     deps: [],
   }, {
@@ -422,7 +422,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in key_stems],
+    sources: [fp"{stem}.c" for stem in key_stems],
     out_dir: p"",
     deps: [],
   }, {
@@ -431,7 +431,7 @@ ${default_options_guard}
     defs: [],
     includes: [],
     root: p"",
-    sources: [fp"${stem}.c" for stem in convert_stems],
+    sources: [fp"{stem}.c" for stem in convert_stems],
     out_dir: p"",
     deps: [],
   }],
@@ -471,12 +471,12 @@ ${default_options_guard}
   })?
 
   make.run_tasks(ltc.tasks.extend(ltm.tasks).extend(multi.tasks), make.jobs()?)?
-  fs.install(p"dropbear", fp"${dest}/usr/bin/dropbear", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dbclient", fp"${dest}/usr/bin/dbclient", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dropbearkey", fp"${dest}/usr/bin/dropbearkey", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dropbearconvert", fp"${dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dropbear", fp"{dest}/usr/bin/dropbear", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dbclient", fp"{dest}/usr/bin/dbclient", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dropbearkey", fp"{dest}/usr/bin/dropbearkey", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dropbearconvert", fp"{dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)?
 
   # Runtime configuration and xinit service module.
-  fs.mkdir(fp"${dest}/etc/dropbear")?
-  fs.install(p"service.xsh", fp"${dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/etc/dropbear")?
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)?
 }

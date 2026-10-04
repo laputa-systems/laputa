@@ -11,13 +11,13 @@ proc check(condition: Bool, kind: Str, message: Str) [error] {
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
   let cc = process.which("cc")?
-  let tmp = fp"${root}/var/tmp/proof-zlib"
+  let tmp = fp"{root}/var/tmp/proof-zlib"
   fs.remove(tmp, missing_ok: true)?
   fs.mkdir(tmp)?
   defer fs.remove(tmp, missing_ok: true)?
 
   fs.write(
-    fp"${tmp}/proof-zlib.c",
+    fp"{tmp}/proof-zlib.c",
     """#include <string.h>
 #include <zlib.h>
 
@@ -39,12 +39,12 @@ int main(void) {
 """,
   )?
 
-  let binary = fp"${tmp}/proof-zlib"
-  run $cc fp"${tmp}/proof-zlib.c" f"-I${root}/usr/include" f"-L${root}/usr/lib" "-lz" "-o" $binary ?
+  let binary = fp"{tmp}/proof-zlib"
+  run $cc fp"{tmp}/proof-zlib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lz" "-o" $binary ?
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
     env ({
-      LD_LIBRARY_PATH: fp"${root}/usr/lib".display(),
+      LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     }) {
       run $binary ?
     } ?
@@ -52,8 +52,8 @@ int main(void) {
     proof.target_elf(root, p"usr/lib/libz.so", "zlib")?
   }
 
-  check(fs.exists(fp"${root}/usr/include/zlib.h")?, "zlib", "missing zlib.h")?
-  check(fs.exists(fp"${root}/usr/lib/libz.so")?, "zlib", "missing libz.so")?
+  check(fs.exists(fp"{root}/usr/include/zlib.h")?, "zlib", "missing zlib.h")?
+  check(fs.exists(fp"{root}/usr/lib/libz.so")?, "zlib", "missing libz.so")?
   print "zlib ok"
 }
 

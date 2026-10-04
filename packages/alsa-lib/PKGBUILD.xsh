@@ -113,10 +113,10 @@ int snd_pcm_close(void *pcm)
 }
 
 proc install_alsa_headers(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/include/alsa")?
+  fs.mkdir(fp"{dest}/usr/include/alsa")?
 
   fs.write(
-    fp"${dest}/usr/include/alsa/asoundlib.h",
+    fp"{dest}/usr/include/alsa/asoundlib.h",
     """#ifndef LAPUTA_ALSA_ASOUNDLIB_H
 #define LAPUTA_ALSA_ASOUNDLIB_H
 
@@ -149,29 +149,29 @@ int snd_pcm_close(snd_pcm_t *pcm);
 }
 
 proc install_pkg_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   fs.write(
-    fp"${dest}/usr/lib/pkgconfig/alsa.pc",
+    fp"{dest}/usr/lib/pkgconfig/alsa.pc",
     f"""prefix=/usr
-exec_prefix=\${{prefix}}
-libdir=\${{exec_prefix}}/lib
-includedir=\${{prefix}}/include
+exec_prefix=${{{{prefix}}}}
+libdir=${{{{exec_prefix}}}}/lib
+includedir=${{{{prefix}}}}/include
 
 Name: alsa
 Description: Laputa minimal native ALSA userspace library
-Version: ${ver}
-Libs: -L\${{libdir}} -lasound
-Cflags: -I\${{includedir}}
+Version: {ver}
+Libs: -L${{{{libdir}}}} -lasound
+Cflags: -I${{{{includedir}}}}
 """,
   )?
 }
 
 proc install_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/share/alsa")?
+  fs.mkdir(fp"{dest}/usr/share/alsa")?
 
   fs.write(
-    fp"${dest}/usr/share/alsa/alsa.conf",
+    fp"{dest}/usr/share/alsa/alsa.conf",
     """defaults.ctl.card 0
 defaults.pcm.card 0
 defaults.pcm.device 0
@@ -183,7 +183,7 @@ defaults.pcm.device 0
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
-  let triple = f"${os.machine}-linux-musl"
+  let triple = f"{os.machine}-linux-musl"
   write_asound_stub()?
 
   let libasound = make.c_shared_library({
@@ -202,8 +202,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(libasound.tasks, make.jobs()?)?
-  fs.install(libasound.output, fp"${dest}/usr/lib/libasound.so.2", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libasound.so.2", fp"${dest}/usr/lib/libasound.so")?
+  fs.install(libasound.output, fp"{dest}/usr/lib/libasound.so.2", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libasound.so.2", fp"{dest}/usr/lib/libasound.so")?
   install_alsa_headers(dest)?
   install_pkg_config(dest)?
   install_config(dest)?

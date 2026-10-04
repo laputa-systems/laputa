@@ -106,7 +106,7 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
     let manifest = local.load_manifest(entry.path)?
 
     for rel_path in manifest {
-      let path_value = fp"${root}/${rel_path}"
+      let path_value = fp"{root}/{rel_path}"
       continue unless path_value.exists()?
       continue unless fs.metadata(path_value)?.kind == "file"
 

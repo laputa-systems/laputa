@@ -19,7 +19,7 @@ proc plan_digest_lines(lines: List[Str]) [error] -> Result[Str] {
 }
 
 pure dependency_key(value: types.PlanDependency) -> Str {
-  f"${types.dependency_kind_text(value.kind)}\t${value.name}"
+  f"{types.dependency_kind_text(value.kind)}\t{value.name}"
 }
 
 pure node_is_before(left: types.PlanNode, right: types.PlanNode) -> Bool {
@@ -64,15 +64,15 @@ proc artifact_key_for(
 ) [error] -> Result[Str] {
   var lines = [
     "format\tlaputa-package-artifact-key-2",
-    f"build-epoch\t${build_epoch}",
-    f"target\t${types.target_text(target)}",
-    f"package\t${plan_canonical_field(package_id)}",
-    f"recipe\t${plan_canonical_field(recipe_sha256)}",
+    f"build-epoch\t{build_epoch}",
+    f"target\t{types.target_text(target)}",
+    f"package\t{plan_canonical_field(package_id)}",
+    f"recipe\t{plan_canonical_field(recipe_sha256)}",
   ]
 
   for dependency in dependencies |> sort-by { |dependency| dependency_key(dependency) } {
     lines = lines.push(
-      f"dependency\t${types.dependency_kind_text(dependency.kind)}\t${plan_canonical_field(dependency.name)}\t${plan_canonical_field(dependency.artifact_key)}",
+      f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
     )
   }
 
@@ -82,26 +82,26 @@ proc artifact_key_for(
 proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) [error] -> Result[Str] {
   plan_digest_lines([
     "format\tlaputa-legacy-remote-artifact-1",
-    f"arch\t${plan_canonical_field(remote.arch)}",
-    f"package\t${plan_canonical_field(package_id)}",
-    f"tarball\t${plan_canonical_field(remote.tarball)}",
-    f"tarball-sha256\t${plan_canonical_field(remote.tarball_sha256)}",
-    f"metadata\t${plan_canonical_field(remote.metadata)}",
-    f"metadata-sha256\t${plan_canonical_field(remote.metadata_sha256)}",
+    f"arch\t{plan_canonical_field(remote.arch)}",
+    f"package\t{plan_canonical_field(package_id)}",
+    f"tarball\t{plan_canonical_field(remote.tarball)}",
+    f"tarball-sha256\t{plan_canonical_field(remote.tarball_sha256)}",
+    f"metadata\t{plan_canonical_field(remote.metadata)}",
+    f"metadata-sha256\t{plan_canonical_field(remote.metadata_sha256)}",
   ])?
 }
 
 proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) [error] -> Result[Str] {
   plan_digest_lines([
     "format\tlaputa-package-proof-key-1",
-    f"package\t${plan_canonical_field(package_id)}",
-    f"artifact\t${plan_canonical_field(artifact_key)}",
-    f"proof\t${plan_canonical_field(proof_sha256)}",
+    f"package\t{plan_canonical_field(package_id)}",
+    f"artifact\t{plan_canonical_field(artifact_key)}",
+    f"proof\t{plan_canonical_field(proof_sha256)}",
   ])?
 }
 
 proc absolute_recipe_package(value: types.PackageCatalog, pkg: types.Package) [fs, error] -> Result[types.Package] {
-  let dir = if pkg.dir.display().starts_with("/") { pkg.dir } else { fp"${value.root}/${pkg.dir}" }
+  let dir = if pkg.dir.display().starts_with("/") { pkg.dir } else { fp"{value.root}/{pkg.dir}" }
   {...pkg, dir}
 }
 
@@ -122,10 +122,10 @@ proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) [fs,
 }
 
 proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) [error] -> Result[Str] {
-  var lines = ["format\tlaputa-package-repository-1", f"target\t${types.target_text(target)}"]
+  var lines = ["format\tlaputa-package-repository-1", f"target\t{types.target_text(target)}"]
 
   for name in recipe_inputs.keys() |> sort {
-    lines = lines.push(f"package\t${plan_canonical_field(name)}\t${recipe_inputs.get(name)?}")
+    lines = lines.push(f"package\t{plan_canonical_field(name)}\t{recipe_inputs.get(name)?}")
   }
 
   plan_digest_lines(lines)?
@@ -140,7 +140,7 @@ proc find_remote(
   for candidate in snapshot.packages {
     if candidate.name == name {
       if selected != null {
-        return Err(types.PmError.PackageContract(f"remote snapshot has duplicate package ${name}"))
+        return Err(types.PmError.PackageContract(f"remote snapshot has duplicate package {name}"))
       }
 
       selected = candidate
@@ -169,8 +169,8 @@ pure plan_version_parts(value: Str) -> List[Str] {
 pure plan_compare_version_part(left: Str, right: Str) -> Int {
   let left_num = left.parse_int() ?? -1
   let right_num = right.parse_int() ?? -1
-  let left_is_num = f"${left_num}" == left
-  let right_is_num = f"${right_num}" == right
+  let left_is_num = f"{left_num}" == left
+  let right_is_num = f"{right_num}" == right
 
   if left_is_num and right_is_num {
     if left_num < right_num {
@@ -208,7 +208,7 @@ pure plan_compare_version_release(left_ver: Str, left_rel: Str, right_ver: Str, 
 
 proc require_supported_target(target: types.Target, label: Str) [error] {
   if types.pm_target_arch(target) == "" {
-    return Err(types.PmError.PackageContract(f"${label} has an unsupported target"))
+    return Err(types.PmError.PackageContract(f"{label} has an unsupported target"))
   }
 }
 
@@ -241,7 +241,7 @@ proc dependency_nodes(
     continue unless edge.from == name and edge.kind != types.dependency_bootstrap() and (selected.get(edge.to) ?? false)
 
     if ! (edge.to in keys) {
-      return Err(types.PmError.PackageContract(f"${name} dependency ${edge.to} was not resolved before its build-plan node"))
+      return Err(types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"))
     }
 
     dependencies = dependencies.push({name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?})
@@ -299,7 +299,7 @@ export proc resolve(
 
   for name in selected_names {
     if ! (name in packages) {
-      return Err(types.PmError.MissingDependency(f"build plan needs a local recipe for ${name}"))
+      return Err(types.PmError.MissingDependency(f"build plan needs a local recipe for {name}"))
     }
   }
 
@@ -339,16 +339,16 @@ export proc resolve(
           if tuple_order < 0 {
             return Err(
               types.PmError.PackageContract(
-                f"${name} declares ${util.version_id(pkg.ver, pkg.rel)} behind remote ${util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
+                f"{name} declares {util.version_id(pkg.ver, pkg.rel)} behind remote {util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
               ),
             )
           }
 
           if tuple_order > 0 {
             let reason = if pkg.ver != candidate.ver {
-              f"local version differs from remote ${util.version_id(candidate.ver, candidate.rel)}"
+              f"local version differs from remote {util.version_id(candidate.ver, candidate.rel)}"
             } else {
-              f"local release is above remote ${util.version_id(candidate.ver, candidate.rel)}"
+              f"local release is above remote {util.version_id(candidate.ver, candidate.rel)}"
             }
             action = types.plan_action_build(reason)
           } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
@@ -358,7 +358,7 @@ export proc resolve(
             # The remote tuple was built against other dependency artifacts.
             # Build locally; publishing the result under the same tuple is an
             # immutable-tuple conflict that `repo publish` reports.
-            action = types.plan_action_build(f"dependencies rebuilt (${changed_dependencies.join(", ")})")
+            action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
           } else if candidate.artifact_key != "" {
             action = types.plan_action_build("remote artifact identity differs")
           } else {
@@ -408,7 +408,7 @@ export proc resolve(
 
 proc require_build_epoch(value: Int, label: Str) [error] {
   if value < 1 {
-    return Err(types.PmError.PackageContract(f"${label} build epoch must be positive"))
+    return Err(types.PmError.PackageContract(f"{label} build epoch must be positive"))
   }
 }
 
@@ -418,7 +418,7 @@ export proc require_current_build_epoch(value: types.BuildPlan) [error] {
   if value.build_epoch != build_policy.BUILD_EPOCH {
     return Err(
       types.PmError.PackageContract(
-        f"build plan was resolved at BUILD_EPOCH ${value.build_epoch}, but this PM is at BUILD_EPOCH ${build_policy.BUILD_EPOCH}; re-run repo plan",
+        f"build plan was resolved at BUILD_EPOCH {value.build_epoch}, but this PM is at BUILD_EPOCH {build_policy.BUILD_EPOCH}; re-run repo plan",
       ),
     )
   }
@@ -426,11 +426,11 @@ export proc require_current_build_epoch(value: types.BuildPlan) [error] {
 
 proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) [error] {
   if value.arch != types.pm_target_arch(target) {
-    return Err(types.PmError.PackageContract(f"remote artifact architecture ${value.arch} does not match ${types.target_text(target)}"))
+    return Err(types.PmError.PackageContract(f"remote artifact architecture {value.arch} does not match {types.target_text(target)}"))
   }
 
-  let _ = util.ensure_relative_path(fp"${value.tarball}", "plan remote tarball")?
-  let _ = util.ensure_relative_path(fp"${value.metadata}", "plan remote metadata")?
+  let _ = util.ensure_relative_path(fp"{value.tarball}", "plan remote tarball")?
+  let _ = util.ensure_relative_path(fp"{value.metadata}", "plan remote metadata")?
 
   if value.tarball_sha256 == "" or value.metadata_sha256 == "" {
     return Err(types.PmError.PackageContract("remote retrieval hashes are required"))
@@ -445,11 +445,11 @@ proc validate_node(
   artifact_keys: Map[Str],
 ) [error] {
   if seen.get(node.name) ?? false {
-    return Err(types.PmError.PackageContract(f"build plan has duplicate node ${node.name}"))
+    return Err(types.PmError.PackageContract(f"build plan has duplicate node {node.name}"))
   }
 
   if node.package_id != util.package_id(node.name, node.ver, node.rel) {
-    return Err(types.PmError.PackageContract(f"build plan node ${node.name} has an invalid package id"))
+    return Err(types.PmError.PackageContract(f"build plan node {node.name} has an invalid package id"))
   }
 
   let _ = util.ensure_relative_path(node.recipe_dir, "plan recipe directory")?
@@ -462,29 +462,29 @@ proc validate_node(
     if dependency_seen.get(key) ?? false {
       return Err(
         types.PmError.PackageContract(
-          f"build plan node ${node.name} repeats ${types.dependency_kind_text(dependency.kind)} dependency ${dependency.name}",
+          f"build plan node {node.name} repeats {types.dependency_kind_text(dependency.kind)} dependency {dependency.name}",
         ),
       )
     }
 
     if prior_dependency != null {
       if dependency_key(dependency) < dependency_key(prior_dependency) {
-        return Err(types.PmError.PackageContract(f"build plan node ${node.name} dependencies are not ordered"))
+        return Err(types.PmError.PackageContract(f"build plan node {node.name} dependencies are not ordered"))
       }
     }
 
     if ! (dependency.name in levels) {
-      return Err(types.PmError.PackageContract(f"build plan node ${node.name} has unresolved dependency ${dependency.name}"))
+      return Err(types.PmError.PackageContract(f"build plan node {node.name} has unresolved dependency {dependency.name}"))
     }
 
     if levels.get(dependency.name)? >= node.level {
-      return Err(types.PmError.PackageContract(f"build plan node ${node.name} is not dependency-first"))
+      return Err(types.PmError.PackageContract(f"build plan node {node.name} is not dependency-first"))
     }
 
     if artifact_keys.get(dependency.name)? != dependency.artifact_key {
       return Err(
         types.PmError.PackageContract(
-          f"build plan node ${node.name} dependency ${dependency.name} artifact key does not match its referenced node",
+          f"build plan node {node.name} dependency {dependency.name} artifact key does not match its referenced node",
         ),
       )
     }
@@ -497,29 +497,29 @@ proc validate_node(
 
   if types.plan_action_is_build(node.action) {
     if node.remote != null {
-      return Err(types.PmError.PackageContract(f"build plan node ${node.name} builds locally but has remote retrieval data"))
+      return Err(types.PmError.PackageContract(f"build plan node {node.name} builds locally but has remote retrieval data"))
     }
 
     if node.artifact_key != expected_local {
-      return Err(types.PmError.PackageContract(f"build plan node ${node.name} artifact key does not match local inputs"))
+      return Err(types.PmError.PackageContract(f"build plan node {node.name} artifact key does not match local inputs"))
     }
   } else {
     let retrieval = node.remote
 
     if retrieval == null {
-      return Err(types.PmError.PackageContract(f"build plan node ${node.name} reuses remote without retrieval data"))
+      return Err(types.PmError.PackageContract(f"build plan node {node.name} reuses remote without retrieval data"))
     } else {
       validate_retrieval(retrieval, value.target)?
       let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
 
       if node.artifact_key != expected_local and node.artifact_key != expected_legacy {
-        return Err(types.PmError.PackageContract(f"build plan node ${node.name} artifact key does not match remote inputs"))
+        return Err(types.PmError.PackageContract(f"build plan node {node.name} artifact key does not match remote inputs"))
       }
     }
   }
 
   if node.proof_key != proof_key_for(node.package_id, node.artifact_key, node.proof_sha256)? {
-    return Err(types.PmError.PackageContract(f"build plan node ${node.name} proof key does not match its inputs"))
+    return Err(types.PmError.PackageContract(f"build plan node {node.name} proof key does not match its inputs"))
   }
 }
 
@@ -548,7 +548,7 @@ export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types
 
 proc validate_structure(value: types.BuildPlan) [error] {
   if value.format != format {
-    return Err(types.PmError.PackageContract(f"unsupported build plan format ${value.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported build plan format {value.format}"))
   }
 
   require_supported_target(value.target, "build plan")?
@@ -566,7 +566,7 @@ proc validate_structure(value: types.BuildPlan) [error] {
 
   for node in value.nodes {
     if names.get(node.name) ?? false {
-      return Err(types.PmError.PackageContract(f"build plan has duplicate node ${node.name}"))
+      return Err(types.PmError.PackageContract(f"build plan has duplicate node {node.name}"))
     }
 
     names[node.name] = true
@@ -576,7 +576,7 @@ proc validate_structure(value: types.BuildPlan) [error] {
 
   for root in value.roots {
     if ! (root in names) {
-      return Err(types.PmError.PackageContract(f"build plan root ${root} is not a node"))
+      return Err(types.PmError.PackageContract(f"build plan root {root} is not a node"))
     }
   }
 
@@ -599,25 +599,25 @@ proc validate_structure(value: types.BuildPlan) [error] {
 proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
   var lines = [
     "format\tlaputa-build-plan-fingerprint-1",
-    f"plan-format\t${plan_canonical_field(value.format)}",
-    f"target\t${types.target_text(value.target)}",
-    f"repository\t${plan_canonical_field(value.repository_digest)}",
-    f"remote-index\t${plan_canonical_field(value.remote_index_sha256)}",
-    f"build-epoch\t${value.build_epoch}",
+    f"plan-format\t{plan_canonical_field(value.format)}",
+    f"target\t{types.target_text(value.target)}",
+    f"repository\t{plan_canonical_field(value.repository_digest)}",
+    f"remote-index\t{plan_canonical_field(value.remote_index_sha256)}",
+    f"build-epoch\t{value.build_epoch}",
   ]
 
   for root in value.roots {
-    lines = lines.push(f"root\t${plan_canonical_field(root)}")
+    lines = lines.push(f"root\t{plan_canonical_field(root)}")
   }
 
   for node in value.nodes {
     lines = lines.push(
-      f"node\t${node.level}\t${plan_canonical_field(node.name)}\t${plan_canonical_field(node.ver)}\t${plan_canonical_field(node.rel)}\t${plan_canonical_field(node.package_id)}\t${plan_canonical_field(node.recipe_dir.display())}\t${plan_canonical_field(node.recipe_sha256)}\t${plan_canonical_field(node.proof_sha256)}\t${plan_canonical_field(node.artifact_key)}\t${plan_canonical_field(node.proof_key)}\t${types.plan_action_text(node.action)}\t${plan_canonical_field(types.plan_action_reason(node.action))}",
+      f"node\t{node.level}\t{plan_canonical_field(node.name)}\t{plan_canonical_field(node.ver)}\t{plan_canonical_field(node.rel)}\t{plan_canonical_field(node.package_id)}\t{plan_canonical_field(node.recipe_dir.display())}\t{plan_canonical_field(node.recipe_sha256)}\t{plan_canonical_field(node.proof_sha256)}\t{plan_canonical_field(node.artifact_key)}\t{plan_canonical_field(node.proof_key)}\t{types.plan_action_text(node.action)}\t{plan_canonical_field(types.plan_action_reason(node.action))}",
     )
 
     for dependency in node.dependencies {
       lines = lines.push(
-        f"dependency\t${plan_canonical_field(node.name)}\t${types.dependency_kind_text(dependency.kind)}\t${plan_canonical_field(dependency.name)}\t${plan_canonical_field(dependency.artifact_key)}",
+        f"dependency\t{plan_canonical_field(node.name)}\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
       )
     }
 
@@ -625,7 +625,7 @@ proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
 
     if retrieval != null {
       lines = lines.push(
-        f"remote\t${plan_canonical_field(node.name)}\t${plan_canonical_field(retrieval.arch)}\t${plan_canonical_field(retrieval.tarball)}\t${plan_canonical_field(retrieval.tarball_sha256)}\t${plan_canonical_field(retrieval.metadata)}\t${plan_canonical_field(retrieval.metadata_sha256)}",
+        f"remote\t{plan_canonical_field(node.name)}\t{plan_canonical_field(retrieval.arch)}\t{plan_canonical_field(retrieval.tarball)}\t{plan_canonical_field(retrieval.tarball_sha256)}\t{plan_canonical_field(retrieval.metadata)}\t{plan_canonical_field(retrieval.metadata_sha256)}",
       )
     }
   }
@@ -651,7 +651,7 @@ export proc validate(value: types.BuildPlan) [error] {
 
 pure color(text: Str, code: Str, colors: Bool) -> Str {
   if colors {
-    return f"\u{1b}[${code}m${text}\u{1b}[0m"
+    return f"\u{1b}[{code}m{text}\u{1b}[0m"
   }
 
   text
@@ -661,14 +661,14 @@ pure color(text: Str, code: Str, colors: Bool) -> Str {
 export proc render(value: types.BuildPlan, colors: Bool) [error] -> Result[Str] {
   validate(value)?
   var lines = [
-    f"plan ${value.plan_sha256}",
-    f"target ${types.target_text(value.target)}",
-    f"roots ${value.roots.join(", ")}",
+    f"plan {value.plan_sha256}",
+    f"target {types.target_text(value.target)}",
+    f"roots {value.roots.join(", ")}",
   ]
 
   for node in value.nodes {
     let action = types.plan_action_text(node.action)
-    let line = f"level ${node.level} ${node.name} ${action} ${node.artifact_key} ${types.plan_action_reason(node.action)}"
+    let line = f"level {node.level} {node.name} {action} {node.artifact_key} {types.plan_action_reason(node.action)}"
     lines = lines.push(color(line, if action == "build" { "1;33" } else { "1;32" }, colors))
   }
 

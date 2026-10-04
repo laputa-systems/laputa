@@ -201,7 +201,7 @@ export proc build(dest: Path) [fs, error] {
     "var/spool/mail",
     "var/tmp",
   ] {
-    fs.mkdir(fp"${dest}/${tree}")?
+    fs.mkdir(fp"{dest}/{tree}")?
   }
 
   # `.keep` is hidden, so it must be visible to the cleanup walk. Leaving it

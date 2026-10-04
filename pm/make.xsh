@@ -129,15 +129,15 @@ pure has_path(path_value: Path) -> Bool {
 }
 
 pure stamp_path(out: Path) -> Path {
-  return fp"${out}.cmd"
+  return fp"{out}.cmd"
 }
 
 pure depfile_path(out: Path) -> Path {
-  return fp"${out}.d"
+  return fp"{out}.d"
 }
 
 pure argv_text(argv: List[Any]) -> List[Str] {
-  return [f"${arg}" for arg in argv]
+  return [f"{arg}" for arg in argv]
 }
 
 pure object_name_for_source(src: Path, ext: Str) -> Str {
@@ -152,7 +152,7 @@ pure object_name_for_source(src: Path, ext: Str) -> Str {
 }
 
 pure object_path_for_source(src: Path, out_dir: Path, ext: Str) -> Path {
-  fp"${out_dir}/${object_name_for_source(src, ext)}"
+  fp"{out_dir}/{object_name_for_source(src, ext)}"
 }
 
 pure source_is_cxx(src: Path) -> Bool {
@@ -164,7 +164,7 @@ pure source_path(root: Path, src: Path) -> Path {
     return src
   }
 
-  return fp"${root}/${src}"
+  return fp"{root}/{src}"
 }
 
 ## Exported PM declaration `task_deps`.
@@ -245,7 +245,7 @@ export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Pat
   for entry in fs.walk(source_root, gitignore: false)? {
     let rel = entry.path.relative_to(source_root)
     continue when path_in_list(rel, exclude)
-    let target = fp"${dest_dir}/${rel}"
+    let target = fp"{dest_dir}/{rel}"
 
     if entry.kind == "dir" {
       fs.mkdir(target)?
@@ -259,7 +259,7 @@ pure parse_jobs(value: Str, source: Str) -> Result[Int] {
   let parsed = value.parse_int()?
 
   if parsed <= 0 {
-    return Err(MakeError.InvalidJobs(message: f"${source} must be a positive integer"))
+    return Err(MakeError.InvalidJobs(message: f"{source} must be a positive integer"))
   }
 
   return parsed
@@ -278,10 +278,10 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
 
     if word == "-j" or word == "--jobs" {
       if index + 1 >= words.len() {
-        return Err(MakeError.InvalidJobs(message: f"MAKEFLAGS ${word} requires a job count"))
+        return Err(MakeError.InvalidJobs(message: f"MAKEFLAGS {word} requires a job count"))
       }
 
-      return parse_jobs(words[index + 1], f"MAKEFLAGS ${word}")?
+      return parse_jobs(words[index + 1], f"MAKEFLAGS {word}")?
     }
 
     if word.starts_with("--jobs=") {
@@ -329,11 +329,11 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
     }
 
     if names.get(task.name) ?? false {
-      return Err(MakeError.DuplicateTask(message: f"duplicate make task '${task.name}'"))
+      return Err(MakeError.DuplicateTask(message: f"duplicate make task '{task.name}'"))
     }
 
     if task.argv.len() == 0 {
-      return Err(MakeError.InvalidTask(message: f"make task '${task.name}' has empty argv"))
+      return Err(MakeError.InvalidTask(message: f"make task '{task.name}' has empty argv"))
     }
 
     names[task.name] = true
@@ -342,11 +342,11 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
       let key = output.display()
 
       if key == "" {
-        return Err(MakeError.InvalidTask(message: f"make task '${task.name}' has empty output path"))
+        return Err(MakeError.InvalidTask(message: f"make task '{task.name}' has empty output path"))
       }
 
       if outputs.get(key) ?? false {
-        return Err(MakeError.DuplicateOutput(message: f"duplicate make output '${key}'"))
+        return Err(MakeError.DuplicateOutput(message: f"duplicate make output '{key}'"))
       }
 
       outputs[key] = true
@@ -356,7 +356,7 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
   for task in tasks {
     for dep in task.deps {
       if ! (names.get(dep) ?? false) {
-        return Err(MakeError.MissingDependency(message: f"make task '${task.name}' depends on missing task '${dep}'"))
+        return Err(MakeError.MissingDependency(message: f"make task '{task.name}' depends on missing task '{dep}'"))
       }
     }
   }
@@ -364,10 +364,10 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
 
 pure dep_path(cwd: Path, dep: Str) -> Path {
   if dep.starts_with("/") {
-    return fp"${dep}"
+    return fp"{dep}"
   }
 
-  return fp"${cwd}/${dep}"
+  return fp"{cwd}/{dep}"
 }
 
 proc depfile_inputs(depfile: Path, cwd: Path) [fs, error] -> Result[List[Path]] {
@@ -512,7 +512,7 @@ proc spawn_task(task: MakeTask) [fs, process, env, error] -> Result[RunningTask]
 }
 
 pure completed_index_key(index: Int) -> Str {
-  return f"${index}"
+  return f"{index}"
 }
 
 proc remove_running_indices(running: List[RunningTask], completed_indices: Map[Bool]) [] -> List[RunningTask] {
@@ -562,9 +562,9 @@ proc emit_dynamic_state(
   idle_intervals: Int,
   task: Str = "",
 ) [env] {
-  let task_suffix = if task == "" { "" } else { f" task=${task}" }
+  let task_suffix = if task == "" { "" } else { f" task={task}" }
   make_progress(
-    f"xsh-make-dynamic-state event=${event} tasks=${task_count} completed=${completed_count} ready=${ready_count} running=${running_count} slots=${jobs_count} peak-running=${peak_running} idle-intervals=${idle_intervals}${task_suffix}",
+    f"xsh-make-dynamic-state event={event} tasks={task_count} completed={completed_count} ready={ready_count} running={running_count} slots={jobs_count} peak-running={peak_running} idle-intervals={idle_intervals}{task_suffix}",
   )
 }
 
@@ -612,7 +612,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
     }
   }
 
-  make_progress(f"xsh-make-dynamic-start tasks ${tasks.len()} jobs ${jobs_count}")
+  make_progress(f"xsh-make-dynamic-start tasks {tasks.len()} jobs {jobs_count}")
 
   while done_count < tasks.len() {
     while running.len() < jobs_count and ready_index < ready.len() {
@@ -707,7 +707,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
 
       if ! completed.status.ok {
         cancel_running_uncompleted(running, completed_indices)
-        return Err(MakeError.CommandFailed(message: f"make task '${row.task.name}' failed"))
+        return Err(MakeError.CommandFailed(message: f"make task '{row.task.name}' failed"))
       }
 
       completed_tasks = completed_tasks.push(row)
@@ -1180,7 +1180,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
 
   for source_group in spec.groups {
     if source_group.name in groups {
-      return Err(MakeError.DuplicateTask(message: f"duplicate source group '${source_group.name}'"))
+      return Err(MakeError.DuplicateTask(message: f"duplicate source group '{source_group.name}'"))
     }
 
     let cflags = spec.cflags.extend(source_group.cflags)
@@ -1189,7 +1189,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
     let root = if source_group.root.display() == "" { spec.root } else { source_group.root }
 
     let out_dir = if source_group.out_dir.display() == "" {
-      fp"${spec.out_dir}/${source_group.name}"
+      fp"{spec.out_dir}/{source_group.name}"
     } else {
       source_group.out_dir
     }
@@ -1220,7 +1220,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
       if ! (group_name in groups) {
         return Err(
           MakeError.MissingDependency(
-            message: f"target '${target.name}' references missing source group '${group_name}'",
+            message: f"target '{target.name}' references missing source group '{group_name}'",
           ),
         )
       }
@@ -1240,7 +1240,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
         spec.includes,
         spec.root,
         target.sources,
-        fp"${spec.out_dir}/${target.name}",
+        fp"{spec.out_dir}/{target.name}",
       )
 
       tasks = tasks.extend(target_compile.tasks)
@@ -1273,7 +1273,7 @@ export proc link_shared_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let _ = toolchain
-  var argv: List[Any] = ["cc", "-target", triple, "-shared", f"-Wl,-soname,${soname}"]
+  var argv: List[Any] = ["cc", "-target", triple, "-shared", f"-Wl,-soname,{soname}"]
   argv = [@argv, @ldflags, @objs, "-o", out]
 
   return {

@@ -72,7 +72,7 @@ test test_qemu_command_is_the_single_aarch64_hvf_contract [error] {
 
 test test_console_markers_fail_before_success [error] {
   for marker in proof.failure_markers {
-    assert proof.failure_marker(f"before ${marker} after") == marker
+    assert proof.failure_marker(f"before {marker} after") == marker
   }
 
   assert ! proof.succeeded("booting")
@@ -82,7 +82,7 @@ test test_console_markers_fail_before_success [error] {
     Err(_) => {}
   }
 
-  match proof.verify_console(f"""${proof.success_marker}
+  match proof.verify_console(f"""{proof.success_marker}
 QEMU_FATAL after success""") {
     Ok(_) => assert false
     Err(_) => {}
@@ -92,16 +92,16 @@ QEMU_FATAL after success""") {
 proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
-  let bundle = fp"${outputs.builds}/fixture"
+  let bundle = fp"{outputs.builds}/fixture"
   fs.mkdir(bundle)?
   fs.symlink(p"builds/fixture", outputs.current)?
-  let fake_qemu = fp"${root}/fake-qemu.sh"
-  let fake_qmp = fp"${root}/fake-qmp.sh"
-  let attempt_one = fp"${root}/qmp-attempt-one"
-  let attempt_two = fp"${root}/qmp-attempt-two"
-  let attempt_three = fp"${root}/qmp-attempt-three"
-  let input_record = fp"${root}/input-record"
-  let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '${outputs.qemu_log}'" } else { "" }
+  let fake_qemu = fp"{root}/fake-qemu.sh"
+  let fake_qmp = fp"{root}/fake-qmp.sh"
+  let attempt_one = fp"{root}/qmp-attempt-one"
+  let attempt_two = fp"{root}/qmp-attempt-two"
+  let attempt_three = fp"{root}/qmp-attempt-three"
+  let input_record = fp"{root}/input-record"
+  let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '{outputs.qemu_log}'" } else { "" }
 
   fs.write(outputs.kernel, "kernel")?
   fs.write(outputs.disk, "disk")?
@@ -112,7 +112,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
     [
       "#!/bin/sh",
       "trap '' TERM",
-      f"printf qmp > '${outputs.qmp_socket}'",
+      f"printf qmp > '{outputs.qmp_socket}'",
       "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'",
       "while :; do sleep 1; done",
     ].join("\n") + "\n",
@@ -124,10 +124,10 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
     fake_qmp,
     [
       "#!/bin/sh",
-      f"if [ ! -e '${attempt_one}' ]; then : > '${attempt_one}'; exit 1; fi",
-      f"if [ ! -e '${attempt_two}' ]; then : > '${attempt_two}'; exit 0; fi",
-      f"if [ ! -e '${attempt_three}' ]; then : > '${attempt_three}'; printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '${outputs.console_log}'; printf 'laputa\\n' > '${input_record}'; exit 0; fi",
-      f"printf 'P6\\n1 1\\n255\\nX' > '${outputs.screenshot}'",
+      f"if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
+      f"if [ ! -e '{attempt_two}' ]; then : > '{attempt_two}'; exit 0; fi",
+      f"if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0; fi",
+      f"printf 'P6\\n1 1\\n255\\nX' > '{outputs.screenshot}'",
       final_log,
       "exit 0",
     ].join("\n") + "\n",
@@ -138,7 +138,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
     config: {
       qemu: fake_qemu,
       python: fake_qmp,
-      qmp_helper: fp"${root}/qmp-helper.py",
+      qmp_helper: fp"{root}/qmp-helper.py",
     },
     outputs,
     qmp_attempt_one: attempt_one,
@@ -150,7 +150,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
 
 test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-screenshot")?
-  let screenshot = fp"${root}/screenshot.ppm"
+  let screenshot = fp"{root}/screenshot.ppm"
   fs.write(screenshot, "")?
   assert ! qemu.screenshot_is_valid(screenshot)?
   fs.write(

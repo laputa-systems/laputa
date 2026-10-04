@@ -10,7 +10,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"${env_value(name, fallback.display())}"
+  fp"{env_value(name, fallback.display())}"
 }
 
 proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
@@ -22,7 +22,7 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
     abort(status.exit_code()?)
   }
 
-  return Err(InstallerAarch64Error.Failed(f"${argv[0]} was signaled"))
+  return Err(InstallerAarch64Error.Failed(f"{argv[0]} was signaled"))
 }
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
@@ -35,7 +35,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   run_argv(
     xsh,
-    ["xsh", fp"${root}/build-installer-common.xsh".display(), "--", "aarch64"],
+    ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", "aarch64"],
     root,
     {XSH_HOST: xsh.display(), LAPUTA_ROOT: root.display()},
   )?

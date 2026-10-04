@@ -13,7 +13,7 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/share/dep.txt", kind: "file"}]
 
 export proc build(dest: Path) [fs, error] -> Result[Unit] {
-  let target = fp"${dest}/usr/share/dep.txt"
+  let target = fp"{dest}/usr/share/dep.txt"
   fs.mkdir(target.parent)?
 
   fs.write(

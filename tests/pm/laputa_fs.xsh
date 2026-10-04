@@ -5,7 +5,7 @@ const inode_table_block = 4
 
 proc runner() [process, env, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
-  return fp"${configured}" when configured != ""
+  return fp"{configured}" when configured != ""
 
   process.which("xsh")?
 }
@@ -16,15 +16,15 @@ proc inode_offset(inode: Int) [] -> Int {
 
 test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "laputa-fs-symlink-boundary")?
-  let source = fp"${root}/source"
-  let image = fp"${root}/rootfs.ext4"
+  let source = fp"{root}/source"
+  let image = fp"{root}/rootfs.ext4"
   let fast_target = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   let block_target = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   assert fast_target.byte_len() == 59
   assert block_target.byte_len() == 60
   fs.mkdir(source)?
-  fs.symlink(fp"${fast_target}", fp"${source}/fast")?
-  fs.symlink(fp"${block_target}", fp"${source}/block")?
+  fs.symlink(fp"{fast_target}", fp"{source}/fast")?
+  fs.symlink(fp"{block_target}", fp"{source}/block")?
   fs.write(image, b"")?
   image.truncate(8 * 1024 * 1024)?
 

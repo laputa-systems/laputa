@@ -56,14 +56,14 @@ export let upstream_sources = [
 export let filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
 
 proc sysroot_path(root: Str, raw: Str) [fs, error] -> Result[Path] {
-  let path_value = fp"${raw.trim()}"
+  let path_value = fp"{raw.trim()}"
 
   if fs.exists(path_value)? {
     return path_value
   }
 
   if root != "" and root != "/" and raw.starts_with("/") {
-    return fp"${root}${raw.trim()}"
+    return fp"{root}{raw.trim()}"
   }
 
   path_value
@@ -75,17 +75,17 @@ proc pkg_config_flags(pkg_config: Path, mode: Str, packages: List[Str]) [process
 }
 
 proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) [process, error] -> Result[Str] {
-  let out = run.text $pkg_config f"--variable=${variable}" $package ?
+  let out = run.text $pkg_config f"--variable={variable}" $package ?
   out.trim()
 }
 
 proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) [fs, process, error] {
   let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
-  run $scanner "enum-header" fp"${protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h" ?
-  run $scanner "enum-header" fp"${protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h" ?
+  run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h" ?
+  run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h" ?
   run $scanner "enum-header" "protocols/wlr-layer-shell-unstable-v1.xml" "wlr-layer-shell-unstable-v1-protocol.h" ?
   run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" "wlr-output-power-management-unstable-v1-protocol.h" ?
-  run $scanner "server-header" fp"${protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h" ?
+  run $scanner "server-header" fp"{protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h" ?
 }
 
 proc patch_startup() [fs, error] {
@@ -236,12 +236,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cross_build = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if cross_build {
-    f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib"
+    f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   } else {
     pc.ld_library_path
   }
 
-  let scanner = if cross_build { fp"${build_root}/usr/bin/wayland-scanner" } else { process.which("wayland-scanner")? }
+  let scanner = if cross_build { fp"{build_root}/usr/bin/wayland-scanner" } else { process.which("wayland-scanner")? }
   let packages = ["wayland-server", "xkbcommon", "libinput", "wlroots-0.19"]
   patch_startup()?
   write_config()?
@@ -261,7 +261,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "-I.",
       "-DWLR_USE_UNSTABLE",
       "-D_POSIX_C_SOURCE=200809L",
-      f"-DVERSION=\"${ver}\"",
+      f"-DVERSION=\"{ver}\"",
       "-Wall",
       "-Wextra",
       "-Wno-unused-parameter",
@@ -275,5 +275,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cc "dwl.o" "util.o" "-o" "dwl" @pkg_libs "-lm" ?
   } ?
 
-  fs.install(p"dwl", fp"${dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)?
 }

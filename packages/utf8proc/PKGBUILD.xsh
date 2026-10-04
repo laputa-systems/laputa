@@ -65,7 +65,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
 
   let cmake_args = [
     "-G",

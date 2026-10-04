@@ -47,9 +47,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   var host_ld_library_path = ""
 
   if cross_build {
-    let build_root = fp"${env.get("XSH_PM_BUILD_ROOT") ?? ""}"
-    bootstrap_cc = fp"${build_root}/usr/bin/cc"
-    host_ld_library_path = f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib"
+    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    bootstrap_cc = fp"{build_root}/usr/bin/cc"
+    host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }
 
   fs.mkdir(p"build")?
@@ -91,14 +91,14 @@ export proc build(dest: Path) [fs, process, env, error] {
         """rule muon_build_c_linker
  command = cc""",
         f"""rule muon_build_c_linker
- command = ${bootstrap_cc}""",
+ command = {bootstrap_cc}""",
       )
 
       patched_ninja = patched_ninja.replace(
         """rule muon_build_c_compiler
  command = cc""",
         f"""rule muon_build_c_compiler
- command = ${bootstrap_cc}""",
+ command = {bootstrap_cc}""",
       )
 
       fs.write(build_ninja, patched_ninja)?
@@ -109,5 +109,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "build/muon-bootstrap" "-C" "build" "samu" ?
   }
 
-  fs.install(p"build/muon", fp"${dest}/usr/bin/muon", 0o755, parents: true, overwrite: true)?
+  fs.install(p"build/muon", fp"{dest}/usr/bin/muon", 0o755, parents: true, overwrite: true)?
 }

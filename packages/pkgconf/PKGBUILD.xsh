@@ -106,7 +106,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
 
   # Step 1: generate libpkgconf/config.h.
   # All HAVE_* values are precomputed for Clang + musl on aarch64 and x86_64.
@@ -132,12 +132,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["PACKAGE"] = "\"pkgconf\""
   defines["PACKAGE_BUGREPORT"] = "\"https://github.com/pkgconf/pkgconf/issues/new\""
   defines["PACKAGE_NAME"] = "\"pkgconf\""
-  defines["PACKAGE_STRING"] = f"\"pkgconf ${ver}\""
+  defines["PACKAGE_STRING"] = f"\"pkgconf {ver}\""
   defines["PACKAGE_TARNAME"] = "\"pkgconf\""
   defines["PACKAGE_URL"] = "\"\""
-  defines["PACKAGE_VERSION"] = f"\"${ver}\""
+  defines["PACKAGE_VERSION"] = f"\"{ver}\""
   defines["STDC_HEADERS"] = "1"
-  defines["VERSION"] = f"\"${ver}\""
+  defines["VERSION"] = f"\"{ver}\""
   configure.config_h(p"libpkgconf/config.h.in", p"libpkgconf/config.h", defines)?
 
   # Compile flags matching configure's detected values.
@@ -255,36 +255,36 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(lib.tasks.extend(static_target.tasks).extend(pkgconf.tasks).extend(bomtool.tasks), make.jobs()?)?
 
   # Step 6: install into dest.
-  fs.install(sofile, fp"${dest}/usr/lib/libpkgconf.so.7.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libpkgconf.so.7.0.0", fp"${dest}/usr/lib/libpkgconf.so.7")?
-  fs.symlink(p"libpkgconf.so.7.0.0", fp"${dest}/usr/lib/libpkgconf.so")?
-  fs.install(static_target.output, fp"${dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)?
-  fs.install(pkgconf_bin, fp"${dest}/usr/bin/pkgconf", 0o755, parents: true, overwrite: true)?
-  fs.install(bomtool_bin, fp"${dest}/usr/bin/bomtool", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"pkgconf", fp"${dest}/usr/bin/pkg-config")?
+  fs.install(sofile, fp"{dest}/usr/lib/libpkgconf.so.7.0.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libpkgconf.so.7.0.0", fp"{dest}/usr/lib/libpkgconf.so.7")?
+  fs.symlink(p"libpkgconf.so.7.0.0", fp"{dest}/usr/lib/libpkgconf.so")?
+  fs.install(static_target.output, fp"{dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)?
+  fs.install(pkgconf_bin, fp"{dest}/usr/bin/pkgconf", 0o755, parents: true, overwrite: true)?
+  fs.install(bomtool_bin, fp"{dest}/usr/bin/bomtool", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"pkgconf", fp"{dest}/usr/bin/pkg-config")?
 
   # Headers: libpkgconf/libpkgconf-api.h, bsdstubs.h, iter.h, libpkgconf.h, stdinc.h
   let headers = fs.files(p"libpkgconf")? |> where .ext == "h"
 
   for hdr in headers {
-    fs.install(hdr.path, fp"${dest}/usr/include/pkgconf/libpkgconf/${hdr.name}", 0o644, parents: true, overwrite: true)?
+    fs.install(hdr.path, fp"{dest}/usr/include/pkgconf/libpkgconf/{hdr.name}", 0o644, parents: true, overwrite: true)?
   }
 
   # libpkgconf.pc (pkg-config metadata).
   # ${prefix} etc. are pkg-config variable references, not XSH interpolation.
   # Use a template with a placeholder for the version.
   let pc_template = f"""prefix=/usr
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
 
 Name: libpkgconf
 Description: a library for accessing and manipulating development framework configuration
 Version: PKG_VER
-Libs: -L\${libdir} -lpkgconf
-Cflags: -I\${includedir}/pkgconf
+Libs: -L${{libdir}} -lpkgconf
+Cflags: -I${{includedir}}/pkgconf
 """
 
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
-  fs.write(fp"${dest}/usr/lib/pkgconfig/libpkgconf.pc", pc_template.replace("PKG_VER", ver))?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.write(fp"{dest}/usr/lib/pkgconfig/libpkgconf.pc", pc_template.replace("PKG_VER", ver))?
 }

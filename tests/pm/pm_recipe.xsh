@@ -4,24 +4,24 @@ use pm.sources
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 proc expect_contract_rejection(dir: Path, description: Str) [fs, env, error] {
   match recipe.load_package(dir) {
-    Ok(_) => test.fail(f"${description}: recipe unexpectedly loaded")?
-    Err(error) => test.ok(error.message != "", f"${description}: error has a message")?
+    Ok(_) => test.fail(f"{description}: recipe unexpectedly loaded")?
+    Err(error) => test.ok(error.message != "", f"{description}: error has a message")?
   }
 }
 
 proc assert_local_source_checksums(package: Str) [fs, env, error] {
-  let package_dir = fp"packages/${package}"
+  let package_dir = fp"packages/{package}"
   let pkg = recipe.load_package(package_dir)?
 
   for source in pkg.upstream_sources {
     let raw = source.source.display()
     continue unless raw.starts_with("files/")
-    let staged = fp"packages/${package}/${raw}"
+    let staged = fp"packages/{package}/{raw}"
     let expected = sources.source_checksum(source, "aarch64")?
     test.eq(hash.sha256(staged)?.hex(), expected)?
   }
@@ -77,7 +77,7 @@ test test_recipe_rejects_invalid_package_name [fs, env, error] {
 
 test test_recipe_rejects_production_directory_name_mismatch [fs, env, error] { |ctx|
   let repo_root = test.temp_dir(ctx, name: "recipe-repo")?
-  let dir = fp"${repo_root}/packages/recipe-dir-mismatch"
+  let dir = fp"{repo_root}/packages/recipe-dir-mismatch"
   let _ = fs.copy_tree(fixture("recipe-dir-mismatch"), dir, parents: true, overwrite: true)?
   expect_contract_rejection(dir, "production directory/name mismatch")?
 }
@@ -150,9 +150,9 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
 
   let root = test.temp_dir(ctx, name: "cargo-proof-root")?
   let xsh = process.which("xsh")?
-  fs.install(xsh, fp"${root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)?
-  fs.install(xsh, fp"${root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)?
-  fs.mkdir(fp"${root}/usr/lib/rustlib/aarch64-unknown-linux-musl/lib")?
+  fs.install(xsh, fp"{root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)?
+  fs.install(xsh, fp"{root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)?
+  fs.mkdir(fp"{root}/usr/lib/rustlib/aarch64-unknown-linux-musl/lib")?
   let stderr_path = test.temp_path(ctx, name: "cargo-proof-stderr")
   let status = process.run(
     process.command_argv(
@@ -174,28 +174,28 @@ test test_wpa_proof_runs_binary_with_composed_libraries [fs, process, env, error
 
   let root = test.temp_dir(ctx, name: "wpa-proof-root")?
   let xsh = process.which("xsh")?
-  let bin = fp"${root}/usr/bin/wpa_supplicant"
-  fs.mkdir(fp"${root}/usr/bin", parents: true)?
-  fs.mkdir(fp"${root}/usr/lib/xinit/services", parents: true)?
-  fs.mkdir(fp"${root}/etc/wpa_supplicant", parents: true)?
-  fs.mkdir(fp"${root}/var/lib/xsh-pm/packages/wpa_supplicant", parents: true)?
+  let bin = fp"{root}/usr/bin/wpa_supplicant"
+  fs.mkdir(fp"{root}/usr/bin", parents: true)?
+  fs.mkdir(fp"{root}/usr/lib/xinit/services", parents: true)?
+  fs.mkdir(fp"{root}/etc/wpa_supplicant", parents: true)?
+  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant", parents: true)?
   fs.write(
     bin,
-    f"""#!${xsh}
-proc main(...argv: List[Str]) [env, error] {
-  if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("${root}/usr/lib") {
+    f"""#!{xsh}
+proc main(...argv: List[Str]) [env, error] {{
+  if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("{root}/usr/lib") {{
     abort(3)
-  }
-}
+  }}
+}}
 main(@args)?
 """,
   )?
   fs.chmod(bin, 0o755)?
-  fs.write(fp"${root}/usr/bin/wpa_cli", "")?
-  fs.write(fp"${root}/usr/bin/wpa_passphrase", "")?
-  fs.write(fp"${root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")?
-  fs.write(fp"${root}/etc/wpa_supplicant/wpa_supplicant.conf", "")?
-  fs.write(fp"${root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
+  fs.write(fp"{root}/usr/bin/wpa_cli", "")?
+  fs.write(fp"{root}/usr/bin/wpa_passphrase", "")?
+  fs.write(fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")?
+  fs.write(fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf", "")?
+  fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
   let stderr_path = test.temp_path(ctx, name: "wpa-proof-stderr")
   let status = process.run(
     process.command_argv(xsh, ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root.display()], fs.cwd()?, {}, stderr: stderr_path),

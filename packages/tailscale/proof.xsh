@@ -2,21 +2,21 @@ error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure_executable(path_value: Path, label: Str) [fs, error] {
   guard fs.executable(path_value)? else {
-    return Err(ProofError.Failed("proof-tailscale", f"missing executable ${label}: ${path_value}"))
+    return Err(ProofError.Failed("proof-tailscale", f"missing executable {label}: {path_value}"))
   }
 }
 
 proc ensure_file(path_value: Path, label: Str) [fs, error] {
   guard fs.exists(path_value)? else {
-    return Err(ProofError.Failed("proof-tailscale", f"missing ${label}: ${path_value}"))
+    return Err(ProofError.Failed("proof-tailscale", f"missing {label}: {path_value}"))
   }
 }
 
 proc main(rootfs = /rootfs) [fs, error] {
-  ensure_executable(fp"${rootfs}/usr/bin/tailscale", "tailscale")?
-  ensure_executable(fp"${rootfs}/usr/bin/tailscaled", "tailscaled")?
-  ensure_executable(fp"${rootfs}/usr/bin/iptables", "iptables")?
-  ensure_file(fp"${rootfs}/usr/lib/xinit/services/tailscaled.xsh", "tailscaled service")?
+  ensure_executable(fp"{rootfs}/usr/bin/tailscale", "tailscale")?
+  ensure_executable(fp"{rootfs}/usr/bin/tailscaled", "tailscaled")?
+  ensure_executable(fp"{rootfs}/usr/bin/iptables", "iptables")?
+  ensure_file(fp"{rootfs}/usr/lib/xinit/services/tailscaled.xsh", "tailscaled service")?
   print "tailscale ok"
 }
 

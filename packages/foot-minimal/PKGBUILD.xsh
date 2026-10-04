@@ -124,7 +124,7 @@ export let filetree = [{path: p"etc/xdg/foot/foot.ini", kind: "file"}, {path: p"
 proc write_version_header() [fs, error] {
   fs.write(
     p"version.h",
-    f"""#define FOOT_VERSION "${ver}"
+    f"""#define FOOT_VERSION "{ver}"
 #define FOOT_MAJOR 1
 #define FOOT_MINOR 27
 #define FOOT_PATCH 0
@@ -230,11 +230,11 @@ srgb_funcs = files('srgb.c', 'srgb.h')
 }
 
 proc write_minimal_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/etc/xdg")?
-  fs.mkdir(fp"${dest}/etc/xdg/foot")?
+  fs.mkdir(fp"{dest}/etc/xdg")?
+  fs.mkdir(fp"{dest}/etc/xdg/foot")?
 
   fs.write(
-    fp"${dest}/etc/xdg/foot/foot.ini",
+    fp"{dest}/etc/xdg/foot/foot.ini",
     """font=Hack:size=11
 term=xterm-256color
 """,
@@ -244,13 +244,13 @@ term=xterm-256color
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
   let cross_build = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if cross_build {
-    f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib"
+    f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   } else {
     pc.ld_library_path
   }
@@ -268,11 +268,11 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if cross_build {
       let ninja = p"build/build.ninja"
-      let scanner_text = fp"${build_root}/usr/bin/wayland-scanner".display()
+      let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"${build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
       fs.write(ninja, ninja_text)?
     }
 
@@ -286,5 +286,5 @@ export proc build(dest: Path) [fs, process, env, error] {
   } ?
 
   write_minimal_config(dest)?
-  fs.remove(fp"${dest}/usr/share", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share", missing_ok: true)?
 }

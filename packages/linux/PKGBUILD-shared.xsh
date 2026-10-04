@@ -67,13 +67,13 @@ proc staged_recipe_helper(name: Str) [fs, env, error] -> Result[Path] {
   let recipe_dir = (env.get("XSH_PM_RECIPE_DIR") ?? "").trim()
 
   if recipe_dir == "" {
-    return Err(kbuild.ScriptError.Failed("linux-recipe-helper", f"missing XSH_PM_RECIPE_DIR for ${name}"))
+    return Err(kbuild.ScriptError.Failed("linux-recipe-helper", f"missing XSH_PM_RECIPE_DIR for {name}"))
   }
 
-  let helper = fp"${recipe_dir}/${name}"
+  let helper = fp"{recipe_dir}/{name}"
 
   if ! helper.exists()? {
-    return Err(kbuild.ScriptError.Failed("linux-recipe-helper", f"missing staged recipe helper: ${helper}"))
+    return Err(kbuild.ScriptError.Failed("linux-recipe-helper", f"missing staged recipe helper: {helper}"))
   }
 
   return helper
@@ -106,7 +106,7 @@ export proc write_materialized_outputs(outputs: List[Path]) [fs, error] {
 """
 
   for output in outputs {
-    text = f"""${text}${output}
+    text = f"""{text}{output}
 """
   }
 
@@ -125,7 +125,7 @@ export proc requested_stop_after() [env, error] -> Result[Str] {
     return Err(
       kbuild.ScriptError.Failed(
         "linux-kbuild-stop-after",
-        f"XSH_LINUX_KBUILD_STOP_AFTER must be prepare, discover, plan, compile, or link; got '${requested}'",
+        f"XSH_LINUX_KBUILD_STOP_AFTER must be prepare, discover, plan, compile, or link; got '{requested}'",
       ),
     )
   }
@@ -136,7 +136,7 @@ export proc requested_stop_after() [env, error] -> Result[Str] {
 ## Exported declaration `stop_after`.
 export proc stop_after(stage: Str) [env, error] {
   if requested_stop_after()? == stage {
-    return Err(kbuild.ScriptError.Failed("linux-kbuild-stopped", f"stopped after ${stage}"))
+    return Err(kbuild.ScriptError.Failed("linux-kbuild-stopped", f"stopped after {stage}"))
   }
 }
 
@@ -171,7 +171,7 @@ export proc emit_kbuild_progress(message: Str) [fs, env, error] {
   if (env.get("XSH_LINUX_KBUILD_PROGRESS") ?? "") == "1" {
     kbuild.write_text_if_changed(
       p".xsh-kbuild-progress",
-      f"""${message}
+      f"""{message}
 """,
     )?
 
@@ -193,14 +193,14 @@ proc archive_plan_cache_fingerprint(
   includes: List[Str],
 ) [fs, error] -> Result[Str] {
   return f"""format linux-archive-plan-cache-v1
-srcarch ${srcarch}
-triple ${triple}
+srcarch {srcarch}
+triple {triple}
 plan
-${kbuild.plan_fingerprint(p".", p".config", plan)?}
+{kbuild.plan_fingerprint(p".", p".config", plan)?}
 cflags
-${cflags.join("\n")}
+{cflags.join("\n")}
 includes
-${includes.join("\n")}
+{includes.join("\n")}
 """
 }
 
@@ -215,7 +215,7 @@ proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) [fs, e
 proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) [fs, error] {
   kbuild.write_text_if_changed(
     path_value,
-    f"""${fingerprint}
+    f"""{fingerprint}
 """,
   )?
 }
@@ -246,16 +246,16 @@ export proc cached_archive_plan(
     return Err(
       kbuild.ScriptError.Failed(
         "linux-native-kbuild-unsupported-arch",
-        f"native scratch Kbuild final link is only implemented for arm64 and x86; ${srcarch} needs new arch support",
+        f"native scratch Kbuild final link is only implemented for arm64 and x86; {srcarch} needs new arch support",
       ),
     )
   }
 
   let archive_report = p".xsh-kbuild-archive-plan.json"
   let archive_fingerprint = p".xsh-kbuild-archive-plan.fingerprint"
-  let stable_cache_dir = fp"${env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
-  let stable_archive_report = fp"${stable_cache_dir}/linux-${srcarch}.archive-plan.json"
-  let stable_archive_fingerprint = fp"${stable_cache_dir}/linux-${srcarch}.archive-plan.fingerprint"
+  let stable_cache_dir = fp"{env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
+  let stable_archive_report = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.json"
+  let stable_archive_fingerprint = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.fingerprint"
   let fingerprint_start = timing_start("archive-fingerprint")
   let fingerprint = archive_plan_cache_fingerprint(plan, srcarch, triple, cflags, includes)?
   timing_done("archive-fingerprint", fingerprint_start)
@@ -269,13 +269,13 @@ export proc cached_archive_plan(
         match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(archive_report)) {
           Ok(archive_plan) => {
             emit_kbuild_progress(
-              f"xsh-kbuild-archive-plan-summary-cache ${archive_plan.task_count} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs",
+              f"xsh-kbuild-archive-plan-summary-cache {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
             )?
 
             return archive_plan
           }
           Err(error) => emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-summary-cache miss ${error.message}",
+            f"xsh-kbuild-archive-plan-summary-cache miss {error.message}",
           )?
         }
       }
@@ -283,7 +283,7 @@ export proc cached_archive_plan(
       match kbuild.read_archive_plan_report(archive_report) {
         Ok(archive_plan) => {
           emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-cache ${archive_plan.tasks.len()} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs",
+            f"xsh-kbuild-archive-plan-cache {archive_plan.tasks.len()} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
           )?
 
           if plan_only {
@@ -293,7 +293,7 @@ export proc cached_archive_plan(
           return archive_plan
         }
         Err(error) => emit_kbuild_progress(
-          f"xsh-kbuild-archive-plan-cache miss ${error.message}",
+          f"xsh-kbuild-archive-plan-cache miss {error.message}",
         )?
       }
     }
@@ -303,7 +303,7 @@ export proc cached_archive_plan(
         match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(stable_archive_report)) {
           Ok(archive_plan) => {
             emit_kbuild_progress(
-              f"xsh-kbuild-archive-plan-stable-summary-cache ${archive_plan.task_count} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs",
+              f"xsh-kbuild-archive-plan-stable-summary-cache {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
             )?
 
             copy_archive_plan_cache(stable_archive_report, archive_report)?
@@ -311,7 +311,7 @@ export proc cached_archive_plan(
             return archive_plan
           }
           Err(error) => emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-stable-summary-cache miss ${error.message}",
+            f"xsh-kbuild-archive-plan-stable-summary-cache miss {error.message}",
           )?
         }
       }
@@ -319,7 +319,7 @@ export proc cached_archive_plan(
       match kbuild.read_archive_plan_report(stable_archive_report) {
         Ok(archive_plan) => {
           emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-stable-cache ${archive_plan.tasks.len()} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs",
+            f"xsh-kbuild-archive-plan-stable-cache {archive_plan.tasks.len()} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
           )?
 
           copy_archive_plan_cache(stable_archive_report, archive_report)?
@@ -327,14 +327,14 @@ export proc cached_archive_plan(
           return archive_plan
         }
         Err(error) => emit_kbuild_progress(
-          f"xsh-kbuild-archive-plan-stable-cache miss ${error.message}",
+          f"xsh-kbuild-archive-plan-stable-cache miss {error.message}",
         )?
       }
     }
   }
 
   emit_kbuild_progress(
-    f"xsh-kbuild-archive-plan-start ${plan.dirs.len()} dirs ${plan.objects.len()} objects ${plan.composites.len()} composites",
+    f"xsh-kbuild-archive-plan-start {plan.dirs.len()} dirs {plan.objects.len()} objects {plan.composites.len()} composites",
   )?
 
   let analysis_jobs = archive_analysis_jobs()?
@@ -353,7 +353,7 @@ export proc cached_archive_plan(
 
   if archive_only {
     emit_kbuild_progress(
-      f"xsh-kbuild-archive-plan ${archive_plan.task_count} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs ${archive_plan.generated_objects.len()} generated ${archive_plan.missing_sources.len()} missing",
+      f"xsh-kbuild-archive-plan {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs {archive_plan.generated_objects.len()} generated {archive_plan.missing_sources.len()} missing",
     )?
     return archive_plan
   }
@@ -367,7 +367,7 @@ export proc cached_archive_plan(
   timing_done("archive-report", report_start)
 
   emit_kbuild_progress(
-    f"xsh-kbuild-archive-plan ${archive_plan.task_count} tasks ${archive_plan.archives.len()} archives ${archive_plan.link_inputs.len()} link-inputs ${archive_plan.generated_objects.len()} generated ${archive_plan.missing_sources.len()} missing",
+    f"xsh-kbuild-archive-plan {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs {archive_plan.generated_objects.len()} generated {archive_plan.missing_sources.len()} missing",
   )?
 
   return archive_plan
@@ -388,15 +388,15 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   }
 
   if explicit_text != "" {
-    emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-text-read ${explicit_text}")?
-    let plan = kbuild.read_discovered_plan_text(fp"${explicit_text}")?
+    emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-text-read {explicit_text}")?
+    let plan = kbuild.read_discovered_plan_text(fp"{explicit_text}")?
     print "xsh-kbuild-plan-cache" "explicit-text" $explicit_text plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
     return plan
   }
 
   if explicit != "" {
-    emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-read ${explicit}")?
-    let plan = kbuild.read_discovered_plan(fp"${explicit}")?
+    emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-read {explicit}")?
+    let plan = kbuild.read_discovered_plan(fp"{explicit}")?
     print "xsh-kbuild-plan-cache" "explicit" $explicit plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
     return plan
   }
@@ -404,9 +404,9 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   let force_discover = (env.get("XSH_LINUX_KBUILD_FORCE_DISCOVER") ?? "") == "1"
   let plan_path = p".xsh-kbuild-plan.json"
   let fingerprint_path = p".xsh-kbuild-plan.fingerprint"
-  let stable_cache_dir = fp"${env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
-  let stable_plan_path = fp"${stable_cache_dir}/linux-${srcarch}.plan.json"
-  let stable_fingerprint_path = fp"${stable_cache_dir}/linux-${srcarch}.plan.fingerprint"
+  let stable_cache_dir = fp"{env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
+  let stable_plan_path = fp"{stable_cache_dir}/linux-{srcarch}.plan.json"
+  let stable_fingerprint_path = fp"{stable_cache_dir}/linux-{srcarch}.plan.fingerprint"
 
   if force_discover {
     emit_kbuild_progress("xsh-kbuild-plan-cache force-discover")?
@@ -415,7 +415,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   if ! force_discover and plan_path.exists()? and fingerprint_path.exists()? {
     emit_kbuild_progress("xsh-kbuild-plan-cache read")?
     let plan = kbuild.read_discovered_plan(plan_path)?
-    emit_kbuild_progress(f"xsh-kbuild-plan-cache fingerprint ${plan.dirs.len()} dirs ${plan.objects.len()} objects")?
+    emit_kbuild_progress(f"xsh-kbuild-plan-cache fingerprint {plan.dirs.len()} dirs {plan.objects.len()} objects")?
 
     if (env.get("XSH_LINUX_KBUILD_TRUST_PLAN_CACHE") ?? "") == "1" {
       print "xsh-kbuild-plan-cache" "trusted" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
@@ -439,7 +439,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
         kbuild.write_text_if_changed(
           fingerprint_path,
-          f"""${stable_fingerprint}
+          f"""{stable_fingerprint}
 """,
         )?
 
@@ -457,7 +457,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -466,7 +466,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         stable_fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -483,7 +483,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -492,7 +492,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         stable_fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -513,7 +513,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         fingerprint_path,
-        f"""${stable_fingerprint}
+        f"""{stable_fingerprint}
 """,
       )?
 
@@ -530,7 +530,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -539,7 +539,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         stable_fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -556,7 +556,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -565,7 +565,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       kbuild.write_text_if_changed(
         stable_fingerprint_path,
-        f"""${repaired_fingerprint}
+        f"""{repaired_fingerprint}
 """,
       )?
 
@@ -578,7 +578,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
   emit_kbuild_progress("xsh-kbuild-plan discover-start")?
   let plan = discover_package_plan(srcarch)?
-  emit_kbuild_progress(f"xsh-kbuild-plan write ${plan.dirs.len()} dirs ${plan.objects.len()} objects")?
+  emit_kbuild_progress(f"xsh-kbuild-plan write {plan.dirs.len()} dirs {plan.objects.len()} objects")?
   kbuild.write_discovered_plan(plan, plan_path)?
   remove_archive_plan_cache()?
   emit_kbuild_progress("xsh-kbuild-plan fingerprint")?
@@ -586,7 +586,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
   kbuild.write_text_if_changed(
     fingerprint_path,
-    f"""${fingerprint}
+    f"""{fingerprint}
 """,
   )?
 
@@ -595,7 +595,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
   kbuild.write_text_if_changed(
     stable_fingerprint_path,
-    f"""${fingerprint}
+    f"""{fingerprint}
 """,
   )?
 
@@ -606,7 +606,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 ## Exported declaration `add_extra_objects_from_env`.
 export proc add_extra_objects_from_env(plan: kbuild.KbuildPlan) [env, error] -> Result[kbuild.KbuildPlan] {
   let raw = (env.get("XSH_LINUX_KBUILD_EXTRA_OBJECTS") ?? "").replace(",", " ")
-  var objects = [fp"${item}" for item in raw.words()]
+  var objects = [fp"{item}" for item in raw.words()]
   return kbuild.add_plan_objects(plan, objects)
 }
 
@@ -617,7 +617,7 @@ proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
     let trimmed = item.trim()
 
     if trimmed != "" {
-      outputs = outputs.push(fp"${trimmed}")
+      outputs = outputs.push(fp"{trimmed}")
     }
   }
 
@@ -691,7 +691,7 @@ export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchiv
     return Err(
       kbuild.ScriptError.Failed(
         "linux-native-kbuild-generated-incomplete",
-        f"x86 full package build still has ${archive_plan.generated_objects.len()} generated object(s); generate or exclude them before linking",
+        f"x86 full package build still has {archive_plan.generated_objects.len()} generated object(s); generate or exclude them before linking",
       ),
     )
   }
@@ -700,7 +700,7 @@ export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchiv
     return Err(
       kbuild.ScriptError.Failed(
         "linux-native-kbuild-missing-sources",
-        f"x86 full package build still has ${archive_plan.missing_sources.len()} selected object(s) without direct sources; restore/generate/exclude them before linking",
+        f"x86 full package build still has {archive_plan.missing_sources.len()} selected object(s) without direct sources; restore/generate/exclude them before linking",
       ),
     )
   }
@@ -711,7 +711,7 @@ export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path] {
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
 
   if build_root != "" {
-    let tool = fp"${build_root}/usr/bin/${name}"
+    let tool = fp"{build_root}/usr/bin/{name}"
 
     if fs.exists(tool)? {
       return tool
@@ -726,7 +726,7 @@ export proc run_native_command(argv: List[Str]) [process, env, error] {
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
 
   let command = if build_root != "" {
-    process.command_argv(argv[0], argv, env: {PATH: f"${build_root}/usr/bin:${env.get("PATH") ?? ""}"})
+    process.command_argv(argv[0], argv, env: {PATH: f"{build_root}/usr/bin:{env.get("PATH") ?? ""}"})
   } else {
     process.command_argv(argv[0], argv)
   }
@@ -734,7 +734,7 @@ export proc run_native_command(argv: List[Str]) [process, env, error] {
   let status = process.run(command)?
 
   if ! status.ok {
-    return Err(kbuild.ScriptError.Failed("linux-native-kbuild-command", f"command failed: ${argv.join(" ")}"))
+    return Err(kbuild.ScriptError.Failed("linux-native-kbuild-command", f"command failed: {argv.join(" ")}"))
   }
 }
 

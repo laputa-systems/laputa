@@ -67,18 +67,18 @@ export proc build(dest: Path) [fs, process, env, error] {
     return Err(GnuStubsError.Failed("gnu-stubs requires a native aarch64 or x86_64 build"))
   }
 
-  let laputa_root = fp"${env.get("LAPUTA_ROOT") ?? ""}"
+  let laputa_root = fp"{env.get("LAPUTA_ROOT") ?? ""}"
   let bootstrap_llvm = env.get("XSH_PM_BOOTSTRAP_LLVM_ROOT") ?? ""
-  let llvm_root = if bootstrap_llvm == "" { fp"${laputa_root}/usr/lib/llvm23" } else { fp"${bootstrap_llvm}" }
-  let clang = fp"${llvm_root}/bin/clang"
-  let lld = fp"${llvm_root}/bin/ld.lld"
-  let llvm_ar = fp"${llvm_root}/bin/llvm-ar"
-  let llvm_objcopy = fp"${llvm_root}/bin/llvm-objcopy"
-  let libunwind = fp"${llvm_root}/lib/libunwind.a"
-  let builtins = fp"${llvm_root}/lib/clang/23/lib/linux/libclang_rt.builtins-${target_arch}.a"
+  let llvm_root = if bootstrap_llvm == "" { fp"{laputa_root}/usr/lib/llvm23" } else { fp"{bootstrap_llvm}" }
+  let clang = fp"{llvm_root}/bin/clang"
+  let lld = fp"{llvm_root}/bin/ld.lld"
+  let llvm_ar = fp"{llvm_root}/bin/llvm-ar"
+  let llvm_objcopy = fp"{llvm_root}/bin/llvm-objcopy"
+  let libunwind = fp"{llvm_root}/lib/libunwind.a"
+  let builtins = fp"{llvm_root}/lib/clang/23/lib/linux/libclang_rt.builtins-{target_arch}.a"
 
   if ! fs.exists(clang)? or ! fs.exists(lld)? or ! fs.exists(llvm_ar)? or ! fs.exists(llvm_objcopy)? {
-    return Err(GnuStubsError.Failed(f"gnu-stubs bootstrap LLVM tools are missing from ${llvm_root}"))
+    return Err(GnuStubsError.Failed(f"gnu-stubs bootstrap LLVM tools are missing from {llvm_root}"))
   }
 
   # Rust's musl target hardcodes -lgcc_s, and the prebuilt cargo binary
@@ -92,20 +92,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   # objects that provide the helpers required by the dynamically loaded
   # rust-lld. Compiler-rt marks those helpers hidden, so make only these
   # required symbols default-visible before linking the shared object.
-  let stub_src = fp"${dest}/.stub.c"
-  let builtins_dir = fp"${dest}/.builtins"
-  let visibility_map = fp"${dest}/.libgcc.visibility"
-  let export_map = fp"${dest}/.libgcc.exports"
-  let libdir = fp"${dest}/usr/lib"
-  let libgcc = fp"${libdir}/libgcc_s.so"
-  let comparetf2 = fp"${builtins_dir}/comparetf2.c.o"
-  let divtf3 = fp"${builtins_dir}/divtf3.c.o"
-  let extendsftf2 = fp"${builtins_dir}/extendsftf2.c.o"
-  let floatsitf = fp"${builtins_dir}/floatsitf.c.o"
-  let floatunditf = fp"${builtins_dir}/floatunditf.c.o"
-  let multf3 = fp"${builtins_dir}/multf3.c.o"
-  let trunctfdf2 = fp"${builtins_dir}/trunctfdf2.c.o"
-  let clear_cache = fp"${builtins_dir}/clear_cache.c.o"
+  let stub_src = fp"{dest}/.stub.c"
+  let builtins_dir = fp"{dest}/.builtins"
+  let visibility_map = fp"{dest}/.libgcc.visibility"
+  let export_map = fp"{dest}/.libgcc.exports"
+  let libdir = fp"{dest}/usr/lib"
+  let libgcc = fp"{libdir}/libgcc_s.so"
+  let comparetf2 = fp"{builtins_dir}/comparetf2.c.o"
+  let divtf3 = fp"{builtins_dir}/divtf3.c.o"
+  let extendsftf2 = fp"{builtins_dir}/extendsftf2.c.o"
+  let floatsitf = fp"{builtins_dir}/floatsitf.c.o"
+  let floatunditf = fp"{builtins_dir}/floatunditf.c.o"
+  let multf3 = fp"{builtins_dir}/multf3.c.o"
+  let trunctfdf2 = fp"{builtins_dir}/trunctfdf2.c.o"
+  let clear_cache = fp"{builtins_dir}/clear_cache.c.o"
   fs.write(stub_src, "")?
   fs.write(
     visibility_map,
@@ -135,10 +135,10 @@ __gttf2
   fs.mkdir(builtins_dir)?
 
   env ({
-    LD_LIBRARY_PATH: f"${llvm_root}/lib:${env.get("LD_LIBRARY_PATH") ?? ""}",
+    LD_LIBRARY_PATH: f"{llvm_root}/lib:{env.get("LD_LIBRARY_PATH") ?? ""}",
   }) {
-    run $clang "-target" f"${target_arch}-linux-musl" "-c" $stub_src "-o" fp"${libdir}/crtbeginS.o" ?
-    run $clang "-target" f"${target_arch}-linux-musl" "-c" $stub_src "-o" fp"${libdir}/crtendS.o" ?
+    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o" ?
+    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o" ?
     cd builtins_dir {
       run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o" ?
     }
@@ -152,17 +152,17 @@ __gttf2
       trunctfdf2,
       clear_cache,
     ] {
-      let visible = fp"${object}.visible"
-      run $llvm_objcopy f"--set-symbols-visibility=${visibility_map}=default" $object $visible ?
+      let visible = fp"{object}.visible"
+      run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible ?
       fs.rename(visible, object, overwrite: true)?
     }
 
     fs.remove(stub_src)?
-    run $lld "-shared" "-o" $libgcc "-L" fp"${laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script=${export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache ?
+    run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache ?
   } ?
 
   fs.remove(builtins_dir)?
   fs.remove(visibility_map)?
   fs.remove(export_map)?
-  fs.symlink(p"libgcc_s.so", fp"${libdir}/libgcc_s.so.1")?
+  fs.symlink(p"libgcc_s.so", fp"{libdir}/libgcc_s.so.1")?
 }

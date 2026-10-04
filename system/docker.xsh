@@ -30,13 +30,13 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 ## every artifact under `.out/`, which `make clean` owns; artifacts are large
 ## sequential files, where bind-mount I/O matches a named volume.
 export pure artifact_store_root(laputa_root: Path, arch: Str) -> Path {
-  fp"${laputa_root}/.out/artifacts/${arch}"
+  fp"{laputa_root}/.out/artifacts/{arch}"
 }
 
 ## Resolve the allowed Docker configuration surface from the host environment.
 export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
-  let docker = fp"${env_value("DOCKER", "docker")}"
-  let output_root = fp"${laputa_root}/target/laputa/${profile_name}"
+  let docker = fp"{env_value("DOCKER", "docker")}"
+  let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 
   if ! fs.exists(docker)? {
     let _ = process.which(docker.display())?
@@ -72,12 +72,12 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--platform",
     "linux/arm64",
     "--mount",
-    f"type=bind,src=${value.laputa_root},dst=/src/laputa,readonly",
+    f"type=bind,src={value.laputa_root},dst=/src/laputa,readonly",
   ].extend(xsh_seed.xsh_seed_mount_argv(value.seed)).extend([
     "--mount",
-    f"type=bind,src=${value.output_root},dst=/output",
+    f"type=bind,src={value.output_root},dst=/output",
     "--mount",
-    f"type=bind,src=${value.artifact_root},dst=/artifacts",
+    f"type=bind,src={value.artifact_root},dst=/artifacts",
     "--workdir",
     "/src/laputa",
     "--env",
@@ -89,7 +89,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
   ])
 
   if value.repo_url != "" {
-    argv = argv.extend(["--env", f"XSH_PM_REPO=${value.repo_url}"])
+    argv = argv.extend(["--env", f"XSH_PM_REPO={value.repo_url}"])
   }
 
   argv.push(value.image).extend(inner_argv)
@@ -135,7 +135,7 @@ export pure docker_profile_build_argv(profile: types.SystemProfile, jobs: Int) -
     "--",
     "build",
     profile.name,
-    f"${jobs}",
+    f"{jobs}",
   ]
 }
 
@@ -148,7 +148,7 @@ export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, er
 ## Reject an image architecture other than the native arm64 runner required for package planning and execution.
 export proc require_arm64_image_architecture(architecture: Str) [error] {
   guard architecture == "arm64" else {
-    return Err(types.LaputaError.Docker(f"Docker runner reports ${architecture}; native arm64 is required"))
+    return Err(types.LaputaError.Docker(f"Docker runner reports {architecture}; native arm64 is required"))
   }
 }
 
@@ -164,14 +164,14 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
   let status = process.run(command(value, inner_argv)?)?
 
   if ! status.ok {
-    return Err(types.LaputaError.Docker(f"Docker command failed for ${value.image}"))
+    return Err(types.LaputaError.Docker(f"Docker command failed for {value.image}"))
   }
 }
 
 ## Run a profile build while atomically replacing its log only after Docker exits successfully.
 export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
   verify_arm64_image(value)?
-  let temporary = fp"${log}.tmp"
+  let temporary = fp"{log}.tmp"
   fs.mkdir(log.parent)?
   fs.remove(temporary, missing_ok: true)?
   defer fs.remove(temporary, missing_ok: true)?
@@ -180,7 +180,7 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   )?
 
   if ! status.ok {
-    return Err(types.LaputaError.Docker(f"Docker command failed for ${value.image}"))
+    return Err(types.LaputaError.Docker(f"Docker command failed for {value.image}"))
   }
 
   fs.fsync(temporary)?

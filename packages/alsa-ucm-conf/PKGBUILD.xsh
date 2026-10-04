@@ -616,6 +616,6 @@ export let filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/share/alsa")?
-  let _ = fs.copy_tree(p"ucm2", fp"${dest}/usr/share/alsa/ucm2", parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/usr/share/alsa")?
+  let _ = fs.copy_tree(p"ucm2", fp"{dest}/usr/share/alsa/ucm2", parents: true, overwrite: true)?
 }

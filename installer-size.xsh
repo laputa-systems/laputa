@@ -12,7 +12,7 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"${env_value(name, fallback.display())}"
+  fp"{env_value(name, fallback.display())}"
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
@@ -22,7 +22,7 @@ pure normalize_arch(arch: Str) -> Result[Str] {
 
   return arch when arch == "aarch64" or arch == "x86_64"
 
-  Err(InstallerSizeError.Failed(f"unsupported installer arch ${arch}"))
+  Err(InstallerSizeError.Failed(f"unsupported installer arch {arch}"))
 }
 
 pure kib(value: Int) -> Int {
@@ -30,7 +30,7 @@ pure kib(value: Int) -> Int {
 }
 
 pure size_label(value: Int) -> Str {
-  f"${kib(value)}K"
+  f"{kib(value)}K"
 }
 
 proc path_size(path_value: Path) [fs, error] -> Result[Int] {
@@ -64,20 +64,20 @@ proc package_size(rootfs: Path, manifest_path: Path) [fs, error] -> Result[Int] 
   var total = 0
 
   for rel in manifest {
-    total += path_size(fp"${rootfs}/${rel}")?
+    total += path_size(fp"{rootfs}/{rel}")?
   }
 
   total
 }
 
 proc package_size_rows(rootfs: Path) [fs, error] -> Result[List[PackageSize]] {
-  let db = fp"${rootfs}/var/lib/xsh-pm/packages"
+  let db = fp"{rootfs}/var/lib/xsh-pm/packages"
   var rows: List[PackageSize] = []
 
   return rows unless fs.exists(db)?
 
   for entry in fs.children(db)? |> where .kind == "dir" {
-    rows = rows.push({name: entry.name, size: package_size(rootfs, fp"${entry.path}/manifest.json")?})
+    rows = rows.push({name: entry.name, size: package_size(rootfs, fp"{entry.path}/manifest.json")?})
   }
 
   rows |> sort-by .size
@@ -99,13 +99,13 @@ proc print_report(arch: Str, work: Path, iso: Path, kernel: Path) [fs, error] {
   print installer size report: $arch
   print_path_size("iso", iso)?
   print_path_size("kernel", kernel)?
-  print_path_size("target rootfs", fp"${work}/rootfs-target")?
-  print_path_size("installer rootfs", fp"${work}/rootfs-installer")?
-  print_path_size("tools rootfs", fp"${work}/rootfs-tools")?
-  print_path_size("target root payload", fp"${work}/target-root.tar.gz")?
-  print_path_size("installer root image", fp"${work}/installer-root.ext4")?
-  print_package_sizes("target rootfs", fp"${work}/rootfs-target")?
-  print_package_sizes("installer rootfs", fp"${work}/rootfs-installer")?
+  print_path_size("target rootfs", fp"{work}/rootfs-target")?
+  print_path_size("installer rootfs", fp"{work}/rootfs-installer")?
+  print_path_size("tools rootfs", fp"{work}/rootfs-tools")?
+  print_path_size("target root payload", fp"{work}/target-root.tar.gz")?
+  print_path_size("installer root image", fp"{work}/installer-root.ext4")?
+  print_package_sizes("target rootfs", fp"{work}/rootfs-target")?
+  print_package_sizes("installer rootfs", fp"{work}/rootfs-installer")?
 }
 
 proc main(...argv: List[Str]) [fs, env, error] {
@@ -118,21 +118,21 @@ proc main(...argv: List[Str]) [fs, env, error] {
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
 
   let work = if argv.len() >= 2 {
-    fp"${argv[1]}"
+    fp"{argv[1]}"
   } else {
-    env_path("LAPUTA_INSTALLER_WORK", fp"${root}/target/laputa-installer-${arch}")?
+    env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?
   }
 
   let iso = if argv.len() >= 3 {
-    fp"${argv[2]}"
+    fp"{argv[2]}"
   } else {
-    env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-${arch}.iso")?
+    env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
   }
 
   let kernel = if argv.len() >= 4 {
-    fp"${argv[3]}"
+    fp"{argv[3]}"
   } else {
-    env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-${arch}.vmlinuz")?
+    env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   }
 
   print_report(arch, work, iso, kernel)?

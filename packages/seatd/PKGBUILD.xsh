@@ -169,7 +169,7 @@ realtime = declare_dependency()""",
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   patch_linux_headers()?
   patch_realtime_dependency()?
@@ -192,6 +192,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     } ?
   } ?
 
-  fs.remove(fp"${dest}/usr/bin/seatd-launch", missing_ok: true)?
-  fs.install(p"service.xsh", fp"${dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)?
+  fs.remove(fp"{dest}/usr/bin/seatd-launch", missing_ok: true)?
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)?
 }

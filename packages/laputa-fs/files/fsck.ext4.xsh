@@ -39,7 +39,7 @@ proc bit_set(bitmap: Bytes, bit: Int) [error] -> Result[Bool] {
 
 proc expect_int(kind: Str, actual: Int, expected: Int) [error] {
   guard actual == expected else {
-    return Err(Ext4FsckError.Failed(kind, f"expected ${expected}, found ${actual}"))
+    return Err(Ext4FsckError.Failed(kind, f"expected {expected}, found {actual}"))
   }
 }
 
@@ -130,7 +130,7 @@ proc main(...argv: List[Str]) [error] {
     return Err(Ext4FsckError.Failed("usage", "usage: fsck.ext4 [-n|-p] IMAGE"))
   }
 
-  check_image(fp"${opts.image[0]}")?
+  check_image(fp"{opts.image[0]}")?
 }
 
 main(@args)?

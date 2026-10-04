@@ -20,11 +20,11 @@ test test_prefixed_define_rescans_expansion [fs, process, error] { |ctx|
 
 test test_include_path_and_multiple_inputs [fs, process, error] { |ctx|
   let root = test.temp_dir(ctx, name: "bison-style")?
-  let inc = fp"${root}/m4sugar"
+  let inc = fp"{root}/m4sugar"
   inc.mkdir()
 
   fs.write(
-    fp"${inc}/helpers.m4",
+    fp"{inc}/helpers.m4",
     """m4_define([b4_token],[$1])
 """,
   )?

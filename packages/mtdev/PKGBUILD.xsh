@@ -78,11 +78,11 @@ proc write_config() [fs, error] {
 #define PACKAGE "mtdev"
 #define PACKAGE_NAME "Multitouch Protocol Translation Library"
 #define PACKAGE_TARNAME "mtdev"
-#define PACKAGE_VERSION "${ver}"
-#define PACKAGE_STRING "Multitouch Protocol Translation Library ${ver}"
+#define PACKAGE_VERSION "{ver}"
+#define PACKAGE_STRING "Multitouch Protocol Translation Library {ver}"
 #define PACKAGE_BUGREPORT "mtdev@lists.freedesktop.org"
 #define PACKAGE_URL ""
-#define VERSION "${ver}"
+#define VERSION "{ver}"
 #define STDC_HEADERS 1
 #define HAVE_INTTYPES_H 1
 #define HAVE_STDINT_H 1
@@ -103,7 +103,7 @@ proc write_config() [fs, error] {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
   let cflags = ["-O2", "-Wall"]
   let defs = ["-DHAVE_CONFIG_H", "-D__user="]
   let includes = ["-Iinclude", "-Isrc", "-I."]
@@ -125,24 +125,24 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(libmtdev.tasks, make.jobs()?)?
-  fs.install(libmtdev.output, fp"${dest}/usr/lib/libmtdev.so.1.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libmtdev.so.1.0.0", fp"${dest}/usr/lib/libmtdev.so.1")?
-  fs.symlink(p"libmtdev.so.1.0.0", fp"${dest}/usr/lib/libmtdev.so")?
-  make.install_header_tree(p"include", fp"${dest}/usr/include")?
-  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.install(libmtdev.output, fp"{dest}/usr/lib/libmtdev.so.1.0.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so.1")?
+  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so")?
+  make.install_header_tree(p"include", fp"{dest}/usr/include")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   fs.write(
-    fp"${dest}/usr/lib/pkgconfig/mtdev.pc",
+    fp"{dest}/usr/lib/pkgconfig/mtdev.pc",
     f"""prefix=/usr
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
 
 Name: mtdev
 Description: Multitouch Protocol Translation Library
-Version: ${ver}
-Libs: -L\${libdir} -lmtdev
-Cflags: -I\${includedir}
+Version: {ver}
+Libs: -L${{libdir}} -lmtdev
+Cflags: -I${{includedir}}
 """,
   )?
 }

@@ -25,19 +25,19 @@ export type ProfileOutputs = {
 export pure outputs(root: Path) -> ProfileOutputs {
   {
     root,
-    builds: fp"${root}/builds",
-    current: fp"${root}/current",
-    build_plan: fp"${root}/build-plan.json",
-    generation_plan: fp"${root}/generation-plan.json",
-    generation: fp"${root}/current/generation.json",
-    rootfs: fp"${root}/current/rootfs.ext4",
-    disk: fp"${root}/current/disk.img",
-    kernel: fp"${root}/current/vmlinuz",
-    build_log: fp"${root}/build.log",
-    console_log: fp"${root}/console.log",
-    qemu_log: fp"${root}/qemu.log",
-    qmp_socket: fp"${root}/qmp.sock",
-    screenshot: fp"${root}/screenshot.ppm",
+    builds: fp"{root}/builds",
+    current: fp"{root}/current",
+    build_plan: fp"{root}/build-plan.json",
+    generation_plan: fp"{root}/generation-plan.json",
+    generation: fp"{root}/current/generation.json",
+    rootfs: fp"{root}/current/rootfs.ext4",
+    disk: fp"{root}/current/disk.img",
+    kernel: fp"{root}/current/vmlinuz",
+    build_log: fp"{root}/build.log",
+    console_log: fp"{root}/console.log",
+    qemu_log: fp"{root}/qemu.log",
+    qmp_socket: fp"{root}/qmp.sock",
+    screenshot: fp"{root}/screenshot.ppm",
   }
 }
 
@@ -52,13 +52,13 @@ export proc plan_system_profile(value: docker.DockerConfig, profile: types.Syste
   docker.docker_plan(value, profile)?
 
   if ! fs.exists(result.build_plan)? {
-    return Err(types.LaputaError.Docker(f"PM plan command did not write ${result.build_plan}"))
+    return Err(types.LaputaError.Docker(f"PM plan command did not write {result.build_plan}"))
   }
 
   docker.docker_generation_plan(value, profile)?
 
   if ! fs.exists(result.generation_plan)? {
-    return Err(types.LaputaError.Docker(f"PM generation plan command did not write ${result.generation_plan}"))
+    return Err(types.LaputaError.Docker(f"PM generation plan command did not write {result.generation_plan}"))
   }
 
   result
@@ -70,12 +70,12 @@ export proc build_profile(value: docker.DockerConfig, profile: types.SystemProfi
   docker.docker_profile_build(value, profile, jobs, result.build_log)?
 
   if ! fs.exists(result.current)? or fs.metadata(result.current)?.kind != "symlink" {
-    return Err(types.LaputaError.Docker(f"profile build did not atomically select ${result.current}"))
+    return Err(types.LaputaError.Docker(f"profile build did not atomically select {result.current}"))
   }
 
   for path_value in [result.generation, result.rootfs, result.disk, result.kernel] {
     if ! fs.exists(path_value)? or fs.metadata(path_value)?.size <= 0 {
-      return Err(types.LaputaError.Docker(f"profile build did not publish ${path_value}"))
+      return Err(types.LaputaError.Docker(f"profile build did not publish {path_value}"))
     }
   }
 

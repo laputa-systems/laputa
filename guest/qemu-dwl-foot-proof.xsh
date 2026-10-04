@@ -5,13 +5,13 @@ error GuestProofError = Failed(phase: Str, message: Str)
 proc guest_console(message: Str) [fs, error] {
   fs.write(
     /dev/console,
-    f"""${message}
+    f"""{message}
 """,
   )?
 }
 
 proc guest_fail(phase: Str, message: Str) [fs, error] {
-  guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED ${phase}: ${message}")?
+  guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED {phase}: {message}")?
   return Err(GuestProofError.Failed(phase, message))
 }
 
@@ -19,7 +19,7 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error
   var elapsed = 0
   while ! fs.exists(path_value)? {
     if elapsed >= seconds {
-      guest_fail(phase, f"missing ${path_value}")?
+      guest_fail(phase, f"missing {path_value}")?
     }
 
     time.sleep(1s)?
@@ -100,7 +100,7 @@ fs.write(p"/run/laputa-foot-input.txt", input)?
   guest_wait_for(/run/laputa-foot-input.txt, "input", 90)?
   let input = fs.read_text(/run/laputa-foot-input.txt)?.trim()
   if input != "laputa" {
-    guest_fail("input", f"expected laputa, got ${input}")?
+    guest_fail("input", f"expected laputa, got {input}")?
   }
 
   guest_console("LAPUTA_DWL_FOOT_PROOF_OK")?

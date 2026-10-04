@@ -121,7 +121,7 @@ proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
     let caps = symbol_re.captures(line)
 
     if caps.len() >= 3 {
-      out = f"""${out}#define vdso_offset_${caps[2]} 0x${caps[1]}
+      out = f"""{out}#define vdso_offset_{caps[2]} 0x{caps[1]}
 """
     }
   }
@@ -192,7 +192,7 @@ proc build_x86_vdso(cc: Path) [fs, process, env, error] {
 
   for item in objects {
     let asm_args = if item.asm { ["-D__ASSEMBLY__"] } else { [] }
-    PKGBUILD_shared.emit_kbuild_progress(f"xsh-kbuild-x86-vdso compile ${item.object}")?
+    PKGBUILD_shared.emit_kbuild_progress(f"xsh-kbuild-x86-vdso compile {item.object}")?
 
     PKGBUILD_shared.run_native_command(
       base.extend(asm_args).extend(["-c", item.source.display(), "-o", item.object.display()]),
@@ -353,20 +353,20 @@ proc write_x86_orc_hash_header() [fs, error] {
 }
 
 proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: Path) [fs, error] -> Result[List[Str]] {
-  var lines = [f"const char * const ${array}[${size}] = {"]
+  var lines = [f"const char * const {array}[{size}] = {{"]
 
   for raw in input.read_text()?.split("\n") {
     let line = raw.replace("\t", " ").trim()
-    continue unless line.starts_with(f"#define ${prefix}")
-    let rest = (line.split(f"#define ${prefix}").get(1) ?? "").trim()
+    continue unless line.starts_with(f"#define {prefix}")
+    let rest = (line.split(f"#define {prefix}").get(1) ?? "").trim()
     let fields = rest.fields()
     continue when fields.len() == 0
     let quote_parts = line.split("\"")
     continue when quote_parts.len() < 3
     let name = fields[0]
     let value = quote_parts[1]
-    let index = if postfix == "" { f"${prefix}${name}" } else { f"${prefix}${name} - ${postfix}" }
-    lines = lines.push(f"\t[${index}] = \"${value}\",")
+    let index = if postfix == "" { f"{prefix}{name}" } else { f"{prefix}{name} - {postfix}" }
+    lines = lines.push(f"\t[{index}] = \"{value}\",")
   }
 
   return lines.push("};")
@@ -389,7 +389,7 @@ proc generate_x86_capflags_source() [fs, error] {
 
   kbuild.write_text_if_changed(
     p"arch/x86/kernel/cpu/capflags.c",
-    f"""${lines.join("\n")}
+    f"""{lines.join("\n")}
 """,
   )?
 }
@@ -399,7 +399,7 @@ proc generate_x86_inat_tables() [fs, error] {
 }
 
 pure realmode_object_paths(objects: List[Str]) -> List[Str] {
-  [fp"arch/x86/realmode/rm/${obj}".display() for obj in objects]
+  [fp"arch/x86/realmode/rm/{obj}".display() for obj in objects]
 }
 
 proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, error] {
@@ -413,7 +413,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
 
     if caps.len() >= 3 {
       let name = caps[2]
-      lines = lines.push(f"pa_${name} = ${name};")
+      lines = lines.push(f"pa_{name} = {name};")
     }
   }
 
@@ -434,7 +434,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
 
   kbuild.write_text_if_changed(
     p"arch/x86/realmode/rm/pasyms.h",
-    f"""${unique.join("\n")}
+    f"""{unique.join("\n")}
 """,
   )?
 }
@@ -544,7 +544,7 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
   ] {
     PKGBUILD_shared.run_native_command(
       realmode_asm_cflags.extend(
-        ["-c", fp"${realmode_dir}/${asm.source}".display(), "-o", fp"${realmode_dir}/${asm.object}".display()],
+        ["-c", fp"{realmode_dir}/{asm.source}".display(), "-o", fp"{realmode_dir}/{asm.object}".display()],
       ),
     )?
   }
@@ -566,7 +566,7 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
     ] {
       PKGBUILD_shared.run_native_command(
         realmode_asm_cflags.extend(
-          ["-c", fp"${realmode_dir}/${asm.source}".display(), "-o", fp"${realmode_dir}/${asm.object}".display()],
+          ["-c", fp"{realmode_dir}/{asm.source}".display(), "-o", fp"{realmode_dir}/{asm.object}".display()],
         ),
       )?
     }
@@ -576,9 +576,9 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
         realmode_cflags.extend(
           [
             "-c",
-            fp"${realmode_dir}/${source}".display(),
+            fp"{realmode_dir}/{source}".display(),
             "-o",
-            fp"${realmode_dir}/${source.replace(".c", ".o")}".display(),
+            fp"{realmode_dir}/{source.replace(".c", ".o")}".display(),
           ],
         ),
       )?

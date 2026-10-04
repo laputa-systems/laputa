@@ -71,7 +71,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
 
   # Generate src/config.h from src/config.h.in.
   # Values captured from: CC="cc" ./configure --prefix=/usr --disable-nls
@@ -122,12 +122,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["PACKAGE"] = "\"flex\""
   defines["PACKAGE_BUGREPORT"] = "\"flex-help@lists.sourceforge.net\""
   defines["PACKAGE_NAME"] = "\"the fast lexical analyser generator\""
-  defines["PACKAGE_STRING"] = f"\"the fast lexical analyser generator ${ver}\""
+  defines["PACKAGE_STRING"] = f"\"the fast lexical analyser generator {ver}\""
   defines["PACKAGE_TARNAME"] = "\"flex\""
   defines["PACKAGE_URL"] = "\"\""
-  defines["PACKAGE_VERSION"] = f"\"${ver}\""
+  defines["PACKAGE_VERSION"] = f"\"{ver}\""
   defines["STDC_HEADERS"] = "1"
-  defines["VERSION"] = f"\"${ver}\""
+  defines["VERSION"] = f"\"{ver}\""
 
   # YYTEXT_POINTER: flex generates char *yytext (not char yytext[]).
   defines["YYTEXT_POINTER"] = "1"
@@ -163,9 +163,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(flex.tasks, make.jobs()?)?
-  fs.install(flex.output, fp"${dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)?
+  fs.install(flex.output, fp"{dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)?
 
   # POSIX requires a 'lex' command; flex is the canonical implementation.
-  fs.symlink(p"flex", fp"${dest}/usr/bin/lex")?
-  fs.install(p"flex.xsh", fp"${dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"flex", fp"{dest}/usr/bin/lex")?
+  fs.install(p"flex.xsh", fp"{dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)?
 }

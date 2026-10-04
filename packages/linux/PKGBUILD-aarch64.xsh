@@ -114,7 +114,7 @@ proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
     let caps = symbol_re.captures(line)
 
     if caps.len() >= 3 {
-      out = f"""${out}#define vdso_offset_${caps[2]} 0x${caps[1]}
+      out = f"""{out}#define vdso_offset_{caps[2]} 0x{caps[1]}
 """
     }
   }
@@ -156,7 +156,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
   ] {
     PKGBUILD_shared.run_native_command(
       base.extend(
-        ["-D__ASSEMBLY__", "-c", f"arch/arm64/kernel/vdso/${asm.source}", "-o", f"arch/arm64/kernel/vdso/${asm.object}"],
+        ["-D__ASSEMBLY__", "-c", f"arch/arm64/kernel/vdso/{asm.source}", "-o", f"arch/arm64/kernel/vdso/{asm.object}"],
       ),
     )?
   }
@@ -451,7 +451,7 @@ proc nvhe_ld_task(
     cwd: p".",
     env: {},
     depfile: p"",
-    stamp: fp"${out}.cmd",
+    stamp: fp"{out}.cmd",
   }
 }
 
@@ -474,14 +474,14 @@ proc nvhe_objcopy_task(objcopy: Path, input: Path, out: Path, deps: List[Str]) [
     cwd: p".",
     env: {},
     depfile: p"",
-    stamp: fp"${out}.cmd",
+    stamp: fp"{out}.cmd",
   }
 }
 
 proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error] {
   let gen = build_native_nvhe_helper(cc)?
   let nvhe_dir = p".xsh-kbuild/obj/arch/arm64/kvm/hyp/nvhe"
-  let linker_script = fp"${nvhe_dir}/hyp.lds"
+  let linker_script = fp"{nvhe_dir}/hyp.lds"
   preprocess_native_nvhe_linker_script(cc, linker_script)?
   let ld = PKGBUILD_shared.native_tool("ld.lld")?
   let objcopy = PKGBUILD_shared.native_tool("llvm-objcopy")?
@@ -504,11 +504,11 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
     object_outputs = object_outputs.push(item.out)
   }
 
-  let tmp = fp"${nvhe_dir}/kvm_nvhe.tmp.o"
-  let reloc_asm = fp"${nvhe_dir}/hyp-reloc.S"
-  let reloc_o = fp"${nvhe_dir}/hyp-reloc.o"
-  let rel = fp"${nvhe_dir}/kvm_nvhe.rel.o"
-  let out = fp"${nvhe_dir}/kvm_nvhe.o"
+  let tmp = fp"{nvhe_dir}/kvm_nvhe.tmp.o"
+  let reloc_asm = fp"{nvhe_dir}/hyp-reloc.S"
+  let reloc_o = fp"{nvhe_dir}/hyp-reloc.o"
+  let rel = fp"{nvhe_dir}/kvm_nvhe.rel.o"
+  let out = fp"{nvhe_dir}/kvm_nvhe.o"
   object_tasks = object_tasks.push(nvhe_ld_task(ld, tmp, object_outputs, display_paths(object_outputs), linker_script))
   make.run_tasks(object_tasks, jobs_count)?
   write_native_nvhe_hyprel(gen, tmp, reloc_asm)?
@@ -537,7 +537,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     return Err(
       kbuild.ScriptError.Failed(
         "linux-native-kbuild-unsupported-arch",
-        f"native scratch Kbuild final link is only implemented for arm64; ${srcarch} needs x86_64 link/vDSO/generated-header support",
+        f"native scratch Kbuild final link is only implemented for arm64; {srcarch} needs x86_64 link/vDSO/generated-header support",
       ),
     )
   }
@@ -560,7 +560,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     return Err(
       kbuild.ScriptError.Failed(
         "linux-kbuild-archive-only",
-        f"archive-only loop planned ${archive_plan.task_count} tasks",
+        f"archive-only loop planned {archive_plan.task_count} tasks",
       ),
     )
   }
@@ -603,7 +603,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   ]
 
   for item in native_nvhe_objects() {
-    materialized_outputs = materialized_outputs.push(fp"${item.out.display().replace(".xsh-kbuild/obj/", "")}")
+    materialized_outputs = materialized_outputs.push(fp"{item.out.display().replace(".xsh-kbuild/obj/", "")}")
   }
 
   PKGBUILD_shared.write_materialized_outputs(materialized_outputs)?
@@ -659,7 +659,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   return Err(
     kbuild.ScriptError.Failed(
       "linux-native-kbuild-compile-incomplete",
-      f"native scratch Kbuild generated config/syscall headers, discovered ${plan.dirs.len()} dirs and ${plan.objects.len()} objects, constructed ${archive_plan.tasks.len()} object/archive tasks for archive_plan.archives.len() archives, found ${archive_plan.generated_objects.len()} generated objects and ${archive_plan.missing_sources.len()} objects without direct sources; next step is generated object handling and task execution",
+      f"native scratch Kbuild generated config/syscall headers, discovered {plan.dirs.len()} dirs and {plan.objects.len()} objects, constructed {archive_plan.tasks.len()} object/archive tasks for archive_plan.archives.len() archives, found {archive_plan.generated_objects.len()} generated objects and {archive_plan.missing_sources.len()} objects without direct sources; next step is generated object handling and task execution",
     ),
   )
 }

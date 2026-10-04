@@ -16,7 +16,7 @@ proc require_tool_runs(tool: Path, args: List[Str]) [process, error] {
 }
 
 proc require_absent(path_value: Path, label: Str) [fs, error] {
-  ensure(! fs.exists(path_value)?, "build-essential-native", f"unexpected ${label}: ${path_value}")?
+  ensure(! fs.exists(path_value)?, "build-essential-native", f"unexpected {label}: {path_value}")?
 }
 
 proc main() [fs, process, env, error] {
@@ -50,23 +50,23 @@ proc main() [fs, process, env, error] {
   require_tool_runs(muon, ["version"])?
   let os = system.uname()?
   let arch = os.machine
-  let dynlinker = fp"/usr/lib/ld-musl-${arch}.so.1"
+  let dynlinker = fp"/usr/lib/ld-musl-{arch}.so.1"
   let tmp_root = fs.tempdir()?
   defer tmp_root.close()?
   let tmp = tmp_root.host_path()?
 
   fs.write(
-    fp"${tmp}/hello.c",
+    fp"{tmp}/hello.c",
     """#include <stdio.h>
 int main(void) { puts("hello build-essential-native"); return 0; }
 """,
   )?
 
-  let hello = fp"${tmp}/hello"
-  run $cc "-dynamic" f"-Wl,-dynamic-linker,${dynlinker}" fp"${tmp}/hello.c" "-o" $hello ?
+  let hello = fp"{tmp}/hello"
+  run $cc "-dynamic" f"-Wl,-dynamic-linker,{dynlinker}" fp"{tmp}/hello.c" "-o" $hello ?
   let out = run.text $dynlinker $hello ?
   let trimmed = out.trim()
-  ensure(trimmed == "hello build-essential-native", "build-essential-native", f"unexpected output: ${trimmed}")?
+  ensure(trimmed == "hello build-essential-native", "build-essential-native", f"unexpected output: {trimmed}")?
   print "build-essential-native ok: "${trimmed}
 }
 

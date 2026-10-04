@@ -34,11 +34,11 @@ export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str]] {
 export proc load_manifest(db: Path) [fs, error] -> Result[List[Path]] {
   var manifest = []
 
-  if fs.exists(fp"${db}/manifest.json")? {
-    let stored: List[Str] = json.read(fp"${db}/manifest.json")?.require(List[Str])?
+  if fs.exists(fp"{db}/manifest.json")? {
+    let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require(List[Str])?
 
     for rel_text in stored {
-      manifest = manifest.push(fp"${rel_text}")
+      manifest = manifest.push(fp"{rel_text}")
     }
   }
 
@@ -51,10 +51,10 @@ export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Res
 
   for rel_path in manifest {
     if util.is_etc_file(rel_path) {
-      let meta = fs.metadata(fp"${dest}/${rel_path}")?
+      let meta = fs.metadata(fp"{dest}/{rel_path}")?
 
       if meta.kind == "file" {
-        let sha256 = hash.sha256(fp"${dest}/${rel_path}")?.hex()
+        let sha256 = hash.sha256(fp"{dest}/{rel_path}")?.hex()
         sums = sums.push({path: rel_path.display(), sha256})
       }
     }
@@ -72,11 +72,11 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     let key = entry.path.display()
 
     if key == "" or key.starts_with("/") or key.starts_with("../") or "/../" in key {
-      return Err(types.PmError.PackageContract(f"${pkg.name} declares an invalid filetree path ${key}"))
+      return Err(types.PmError.PackageContract(f"{pkg.name} declares an invalid filetree path {key}"))
     }
 
     if key in declared {
-      return Err(types.PmError.PackageContract(f"${pkg.name} declares ${key} more than once"))
+      return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} more than once"))
     }
 
     declared[key] = entry.kind
@@ -86,15 +86,15 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     if entry.kind == types.file_kind_tree() {
-      if fs.metadata(fp"${dest}/${entry.path}")?.kind != "dir" {
-        return Err(types.PmError.PackageContract(f"${pkg.name} declares ${key} as a tree, but it is not a directory"))
+      if fs.metadata(fp"{dest}/{entry.path}")?.kind != "dir" {
+        return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
       }
     }
   }
 
   for rel_path in manifest {
     let key = rel_path.display()
-    let path_value = fp"${dest}/${rel_path}"
+    let path_value = fp"{dest}/{rel_path}"
     let actual_kind = fs.metadata(path_value)?.kind
     if ! (key in declared) {
       var covered_by_tree = false
@@ -102,22 +102,22 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
       for entry in pkg.filetree {
         let tree = entry.path.display()
 
-        if entry.kind == types.file_kind_tree() and key.starts_with(f"${tree}/") {
+        if entry.kind == types.file_kind_tree() and key.starts_with(f"{tree}/") {
           covered_by_tree = true
         }
       }
 
       if ! covered_by_tree {
-        return Err(types.PmError.PackageContract(f"${pkg.name} built undeclared file ${key}"))
+        return Err(types.PmError.PackageContract(f"{pkg.name} built undeclared file {key}"))
       }
 
       if actual_kind == "symlink" {
-        return Err(types.PmError.PackageContract(f"${pkg.name} symlink ${key} must be declared explicitly"))
+        return Err(types.PmError.PackageContract(f"{pkg.name} symlink {key} must be declared explicitly"))
       }
 
       match elf.inspect(path_value) {
         Ok(info) if info.type != "not-elf" => return Err(
-          types.PmError.PackageContract(f"${pkg.name} ELF output ${key} must be declared as binary"),
+          types.PmError.PackageContract(f"{pkg.name} ELF output {key} must be declared as binary"),
         )
         Ok(_) => {}
         Err(_) => {}
@@ -129,12 +129,12 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     let declared_kind = declared.get(key)?
 
     if declared_kind == types.file_kind_tree() {
-      return Err(types.PmError.PackageContract(f"${pkg.name} filetree tree ${key} overlaps an output file"))
+      return Err(types.PmError.PackageContract(f"{pkg.name} filetree tree {key} overlaps an output file"))
     }
 
     if declared_kind == types.file_kind_symlink() {
       if actual_kind != "symlink" {
-        return Err(types.PmError.PackageContract(f"${pkg.name} declares ${key} as a symlink, found ${actual_kind}"))
+        return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a symlink, found {actual_kind}"))
       }
 
       continue
@@ -143,21 +143,21 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     if actual_kind != "file" {
       return Err(
         types.PmError.PackageContract(
-          f"${pkg.name} declares ${key} as ${types.file_kind_text(declared_kind)}, found ${actual_kind}",
+          f"{pkg.name} declares {key} as {types.file_kind_text(declared_kind)}, found {actual_kind}",
         ),
       )
     }
 
     match elf.inspect(path_value) {
       Ok(info) if info.type != "not-elf" and declared_kind == types.file_kind_file() => return Err(
-        types.PmError.PackageContract(f"${pkg.name} ELF output ${key} must be declared as binary"),
+        types.PmError.PackageContract(f"{pkg.name} ELF output {key} must be declared as binary"),
       )
       Ok(info) if info.type == "not-elf" and declared_kind == types.file_kind_binary() => return Err(
-        types.PmError.PackageContract(f"${pkg.name} declares non-ELF output ${key} as binary"),
+        types.PmError.PackageContract(f"{pkg.name} declares non-ELF output {key} as binary"),
       )
       Ok(_) => {}
       Err(_) if declared_kind == types.file_kind_binary() => return Err(
-        types.PmError.PackageContract(f"${pkg.name} declares non-ELF output ${key} as binary"),
+        types.PmError.PackageContract(f"{pkg.name} declares non-ELF output {key} as binary"),
       )
       Err(_) => {}
     }
@@ -166,8 +166,8 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   for entry in pkg.filetree {
     let key = entry.path.display()
 
-    if entry.kind != types.file_kind_tree() and ! fp"${dest}/${entry.path}".exists()? {
-      return Err(types.PmError.PackageContract(f"${pkg.name} declares missing file ${key}"))
+    if entry.kind != types.file_kind_tree() and ! fp"{dest}/{entry.path}".exists()? {
+      return Err(types.PmError.PackageContract(f"{pkg.name} declares missing file {key}"))
     }
   }
 
@@ -178,7 +178,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   let strip = process.which("llvm-strip")?
 
   for rel_path in binaries {
-    run $strip "--strip-unneeded" fp"${dest}/${rel_path}" ?
+    run $strip "--strip-unneeded" fp"{dest}/{rel_path}" ?
   }
 }
 
@@ -212,7 +212,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
     match meta.kind {
       "file" => kind = types.file_kind_file()
       "dir" => kind = types.file_kind_tree()
-      _ => return Err(types.PmError.PackageContract(f"metadata cannot represent ${rel_path} as ${meta.kind}"))
+      _ => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
     }
     files = files.push({path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""})
   }
@@ -249,7 +249,7 @@ export proc collect_archive_paths(
   # archive assembled by `pm.build`.
   for entry in filetree {
     if entry.kind == types.file_kind_tree() {
-      let tree = fp"${root}/${entry.path}"
+      let tree = fp"{root}/{entry.path}"
 
       if dir_empty(tree)? {
         entries = entries.push(entry.path)
@@ -284,24 +284,24 @@ export proc collect_artifact_entries(
 
 ## Exported PM declaration `metadata_files_sha256`.
 export proc metadata_files_sha256(pkg: types.Package, files: List[types.ArtifactEntry]) [error] -> Result[Str] {
-  var body = f"""name	${pkg.name}
-ver	${pkg.ver}
-deps	${pkg.deps.join(" ")}
-mkdeps_host	${pkg.mkdeps_host.join(" ")}
+  var body = f"""name	{pkg.name}
+ver	{pkg.ver}
+deps	{pkg.deps.join(" ")}
+mkdeps_host	{pkg.mkdeps_host.join(" ")}
 """
 
   if pkg.mkdeps_target.len() > 0 {
-    body = f"""${body}mkdeps_target	${pkg.mkdeps_target.join(" ")}
+    body = f"""{body}mkdeps_target	{pkg.mkdeps_target.join(" ")}
 """
   }
 
   for entry in pkg.filetree {
-    body = f"""${body}filetree	${entry.path}	${types.file_kind_text(entry.kind)}
+    body = f"""{body}filetree	{entry.path}	{types.file_kind_text(entry.kind)}
 """
   }
 
   for file in files {
-    body = f"""${body}${file.path}	${types.file_kind_text(file.kind)}	${file.mode}	${file.sha256}	${file.target}
+    body = f"""{body}{file.path}	{types.file_kind_text(file.kind)}	{file.mode}	{file.sha256}	{file.target}
 """
   }
 
@@ -365,11 +365,11 @@ export proc write_package_db(
   let db = util.package_db_path(root, pkg.name)
   fs.mkdir(db)?
   let manifest_text = collect_manifest_text(manifest)?
-  json.write(fp"${db}/manifest.json", manifest_text)?
-  json.write(fp"${db}/etcsums.json", etcsums)?
+  json.write(fp"{db}/manifest.json", manifest_text)?
+  json.write(fp"{db}/etcsums.json", etcsums)?
 
   json.write(
-    fp"${db}/metadata.json",
+    fp"{db}/metadata.json",
     {
       name: pkg.name,
       ver: pkg.ver,
@@ -394,7 +394,7 @@ export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[
     let pkg = recipe.load_package(dir)?
 
     if pkg.name in seen {
-      return Err(types.PmError.PackageContract(f"duplicate package ${pkg.name}"))
+      return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
     }
 
     seen[pkg.name] = true
@@ -427,7 +427,7 @@ export proc load_built_package_from_dest(
 
   let db = util.package_db_path(dest, pkg.name)
   let manifest = load_manifest(db)?
-  let etcsums: List[types.EtcSum] = json.read(fp"${db}/etcsums.json")?.require(List[types.EtcSum])?
+  let etcsums: List[types.EtcSum] = json.read(fp"{db}/etcsums.json")?.require(List[types.EtcSum])?
   let metadata_files = collect_artifact_entries(dest, pkg.filetree)?
   let metadata_sha256 = metadata_files_sha256(pkg, metadata_files)?
 

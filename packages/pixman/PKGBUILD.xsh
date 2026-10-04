@@ -66,7 +66,7 @@ proc patch_musl_math() [fs, error] {
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let arch = pm_util.target_arch()?
   patch_musl_math()?
 
@@ -84,7 +84,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "muon" "-C" "build" install ?
   } ?
 
-  fs.remove(fp"${dest}/usr/include", missing_ok: true)?
-  fs.remove(fp"${dest}/usr/lib/pkgconfig", missing_ok: true)?
-  fs.remove(fp"${dest}/usr/lib/libpixman-1.so", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/include", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/lib/libpixman-1.so", missing_ok: true)?
 }

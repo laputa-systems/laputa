@@ -72,7 +72,7 @@ proc patch_musl_math() [fs, error] {
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let arch = pm_util.target_arch()?
   patch_musl_math()?
@@ -99,7 +99,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     } ?
   } ?
 
-  for entry in fs.children(fp"${dest}/usr/lib")? {
+  for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libpixman-1.so.") {
       fs.remove(entry.path, missing_ok: true)?
     }

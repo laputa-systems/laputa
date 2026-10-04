@@ -60,13 +60,13 @@ proc patch_optional_installs() [fs, error] {
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
   let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
   let native_scanner = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if native_scanner {
-    f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib:${pc.ld_library_path}"
+    f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib:{pc.ld_library_path}"
   } else {
     pc.ld_library_path
   }
@@ -84,11 +84,11 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if native_scanner {
       let ninja = p"build/build.ninja"
-      let scanner_text = fp"${build_root}/usr/bin/wayland-scanner".display()
+      let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"${build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
       fs.write(ninja, ninja_text)?
     }
 
@@ -101,5 +101,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     } ?
   } ?
 
-  fs.remove(fp"${dest}/usr/share/man", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
 }

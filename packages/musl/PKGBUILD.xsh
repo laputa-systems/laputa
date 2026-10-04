@@ -135,11 +135,11 @@ proc compiler_rt_builtins(arch: Str) [fs, error] -> Result[List[Path]] {
   let target_root = p"llvm-toolchain-target"
 
   let candidates = [
-    fp"${target_root}/usr/lib/llvm23/lib/clang/23/lib/${arch}-linux-musl/libclang_rt.builtins-${arch}.a",
-    fp"${target_root}/lib/llvm23/lib/clang/23/lib/${arch}-linux-musl/libclang_rt.builtins-${arch}.a",
-    fp"/usr/lib/llvm23/lib/clang/23/lib/${arch}-linux-musl/libclang_rt.builtins-${arch}.a",
-    fp"/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-${arch}.a",
-    fp"/usr/lib/libclang_rt.builtins-${arch}.a",
+    fp"{target_root}/usr/lib/llvm23/lib/clang/23/lib/{arch}-linux-musl/libclang_rt.builtins-{arch}.a",
+    fp"{target_root}/lib/llvm23/lib/clang/23/lib/{arch}-linux-musl/libclang_rt.builtins-{arch}.a",
+    fp"/usr/lib/llvm23/lib/clang/23/lib/{arch}-linux-musl/libclang_rt.builtins-{arch}.a",
+    fp"/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a",
+    fp"/usr/lib/libclang_rt.builtins-{arch}.a",
   ]
 
   for candidate in candidates {
@@ -155,7 +155,7 @@ proc compiler_rt_builtins(arch: Str) [fs, error] -> Result[List[Path]] {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
-  let triple = f"${arch}-linux-musl"
+  let triple = f"{arch}-linux-musl"
 
   # Generate include/bits/alltypes.h and include/bits/syscall.h.
   # bits/ does not exist in the source tree — create it first.
@@ -169,7 +169,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   #                     #endif
   # STRUCT name body; and UNION name body; get equivalent struct/union wrappers.
   # All other lines (#define, #if, #endif, blank, etc.) pass through unchanged.
-  let arch_at = fs.read_text(fp"arch/${arch}/bits/alltypes.h.in")?
+  let arch_at = fs.read_text(fp"arch/{arch}/bits/alltypes.h.in")?
   let generic_at = fs.read_text(p"include/alltypes.h.in")?
   var at_lines = []
 
@@ -178,25 +178,25 @@ export proc build(dest: Path) [fs, process, env, error] {
       let caps = regex_captures(line, "^TYPEDEF (.+) ([^ ]+);$")?
       let type_expr = caps[1]
       let type_name = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_${type_name}) && !defined(__DEFINED_${type_name})")
-      at_lines = at_lines.push(f"typedef ${type_expr} ${type_name};")
-      at_lines = at_lines.push(f"#define __DEFINED_${type_name}")
+      at_lines = at_lines.push(f"#if defined(__NEED_{type_name}) && !defined(__DEFINED_{type_name})")
+      at_lines = at_lines.push(f"typedef {type_expr} {type_name};")
+      at_lines = at_lines.push(f"#define __DEFINED_{type_name}")
       at_lines = at_lines.push("#endif")
     } else if line.starts_with("STRUCT ") {
       let caps = regex_captures(line, "^STRUCT +([^ ]+) (.+);$")?
       let sname = caps[1]
       let sbody = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_struct_${sname}) && !defined(__DEFINED_struct_${sname})")
-      at_lines = at_lines.push(f"struct ${sname} ${sbody};")
-      at_lines = at_lines.push(f"#define __DEFINED_struct_${sname}")
+      at_lines = at_lines.push(f"#if defined(__NEED_struct_{sname}) && !defined(__DEFINED_struct_{sname})")
+      at_lines = at_lines.push(f"struct {sname} {sbody};")
+      at_lines = at_lines.push(f"#define __DEFINED_struct_{sname}")
       at_lines = at_lines.push("#endif")
     } else if line.starts_with("UNION ") {
       let caps = regex_captures(line, "^UNION +([^ ]+) (.+);$")?
       let uname = caps[1]
       let ubody = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_union_${uname}) && !defined(__DEFINED_union_${uname})")
-      at_lines = at_lines.push(f"union ${uname} ${ubody};")
-      at_lines = at_lines.push(f"#define __DEFINED_union_${uname}")
+      at_lines = at_lines.push(f"#if defined(__NEED_union_{uname}) && !defined(__DEFINED_union_{uname})")
+      at_lines = at_lines.push(f"union {uname} {ubody};")
+      at_lines = at_lines.push(f"#define __DEFINED_union_{uname}")
       at_lines = at_lines.push("#endif")
     } else {
       at_lines = at_lines.push(line)
@@ -206,14 +206,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.write(p"include/bits/alltypes.h", at_lines.join("\n"))?
 
   # Generate include/bits/syscall.h: rename __NR_* → SYS_*.
-  let syscall_in = fs.read_text(fp"arch/${arch}/bits/syscall.h.in")?
+  let syscall_in = fs.read_text(fp"arch/{arch}/bits/syscall.h.in")?
   fs.write(p"include/bits/syscall.h", syscall_in.replace("__NR_", "SYS_"))?
 
   # Generate src/internal/version.h (included by src/internal/version.c).
   # configure normally produces this from tools/version.sh + VERSION file.
   fs.write(
     p"src/internal/version.h",
-    f"""#define VERSION "${ver}"
+    f"""#define VERSION "{ver}"
 """,
   )?
 
@@ -236,7 +236,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-fno-sanitize=all",
   ]
 
-  let includes = [f"-I./arch/${arch}", "-I./arch/generic", "-I./src/include", "-I./src/internal", "-I./include"]
+  let includes = [f"-I./arch/{arch}", "-I./arch/generic", "-I./src/include", "-I./src/internal", "-I./include"]
 
   # Collect arch-override stems and files from two sources, matching musl's
   # Makefile ARCH_SRCS = arch/$(ARCH)/*.{c,s} + src/*/{arch}/*.[csS]:
@@ -249,19 +249,19 @@ export proc build(dest: Path) [fs, process, env, error] {
   var arch_s_files = []
 
   # 1. arch/${arch}/ direct children (headers only for aarch64/x86_64 in practice).
-  for e in fs.children(fp"arch/${arch}")? |> where .kind == "file" {
+  for e in fs.children(fp"arch/{arch}")? |> where .kind == "file" {
     if e.ext == "c" {
       arch_stems = arch_stems.push(e.name.replace(".c", ""))
       arch_c_files = arch_c_files.push(e.path)
     } else if e.ext == "s" or e.ext == "S" {
-      arch_stems = arch_stems.push(e.name.replace(f".${e.ext}", ""))
+      arch_stems = arch_stems.push(e.name.replace(f".{e.ext}", ""))
       arch_s_files = arch_s_files.push(e.path)
     }
   }
 
   # 2. src/{subsystem}/${arch}/*.[csS] — in-source arch overrides.
   for subsys in fs.children(p"src")? |> where .kind == "dir" {
-    let arch_subdir = fp"${subsys.path}/${arch}"
+    let arch_subdir = fp"{subsys.path}/{arch}"
 
     if fs.exists(arch_subdir)? {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
@@ -269,7 +269,7 @@ export proc build(dest: Path) [fs, process, env, error] {
           arch_stems = arch_stems.push(e.name.replace(".c", ""))
           arch_c_files = arch_c_files.push(e.path)
         } else if e.ext == "s" or e.ext == "S" {
-          arch_stems = arch_stems.push(e.name.replace(f".${e.ext}", ""))
+          arch_stems = arch_stems.push(e.name.replace(f".{e.ext}", ""))
           arch_s_files = arch_s_files.push(e.path)
         }
       }
@@ -324,7 +324,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   var ldso_objs = []
   var ldso_deps = []
   fs.mkdir(p"obj/ldso")?
-  let ldso_sources = [fp"ldso/${src_name}.c" for src_name in ["dlstart", "dynlink"]]
+  let ldso_sources = [fp"ldso/{src_name}.c" for src_name in ["dlstart", "dynlink"]]
   let ldso_compile = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", ldso_sources, p"obj/ldso")
   tasks = tasks.extend(ldso_compile.tasks)
   ldso_objs = ldso_compile.objects
@@ -377,7 +377,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     cwd: p".",
     env: {},
     depfile: p"",
-    stamp: fp"${libc_so}.cmd",
+    stamp: fp"{libc_so}.cmd",
   })
 
   make.run_tasks(tasks, make.jobs()?)?
@@ -390,16 +390,16 @@ export proc build(dest: Path) [fs, process, env, error] {
   var crt_outs: List[Path] = []
 
   for src_name in ["crt1", "crti", "crtn"] {
-    let src = fp"crt/${src_name}.c"
-    let out = fp"obj/${src_name}.o"
+    let src = fp"crt/{src_name}.c"
+    let out = fp"obj/{src_name}.o"
     let task = make.compile_c_task(cc, triple, crt_cflags, [], includes, src, out)
     crt_tasks = crt_tasks.push({...task, stamp: p""})
     crt_outs = crt_outs.push(out)
   }
 
   for src_name in ["Scrt1", "rcrt1"] {
-    let src = fp"crt/${src_name}.c"
-    let out = fp"obj/${src_name}.o"
+    let src = fp"crt/{src_name}.c"
+    let out = fp"obj/{src_name}.o"
     let task = make.compile_lo_task(cc, triple, crt_cflags, [], includes, src, out)
     crt_tasks = crt_tasks.push({...task, stamp: p""})
     crt_outs = crt_outs.push(out)
@@ -408,21 +408,21 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(crt_tasks, make.jobs()?)?
 
   for out in crt_outs {
-    fs.install(out, fp"${dest}/usr/lib/${out.name()}", 0o644, parents: true, overwrite: true)?
+    fs.install(out, fp"{dest}/usr/lib/{out.name()}", 0o644, parents: true, overwrite: true)?
   }
 
   # Install shared library and static archive.
-  fs.install(libc_so, fp"${dest}/usr/lib/libc.so", 0o755, parents: true, overwrite: true)?
-  fs.install(libc_a, fp"${dest}/usr/lib/libc.a", 0o644, parents: true, overwrite: true)?
+  fs.install(libc_so, fp"{dest}/usr/lib/libc.so", 0o755, parents: true, overwrite: true)?
+  fs.install(libc_a, fp"{dest}/usr/lib/libc.a", 0o644, parents: true, overwrite: true)?
 
   for builtin in builtins {
-    fs.install(builtin, fp"${dest}/usr/lib/${builtin.name()}", 0o644, parents: true, overwrite: true)?
+    fs.install(builtin, fp"{dest}/usr/lib/{builtin.name()}", 0o644, parents: true, overwrite: true)?
   }
 
-  let packaged_builtin = fp"llvm-toolchain-target/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-${arch}.a"
+  let packaged_builtin = fp"llvm-toolchain-target/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a"
 
   if fs.exists(packaged_builtin)? {
-    fs.install(packaged_builtin, fp"${dest}/usr/lib/${packaged_builtin.name()}", 0o644, parents: true, overwrite: true)?
+    fs.install(packaged_builtin, fp"{dest}/usr/lib/{packaged_builtin.name()}", 0o644, parents: true, overwrite: true)?
   }
 
   # These libraries are folded into libc on musl, but compiler drivers and
@@ -430,8 +430,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Keep the aliases as relative symlinks so they do not duplicate libc in the
   # installed root or package archive.
   for lib in ["m", "dl", "rt", "crypt", "pthread"] {
-    fs.symlink(p"libc.so", fp"${dest}/usr/lib/lib${lib}.so")?
-    fs.symlink(p"libc.a", fp"${dest}/usr/lib/lib${lib}.a")?
+    fs.symlink(p"libc.so", fp"{dest}/usr/lib/lib{lib}.so")?
+    fs.symlink(p"libc.a", fp"{dest}/usr/lib/lib{lib}.a")?
   }
 
   # Clang's musl driver links libssp_nonshared by default. Keep the archive
@@ -439,7 +439,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let ar = process.which("ar")?
   let libssp = p"obj/libssp_nonshared.a"
   run $ar "rcs" $libssp ?
-  fs.install(libssp, fp"${dest}/usr/lib/libssp_nonshared.a", 0o644, parents: true, overwrite: true)?
+  fs.install(libssp, fp"{dest}/usr/lib/libssp_nonshared.a", 0o644, parents: true, overwrite: true)?
 
   # Install public headers from include/ (.h.in templates are excluded by the
   # .ext filter; the generated bits/ headers are picked up by recursive walk).
@@ -447,15 +447,15 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for e in fs.files(p"include")? |> where .ext == "h" {
     let rel_path = e.path.relative_to(include_root)
-    fs.install(e.path, fp"${dest}/usr/include/${rel_path}", 0o644, parents: true, overwrite: true)?
+    fs.install(e.path, fp"{dest}/usr/include/{rel_path}", 0o644, parents: true, overwrite: true)?
   }
 
-  for bits_dir in [p"arch/generic/bits", fp"arch/${arch}/bits"] {
+  for bits_dir in [p"arch/generic/bits", fp"arch/{arch}/bits"] {
     let bits_root = path.absolute(bits_dir)?
 
     for e in fs.files(bits_dir)? |> where .ext == "h" {
       let rel_path = e.path.relative_to(bits_root)
-      fs.install(e.path, fp"${dest}/usr/include/bits/${rel_path}", 0o644, parents: true, overwrite: true)?
+      fs.install(e.path, fp"{dest}/usr/include/bits/{rel_path}", 0o644, parents: true, overwrite: true)?
     }
   }
 
@@ -472,21 +472,21 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   if ldso != "" {
-    fs.symlink(p"libc.so", fp"${dest}/usr/lib/${ldso}")?
-    fs.mkdir(fp"${dest}/usr/bin")?
-    fs.remove(fp"${dest}/usr/bin/ldd", missing_ok: true)?
+    fs.symlink(p"libc.so", fp"{dest}/usr/lib/{ldso}")?
+    fs.mkdir(fp"{dest}/usr/bin")?
+    fs.remove(fp"{dest}/usr/bin/ldd", missing_ok: true)?
 
     fs.write(
-      fp"${dest}/usr/bin/ldd",
+      fp"{dest}/usr/bin/ldd",
       f"""#!/bin/xsh
-proc main(...argv: List[Str]) [process, error] {{
-  unix.exec(process.command_argv("/usr/lib/${ldso}", ["/usr/lib/${ldso}", "--list"].extend(argv)))?
-}}
+proc main(...argv: List[Str]) [process, error] {{{{
+  unix.exec(process.command_argv("/usr/lib/{ldso}", ["/usr/lib/{ldso}", "--list"].extend(argv)))?
+}}}}
 
 main(@args)?
 """,
     )?
 
-    fs.chmod(fp"${dest}/usr/bin/ldd", 0o755)?
+    fs.chmod(fp"{dest}/usr/bin/ldd", 0o755)?
   }
 }

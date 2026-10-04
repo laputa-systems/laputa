@@ -104,26 +104,26 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let target_arch = pm_util.target_arch()?
   let build_arch = pm_util.build_arch()?
-  let triple = f"${target_arch}-linux-musl"
-  let build_triple = f"${build_arch}-linux-musl"
+  let triple = f"{target_arch}-linux-musl"
+  let build_triple = f"{build_arch}-linux-musl"
   let cross_build = build_arch != target_arch
   let tool_prefix = cc.parent.parent
-  let tool_lib = fp"${tool_prefix}/lib"
+  let tool_lib = fp"{tool_prefix}/lib"
   var bootstrap_cc = cc
   var bootstrap_triple = triple
   var bootstrap_task_env: Record = {}
   var bootstrap_ld_library_path = tool_lib.display()
 
   if cross_build {
-    let build_root = fp"${env.get("XSH_PM_BUILD_ROOT") ?? ""}"
-    bootstrap_cc = fp"${build_root}/usr/bin/cc"
+    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    bootstrap_cc = fp"{build_root}/usr/bin/cc"
     bootstrap_triple = build_triple
-    bootstrap_ld_library_path = f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib"
+    bootstrap_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
 
     bootstrap_task_env = {
       XSH_MAKE_NATIVE_CROSS: "0",
-      PATH: f"${build_root}/usr/bin:${build_root}/usr/lib/llvm-toolchain/bin:${env.get("PATH") ?? ""}",
-      LD_LIBRARY_PATH: f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib",
+      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{env.get("PATH") ?? ""}",
+      LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     }
   }
 
@@ -142,7 +142,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.mkdir(bsdir)?
 
   fs.write(
-    fp"${bsdir}/cmVersionConfig.h",
+    fp"{bsdir}/cmVersionConfig.h",
     """#define CMake_VERSION_MAJOR 4
 #define CMake_VERSION_MINOR 3
 #define CMake_VERSION_PATCH 1
@@ -153,9 +153,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   let src_dir = fs.cwd()?
 
   fs.write(
-    fp"${bsdir}/cmConfigure.h",
-    f"""#define CMAKE_BOOTSTRAP_SOURCE_DIR "${src_dir}"
-#define CMAKE_BOOTSTRAP_BINARY_DIR "${src_dir}/Bootstrap.cmk"
+    fp"{bsdir}/cmConfigure.h",
+    f"""#define CMAKE_BOOTSTRAP_SOURCE_DIR "{src_dir}"
+#define CMAKE_BOOTSTRAP_BINARY_DIR "{src_dir}/Bootstrap.cmk"
 #define CMake_DEFAULT_RECURSION_LIMIT 400
 #define CMAKE_BIN_DIR "/bootstrap-not-installed"
 #define CMAKE_DATA_DIR "/bootstrap-not-installed"
@@ -164,12 +164,12 @@ export proc build(dest: Path) [fs, process, env, error] {
 """,
   )?
 
-  fs.write(fp"${bsdir}/cmSTL.hxx", "")?
+  fs.write(fp"{bsdir}/cmSTL.hxx", "")?
 
   # cmThirdParty.h: only #pragma once when using bundled libs (no system libs).
   # cmake's bootstrap only adds #define CMAKE_USE_SYSTEM_* when system libs are found.
   fs.write(
-    fp"${bsdir}/cmThirdParty.h",
+    fp"{bsdir}/cmThirdParty.h",
     """#pragma once
 """,
   )?
@@ -203,7 +203,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     ],
   ]
 
-  fs.mkdir(fp"${bsdir}/cmsys")?
+  fs.mkdir(fp"{bsdir}/cmsys")?
 
   for hdr in [
     "Configure.h",
@@ -220,12 +220,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     "System.h",
     "SystemTools.hxx",
   ] {
-    configure.substitute(fp"Source/kwsys/${hdr}.in", fp"${bsdir}/cmsys/${hdr}", kwsys_subs)?
+    configure.substitute(fp"Source/kwsys/{hdr}.in", fp"{bsdir}/cmsys/{hdr}", kwsys_subs)?
   }
 
   # Step 3: compile bootstrap cmake from source. No sh, no configure, no make.
   # Source categories from CMAKE_*_SOURCES in cmake's bootstrap script.
-  fs.mkdir(fp"${bsdir}/obj")?
+  fs.mkdir(fp"{bsdir}/obj")?
 
   # Pre-combined flag lists (XSH has no list concat, so build them explicitly).
   # Linux system flags + cmake bootstrap flags + includes
@@ -235,7 +235,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DCMAKE_BOOTSTRAP",
     "-DCMake_HAVE_CXX_MAKE_UNIQUE=1",
     "-DCMake_HAVE_CXX_FILESYSTEM=1",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/LexerParser",
     "-IUtilities/std",
@@ -246,7 +246,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
     "-DCMAKE_BOOTSTRAP",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/LexerParser",
     "-IUtilities",
@@ -267,7 +267,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DKWSYS_CXX_HAS_ENVIRON_IN_STDLIB_H=0",
     "-DKWSYS_CXX_HAS_UTIMENSAT=1",
     "-DKWSYS_CXX_HAS_UTIMES=1",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/kwsys",
   ]
@@ -288,7 +288,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DKWSYS_SYSTEMINFORMATION_HAS_BACKTRACE=0",
     "-DKWSYS_SYSTEMINFORMATION_HAS_CPP_DEMANGLE=0",
     "-DKWSYS_SYSTEMINFORMATION_HAS_SYMBOL_LOOKUP=0",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/kwsys",
   ]
@@ -298,7 +298,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-D_TIME_BITS=64",
     "-DCMAKE_BOOTSTRAP",
     "-D_GNU_SOURCE",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-IUtilities/cmlibuv/include",
     "-IUtilities/cmlibuv/src",
     "-IUtilities/cmlibuv/src/unix",
@@ -308,7 +308,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
     "-DNO_IMPORT_EXPORT",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-IUtilities/cmlibrhash",
     "-IUtilities",
   ]
@@ -317,14 +317,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
     "-DCMAKE_BOOTSTRAP",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-IUtilities/cmjsoncpp/include",
     "-IUtilities",
   ]
 
   # cmake CXX sources: Source/cm*.cxx (list from CMAKE_CXX_SOURCES in bootstrap)
   let cmake_cxx_sources = [
-    fp"Source/${s}.cxx"
+    fp"Source/{s}.cxx"
     for s in [
       "cmAddCompileDefinitionsCommand",
       "cmAddCustomCommandCommand",
@@ -580,7 +580,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Ninja generator sources (bootstrap uses Ninja so samu can drive the full build).
   let ninja_cxx_sources = [
-    fp"Source/${s}.cxx"
+    fp"Source/{s}.cxx"
     for s in [
       "cmFortranParserImpl",
       "cmGlobalNinjaGenerator",
@@ -594,14 +594,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   ]
 
   # Fortran LexerParser sources needed by the Ninja generator.
-  let fortran_lexer_sources = [fp"Source/LexerParser/${s}.cxx" for s in ["cmFortranLexer", "cmFortranParser"]]
+  let fortran_lexer_sources = [fp"Source/LexerParser/{s}.cxx" for s in ["cmFortranLexer", "cmFortranParser"]]
 
   # Utilities/std: fs_path.cxx, string_view.cxx
-  let std_cxx_sources = [fp"Utilities/std/cm/bits/${s}.cxx" for s in ["fs_path", "string_view"]]
+  let std_cxx_sources = [fp"Utilities/std/cm/bits/{s}.cxx" for s in ["fs_path", "string_view"]]
 
   # LexerParser CXX
   let lexer_parser_cxx_sources = [
-    fp"Source/LexerParser/${s}.cxx"
+    fp"Source/LexerParser/{s}.cxx"
     for s in ["cmExprLexer", "cmExprParser", "cmGccDepfileLexer"]
   ]
 
@@ -612,12 +612,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-D_TIME_BITS=64",
     "-DCMAKE_BOOTSTRAP",
     "-DKWSYS_NAMESPACE=cmsys",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/kwsys",
   ]
 
-  let kwsys_c_sources = [fp"Source/kwsys/${s}.c" for s in ["EncodingC", "ProcessUNIX", "System"]]
+  let kwsys_c_sources = [fp"Source/kwsys/{s}.c" for s in ["EncodingC", "ProcessUNIX", "System"]]
 
   let string_flags = [
     "-D_FILE_OFFSET_BITS=64",
@@ -625,20 +625,20 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DCMAKE_BOOTSTRAP",
     "-DKWSYS_NAMESPACE=cmsys",
     "-DKWSYS_STRING_C",
-    f"-I${bsdir}",
+    f"-I{bsdir}",
     "-ISource",
     "-ISource/kwsys",
   ]
 
   # kwsys CXX (KWSYS_CXX_SOURCES from bootstrap)
   let kwsys_cxx_sources = [
-    fp"Source/kwsys/${s}.cxx"
+    fp"Source/kwsys/{s}.cxx"
     for s in ["Directory", "EncodingCXX", "FStream", "Glob", "RegularExpression", "Status"]
   ]
 
   # libuv C sources (unix branch, bundled)
   let uv_sources = [
-    fp"Utilities/cmlibuv/${s}"
+    fp"Utilities/cmlibuv/{s}"
     for s in [
       "src/strscpy.c",
       "src/strtok.c",
@@ -664,7 +664,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # librhash C sources (bundled)
   let rhash_sources = [
-    fp"Utilities/cmlibrhash/${s}"
+    fp"Utilities/cmlibrhash/{s}"
     for s in [
       "librhash/algorithms.c",
       "librhash/byte_order.c",
@@ -681,12 +681,12 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # jsoncpp CXX sources (bundled)
   let jsoncpp_sources = [
-    fp"Utilities/cmjsoncpp/${s}"
+    fp"Utilities/cmjsoncpp/{s}"
     for s in ["src/lib_json/json_reader.cpp", "src/lib_json/json_value.cpp", "src/lib_json/json_writer.cpp"]
   ]
 
   # Step 4: link the bootstrap cmake binary (C++ program needs C++ compiler driver).
-  let bootstrap_cmake = fp"${bsdir}/cmake"
+  let bootstrap_cmake = fp"{bsdir}/cmake"
 
   let bootstrap_target = make.c_multi_program(
     {
@@ -696,7 +696,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       defs: [],
       includes: [],
       root: p".",
-      out_dir: fp"${bsdir}/obj",
+      out_dir: fp"{bsdir}/obj",
       groups: [
         {
           name: "cmake-cxx",
@@ -891,7 +891,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Step 5: generate InitialCacheFlags.cmake — passed as -C to bootstrap cmake.
   # The bootstrap script generates this to configure install paths and features.
   fs.write(
-    fp"${bsdir}/InitialCacheFlags.cmake",
+    fp"{bsdir}/InitialCacheFlags.cmake",
     """# Generated by cmake PKGBUILD.xsh bootstrap
 set (CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type." FORCE)
 set (CMAKE_C_COMPILER "/usr/bin/cc" CACHE FILEPATH "C compiler." FORCE)
@@ -917,7 +917,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
   # No Alpine make required — samu is a mkdep and on PATH via /build-env.
   let samu = process.which("samu")?
   let jobs = make.jobs()?
-  let jobs_flag = f"-j${jobs}"
+  let jobs_flag = f"-j{jobs}"
   let build_dir = p"cmake-build"
   fs.mkdir(build_dir)?
 
@@ -931,10 +931,10 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
       var cmake_args = [
         bc.display(),
         "..",
-        f"-C${init_cache}",
+        f"-C{init_cache}",
         "-G",
         "Ninja",
-        f"-DCMAKE_MAKE_PROGRAM=${samu}",
+        f"-DCMAKE_MAKE_PROGRAM={samu}",
         "-DCMAKE_USE_OPENSSL=OFF",
         "-DCMAKE_USE_SYSTEM_LIBRARIES=OFF",
         "-DBUILD_TESTING=OFF",

@@ -105,23 +105,23 @@ export let filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let src = fs.cwd()?
-  let objs = fp"${dest}/../objs"
+  let objs = fp"{dest}/../objs"
 
   fs.mkdir(objs)?
-  fs.install(p"config", fp"${src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)?
+  fs.install(p"config", fp"{src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)?
   let cc = process.which("cc")?
-  let triple = f"${env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
+  let triple = f"{env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
 
   # Flags mirror wpa_supplicant's defconfig: no IPv6, no D-Bus, no readline.
   var cflags = ["-O2", "-Wall", "-ffunction-sections", "-fdata-sections"]
 
   var includes = [
     "-I",
-    fp"${src}/src".display(),
+    fp"{src}/src".display(),
     "-I",
-    fp"${src}/src/utils".display(),
+    fp"{src}/src/utils".display(),
     "-I",
-    fp"${src}/wpa_supplicant".display(),
+    fp"{src}/wpa_supplicant".display(),
     "-I",
     "/usr/include",
   ]
@@ -266,8 +266,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     includes,
     root: src,
     sources: shared_sources,
-    out_dir: fp"${objs}/shared-objs",
-    out: fp"${objs}/libwpa-common.a",
+    out_dir: fp"{objs}/shared-objs",
+    out: fp"{objs}/libwpa-common.a",
     deps: [],
   })
 
@@ -278,7 +278,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     defs,
     includes,
     root: src,
-    out_dir: fp"${objs}/compile",
+    out_dir: fp"{objs}/compile",
     groups: [],
     targets: [{
     name: "wpa_supplicant",
@@ -286,7 +286,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     sources: [p"wpa_supplicant/main.c"],
     libs: [shared.output],
     ldflags,
-    out: fp"${objs}/wpa_supplicant",
+    out: fp"{objs}/wpa_supplicant",
     deps: shared.deps,
   }, {
     name: "wpa_cli",
@@ -294,7 +294,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     sources: [p"wpa_supplicant/wpa_cli.c"],
     libs: [shared.output],
     ldflags,
-    out: fp"${objs}/wpa_cli",
+    out: fp"{objs}/wpa_cli",
     deps: shared.deps,
   }, {
     name: "wpa_passphrase",
@@ -302,7 +302,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     sources: [p"wpa_supplicant/wpa_passphrase.c"],
     libs: [shared.output],
     ldflags,
-    out: fp"${objs}/wpa_passphrase",
+    out: fp"{objs}/wpa_passphrase",
     deps: shared.deps,
   }],
   })?
@@ -314,23 +314,23 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Install under /usr/bin: baselayout symlinks /usr/sbin -> bin so
   # installing to /usr/sbin would fail proof extraction with "symlink escape".
-  fs.install(wpa_supplicant_out, fp"${dest}/usr/bin/wpa_supplicant", 0o755, parents: true, overwrite: true)?
-  fs.install(wpa_cli_out, fp"${dest}/usr/bin/wpa_cli", 0o755, parents: true, overwrite: true)?
-  fs.install(passphrase_out, fp"${dest}/usr/bin/wpa_passphrase", 0o755, parents: true, overwrite: true)?
+  fs.install(wpa_supplicant_out, fp"{dest}/usr/bin/wpa_supplicant", 0o755, parents: true, overwrite: true)?
+  fs.install(wpa_cli_out, fp"{dest}/usr/bin/wpa_cli", 0o755, parents: true, overwrite: true)?
+  fs.install(passphrase_out, fp"{dest}/usr/bin/wpa_passphrase", 0o755, parents: true, overwrite: true)?
 
   fs.install(
     p"service.xsh",
-    fp"${dest}/usr/lib/xinit/services/wpa_supplicant.xsh",
+    fp"{dest}/usr/lib/xinit/services/wpa_supplicant.xsh",
     0o644,
     parents: true,
     overwrite: true,
   )?
 
-  fs.mkdir(fp"${dest}/etc/wpa_supplicant")?
+  fs.mkdir(fp"{dest}/etc/wpa_supplicant")?
 
   fs.install(
     p"wpa_supplicant.conf",
-    fp"${dest}/etc/wpa_supplicant/wpa_supplicant.conf",
+    fp"{dest}/etc/wpa_supplicant/wpa_supplicant.conf",
     0o600,
     parents: true,
     overwrite: true,

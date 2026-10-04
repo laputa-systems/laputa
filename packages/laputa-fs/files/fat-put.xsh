@@ -82,8 +82,8 @@ proc main(...argv: List[Str]) [fs, error] {
   }
 
   let fat_name = fallback_fat_name(opts.operands[2])?
-  let image = fp"${opts.operands[0]}"
-  let source = fp"${opts.operands[1]}"
+  let image = fp"{opts.operands[0]}"
+  let source = fp"{opts.operands[1]}"
   let data = source.read_bytes()?
   let boot = bytes.read_at(image, 0, 512)?
   let bytes_per_sector = bytes.unpack_le(boot, 2, offset: 11)?

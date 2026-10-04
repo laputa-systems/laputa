@@ -33,35 +33,35 @@ export let receipt_format: Str = "laputa-package-artifact-2"
 # older format live under their own directory (`v1/`), which this PM never
 # reads, so old and new artifacts cannot mix.
 pure store_layout(root: Path) -> Path {
-  fp"${root}/v2"
+  fp"{root}/v2"
 }
 
 pure object_root(root: Path) -> Path {
-  fp"${store_layout(root)}/sha256"
+  fp"{store_layout(root)}/sha256"
 }
 
 pure lock_path(root: Path, key: Str) -> Path {
-  fp"${store_layout(root)}/locks/${key}.lock"
+  fp"{store_layout(root)}/locks/{key}.lock"
 }
 
 pure temporary_path(root: Path, key: Str) -> Path {
-  fp"${store_layout(root)}/tmp/${key}"
+  fp"{store_layout(root)}/tmp/{key}"
 }
 
 pure receipt_path(dir: Path) -> Path {
-  fp"${dir}/artifact.json"
+  fp"{dir}/artifact.json"
 }
 
 pure payload_path(dir: Path) -> Path {
-  fp"${dir}/payload.tar.gz"
+  fp"{dir}/payload.tar.gz"
 }
 
 pure metadata_path(dir: Path) -> Path {
-  fp"${dir}/metadata.json"
+  fp"{dir}/metadata.json"
 }
 
 pure proof_path(dir: Path) -> Path {
-  fp"${dir}/proof.json"
+  fp"{dir}/proof.json"
 }
 
 pure sha256_text_is_valid(value: Str) -> Bool {
@@ -70,7 +70,7 @@ pure sha256_text_is_valid(value: Str) -> Bool {
 
 proc require_sha256(value: Str, label: Str) [error] {
   if ! sha256_text_is_valid(value) {
-    return Err(types.PmError.PackageContract(f"${label} must be a lowercase SHA-256 digest"))
+    return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
 
@@ -149,14 +149,14 @@ proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) [error] -> 
 
 proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
   if value.format != receipt_format {
-    return Err(types.PmError.PackageContract(f"unsupported artifact receipt format ${value.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported artifact receipt format {value.format}"))
   }
 
   require_key(expected_key)?
   require_key(value.key)?
 
   if value.key != expected_key {
-    return Err(types.PmError.PackageContract(f"artifact receipt key ${value.key} does not match ${expected_key}"))
+    return Err(types.PmError.PackageContract(f"artifact receipt key {value.key} does not match {expected_key}"))
   }
 
   if types.pm_target_arch(value.target) == "" {
@@ -184,7 +184,7 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
     require_sha256(dependency_key, "artifact receipt dependency key")?
 
     if dependency_key in seen {
-      return Err(types.PmError.PackageContract(f"artifact receipt repeats dependency key ${dependency_key}"))
+      return Err(types.PmError.PackageContract(f"artifact receipt repeats dependency key {dependency_key}"))
     }
 
     seen[dependency_key] = true
@@ -196,11 +196,11 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
     require_sha256(dependency_key, "artifact receipt runtime dependency key")?
 
     if ! (dependency_key in seen) {
-      return Err(types.PmError.PackageContract(f"artifact receipt runtime dependency key ${dependency_key} is not a dependency"))
+      return Err(types.PmError.PackageContract(f"artifact receipt runtime dependency key {dependency_key} is not a dependency"))
     }
 
     if dependency_key in seen_runtime {
-      return Err(types.PmError.PackageContract(f"artifact receipt repeats runtime dependency key ${dependency_key}"))
+      return Err(types.PmError.PackageContract(f"artifact receipt repeats runtime dependency key {dependency_key}"))
     }
 
     seen_runtime[dependency_key] = true
@@ -215,14 +215,14 @@ proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.Arti
   let format_field = raw.require(ReceiptFormatDto)?.format
 
   if format_field != receipt_format {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} has unsupported receipt format ${format_field}; this PM reads ${receipt_format}"))
+    return Err(types.PmError.PackageContract(f"artifact {expected_key} has unsupported receipt format {format_field}; this PM reads {receipt_format}"))
   }
 
   let value = receipt_from_dto(raw.require(ArtifactReceiptDto)?, dir)?
   validate_receipt(value, expected_key)?
 
   if ! fs.exists(payload_path(dir))? or ! fs.exists(metadata_path(dir))? or ! fs.exists(proof_path(dir))? {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} is incomplete"))
+    return Err(types.PmError.PackageContract(f"artifact {expected_key} is incomplete"))
   }
 
   value
@@ -236,19 +236,19 @@ proc verify_dir(dir: Path, expected_key: Str) [fs, error] -> Result[types.Artifa
   let actual_payload = hash.sha256(payload)?.hex()
 
   if actual_payload != value.payload_sha256 {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} payload SHA-256 does not match receipt"))
+    return Err(types.PmError.PackageContract(f"artifact {expected_key} payload SHA-256 does not match receipt"))
   }
 
   let actual_metadata = hash.sha256(metadata)?.hex()
 
   if actual_metadata != value.metadata_sha256 {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} metadata SHA-256 does not match receipt"))
+    return Err(types.PmError.PackageContract(f"artifact {expected_key} metadata SHA-256 does not match receipt"))
   }
 
   let actual_proof = hash.sha256(proof)?.hex()
 
   if actual_proof != value.proof_sha256 {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} proof SHA-256 does not match receipt"))
+    return Err(types.PmError.PackageContract(f"artifact {expected_key} proof SHA-256 does not match receipt"))
   }
 
   value
@@ -273,7 +273,7 @@ proc receipt_for(
   let proof = proof_path(dir)
 
   if ! fs.exists(payload)? or ! fs.exists(metadata)? or ! fs.exists(proof)? {
-    return Err(types.PmError.PackageContract(f"staged artifact for ${node.package_id} is incomplete"))
+    return Err(types.PmError.PackageContract(f"staged artifact for {node.package_id} is incomplete"))
   }
 
   {
@@ -318,7 +318,7 @@ proc commit_locked(
   if fs.exists(final_dir)? {
     let existing = read_receipt(final_dir, key)?
     if existing.target != target {
-      return Err(types.PmError.PackageContract(f"artifact ${key} target does not match requested ${types.target_text(target)}"))
+      return Err(types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"))
     }
     return existing
   }
@@ -366,8 +366,8 @@ proc fetch_remote_object(
   expected_sha256: Str,
   label: Str,
 ) [fs, net, error] {
-  require_sha256(expected_sha256, f"remote ${label} SHA-256")?
-  let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote ${label}")?, cache_path)?
+  require_sha256(expected_sha256, f"remote {label} SHA-256")?
+  let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote {label}")?, cache_path)?
 
   if failure != "" {
     return Err(types.PmError.RemoteFetch(failure))
@@ -377,7 +377,7 @@ proc fetch_remote_object(
 
   if actual != expected_sha256 {
     fs.remove(cache_path, missing_ok: true)?
-    return Err(types.PmError.RemoteFetch(f"remote ${label} SHA-256 mismatch: expected ${expected_sha256}, got ${actual}"))
+    return Err(types.PmError.RemoteFetch(f"remote {label} SHA-256 mismatch: expected {expected_sha256}, got {actual}"))
   }
 }
 
@@ -385,7 +385,7 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) [fs, error] ->
   let dto = json.read(metadata)?.require(RemoteMetadataDto)?
 
   if dto.name != node.name or dto.ver != node.ver or dto.rel != node.rel {
-    return Err(types.PmError.PackageContract(f"remote metadata does not match plan node ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"remote metadata does not match plan node {node.package_id}"))
   }
 
   # Legacy package metadata did not record an executor digest. Its verified metadata digest is a stable fallback.
@@ -402,13 +402,13 @@ proc remote_staged_artifact_for(
   cache: Path,
 ) [fs, net, error] -> Result[types.StagedArtifact] {
   require_key(node.artifact_key)?
-  let cache_dir = fp"${cache}/${node.artifact_key}"
-  let payload = fp"${cache_dir}/payload.tar.gz"
-  let metadata = fp"${cache_dir}/metadata.json"
-  let proof = fp"${cache_dir}/proof.json"
+  let cache_dir = fp"{cache}/{node.artifact_key}"
+  let payload = fp"{cache_dir}/payload.tar.gz"
+  let metadata = fp"{cache_dir}/metadata.json"
+  let proof = fp"{cache_dir}/proof.json"
   fs.mkdir(cache_dir)?
-  fetch_remote_object(remote_repo, fp"${retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")?
-  fetch_remote_object(remote_repo, fp"${retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")?
+  fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")?
+  fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")?
   let executor_sha256 = remote_executor_sha256(metadata, node)?
   # fetch_remote_object verified the payload against this digest.
   let payload_sha256 = retrieval.tarball_sha256
@@ -433,12 +433,12 @@ proc remote_staged_artifact(node: types.PlanNode, remote_repo: Str, cache: Path)
     return remote_staged_artifact_for(node, retrieval, remote_repo, cache)
   }
 
-  return Err(types.PmError.PackageContract(f"remote artifact ${node.package_id} has no retrieval coordinates"))
+  return Err(types.PmError.PackageContract(f"remote artifact {node.package_id} has no retrieval coordinates"))
 }
 
 ## Returns the canonical final directory for an artifact key. `path` is reserved by XSH's standard module namespace, so `artifact_path` is the strict-safe spelling.
 export pure artifact_path(root: Path, key: Str) -> Path {
-  fp"${object_root(root)}/${key}"
+  fp"{object_root(root)}/{key}"
 }
 
 ## Returns one completed artifact's validated receipt without re-hashing its objects.
@@ -449,7 +449,7 @@ export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactRec
   let final_dir = artifact_path(root, key)
 
   if ! fs.exists(final_dir)? {
-    return Err(types.PmError.PackageTarball(f"artifact ${key} is missing"))
+    return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
   read_receipt(final_dir, key)
@@ -457,7 +457,7 @@ export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactRec
 
 ## Returns the immutable proof receipt path for an artifact re-proved under a newer proof key.
 export pure reproof_receipt_path(root: Path, artifact_key: Str, proof_key: Str) -> Path {
-  fp"${store_layout(root)}/proofs/${artifact_key}/${proof_key}.json"
+  fp"{store_layout(root)}/proofs/{artifact_key}/{proof_key}.json"
 }
 
 ## Re-verifies a receipt at its returned immutable artifact directory before another domain consumes its payload.
@@ -492,7 +492,7 @@ export proc import_remote(
   if fs.exists(artifact_path(root, key))? {
     let existing = lookup(root, key)?
     if existing.target != target {
-      return Err(types.PmError.PackageContract(f"artifact ${key} target does not match requested ${types.target_text(target)}"))
+      return Err(types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"))
     }
     return existing
   }
@@ -507,7 +507,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
   let final_dir = artifact_path(root, key)
 
   if ! fs.exists(final_dir)? {
-    return Err(types.PmError.PackageTarball(f"artifact ${key} is missing"))
+    return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
   verify_dir(final_dir, key)
@@ -526,7 +526,7 @@ export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactRece
 
   for entry in fs.children(objects)? |> sort-by .name {
     if entry.kind != "dir" {
-      return Err(types.PmError.PackageContract(f"artifact store object ${entry.path} is not a directory"))
+      return Err(types.PmError.PackageContract(f"artifact store object {entry.path} is not a directory"))
     }
 
     receipts = receipts.push(verify_artifact(root, entry.name)?)

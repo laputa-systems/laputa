@@ -8,14 +8,14 @@ use pm.policy
 use pm.store
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
   if configured != "" {
-    return path.absolute(fp"${configured}")?
+    return path.absolute(fp"{configured}")?
   }
 
   process.which("xsh")?
@@ -27,9 +27,9 @@ proc module_root() [fs, error] -> Result[Path] {
 
 proc copied_repository(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"${root}/pm")?
-  fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
+  fs.mkdir(fp"{root}/pm")?
+  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
   root
 }
 
@@ -47,8 +47,8 @@ proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[P
     false,
   )?
   let overlay = test.temp_dir(ctx, name: "root-inspect-overlay")?
-  fs.mkdir(fp"${overlay}/overlay")?
-  let generation_value = generation.plan(build_value, ["app"], generation.overlay_digest(fp"${overlay}/overlay")?)?
+  fs.mkdir(fp"{overlay}/overlay")?
+  let generation_value = generation.plan(build_value, ["app"], generation.overlay_digest(fp"{overlay}/overlay")?)?
   let receipt = test.temp_path(ctx, name: "published-generation.json")
   json.write(
     receipt,
@@ -126,13 +126,13 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   let plan_path = test.temp_path(ctx, name: "store-extract-plan.json")
   plan_json.write_plan(plan_path, build_plan)?
   let stage = test.temp_dir(ctx, name: "store-extract-stage")?
-  let contents = fp"${stage}/contents"
-  let kernel = fp"${contents}/boot/vmlinuz"
+  let contents = fp"{stage}/contents"
+  let kernel = fp"{contents}/boot/vmlinuz"
   fs.mkdir(kernel.parent)?
   fs.write(kernel, "kernel payload\n")?
-  let payload = fp"${stage}/payload.tar.gz"
+  let payload = fp"{stage}/payload.tar.gz"
   archive.tar_create(payload, contents, [p"."], compression: "gz")?
-  let metadata = fp"${stage}/metadata.json"
+  let metadata = fp"{stage}/metadata.json"
   json.write(metadata, {
     name: selected.name,
     ver: selected.ver,
@@ -140,7 +140,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
     package_kind: "payload",
     files: [{path: "boot/vmlinuz", kind: "file", mode: 0o644, sha256: bytes.from_text("kernel payload\n").sha256().hex(), target: ""}],
   })?
-  let proof = fp"${stage}/proof.json"
+  let proof = fp"{stage}/proof.json"
   fs.write(proof, "proof\n")?
   let store_root = test.temp_dir(ctx, name: "store-extract-store")?
   let _ = store.commit(types.target_aarch64(), store_root, selected, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: bytes.from_text("test executor").sha256().hex()})?
@@ -193,7 +193,7 @@ test test_repo_check_validates_catalog [fs, process, env, error] { |ctx|
 test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, env, error] { |ctx|
   let root = copied_repository(ctx, "repo-arguments")?
   let err = test.temp_path(ctx, name: "repo-arguments.err")
-  let output = fp"${root}/out/plan.json"
+  let output = fp"{root}/out/plan.json"
 
   let missing_selection = pm_status(["repo", "plan", "--repo", root.display(), "--output", output.display()], err)?
   test.eq(missing_selection.ok, false)?
@@ -219,12 +219,12 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
 test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |ctx|
   let root = copied_repository(ctx, "repo-no-inference")?
   let err = test.temp_path(ctx, name: "repo-no-inference.err")
-  let package_like = fp"${root}/looks-like-package"
+  let package_like = fp"{root}/looks-like-package"
   fs.mkdir(package_like)?
-  fs.write(fp"${package_like}/PKGBUILD.xsh", "not a command argument\n")?
+  fs.write(fp"{package_like}/PKGBUILD.xsh", "not a command argument\n")?
 
   let status = pm_status(
-    ["repo", "plan", "--repo", root.display(), "--all", "--output", fp"${root}/out/plan.json".display(), package_like.display()],
+    ["repo", "plan", "--repo", root.display(), "--all", "--output", fp"{root}/out/plan.json".display(), package_like.display()],
     err,
   )?
 
@@ -235,7 +235,7 @@ test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |c
 
 test test_repo_plan_writes_and_show_renders_verified_fields [fs, process, env, error] { |ctx|
   let root = copied_repository(ctx, "repo-plan")?
-  let output = fp"${root}/out/plan.json"
+  let output = fp"{root}/out/plan.json"
   let planned = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", output.display()])?
   let value = plan_json.read(output)?
   let shown = pm_output(["repo", "show", output.display()])?
@@ -250,8 +250,8 @@ test test_repo_plan_writes_and_show_renders_verified_fields [fs, process, env, e
 
 test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, process, env, error] { |ctx|
   let root = copied_repository(ctx, "repo-x86-plan")?
-  let arm_output = fp"${root}/out/arm-plan.json"
-  let x86_output = fp"${root}/out/x86-plan.json"
+  let arm_output = fp"{root}/out/arm-plan.json"
+  let x86_output = fp"{root}/out/x86-plan.json"
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", arm_output.display()])?
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--target", "x86_64-linux-musl", "--output", x86_output.display()])?
   let arm = plan_json.read(arm_output)?
@@ -265,7 +265,7 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
     return
   }
 
-  let store = fp"${root}/store"
+  let store = fp"{root}/store"
   let err = test.temp_path(ctx, name: "repo-x86-build.err")
   let build_status = pm_status(["repo", "build", x86_output.display(), "--store", store.display()], err)?
   test.eq(build_status.ok, false)?
@@ -276,7 +276,7 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
 
 test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   let root = copied_repository(ctx, "repo-corrupt")?
-  let output = fp"${root}/out/plan.json"
+  let output = fp"{root}/out/plan.json"
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", output.display()])?
   let value = plan_json.read(output)?
   fs.write(output, output.read_text()?.replace(value.plan_sha256, "corrupt-plan-digest"))?
@@ -293,23 +293,23 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
 test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, error] { |ctx|
   let repository = copied_repository(ctx, "plan-executor-repository")?
   let pm_copy = test.temp_dir(ctx, name: "plan-executor-pm")?
-  fs.copy(p"pm.xsh", fp"${pm_copy}/pm.xsh")?
-  let _ = fs.copy_tree(p"pm", fp"${pm_copy}/pm", parents: true, overwrite: true)?
+  fs.copy(p"pm.xsh", fp"{pm_copy}/pm.xsh")?
+  let _ = fs.copy_tree(p"pm", fp"{pm_copy}/pm", parents: true, overwrite: true)?
   let runners = test.temp_dir(ctx, name: "plan-executor-runners")?
   let _ = fs.copy_tree(fixture("fingerprint-executor/runners"), runners, parents: true, overwrite: true)?
   let xsh = runner()?
-  let entrypoint = fp"${pm_copy}/pm.xsh"
-  let declared_runner = fp"${runners}/xsh"
-  let cli_module = fp"${pm_copy}/pm/cli.xsh"
+  let entrypoint = fp"{pm_copy}/pm.xsh"
+  let declared_runner = fp"{runners}/xsh"
+  let cli_module = fp"{pm_copy}/pm/cli.xsh"
   var plans: List[types.BuildPlan] = []
 
   for revision in ["first", "second"] {
-    let output = test.temp_path(ctx, name: f"plan-executor-${revision}.json")
+    let output = test.temp_path(ctx, name: f"plan-executor-{revision}.json")
     let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output ?
     plans = plans.push(plan_json.read(output)?)
 
     for name in ["xsh", "xshi", "xsht"] {
-      fs.write(fp"${runners}/${name}", f"rebuilt ${name} runner\n")?
+      fs.write(fp"{runners}/{name}", f"rebuilt {name} runner\n")?
     }
 
     fs.write(cli_module, cli_module.read_text()? + "\n# A PM revision that must not change any artifact key.\n")?

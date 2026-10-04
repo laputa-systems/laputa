@@ -28,5 +28,5 @@ export let filetree = [{path: p"usr/lib/init/rc.d", kind: "tree"}]
 
 ## Builds the declared empty directory.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"${dest}/usr/lib/init/rc.d")?
+  fs.mkdir(fp"{dest}/usr/lib/init/rc.d")?
 }

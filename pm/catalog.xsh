@@ -37,7 +37,7 @@ proc make_catalog(
 
   for pkg in sorted_packages {
     if pkg.name in local_names {
-      return Err(types.PmError.PackageContract(f"duplicate package ${pkg.name}"))
+      return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
     }
 
     local_names[pkg.name] = true
@@ -47,7 +47,7 @@ proc make_catalog(
   for pkg in sorted_packages {
     for dependency in package_dependencies(pkg) {
       if ! (dependency in available_names) {
-        return Err(types.PmError.MissingDependency(f"${pkg.name} depends on missing ${dependency}"))
+        return Err(types.PmError.MissingDependency(f"{pkg.name} depends on missing {dependency}"))
       }
     }
   }
@@ -85,17 +85,17 @@ export pure package_map(value: types.PackageCatalog) -> Map[types.Package] {
 ## Discovers every recipe with filetrees selected by the explicit plan target.
 export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -> Result[types.PackageCatalog] {
   let absolute_root = path.absolute(root)?
-  let recipe_root = fp"${absolute_root}/packages"
+  let recipe_root = fp"{absolute_root}/packages"
 
   if ! fs.exists(recipe_root)? {
-    return Err(types.PmError.PackageContract(f"${absolute_root} does not contain packages"))
+    return Err(types.PmError.PackageContract(f"{absolute_root} does not contain packages"))
   }
 
   var packages: List[types.Package] = []
 
   for entry in fs.children(recipe_root)? |> sort-by .name {
     continue unless entry.kind == "dir"
-    continue unless fs.exists(fp"${entry.path}/PKGBUILD.xsh")?
+    continue unless fs.exists(fp"{entry.path}/PKGBUILD.xsh")?
 
     let pkg = recipe.load_package_for_target(entry.path, target)?
     let durable_dir = pkg.dir.relative_to(absolute_root)

@@ -18,16 +18,16 @@ proc main(arch: Str, ...suites: List[Str]) [fs, process, env, error] {
   run /bin/xsht --help ?
   run /bin/xsh --help ?
 
-  let manifest = json.read(fp"/src/laputa/.out/seed/${arch}/manifest.json")?.require(Record)?
+  let manifest = json.read(fp"/src/laputa/.out/seed/{arch}/manifest.json")?.require(Record)?
   let commit: Str = manifest.get("xsh_commit")?.require()?
   let dirty: Bool = manifest.get("xsh_dirty")?.require()?
-  print f"seed xsh ${commit} dirty=${dirty}"
+  print f"seed xsh {commit} dirty={dirty}"
 
   let handle = fs.tempdir()?
   defer handle.close()?
-  let plan = fp"${handle.host_path()?}/plan.json"
-  run /bin/xsh /src/laputa/pm.xsh -- repo plan --repo /src/laputa --all --target f"${arch}-linux-musl" --output $plan ?
-  print f"planned ${json.read(plan)?.require(Record)?.get("nodes")?.require(List[Record])?.len()} nodes offline"
+  let plan = fp"{handle.host_path()?}/plan.json"
+  run /bin/xsh /src/laputa/pm.xsh -- repo plan --repo /src/laputa --all --target f"{arch}-linux-musl" --output $plan ?
+  print f"planned {json.read(plan)?.require(Record)?.get("nodes")?.require(List[Record])?.len()} nodes offline"
 
   for suite in if suites.len() == 0 { seed_smoke_default_suites } else { suites } {
     run /bin/xsht test $suite ?

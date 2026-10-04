@@ -93,7 +93,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
 
   return size when size > 0
 
-  let sectors_path = fp"/sys/class/block/${image.name}/size"
+  let sectors_path = fp"/sys/class/block/{image.name}/size"
 
   if fs.exists(sectors_path)? {
     return fs.read_text(sectors_path)?.trim().parse_int()? * 512
@@ -158,7 +158,7 @@ proc main(...argv: List[Str]) [fs, error] {
     return Err(FatToolError.Failed("usage", "usage: mkfs.vfat [-n LABEL] IMAGE"))
   }
 
-  format_fat16(fp"${opts.image[0]}", opts.label)?
+  format_fat16(fp"{opts.image[0]}", opts.label)?
 }
 
 main(@args)?

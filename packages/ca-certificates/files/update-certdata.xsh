@@ -4,7 +4,7 @@
 error UpdateCertdataError = Failed(message: Str)
 
 proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
-  let tmp = fp"${dest.parent}/.${dest.name}.tmp"
+  let tmp = fp"{dest.parent}/.{dest.name}.tmp"
   fs.mkdir(dest.parent)?
   fs.remove(tmp, missing_ok: true)?
   defer tmp.remove(missing_ok: true)?
@@ -20,7 +20,7 @@ proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   }
 
   fs.rename(tmp, dest, overwrite: true)?
-  print f"update-certdata: updated ${dest}"
+  print f"update-certdata: updated {dest}"
 }
 
 main(@args)?

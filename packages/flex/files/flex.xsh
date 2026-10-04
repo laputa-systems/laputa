@@ -63,29 +63,29 @@ proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
       cur = escaped.rest
 
       if escaped.content == "n" {
-        out = f"${out}\\n"
+        out = f"{out}\\n"
       } else if escaped.content == "t" {
-        out = f"${out}\\t"
+        out = f"{out}\\t"
       } else {
-        out = f"${out}\\${escaped.content}"
+        out = f"{out}\\{escaped.content}"
       }
     } else {
       match ch.content {
-        "." => out = f"${out}\\."
-        "*" => out = f"${out}\\*"
-        "+" => out = f"${out}\\+"
-        "?" => out = f"${out}\\?"
-        "(" => out = f"${out}\\("
-        ")" => out = f"${out}\\)"
-        "[" => out = f"${out}\\["
-        "]" => out = f"${out}\\]"
-        "{" => out = f"${out}\\{"
-        "}" => out = f"${out}\\}"
-        "|" => out = f"${out}\\|"
-        "^" => out = f"${out}\\^"
-        "$" => out = f"${out}\\$"
-        "\\" => out = f"${out}\\\\"
-        _ => out = f"${out}${ch.content}"
+        "." => out = f"{out}\\."
+        "*" => out = f"{out}\\*"
+        "+" => out = f"{out}\\+"
+        "?" => out = f"{out}\\?"
+        "(" => out = f"{out}\\("
+        ")" => out = f"{out}\\)"
+        "[" => out = f"{out}\\["
+        "]" => out = f"{out}\\]"
+        "{" => out = f"{out}\\{{"
+        "}" => out = f"{out}\\}}"
+        "|" => out = f"{out}\\|"
+        "^" => out = f"{out}\\^"
+        "$" => out = f"{out}\\$"
+        "\\" => out = f"{out}\\\\"
+        _ => out = f"{out}{ch.content}"
       }
     }
   }
@@ -110,7 +110,7 @@ proc expand_definitions(pattern: Str, defs: Map[Str]) [error] -> Result[Str] {
   var out = pattern
 
   for name in defs.keys() {
-    out = out.replace(f"{${name}}", f"(${defs.get(name) ?? ""})")
+    out = out.replace(f"{{{name}}}", f"({defs.get(name) ?? ""})")
   }
 
   return out
@@ -200,7 +200,7 @@ proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
       return {pattern, action: cur.trim()}
     }
 
-    pattern = f"${pattern}${ch.content}"
+    pattern = f"{pattern}{ch.content}"
 
     if escaped {
       escaped = false
@@ -215,7 +215,7 @@ proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
     }
   }
 
-  return Err(ToolError.Failed("lex", f"missing action for rule: ${raw}"))
+  return Err(ToolError.Failed("lex", f"missing action for rule: {raw}"))
 }
 
 proc split_state_qualifier(pattern: Str) [error] -> Result[StateQualifier] {
@@ -337,10 +337,10 @@ proc parse_lex_file(source: Str) [error] -> Result[LexProgram] {
 
   while i < parts.len() {
     if i > 2 {
-      user_code = f"${user_code}%%"
+      user_code = f"{user_code}%%"
     }
 
-    user_code = f"${user_code}${parts[i]}"
+    user_code = f"{user_code}{parts[i]}"
     i = i + 1
   }
 
@@ -367,10 +367,10 @@ proc lex_user_code(source: Str) [error] -> Result[Str] {
 
   while i < parts.len() {
     if i > 2 {
-      user_code = f"${user_code}%%"
+      user_code = f"{user_code}%%"
     }
 
-    user_code = f"${user_code}${parts[i]}"
+    user_code = f"{user_code}{parts[i]}"
     i = i + 1
   }
 
@@ -400,13 +400,13 @@ int yyleng;
 int yylineno = 1;
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
-struct yy_buffer_state {
+struct yy_buffer_state {{
   FILE *file;
-};
+}};
 
 #define YY_BUF_SIZE 16384
 #define YY_CURRENT_BUFFER ((YY_BUFFER_STATE)0)
-${state_defines}
+{state_defines}
 #define BEGIN(state) ((void)(state))
 #define YY_START 0
 
@@ -415,70 +415,70 @@ ${state_defines}
 #endif
 
 static int input(void)
-{
+{{
   return yyin ? fgetc(yyin) : EOF;
-}
+}}
 
 static void unput(int c)
-{
-  if (yyin && c != EOF) {
+{{
+  if (yyin && c != EOF) {{
     ungetc(c, yyin);
-  }
-}
+  }}
+}}
 
 YY_BUFFER_STATE yy_create_buffer(FILE *file, int size)
-{
+{{
   (void)size;
   YY_BUFFER_STATE buffer = malloc(sizeof(*buffer));
-  if (buffer) {
+  if (buffer) {{
     buffer->file = file;
-  }
+  }}
   return buffer;
-}
+}}
 
 void yy_switch_to_buffer(YY_BUFFER_STATE buffer)
-{
-  if (buffer) {
+{{
+  if (buffer) {{
     yyin = buffer->file;
-  }
-}
+  }}
+}}
 
 void yypush_buffer_state(YY_BUFFER_STATE buffer)
-{
+{{
   yy_switch_to_buffer(buffer);
-}
+}}
 
 void yy_delete_buffer(YY_BUFFER_STATE buffer)
-{
+{{
   free(buffer);
-}
+}}
 
 void yy_pop_buffer_state(void)
-{
-}
+{{
+}}
 
 void yypop_buffer_state(void)
-{
+{{
   yy_pop_buffer_state();
-}
+}}
 
 int yywrap(void)
-{
+{{
   return 1;
-}
+}}
 
-${prologue}
+{prologue}
 
 #ifndef YY_DECL
 #define YY_DECL int yylex(void)
 #endif
 
 YY_DECL
-{
+{{
   return 0;
-}
+}}
 
-${user_code}
+{user_code}
 """
 }
 
@@ -501,7 +501,7 @@ proc generate_state_defines(states: List[Str]) [error] -> Result[Str] {
   var i = 0
 
   while i < states.len() {
-    lines = lines.push(f"#define ${states[i]} ${i + 1}")
+    lines = lines.push(f"#define {states[i]} {i + 1}")
     i = i + 1
   }
 
@@ -529,14 +529,14 @@ proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Res
     } else if rule.state == "*" {
       "-2"
     } else {
-      f"${state_id(rule.state, states)?}"
+      f"{state_id(rule.state, states)?}"
     }
 
     if state == "-1" and rule.state != "" {
-      return Err(ToolError.Failed("lex", f"unknown start condition: ${rule.state}"))
+      return Err(ToolError.Failed("lex", f"unknown start condition: {rule.state}"))
     }
 
-    lines = lines.push(f"  {\"^(${c_quote(rule.pattern)})\", ${bol}, ${state}},")
+    lines = lines.push(f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},")
   }
 
   return lines.join("\n")
@@ -547,7 +547,7 @@ proc generate_actions(rules: List[LexRule]) [error] -> Result[Str] {
   var i = 0
 
   for rule in rules {
-    lines = lines.push(f"    case ${i}: { ${rule.action} } break;")
+    lines = lines.push(f"    case {i}: {{ {rule.action} }} break;")
     i = i + 1
   }
 
@@ -585,25 +585,25 @@ FILE *yyout;
 char *yytext;
 int yyleng;
 
-${state_defines}
+{state_defines}
 #define BEGIN(state) (yy_start = (state))
 
 #ifndef ECHO
 #define ECHO fwrite(yytext, 1, (size_t)yyleng, yyout)
 #endif
 
-struct yy_rule {
+struct yy_rule {{
   const char *pattern;
   int bol;
   int state;
-};
+}};
 
-static struct yy_rule yy_rules[] = {
-${table}
-};
+static struct yy_rule yy_rules[] = {{
+{table}
+}};
 
 static int yy_start;
-static int yy_exclusive[] = {${exclusive_table}};
+static int yy_exclusive[] = {{{exclusive_table}}};
 static regex_t yy_regexes[sizeof(yy_rules) / sizeof(yy_rules[0])];
 static int yy_ready;
 static char *yy_input;
@@ -613,107 +613,107 @@ static int yy_has_hold;
 static size_t yy_hold_pos;
 static char yy_hold;
 
-static char *yy_read_all(FILE *in) {
+static char *yy_read_all(FILE *in) {{
   size_t cap = 4096;
   size_t len = 0;
   char *buf = malloc(cap);
   int ch;
 
-  if (!buf) {
+  if (!buf) {{
     return NULL;
-  }
+  }}
 
-  while ((ch = fgetc(in)) != EOF) {
-    if (len + 2 >= cap) {
+  while ((ch = fgetc(in)) != EOF) {{
+    if (len + 2 >= cap) {{
       cap *= 2;
       char *next = realloc(buf, cap);
-      if (!next) {
+      if (!next) {{
         free(buf);
         return NULL;
-      }
+      }}
       buf = next;
-    }
+    }}
     buf[len++] = (char)ch;
-  }
+  }}
 
   buf[len] = 0;
   return buf;
-}
+}}
 
-static void yy_restore_hold(void) {
-  if (yy_has_hold) {
+static void yy_restore_hold(void) {{
+  if (yy_has_hold) {{
     yy_input[yy_hold_pos] = yy_hold;
     yy_has_hold = 0;
-  }
-}
+  }}
+}}
 
-static int yy_rule_active(struct yy_rule *rule) {
-  if (rule->state == -2) {
+static int yy_rule_active(struct yy_rule *rule) {{
+  if (rule->state == -2) {{
     return 1;
-  }
-  if (rule->state >= 0) {
+  }}
+  if (rule->state >= 0) {{
     return rule->state == yy_start;
-  }
-  if (yy_start == 0) {
+  }}
+  if (yy_start == 0) {{
     return 1;
-  }
+  }}
   return !yy_exclusive[yy_start];
-}
+}}
 
-int yylex(void) {
-  if (!yy_ready) {
+int yylex(void) {{
+  if (!yy_ready) {{
     yyin = yyin ? yyin : stdin;
     yyout = yyout ? yyout : stdout;
 
-    for (size_t i = 0; i < sizeof(yy_rules) / sizeof(yy_rules[0]); i++) {
+    for (size_t i = 0; i < sizeof(yy_rules) / sizeof(yy_rules[0]); i++) {{
       int rc = regcomp(&yy_regexes[i], yy_rules[i].pattern, REG_EXTENDED | REG_NEWLINE);
-      if (rc != 0) {
+      if (rc != 0) {{
         fprintf(stderr, "lex.yy.c: failed to compile generated regex %zu\\n", i);
         return 2;
-      }
-    }
+      }}
+    }}
 
     yy_input = yy_read_all(yyin);
-    if (!yy_input) {
+    if (!yy_input) {{
       return 2;
-    }
+    }}
 
     yy_len = strlen(yy_input);
     yy_ready = 1;
-  }
+  }}
 
   yy_restore_hold();
 
-  while (yy_pos < yy_len) {
+  while (yy_pos < yy_len) {{
     int best = -1;
     size_t best_len = 0;
 
-    for (size_t i = 0; i < sizeof(yy_rules) / sizeof(yy_rules[0]); i++) {
-      if (!yy_rule_active(&yy_rules[i])) {
+    for (size_t i = 0; i < sizeof(yy_rules) / sizeof(yy_rules[0]); i++) {{
+      if (!yy_rule_active(&yy_rules[i])) {{
         continue;
-      }
+      }}
 
-      if (yy_rules[i].bol && yy_pos != 0 && yy_input[yy_pos - 1] != '\\n') {
+      if (yy_rules[i].bol && yy_pos != 0 && yy_input[yy_pos - 1] != '\\n') {{
         continue;
-      }
+      }}
 
       regmatch_t match;
-      if (regexec(&yy_regexes[i], yy_input + yy_pos, 1, &match, 0) == 0 && match.rm_so == 0) {
+      if (regexec(&yy_regexes[i], yy_input + yy_pos, 1, &match, 0) == 0 && match.rm_so == 0) {{
         size_t n = (size_t)match.rm_eo;
-        if (n > best_len) {
+        if (n > best_len) {{
           best = (int)i;
           best_len = n;
-        }
-      }
-    }
+        }}
+      }}
+    }}
 
-    if (best < 0 || best_len == 0) {
+    if (best < 0 || best_len == 0) {{
       yytext = yy_input + yy_pos;
       yyleng = 1;
       ECHO;
       yy_pos++;
       continue;
-    }
+    }}
 
     yy_hold_pos = yy_pos + best_len;
     yy_hold = yy_input[yy_hold_pos];
@@ -723,18 +723,18 @@ int yylex(void) {
     yyleng = (int)best_len;
     yy_pos += best_len;
 
-    switch (best) {
-${actions}
-    }
+    switch (best) {{
+{actions}
+    }}
 
     yy_restore_hold();
-  }
+  }}
 
   return 0;
-}
+}}
 
-${user_code}
-${generated_main_text}
+{user_code}
+{generated_main_text}
 """
 }
 
@@ -787,7 +787,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
     } else if token.name == "o" or token.name == "outfile" {
       output = token.value
     } else {
-      return Err(ToolError.Failed("usage", f"unsupported option: ${token.name}"))
+      return Err(ToolError.Failed("usage", f"unsupported option: {token.name}"))
     }
   }
 
@@ -809,7 +809,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
     return
   }
 
-  let source = if opt.input == "-" { io.stdin_text()? } else { fs.read_text(fp"${opt.input}")? }
+  let source = if opt.input == "-" { io.stdin_text()? } else { fs.read_text(fp"{opt.input}")? }
   let upstream_reason = upstream_flex_source_reason(source)
 
   if upstream_reason != "" {
@@ -819,7 +819,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
       if opt.to_stdout {
         io.write_stdout(code)?
       } else {
-        fs.write(fp"${opt.output}", code)?
+        fs.write(fp"{opt.output}", code)?
       }
 
       return
@@ -833,13 +833,13 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let code = generate_c(parsed.rules, parsed.user_code, parsed.states, parsed.exclusive)?
 
   if opt.verbose {
-    eprint f"flex.xsh: ${parsed.rules.len()} rules"
+    eprint f"flex.xsh: {parsed.rules.len()} rules"
   }
 
   if opt.to_stdout {
     io.write_stdout(code)?
   } else {
-    fs.write(fp"${opt.output}", code)?
+    fs.write(fp"{opt.output}", code)?
   }
 }
 

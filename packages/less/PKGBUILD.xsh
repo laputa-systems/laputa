@@ -46,20 +46,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let target_arch = pm_util.target_arch()?
   let build_arch = pm_util.build_arch()?
-  let triple = f"${target_arch}-linux-musl"
-  let build_triple = f"${build_arch}-linux-musl"
+  let triple = f"{target_arch}-linux-musl"
+  let build_triple = f"{build_arch}-linux-musl"
   var build_cc = cc
   let cross_build = build_arch != target_arch
   var build_task_env: Record = {}
 
   if cross_build {
-    let build_root = fp"${env.get("XSH_PM_BUILD_ROOT") ?? ""}"
-    build_cc = fp"${build_root}/usr/bin/cc"
+    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    build_cc = fp"{build_root}/usr/bin/cc"
 
     build_task_env = {
       XSH_MAKE_NATIVE_CROSS: "0",
-      PATH: f"${build_root}/usr/bin:${build_root}/usr/lib/llvm-toolchain/bin:${env.get("PATH") ?? ""}",
-      LD_LIBRARY_PATH: f"${build_root}/usr/lib:${build_root}/usr/lib/llvm23/lib",
+      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{env.get("PATH") ?? ""}",
+      LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     }
   }
 
@@ -134,7 +134,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   var funcs_input = ""
 
   for src in less_srcs {
-    funcs_input = f"${funcs_input}${src.read_text()?}"
+    funcs_input = f"{funcs_input}{src.read_text()?}"
   }
 
   fs.write(p"obj/less-srcs.c", funcs_input)?
@@ -157,6 +157,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   })
 
   make.run_tasks(less.tasks, make.jobs()?)?
-  fs.install(less.output, fp"${dest}/usr/bin/less", 0o755, parents: true, overwrite: true)?
-  fs.install(p"less-osc8-open.sh", fp"${dest}/usr/libexec/less-osc8-open", 0o755, parents: true, overwrite: true)?
+  fs.install(less.output, fp"{dest}/usr/bin/less", 0o755, parents: true, overwrite: true)?
+  fs.install(p"less-osc8-open.sh", fp"{dest}/usr/libexec/less-osc8-open", 0o755, parents: true, overwrite: true)?
 }

@@ -5,7 +5,7 @@ use pm.policy
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/${name}"
+  fp"tests/pm/fixtures/{name}"
 }
 
 pure has_edge(edges: List[types.DependencyEdge], from: Str, to: Str, kind: types.DependencyKind) -> Bool {
@@ -20,7 +20,7 @@ pure has_edge(edges: List[types.DependencyEdge], from: Str, to: Str, kind: types
 
 pure fixture_package(name: Str, deps: List[Str], mkdeps_host: List[Str], mkdeps_target: List[Str]) -> types.Package {
   {
-    dir: fp"packages/${name}",
+    dir: fp"packages/{name}",
     name,
     ver: "1",
     rel: "1",
@@ -37,7 +37,7 @@ pure fixture_package(name: Str, deps: List[Str], mkdeps_host: List[Str], mkdeps_
 
 proc expect_catalog_rejection(root: Path, expected: Str) [fs, env, error] {
   match catalog.load(root) {
-    Ok(_) => test.fail(f"${expected}: catalog unexpectedly loaded")?
+    Ok(_) => test.fail(f"{expected}: catalog unexpectedly loaded")?
     Err(problem) => assert expected in problem.message
   }
 }

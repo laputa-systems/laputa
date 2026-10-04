@@ -25,20 +25,20 @@ export proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 
 ## Exported PM declaration `package_metadata`.
 export proc package_metadata(root: Path, name: Str) [fs, error] {
-  let db = fp"${root}/var/lib/xsh-pm/packages/${name}/metadata.json"
-  ensure(fs.exists(db)?, f"proof-${name}", f"missing package metadata: ${db}")?
+  let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
+  ensure(fs.exists(db)?, f"proof-{name}", f"missing package metadata: {db}")?
 }
 
 proc package_dependency_map(root: Path) [fs, error] -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
-  let packages_db = fp"${root}/var/lib/xsh-pm/packages"
+  let packages_db = fp"{root}/var/lib/xsh-pm/packages"
 
   if ! fs.exists(packages_db)? {
     return package_deps
   }
 
   for entry in fs.children(packages_db) |> where .kind == "dir" {
-    let metadata_path = fp"${entry.path}/metadata.json"
+    let metadata_path = fp"{entry.path}/metadata.json"
 
     if fs.exists(metadata_path)? {
       let metadata: Record = json.read(metadata_path)?.require(Record)?
@@ -60,11 +60,11 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
   let providers = elfdeps.collect_library_providers(root)?
   let package_deps = package_dependency_map(root)?
   let allowed = elfdeps.runtime_dependency_closure(package_deps.get(name) ?? [], package_deps)
-  let manifest = local.load_manifest(fp"${root}/var/lib/xsh-pm/packages/${name}")?
+  let manifest = local.load_manifest(fp"{root}/var/lib/xsh-pm/packages/{name}")?
   var failures = []
 
   for rel_path in manifest {
-    let path_value = fp"${root}/${rel_path}"
+    let path_value = fp"{root}/{rel_path}"
 
     if path_value.exists()? {
       failures = failures.extend(
@@ -78,8 +78,8 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
 
     return Err(
       ProofError.Failed(
-        f"proof-${name}",
-        f"${first.file} needs ${first.soname} from ${first.provider} without a runtime dependency",
+        f"proof-{name}",
+        f"{first.file} needs {first.soname} from {first.provider} without a runtime dependency",
       ),
     )
   }
@@ -121,19 +121,19 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path] {
 
 ## Exported PM declaration `target_elf`.
 export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, error] {
-  let path_value = fp"${root}/${rel}"
-  ensure(fs.exists(path_value)?, f"proof-${name}", f"missing ELF: ${path_value}")?
+  let path_value = fp"{root}/{rel}"
+  ensure(fs.exists(path_value)?, f"proof-{name}", f"missing ELF: {path_value}")?
   let readelf = readelf_tool()?
   let header = run.text $readelf "-h" $path_value ?
   let arch = pm_util.target_arch()?
-  ensure(elf_machine_name(arch) in header, f"proof-${name}", f"${rel} is not ${arch}")?
+  ensure(elf_machine_name(arch) in header, f"proof-{name}", f"{rel} is not {arch}")?
 }
 
 proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
   if configured != "" {
-    let selected = fp"${configured}"
+    let selected = fp"{configured}"
 
     if fs.exists(selected)? {
       return selected
@@ -150,10 +150,10 @@ proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
 ## Runs one package proof against an already composed mutable proof work root.
 ## Callers must seed the explicit executor substrate before invoking this boundary.
 export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env, error] -> Result[Unit] {
-  let script = fp"${pkg.dir}/proof.xsh"
+  let script = fp"{pkg.dir}/proof.xsh"
 
   if ! fs.exists(script)? {
-    return Err(types.PmError.PackageContract(f"${pkg.name} is missing proof.xsh"))
+    return Err(types.PmError.PackageContract(f"{pkg.name} is missing proof.xsh"))
   }
 
   package_metadata(root, pkg.name)?
@@ -169,11 +169,11 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 
   env ({
     LAPUTA_ROOT: root.display(),
-    PATH: f"${root}/bin:${root}/usr/bin:${env.get("PATH") ?? ""}",
+    PATH: f"{root}/bin:{root}/usr/bin:{env.get("PATH") ?? ""}",
     XSH_MODULE_PATH: env.get("XSH_MODULE_PATH") ?? "",
     XSH_PM_PROOF_ROOT: root.display(),
     XSH_PM_PROOF_HOST_PATH: env.get("PATH") ?? "",
-    SHELL: fp"${root}/bin/xshi",
+    SHELL: fp"{root}/bin/xshi",
   }) {
     let status = process.run(process.command_argv(xsh, [xsh.display(), script.display(), "--", root.display()]))?
     proof_ok = status.ok
@@ -186,10 +186,10 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 
   if ! proof_ok {
     if proof_exited {
-      return Err(types.PmError.ExtensionFailed(f"package proof for ${pkg.name} exited with status ${proof_exit_code}"))
+      return Err(types.PmError.ExtensionFailed(f"package proof for {pkg.name} exited with status {proof_exit_code}"))
     }
 
-    return Err(types.PmError.ExtensionFailed(f"package proof for ${pkg.name} was signaled"))
+    return Err(types.PmError.ExtensionFailed(f"package proof for {pkg.name} was signaled"))
   }
 
   return Ok()
@@ -217,14 +217,14 @@ export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payl
   let value = json.read(path_value)?.require(ArtifactProofDto)?
 
   if value.format != "laputa-package-proof-3" {
-    return Err(types.PmError.PackageContract(f"unsupported package proof format ${value.format}"))
+    return Err(types.PmError.PackageContract(f"unsupported package proof format {value.format}"))
   }
 
   if value.package_id != node.package_id or value.artifact_key != node.artifact_key or value.proof_key != node.proof_key or value.proof_sha256 != node.proof_sha256 {
-    return Err(types.PmError.PackageContract(f"proof receipt ${path_value} does not match ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"proof receipt {path_value} does not match {node.package_id}"))
   }
 
   if value.payload_sha256 != payload_sha256 {
-    return Err(types.PmError.PackageContract(f"proof receipt ${path_value} payload hash does not match ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"proof receipt {path_value} payload hash does not match {node.package_id}"))
   }
 }

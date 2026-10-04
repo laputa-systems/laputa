@@ -22,25 +22,25 @@ proc repo_verify_node_receipt(
   let runtime_dependency_keys = store.receipt_runtime_dependency_keys(node)
 
   if receipt.key != node.artifact_key or receipt.target != value.target or receipt.package_name != node.name or receipt.package_id != node.package_id or receipt.recipe_sha256 != node.recipe_sha256 or receipt.dependency_keys != dependency_keys or receipt.runtime_dependency_keys != runtime_dependency_keys {
-    return Err(types.PmError.PackageContract(f"artifact receipt ${node.artifact_key} does not match BuildPlan node ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"artifact receipt {node.artifact_key} does not match BuildPlan node {node.package_id}"))
   }
 
   if types.plan_action_is_build(node.action) {
     if receipt.origin != types.artifact_origin_built() {
-      return Err(types.PmError.PackageContract(f"BuildPlan build node ${node.package_id} is not a locally proved artifact"))
+      return Err(types.PmError.PackageContract(f"BuildPlan build node {node.package_id} is not a locally proved artifact"))
     }
   } else if receipt.origin != types.artifact_origin_remote() {
-    return Err(types.PmError.PackageContract(f"BuildPlan remote node ${node.package_id} is not a verified imported artifact"))
+    return Err(types.PmError.PackageContract(f"BuildPlan remote node {node.package_id} is not a verified imported artifact"))
   }
 }
 
 proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) [fs, error] -> Result[types.PackageKind] {
-  let metadata = fp"${receipt.artifact_dir}/metadata.json"
+  let metadata = fp"{receipt.artifact_dir}/metadata.json"
   let raw: Record = json.read(metadata)?.require(Record)?
   let core = raw.require(RepoArtifactMetadataDto)?
 
   if core.name != node.name or core.ver != node.ver or core.rel != node.rel {
-    return Err(types.PmError.PackageContract(f"artifact metadata ${metadata} does not match ${node.package_id}"))
+    return Err(types.PmError.PackageContract(f"artifact metadata {metadata} does not match {node.package_id}"))
   }
 
   if "package_kind" in raw {
@@ -56,7 +56,7 @@ proc repo_verified_proof_path(
   node: types.PlanNode,
   receipt: types.ArtifactReceipt,
 ) [fs, error] -> Result[Path] {
-  let primary = fp"${receipt.artifact_dir}/proof.json"
+  let primary = fp"{receipt.artifact_dir}/proof.json"
 
   if receipt.origin == types.artifact_origin_remote() {
     # import_remote hashes and verifies its opaque remote proof object through the Store receipt.
@@ -71,7 +71,7 @@ proc repo_verified_proof_path(
   let reproved = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
 
   if ! fs.exists(reproved)? {
-    return Err(types.PmError.PackageTarball(f"${node.package_id} is missing proof ${node.proof_key}; execute the BuildPlan before publication"))
+    return Err(types.PmError.PackageTarball(f"{node.package_id} is missing proof {node.proof_key}; execute the BuildPlan before publication"))
   }
 
   pm_proof.verify_artifact_receipt(reproved, node, receipt.payload_sha256)?
@@ -93,8 +93,8 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
     packages = packages.push({
       node,
       receipt,
-      payload: fp"${receipt.artifact_dir}/payload.tar.gz",
-      metadata: fp"${receipt.artifact_dir}/metadata.json",
+      payload: fp"{receipt.artifact_dir}/payload.tar.gz",
+      metadata: fp"{receipt.artifact_dir}/metadata.json",
       proof,
       kind,
     })
@@ -105,7 +105,7 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
 
 proc repo_metadata_for_publication(value: types.RepoPublication, output: Path) [fs, error] -> Result[Path] {
   let raw = json.read(value.metadata)?.require(RepoArtifactMetadataDto)?
-  let metadata = fp"${output}/${value.node.artifact_key}.json"
+  let metadata = fp"{output}/{value.node.artifact_key}.json"
   fs.mkdir(metadata.parent)?
   fs.write_atomic(
     metadata,
@@ -168,7 +168,7 @@ proc repo_merge_publication(index: List[types.RemotePackage], entry: types.Remot
     if existing.arch == entry.arch and existing.name == entry.name {
       if existing.ver == entry.ver and existing.rel == entry.rel {
         if ! repo_same_publication(existing, entry) {
-          return Err(types.PmError.PackageConflict(f"immutable remote tuple ${entry.arch}/${entry.name}-${entry.ver}-${entry.rel} already exists with different content"))
+          return Err(types.PmError.PackageConflict(f"immutable remote tuple {entry.arch}/{entry.name}-{entry.ver}-{entry.rel} already exists with different content"))
         }
 
         return {index, already_published: true}
@@ -185,7 +185,7 @@ proc repo_merge_publication(index: List[types.RemotePackage], entry: types.Remot
     updated = updated.push(entry)
   }
 
-  {index: updated |> sort-by { |item| f"${item.arch}\t${item.name}" }, already_published: false}
+  {index: updated |> sort-by { |item| f"{item.arch}\t{item.name}" }, already_published: false}
 }
 
 proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token: Str, work: Path) [fs, net, error] {
@@ -215,19 +215,19 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
     let verified = store.verify_receipt(publication.receipt)?
 
     if verified != publication.receipt {
-      return Err(types.PmError.PackageContract(f"repository snapshot receipt changed for ${publication.node.package_id}"))
+      return Err(types.PmError.PackageContract(f"repository snapshot receipt changed for {publication.node.package_id}"))
     }
 
     if publication.receipt.origin == types.artifact_origin_built() {
       pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)?
     }
 
-    let metadata = repo_metadata_for_publication(publication, fp"${work}/metadata")?
+    let metadata = repo_metadata_for_publication(publication, fp"{work}/metadata")?
     stages = stages.push({publication, entry: repo_publication_entry(publication, metadata)?, metadata})
   }
 
   # This is the sole remote-index read. It establishes immutable tuple conflicts before any object upload.
-  var index = remote.load_remote_index_from_repo(remote_repo, fp"${work}/index")?
+  var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
   var pending: List[RepoPublishStage] = []
 
   for stage in stages {
@@ -243,14 +243,14 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
 
   for stage in pending {
     if ! stage.entry.metapackage {
-      repo_publish_immutable_object(remote_repo, fp"${stage.entry.tarball}", stage.publication.payload, token, work)?
+      repo_publish_immutable_object(remote_repo, fp"{stage.entry.tarball}", stage.publication.payload, token, work)?
     }
 
-    repo_publish_immutable_object(remote_repo, fp"${stage.entry.metadata}", stage.metadata, token, work)?
-    repo_publish_immutable_object(remote_repo, fp"${stage.entry.proof}", stage.publication.proof, token, work)?
+    repo_publish_immutable_object(remote_repo, fp"{stage.entry.metadata}", stage.metadata, token, work)?
+    repo_publish_immutable_object(remote_repo, fp"{stage.entry.proof}", stage.publication.proof, token, work)?
   }
 
   if pending.len() > 0 {
-    remote.write_remote_index_to_repo(remote_repo, work, fp"${work}/index", index, token)?
+    remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)?
   }
 }

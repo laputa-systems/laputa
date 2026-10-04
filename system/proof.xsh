@@ -32,10 +32,10 @@ export pure succeeded(console: Str) -> Bool {
 export proc verify_console(console: Str) [error] {
   let failed = failure_marker(console)
   if failed != "" {
-    return Err(types.LaputaError.Profile(f"guest proof failed with marker ${failed}"))
+    return Err(types.LaputaError.Profile(f"guest proof failed with marker {failed}"))
   }
 
   if ! succeeded(console) {
-    return Err(types.LaputaError.Profile(f"guest proof did not emit ${success_marker}"))
+    return Err(types.LaputaError.Profile(f"guest proof did not emit {success_marker}"))
   }
 }

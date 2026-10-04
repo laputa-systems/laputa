@@ -15,15 +15,15 @@ pure container_output_root() -> Path {
 }
 
 pure container_build_plan_path() -> Path {
-  fp"${container_output_root()}/build-plan.json"
+  fp"{container_output_root()}/build-plan.json"
 }
 
 pure container_generation_plan_path() -> Path {
-  fp"${container_output_root()}/generation-plan.json"
+  fp"{container_output_root()}/generation-plan.json"
 }
 
 pure container_overlay_root(name: Str) -> Path {
-  fp"/src/laputa/profiles/${name}"
+  fp"/src/laputa/profiles/{name}"
 }
 
 pure container_guest_proof_source() -> Path {
@@ -43,23 +43,23 @@ pure container_repo_root() -> Path {
 # generation, and image path beneath the container-local temporary workspace;
 # only one complete, verified system bundle crosses this boundary.
 pure container_work_build_plan(work: Path) -> Path {
-  fp"${work}/build-plan.json"
+  fp"{work}/build-plan.json"
 }
 
 pure container_work_generation_manifest(work: Path) -> Path {
-  fp"${work}/generation.json"
+  fp"{work}/generation.json"
 }
 
 pure container_work_kernel(work: Path) -> Path {
-  fp"${work}/vmlinuz"
+  fp"{work}/vmlinuz"
 }
 
 pure container_work_rootfs(work: Path) -> Path {
-  fp"${work}/rootfs.ext4"
+  fp"{work}/rootfs.ext4"
 }
 
 pure container_work_disk(work: Path) -> Path {
-  fp"${work}/disk.img"
+  fp"{work}/disk.img"
 }
 
 proc container_load_profile(name: Str) [fs, error] -> Result[types.SystemProfile] {
@@ -68,19 +68,19 @@ proc container_load_profile(name: Str) [fs, error] -> Result[types.SystemProfile
 
 proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, error] -> Result[Path] {
   let source = container_overlay_root(profile.name)
-  let overlay = fp"${work}/overlay"
+  let overlay = fp"{work}/overlay"
   let guest_proof = container_guest_proof_source()
 
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "dir" {
-    return Err(ContainerBuildError.Failed(f"profile overlay is missing: ${source}"))
+    return Err(ContainerBuildError.Failed(f"profile overlay is missing: {source}"))
   }
 
   if ! fs.exists(guest_proof)? or fs.metadata(guest_proof)?.kind != "file" {
-    return Err(ContainerBuildError.Failed(f"guest proof source is missing: ${guest_proof}"))
+    return Err(ContainerBuildError.Failed(f"guest proof source is missing: {guest_proof}"))
   }
 
   let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
-  fs.install(guest_proof, fp"${overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)?
+  fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)?
   overlay
 }
 
@@ -90,12 +90,12 @@ proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemPro
 
     if let Ok(info) = elf.inspect(entry.path) {
       if info.soname in profile.forbidden_sonames {
-        return Err(ContainerBuildError.Failed(f"generation provides forbidden SONAME ${info.soname}"))
+        return Err(ContainerBuildError.Failed(f"generation provides forbidden SONAME {info.soname}"))
       }
 
       for soname in info.needed {
         if soname in profile.forbidden_sonames {
-          return Err(ContainerBuildError.Failed(f"generation needs forbidden SONAME ${soname}"))
+          return Err(ContainerBuildError.Failed(f"generation needs forbidden SONAME {soname}"))
         }
       }
     }
@@ -107,7 +107,7 @@ proc container_stage_build_plan(work: Path) [fs, error] -> Result[Path] {
   let staged = container_work_build_plan(work)
 
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
-    return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: ${source}"))
+    return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: {source}"))
   }
 
   fs.copy(source, staged)?
@@ -133,7 +133,7 @@ proc container_pm(args: List[Str]) [fs, process, error] {
   )?
 
   if ! status.ok {
-    return Err(ContainerBuildError.Failed(f"PM public command failed: ${args.join(" ")}; the mounted PM checkout may not support this command"))
+    return Err(ContainerBuildError.Failed(f"PM public command failed: {args.join(" ")}; the mounted PM checkout may not support this command"))
   }
 }
 
@@ -145,7 +145,7 @@ proc container_pm_repo_build(build_plan: Path, jobs: Int) [fs, net, process, env
     "--store",
     container_store_root().display(),
     "--jobs",
-    f"${jobs}",
+    f"{jobs}",
   ])?
 }
 
@@ -180,7 +180,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
   ])?
 
   if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or fs.metadata(output)?.size <= 0 {
-    return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel ${profile.kernel_path}"))
+    return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel {profile.kernel_path}"))
   }
 }
 
@@ -205,7 +205,7 @@ proc container_system_key(build_plan: Path, generation_manifest: Path, profile: 
   if generation_sha256.count_chars() != 64 or kernel_key.count_chars() != 64 {
     return Err(ContainerBuildError.Failed("saved plan or generation manifest has an invalid system identity"))
   }
-  bytes.from_text(f"laputa-qemu-system-1\ngeneration\t${generation_sha256}\nkernel\t${kernel_key}\nimage-format-epoch\t1\n").sha256().hex()
+  bytes.from_text(f"laputa-qemu-system-1\ngeneration\t{generation_sha256}\nkernel\t{kernel_key}\nimage-format-epoch\t1\n").sha256().hex()
 }
 
 proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, error] {
@@ -234,9 +234,9 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
     return Err(ContainerBuildError.Failed("saved generation plan differs from the current BuildPlan or overlay"))
   }
   container_pm_repo_build(build_plan, jobs)?
-  let root = fp"${work}/generation"
+  let root = fp"{work}/generation"
   let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?
-  let embedded_manifest = fp"${root}/var/lib/laputa/generation.json"
+  let embedded_manifest = fp"{root}/var/lib/laputa/generation.json"
   if ! fs.exists(embedded_manifest)? or fs.metadata(embedded_manifest)?.kind != "file" {
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
   }
@@ -262,7 +262,7 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
     let work = handle.host_path()?
     let overlay = container_prepare_overlay(profile, work)?
     let generation_plan = container_generation_plan(container_build_plan_path(), profile, overlay)?
-    let staged = fp"${work}/generation-plan.json"
+    let staged = fp"{work}/generation-plan.json"
     pm_generation.write_generation_plan(staged, generation_plan)?
     container_output.publish_final_file(staged, container_generation_plan_path())?
     return

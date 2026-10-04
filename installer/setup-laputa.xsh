@@ -30,10 +30,10 @@ pure partition_path(disk: Path, index: Int) -> Path {
   let name = disk.name
 
   if name.starts_with("nvme") or name.starts_with("mmcblk") {
-    return fp"${disk}p${index}"
+    return fp"{disk}p{index}"
   }
 
-  fp"${disk}${index}"
+  fp"{disk}{index}"
 }
 
 pure prefix_octet(bits: Int) -> Int {
@@ -59,9 +59,7 @@ pure prefix_octet(bits: Int) -> Int {
 }
 
 pure prefix_to_netmask(prefix_len: Int) -> Str {
-  f"${prefix_octet(prefix_len)}.${prefix_octet(prefix_len - 8)}.${prefix_octet(prefix_len - 16)}.${prefix_octet(
-    prefix_len - 24,
-  )}"
+  f"{prefix_octet(prefix_len)}.{prefix_octet(prefix_len - 8)}.{prefix_octet(prefix_len - 16)}.{prefix_octet(prefix_len - 24)}"
 }
 
 proc write_text(text: Str) [fs, error, io] {
@@ -73,7 +71,7 @@ proc write_text(text: Str) [fs, error, io] {
 }
 
 proc write_stdout_line(line: Str) [fs, error, io] {
-  write_text(f"""${line}
+  write_text(f"""{line}
 """)?
 }
 
@@ -118,10 +116,10 @@ proc normalize_target_ownership(root: Path) [fs, error] {
   }
 
   for path_value in [
-    fp"${root}/usr/bin/passwd",
-    fp"${root}/usr/bin/su",
-    fp"${root}/usr/bin/sudo",
-    fp"${root}/usr/bin/unix_chkpwd",
+    fp"{root}/usr/bin/passwd",
+    fp"{root}/usr/bin/su",
+    fp"{root}/usr/bin/sudo",
+    fp"{root}/usr/bin/unix_chkpwd",
   ] {
     if fs.exists(path_value)? {
       fs.chmod(path_value, 0o4755)?
@@ -130,7 +128,7 @@ proc normalize_target_ownership(root: Path) [fs, error] {
 }
 
 proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
-  let public_key_path = fp"${root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
+  let public_key_path = fp"{root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
 
   return false unless fs.exists(public_key_path)?
 
@@ -138,19 +136,19 @@ proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
 
   return false when public_key == ""
 
-  let ssh_dir = fp"${root}/home/pazu/.ssh"
-  let authorized_keys = fp"${ssh_dir}/authorized_keys"
-  fs.mkdir(fp"${root}/etc/dropbear")?
+  let ssh_dir = fp"{root}/home/pazu/.ssh"
+  let authorized_keys = fp"{ssh_dir}/authorized_keys"
+  fs.mkdir(fp"{root}/etc/dropbear")?
   fs.mkdir(ssh_dir)?
 
   fs.write(
     authorized_keys,
-    f"""${public_key}
+    f"""{public_key}
 """,
   )?
 
-  fs.chown(fp"${root}/home/pazu", user.by_uid(1000)?)?
-  fs.chgrp(fp"${root}/home/pazu", group.by_gid(1000)?)?
+  fs.chown(fp"{root}/home/pazu", user.by_uid(1000)?)?
+  fs.chgrp(fp"{root}/home/pazu", group.by_gid(1000)?)?
   fs.chown(ssh_dir, user.by_uid(1000)?)?
   fs.chgrp(ssh_dir, group.by_gid(1000)?)?
   fs.chown(authorized_keys, user.by_uid(1000)?)?
@@ -182,14 +180,14 @@ proc print_disks(disks: List[Path]) [fs, error, io] {
   write_stdout_line("Available disks:")?
 
   for disk in disks {
-    write_stdout_line(f"  ${disk}")?
+    write_stdout_line(f"  {disk}")?
   }
 }
 
 proc disk_has_partitions(disk: Path) [fs, error] -> Result[Bool] {
-  for entry in fs.children(fp"/sys/block/${disk.name}")? {
+  for entry in fs.children(fp"/sys/block/{disk.name}")? {
     if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(
-      fp"/sys/block/${disk.name}/${entry.name}/partition",
+      fp"/sys/block/{disk.name}/{entry.name}/partition",
     )? {
       return true
     }
@@ -209,13 +207,13 @@ proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
-  write_text(f"Install to disk [${default_disk}]: ")?
+  write_text(f"Install to disk [{default_disk}]: ")?
   let answer = io.stdin_line()?
   let trimmed = answer.trim()
 
   return default_disk when trimmed == ""
 
-  fp"${trimmed}"
+  fp"{trimmed}"
 }
 
 proc wait_for(path_value: Path) [fs, time, error] {
@@ -274,11 +272,11 @@ proc target_static_interfaces() [process, error] -> Result[Str] {
   f"""auto lo
 iface lo inet loopback
 
-auto ${netcfg.iface}
-iface ${netcfg.iface} inet static
-    address ${netcfg.address}
-    netmask ${netcfg.netmask}
-    gateway ${netcfg.gateway}
+auto {netcfg.iface}
+iface {netcfg.iface} inet static
+    address {netcfg.address}
+    netmask {netcfg.netmask}
+    gateway {netcfg.gateway}
 """
 }
 
@@ -288,8 +286,8 @@ proc target_dhcp_interfaces() [process, error] -> Result[Str] {
   f"""auto lo
 iface lo inet loopback
 
-auto ${netcfg.iface}
-iface ${netcfg.iface} inet dhcp
+auto {netcfg.iface}
+iface {netcfg.iface} inet dhcp
 """
 }
 
@@ -329,26 +327,26 @@ proc write_target_config(
   let fstab_swap = if ci { "/dev/vda2" } else { swap_part.display() }
 
   write_file(
-    fp"${root}/etc/hostname",
+    fp"{root}/etc/hostname",
     """laputa
 """,
   )?
 
   write_file(
-    fp"${root}/etc/fstab",
+    fp"{root}/etc/fstab",
     f"""proc /proc proc defaults 0 0
 sysfs /sys sysfs defaults 0 0
 devtmpfs /dev devtmpfs defaults 0 0
 tmpfs /run tmpfs mode=0755,nosuid,nodev 0 0
 tmpfs /dev/shm tmpfs mode=1777,nosuid,nodev 0 0
-${fstab_root} / ext4 rw,noatime 0 1
-${fstab_esp} /boot vfat rw,noatime 0 2
-${fstab_swap} none swap sw 0 0
+{fstab_root} / ext4 rw,noatime 0 1
+{fstab_esp} /boot vfat rw,noatime 0 2
+{fstab_swap} none swap sw 0 0
 """,
   )?
 
   write_file(
-    fp"${root}/etc/passwd",
+    fp"{root}/etc/passwd",
     """root:x:0:0:root:/root:/bin/xshi
 pazu:x:1000:1000:Pazu:/home/pazu:/bin/xshi
 nobody:x:99:99:Unprivileged User:/dev/null:/bin/false
@@ -356,7 +354,7 @@ nobody:x:99:99:Unprivileged User:/dev/null:/bin/false
   )?
 
   write_file(
-    fp"${root}/etc/shadow",
+    fp"{root}/etc/shadow",
     """root:*:0:0:99999:7:::
 pazu:*:0:0:99999:7:::
 nobody:*:0:0:99999:7:::
@@ -364,7 +362,7 @@ nobody:*:0:0:99999:7:::
   )?
 
   write_file(
-    fp"${root}/etc/group",
+    fp"{root}/etc/group",
     """root:x:0:
 wheel:x:4:pazu
 tty:x:5:
@@ -382,11 +380,11 @@ pazu:x:1000:
 """,
   )?
 
-  write_file(fp"${root}/etc/network/interfaces", target_interfaces(network_method)?)?
+  write_file(fp"{root}/etc/network/interfaces", target_interfaces(network_method)?)?
 
   if ci {
     write_file(
-      fp"${root}/usr/local/bin/laputa-ci-idle",
+      fp"{root}/usr/local/bin/laputa-ci-idle",
       """#!/bin/xsh
 proc main() [time, error] {
 while true {
@@ -398,10 +396,10 @@ main()?
 """,
     )?
 
-    fs.chmod(fp"${root}/usr/local/bin/laputa-ci-idle", 0o755)?
+    fs.chmod(fp"{root}/usr/local/bin/laputa-ci-idle", 0o755)?
   } else {
     write_file(
-      fp"${root}/etc/inittab",
+      fp"{root}/etc/inittab",
       """::sysinit:/usr/lib/init/rc.boot
 ::once:/usr/lib/init/mdev.supervise
 ttyAMA0::respawn:/usr/bin/login -f pazu
@@ -412,8 +410,8 @@ tty1::respawn:/usr/bin/login -f pazu
     )?
   }
 
-  fp"${root}/home/pazu".mkdir()?
-  fs.chmod(fp"${root}/home/pazu", 0o755)?
+  fp"{root}/home/pazu".mkdir()?
+  fs.chmod(fp"{root}/home/pazu", 0o755)?
   let qemu_smoke_ssh = if ci { configure_qemu_smoke_ssh(root)? } else { false }
 
   if ci {
@@ -425,10 +423,10 @@ tty1::respawn:/usr/bin/login -f pazu
     }
 
     write_file(
-      fp"${root}/etc/inittab",
+      fp"{root}/etc/inittab",
       f"""::sysinit:/usr/lib/init/rc.boot
 ::once:/usr/lib/init/mdev.supervise
-${dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
+{dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
 ::shutdown:/usr/lib/init/rc.shutdown
 """,
     )?
@@ -437,7 +435,7 @@ ${dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
     # install_installer_tools. Copy it into the target rootfs.
     fs.install(
       /usr/lib/init/rc.d/laputa-ci-smoke.boot,
-      fp"${root}/usr/lib/init/rc.d/laputa-ci-smoke.boot",
+      fp"{root}/usr/lib/init/rc.d/laputa-ci-smoke.boot",
       0o755,
       parents: true,
       overwrite: true,
@@ -455,7 +453,7 @@ proc configured_ci_esp_bytes() [fs, error] -> Result[Int] {
 }
 
 proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[DiskParts] {
-  let total_sectors = fs.read_text(fp"/sys/block/${disk.name}/size")?.trim().parse_int()?
+  let total_sectors = fs.read_text(fp"/sys/block/{disk.name}/size")?.trim().parse_int()?
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128 * 1024 * 1024 }
   let swap_bytes = if ci { 8 * 1024 * 1024 } else { linux.meminfo()?.total * 2 }
   let esp_sectors = align_up(ceil_div(esp_bytes, 512), 2048)
@@ -470,19 +468,19 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Dis
   let root_end = root_start + root_sectors - 1
 
   if root_sectors <= 0 or root_end <= root_start {
-    return Err(InstallerError.Failed("disk-too-small", f"${disk} is too small for Laputa"))
+    return Err(InstallerError.Failed("disk-too-small", f"{disk} is too small for Laputa"))
   }
 
   let table = json.decode(
-    f"""{
+    f"""{{
   "label": "gpt",
   "uuid": "11111111-2222-3333-4444-555555555555",
   "partitions": [
-    {"index": 1, "start": ${esp_start}, "end": ${esp_end}, "type": "${ESP_TYPE}", "uuid": "11111111-1111-1111-1111-111111111111", "name": "LAPUTA_ESP"},
-    {"index": 2, "start": ${swap_start}, "end": ${swap_end}, "type": "${SWAP_TYPE}", "uuid": "22222222-2222-2222-2222-222222222222", "name": "LAPUTA_SWAP"},
-    {"index": 3, "start": ${root_start}, "end": ${root_end}, "type": "${LINUX_TYPE}", "uuid": "33333333-3333-3333-3333-333333333333", "name": "LAPUTA_ROOT"}
+    {{"index": 1, "start": {esp_start}, "end": {esp_end}, "type": "{ESP_TYPE}", "uuid": "11111111-1111-1111-1111-111111111111", "name": "LAPUTA_ESP"}},
+    {{"index": 2, "start": {swap_start}, "end": {swap_end}, "type": "{SWAP_TYPE}", "uuid": "22222222-2222-2222-2222-222222222222", "name": "LAPUTA_SWAP"}},
+    {{"index": 3, "start": {root_start}, "end": {root_end}, "type": "{LINUX_TYPE}", "uuid": "33333333-3333-3333-3333-333333333333", "name": "LAPUTA_ROOT"}}
   ]
-}""",
+}}""",
   )?.require(Record)?
 
   linux.write_partition_table(disk, table)?
@@ -494,7 +492,7 @@ proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
   require_file(/usr/bin/mkfs.vfat)?
   require_file(/usr/share/laputa-installer/target-root.tar.gz)?
   let network_method = prompt_network_method(ci)?
-  write_stdout_line(f"Installing Laputa to ${disk}")?
+  write_stdout_line(f"Installing Laputa to {disk}")?
   let parts = wipe_and_partition(disk, ci)?
   wait_for(parts.esp)?
   wait_for(parts.swap)?
@@ -575,7 +573,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
       disk_text = argv[index]
     } else {
-      return Err(InstallerError.Failed("usage", f"unknown argument ${arg}"))
+      return Err(InstallerError.Failed("usage", f"unknown argument {arg}"))
     }
 
     index += 1
@@ -595,7 +593,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
   }
 
   let disk = if disk_text != "" {
-    fp"${disk_text}"
+    fp"{disk_text}"
   } else if ci {
     ci_default_disk(disks)?
   } else if auto {

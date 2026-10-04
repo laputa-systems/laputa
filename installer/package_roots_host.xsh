@@ -25,15 +25,15 @@ export proc prepare(
       "--",
       if smoke { "1" } else { "0" },
       kernel_package,
-      f"${jobs}",
+      f"{jobs}",
     ],
   )?
 
-  let bundle = fp"${config.output_root}/current"
+  let bundle = fp"{config.output_root}/current"
   for name in ["build-plan.json", "target-root.tar.gz", "installer-root.tar.gz", "tools-root.tar.gz"] {
-    let file = fp"${bundle}/${name}"
+    let file = fp"{bundle}/{name}"
     if ! fs.exists(file)? or fs.metadata(file)?.kind != "file" or fs.metadata(file)?.size <= 0 {
-      return Err(InstallerPackageHostError.Failed(f"installer package bundle is missing ${name}"))
+      return Err(InstallerPackageHostError.Failed(f"installer package bundle is missing {name}"))
     }
   }
 

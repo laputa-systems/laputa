@@ -125,7 +125,7 @@ pure rust_triple(arch: Str) -> Str {
     return "x86_64-unknown-linux-musl"
   }
 
-  return f"${arch}-unknown-linux-musl"
+  return f"{arch}-unknown-linux-musl"
 }
 
 proc stage_rustlib(source: Path, dest: Path) [fs, error] {
@@ -135,7 +135,7 @@ proc stage_rustlib(source: Path, dest: Path) [fs, error] {
   for entry in fs.walk(source, gitignore: false)? |> sort-by .path {
     continue when entry.path == source
     let relative = entry.path.relative_to(source)
-    let out = fp"${dest}/${relative}"
+    let out = fp"{dest}/{relative}"
 
     if entry.kind == "dir" {
       fs.mkdir(out)?
@@ -186,13 +186,13 @@ proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCra
 # map skips per-file verification of the already sha256-verified crate.
 proc mark_vendored_crates(lockfile: Path, vendor: Path) [fs, error] {
   for item in locked_registry_crates(lockfile)? {
-    let dir = fp"${vendor}/${item.name}-${item.version}"
+    let dir = fp"{vendor}/{item.name}-{item.version}"
 
-    if ! fs.exists(fp"${dir}/Cargo.toml")? {
-      return Err(SudoRsBuildError.MissingVendoredCrate(f"${item.name}-${item.version}"))
+    if ! fs.exists(fp"{dir}/Cargo.toml")? {
+      return Err(SudoRsBuildError.MissingVendoredCrate(f"{item.name}-{item.version}"))
     }
 
-    json.write(fp"${dir}/.cargo-checksum.json", {files: {}, package: item.checksum})?
+    json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: item.checksum})?
   }
 }
 
@@ -201,24 +201,24 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cargo = process.which("cargo")?
   let cc = process.which("cc")?
   let target_arch = pm_util.target_arch()?
-  let build_root = fp"${env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+  let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
   let target_root_value = (env.get("LAPUTA_ROOT") ?? env.get("XSH_PM_ROOT") ?? "").trim()
-  let target_root = if target_root_value != "" { fp"${target_root_value}" } else { cc.parent.parent }
-  var libdir = fp"${target_root}/usr/lib"
+  let target_root = if target_root_value != "" { fp"{target_root_value}" } else { cc.parent.parent }
+  var libdir = fp"{target_root}/usr/lib"
 
   if ! fs.exists(libdir)? {
-    libdir = fp"${cc.parent.parent}/lib"
+    libdir = fp"{cc.parent.parent}/lib"
   }
 
   let build_arch = pm_util.build_arch()?
   let triple = rust_triple(target_arch)
   let host_triple = rust_triple(build_arch)
-  let host_cc = if fs.exists(fp"${build_root}/usr/bin/cc")? { fp"${build_root}/usr/bin/cc" } else { cc }
-  let host_libdir = fp"${build_root}/usr/lib"
-  let target_rustlib = fp"rust-std/rust-std-${triple}/lib/rustlib/${triple}"
-  let staged_rustlib = fp"${target_root}/usr/lib/rustlib/${triple}"
+  let host_cc = if fs.exists(fp"{build_root}/usr/bin/cc")? { fp"{build_root}/usr/bin/cc" } else { cc }
+  let host_libdir = fp"{build_root}/usr/lib"
+  let target_rustlib = fp"rust-std/rust-std-{triple}/lib/rustlib/{triple}"
+  let staged_rustlib = fp"{target_root}/usr/lib/rustlib/{triple}"
 
-  if ! fs.exists(fp"${staged_rustlib}/lib")? {
+  if ! fs.exists(fp"{staged_rustlib}/lib")? {
     if ! fs.exists(target_rustlib)? {
       return Err(SudoRsBuildError.MissingRustStd(target_rustlib.display()))
     }
@@ -226,8 +226,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     stage_rustlib(target_rustlib, staged_rustlib)?
   }
 
-  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker=${cc} -L native=${libdir} -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
-  let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker=${host_cc} -L native=${host_libdir} -C link-arg=-Wl,--as-needed"
+  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
+  let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={host_cc} -L native={host_libdir} -C link-arg=-Wl,--as-needed"
   let aarch64_rustflags = if triple == "aarch64-unknown-linux-musl" { target_rustflags } else { host_rustflags }
 
   let x86_64_rustflags = if host_triple == "x86_64-unknown-linux-musl" and triple != host_triple {
@@ -240,13 +240,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   let x86_64_linker = if triple == "x86_64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
   mark_vendored_crates(p"Cargo.lock", p"vendor")?
   let current_path = env.get("PATH") ?? ""
-  let cargo_path = f"${host_cc.parent}:${current_path}"
+  let cargo_path = f"{host_cc.parent}:{current_path}"
 
   env ({
     PATH: cargo_path,
     CC: host_cc.display(),
     HOST_CC: host_cc.display(),
-    CARGO_HOME: fp"${fs.cwd()?}/.cargo-home".display(),
+    CARGO_HOME: fp"{fs.cwd()?}/.cargo-home".display(),
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64_linker,
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64_linker,
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: aarch64_rustflags,
@@ -255,7 +255,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "sudo" "--bin" "su" ?
   } ?
 
-  fs.install(fp"target/${triple}/release/sudo", fp"${dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)?
-  fs.install(fp"target/${triple}/release/su", fp"${dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)?
-  fs.symlink(p"sudo", fp"${dest}/usr/bin/sudoedit")?
+  fs.install(fp"target/{triple}/release/sudo", fp"{dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)?
+  fs.install(fp"target/{triple}/release/su", fp"{dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)?
+  fs.symlink(p"sudo", fp"{dest}/usr/bin/sudoedit")?
 }

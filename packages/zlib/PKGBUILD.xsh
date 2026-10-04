@@ -130,7 +130,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
   let jobs = make.jobs()?
-  let jobs_flag = f"-j${jobs}"
+  let jobs_flag = f"-j{jobs}"
 
   let cmake_args = [
     "-G",

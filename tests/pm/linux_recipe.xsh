@@ -12,14 +12,14 @@ use packages.linux.linux_config
 use packages.linux.PKGBUILD-shared as linux_shared
 
 pure fixture(name: Str) -> Path {
-  fp"tests/pm/fixtures/linux-recipe/${name}"
+  fp"tests/pm/fixtures/linux-recipe/{name}"
 }
 
 proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
   if configured != "" {
-    return path.absolute(fp"${configured}")?
+    return path.absolute(fp"{configured}")?
   }
 
   process.which("xsh")?
@@ -56,18 +56,18 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   let original = recipe.load_package(p"packages/linux")?
   let config = linux_config_source(original)?
   let stage_root = test.temp_dir(ctx, name: "linux-config-stage")?
-  let source = fp"${stage_root}/source"
+  let source = fp"{stage_root}/source"
   fs.mkdir(source)?
   sources.stage_package_sources({...original, upstream_sources: [config]}, source)?
-  let staged = fp"${source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
+  let staged = fp"{source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
   test.ok(staged.exists()?)?
 
   let copied_root = test.temp_dir(ctx, name: "linux-config-fingerprint")?
-  let copied = fp"${copied_root}/packages/linux"
+  let copied = fp"{copied_root}/packages/linux"
   let _ = fs.copy_tree(p"packages/linux", copied, parents: true, overwrite: true)?
   let before = recipe.load_package(copied)?
   let first = fingerprint.package_build_input(copied_root, before, types.target_aarch64())?
-  fs.write(fp"${copied}/files/config/aarch64/base-aarch64.fragment", "# changed staged config input\n")?
+  fs.write(fp"{copied}/files/config/aarch64/base-aarch64.fragment", "# changed staged config input\n")?
   let after = recipe.load_package(copied)?
   test.eq(fingerprint.package_build_input(copied_root, after, types.target_aarch64())? == first, false)?
 }
@@ -88,22 +88,22 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
   test.eq(local_sources.len(), required.len())?
 
   let stage_root = test.temp_dir(ctx, name: "linux-x86-generated-inputs")?
-  let source = fp"${stage_root}/source"
+  let source = fp"{stage_root}/source"
   fs.mkdir(source)?
   sources.stage_package_sources({...original, upstream_sources: local_sources}, source)?
 
   for name in required {
-    test.ok(fs.exists(fp"${source}/${name}")?, f"missing staged ${name}")?
+    test.ok(fs.exists(fp"{source}/{name}")?, f"missing staged {name}")?
   }
 }
 
 test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_recipe [fs, net, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "laputa-pm-repository-input")?
-  let package_dir = fp"${root}/packages/laputa-pm"
-  let source = fp"${root}/source"
+  let package_dir = fp"{root}/packages/laputa-pm"
+  let source = fp"{root}/source"
   let _ = fs.copy_tree(p"packages/laputa-pm", package_dir, parents: true, overwrite: true)?
-  fs.copy(p"pm.xsh", fp"${root}/pm.xsh", overwrite: true)?
-  let _ = fs.copy_tree(p"pm", fp"${root}/pm", parents: true, overwrite: true)?
+  fs.copy(p"pm.xsh", fp"{root}/pm.xsh", overwrite: true)?
+  let _ = fs.copy_tree(p"pm", fp"{root}/pm", parents: true, overwrite: true)?
   fs.mkdir(source)?
   let pkg = recipe.load_package(package_dir)?
   let first = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
@@ -117,9 +117,9 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
     sources.stage_package_sources(pkg, source)?
   } ?
 
-  test.ok(fs.exists(fp"${source}/pm.xsh")?)?
-  test.ok(fs.exists(fp"${source}/pm/execute.xsh")?)?
-  fs.write(fp"${root}/pm/execute.xsh", "changed PM executor input\n")?
+  test.ok(fs.exists(fp"{source}/pm.xsh")?)?
+  test.ok(fs.exists(fp"{source}/pm/execute.xsh")?)?
+  fs.write(fp"{root}/pm/execute.xsh", "changed PM executor input\n")?
   let second = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
   test.eq(second == first, false)?
 }
@@ -127,13 +127,13 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
 test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, net, process, env, time, error] { |ctx|
   let pkg = recipe.load_package(p"packages/baselayout")?
   let root = test.temp_dir(ctx, name: "baselayout-directory-input")?
-  let source = fp"${root}/source"
+  let source = fp"{root}/source"
   fs.mkdir(source)?
 
   sources.stage_package_sources(pkg, source)?
 
-  test.ok(fs.exists(fp"${source}/etc/passwd")?)?
-  test.ok(fs.exists(fp"${source}/usr/lib/init/rc.boot")?)?
+  test.ok(fs.exists(fp"{source}/etc/passwd")?)?
+  test.ok(fs.exists(fp"{source}/usr/lib/init/rc.boot")?)?
 }
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |ctx|
@@ -150,87 +150,87 @@ test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error]
 test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, process, env, time, error] { |ctx|
   let pkg = recipe.load_package(p"packages/baselayout")?
   let root = test.temp_dir(ctx, name: "baselayout-empty-directories")?
-  let source = fp"${root}/source"
-  let dest = fp"${root}/dest"
+  let source = fp"{root}/source"
+  let dest = fp"{root}/dest"
   fs.mkdir(source)?
   sources.stage_package_sources(pkg, source)?
   recipe.call_build(pkg, source, dest)?
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    test.eq(fs.metadata(fp"${dest}/${required}")?.kind, "dir")?
+    test.eq(fs.metadata(fp"{dest}/{required}")?.kind, "dir")?
   }
 }
 
 test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, process, env, time, error] { |ctx|
   let pkg = recipe.load_package(p"packages/laputa-net")?
   let root = test.temp_dir(ctx, name: "laputa-net-hook-directories")?
-  let source = fp"${root}/source"
-  let dest = fp"${root}/dest"
+  let source = fp"{root}/source"
+  let dest = fp"{root}/dest"
   fs.mkdir(source)?
   sources.stage_package_sources(pkg, source)?
   recipe.call_build(pkg, source, dest)?
 
   for hook in ["if-pre-up.d", "if-up.d", "if-down.d", "if-pre-down.d", "if-post-down.d"] {
-    let relative = fp"etc/network/${hook}"
+    let relative = fp"etc/network/{hook}"
     test.ok({path: relative, kind: types.file_kind_tree()} in pkg.filetree)?
-    test.eq(fs.metadata(fp"${dest}/${relative}")?.kind, "dir")?
-    for entry in fs.children(fp"${dest}/${relative}")? {
-      test.fail(f"network hook directory contains ${entry.name}")?
+    test.eq(fs.metadata(fp"{dest}/{relative}")?.kind, "dir")?
+    for entry in fs.children(fp"{dest}/{relative}")? {
+      test.fail(f"network hook directory contains {entry.name}")?
     }
   }
 }
 
 test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "baselayout-artifact-directories")?
-  let recipe_dir = fp"${root}/recipe"
-  let source = fp"${root}/source"
-  let dest = fp"${root}/dest"
-  let archive_path = fp"${root}/baselayout.tar.gz"
-  let extracted = fp"${root}/extracted"
+  let recipe_dir = fp"{root}/recipe"
+  let source = fp"{root}/source"
+  let dest = fp"{root}/dest"
+  let archive_path = fp"{root}/baselayout.tar.gz"
+  let extracted = fp"{root}/extracted"
   let _ = fs.copy_tree(p"packages/baselayout", recipe_dir, parents: true, overwrite: true)?
   fs.mkdir(source)?
   let pkg = recipe.load_package(recipe_dir)?
   sources.stage_package_sources(pkg, source)?
   pm_build.build_prepared_package(recipe_dir, source, dest, archive_path)?
 
-  if !fs.exists(fp"${dest}/dev")? {
+  if !fs.exists(fp"{dest}/dev")? {
     test.fail("baselayout prepared payload is missing dev")?
   }
 
   archive.tar_extract(archive_path, extracted)?
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    if !fs.exists(fp"${extracted}/${required}")? {
-      test.fail(f"baselayout archive is missing ${required}")?
+    if !fs.exists(fp"{extracted}/{required}")? {
+      test.fail(f"baselayout archive is missing {required}")?
     }
 
-    test.eq(fs.metadata(fp"${extracted}/${required}")?.kind, "dir")?
+    test.eq(fs.metadata(fp"{extracted}/{required}")?.kind, "dir")?
   }
 }
 
 test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "xsh-proof-runtime-closure")?
-  let stderr = fp"${root}/xsh-proof.stderr"
+  let stderr = fp"{root}/xsh-proof.stderr"
   let modules = module_root()?
   let xsh = runner()?
-  fs.mkdir(fp"${root}/usr/bin")?
-  fs.mkdir(fp"${root}/usr/lib/xsh/core")?
-  fs.mkdir(fp"${root}/var/lib/xsh-pm/packages/xsh")?
+  fs.mkdir(fp"{root}/usr/bin")?
+  fs.mkdir(fp"{root}/usr/lib/xsh/core")?
+  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/xsh")?
 
   for path_value in [
-    fp"${root}/usr/bin/sh",
-    fp"${root}/usr/bin/xsh",
-    fp"${root}/usr/bin/xshi",
-    fp"${root}/usr/bin/xsht",
-    fp"${root}/usr/bin/cat",
-    fp"${root}/usr/bin/ifup",
-    fp"${root}/usr/bin/env",
-    fp"${root}/usr/lib/xsh/core/cat",
+    fp"{root}/usr/bin/sh",
+    fp"{root}/usr/bin/xsh",
+    fp"{root}/usr/bin/xshi",
+    fp"{root}/usr/bin/xsht",
+    fp"{root}/usr/bin/cat",
+    fp"{root}/usr/bin/ifup",
+    fp"{root}/usr/bin/env",
+    fp"{root}/usr/lib/xsh/core/cat",
   ] {
     fs.write(path_value, "typed xsh proof fixture\n")?
   }
 
-  fs.write(fp"${root}/var/lib/xsh-pm/packages/xsh/metadata.json", "{}\n")?
+  fs.write(fp"{root}/var/lib/xsh-pm/packages/xsh/metadata.json", "{}\n")?
   let status = process.run(
     process.command_argv(
       xsh,
@@ -259,14 +259,14 @@ proc repository_with_fixture_seed(ctx: TestContext) [fs, error] -> Result[Path] 
   let root = test.temp_dir(ctx, name: "repository-with-seed")?
 
   for name in ["packages", "pm", "pm.xsh", "xinit"] {
-    fs.symlink(fp"${checkout}/${name}", fp"${root}/${name}")?
+    fs.symlink(fp"{checkout}/{name}", fp"{root}/{name}")?
   }
 
-  let seed = fp"${root}/.out/seed/aarch64"
+  let seed = fp"{root}/.out/seed/aarch64"
   fs.mkdir(seed)?
 
   for name in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json"] {
-    fs.write(fp"${seed}/${name}", f"fixture ${name}\n")?
+    fs.write(fp"{seed}/{name}", f"fixture {name}\n")?
   }
 
   root
@@ -297,10 +297,10 @@ test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
 
 test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_missing [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-config-resolve")?
-  let source = fp"${root}/source"
-  let staged = fp"${source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
-  let recipe_root = fp"${root}/recipe"
-  let unrelated = fp"${root}/unrelated"
+  let source = fp"{root}/source"
+  let staged = fp"{source}/.laputa-inputs/files/config/aarch64/base-aarch64.fragment"
+  let recipe_root = fp"{root}/recipe"
+  let unrelated = fp"{root}/unrelated"
   fs.mkdir(staged.parent)?
   fs.mkdir(recipe_root)?
   fs.mkdir(unrelated)?
@@ -331,13 +331,13 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
 
 test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-staged-discovery-worker")?
-  let recipe_root = fp"${root}/recipe"
-  let source = fp"${root}/source"
-  let worker = fp"${recipe_root}/kbuild-pool-worker.xsh"
+  let recipe_root = fp"{root}/recipe"
+  let source = fp"{root}/source"
+  let worker = fp"{recipe_root}/kbuild-pool-worker.xsh"
   let _ = fs.copy_tree(p"packages/linux", recipe_root, parents: true, overwrite: true)?
   fs.mkdir(source)?
-  fs.write(fp"${source}/.config", "")?
-  fs.write(fp"${source}/Kbuild", "obj-y += one.o\n")?
+  fs.write(fp"{source}/.config", "")?
+  fs.write(fp"{source}/Kbuild", "obj-y += one.o\n")?
   test.ok(worker.exists()?)?
 
   env ({

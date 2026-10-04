@@ -21,7 +21,7 @@ pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKi
 }
 
 pure edge_key(from: Str, to: Str) -> Str {
-  f"${from}->${to}"
+  f"{from}->{to}"
 }
 
 pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.DependencyEdge] {
@@ -125,7 +125,7 @@ proc closure_from_edges(
     let name = pending[index]
 
     if ! (local_names.get(name) ?? false) and ! (remote_names.get(name) ?? false) {
-      return Err(types.PmError.MissingDependency(f"graph root ${name} is unavailable"))
+      return Err(types.PmError.MissingDependency(f"graph root {name} is unavailable"))
     }
 
     if ! (included.get(name) ?? false) {
@@ -165,7 +165,7 @@ export proc edges(
     continue unless (! rule.native_only or value.native_build) and (local_names.get(rule.package) ?? false)
 
     if ! (local_names.get(rule.dependency) ?? false) and ! (remote_names.get(rule.dependency) ?? false) {
-      return Err(types.PmError.MissingDependency(f"${rule.package} bootstrap requires missing ${rule.dependency}"))
+      return Err(types.PmError.MissingDependency(f"{rule.package} bootstrap requires missing {rule.dependency}"))
     }
 
     let key = edge_key(rule.package, rule.dependency)
@@ -225,7 +225,7 @@ export proc topological_levels(
     if ready.len() == 0 {
       let cycle = find_cycle(selected_names, local_edges)
       let rendered = if cycle.len() > 0 { cycle.join(" -> ") } else { selected_names.join(", ") }
-      return Err(types.PmError.DependencyCycle(f"package dependency cycle: ${rendered}"))
+      return Err(types.PmError.DependencyCycle(f"package dependency cycle: {rendered}"))
     }
 
     levels = levels.push(ready)

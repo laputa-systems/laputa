@@ -159,7 +159,7 @@ compat/utf8proc.c
 """.words()
 
   let generated_sources = ["cmd-parse.c", "osdep-linux.c"]
-  let tmux_sources = [fp"${source}" for source in core_sources.extend(generated_sources).extend(compat_sources)]
+  let tmux_sources = [fp"{source}" for source in core_sources.extend(generated_sources).extend(compat_sources)]
   let pc = make.pkg_config_flags(["libevent_core", "libutf8proc"])?
 
   let cflags = [
@@ -170,7 +170,7 @@ compat/utf8proc.c
     "-O2",
     "-Wno-deprecated-declarations",
     "-Wno-macro-redefined",
-    f"-DTMUX_VERSION=\"${ver}\"",
+    f"-DTMUX_VERSION=\"{ver}\"",
     "-DTMUX_CONF=\"/etc/tmux.conf:~/.tmux.conf:~/.config/tmux/tmux.conf\"",
     "-DTMUX_LOCK_CMD=\"lock -np\"",
     "-DTMUX_TERM=\"tmux-256color\"",
@@ -180,7 +180,7 @@ compat/utf8proc.c
 
   let tmux = make.c_program({
     cc,
-    triple: f"${arch}-linux-musl",
+    triple: f"{arch}-linux-musl",
     cflags,
     defs: [],
     includes: [],
@@ -202,5 +202,5 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   write_config_h()?
   let tmux = build_tmux(cc)?
-  fs.install(tmux, fp"${dest}/usr/bin/tmux", 0o755, parents: true, overwrite: true)?
+  fs.install(tmux, fp"{dest}/usr/bin/tmux", 0o755, parents: true, overwrite: true)?
 }

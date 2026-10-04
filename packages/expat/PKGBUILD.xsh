@@ -96,7 +96,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
-  let jobs_flag = f"-j${cpu.count()}"
+  let jobs_flag = f"-j{cpu.count()}"
 
   let cmake_args = [
     "-S",
@@ -128,5 +128,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   } ?
 
-  fs.remove(fp"${dest}/usr/lib/libexpat.a", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/lib/libexpat.a", missing_ok: true)?
 }

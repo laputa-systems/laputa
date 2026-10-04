@@ -796,7 +796,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
     return size
   }
 
-  let sectors_path = fp"/sys/class/block/${image.name}/size"
+  let sectors_path = fp"/sys/class/block/{image.name}/size"
 
   if fs.exists(sectors_path)? {
     return fs.read_text(sectors_path)?.trim().parse_int()? * 512
@@ -950,7 +950,7 @@ proc main(...argv: List[Str]) [fs, error] {
 
   let image = opts.image[0]
   let label = opts.label
-  var source_root = if opts.source_root == "" { p"" } else { fp"${opts.source_root}" }
+  var source_root = if opts.source_root == "" { p"" } else { fp"{opts.source_root}" }
 
   if source_root.display() == "" {
     let empty_dir = /tmp/mkfs-ext4-empty
@@ -958,7 +958,7 @@ proc main(...argv: List[Str]) [fs, error] {
     source_root = empty_dir
   }
 
-  format_ext_image(fp"${image}", source_root, label)?
+  format_ext_image(fp"{image}", source_root, label)?
 }
 
 main(@args)?

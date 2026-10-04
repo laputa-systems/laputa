@@ -25,20 +25,20 @@ const package_tools_contract_epoch = "laputa-package-tools-2"
 
 ## The checked-in Dockerfile for the networked host-tools base.
 export pure host_tools_dockerfile(laputa_root: Path) -> Path {
-  fp"${laputa_root}/seed/Dockerfile.host-tools"
+  fp"{laputa_root}/seed/Dockerfile.host-tools"
 }
 
 ## The checked-in Dockerfile for the offline package-tools image.
 export pure package_tools_dockerfile(laputa_root: Path) -> Path {
-  fp"${laputa_root}/Dockerfile.package-tools"
+  fp"{laputa_root}/Dockerfile.package-tools"
 }
 
 pure package_tools_bootstrap_helper(laputa_root: Path) -> Path {
-  fp"${laputa_root}/bootstrap-llvm-seed.xsh"
+  fp"{laputa_root}/bootstrap-llvm-seed.xsh"
 }
 
 pure llvm_recipe_dir(laputa_root: Path) -> Path {
-  fp"${laputa_root}/packages/llvm-toolchain"
+  fp"{laputa_root}/packages/llvm-toolchain"
 }
 
 pure short_key(key: Str) -> Str {
@@ -47,17 +47,17 @@ pure short_key(key: Str) -> Str {
 
 proc require_file(file: Path) [fs, error] {
   if ! fs.exists(file)? or fs.metadata(file)?.kind != "file" {
-    return Err(SeedImageError.Missing(f"image input is missing: ${file}"))
+    return Err(SeedImageError.Missing(f"image input is missing: {file}"))
   }
 }
 
 proc tree_digest(root: Path) [fs, error] -> Result[Str] {
   guard fs.exists(root)? else {
-    return Err(SeedImageError.Missing(f"image input is missing: ${root}"))
+    return Err(SeedImageError.Missing(f"image input is missing: {root}"))
   }
 
   let lines = [
-    f"${entry.path.strip_prefix(root)?.display()}\t${hash.sha256(entry.path)?.hex()}"
+    f"{entry.path.strip_prefix(root)?.display()}\t{hash.sha256(entry.path)?.hex()}"
     for entry in fs.files(root)
   ]
   let sorted = lines |> sort
@@ -68,22 +68,22 @@ proc tree_digest(root: Path) [fs, error] -> Result[Str] {
 export proc host_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
   let dockerfile = host_tools_dockerfile(laputa_root)
   require_file(dockerfile)?
-  let body = f"""${host_tools_contract_epoch}
-dockerfile\t${hash.sha256(dockerfile)?.hex()}
-platform\t${value.docker_platform}
+  let body = f"""{host_tools_contract_epoch}
+dockerfile\t{hash.sha256(dockerfile)?.hex()}
+platform\t{value.docker_platform}
 """
   bytes.from_text(body).sha256().hex()
 }
 
 ## The host-tools tag for one architecture.
 export proc host_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
-  f"laputa-host-tools:${value.arch}-${short_key(host_tools_key(laputa_root, value)?)}"
+  f"laputa-host-tools:{value.arch}-{short_key(host_tools_key(laputa_root, value)?)}"
 }
 
 ## Where `make fetch` saves the host-tools base so later runs load it offline.
 export proc host_tools_saved_image(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Path] {
   let name = host_tools_tag(laputa_root, value)?.replace(":", "-")
-  fp"${laputa_root}/.cache/images/${name}.tar"
+  fp"{laputa_root}/.cache/images/{name}.tar"
 }
 
 ## The pinned LLVM seed archive digest for one architecture, read through the typed recipe boundary.
@@ -99,7 +99,7 @@ export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> R
 
 ## The fetched LLVM seed archive in the content-addressed source cache.
 export proc llvm_seed_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Path] {
-  fp"${laputa_root}/.cache/sources/sha256/${llvm_seed_sha256(laputa_root, arch)?}"
+  fp"{laputa_root}/.cache/sources/sha256/{llvm_seed_sha256(laputa_root, arch)?}"
 }
 
 ## The content key for package-tools: its Dockerfile, the LLVM bootstrap helper and recipe, and the base tag.
@@ -109,25 +109,25 @@ export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, 
   let helper = package_tools_bootstrap_helper(laputa_root)
   require_file(dockerfile)?
   require_file(helper)?
-  let body = f"""${package_tools_contract_epoch}
-dockerfile\t${hash.sha256(dockerfile)?.hex()}
-bootstrap-helper\t${hash.sha256(helper)?.hex()}
-llvm-seed-recipe\t${tree_digest(llvm_recipe_dir(laputa_root))?}
-host-tools\t${host_tools_tag(laputa_root, value)?}
-platform\t${value.docker_platform}
+  let body = f"""{package_tools_contract_epoch}
+dockerfile\t{hash.sha256(dockerfile)?.hex()}
+bootstrap-helper\t{hash.sha256(helper)?.hex()}
+llvm-seed-recipe\t{tree_digest(llvm_recipe_dir(laputa_root))?}
+host-tools\t{host_tools_tag(laputa_root, value)?}
+platform\t{value.docker_platform}
 """
   bytes.from_text(body).sha256().hex()
 }
 
 ## The package-tools tag for one architecture.
 export proc package_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
-  f"laputa-package-tools:${value.arch}-${short_key(package_tools_key(laputa_root, value)?)}"
+  f"laputa-package-tools:{value.arch}-{short_key(package_tools_key(laputa_root, value)?)}"
 }
 
 proc quiet_status(docker: Path, argv: List[Str], cwd: Path) [fs, process, error] -> Result[Bool] {
   let handle = fs.tempdir()?
   defer handle.close()?
-  let quiet = fp"${handle.host_path()?}/output"
+  let quiet = fp"{handle.host_path()?}/output"
   let status = process.run(process.command_argv(docker, argv, cwd, stdout: quiet, stderr: quiet))?
   status.ok
 }
@@ -141,7 +141,7 @@ proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, 
   let status = process.run(process.command_argv(docker, argv, cwd))?
 
   if ! status.ok {
-    return Err(SeedImageError.Failed(f"${what} failed"))
+    return Err(SeedImageError.Failed(f"{what} failed"))
   }
 }
 
@@ -156,7 +156,7 @@ export proc host_tools_build_argv(docker: Path, laputa_root: Path, value: xsh_se
     host_tools_dockerfile(laputa_root).display(),
     "--tag",
     host_tools_tag(laputa_root, value)?,
-    fp"${laputa_root}/seed".display(),
+    fp"{laputa_root}/seed".display(),
   ]
 }
 
@@ -170,13 +170,13 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   }
 
   if ! image_exists(docker, tag, laputa_root)? {
-    docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building ${tag}")?
+    docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")?
   }
 
   fs.mkdir(saved.parent)?
-  let temporary = fp"${saved}.tmp"
+  let temporary = fp"{saved}.tmp"
   fs.remove(temporary, missing_ok: true)?
-  docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving ${tag}")?
+  docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")?
   fs.rename(temporary, saved, overwrite: true)?
 }
 
@@ -188,13 +188,13 @@ export proc ensure_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.S
 
   let saved = host_tools_saved_image(laputa_root, value)?
   if ! fs.exists(saved)? {
-    return Err(SeedImageError.Missing(f"${tag} is neither loaded nor saved at ${saved}; run `make fetch`"))
+    return Err(SeedImageError.Missing(f"{tag} is neither loaded nor saved at {saved}; run `make fetch`"))
   }
 
-  docker_step(docker, [docker.display(), "load", "--input", saved.display()], laputa_root, f"loading ${saved}")?
+  docker_step(docker, [docker.display(), "load", "--input", saved.display()], laputa_root, f"loading {saved}")?
 
   if ! image_exists(docker, tag, laputa_root)? {
-    return Err(SeedImageError.Failed(f"${saved} did not provide ${tag}"))
+    return Err(SeedImageError.Failed(f"{saved} did not provide {tag}"))
   }
 
   tag
@@ -208,11 +208,11 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[
   let digest = llvm_seed_sha256(laputa_root, arch)?
 
   if ! fs.exists(source)? {
-    return Err(SeedImageError.Missing(f"the ${arch} LLVM seed ${source} is not fetched; run `make fetch`"))
+    return Err(SeedImageError.Missing(f"the {arch} LLVM seed {source} is not fetched; run `make fetch`"))
   }
 
-  let context = fp"${laputa_root}/.out/package-tools/${arch}/sources"
-  let staged = fp"${context}/sha256/${digest}"
+  let context = fp"{laputa_root}/.out/package-tools/{arch}/sources"
+  let staged = fp"{context}/sha256/{digest}"
 
   if ! fs.exists(staged)? {
     fs.remove(context, missing_ok: true)?
@@ -244,13 +244,13 @@ export pure package_tools_build_argv(
     "--target",
     "package-tools",
     "--build-arg",
-    f"HOST_TOOLS_IMAGE=${host_tag}",
+    f"HOST_TOOLS_IMAGE={host_tag}",
     "--build-arg",
-    f"XSH_PM_TARGET_ARCH=${value.arch}",
+    f"XSH_PM_TARGET_ARCH={value.arch}",
     "--build-context",
-    f"seed=${xsh_seed.xsh_seed_dir(laputa_root, value.arch)}",
+    f"seed={xsh_seed.xsh_seed_dir(laputa_root, value.arch)}",
     "--build-context",
-    f"sources=${sources}",
+    f"sources={sources}",
     "--tag",
     tag,
     laputa_root.display(),
@@ -270,7 +270,7 @@ export proc ensure_package_tools(docker: Path, laputa_root: Path, value: xsh_see
     docker,
     package_tools_build_argv(docker, laputa_root, value, host_tag, tag, sources),
     laputa_root,
-    f"building ${tag}",
+    f"building {tag}",
   )?
   tag
 }

@@ -93,7 +93,7 @@ proc rule_parts(ruleset: Str) [fs, error] -> Result[List[Path]] {
   for entry in entries {
     if ! ("base." in entry.name) and ! ("evdev." in entry.name) {
       parts = parts.push(entry.path)
-    } else if f"${ruleset}." in entry.name {
+    } else if f"{ruleset}." in entry.name {
       parts = parts.push(entry.path)
     }
   }
@@ -116,8 +116,8 @@ proc merged_rules(ruleset: Str) [fs, error] -> Result[Str] {
       let header = lines[0].split("//")[0].trim()
 
       if ! (seen_headers.get(header) ?? false) {
-        output = f"""${output}
-${lines[0]}
+        output = f"""{output}
+{lines[0]}
 """
 
         seen_headers[header] = true
@@ -129,7 +129,7 @@ ${lines[0]}
     var index = start
 
     while index < lines.len() {
-      output = f"""${output}${lines[index]}
+      output = f"""{output}{lines[index]}
 """
 
       index += 1
@@ -141,33 +141,33 @@ ${lines[0]}
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  let base = fp"${dest}/usr/share/xkeyboard-config-2"
+  let base = fp"{dest}/usr/share/xkeyboard-config-2"
   fs.mkdir(base)?
 
   for dir in [p"compat", p"geometry", p"keycodes", p"symbols", p"types"] {
-    fs.copy_tree(dir, fp"${base}/${dir.name}", parents: true, overwrite: true)?
+    fs.copy_tree(dir, fp"{base}/{dir.name}", parents: true, overwrite: true)?
   }
 
-  fs.mkdir(fp"${base}/rules")?
+  fs.mkdir(fp"{base}/rules")?
 
   for ruleset in ["base", "evdev"] {
-    fs.write(fp"${base}/rules/${ruleset}", merged_rules(ruleset)?)?
-    let xml = fp"rules/${ruleset}.xml"
+    fs.write(fp"{base}/rules/{ruleset}", merged_rules(ruleset)?)?
+    let xml = fp"rules/{ruleset}.xml"
     let xml_source = if fs.exists(xml)? { xml } else { p"rules/base.xml" }
-    fs.install(xml_source, fp"${base}/rules/${ruleset}.xml", 0o644, parents: true, overwrite: true)?
-    let extras = fp"rules/${ruleset}.extras.xml"
+    fs.install(xml_source, fp"{base}/rules/{ruleset}.xml", 0o644, parents: true, overwrite: true)?
+    let extras = fp"rules/{ruleset}.extras.xml"
     let extras_source = if fs.exists(extras)? { extras } else { p"rules/base.extras.xml" }
-    fs.install(extras_source, fp"${base}/rules/${ruleset}.extras.xml", 0o644, parents: true, overwrite: true)?
-    fs.write(fp"${base}/rules/${ruleset}.lst", "")?
+    fs.install(extras_source, fp"{base}/rules/{ruleset}.extras.xml", 0o644, parents: true, overwrite: true)?
+    fs.write(fp"{base}/rules/{ruleset}.lst", "")?
   }
 
-  fs.install(p"rules/xkb.dtd", fp"${base}/rules/xkb.dtd", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"${dest}/usr/share/X11")?
-  fs.symlink(../xkeyboard-config-2, fp"${dest}/usr/share/X11/xkb")?
-  fs.mkdir(fp"${dest}/usr/share/pkgconfig")?
+  fs.install(p"rules/xkb.dtd", fp"{base}/rules/xkb.dtd", 0o644, parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/usr/share/X11")?
+  fs.symlink(../xkeyboard-config-2, fp"{dest}/usr/share/X11/xkb")?
+  fs.mkdir(fp"{dest}/usr/share/pkgconfig")?
 
   fs.write(
-    fp"${dest}/usr/share/pkgconfig/xkeyboard-config-2.pc",
+    fp"{dest}/usr/share/pkgconfig/xkeyboard-config-2.pc",
     """prefix=/usr
 datadir=\${prefix}/share
 xkb_root=\${datadir}/xkeyboard-config-2
@@ -179,5 +179,5 @@ Version: 2.45
 """,
   )?
 
-  fs.symlink(p"xkeyboard-config-2.pc", fp"${dest}/usr/share/pkgconfig/xkeyboard-config.pc")?
+  fs.symlink(p"xkeyboard-config-2.pc", fp"{dest}/usr/share/pkgconfig/xkeyboard-config.pc")?
 }

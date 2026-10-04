@@ -7,17 +7,17 @@ type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], ent
 
 proc ensure_exists(path_value: Path, label: Str) [fs, error] {
   guard fs.exists(path_value)? else {
-    return Err(ScriptError.Failed("proof-build-essential-native-rootfs", f"missing ${label}: ${path_value}"))?
+    return Err(ScriptError.Failed("proof-build-essential-native-rootfs", f"missing {label}: {path_value}"))?
   }
 }
 
 proc ensure_runtime_artifacts(rootfs: Path, packages: List[Str]) [fs, error] {
-  let path_value = fp"${rootfs}/var/lib/laputa/root.json"
+  let path_value = fp"{rootfs}/var/lib/laputa/root.json"
   let receipt = json.read(path_value)?.require(RootReceipt)?
 
   if receipt.format != "laputa-root-1" or receipt.target != "aarch64-linux-musl" {
     return Err(
-      ScriptError.Failed("proof-build-essential-native-rootfs", f"invalid typed root receipt: ${path_value}"),
+      ScriptError.Failed("proof-build-essential-native-rootfs", f"invalid typed root receipt: {path_value}"),
     )
   }
 
@@ -34,7 +34,7 @@ proc ensure_runtime_artifacts(rootfs: Path, packages: List[Str]) [fs, error] {
       return Err(
         ScriptError.Failed(
           "proof-build-essential-native-rootfs",
-          f"missing ${package} artifact in typed root receipt: ${path_value}",
+          f"missing {package} artifact in typed root receipt: {path_value}",
         ),
       )
     }
@@ -53,10 +53,10 @@ proc main(rootfs = /proof-rootfs) [fs, error] {
     "bison",
     "muon",
   ] {
-    ensure_exists(fp"${rootfs}/usr/bin/${tool}", tool)?
+    ensure_exists(fp"{rootfs}/usr/bin/{tool}", tool)?
   }
 
-  ensure_exists(fp"${rootfs}/boot/vmlinuz", "linux kernel image")?
+  ensure_exists(fp"{rootfs}/boot/vmlinuz", "linux kernel image")?
 
   # Final roots retain the same verified immutable receipt contract as proof
   # roots; no legacy package-manager database is synthesized for validation.

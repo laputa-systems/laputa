@@ -10,11 +10,11 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"${env_value(name, fallback.display())}"
+  fp"{env_value(name, fallback.display())}"
 }
 
 proc env_int(name: Str, fallback: Int) [env, error] -> Result[Int] {
-  env_value(name, f"${fallback}").parse_int()?
+  env_value(name, f"{fallback}").parse_int()?
 }
 
 pure normalize_arch(arch: Str) -> Result[Str] {
@@ -24,11 +24,11 @@ pure normalize_arch(arch: Str) -> Result[Str] {
 
   return arch when arch == "aarch64" or arch == "x86_64"
 
-  Err(InstallerQemuTestError.Failed("arch", f"unsupported installer arch ${arch}"))
+  Err(InstallerQemuTestError.Failed("arch", f"unsupported installer arch {arch}"))
 }
 
 proc command_path(name: Str) [process, error] -> Result[Path] {
-  return fp"${name}" when "/" in name
+  return fp"{name}" when "/" in name
 
   process.which(name)?
 }
@@ -42,7 +42,7 @@ proc ensure_dir(path_value: Path) [fs, error] {
 proc ensure_file(path_value: Path, kind: Str) [fs, error] {
   return when fs.exists(path_value)?
 
-  return Err(InstallerQemuTestError.Failed(kind, f"missing ${path_value}"))
+  return Err(InstallerQemuTestError.Failed(kind, f"missing {path_value}"))
 }
 
 proc remove_tree(path_value: Path) [fs, error] {
@@ -77,11 +77,11 @@ proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [proc
     abort(status.exit_code()?)
   }
 
-  return Err(InstallerQemuTestError.Failed("command", f"${argv[0]} was signaled"))
+  return Err(InstallerQemuTestError.Failed("command", f"{argv[0]} was signaled"))
 }
 
 proc process_live(kill: Path, pid: Int, cwd: Path) [process, error] -> Result[Bool] {
-  let status = process.run(process.command_argv(kill, ["kill", "-0", f"${pid}"], cwd, {}))?
+  let status = process.run(process.command_argv(kill, ["kill", "-0", f"{pid}"], cwd, {}))?
   status.ok
 }
 
@@ -150,7 +150,7 @@ proc wait_for_marker(
       if has_panic(log)? {
         dump_tail(tail, log, 120)?
         terminate_if_live(pid)
-        return Err(InstallerQemuTestError.Failed("qemu", f"${ok} was followed by a kernel panic"))
+        return Err(InstallerQemuTestError.Failed("qemu", f"{ok} was followed by a kernel panic"))
       }
 
       return when keep_running
@@ -162,13 +162,13 @@ proc wait_for_marker(
     if has_line_marker(log, failed)? or has_panic(log)? {
       dump_tail(tail, log, 120)?
       terminate_if_live(pid)
-      return Err(InstallerQemuTestError.Failed("qemu", f"failed while waiting for ${ok}"))
+      return Err(InstallerQemuTestError.Failed("qemu", f"failed while waiting for {ok}"))
     }
 
     if elapsed >= timeout_seconds {
       dump_tail(tail, log, 120)?
       terminate_if_live(pid)
-      return Err(InstallerQemuTestError.Failed("qemu-timeout", f"timed out waiting for ${ok}"))
+      return Err(InstallerQemuTestError.Failed("qemu-timeout", f"timed out waiting for {ok}"))
     }
 
     time.sleep(1s)?
@@ -176,7 +176,7 @@ proc wait_for_marker(
   }
 
   dump_tail(tail, log, 120)?
-  return Err(InstallerQemuTestError.Failed("qemu-exit", f"qemu exited before ${ok}"))
+  return Err(InstallerQemuTestError.Failed("qemu-exit", f"qemu exited before {ok}"))
 }
 
 pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) -> List[Str] {
@@ -184,7 +184,7 @@ pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) 
     "-i",
     ssh_key.display(),
     "-p",
-    f"${port}",
+    f"{port}",
     "-o",
     "BatchMode=yes",
     "-o",
@@ -192,7 +192,7 @@ pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) 
     "-o",
     "StrictHostKeyChecking=no",
     "-o",
-    f"UserKnownHostsFile=${known_hosts}",
+    f"UserKnownHostsFile={known_hosts}",
     "-o",
     "GlobalKnownHostsFile=/dev/null",
     "-o",
@@ -295,9 +295,9 @@ pure qemu_cpu(arch: Str) -> Str {
 }
 
 pure qemu_block_device(arch: Str, drive: Str) -> Str {
-  return f"virtio-blk-pci,drive=${drive}" when arch == "x86_64"
+  return f"virtio-blk-pci,drive={drive}" when arch == "x86_64"
 
-  f"virtio-blk-device,drive=${drive}"
+  f"virtio-blk-device,drive={drive}"
 }
 
 pure qemu_net_device(arch: Str) -> Str {
@@ -325,21 +325,21 @@ pure qemu_accel_args(arch: Str) -> List[Str] {
 }
 
 pure qemu_console_args(log: Path) -> List[Str] {
-  ["-display", "none", "-serial", f"file:${log}", "-monitor", "none"]
+  ["-display", "none", "-serial", f"file:{log}", "-monitor", "none"]
 }
 
 pure installer_cmdline_default(arch: Str) -> Str {
   let console = if arch == "x86_64" { "console=ttyS0 console=tty0" } else { "console=ttyAMA0 console=tty0" }
   let video = if arch == "x86_64" { "vga=normal " } else { "" }
   let loglevel = if arch == "x86_64" { "7" } else { "4" }
-  f"root=PARTUUID=55555555-5555-5555-5555-555555555555 rootfstype=ext4 rootwait rootdelay=2 rw ${console} ${video}loglevel=${loglevel} devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
+  f"root=PARTUUID=55555555-5555-5555-5555-555555555555 rootfstype=ext4 rootwait rootdelay=2 rw {console} {video}loglevel={loglevel} devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 }
 
 pure target_cmdline_default(arch: Str) -> Str {
   let console = if arch == "x86_64" { "console=ttyS0 console=tty0" } else { "console=ttyAMA0 console=tty0" }
   let video = if arch == "x86_64" { "vga=normal " } else { "" }
   let loglevel = if arch == "x86_64" { "7" } else { "4" }
-  f"root=PARTUUID=33333333-3333-3333-3333-333333333333 rootfstype=ext4 rootwait rootdelay=2 rw ${console} ${video}loglevel=${loglevel} devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
+  f"root=PARTUUID=33333333-3333-3333-3333-333333333333 rootfstype=ext4 rootwait rootdelay=2 rw {console} {video}loglevel={loglevel} devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 }
 
 pure qemu_installer_args(
@@ -368,11 +368,11 @@ pure qemu_installer_args(
       "-append",
       installer_cmdline,
       "-drive",
-      f"if=none,id=installer,format=raw,file=${installer_iso}",
+      f"if=none,id=installer,format=raw,file={installer_iso}",
       "-device",
       qemu_block_device(arch, "installer"),
       "-drive",
-      f"if=none,id=target,format=raw,file=${target_image}",
+      f"if=none,id=target,format=raw,file={target_image}",
       "-device",
       qemu_block_device(arch, "target"),
       "-netdev",
@@ -411,11 +411,11 @@ pure qemu_target_args(
       "-append",
       target_cmdline,
       "-drive",
-      f"if=none,id=target,format=raw,file=${target_image}",
+      f"if=none,id=target,format=raw,file={target_image}",
       "-device",
       qemu_block_device(arch, "target"),
       "-netdev",
-      f"user,id=net0,hostfwd=tcp:127.0.0.1:${port}-:22",
+      f"user,id=net0,hostfwd=tcp:127.0.0.1:{port}-:22",
       "-device",
       qemu_net_device(arch),
     ],
@@ -436,7 +436,7 @@ proc clean_build_state(work: Path) [fs, error] {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    remove_tree(fp"${work}/${name}")?
+    remove_tree(fp"{work}/{name}")?
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -448,7 +448,7 @@ proc clean_build_state(work: Path) [fs, error] {
     "pm-out-installer-tools",
     "pm-out-tools",
   ] {
-    let out = fp"${work}/${name}"
+    let out = fp"{work}/{name}"
 
     if fs.exists(out)? {
       for entry in fs.children(out)? {
@@ -466,7 +466,7 @@ proc kernel_source_env(root: Path, arch: Str) [fs, env, error] -> Result[Str] {
   return configured when configured != ""
 
   let local_name = if arch == "x86_64" { "local-linux-x86_64.bzImage" } else { "local-linux-aarch64.Image" }
-  let local_kernel = fp"${root}/target/laputa-installer/${local_name}"
+  let local_kernel = fp"{root}/target/laputa-installer/{local_name}"
 
   return local_kernel.display() when fs.exists(local_kernel)?
 
@@ -518,7 +518,7 @@ proc build_installer(
     }
   }
 
-  run_argv(xsh, ["xsh", fp"${root}/build-installer-common.xsh".display(), "--", arch], root, build_env)?
+  run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)?
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
@@ -528,12 +528,12 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
 
   let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
   let arch = env_value("LAPUTA_INSTALLER_ARCH", "aarch64") |> normalize_arch(_)?
-  let work = env_path("LAPUTA_INSTALLER_WORK", fp"${root}/target/laputa-installer-${arch}-qemu")?
-  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"${work}/laputa-installer-${arch}.iso")?
-  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"${work}/laputa-installer-${arch}.vmlinuz")?
-  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"${work}/laputa-target-128m.img")?
-  let installer_log = env_path("LAPUTA_INSTALLER_QEMU_LOG", fp"${work}/qemu-installer.log")?
-  let target_log = env_path("LAPUTA_TARGET_QEMU_LOG", fp"${work}/qemu-target.log")?
+  let work = env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}-qemu")?
+  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
+  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
+  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-128m.img")?
+  let installer_log = env_path("LAPUTA_INSTALLER_QEMU_LOG", fp"{work}/qemu-installer.log")?
+  let target_log = env_path("LAPUTA_TARGET_QEMU_LOG", fp"{work}/qemu-target.log")?
 
   let installer_cmdline = env_value("LAPUTA_KERNEL_CMDLINE", installer_cmdline_default(arch)) |> env_value(
     "LAPUTA_INSTALLER_KERNEL_CMDLINE",
@@ -558,13 +558,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   let tail = command_path("tail")?
   let xsh = env_path("XSH_HOST", process.which("xsh")?)?
   let target_ssh_port = env_int("LAPUTA_TARGET_SSH_PORT", 10022)?
-  let ssh_key = env_path("LAPUTA_TARGET_SSH_KEY", fp"${work}/qemu-smoke-ed25519")?
-  let ssh_known_hosts = fp"${work}/qemu-smoke-known-hosts"
+  let ssh_key = env_path("LAPUTA_TARGET_SSH_KEY", fp"{work}/qemu-smoke-ed25519")?
+  let ssh_known_hosts = fp"{work}/qemu-smoke-known-hosts"
   let timeout_seconds = env_int("LAPUTA_INSTALLER_QEMU_TIMEOUT", 180)?
   ensure_dir(work)?
   clean_build_state(work)?
   fs.remove(ssh_key, missing_ok: true)?
-  fs.remove(fp"${ssh_key}.pub", missing_ok: true)?
+  fs.remove(fp"{ssh_key}.pub", missing_ok: true)?
   fs.remove(ssh_known_hosts, missing_ok: true)?
 
   run_argv(
@@ -584,7 +584,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     root,
   )?
 
-  build_installer(root, arch, work, installer_iso, installer_kernel, fp"${ssh_key}.pub", xsh)?
+  build_installer(root, arch, work, installer_iso, installer_kernel, fp"{ssh_key}.pub", xsh)?
   ensure_file(installer_iso, "installer-iso")?
   ensure_file(installer_kernel, "installer-kernel")?
   fs.remove(target_image, missing_ok: true)?

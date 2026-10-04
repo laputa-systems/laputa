@@ -5,12 +5,12 @@ use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  let cmake = fp"${rootfs}/usr/bin/cmake"
+  let cmake = fp"{rootfs}/usr/bin/cmake"
   proof.target_elf(rootfs, p"usr/bin/cmake", "cmake")?
   proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")?
   proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")?
 
-  if ! fs.exists(fp"${rootfs}/usr/share/cmake/Modules/CMake.cmake")? {
+  if ! fs.exists(fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake")? {
     Err(ScriptError.Failed("cmake-proof", "missing CMake module tree"))?
   }
 
@@ -19,7 +19,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     return
   }
 
-  let tmp = fp"${rootfs}/var/tmp/proof-cmake"
+  let tmp = fp"{rootfs}/var/tmp/proof-cmake"
   fs.remove(tmp, missing_ok: true)?
   fs.mkdir(tmp)?
   defer fs.remove(tmp, missing_ok: true)?
@@ -29,7 +29,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   # resolving a build dependency through the proof root. It gives CMake the
   # generator capability required for a configure-only package smoke test;
   # `llvm-toolchain` proves compiler execution independently.
-  let proof_samu = fp"${tmp}/proof-samu"
+  let proof_samu = fp"{tmp}/proof-samu"
   fs.write(
     proof_samu,
     """#!/bin/xsh
@@ -43,22 +43,22 @@ main(@args)?
   fs.chmod(proof_samu, 0o755)?
 
   fs.write(
-    fp"${tmp}/CMakeLists.txt",
+    fp"{tmp}/CMakeLists.txt",
     r"""cmake_minimum_required(VERSION 3.13)
 project(laputa_cmake_runtime NONE)
 file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
 """,
   )?
 
-  fs.mkdir(fp"${tmp}/build")?
+  fs.mkdir(fp"{tmp}/build")?
 
-  cd fp"${tmp}/build" {
+  cd fp"{tmp}/build" {
     let cmake_args = [
       cmake.display(),
       "..",
       "-G",
       "Ninja",
-      f"-DCMAKE_MAKE_PROGRAM=${proof_samu}",
+      f"-DCMAKE_MAKE_PROGRAM={proof_samu}",
     ]
 
     let cmake_proc = process.command_argv(cmake_args[0], cmake_args)
@@ -68,8 +68,8 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
       Err(ScriptError.Failed("cmake-proof-configure", "cmake configure failed"))?
     }
 
-    let cache = fs.read_text(fp"${tmp}/build/CMakeCache.txt")?
-    let marker = fs.read_text(fp"${tmp}/build/proof-output.txt")?
+    let cache = fs.read_text(fp"{tmp}/build/CMakeCache.txt")?
+    let marker = fs.read_text(fp"{tmp}/build/proof-output.txt")?
 
     if proof_samu.display() not in cache or marker != "cmake runtime closure\n" {
       Err(ScriptError.Failed("cmake-proof", "configure did not use the isolated runtime proof inputs"))?

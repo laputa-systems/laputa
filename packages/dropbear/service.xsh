@@ -5,10 +5,10 @@ pure restart_policy() -> Record {
 
 pure dropbear_argv(bind: Str, port: Int, host_key: Path) -> List[Str] {
   guard host_key.display() == "" else {
-    return ["dropbear", "-F", "-E", "-p", f"${bind}:${port}", "-r", host_key.display()]
+    return ["dropbear", "-F", "-E", "-p", f"{bind}:{port}", "-r", host_key.display()]
   }
 
-  ["dropbear", "-F", "-E", "-R", "-p", f"${bind}:${port}"]
+  ["dropbear", "-F", "-E", "-R", "-p", f"{bind}:{port}"]
 }
 
 pure dropbear_service(bind: Str, port: Int, host_key: Path) -> Record {

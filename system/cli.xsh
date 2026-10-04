@@ -44,9 +44,9 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs] {
 
   if argv[0] != "plan" and argv[0] != "build" and argv[0] != "test" and argv[0] != "boot" and argv[0] != "clean" {
     return Err(
-      types.LaputaError.Usage(f"""unknown laputa command ${argv[0]}
+      types.LaputaError.Usage(f"""unknown laputa command {argv[0]}
 
-${usage()}"""),
+{usage()}"""),
     )
   }
 
@@ -65,9 +65,9 @@ ${usage()}"""),
 
   if argv.len() < 2 {
     return Err(
-      types.LaputaError.Usage(f"""laputa ${command_name} requires a profile name
+      types.LaputaError.Usage(f"""laputa {command_name} requires a profile name
 
-${usage()}"""),
+{usage()}"""),
     )
   }
 
@@ -80,7 +80,7 @@ ${usage()}"""),
 
     if token == "--jobs" or token == "-j" {
       if (command_name != "build" and command_name != "test" and command_name != "boot") or index + 1 >= argv.len() {
-        return Err(types.LaputaError.Usage(f"invalid ${token} for laputa ${command_name}"))
+        return Err(types.LaputaError.Usage(f"invalid {token} for laputa {command_name}"))
       }
 
       jobs = argv[index + 1].parse_int()?
@@ -91,9 +91,9 @@ ${usage()}"""),
     }
 
     return Err(
-      types.LaputaError.Usage(f"""unexpected argument ${token}
+      types.LaputaError.Usage(f"""unexpected argument {token}
 
-${usage()}"""),
+{usage()}"""),
     )
   }
 
@@ -104,16 +104,16 @@ ${usage()}"""),
 export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
-  let value = profile.load_system_profile(parsed.profile_name, fp"${root}/profiles")?
+  let value = profile.load_system_profile(parsed.profile_name, fp"{root}/profiles")?
 
   match parsed.command {
     LaputaClean => {
-      build.clean(fp"${root}/target/laputa/${value.name}")?
-      print f"laputa clean ${value.name}: ok"
+      build.clean(fp"{root}/target/laputa/{value.name}")?
+      print f"laputa clean {value.name}: ok"
     }
     LaputaPlan => {
       let outputs = build.plan_system_profile(docker.build_config(root, value.name)?, value)?
-      print f"laputa plan ${value.name} ${profile.digest(value)?} ${outputs.build_plan}"
+      print f"laputa plan {value.name} {profile.digest(value)?} {outputs.build_plan}"
     }
     LaputaTest => {
       let outputs = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
@@ -125,7 +125,7 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
     }
     LaputaBuild => {
       let _ = build.build_profile(docker.build_config(root, value.name)?, value, parsed.jobs)?
-      print f"laputa build ${value.name}: ok"
+      print f"laputa build {value.name}: ok"
     }
   }
 }

@@ -106,7 +106,7 @@ export let filetree = [
 proc write_version_header() [fs, error] {
   fs.write(
     p"version.h",
-    f"""#define FCFT_VERSION "${ver}"
+    f"""#define FCFT_VERSION "{ver}"
 """,
   )?
 }
@@ -155,7 +155,7 @@ version = files('version.h')
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
   patch_generated_inputs()?
 

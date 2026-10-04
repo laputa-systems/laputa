@@ -665,7 +665,7 @@ fcobjshash_h = custom_target('fcobjshash.h',
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
   patch_generated_build_inputs()?
 
@@ -687,13 +687,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   } ?
 
   for bin in ["fc-cat", "fc-conflist", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
-    fs.remove(fp"${dest}/usr/bin/${bin}", missing_ok: true)?
+    fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)?
   }
 
   for conf in conf_links {
-    fs.symlink(fp"../../share/fontconfig/conf.avail/${conf}", fp"${dest}/etc/fonts/conf.d/${conf}")?
+    fs.symlink(fp"../../share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")?
   }
 
-  fs.remove(fp"${dest}/usr/share/man", missing_ok: true)?
-  fs.remove(fp"${dest}/usr/share/gettext", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/gettext", missing_ok: true)?
 }

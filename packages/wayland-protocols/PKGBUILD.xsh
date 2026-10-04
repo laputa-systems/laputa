@@ -294,15 +294,15 @@ endif"""
 }
 
 proc prune_x_compat_protocols(root: Path) [fs, error] {
-  fs.remove(fp"${root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)?
-  fs.remove(fp"${root}/usr/share/wayland-protocols/staging/xwayland-shell", missing_ok: true)?
+  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)?
+  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell", missing_ok: true)?
 
   fs.remove(
-    fp"${root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml",
+    fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml",
     missing_ok: true,
   )?
 
-  fs.remove(fp"${root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab", missing_ok: true)?
+  fs.remove(fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab", missing_ok: true)?
 }
 
 ## Package recipe export.

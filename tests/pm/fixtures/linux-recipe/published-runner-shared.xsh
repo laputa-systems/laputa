@@ -3,7 +3,7 @@ use packages.linux.PKGBUILD-shared as linux_shared
 
 proc main() [env, error] {
   let jobs = linux_shared.build_jobs()?
-  print f"linux-kbuild-shared-jobs ${jobs}"
+  print f"linux-kbuild-shared-jobs {jobs}"
 }
 
 main()?

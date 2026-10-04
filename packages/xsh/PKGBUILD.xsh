@@ -110,11 +110,11 @@ export let filetree = [
 const seed_products = ["xsh", "xshi", "xsht", "core.tar.xz"]
 
 proc verified_seed(arch: Str) [fs, error] -> Result[Path] {
-  let seed = fp"seed/${arch}"
-  let manifest_path = fp"${seed}/manifest.json"
+  let seed = fp"seed/{arch}"
+  let manifest_path = fp"{seed}/manifest.json"
 
   if ! fs.exists(manifest_path)? {
-    return Err(XshPackageError.Source(f"the ${arch} XSH seed is missing; run `make seed ARCH=${arch}`"))
+    return Err(XshPackageError.Source(f"the {arch} XSH seed is missing; run `make seed ARCH={arch}`"))
   }
 
   let manifest = json.read(manifest_path)?.require(Record)?
@@ -122,10 +122,10 @@ proc verified_seed(arch: Str) [fs, error] -> Result[Path] {
 
   for product in seed_products {
     let expected: Str = files.get(product)?.require(Str)?
-    let actual = hash.sha256(fp"${seed}/${product}")?.hex()
+    let actual = hash.sha256(fp"{seed}/{product}")?.hex()
 
     if actual != expected {
-      return Err(XshPackageError.Source(f"seed ${product} has sha256 ${actual}, its manifest records ${expected}"))
+      return Err(XshPackageError.Source(f"seed {product} has sha256 {actual}, its manifest records {expected}"))
     }
   }
 
@@ -139,18 +139,18 @@ export proc build(dest: Path) [fs, env, error] {
   let seed = verified_seed(pm_util.target_arch()?)?
 
   for product in ["xsh", "xshi", "xsht"] {
-    fs.install(fp"${seed}/${product}", fp"${dest}/usr/bin/${product}", 0o755, parents: true, overwrite: true)?
+    fs.install(fp"{seed}/{product}", fp"{dest}/usr/bin/{product}", 0o755, parents: true, overwrite: true)?
   }
 
-  let shell = fp"${dest}/usr/bin/sh"
+  let shell = fp"{dest}/usr/bin/sh"
   fs.remove(shell, missing_ok: true)?
   fs.symlink(p"xshi", shell)?
 
-  let core = fp"${dest}/usr/lib/xsh/core"
+  let core = fp"{dest}/usr/lib/xsh/core"
   fs.mkdir(core.parent)?
-  archive.tar_extract(fp"${seed}/core.tar.xz", core.parent, 0, "xz", true)?
+  archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)?
 
   for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {
-    fs.symlink(fp"../lib/xsh/core/${entry.name}", fp"${dest}/usr/bin/${entry.name}")?
+    fs.symlink(fp"../lib/xsh/core/{entry.name}", fp"{dest}/usr/bin/{entry.name}")?
   }
 }

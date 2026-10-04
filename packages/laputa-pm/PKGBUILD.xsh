@@ -46,12 +46,12 @@ export let filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"pm.xsh", fp"${dest}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)?
-  let _ = fs.copy_tree(p"pm", fp"${dest}/usr/lib/pm/pm", parents: true, overwrite: true)?
-  fs.mkdir(fp"${dest}/usr/bin")?
+  fs.install(p"pm.xsh", fp"{dest}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)?
+  let _ = fs.copy_tree(p"pm", fp"{dest}/usr/lib/pm/pm", parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/usr/bin")?
 
   fs.write(
-    fp"${dest}/usr/bin/pm",
+    fp"{dest}/usr/bin/pm",
     """#!/bin/xsh
 error WrapperError = Failed(message: Str)
 
@@ -78,5 +78,5 @@ proc main(...argv: List[Str]) [process, env, error] {
 main(@args)?
 """,
   )?
-  fs.chmod(fp"${dest}/usr/bin/pm", 0o755)?
+  fs.chmod(fp"{dest}/usr/bin/pm", 0o755)?
 }

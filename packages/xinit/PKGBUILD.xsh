@@ -50,8 +50,8 @@ export let filetree = [
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  let xinit = fp"${dest}/usr/bin/xinit"
+  let xinit = fp"{dest}/usr/bin/xinit"
   fs.install(p"xinit.xsh", xinit, 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"xinit", fp"${dest}/usr/bin/init")?
-  fs.symlink(p"usr/bin/xinit", fp"${dest}/init")?
+  fs.symlink(p"xinit", fp"{dest}/usr/bin/init")?
+  fs.symlink(p"usr/bin/xinit", fp"{dest}/init")?
 }

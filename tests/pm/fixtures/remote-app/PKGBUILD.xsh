@@ -27,7 +27,7 @@ export let upstream_sources = [
 export let filetree = [{path: p"usr/share/remote-app/payload.txt", kind: "file"}]
 
 export proc build(dest: Path) [fs, error] -> Result[Unit] {
-  let target = fp"${dest}/usr/share/remote-app/payload.txt"
+  let target = fp"{dest}/usr/share/remote-app/payload.txt"
   fs.mkdir(target.parent)?
   fs.install(p"payload.txt", target, 0o644)?
 }

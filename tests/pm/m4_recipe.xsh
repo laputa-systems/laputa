@@ -3,7 +3,7 @@ proc runner() [fs, process, env, error] -> Result[Path] {
   let configured = (env.get("XSH_HOST") ?? "").trim()
 
   if configured != "" {
-    let selected = fp"${configured}"
+    let selected = fp"{configured}"
 
     return selected when selected.exists()?
   }
@@ -13,15 +13,15 @@ proc runner() [fs, process, env, error] -> Result[Path] {
 
 test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "m4-proof-file-operand")?
-  let m4 = fp"${root}/usr/bin/m4"
-  let stderr = fp"${root}/proof.stderr"
+  let m4 = fp"{root}/usr/bin/m4"
+  let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
   fs.mkdir(m4.parent)?
 
   # The proof invokes the staged runner as an executable.  Its shebang points
   # at this host test runner solely so the behavior can be checked without a
   # target rootfs; the package payload still ships `#!/bin/xsh`.
-  let staged = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
+  let staged = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!{xsh}")
   fs.write(m4, staged)?
   fs.chmod(m4, 0o755)?
 
@@ -39,26 +39,26 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
 
 test test_bison_stack_proof_passes_the_generated_m4_file_operand [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "bison-stack-m4-operand")?
-  let stderr = fp"${root}/proof.stderr"
+  let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
-  fs.mkdir(fp"${root}/usr/bin")?
+  fs.mkdir(fp"{root}/usr/bin")?
 
-  let m4 = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
-  fs.write(fp"${root}/usr/bin/m4", m4)?
+  let m4 = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!{xsh}")
+  fs.write(fp"{root}/usr/bin/m4", m4)?
   fs.write(
-    fp"${root}/usr/bin/flex",
-    f"""#!${xsh}
+    fp"{root}/usr/bin/flex",
+    f"""#!{xsh}
 print "flex 2.6 fixture"
 """,
   )?
   fs.write(
-    fp"${root}/usr/bin/bison",
-    f"""#!${xsh}
+    fp"{root}/usr/bin/bison",
+    f"""#!{xsh}
 print "GNU Bison fixture"
 """,
   )?
   for tool in ["m4", "flex", "bison"] {
-    fs.chmod(fp"${root}/usr/bin/${tool}", 0o755)?
+    fs.chmod(fp"{root}/usr/bin/{tool}", 0o755)?
   }
 
   let status = process.run(

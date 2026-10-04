@@ -13,7 +13,7 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/bin/cat", kind: "file"}]
 
 export proc build(dest: Path) [fs, error] -> Result[Unit] {
-  let target = fp"${dest}/usr/bin/cat"
+  let target = fp"{dest}/usr/bin/cat"
   fs.mkdir(target.parent)?
 
   fs.write(

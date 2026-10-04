@@ -301,7 +301,7 @@ export let filetree = [
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
-  let jobs_flag = f"-j${make.jobs()?}"
+  let jobs_flag = f"-j{make.jobs()?}"
   let target_root = env.get("LAPUTA_ROOT") ?? "/"
 
   var cmake_args = [
@@ -325,10 +325,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   if target_root != "" and target_root != "/" {
     cmake_args = cmake_args.extend(
       [
-        f"-DZLIB_LIBRARY=${target_root}/usr/lib/libz.so",
-        f"-DZLIB_INCLUDE_DIR=${target_root}/usr/include",
-        f"-DPNG_LIBRARY=${target_root}/usr/lib/libpng.so",
-        f"-DPNG_PNG_INCLUDE_DIR=${target_root}/usr/include",
+        f"-DZLIB_LIBRARY={target_root}/usr/lib/libz.so",
+        f"-DZLIB_INCLUDE_DIR={target_root}/usr/include",
+        f"-DPNG_LIBRARY={target_root}/usr/lib/libpng.so",
+        f"-DPNG_PNG_INCLUDE_DIR={target_root}/usr/include",
       ],
     )
   }
@@ -344,6 +344,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   } ?
 
-  fs.remove(fp"${dest}/usr/share/aclocal", missing_ok: true)?
-  fs.remove(fp"${dest}/usr/share/man", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/aclocal", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
 }
