@@ -9,10 +9,10 @@ export const name = "wpa_supplicant"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "2.11"
+export const ver = "2.12"
 
 ## Package recipe export.
-export const rel = "5"
+export const rel = "1"
 
 # Internal TLS/crypto — no openssl needed.
 # The nl80211 driver unconditionally includes <netlink/genl/genl.h>, so libnl3
@@ -29,7 +29,7 @@ export const runtime_only_deps = ["xinit"]
 ## Package recipe export.
 export const upstream_sources = [
   {
-    source: p"https://w1.fi/releases/wpa_supplicant-2.11.tar.gz",
+    source: p"https://w1.fi/releases/wpa_supplicant-2.12.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -37,7 +37,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "912ea06f74e30a8e36fbb68064d6cdff218d8d591db0fc5d75dee6c81ac7fc0a",
+        sha256: "08e23937e16d0155e55cab2b51f51fbe10d80a1aa91c4e15442645059b737ef6",
       },
     ],
   },
@@ -116,7 +116,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
 
-  # Flags mirror wpa_supplicant's defconfig: no IPv6, no D-Bus, no readline.
   var cflags = ["-O2", "-Wall", "-ffunction-sections", "-fdata-sections"]
 
   var includes = [
@@ -130,136 +129,112 @@ export proc build(dest: Path) [fs, process, env, error] {
     "/usr/include",
   ]
 
+  # The defines upstream's Makefile derives from the `config` file, as printed
+  # by `make -n V=1`. CONFIG_SME, CONFIG_WNM, and CONFIG_BGSCAN follow from the
+  # nl80211 driver and bgscan_simple; CONFIG_DEBUG_SYSLOG_FACILITY becomes
+  # LOG_HOSTAPD.
   var defs = [
+    "-DCONFIG_BACKEND_FILE",
+    "-DCONFIG_BGSCAN",
+    "-DCONFIG_BGSCAN_SIMPLE",
+    "-DCONFIG_CRYPTO_INTERNAL",
     "-DCONFIG_CTRL_IFACE",
     "-DCONFIG_CTRL_IFACE_UNIX",
-    "-DCONFIG_BACKEND_FILE",
-    "-DCONFIG_DRIVER_NL80211",
-    "-DCONFIG_IEEE80211W",
-    "-DCONFIG_BGSCAN_SIMPLE",
-    "-DCONFIG_GETRANDOM",
     "-DCONFIG_DEBUG_SYSLOG",
-    "-DCONFIG_WPA_CLI_EDIT",
+    "-DCONFIG_DRIVER_NL80211",
+    "-DCONFIG_GETRANDOM",
     "-DCONFIG_INTERNAL_LIBTOMMATH",
-    "-DCONFIG_CRYPTO_INTERNAL",
-    "-DCONFIG_LIBNL32",
+    "-DCONFIG_INTERNAL_SHA384",
+    "-DCONFIG_INTERNAL_SHA512",
+    "-DCONFIG_SHA256",
+    "-DCONFIG_SME",
+    "-DCONFIG_WNM",
+    "-DLOG_HOSTAPD=LOG_DAEMON",
   ]
 
   var ldflags = ["-L", "/usr/lib", "-lnl-3", "-lnl-genl-3", "-Wl,--gc-sections"]
 
-  # The set of .c files needed for a minimal WPA2-PSK + SAE build with internal
-  # TLS/crypto.  Each entry is a path relative to the source root.
-  # Source files for a minimal WPA2-PSK + SAE build.  Each entry is a path
-  # relative to the source root.  The set mirrors what CONFIG_TLS=internal,
-  # CONFIG_DRIVER_NL80211, CONFIG_SAE, and CONFIG_CTRL_IFACE bring in.
-  # sae_pk.c is excluded (requires CONFIG_SAE_PK).  tdls.c, preauth.c,
-  # peerkey.c, wpa_ft.c are excluded (require additional config).
+  # Every object upstream's wpa_supplicant/Makefile builds for wpa_supplicant,
+  # wpa_cli, and wpa_passphrase from the `config` file (all but their main
+  # files), as listed by `make -n V=1 wpa_supplicant wpa_cli wpa_passphrase`
+  # run in wpa_supplicant/ with that file as .config. No EAP method needs TLS,
+  # so upstream links tls_none rather than the internal TLS client.
   let shared_sources = [
-    p"src/utils/os_unix.c",
-    p"src/utils/eloop.c",
+    p"src/utils/base64.c",
+    p"src/utils/bitfield.c",
     p"src/utils/common.c",
     p"src/utils/config.c",
-    p"src/utils/wpa_debug.c",
-    p"src/utils/wpabuf.c",
-    p"src/utils/bitfield.c",
-    p"src/utils/ip_addr.c",
     p"src/utils/crc32.c",
     p"src/utils/edit.c",
+    p"src/utils/eloop.c",
+    p"src/utils/ip_addr.c",
+    p"src/utils/os_unix.c",
     p"src/utils/radiotap.c",
-    p"src/utils/base64.c",
-    p"src/utils/json.c",
-    p"src/utils/uuid.c",
-    p"src/common/wpa_common.c",
-    p"src/common/ctrl_iface_common.c",
-    p"src/common/ptksa_cache.c",
+    p"src/utils/wpa_debug.c",
+    p"src/utils/wpabuf.c",
     p"src/common/cli.c",
-    p"src/common/wpa_ctrl.c",
-    p"src/common/ieee802_11_common.c",
+    p"src/common/ctrl_iface_common.c",
     p"src/common/hw_features_common.c",
-    p"src/crypto/aes-wrap.c",
-    p"src/crypto/aes-ccm.c",
-    p"src/crypto/aes-ctr.c",
-    p"src/crypto/aes-gcm.c",
+    p"src/common/ieee802_11_common.c",
+    p"src/common/ptksa_cache.c",
+    p"src/common/wpa_common.c",
+    p"src/common/wpa_ctrl.c",
+    p"src/crypto/aes-internal-dec.c",
+    p"src/crypto/aes-internal-enc.c",
+    p"src/crypto/aes-internal.c",
     p"src/crypto/aes-omac1.c",
-    p"src/crypto/aes-siv.c",
     p"src/crypto/aes-unwrap.c",
     p"src/crypto/crypto_internal.c",
-    p"src/crypto/crypto_internal-cipher.c",
-    p"src/crypto/crypto_internal-modexp.c",
-    p"src/crypto/crypto_internal-rsa.c",
-    p"src/crypto/dh_group5.c",
-    p"src/crypto/dh_groups.c",
-    p"src/crypto/md5.c",
     p"src/crypto/md5-internal.c",
-    p"src/crypto/ms_funcs.c",
-    p"src/crypto/sha1.c",
-    p"src/crypto/sha1-internal.c",
-    p"src/crypto/sha256.c",
-    p"src/crypto/sha256-internal.c",
-    p"src/crypto/sha384.c",
-    p"src/crypto/sha384-internal.c",
-    p"src/crypto/sha512.c",
-    p"src/crypto/sha512-internal.c",
-    p"src/crypto/sha1-prf.c",
-    p"src/crypto/sha1-tlsprf.c",
-    p"src/crypto/sha256-prf.c",
-    p"src/crypto/sha1-pbkdf2.c",
-    p"src/crypto/tls_internal.c",
-    p"src/crypto/des-internal.c",
-    p"src/crypto/md4-internal.c",
+    p"src/crypto/md5.c",
     p"src/crypto/random.c",
     p"src/crypto/rc4.c",
-    p"src/crypto/aes-internal.c",
-    p"src/crypto/aes-internal-enc.c",
-    p"src/crypto/aes-internal-dec.c",
-    p"src/tls/asn1.c",
-    p"src/tls/bignum.c",
-    p"src/tls/pkcs1.c",
-    p"src/tls/pkcs5.c",
-    p"src/tls/pkcs8.c",
-    p"src/tls/rsa.c",
-    p"src/tls/tlsv1_client.c",
-    p"src/tls/tlsv1_client_read.c",
-    p"src/tls/tlsv1_client_ocsp.c",
-    p"src/tls/tlsv1_client_write.c",
-    p"src/tls/tlsv1_common.c",
-    p"src/tls/tlsv1_cred.c",
-    p"src/tls/tlsv1_record.c",
-    p"src/tls/tlsv1_server.c",
-    p"src/tls/tlsv1_server_read.c",
-    p"src/tls/tlsv1_server_write.c",
-    p"src/tls/x509v3.c",
+    p"src/crypto/sha1-internal.c",
+    p"src/crypto/sha1-pbkdf2.c",
+    p"src/crypto/sha1-prf.c",
+    p"src/crypto/sha1.c",
+    p"src/crypto/sha256-internal.c",
+    p"src/crypto/sha256-prf.c",
+    p"src/crypto/sha256.c",
+    p"src/crypto/sha384-internal.c",
+    p"src/crypto/sha512-internal.c",
+    p"src/crypto/tls_none.c",
+    p"src/rsn_supp/pmksa_cache.c",
+    p"src/rsn_supp/preauth.c",
     p"src/rsn_supp/wpa.c",
     p"src/rsn_supp/wpa_ie.c",
-    p"src/rsn_supp/pmksa_cache.c",
+    p"src/drivers/driver_common.c",
     p"src/drivers/driver_nl80211.c",
     p"src/drivers/driver_nl80211_capa.c",
     p"src/drivers/driver_nl80211_event.c",
+    p"src/drivers/driver_nl80211_monitor.c",
     p"src/drivers/driver_nl80211_scan.c",
     p"src/drivers/drivers.c",
-    p"src/drivers/netlink.c",
-    p"src/drivers/driver_common.c",
-    p"src/drivers/driver_nl80211_monitor.c",
     p"src/drivers/linux_ioctl.c",
+    p"src/drivers/netlink.c",
     p"src/drivers/rfkill.c",
     p"src/l2_packet/l2_packet_linux.c",
-    p"wpa_supplicant/config.c",
-    p"wpa_supplicant/config_file.c",
+    p"wpa_supplicant/bgscan.c",
+    p"wpa_supplicant/bgscan_simple.c",
     p"wpa_supplicant/bss.c",
     p"wpa_supplicant/bssid_ignore.c",
-    p"wpa_supplicant/events.c",
-    p"wpa_supplicant/notify.c",
-    p"wpa_supplicant/wmm_ac.c",
-    p"wpa_supplicant/rrm.c",
-    p"wpa_supplicant/robust_av.c",
-    p"wpa_supplicant/op_classes.c",
-    p"wpa_supplicant/wpas_glue.c",
-    p"wpa_supplicant/offchannel.c",
-    p"wpa_supplicant/wpa_supplicant.c",
-    p"wpa_supplicant/eap_register.c",
+    p"wpa_supplicant/config.c",
+    p"wpa_supplicant/config_file.c",
     p"wpa_supplicant/ctrl_iface.c",
     p"wpa_supplicant/ctrl_iface_unix.c",
+    p"wpa_supplicant/eap_register.c",
+    p"wpa_supplicant/events.c",
+    p"wpa_supplicant/notify.c",
+    p"wpa_supplicant/op_classes.c",
+    p"wpa_supplicant/robust_av.c",
+    p"wpa_supplicant/rrm.c",
     p"wpa_supplicant/scan.c",
+    p"wpa_supplicant/sme.c",
+    p"wpa_supplicant/twt.c",
+    p"wpa_supplicant/wmm_ac.c",
+    p"wpa_supplicant/wnm_sta.c",
+    p"wpa_supplicant/wpa_supplicant.c",
+    p"wpa_supplicant/wpas_glue.c",
   ]
 
   let shared = make.c_static_library({

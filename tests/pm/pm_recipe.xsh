@@ -173,19 +173,10 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   test.ok(status.ok, fs.read_text(stderr_path)?)?
 }
 
-test test_wpa_proof_runs_binary_with_composed_libraries [fs, process, env, error] { |ctx|
-  guard system.uname()?.sysname == "Linux" else {
-    test.skip("the WPA proof runs a Linux executable")
-    return
-  }
-
-  let root = test.temp_dir(ctx, name: "wpa-proof-root")?
-  let xsh = process.which("xsh")?
-  let bin = fp"{root}/usr/bin/wpa_supplicant"
-  fs.mkdir(fp"{root}/usr/bin")?
-  fs.mkdir(fp"{root}/usr/lib/xinit/services")?
-  fs.mkdir(fp"{root}/etc/wpa_supplicant")?
-  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")?
+# A stand-in executable that prints `output` only when run against the proof
+# root's libraries, and aborts otherwise.
+proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) [fs, error] {
+  let bin = fp"{root}/usr/bin/{name}"
   fs.write(
     bin,
     f"""#!{xsh}
@@ -193,17 +184,30 @@ proc main(...argv: List[Str]) [env, error] {{
   if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("{root}/usr/lib") {{
     abort(3)
   }}
+  print "{output}"
 }}
 main(@args)?
 """,
   )?
   fs.chmod(bin, 0o755)?
+}
+
+type WpaProofRun = {ok: Bool, stderr: Str}
+
+proc run_wpa_proof(ctx: TestContext, name: Str, psk: Str) [fs, process, env, error] -> Result[WpaProofRun] {
+  let root = test.temp_dir(ctx, name:)?
+  let xsh = process.which("xsh")?
+  fs.mkdir(fp"{root}/usr/bin")?
+  fs.mkdir(fp"{root}/usr/lib/xinit/services")?
+  fs.mkdir(fp"{root}/etc/wpa_supplicant")?
+  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")?
+  write_wpa_tool(xsh, root, "wpa_supplicant", "wpa_supplicant v2.12")?
+  write_wpa_tool(xsh, root, "wpa_passphrase", f"psk={psk}")?
   fs.write(fp"{root}/usr/bin/wpa_cli", "")?
-  fs.write(fp"{root}/usr/bin/wpa_passphrase", "")?
   fs.write(fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")?
   fs.write(fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf", "")?
   fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
-  let stderr_path = test.temp_path(ctx, name: "wpa-proof-stderr")
+  let stderr_path = test.temp_path(ctx, name: f"{name}-stderr")
   let status = process.run(
     process.command_argv(
       xsh,
@@ -213,7 +217,21 @@ main(@args)?
       stderr: stderr_path,
     ),
   )?
-  test.ok(status.ok, fs.read_text(stderr_path)?)?
+  {ok: status.ok, stderr: fs.read_text(stderr_path)?}
+}
+
+test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, error] { |ctx|
+  guard system.uname()?.sysname == "Linux" else {
+    test.skip("the WPA proof runs a Linux executable")
+    return
+  }
+
+  let good = run_wpa_proof(ctx, "wpa-proof-good", "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e")?
+  test.ok(good.ok, good.stderr)?
+
+  let bad = run_wpa_proof(ctx, "wpa-proof-bad-psk", "00")?
+  assert ! bad.ok
+  assert "wrong PSK" in bad.stderr
 }
 
 proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) [fs, error] -> Result[Path] {
