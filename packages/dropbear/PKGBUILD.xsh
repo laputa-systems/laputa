@@ -8,10 +8,10 @@ export const name = "dropbear"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2025.89"
+export const ver = "2026.94"
 
 ## Exported declaration `rel`.
-export const rel = "16"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "zlib"]
@@ -22,11 +22,10 @@ export const mkdeps_host = ["llvm-toolchain"]
 ## The build installs an xinit service module; xinit runs it at runtime.
 export const runtime_only_deps = ["xinit"]
 
-# Source is a git commit (no VERSION substitution needed).
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
-    source: p"https://github.com/mkj/dropbear/archive/f5d44406ef2952ca69a68d59c6b0f7f0ff777305.tar.gz",
+    source: p"https://matt.ucc.asn.au/dropbear/releases/dropbear-VERSION.tar.bz2",
     kind: "auto",
     architectures: [
       "all",
@@ -34,7 +33,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "ca55783baa7a67e57de4c234d43711349b7b3f8c17b15a04fd58a6e88700572c",
+        sha256: "e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81",
       },
     ],
   },
@@ -88,6 +87,10 @@ proc write_config_h() [fs, error] {
 #define DISABLE_UTMPX 1
 #define DISABLE_WTMP 1
 #define DISABLE_WTMPX 1
+
+/* configure's default: no external public-key auth plugin (the option is now
+   --enable-plugin-deprecated). */
+#define DROPBEAR_PLUGIN 0
 
 #define STDC_HEADERS 1
 #define HAVE_BASENAME 1
@@ -187,11 +190,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   # Feature overrides: disable password auth (no libcrypt in musl), drop-privs
-  # (setresgid misdetected by configure tests), and local stream fwd
-  # (requires either drop-privs or non-multiuser — we have neither).
+  # (setresgid misdetected by configure tests), and local and remote stream
+  # forwarding, which need either drop-privs or non-multiuser (we have
+  # neither). sysoptions.h checks only the local option, but the remote one
+  # binds a Unix socket for the user and needs the same privilege drop.
   let local_opts = """#define DROPBEAR_SVR_PASSWORD_AUTH 0
 #define DROPBEAR_SVR_DROP_PRIVS 0
 #define DROPBEAR_SVR_LOCALSTREAMFWD 0
+#define DROPBEAR_SVR_REMOTESTREAMFWD 0
 """
 
   fs.write(p"localoptions.h", local_opts)?
@@ -235,6 +241,7 @@ Local customisation goes in localoptions.h
     "ed25519",
     "sk-ed25519",
     "dbmalloc",
+    "dbctype",
     "gensignkey",
     "gendss",
     "genrsa",
@@ -282,7 +289,9 @@ Local customisation goes in localoptions.h
     "svr-agentfwd",
     "svr-main",
     "svr-x11fwd",
+    "svr-forward",
     "svr-tcpfwd",
+    "svr-streamfwd",
     "svr-authpam",
   ]
 
