@@ -314,6 +314,20 @@ laputa/
   - drop dead `XSH_PM_BUILD_CHROOT` and chroot leftovers;
   - measure plan and build time before and after on a fixed package set.
 
+**Phase 1 follow-up (before Phase 2): runtime-only dependencies.**
+- Today `deps` are installed into every build root with their runtime
+  closure, so they are part of the key. That is correct for real build
+  inputs (musl, zlib for dropbear).
+- Add a recipe field for runtime-only dependencies that are never installed
+  into the build root and do not enter the key. Examples: tailscale →
+  iptables/xinit/xsh, foot → font-ttf-hack, laputa-fs/laputa-pm/xinit → xsh,
+  alsa-ucm-conf → alsa-lib.
+- That way a new `xsh` package (a new seed) rebuilds only `xsh`, not its
+  runtime dependents.
+- Root composition still installs runtime-only dependencies.
+- Also: the `xsh` package's key must change when the seed bytes change; a
+  local `SKIP` source must not hide them.
+
 **Phase 2, integrator: first local bootstrap on macOS.**
 1. `make clean`, then `fetch`, then `seed`, then `mirror`.
 2. `make build STOP=pre-cmake` in arm64 Docker with `--network none`,
