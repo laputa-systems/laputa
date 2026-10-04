@@ -8,10 +8,10 @@ export const name = "muon"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.5.0"
+export const ver = "0.7.0"
 
 ## Package recipe export.
-export const rel = "10"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "565c1b6e1e58f7e90d8813fda0e2102df69fb493ddab4cf6a84ce3647466bee5",
+        sha256: "e7095741dc11338f5ed8e0aa02e993fc34df4295dad4296127bbb212bcf56e07",
       },
     ],
   },
@@ -38,6 +38,24 @@ export const upstream_sources = [
 
 ## Package recipe export.
 export const filetree = [{path: p"usr/bin/muon", kind: "binary"}]
+
+error MuonError = Patch(message: Str)
+
+# Musl provides realtime interfaces in libc, and its librt.so is a symlink to
+# libc.so, which has no SONAME. muon resolves find_library() to that file's
+# path, so linking it would record the build root's librt.so path as a
+# DT_NEEDED entry that no runtime root can satisfy.
+proc patch_realtime_dependency() [fs, error] {
+  let meson = p"src/platform/meson.build"
+  let text = fs.read_text(meson)?
+  let lookup = "    librt = cc.find_library('rt', required: false)\n"
+
+  if lookup not in text {
+    return Err(MuonError.Patch(f"{meson} no longer looks up librt"))?
+  }
+
+  fs.write(meson, text.replace(lookup, "    librt = declare_dependency()\n"))?
+}
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
@@ -52,6 +70,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }
 
+  patch_realtime_dependency()?
   fs.mkdir(p"build")?
 
   if cross_build {
@@ -72,6 +91,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-Dlibpkgconf=disabled",
     "-Dsamurai=enabled",
     "-Dtracy=disabled",
+    "-Dnative_backtrace=disabled",
+    "-Ddocs=disabled",
     "-Dman-pages=disabled",
     "-Dmeson-docs=disabled",
     "-Dmeson-tests=disabled",
