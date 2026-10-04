@@ -126,7 +126,7 @@ laputa/
   profiles/ guest/ boot/ installer/
   xinit/              xinit.xsh, tests, docs          (xinit/*)
   mirror/             Rust mirror server, host tool   (mirror/*)
-  seed/               seed.lock and seed scripts
+  seed/               seed scripts
   tests/ docs/ tools/
   .out/               ALL derived state (gitignored)
   .cache/             fetched inputs: sources by sha256, seed artifacts, saved images (gitignored)
@@ -134,8 +134,8 @@ laputa/
 
 - The `xinit` and `laputa-*` recipes take their sources from the tree, through
   `repository/` sources, instead of from GitHub.
-- `xsh` stays its own repo at `XSH_ROOT ?= ../xsh`. The seed is built from a
-  pinned commit of it (decision D2).
+- `xsh` stays its own repo at `XSH_ROOT ?= ../xsh`. The seed is built from
+  the current checkout (D2).
 
 ### Make targets
 
@@ -158,8 +158,9 @@ laputa/
   It never contacts the Laputa mirror.
 - **`make seed`:**
   - builds static musl `xsh`/`xshi`/`xsht` and the core tarball from
-    `XSH_ROOT` at the commit pinned in `seed/seed.lock`, in xsh's
-    `Dockerfile.test` image with the release profile;
+    the current `XSH_ROOT` checkout, in xsh's `Dockerfile.test` image with
+    the release profile. It is incremental, so it rebuilds only when xsh
+    changed;
   - builds the package-tools image from local inputs only (no GitHub `ADD`),
     or loads it from the saved tar.
 - **`make mirror`:**
@@ -183,10 +184,11 @@ laputa/
   string and checksum as today, so moving to the local mirror changes no key.
 - **No remote mirror default** and no `.env` reading. Publishing to
   `http://127.0.0.1` local mode needs no token.
-- **Executor identity per decision D2:** artifacts key on the pinned seed
-  xsh, not the host's dev xsh build. The PM identity covers only the modules
-  that affect build outputs; changes to the PM CLI, plan or remote code
-  rebuild nothing. `BUILD_EPOCH` is the explicit way to invalidate.
+- **Executor identity per D2:**
+  - xsh and the PM code are recorded, not keyed;
+  - keys hash build-dependency keys only, so a runtime dependency that is
+    rebuilt does not cascade;
+  - `BUILD_EPOCH` is the explicit way to invalidate.
 - **Hash each payload once per process.** Trust store entries whose
   directory key was verified when they were committed; plan validation runs
   once per build, not per node.
@@ -291,19 +293,22 @@ laputa/
 - **C. Seed and container** (`seed/`, `Dockerfile.package-tools`,
   `system/docker.xsh`, `bootstrap-llvm-seed.xsh`, recipes `xsh`, `xinit`,
   `llvm-toolchain`, `laputa-*`):
-  - `seed.lock`;
   - `make seed`;
   - a package-tools image built from `.cache` with no network;
   - the xsh recipe packaged from the seed build;
   - in-tree xinit;
   - pass `XSH_PM_BUILD_ROOT` to recipes;
-  - fix the update-xsh and `XSH_RELEASE` build-arg bugs, or replace them with
-    `seed.lock`;
+  - delete `update-xsh.xsh` and the `XSH_RELEASE` pins (no release pins remain);
   - replace named volumes with paths that `make clean` owns.
 - **D. PM build speed and identity** (`pm/plan.xsh`, `execute.xsh`,
   `store.xsh`, `fingerprint.xsh`, `build.xsh`):
-  - the D2 executor identity, checked at build time against `plan.executor`;
+  - the D2 key: drop xsh, PM and core from artifact keys, and record them in
+    artifact metadata instead;
+  - hash only build-dependency (`mkdeps`) keys;
   - `BUILD_EPOCH`;
+  - prove it with tests: an xsh rebuild, or an edit to PM's CLI, changes no
+    keys, and a `BUILD_EPOCH` or `rel` bump changes exactly the expected
+    keys;
   - hash once;
   - unpack once;
   - drop dead `XSH_PM_BUILD_CHROOT` and chroot leftovers;
@@ -347,13 +352,18 @@ laputa/
   - Everything after that runs with `--network none` against the local
     mirror.
   - Nothing ever contacts `laputa.17166969.xyz`.
-- **D2. The seed xsh is built locally, never taken from a published
-  release.**
-  - `seed/seed.lock` pins an `../xsh` commit, and `make seed` builds it.
-  - Artifact keys track that seed. Everyday xsh edits do not rebuild the
-    distro; `make seed-bump` does, deliberately.
-  - The PM identity covers only the modules that affect build outputs, and
-    `BUILD_EPOCH` invalidates explicitly.
+- **D2. The seed xsh is built locally,** never taken from a published release.
+  xsh changes do not rebuild the world (revised 2026-10-03; development
+  speed comes first).
+  - `make seed` builds the current `../xsh` checkout. There is no pin and no
+    `seed.lock`.
+  - Artifact keys exclude the build-time xsh and the PM code. A key covers
+    the target, the recipe and its sources, the keys of its build
+    dependencies (`mkdeps`, not runtime `deps`), and a global `BUILD_EPOCH`.
+  - Each artifact's metadata records which xsh and PM revision built it, for
+    provenance; that record is not part of the key.
+  - To force rebuilds, bump `BUILD_EPOCH` (all packages) or a recipe's `rel`
+    (one package).
 - **D3. Keep the pinned prebuilt LLVM 23.1.0-rc2 seed,** cached by
   `make fetch`. LLVM from source is out of scope.
 - **D4. Fresh import:** the files of `packages`, `mirror` and `xinit` are
