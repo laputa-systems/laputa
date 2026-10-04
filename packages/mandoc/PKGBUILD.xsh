@@ -171,10 +171,9 @@ main manpath mdoc_man mdoc_markdown out tree
 
 const soelim_stems = ["compat_progname", "compat_stringlist", "soelim"]
 
-# Pages from upstream's base-install, as (source, installed path). Linux
-# man-pages owns man7/man.7, the Linux manual's description of the man macro
-# package, so mandoc's man(7) installs under the name its configure knob
-# MANM_MAN selects for that case.
+# Pages from upstream's base-install, as (source, installed path). mandoc
+# owns man7/man.7: Linux man-pages' page of that name only sources groff's
+# groff_man(7), so the man-pages recipe leaves it out.
 const manuals = [
   ["mandoc.1", "man1/mandoc.1"],
   ["demandoc.1", "man1/demandoc.1"],
@@ -183,7 +182,7 @@ const manuals = [
   ["apropos.1", "man1/apropos.1"],
   ["man.conf.5", "man5/man.conf.5"],
   ["mandoc.db.5", "man5/mandoc.db.5"],
-  ["man.7", "man7/mandoc_man.7"],
+  ["man.7", "man7/man.7"],
   ["mdoc.7", "man7/mdoc.7"],
   ["roff.7", "man7/roff.7"],
   ["eqn.7", "man7/eqn.7"],
