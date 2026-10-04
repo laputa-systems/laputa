@@ -169,49 +169,78 @@ pure plan_compare_lex(left: Str, right: Str) -> Int {
   1
 }
 
-pure plan_version_parts(value: Str) -> List[Str] {
-  value.replace("-", ".").replace("_", ".").replace("+", ".").split(".")
+# One run of a version string: digits or letters, and whether a separator
+# (`.`, `-`, `_`, `+`) came right before it.
+type VersionRun = {text: Str, numeric: Bool, separated: Bool}
+
+pure plan_version_runs(value: Str) -> List[VersionRun] {
+  var runs: List[VersionRun] = []
+  var separated = false
+
+  for found in rx"[0-9]+|[A-Za-z]+|[^0-9A-Za-z]+".find(value) {
+    let text = found.text
+
+    if rx"^[^0-9A-Za-z]+$".matches(text) {
+      separated = true
+      continue
+    }
+
+    runs += [{text, numeric: rx"^[0-9]+$".matches(text), separated: separated or runs.len() == 0}]
+    separated = false
+  }
+
+  runs
 }
 
-pure plan_compare_version_part(left: Str, right: Str) -> Int {
-  let left_num = left.parse_int() ?? -1
-  let right_num = right.parse_int() ?? -1
-  let left_is_num = f"{left_num}" == left
-  let right_is_num = f"{right_num}" == right
-
-  if left_is_num and right_is_num {
-    if left_num < right_num {
-      return -1
-    }
-
-    if left_num > right_num {
-      return 1
-    }
-
+pure plan_compare_version_run(left: VersionRun, right: VersionRun) -> Int {
+  if left.numeric and right.numeric {
+    let left_num = left.text.parse_int() ?? 0
+    let right_num = right.text.parse_int() ?? 0
+    return -1 when left_num < right_num
+    return 1 when left_num > right_num
     return 0
   }
 
-  plan_compare_lex(left, right)
+  # A digit run outranks a letter run: `3.7c` is newer than `next-3.7`.
+  return 1 when left.numeric
+  return -1 when right.numeric
+
+  plan_compare_lex(left.text, right.text)
+}
+
+# Versions compare run by run, as rpm and apk order them. When one runs out,
+# the longer is newer (`3.7c` after `3.7`), unless its next run is letters
+# after a separator, which marks a pre-release (`23.1.0-rc2` before `23.1.0`).
+pure plan_compare_version(left: Str, right: Str) -> Int {
+  let left_runs = plan_version_runs(left)
+  let right_runs = plan_version_runs(right)
+  var index = 0
+
+  while index < left_runs.len() and index < right_runs.len() {
+    let result = plan_compare_version_run(left_runs[index], right_runs[index])
+    return result when result != 0
+    index += 1
+  }
+
+  return 0 when left_runs.len() == right_runs.len()
+
+  if index < left_runs.len() {
+    let next = left_runs[index]
+    return -1 when ! next.numeric and next.separated
+    return 1
+  }
+
+  let next = right_runs[index]
+  return 1 when ! next.numeric and next.separated
+  -1
 }
 
 ## Orders two ver-rel tuples: negative when the left is older, zero when equal.
 export pure plan_compare_version_release(left_ver: Str, left_rel: Str, right_ver: Str, right_rel: Str) -> Int {
-  let left_parts = plan_version_parts(left_ver)
-  let right_parts = plan_version_parts(right_ver)
-  let total = if left_parts.len() > right_parts.len() { left_parts.len() } else { right_parts.len() }
-  var index = 0
+  let by_version = plan_compare_version(left_ver, right_ver)
+  return by_version when by_version != 0
 
-  while index < total {
-    let result = plan_compare_version_part(left_parts.get(index) ?? "0", right_parts.get(index) ?? "0")
-
-    if result != 0 {
-      return result
-    }
-
-    index += 1
-  }
-
-  plan_compare_version_part(left_rel, right_rel)
+  plan_compare_version(left_rel, right_rel)
 }
 
 proc require_supported_target(target: types.Target, label: Str) [error] {

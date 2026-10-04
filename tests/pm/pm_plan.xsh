@@ -582,3 +582,26 @@ test test_runtime_only_dependency_may_close_a_cycle [fs, env, error] { |ctx|
   assert [dependency.kind for dependency in node_named(resolved, "service")?.dependencies] == [types.RuntimeOnly]
   plan.validate(resolved)?
 }
+
+# Versions compare as runs of digits (numerically) and letters (as text), and
+# a digit run outranks a letter run, as rpm and apk order them.
+test test_version_order_compares_digit_and_letter_runs [error] {
+  let older_newer = [
+    ["next-3.7", "3.7c"],
+    ["3.7", "3.7c"],
+    ["3.7b", "3.7c"],
+    ["1.2.9", "1.2.10"],
+    ["2.1.12-stable", "2.1.13-stable"],
+    ["701", "710"],
+    ["0.9", "0.10"],
+    ["23.1.0-rc2", "23.1.0"],
+  ]
+
+  for pair in older_newer {
+    assert plan.plan_compare_version_release(pair[0], "1", pair[1], "1") < 0, f"{pair[0]} < {pair[1]}"
+    assert plan.plan_compare_version_release(pair[1], "1", pair[0], "1") > 0, f"{pair[1]} > {pair[0]}"
+  }
+
+  assert plan.plan_compare_version_release("1.0", "1", "1.0", "1") == 0
+  assert plan.plan_compare_version_release("1.0", "2", "1.0", "10") < 0
+}
