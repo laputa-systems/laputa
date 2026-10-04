@@ -9,7 +9,7 @@ export const package_kind = "payload"
 export const ver = "1.0"
 
 ## Package recipe export.
-export const rel = "10"
+export const rel = "11"
 
 ## Package recipe export.
 export const deps: List[Str] = []

@@ -14,10 +14,12 @@ export const package_kind = "payload"
 export const ver = "3.8.2"
 
 ## Exported declaration `rel`.
-export const rel = "12"
+export const rel = "13"
 
+# bison runs `/usr/bin/m4` on every grammar, so m4 is a runtime dependency
+# (and in the proof root, which holds `deps` only).
 ## Exported declaration `deps`.
-export const deps = ["musl"]
+export const deps = ["musl", "m4"]
 
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain"]
@@ -191,6 +193,29 @@ export const filetree = [
   },
 ]
 
+error BisonBuildError = Failed(kind: Str, message: Str)
+
+# Upstream bison ignores m4's exit status: when m4 fails it reports success
+# with an empty or partial parser. A failed m4 is made a fatal error so a
+# broken skeleton expansion cannot pass silently. m4 failures that bison
+# expects (`b4_fatal`) end bison through `@fatal` before this wait.
+proc fail_on_m4_status() [fs, error] {
+  let output_c = p"src/output.c"
+  let text = output_c.read_text()?
+  let wait_call = """  wait_subprocess (pid, "m4", false, false, true, true, NULL);
+"""
+
+  if wait_call not in text {
+    return Err(BisonBuildError.Failed("bison-patch", "src/output.c no longer waits for m4 as this recipe expects"))
+  }
+
+  let checked_wait = """  if (wait_subprocess (pid, "m4", false, false, true, true, NULL) != 0)
+    complain (NULL, fatal, _("%s subprocess failed"), "m4");
+"""
+
+  fs.write(output_c, text.replace(wait_call, checked_wait))?
+}
+
 proc install_data_tree(src: Path, dest: Path) [fs, error] {
   for e in fs.children(src)? {
     if e.kind == "dir" {
@@ -204,6 +229,7 @@ proc install_data_tree(src: Path, dest: Path) [fs, error] {
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
+  fail_on_m4_status()?
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
   let abi = target.lp64_musl_abi(arch)

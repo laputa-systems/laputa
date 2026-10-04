@@ -28,7 +28,7 @@ dependents'), never order a build, and never enter an artifact key, so
 rebuilding one rebuilds none of its dependents. A package may appear in only
 one of `deps`, `mkdeps_*`, and `runtime_only_deps`; one the build uses belongs
 in `deps`. A build tool's own runtime needs stay `deps` when dependents run it
-at build time (`flex` needs `m4`), except `xsh`, which the executor substrate
+at build time (`flex` and `bison` need `m4`), except `xsh`, which the executor substrate
 seeds into every build root.
 
 A recipe without `architectures` exists for every target. One that names a
@@ -333,8 +333,9 @@ validate Linux package execution. `pm_make.xsh`
 uses temporary native child scripts to verify argument and environment preservation,
 dependency order, stamp reuse, failed-peer cancellation, and checked pkg-config
 flag lists without package builds. `ca_certificates_recipe.xsh` checks the proof
-metadata boundary using a temporary bundle and helper; `m4_recipe.xsh` checks
-literal source operands and rejection of directory inputs. `parser_generators.xsh`
+metadata boundary using a temporary bundle and helper; `m4_recipe.xsh` runs
+the m4 proof and checks GNU m4 1.4 output on the constructs bison's and
+flex's skeletons use, plus its loud failures. `parser_generators.xsh`
 checks Bison token definitions, Flex definition expansion, generated output paths,
 and missing-input diagnostics independently of Linux build modules.
 
