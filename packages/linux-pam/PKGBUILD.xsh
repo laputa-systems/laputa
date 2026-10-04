@@ -255,6 +255,10 @@ export const filetree = [
     kind: "binary",
   },
   {
+    path: p"usr/lib/security/pam_keyinit.so",
+    kind: "binary",
+  },
+  {
     path: p"usr/lib/security/pam_limits.so",
     kind: "binary",
   },
