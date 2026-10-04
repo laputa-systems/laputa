@@ -105,6 +105,15 @@ export pure xsh_seed_cargo_build_argv(
     "CARGO_TARGET_DIR=/target",
     "--env",
     "CARGO_NET_OFFLINE=true",
+    # The release profile's thin LTO and non-incremental codegen made a
+    # one-line XSH edit cost a full ~7 minute rebuild at -j 4; without LTO and
+    # with incremental codegen the same edit rebuilds in ~13 s. The binaries
+    # stay opt-level 3 and grow by about 1%. The dist profile is reserved for
+    # XSH's release packaging.
+    "--env",
+    "CARGO_PROFILE_RELEASE_LTO=false",
+    "--env",
+    "CARGO_PROFILE_RELEASE_INCREMENTAL=true",
     "--env",
     f"${rustflags.name}=${rustflags.value}",
     xsh_seed_build_image,
@@ -374,7 +383,7 @@ export proc xsh_seed_build(
     format: xsh_seed_manifest_format,
     arch: value.arch,
     triple: value.triple,
-    cargo_profile: "release",
+    cargo_profile: "release, lto=false, incremental",
     features: xsh_seed_features,
     xsh_commit: xsh_seed_git_text(xsh_root, ["rev-parse", "HEAD"])?,
     xsh_dirty: dirty,

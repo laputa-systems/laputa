@@ -27,6 +27,7 @@ test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
   assert "--locked" in argv and "--offline" in argv and "--release" in argv
   assert ! ("--profile" in argv)
   assert ! (argv |> any "dist" in .)
+  assert "CARGO_PROFILE_RELEASE_INCREMENTAL=true" in argv
   assert "aarch64-unknown-linux-musl" in argv
   assert "type=bind,src=/work/xsh,dst=/work,readonly" in argv
   assert "type=bind,src=/work/laputa/.out/xsh-target,dst=/target" in argv
