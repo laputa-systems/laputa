@@ -35,14 +35,11 @@ export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 # differ only in the architecture macros and five x86-only kernel structures.
 # With linux-headers no newer than the bundled 7.2 headers, configure selects
 # the bundled `linux/` headers, so their values are what the build sees.
-#
-# The tarball is staged as a plain file and unpacked by `prepare_sources`;
-# that hook says why.
 ## Package recipe export.
 export const upstream_sources = [
   {
     source: p"https://github.com/strace/strace/releases/download/vVERSION/strace-VERSION.tar.xz",
-    kind: "file",
+    kind: "auto",
     architectures: [
       "all",
     ],
@@ -299,30 +296,6 @@ pure cpp_task(cc: Path, triple: Str, flags: List[Str], src: Path, out: Path) -> 
     depfile: p"",
     stamp: fp"{out}.cmd",
   }
-}
-
-# The tarball hard-links two bundled asm-generic headers to their asm/
-# copies. XSH's tar extraction strips leading components from member paths
-# but not from hard-link targets, so the stripped extraction PM performs for
-# archive sources fails on them. Unpacking without stripping and moving the
-# tree up keeps the links intact; this goes back to an `auto` source once
-# tar extraction strips hard-link targets too.
-## Unpacks the upstream tarball over the staged source directory.
-export proc prepare_sources(src: Path) [fs, error] {
-  let tarball = fp"{src}/strace-{ver}.tar.xz"
-  let unpacked = fp"{src}/.upstream"
-  fs.remove(unpacked, missing_ok: true)?
-  archive.tar_extract(tarball, unpacked, 0, "auto", true)?
-
-  let top = fp"{unpacked}/strace-{ver}"
-
-  for entry in fs.children(top)? {
-    fs.rename(entry.path, fp"{src}/{entry.name}")?
-  }
-
-  fs.remove(top)?
-  fs.remove(unpacked)?
-  fs.remove(tarball)?
 }
 
 ## Package recipe export.
