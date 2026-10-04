@@ -8,10 +8,10 @@ export const name = "expat"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.7.3"
+export const ver = "2.8.5"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -22,7 +22,7 @@ export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
-    source: p"https://github.com/libexpat/libexpat/releases/download/R_2_7_3/expat-VERSION.tar.xz",
+    source: p"https://github.com/libexpat/libexpat/releases/download/R_2_8_5/expat-VERSION.tar.xz",
     kind: "auto",
     architectures: [
       "all",
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "71df8f40706a7bb0a80a5367079ea75d91da4f8c65c58ec59bcdfbf7decdab9f",
+        sha256: "1e727b8933ec51a77a9a9d9afcf8e688bce45d907c13e36ab7393fe36e703182",
       },
     ],
   },
@@ -51,19 +51,19 @@ export const filetree = [
     kind: "file",
   },
   {
-    path: p"usr/lib/cmake/expat-2.7.3/expat-config-version.cmake",
+    path: p"usr/lib/cmake/expat-2.8.5/expat-config-version.cmake",
     kind: "file",
   },
   {
-    path: p"usr/lib/cmake/expat-2.7.3/expat-config.cmake",
+    path: p"usr/lib/cmake/expat-2.8.5/expat-config.cmake",
     kind: "file",
   },
   {
-    path: p"usr/lib/cmake/expat-2.7.3/expat-release.cmake",
+    path: p"usr/lib/cmake/expat-2.8.5/expat-release.cmake",
     kind: "file",
   },
   {
-    path: p"usr/lib/cmake/expat-2.7.3/expat.cmake",
+    path: p"usr/lib/cmake/expat-2.8.5/expat.cmake",
     kind: "file",
   },
   {
@@ -75,7 +75,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libexpat.so.1.11.1",
+    path: p"usr/lib/libexpat.so.1.12.5",
     kind: "binary",
   },
   {
