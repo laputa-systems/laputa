@@ -1,6 +1,13 @@
 ##! Explicit build-policy data for typed package graph resolution.
 use types
 
+## The global artifact-key epoch. Every artifact key hashes it, so bumping it
+## rebuilds every package. Artifact keys deliberately exclude the XSH runners,
+## the PM code, and the core applets that execute a build; bump this when a
+## change to those can alter payloads without any recipe change. Bump a
+## recipe's `rel` instead to rebuild one package and its build dependents.
+export const BUILD_EPOCH = 1
+
 ## Returns the aarch64 Docker build policy, including native bootstrap seed rules.
 ## `musl -> llvm-toolchain` breaks the musl/LLVM cycle with the already-seeded compiler.
 ## `musl -> zlib` supplies the native bootstrap toolchain before the rebuilt target runtime is present.
@@ -30,6 +37,7 @@ export pure aarch64_docker() -> types.BuildPolicy {
         reason: "gnu-stubs is built with the already-seeded compiler before the new llvm-toolchain is available",
       },
     ],
+    build_epoch: BUILD_EPOCH,
   }
 }
 

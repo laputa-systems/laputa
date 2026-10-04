@@ -196,7 +196,8 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 }
 
 ## Writes the deterministic proof receipt that binds a proof input to one exact payload artifact.
-export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, payload: Path) [fs, error] {
+## `payload_sha256` is the payload digest the caller already holds (staged or Store receipt).
+export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, payload_sha256: Str) [fs, error] {
   fs.mkdir(path_value.parent)?
   fs.write(
     path_value,
@@ -206,13 +207,13 @@ export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, paylo
       artifact_key: node.artifact_key,
       proof_key: node.proof_key,
       proof_sha256: node.proof_sha256,
-      payload_sha256: hash.sha256(payload)?.hex(),
+      payload_sha256,
     })? + "\n",
   )?
 }
 
-## Verifies an immutable proof receipt against the exact node and payload it attests.
-export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payload: Path) [fs, error] {
+## Verifies an immutable proof receipt against the exact node and payload digest it attests.
+export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payload_sha256: Str) [fs, error] {
   let value = json.read(path_value)?.require(ArtifactProofDto)?
 
   if value.format != "laputa-package-proof-3" {
@@ -223,7 +224,7 @@ export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payl
     return Err(types.PmError.PackageContract(f"proof receipt ${path_value} does not match ${node.package_id}"))
   }
 
-  if value.payload_sha256 != hash.sha256(payload)?.hex() {
+  if value.payload_sha256 != payload_sha256 {
     return Err(types.PmError.PackageContract(f"proof receipt ${path_value} payload hash does not match ${node.package_id}"))
   }
 }

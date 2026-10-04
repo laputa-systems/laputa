@@ -23,13 +23,8 @@ pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/${name}"
 }
 
-pure publish_executor_identity() -> types.ExecutorIdentity {
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "pm-tree",
-    xsh_sha256: "xsh-runners",
-    core_sha256: "core-tree",
-  }
+pure publish_executor_sha256() -> Str {
+  bytes.from_text("publish executor").sha256().hex()
 }
 
 pure publish_empty_remote() -> types.RemoteSnapshot {
@@ -47,7 +42,7 @@ proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
 proc publish_plan(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.BuildPlan] {
   let repo_root = copied_publish_repository(ctx, name)?
   let catalog_value = catalog.load(repo_root)?
-  plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false, publish_executor_identity())?
+  plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false)?
 }
 
 proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanNode] {
@@ -68,7 +63,7 @@ proc stage_plan_artifacts(
   include_package_kind: Bool = true,
   package_kind: Str = "payload",
 ) [fs, error] {
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
+  let executor_sha256 = publish_executor_sha256()
 
   for node in value.nodes {
     let staged_root = test.temp_dir(ctx, name: f"publish-stage-${node.name}")?
@@ -76,6 +71,7 @@ proc stage_plan_artifacts(
     let metadata = fp"${staged_root}/metadata.json"
     let proof = fp"${staged_root}/proof.json"
     fs.write(payload, f"payload ${node.package_id}\n")?
+    let payload_sha256 = hash.sha256(payload)?.hex()
     if include_package_kind {
       json.write(metadata, {
         arch: "aarch64",
@@ -98,12 +94,12 @@ proc stage_plan_artifacts(
     }
 
     if valid_proofs {
-      pm_proof.write_artifact_receipt(proof, node, payload)?
+      pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
     } else {
       fs.write(proof, "not a package proof receipt\n")?
     }
 
-    let _ = store.commit(types.target_aarch64(), store_root, node, {payload, metadata, proof, executor_sha256})?
+    let _ = store.commit(types.target_aarch64(), store_root, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
   }
 }
 
@@ -177,7 +173,7 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   test.eq(metadata.target, "aarch64-linux-musl")?
   test.eq(metadata.artifact_key, app.artifact_key)?
   test.eq(metadata.recipe_sha256, app.recipe_sha256)?
-  test.eq(metadata.executor_sha256, plan.executor_fingerprint(value.executor)?)?
+  test.eq(metadata.executor_sha256, publish_executor_sha256())?
   test.eq(metadata.proof_key, app.proof_key)?
   test.eq(metadata.proof_sha256, app.proof_sha256)?
 
@@ -288,7 +284,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
   fs.mkdir(payload.parent)?
   fs.mkdir(metadata.parent)?
   fs.write(payload, "legacy remote payload")?
-  json.write(metadata, {name: node.name, ver: node.ver, rel: node.rel, executor_sha256: plan.executor_fingerprint(value.executor)?})?
+  json.write(metadata, {name: node.name, ver: node.ver, rel: node.rel, executor_sha256: publish_executor_sha256()})?
   let imported_store = test.temp_dir(ctx, name: "publish-legacy-import-store")?
   let imported = store.import_remote(
     types.target_aarch64(),
@@ -319,7 +315,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
   fs.mkdir(payload.parent)?
   fs.mkdir(metadata.parent)?
   fs.write(payload, "legacy hash payload")?
-  json.write(metadata, {name: node.name, ver: node.ver, rel: node.rel, executor_sha256: plan.executor_fingerprint(value.executor)?})?
+  json.write(metadata, {name: node.name, ver: node.ver, rel: node.rel, executor_sha256: publish_executor_sha256()})?
   let legacy = remote.decode_remote_package({
     arch: "aarch64",
     name: node.name,

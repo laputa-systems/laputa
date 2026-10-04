@@ -116,6 +116,7 @@ proc closure_from_edges(
 ) [error] -> Result[List[Str]] {
   let local_names = {pkg.name: true for pkg in catalog.packages}
   let remote_names = {name: true for name in catalog.remote_names}
+  let kind_edges = selected_edges(dependency_edges, kinds)
   var pending = graph_sorted_unique_names(roots)
   var included: Map[Bool] = {}
   var index = 0
@@ -130,7 +131,7 @@ proc closure_from_edges(
     if ! (included.get(name) ?? false) {
       included[name] = true
 
-      for dependency in direct_dependencies(name, selected_edges(dependency_edges, kinds)) {
+      for dependency in direct_dependencies(name, kind_edges) {
         if ! (included.get(dependency) ?? false) {
           pending = pending.push(dependency)
         }

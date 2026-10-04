@@ -1,4 +1,7 @@
-##! Immutable, content-verified package artifacts addressed by semantic SHA-256 keys; finals appear only after a verified temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
+##! Immutable package artifacts addressed by semantic SHA-256 keys; finals appear only after a temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
+# Object hashes are computed once, when an artifact is committed, and recorded
+# in its receipt. Lookups trust a committed directory and do not re-hash it;
+# `verify_artifact`, `verify_receipt`, and `verify_all` re-hash on request.
 use remote
 use types
 use util
@@ -21,21 +24,28 @@ type ArtifactReceiptDto = {
 }
 
 type RemoteMetadataDto = {name: Str, ver: Str, rel: Str}
+type ReceiptFormatDto = {format: Str}
 
-pure store_v1(root: Path) -> Path {
-  fp"${root}/v1"
+## The receipt format this Store writes and reads.
+export let receipt_format: Str = "laputa-package-artifact-2"
+
+# The layout directory is versioned with the artifact-key format. Keys of an
+# older format live under their own directory (`v1/`), which this PM never
+# reads, so old and new artifacts cannot mix.
+pure store_layout(root: Path) -> Path {
+  fp"${root}/v2"
 }
 
 pure object_root(root: Path) -> Path {
-  fp"${store_v1(root)}/sha256"
+  fp"${store_layout(root)}/sha256"
 }
 
 pure lock_path(root: Path, key: Str) -> Path {
-  fp"${store_v1(root)}/locks/${key}.lock"
+  fp"${store_layout(root)}/locks/${key}.lock"
 }
 
 pure temporary_path(root: Path, key: Str) -> Path {
-  fp"${store_v1(root)}/tmp/${key}"
+  fp"${store_layout(root)}/tmp/${key}"
 }
 
 pure receipt_path(dir: Path) -> Path {
@@ -138,7 +148,7 @@ proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) [error] -> 
 }
 
 proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
-  if value.format != "laputa-package-artifact-1" {
+  if value.format != receipt_format {
     return Err(types.PmError.PackageContract(f"unsupported artifact receipt format ${value.format}"))
   }
 
@@ -197,10 +207,24 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
   }
 }
 
+# Reads and validates a receipt and checks that its objects exist, without hashing them.
 proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
-  let dto = json.read(receipt_path(dir))?.require(ArtifactReceiptDto)?
-  let value = receipt_from_dto(dto, dir)?
+  let raw = json.read(receipt_path(dir))?
+  # Check the format before the DTO so a receipt from another Store schema
+  # names its format instead of failing on a missing field.
+  let format_field = raw.require(ReceiptFormatDto)?.format
+
+  if format_field != receipt_format {
+    return Err(types.PmError.PackageContract(f"artifact ${expected_key} has unsupported receipt format ${format_field}; this PM reads ${receipt_format}"))
+  }
+
+  let value = receipt_from_dto(raw.require(ArtifactReceiptDto)?, dir)?
   validate_receipt(value, expected_key)?
+
+  if ! fs.exists(payload_path(dir))? or ! fs.exists(metadata_path(dir))? or ! fs.exists(proof_path(dir))? {
+    return Err(types.PmError.PackageContract(f"artifact ${expected_key} is incomplete"))
+  }
+
   value
 }
 
@@ -209,11 +233,6 @@ proc verify_dir(dir: Path, expected_key: Str) [fs, error] -> Result[types.Artifa
   let payload = payload_path(dir)
   let metadata = metadata_path(dir)
   let proof = proof_path(dir)
-
-  if ! fs.exists(payload)? or ! fs.exists(metadata)? or ! fs.exists(proof)? {
-    return Err(types.PmError.PackageContract(f"artifact ${expected_key} is incomplete"))
-  }
-
   let actual_payload = hash.sha256(payload)?.hex()
 
   if actual_payload != value.payload_sha256 {
@@ -239,6 +258,7 @@ proc receipt_for(
   target: types.Target,
   node: types.PlanNode,
   dir: Path,
+  payload_sha256: Str,
   executor_sha256: Str,
   origin: types.ArtifactOrigin,
 ) [fs, error] -> Result[types.ArtifactReceipt] {
@@ -246,6 +266,7 @@ proc receipt_for(
   require_sha256(node.recipe_sha256, "plan node recipe_sha256")?
   require_sha256(node.proof_key, "plan node proof_key")?
   require_sha256(executor_sha256, "staged executor_sha256")?
+  require_sha256(payload_sha256, "staged payload_sha256")?
 
   let payload = payload_path(dir)
   let metadata = metadata_path(dir)
@@ -256,7 +277,7 @@ proc receipt_for(
   }
 
   {
-    format: "laputa-package-artifact-1",
+    format: receipt_format,
     key: node.artifact_key,
     target,
     package_name: node.name,
@@ -264,7 +285,7 @@ proc receipt_for(
     origin,
     recipe_sha256: node.recipe_sha256,
     executor_sha256,
-    payload_sha256: hash.sha256(payload)?.hex(),
+    payload_sha256,
     metadata_sha256: hash.sha256(metadata)?.hex(),
     proof_key: node.proof_key,
     proof_sha256: hash.sha256(proof)?.hex(),
@@ -295,7 +316,7 @@ proc commit_locked(
   let final_dir = artifact_path(root, key)
 
   if fs.exists(final_dir)? {
-    let existing = verify_artifact(root, key)?
+    let existing = read_receipt(final_dir, key)?
     if existing.target != target {
       return Err(types.PmError.PackageContract(f"artifact ${key} target does not match requested ${types.target_text(target)}"))
     }
@@ -307,14 +328,15 @@ proc commit_locked(
   defer fs.remove(temporary, missing_ok: true)?
   fs.mkdir(temporary)?
   copy_staged(temporary, staged)?
-  let value = receipt_for(target, node, temporary, staged.executor_sha256, origin)?
+  # The staged payload digest was computed when the payload was produced or
+  # downloaded; hashing the copy again would only re-read the same bytes.
+  let value = receipt_for(target, node, temporary, staged.payload_sha256, staged.executor_sha256, origin)?
 
-  # artifact.json is intentionally the final temporary write: a directory with it is complete only after verification.
+  # artifact.json is intentionally the final temporary write: a directory with it is complete.
   write_receipt(temporary, value)?
-  let _ = verify_dir(temporary, key)?
   fs.mkdir(final_dir.parent)?
   fs.rename(temporary, final_dir)?
-  verify_artifact(root, key)
+  read_receipt(final_dir, key)
 }
 
 proc commit_staged(
@@ -388,6 +410,8 @@ proc remote_staged_artifact_for(
   fetch_remote_object(remote_repo, fp"${retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")?
   fetch_remote_object(remote_repo, fp"${retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")?
   let executor_sha256 = remote_executor_sha256(metadata, node)?
+  # fetch_remote_object verified the payload against this digest.
+  let payload_sha256 = retrieval.tarball_sha256
   fs.write_atomic(
     proof,
     json.encode({
@@ -399,7 +423,7 @@ proc remote_staged_artifact_for(
       metadata_sha256: retrieval.metadata_sha256,
     })? + "\n",
   )?
-  {payload, metadata, proof, executor_sha256}
+  {payload, payload_sha256, metadata, proof, executor_sha256}
 }
 
 proc remote_staged_artifact(node: types.PlanNode, remote_repo: Str, cache: Path) [fs, net, error] -> Result[types.StagedArtifact] {
@@ -417,9 +441,23 @@ export pure artifact_path(root: Path, key: Str) -> Path {
   fp"${object_root(root)}/${key}"
 }
 
-## Looks up one completed artifact and verifies every stored object before returning its receipt.
+## Returns one completed artifact's validated receipt without re-hashing its objects.
+## A final directory appears only through `commit`, which recorded those hashes; use
+## `verify_artifact` where an artifact must be re-checked against its receipt.
 export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
-  verify_artifact(root, key)
+  require_key(key)?
+  let final_dir = artifact_path(root, key)
+
+  if ! fs.exists(final_dir)? {
+    return Err(types.PmError.PackageTarball(f"artifact ${key} is missing"))
+  }
+
+  read_receipt(final_dir, key)
+}
+
+## Returns the immutable proof receipt path for an artifact re-proved under a newer proof key.
+export pure reproof_receipt_path(root: Path, artifact_key: Str, proof_key: Str) -> Path {
+  fp"${store_layout(root)}/proofs/${artifact_key}/${proof_key}.json"
 }
 
 ## Re-verifies a receipt at its returned immutable artifact directory before another domain consumes its payload.
@@ -452,7 +490,7 @@ export proc import_remote(
   defer fs.unlock(lock)?
 
   if fs.exists(artifact_path(root, key))? {
-    let existing = verify_artifact(root, key)?
+    let existing = lookup(root, key)?
     if existing.target != target {
       return Err(types.PmError.PackageContract(f"artifact ${key} target does not match requested ${types.target_text(target)}"))
     }

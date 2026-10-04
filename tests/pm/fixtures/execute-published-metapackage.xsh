@@ -259,7 +259,6 @@ main(@args)?
 
 proc published_parallel_level_barrier_regression(
   workspace: Path,
-  executor: types.ExecutorIdentity,
 ) [fs, net, process, env, time, error] {
   let repo = fp"${workspace}/packages"
   let store = fp"${workspace}/level-barrier-store"
@@ -270,7 +269,6 @@ proc published_parallel_level_barrier_regression(
     policy.aarch64_docker(),
     ["direct-leaf"],
     false,
-    executor,
   )?
   let app = value.nodes[2]
   let peer = value.nodes[3]
@@ -316,9 +314,10 @@ proc published_legacy_package_kind_regression(
   # The only legacy exception is an omitted package_kind.  The store receipt
   # binds these exact bytes before repo publication decodes them.
   json.write(metadata, {arch: "aarch64", name: node.name, ver: node.ver, rel: node.rel, files: []})?
-  pm_proof.write_artifact_receipt(proof, node, payload)?
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
-  let _ = artifact_store.commit(types.target_aarch64(), legacy_store, node, {payload, metadata, proof, executor_sha256})?
+  let payload_sha256 = hash.sha256(payload)?.hex()
+  pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
+  let executor_sha256 = bytes.from_text("published executor").sha256().hex()
+  let _ = artifact_store.commit(types.target_aarch64(), legacy_store, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
   let snapshot = pm_repo.snapshot(value, legacy_store)?
 
   if snapshot.packages[0].kind != types.package_payload() {
@@ -333,8 +332,9 @@ proc published_legacy_package_kind_regression(
   fs.mkdir(invalid_stage)?
   fs.write(invalid_payload, "published invalid payload\n")?
   json.write(invalid_metadata, {arch: "aarch64", name: node.name, ver: node.ver, rel: node.rel, package_kind: "", files: []})?
-  pm_proof.write_artifact_receipt(invalid_proof, node, invalid_payload)?
-  let _ = artifact_store.commit(types.target_aarch64(), invalid_store, node, {payload: invalid_payload, metadata: invalid_metadata, proof: invalid_proof, executor_sha256})?
+  let invalid_payload_sha256 = hash.sha256(invalid_payload)?.hex()
+  pm_proof.write_artifact_receipt(invalid_proof, node, invalid_payload_sha256)?
+  let _ = artifact_store.commit(types.target_aarch64(), invalid_store, node, {payload: invalid_payload, payload_sha256: invalid_payload_sha256, metadata: invalid_metadata, proof: invalid_proof, executor_sha256})?
 
   match pm_repo.snapshot(value, invalid_store) {
     Ok(_) => return error.fail("published explicit empty package_kind unexpectedly published")
@@ -353,7 +353,6 @@ proc published_legacy_package_kind_regression(
 # `BuildResult` and `generation_adapter_execute_profile`.
 proc published_generation_adapter_regression(
   workspace: Path,
-  executor: types.ExecutorIdentity,
 ) [fs, net, process, env, time, error] {
   let repo = fp"${workspace}/packages"
   let plan_path = fp"${workspace}/adapter-build-plan.json"
@@ -371,7 +370,6 @@ proc published_generation_adapter_regression(
     policy.aarch64_docker(),
     ["direct-meta", "direct-tool"],
     false,
-    executor,
   )?
   plan_json.write_plan(plan_path, value)?
   let result = generation_adapter.generation_adapter_execute_profile(
@@ -407,12 +405,6 @@ proc main() [fs, net, process, env, time, error] {
   fs.copy(p"pm/proof.xsh", fp"${workspace}/pm/proof.xsh", overwrite: true)?
   write_dep_recipe(repo)?
   write_meta_recipe(repo)?
-  let executor: types.ExecutorIdentity = {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "published-pm",
-    xsh_sha256: "published-xsh",
-    core_sha256: "published-core",
-  }
   let catalog_value = catalog.load(workspace)?
   let value = plan.resolve(
     catalog_value,
@@ -420,7 +412,6 @@ proc main() [fs, net, process, env, time, error] {
     policy.aarch64_docker(),
     ["direct-meta"],
     false,
-    executor,
   )?
   let legacy_value = plan.resolve(
     catalog_value,
@@ -428,7 +419,6 @@ proc main() [fs, net, process, env, time, error] {
     policy.aarch64_docker(),
     ["direct-dep"],
     false,
-    executor,
   )?
   let result = execute.build_plan(value, workspace, store, "", 1)?
   let meta = result.artifacts[1]
@@ -447,9 +437,9 @@ proc main() [fs, net, process, env, time, error] {
     return error.fail("published metapackage execution did not retain dependency and selector proof receipts")
   }
 
-  published_parallel_level_barrier_regression(workspace, executor)?
+  published_parallel_level_barrier_regression(workspace)?
   published_legacy_package_kind_regression(legacy_value, workspace)?
-  published_generation_adapter_regression(workspace, executor)?
+  published_generation_adapter_regression(workspace)?
 
   print "execute-published-metapackage-ok"
 }

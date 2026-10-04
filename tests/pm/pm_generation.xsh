@@ -10,15 +10,6 @@ pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/${name}"
 }
 
-pure generation_executor_identity() -> types.ExecutorIdentity {
-  {
-    format: "laputa-pm-executor-1",
-    pm_sha256: "generation-pm",
-    xsh_sha256: "generation-runners",
-    core_sha256: "generation-core",
-  }
-}
-
 pure generation_empty_remote() -> types.RemoteSnapshot {
   {target: types.Aarch64LinuxMusl, index_sha256: "generation-empty-remote", packages: []}
 }
@@ -43,7 +34,6 @@ proc generation_build_plan(ctx: TestContext, name: Str) [fs, env, error] -> Resu
     policy.aarch64_docker(),
     ["app"],
     false,
-    generation_executor_identity(),
   )?
 }
 
@@ -61,12 +51,11 @@ proc generation_baselayout_build_plan(ctx: TestContext, name: Str) [fs, env, err
     policy.aarch64_docker(),
     ["baselayout"],
     false,
-    generation_executor_identity(),
   )?
 }
 
 proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_root: Path) [fs, error] {
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
+  let executor_sha256 = bytes.from_text("test executor").sha256().hex()
 
   for node in value.nodes {
     let stage = test.temp_dir(ctx, name: f"generation-stage-${node.name}")?
@@ -98,13 +87,13 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
       },
     )?
     fs.write(proof, f"proof ${node.name}\n")?
-    let _ = store.commit(value.target, store_root, node, {payload, metadata, proof, executor_sha256})?
+    let _ = store.commit(value.target, store_root, node, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256})?
   }
 }
 
 proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPlan, store_root: Path) [fs, error] {
   let node = value.nodes[0]
-  let executor_sha256 = plan.executor_fingerprint(value.executor)?
+  let executor_sha256 = bytes.from_text("test executor").sha256().hex()
   let stage = test.temp_dir(ctx, name: "generation-stage-baselayout")?
   let contents = fp"${stage}/contents"
   let payload = fp"${stage}/payload.tar.gz"
@@ -134,7 +123,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
     },
   )?
   fs.write(proof, "proof baselayout\n")?
-  let _ = store.commit(value.target, store_root, node, {payload, metadata, proof, executor_sha256})?
+  let _ = store.commit(value.target, store_root, node, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256})?
 }
 
 proc empty_overlay(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
@@ -182,7 +171,6 @@ test test_generation_x86_64_plan_and_composition_preserve_target [fs, env, error
     policy.x86_64_docker(),
     ["app"],
     false,
-    generation_executor_identity(),
   )?
   let overlay = empty_overlay(ctx, "generation-x86-overlay")?
   let planned = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?

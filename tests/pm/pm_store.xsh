@@ -76,6 +76,7 @@ proc staged_artifact(ctx: TestContext, name: Str, payload: Str = "payload", meta
     root,
     staged: {
       payload: payload_path,
+      payload_sha256: digest(payload),
       metadata: metadata_path,
       proof: proof_path,
       executor_sha256: digest("executor"),
@@ -162,7 +163,7 @@ test test_store_receipts_deduplicate_shared_runtime_and_build_host_artifacts [fs
 test test_store_discards_incomplete_temporary_artifacts [fs, error] { |ctx|
   let root = store_root(ctx, "store-temporary")?
   let key = digest("temporary")
-  let temporary = fp"${root}/v1/tmp/${key}"
+  let temporary = fp"${root}/v2/tmp/${key}"
   fs.mkdir(temporary)?
   fs.write(fp"${temporary}/payload.tar.gz", "incomplete")?
   let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-temporary-stage")?.staged)?
@@ -174,7 +175,7 @@ test test_store_verify_all_ignores_temporary_state_and_checks_finals [fs, error]
   let root = store_root(ctx, "store-verify-all")?
   let key = digest("verify-all")
   let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-verify-all-stage")?.staged)?
-  let temporary = fp"${root}/v1/tmp/${digest("ignored")}"
+  let temporary = fp"${root}/v2/tmp/${digest("ignored")}"
   fs.mkdir(temporary)?
   fs.write(fp"${temporary}/partial", "interrupted")?
 
@@ -215,7 +216,7 @@ proc main(...argv: List[Str]) [fs, error] {
     types.target_aarch64(),
     fp"${argv[0]}",
     node,
-    {payload: fp"${argv[2]}", metadata: fp"${argv[3]}", proof: fp"${argv[4]}", executor_sha256: digest("executor")},
+    {payload: fp"${argv[2]}", payload_sha256: hash.sha256(fp"${argv[2]}")?.hex(), metadata: fp"${argv[3]}", proof: fp"${argv[4]}", executor_sha256: digest("executor")},
   )?
 }
 
@@ -237,9 +238,11 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
   let key = digest("corrupt")
   let final_dir = store.artifact_path(root, key)
   let stage = staged_artifact(ctx, "store-corrupt-stage")?
-  let _ = store.commit(types.target_aarch64(), root, test_node(key), stage.staged)?
+  let committed = store.commit(types.target_aarch64(), root, test_node(key), stage.staged)?
 
+  # Lookups trust the hashes recorded at commit; explicit verification re-hashes.
   fs.write(fp"${final_dir}/payload.tar.gz", "corrupted payload")?
+  test.eq(store.lookup(root, key)?, committed)?
   expect_store_error(ctx, store.verify_artifact(root, key), "payload SHA-256 does not match receipt")?
 
   fs.write(fp"${final_dir}/payload.tar.gz", "payload")?
@@ -326,4 +329,24 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
     "remote metadata does not match plan node",
   )?
   test.eq(fs.exists(store.artifact_path(root, metadata_key))?, false)?
+}
+
+test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs, error] { |ctx|
+  let root = store_root(ctx, "store-schema")?
+  let key = digest("schema")
+  let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-schema-stage")?.staged)?
+  test.eq(receipt.format, store.receipt_format)?
+
+  let final_dir = store.artifact_path(root, key)
+  let raw = json.read(fp"${final_dir}/artifact.json")?.require(ReceiptDto)?
+  fs.write(fp"${final_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")?
+  expect_store_error(ctx, store.lookup(root, key), f"unsupported receipt format laputa-package-artifact-1; this PM reads ${store.receipt_format}")?
+
+  # Artifacts under an older layout directory are never read or listed.
+  let legacy_root = store_root(ctx, "store-legacy-layout")?
+  let legacy_dir = fp"${legacy_root}/v1/sha256/${key}"
+  fs.mkdir(legacy_dir)?
+  fs.write(fp"${legacy_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")?
+  expect_store_error(ctx, store.lookup(legacy_root, key), "is missing")?
+  test.eq(store.verify_all(legacy_root)?, [])?
 }

@@ -340,18 +340,7 @@ export proc prepare_source_tree(pkg: types.Package, src: Path) [fs, process, env
 }
 
 ## Stages a package's sources and runs its `prepare_sources` hook.
-## Temporary: the executor and the LLVM seed script still pass the retired
-## work, out, force-download, and source-mirror arguments, which are ignored;
-## drop them here together with those two call sites.
-export proc prepare_package_source_tree(
-  _work: Path,
-  _out: Path,
-  pkg: types.Package,
-  src: Path,
-  _force_download: Bool,
-  _allow_mirror: Bool,
-  _pack_mirror: Bool,
-) [fs, net, process, env, time, error] {
+export proc prepare_package_source_tree(pkg: types.Package, src: Path) [fs, net, process, env, time, error] {
   let stage_started = time.now()
   print --flush "pm-build-source-start" $pkg.name "stage"
   stage_package_sources(pkg, src)?

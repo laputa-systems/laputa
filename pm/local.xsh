@@ -308,8 +308,15 @@ mkdeps_host	${pkg.mkdeps_host.join(" ")}
   bytes.from_text(body).sha256().hex()
 }
 
-## Exported PM declaration `write_package_metadata`.
-export proc write_package_metadata(path_value: Path, arch: Str, item: types.BuiltPackage) [fs, error] {
+## Writes artifact metadata: the package inventory plus the executor that built it.
+## `executor` is provenance for readers; the typed DTO leaves it out so metadata
+## written before it existed still decodes.
+export proc write_package_metadata(
+  path_value: Path,
+  arch: Str,
+  item: types.BuiltPackage,
+  executor: types.ExecutorProvenance,
+) [fs, error] {
   fs.mkdir(path_value.parent)?
   let manifest = collect_manifest_text(item.manifest)?
 
@@ -336,7 +343,7 @@ export proc write_package_metadata(path_value: Path, arch: Str, item: types.Buil
       for entry in item.metadata_files
     ],
   }
-  json.write(path_value, metadata)?
+  json.write(path_value, {...metadata, executor})?
 }
 
 ## Exported PM declaration `dir_empty`.

@@ -102,8 +102,13 @@ proc stage_artifact(
       dependencies,
       remote: null,
     },
-    staged: {payload, metadata, proof, executor_sha256: digest("root executor")},
+    staged: {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: digest("root executor")},
   }
+}
+
+# Records the digest of a payload a test rewrote after staging it.
+proc rehashed(staged: types.StagedArtifact) [fs, error] -> Result[types.StagedArtifact] {
+  {...staged, payload_sha256: hash.sha256(staged.payload)?.hex()}
 }
 
 proc write_legacy_sidecar_metadata(
@@ -253,7 +258,7 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   # package_kind. Root decoding owns the one payload-default compatibility rule.
   write_legacy_sidecar_metadata(legacy.staged, "legacy", entries)?
   rewrite_legacy_database_payload(ctx, legacy.staged, "legacy", entries)?
-  let receipt = store.commit(types.target_aarch64(), store_root, legacy.node, legacy.staged)?
+  let receipt = store.commit(types.target_aarch64(), store_root, legacy.node, rehashed(legacy.staged)?)?
   let plan = root.preflight(types.target_aarch64(), [receipt])?
   test.eq(plan.artifacts[0].payload, true)?
   test.eq(plan.entries[0].path, "usr/bin/legacy")?
@@ -266,7 +271,7 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   let unexpected = stage_artifact(ctx, "legacy-extra", types.Payload, entries)?
   write_legacy_sidecar_metadata(unexpected.staged, "legacy-extra", entries)?
   rewrite_legacy_database_payload(ctx, unexpected.staged, "legacy-extra", entries, unexpected: true)?
-  let unexpected_receipt = store.commit(types.target_aarch64(), store_root, unexpected.node, unexpected.staged)?
+  let unexpected_receipt = store.commit(types.target_aarch64(), store_root, unexpected.node, rehashed(unexpected.staged)?)?
   expect_root_error(
     ctx,
     root.preflight(types.target_aarch64(), [unexpected_receipt]),
@@ -327,7 +332,7 @@ test test_root_rejects_cyclic_payload_link_that_differs_from_receipt [fs, error]
   fs.mkdir(fp"${payload_root}/usr/lib", parents: true)?
   fs.symlink(p"link", fp"${payload_root}/usr/lib/link")?
   archive.tar_create(prepared.staged.payload, payload_root, [p"."], compression: "gz", overwrite: true)?
-  let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, prepared.staged)?
+  let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, rehashed(prepared.staged)?)?
 
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [receipt]), "root symlink usr/lib/link does not match metadata")?
 }
@@ -473,7 +478,7 @@ test test_root_identifies_the_missing_payload_inventory_entry [fs, error] { |ctx
   fs.mkdir(fp"${archive_root}/usr/bin", parents: true)?
   fs.write(fp"${archive_root}/usr/bin/present", "present")?
   archive.tar_create(staged.staged.payload, archive_root, [p"."], compression: "gz", overwrite: true)?
-  let receipt = store.commit(types.target_aarch64(), store_root, staged.node, staged.staged)?
+  let receipt = store.commit(types.target_aarch64(), store_root, staged.node, rehashed(staged.staged)?)?
 
   expect_root_error(
     ctx,

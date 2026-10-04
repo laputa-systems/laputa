@@ -258,7 +258,6 @@ test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
     policy.aarch64_docker(),
     ["wlroots0.19-mesa"],
     false,
-    {format: "laputa-pm-executor-1", pm_sha256: "linux-recipe-pm", xsh_sha256: "linux-recipe-xsh", core_sha256: "linux-recipe-core"},
   )?
   var found = false
   for node in plan_value.nodes {
