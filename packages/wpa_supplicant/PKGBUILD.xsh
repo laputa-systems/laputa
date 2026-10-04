@@ -1,5 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.make as make
+use pm.util as pm_util
 
 ## Package recipe export.
 export let name = "wpa_supplicant"
@@ -113,7 +114,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.mkdir(objs)?
   fs.install(p"config", fp"{src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)?
   let cc = process.which("cc")?
-  let triple = f"{env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
+  let triple = f"{pm_util.target_arch()?}-linux-musl"
 
   # Flags mirror wpa_supplicant's defconfig: no IPv6, no D-Bus, no readline.
   var cflags = ["-O2", "-Wall", "-ffunction-sections", "-fdata-sections"]

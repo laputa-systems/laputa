@@ -5189,6 +5189,9 @@ pure x86_compressed_cflags() -> List[Str] {
     "-fPIE",
     "-Wundef",
     "-DDISABLE_BRANCH_PROFILING",
+    # The decompressor runs before CPU feature checks: clang's x86-64
+    # baseline, not the -march=x86-64-v3 the `cc` wrapper would add.
+    "-march=x86-64",
     "-mcmodel=small",
     "-mno-red-zone",
     "-mno-mmx",

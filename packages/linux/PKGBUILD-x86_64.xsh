@@ -32,6 +32,12 @@ pure x86_kbuild_cflags() -> List[Str] {
     "-fno-function-sections",
     "-fno-data-sections",
     "-mcmodel=kernel",
+    # The baseline upstream passes without CONFIG_X86_NATIVE_CPU. The `cc`
+    # wrapper otherwise adds -march=x86-64-v3, whose BMI/LZCNT/MOVBE
+    # instructions -mno-sse does not remove, so the kernel would trap on
+    # pre-v3 CPUs and QEMU's default CPU model.
+    "-march=x86-64",
+    "-mtune=generic",
     "-mno-mmx",
     "-mno-sse",
     "-mno-sse2",
@@ -90,6 +96,9 @@ pure x86_vdso_cflags() -> List[Str] {
     "-fpic",
     "-m64",
     "-mcmodel=small",
+    # The vDSO keeps the kernel's baseline -march (see x86_kbuild_cflags).
+    "-march=x86-64",
+    "-mtune=generic",
     "-DDISABLE_BRANCH_PROFILING",
     "-DBUILD_VDSO",
     "-DBUILD_VDSO64",
@@ -344,6 +353,32 @@ proc generate_x86_kvm_asm_offsets_header(cc: Path) [fs, process, env, error] {
   kbuild.generate_offsets_header(asm_out, p"arch/x86/kvm/kvm-asm-offsets.h", "__KVM_ASM_OFFSETS_H__")?
 }
 
+# offsetof(struct rq, nr_pinned) depends on the arch and config (x86 adds
+# PARAVIRT and HOTPLUG_CPU fields ahead of it), and inline migrate_disable()
+# writes through it, so x86 generates it as upstream Kbuild does instead of
+# sharing the aarch64-derived files/generated/rq-offsets.h.
+proc generate_x86_rq_offsets_header(cc: Path) [fs, process, env, error] {
+  fs.mkdir(p".xsh-kbuild/generated")?
+  let asm_out = p".xsh-kbuild/generated/rq-offsets.s"
+  let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
+  let with_flags = base.extend(x86_kbuild_cflags())
+  let with_includes = with_flags.extend(x86_kbuild_includes())
+
+  let argv = with_includes.extend(
+    [
+      "-DKBUILD_BASENAME=\"rq_offsets\"",
+      "-DKBUILD_MODNAME=\"rq_offsets\"",
+      "-D__KBUILD_MODNAME=rq_offsets",
+      "kernel/sched/rq-offsets.c",
+      "-o",
+      asm_out.display(),
+    ],
+  )
+
+  PKGBUILD_shared.run_native_command(argv)?
+  kbuild.generate_offsets_header(asm_out, p"include/generated/rq-offsets.h", "__RQ_OFFSETS_H__")?
+}
+
 proc write_x86_orc_hash_header() [fs, error] {
   kbuild.write_text_if_changed(
     p"arch/x86/include/generated/asm/orc_hash.h",
@@ -490,6 +525,10 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
     "-std=gnu11",
     "-fms-extensions",
     "-m16",
+    # Upstream REALMODE_CFLAGS: 16-bit trampoline code is i386 with register
+    # arguments; without -march the `cc` wrapper would add -march=x86-64-v3.
+    "-march=i386",
+    "-mregparm=3",
     "-g",
     "-Os",
     "-ffreestanding",
@@ -654,7 +693,7 @@ export proc build_x86_64_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process,
   generate_x86_asm_offsets_header(cc)?
   generate_x86_kvm_asm_offsets_header(cc)?
   write_x86_orc_hash_header()?
-  kbuild.copy_text_if_changed(p"rq-offsets.h", p"include/generated/rq-offsets.h")?
+  generate_x86_rq_offsets_header(cc)?
   generate_x86_capflags_source()?
   generate_x86_inat_tables()?
   kbuild.generate_empty_root_dtb_asm(p".")?

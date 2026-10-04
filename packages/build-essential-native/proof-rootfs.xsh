@@ -1,4 +1,5 @@
 ##! XSH module `proof-rootfs` package and build operations.
+use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payload: Bool}
@@ -11,11 +12,12 @@ proc ensure_exists(path_value: Path, label: Str) [fs, error] {
   }
 }
 
-proc ensure_runtime_artifacts(rootfs: Path, packages: List[Str]) [fs, error] {
+# The root must be composed for the target this proof runs for.
+proc ensure_runtime_artifacts(rootfs: Path, packages: List[Str]) [fs, env, error] {
   let path_value = fp"{rootfs}/var/lib/laputa/root.json"
   let receipt = json.read(path_value)?.require(RootReceipt)?
 
-  if receipt.format != "laputa-root-1" or receipt.target != "aarch64-linux-musl" {
+  if receipt.format != "laputa-root-1" or receipt.target != f"{pm_util.target_arch()?}-linux-musl" {
     return Err(
       ScriptError.Failed("proof-build-essential-native-rootfs", f"invalid typed root receipt: {path_value}"),
     )
@@ -41,7 +43,7 @@ proc ensure_runtime_artifacts(rootfs: Path, packages: List[Str]) [fs, error] {
   }
 }
 
-proc main(rootfs = /proof-rootfs) [fs, error] {
+proc main(rootfs = /proof-rootfs) [fs, env, error] {
   for tool in [
     "cc",
     "c++",

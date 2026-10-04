@@ -1,5 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.make as make
+use pm.util as pm_util
 
 ## Exported declaration `name`.
 export let name = "libnl3"
@@ -135,7 +136,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   let cc = process.which("cc")?
-  let triple = f"{env.get("XSH_PM_ARCH") ?? "aarch64"}-linux-musl"
+  let triple = f"{pm_util.target_arch()?}-linux-musl"
 
   # Pre-create install directories.
   fs.mkdir(fp"{dest}/usr")?

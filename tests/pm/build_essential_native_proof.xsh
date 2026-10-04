@@ -22,7 +22,7 @@ proc runner() [process, env, error] -> Result[Path] {
   process.which("xsh")?
 }
 
-proc proof_root(ctx: TestContext) [fs, error] -> Result[Path] {
+proc proof_root(ctx: TestContext, target: Str) [fs, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: "build-essential-native-proof")?
   fs.mkdir(fp"{root}/usr/bin")?
   fs.mkdir(fp"{root}/boot")?
@@ -51,16 +51,16 @@ proc proof_root(ctx: TestContext) [fs, error] -> Result[Path] {
 """,
   )?
   fs.mkdir(fp"{root}/var/lib/laputa")?
-  write_root_receipt(root, runtime_packages())?
+  write_root_receipt(root, target, runtime_packages())?
   root
 }
 
-proc write_root_receipt(root: Path, packages: List[Str]) [fs, error] {
+proc write_root_receipt(root: Path, target: Str, packages: List[Str]) [fs, error] {
   json.write(
     fp"{root}/var/lib/laputa/root.json",
     {
       format: "laputa-root-1",
-      target: "aarch64-linux-musl",
+      target,
       artifacts: [
         {
           package_name: package,
@@ -76,25 +76,40 @@ proc write_root_receipt(root: Path, packages: List[Str]) [fs, error] {
   )?
 }
 
-proc run_build_essential_proof(xsh: Path, root: Path, stderr: Path) [process, error] -> Result[Status] {
-  process.run(
-    process.command_argv(
-      xsh,
-      [xsh.display(), "packages/build-essential-native/proof.xsh", "--", root.display()],
-      stderr:,
-    ),
-  )
+# Proofs run with the build's XSH_PM_TARGET_ARCH, as in package-tools.
+proc run_build_essential_proof(xsh: Path, arch: Str, root: Path, stderr: Path) [process, env, error] -> Result[Status] {
+  env ({XSH_PM_TARGET_ARCH: arch}) {
+    process.run(
+      process.command_argv(
+        xsh,
+        [xsh.display(), "packages/build-essential-native/proof.xsh", "--", root.display()],
+        stderr:,
+      ),
+    )?
+  }
 }
 
 test test_build_essential_native_proof_uses_typed_root_receipt_without_legacy_db [fs, process, env, error] { |ctx|
-  let root = proof_root(ctx)?
-  let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
-  assert fs.exists(fp"{root}/var/lib/xsh-pm/packages")? == false
-  test.ok(run_build_essential_proof(xsh, root, stderr)?.ok)?
 
-  write_root_receipt(root, [package for package in runtime_packages() if package != "linux"])?
-  let missing = run_build_essential_proof(xsh, root, stderr)?
-  assert missing.ok == false
-  assert "missing linux artifact in typed root receipt" in stderr.read_text()?
+  for arch in ["aarch64", "x86_64"] {
+    let target = f"{arch}-linux-musl"
+    let root = proof_root(ctx, target)?
+    let stderr = fp"{root}/proof.stderr"
+    assert fs.exists(fp"{root}/var/lib/xsh-pm/packages")? == false
+    test.ok(run_build_essential_proof(xsh, arch, root, stderr)?.ok)?
+
+    write_root_receipt(root, target, [package for package in runtime_packages() if package != "linux"])?
+    let missing = run_build_essential_proof(xsh, arch, root, stderr)?
+    assert missing.ok == false
+    assert "missing linux artifact in typed root receipt" in stderr.read_text()?
+  }
+}
+
+test test_build_essential_native_proof_rejects_a_root_for_another_target [fs, process, env, error] { |ctx|
+  let root = proof_root(ctx, "x86_64-linux-musl")?
+  let stderr = fp"{root}/proof.stderr"
+  let status = run_build_essential_proof(runner()?, "aarch64", root, stderr)?
+  assert status.ok == false
+  assert "invalid typed root receipt" in stderr.read_text()?
 }
