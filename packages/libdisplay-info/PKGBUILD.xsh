@@ -8,10 +8,10 @@ export const name = "libdisplay-info"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "0.3.0"
+export const ver = "0.4.0"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "hwdata"]
@@ -30,16 +30,18 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "6ae77cd937f9cf7d1321d35c116062c4911e8447010a6a713ac4286f7a9d5987",
+        sha256: "43b180baa143e2035654759d84e2b2f5ee77d5fe817c423838c7fe59c0d68459",
       },
     ],
   },
 ]
 
-type PnpRecord = {id: Str, name: Str}
-
 ## Exported declaration `filetree`.
 export const filetree = [
+  {
+    path: p"usr/include/libdisplay-info/cta-vic.h",
+    kind: "file",
+  },
   {
     path: p"usr/include/libdisplay-info/cta.h",
     kind: "file",
@@ -69,6 +71,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/include/libdisplay-info/hdmi-vic.h",
+    kind: "file",
+  },
+  {
     path: p"usr/include/libdisplay-info/info.h",
     kind: "file",
   },
@@ -77,11 +83,11 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libdisplay-info.so.0.3.0",
+    path: p"usr/lib/libdisplay-info.so.0.4.0",
     kind: "binary",
   },
   {
-    path: p"usr/lib/libdisplay-info.so.3",
+    path: p"usr/lib/libdisplay-info.so.4",
     kind: "symlink",
   },
   {
@@ -90,52 +96,89 @@ export const filetree = [
   },
 ]
 
-pure c_string(text: Str) -> Str {
-  text.replace("\\", "\\\\").replace("\"", "\\\"")
+# Port of tool/gen-search-table.py, which turns hwdata's pnp.ids into the
+# PNP ID lookup switch. The output matches the script's except in escaping:
+# the script escapes each non-alphanumeric character by its code point, which
+# for a non-ASCII character yields an octal escape C reads as the wrong bytes.
+# This port escapes every byte outside [A-Za-z0-9 .,] instead, so names stay
+# valid UTF-8, and `?` is still escaped, so no trigraph forms.
+pure c_escaped(text: Str) -> Str {
+  var out = ""
+  var index = 0
+
+  while index < text.byte_len() {
+    let byte = text.byte_at(index) ?? 0
+    let plain = (byte >= 48 and byte <= 57) or (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122) or byte == 32 or byte == 44 or byte == 46
+
+    if plain {
+      out = f"{out}{text.byte_slice(index, 1)}"
+    } else {
+      out = f"{out}\\{byte / 64}{byte / 8 % 8}{byte % 8}"
+    }
+
+    index += 1
+  }
+
+  out
 }
 
-proc write_pnp_table(root: Str) [fs, error] {
-  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  var records: List[PnpRecord] = []
+## The PNP ID lookup C source for the text of hwdata's pnp.ids: one switch
+## case per three-character ID, keyed by the ID's bytes, the last name
+## listed for an ID winning.
+export pure pnp_id_table_source(pnp_ids: Str) -> Str {
+  var names: Map[Str] = {}
 
-  for line in pnp.read_text()?.split("\n") {
-    let trimmed = line.trim()
-
-    if trimmed != "" {
-      let words = trimmed.words()
-
-      if words.len() >= 2 and words[0].count_chars() == 3 {
-        let id = words[0]
-        let display_name = trimmed.replace(id, "").trim()
-        records = records.push({id, name: display_name})
+  for line in pnp_ids.split("\n") {
+    if let [_, id, display_name] = rx"^\s*(\S+)\s+(.*)$".captures(line) {
+      if id.count_chars() == 3 {
+        names[id] = c_escaped(display_name.trim())
       }
     }
   }
 
-  records = records |> sort-by .id
+  var cases = []
 
-  var cases = [
-    f"    if (strcmp(key, \"{c_string(entry.id)}\") == 0) return \"{c_string(entry.name)}\";"
-    for entry in records
-  ]
+  for id in names.keys() |> sort {
+    let key = (id.byte_at(0) ?? 0) * 65536 + (id.byte_at(1) ?? 0) * 256 + (id.byte_at(2) ?? 0)
+    cases = cases.push(f"    case {key}: return \"{names.get(id) ?? ""}\";")
+  }
 
   let case_text = cases.join("\n")
 
-  fs.write(
-    p"pnp-id-table.c",
-    f"""#include <string.h>
+  f"""
+
+#include <string.h>
+#include <stdint.h>
 
 const char *
 pnp_id_table(const char *key);
 
 const char *
 pnp_id_table(const char *key)
-{{{{
+{{
+    size_t len = strlen(key);
+    size_t i;
+    uint32_t u = 0;
+
+    if (len > 4)
+        return NULL;
+
+    for (i = 0; i < len; i++)
+        u = (u << 8) | (uint8_t)key[i];
+
+    switch (u) {{
 {case_text}
-    return NULL;
-}}}}
-""",
-  )?
+
+    default:
+        return NULL;
+    }}
+}}
+"""
+}
+
+proc write_pnp_table(root: Str) [fs, error] {
+  let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
+  fs.write(p"pnp-id-table.c", pnp_id_table_source(pnp.read_text()?))?
 }
 
 proc patch_generators(root: Str) [fs, error] {
