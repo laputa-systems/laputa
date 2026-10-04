@@ -10,7 +10,7 @@ export const package_kind = "payload"
 export const ver = "7.0.5"
 
 ## Exported declaration `rel`.
-export const rel = "36"
+export const rel = "37"
 
 ## Exported declaration `deps`.
 export const deps: List[Str] = []

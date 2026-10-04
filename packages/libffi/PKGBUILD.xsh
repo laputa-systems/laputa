@@ -15,10 +15,10 @@ export const ver = "3.5.2"
 export const rel = "10"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "linux"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [

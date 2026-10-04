@@ -60,8 +60,6 @@ proc ensure_x86_bzimage(image_path: Path) [fs, error] {
 proc main(rootfs = /rootfs) [fs, env, error] {
   ensure_file(fp"{rootfs}/boot/vmlinuz", "kernel image")?
   ensure_file(fp"{rootfs}/usr/share/linux/config-7.0.5", "kernel config")?
-  ensure_file(fp"{rootfs}/usr/include/linux/version.h", "linux version header")?
-  ensure_file(fp"{rootfs}/usr/include/asm/unistd.h", "arch uapi header")?
   let config_path = fp"{rootfs}/usr/share/linux/config-7.0.5"
   let os = system.uname()?
   let host_machine = os.machine
@@ -76,7 +74,7 @@ proc main(rootfs = /rootfs) [fs, env, error] {
     return Err(ProofError.Failed("proof-linux", f"unsupported proof arch: {proof_arch}"))?
   }
 
-  print "linux ok: vmlinuz and uapi headers"
+  print "linux ok: vmlinuz"
 }
 
 main(@args)?

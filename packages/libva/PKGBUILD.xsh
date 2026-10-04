@@ -18,7 +18,7 @@ export const rel = "8"
 export const deps = ["musl", "libdrm", "wayland-libs-client"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libdrm", "wayland-dev"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf", "libdrm", "wayland-dev"]
 
 ## Exported declaration `mkdeps_target`.
 export const mkdeps_target = ["wayland-dev"]

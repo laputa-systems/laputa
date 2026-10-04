@@ -33,7 +33,7 @@ export const deps = [
 ## Package recipe export.
 export const mkdeps_host = [
   "llvm-toolchain",
-  "linux",
+  "linux-headers",
   "muon",
   "samurai",
   "pkgconf",
@@ -741,7 +741,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   patch_build(root)?
 
   env ({
-    CFLAGS: "-D__user=",
     LD_LIBRARY_PATH: native_tools_ld,
     PKG_CONFIG: pc.pkg_config,
     PKG_CONFIG_LIBDIR: pc.pkg_config_libdir,

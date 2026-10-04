@@ -15,10 +15,10 @@ export const ver = "1.0.3"
 export const rel = "8"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "linux"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
@@ -63,7 +63,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
   let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes"]
-  let defs = ["-D_XOPEN_SOURCE=700", "-D__user="]
+  let defs = ["-D_XOPEN_SOURCE=700"]
   let includes = []
   let srcs = [p"udev.c", p"udev_list.c", p"udev_device.c", p"udev_monitor.c", p"udev_enumerate.c"]
 

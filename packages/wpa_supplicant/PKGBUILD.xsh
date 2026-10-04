@@ -18,10 +18,10 @@ export const rel = "5"
 # The nl80211 driver unconditionally includes <netlink/genl/genl.h>, so libnl3
 # headers and library are required at build and runtime.
 ## Package recipe export.
-export const deps = ["musl", "linux", "libnl3"]
+export const deps = ["musl", "libnl3"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "libnl3"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "libnl3"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
 export const runtime_only_deps = ["xinit"]

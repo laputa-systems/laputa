@@ -113,12 +113,14 @@ test-system: need-xsh
 test-xinit: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
 
+# The kernel recipe's Kbuild tests and linux-headers' headers_install tests.
 # The kbuild tests write the stable archive-plan cache, which defaults to
 # /var/cache/laputa/linux-kbuild; keep it under .out/, which `make clean` owns.
 LINUX_KBUILD_CACHE := $(CURDIR)/.out/cache/linux-kbuild
 test-linux: need-xsh
 	mkdir -p "$(LINUX_KBUILD_CACHE)"
 	$(HOST_XSH_ENV) XSH_LINUX_KBUILD_PLAN_CACHE_DIR="$(LINUX_KBUILD_CACHE)" $(XSHT) test packages/linux/tests
+	$(HOST_XSH_ENV) $(XSHT) test packages/linux-headers/tests
 
 # All derived state: .out/ (seed, artifact store, cargo target, image
 # contexts), target/ (profile and installer outputs), mirror build outputs,

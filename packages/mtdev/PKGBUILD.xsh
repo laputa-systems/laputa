@@ -15,10 +15,10 @@ export const ver = "1.1.7"
 export const rel = "9"
 
 ## Package recipe export.
-export const deps = ["musl", "linux"]
+export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "linux"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -105,7 +105,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
   let cflags = ["-O2", "-Wall"]
-  let defs = ["-DHAVE_CONFIG_H", "-D__user="]
+  let defs = ["-DHAVE_CONFIG_H"]
   let includes = ["-Iinclude", "-Isrc", "-I."]
   write_config()?
 

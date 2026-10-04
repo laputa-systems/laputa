@@ -19,7 +19,7 @@ export let deps = []
 export const runtime_only_deps = ["iptables", "xinit"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host: List[Str] = []
 
 ## Package recipe export.
 export const upstream_sources = [

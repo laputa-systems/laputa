@@ -25,7 +25,6 @@ export const deps = [
   "pixman",
   "fontconfig",
   "fcft-minimal",
-  "utf8proc",
 ]
 
 ## The default config names the Hack font; fontconfig finds it at runtime.
@@ -34,7 +33,7 @@ export const runtime_only_deps = ["font-ttf-hack"]
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = [
   "llvm-toolchain",
-  "linux",
+  "linux-headers",
   "pkgconf",
   "muon",
   "samurai",

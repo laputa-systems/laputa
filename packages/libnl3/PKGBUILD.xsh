@@ -15,10 +15,10 @@ export const ver = "3.11.0"
 export const rel = "5"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "linux"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
@@ -223,41 +223,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.symlink(fp"{basename}", fp"{dest}/usr/lib/{soname}")?
     fs.symlink(fp"{soname}", fp"{dest}/usr/lib/{linker}")?
   }
-
-  # Stub missing kernel header.  linux/filter.h (UAPI) includes linux/compiler.h
-  # which is a kernel-internal header not exported to userspace.
-  let linux_hdrs = fp"{dest}/usr/include/linux"
-  fs.mkdir(linux_hdrs)?
-
-  fs.write(
-    fp"{linux_hdrs}/compiler.h",
-    """#ifndef _UAPI_LINUX_COMPILER_H
-#define _UAPI_LINUX_COMPILER_H
-#define __user
-#define __force
-#define __iomem
-#define __bitwise __bitwise__
-#define __attribute_const__ __attribute__((__const__))
-#define __printf(a, b) __attribute__((__format__(printf, a, b)))
-#define __scanf(a, b) __attribute__((__format__(__scanf__, a, b)))
-#define __cold __attribute__((__cold__))
-#define __visible __attribute__((__externally_visible__))
-#define __packed __attribute__((__packed__))
-#define __aligned(x) __attribute__((__aligned__(x)))
-#define __section(x) __attribute__((__section__(x)))
-#define __always_inline inline __attribute__((__always_inline__))
-#define __noinline __attribute__((__noinline__))
-#define __must_check __attribute__((__warn_unused_result__))
-#define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
-#define __is_constexpr(x) __builtin_constant_p(x)
-#define __counted_by(m)
-#define __rcu
-#define __nocast
-#define __read_mostly
-#define __ro_after_init
-#endif
-""",
-  )?
 
   # Install public headers at /usr/include/netlink/
   let usr_include = fp"{dest}/usr/include"

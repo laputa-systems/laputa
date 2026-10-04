@@ -20,7 +20,7 @@ export const deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = [
   "llvm-toolchain",
-  "linux",
+  "linux-headers",
   "muon",
   "samurai",
   "pkgconf",

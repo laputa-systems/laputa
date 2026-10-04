@@ -4866,52 +4866,6 @@ pure efi_libstub_source_x86(stem: Str) -> Path {
   fp"drivers/firmware/efi/libstub/{stem}.c"
 }
 
-proc gzip_store_bytes(data: Bytes) [error] -> Result[Bytes] {
-  var parts = [
-    bytes.from_ints(
-      [
-        31,
-        139,
-        8,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        3,
-      ],
-    )?,
-  ]
-
-  var offset = 0
-
-  while offset < data.len() {
-    let remaining = data.len() - offset
-    let chunk_len = if remaining > 65535 { 65535 } else { remaining }
-    let final = if offset + chunk_len >= data.len() { 1 } else { 0 }
-    parts = parts.push(bytes.from_ints([final])?)
-    parts = parts.push(bytes.pack_le(chunk_len, 2)?)
-    parts = parts.push(bytes.pack_le(65535 - chunk_len, 2)?)
-    parts = parts.push(data.slice(offset:, length: chunk_len))
-    offset += chunk_len
-  }
-
-  parts = parts.push(bytes.pack_le(hash.crc32(data), 4)?)
-  parts = parts.push(bytes.pack_le(data.len() % 4294967296, 4)?)
-  bytes.concat(parts)
-}
-
-proc write_gzip_store(input: Path, out: Path) [fs, error] {
-  write_text_if_changed(
-    fp"{out}.note",
-    f"""stored-gzip source={input} size={input.metadata()?.size}
-""",
-  )?
-
-  fs.write(out, gzip_store_bytes(input.read_bytes()?)?)?
-}
-
 proc append_x86_relocs(relocs: Path, input: Path, out: Path) [fs, process, error] {
   let input_text = input.display()
   let reloc_data = run.capture --bytes $relocs $input_text ?
@@ -5147,7 +5101,7 @@ proc build_x86_compressed_kernel(
   let boot_vmlinux_bin = p"arch/x86/boot/vmlinux.bin"
   make.run_tasks([x86_compressed_vmlinux_bin_task(objcopy, vmlinux, kernel_bin)], 1)?
   append_x86_relocs(relocs, vmlinux, kernel_all)?
-  write_gzip_store(kernel_all, kernel_gz)?
+  archive.compress(kernel_all, kernel_gz, format: "gzip", level: 9, overwrite: true)?
   run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-o" $mkpiggy "arch/x86/boot/compressed/mkpiggy.c" ?
   let piggy_text = run.text $mkpiggy $kernel_gz ?
   write_text_if_changed(piggy_s, piggy_text)?

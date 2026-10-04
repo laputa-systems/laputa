@@ -14,10 +14,10 @@ export const ver = "1.13.6"
 export const rel = "8"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "linux"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [

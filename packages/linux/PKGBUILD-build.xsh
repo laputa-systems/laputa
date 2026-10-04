@@ -47,34 +47,6 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
   )
 }
 
-proc install_headers_from(root: Path, source: Path, target: Path) [fs, error] {
-  guard fs.exists(source)? else {
-    return
-  }
-
-  let source_root = path.absolute(source)?
-
-  for entry in fs.files(source)? |> where .ext == "h" {
-    let header_rel = entry.path.relative_to(source_root)
-
-    fs.install(
-      entry.path,
-      fp"{root}/{target}/{header_rel}",
-      0o644,
-      parents: true,
-      overwrite: true,
-    )?
-  }
-}
-
-proc install_uapi_headers(dest: Path, srcarch: Str) [fs, error] {
-  install_headers_from(dest, p"include/uapi/linux", p"usr/include/linux")?
-  install_headers_from(dest, p"include/generated/uapi/linux", p"usr/include/linux")?
-  install_headers_from(dest, p"include/uapi/asm-generic", p"usr/include/asm-generic")?
-  install_headers_from(dest, fp"arch/{srcarch}/include/uapi/asm", p"usr/include/asm")?
-  install_headers_from(dest, fp"arch/{srcarch}/include/generated/uapi/asm", p"usr/include/asm")?
-}
-
 proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, env, time, error] {
   if srcarch == "arm64" {
     PKGBUILD_aarch64.build_scratch(cc, srcarch, version)?
@@ -131,7 +103,6 @@ proc main(dest: Path) [fs, process, env, time, error] {
   fs.install(image, fp"{dest}/boot/vmlinuz-{version}", 0o644, parents: true, overwrite: true)?
   fs.install(image, fp"{dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)?
   fs.install(p".config", fp"{dest}/usr/share/linux/config-{version}", 0o644, parents: true, overwrite: true)?
-  install_uapi_headers(dest, srcarch)?
   PKGBUILD_shared.timing_done("install", install_start)
   PKGBUILD_shared.timing_done("package-total", package_start)
 }

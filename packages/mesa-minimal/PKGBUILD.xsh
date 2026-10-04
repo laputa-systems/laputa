@@ -17,7 +17,7 @@ export const rel = "27"
 export const deps = ["musl", "libdrm", "wayland-libs-client", "wayland-libs-server", "libffi"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "linux", "pkgconf", "libdrm", "wayland-dev", "libffi"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "pkgconf", "libdrm", "wayland-dev", "libffi"]
 
 ## Package recipe export.
 export const upstream_sources = [

@@ -12,7 +12,7 @@ export const ver = "1.0"
 export const rel = "10"
 
 ## Package recipe export.
-export const deps = ["musl"]
+export const deps: List[Str] = []
 
 ## Package recipe export.
 export let mkdeps_host = []

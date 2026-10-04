@@ -17,7 +17,7 @@ export const rel = "9"
 export const deps = ["musl", "libudev-zero"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai", "pkgconf", "libudev-zero"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf", "libudev-zero"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [

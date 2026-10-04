@@ -23,7 +23,7 @@ export const mkdeps_host = [
   "pkgconf",
   "wayland-dev",
   "wayland-protocols",
-  "linux",
+  "linux-headers",
   "wlroots0.19-mesa",
   "pixman-dev",
   "libdrm",

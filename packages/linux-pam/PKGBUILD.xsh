@@ -17,7 +17,7 @@ export const rel = "9"
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "linux", "muon", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai"]
 
 ## Package recipe export.
 export const upstream_sources = [

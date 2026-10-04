@@ -23,7 +23,7 @@ export const deps = [
   "m4",
   "flex",
   "bison",
-  "linux",
+  "linux-headers",
   "muon",
 ]
 
