@@ -1,479 +1,205 @@
 # Local Laputa bootstrap campaign
 
-Goal: one Laputa monorepo, built from a clean checkout on a local machine, end
-to end:
+Goal: build the whole Laputa world locally from a clean checkout of this
+monorepo and `../xsh`, with:
 
 - no dependence on `https://laputa.17166969.xyz`;
 - sources served by a locally run mirror over plain unauthenticated HTTP;
 - a locally built seed xsh;
 - fast, cached rebuilds.
 
-This macOS pass ends once the first packages build from the local seed. It
-stops before `cmake` and `linux`. A Linux amd64 host finishes the world build
-afterwards.
+Laputa and XSH are developed together. Changes to xsh and xsht that make the
+distribution simpler are in scope.
 
-Laputa and XSH are developed together: Laputa is the distribution, and XSH is
-the language that powers it. Changes to xsh and xsht that make the
-distribution simpler are in scope, and the Laputa docs say so.
+Phases 0–2 ran on Apple Silicon and stopped before `cmake` and `linux`. The
+rest of the campaign runs on a fresh Linux amd64 host that has only git, make,
+Docker, and the two checkouts (see "Linux amd64 host campaign").
 
-Out of scope:
-- GitHub CI.
-- Building the mirror as a Laputa package (no Deno package). The mirror is a
-  host tool the bootstrap runs, not something it builds.
+Out of scope: GitHub CI, and building the mirror as a Laputa package (it is a
+host tool).
 
-## Where things stand (research, 2026-10-03)
+## Done
 
-### Repositories
+**Phase 0: consolidation (2026-10-03).** The `packages`, `mirror` and `xinit`
+repos were imported without history (D4) into one layout: `pm.xsh` and `pm/`,
+`packages/<name>/`, `system/`, `xinit/`, `mirror/`, `seed/`, and
+`tests/{pm,system,integration}/`. There is one `Makefile`, one
+`xsht-config.ini` and one `AGENTS.md`, and containers mount the checkout at
+`/src/laputa`. The `xinit` recipe builds from `repository/xinit/xinit.xsh`.
+Stray scripts, the legacy x86_64 installer route and PM's `.env` reading were
+deleted, and xinit was ported to current XSH. No sibling-path references
+remain.
 
-| Repo | Commits | Role |
-|---|---|---|
-| `laputa` | 41 | profile CLI (`laputa/`), installer, QEMU proof, `Dockerfile.package-tools`, `bootstrap-llvm-seed.xsh` |
-| `packages` | 199 | `pm.xsh` and `pm/` (28 modules, ~11.7k lines); `repo/` (70 recipes, `linux/` alone is 10.5k lines) |
-| `mirror` | 15 | Rust server for index, packages, metadata and per-package source tarballs. S3/R2 only, WebAuthn and token auth for writes. |
-| `xinit` | 6 | `xinit.xsh` (PID 1 and service manager), with tests and docs |
+**Phase 1: four lanes (2026-10-03).**
+- The mirror gained a `--local DIR` mode (filesystem storage, plain HTTP on
+  127.0.0.1, no auth) and serves the source cache at `/sources/sha256/<hash>`.
+- PM gained a content-addressed source cache. `pm sources fetch` (`make
+  fetch`) is the only networked step, there is no default remote, and
+  publishing to a loopback mirror needs no token. `sudo-rs` crates are
+  vendored as sources.
+- `make seed` builds static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from
+  `XSH_ROOT` in XSH's `xsh-test` image, then the content-keyed package-tools
+  image offline. The `xsh` package packages the seed (D6).
+- Artifact keys follow D2: they exclude the executor, hash only build-dependency
+  keys, and honor `BUILD_EPOCH`. A `runtime_only_deps` field keeps
+  runtime-only edges out of build roots and keys.
 
-There are no submodules. Everything assumes sibling checkouts (`../packages`,
-`../xsh`, `$HOME/d/laputa-systems/...`).
+**Phase 2: first local bootstrap on macOS (2026-10-03).**
+- All 31 pre-cmake packages build offline from the local seed, publish to the
+  local mirror, and compose a root whose ELF files load under musl and whose
+  `xsh` runs.
+- Measured cold, one step at a time: seed 336 s, build 123 s, publish 3.4 s. A
+  rebuild with no change takes 8–11 s.
+- The D2 proofs held. A new seed rebuilds only `xsh`. A PM edit rebuilds only
+  `laputa-pm`. A `rel` bump rebuilds that package and its build dependents.
+- The D8 follow-up made package identity content-addressed. Objects are named
+  by artifact and proof key, the index row is the only mutable pointer, and a
+  rebuild under the same `ver`-`rel` publishes cleanly.
+- Fixes along the way:
+  - `repo plan --all --without` computes the stop line from the real graph.
+  - Bootstrap edges no longer select packages.
+  - `make publish` builds the current plan before uploading it.
 
-### Network dependencies today
-
-- **Remote mirror:**
-  - `pm/remote.xsh::default_repo_url` is the default unless
-    `XSH_PM_OFFLINE=1`;
-  - `build-installer-common.xsh` and `build-installer-image.xsh` use it for
-    the x86_64 installer, `linux_tarball` and `install_remote_packages`;
-  - PM reads `.env` for `LAPUTA_TOKEN`.
-- **Seeds fetched from GitHub** (all still reachable as of 2026-10-03):
-  - `laputa-systems/llvm-prebuilt-musl` `clang+llvm-23.1.0-rc2` (aarch64 and
-    x86_64);
-  - `laputa-systems/xsh` release `d09c6c33` (xsh, xshi, xsht, core);
-  - `github.com/laputa-systems/xinit/raw/c6af710…`, three commits behind
-    xinit HEAD.
-- **Base image:** `alpine:3.21@sha256:48b0…` plus unpinned
-  `apk add build-base ca-certificates curl e2fsprogs util-linux xz zlib`.
-- **Upstream sources:** about 60 recipes pull from GNU, kernel.org,
-  freedesktop, GitHub, static.rust-lang.org (cargo is a prebuilt Rust
-  toolchain), pkgs.tailscale.com (a prebuilt binary) and others.
-- **Hidden fetch at build time:** `sudo-rs` runs `cargo build` against
-  crates.io during the build.
-
-### Local state
-
-- Nothing is cached locally: no source cache, no local repo, no mirror data.
-- The only local LLVM tarball (22.1.8) matches no pin.
-- OrbStack's Docker daemon is not running.
-
-### How build and caching work today
-
-- **Plan:** `repo plan` loads all 70 recipes, fetches the remote `index.json`
-  (unless offline), and hashes the PM tree, the xsh binaries and the core
-  applets into the *executor identity*. Artifact key = target + package +
-  recipe hash + executor + dependency keys.
-- **Build:** `execute.build_plan` builds level by level with `par-map`. There
-  is no chroot. Each node unpacks and then copies its dependency closure into a
-  temp root, seeds host xsh, runs `xsht trace` with the host `PATH` appended,
-  and stores
-  `v1/sha256/<key>/{artifact.json,payload.tar.gz,metadata.json,proof.json}`.
-- **No download cache:** sources download into a fresh temp work dir every
-  build.
-- **Any change to `pm/*.xsh`, the xsh binaries or the core rebuilds the
-  entire world,** Linux included. That is incompatible with co-developing XSH.
-- **Repeated hashing:** payloads are hashed many times per build (receipt
-  closure, double lookups, plan re-validation per node).
-- **Kbuild caches** live in throwaway trees or at an unmounted
-  `/var/cache/laputa/linux-kbuild`.
-
-### Build order
-
-| Level | Packages |
-|---|---|
-| L0 | musl, xsh, baselayout, ca-certificates, hwdata, tllist, xkeyboard-config, font-ttf-hack |
-| L1 | llvm-toolchain, m4, gnu-stubs, xinit, laputa-fs, laputa-pm |
-| L2 | samurai, bison, flex, pkgconf, cargo, alsa-lib, less, iptables, eudev-lite, mdevd |
-| L3 | **cmake**, muon, **linux**, tailscale |
-
-The macOS stop line is the end of L2, plus any L3+ package that needs neither
-cmake nor linux.
-
-## Bootstrap blockers and risks
-
-- **No fatal blocker.** Every pinned seed URL still resolves.
-- **The LLVM seed is a prebuilt binary** from our own GitHub repo. LLVM is
-  never built from source here (decision D3).
-- **The Docker daemon must be running** (OrbStack, `linux/arm64`).
-- **The Alpine base image and apk packages need network once.** apk is
-  unpinned, so an image rebuild can drift.
-- **Every recipe upstream must be fetched once.** Dead upstream URLs show up
-  only when we fetch them all (step B1).
-- **The world rebuilds** whenever the PM code or xsh changes (decision D2).
-- **`sudo-rs` must be vendored** to build offline.
-- **Done:** the user deleted `laputa/.env`, which held live
-  `TAILSCALE_AUTH_KEY` and `LAPUTA_TOKEN` values. PM still reads `.env`
-  files; delete that code.
-
-## Target design
-
-### Monorepo layout
-
-Import the files of `packages`, `mirror` and `xinit` in one commit, without history (D4).
-
-```
-laputa/
-  Makefile            single entry point (below)
-  pm.xsh  pm/         package manager                 (packages/pm.xsh, pm/)
-  packages/<name>/    recipes                         (packages/repo/*)
-  system/             profile CLI modules             (laputa/laputa/*)
-  profiles/ guest/ boot/ installer/
-  xinit/              xinit.xsh, tests, docs          (xinit/*)
-  mirror/             Rust mirror server, host tool   (mirror/*)
-  seed/               seed scripts
-  tests/ docs/ tools/
-  .out/               ALL derived state (gitignored)
-  .cache/             fetched inputs: sources by sha256, seed artifacts, saved images (gitignored)
-```
-
-- The `xinit` and `laputa-*` recipes take their sources from the tree, through
-  `repository/` sources, instead of from GitHub.
-- `xsh` stays its own repo at `XSH_ROOT ?= ../xsh`. The seed is built from
-  the current checkout (D2).
-
-### Make targets
-
-- **`make clean`:** removes every piece of derived state:
-  - `.out/`, which holds the PM store, work dirs, local mirror package data,
-    logs, kbuild caches and installer outputs;
-  - Laputa Docker volumes and `laputa-*` images, through
-    `docker volume rm` / `docker image rm` against an explicit list.
-
-  It keeps `.cache/`.
-- **`make distclean`:** `clean`, then also deletes `.cache/`.
-- **`make fetch`:** the only step that touches the network. It downloads every
-  pinned input into `.cache/` and verifies each sha256:
-  - each recipe's upstream sources for the selected arch;
-  - the LLVM seed;
-  - the Rust dist;
-  - the vendored crates;
-  - the base image, saved with `docker save`.
-
-  It never contacts the Laputa mirror.
-- **`make seed`:**
-  - builds static musl `xsh`/`xshi`/`xsht` and the core tarball from
-    the current `XSH_ROOT` checkout, in xsh's `Dockerfile.test` image with
-    the release profile. It is incremental, so it rebuilds only when xsh
-    changed;
-  - builds the package-tools image from local inputs only (no GitHub `ADD`),
-    or loads it from the saved tar.
-- **`make mirror`:**
-  - runs `mirror` locally from `.out/mirror` in local mode: plain HTTP on
-    127.0.0.1, no auth, filesystem storage;
-  - serves `.cache/sources` read-only by sha256;
-  - accepts package publishes without a token.
-- **`make plan` / `make build [PKGS=…|STOP=pre-cmake]`:**
-  - PM plans offline against the local mirror;
-  - builds run in arm64 Docker with `--network none`;
-  - results publish into the local mirror.
-- **`make test`:** native suites for PM, laputa and xinit (`xsht test`).
-- **`make check`:** `xsht check` and `xsht lint` across the tree.
-
-### Sources and caching
-
-- **Downloads are content-addressed** at `.cache/sources/sha256/<hash>`. A
-  fetch first tries the local mirror (`LAPUTA_MIRROR`, by sha256), then the
-  cache. Only `make fetch` contacts upstreams.
-- **URL rewriting stays outside fingerprints.** Artifact keys hash the source
-  string and checksum as today, so moving to the local mirror changes no key.
-- **No remote mirror default** and no `.env` reading. Publishing to
-  `http://127.0.0.1` local mode needs no token.
-- **Executor identity per D2:**
-  - xsh and the PM code are recorded, not keyed;
-  - keys hash build-dependency keys only, so a runtime dependency that is
-    rebuilt does not cascade;
-  - `BUILD_EPOCH` is the explicit way to invalidate.
-- **Hash each payload once per process.** Trust store entries whose
-  directory key was verified when they were committed; plan validation runs
-  once per build, not per node.
-- **Build roots:** unpack the dependency closure once per node, with no
-  second copy. Proof roots reuse unpacked dependency payloads through a
-  per-build unpack cache.
-- **Persistent kbuild plan cache** under `.out/cache/linux-kbuild`. This
-  mostly matters on the Linux host.
-
-## Lanes (up to 4 in parallel, Opus 5.5 medium)
-
-**Phase 0, serial (integrator): consolidation.**
-- Copy in the files of the three repos (D4).
-- Move them into the layout and rewrite every sibling path:
-  - `xsht-config.ini` module paths;
-  - the Makefiles and their merge into one;
-  - `docker.xsh` `--build-context`;
-  - the `packages_root()` home path;
-  - the AGENTS.md files.
-- Delete the stray files the research found:
-  - `plan2.md`;
-  - `repo/run-package-build.trace` and the two `run-package-build.xsh`
-    scripts;
-  - `prepare-proof-rootfs-package-upgrade.xsh`;
-  - `tools/linux-kbuild-oracle.py` and its fixture;
-  - `.envrc`;
-  - stale `.gitignore`/`.dockerignore` entries;
-  - `Dockerfile.test-local`.
-- Gate: every module checks (`xsht check`), and all three test suites pass
-  on the host.
-- **Done (2026-10-03).** The layout:
-  - `pm.xsh`, `pm/`;
-  - `packages/<name>/`;
-  - `system/` (module names `system.*`), `laputa.xsh`;
-  - `profiles/`, `guest/`, `boot/`;
-  - `installer/` plus the root `build-installer-*`/`installer-*` scripts;
-  - `xinit/`;
-  - `mirror/`;
-  - `tests/{pm,system,integration}/`;
-  - `docs/`.
-
-  The PM repository root is the directory that holds `pm.xsh` and
-  `packages/`. Recipe modules import as `packages.*`. Containers mount the
-  one checkout at `/src/laputa`. `XSH_ROOT` replaces `XSH_SOURCE_ROOT` and
-  `LAPUTA_PACKAGES_ROOT`. The `xinit` recipe takes its source from
-  `repository/xinit/xinit.xsh`.
-
-  There is one root `Makefile`:
-  - `check`;
-  - `test` (`test-pm`, `test-system`, `test-xinit`);
-  - `clean` (`.out/`, `target/`, mirror frontend outputs);
-  - `profile-*`, `test-pm-*`, `installer-*`, `mirror-*`.
-
-  There is also one `xsht-config.ini` and one `AGENTS.md`. The legacy
-  x86_64 installer route and the `.env` reading in PM are deleted. xinit
-  is ported to current XSH: it had ~100 check diagnostics, and its tests
-  no longer loaded.
-
-  Gates:
-  - `make check`: clean;
-  - PM: 153 passed, 2 skipped;
-  - system: 36 passed;
-  - xinit: 22 passed;
-  - mirror `cargo test`: 37 passed;
-  - no sibling-path references remain.
-
-  Deferred to later phases:
-  - **Remote-mirror defaults stay** in `pm/remote.xsh` and in the
-    installer's `LAPUTA_REPO_URL` (lanes B and C, then the Phase 3
-    installer work).
-  - **GitHub xsh release `ADD`s stay** in `Dockerfile.package-tools`,
-    `Dockerfile.pm-test` and `packages/xsh` (lane C).
-  - **The package-tools image build was not exercised.** Docker was not
-    running, and the build context is now the monorepo root behind
-    `.dockerignore`.
-  - **Some docs still describe the pre-monorepo commands:** `docs/PM.md`,
-    `LAPUTA.md`, `MAKE.md` and `QEMU.md` (Phase 3).
-  - **xinit now needs post-2026-09 XSH APIs,** so the seed pin must not be
-    older than the current `../xsh`.
-
-**Phase 1, 4 lanes in parallel.** File ownership is disjoint.
-
-- **A. Local mirror** (`mirror/`):
-  - a `Storage::Fs` backend;
-  - `--local DIR` mode: plain HTTP, 127.0.0.1 only, no auth, no env panics,
-    no frontend;
-  - a read-only `sources/sha256/<hash>` route over the source cache;
-  - tests;
-  - `make mirror`.
-  - Production S3/WebAuthn behavior stays unchanged.
-- **B. PM sources and offline** (`pm/sources.xsh`, `remote.xsh`, `util.xsh`,
-  `cli.xsh` fetch commands, `packages/*` source records):
-  - the content-addressed cache;
-  - local-mirror resolution;
-  - `pm sources fetch` (the network step behind `make fetch`);
-  - remove `default_repo_url` and `.env` reading;
-  - tokenless local publish;
-  - vendor `sudo-rs` crates;
-  - delete the dead remote/local exports, the duplicated redirect and
-    header code, and the fragile `source_vars` expansion;
-  - fetch every upstream once and report dead URLs.
-- **C. Seed and container** (`seed/`, `Dockerfile.package-tools`,
-  `system/docker.xsh`, `bootstrap-llvm-seed.xsh`, recipes `xsh`, `xinit`,
-  `llvm-toolchain`, `laputa-*`):
-  - `make seed`;
-  - a package-tools image built from `.cache` with no network;
-  - the xsh recipe packaged from the seed build;
-  - in-tree xinit;
-  - pass `XSH_PM_BUILD_ROOT` to recipes;
-  - delete `update-xsh.xsh` and the `XSH_RELEASE` pins (no release pins remain);
-  - replace named volumes with paths that `make clean` owns.
-- **D. PM build speed and identity** (`pm/plan.xsh`, `execute.xsh`,
-  `store.xsh`, `fingerprint.xsh`, `build.xsh`):
-  - the D2 key: drop xsh, PM and core from artifact keys, and record them in
-    artifact metadata instead;
-  - hash only build-dependency (`mkdeps`) keys;
-  - `BUILD_EPOCH`;
-  - prove it with tests: an xsh rebuild, or an edit to PM's CLI, changes no
-    keys, and a `BUILD_EPOCH` or `rel` bump changes exactly the expected
-    keys;
-  - hash once;
-  - unpack once;
-  - drop dead `XSH_PM_BUILD_CHROOT` and chroot leftovers;
-  - measure plan and build time before and after on a fixed package set.
-
-**Phase 1 follow-up (before Phase 2): runtime-only dependencies.**
-- Today `deps` are installed into every build root with their runtime
-  closure, so they are part of the key. That is correct for real build
-  inputs (musl, zlib for dropbear).
-- Add a recipe field for runtime-only dependencies that are never installed
-  into the build root and do not enter the key. Examples: tailscale →
-  iptables/xinit/xsh, foot → font-ttf-hack, laputa-fs/laputa-pm/xinit → xsh,
-  alsa-ucm-conf → alsa-lib.
-- That way a new `xsh` package (a new seed) rebuilds only `xsh`, not its
-  runtime dependents.
-- Root composition still installs runtime-only dependencies.
-- Also: the `xsh` package's key must change when the seed bytes change; a
-  local `SKIP` source must not hide them.
-
-**Phase 2, integrator: first local bootstrap on macOS.**
-1. `make clean`, then `fetch`, then `seed`, then `mirror`.
-2. `make build STOP=pre-cmake` in arm64 Docker with `--network none`,
-   publishing to the local mirror.
-3. `root compose` a small root from the local mirror.
-4. Run a rebuild with no changes and confirm it is a no-op that finishes in
-   seconds.
-- **Done (2026-10-03).** Every pre-cmake package builds offline from the
-  local seed. Measured on Apple Silicon with OrbStack, one step at a time:
+**Linux-host readiness (2026-10-03).**
+- **Host tools without Rust.** `make host-xsh` builds the host tools in
+  `xsh-test` with plain Docker: static `xsh`/`xshi`/`xsht` for the host arch
+  in `.out/host/<arch>/`. It shares `.out/xsh-target` with the seed, and a
+  test pins its cargo command to the seed's.
+  - On Linux the Makefile uses these tools when `../xsh/target/release/xsh` is
+    absent.
+  - `make mirror` runs a static mirror built the same way. Its crates come
+    from `make fetch`.
+  - `ARCH` defaults to the host arch.
+  - On Linux, `make clean` and `make root` remove root-owned,
+    container-written state from a container.
+- **x86_64 de-risked from macOS without amd64 Docker:**
+  - The host-side `pm sources fetch --all --target x86_64-linux-musl` fetched
+    58 sources (5 new) with 0 failures. Every URL source has an x86_64 pin.
+  - A host-side offline `repo plan --all --target x86_64-linux-musl` plans
+    all 69 recipes.
+  - The Alpine base digest is a multi-arch index that includes `linux/amd64`.
+  - A static audit fixed libnl3 and wpa_supplicant, whose compiler triple was
+    always aarch64, and build-essential-native's proofs, which required an
+    aarch64 root.
+  - The audit also fixed the x86 kernel's `-march` flags (the `cc` wrapper's
+    x86-64-v3 default was leaking in) and its shared, aarch64-derived
+    `rq-offsets.h`.
+- **aarch64 rerun, nothing regressed** (one step at a time, `linux/arm64`):
 
   | Step | Wall time | Result |
   |---|---|---|
-  | `make clean` | 1.3 s | `.out/`, `target/` and Laputa images removed |
-  | `make fetch` | 5.4 s | no-op: 58 sources cached, 0 fetched |
-  | `make seed` (cold) | 336 s | release cargo build in `xsh-test`, then package-tools |
-  | `make mirror` | ~1 s | cargo binary already built |
-  | `make plan STOP=pre-cmake` | 6–9 s | 31 packages |
-  | `make build STOP=pre-cmake` (cold) | 123 s | 31 built and proved, 0 failures |
-  | `make publish` | 3.4 s | 31 artifacts into the mirror |
-  | `make root PKGS="baselayout xsh xinit musl m4 less pkgconf libxkbcommon pixman"` | 34 s | see below |
-  | `make build STOP=pre-cmake` (no change) | 8–11 s | every artifact reused |
+  | `make clean` | 7.4 s | `.out/`, `target/` and Laputa images removed |
+  | `make fetch` | 13.0 s | 58 sources cached, 0 fetched |
+  | `make seed` | 493 s | cold release build in `xsh-test`, then package-tools |
+  | `make mirror` | 1.1 s | listening |
+  | `make build STOP=pre-cmake` | 107 s | 31 built and proved |
+  | `make publish STOP=pre-cmake` | 10.3 s | 31 artifacts |
+  | `make root PKGS="baselayout xsh xinit musl"` | 21.1 s | 324 files, 12 ELF, 0 failures |
 
-  - **The 31 packages:**
-    - alsa-lib, alsa-ucm-conf, baselayout, bison, ca-certificates, cargo,
-      eudev-lite, flex, font-ttf-hack, gnu-stubs, hwdata, iptables;
-    - laputa-fs, laputa-pm, less, libdisplay-info, libxkbcommon,
-      llvm-toolchain, m4, mdevd, muon, musl;
-    - pixman, pixman-dev, pkgconf, samurai, tailscale, tllist, xinit,
-      xkeyboard-config, xsh.
+## Linux amd64 host campaign
 
-    Nothing in the set needed porting.
-  - **The root:** `make root` imported the 13-artifact closure from the
-    mirror into a fresh store and composed the 10 runtime packages. The root
-    holds 659 files and 19 ELF objects, three of them dynamic executables.
-    Every dynamic object names `/lib/ld-musl-aarch64.so.1` and loads under
-    musl's loader inside the root; the only needed sonames are `libc.so` and
-    `libm.so`. The root's own `xsh` runs a script inside it. No build tool
-    leaked into the root.
-  - **The no-op rebuild** is mostly the offline plan: a container that loads
-    all 70 recipes.
-  - **D2 proofs** (each scratch commit was dropped afterwards):
+**Done means:** on the Linux amd64 host, every package in `packages/` builds
+for `x86_64-linux-musl` from `make clean`. There are no exclusions and no
+skipped recipes: fix a failing recipe, never drop it. The world then
+publishes to the local mirror, composes a root, and produces an installer
+image that passes the QEMU proof:
 
-    | Change | Rebuilt | Time |
-    |---|---|---|
-    | `make seed` again, same XSH | nothing: identical seed bytes | 2.1 s seed, 11 s build |
-    | XSH moved `ff2cfa21` → `58979a17`, plus the port below | `xsh`, `laputa-pm`, `laputa-fs`, `xkeyboard-config`, `libxkbcommon` | 15 s |
-    | a `pm/cli.xsh` comment | `laputa-pm`, which packages the PM tree | 11 s |
-    | m4 `rel` 10 → 11 | `m4`, `flex` (its build dependent) | 12 s |
+```sh
+make clean
+make fetch
+make seed
+make mirror &                 # leave running; `kill %1` at the end
+make build                    # ARCH defaults to x86_64 here; no PKGS/STOP = all 69 packages
+make publish
+make root PKGS="baselayout xsh xinit musl"
+make installer-image          # once parameterized by arch (below)
+make installer-qemu-test
+```
 
-    `laputa-fs` and `xkeyboard-config` rebuilt because the port edited their
-    inputs, and `libxkbcommon` because it builds against `xkeyboard-config`.
-  - **Publish design.** Containers never get a network. Builds read the
-    read-only source cache, and the store is the build cache. Only host
-    processes reach the loopback mirror:
-    - `make publish` builds the same selection (a no-op when nothing
-      changed), then runs `pm repo publish` on the host;
-    - `make root` plans and imports from the mirror on the host, then
-      composes offline in a container.
+Start from the README sequence: clone `laputa` and `xsh` side by side, then
+`make host-xsh`. Work through the list roughly in order, checking each item
+off here with its measurement or result.
 
-    `seed/world.xsh` owns these commands.
-  - **Fixes:**
-    - **`repo plan --all --without PACKAGE...`** computes the stop line from
-      the real graph.
-    - **Bootstrap edges no longer select packages.** musl's seeded `zlib`
-      edge pulled zlib and cmake into every plan, leaving only 10 packages
-      before cmake.
-    - **Ported to current XSH.** It now rejects ignored results. Four sites
-      failed: `pm/sources.xsh`, `pm/fingerprint.xsh`, the xkeyboard-config
-      recipe and `mkfs.ext4.xsh`.
-    - **`make publish` no longer publishes a stale plan.** It had pushed a
-      reverted m4 `rel` bump, and the checkout then planned as behind the
-      remote.
-  - **Open:**
-    - **Immutable tuples versus D2.** A new seed or a PM edit rebuilds `xsh`
-      or `laputa-pm` under the same `ver`/`rel`, and publishing it was an
-      immutable-tuple conflict. Resolved by D8; see the follow-up below.
-    - **One flaky seed build.** An incremental `make seed` once failed
-      linking `xshi`: rust-lld could not open an `.rcgu.o` in the
-      bind-mounted target dir. XSH was being committed to concurrently, and
-      the rerun passed.
-    - **XSH checker bug.** `assert xs |> where . == "a" |> len == 1` reports
-      `check.desugar: pipeline sugar was not desugared` instead of checking
-      or giving a real diagnostic.
-
-**Phase 2 follow-up: content-addressed package identity (D8).**
-- **Done (2026-10-03).**
-  - **Naming:** published objects are named by key:
-    - `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`;
-    - `metadata/` and `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`.
-
-    The proof key is in the JSON names because a proof-only change re-proves
-    the same payload.
-  - **The index row is the only mutable pointer.** The same `ver`-`rel` with
-    a new key replaces the row. A row behind the remote's `ver`-`rel` is
-    refused at publish time; `make publish` plans offline, so the plan-time
-    check never saw the remote. The same keys with different bytes fail at
-    the immutable object upload.
-  - **Retries.** An HTTP `412` on an object whose bytes match is accepted, as
-    `file://` remotes already did, so a retried or reverted publish
-    completes.
-  - **Mirror.** Writes accept only content-addressed package names. An index
-    row that names a content-addressed object must name exactly its keys'
-    objects. Rows that point at legacy tuple-named objects stay valid and
-    readable, so existing indexes keep publishing.
-  - **Generations and system bundles** already followed artifact keys; a
-    test now pins it. No install or upgrade path compared `ver`-`rel`.
-  - **Arch.** Publication takes the arch from the plan target. A test
-    publishes an x86_64 plan.
-  - **The discarded-value lint** (`check.ignored-result`) had nothing left
-    to migrate.
-  - **End to end on macOS,** against the Phase 2 mirror data (31 rows with
-    legacy names):
-
-    | Step | Wall time | Result |
-    |---|---|---|
-    | `make mirror` | ~1 s | binary already built |
-    | `make publish STOP=pre-cmake` | 12.1 s | `laputa-pm` rebuilt by the PM edits and replaced under `1-15`; the other 30 rows moved to content-addressed names, keys unchanged |
-    | `make publish` again | 9.3 s | 31 already published |
-    | scratch comment in `packages/xinit/PKGBUILD.xsh`, `make publish` | 9.3 s | only `xinit` rebuilt; only its row moved (`88dff857…` → `d2f3e271…`, still `1-9`) |
-    | revert, `make publish` | 9.1 s | the row moved back to `88dff857…`; the existing objects were accepted by byte comparison; the index matches the pre-scratch one |
-    | `make root PKGS="baselayout xsh xinit musl"` | 19.2 s | 4 exact mirror artifacts at the current keys; 324 files, 12 ELF, none dynamic; the root's `xsh` runs |
-
-**Phase 3, up to 4 lanes in parallel: cleanup and docs.**
-- **Docs:**
-  - one README, AGENTS.md and `docs/` set;
-  - a co-development note on XSH;
-  - fix stale PM.md, LAPUTA.md, INSTALLER.md and xinit docs.
-- **Installer:**
-  - aarch64 built from the local mirror;
-  - delete the legacy x86_64 route that depends on the remote mirror (D5);
+- [ ] **Host tools.** `make host-xsh` builds `xsh-test` natively for
+  `linux/amd64`, and `.out/host/x86_64/xsh` runs. A following `make seed`
+  finishes cargo in about a second, because the compiled units are shared.
+  `make check`, `make test-pm`, `make test-system` and `make test-xinit` pass
+  with the host tools. `make mirror-test` needs a host cargo, so on a
+  Rust-free host give it an `xsh-test` path like `host-mirror`.
+- [ ] **Docker ownership.** Rootful Docker leaves root-owned files under
+  `.out/`. `make clean` and `make root` handle that already. Confirm that
+  `make publish` reads the store, and decide whether containers should run as
+  the host user instead. Rootless Docker avoids the problem.
+- [ ] **CPU baseline.** The `cc` wrapper builds userland with
+  `-march=x86-64-v3`, and package proofs run the binaries natively. Confirm
+  that the host has AVX2, BMI2 and MOVBE (`grep -o 'avx2\|bmi2\|movbe'
+  /proc/cpuinfo | sort -u`), or change the policy in
+  `packages/llvm-toolchain`.
+- [ ] **Pre-cmake first.** `make build STOP=pre-cmake` (31 packages) gives a
+  fast signal on the seed, package-tools and the toolchain for x86_64.
+- [ ] **cmake, linux and the rest of the world.** `make build` with no
+  selection. Record the per-package failures and their fixes. Expect x86-only
+  paths to be exercised for the first time:
+  - the kernel's x86 kbuild (`packages/linux/PKGBUILD-x86_64.xsh`), including
+    the new `rq-offsets.h` generation and the `-march` fixes, all unverified;
+  - the libnl3 and wpa_supplicant triple fix;
+  - gnu-stubs against the x86_64 builtins;
+  - pixman's SIMD paths.
+- [ ] **Kernel command line.** `base-x86_64.fragment` has
+  `# CONFIG_CMDLINE_BOOL is not set`, while aarch64 builds in
+  `root=LABEL=LAPUTA_ROOT rw ...`. Set an x86 equivalent (with
+  `console=ttyS0`) or have the installer and QEMU pass one.
+- [ ] **Kbuild speed and a persistent kbuild cache.** Measure the linux build
+  cold and warm. Keep the kbuild plan cache under `.out/cache/linux-kbuild`
+  (mounted into the build container, removed by `make clean`) instead of
+  throwaway trees or `/var/cache/laputa`.
+- [ ] **Kernel headers as a build-only dependency.** libffi, libnl3, libevdev,
+  mtdev, libudev-zero and wpa_supplicant list `linux` in `deps`, which pulls
+  the kernel into runtime roots. Make them take kernel headers as a
+  build-only dependency.
+- [ ] **Unused build dependencies.** Drop tailscale's build-host
+  `llvm-toolchain`, foot's `utf8proc` (grapheme clustering is disabled) and
+  m4's `musl` (m4 is an XSH script).
+- [ ] **Linux tests make target.** The kbuild tests under
+  `packages/linux/tests` have no make target, and on macOS they fail writing
+  `/var/cache/laputa`. Add a target whose cache lives under `.out/`.
+- [ ] **Installer from the local mirror.** `build-installer-common.xsh` and
+  `build-installer-image.xsh` still default `LAPUTA_REPO_URL` to the remote
+  mirror. Point them at the local mirror and parameterize them by arch:
+  - aarch64 first, then rebuild x86_64 through the same container and
+    local-mirror path (D5);
   - fix the serial console, the cmdline override and `forbidden_packages`
     enforcement.
-- **Deduplication** in laputa scripts (GPT helpers, `env_value`, `run_argv`,
-  `remove_tree`, the installer wrappers).
-- **xsh changes the work surfaced,** such as primitives that would remove
-  copy-paste.
+- [ ] **QEMU proof.** The installer and the profile CLI are aarch64- and
+  macOS-only today:
+  - `system/docker.xsh` pins `linux/arm64` and `profile_seed_arch`;
+  - `system/qemu.xsh` runs `qemu-system-aarch64` with HVF and Cocoa.
 
-**Phase 4, Linux amd64 host (later):**
-- Kernel headers: libffi, libnl3, libevdev, mtdev, libudev-zero and wpa_supplicant list `linux` in `deps`, which pulls the kernel into runtime roots. They should take headers as a build-only dependency.
-- Unused build dependencies to drop: tailscale's build-host `llvm-toolchain`, foot's `utf8proc` (grapheme clustering disabled), and m4's `musl` (m4 is an XSH script).
-- The `packages/linux/tests` kbuild tests have no make target. On macOS they fail writing `/var/cache/laputa`; give them a target and a cache under `.out/`.
+  Add an x86_64 path that uses `qemu-system-x86_64` with KVM on the host, and
+  prove the installer image boots and installs.
+- [ ] **Two musl and bison checks** (both arches; the audit raised them):
+  - musl excludes generic sources by bare file stem, so `src/thread/<arch>/clone.s`
+    may knock out `src/linux/clone.c` and leave libc without `clone()`;
+  - `pm/target.xsh::lp64_musl_abi` sets `signed_wchar_t: true`, which is
+    wrong for aarch64.
+- [ ] **Docs consolidation.** One README, AGENTS.md and `docs/` set. Fix the
+  stale docs:
+  - `docs/PM.md` still says `repo/<package>`, `tests/xsh/` and
+    `make test-native`;
+  - `docs/LAPUTA.md` describes the sibling `packages` repo;
+  - `docs/CORE-INFRASTRUCTURE.md` says "aarch64-only";
+  - also update `INSTALLER.md`, `docs/QEMU.md`, `docs/MAKE.md` and the xinit
+    docs.
+- [ ] **Deduplicate the laputa scripts:** the GPT helpers, `env_value`,
+  `run_argv`, `remove_tree` and the installer wrappers. Decide whether
+  `packages/build-essential-native/proof-rootfs.xsh` and `proof-image.xsh`,
+  which nothing references, should be deleted.
 
-- the x86_64 seed;
-- cmake, linux and the rest of the world;
-- kbuild speed;
-- installer images and the QEMU proof.
+Known open XSH items:
+- `assert xs |> where . == "a" |> len == 1` reports `check.desugar: pipeline
+  sugar was not desugared` instead of checking or giving a real diagnostic.
+- An incremental seed build once failed to link `xshi` while XSH was being
+  committed to concurrently. The rerun passed.
 
 ## Decisions (settled 2026-10-03)
 
@@ -516,10 +242,3 @@ laputa/
     same `ver`-`rel` replaces the row, not the objects.
   - A row behind the remote's `ver`-`rel` is refused. `ver`-`rel` is for
     display and ordering; roots and generations follow keys.
-
-## Sequencing note
-
-The XSH f-string migration (`{expr}` interpolation) is landing in `../xsh`
-now. Its migration tool runs on the monorepo once Phase 0 lands, before the
-Phase 1 lanes branch off. That keeps the f-string churn out of every lane's
-diff.
