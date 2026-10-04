@@ -10,10 +10,10 @@ export const name = "foot-minimal"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.27.0"
+export const ver = "1.28.0"
 
 ## Exported declaration `rel`.
-export const rel = "11"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = [
@@ -61,7 +61,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "f5917cad2d7b723b99873e53d78fd10ea202923d189aed5086591fc53b70b7e3",
+        sha256: "4296be402b5684d049534598e69db92b918f92beac9dab76b585207045f0b037",
       },
     ],
   },
@@ -87,7 +87,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "a2ff78b72d3b941f05d2a690eaaba4ac7fcb62ce7c599558a4e50a89f8950f76",
+        sha256: "347c6692c63eded33b7f84a723f739003a7a33ede8e126f3f751c42c6de9b92b",
       },
     ],
   },
@@ -127,13 +127,21 @@ proc write_version_header() [fs, error] {
     p"version.h",
     f"""#define FOOT_VERSION "{ver}"
 #define FOOT_MAJOR 1
-#define FOOT_MINOR 27
+#define FOOT_MINOR 28
 #define FOOT_PATCH 0
 #define FOOT_EXTRA ""
 """,
   )?
 }
 
+# files/generated/ replaces upstream's Python generator targets. Regenerate
+# them on a Linux host from the unpacked source tree; the terminfo script
+# records the generating host's kernel name as query-os-name, so it must run
+# on Linux. `@default_terminfo@` is the literal entry name in foot.info:
+#   python3 scripts/generate-builtin-terminfo.py @default_terminfo@ foot.info foot foot-terminfo.h
+#   python3 scripts/generate-emoji-variation-sequences.py \
+#     unicode/emoji-variation-sequences.txt emoji-variation-sequences.h
+#   python3 scripts/srgb.py srgb.c srgb.h
 proc patch_generated_inputs() [fs, error] {
   fs.install(p"generated/emoji-variation-sequences.h", p"emoji-variation-sequences.h", 0o644, overwrite: true)?
   fs.install(p"generated/foot-terminfo.h", p"foot-terminfo.h", 0o644, overwrite: true)?
@@ -199,7 +207,7 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   'util.h',
   version,
   dependencies: [tllist, utf8proc],
-  link_with: common,
+  link_with: [common, misc],
   install: true)
 """,
     """executable(
@@ -210,7 +218,7 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   'util.h',
   version,
   dependencies: [tllist, utf8proc],
-  link_with: common,
+  link_with: [common, misc],
   install: false)
 """,
   )
