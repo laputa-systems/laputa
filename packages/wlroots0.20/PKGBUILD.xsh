@@ -674,20 +674,6 @@ rt = declare_dependency()""",
 """,
   )?
 
-  # Temporary: mesa-minimal's gl2ext.h predates EXT_texture_norm16's RGB16
-  # format, which wlroots 0.20 lists. Khronos assigns it 0x8054. Remove this
-  # once wlroots builds against real Mesa headers.
-  replace_required(
-    p"render/gles2/pixel_format.c",
-    """#include <GLES2/gl2ext.h>
-""",
-    """#include <GLES2/gl2ext.h>
-#ifndef GL_RGB16_EXT
-#define GL_RGB16_EXT 0x8054
-#endif
-""",
-  )?
-
   let shader_meson = p"render/gles2/shaders/meson.build"
 
   replace_required(shader_meson, """embed = find_program('./embed.sh', native: true)
