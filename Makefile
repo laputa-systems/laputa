@@ -99,7 +99,8 @@ seed-smoke:
 # reuses every artifact.
 #
 # Containers have no network, so only the host talks to the loopback mirror:
-# `publish` uploads the last plan's artifacts from the host, and `root`
+# `publish` builds the same selection, then uploads that plan's artifacts
+# from the host (never a stale plan), and `root`
 # imports PKGS from the mirror into a fresh store on the host, then composes,
 # inspects, and runs that root in an offline container
 # (.out/world/$(ARCH)/root/). Both need `make mirror` running.
@@ -117,7 +118,7 @@ build:
 	$(WORLD) build --arch $(ARCH) --jobs $(JOBS) $(WORLD_SELECTION)
 
 publish:
-	$(WORLD) publish --arch $(ARCH) --repo $(MIRROR_URL)
+	$(WORLD) publish --arch $(ARCH) --jobs $(JOBS) --repo $(MIRROR_URL) $(WORLD_SELECTION)
 
 root:
 	rm -rf .out/world/$(ARCH)/root

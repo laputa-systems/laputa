@@ -6,10 +6,10 @@
 # cache: plans are offline, so every node says `build`, and the executor skips
 # each one whose artifact the store already holds.
 #
-# Only host processes talk to the loopback mirror. `publish` uploads verified
-# store artifacts from the host; `root` imports a root's closure from the
-# mirror into a fresh store on the host, then composes and inspects it in an
-# offline container. Sources need no mirror inside a build: the read-only
+# Only host processes talk to the loopback mirror. `publish` builds, then
+# uploads that plan's verified store artifacts from the host; `root` imports
+# a root's closure from the mirror into a fresh store on the host, then
+# composes and inspects it in an offline container. Sources need no mirror inside a build: the read-only
 # cache already holds every pinned upstream.
 use pm.cli as pm_cli
 use pm.plan_json as pm_plan_json
@@ -23,7 +23,8 @@ pure world_usage() -> Str {
   plan    [--package NAME... | --stop LINE]   offline plan in package-tools
   build   [--package NAME... | --stop LINE] [--jobs N]
                                               plan, then build into the artifact store
-  publish --repo URL                          publish the last plan's artifacts from the host
+  publish --repo URL [--package NAME... | --stop LINE] [--jobs N]
+                                              build, then publish that plan's artifacts from the host
   root    --repo URL --package NAME... [--jobs N]
                                               import NAMEs from the mirror, compose and inspect a root offline
 
@@ -214,14 +215,13 @@ proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
   } ?
 }
 
-proc world_publish(laputa_root: Path, args: WorldArgs) [fs, net, process, env, time, error] {
-  let plan = fp"{world_dir(laputa_root, args.arch)}/plan.json"
-
-  if ! fs.exists(plan)? {
-    return Err(xsh_seed.SeedError.Missing(f"{plan} is missing; run `make build` first"))
-  }
-
-  host_pm(args.repo, ["repo", "publish", plan.display(), "--store", world_store(laputa_root, args.arch).display()])?
+# Publishing the last plan could upload a stale selection (a reverted rel
+# bump, say) under tuples the checkout no longer declares, so publish first
+# builds the current checkout's plan; an unchanged build is a no-op.
+proc world_publish(container: WorldContainer, args: WorldArgs) [fs, net, process, env, time, error] {
+  world_build(container, args)?
+  let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
+  host_pm(args.repo, ["repo", "publish", plan.display(), "--store", world_store(container.laputa_root, args.arch).display()])?
 }
 
 ## The `make root` tree: the mirror plan, the store imported from the mirror, and the composed receipt.
@@ -236,7 +236,7 @@ proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   let missing = [node.name for node in value.nodes if pm_types.plan_action_is_build(node.action)]
 
   if missing.len() > 0 {
-    return Err(xsh_seed.SeedError.Missing(f"{repo} lacks exact artifacts for {missing.join(", ")}; run `make build` and `make publish` first"))
+    return Err(xsh_seed.SeedError.Missing(f"{repo} lacks exact artifacts for {missing.join(", ")}; run `make publish` with a selection that includes them first"))
   }
 }
 
@@ -280,7 +280,7 @@ export proc world_command(laputa_root: Path, args: WorldArgs) [fs, net, process,
   match args.command {
     "plan" => world_plan(world_container(laputa_root, value)?, args)?
     "build" => world_build(world_container(laputa_root, value)?, args)?
-    "publish" => world_publish(laputa_root, args)?
+    "publish" => world_publish(world_container(laputa_root, value)?, args)?
     _ => world_root(world_container(laputa_root, value)?, args)?
   }
 }
