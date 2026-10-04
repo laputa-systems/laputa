@@ -264,7 +264,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
     container,
     root_dir,
     store,
-    ["/bin/xsh", "/src/laputa/seed/world_root.xsh", "--", "/output/plan.json", "/artifacts", "/output"].extend(args.packages),
+    ["/bin/xsh", "/src/laputa/seed/world_root.xsh", "--", args.arch, "/output/plan.json", "/artifacts", "/output"].extend(args.packages),
     "root compose",
   )?
 }

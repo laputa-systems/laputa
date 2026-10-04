@@ -8,8 +8,6 @@
 # Alpine's chroot lives in /usr/sbin, which package-tools leaves off PATH.
 const chroot = "/usr/sbin/chroot"
 
-# Every dynamic ELF in a Laputa root must name musl's loader.
-const musl_interpreter = "/lib/ld-musl-aarch64.so.1"
 
 ## Errors that fail the root inspection.
 error WorldRootError = Failed(message: Str) : ProcessFailure
@@ -64,7 +62,9 @@ proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport
   report
 }
 
-proc main(plan: Str, store: Str, output: Str, ...runtime_roots: List[Str]) [fs, process, env, error] {
+proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[Str]) [fs, process, env, error] {
+  # Every dynamic ELF in a Laputa root must name musl's loader.
+  let musl_interpreter = f"/lib/ld-musl-{arch}.so.1"
   let handle = fs.tempdir()?
   defer handle.close()?
   let root = fp"{handle.host_path()?}/root"
