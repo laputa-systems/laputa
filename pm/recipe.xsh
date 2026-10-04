@@ -237,6 +237,42 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) [error] -> Result[Lis
   entries
 }
 
+# The recipe data contract. `.require` checks every present export's type, so
+# an optional export read through `.get` can fail only by being absent, and
+# its `??` fallback is that export's documented default.
+type RecipeModule = module {
+  export let name: Str
+  export let ver: Str
+  export let rel: Str
+  export let deps: List[Str]
+  export let mkdeps_host: List[Str]
+  export let upstream_sources: List[Record]
+  export let filetree: List[Record]
+  export optional let mkdeps_target: List[Str]
+  export optional let architectures: List[Str]
+  export optional let runtime_only_deps: List[Str]
+  export optional let filetree_aarch64: List[Record]
+  export optional let filetree_x86_64: List[Record]
+  export optional let package_kind: Str
+  export optional let nostrip: Bool
+  export optional let source_mirror: Bool
+}
+
+# The hook callers need only the recipe's identity; this contract makes the
+# loaded module's exports readable by name, and each hook is then validated
+# against its own capability contract.
+type RecipeProcedures = module {
+  export let name: Str
+}
+
+proc load_recipe_procedures(pkgbuild: Path) [fs, error] -> Result[RecipeProcedures] {
+  module.load(pkgbuild)?.require(RecipeProcedures).context("package-load", pkgbuild.display())?
+}
+
+proc load_recipe_module(pkgbuild: Path) [fs, error] -> Result[RecipeModule] {
+  module.load(pkgbuild)?.require(RecipeModule).context("package-load", pkgbuild.display())?
+}
+
 pure select_filetree(metadata: PackageMetadata, arch: Str) -> List[Record] {
   if arch == "aarch64" and metadata.has_filetree_aarch64 {
     return metadata.filetree_aarch64
@@ -252,61 +288,27 @@ proc is_production_recipe_directory(dir: Path) [] -> Bool {
 }
 
 proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
-  let dynamic = module.load(pkgbuild)?
-  let name: Str = dynamic.get("name").context("package-load", pkgbuild.display())?.require()?
-  let ver: Str = dynamic.get("ver").context("package-load", pkgbuild.display())?.require()?
-  let rel: Str = dynamic.get("rel").context("package-load", pkgbuild.display())?.require()?
-  let deps: List[Str] = dynamic.get("deps").context("package-load", pkgbuild.display())?.require()?
-  let mkdeps_host: List[Str] = dynamic.get("mkdeps_host").context("package-load", pkgbuild.display())?.require()?
-  let upstream_sources: List[Record] = dynamic.get("upstream_sources").context("package-load", pkgbuild.display())?.require()?
-  let filetree: List[Record] = dynamic.get("filetree").context("package-load", pkgbuild.display())?.require()?
-  let has_build = "build" in dynamic.keys()
-  var mkdeps_target: List[Str] = []
-  var runtime_only_deps: List[Str] = []
-  let has_filetree_aarch64 = "filetree_aarch64" in dynamic.keys()
-  let has_filetree_x86_64 = "filetree_x86_64" in dynamic.keys()
-  var filetree_aarch64: List[Record] = []
-  var filetree_x86_64: List[Record] = []
-
-  if "mkdeps_target" in dynamic.keys() {
-    mkdeps_target = dynamic.get("mkdeps_target")?.require(List[Str])?
-  }
-
+  let recipe = load_recipe_module(pkgbuild)?
+  let has_build = recipe.get("build") is Ok(_)
+  let has_filetree_aarch64 = recipe.get("filetree_aarch64") is Ok(_)
+  let has_filetree_x86_64 = recipe.get("filetree_x86_64") is Ok(_)
+  let has_package_kind = recipe.get("package_kind") is Ok(_)
+  let name = recipe.name
+  let ver = recipe.ver
+  let rel = recipe.rel
+  let deps = recipe.deps
+  let mkdeps_host = recipe.mkdeps_host
+  let upstream_sources = recipe.upstream_sources
+  let filetree = recipe.filetree
+  let mkdeps_target: List[Str] = recipe.get("mkdeps_target") ?? []
   # A recipe without an `architectures` export exists for every supported target.
-  var architectures = ["aarch64", "x86_64"]
-
-  if "architectures" in dynamic.keys() {
-    architectures = dynamic.get("architectures")?.require(List[Str])?
-  }
-
-  if "runtime_only_deps" in dynamic.keys() {
-    runtime_only_deps = dynamic.get("runtime_only_deps")?.require(List[Str])?
-  }
-
-  if has_filetree_aarch64 {
-    filetree_aarch64 = dynamic.get("filetree_aarch64")?.require(List[Record])?
-  }
-
-  if has_filetree_x86_64 {
-    filetree_x86_64 = dynamic.get("filetree_x86_64")?.require(List[Record])?
-  }
-
-  let has_package_kind = "package_kind" in dynamic.keys()
-  var package_kind = ""
-  var nostrip = false
-  var source_mirror = true
-
-  if has_package_kind {
-    package_kind = dynamic.get("package_kind")?.require(Str)?
-  }
-
-  if "nostrip" in dynamic.keys() {
-    nostrip = dynamic.get("nostrip")?.require(Bool)?
-  }
-
-  if "source_mirror" in dynamic.keys() {
-    source_mirror = dynamic.get("source_mirror")?.require(Bool)?
-  }
+  let architectures: List[Str] = recipe.get("architectures") ?? ["aarch64", "x86_64"]
+  let runtime_only_deps: List[Str] = recipe.get("runtime_only_deps") ?? []
+  let filetree_aarch64: List[Record] = recipe.get("filetree_aarch64") ?? []
+  let filetree_x86_64: List[Record] = recipe.get("filetree_x86_64") ?? []
+  let package_kind: Str = recipe.get("package_kind") ?? ""
+  let nostrip: Bool = recipe.get("nostrip") ?? false
+  let source_mirror: Bool = recipe.get("source_mirror") ?? true
 
   {
     name,
@@ -425,9 +427,9 @@ proc dynamic_recipe_path(pkg: types.Package) [fs, error] -> Result[Path] {
 
 ## Invokes the optional dynamic `prepare` procedure for a loaded package.
 export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error] {
-  let dynamic = module.load(dynamic_recipe_path(pkg)?)?
+  let dynamic = load_recipe_procedures(dynamic_recipe_path(pkg)?)?
 
-  return unless "prepare" in dynamic.keys()
+  return unless dynamic.get("prepare") is Ok(_)
 
   if let Ok(filesystem_hook) = dynamic.require(hooks.PrepareFilesystem) {
     filesystem_hook.prepare(src)?
@@ -452,9 +454,9 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
 export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, env, error] {
   return when pkg.kind == types.package_meta()
 
-  let dynamic = module.load(dynamic_recipe_path(pkg)?)?
+  let dynamic = load_recipe_procedures(dynamic_recipe_path(pkg)?)?
 
-  if ! ("build" in dynamic.keys()) {
+  if ! (dynamic.get("build") is Ok(_)) {
     return Err(types.PmError.PackageContract(f"{pkg.name}: payload package lost its build procedure"))
   }
 
@@ -479,9 +481,9 @@ export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, 
 
 ## Invokes the optional dynamic `prepare_sources` procedure for a loaded package.
 export proc call_prepare_sources(pkg: types.Package, src: Path) [fs, process, env, error] {
-  let dynamic = module.load(dynamic_recipe_path(pkg)?)?
+  let dynamic = load_recipe_procedures(dynamic_recipe_path(pkg)?)?
 
-  if "prepare_sources" in dynamic.keys() {
+  if dynamic.get("prepare_sources") is Ok(_) {
     let sources_hook = dynamic.require(hooks.PrepareSourcesFilesystem)?
     sources_hook.prepare_sources(src)?
   }

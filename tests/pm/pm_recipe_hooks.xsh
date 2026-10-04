@@ -33,6 +33,8 @@ test recipe_hooks_dispatch_each_supported_capability_set [fs, process, env, erro
     let dir = test.temp_dir(ctx, name:)?
     let pkg = hook_package(dir)
     fp"{dir}/PKGBUILD.xsh".write(f"""##! Hook capability fixture.
+## Names the fixture recipe.
+export let name = "hook-probe"
 error HookProbe = Reached(message: Str)
 ## Reports that the preparation hook received its typed source path.
 export proc prepare(src: Path) [{effects}] -> Result[Unit] {{
@@ -84,7 +86,7 @@ test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, p
   for {key: name, value: declaration} in incompatible {
     let dir = test.temp_dir(ctx, name:)?
     fp"{dir}/PKGBUILD.xsh".write(
-      f"##! Incompatible hook fixture.\n## Exposes an incompatible build hook.\n{declaration}\n",
+      f"##! Incompatible hook fixture.\n## Names the fixture recipe.\nexport let name = \"hook-probe\"\n## Exposes an incompatible build hook.\n{declaration}\n",
     )?
     let pkg = hook_package(dir)
     match recipe.call_build(pkg, dir, dir) {
@@ -97,6 +99,8 @@ test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, p
 test recipe_source_preparation_keeps_filesystem_contract [fs, process, env, error] { |ctx|
   let dir = test.temp_dir(ctx, name: "source-hook")?
   fp"{dir}/PKGBUILD.xsh".write("""##! Source hook fixture.
+## Names the fixture recipe.
+export let name = "hook-probe"
 ## Writes a marker inside the supplied source path.
 export proc prepare_sources(src: Path) [fs, error] -> Result[Unit] {
   fp"{src}/prepared".write("source prepared")?
