@@ -941,6 +941,17 @@ test test_kbuild_generates_offsets_header [fs, error] { |ctx|
 """
 }
 
+test test_kbuild_config_keeps_string_values_that_contain_equals_signs [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-config-strings")?
+  fs.write(fp"{root}/.config", """CONFIG_CMDLINE_BOOL=y
+CONFIG_CMDLINE="root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0"
+""")?
+  let config = kbuild.load_config(fp"{root}/.config")?
+  test.eq(config.values.get("CMDLINE") ?? "", "root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0")?
+  kbuild.write_config_headers(fp"{root}/.config", root, "7.0.5", "x86")?
+  assert "#define CONFIG_CMDLINE \"root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0\"" in fs.read_text(fp"{root}/include/generated/autoconf.h")?
+}
+
 test test_kbuild_x86_vmlinux_archive_leaves_out_efi_stub [error] {
   let inputs = [
     p".xsh-kbuild/obj/lib/cmdline.o",

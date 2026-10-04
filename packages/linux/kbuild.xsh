@@ -435,9 +435,11 @@ export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig] {
     let line = raw.trim()
 
     if line.starts_with("CONFIG_") and "=" in line {
-      let parts = line.split("=")
-      let name = parts[0].replace("CONFIG_", "")
-      let value = clean_config_value(parts.get(1) ?? "")
+      # Only the first `=` ends the name: string values such as CONFIG_CMDLINE
+      # contain more of them.
+      let split_at = line.find("=") ?? 0
+      let name = line.byte_slice(0, split_at).replace("CONFIG_", "")
+      let value = clean_config_value(line.byte_slice(split_at + 1))
       values[name] = value
 
       if value == "y" {
