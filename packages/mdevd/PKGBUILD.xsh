@@ -14,7 +14,7 @@ export const package_kind = "payload"
 export const ver = "0.1.8.2"
 
 ## Package recipe export.
-export const rel = "8"
+export const rel = "9"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -41,7 +41,7 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"https://skarnet.org/software/skalibs/skalibs-2.15.0.0.tar.gz => skalibs",
+    source: p"https://skarnet.org/software/skalibs/skalibs-2.15.1.0.tar.gz => skalibs",
     kind: "auto",
     architectures: [
       "all",
@@ -49,7 +49,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "7fde96e8afb4191593a15328883e9c7726c96891cf071222146821e8c87f8007",
+        sha256: "f9c905e74935c6fe911c7e344e3e89d5fbd2014c1a04650b524b15ce9b5635d1",
       },
     ],
   },
@@ -252,6 +252,7 @@ pthreadmutexclocklock: no
 devurandom: yes
 posixspawnearlyreturn: no
 procselfexe: /proc/self/exe
+selectinfinite: yes
 """,
   )?
 }
@@ -262,7 +263,7 @@ proc write_skalibs_config() [fs, error] {
     """#ifndef SKALIBS_CONFIG_H
 #define SKALIBS_CONFIG_H
 
-#define SKALIBS_VERSION "2.15.0.0"
+#define SKALIBS_VERSION "2.15.1.0"
 #define SKALIBS_DEFAULTPATH "/usr/bin:/bin"
 #define SKALIBS_ETC "/usr/etc"
 #define SKALIBS_SPROOT ""
@@ -465,6 +466,7 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, erro
     "-Werror=implicit-int",
     "-Werror=pointer-sign",
     "-Werror=pointer-arith",
+    "-Werror=incompatible-pointer-types",
     "-Wno-unused-value",
     "-Wno-parentheses",
   ]
