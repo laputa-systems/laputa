@@ -325,3 +325,25 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
   expect_generation_error(ctx, generation.compose(mode_plan, store_root, mode_output, mode_conflict), "incompatible directory type or mode metadata")?
   test.eq(fs.exists(mode_output)?, false)?
 }
+
+# Artifact keys exclude the executor, so a package can be rebuilt under the
+# same ver-rel. The generation follows the artifact key, not the tuple: the
+# rebuilt package yields a new generation (and so a new system bundle).
+test test_generation_follows_artifact_keys_not_releases [fs, env, error] { |ctx|
+  let first = generation_build_plan(ctx, "generation-key-first")?
+  # A separate checkout: one process loads each recipe path once.
+  let repo_root = copied_generation_repository(ctx, "generation-key-rebuilt")?
+  let recipe = fp"{repo_root}/packages/runtime-lib/PKGBUILD.xsh"
+  fs.write(recipe, fs.read_text(recipe)? + "# A rebuild input without a rel bump.\n")?
+  let rebuilt = plan.resolve(catalog.load(repo_root)?, generation_empty_remote(), policy.aarch64_docker(), ["app"], false)?
+
+  let before = generation.plan(first, ["app"], test_generation_sha256("overlay"))?
+  let after = generation.plan(rebuilt, ["app"], test_generation_sha256("overlay"))?
+  test.eq([artifact.package_id for artifact in after.artifacts], [artifact.package_id for artifact in before.artifacts])?
+  test.ok(after.generation_sha256 != before.generation_sha256)?
+
+  let before_keys: Map[Str] = {artifact.package_name: artifact.artifact_key for artifact in before.artifacts}
+  let changed = [artifact.package_name for artifact in after.artifacts if before_keys.get(artifact.package_name)? != artifact.artifact_key]
+  # runtime-lib and app, which builds against it.
+  test.eq(changed, ["app", "runtime-lib"])?
+}

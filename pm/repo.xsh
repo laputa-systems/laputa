@@ -103,7 +103,7 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
   {format: "laputa-repo-snapshot-1", target: value.target, plan_sha256: value.plan_sha256, packages}
 }
 
-proc repo_metadata_for_publication(value: types.RepoPublication, output: Path) [fs, error] -> Result[Path] {
+proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, output: Path) [fs, error] -> Result[Path] {
   let raw = json.read(value.metadata)?.require(RepoArtifactMetadataDto)?
   let metadata = fp"{output}/{value.node.artifact_key}.json"
   fs.mkdir(metadata.parent)?
@@ -111,7 +111,7 @@ proc repo_metadata_for_publication(value: types.RepoPublication, output: Path) [
     metadata,
     json.encode({
       ...raw,
-      arch: "aarch64",
+      arch,
       target: types.target_text(value.receipt.target),
       artifact_key: value.node.artifact_key,
       recipe_sha256: value.node.recipe_sha256,
@@ -123,16 +123,16 @@ proc repo_metadata_for_publication(value: types.RepoPublication, output: Path) [
   metadata
 }
 
-proc repo_publication_entry(value: types.RepoPublication, metadata: Path) [fs, error] -> Result[types.RemotePackage] {
+proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: Path) [fs, error] -> Result[types.RemotePackage] {
   let node = value.node
-  let payload_rel = util.remote_binary_rel("aarch64", node.name, node.ver, node.rel)
-  let metadata_rel = util.remote_metadata_rel("aarch64", node.name, node.ver, node.rel)
-  let proof_rel = util.remote_proof_rel("aarch64", node.name, node.ver, node.rel)
+  let payload_rel = util.remote_binary_rel(arch, node.name, node.ver, node.rel, node.artifact_key)
+  let metadata_rel = util.remote_metadata_rel(arch, node.name, node.ver, node.rel, node.artifact_key, node.proof_key)
+  let proof_rel = util.remote_proof_rel(arch, node.name, node.ver, node.rel, node.artifact_key, node.proof_key)
   let metadata_sha256 = hash.sha256(metadata)?.hex()
   let proof_receipt_sha256 = hash.sha256(value.proof)?.hex()
 
   {
-    arch: "aarch64",
+    arch,
     name: node.name,
     ver: node.ver,
     rel: node.rel,
@@ -161,18 +161,34 @@ proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage
   left.arch == right.arch and left.name == right.name and left.ver == right.ver and left.rel == right.rel and left.deps == right.deps and left.runtime_only_deps == right.runtime_only_deps and left.mkdeps_host == right.mkdeps_host and left.mkdeps_target == right.mkdeps_target and left.sha256 == right.sha256 and left.size == right.size and left.tarball == right.tarball and left.metadata == right.metadata and left.metadata_sha256 == right.metadata_sha256 and left.artifact_key == right.artifact_key and left.recipe_sha256 == right.recipe_sha256 and left.executor_sha256 == right.executor_sha256 and left.proof_key == right.proof_key and left.proof_sha256 == right.proof_sha256 and left.proof == right.proof and left.proof_receipt_sha256 == right.proof_receipt_sha256 and left.source_sha256 == right.source_sha256 and left.metapackage == right.metapackage
 }
 
+# The index row is the only mutable pointer to a package; its objects are
+# named by artifact and proof key, so replacing a row never touches published
+# bytes. A rebuild under the same ver-rel (a different artifact key) replaces
+# the row; a row behind the remote's ver-rel is refused, because publishing it
+# would move the index backwards.
 proc repo_merge_publication(index: List[types.RemotePackage], entry: types.RemotePackage) [error] -> Result[RepoIndexMerge] {
   var updated: List[types.RemotePackage] = []
   var replaced = false
 
   for existing in index {
     if existing.arch == entry.arch and existing.name == entry.name {
-      if existing.ver == entry.ver and existing.rel == entry.rel {
-        if ! repo_same_publication(existing, entry) {
-          return Err(types.PmError.PackageConflict(f"immutable remote tuple {entry.arch}/{entry.name}-{entry.ver}-{entry.rel} already exists with different content"))
-        }
-
+      if repo_same_publication(existing, entry) {
         return {index, already_published: true}
+      }
+
+      if build_plan.plan_compare_version_release(entry.ver, entry.rel, existing.ver, existing.rel) < 0 {
+        return Err(
+          types.PmError.PackageContract(
+            f"{entry.arch}/{entry.name} {util.version_id(entry.ver, entry.rel)} is behind remote {util.version_id(existing.ver, existing.rel)}; bump PKGBUILD.xsh rel explicitly",
+          ),
+        )
+      }
+
+      # Same artifact and proof keys name the same immutable objects, so a
+      # row that differs anyway (another store's payload bytes or executor)
+      # cannot be published beside it.
+      if existing.artifact_key == entry.artifact_key and existing.proof_key == entry.proof_key {
+        return Err(types.PmError.PackageConflict(f"remote {entry.arch}/{entry.name} already publishes artifact {entry.artifact_key} with different content"))
       }
 
       updated = updated.push(entry)
@@ -195,7 +211,9 @@ proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token
 
 ## Publishes a verified repository snapshot: immutable package objects first and the remote index last.
 export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: Str, work: Path) [fs, net, time, error] {
-  if repo_snapshot.format != "laputa-repo-snapshot-1" or repo_snapshot.target != types.target_aarch64() {
+  let arch = types.pm_target_arch(repo_snapshot.target)
+
+  if repo_snapshot.format != "laputa-repo-snapshot-1" or arch == "" {
     return Err(types.PmError.PackageContract("unsupported repository snapshot"))
   }
 
@@ -223,11 +241,12 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
       pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)?
     }
 
-    let metadata = repo_metadata_for_publication(publication, fp"{work}/metadata")?
-    stages = stages.push({publication, entry: repo_publication_entry(publication, metadata)?, metadata})
+    let metadata = repo_metadata_for_publication(publication, arch, fp"{work}/metadata")?
+    stages = stages.push({publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata})
   }
 
-  # This is the sole remote-index read. It establishes immutable tuple conflicts before any object upload.
+  # This is the sole remote-index read. It establishes behind-remote rows and
+  # artifact conflicts before any object upload.
   var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
   var pending: List[RepoPublishStage] = []
 

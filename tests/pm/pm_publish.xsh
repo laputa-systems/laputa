@@ -7,8 +7,10 @@ use pm.remote
 use pm.repo
 use pm.store
 use pm.types
+use pm.util as pm_util
 
 type AdditionalMetadataDto = {source: Str}
+type PublishedArchDto = {arch: Str, target: Str}
 type PublishedMetadataDto = {
   additional_metadata: AdditionalMetadataDto,
   target: Str,
@@ -41,8 +43,31 @@ proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
 
 proc publish_plan(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.BuildPlan] {
   let repo_root = copied_publish_repository(ctx, name)?
-  let catalog_value = catalog.load(repo_root)?
+  plan_publish_repository(repo_root)?
+}
+
+proc plan_publish_repository(repo_root: Path) [fs, env, error] -> Result[types.BuildPlan] {
+  let catalog_value = catalog.load_for_target(repo_root, types.target_aarch64())?
   plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false)?
+}
+
+# Builds, stores and publishes one plan of `repo_root` to the file remote.
+proc publish_repository_once(ctx: TestContext, repo_root: Path, remote_url: Str, name: Str) [fs, net, env, time, error] -> Result[types.BuildPlan] {
+  let value = plan_publish_repository(repo_root)?
+  let store_root = test.temp_dir(ctx, name: f"{name}-store")?
+  stage_plan_artifacts(ctx, value, store_root)?
+  repo.publish(repo.snapshot(value, store_root)?, remote_url, "", test.temp_dir(ctx, name: f"{name}-work")?)?
+  value
+}
+
+proc index_row(index: List[types.RemotePackage], name: Str) [error] -> Result[types.RemotePackage] {
+  for entry in index {
+    if entry.name == name {
+      return entry
+    }
+  }
+
+  return Err(types.PmError.PackageContract(f"missing index row {name}"))
 }
 
 proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanNode] {
@@ -62,8 +87,10 @@ proc stage_plan_artifacts(
   valid_proofs: Bool = true,
   include_package_kind: Bool = true,
   package_kind: Str = "payload",
+  target: types.Target = types.target_aarch64(),
 ) [fs, error] {
   let executor_sha256 = publish_executor_sha256()
+  let arch = types.pm_target_arch(target)
 
   for node in value.nodes {
     let staged_root = test.temp_dir(ctx, name: f"publish-stage-{node.name}")?
@@ -74,7 +101,7 @@ proc stage_plan_artifacts(
     let payload_sha256 = hash.sha256(payload)?.hex()
     if include_package_kind {
       json.write(metadata, {
-        arch: "aarch64",
+        arch,
         name: node.name,
         additional_metadata: {source: "recipe"},
         ver: node.ver,
@@ -84,7 +111,7 @@ proc stage_plan_artifacts(
       })?
     } else {
       json.write(metadata, {
-        arch: "aarch64",
+        arch,
         name: node.name,
         additional_metadata: {source: "recipe"},
         ver: node.ver,
@@ -99,7 +126,7 @@ proc stage_plan_artifacts(
       fs.write(proof, "not a package proof receipt\n")?
     }
 
-    let _ = store.commit(types.target_aarch64(), store_root, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
+    let _ = store.commit(target, store_root, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
   }
 }
 
@@ -165,6 +192,10 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   test.eq(entry.proof_key, app.proof_key)?
   test.eq(entry.proof_sha256, app.proof_sha256)?
   test.ok(entry.metadata_sha256 != "")?
+  test.eq(entry.tarball, pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key).display())?
+  test.eq(entry.tarball, f"packages/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}.tar.gz")?
+  test.eq(entry.metadata, f"metadata/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json")?
+  test.eq(entry.proof, f"proofs/aarch64/app/app-1-1-{app.artifact_key.byte_slice(0, 12)}-{app.proof_key.byte_slice(0, 12)}.json")?
   test.ok(fp"{remote_root}/{entry.tarball}".exists()?)?
   test.ok(fp"{remote_root}/{entry.metadata}".exists()?)?
   test.ok(fp"{remote_root}/{entry.proof}".exists()?)?
@@ -239,7 +270,7 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   let work = test.temp_dir(ctx, name: "publish-conflict-work")?
   let remote_url = f"file://{remote_root}"
   let app = node_named(value, "app")?
-  let blocked_metadata = fp"{remote_root}/metadata/aarch64/{app.name}/{app.package_id}.json"
+  let blocked_metadata = fp"{remote_root}/{pm_util.remote_metadata_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key, app.proof_key)}"
   fs.mkdir(blocked_metadata.parent)?
   fs.write(blocked_metadata, "different immutable metadata")?
   json.write(fp"{remote_root}/index.json", [])?
@@ -251,7 +282,7 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
 
   let unchanged_index = fs.read_text(fp"{remote_root}/index.json")?
   test.eq(unchanged_index, "[]")?
-  test.ok(fp"{remote_root}/packages/aarch64/{app.name}/{app.package_id}.tar.gz".exists()?)?
+  test.ok(fp"{remote_root}/{pm_util.remote_binary_rel("aarch64", app.name, app.ver, app.rel, app.artifact_key)}".exists()?)?
 
   let clean_remote = test.temp_dir(ctx, name: "publish-tuple-conflict-remote")?
   let clean_work = test.temp_dir(ctx, name: "publish-tuple-conflict-work")?
@@ -261,8 +292,102 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   fs.write(fp"{clean_remote}/index.json", json.encode([{...raw[0], sha256: "different tuple bytes"}])? + "\n")?
 
   match repo.publish(snapshot, clean_url, "", clean_work) {
-    Ok(_) => test.fail("conflicting immutable tuple unexpectedly published")?
-    Err(problem) => assert "already exists with different content" in problem.message
+    Ok(_) => test.fail("conflicting artifact unexpectedly published")?
+    Err(problem) => assert "already publishes artifact" in problem.message
+  }
+}
+
+# Artifact keys exclude the executor, so a new seed or PM rebuilds a package
+# under the same ver-rel. Its objects get new names; only its index row moves.
+test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, net, env, time, error] { |ctx|
+  let repo_root = copied_publish_repository(ctx, "publish-rebuild-repo")?
+  let remote_root = test.temp_dir(ctx, name: "publish-rebuild-remote")?
+  let remote_url = f"file://{remote_root}"
+  let first = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-first")?
+  let before = remote.load_remote_index_from(fp"{remote_root}/index.json")?
+
+  let recipe = fp"{repo_root}/packages/app/PKGBUILD.xsh"
+  fs.write(recipe, fs.read_text(recipe)? + "# A rebuild input without a rel bump.\n")?
+  let second = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-second")?
+  let after = remote.load_remote_index_from(fp"{remote_root}/index.json")?
+
+  let old_app = node_named(first, "app")?
+  let new_app = node_named(second, "app")?
+  test.ok(old_app.artifact_key != new_app.artifact_key)?
+  test.eq(index_row(after, "app")?.artifact_key, new_app.artifact_key)?
+  test.eq(index_row(after, "app")?.rel, "1")?
+
+  for name in ["host-tool", "runtime-lib", "target-sdk"] {
+    test.eq(index_row(after, name)?, index_row(before, name)?)?
+  }
+
+  # The earlier objects stay published and unchanged beside the new ones.
+  let old_row = index_row(before, "app")?
+  let new_row = index_row(after, "app")?
+
+  for rel in [old_row.tarball, old_row.metadata, old_row.proof, new_row.tarball, new_row.metadata, new_row.proof] {
+    test.ok(fp"{remote_root}/{rel}".exists()?)?
+  }
+
+  test.eq(hash.sha256(fp"{remote_root}/{old_row.tarball}")?.hex(), old_row.sha256)?
+
+  # Publishing the first build again moves the row back; its objects already exist.
+  fs.write(recipe, fs.read_text(recipe)?.replace("# A rebuild input without a rel bump.\n", ""))?
+  let _ = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-revert")?
+  test.eq(index_row(remote.load_remote_index_from(fp"{remote_root}/index.json")?, "app")?.artifact_key, old_app.artifact_key)?
+}
+
+test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, error] { |ctx|
+  let remote_root = test.temp_dir(ctx, name: "publish-behind-remote")?
+  let remote_url = f"file://{remote_root}"
+  # Separate checkouts: one process loads each recipe path once.
+  let ahead_root = copied_publish_repository(ctx, "publish-behind-ahead-repo")?
+  let recipe = fp"{ahead_root}/packages/app/PKGBUILD.xsh"
+  fs.write(recipe, fs.read_text(recipe)?.replace("export let rel = \"1\"", "export let rel = \"2\""))?
+  let _ = publish_repository_once(ctx, ahead_root, remote_url, "publish-behind-ahead")?
+  let published = fs.read_text(fp"{remote_root}/index.json")?
+
+  let stale_root = copied_publish_repository(ctx, "publish-behind-stale-repo")?
+
+  match publish_repository_once(ctx, stale_root, remote_url, "publish-behind-stale") {
+    Ok(_) => test.fail("a release behind the remote unexpectedly published")?
+    Err(problem) => assert "aarch64/app 1-1 is behind remote 1-2" in problem.message
+  }
+
+  test.eq(fs.read_text(fp"{remote_root}/index.json")?, published)?
+}
+
+# Publication takes the arch from the plan target: object paths, index rows
+# and published metadata all name x86_64.
+test test_publish_x86_64_plan_uses_its_target_arch [fs, net, env, time, error] { |ctx|
+  let repo_root = copied_publish_repository(ctx, "publish-x86-repo")?
+  let target = types.target_x86_64()
+  let value = plan.resolve(
+    catalog.load_for_target(repo_root, target)?,
+    {target, index_sha256: "publish-empty-x86-remote", packages: []},
+    policy.x86_64_docker(),
+    ["app"],
+    false,
+  )?
+  let store_root = test.temp_dir(ctx, name: "publish-x86-store")?
+  stage_plan_artifacts(ctx, value, store_root, target: target)?
+  let remote_root = test.temp_dir(ctx, name: "publish-x86-remote")?
+  repo.publish(repo.snapshot(value, store_root)?, f"file://{remote_root}", "", test.temp_dir(ctx, name: "publish-x86-work")?)?
+
+  let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
+  test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "target-sdk"])?
+
+  for entry in index {
+    let node = node_named(value, entry.name)?
+    test.eq(entry.arch, "x86_64")?
+    test.eq(entry.tarball, pm_util.remote_binary_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key).display())?
+    test.eq(entry.metadata, pm_util.remote_metadata_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key, node.proof_key).display())?
+    test.eq(entry.proof, pm_util.remote_proof_rel("x86_64", node.name, node.ver, node.rel, node.artifact_key, node.proof_key).display())?
+    test.ok(fp"{remote_root}/{entry.tarball}".exists()?)?
+    test.ok(fp"{remote_root}/{entry.proof}".exists()?)?
+    let metadata = json.read(fp"{remote_root}/{entry.metadata}")?.require(PublishedArchDto)?
+    test.eq(metadata.arch, "x86_64")?
+    test.eq(metadata.target, "x86_64-linux-musl")?
   }
 }
 

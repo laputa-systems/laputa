@@ -26,29 +26,45 @@ export pure remote_index_cache_path(out: Path) -> Path {
   fp"{out}/remote-index.json"
 }
 
-## Exported PM declaration `remote_tarball_name`.
-export pure remote_tarball_name(name: Str, ver: Str, rel: Str) -> Str {
-  f"{package_id(name, ver, rel)}.tar.gz"
+# Remote package objects are content-addressed and therefore immutable: a
+# rebuild under the same ver-rel (a new seed, a PM edit, a rebuilt
+# dependency) gets new object names instead of overwriting the old ones, and
+# the index row is the only mutable pointer. The payload is named by its
+# artifact key; metadata and proof also carry the proof key, because a
+# proof-only change re-proves the same payload with a new proof receipt and
+# metadata. Twelve hex digits of each key keep names readable; the index row
+# carries the full keys.
+pure remote_key_prefix(key: Str) -> Str {
+  key.byte_slice(0, 12)
 }
 
-## Exported PM declaration `remote_binary_rel`.
-export pure remote_binary_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"packages/{arch}/{name}/{remote_tarball_name(name, ver, rel)}"
+pure remote_object_stem(name: Str, ver: Str, rel: Str, artifact_key: Str) -> Str {
+  f"{package_id(name, ver, rel)}-{remote_key_prefix(artifact_key)}"
 }
 
-## Exported PM declaration `remote_metadata_name`.
-export pure remote_metadata_name(name: Str, ver: Str, rel: Str) -> Str {
-  f"{package_id(name, ver, rel)}.json"
+## `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`.
+export pure remote_binary_rel(arch: Str, name: Str, ver: Str, rel: Str, artifact_key: Str) -> Path {
+  fp"packages/{arch}/{name}/{remote_object_stem(name, ver, rel, artifact_key)}.tar.gz"
 }
 
-## Exported PM declaration `remote_metadata_rel`.
-export pure remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"metadata/{arch}/{name}/{remote_metadata_name(name, ver, rel)}"
+## `metadata/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`.
+export pure remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str, artifact_key: Str, proof_key: Str) -> Path {
+  fp"metadata/{arch}/{name}/{remote_object_stem(name, ver, rel, artifact_key)}-{remote_key_prefix(proof_key)}.json"
 }
 
-## Exported PM declaration `remote_proof_rel`.
-export pure remote_proof_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
-  fp"proofs/{arch}/{name}/{remote_metadata_name(name, ver, rel)}"
+## `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`.
+export pure remote_proof_rel(arch: Str, name: Str, ver: Str, rel: Str, artifact_key: Str, proof_key: Str) -> Path {
+  fp"proofs/{arch}/{name}/{remote_object_stem(name, ver, rel, artifact_key)}-{remote_key_prefix(proof_key)}.json"
+}
+
+## Legacy payload name of index rows that predate artifact keys and omit `tarball`.
+export pure legacy_remote_binary_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
+  fp"packages/{arch}/{name}/{package_id(name, ver, rel)}.tar.gz"
+}
+
+## Legacy metadata name of index rows that predate artifact keys and omit `metadata`.
+export pure legacy_remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str) -> Path {
+  fp"metadata/{arch}/{name}/{package_id(name, ver, rel)}.json"
 }
 
 ## Exported PM declaration `ensure_relative_path`.

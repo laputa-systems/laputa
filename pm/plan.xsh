@@ -193,7 +193,8 @@ pure plan_compare_version_part(left: Str, right: Str) -> Int {
   plan_compare_lex(left, right)
 }
 
-pure plan_compare_version_release(left_ver: Str, left_rel: Str, right_ver: Str, right_rel: Str) -> Int {
+## Orders two ver-rel tuples: negative when the left is older, zero when equal.
+export pure plan_compare_version_release(left_ver: Str, left_rel: Str, right_ver: Str, right_rel: Str) -> Int {
   let left_parts = plan_version_parts(left_ver)
   let right_parts = plan_version_parts(right_ver)
   let total = if left_parts.len() > right_parts.len() { left_parts.len() } else { right_parts.len() }
@@ -388,8 +389,8 @@ export proc resolve(
             remote = candidate.retrieval
           } else if changed_dependencies.len() > 0 {
             # The remote tuple was built against other dependency artifacts.
-            # Build locally; publishing the result under the same tuple is an
-            # immutable-tuple conflict that `repo publish` reports.
+            # Build locally; publishing the result under the same tuple
+            # replaces the remote index row with the new artifact key.
             action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
           } else if candidate.artifact_key != "" {
             action = types.plan_action_build("remote artifact identity differs")

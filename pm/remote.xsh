@@ -73,8 +73,19 @@ export proc upload_immutable_repo_file(repo: Str, rel: Path, source: Path, token
       return true
     }
 
+    # Objects are content-addressed, so a retried publication meets the
+    # objects its failed attempt already uploaded; identical bytes are done.
     if response.status == 409 or response.status == 412 {
-      return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists"))
+      let existing = fp"{work}/immutable-existing/{bytes.from_text(rel.display()).sha256().hex()}"
+      fs.mkdir(existing.parent)?
+      defer fs.remove(existing, missing_ok: true)?
+      let failure = try_fetch_repo_file(repo, rel, existing)?
+
+      if failure == "" and hash.sha256(existing)?.hex() == hash.sha256(source)?.hex() {
+        return false
+      }
+
+      return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
     }
 
     return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object {rel}: HTTP {response.status}"))
@@ -305,12 +316,12 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
 
   let fallback = legacy_snapshot_digest(value)
   let tarball = if value.tarball == "" {
-    util.remote_binary_rel(value.arch, value.name, value.ver, value.rel).display()
+    util.legacy_remote_binary_rel(value.arch, value.name, value.ver, value.rel).display()
   } else {
     value.tarball
   }
   let metadata = if value.metadata == "" {
-    util.remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
+    util.legacy_remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
   } else {
     value.metadata
   }
@@ -336,7 +347,7 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
 
 proc remote_legacy_metadata_rel(value: types.RemotePackage) [error] -> Result[Path] {
   let raw = if value.metadata == "" {
-    util.remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
+    util.legacy_remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
   } else {
     value.metadata
   }
