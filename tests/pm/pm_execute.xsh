@@ -160,11 +160,15 @@ export let filetree = [{path: p"usr/share/execute-service.txt", kind: "file"}]
 
 error ServiceBuildError = Failed(message: Str)
 
-## Builds only when the runtime-only dependency is absent from the build root.
+## Builds only when the runtime-only dependency is absent from the build root
+## and the environment names the compilers PATH resolves in it.
 export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
   let root = env("LAPUTA_ROOT")?
   if fs.exists(fp"{root}/usr/share/execute-dep.txt")? {
     return Err(ServiceBuildError.Failed("execute-dep reached the build root"))
+  }
+  if env("CC")? != "cc" or env("CXX")? != "c++" {
+    return Err(ServiceBuildError.Failed("the build environment does not name the compilers"))
   }
   let target = fp"{dest}/usr/share/execute-service.txt"
   fs.mkdir(target.parent)?
