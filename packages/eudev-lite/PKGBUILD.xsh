@@ -8,10 +8,10 @@ export const name = "eudev-lite"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "3.2.14"
+export const ver = "3.2.15"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "8da4319102f24abbf7fff5ce9c416af848df163b29590e666d334cc1927f006f",
+        sha256: "eb69809fc0d1187f2463ab2149c53aa9f42a78e59f14ebea68eae6cb6b4fc1c3",
       },
     ],
   },
