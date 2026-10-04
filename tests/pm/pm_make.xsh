@@ -81,6 +81,14 @@ error.fail("task fixture failed")?
   assert ! failure.stamp.exists()?
 }
 
+test make_task_argv_accepts_only_text_and_path_words [error] {
+  assert make.argv_text(["cc", p"src/main.c", "-o", p"out dir/main"])? == ["cc", "src/main.c", "-o", "out dir/main"]
+  match make.argv_text(["cc", 2]) {
+    Ok(_) => test.fail("an Int argv word unexpectedly became process text")?
+    Err(problem) => assert problem is InvalidData
+  }
+}
+
 test make_pkg_config_flags_preserve_checked_compiler_and_linker_lists [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "pkg config flags")?
   let runner = task_runner()?

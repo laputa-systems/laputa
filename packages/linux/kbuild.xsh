@@ -113,6 +113,13 @@ export type ArchiveAnalysisResult = {
   missing_sources: List[Str],
 }
 
+# A compile task spec as emitted for materialized archive plans.
+type ArchiveCompileTaskSpec = {source: Str, output: Str, argv: List[Str], depfile: Str, stamp: Str}
+
+# A position-independent object spec: its base compile, then objcopy and the
+# relocation check derived from `base` and `output`.
+type ArchivePiTaskSpec = {base: Str, output: Str, base_task: ArchiveCompileTaskSpec}
+
 type CompileFlagsCache = {format: Str, fingerprint: Str, flags: List[CompileFlagsEntry]}
 
 type LocalRecordCache = {format: Str, key: Str, records: List[ScanRecord]}
@@ -3081,10 +3088,6 @@ pure path_strings(paths: List[Path]) -> List[Str] {
   return [path_key(path_value) for path_value in paths]
 }
 
-pure argv_strings(argv: List[Any]) -> List[Str] {
-  return [f"{arg}" for arg in argv]
-}
-
 proc paths_from_strings(items: List[Str]) [error] -> Result[List[Path]] {
   [path_from_string(item)? for item in items]
 }
@@ -3324,22 +3327,22 @@ composites {plan.composites.len()}
 """
 }
 
-pure task_record(task: make.MakeTask) -> ArchiveTaskRecord {
-  return {
+pure task_record(task: make.MakeTask) -> Result[ArchiveTaskRecord] {
+  Ok({
     name: task.name,
     outputs: path_strings(task.outputs),
     inputs: path_strings(task.inputs),
     deps: task.deps,
-    argv: argv_strings(task.argv),
+    argv: make.argv_text(task.argv)?,
     env: task.env,
     cwd: task.cwd.display(),
     depfile: task.depfile.display(),
     stamp: task.stamp.display(),
-  }
+  })
 }
 
-pure task_records(tasks: List[make.MakeTask]) -> List[ArchiveTaskRecord] {
-  return [task_record(task) for task in tasks]
+pure task_records(tasks: List[make.MakeTask]) -> Result[List[ArchiveTaskRecord]] {
+  [task_record(task)? for task in tasks]
 }
 
 pure archive_plan_report_format() -> Str {
@@ -3392,7 +3395,7 @@ export proc write_archive_plan_summary(archive_plan: BuiltinArchivePlan, out: Pa
 ## Exported declaration `write_archive_plan_report`.
 export proc write_archive_plan_report(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
   let records_start = archive_plan_timing_start("report-task-records")
-  let task_rows = task_records(archive_plan.tasks)
+  let task_rows = task_records(archive_plan.tasks)?
   archive_plan_timing_done("report-task-records", records_start)
 
   let encode_start = archive_plan_timing_start("report-encode")
@@ -7192,10 +7195,9 @@ proc archive_analysis_process_pool(
   return results
 }
 
-proc archive_compile_task_from_spec(spec: Record) [error] -> Result[make.MakeTask] {
-  let source = fp"{spec.get("source")?}"
-  let output = fp"{spec.get("output")?}"
-  let argv = spec.get("argv")?.require(List[Str])?
+pure archive_compile_task_from_spec(spec: ArchiveCompileTaskSpec) -> make.MakeTask {
+  let source = fp"{spec.source}"
+  let output = fp"{spec.output}"
 
   return {
     name: output.display(),
@@ -7206,11 +7208,11 @@ proc archive_compile_task_from_spec(spec: Record) [error] -> Result[make.MakeTas
       source,
     ],
     deps: [],
-    argv: [@argv],
+    argv: [@spec.argv],
     cwd: p".",
     env: {},
-    depfile: fp"{spec.get("depfile")?}",
-    stamp: fp"{spec.get("stamp")?}",
+    depfile: fp"{spec.depfile}",
+    stamp: fp"{spec.stamp}",
   }
 }
 
@@ -7253,9 +7255,9 @@ proc assemble_builtin_archive_plan(
         let kind = spec.get("kind")?.require(Str)?
 
         if kind == "pi" {
-          let out = fp"{spec.get("output")?}"
-          let base_task_spec = spec.get("base_task")?.require(Record)?
-          let base_out = fp"{spec.get("base")?}"
+          let pi_spec = spec.require(ArchivePiTaskSpec)?
+          let out = fp"{pi_spec.output}"
+          let base_out = fp"{pi_spec.base}"
           let check_task_name = f"{out}:relacheck"
 
           if ! pi_relacheck_added {
@@ -7268,7 +7270,7 @@ proc assemble_builtin_archive_plan(
           }
 
           if materialize_tasks {
-            let base_task = archive_compile_task_from_spec(base_task_spec)?
+            let base_task = archive_compile_task_from_spec(pi_spec.base_task)
             let objcopy_task = pi_objcopy_task(cc, base_out, out, [base_task.name])
             let check_task = pi_relacheck_task(
               pi_relacheck_path(),
@@ -7290,10 +7292,11 @@ proc assemble_builtin_archive_plan(
           objects_by_dir = objects_by_dir.push(owner_key, out)
           deps_by_dir = deps_by_dir.push(owner_key, check_task_name)
         } else if kind == "compile" {
-          let out = fp"{spec.get("output")?}"
+          let compile_spec = spec.require(ArchiveCompileTaskSpec)?
+          let out = fp"{compile_spec.output}"
 
           if materialize_tasks {
-            tasks = tasks.push(archive_compile_task_from_spec(spec)?)
+            tasks = tasks.push(archive_compile_task_from_spec(compile_spec))
           }
 
           task_count += 1

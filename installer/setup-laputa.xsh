@@ -5,6 +5,8 @@ error InstallerError = Failed(kind: Str, message: Str)
 
 type DiskParts = {esp: Path, swap: Path, root: Path}
 
+type InstallerNetwork = {iface: Str, address: Str, netmask: Str, gateway: Str}
+
 const ESP_TYPE = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
 const SWAP_TYPE = "0657FD6D-A4AB-43C4-84E5-0933C84B4F4F"
 const LINUX_TYPE = "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
@@ -229,7 +231,7 @@ proc wait_for(path_value: Path) [fs, time, error] {
   return Err(InstallerError.Failed("device-timeout", path_value.display()))
 }
 
-proc installer_network_interfaces() [process, error] -> Result[Record] {
+proc installer_network_interfaces() [process, error] -> Result[InstallerNetwork] {
   let interfaces = linux.interfaces()?
   let routes = linux.routes()?
   var iface = ""
