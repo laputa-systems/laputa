@@ -9,10 +9,10 @@ export const name = "libnl3"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "3.11.0"
+export const ver = "3.12.0"
 
 ## Exported declaration `rel`.
-export const rel = "5"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -23,7 +23,7 @@ export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
-    source: p"https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-3.11.0.tar.gz",
+    source: p"https://github.com/thom311/libnl/releases/download/libnl3_12_0/libnl-3.12.0.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "2a56e1edefa3e68a7c00879496736fdbf62fc94ed3232c0baba127ecfa76874d",
+        sha256: "fc51ca7196f1a3f5fdf6ffd3864b50f4f9c02333be28be4eeca057e103c0dd18",
       },
     ],
   },
@@ -95,40 +95,40 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.write(version_h, body)?
   }
 
-  # Generate include/config.h (minimal — configure would produce this)
+  # include/config.h as configure writes it for musl: the keys are exactly
+  # those of include/config.h.in. musl declares neither getprotobyname_r nor
+  # getprotobynumber_r, so utils.c takes its non-reentrant fallback; pthreads
+  # live in libc.
   let config_h = fp"{src}/include/config.h"
 
   if ! fs.exists(config_h)? {
     let cfg_body = f"""#ifndef LIBNL_CONFIG_H
 #define LIBNL_CONFIG_H
-#define PACKAGE_STRING "libnl {ver}"
-#define PACKAGE_NAME "libnl"
-#define PACKAGE_VERSION "{ver}"
-#define SYSCONFDIR "/etc"
-#define PACKAGE_URL "http://www.infradead.org/~tgr/libnl/"
-#define PACKAGE "libnl-3-11-0"
-#define STDC_HEADERS 1
-#define HAVE_STDINT_H 1
-#define HAVE_STDDEF_H 1
-#define HAVE_STDLIB_H 1
-#define HAVE_STRING_H 1
-#define HAVE_UNISTD_H 1
-#define HAVE_SYS_SOCKET_H 1
-#define HAVE_SYS_TIME_H 1
-#define HAVE_LINUX_IF_TUN_H 1
-#define HAVE_LINUX_IF_PACKET_H 1
-#define HAVE_ARPA_INET_H 1
+#define HAVE_DECL_GETPROTOBYNAME_R 0
+#define HAVE_DECL_GETPROTOBYNUMBER_R 0
 #define HAVE_DLFCN_H 1
-#define HAVE_FCNTL_H 1
-#define HAVE_NETDB_H 1
-#define HAVE_NETINET_IN_H 1
-#define HAVE_SYS_SELECT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_LIBPTHREAD 1
+#define HAVE_STDINT_H 1
+#define HAVE_STDIO_H 1
+#define HAVE_STDLIB_H 1
 #define HAVE_STRERROR_L 1
-#define HAVE_FLOCK 1
-#define HAVE_GETTIMEOFDAY 1
-#define TIME_WITH_SYS_TIME 1
+#define HAVE_STRINGS_H 1
+#define HAVE_STRING_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_WCHAR_H 1
 #define NL_DEBUG 0
-#define const /**/
+#define PACKAGE "libnl"
+#define PACKAGE_BUGREPORT ""
+#define PACKAGE_NAME "libnl"
+#define PACKAGE_STRING "libnl {ver}"
+#define PACKAGE_TARNAME "libnl"
+#define PACKAGE_URL "http://www.infradead.org/~tgr/libnl/"
+#define PACKAGE_VERSION "{ver}"
+#define STDC_HEADERS 1
+#define VERSION "{ver}"
 #endif
 """
 
@@ -142,8 +142,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.mkdir(fp"{dest}/usr")?
   fs.mkdir(fp"{dest}/usr/lib")?
   fs.mkdir(fp"{dest}/usr/include")?
-  var cflags = ["-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
-  var defs = []
+  # Upstream compiles every library as gnu11 with the sysconfdir and pkglibdir
+  # defines from Makefile.am's defines_cppflags.
+  var cflags = ["-std=gnu11", "-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
+  var defs = ["-D_NL_SYSCONFDIR_LIBNL=\"/etc/libnl\"", "-D_NL_PKGLIBDIR=\"/usr/lib/libnl\""]
 
   var includes = [
     "-I",
@@ -154,6 +156,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{src}/lib".display(),
     "-I",
     src.display(),
+    "-I",
+    fp"{src}/third_party/c-list/src".display(),
   ]
 
   # Core source files for libnl-3.so
