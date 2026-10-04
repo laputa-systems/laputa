@@ -9,10 +9,10 @@ export const name = "libffi"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "3.5.2"
+export const ver = "3.8.0"
 
 ## Exported declaration `rel`.
-export const rel = "10"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc",
+        sha256: "7da3e2d9a171eb0a038f592ecad3ff2bb2550f3496d87b3b29ad0cf4430c0db4",
       },
     ],
   },
@@ -42,35 +42,11 @@ type LibffiTarget = {target: Str, dir: Str, sources: List[Str]}
 ## Exported declaration `filetree`.
 export const filetree = [
   {
-    path: p"usr/include/Makefile.am",
-    kind: "file",
-  },
-  {
-    path: p"usr/include/Makefile.in",
-    kind: "file",
-  },
-  {
     path: p"usr/include/ffi.h",
     kind: "file",
   },
   {
-    path: p"usr/include/ffi.h.in",
-    kind: "file",
-  },
-  {
-    path: p"usr/include/ffi_cfi.h",
-    kind: "file",
-  },
-  {
-    path: p"usr/include/ffi_common.h",
-    kind: "file",
-  },
-  {
     path: p"usr/include/ffitarget.h",
-    kind: "file",
-  },
-  {
-    path: p"usr/include/tramp.h",
     kind: "file",
   },
   {
@@ -82,7 +58,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libffi.so.8.2.0",
+    path: p"usr/lib/libffi.so.8.5.0",
     kind: "binary",
   },
   {
@@ -108,6 +84,12 @@ pure libffi_target(machine: Str) -> LibffiTarget {
   {target: "AARCH64", dir: "aarch64", sources: ["src/aarch64/ffi.c", "src/aarch64/sysv.S"]}
 }
 
+# configure.ac encodes X.Y.Z as X*10000 + Y*100 + Z.
+proc ffi_version_number() [error] -> Result[Int] {
+  let parts = ver.split(".")
+  parts[0].parse_int()? * 10000 + parts[1].parse_int()? * 100 + parts[2].parse_int()?
+}
+
 proc write_generated_headers(target: LibffiTarget) [fs, error] {
   let target_defines = if target.target == "X86_64" {
     """#define HAVE_AS_X86_PCREL 1
@@ -128,6 +110,7 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
 #define HAVE_AS_CFI_PSEUDO_OP 1
 #define HAVE_DLFCN_H 1
 #define HAVE_HIDDEN_VISIBILITY_ATTRIBUTE 1
+#define HAVE_INT128 1
 #define HAVE_INTTYPES_H 1
 #define HAVE_LONG_DOUBLE 1
 #define HAVE_MEMCPY 1
@@ -182,81 +165,30 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
     .replace("@HAVE_LONG_DOUBLE@", "1")
     .replace("@HAVE_LONG_DOUBLE_VARIANT@", "0")
     .replace("@FFI_VERSION_STRING@", ver)
-    .replace("@FFI_VERSION_NUMBER@", "30502")
+    .replace("@FFI_VERSION_NUMBER@", f"{ffi_version_number()?}")
     .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", "0")
 
   fs.write(p"include/ffi.h", ffi_h)?
   fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)?
 }
 
-proc write_version_script() [fs, error] {
-  fs.write(
-    p"libffi.map",
-    """LIBFFI_BASE_8.0 {
-  global:
-    ffi_type_void;
-    ffi_type_uint8;
-    ffi_type_sint8;
-    ffi_type_uint16;
-    ffi_type_sint16;
-    ffi_type_uint32;
-    ffi_type_sint32;
-    ffi_type_uint64;
-    ffi_type_sint64;
-    ffi_type_float;
-    ffi_type_double;
-    ffi_type_longdouble;
-    ffi_type_pointer;
-    ffi_call;
-    ffi_prep_cif;
-    ffi_prep_cif_var;
-    ffi_raw_call;
-    ffi_ptrarray_to_raw;
-    ffi_raw_to_ptrarray;
-    ffi_raw_size;
-    ffi_java_raw_call;
-    ffi_java_ptrarray_to_raw;
-    ffi_java_raw_to_ptrarray;
-    ffi_java_raw_size;
-    ffi_get_struct_offsets;
-  local:
-    *;
-};
+# Upstream's Makefile preprocesses libffi.map.in against fficonfig.h and the
+# target's ffitarget.h, which select the closure, Go closure, complex, and
+# int128 symbol nodes the target exports.
+proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: List[Str], includes: List[Str]) [process, error] {
+  let argv = ["-target", triple].extend(defs).extend(includes).extend([
+    f"-D{target.target}",
+    "-DGENERATE_LIBFFI_MAP",
+    "-E",
+    "-P",
+    "-x",
+    "assembler-with-cpp",
+    "-o",
+    "libffi.map",
+    "libffi.map.in",
+  ])
 
-LIBFFI_BASE_8.1 {
-  global:
-    ffi_get_version;
-    ffi_get_version_number;
-    ffi_get_default_abi;
-    ffi_get_closure_size;
-} LIBFFI_BASE_8.0;
-
-LIBFFI_COMPLEX_8.0 {
-  global:
-    ffi_type_complex_float;
-    ffi_type_complex_double;
-    ffi_type_complex_longdouble;
-} LIBFFI_BASE_8.0;
-
-LIBFFI_CLOSURE_8.0 {
-  global:
-    ffi_closure_alloc;
-    ffi_closure_free;
-    ffi_prep_closure;
-    ffi_prep_closure_loc;
-    ffi_prep_raw_closure;
-    ffi_prep_raw_closure_loc;
-    ffi_prep_java_raw_closure;
-    ffi_prep_java_raw_closure_loc;
-} LIBFFI_BASE_8.0;
-
-LIBFFI_GO_CLOSURE_8.0 {
-  global:
-    ffi_call_go;
-    ffi_prep_go_closure;
-} LIBFFI_CLOSURE_8.0;
-""",
-  )?
+  run $cc ${argv} ?
 }
 
 ## Exported declaration `build`.
@@ -274,7 +206,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   )
 
   write_generated_headers(target)?
-  write_version_script()?
+  write_version_script(cc, triple, target, defs, includes)?
 
   let libffi = make.c_shared_library({
     cc,
@@ -285,17 +217,20 @@ export proc build(dest: Path) [fs, process, env, error] {
     root: p".",
     sources: [fp"{src}" for src in srcs],
     out_dir: p"obj",
-    out: p"obj/libffi.so.8.2.0",
+    out: p"obj/libffi.so.8.5.0",
     soname: "libffi.so.8",
     ldflags: ["-Wl,--version-script,libffi.map"],
     deps: [],
   })
 
   make.run_tasks(libffi.tasks, make.jobs()?)?
-  fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.2.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libffi.so.8.2.0", fp"{dest}/usr/lib/libffi.so.8")?
-  fs.symlink(p"libffi.so.8.2.0", fp"{dest}/usr/lib/libffi.so")?
-  make.install_header_tree(p"include", fp"{dest}/usr/include")?
+  fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.5.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so.8")?
+  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so")?
+  # include/Makefile.am installs only the generated ffi.h and the target's
+  # ffitarget.h; the other headers there are private to the build.
+  fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)?
+  fs.install(p"include/ffitarget.h", fp"{dest}/usr/include/ffitarget.h", 0o644, parents: true, overwrite: true)?
   fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
 
   fs.write(
