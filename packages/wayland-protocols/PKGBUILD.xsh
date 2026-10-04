@@ -39,6 +39,254 @@ export const upstream_sources = [
 ## Package recipe export.
 export const filetree = [
   {
+    path: p"usr/include/wayland-protocols/alpha-modifier-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/color-management-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/color-representation-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/commit-timing-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/content-type-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/cursor-shape-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/drm-lease-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-background-effect-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-data-control-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-foreign-toplevel-list-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-idle-notify-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-image-capture-source-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-image-copy-capture-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-session-lock-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-transient-seat-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/ext-workspace-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/fifo-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/fractional-scale-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/fullscreen-shell-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/idle-inhibit-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/input-method-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/input-timestamps-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/keyboard-shortcuts-inhibit-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/linux-dmabuf-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/linux-dmabuf-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/linux-drm-syncobj-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/linux-explicit-synchronization-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/pointer-constraints-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/pointer-gestures-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/pointer-warp-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/presentation-time-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/primary-selection-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/relative-pointer-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/security-context-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/single-pixel-buffer-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/tablet-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/tablet-unstable-v2-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/tablet-v2-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/tearing-control-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/text-input-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/text-input-unstable-v3-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/viewporter-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-activation-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-decoration-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-dialog-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-foreign-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-foreign-unstable-v2-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-output-unstable-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-session-management-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-shell-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-shell-unstable-v5-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-shell-unstable-v6-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-system-bell-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-toplevel-drag-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-toplevel-icon-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xdg-toplevel-tag-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-cutouts-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-input-method-v2-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-keyboard-filter-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-session-management-v1-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-text-input-v3-enum.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/wayland-protocols/xx-zones-v1-enum.h",
+    kind: "file",
+  },
+  {
     path: p"usr/share/pkgconfig/wayland-protocols.pc",
     kind: "file",
   },
@@ -268,53 +516,9 @@ export const filetree = [
   },
 ]
 
-error WaylandProtocolsError = Patch(message: Str)
-
-proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
-  let text = fs.read_text(file)?
-
-  if old not in text {
-    return Err(WaylandProtocolsError.Patch(f"{file} no longer holds the patched block"))?
-  }
-
-  fs.write(file, text.replace(old, new))?
-}
-
-# The package ships protocol XML only. When it finds wayland-scanner, upstream
-# generates and installs a C header per protocol; consumers run the scanner
-# themselves, so drop the scanner lookup and the generated headers.
-proc patch_generated_header_install() [fs, error] {
-  let build_file = p"meson.build"
-
-  replace_required(
-    build_file,
-    """dep_scanner = dependency('wayland-scanner',
-    version: get_option('tests') ? '>=1.25.0' : '>=1.22.90',
-    required: get_option('tests'),
-    native: true,
-    fallback: 'wayland'
-)
-if dep_scanner.found()
-	prog_scanner = find_program(dep_scanner.get_variable(pkgconfig: 'wayland_scanner', internal: 'wayland_scanner'))
-endif
-""",
-    "",
-  )?
-
-  replace_required(
-    build_file,
-    """include_dirs = []
-headers = []
-if dep_scanner.found()
-	subdir('include/wayland-protocols')
-	include_dirs = ['include']
-endif""",
-    """include_dirs = []
-headers = []""",
-  )?
-}
-
 proc prune_x_compat_protocols(root: Path) [fs, error] {
+  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-shell-v1-enum.h", missing_ok: false)?
+  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-keyboard-grab-unstable-v1-enum.h", missing_ok: false)?
   fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)?
   fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell", missing_ok: true)?
 
@@ -330,7 +534,6 @@ proc prune_x_compat_protocols(root: Path) [fs, error] {
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let pc = pm_env.pkg_config_context()?
-  patch_generated_header_install()?
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -340,6 +543,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
     run $muon "setup" pm_env.meson_prefix_arg() "-Dtests=false" "build" ?
+    run $muon "-C" "build" samu f"-j{cpu.count()}" ?
 
     env ({
       DESTDIR: dest,

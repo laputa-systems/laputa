@@ -18,6 +18,9 @@ proc main(root: Path = /rootfs) [fs, error] {
     proof.ensure("<protocol name=" in xml, "proof-wayland-protocols", f"{rel} is not a protocol description")?
   }
 
+  # wlroots includes the scanner-generated enum headers.
+  let header = fp"{root}/usr/include/wayland-protocols/xdg-shell-enum.h".read_text()?
+  proof.ensure("enum xdg_toplevel_state" in header, "proof-wayland-protocols", "xdg-shell-enum.h lacks the toplevel states")?
   print "wayland-protocols ok"
 }
 
