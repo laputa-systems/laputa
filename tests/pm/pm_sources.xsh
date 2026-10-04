@@ -266,3 +266,27 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   assert "1 cached" in second.stdout
   assert "0 fetched" in second.stdout
 }
+
+test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env, error] { |ctx|
+  let upstream = test.temp_dir(ctx, name: "checksum-upstream")?
+  fs.write(fp"${upstream}/new-1.0.txt", "new upstream bytes\n")?
+  let new_sha256 = hash.sha256(fp"${upstream}/new-1.0.txt")?.hex()
+  # The recorded pin is stale; `repo checksum` reports what upstream serves now.
+  let repository = fetch_repository(ctx, fetch_source_record(f"file://${upstream}/new-VERSION.txt", sha256_of_empty))?
+  let cache = test.temp_dir(ctx, name: "checksum-cache")?
+  let xsh = runner()?
+  let modules = path.absolute(p".")?
+
+  let cwd = test.temp_dir(ctx, name: "checksum-cwd")?
+  let entrypoint = fp"${modules}/pm.xsh"
+  var output = ""
+
+  cd $cwd {
+    output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo ?
+  } ?
+
+  test.eq(output.trim(), f"fetchdemo ${new_sha256}")?
+  test.eq(fs.read_text(sources.source_cache_entry(cache, new_sha256))?, "new upstream bytes\n")?
+  # The download is staged in a private temporary directory, never the caller's cwd.
+  test.eq(fs.children(cwd)? |> count(), 0)?
+}

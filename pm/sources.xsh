@@ -370,21 +370,22 @@ export proc prepare_package_source_tree(
 proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) [fs, net, error] -> Result[Str] {
   let partial_dir = fp"${cache_root}/partial"
   fs.mkdir(partial_dir)?
-  let download = fs.tempfile()?
-  defer download.root.close()?
-  let failure = util.download_file(url, download.path)?
+  let scratch = fs.tempdir()?
+  defer scratch.close()?
+  let download = fp"${scratch.host_path()?}/download"
+  let failure = util.download_file(url, download)?
 
   if failure != "" {
     return Err(types.PmError.DownloadFailed(f"${package_name}: ${failure}"))
   }
 
-  let digest = hash.sha256(download.path)?.hex()
+  let digest = hash.sha256(download)?.hex()
   let entry = source_cache_entry(cache_root, digest)
 
   if ! fs.exists(entry)? {
     let partial = fp"${partial_dir}/${digest}.checksum"
     fs.mkdir(entry.parent)?
-    fs.copy(download.path, partial, overwrite: true)?
+    fs.copy(download, partial, overwrite: true)?
     fs.rename(partial, entry, overwrite: true)?
   }
 
