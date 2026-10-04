@@ -25,8 +25,18 @@ pub struct RemotePackage {
     pub metadata: String,
     pub source_sha256: String,
     pub metapackage: bool,
-    /// Fields the mirror does not interpret (artifact and proof identities)
-    /// survive the validate-and-rewrite of `index.json` unchanged.
+    /// The artifact key that names this row's payload object. Empty only in
+    /// legacy rows published before content-addressed object names.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub artifact_key: String,
+    /// The proof key that, with the artifact key, names the metadata and
+    /// proof objects.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proof_key: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proof: String,
+    /// Fields the mirror does not interpret (recipe, executor and proof
+    /// digests) survive the validate-and-rewrite of `index.json` unchanged.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -261,7 +271,7 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
         return put_upload_chunk(path, body, state);
     }
 
-    let Some(key) = object_key(path) else {
+    let Some(key) = publishable_object_key(path) else {
         return Response::not_found();
     };
     // `If-None-Match: *` publishes an immutable object only if it is absent.
@@ -332,7 +342,7 @@ fn complete_chunked_upload(
     }
 
     let rel_path = format!("/{}", req.rel);
-    let Some(key) = object_key(&rel_path) else {
+    let Some(key) = publishable_object_key(&rel_path) else {
         return Response::bad_request("invalid upload path");
     };
 
@@ -615,13 +625,55 @@ fn proof_key(path: &str) -> Option<String> {
     json_object_key("proofs", path)
 }
 
-/// Every object path the mirror stores: packages, sources, metadata
-/// sidecars, and proof receipts.
+/// Every object path the mirror serves: packages, sources, metadata sidecars,
+/// and proof receipts, including the legacy names of objects published before
+/// content-addressed naming.
 fn object_key(path: &str) -> Option<String> {
     package_key(path)
         .or_else(|| source_key(path))
         .or_else(|| metadata_key(path))
         .or_else(|| proof_key(path))
+}
+
+/// The object paths a write may create. Package payloads, metadata and
+/// proofs are content-addressed (`<name>-<ver>-<rel>-<artifact12>.tar.gz`,
+/// `<name>-<ver>-<rel>-<artifact12>-<proof12>.json`), so a rebuild under the
+/// same ver-rel never overwrites a published object; only the index row moves.
+fn publishable_object_key(path: &str) -> Option<String> {
+    let key = object_key(path)?;
+    let parts: Vec<&str> = key.split('/').collect();
+    let content_addressed = match parts.as_slice() {
+        ["packages", _, name, file] => file
+            .strip_suffix(".tar.gz")
+            .is_some_and(|stem| is_content_addressed(name, stem, 1)),
+        ["metadata" | "proofs", _, name, file] => file
+            .strip_suffix(".json")
+            .is_some_and(|stem| is_content_addressed(name, stem, 2)),
+        ["sources", ..] => true,
+        _ => false,
+    };
+    content_addressed.then_some(key)
+}
+
+/// Whether `stem` is `<name>-<ver>-<rel>` followed by `keys` dash-separated
+/// twelve-digit lowercase hex key prefixes.
+fn is_content_addressed(name: &str, stem: &str, keys: usize) -> bool {
+    let Some(mut rest) = stem.strip_prefix(name).and_then(|rest| rest.strip_prefix('-')) else {
+        return false;
+    };
+    for _ in 0..keys {
+        match rest.rsplit_once('-') {
+            Some((head, prefix)) if valid_key_prefix(prefix) => rest = head,
+            _ => return false,
+        }
+    }
+    // At least `<ver>-<rel>` remains.
+    rest.split_once('-')
+        .is_some_and(|(ver, rel)| !ver.is_empty() && !rel.is_empty())
+}
+
+fn valid_key_prefix(value: &str) -> bool {
+    value.len() == 12 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn json_object_key(prefix: &str, path: &str) -> Option<String> {
@@ -703,13 +755,22 @@ fn validate_index(index: &[RemotePackage]) -> Result<(), String> {
             if !pkg.tarball.is_empty() || pkg.size != 0 || !pkg.sha256.is_empty() {
                 return Err(format!("invalid metapackage fields for {}", pkg.name));
             }
-        } else if package_key(&format!("/{}", pkg.tarball)).is_none() {
-            return Err(format!("invalid tarball path for {}", pkg.name));
-        } else if !tarball_matches_entry(pkg) {
-            return Err(format!(
-                "tarball path does not match package arch/name for {}",
-                pkg.name
-            ));
+        }
+        if !pkg.artifact_key.is_empty() {
+            validate_content_addressed_row(pkg)?;
+            continue;
+        }
+        // Legacy rows, published before artifact keys named objects.
+        if !pkg.metapackage {
+            if package_key(&format!("/{}", pkg.tarball)).is_none() {
+                return Err(format!("invalid tarball path for {}", pkg.name));
+            }
+            if !tarball_matches_entry(pkg) {
+                return Err(format!(
+                    "tarball path does not match package arch/name for {}",
+                    pkg.name
+                ));
+            }
         }
         if !pkg.metadata.is_empty() {
             if metadata_key(&format!("/{}", pkg.metadata)).is_none() {
@@ -724,6 +785,40 @@ fn validate_index(index: &[RemotePackage]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// A row that carries an artifact key names exactly the content-addressed
+/// objects of that key and its proof key.
+fn validate_content_addressed_row(pkg: &RemotePackage) -> Result<(), String> {
+    if !valid_lower_sha256(&pkg.artifact_key) || !valid_lower_sha256(&pkg.proof_key) {
+        return Err(format!("invalid artifact or proof key for {}", pkg.name));
+    }
+    let stem = format!("{}-{}-{}-{}", pkg.name, pkg.ver, pkg.rel, &pkg.artifact_key[..12]);
+    let json = format!("{}/{}/{stem}-{}.json", pkg.arch, pkg.name, &pkg.proof_key[..12]);
+    if !pkg.metapackage && pkg.tarball != format!("packages/{}/{}/{stem}.tar.gz", pkg.arch, pkg.name) {
+        return Err(format!("tarball path does not match the artifact key for {}", pkg.name));
+    }
+    if pkg.metadata != format!("metadata/{json}") {
+        return Err(format!("metadata path does not match the artifact key for {}", pkg.name));
+    }
+    if pkg.proof != format!("proofs/{json}") {
+        return Err(format!("proof path does not match the artifact key for {}", pkg.name));
+    }
+    // The names must also be writable objects (a ver or rel with `/` is not).
+    let mut objects = vec![&pkg.metadata, &pkg.proof];
+    if !pkg.metapackage {
+        objects.push(&pkg.tarball);
+    }
+    for object in objects {
+        if publishable_object_key(&format!("/{object}")).is_none() {
+            return Err(format!("invalid object path {object} for {}", pkg.name));
+        }
+    }
+    Ok(())
+}
+
+fn valid_lower_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn tarball_matches_entry(pkg: &RemotePackage) -> bool {
@@ -829,12 +924,38 @@ mod tests {
             mkdeps_target: vec![],
             sha256: "a".repeat(64),
             size: 10,
-            tarball: "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".to_string(),
-            metadata: "metadata/aarch64/zlib/zlib-1.3.2-5.json".to_string(),
+            tarball: "packages/aarch64/zlib/zlib-1.3.2-5-cccccccccccc.tar.gz".to_string(),
+            metadata: "metadata/aarch64/zlib/zlib-1.3.2-5-cccccccccccc-dddddddddddd.json".to_string(),
             source_sha256: "b".repeat(64),
             metapackage: false,
+            artifact_key: "c".repeat(64),
+            proof_key: "d".repeat(64),
+            proof: "proofs/aarch64/zlib/zlib-1.3.2-5-cccccccccccc-dddddddddddd.json".to_string(),
             extra: Default::default(),
         }];
         assert!(validate_index(&index).is_ok());
+    }
+
+    #[test]
+    fn publishable_objects_are_content_addressed() {
+        for path in [
+            "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
+            "/packages/x86_64/xsh-git/xsh-git-0.1-r2-1-0123456789ab.tar.gz",
+            "/metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
+            "/proofs/x86_64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
+            "/sources/zlib/zlib-1.3.2-5-aarch64-src.tar.bz2",
+        ] {
+            assert_eq!(publishable_object_key(path).as_deref(), Some(&path[1..]), "{path}");
+        }
+        for path in [
+            "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+            "/packages/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
+            "/packages/aarch64/zlib/zlib-0123456789ab.tar.gz",
+            "/packages/aarch64/zlib/zlib--5-0123456789ab.tar.gz",
+            "/metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab.json",
+            "/proofs/aarch64/zlib/zlib-1.3.2-5-0123456789ab-FEDCBA987654.json",
+        ] {
+            assert!(publishable_object_key(path).is_none(), "{path}");
+        }
     }
 }

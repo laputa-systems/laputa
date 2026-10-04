@@ -168,10 +168,13 @@ fn sample_index() -> Vec<packages::RemotePackage> {
         mkdeps_target: vec!["llvm-toolchain".to_string()],
         sha256: db::sha256_hex(b"package"),
         size: 7,
-        tarball: "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".to_string(),
-        metadata: String::new(),
+        tarball: PACKAGE.to_string(),
+        metadata: METADATA.to_string(),
         source_sha256: db::sha256_hex(b"source"),
         metapackage: false,
+        artifact_key: ARTIFACT_KEY.to_string(),
+        proof_key: PROOF_KEY.to_string(),
+        proof: PROOF.to_string(),
         extra: Default::default(),
     }]
 }
@@ -195,7 +198,7 @@ fn public_reads_return_index_and_objects() {
     state
         .storage
         .put(
-            "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+            "packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
             b"package".to_vec(),
             "application/octet-stream",
         )
@@ -211,7 +214,7 @@ fn public_reads_return_index_and_objects() {
     state
         .storage
         .put(
-            "metadata/aarch64/zlib/zlib-1.3.2-5.json",
+            "metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
             br#"{"metadata_sha256":"abc"}"#.to_vec(),
             "application/json",
         )
@@ -230,7 +233,7 @@ fn public_reads_return_index_and_objects() {
 
     let resp = packages::route(
         "GET",
-        "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
         &headers(&[]),
         b"",
         &state,
@@ -250,7 +253,7 @@ fn public_reads_return_index_and_objects() {
 
     let resp = packages::route(
         "GET",
-        "/metadata/aarch64/zlib/zlib-1.3.2-5.json",
+        "/metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
         &headers(&[]),
         b"",
         &state,
@@ -265,7 +268,7 @@ fn authenticated_puts_store_objects_and_index() {
     let state = make_state();
     let resp = packages::route(
         "PUT",
-        "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
         &auth_headers(),
         b"package",
         &state,
@@ -274,7 +277,7 @@ fn authenticated_puts_store_objects_and_index() {
     assert_eq!(
         state
             .storage
-            .get("packages/aarch64/zlib/zlib-1.3.2-5.tar.gz")
+            .get("packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz")
             .unwrap(),
         b"package"
     );
@@ -290,7 +293,7 @@ fn authenticated_puts_store_objects_and_index() {
 
     let resp = packages::route(
         "PUT",
-        "/metadata/aarch64/zlib/zlib-1.3.2-5.json",
+        "/metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
         &auth_headers(),
         br#"{"metadata_sha256":"abc"}"#,
         &state,
@@ -299,7 +302,7 @@ fn authenticated_puts_store_objects_and_index() {
     assert_eq!(
         state
             .storage
-            .get("metadata/aarch64/zlib/zlib-1.3.2-5.json")
+            .get("metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json")
             .unwrap(),
         br#"{"metadata_sha256":"abc"}"#
     );
@@ -356,7 +359,7 @@ fn writes_require_bearer_auth() {
     let state = make_state();
     let resp = packages::route(
         "PUT",
-        "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
         &headers(&[]),
         b"package",
         &state,
@@ -406,7 +409,7 @@ fn r2_redirects_use_flat_object_paths() {
 
     let resp = packages::route(
         "GET",
-        "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
         &headers(&[]),
         b"",
         &state,
@@ -419,7 +422,7 @@ fn r2_redirects_use_flat_object_paths() {
         .map(|(_, v)| v.as_str());
     assert_eq!(
         loc,
-        Some("https://pub.example/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz")
+        Some("https://pub.example/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz")
     );
 }
 
@@ -432,7 +435,7 @@ fn index_persists_to_storage_and_reloads() {
     assert_eq!(loaded[0].name, "zlib");
     assert_eq!(
         loaded[0].tarball,
-        "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz"
+        "packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz"
     );
 }
 
@@ -503,8 +506,13 @@ fn static_rejects_path_traversal() {
     }
 }
 
-const PACKAGE: &str = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz";
-const METADATA: &str = "metadata/aarch64/zlib/zlib-1.3.2-5.json";
+// Published package objects are named by artifact key (payload) and by
+// artifact and proof key (metadata, proof).
+const ARTIFACT_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const PROOF_KEY: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+const PACKAGE: &str = "packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz";
+const METADATA: &str = "metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json";
+const PROOF: &str = "proofs/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json";
 const SOURCE: &str = "sources/zlib/zlib-1.3.2-5-aarch64-src.tar.bz2";
 
 /// Names in `dir`, so tests can assert no temp file was left behind.
@@ -546,7 +554,7 @@ fn fs_storage_round_trips_objects() {
     // Only the final names remain next to each object: temp files were renamed away.
     assert_eq!(
         dir_entries(&tmp.path().join("packages/aarch64/zlib")),
-        ["zlib-1.3.2-5.tar.gz"]
+        ["zlib-1.3.2-5-0123456789ab.tar.gz"]
     );
     assert_eq!(
         dir_entries(&tmp.path().join("sources/zlib")),
@@ -586,7 +594,7 @@ fn fs_failed_write_leaves_no_partial_object() {
     assert_eq!(storage.get(PACKAGE), Some(b"old".to_vec()));
     assert_eq!(
         dir_entries(&tmp.path().join("packages/aarch64/zlib")),
-        ["zlib-1.3.2-5.tar.gz"]
+        ["zlib-1.3.2-5-0123456789ab.tar.gz"]
     );
 }
 
@@ -789,7 +797,7 @@ fn local_mode_streams_large_files_with_content_length() {
 #[test]
 fn local_mode_publishes_proof_receipts_as_json() {
     let state = make_local_state();
-    let proof = "proofs/aarch64/zlib/zlib-1.3.2-5.json";
+    let proof = "proofs/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json";
     let resp = packages::route("PUT", &format!("/{proof}"), &headers(&[]), br#"{"proof":1}"#, &state);
     assert_eq!(resp.status, 201);
     let resp = get(&state, &format!("/{proof}"));
@@ -817,11 +825,102 @@ fn if_none_match_star_refuses_to_replace_an_existing_object() {
 fn index_rewrite_keeps_fields_the_mirror_does_not_interpret() {
     let state = make_local_state();
     let mut index = serde_json::to_value(sample_index()).unwrap();
-    index[0]["artifact_key"] = serde_json::json!("abc123");
-    index[0]["proof"] = serde_json::json!("proofs/aarch64/zlib/zlib-1.3.2-5.json");
+    index[0]["recipe_sha256"] = serde_json::json!("abc123");
     let body = serde_json::to_vec(&index).unwrap();
     assert_eq!(packages::route("PUT", "/index.json", &headers(&[]), &body, &state).status, 201);
     let stored = body_json(&get(&state, "/index.json"));
-    assert_eq!(stored[0]["artifact_key"], "abc123");
-    assert_eq!(stored[0]["proof"], "proofs/aarch64/zlib/zlib-1.3.2-5.json");
+    assert_eq!(stored[0]["recipe_sha256"], "abc123");
+    assert_eq!(stored[0]["artifact_key"], ARTIFACT_KEY);
+    assert_eq!(stored[0]["proof"], PROOF);
+}
+
+#[test]
+fn writes_need_content_addressed_object_names() {
+    let state = make_local_state();
+    let no_auth = headers(&[]);
+    for path in [
+        // Legacy names, without the artifact (and proof) key prefixes.
+        "/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz",
+        "/packages/zlib/zlib-1.3.2-5-0123456789ab.tar.gz",
+        "/metadata/aarch64/zlib/zlib-1.3.2-5.json",
+        "/proofs/aarch64/zlib/zlib-1.3.2-5-0123456789ab.json",
+        // Malformed key prefixes or no ver-rel.
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789AB.tar.gz",
+        "/packages/aarch64/zlib/zlib-1.3.2-5-0123456789a.tar.gz",
+        "/packages/aarch64/zlib/zlib-5-0123456789ab.tar.gz",
+        "/metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba98765.json",
+    ] {
+        assert_eq!(packages::route("PUT", path, &no_auth, b"x", &state).status, 404, "PUT {path}");
+    }
+
+    let body = r#"{"rel":"packages/aarch64/zlib/zlib-1.3.2-5.tar.gz","chunks":1}"#;
+    assert_eq!(packages::route("PUT", "/_uploads/up/0", &no_auth, b"x", &state).status, 201);
+    let resp = packages::route("POST", "/_uploads/up/complete", &no_auth, body.as_bytes(), &state);
+    assert_eq!(resp.status, 400);
+}
+
+#[test]
+fn legacy_object_names_stay_readable() {
+    let state = make_local_state();
+    let legacy = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz";
+    state.storage.put(legacy, b"legacy".to_vec(), "").unwrap();
+    assert_eq!(body_bytes(get(&state, &format!("/{legacy}"))), b"legacy");
+}
+
+#[test]
+fn index_rows_must_name_their_artifact_key_objects() {
+    let state = make_state();
+    let other_key = "a".repeat(64);
+    let cases: [(&str, Box<dyn Fn(&mut packages::RemotePackage)>); 6] = [
+        ("tarball", Box::new(|row| row.tarball = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".into())),
+        ("metadata", Box::new(|row| row.metadata = "metadata/aarch64/zlib/zlib-1.3.2-5.json".into())),
+        ("proof", Box::new(|row| row.proof = String::new())),
+        ("artifact key", Box::new(move |row| row.artifact_key = other_key.clone())),
+        ("short key", Box::new(|row| row.artifact_key = "0123456789ab".into())),
+        ("proof key", Box::new(|row| row.proof_key = String::new())),
+    ];
+    for (label, mutate) in cases {
+        let mut index = sample_index();
+        mutate(&mut index[0]);
+        assert_eq!(put_index(&state, &index).status, 400, "{label}");
+    }
+
+    // A legacy row without an artifact key keeps its legacy object names.
+    let mut legacy = sample_index();
+    legacy[0].artifact_key = String::new();
+    legacy[0].proof_key = String::new();
+    legacy[0].proof = String::new();
+    legacy[0].tarball = "packages/aarch64/zlib/zlib-1.3.2-5.tar.gz".into();
+    legacy[0].metadata = "metadata/aarch64/zlib/zlib-1.3.2-5.json".into();
+    assert_eq!(put_index(&state, &legacy).status, 201);
+}
+
+#[test]
+fn a_rebuild_under_the_same_release_replaces_the_row_not_the_objects() {
+    let state = make_local_state();
+    let immutable = headers(&[("if-none-match", "*")]);
+    for path in [PACKAGE, METADATA, PROOF] {
+        assert_eq!(packages::route("PUT", &format!("/{path}"), &immutable, b"first", &state).status, 201);
+    }
+    assert_eq!(put_index(&state, &sample_index()).status, 201);
+
+    let rebuilt_key = "b".repeat(64);
+    let rebuilt_package = "packages/aarch64/zlib/zlib-1.3.2-5-bbbbbbbbbbbb.tar.gz";
+    let rebuilt_metadata = "metadata/aarch64/zlib/zlib-1.3.2-5-bbbbbbbbbbbb-fedcba987654.json";
+    let rebuilt_proof = "proofs/aarch64/zlib/zlib-1.3.2-5-bbbbbbbbbbbb-fedcba987654.json";
+    for path in [rebuilt_package, rebuilt_metadata, rebuilt_proof] {
+        assert_eq!(packages::route("PUT", &format!("/{path}"), &immutable, b"second", &state).status, 201);
+    }
+    let mut rebuilt = sample_index();
+    rebuilt[0].artifact_key = rebuilt_key.clone();
+    rebuilt[0].tarball = rebuilt_package.into();
+    rebuilt[0].metadata = rebuilt_metadata.into();
+    rebuilt[0].proof = rebuilt_proof.into();
+    assert_eq!(put_index(&state, &rebuilt).status, 201);
+
+    let stored = body_json(&get(&state, "/index.json"));
+    assert_eq!(stored[0]["artifact_key"], rebuilt_key);
+    assert_eq!(stored[0]["tarball"], rebuilt_package);
+    assert_eq!(body_bytes(get(&state, &format!("/{PACKAGE}"))), b"first");
+    assert_eq!(body_bytes(get(&state, &format!("/{rebuilt_package}"))), b"second");
 }
