@@ -217,6 +217,55 @@ laputa/
   - `Dockerfile.test-local`.
 - Gate: every module checks (`xsht check`), and all three test suites pass
   on the host.
+- **Done (2026-10-03).** The layout:
+  - `pm.xsh`, `pm/`;
+  - `packages/<name>/`;
+  - `system/` (module names `system.*`), `laputa.xsh`;
+  - `profiles/`, `guest/`, `boot/`;
+  - `installer/` plus the root `build-installer-*`/`installer-*` scripts;
+  - `xinit/`;
+  - `mirror/`;
+  - `tests/{pm,system,integration}/`;
+  - `docs/`.
+
+  The PM repository root is the directory that holds `pm.xsh` and
+  `packages/`. Recipe modules import as `packages.*`. Containers mount the
+  one checkout at `/src/laputa`. `XSH_ROOT` replaces `XSH_SOURCE_ROOT` and
+  `LAPUTA_PACKAGES_ROOT`. The `xinit` recipe takes its source from
+  `repository/xinit/xinit.xsh`.
+
+  There is one root `Makefile`:
+  - `check`;
+  - `test` (`test-pm`, `test-system`, `test-xinit`);
+  - `clean` (`.out/`, `target/`, mirror frontend outputs);
+  - `profile-*`, `test-pm-*`, `installer-*`, `mirror-*`.
+
+  There is also one `xsht-config.ini` and one `AGENTS.md`. The legacy
+  x86_64 installer route and the `.env` reading in PM are deleted. xinit
+  is ported to current XSH: it had ~100 check diagnostics, and its tests
+  no longer loaded.
+
+  Gates:
+  - `make check`: clean;
+  - PM: 153 passed, 2 skipped;
+  - system: 36 passed;
+  - xinit: 22 passed;
+  - mirror `cargo test`: 37 passed;
+  - no sibling-path references remain.
+
+  Deferred to later phases:
+  - **Remote-mirror defaults stay** in `pm/remote.xsh` and in the
+    installer's `LAPUTA_REPO_URL` (lanes B and C, then the Phase 3
+    installer work).
+  - **GitHub xsh release `ADD`s stay** in `Dockerfile.package-tools`,
+    `Dockerfile.pm-test` and `packages/xsh` (lane C).
+  - **The package-tools image build was not exercised.** Docker was not
+    running, and the build context is now the monorepo root behind
+    `.dockerignore`.
+  - **Some docs still describe the pre-monorepo commands:** `docs/PM.md`,
+    `LAPUTA.md`, `MAKE.md` and `QEMU.md` (Phase 3).
+  - **xinit now needs post-2026-09 XSH APIs,** so the seed pin must not be
+    older than the current `../xsh`.
 
 **Phase 1, 4 lanes in parallel.** File ownership is disjoint.
 
