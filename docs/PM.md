@@ -338,6 +338,9 @@ the m4 proof and checks GNU m4 1.4 output on the constructs bison's and
 flex's skeletons use, plus its loud failures. `parser_generators.xsh`
 checks Bison token definitions, Flex definition expansion, generated output paths,
 and missing-input diagnostics independently of Linux build modules.
+`tic_recipe.xsh` compiles vendored terminfo sources with the XSH `tic` and
+compares every compiled entry byte for byte with ncurses 6.6 `tic -x` output
+vendored beside them in `tests/pm/fixtures/tic/`.
 
 `make test-pm` runs the suite with the host tools. `make test-pm-native` runs
 it against `XSH_ROOT`'s debug build with coverage, and `make test-pm-docker`
