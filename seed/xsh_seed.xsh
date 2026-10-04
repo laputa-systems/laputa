@@ -9,6 +9,9 @@
 ## One supported seed architecture and the names each tool uses for it.
 export type SeedArch = {arch: Str, triple: Str, docker_platform: Str}
 
+## One environment variable passed to the seed build container.
+export type SeedEnvVar = {name: Str, value: Str}
+
 ## Errors raised when the seed inputs, build, or outputs violate their contract.
 export error SeedError = Usage(message: Str) : Usage | Missing(message: Str) : NotFound | Failed(message: Str) : ProcessFailure
 
@@ -62,7 +65,7 @@ pure xsh_seed_registry_stamp(laputa_root: Path) -> Path {
 ## The Rust flags XSH's Linux test path sets for a static musl target.
 ## These mirror XSH's `dev/targets.xsh::docker_test_env`; the `__isoc23_*`
 ## aliases match the CRT objects in the `xsh-test` image.
-export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[Record] {
+export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[SeedEnvVar] {
   let flags = [
     "-C target-feature=+crt-static",
     "-C link-arg=--defsym=__isoc23_sscanf=sscanf",
