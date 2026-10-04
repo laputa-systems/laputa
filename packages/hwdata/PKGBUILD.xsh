@@ -6,10 +6,10 @@ export const name = "hwdata"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "0.400"
+export const ver = "0.412"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -28,7 +28,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "05d96821aaae04be4e684eaf9ac22e08efe646321bc64be323b91b66e7e2095c",
+        sha256: "f0c64cd7e31d70a5fb3a52e53ab50a61e74c0421a6381eaa45114eec3bde5fe7",
       },
     ],
   },
@@ -65,7 +65,6 @@ pkgdatadir=\${datadir}/hwdata
 
 Name: hwdata
 Description: Hardware identification data
-Version: 0.400
-""",
+""" + f"Version: {ver}\n",
   )?
 }
