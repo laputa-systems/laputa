@@ -377,3 +377,31 @@ test test_publish_requires_token_only_for_network_remote [fs, net, env, time, er
     Err(problem) => assert "needs LAPUTA_TOKEN" in problem.message
   }
 }
+
+test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, time, error] { |ctx|
+  let value = publish_plan(ctx, "publish-local-mirror-repo")?
+  let store_root = test.temp_dir(ctx, name: "publish-local-mirror-store")?
+  stage_plan_artifacts(ctx, value, store_root)?
+  let snapshot = repo.snapshot(value, store_root)?
+  let work = test.temp_dir(ctx, name: "publish-local-mirror-work")?
+  let local_mirror = "http://127.0.0.1:3000"
+  let created = {status: 201, reason: "Created", bytes: 0, headers: [], url: local_mirror}
+  test.mock(
+    ctx,
+    "net.request",
+    {url: f"${local_mirror}/index.json"},
+    Ok({status: 404, reason: "Not Found", bytes: 0, headers: [], url: f"${local_mirror}/index.json", body: b""}),
+  )?
+  # Three immutable objects per package, then the index.
+  test.mock(ctx, "net.upload", {method: "PUT"}, Ok(created), snapshot.packages.len() * 3 + 1)?
+
+  repo.publish(snapshot, local_mirror, "", work)?
+
+  let uploads = test.calls(ctx, "net.upload")
+  test.eq(uploads.len(), snapshot.packages.len() * 3 + 1)?
+
+  for upload in uploads {
+    let headers = upload.args.get("headers")?.require(List[NetHeader])?
+    test.eq([header.name for header in headers if header.name == "Authorization"], [])?
+  }
+}

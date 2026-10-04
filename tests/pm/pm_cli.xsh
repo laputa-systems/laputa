@@ -84,13 +84,13 @@ proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[P
 proc pm_output(args: List[Str]) [fs, process, env, error] -> Result[Str] {
   let xsh = runner()?
   let modules = module_root()?
-  return run.text XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_OFFLINE=1 $xsh pm.xsh -- @args ?
+  return run.text XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args ?
 }
 
 proc pm_status(args: List[Str], err: Path) [fs, process, env, error] -> Result[Status] {
   let xsh = runner()?
   let modules = module_root()?
-  return run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_OFFLINE=1 $xsh pm.xsh -- @args 2> $err
+  return run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args 2> $err
 }
 
 test test_repo_help_is_explicit [fs, process, env, error] { |ctx|

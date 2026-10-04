@@ -1,5 +1,4 @@
 ##! PM sources operations and shared package-manager policy.
-use fingerprint
 use recipe
 use types
 use util
@@ -40,192 +39,156 @@ export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> 
   Err(types.PmError.SourceChecksum(f"no checksum for ${source.source} on ${arch}"))
 }
 
-proc sources_response_header(headers: List[NetHeader], name: Str) [] -> Str {
-  for header in headers {
-    if header.name == name or (name == "location" and header.name == "Location") {
-      return header.value
-    }
+# URL sources are content-addressed: `make fetch` (`pm sources fetch`) is the
+# only step that contacts upstream hosts. Builds resolve a pinned URL source from
+# the cache, then from the local mirror named by LAPUTA_MIRROR, and otherwise
+# fail. The source string and checksum stay the recipe's identity, so where the
+# bytes come from never changes a fingerprint.
+const sha256_hex = rx"^[0-9a-f]{64}$"
+
+## The source cache root for a package repository: LAPUTA_SOURCE_CACHE when set,
+## otherwise `.cache/sources` under the repository root.
+export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path] {
+  let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
+
+  if configured != "" {
+    return path.absolute(fp"${configured}")?
   }
 
-  ""
+  fp"${repo_root}/.cache/sources"
 }
 
-proc sources_resolve_download_redirect(url: Str) [net] -> Str {
-  let response = net.request({
-    method: "GET",
-    url: url,
-    redirects: 0,
-    max_body_bytes: 4096,
-    pool: "pm",
-    fail_status: false,
-  })
+# Builds name their package repository through XSH_PM_REPOSITORY_ROOT, the same
+# root that `repository/` inputs resolve against.
+proc build_source_cache_root() [fs, env, error] -> Result[Path] {
+  let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
+  let repo_root = (env.get("XSH_PM_REPOSITORY_ROOT") ?? "").trim()
 
-  match response {
-    Ok(result) => {
-      if result.status >= 300 and result.status < 400 {
-        let location = sources_response_header(result.headers, "location")
-
-        if location.starts_with("http://") or location.starts_with("https://") {
-          return location
-        }
-      }
-    }
-    Err(_) => {}
+  if configured == "" and repo_root == "" {
+    return Err(types.PmError.SourceNotFound("URL sources need LAPUTA_SOURCE_CACHE or XSH_PM_REPOSITORY_ROOT to locate the source cache"))
   }
 
-  url
+  source_cache_root(fp"${repo_root}")?
 }
 
-## Exported PM declaration `try_download_url_to_cache`.
-export proc try_download_url_to_cache(url: Str, dest: Path) [fs, net, error] -> Result[Bool] {
-  if fs.exists(dest)? {
-    return true
-  }
-
-  if dest.name == "" {
-    return false
-  }
-
-  fs.mkdir(dest.parent)?
-  let tmp = fp"${dest.parent}/.${dest.name}.tmp"
-  fs.remove(tmp, missing_ok: true)?
-  defer fs.remove(tmp, missing_ok: true)?
-
-  if url.starts_with("file://") {
-    let source = fp"${url.replace("file://", "")}"
-
-    if fs.exists(source)? {
-      fs.copy(source, tmp, overwrite: true)?
-      fs.rename(tmp, dest, overwrite: true)?
-      return true
-    }
-
-    return false
-  }
-
-  let download_url = sources_resolve_download_redirect(url)
-
-  let response = net.download({
-    url: download_url,
-    dest: tmp,
-    atomic: true,
-    overwrite: true,
-    pool: "pm",
-    connect_timeout: 10s,
-    timeout: 1800s,
-    fail_status: true,
-  })
-
-  match response {
-    Ok(_) => {
-      fs.rename(tmp, dest, overwrite: true)?
-      return true
-    }
-    Err(_) => fs.remove(tmp, missing_ok: true)?
-  }
-
-  false
+## The cache entry for one sha256, the layout the local mirror serves at `/sources/sha256/<hash>`.
+export pure source_cache_entry(root: Path, sha256: Str) -> Path {
+  fp"${root}/sha256/${sha256}"
 }
 
-## Exported PM declaration `download_url_to_cache`.
-export proc download_url_to_cache(url: Str, dest: Path) [fs, net, time, error] {
-  if dest.name == "" {
-    return Err(types.PmError.SourceName(f"URL has no file name: ${url}"))
+## The local mirror URL for one cached source.
+export pure mirror_source_url(mirror: Str, sha256: Str) -> Str {
+  var base = mirror.trim()
+
+  while base.ends_with("/") {
+    base = base.byte_slice(0, base.byte_len() - 1)
   }
 
-  if url.starts_with("file://") {
-    if try_download_url_to_cache(url, dest)? {
-      return
-    }
-
-    return Err(types.PmError.DownloadFailed(f"failed to download ${url}"))
-  }
-
-  retry [1s, 2s, 4s, 15s, 60s] {
-    let downloaded = try_download_url_to_cache(url, dest)?
-
-    match downloaded {
-      true => Ok()
-      false => Err(types.PmError.DownloadFailed(f"failed to download ${url}"))
-    }
-  }?
+  f"${base}/sources/sha256/${sha256}"
 }
 
-## Exported PM declaration `checkout_git_source`.
-export proc checkout_git_source(source: Str, dest: Path) [fs, process, env, error] {
-  if fs.exists(dest)? {
-    return
+## Validates the pin a URL source is cached under. `SKIP` is only for repository-local sources.
+export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Result[Str] {
+  if checksum == "SKIP" {
+    return Err(types.PmError.SourceChecksum(f"${package_name} URL source ${url} must pin a sha256; SKIP is only for repository-local sources"))
   }
 
-  var git = p"git"
-
-  match process.which("git") {
-    Ok(tool) => git = tool
-    Err(_) => return Err(types.PmError.DownloadTool("git is required for git sources"))
+  if ! sha256_hex.matches(checksum) {
+    return Err(types.PmError.SourceChecksum(f"${package_name} URL source ${url} has a malformed sha256 ${checksum}"))
   }
 
-  fs.remove(dest, missing_ok: true)?
-  fs.mkdir(dest.parent)?
-  let url = util.git_source_url(source)
-  let clone = run.status $git clone --depth 1 $url $dest ?
+  checksum
+}
 
-  if ! clone.ok {
-    fs.remove(dest, missing_ok: true)?
-    return Err(types.PmError.DownloadFailed(f"failed to clone ${url}"))
+## How filling one source cache entry ended.
+export enum SourceFetchOutcome { Cached, Fetched(Int), Unavailable(Str), Mismatch(Str) }
+
+## Downloads `url` into the cache entry for `sha256`, publishing only verified bytes.
+export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome] {
+  let entry = source_cache_entry(root, sha256)
+  let partial_dir = fp"${root}/partial"
+  fs.mkdir(entry.parent)?
+  fs.mkdir(partial_dir)?
+  # Packages built in parallel can share one source, so one writer fills an entry.
+  let lock = fs.lock(fp"${partial_dir}/${sha256}.lock")?
+  defer fs.unlock(lock)?
+
+  if fs.exists(entry)? {
+    return Cached
   }
 
-  let rev = util.git_source_ref(source)
+  let partial = fp"${partial_dir}/${sha256}"
+  fs.remove(partial, missing_ok: true)?
+  defer fs.remove(partial, missing_ok: true)?
+  let failure = util.download_file(url, partial)?
 
-  if rev != "" {
-    var checkout_ok = true
+  if failure != "" {
+    return Unavailable(failure)
+  }
 
-    cd dest {
-      let checkout = run.status $git checkout $rev ?
-      checkout_ok = checkout.ok
-    } ?
+  let actual = hash.sha256(partial)?.hex()
 
-    if ! checkout_ok {
-      fs.remove(dest, missing_ok: true)?
-      return Err(types.PmError.DownloadFailed(f"failed to checkout ${rev} from ${url}"))
-    }
+  if actual != sha256 {
+    return Mismatch(f"${url}: expected sha256 ${sha256}, got ${actual}")
+  }
+
+  let size = fs.metadata(partial)?.size
+  fs.rename(partial, entry)?
+  Fetched(size)
+}
+
+proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, env, error] -> Result[Path] {
+  let sha256 = pinned_url_sha256(package_name, url, checksum)?
+  let root = build_source_cache_root()?
+  let entry = source_cache_entry(root, sha256)
+
+  if fs.exists(entry)? {
+    return entry
+  }
+
+  let mirror = (env.get("LAPUTA_MIRROR") ?? "").trim()
+
+  if mirror == "" {
+    return Err(
+      types.PmError.SourceNotFound(f"${package_name} source ${url} (sha256 ${sha256}) is not in the source cache ${root}; run `make fetch`, or set LAPUTA_MIRROR to a local mirror that serves it"),
+    )
+  }
+
+  match fill_source_cache_entry(root, sha256, mirror_source_url(mirror, sha256))? {
+    Cached => entry
+    Fetched(_) => entry
+    Unavailable(detail) => Err(types.PmError.DownloadFailed(f"${package_name} source ${url} (sha256 ${sha256}) is not in the source cache ${root} or the mirror: ${detail}; run `make fetch`"))
+    Mismatch(detail) => Err(types.PmError.SourceChecksum(f"${package_name} source ${url} from the mirror: ${detail}"))
   }
 }
 
-## Exported PM declaration `resolve_source`.
+pure source_selected(source: types.UpstreamSource, arch: Str) -> Bool {
+  source.architectures.len() == 0 or "all" in source.architectures or arch in source.architectures
+}
+
+## Resolves one source line to a local file or directory. URL sources resolve only through the content-addressed cache or the local mirror.
 export proc resolve_source(
-  work: Path,
   pkg: types.Package,
   line: types.SourceLine,
+  checksum: Str,
   arch: Str,
-  force_download: Bool,
-) [fs, net, process, env, time, error] -> Result[types.ResolvedSource] {
+  build: Str,
+) [fs, net, env, error] -> Result[types.ResolvedSource] {
   ensure_source_dest(line.dest)?
-  let source = util.source_vars(line.source, pkg, arch)?
+  let source = util.expand_source(line.source, pkg, arch, build)
 
   if source == "" {
     return Err(types.PmError.SourceName(f"${pkg.name} has an empty source"))
   }
 
-  if util.is_git_source(source) {
-    let cache = util.source_cache_path(work, pkg, line, source)?
-
-    if force_download {
-      fs.remove(cache, missing_ok: true)?
-    }
-
-    checkout_git_source(source, cache)?
-    return {path: cache, kind: "git"}
-  }
-
   if util.is_url_source(source) {
-    let cache = util.source_cache_path(work, pkg, line, source)?
+    let name = util.source_basename(source)?
 
-    if force_download {
-      fs.remove(cache, missing_ok: true)?
+    if name == "" {
+      return Err(types.PmError.SourceName(f"URL has no file name: ${source}"))
     }
 
-    download_url_to_cache(source, cache)?
-    return {path: cache, kind: "file"}
+    return {path: resolve_url_source(pkg.name, source, checksum)?, kind: "file", name}
   }
 
   let source_path = fp"${source}"
@@ -245,7 +208,7 @@ export proc resolve_source(
   }
 
   let metadata = fs.metadata(local)?
-  {path: local, kind: metadata.kind}
+  {path: local, kind: metadata.kind, name: local.name}
 }
 
 ## Exported PM declaration `verify_source_checksum`.
@@ -297,49 +260,41 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
   0
 }
 
-## Exported PM declaration `stage_resolved_source`.
-export proc stage_resolved_source(
-  _: types.Package,
+# `resolved.name` is the upstream file name: a content-addressed cache entry has
+# none, and archive detection and plain-file staging both depend on it.
+proc stage_resolved_source(
   line: types.SourceLine,
-  source_path: Path,
-  resolved_kind: Str,
+  resolved: types.ResolvedSource,
   source_kind: types.SourceKind,
   checksum: Str,
   src: Path,
 ) [fs, error] {
-  verify_source_checksum(source_path, checksum, resolved_kind)?
+  let source_path = resolved.path
+  let name = fp"${resolved.name}"
+  verify_source_checksum(source_path, checksum, resolved.kind)?
   let dest = util.source_stage_dir(src, line)
 
-  if source_kind == types.source_git() or resolved_kind == "git" {
-    fs.mkdir(dest)?
-    prune_git_dirs(source_path)?
-    fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
-    return
-  }
-
-  if source_kind == types.source_directory() or resolved_kind == "dir" {
+  if source_kind == types.source_directory() or resolved.kind == "dir" {
     fs.mkdir(dest)?
     fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
     return
   }
 
-  if (source_kind == types.source_archive() and util.is_tar_source(source_path)) or (source_kind == types.source_auto() and util.is_tar_source(
-    source_path,
-  )) {
+  if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(name)) {
     fs.remove(dest, missing_ok: true)?
     dest.parent.mkdir()?
     archive.tar_extract(source_path, dest, tar_source_strip_components(source_path)?, "auto", true)?
     return
   }
 
-  if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(source_path)) {
+  if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(name)) {
     fs.remove(dest, missing_ok: true)?
     dest.parent.mkdir()?
     archive.zip_extract(source_path, dest, overwrite: true)?
     return
   }
 
-  if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(source_path)) {
+  if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(name)) {
     fs.remove(dest, missing_ok: true)?
     dest.parent.mkdir()?
     archive.cpio_extract(source_path, dest, overwrite: true)?
@@ -347,52 +302,26 @@ export proc stage_resolved_source(
   }
 
   fs.mkdir(dest)?
-  fs.install(source_path, fp"${dest}/${source_path.name}", 0o644, parents: true, overwrite: true)?
+  fs.install(source_path, fp"${dest}/${name}", 0o644, parents: true, overwrite: true)?
 }
 
-## Exported PM declaration `stage_package_sources`.
-export proc stage_package_sources(
-  work: Path,
-  pkg: types.Package,
-  src: Path,
-  force_download: Bool,
-) [fs, net, process, env, time, error] {
+## Resolves every source the target architecture selects, then stages them into `src`.
+## Resolution finishes first, so a missing cache entry fails before any extraction.
+export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, error] {
   let arch = util.machine_arch()?
-  var entries = []
+  let build = util.build_arch()?
+  var staged = []
 
   for source in pkg.upstream_sources {
-    if source.architectures.len() == 0 or "all" in source.architectures or arch in source.architectures {
-      let line = util.parse_source_line(source.source)?
-      entries = entries.push({source, line})
-    }
+    continue unless source_selected(source, arch)
+    let line = util.parse_source_line(source.source)?
+    let checksum = source_checksum(source, arch)?
+    let resolved = resolve_source(pkg, line, checksum, arch, build)?
+    staged = staged.push({line, resolved, kind: source.kind, checksum})
   }
 
-  if entries.len() == 0 {
-    return
-  }
-
-  var resolved_sources = []
-
-  for entry in entries {
-    let resolved = resolve_source(work, pkg, entry.line, arch, force_download)?
-
-    resolved_sources = resolved_sources.push(
-      {source: entry.source, line: entry.line, path: resolved.path, kind: resolved.kind},
-    )
-  }
-
-  for resolved in resolved_sources {
-    let checksum = source_checksum(resolved.source, arch)?
-
-    stage_resolved_source(
-      pkg,
-      resolved.line,
-      resolved.path,
-      resolved.kind,
-      resolved.source.kind,
-      checksum,
-      src,
-    )?
+  for entry in staged {
+    stage_resolved_source(entry.line, entry.resolved, entry.kind, entry.checksum, src)?
   }
 }
 
@@ -405,241 +334,90 @@ export proc prune_git_dirs(src: Path) [fs, error] {
   }
 }
 
-proc expected_source_sha256(out: Path, pkg: types.Package, arch: Str) [fs, error] -> Result[Str] {
-  let index = util.remote_index_cache_path(out)
-
-  if ! fs.exists(index)? {
-    return ""
-  }
-
-  let rows: List[Record] = json.read(index)?.require(List[Record])?
-
-  for row in rows {
-    if row.get("arch")? == arch and row.get("name")? == pkg.name and row.get("ver")? == pkg.ver and row.get("rel")? == pkg.rel {
-      return row.get("source_sha256")?.require(Str)?
-    }
-  }
-
-  ""
-}
-
-proc validate_source_mirror(out: Path, pkg: types.Package, mirror: Path) [fs, env, error] -> Result[Bool] {
-  let expected = expected_source_sha256(out, pkg, util.machine_arch()?)?
-
-  if expected == "" {
-    return true
-  }
-
-  let actual = hash.sha256(mirror)?.hex()
-
-  if actual == expected {
-    return true
-  }
-
-  fs.remove(mirror, missing_ok: true)?
-  false
-}
-
-pure source_mirror_fingerprint_target(arch: Str) -> types.Target {
-  if arch == "aarch64" {
-    return types.target_aarch64()
-  }
-
-  if arch == "x86_64" {
-    return types.target_x86_64()
-  }
-
-  types.target_reserved()
-}
-
-proc source_mirror_build_input(pkg: types.Package) [fs, env, error] -> Result[Str] {
-  fingerprint.package_build_input(pkg.dir.parent.parent, pkg, source_mirror_fingerprint_target(util.target_arch()?))?
-}
-
 ## Exported PM declaration `prepare_source_tree`.
 export proc prepare_source_tree(pkg: types.Package, src: Path) [fs, process, env, error] {
   recipe.call_prepare_sources(pkg, src)?
 }
 
-## Exported PM declaration `try_fetch_source_mirror_from_repo`.
-export proc try_fetch_source_mirror_from_repo(out: Path, pkg: types.Package) [fs, net, env, error] {
-  let arch = util.machine_arch()?
-  let mirror = util.source_mirror_path_for_arch(out, pkg, arch)
-
-  if fs.exists(mirror)? {
-    return
-  }
-
-  fs.mkdir(mirror.parent)?
-  let rel = util.remote_source_rel_for_arch(arch, pkg.name, pkg.ver, pkg.rel)
-
-  let urls = [
-    (env.get("XSH_PM_PUBLIC_REPO") ?? env.get("R2_PUBLIC_URL") ?? "").trim(),
-    (env.get("XSH_PM_REPO") ?? env.get("LAPUTA_REPO") ?? "").trim(),
-  ]
-
-  var seen: Map[Bool] = {}
-
-  for repo in urls {
-    if repo != "" and ! (seen.get(repo) ?? false) {
-      seen[repo] = true
-
-      if util.is_file_url(repo) {
-        let source = util.repo_file_path(repo, rel)?
-
-        if fs.exists(source)? {
-          fs.copy(source, mirror, overwrite: true)?
-          let _ = validate_source_mirror(out, pkg, mirror)?
-          return
-        }
-      } else if try_download_url_to_cache(util.repo_url_for(repo, rel)?, mirror)? {
-        let _ = validate_source_mirror(out, pkg, mirror)?
-        return
-      }
-    }
-  }
-}
-
-## Exported PM declaration `use_source_mirror`.
-export proc use_source_mirror(out: Path, pkg: types.Package, src: Path) [fs, env, error] -> Result[Bool] {
-  let arch = util.machine_arch()?
-  let mirror = util.source_mirror_path_for_arch(out, pkg, arch)
-
-  if ! fs.exists(mirror)? {
-    return false
-  }
-
-  if ! validate_source_mirror(out, pkg, mirror)? {
-    return false
-  }
-
-  fs.remove(src, missing_ok: true)?
-  fs.mkdir(src)?
-
-  match archive.tar_extract(mirror, src) {
-    Ok(_) => return true
-    Err(_) => {
-      fs.remove(src, missing_ok: true)?
-      fs.mkdir(src)?
-      return false
-    }
-  }
-}
-
-## Exported PM declaration `pack_source_mirror`.
-export proc pack_source_mirror(out: Path, pkg: types.Package, src: Path) [fs, env, error] {
-  if pkg.upstream_sources.len() == 0 or ! pkg.source_mirror {
-    return
-  }
-
-  prune_git_dirs(src)?
-  let arch = util.machine_arch()?
-  let mirror = util.source_mirror_path_for_arch(out, pkg, arch)
-  let manifest = util.source_manifest_path_for_arch(out, pkg, arch)
-  fs.mkdir(mirror.parent)?
-  archive.tar_create(mirror, src, [p"."], compression: "bz2", overwrite: true)?
-  var entries = []
-
-  for entry in fs.walk(src) |> sort-by .path {
-    let rel = entry.path.strip_prefix(src)?
-    let metadata = fs.metadata(entry.path)?
-    var sha256 = ""
-    var target = ""
-
-    if metadata.kind == "file" {
-      sha256 = hash.sha256(entry.path)?.hex()
-    } else if metadata.kind == "symlink" {
-      target = entry.path.readlink()?.display()
-    }
-
-    entries = entries.push({
-      path: rel.display(),
-      kind: metadata.kind,
-      mode: metadata.mode % 4096,
-      size: metadata.size,
-      sha256,
-      target,
-    })
-  }
-
-  json.write(
-    manifest,
-    {
-      format: "laputa-source-manifest-1",
-      name: pkg.name,
-      ver: pkg.ver,
-      rel: pkg.rel,
-      arch,
-      build_input: source_mirror_build_input(pkg)?,
-      archive_sha256: hash.sha256(mirror)?.hex(),
-      entries,
-    },
-  )?
-}
-
-## Exported PM declaration `prepare_package_source_tree`.
+## Stages a package's sources and runs its `prepare_sources` hook.
+## Temporary: the executor and the LLVM seed script still pass the retired
+## work, out, force-download, and source-mirror arguments, which are ignored;
+## drop them here together with those two call sites.
 export proc prepare_package_source_tree(
-  work: Path,
-  out: Path,
+  _work: Path,
+  _out: Path,
   pkg: types.Package,
   src: Path,
-  force_download: Bool,
-  allow_mirror: Bool,
-  pack_mirror: Bool,
+  _force_download: Bool,
+  _allow_mirror: Bool,
+  _pack_mirror: Bool,
 ) [fs, net, process, env, time, error] {
-  if allow_mirror and pkg.source_mirror and ! force_download {
-    let mirror_fetch_started = time.now()
-    print --flush "pm-build-source-start" $pkg.name "mirror-fetch"
-    try_fetch_source_mirror_from_repo(out, pkg)?
-    print --flush "pm-build-source-done" $pkg.name "mirror-fetch" ${time.now() - mirror_fetch_started} "ms"
-  }
-
-  var used_mirror = false
-
-  if allow_mirror and pkg.source_mirror and ! force_download {
-    let mirror_stage_started = time.now()
-    print --flush "pm-build-source-start" $pkg.name "mirror-stage"
-    used_mirror = use_source_mirror(out, pkg, src)?
-    print --flush "pm-build-source-done" $pkg.name "mirror-stage" ${time.now() - mirror_stage_started} "ms"
-  }
-
-  if ! used_mirror {
-    let stage_started = time.now()
-    print --flush "pm-build-source-start" $pkg.name "fetch-stage"
-    stage_package_sources(work, pkg, src, force_download)?
-    print --flush "pm-build-source-done" $pkg.name "fetch-stage" ${time.now() - stage_started} "ms"
-  }
+  let stage_started = time.now()
+  print --flush "pm-build-source-start" $pkg.name "stage"
+  stage_package_sources(pkg, src)?
+  print --flush "pm-build-source-done" $pkg.name "stage" ${time.now() - stage_started} "ms"
 
   let tree_started = time.now()
   print --flush "pm-build-source-start" $pkg.name "prepare-tree"
   prepare_source_tree(pkg, src)?
   prune_git_dirs(src)?
   print --flush "pm-build-source-done" $pkg.name "prepare-tree" ${time.now() - tree_started} "ms"
-
-  if pack_mirror {
-    pack_source_mirror(out, pkg, src)?
-  }
 }
 
-## Exported PM declaration `generate_checksums_for`.
+# Checksum generation is a maintainer step that reads upstream directly: a new
+# pin has no cache entry yet. The downloaded bytes enter the cache under the
+# digest they produce, so the next build finds them.
+proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) [fs, net, error] -> Result[Str] {
+  let partial_dir = fp"${cache_root}/partial"
+  fs.mkdir(partial_dir)?
+  let download = fs.tempfile()?
+  defer download.root.close()?
+  let failure = util.download_file(url, download.path)?
+
+  if failure != "" {
+    return Err(types.PmError.DownloadFailed(f"${package_name}: ${failure}"))
+  }
+
+  let digest = hash.sha256(download.path)?.hex()
+  let entry = source_cache_entry(cache_root, digest)
+
+  if ! fs.exists(entry)? {
+    let partial = fp"${partial_dir}/${digest}.checksum"
+    fs.mkdir(entry.parent)?
+    fs.copy(download.path, partial, overwrite: true)?
+    fs.rename(partial, entry, overwrite: true)?
+  }
+
+  digest
+}
+
+## Computes the sha256 each selected source currently has upstream or on disk; `SKIP` stays `SKIP`.
 export proc generate_checksums_for(
-  work: Path,
+  cache_root: Path,
   pkg: types.Package,
   arch: Str,
-) [fs, net, process, env, time, error] -> Result[List[Str]] {
+) [fs, net, env, error] -> Result[List[Str]] {
+  let build = util.build_arch()?
   var generated = []
 
   for source in pkg.upstream_sources {
-    continue when source.architectures.len() > 0 and "all" not in source.architectures and arch not in source.architectures
+    continue unless source_selected(source, arch)
     let line = util.parse_source_line(source.source)?
-    let resolved = resolve_source(work, pkg, line, arch, true)?
     let stored = source_checksum(source, arch)?
+    let expanded = util.expand_source(line.source, pkg, arch, build)
 
-    if stored == "SKIP" or resolved.kind == "dir" or resolved.kind == "git" {
+    if stored == "SKIP" {
       generated = generated.push("SKIP")
+    } else if util.is_url_source(expanded) {
+      generated = generated.push(upstream_sha256(cache_root, pkg.name, expanded)?)
     } else {
-      let digest = hash.sha256(resolved.path)?.hex()
-      generated = generated.push(digest)
+      let resolved = resolve_source(pkg, line, stored, arch, build)?
+
+      if resolved.kind == "dir" {
+        generated = generated.push("SKIP")
+      } else {
+        generated = generated.push(hash.sha256(resolved.path)?.hex())
+      }
     }
   }
 
@@ -648,11 +426,11 @@ export proc generate_checksums_for(
 
 ## Exported PM declaration `collect_checksum_updates`.
 export proc collect_checksum_updates(
-  work: Path,
+  cache_root: Path,
   pkg: types.Package,
-) [fs, net, process, env, time, error] -> Result[List[types.ChecksumUpdate]] {
+) [fs, net, env, error] -> Result[List[types.ChecksumUpdate]] {
   let arch = util.machine_arch()?
-  let generated = generate_checksums_for(work, pkg, arch)?
+  let generated = generate_checksums_for(cache_root, pkg, arch)?
   [{field: f"upstream_sources:${arch}", values: generated}]
 }
 
@@ -714,38 +492,128 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
   fs.write_atomic(pkgbuild, output.join("\n"))?
 }
 
-## Exported PM declaration `audit_source_mirrors`.
-export proc audit_source_mirrors(out: Path, packages: List[types.Package]) [fs, env, error] {
-  var missing = []
+## One pinned upstream download: every package and URL that names the same content.
+export type SourceFetchItem = {sha256: Str, urls: List[Str], packages: List[Str]}
+
+## Collects the pinned URL sources `packages` select for `arch`, one item per
+## sha256. Builds run natively, so the build architecture equals the target.
+export proc source_fetch_items(packages: List[types.Package], arch: Str) [error] -> Result[List[SourceFetchItem]] {
+  var by_sha256: Map[SourceFetchItem] = {}
 
   for pkg in packages {
-    if pkg.upstream_sources.len() == 0 or ! pkg.source_mirror {
-      print ${pkg.name} "source-mirror" "disabled"
-      continue
+    for source in pkg.upstream_sources {
+      continue unless source_selected(source, arch)
+      let line = util.parse_source_line(source.source)?
+      let url = util.expand_source(line.source, pkg, arch, arch)
+      continue unless util.is_url_source(url)
+      let sha256 = pinned_url_sha256(pkg.name, url, source_checksum(source, arch)?)?
+      let empty: List[Str] = []
+      let existing = by_sha256.get(sha256) ?? {sha256, urls: empty, packages: empty}
+      by_sha256[sha256] = {
+        sha256,
+        urls: if url in existing.urls { existing.urls } else { existing.urls.push(url) },
+        packages: if pkg.name in existing.packages { existing.packages } else { existing.packages.push(pkg.name) },
+      }
     }
-
-    let arch = util.machine_arch()?
-    let mirror = util.source_mirror_path_for_arch(out, pkg, arch)
-    let manifest = util.source_manifest_path_for_arch(out, pkg, arch)
-
-    if ! fs.exists(mirror)? or ! fs.exists(manifest)? {
-      missing = missing.push(pkg.name)
-      print ${pkg.name} "source-mirror" "missing"
-      continue
-    }
-
-    let actual = hash.sha256(mirror)?.hex()
-    let metadata: Record = json.read(manifest)?.require(Record)?
-    let recorded: Str = metadata.get("archive_sha256")?.require(Str)?
-
-    if actual != recorded {
-      return Err(types.PmError.SourceChecksum(f"${pkg.name} source manifest hash mismatch"))
-    }
-
-    print ${pkg.name} "source-mirror" "ok"
   }
 
-  if missing.len() > 0 {
-    return Err(types.PmError.SourceNotFound(f"${missing.len()} source mirror(s) missing"))
+  by_sha256.values() |> sort-by { |item| f"${item.packages[0]}\t${item.urls[0]}" }
+}
+
+# A dead host or a transient failure gets a few spaced retries. A checksum
+# mismatch or a missing `file://` path is deterministic, so neither is retried.
+proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error] -> Result[SourceFetchOutcome] {
+  if fs.exists(source_cache_entry(root, item.sha256))? {
+    return Cached
+  }
+
+  var unavailable: List[Str] = []
+  var mismatched: List[Str] = []
+
+  for url in item.urls {
+    var last_failure = ""
+
+    let delays = if util.is_file_url(url) { [0s] } else { [0s, 2s, 5s, 15s] }
+
+    for delay in delays {
+      if delay > 0s {
+        time.sleep(delay)?
+      }
+
+      let outcome = fill_source_cache_entry(root, item.sha256, url)?
+
+      match outcome {
+        Unavailable(detail) => last_failure = detail
+        Mismatch(detail) => {
+          mismatched = mismatched.push(detail)
+          last_failure = ""
+          break
+        }
+        _ => return outcome
+      }
+    }
+
+    if last_failure != "" {
+      unavailable = unavailable.push(last_failure)
+    }
+  }
+
+  if mismatched.len() > 0 {
+    return Mismatch(mismatched.extend(unavailable).join("; "))
+  }
+
+  Unavailable(unavailable.join("; "))
+}
+
+pure source_fetch_label(item: SourceFetchItem) -> Str {
+  f"${item.packages.join(",")} ${item.urls[0]}"
+}
+
+## Downloads every item missing from the cache with at most four transfers in
+## flight, verifies each sha256, and reports every dead URL and checksum
+## mismatch together before failing.
+export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, time, error] {
+  fs.mkdir(fp"${root}/sha256")?
+
+  # par-map workers do not forward stdout, so progress goes to flushed stderr.
+  let results = items |> par-map(jobs: 4) { |item|
+    let outcome = fetch_source_item(root, item)?
+    let label = source_fetch_label(item)
+
+    match outcome {
+      Cached => eprint --flush "sources" "cached" $label
+      Fetched(size) => eprint --flush "sources" "fetched" $size $label
+      Unavailable(_) => eprint --flush "sources" "dead" $label
+      Mismatch(_) => eprint --flush "sources" "mismatch" $label
+    }
+
+    {item, outcome}
+  }
+
+  var cached = 0
+  var fetched = 0
+  var fetched_bytes = 0
+  var failures: List[Str] = []
+
+  for result in results {
+    match result.outcome {
+      Cached => cached += 1
+      Fetched(size) => {
+        fetched += 1
+        fetched_bytes += size
+      }
+      Unavailable(detail) => failures = failures.push(f"dead ${result.item.packages.join(",")}: ${detail}")
+      Mismatch(detail) => failures = failures.push(f"mismatch ${result.item.packages.join(",")}: ${detail}")
+    }
+  }
+
+  print "sources" "summary" $cached "cached" $fetched "fetched" $fetched_bytes "bytes" ${failures.len()} "failed" "cache" $root
+
+  for failure in failures {
+    eprint $failure
+  }
+
+  if failures.len() > 0 {
+    return Err(types.PmError.DownloadFailed(f"${failures.len()} pinned source(s) could not be fetched"))
   }
 }

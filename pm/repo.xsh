@@ -210,8 +210,10 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
     return Err(types.PmError.RemoteRepo("repository publication needs a remote repository"))
   }
 
-  if ! util.is_file_url(remote_repo) and token.trim() == "" {
-    return Err(types.PmError.Auth("repository publication needs LAPUTA_TOKEN for network remotes"))
+  # The loopback local mirror and file trees need no credentials; any other
+  # network remote does.
+  if ! util.is_local_repo_url(remote_repo) and token.trim() == "" {
+    return Err(types.PmError.Auth("repository publication needs LAPUTA_TOKEN for network remotes other than the local mirror"))
   }
 
   fs.mkdir(work)?

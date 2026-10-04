@@ -1,8 +1,5 @@
 ##! PM local operations and shared package-manager policy.
-use catalog
 use elf
-use graph
-use policy
 use recipe
 use sources
 use types
@@ -46,48 +43,6 @@ export proc load_manifest(db: Path) [fs, error] -> Result[List[Path]] {
   }
 
   manifest
-}
-
-## Exported PM declaration `map_etcsums`.
-export proc map_etcsums(etcsums: List[types.EtcSum]) [error] -> Result[Map[Str]] {
-  var mapped = {entry.path: entry.sha256 for entry in etcsums}
-  mapped
-}
-
-## Exported PM declaration `load_etcsums`.
-export proc load_etcsums(db: Path) [fs, error] -> Result[Map[Str]] {
-  var mapped: Map[Str] = {}
-
-  if fs.exists(fp"${db}/etcsums.json")? {
-    let rows: List[types.EtcSum] = json.read(fp"${db}/etcsums.json")?.require(List[types.EtcSum])?
-
-    for row in rows {
-      mapped[row.path] = row.sha256
-    }
-  }
-
-  mapped
-}
-
-## Exported PM declaration `load_metadata`.
-export proc load_metadata(db: Path) [fs, error] -> Result[Record] {
-  let metadata: Record = json.read(fp"${db}/metadata.json")?.require(Record)?
-  metadata
-}
-
-## Exported PM declaration `compressed_package_size`.
-export pure compressed_package_size(size: Int) -> Str {
-  let kib = (size + 1023) / 1024
-  f"${kib}K"
-}
-
-## Exported PM declaration `collect_old_manifest_extra`.
-export proc collect_old_manifest_extra(
-  old_manifest: List[Path],
-  new_manifest: List[Path],
-) [error] -> Result[List[Path]] {
-  var extra = [rel_path for rel_path in old_manifest if rel_path not in new_manifest]
-  extra
 }
 
 ## Exported PM declaration `collect_etcsums`.
@@ -384,138 +339,6 @@ export proc write_package_metadata(path_value: Path, arch: Str, item: types.Buil
   json.write(path_value, metadata)?
 }
 
-## Exported PM declaration `load_installed_owners`.
-export proc load_installed_owners(root: Path) [fs, error] -> Result[Map[Str]] {
-  var owners: Map[Str] = {}
-  let packages_db = util.packages_db_path(root)
-
-  if ! fs.exists(packages_db)? {
-    return owners
-  }
-
-  let entries = fs.children(packages_db)?
-
-  for entry in entries {
-    if entry.kind == "dir" {
-      let manifest = load_manifest(entry.path)?
-
-      for rel_path in manifest {
-        owners[rel_path.display()] = entry.name
-      }
-    }
-  }
-
-  owners
-}
-
-## Exported PM declaration `ensure_installable`.
-export proc ensure_installable(
-  root: Path,
-  pkg: types.Package,
-  manifest: List[Path],
-  installed_owners: Map[Str],
-) [fs, error] {
-  for rel_path in manifest {
-    let key = rel_path.display()
-
-    if key in installed_owners {
-      let owner = installed_owners.get(key)?
-
-      if owner != pkg.name {
-        return Err(types.PmError.PackageConflict(f"${pkg.name} conflicts with ${owner}: ${key}"))
-      }
-    } else if fs.exists(fp"${root}/${rel_path}")? and ! util.is_etc_file(rel_path) {
-      return Err(types.PmError.DirtyFilesystem(f"${pkg.name} would overwrite unowned ${key} in root ${root}"))
-    }
-  }
-}
-
-## Exported PM declaration `install_etc_file`.
-export proc install_etc_file(
-  source_root: FsRoot,
-  source: Path,
-  dest_root: FsRoot,
-  dest: Path,
-  mode: Int,
-  key: Str,
-  old_sums: Map[Str],
-  new_sums: Map[Str],
-) [fs, error] {
-  let new_sum = new_sums.get(key)?
-  var old_sum = ""
-
-  if key in old_sums {
-    let value = old_sums.get(key)?
-    old_sum = value
-  }
-
-  var sys_sum = ""
-
-  if dest_root.exists(dest)? {
-    sys_sum = dest_root.read_bytes(dest)?.sha256().hex()
-  }
-
-  if old_sum == new_sum and new_sum != sys_sum {
-    return
-  }
-
-  if sys_sum == "" or old_sum == sys_sum or sys_sum == new_sum {
-    fs.root_install_file(source_root, source, dest_root, dest, mode, overwrite: true)?
-    return
-  }
-
-  fs.root_install_file(source_root, source, dest_root, fp"${dest.parent}/${dest.name}.new", mode, overwrite: true)?
-}
-
-## Exported PM declaration `install_manifest_entries`.
-export proc install_manifest_entries(
-  root: Path,
-  stage: Path,
-  pkg: types.Package,
-  manifest: List[Path],
-  old_sums: Map[Str],
-  new_sums: Map[Str],
-  installed_owners: Map[Str],
-) [fs, error] {
-  let source_root = fs.open_root(stage)?
-  defer source_root.close()
-  let dest_root = fs.open_root(root)?
-  defer dest_root.close()
-
-  for rel_path in manifest {
-    let key = rel_path.display()
-    var overwrite = false
-
-    if key in installed_owners {
-      let owner = installed_owners.get(key)?
-
-      if owner == pkg.name {
-        overwrite = true
-      }
-    }
-
-    match source_root.readlink(rel_path) {
-      Ok(target) => {
-        dest_root.symlink(target, rel_path, true, overwrite)?
-        continue
-      }
-      Err(_) => {}
-    }
-
-    let metadata = source_root.metadata(rel_path)?
-
-    if metadata.kind == "file" {
-      let file_mode = metadata.mode % 4096
-
-      if util.is_etc_file(rel_path) {
-        install_etc_file(source_root, rel_path, dest_root, rel_path, file_mode, key, old_sums, new_sums)?
-      } else {
-        fs.root_install_file(source_root, rel_path, dest_root, rel_path, file_mode, overwrite: overwrite)?
-      }
-    }
-  }
-}
-
 ## Exported PM declaration `dir_empty`.
 export proc dir_empty(path_value: Path) [fs, error] -> Result[Bool] {
   for _ in fs.children(path_value)? {
@@ -523,33 +346,6 @@ export proc dir_empty(path_value: Path) [fs, error] -> Result[Bool] {
   }
 
   true
-}
-
-## Exported PM declaration `collect_removable_manifest`.
-export proc collect_removable_manifest(
-  root: Path,
-  manifest: List[Path],
-  etcsums: Map[Str],
-) [fs, error] -> Result[List[Path]] {
-  var removable = []
-  let root_handle = fs.open_root(root)?
-  defer root_handle.close()
-
-  for rel_path in manifest {
-    let key = rel_path.display()
-
-    if util.is_etc_file(rel_path) and key in etcsums and root_handle.exists(rel_path)? {
-      let expected = etcsums.get(key)?
-
-      if root_handle.read_bytes(rel_path)?.sha256().hex() == expected {
-        removable = removable.push(rel_path)
-      }
-    } else {
-      removable = removable.push(rel_path)
-    }
-  }
-
-  removable
 }
 
 ## Exported PM declaration `write_package_db`.
@@ -601,107 +397,6 @@ export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[
   packages
 }
 
-## Exported PM declaration `order_packages`.
-export proc order_packages(
-  root: Path,
-  packages: List[types.Package],
-  allow_installed_deps: Bool,
-) [fs, error] -> Result[List[types.Package]] {
-  var local_names: Map[Bool] = {}
-  var available_names: List[Str] = []
-
-  for pkg in packages {
-    local_names[pkg.name] = true
-  }
-
-  for pkg in packages {
-    for dependency in pkg.deps {
-      if ! (local_names.get(dependency) ?? false) {
-        if ! allow_installed_deps or ! fs.exists(util.package_db_path(root, dependency))? {
-          return Err(types.PmError.MissingDependency(f"${pkg.name} depends on missing ${dependency}"))
-        }
-
-        available_names = available_names.push(dependency)
-      }
-    }
-
-    for dependency in pkg.mkdeps_host.extend(pkg.mkdeps_target) {
-      if ! (local_names.get(dependency) ?? false) {
-        available_names = available_names.push(dependency)
-      }
-    }
-  }
-
-  let value = catalog.from_packages(root, packages, available_names)?
-  let edges = graph.edges(value, policy.aarch64_docker())?
-  let runtime_edges = [edge for edge in edges if edge.kind == types.dependency_runtime()]
-  let levels = graph.topological_levels(catalog.package_names(value), runtime_edges)?
-  let by_name = catalog.package_map(value)
-  var ordered: List[types.Package] = []
-
-  for level in levels {
-    for name in level {
-      if name in by_name {
-        let pkg: types.Package = by_name.get(name)?.require(types.Package)?
-        ordered = ordered.push(pkg)
-      }
-    }
-  }
-
-  ordered
-}
-
-## Exported PM declaration `filter_packages_by_names`.
-export proc filter_packages_by_names(
-  packages: List[types.Package],
-  names: List[Str],
-) [error] -> Result[List[types.Package]] {
-  var selected = [pkg for pkg in packages if pkg.name in names]
-  selected
-}
-
-## Exported PM declaration `collect_upgrade_names`.
-export proc collect_upgrade_names(root: Path, packages: List[types.Package]) [fs, error] -> Result[List[Str]] {
-  var names = []
-
-  for pkg in packages {
-    let db = util.package_db_path(root, pkg.name)
-
-    if fs.exists(db)? {
-      let metadata = load_metadata(db)?
-      let ver: Str = metadata.get("ver")?.require(Str)?
-      let rel: Str = metadata.get("rel")?.require(Str)?
-
-      if ver != pkg.ver or rel != pkg.rel {
-        names = names.push(pkg.name)
-      }
-    }
-  }
-
-  if "pm" in names {
-    return ["pm"]
-  }
-
-  names
-}
-
-## Exported PM declaration `collect_local_index`.
-export pure collect_local_index(packages: List[types.Package]) -> Result[List[types.PackageIndex]] {
-  let index = [
-    {
-      name: pkg.name,
-      ver: pkg.ver,
-      rel: pkg.rel,
-      deps: pkg.deps,
-      mkdeps_host: pkg.mkdeps_host,
-      mkdeps_target: pkg.mkdeps_target,
-    }
-    for pkg in packages
-  ]
-
-  index
-}
-
 ## Exported PM declaration `load_built_package_from_dest`.
 export proc load_built_package_from_dest(
   pkg: types.Package,
@@ -740,21 +435,10 @@ export proc load_built_package_from_dest(
   }
 }
 
-## Exported PM declaration `write_local_index`.
-export proc write_local_index(out: Path, packages: List[types.Package]) [fs, error] {
-  fs.mkdir(out)?
-  let index = collect_local_index(packages)?
-  json.write(fp"${out}/index.json", index)?
-
-  for pkg in packages {
-    print ${pkg.name} util.version_id(pkg.ver, pkg.rel) "indexed"
-  }
-}
-
 ## Exported PM declaration `print_package_checksums`.
-export proc print_package_checksums(work: Path, pkg: types.Package) [fs, net, process, env, time, error] {
+export proc print_package_checksums(cache_root: Path, pkg: types.Package) [fs, net, env, error] {
   let arch = util.machine_arch()?
-  let generated = sources.generate_checksums_for(work, pkg, arch)?
+  let generated = sources.generate_checksums_for(cache_root, pkg, arch)?
 
   for checksum in generated {
     print ${pkg.name} $checksum
@@ -762,21 +446,11 @@ export proc print_package_checksums(work: Path, pkg: types.Package) [fs, net, pr
 }
 
 ## Exported PM declaration `update_package_checksums`.
-export proc update_package_checksums(work: Path, pkg: types.Package) [fs, net, process, env, time, error] {
-  let updates = sources.collect_checksum_updates(work, pkg)?
+export proc update_package_checksums(cache_root: Path, pkg: types.Package) [fs, net, env, error] {
+  let updates = sources.collect_checksum_updates(cache_root, pkg)?
 
   for update in updates {
     sources.write_checksum_field(pkg, update.field, update.values)?
     print ${pkg.name} ${update.field} updated
   }
-}
-
-## Exported PM declaration `download_package_sources`.
-export proc download_package_sources(work: Path, out: Path, pkg: types.Package) [fs, net, process, env, time, error] {
-  let id = util.package_id(pkg.name, pkg.ver, pkg.rel)
-  let src = fp"${work}/download/${id}"
-  fs.remove(src, missing_ok: true)?
-  fs.mkdir(src)?
-  sources.prepare_package_source_tree(work, out, pkg, src, false, true, true)?
-  print ${pkg.name} "sources" "downloaded"
 }

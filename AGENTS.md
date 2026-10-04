@@ -33,6 +33,7 @@ and the Makefile sets it.
 | Command | Does |
 |---|---|
 | `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes) |
+| `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`) |
 | `make test` | `test-pm`, `test-system`, `test-xinit` native suites |
 | `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` inside `mirror/` |
 | `make profile-{plan,build,test,boot,clean}` | the typed profile CLI in native `linux/arm64` Docker |

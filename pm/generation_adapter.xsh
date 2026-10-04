@@ -222,9 +222,7 @@ export proc generation_adapter_execute_profile(
   forbidden_packages: List[Str],
 ) [fs, net, process, env, time, error] -> Result[GenerationAdapterResult] {
   let build_plan = pm_plan_json.read(build_plan_path)?
-  let urls = pm_remote.load_repo_urls()?
-  let remote_repo = if urls.repo != "" { urls.repo } else { urls.public_repo }
-  let execution: types.BuildResult = pm_execute.build_plan(build_plan, repo_root, store_root, remote_repo, jobs)?
+  let execution: types.BuildResult = pm_execute.build_plan(build_plan, repo_root, store_root, pm_remote.repo_url(), jobs)?
   generation_adapter_completed_build(build_plan, execution)?
   let generation = generation_adapter_plan(build_plan_path, runtime_roots, profile_name, overlay_root, generation_plan_output)?
   let receipt = generation_adapter_ensure_generation(generation, store_root, output_parent, overlay_root, generation_receipt_output)?

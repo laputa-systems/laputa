@@ -12,7 +12,7 @@ export enum PackageKind { Payload, Meta }
 export enum DependencyKind { Runtime, BuildHost, BuildTarget, Bootstrap }
 
 ## The source staging strategy selected by a recipe source record.
-export enum SourceKind { Auto, Archive, Zip, Cpio, SourceFile, Directory, Git }
+export enum SourceKind { Auto, Archive, Zip, Cpio, SourceFile, Directory }
 
 ## The expected on-disk kind for a declared package output path.
 export enum FileKind { File, Binary, Symlink, Tree }
@@ -98,11 +98,6 @@ export pure source_file() -> SourceKind {
 ## Return a directory source staging kind.
 export pure source_directory() -> SourceKind {
   return Directory
-}
-
-## Return Git source staging.
-export pure source_git() -> SourceKind {
-  return Git
 }
 
 ## Return the regular-file metadata kind.
@@ -275,7 +270,6 @@ export pure source_kind_text(kind: SourceKind) -> Str {
     Cpio => return "cpio"
     SourceFile => return "file"
     Directory => return "directory"
-    Git => return "git"
   }
 }
 
@@ -288,7 +282,6 @@ export pure parse_source_kind(raw: Str) -> Result[SourceKind] {
     "cpio" => return Cpio
     "file" => return SourceFile
     "directory" => return Directory
-    "git" => return Git
     _ => return Err(PmError.PackageContract(f"invalid upstream source kind ${raw}"))
   }
 }
@@ -591,14 +584,9 @@ export type RemotePackage = {
 ## A source mapping declared by a package definition.
 export type SourceLine = {source: Str, dest: Path}
 
-## A source resolved to a local path and source kind.
-export type ResolvedSource = {path: Path, kind: Str}
+## A source resolved to a local path, its filesystem kind, and the file name it stages under.
+export type ResolvedSource = {path: Path, kind: Str, name: Str}
 
 ## A checksum field update produced by source commands.
 export type ChecksumUpdate = {field: Str, values: List[Str]}
 
-## Repository endpoints used by upload and export flows.
-export type RepoUrls = {repo: Str, public_repo: Str}
-
-## An uploaded source path and its content digest.
-export type UploadedSource = {rel: Str, sha256: Str}
