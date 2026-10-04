@@ -6,10 +6,10 @@ export const name = "alsa-ucm-conf"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.2.15.3"
+export const ver = "1.2.16.1"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "9f79e813c08fc86cfa46dd75c4fcda1a4a51b482db2607e1fcfaafb92f588a31",
+        sha256: "cf3d1c07e089a83c4ece2c20f05dd6a8aab7fcd108768c38811386880575492b",
       },
     ],
   },
@@ -42,6 +42,10 @@ export const filetree = [
   {
     path: p"usr",
     kind: "tree",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/codecs/cs35l56+cs42l43-spk",
+    kind: "symlink",
   },
   {
     path: p"usr/share/alsa/ucm2/conf.d/DB410c/DB410c.conf",
@@ -268,6 +272,10 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/share/alsa/ucm2/conf.d/glymur/GLYMUR-CRD.conf",
+    kind: "symlink",
+  },
+  {
     path: p"usr/share/alsa/ucm2/conf.d/gx-sound-card/GXL-P241.conf",
     kind: "symlink",
   },
@@ -281,6 +289,10 @@ export const filetree = [
   },
   {
     path: p"usr/share/alsa/ucm2/conf.d/hdaudioB0D2/hdaudioB0D2.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/conf.d/kaanapali/Kaanapali-MTP.conf",
     kind: "symlink",
   },
   {
@@ -308,6 +320,10 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/share/alsa/ucm2/conf.d/mt8366-evk/mt8366-evk.conf",
+    kind: "symlink",
+  },
+  {
     path: p"usr/share/alsa/ucm2/conf.d/mt8370-evk/mt8370-evk.conf",
     kind: "symlink",
   },
@@ -328,7 +344,15 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/share/alsa/ucm2/conf.d/qcm6490/QCM6490-IDP.conf",
+    kind: "symlink",
+  },
+  {
     path: p"usr/share/alsa/ucm2/conf.d/qcs615/TALOS-EVK.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/conf.d/qcs6490/QCS6490-RB3Gen2.conf",
     kind: "symlink",
   },
   {
@@ -336,7 +360,19 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/share/alsa/ucm2/conf.d/qcs6490/QCS6490-Thundercomm-RubikPi3.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/conf.d/qcs6490/RadxaComputerCo.Ltd.-RadxaDragonQ6A-1.0.conf",
+    kind: "symlink",
+  },
+  {
     path: p"usr/share/alsa/ucm2/conf.d/qcs8300/MONACO-EVK.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/conf.d/qcs8300/arduino-monza.conf",
     kind: "symlink",
   },
   {
@@ -380,7 +416,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/share/alsa/ucm2/conf.d/simple-card/apalis-imx8.conf",
+    path: p"usr/share/alsa/ucm2/conf.d/simple-card/apalis-imx8qm.conf",
     kind: "symlink",
   },
   {
@@ -500,6 +536,10 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/share/alsa/ucm2/conf.d/sun4i-codec/h616-audio-codec.conf",
+    kind: "symlink",
+  },
+  {
     path: p"usr/share/alsa/ucm2/conf.d/tegra-hda/tegra-hda.conf",
     kind: "symlink",
   },
@@ -613,6 +653,14 @@ export const filetree = [
   },
   {
     path: p"usr/share/alsa/ucm2/module/snd_soc_tegra_max98090.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/sof-soundwire/cs35l56+cs42l43-spk.conf",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/share/alsa/ucm2/sof-soundwire/cs42l43-spk+cs35l56.conf",
     kind: "symlink",
   },
 ]

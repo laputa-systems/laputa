@@ -8,10 +8,10 @@ export const name = "alsa-utils-minimal"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.2.15.2"
+export const ver = "1.2.16"
 
 ## Exported declaration `rel`.
-export const rel = "10"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -34,7 +34,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "7aaaafbfb01942113ec0c31e51f705910e81079205088ca2f8f137a3869e1a3a",
+        sha256: "092399d5e8749a1d5e188e393157521cec4b75693b60ebb79bbce728cff2232c",
       },
     ],
   },

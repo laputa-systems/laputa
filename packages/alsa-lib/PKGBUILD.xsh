@@ -8,10 +8,10 @@ export const name = "alsa-lib"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.2.15.3"
+export const ver = "1.2.16.1"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "7b079d614d582cade7ab8db2364e65271d0877a37df8757ac4ac0c8970be861e",
+        sha256: "f740db7f488255944ffd4428416ee3390a96742856916433df468c281436480e",
       },
     ],
   },
@@ -68,7 +68,7 @@ proc write_asound_stub() [fs, error] {
 
 const char *snd_asoundlib_version(void)
 {
-    return "1.2.15.3";
+    return "@VERSION@";
 }
 
 const char *snd_strerror(int errnum)
@@ -108,7 +108,7 @@ int snd_pcm_close(void *pcm)
     (void)pcm;
     return 0;
 }
-""",
+""".replace("@VERSION@", ver),
   )?
 }
 
@@ -124,7 +124,7 @@ proc install_alsa_headers(dest: Path) [fs, error] {
 extern "C" {
 #endif
 
-#define SND_LIB_VERSION_STR "1.2.15.3"
+#define SND_LIB_VERSION_STR "@VERSION@"
 #define SND_PCM_STREAM_PLAYBACK 0
 #define SND_PCM_STREAM_CAPTURE 1
 #define SND_PCM_NONBLOCK 0x00000001
@@ -144,7 +144,7 @@ int snd_pcm_close(snd_pcm_t *pcm);
 #endif
 
 #endif
-""",
+""".replace("@VERSION@", ver),
   )?
 }
 
