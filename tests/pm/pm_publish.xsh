@@ -20,7 +20,7 @@ type PublishedMetadataDto = {
 }
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 pure publish_executor_identity() -> types.ExecutorIdentity {
@@ -38,7 +38,7 @@ pure publish_empty_remote() -> types.RemoteSnapshot {
 
 proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/repo"), fp"${root}/repo", parents: true, overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"${root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
   root

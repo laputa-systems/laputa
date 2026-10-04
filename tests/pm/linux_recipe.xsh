@@ -8,11 +8,11 @@ use pm.recipe
 use pm.sources
 use pm.types
 use pm.util
-use repo.linux.linux_config
-use repo.linux.PKGBUILD-shared as linux_shared
+use packages.linux.linux_config
+use packages.linux.PKGBUILD-shared as linux_shared
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/linux-recipe/${name}"
+  fp"tests/pm/fixtures/linux-recipe/${name}"
 }
 
 proc runner() [fs, process, env, error] -> Result[Path] {
@@ -53,7 +53,7 @@ test test_linux_kbuild_modules_parse_and_preserve_job_error_branch [fs, process,
 }
 
 test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net, process, env, time, error] { |ctx|
-  let original = recipe.load_package(p"repo/linux")?
+  let original = recipe.load_package(p"packages/linux")?
   let config = linux_config_source(original)?
   let stage_root = test.temp_dir(ctx, name: "linux-config-stage")?
   let source = fp"${stage_root}/source"
@@ -63,8 +63,8 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   test.ok(staged.exists()?)?
 
   let copied_root = test.temp_dir(ctx, name: "linux-config-fingerprint")?
-  let copied = fp"${copied_root}/repo/linux"
-  let _ = fs.copy_tree(p"repo/linux", copied, parents: true, overwrite: true)?
+  let copied = fp"${copied_root}/packages/linux"
+  let _ = fs.copy_tree(p"packages/linux", copied, parents: true, overwrite: true)?
   let before = recipe.load_package(copied)?
   let first = fingerprint.package_build_input(copied_root, before, types.target_aarch64())?
   fs.write(fp"${copied}/files/config/aarch64/base-aarch64.fragment", "# changed staged config input\n")?
@@ -73,7 +73,7 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
 }
 
 test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, process, env, time, error] { |ctx|
-  let original = recipe.load_package(p"repo/linux")?
+  let original = recipe.load_package(p"packages/linux")?
   let required = [
     "timeconst.h",
     "cpufeaturemasks-x86.h",
@@ -99,9 +99,9 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
 
 test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_recipe [fs, net, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "laputa-pm-repository-input")?
-  let package_dir = fp"${root}/repo/laputa-pm"
+  let package_dir = fp"${root}/packages/laputa-pm"
   let source = fp"${root}/source"
-  let _ = fs.copy_tree(p"repo/laputa-pm", package_dir, parents: true, overwrite: true)?
+  let _ = fs.copy_tree(p"packages/laputa-pm", package_dir, parents: true, overwrite: true)?
   fs.copy(p"pm.xsh", fp"${root}/pm.xsh", overwrite: true)?
   let _ = fs.copy_tree(p"pm", fp"${root}/pm", parents: true, overwrite: true)?
   fs.mkdir(source)?
@@ -125,7 +125,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
 }
 
 test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, net, process, env, time, error] { |ctx|
-  let pkg = recipe.load_package(p"repo/baselayout")?
+  let pkg = recipe.load_package(p"packages/baselayout")?
   let root = test.temp_dir(ctx, name: "baselayout-directory-input")?
   let source = fp"${root}/source"
   fs.mkdir(source)?
@@ -137,7 +137,7 @@ test test_baselayout_directory_input_stages_into_the_prepared_source_root [fs, n
 }
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |ctx|
-  let pkg = recipe.load_package(p"repo/baselayout")?
+  let pkg = recipe.load_package(p"packages/baselayout")?
   let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.file_kind_tree()]
 
   # The kernel mounts devtmpfs before `/init`; the remaining mount points must
@@ -148,7 +148,7 @@ test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error]
 }
 
 test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, process, env, time, error] { |ctx|
-  let pkg = recipe.load_package(p"repo/baselayout")?
+  let pkg = recipe.load_package(p"packages/baselayout")?
   let root = test.temp_dir(ctx, name: "baselayout-empty-directories")?
   let source = fp"${root}/source"
   let dest = fp"${root}/dest"
@@ -162,7 +162,7 @@ test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, p
 }
 
 test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, process, env, time, error] { |ctx|
-  let pkg = recipe.load_package(p"repo/laputa-net")?
+  let pkg = recipe.load_package(p"packages/laputa-net")?
   let root = test.temp_dir(ctx, name: "laputa-net-hook-directories")?
   let source = fp"${root}/source"
   let dest = fp"${root}/dest"
@@ -187,7 +187,7 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
   let dest = fp"${root}/dest"
   let archive_path = fp"${root}/baselayout.tar.gz"
   let extracted = fp"${root}/extracted"
-  let _ = fs.copy_tree(p"repo/baselayout", recipe_dir, parents: true, overwrite: true)?
+  let _ = fs.copy_tree(p"packages/baselayout", recipe_dir, parents: true, overwrite: true)?
   fs.mkdir(source)?
   let pkg = recipe.load_package(recipe_dir)?
   sources.stage_package_sources(root, pkg, source, false)?
@@ -234,7 +234,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
   let status = process.run(
     process.command_argv(
       xsh,
-      [xsh.display(), "repo/xsh/proof.xsh", "--", root.display()],
+      [xsh.display(), "packages/xsh/proof.xsh", "--", root.display()],
       cwd: modules,
       env: {XSH_MODULE_PATH: modules.display()},
       stderr: stderr,
@@ -246,7 +246,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
 }
 
 test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
-  let pkg = recipe.load_package(p"repo/wlroots0.19-mesa")?
+  let pkg = recipe.load_package(p"packages/wlroots0.19-mesa")?
   test.ok("seatd" in pkg.deps)?
 }
 
@@ -313,7 +313,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   let recipe_root = fp"${root}/recipe"
   let source = fp"${root}/source"
   let worker = fp"${recipe_root}/kbuild-pool-worker.xsh"
-  let _ = fs.copy_tree(p"repo/linux", recipe_root, parents: true, overwrite: true)?
+  let _ = fs.copy_tree(p"packages/linux", recipe_root, parents: true, overwrite: true)?
   fs.mkdir(source)?
   fs.write(fp"${source}/.config", "")?
   fs.write(fp"${source}/Kbuild", "obj-y += one.o\n")?

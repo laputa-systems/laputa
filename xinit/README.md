@@ -2,33 +2,27 @@
 
 `xinit` is a pure XSH init and service supervisor script.
 
-This repository expects a sibling XSH checkout with debug binaries already
-built:
+It lives in the Laputa monorepo and uses the XSH tools from the sibling
+checkout at `XSH_ROOT` (default `../xsh` from the monorepo root). From the
+monorepo root:
 
 ```sh
-cd ../xsh
-cargo build --bin xsh --bin xsht
-```
-
-Then from this repository:
-
-```sh
-make verify
+make test-xinit
 ```
 
 ## Commands
 
 ```sh
-../xsh/target/debug/xsh xinit.xsh -- /etc/inittab
-../xsh/target/debug/xsh xinit.xsh -- boot
-../xsh/target/debug/xsh xinit.xsh -- start SERVICE
-../xsh/target/debug/xsh xinit.xsh -- restart SERVICE
-../xsh/target/debug/xsh xinit.xsh -- status SERVICE
-../xsh/target/debug/xsh xinit.xsh -- logs SERVICE
-../xsh/target/debug/xsh xinit.xsh -- stop SERVICE
-../xsh/target/debug/xsh xinit.xsh -- list
-../xsh/target/debug/xsh xinit.xsh -- graph SERVICE_OR_TARGET
-../xsh/target/debug/xsh xinit.xsh -- check [SERVICE_OR_PATH]
+xsh xinit/xinit.xsh -- /etc/inittab
+xsh xinit/xinit.xsh -- boot
+xsh xinit/xinit.xsh -- start SERVICE
+xsh xinit/xinit.xsh -- restart SERVICE
+xsh xinit/xinit.xsh -- status SERVICE
+xsh xinit/xinit.xsh -- logs SERVICE
+xsh xinit/xinit.xsh -- stop SERVICE
+xsh xinit/xinit.xsh -- list
+xsh xinit/xinit.xsh -- graph SERVICE_OR_TARGET
+xsh xinit/xinit.xsh -- check [SERVICE_OR_PATH]
 ```
 
 See `docs/INIT.md` for the full contract.

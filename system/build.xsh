@@ -1,7 +1,7 @@
 ##! Profile-output paths and the typed package-plan Docker adapter.
-use laputa.docker as docker
-use laputa.image as image
-use laputa.types as types
+use system.docker as docker
+use system.image as image
+use system.types as types
 
 ## The durable host output paths owned by one system profile.
 export type ProfileOutputs = {

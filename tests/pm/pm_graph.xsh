@@ -5,7 +5,7 @@ use pm.policy
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 pure has_edge(edges: List[types.DependencyEdge], from: Str, to: Str, kind: types.DependencyKind) -> Bool {
@@ -20,7 +20,7 @@ pure has_edge(edges: List[types.DependencyEdge], from: Str, to: Str, kind: types
 
 pure fixture_package(name: Str, deps: List[Str], mkdeps_host: List[Str], mkdeps_target: List[Str]) -> types.Package {
   {
-    dir: fp"repo/${name}",
+    dir: fp"packages/${name}",
     name,
     ver: "1",
     rel: "1",
@@ -45,7 +45,7 @@ proc expect_catalog_rejection(root: Path, expected: Str) [fs, env, error] {
 test test_catalog_loads_packages_in_name_order_with_relative_dirs [fs, env, error] {
   let value = catalog.load(fixture("graph-catalog"))?
   test.eq(catalog.package_names(value), ["app", "host-tool", "runtime-lib", "target-sdk"])?
-  test.eq(value.packages[0].dir.display(), "repo/app")?
+  test.eq(value.packages[0].dir.display(), "packages/app")?
 }
 
 test test_catalog_rejects_missing_dependency [fs, env, error] {

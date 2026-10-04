@@ -1,6 +1,6 @@
 ##! Published-arm64 regression: a case-sensitive target root stays container-local and only its final image crosses /output.
-use laputa.container_output as container_output
-use laputa.image as image
+use system.container_output as container_output
+use system.image as image
 
 proc main() [fs, process, error] {
   let workspace = /tmp/laputa-container-local-staging
@@ -32,7 +32,7 @@ proc main() [fs, process, error] {
   }
 
   let staged_rootfs = fp"${workspace}/rootfs.ext4"
-  image.image_write_rootfs(root, /src/packages/repo/laputa-fs/files/mkfs.ext4.xsh, staged_rootfs)?
+  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, staged_rootfs)?
 
   if ! fs.exists(staged_rootfs)? or fs.metadata(staged_rootfs)?.size <= 0 {
     return error.fail("container-local image was not produced from the staged generation")

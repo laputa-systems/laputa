@@ -1,13 +1,13 @@
 ##! Native Linux arm64 Docker command construction for Laputa profile builds.
-use laputa.types as types
+use system.types as types
 
 ## Select the published package-tools interpreter or a checked-out ARM64 debug binary.
 export enum ContainerXsh { PinnedXsh, CheckedOutXsh(Path) }
 
 ## The fixed host paths and named volumes mounted into the profile build container.
+## `laputa_root` is the monorepo checkout: PM, recipes, profiles, and system modules.
 export type DockerConfig = {
   docker: Path,
-  packages_root: Path,
   laputa_root: Path,
   xsh_root: Path,
   output_root: Path,
@@ -53,14 +53,9 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
 
 ## Resolve the allowed Docker configuration surface from the host environment.
 export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env, error] -> Result[DockerConfig] {
-  let packages_root = fp"${env_value("LAPUTA_PACKAGES_ROOT", fp"${laputa_root.parent}/packages".display())}"
-  let xsh_root = fp"${env_value("XSH_SOURCE_ROOT", fp"${laputa_root.parent}/xsh".display())}"
+  let xsh_root = fp"${env_value("XSH_ROOT", fp"${laputa_root.parent}/xsh".display())}"
   let docker = fp"${env_value("DOCKER", "docker")}"
   let output_root = fp"${laputa_root}/target/laputa/${profile_name}"
-
-  if ! fs.exists(packages_root)? {
-    return Err(types.LaputaError.Docker(f"package checkout does not exist: ${packages_root}"))
-  }
 
   if ! fs.exists(xsh_root)? or ! fs.exists(fp"${xsh_root}/core")? {
     return Err(types.LaputaError.Docker(f"XSH source checkout with core/ does not exist: ${xsh_root}"))
@@ -83,7 +78,6 @@ export proc build_config(laputa_root: Path, profile_name: Str) [fs, process, env
 
   let base: DockerConfig = DockerConfig(
     docker:,
-    packages_root:,
     laputa_root:,
     xsh_root:,
     output_root:,
@@ -109,8 +103,6 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--platform",
     "linux/arm64",
     "--mount",
-    f"type=bind,src=${value.packages_root},dst=/src/packages,readonly",
-    "--mount",
     f"type=bind,src=${value.laputa_root},dst=/src/laputa,readonly",
     "--mount",
     f"type=bind,src=${value.xsh_root}/core,dst=/usr/lib/xsh/core,readonly",
@@ -121,9 +113,9 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "--mount",
     f"type=volume,src=${value.source_volume},dst=/sources",
     "--workdir",
-    "/src/packages",
+    "/src/laputa",
     "--env",
-    "XSH_MODULE_PATH=/src/packages:/src/laputa",
+    "XSH_MODULE_PATH=/src/laputa",
     "--env",
     "PATH=/bin:/usr/bin",
     "--env",
@@ -151,8 +143,6 @@ export pure package_tools_build_argv(value: DockerConfig, tag: Str) -> List[Str]
     "linux/arm64",
     "--file",
     package_tools_dockerfile(value).display(),
-    "--build-context",
-    f"packages=${value.packages_root}",
     "--tag",
     tag,
     value.laputa_root.display(),
@@ -187,9 +177,9 @@ export proc package_tools_input_key(value: DockerConfig) [fs, env, error] -> Res
   let body = f"""${package_tools_contract_epoch}
 dockerfile\t${hash.sha256(dockerfile)?.hex()}
 bootstrap-helper\t${hash.sha256(bootstrap)?.hex()}
-pm-entrypoint\t${package_tools_tree_digest(fp"${value.packages_root}/pm.xsh")?}
-pm-modules\t${package_tools_tree_digest(fp"${value.packages_root}/pm")?}
-llvm-seed-recipe\t${package_tools_tree_digest(fp"${value.packages_root}/repo/llvm-toolchain")?}
+pm-entrypoint\t${package_tools_tree_digest(fp"${value.laputa_root}/pm.xsh")?}
+pm-modules\t${package_tools_tree_digest(fp"${value.laputa_root}/pm")?}
+llvm-seed-recipe\t${package_tools_tree_digest(fp"${value.laputa_root}/packages/llvm-toolchain")?}
 xsh-release\t${env_value("XSH_RELEASE", "")}
 xsh-core-release\t${env_value("XSH_CORE_RELEASE", "")}
 architecture\tarm64
@@ -259,7 +249,7 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile) -> List[Str] {
   # The mounted checkout owns this PM invocation.  Mixing the image's pm.xsh
   # entrypoint with checkout modules loads pm.types twice under the published
   # runner's shared user-module namespace.
-  var argv = ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "plan", "--repo", "/src/packages"]
+  var argv = ["/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "plan", "--repo", "/src/laputa"]
 
   for package_name in profile.package_roots {
     argv += ["--root", package_name]
@@ -278,7 +268,7 @@ export pure docker_plan_command_argv(value: DockerConfig, profile: types.SystemP
 export pure docker_generation_plan_argv(profile: types.SystemProfile) -> List[Str] {
   [
     "/bin/xsh",
-    "/src/laputa/laputa/container_build.xsh",
+    "/src/laputa/system/container_build.xsh",
     "--",
     "plan",
     profile.name,
@@ -290,7 +280,7 @@ export pure docker_generation_plan_argv(profile: types.SystemProfile) -> List[St
 export pure docker_profile_build_argv(profile: types.SystemProfile, jobs: Int) -> List[Str] {
   [
     "/bin/xsh",
-    "/src/laputa/laputa/container_build.xsh",
+    "/src/laputa/system/container_build.xsh",
     "--",
     "build",
     profile.name,

@@ -13,7 +13,7 @@ proc main() [fs, process, env, error] {
       /xsh-release/bin/xsh,
       [
         "/xsh-release/bin/xsh",
-        "/src/repo/bison/files/bison.xsh",
+        "/src/packages/bison/files/bison.xsh",
         "--",
         "-o",
         "scripts/kconfig/parser.tab.c",
@@ -35,7 +35,7 @@ proc main() [fs, process, env, error] {
       /xsh-release/bin/xsh,
       [
         "/xsh-release/bin/xsh",
-        "/src/repo/bison/files/bison.xsh",
+        "/src/packages/bison/files/bison.xsh",
         "--",
         "-o",
         "scripts/kconfig/parser.tab.c",

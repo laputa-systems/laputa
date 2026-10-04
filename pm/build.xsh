@@ -5,6 +5,8 @@ use recipe
 use types
 use util
 
+# The PM tree is the monorepo root (pm.xsh beside pm/) in a checkout and
+# /usr/lib/pm on an installed system.
 proc pm_source_root() [fs, env, error] -> Result[Path] {
   for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
     let root = fp"${entry}"
@@ -14,10 +16,8 @@ proc pm_source_root() [fs, env, error] -> Result[Path] {
     }
   }
 
-  for candidate in [p"laputa", p"."] {
-    if fs.exists(fp"${candidate}/pm.xsh")? and fs.exists(fp"${candidate}/pm")? {
-      return path.absolute(candidate)?
-    }
+  if fs.exists(p"pm.xsh")? and fs.exists(p"pm")? {
+    return path.absolute(p".")?
   }
 
   /usr/lib/pm

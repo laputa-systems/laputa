@@ -25,12 +25,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
-      - name: Checkout packages
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
-        with:
-          repository: laputa-systems/packages
-          path: packages
-
       - name: Install XSH release
         run: |
           set -euo pipefail
@@ -50,13 +44,12 @@ jobs:
 
       - name: Strict-check PM and Laputa modules
         run: |
-          XSH_MODULE_PATH="$PWD/packages" xsht check --strict \
-            packages/pm.xsh packages/pm/*.xsh packages/tests/xsh/*.xsh
-          XSH_MODULE_PATH="$PWD:$PWD/packages" xsht check --strict \
-            laputa.xsh laputa/*.xsh profiles/*.xsh guest/*.xsh tests/xsh/*.xsh
+          XSH_MODULE_PATH="$PWD" xsht check --strict \
+            pm.xsh pm/*.xsh tests/pm/*.xsh \
+            laputa.xsh system/*.xsh profiles/*.xsh guest/*.xsh tests/system/*.xsh
 
       - name: Run focused Laputa tests
         run: |
-          XSH_MODULE_PATH="$PWD:$PWD/packages" xsht test \
-            tests/xsh/cli.xsh tests/xsh/build.xsh tests/xsh/container_output.xsh \
-            tests/xsh/docker.xsh tests/xsh/profile.xsh tests/xsh/qemu.xsh
+          XSH_MODULE_PATH="$PWD" xsht test \
+            tests/system/cli.xsh tests/system/build.xsh tests/system/container_output.xsh \
+            tests/system/docker.xsh tests/system/profile.xsh tests/system/qemu.xsh

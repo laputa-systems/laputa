@@ -4,7 +4,7 @@ use pm.local
 use pm.recipe
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 ## Builds write a runner and trace beside the recipe, so build a copy instead of the checkout fixture.

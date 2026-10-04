@@ -261,7 +261,7 @@ proc published_parallel_level_barrier_regression(
   workspace: Path,
   executor: types.ExecutorIdentity,
 ) [fs, net, process, env, time, error] {
-  let repo = fp"${workspace}/repo"
+  let repo = fp"${workspace}/packages"
   let store = fp"${workspace}/level-barrier-store"
   write_level_barrier_recipes(repo)?
   let value = plan.resolve(
@@ -355,7 +355,7 @@ proc published_generation_adapter_regression(
   workspace: Path,
   executor: types.ExecutorIdentity,
 ) [fs, net, process, env, time, error] {
-  let repo = fp"${workspace}/repo"
+  let repo = fp"${workspace}/packages"
   let plan_path = fp"${workspace}/adapter-build-plan.json"
   let store = fp"${workspace}/adapter-store"
   let overlay = fp"${workspace}/adapter-overlay"
@@ -397,7 +397,7 @@ proc main() [fs, net, process, env, time, error] {
   let workspace = p"/tmp/laputa-published-metapackage"
   fs.remove(workspace, missing_ok: true)?
   defer fs.remove(workspace, missing_ok: true)?
-  let repo = fp"${workspace}/repo"
+  let repo = fp"${workspace}/packages"
   let store = fp"${workspace}/store"
   fs.mkdir(repo)?
   fs.mkdir(fp"${workspace}/pm")?

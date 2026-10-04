@@ -2,71 +2,69 @@
 
 This is the command reference for the completed typed core-infrastructure workflow. All package build, proof, root-composition, and disk-image commands execute in native `linux/arm64` Docker containers; QEMU runs on an Apple Silicon macOS host with Homebrew QEMU and HVF. The only supported system profile is `qemu-dwl-foot`.
 
-Set the checkout roots when they differ from the standard sibling layout:
+PM, recipes (`packages/`), and the profile modules (`system/`) live in this
+monorepo; XSH is a sibling checkout at `XSH_ROOT` (default `../xsh`). Set the
+roots when they differ:
 
 ```bash
-export XSH_SOURCE_ROOT="$HOME/d/laputa-systems/xsh"
-export LAPUTA_PACKAGES_ROOT="$HOME/d/laputa-systems/packages"
+export XSH_ROOT="$HOME/d/laputa-systems/xsh"
 export LAPUTA_ROOT="$HOME/d/laputa-systems/laputa"
-export XSH_MODULE_PATH="$LAPUTA_ROOT:$LAPUTA_PACKAGES_ROOT"
-export XSH_HOST="$XSH_SOURCE_ROOT/target/debug/xsh"
-export XSHT="$XSH_SOURCE_ROOT/target/debug/xsht"
+export XSH_MODULE_PATH="$LAPUTA_ROOT"
+export XSH_HOST="$XSH_ROOT/target/release/xsh"
+export XSHT="$XSH_ROOT/target/release/xsht"
 ```
 
-Build the local debug XSH tools before invoking these commands if they do not yet exist. Do not use an installed XSH binary in place of the checked-out runner.
+Build the XSH tools before invoking these commands if they do not yet exist. Do not use an installed XSH binary in place of the checked-out runner.
 
 ## Static check
 
 ```bash
 cd "$LAPUTA_ROOT"
-XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check \
+XSH_MODULE_PATH="$PWD" "$XSHT" check \
   laputa.xsh \
-  laputa/{build,cli,container_output,docker,image,profile,proof,qemu,types}.xsh \
+  system/*.xsh \
   profiles/*.xsh \
   guest/*.xsh \
-  tests/xsh/*.xsh
-XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check laputa/container_build.xsh
+  tests/system/*.xsh
 ```
 
 `xsht check` validates dynamic boundaries by default; the `--strict` option
-has been removed. `laputa/container_build.xsh` statically imports PM generation
+has been removed. `system/container_build.xsh` statically imports PM generation
 modules, so its check also requires the checked-out PM graph to pass the current
 language contracts.
 
 Run the native test suite from the checkout root:
 
 ```bash
-"$XSHT" test --jobs 2
+make test-system
 ```
 
-`xsht-config.ini` sets `module_path` to this checkout and the sibling
-`../packages`, so plain `xsht test` resolves `laputa.*` and PM imports, including
-`use` imports inside profiles loaded through `module.load`, without
-`XSH_MODULE_PATH`. It also excludes `tests/xsh/fixtures/`: the standalone
+`xsht-config.ini` sets `module_path` to this checkout, so `xsht test` resolves
+`system.*` and PM imports, including `use` imports inside profiles loaded
+through `module.load`. It also excludes `tests/system/fixtures/`: the standalone
 `container-local-staging.xsh` script requires the Linux container's
-`/src/packages` and `/output` mounts and must run through container verification
+`/src/laputa` and `/output` mounts and must run through container verification
 instead of the host native-test gate.
 
 The combined PM/Laputa import test uses the PM source graph. Check and run it
 separately to distinguish package-owned diagnostics from Laputa-owned modules:
 
 ```bash
-XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" check tests/integration/cross_consumer.xsh
-XSH_MODULE_PATH="$PWD:$LAPUTA_PACKAGES_ROOT" "$XSHT" test --jobs 1 tests/integration/cross_consumer.xsh
+XSH_MODULE_PATH="$PWD" "$XSHT" check tests/integration/cross_consumer.xsh
+XSH_MODULE_PATH="$PWD" "$XSHT" test --jobs 1 tests/integration/cross_consumer.xsh
 ```
 
 ## PM test
 
 ```bash
-cd "$LAPUTA_PACKAGES_ROOT"
-make test
+cd "$LAPUTA_ROOT"
+make test-pm
 ```
 
 ## Profile plan
 
-For a checked-out Linux XSH build, run `make xsh-local-bins` in
-`$LAPUTA_PACKAGES_ROOT` and set
-`LAPUTA_LOCAL_XSH_BIN="$XSH_SOURCE_ROOT/target/aarch64-unknown-linux-musl/debug/xsh"`.
+For a checked-out Linux XSH build, run `make xsh-local-bins` and set
+`LAPUTA_LOCAL_XSH_BIN="$XSH_ROOT/target/aarch64-unknown-linux-musl/debug/xsh"`.
 The Docker adapter mounts that binary read-only at `/bin/xsh` for profile
 commands; the package-tools image itself still comes from the pinned release.
 Leave the variable unset to test the published binary.
@@ -122,11 +120,11 @@ The final public Laputa CLI intentionally has no store command. Invoke the PM ve
 cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
-  --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
-  --workdir /src/packages \
-  --env XSH_MODULE_PATH=/src/packages \
+  --mount type=bind,src="$LAPUTA_ROOT",dst=/src/laputa,readonly \
+  --workdir /src/laputa \
+  --env XSH_MODULE_PATH=/src/laputa \
   laputa-package-tools \
-  /bin/xsh /src/packages/pm.xsh -- store verify --store /artifacts
+  /bin/xsh /src/laputa/pm.xsh -- store verify --store /artifacts
 ```
 
 Every artifact must verify. This is `pm store verify --store STORE` running in the Docker build environment; it does not publish or mutate the repository.
@@ -138,11 +136,11 @@ cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
   --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
   --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \
-  --mount type=bind,src="$LAPUTA_PACKAGES_ROOT",dst=/src/packages,readonly \
-  --workdir /src/packages \
-  --env XSH_MODULE_PATH=/src/packages \
+  --mount type=bind,src="$LAPUTA_ROOT",dst=/src/laputa,readonly \
+  --workdir /src/laputa \
+  --env XSH_MODULE_PATH=/src/laputa \
   laputa-package-tools \
-  /bin/xsh /src/packages/pm.xsh -- generation inspect /profile/current/generation.json
+  /bin/xsh /src/laputa/pm.xsh -- generation inspect /profile/current/generation.json
 ```
 
 The generation's direct runtime roots must be `baselayout`, `xsh`, `laputa-pm`, `xinit`, `mdevd`, `seatd`, `dwl-minimal`, and `foot-minimal`. Build-only tools must be absent unless independently runtime-required: `llvm-toolchain`, `pkgconf`, `cmake`, `muon`, `samurai`, `m4`, `flex`, `bison`, `wayland-dev`, `wayland-protocols`, and `pixman-dev`.

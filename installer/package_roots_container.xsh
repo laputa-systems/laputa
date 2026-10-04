@@ -1,15 +1,15 @@
 #!/bin/xsh
 ##! Compose the installer's package roots from one saved native ARM64 BuildPlan.
-use laputa.container_output as container_output
+use system.container_output as container_output
 
 error InstallerPackageRootsError = Failed(message: Str) : InvalidData
 
 pure pm_argv(args: List[Str]) -> List[Str] {
-  ["/bin/xsh", "/src/packages/pm.xsh", "--"].extend(args)
+  ["/bin/xsh", "/src/laputa/pm.xsh", "--"].extend(args)
 }
 
 proc run_pm(args: List[Str]) [fs, process, error] {
-  let status = process.run(process.command_argv(/bin/xsh, pm_argv(args), /src/packages))?
+  let status = process.run(process.command_argv(/bin/xsh, pm_argv(args), /src/laputa))?
   if ! status.ok {
     return Err(InstallerPackageRootsError.Failed(f"PM failed: ${args.join(" ")}"))
   }
@@ -96,7 +96,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
     "repo",
     "plan",
     "--repo",
-    "/src/packages",
+    "/src/laputa",
     "--target",
     "aarch64-linux-musl",
     "--output",

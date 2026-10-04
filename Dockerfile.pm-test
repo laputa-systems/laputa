@@ -25,6 +25,6 @@ FROM scratch
 COPY --from=xsh-unpack /image/ /
 
 ENV PATH=/bin:/usr/bin \
-    XSH_MODULE_PATH=/src/packages
+    XSH_MODULE_PATH=/src/laputa
 
-WORKDIR /src/packages
+WORKDIR /src/laputa

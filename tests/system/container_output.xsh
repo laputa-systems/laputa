@@ -1,5 +1,5 @@
 ##! Behavior coverage for publishing final container artifacts without exposing partial host outputs.
-use laputa.container_output as container_output
+use system.container_output as container_output
 
 test test_publish_final_file_replaces_only_after_the_verified_copy [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "container-output")?

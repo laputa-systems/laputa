@@ -1,5 +1,5 @@
 ##! PM and Laputa modules must load together in one XSH process.
-use laputa.cli as laputa_cli
+use system.cli as laputa_cli
 use pm.cli as pm_cli
 
 test test_pm_and_laputa_clis_share_one_runtime_namespace [fs, net, process, env, time, error] {

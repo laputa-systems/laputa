@@ -1,5 +1,5 @@
 ##! Contract coverage for the minimal dwl keyboard configuration.
-use repo.dwl-minimal.PKGBUILD as dwl_recipe
+use packages.dwl-minimal.PKGBUILD as dwl_recipe
 
 test test_dwl_minimal_removes_the_unavailable_menu_binding [fs, error] { |ctx|
   let upstream = """static const char *termcmd[] = { \"foot\", NULL };

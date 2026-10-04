@@ -1,8 +1,8 @@
 # Core Infrastructure
 
 Laputa is the aarch64-only integration layer for one `qemu-dwl-foot` system.
-The sibling `packages` checkout owns recipes, the typed `PackageCatalog`, graph
-resolution, and the package-manager CLI. Laputa owns the typed `SystemProfile`,
+`pm.xsh`, `pm/`, and `packages/` own recipes, the typed `PackageCatalog`, graph
+resolution, and the package-manager CLI. `system/` owns the typed `SystemProfile`,
 native `linux/arm64` Docker adapter, image construction, and the QEMU proof.
 
 `pm repo plan` resolves one deterministic `BuildPlan`. Its semantic artifact

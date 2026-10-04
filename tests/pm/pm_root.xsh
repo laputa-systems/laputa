@@ -92,7 +92,7 @@ proc stage_artifact(
       ver: "1.0.0",
       rel: "1",
       package_id: f"${name}-1.0.0-1",
-      recipe_dir: p"repo/test",
+      recipe_dir: p"packages/test",
       recipe_sha256: digest(f"recipe ${name}"),
       proof_sha256: digest(f"proof input ${name}"),
       artifact_key: key,

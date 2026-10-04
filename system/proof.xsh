@@ -1,5 +1,5 @@
 ##! Concrete console-marker validation for the sole qemu-dwl-foot proof.
-use laputa.types as types
+use system.types as types
 
 ## The marker emitted only after foot's reader receives the injected input.
 export let success_marker = "LAPUTA_DWL_FOOT_PROOF_OK"

@@ -85,10 +85,10 @@ export pure package_map(value: types.PackageCatalog) -> Map[types.Package] {
 ## Discovers every recipe with filetrees selected by the explicit plan target.
 export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -> Result[types.PackageCatalog] {
   let absolute_root = path.absolute(root)?
-  let recipe_root = fp"${absolute_root}/repo"
+  let recipe_root = fp"${absolute_root}/packages"
 
   if ! fs.exists(recipe_root)? {
-    return Err(types.PmError.PackageContract(f"${absolute_root} does not contain repo"))
+    return Err(types.PmError.PackageContract(f"${absolute_root} does not contain packages"))
   }
 
   var packages: List[types.Package] = []

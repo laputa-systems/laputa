@@ -1,9 +1,9 @@
 ##! Native-arm64 profile execution: one saved PM plan becomes verified artifacts, a runtime generation, and atomic image outputs.
 #!/bin/xsh
-use laputa.container_output as container_output
-use laputa.image as image
-use laputa.profile as system_profile
-use laputa.types as types
+use system.container_output as container_output
+use system.image as image
+use system.profile as system_profile
+use system.types as types
 use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
 use pm.types as pm_types
@@ -34,8 +34,8 @@ pure container_store_root() -> Path {
   p"/artifacts"
 }
 
-pure container_package_root() -> Path {
-  p"/src/packages"
+pure container_repo_root() -> Path {
+  p"/src/laputa"
 }
 
 # `/output` is a host bind mount and may be case-folding (notably on macOS),
@@ -120,7 +120,7 @@ proc container_stage_build_plan(work: Path) [fs, error] -> Result[Path] {
 }
 
 pure container_pm_argv(args: List[Str]) -> List[Str] {
-  ["/bin/xsh", "/src/packages/pm.xsh", "--"].extend(args)
+  ["/bin/xsh", "/src/laputa/pm.xsh", "--"].extend(args)
 }
 
 proc container_pm(args: List[Str]) [fs, process, error] {
@@ -128,7 +128,7 @@ proc container_pm(args: List[Str]) [fs, process, error] {
     process.command_argv(
       p"/bin/xsh",
       container_pm_argv(args),
-      container_package_root(),
+      container_repo_root(),
     ),
   )?
 
@@ -185,7 +185,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
 }
 
 proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, error] {
-  image.image_write_rootfs(root, p"/src/packages/repo/laputa-fs/files/mkfs.ext4.xsh", rootfs)?
+  image.image_write_rootfs(root, p"/src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh", rootfs)?
   image.write_disk(rootfs, disk)?
   image.verify_disk(disk, fs.metadata(rootfs)?.size)?
 }

@@ -34,7 +34,7 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
       xsh,
       [
         xsh.display(),
-        "repo/laputa-fs/files/mkfs.ext4.xsh",
+        "packages/laputa-fs/files/mkfs.ext4.xsh",
         "--",
         "-d",
         source.display(),

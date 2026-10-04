@@ -1,8 +1,8 @@
 ##! Structured QEMU construction and supervision for qemu-dwl-foot.
-use laputa.build as build
-use laputa.image as image
-use laputa.proof as proof
-use laputa.types as types
+use system.build as build
+use system.image as image
+use system.proof as proof
+use system.types as types
 
 ## The host executable and QMP helper used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path}

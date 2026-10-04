@@ -21,14 +21,14 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   # The proof invokes the staged runner as an executable.  Its shebang points
   # at this host test runner solely so the behavior can be checked without a
   # target rootfs; the package payload still ships `#!/bin/xsh`.
-  let staged = fs.read_text(p"repo/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
+  let staged = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
   fs.write(m4, staged)?
   fs.chmod(m4, 0o755)?
 
   let status = process.run(
     process.command_argv(
       xsh,
-      [xsh.display(), "repo/m4/proof.xsh", "--", root.display()],
+      [xsh.display(), "packages/m4/proof.xsh", "--", root.display()],
       stderr:,
     ),
   )?
@@ -43,7 +43,7 @@ test test_bison_stack_proof_passes_the_generated_m4_file_operand [fs, process, e
   let xsh = runner()?
   fs.mkdir(fp"${root}/usr/bin")?
 
-  let m4 = fs.read_text(p"repo/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
+  let m4 = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!${xsh}")
   fs.write(fp"${root}/usr/bin/m4", m4)?
   fs.write(
     fp"${root}/usr/bin/flex",
@@ -64,7 +64,7 @@ print "GNU Bison fixture"
   let status = process.run(
     process.command_argv(
       xsh,
-      [xsh.display(), "repo/bison/proof-stack.xsh", "--", root.display()],
+      [xsh.display(), "packages/bison/proof-stack.xsh", "--", root.display()],
       stderr:,
     ),
   )?

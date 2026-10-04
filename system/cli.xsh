@@ -1,9 +1,9 @@
 ##! Explicit command parsing for the single qemu-dwl-foot Laputa profile.
-use laputa.build as build
-use laputa.docker as docker
-use laputa.profile as profile
-use laputa.qemu as qemu
-use laputa.types as types
+use system.build as build
+use system.docker as docker
+use system.profile as profile
+use system.qemu as qemu
+use system.types as types
 
 ## The closed public Laputa command surface; all execution choices are explicit command data.
 export enum LaputaCommand {

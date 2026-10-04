@@ -8,7 +8,7 @@ use pm.store
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 pure executor_identity() -> types.ExecutorIdentity {
@@ -26,7 +26,7 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 
 proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("execute/repo"), fp"${root}/repo", parents: true, overwrite: true)?
+  let _ = fs.copy_tree(fixture("execute/packages"), fp"${root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"${root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
   root
@@ -66,7 +66,7 @@ proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
 }
 
 proc write_execute_metapackage(repo_root: Path) [fs, error] {
-  let package = fp"${repo_root}/repo/execute-meta"
+  let package = fp"${repo_root}/packages/execute-meta"
   fs.mkdir(package)?
   fs.write(
     fp"${package}/PKGBUILD.xsh",
@@ -94,7 +94,7 @@ export let filetree = []
 }
 
 proc write_execute_leaf(repo_root: Path) [fs, error] {
-  let package = fp"${repo_root}/repo/execute-leaf"
+  let package = fp"${repo_root}/packages/execute-leaf"
   fs.mkdir(package)?
   fs.write(
     fp"${package}/PKGBUILD.xsh",
@@ -245,7 +245,7 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
   test.eq([receipt.origin for receipt in first.artifacts], [types.Built, types.Built, types.Built])?
   test.ok(fs.exists(store.artifact_path(object_store, node_named(value, "execute-app")?.artifact_key))?)?
   test.eq(fs.exists(stale)?, false)?
-  test.eq(fs.exists(fp"${repo_root}/repo/execute-app/run-package-build.xsh")?, false)?
+  test.eq(fs.exists(fp"${repo_root}/packages/execute-app/run-package-build.xsh")?, false)?
 
   # Jobs are a scheduler choice, never a build-plan or artifact-key input.
   let second = execute.build_plan(value, repo_root, object_store, "", 3)?
@@ -254,7 +254,7 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
 
 test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-x86-repo")?
-  let pkgbuild = fp"${repo_root}/repo/execute-dep/PKGBUILD.xsh"
+  let pkgbuild = fp"${repo_root}/packages/execute-dep/PKGBUILD.xsh"
   fs.write(
     pkgbuild,
     pkgbuild.read_text()?.replace(
@@ -262,7 +262,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
       "export let filetree = []\n## Target-specific declared output.\nexport let filetree_x86_64 = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
     ),
   )?
-  let proof = fp"${repo_root}/repo/execute-app/proof.xsh"
+  let proof = fp"${repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     proof,
     proof.read_text()?.replace(
@@ -296,7 +296,7 @@ test test_execute_reproofs_changed_proof_without_rebuilding_payload [fs, net, pr
   let built = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_app = node_named(initial, "execute-app")?
   let initial_receipt = receipt_named(built, "execute-app")?
-  let proof_path = fp"${repo_root}/repo/execute-app/proof.xsh"
+  let proof_path = fp"${repo_root}/packages/execute-app/proof.xsh"
   fs.write(proof_path, proof_path.read_text()? + "\n# proof revision only\n")?
   let reproved_plan = resolve_execute_plan(repo_root)?
   let reproved_app = node_named(reproved_plan, "execute-app")?
@@ -311,7 +311,7 @@ test test_execute_parallel_level_requires_published_dependency_receipts [fs, net
   let repo_root = copied_execute_repository(ctx, "execute-level-barrier-repo")?
   write_execute_leaf(repo_root)?
   let object_store = execute_store(ctx, "execute-level-barrier-store")?
-  let app_proof = fp"${repo_root}/repo/execute-app/proof.xsh"
+  let app_proof = fp"${repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     app_proof,
     """error ProofError = Failed(message: Str)
@@ -349,7 +349,7 @@ test test_execute_rebuilds_changed_recipe_and_dependents [fs, net, process, env,
   let _ = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_dep = node_named(initial, "execute-dep")?
   let initial_app = node_named(initial, "execute-app")?
-  let pkgbuild = fp"${repo_root}/repo/execute-dep/PKGBUILD.xsh"
+  let pkgbuild = fp"${repo_root}/packages/execute-dep/PKGBUILD.xsh"
   fs.write(pkgbuild, pkgbuild.read_text()?.replace("dependency\\n", "dependency revision two\\n"))?
   let changed = resolve_execute_plan(repo_root)?
   let changed_dep = node_named(changed, "execute-dep")?
@@ -368,7 +368,7 @@ test test_execute_rebuilds_when_package_source_input_changes [fs, net, process, 
   let initial = resolve_execute_plan(repo_root)?
   let _ = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_app = node_named(initial, "execute-app")?
-  fs.write(fp"${repo_root}/repo/execute-app/files/input.txt", "source revision two\n")?
+  fs.write(fp"${repo_root}/packages/execute-app/files/input.txt", "source revision two\n")?
   let changed = resolve_execute_plan(repo_root)?
   let changed_app = node_named(changed, "execute-app")?
   test.eq(changed_app.artifact_key == initial_app.artifact_key, false)?
@@ -418,7 +418,7 @@ test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution
 test test_execute_proof_failure_and_corrupt_final_never_publish_replacement [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-proof-failure-repo")?
   let object_store = execute_store(ctx, "execute-proof-failure-store")?
-  let proof_path = fp"${repo_root}/repo/execute-app/proof.xsh"
+  let proof_path = fp"${repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     proof_path,
     """error ProofError = Failed(message: Str)

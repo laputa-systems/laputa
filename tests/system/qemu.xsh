@@ -1,8 +1,8 @@
 ##! Unit coverage for QEMU construction and QEMU proof marker handling.
-use laputa.build as build
-use laputa.proof as proof
-use laputa.qemu as qemu
-use laputa.types as types
+use system.build as build
+use system.proof as proof
+use system.qemu as qemu
+use system.types as types
 
 type SupervisorFixture = {
   config: qemu.QemuConfig,
@@ -187,7 +187,7 @@ test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, 
 test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   let hook_metadata = fs.metadata(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
   let hook = fs.read_text(p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot")?
-  let builder = fs.read_text(p"laputa/container_build.xsh")?
+  let builder = fs.read_text(p"system/container_build.xsh")?
   let guest = fs.read_text(p"guest/qemu-dwl-foot-proof.xsh")?
   assert hook_metadata.mode % 4096 == 0o755
   assert "/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook

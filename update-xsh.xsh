@@ -265,10 +265,11 @@ proc main(...argv: List[Str]) [fs, net, error] {
   let laputa_files = [
     fp"Makefile",
     fp"Dockerfile.package-tools",
+    fp"Dockerfile.pm-test",
     fp".github/workflows/laputa-validate.yml",
   ]
 
-  let pkgbuilds = [fp"../packages/repo/xsh/PKGBUILD.xsh"]
+  let pkgbuilds = [fp"packages/xsh/PKGBUILD.xsh"]
   print "updating laputa repo files..."
 
   for file in laputa_files {

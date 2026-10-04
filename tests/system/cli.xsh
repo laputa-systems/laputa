@@ -1,5 +1,5 @@
 ##! Behavior coverage for the closed typed Laputa command parser.
-use laputa.cli as laputa_cli
+use system.cli as laputa_cli
 
 test test_laputa_cli_exports_the_closed_command_type [error] {
   let command: laputa_cli.LaputaCommand = laputa_cli.LaputaPlan
@@ -55,7 +55,7 @@ test test_laputa_cli_rejects_ambiguous_or_invalid_arguments [error] {
 }
 
 test test_laputa_test_and_boot_dispatch_through_the_current_build_path [fs, error] {
-  let source = fs.read_text(p"laputa/cli.xsh")?
+  let source = fs.read_text(p"system/cli.xsh")?
   assert """LaputaTest => {
       let outputs = build.build_profile""" in source
   assert """LaputaBoot => {

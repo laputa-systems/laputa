@@ -8,7 +8,7 @@ use pm.plan_json
 use pm.policy
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 proc copied_package(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.Package] {
@@ -131,7 +131,7 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 
 proc copied_plan_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/repo"), fp"${root}/repo", parents: true, overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"${root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
   root

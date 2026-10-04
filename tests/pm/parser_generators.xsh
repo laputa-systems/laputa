@@ -13,7 +13,7 @@ test test_bison_parses_linux_kconfig_argv_and_rejects_missing_grammar [fs, proce
   let stderr = fp"${root}/bison.err"
   let modules = path.absolute(p".")?
   let xsh = generator_runner()?
-  let bison = fp"${modules}/repo/bison/files/bison.xsh"
+  let bison = fp"${modules}/packages/bison/files/bison.xsh"
   fs.mkdir(grammar.parent)?
   fs.write(
     grammar,
@@ -77,7 +77,7 @@ test test_flex_parses_linux_kconfig_argv_and_rejects_missing_input [fs, process,
   let stderr = fp"${root}/flex.err"
   let modules = path.absolute(p".")?
   let xsh = generator_runner()?
-  let flex = fp"${modules}/repo/flex/files/flex.xsh"
+  let flex = fp"${modules}/packages/flex/files/flex.xsh"
   fs.mkdir(lexer.parent)?
   fs.write(lexer, "WORD [a-z]+\n%%\n{WORD} return 1;\n%%\n")?
 

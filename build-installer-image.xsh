@@ -16,28 +16,6 @@ proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
   fp"${installer_env_value(name, fallback.display())}"
 }
 
-proc packages_root(root: Path) [fs, env, error] -> Result[Path] {
-  let configured = env.get("LAPUTA_PACKAGES_ROOT") ?? ""
-
-  return fp"${configured}" when configured.trim() != ""
-
-  let home = env.get("HOME") ?? ""
-
-  if home != "" {
-    let home_root = fp"${home}/d/laputa-systems/packages"
-
-    return home_root when fs.exists(home_root)?
-  }
-
-  let sibling = fp"${root.parent}/packages"
-
-  return sibling when fs.exists(sibling)?
-
-  return fp"${home}/d/laputa-systems/packages" when home != ""
-
-  sibling
-}
-
 proc installer_work_path(root: Path, arch: Str) [env, error] -> Result[Path] {
   let raw = env.get("LAPUTA_INSTALLER_WORK") ?? ""
 
@@ -66,15 +44,13 @@ proc run_pm(
   argv: List[Str],
   qemu_smoke: Str? = null,
 ) [fs, process, env, error] {
-  let pm_root = packages_root(root)?
-
-  let command_argv = ["xsh", fp"${pm_root}/pm.xsh".display(), "--"].extend(argv)
+  let command_argv = ["xsh", fp"${root}/pm.xsh".display(), "--"].extend(argv)
   if qemu_smoke != null {
-    run_argv(xsh, command_argv, root, package_environment.smoke_environment(pm_root, repo_url, arch, qemu_smoke))?
+    run_argv(xsh, command_argv, root, package_environment.smoke_environment(root, repo_url, arch, qemu_smoke))?
     return
   }
 
-  run_argv(xsh, command_argv, root, package_environment.environment(pm_root, repo_url, arch))?
+  run_argv(xsh, command_argv, root, package_environment.environment(root, repo_url, arch))?
 }
 
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
@@ -82,7 +58,7 @@ proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, proce
     xsh,
     ["xsh", tool.display(), "--"].extend(argv),
     root,
-    {XSH_MODULE_PATH: packages_root(root)?.display(), XSH_UNIX_REAL: "1"},
+    {XSH_MODULE_PATH: root.display(), XSH_UNIX_REAL: "1"},
   )?
 }
 
@@ -244,10 +220,8 @@ proc install_installer_tools(root: Path, rootfs: Path) [fs, env, error] {
 }
 
 proc install_live_filesystem_tools(root: Path, rootfs: Path) [fs, env, error] {
-  let pm_root = packages_root(root)?
-
   fs.install(
-    fp"${pm_root}/repo/laputa-fs/files/mkfs.vfat.xsh",
+    fp"${root}/packages/laputa-fs/files/mkfs.vfat.xsh",
     fp"${rootfs}/usr/bin/mkfs.vfat",
     0o755,
     parents: true,
@@ -255,7 +229,7 @@ proc install_live_filesystem_tools(root: Path, rootfs: Path) [fs, env, error] {
   )?
 
   fs.install(
-    fp"${pm_root}/repo/laputa-fs/files/mkfs.ext4.xsh",
+    fp"${root}/packages/laputa-fs/files/mkfs.ext4.xsh",
     fp"${rootfs}/usr/bin/mkfs.ext4",
     0o755,
     parents: true,
@@ -264,10 +238,8 @@ proc install_live_filesystem_tools(root: Path, rootfs: Path) [fs, env, error] {
 }
 
 proc install_qemu_smoke_target_tools(root: Path, rootfs: Path) [fs, env, error] {
-  let pm_root = packages_root(root)?
-
   fs.install(
-    fp"${pm_root}/repo/dropbear/service.xsh",
+    fp"${root}/packages/dropbear/service.xsh",
     fp"${rootfs}/usr/lib/xinit/services/dropbear.xsh",
     0o644,
     parents: true,

@@ -1,11 +1,11 @@
 ##! Published-runner regression for staged Linux Kbuild discovery workers.
-use repo.linux.PKGBUILD-shared as linux_shared
+use packages.linux.PKGBUILD-shared as linux_shared
 
 proc main() [fs, process, env, time, error] {
   let root = p"/tmp/linux-kbuild-pool"
   let recipe = p"/tmp/linux-kbuild-pool/recipe"
   let source = p"/tmp/linux-kbuild-pool/source"
-  let _ = fs.copy_tree(p"/src/repo/linux", recipe, parents: true, overwrite: true)?
+  let _ = fs.copy_tree(p"/src/packages/linux", recipe, parents: true, overwrite: true)?
   fs.mkdir(source)?
   fs.write(fp"${source}/.config", "")?
   fs.write(fp"${source}/Kbuild", "obj-y += one.o\n")?

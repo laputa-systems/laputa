@@ -122,7 +122,7 @@ proc current_pm_repo_root() [fs, error] -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
-    if fs.exists(fp"${dir}/pm.xsh")? and fs.exists(fp"${dir}/repo")? {
+    if fs.exists(fp"${dir}/pm.xsh")? and fs.exists(fp"${dir}/packages")? {
       return dir
     }
 
@@ -419,13 +419,27 @@ proc cli_core_root(pm_root: Path) [fs, env, error] -> Result[Path] {
     return Err(types.PmError.PackageContract(f"XSH_CORE_ROOT ${root} is missing"))
   }
 
+  # XSH is co-developed in its own checkout: XSH_ROOT names it, and the
+  # default is the sibling `../xsh` of the monorepo that holds pm.xsh.
+  let xsh_root = (env.get("XSH_ROOT") ?? "").trim()
+
+  if xsh_root != "" {
+    let root = path.absolute(fp"${xsh_root}/core")?
+
+    if fs.exists(root)? {
+      return root
+    }
+
+    return Err(types.PmError.PackageContract(f"XSH_ROOT core applets ${root} are missing"))
+  }
+
   for candidate in [p"/usr/lib/xsh/core", fp"${pm_root.parent}/xsh/core"] {
     if fs.exists(candidate)? {
       return candidate
     }
   }
 
-  return Err(types.PmError.PackageContract("cannot locate XSH core applets for BuildPlan executor identity; set XSH_CORE_ROOT"))
+  return Err(types.PmError.PackageContract("cannot locate XSH core applets for BuildPlan executor identity; set XSH_CORE_ROOT or XSH_ROOT"))
 }
 
 proc cli_executor_identity(repo_root: Path) [fs, process, env, error] -> Result[types.ExecutorIdentity] {

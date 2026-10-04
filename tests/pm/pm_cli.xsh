@@ -8,7 +8,7 @@ use pm.policy
 use pm.store
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 proc runner() [fs, process, env, error] -> Result[Path] {
@@ -27,7 +27,7 @@ proc module_root() [fs, error] -> Result[Path] {
 
 proc copied_repository(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: name)?
-  let _ = fs.copy_tree(fixture("graph-catalog/repo"), fp"${root}/repo", parents: true, overwrite: true)?
+  let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"${root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"${root}/pm")?
   fs.copy(p"pm/proof.xsh", fp"${root}/pm/proof.xsh", overwrite: true)?
   root

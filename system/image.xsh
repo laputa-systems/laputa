@@ -1,5 +1,5 @@
 ##! Deterministic ext4 sizing and atomic GPT disk construction for Laputa generations.
-# This module deliberately owns a narrow error boundary instead of importing `laputa.types`.
+# This module deliberately owns a narrow error boundary instead of importing `system.types`.
 # The native build helper imports PM modules and XSH currently shares union-tag names across
 # user modules; both domains model the supported ARM target with the same tag spelling.
 ## Image-construction failures retained at the narrow image boundary.

@@ -1,11 +1,10 @@
 ##! Behavior coverage for native arm64 Docker command construction.
-use laputa.docker as docker
-use laputa.profile as profile
+use system.docker as docker
+use system.profile as profile
 
 pure fixture_config() -> docker.DockerConfig {
   {
     docker: p"docker",
-    packages_root: /work/packages,
     laputa_root: /work/laputa,
     xsh_root: /work/xsh,
     output_root: /work/laputa/target/laputa/qemu-dwl-foot,
@@ -21,12 +20,12 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   assert docker.docker_pm_plan_argv(value) == [
     "/bin/xsh",
-    "/src/packages/pm.xsh",
+    "/src/laputa/pm.xsh",
     "--",
     "repo",
     "plan",
     "--repo",
-    "/src/packages",
+    "/src/laputa",
     "--root",
     "baselayout",
     "--root",
@@ -61,26 +60,25 @@ test test_docker_rejects_non_arm64_runner_architecture [error] {
 
 test test_docker_places_optional_repository_configuration_before_image [error] {
   let argv = docker.docker_command_argv({...fixture_config(), repo_url: "https://packages.example.test"}, [])
+  assert argv[23] == "--env"
+  assert argv[24] == "XSH_PM_REPO=https://packages.example.test"
   assert argv[25] == "--env"
-  assert argv[26] == "XSH_PM_REPO=https://packages.example.test"
-  assert argv[27] == "--env"
-  assert argv[28] == "XSH_PM_PUBLIC_REPO=https://packages.example.test"
-  assert argv[29] == "laputa-package-tools"
+  assert argv[26] == "XSH_PM_PUBLIC_REPO=https://packages.example.test"
+  assert argv[27] == "laputa-package-tools"
 }
 
 test test_native_arm64_docker_command_mounts_only_declared_inputs [error] {
-  let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/packages/pm.xsh", "--", "repo", "check"])
+  let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "check"])
   assert argv[0] == "docker"
   assert "linux/arm64" in argv
-  assert argv |> any "/src/packages,readonly" in .
   assert argv |> any "/src/laputa,readonly" in .
+  assert ! (argv |> any "/src/packages" in .)
   assert argv |> any "/usr/lib/xsh/core,readonly" in .
   assert argv |> any "dst=/output" in .
   assert argv |> any "laputa-artifacts-aarch64-v2" in .
   assert argv |> any "laputa-sources-aarch64-v2" in .
-  assert "XSH_MODULE_PATH=/src/packages:/src/laputa" in argv
+  assert "XSH_MODULE_PATH=/src/laputa" in argv
   assert "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv
-  assert ! (argv |> any "XSH_MODULE_PATH=/src/laputa:/src/packages" in .)
   assert ! (argv |> any "amd64" in .)
   assert ! (argv |> any "x86_64" in .)
 }
@@ -98,7 +96,7 @@ test test_generation_projection_and_build_use_the_single_container_adapter [fs, 
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   assert docker.docker_generation_plan_argv(value) == [
     "/bin/xsh",
-    "/src/laputa/laputa/container_build.xsh",
+    "/src/laputa/system/container_build.xsh",
     "--",
     "plan",
     "qemu-dwl-foot",
@@ -106,7 +104,7 @@ test test_generation_projection_and_build_use_the_single_container_adapter [fs, 
   ]
   assert docker.docker_profile_build_argv(value, 3) == [
     "/bin/xsh",
-    "/src/laputa/laputa/container_build.xsh",
+    "/src/laputa/system/container_build.xsh",
     "--",
     "build",
     "qemu-dwl-foot",
@@ -126,26 +124,25 @@ proc package_tools_fixture(ctx: TestContext) [fs, error] -> Result[docker.Docker
     """seed
 """,
   )?
-  fs.mkdir(fp"${root}/packages/pm")?
-  fs.mkdir(fp"${root}/packages/repo/llvm-toolchain")?
+  fs.mkdir(fp"${root}/pm")?
+  fs.mkdir(fp"${root}/packages/llvm-toolchain")?
   fs.write(
-    fp"${root}/packages/pm.xsh",
+    fp"${root}/pm.xsh",
     """pm entrypoint
 """,
   )?
   fs.write(
-    fp"${root}/packages/pm/cli.xsh",
+    fp"${root}/pm/cli.xsh",
     """pm module
 """,
   )?
   fs.write(
-    fp"${root}/packages/repo/llvm-toolchain/PKGBUILD.xsh",
+    fp"${root}/packages/llvm-toolchain/PKGBUILD.xsh",
     """llvm seed
 """,
   )?
   {
     docker: p"docker",
-    packages_root: fp"${root}/packages",
     laputa_root: root,
     xsh_root: fp"${root}/xsh",
     output_root: fp"${root}/output",
@@ -164,7 +161,7 @@ test test_package_tools_input_key_and_tag_are_deterministic [fs, env, error] { |
   assert first == second
   assert first.starts_with("laputa-package-tools:arm64-")
   fs.write(
-    fp"${value.packages_root}/pm/cli.xsh",
+    fp"${value.laputa_root}/pm/cli.xsh",
     """changed pm module
 """,
   )?
@@ -175,7 +172,6 @@ test test_package_tools_requires_the_focused_bootstrap_contract [fs, process, en
   let root = test.temp_dir(ctx, name: "package-tools-missing")?
   let value: docker.DockerConfig = docker.DockerConfig(
     docker: p"docker",
-    packages_root: fp"${root}/packages",
     laputa_root: root,
     xsh_root: fp"${root}/xsh",
     output_root: fp"${root}/output",
@@ -210,8 +206,8 @@ test test_package_tools_dockerfile_has_the_native_runtime_contract [fs, error] {
   assert "mkfs.ext4.xsh" in source
   assert "e2fsprogs" in source
   assert "util-linux" in source
-  assert "/src/packages" in source
   assert "/src/laputa" in source
+  assert ! ("/src/packages" in source)
   assert ! ("amd64" in source)
   assert ! ("x86_64" in source)
 }

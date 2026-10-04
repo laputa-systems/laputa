@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.19
 #
 # This package-tools bootstrap image uses the caller's platform; the profile
-# builds with `--platform linux/arm64`. The checked-out PM and Laputa trees
-# are supplied as mounted inputs when the image is used. The image contains the runner,
+# builds with `--platform linux/arm64`. The checked-out monorepo is supplied
+# as a mounted input when the image is used. The image contains the runner,
 # bootstrap compiler, and host tools needed to build the declared graph.
 ARG XSH_RELEASE=release-d09c6c3305ab8c650043bd8d32e03f2db6509e97
 ARG XSH_RELEASE_ARCH=aarch64
@@ -46,26 +46,26 @@ ARG XSH_PM_TARGET_ARCH
 WORKDIR /src
 ENV PATH=/bin:/usr/bin
 ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
-ENV XSH_MODULE_PATH=/src/packages
-COPY --from=packages pm.xsh /src/packages/pm.xsh
-COPY --from=packages pm/ /src/packages/pm/
-COPY --from=packages repo/llvm-toolchain/ /src/packages/repo/llvm-toolchain/
+ENV XSH_MODULE_PATH=/src/laputa
+COPY pm.xsh /src/laputa/pm.xsh
+COPY pm/ /src/laputa/pm/
+COPY packages/llvm-toolchain/ /src/laputa/packages/llvm-toolchain/
 COPY bootstrap-llvm-seed.xsh /src/bootstrap-llvm-seed.xsh
-RUN ["/bin/xsh", "/src/bootstrap-llvm-seed.xsh", "--", "/src/packages", "/seed-root"]
+RUN ["/bin/xsh", "/src/bootstrap-llvm-seed.xsh", "--", "/src/laputa", "/seed-root"]
 
 FROM xsh-runtime AS package-tools
 ARG XSH_PM_TARGET_ARCH
 COPY --from=llvm-seed /seed-root/ /
 
-# Keep the runtime mounts explicit and stable.  `/src/packages` is the
-# authoritative checked-out PM tree and `/src/laputa` is the Laputa tree; both
-# are mounted read-only by laputa/docker.xsh for each structured PM command.
-RUN mkdir -p /src/packages /src/laputa /artifacts /sources /output && \
+# Keep the runtime mounts explicit and stable.  `/src/laputa` is the
+# authoritative checked-out monorepo (PM, recipes, profiles, system modules);
+# system/docker.xsh mounts it read-only for each structured PM command.
+RUN mkdir -p /src/laputa /artifacts /sources /output && \
     test -x /bin/xsh && test -x /bin/xshi && test -x /bin/xsht && \
     test -x /usr/bin/cc && (test -x /sbin/mkfs.ext4 || test -x /usr/sbin/mkfs.ext4)
-WORKDIR /src/packages
+WORKDIR /src/laputa
 ENV PATH=/bin:/usr/bin
-ENV XSH_MODULE_PATH=/src/packages:/src/laputa
+ENV XSH_MODULE_PATH=/src/laputa
 ENV XSH_PM_TARGET_ARCH=${XSH_PM_TARGET_ARCH}
 RUN ["/bin/xsh", "--help"]
 RUN ["/bin/xshi", "--help"]

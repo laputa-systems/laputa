@@ -4,7 +4,7 @@ use pm.sources
 use pm.types
 
 pure fixture(name: Str) -> Path {
-  fp"tests/xsh/fixtures/${name}"
+  fp"tests/pm/fixtures/${name}"
 }
 
 proc expect_contract_rejection(dir: Path, description: Str) [fs, env, error] {
@@ -15,13 +15,13 @@ proc expect_contract_rejection(dir: Path, description: Str) [fs, env, error] {
 }
 
 proc assert_local_source_checksums(package: Str) [fs, env, error] {
-  let package_dir = fp"repo/${package}"
+  let package_dir = fp"packages/${package}"
   let pkg = recipe.load_package(package_dir)?
 
   for source in pkg.upstream_sources {
     let raw = source.source.display()
     continue unless raw.starts_with("files/")
-    let staged = fp"repo/${package}/${raw}"
+    let staged = fp"packages/${package}/${raw}"
     let expected = sources.source_checksum(source, "aarch64")?
     test.eq(hash.sha256(staged)?.hex(), expected)?
   }
@@ -43,7 +43,7 @@ test test_recipe_loads_valid_metapackage [fs, env, error] {
 }
 
 test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, error] {
-  let pkg = recipe.load_package(p"repo/linux")?
+  let pkg = recipe.load_package(p"packages/linux")?
   test.eq(pkg.name, "linux")?
   test.eq(pkg.ver, "7.0.5")?
   test.eq(pkg.kind, types.Payload)?
@@ -62,8 +62,8 @@ test test_flex_local_source_matches_declared_checksum [fs, env, error] {
 }
 
 test test_recipe_selects_target_filetree_variant [fs, env, error] {
-  let x86 = recipe.load_package_for_target(p"repo/musl", types.target_x86_64())?
-  let arm = recipe.load_package_for_target(p"repo/musl", types.target_aarch64())?
+  let x86 = recipe.load_package_for_target(p"packages/musl", types.target_x86_64())?
+  let arm = recipe.load_package_for_target(p"packages/musl", types.target_aarch64())?
   let x86_filetree = [entry.path.display() for entry in x86.filetree].join("\n")
   let arm_filetree = [entry.path.display() for entry in arm.filetree].join("\n")
   assert "usr/lib/ld-musl-x86_64.so.1" in x86_filetree
@@ -77,7 +77,7 @@ test test_recipe_rejects_invalid_package_name [fs, env, error] {
 
 test test_recipe_rejects_production_directory_name_mismatch [fs, env, error] { |ctx|
   let repo_root = test.temp_dir(ctx, name: "recipe-repo")?
-  let dir = fp"${repo_root}/repo/recipe-dir-mismatch"
+  let dir = fp"${repo_root}/packages/recipe-dir-mismatch"
   let _ = fs.copy_tree(fixture("recipe-dir-mismatch"), dir, parents: true, overwrite: true)?
   expect_contract_rejection(dir, "production directory/name mismatch")?
 }
@@ -135,7 +135,7 @@ test test_recipe_rejects_metapackage_with_payload_files [fs, env, error] {
 }
 
 test test_recipe_loads_every_migrated_production_recipe [fs, env, error] {
-  for entry in fs.children(p"repo")? {
+  for entry in fs.children(p"packages")? {
     continue unless entry.kind == "dir"
     let pkg = recipe.load_package(entry.path)?
     test.eq(pkg.name, entry.name)?
@@ -157,7 +157,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   let status = process.run(
     process.command_argv(
       xsh,
-      ["xsh", "repo/cargo/proof.xsh", "--", root.display()],
+      ["xsh", "packages/cargo/proof.xsh", "--", root.display()],
       fs.cwd()?,
       {XSH_PM_BUILD_ARCH: "x86_64", XSH_PM_TARGET_ARCH: "aarch64"},
       stderr: stderr_path,
@@ -198,7 +198,7 @@ main(@args)?
   fs.write(fp"${root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
   let stderr_path = test.temp_path(ctx, name: "wpa-proof-stderr")
   let status = process.run(
-    process.command_argv(xsh, ["xsh", "repo/wpa_supplicant/proof.xsh", "--", root.display()], fs.cwd()?, {}, stderr: stderr_path),
+    process.command_argv(xsh, ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root.display()], fs.cwd()?, {}, stderr: stderr_path),
   )?
   test.ok(status.ok, fs.read_text(stderr_path)?)?
 }

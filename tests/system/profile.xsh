@@ -1,6 +1,6 @@
 ##! Behavior coverage for loading and validating the qemu-dwl-foot profile.
-use laputa.profile as profile
-use laputa.types as types
+use system.profile as profile
+use system.types as types
 
 pure profiles_root() -> Path {
   p"profiles"

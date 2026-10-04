@@ -12,7 +12,7 @@ proc main() [fs, process, env, error] {
       /xsh-release/bin/xsh,
       [
         "/xsh-release/bin/xsh",
-        "/src/repo/flex/files/flex.xsh",
+        "/src/packages/flex/files/flex.xsh",
         "--",
         "-oscripts/kconfig/lexer.lex.c",
         "-L",
@@ -31,7 +31,7 @@ proc main() [fs, process, env, error] {
       /xsh-release/bin/xsh,
       [
         "/xsh-release/bin/xsh",
-        "/src/repo/flex/files/flex.xsh",
+        "/src/packages/flex/files/flex.xsh",
         "--",
         "-oscripts/kconfig/lexer.lex.c",
         "-L",
