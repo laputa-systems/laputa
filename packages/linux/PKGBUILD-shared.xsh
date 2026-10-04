@@ -369,6 +369,10 @@ export proc cached_archive_plan(
   archive_plan
 }
 
+# A cached plan is used only when its fingerprint (the .config and the
+# kernel release) still matches; anything else rediscovers the whole plan,
+# which takes about a second. Patching a stale plan for a few known config
+# symbols would silently miss every other config change.
 ## Exported declaration `cached_package_plan`.
 export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] -> Result[kbuild.KbuildPlan] {
   let config = kbuild.load_config(p".config")?
@@ -444,58 +448,6 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
       }
     }
 
-    if srcarch == "x86" {
-      emit_kbuild_progress("xsh-kbuild-plan-cache targeted-repair")?
-      let repaired = kbuild.refresh_x86_kernel_config_objects(config, plan)?
-      kbuild.write_discovered_plan(repaired, plan_path)?
-      remove_archive_plan_cache()?
-      let repaired_fingerprint = kbuild.plan_fingerprint(p".", p".config", repaired)?
-
-      kbuild.write_text_if_changed(
-        fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      fs.mkdir(stable_cache_dir)?
-      kbuild.write_discovered_plan(repaired, stable_plan_path)?
-
-      kbuild.write_text_if_changed(
-        stable_fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      print "xsh-kbuild-plan-cache" "targeted-repaired" repaired.dirs.len() "dirs" repaired.objects.len() "objects" repaired.composites.len() "composites"
-      return repaired
-    }
-
-    if srcarch == "arm64" {
-      emit_kbuild_progress("xsh-kbuild-plan-cache targeted-repair")?
-      let repaired = kbuild.refresh_arm64_kernel_config_objects(config, plan)?
-      kbuild.write_discovered_plan(repaired, plan_path)?
-      remove_archive_plan_cache()?
-      let repaired_fingerprint = kbuild.plan_fingerprint(p".", p".config", repaired)?
-
-      kbuild.write_text_if_changed(
-        fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      fs.mkdir(stable_cache_dir)?
-      kbuild.write_discovered_plan(repaired, stable_plan_path)?
-
-      kbuild.write_text_if_changed(
-        stable_fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      print "xsh-kbuild-plan-cache" "targeted-repaired" repaired.dirs.len() "dirs" repaired.objects.len() "objects" repaired.composites.len() "composites"
-      return repaired
-    }
-
     emit_kbuild_progress("xsh-kbuild-plan-cache stale")?
   }
 
@@ -515,58 +467,6 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
       print "xsh-kbuild-plan-cache" "stable-hit" stable_plan.dirs.len() "dirs" stable_plan.objects.len() "objects" stable_plan.composites.len() "composites"
       return stable_plan
-    }
-
-    if srcarch == "x86" {
-      emit_kbuild_progress("xsh-kbuild-plan-cache stable-targeted-repair")?
-      let repaired = kbuild.refresh_x86_kernel_config_objects(config, stable_plan)?
-      kbuild.write_discovered_plan(repaired, plan_path)?
-      remove_archive_plan_cache()?
-      let repaired_fingerprint = kbuild.plan_fingerprint(p".", p".config", repaired)?
-
-      kbuild.write_text_if_changed(
-        fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      fs.mkdir(stable_cache_dir)?
-      kbuild.write_discovered_plan(repaired, stable_plan_path)?
-
-      kbuild.write_text_if_changed(
-        stable_fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      print "xsh-kbuild-plan-cache" "stable-targeted-repaired" repaired.dirs.len() "dirs" repaired.objects.len() "objects" repaired.composites.len() "composites"
-      return repaired
-    }
-
-    if srcarch == "arm64" {
-      emit_kbuild_progress("xsh-kbuild-plan-cache stable-targeted-repair")?
-      let repaired = kbuild.refresh_arm64_kernel_config_objects(config, stable_plan)?
-      kbuild.write_discovered_plan(repaired, plan_path)?
-      remove_archive_plan_cache()?
-      let repaired_fingerprint = kbuild.plan_fingerprint(p".", p".config", repaired)?
-
-      kbuild.write_text_if_changed(
-        fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      fs.mkdir(stable_cache_dir)?
-      kbuild.write_discovered_plan(repaired, stable_plan_path)?
-
-      kbuild.write_text_if_changed(
-        stable_fingerprint_path,
-        f"""{repaired_fingerprint}
-""",
-      )?
-
-      print "xsh-kbuild-plan-cache" "stable-targeted-repaired" repaired.dirs.len() "dirs" repaired.objects.len() "objects" repaired.composites.len() "composites"
-      return repaired
     }
 
     emit_kbuild_progress("xsh-kbuild-plan-cache stable-miss")?

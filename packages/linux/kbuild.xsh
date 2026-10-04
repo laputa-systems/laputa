@@ -1895,27 +1895,6 @@ export proc refresh_plan_composite_members(
   normalize_plan({...plan, objects: top_objects, composites: composites})
 }
 
-## Exported declaration `refresh_arm64_kernel_config_objects`.
-export proc refresh_arm64_kernel_config_objects(config: Kconfig, plan: KbuildPlan) [fs, error] -> Result[KbuildPlan] {
-  var objects: List[Path] = []
-
-  if config_value(config, "VFIO") == "y" {
-    objects += [p"drivers/vfio/vfio.o"]
-  }
-
-  if config_value(config, "VFIO_PCI_CORE") == "y" {
-    objects += [p"drivers/vfio/pci/vfio-pci-core.o"]
-  }
-
-  if config_value(config, "VFIO_PCI") == "y" {
-    objects += [p"drivers/vfio/pci/vfio-pci.o"]
-  }
-
-  return plan when objects.len() == 0
-
-  refresh_plan_composite_members(p".", config, plan, "arm64", objects)?
-}
-
 ## Exported declaration `add_plan_objects`.
 export proc add_plan_objects(plan: KbuildPlan, objects: List[Path]) [] -> KbuildPlan {
   var next = plan
@@ -3139,10 +3118,11 @@ proc fingerprint_dir_line(root: Path, dir: Path) [fs, error] -> Result[Str] {
 
 ## Exported declaration `plan_fingerprint`.
 export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str] {
-  let _ = root
-
-  f"""format linux-kbuild-plan-fingerprint-v9
+  # The top-level Makefile carries VERSION/PATCHLEVEL/SUBLEVEL, so a plan
+  # discovered in another kernel release never matches.
+  f"""format linux-kbuild-plan-fingerprint-v10
 config {hash.sha256(config_path)?.hex()}
+makefile {hash.sha256(fp"{root}/Makefile")?.hex()}
 dirs {plan.dirs.len()}
 objects {plan.objects.len()}
 lib_objects {plan.lib_objects.len()}
