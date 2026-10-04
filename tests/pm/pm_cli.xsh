@@ -6,6 +6,7 @@ use pm.plan_json
 use pm.policy
 use pm.store
 use pm.types
+use pm.util
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
@@ -91,7 +92,8 @@ test test_repo_help_is_explicit [fs, process, env, error] { |ctx|
   let plan = pm_output(["repo", "plan", "--help"])?
 
   assert "repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN" in top
-  assert "x86_64-linux-musl (native Linux runner)" in plan
+  assert "x86_64-linux-musl (default: the host's)" in plan
+  assert "repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY" in top
   assert "repo build PLAN --store STORE" in top
   assert "root compose PLAN --store STORE --runtime-root PACKAGE... --output GENERATION" in top
   assert "world-plan" not in top
@@ -353,7 +355,8 @@ test test_repo_plan_writes_and_show_renders_verified_fields [fs, process, env, e
   let shown = pm_output(["repo", "show", output.display()])?
 
   assert output.exists()?
-  assert value.target == types.target_aarch64()
+  # Without --target, a plan targets the machine planning it.
+  assert types.target_text(value.target) == f"{util.host_arch()?}-linux-musl"
   assert "level 1 app build" in planned
   assert "level 1 app build" in shown
   assert "new package" in shown
@@ -364,7 +367,9 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
   let root = copied_repository(ctx, "repo-x86-plan")?
   let arm_output = fp"{root}/out/arm-plan.json"
   let x86_output = fp"{root}/out/x86-plan.json"
-  let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", arm_output.display()])?
+  let _ = pm_output(
+    ["repo", "plan", "--repo", root.display(), "--root", "app", "--target", "aarch64-linux-musl", "--output", arm_output.display()],
+  )?
   let _ = pm_output(
     [
       "repo",

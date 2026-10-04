@@ -9,6 +9,7 @@ use build as pm_build
 use fingerprint
 use local
 use plan as build_plan
+use plan_json
 use proof as pm_proof
 use recipe
 use root as pm_root
@@ -339,83 +340,208 @@ proc execute_node(
   execute_remote_node(context, node)
 }
 
-# The published runner erases `par-map`'s result element schema, including
-# primitive `Str` values. Do not expose or type-bind that transient result.
-# Each worker writes one unique transient outcome marker before its `?`
-# propagation; after all workers stop, the parent converts that non-generic
-# status back into the original node failure before it ever reads Store. This
-# retains worker error propagation on runners that leave par-map errors
-# in-band, while Store receipt-last publication remains the level boundary.
-pure execute_parallel_level_ok_marker(status: Path, node: types.PlanNode) -> Path {
-  fp"{status}/{node.artifact_key}.ok"
+# The edges a node waits for before it starts: everything its build root or
+# proof root composes. A runtime-only dependency orders no build, so it is
+# not one of them.
+pure execute_wait_keys(node: types.PlanNode) -> List[Str] {
+  [dependency.artifact_key for dependency in node.dependencies if dependency.kind != types.dependency_runtime_only()]
 }
 
-pure execute_parallel_level_error_marker(status: Path, node: types.PlanNode) -> Path {
-  fp"{status}/{node.artifact_key}.error"
+# One node building in its own child process.
+type RunningNode = {handle: ProcessHandle, node: types.PlanNode, log: Path, started: Int}
+
+type FinishedNode = {name: Str, seconds: Int, log: Path}
+
+# The last lines of a failed node's log: the cause, without the rest of a
+# build that can run to tens of thousands of lines.
+proc execute_log_tail(log: Path, count: Int) [fs, error] -> Result[Str] {
+  return "" unless fs.exists(log)?
+
+  let lines = fs.read_text(log)?.lines()
+  let first = if lines.len() > count { lines.len() - count } else { 0 }
+  lines[first..].join("\n")
 }
 
-proc execute_parallel_level_worker(
-  context: ExecuteContext,
-  node: types.PlanNode,
-  status: Path,
-) [fs, net, process, env, time, error] -> Result[Unit] {
-  # Keep the node Result as data until its failure marker is durable. The
-  # caller reconstructs that marker after par-map completion; propagating it
-  # here would make runner-specific erased par-map control flow observable.
-  match execute_node(context, node) {
-    Ok(_) => {
-      fs.write(execute_parallel_level_ok_marker(status, node), "ok\n")?
-      return
-    }
-    Err(problem) => {
-      fs.write(execute_parallel_level_error_marker(status, node), problem.message + "\n")?
-      # The parent reconstructs and propagates this failure only after every
-      # worker has joined. Returning success here avoids an erased par-map
-      # result becoming a runner-dependent control-flow boundary.
-      return
-    }
+# The `error:` lines of a failed node's log, which name the cause above the
+# runtime traceback; the plain tail when there are none.
+proc execute_log_errors(log: Path) [fs, error] -> Result[Str] {
+  return "" unless fs.exists(log)?
+
+  let errors = [line.trim() for line in fs.read_text(log)?.lines() if line.trim().starts_with("error:")]
+
+  return execute_log_tail(log, 12)? when errors.len() == 0
+
+  let first = if errors.len() > 6 { errors.len() - 6 } else { 0 }
+  errors[first..].join("\n")
+}
+
+proc execute_report_slowest(finished: List[FinishedNode]) [] {
+  return when finished.len() == 0
+
+  let ascending = finished |> sort-by .seconds |> collect
+  var index = ascending.len() - 1
+  var shown = 0
+  print "repo build slowest packages:"
+
+  while index >= 0 and shown < 10 {
+    print f"  {ascending[index].seconds}s {ascending[index].name}"
+    index -= 1
+    shown += 1
   }
 }
 
-proc execute_parallel_level_require_workers(nodes: List[types.PlanNode], status: Path) [fs, error] {
-  for node in nodes {
-    let error_marker = execute_parallel_level_error_marker(status, node)
-
-    if fs.exists(error_marker)? {
-      let message = fs.read_text(error_marker)?.trim()
-      return Err(types.PmError.ExtensionFailed(f"parallel executor node {node.package_id} failed: {message}"))
-    }
-
-    if ! fs.exists(execute_parallel_level_ok_marker(status, node))? {
-      return Err(types.PmError.PackageContract(f"parallel executor node {node.package_id} did not report completion"))
-    }
-  }
-}
-
-# Once the ephemeral completion barrier succeeds, derive immutable keys from
-# the known plan nodes and read receipt-last Store objects in ordinal order.
-# This makes Store publication, rather than an erased parallel result, the
-# executor's typed boundary.
-proc execute_parallel_level(
+# Schedules by dependency, not by plan level. A node starts as soon as every
+# node it waits for is in the store, so one slow package delays only its own
+# dependents. Each build runs as `pm repo build-node` in a child process
+# writing logs/NAME.log, so parallel builds never interleave their output and a
+# failure names its package and log. Store publication stays receipt-last: a
+# dependent reads only receipts its children already published.
+proc execute_scheduled(
   context: ExecuteContext,
-  nodes: List[types.PlanNode],
+  plan_path: Path,
+  logs: Path,
   jobs: Int,
-) [fs, net, process, env, time, error] -> Result[List[types.ArtifactReceipt]] {
-  let handle = fs.tempdir()?
-  defer handle.close()?
-  let status = fp"{handle.host_path()?}/parallel-level-status"
-  fs.mkdir(status)?
+) [fs, net, process, env, time, error] -> Result[Map[types.ArtifactReceipt]] {
+  let pm_root = pm_build.pm_source_root()?
+  let xsh = process.which("xsh")?
+  var done: Map[types.ArtifactReceipt] = {}
+  var pending = context.plan.nodes
+  var running: List[RunningNode] = []
+  var finished: List[FinishedNode] = []
+  var failure = ""
+  fs.mkdir(logs)?
 
-  let _ = nodes
-    |> par-map(jobs:) { |node|
-      execute_parallel_level_worker(context, node, status)?
-      # The value is deliberately ignored: only its completion/error behavior
-      # matters, and the published runner erases the par-map element schema.
-      0
+  while pending.len() > 0 or running.len() > 0 {
+    var waiting: List[types.PlanNode] = []
+
+    for node in pending {
+      let ready = [key for key in execute_wait_keys(node) if key not in done].len() == 0
+
+      if failure != "" or ! ready or running.len() >= jobs {
+        waiting += [node]
+        continue
+      }
+
+      # Stored artifacts and exact remote imports cost no build; they run here,
+      # so the scheduler's slots go to real builds.
+      let stored = fs.exists(store.artifact_path(context.store_root, node.artifact_key))?
+
+      if stored or ! types.plan_action_is_build(node.action) {
+        let receipt = execute_node({...context, published: done}, node)?
+        execute_require_receipt(context.plan, node, receipt)?
+        done[node.artifact_key] = receipt
+        continue
+      }
+
+      let log = fp"{logs}/{node.name}.log"
+      fs.write(log, "")?
+      print f"repo build start {node.name}"
+      let command = process.command_argv(
+        xsh,
+        [
+          "xsh",
+          fp"{pm_root}/pm.xsh".display(),
+          "--",
+          "repo",
+          "build-node",
+          plan_path.display(),
+          "--repo",
+          context.repo_root.display(),
+          "--store",
+          context.store_root.display(),
+          "--node",
+          node.artifact_key,
+        ],
+        context.repo_root,
+        stdout: log,
+        stderr: log,
+        stdout_append: true,
+        stderr_append: true,
+      )
+      let handle = spawn command?
+      running += [{handle, node, log, started: time.now()}]
     }
 
-  execute_parallel_level_require_workers(nodes, status)?
-  [store.lookup(context.store_root, node.artifact_key)? for node in nodes]
+    pending = waiting
+
+    if running.len() == 0 {
+      # Nothing runs and nothing can start: a failure drained the running
+      # builds, or no pending node has its dependencies (an invalid plan).
+      return Err(types.PmError.ExtensionFailed(failure)) when failure != ""
+
+      return Err(types.PmError.PackageContract(f"no plan node can start; {pending.len()} wait on missing dependencies")) when pending.len() > 0
+
+      break
+    }
+
+    let next = process.wait_any([entry.handle for entry in running])?
+    let entry = running[next.index]
+    running = [other for other in running if other.node.artifact_key != entry.node.artifact_key]
+    let seconds = (time.now() - entry.started) / 1000
+
+    if next.status.ok {
+      let receipt = store.lookup(context.store_root, entry.node.artifact_key)?
+      execute_require_receipt(context.plan, entry.node, receipt)?
+      done[entry.node.artifact_key] = receipt
+      finished += [{name: entry.node.name, seconds, log: entry.log}]
+      print f"repo build done {entry.node.name} {seconds}s"
+      continue
+    }
+
+    print f"repo build FAILED {entry.node.name} after {seconds}s; log {entry.log}:"
+    let tail = execute_log_tail(entry.log, 40)?
+    print $tail
+
+    if failure == "" {
+      failure = f"package build for {entry.node.package_id} failed (log {entry.log}):\n{execute_log_errors(entry.log)?}"
+
+      # Stop the other builds: their results are not needed once the build has
+      # failed, and the store never keeps a partial artifact.
+      for other in running {
+        print f"repo build cancel {other.node.name}"
+        other.handle.cancel(signal: "TERM", kill_after: 5s)?
+      }
+
+      running = []
+    }
+  }
+
+  execute_report_slowest(finished)
+
+  # The failed node may have been the last one, which ends the loop normally.
+  return Err(types.PmError.ExtensionFailed(failure)) when failure != ""
+
+  done
+}
+
+## Build the one plan node `key` names, in a `pm repo build-node` child of the scheduler: every node it waits for is already in the store.
+export proc build_plan_node(
+  plan_value: types.BuildPlan,
+  repo_root: Path,
+  store_root: Path,
+  remote_repo: Str,
+  key: Str,
+) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+  build_plan.validate(plan_value)?
+  build_plan.require_current_build_epoch(plan_value)?
+  let matches = [node for node in plan_value.nodes if node.artifact_key == key]
+
+  guard matches.len() == 1 else {
+    return Err(types.PmError.Usage(f"plan has no node with artifact key {key}"))
+  }
+
+  let node = matches[0]
+  let context: ExecuteContext = {
+    plan: plan_value,
+    repo_root,
+    store_root,
+    remote_repo,
+    executor: if execute_plan_builds({...plan_value, nodes: [node]}, store_root)? { pm_build.executor_provenance()? } else { null },
+    published: {},
+  }
+  let receipt = execute_node(context, node)?
+  execute_require_receipt(plan_value, node, receipt)?
+  receipt
 }
 
 # Executor provenance hashes the XSH runners and the PM tree, so compute it only
@@ -430,20 +556,21 @@ proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) [fs, err
   false
 }
 
-## Executes each topological BuildPlan level with bounded, deterministic result ordering; artifact-store receipts are the only resume state.
+## Executes a BuildPlan into `store_root`; `jobs` bounds concurrent package builds and `logs` holds one log per built package. Artifact-store receipts are the only resume state, and results come back in plan order.
 export proc build_plan(
   plan_value: types.BuildPlan,
   repo_root: Path,
   store_root: Path,
   remote_repo: Str,
   jobs: Int,
+  logs: Path = p"",
 ) [fs, net, process, env, time, error] -> Result[types.BuildResult] {
   build_plan.validate(plan_value)?
   build_plan.require_current_build_epoch(plan_value)?
 
   return Err(types.PmError.Usage("build jobs must be at least one")) when jobs < 1
 
-  var context: ExecuteContext = {
+  let context: ExecuteContext = {
     plan: plan_value,
     repo_root,
     store_root,
@@ -451,51 +578,27 @@ export proc build_plan(
     executor: if execute_plan_builds(plan_value, store_root)? { pm_build.executor_provenance()? } else { null },
     published: {},
   }
-  var artifacts: List[types.ArtifactReceipt] = []
-  var index = 0
+  var done: Map[types.ArtifactReceipt] = {}
 
-  while index < plan_value.nodes.len() {
-    let level = plan_value.nodes[index].level
-    var level_nodes: List[types.PlanNode] = []
-
-    while index < plan_value.nodes.len() and plan_value.nodes[index].level == level {
-      level_nodes = level_nodes.push(plan_value.nodes[index])
-      index += 1
+  if jobs == 1 {
+    # One job builds in this process, in plan order, with output inline.
+    for node in plan_value.nodes {
+      let receipt = execute_node({...context, published: done}, node)?
+      execute_require_receipt(plan_value, node, receipt)?
+      done[node.artifact_key] = receipt
     }
-
-    var completed: List[types.ArtifactReceipt] = []
-
-    if jobs == 1 or level_nodes.len() == 1 {
-      for node in level_nodes {
-        completed = completed.push(execute_node(context, node)?)
-      }
-    } else {
-      # The postfix `?` is the scheduling boundary: without it par-map keeps
-      # a failed worker in-band and a later level can attempt to consume that
-      # worker's absent receipt. The level barrier below makes completion
-      # of receipt-last publication explicit before advancing the plan.
-      completed = execute_parallel_level(context, level_nodes, jobs)?
-    }
-
-    # Every receipt here was read from its final Store directory. A dependent
-    # level starts only after each one matches its plan node.
-    if completed.len() != level_nodes.len() {
-      return Err(types.PmError.PackageContract("executor level result count does not match its plan nodes"))
-    }
-
-    var published = context.published
-    var position = 0
-
-    while position < level_nodes.len() {
-      let receipt = completed[position]
-      execute_require_receipt(plan_value, level_nodes[position], receipt)?
-      published[receipt.key] = receipt
-      artifacts += [receipt]
-      position += 1
-    }
-
-    context = {...context, published}
+  } else {
+    let handle = fs.tempdir()?
+    defer handle.close()?
+    let scratch = handle.host_path()?
+    # Children read the plan from disk; write_plan seals it with its digest.
+    let plan_path = fp"{scratch}/plan.json"
+    plan_json.write_plan(plan_path, plan_value)?
+    let log_dir = if logs.display() == "" { fp"{scratch}/logs" } else { logs }
+    done = execute_scheduled(context, plan_path, log_dir, jobs)?
   }
+
+  let artifacts = [done.get(node.artifact_key)? for node in plan_value.nodes]
 
   # Keep the receipt list concrete at the public executor boundary. The
   # generated profile adapter crosses this boundary in a separate module and

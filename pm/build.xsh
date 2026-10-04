@@ -8,7 +8,8 @@ use util
 
 # The PM tree is the monorepo root (pm.xsh beside pm/) in a checkout and
 # /usr/lib/pm on an installed system.
-proc pm_source_root() [fs, env, error] -> Result[Path] {
+## The directory holding this PM's pm.xsh and pm/ tree.
+export proc pm_source_root() [fs, env, error] -> Result[Path] {
   for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 

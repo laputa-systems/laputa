@@ -19,6 +19,7 @@ export type DockerConfig = {
   artifact_root: Path,
   image: Str,
   repo_url: Str,
+  owner: world.WorldOwner,
 }
 
 proc env_value(name: Str, fallback: Str) [env] -> Str {
@@ -61,6 +62,7 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
     artifact_root:,
     image:,
     repo_url: env_value("LAPUTA_REPO_URL", ""),
+    owner: {uid: unix.id()?.uid, gid: unix.id()?.gid},
   )
 }
 
@@ -98,7 +100,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     argv = argv.extend(["--env", f"XSH_PM_REPO={value.repo_url}"])
   }
 
-  argv.push(value.image).extend(inner_argv)
+  argv.push(value.image).extend(world.world_owned_argv(value.owner, inner_argv))
 }
 
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.

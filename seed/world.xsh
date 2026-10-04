@@ -138,7 +138,26 @@ export pure world_kbuild_cache_mount_argv(laputa_root: Path) -> List[Str] {
   ["--mount", f"type=bind,src={world_kbuild_cache(laputa_root)},dst=/var/cache/laputa/linux-kbuild"]
 }
 
-## Construct one offline package-tools run: `output` at /output, `store` at /artifacts.
+## The host user a container hands its writable mounts back to.
+export type WorldOwner = {uid: Int, gid: Int}
+
+## The container entry that runs `inner`, then gives `/output`, `/artifacts`, and the Kbuild cache to `owner`.
+export pure world_owned_argv(owner: WorldOwner, inner: List[Str]) -> List[Str] {
+  [
+    "/bin/xsh",
+    "/src/laputa/seed/container_entry.xsh",
+    "--",
+    f"{owner.uid}",
+    f"{owner.gid}",
+    "/output",
+    "/artifacts",
+    "/var/cache/laputa/linux-kbuild",
+    "--",
+    @inner,
+  ]
+}
+
+## Construct one offline package-tools run: `output` at /output, `store` at /artifacts, owned by `owner` afterwards.
 export pure world_container_argv(
   docker: Path,
   laputa_root: Path,
@@ -147,6 +166,7 @@ export pure world_container_argv(
   tag: Str,
   output: Path,
   store: Path,
+  owner: WorldOwner,
   inner: List[Str],
 ) -> List[Str] {
   [
@@ -168,17 +188,18 @@ export pure world_container_argv(
     "--workdir",
     "/src/laputa",
     tag,
-    @inner,
+    @world_owned_argv(owner, inner),
   ]
 }
 
-type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str}
+type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str, owner: WorldOwner}
 
 proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) [fs, process, env, error] -> Result[WorldContainer] {
   let docker = images.docker_program()?
   let seed = xsh_seed.xsh_seed_require(laputa_root, value.arch)?
   let tag = images.ensure_package_tools(docker, laputa_root, value)?
-  {docker, laputa_root, seed, value, tag}
+  let id = unix.id()?
+  {docker, laputa_root, seed, value, tag, owner: {uid: id.uid, gid: id.gid}}
 }
 
 proc world_run(
@@ -199,6 +220,7 @@ proc world_run(
     container.tag,
     output,
     store,
+    container.owner,
     inner,
   )
   let status = process.run(process.command_argv(container.docker, argv, container.laputa_root))?
@@ -247,7 +269,7 @@ proc world_build(container: WorldContainer, args: WorldArgs) [fs, process, error
     container,
     world_dir(container.laputa_root, args.arch),
     world_store(container.laputa_root, args.arch),
-    pm_argv(["repo", "build", "/output/plan.json", "--store", "/artifacts", "--jobs", f"{args.jobs}"]),
+    pm_argv(["repo", "build", "/output/plan.json", "--store", "/artifacts", "--jobs", f"{args.jobs}", "--logs", "/output/logs"]),
     "repo build",
   )?
 }

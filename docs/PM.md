@@ -74,9 +74,10 @@ module path.
 ```text
 pm repo check [--repo PATH]
 pm repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) \
-  [--target TARGET] --output PLAN
+  [--target TARGET] --output PLAN    # TARGET defaults to the host's arch
 pm repo show PLAN
-pm repo build PLAN --store STORE [-j N|--jobs N]
+pm repo build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
+pm repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
 pm repo publish PLAN --store STORE
 pm repo checksum [--repo PATH] PACKAGE...
 pm repo update-checksums [--repo PATH] PACKAGE...
@@ -101,7 +102,7 @@ remote. It records the target, typed dependency graph, remote retrieval
 identity, build/proof inputs, `BUILD_EPOCH`, action reasons, and sorted
 artifact keys in an atomically written plan.
 
-Without `--target`, PM targets `aarch64-linux-musl`; the make targets and the
+Without `--target`, `repo plan` and `sources fetch` target the host's arch; the make targets and the
 profile CLI always pass the target for `ARCH` or the host. `x86_64-linux-musl`
 is planned anywhere and built on a native Linux x86_64 runner, with
 target-specific source checksums, filetrees, remote index entries, and

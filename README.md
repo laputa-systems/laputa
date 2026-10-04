@@ -42,9 +42,9 @@ On macOS (Apple Silicon), the developer path uses XSH's native release build
 mirror-test` through `cargo`. Docker must run `linux/arm64` natively (for
 example OrbStack).
 
-On Linux, builds use rootful Docker and containers run as root, so some files
-under `.out/` are owned by root. `make clean` and `make root` delete that state
-through a container, so you never need `sudo`.
+On Linux, builds use rootful Docker. Package builds give their outputs back to
+you when they finish, and `make clean` deletes the cargo targets the XSH build
+image leaves root-owned through a container, so you never need `sudo`.
 
 The QEMU proofs below also need `qemu-system-<arch>` for the host's
 architecture. The profile proof and the x86_64 installer proof run under KVM

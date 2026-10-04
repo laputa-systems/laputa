@@ -106,6 +106,13 @@ Stop the mirror with Ctrl-C when done.
   `.out/artifacts/<arch>` is the build cache. Plans are offline, so every node
   reads `build`, and the executor reuses every artifact the store holds. An
   unchanged rebuild takes seconds, most of it planning.
+- `JOBS` (default 4) bounds how many packages build at once. A package starts
+  as soon as the packages it needs are in the store, not when a whole plan
+  level finishes. Each one builds in its own child process with its log in
+  `.out/world/<arch>/logs/<package>.log`, so the console shows one line per
+  start and finish. A failure stops the other builds and prints the failing
+  package, its log path, and the log's tail. The build ends with its slowest
+  packages.
 - `PKGS="a b"` plans those packages' closures. `STOP=pre-cmake` runs
   `repo plan --all --without cmake --without linux`, a fast first signal on a
   new seed or toolchain. With neither, the build covers every package. The
@@ -141,15 +148,16 @@ Stop the mirror with Ctrl-C when done.
 
 ## Containers and file ownership
 
-Builds use rootful Docker and containers run as root, so on Linux the files
-containers write under `.out/` are owned by root. Two things keep that from
-getting in the way:
+Builds use rootful Docker and containers run as root (recipes build as root
+and `make root` chroots). Package-tools containers start through
+`seed/container_entry.xsh`, which runs the command, then gives the writable
+mounts (`/output`, the store at `/artifacts`, and the Kbuild cache) to the host
+user that started the build. So the world, the store, and profile outputs
+under `.out/` and `target/` belong to you after every run, failed or not.
 
-- `make clean` and `make root` delete root-owned state from a container (in
-  `xsh-test`, with the checkout mounted), so no `sudo` is needed.
-- XSH's atomic writes keep the modes a plain write would get, so files a
-  container writes (plans, receipts, store objects) stay readable by the
-  host user. `make publish` reads the plan and the store from the host.
+The cargo builds in `xsh-test` (`make host-xsh`, `make seed`, the mirror) still
+leave root-owned target directories, so `make clean` and `make root` delete
+derived state from a container on Linux and no `sudo` is needed.
 
 On macOS, Docker maps container writes to the host user.
 

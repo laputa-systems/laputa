@@ -22,7 +22,9 @@ type RepoPlanArgs = {repo: Path, all: Bool, roots: List[Str], without: List[Str]
 
 type RepoShowArgs = {input: Path}
 
-type RepoBuildArgs = {input: Path, store: Path, jobs: Int}
+type RepoBuildArgs = {input: Path, store: Path, jobs: Int, logs: Path}
+
+type RepoBuildNodeArgs = {input: Path, repo: Path, store: Path, node: Str}
 
 type RepoPublishArgs = {input: Path, store: Path}
 
@@ -44,6 +46,7 @@ enum PmCommand {
     RepoPlan(RepoPlanArgs),
     RepoShow(RepoShowArgs),
     RepoBuild(RepoBuildArgs),
+    RepoBuildNode(RepoBuildNodeArgs),
     RepoPublish(RepoPublishArgs),
     RepoChecksum(RepoPackagesArgs),
     RepoUpdateChecksums(RepoPackagesArgs),
@@ -60,7 +63,9 @@ type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], without: List[St
 
 type RepoShowOptions = {input: Path}
 
-type RepoBuildOptions = {input: Path, store: Path, jobs: Int}
+type RepoBuildOptions = {input: Path, store: Path, jobs: Int, logs: Str}
+
+type RepoBuildNodeOptions = {input: Path, repo: Str, store: Path, node: Str}
 
 type RepoPublishOptions = {input: Path, store: Path}
 
@@ -83,7 +88,8 @@ repository commands:
   repo check [--repo PATH]
   repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   repo show PLAN
-  repo build PLAN --store STORE [-j N|--jobs N]
+  repo build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
+  repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
   repo publish PLAN --store STORE
   repo checksum [--repo PATH] PACKAGE...
   repo update-checksums [--repo PATH] PACKAGE...
@@ -99,7 +105,7 @@ store commands:
   store verify --store STORE
   store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 
-targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
+targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 """
 }
 
@@ -109,12 +115,13 @@ pure repo_help_text() -> Str {
   check [--repo PATH]
   plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   show PLAN
-  build PLAN --store STORE [-j N|--jobs N]
+  build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
+  build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
   publish PLAN --store STORE
   checksum [--repo PATH] PACKAGE...
   update-checksums [--repo PATH] PACKAGE...
 
-targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
+targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 """
 }
 
@@ -125,7 +132,7 @@ pure repo_plan_help_text() -> Str {
 PACKAGE (and PACKAGE itself): `--all --without cmake --without linux` plans
 everything that builds before cmake and linux exist.
 
-targets: aarch64-linux-musl (default), x86_64-linux-musl (native Linux runner)
+targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 """
 }
 
@@ -138,7 +145,7 @@ REPO/.cache/sources) and verifies its sha256. This is the only PM command that
 contacts upstream hosts; builds read the cache or the local mirror named by
 LAPUTA_MIRROR.
 
-targets: aarch64-linux-musl (default), x86_64-linux-musl
+targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 """
 }
 
@@ -235,7 +242,7 @@ proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[Re
   {repo: resolve_repo_root(parsed.repo)?, packages: parsed.packages}
 }
 
-proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
+proc parse_repo_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(repo_help_text())
   }
@@ -243,7 +250,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   let action = argv[1]
   let args = tail_after(argv, 2)
 
-  if action not in ["check", "plan", "show", "build", "publish", "checksum", "update-checksums"] {
+  if action not in ["check", "plan", "show", "build", "build-node", "publish", "checksum", "update-checksums"] {
     return Err(types.PmError.Usage(f"unknown pm repo command {action}"))
   }
 
@@ -267,7 +274,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         all: false,
         roots: [],
         without: [],
-        target: "aarch64-linux-musl",
+        target: "",
         output: p"",
       )
       match cli.parse(
@@ -277,7 +284,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
           all: {form: "--all", default: false},
           roots: {form: "--root PACKAGE", repeated: true},
           without: {form: "--without PACKAGE", repeated: true},
-          target: {form: "--target TARGET", default: "aarch64-linux-musl"},
+          target: {form: "--target TARGET", default: ""},
           output: {form: "--output PLAN", kind: "Path", required: true},
         },
         "pm repo plan",
@@ -294,7 +301,10 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         return Err(types.PmError.Usage("pm repo plan --without requires --all"))
       }
 
-      let _ = types.parse_target(parsed.target)?
+      # A plan targets the host's architecture unless it names one.
+      let target = if parsed.target == "" { f"{util.host_arch()?}-linux-musl" } else { parsed.target }
+      let _ = types.parse_target(target)?
+      parsed = {...parsed, target}
       RepoPlan({
         repo: resolve_repo_root(parsed.repo)?,
         all: parsed.all,
@@ -314,13 +324,14 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
       RepoShow({input: parsed.input})
     }
     "build" => {
-      var parsed: RepoBuildOptions = RepoBuildOptions(input: p"", store: p"", jobs: cpu.count())
+      var parsed: RepoBuildOptions = RepoBuildOptions(input: p"", store: p"", jobs: cpu.count(), logs: "")
       match cli.parse(
         args,
         {
           input: {form: "PLAN", kind: "Path", required: true},
           store: {form: "--store STORE", kind: "Path", required: true},
           jobs: {form: "-j --jobs N", kind: "Int", default: cpu.count(), min: 1},
+          logs: {form: "--logs DIR", default: ""},
         },
         "pm repo build",
       ) {
@@ -328,7 +339,25 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Err(problem) => return Err(problem)
       }
 
-      RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs})
+      RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs, logs: fp"{parsed.logs}"})
+    }
+    "build-node" => {
+      var parsed: RepoBuildNodeOptions = RepoBuildNodeOptions(input: p"", repo: "", store: p"", node: "")
+      match cli.parse(
+        args,
+        {
+          input: {form: "PLAN", kind: "Path", required: true},
+          repo: {form: "--repo PATH", required: true},
+          store: {form: "--store STORE", kind: "Path", required: true},
+          node: {form: "--node ARTIFACT_KEY", required: true},
+        },
+        "pm repo build-node",
+      ) {
+        Ok(value) => parsed = value.require(RepoBuildNodeOptions)?
+        Err(problem) => return Err(problem)
+      }
+
+      RepoBuildNode({input: parsed.input, repo: fp"{parsed.repo}", store: parsed.store, node: parsed.node})
     }
     "publish" => {
       var parsed: RepoPublishOptions = RepoPublishOptions(input: p"", store: p"")
@@ -352,7 +381,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
   }
 }
 
-proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
+proc parse_sources_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(sources_help_text())
   }
@@ -386,7 +415,7 @@ proc parse_sources_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
     return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
   }
 
-  let names = if parsed.targets.len() == 0 { ["aarch64-linux-musl"] } else { parsed.targets }
+  let names = if parsed.targets.len() == 0 { [f"{util.host_arch()?}-linux-musl"] } else { parsed.targets }
   var targets: List[types.Target] = []
 
   for name in names {
@@ -504,7 +533,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   StoreVerify({store: parsed.store})
 }
 
-proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
+proc parse_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
   return Help(help_text()) when argv.len() == 0 or argv[0] in ["-h", "--help", "help"]
 
   match argv[0] {
@@ -620,8 +649,14 @@ proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
   }
 
-  let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, remote.repo_url(), args.jobs)?
+  let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, remote.repo_url(), args.jobs, args.logs)?
   print "repo" "build" $result.plan_sha256 result.artifacts.len() "artifacts"
+}
+
+proc command_repo_build_node(args: RepoBuildNodeArgs) [fs, net, process, env, time, error] {
+  let value = pm_plan_json.read(args.input)?
+  let receipt = pm_execute.build_plan_node(value, args.repo, args.store, remote.repo_url(), args.node)?
+  print "repo" "build-node" $receipt.package_id $receipt.key
 }
 
 proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
@@ -734,6 +769,7 @@ proc handle(command: PmCommand) [fs, net, process, env, time, error] {
     RepoPlan(args) => command_repo_plan(args)?
     RepoShow(args) => command_repo_show(args)?
     RepoBuild(args) => command_repo_build(args)?
+    RepoBuildNode(args) => command_repo_build_node(args)?
     RepoPublish(args) => command_repo_publish(args)?
     RepoChecksum(args) => command_repo_checksums(args, false)?
     RepoUpdateChecksums(args) => command_repo_checksums(args, true)?

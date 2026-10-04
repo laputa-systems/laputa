@@ -633,3 +633,38 @@ test test_execute_keeps_runtime_only_dependency_out_of_build_root_and_composes_i
   assert fp"{output}/usr/share/execute-service.txt".read_text()? == "service\n"
   generation.verify_generation(output, receipt)?
 }
+
+# Parallel builds each write their own log, and a failure names its package
+# and log instead of surfacing only a scheduler error.
+test test_execute_parallel_builds_log_per_package_and_failures_name_their_log [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-logs-repo")?
+  let value = resolve_execute_plan(repo_root)?
+  let logs = test.temp_dir(ctx, name: "execute-logs")?
+  let _ = execute.build_plan(value, repo_root, execute_store(ctx, "execute-logs-store")?, "", 2, logs)?
+
+  for name in ["execute-dep", "execute-tool", "execute-app"] {
+    assert fs.exists(fp"{logs}/{name}.log")?, f"{name} has a log"
+  }
+
+  fs.write(
+    fp"{repo_root}/packages/execute-app/proof.xsh",
+    """error ProofError = Failed(message: Str)
+
+proc main(root: Path) [error] {
+  return Err(ProofError.Failed("intentional proof failure"))
+}
+
+main(@args)?
+""",
+  )?
+  let failing = resolve_execute_plan(repo_root)?
+  let failed_logs = test.temp_dir(ctx, name: "execute-failed-logs")?
+
+  match execute.build_plan(failing, repo_root, execute_store(ctx, "execute-failed-store")?, "", 2, failed_logs) {
+    Ok(_) => test.fail("a failing proof built")?
+    Err(problem) => {
+      assert f"{failed_logs}/execute-app.log" in problem.message, problem.message
+      assert "intentional proof failure" in problem.message, problem.message
+    }
+  }
+}

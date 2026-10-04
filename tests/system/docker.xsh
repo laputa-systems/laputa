@@ -13,6 +13,7 @@ pure fixture_config() -> docker.DockerConfig {
     artifact_root: docker.artifact_store_root(/work/laputa, "aarch64"),
     image: "laputa-package-tools:aarch64-test",
     repo_url: "",
+    owner: {uid: 1000, gid: 1000},
   }
 }
 
@@ -66,10 +67,14 @@ test test_docker_rejects_a_runner_image_of_another_architecture [error] {
 
 test test_docker_places_optional_repository_configuration_before_image [error] {
   let argv = docker.docker_command_argv({...fixture_config(), repo_url: "https://packages.example.test"}, [])
-  let last = argv.len() - 1
-  assert argv[last] == "laputa-package-tools:aarch64-test"
-  assert argv[last - 2] == "--env"
-  assert argv[last - 1] == "XSH_PM_REPO=https://packages.example.test"
+  var image = 0
+
+  while argv[image] != "laputa-package-tools:aarch64-test" {
+    image += 1
+  }
+
+  assert argv[image - 2] == "--env"
+  assert argv[image - 1] == "XSH_PM_REPO=https://packages.example.test"
   assert ! (argv |> any "XSH_PM_PUBLIC_REPO" in .)
 }
 
