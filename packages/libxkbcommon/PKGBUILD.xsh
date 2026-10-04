@@ -8,10 +8,10 @@ export const name = "libxkbcommon"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.11.0"
+export const ver = "1.13.2"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "xkeyboard-config"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "78a6b14f16e9a55025978c252e53ce9e16a02bfdb929550b9a0db5af87db7e02",
+        sha256: "acc4d5f7c3cbba5f9f8d08d8bdbeede84ecede46792f47929aa9321873385528",
       },
     ],
   },
@@ -43,7 +43,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "e237a6b6396515462e50c56041681c1b1ce83f8582e8ab661a48d91cdaf97a8e",
+        sha256: "f77e4c07f6b74579a3b703544f36be7a853ee3ae95a90f32b944f11b9b455650",
       },
     ],
   },
@@ -56,7 +56,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "5abcf6696e29a393960b9d842a719b025fcaea2c8c41b2976b5fa5f28e763b96",
+        sha256: "3d7668420fae724667a73b80134cc89271934e2fa46478a9c0daaac97297ea3a",
       },
     ],
   },
@@ -93,7 +93,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libxkbcommon.so.0.11.0",
+    path: p"usr/lib/libxkbcommon.so.0.13.2",
     kind: "binary",
   },
   {
@@ -102,6 +102,11 @@ export const filetree = [
   },
 ]
 
+# files/parser.c and files/parser.h replace upstream's Bison step. Regenerate
+# them on the host with GNU Bison 3.8.2 from the directory holding the
+# unpacked source tree, using the flags of upstream's yacc_gen:
+#   bison --defines=parser.h -o parser.c -p _xkbcommon_ \
+#     libxkbcommon-xkbcommon-VERSION/src/xkbcomp/parser.y
 proc patch_vendored_parser() [fs, error] {
   fs.install(p"generated/parser.c", p"src/xkbcomp/parser.c", 0o644, parents: true, overwrite: true)?
   fs.install(p"generated/parser.h", p"src/xkbcomp/parser.h", 0o644, parents: true, overwrite: true)?
@@ -147,7 +152,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
     run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build" ?
-    run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.11.0" ?
+    run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.13.2" ?
 
     env ({
       DESTDIR: dest,

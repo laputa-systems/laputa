@@ -72,7 +72,7 @@
 #define yynerrs         _xkbcommon_nerrs
 
 /* First part of user prologue.  */
-#line 21 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 21 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
 
 #include "config.h"
 
@@ -95,6 +95,9 @@ struct parser_param {
 
 #define parser_warn(param, warning_id, fmt, ...) \
     scanner_warn((param)->scanner, warning_id, fmt, ##__VA_ARGS__)
+
+#define parser_vrb(param, verbosity, warning_id, fmt, ...) \
+    scanner_vrb((param)->scanner, verbosity, warning_id, fmt, ##__VA_ARGS__)
 
 static void
 _xkbcommon_error(struct parser_param *param, const char *msg)
@@ -138,7 +141,7 @@ resolve_keysym(struct parser_param *param, struct sval name, xkb_keysym_t *sym_r
 
 #define param_scanner param->scanner
 
-#line 142 "parser.c"
+#line 145 "parser.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -219,98 +222,99 @@ enum yysymbol_kind_t
   YYSYMBOL_EXCLAM = 50,                    /* "!"  */
   YYSYMBOL_INVERT = 51,                    /* "~"  */
   YYSYMBOL_STRING = 52,                    /* "string literal"  */
-  YYSYMBOL_INTEGER = 53,                   /* "integer literal"  */
-  YYSYMBOL_FLOAT = 54,                     /* "float literal"  */
-  YYSYMBOL_IDENT = 55,                     /* "identifier"  */
-  YYSYMBOL_KEYNAME = 56,                   /* "key name"  */
-  YYSYMBOL_PARTIAL = 57,                   /* "partial"  */
-  YYSYMBOL_DEFAULT = 58,                   /* "default"  */
-  YYSYMBOL_HIDDEN = 59,                    /* "hidden"  */
-  YYSYMBOL_ALPHANUMERIC_KEYS = 60,         /* "alphanumeric_keys"  */
-  YYSYMBOL_MODIFIER_KEYS = 61,             /* "modifier_keys"  */
-  YYSYMBOL_KEYPAD_KEYS = 62,               /* "keypad_keys"  */
-  YYSYMBOL_FUNCTION_KEYS = 63,             /* "function_keys"  */
-  YYSYMBOL_ALTERNATE_GROUP = 64,           /* "alternate_group"  */
-  YYSYMBOL_YYACCEPT = 65,                  /* $accept  */
-  YYSYMBOL_XkbFile = 66,                   /* XkbFile  */
-  YYSYMBOL_XkbCompositeMap = 67,           /* XkbCompositeMap  */
-  YYSYMBOL_XkbCompositeType = 68,          /* XkbCompositeType  */
-  YYSYMBOL_XkbMapConfigList = 69,          /* XkbMapConfigList  */
-  YYSYMBOL_XkbMapConfig = 70,              /* XkbMapConfig  */
-  YYSYMBOL_FileType = 71,                  /* FileType  */
-  YYSYMBOL_OptFlags = 72,                  /* OptFlags  */
-  YYSYMBOL_Flags = 73,                     /* Flags  */
-  YYSYMBOL_Flag = 74,                      /* Flag  */
-  YYSYMBOL_DeclList = 75,                  /* DeclList  */
-  YYSYMBOL_Decl = 76,                      /* Decl  */
-  YYSYMBOL_VarDecl = 77,                   /* VarDecl  */
-  YYSYMBOL_KeyNameDecl = 78,               /* KeyNameDecl  */
-  YYSYMBOL_KeyAliasDecl = 79,              /* KeyAliasDecl  */
-  YYSYMBOL_VModDecl = 80,                  /* VModDecl  */
-  YYSYMBOL_VModDefList = 81,               /* VModDefList  */
-  YYSYMBOL_VModDef = 82,                   /* VModDef  */
-  YYSYMBOL_InterpretDecl = 83,             /* InterpretDecl  */
-  YYSYMBOL_InterpretMatch = 84,            /* InterpretMatch  */
-  YYSYMBOL_VarDeclList = 85,               /* VarDeclList  */
-  YYSYMBOL_KeyTypeDecl = 86,               /* KeyTypeDecl  */
-  YYSYMBOL_SymbolsDecl = 87,               /* SymbolsDecl  */
-  YYSYMBOL_OptSymbolsBody = 88,            /* OptSymbolsBody  */
-  YYSYMBOL_SymbolsBody = 89,               /* SymbolsBody  */
-  YYSYMBOL_SymbolsVarDecl = 90,            /* SymbolsVarDecl  */
-  YYSYMBOL_MultiKeySymOrActionList = 91,   /* MultiKeySymOrActionList  */
-  YYSYMBOL_NoSymbolOrActionList = 92,      /* NoSymbolOrActionList  */
-  YYSYMBOL_GroupCompatDecl = 93,           /* GroupCompatDecl  */
-  YYSYMBOL_ModMapDecl = 94,                /* ModMapDecl  */
-  YYSYMBOL_KeyOrKeySymList = 95,           /* KeyOrKeySymList  */
-  YYSYMBOL_KeyOrKeySym = 96,               /* KeyOrKeySym  */
-  YYSYMBOL_LedMapDecl = 97,                /* LedMapDecl  */
-  YYSYMBOL_LedNameDecl = 98,               /* LedNameDecl  */
-  YYSYMBOL_ShapeDecl = 99,                 /* ShapeDecl  */
-  YYSYMBOL_SectionDecl = 100,              /* SectionDecl  */
-  YYSYMBOL_SectionBody = 101,              /* SectionBody  */
-  YYSYMBOL_SectionBodyItem = 102,          /* SectionBodyItem  */
-  YYSYMBOL_RowBody = 103,                  /* RowBody  */
-  YYSYMBOL_RowBodyItem = 104,              /* RowBodyItem  */
-  YYSYMBOL_Keys = 105,                     /* Keys  */
-  YYSYMBOL_Key = 106,                      /* Key  */
-  YYSYMBOL_OverlayDecl = 107,              /* OverlayDecl  */
-  YYSYMBOL_OverlayKeyList = 108,           /* OverlayKeyList  */
-  YYSYMBOL_OverlayKey = 109,               /* OverlayKey  */
-  YYSYMBOL_OutlineList = 110,              /* OutlineList  */
-  YYSYMBOL_OutlineInList = 111,            /* OutlineInList  */
-  YYSYMBOL_CoordList = 112,                /* CoordList  */
-  YYSYMBOL_Coord = 113,                    /* Coord  */
-  YYSYMBOL_DoodadDecl = 114,               /* DoodadDecl  */
-  YYSYMBOL_DoodadType = 115,               /* DoodadType  */
-  YYSYMBOL_FieldSpec = 116,                /* FieldSpec  */
-  YYSYMBOL_Element = 117,                  /* Element  */
-  YYSYMBOL_OptMergeMode = 118,             /* OptMergeMode  */
-  YYSYMBOL_MergeMode = 119,                /* MergeMode  */
-  YYSYMBOL_ExprList = 120,                 /* ExprList  */
-  YYSYMBOL_Expr = 121,                     /* Expr  */
-  YYSYMBOL_Term = 122,                     /* Term  */
-  YYSYMBOL_MultiActionList = 123,          /* MultiActionList  */
-  YYSYMBOL_ActionList = 124,               /* ActionList  */
-  YYSYMBOL_NonEmptyActions = 125,          /* NonEmptyActions  */
-  YYSYMBOL_Actions = 126,                  /* Actions  */
-  YYSYMBOL_Action = 127,                   /* Action  */
-  YYSYMBOL_Lhs = 128,                      /* Lhs  */
-  YYSYMBOL_Terminal = 129,                 /* Terminal  */
-  YYSYMBOL_MultiKeySymList = 130,          /* MultiKeySymList  */
-  YYSYMBOL_KeySymList = 131,               /* KeySymList  */
-  YYSYMBOL_NonEmptyKeySyms = 132,          /* NonEmptyKeySyms  */
-  YYSYMBOL_KeySyms = 133,                  /* KeySyms  */
-  YYSYMBOL_KeySym = 134,                   /* KeySym  */
-  YYSYMBOL_KeySymLit = 135,                /* KeySymLit  */
-  YYSYMBOL_SignedNumber = 136,             /* SignedNumber  */
-  YYSYMBOL_Number = 137,                   /* Number  */
-  YYSYMBOL_Float = 138,                    /* Float  */
-  YYSYMBOL_Integer = 139,                  /* Integer  */
-  YYSYMBOL_KeyCode = 140,                  /* KeyCode  */
-  YYSYMBOL_Ident = 141,                    /* Ident  */
-  YYSYMBOL_String = 142,                   /* String  */
-  YYSYMBOL_OptMapName = 143,               /* OptMapName  */
-  YYSYMBOL_MapName = 144                   /* MapName  */
+  YYSYMBOL_DECIMAL_DIGIT = 53,             /* "decimal digit"  */
+  YYSYMBOL_INTEGER = 54,                   /* "integer literal"  */
+  YYSYMBOL_FLOAT = 55,                     /* "float literal"  */
+  YYSYMBOL_IDENT = 56,                     /* "identifier"  */
+  YYSYMBOL_KEYNAME = 57,                   /* "key name"  */
+  YYSYMBOL_PARTIAL = 58,                   /* "partial"  */
+  YYSYMBOL_DEFAULT = 59,                   /* "default"  */
+  YYSYMBOL_HIDDEN = 60,                    /* "hidden"  */
+  YYSYMBOL_ALPHANUMERIC_KEYS = 61,         /* "alphanumeric_keys"  */
+  YYSYMBOL_MODIFIER_KEYS = 62,             /* "modifier_keys"  */
+  YYSYMBOL_KEYPAD_KEYS = 63,               /* "keypad_keys"  */
+  YYSYMBOL_FUNCTION_KEYS = 64,             /* "function_keys"  */
+  YYSYMBOL_ALTERNATE_GROUP = 65,           /* "alternate_group"  */
+  YYSYMBOL_YYACCEPT = 66,                  /* $accept  */
+  YYSYMBOL_XkbFile = 67,                   /* XkbFile  */
+  YYSYMBOL_XkbCompositeMap = 68,           /* XkbCompositeMap  */
+  YYSYMBOL_XkbCompositeType = 69,          /* XkbCompositeType  */
+  YYSYMBOL_XkbMapConfigList = 70,          /* XkbMapConfigList  */
+  YYSYMBOL_XkbMapConfig = 71,              /* XkbMapConfig  */
+  YYSYMBOL_FileType = 72,                  /* FileType  */
+  YYSYMBOL_OptFlags = 73,                  /* OptFlags  */
+  YYSYMBOL_Flags = 74,                     /* Flags  */
+  YYSYMBOL_Flag = 75,                      /* Flag  */
+  YYSYMBOL_DeclList = 76,                  /* DeclList  */
+  YYSYMBOL_Decl = 77,                      /* Decl  */
+  YYSYMBOL_VarDecl = 78,                   /* VarDecl  */
+  YYSYMBOL_KeyNameDecl = 79,               /* KeyNameDecl  */
+  YYSYMBOL_KeyAliasDecl = 80,              /* KeyAliasDecl  */
+  YYSYMBOL_VModDecl = 81,                  /* VModDecl  */
+  YYSYMBOL_VModDefList = 82,               /* VModDefList  */
+  YYSYMBOL_VModDef = 83,                   /* VModDef  */
+  YYSYMBOL_InterpretDecl = 84,             /* InterpretDecl  */
+  YYSYMBOL_InterpretMatch = 85,            /* InterpretMatch  */
+  YYSYMBOL_VarDeclList = 86,               /* VarDeclList  */
+  YYSYMBOL_KeyTypeDecl = 87,               /* KeyTypeDecl  */
+  YYSYMBOL_SymbolsDecl = 88,               /* SymbolsDecl  */
+  YYSYMBOL_OptSymbolsBody = 89,            /* OptSymbolsBody  */
+  YYSYMBOL_SymbolsBody = 90,               /* SymbolsBody  */
+  YYSYMBOL_SymbolsVarDecl = 91,            /* SymbolsVarDecl  */
+  YYSYMBOL_MultiKeySymOrActionList = 92,   /* MultiKeySymOrActionList  */
+  YYSYMBOL_NoSymbolOrActionList = 93,      /* NoSymbolOrActionList  */
+  YYSYMBOL_GroupCompatDecl = 94,           /* GroupCompatDecl  */
+  YYSYMBOL_ModMapDecl = 95,                /* ModMapDecl  */
+  YYSYMBOL_KeyOrKeySymList = 96,           /* KeyOrKeySymList  */
+  YYSYMBOL_KeyOrKeySym = 97,               /* KeyOrKeySym  */
+  YYSYMBOL_LedMapDecl = 98,                /* LedMapDecl  */
+  YYSYMBOL_LedNameDecl = 99,               /* LedNameDecl  */
+  YYSYMBOL_ShapeDecl = 100,                /* ShapeDecl  */
+  YYSYMBOL_SectionDecl = 101,              /* SectionDecl  */
+  YYSYMBOL_SectionBody = 102,              /* SectionBody  */
+  YYSYMBOL_SectionBodyItem = 103,          /* SectionBodyItem  */
+  YYSYMBOL_RowBody = 104,                  /* RowBody  */
+  YYSYMBOL_RowBodyItem = 105,              /* RowBodyItem  */
+  YYSYMBOL_Keys = 106,                     /* Keys  */
+  YYSYMBOL_Key = 107,                      /* Key  */
+  YYSYMBOL_OverlayDecl = 108,              /* OverlayDecl  */
+  YYSYMBOL_OverlayKeyList = 109,           /* OverlayKeyList  */
+  YYSYMBOL_OverlayKey = 110,               /* OverlayKey  */
+  YYSYMBOL_OutlineList = 111,              /* OutlineList  */
+  YYSYMBOL_OutlineInList = 112,            /* OutlineInList  */
+  YYSYMBOL_CoordList = 113,                /* CoordList  */
+  YYSYMBOL_Coord = 114,                    /* Coord  */
+  YYSYMBOL_DoodadDecl = 115,               /* DoodadDecl  */
+  YYSYMBOL_DoodadType = 116,               /* DoodadType  */
+  YYSYMBOL_FieldSpec = 117,                /* FieldSpec  */
+  YYSYMBOL_Element = 118,                  /* Element  */
+  YYSYMBOL_OptMergeMode = 119,             /* OptMergeMode  */
+  YYSYMBOL_MergeMode = 120,                /* MergeMode  */
+  YYSYMBOL_ExprList = 121,                 /* ExprList  */
+  YYSYMBOL_Expr = 122,                     /* Expr  */
+  YYSYMBOL_Term = 123,                     /* Term  */
+  YYSYMBOL_MultiActionList = 124,          /* MultiActionList  */
+  YYSYMBOL_ActionList = 125,               /* ActionList  */
+  YYSYMBOL_NonEmptyActions = 126,          /* NonEmptyActions  */
+  YYSYMBOL_Actions = 127,                  /* Actions  */
+  YYSYMBOL_Action = 128,                   /* Action  */
+  YYSYMBOL_Lhs = 129,                      /* Lhs  */
+  YYSYMBOL_Terminal = 130,                 /* Terminal  */
+  YYSYMBOL_MultiKeySymList = 131,          /* MultiKeySymList  */
+  YYSYMBOL_KeySymList = 132,               /* KeySymList  */
+  YYSYMBOL_NonEmptyKeySyms = 133,          /* NonEmptyKeySyms  */
+  YYSYMBOL_KeySyms = 134,                  /* KeySyms  */
+  YYSYMBOL_KeySym = 135,                   /* KeySym  */
+  YYSYMBOL_KeySymLit = 136,                /* KeySymLit  */
+  YYSYMBOL_SignedNumber = 137,             /* SignedNumber  */
+  YYSYMBOL_Number = 138,                   /* Number  */
+  YYSYMBOL_Float = 139,                    /* Float  */
+  YYSYMBOL_Integer = 140,                  /* Integer  */
+  YYSYMBOL_KeyCode = 141,                  /* KeyCode  */
+  YYSYMBOL_Ident = 142,                    /* Ident  */
+  YYSYMBOL_String = 143,                   /* String  */
+  YYSYMBOL_OptMapName = 144,               /* OptMapName  */
+  YYSYMBOL_MapName = 145                   /* MapName  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -638,16 +642,16 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  16
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   876
+#define YYLAST   859
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  65
+#define YYNTOKENS  66
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  80
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  209
+#define YYNRULES  213
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  368
+#define YYNSTATES  372
 
 /* YYMAXUTOK -- Last valid token kind.  */
 #define YYMAXUTOK   257
@@ -670,8 +674,8 @@ static const yytype_int8 yytranslate[] =
       27,    28,    29,    30,    31,    32,    33,    34,    35,     2,
       36,    37,    38,    39,    40,    41,    42,    43,    44,    45,
       46,    47,    48,    49,    50,    51,     2,     2,     2,     2,
-      52,    53,    54,    55,    56,     2,     2,     2,     2,     2,
-      57,    58,    59,    60,    61,    62,    63,    64,     2,     2,
+      52,    53,    54,    55,    56,    57,     2,     2,     2,     2,
+      58,    59,    60,    61,    62,    63,    64,    65,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -696,27 +700,28 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   262,   262,   264,   266,   270,   276,   277,   278,   284,
-     296,   299,   307,   308,   309,   310,   311,   314,   315,   318,
-     319,   322,   323,   324,   325,   326,   327,   328,   329,   332,
-     347,   357,   360,   366,   371,   376,   381,   386,   391,   396,
-     401,   406,   411,   412,   413,   414,   421,   423,   425,   429,
-     433,   437,   441,   443,   447,   449,   453,   459,   461,   465,
-     477,   480,   486,   492,   493,   496,   498,   502,   503,   504,
-     505,   506,   521,   523,   541,   543,   565,   571,   573,   575,
-     578,   582,   586,   588,   592,   594,   598,   602,   604,   608,
-     610,   614,   618,   619,   622,   624,   626,   628,   630,   634,
-     635,   638,   639,   643,   644,   647,   649,   653,   657,   658,
-     661,   664,   666,   670,   672,   674,   678,   680,   684,   688,
-     692,   693,   694,   695,   698,   699,   702,   704,   706,   708,
-     710,   712,   714,   716,   718,   720,   722,   726,   727,   730,
-     731,   732,   733,   734,   746,   758,   760,   763,   765,   767,
-     769,   771,   773,   777,   779,   781,   783,   785,   787,   789,
-     791,   793,   797,   803,   805,   807,   811,   813,   817,   821,
-     823,   827,   831,   833,   835,   837,   841,   843,   845,   847,
-     851,   857,   859,   861,   865,   867,   874,   880,   892,   894,
-     906,   908,   912,   914,   923,   936,   937,   987,   988,   991,
-     992,   995,   998,  1001,  1004,  1005,  1008,  1011,  1012,  1015
+       0,   266,   266,   268,   270,   274,   280,   281,   282,   288,
+     300,   303,   311,   312,   313,   314,   315,   318,   319,   322,
+     323,   326,   327,   328,   329,   330,   331,   332,   333,   336,
+     351,   361,   364,   370,   375,   380,   385,   390,   395,   400,
+     405,   410,   415,   416,   417,   418,   425,   427,   429,   433,
+     437,   441,   445,   447,   451,   453,   457,   463,   465,   469,
+     481,   484,   490,   496,   497,   500,   502,   506,   507,   508,
+     509,   510,   525,   527,   545,   547,   569,   575,   577,   579,
+     582,   586,   590,   592,   596,   598,   602,   606,   608,   612,
+     614,   618,   622,   623,   626,   628,   630,   632,   634,   638,
+     639,   642,   643,   647,   648,   651,   653,   657,   661,   662,
+     665,   668,   670,   674,   676,   678,   682,   684,   688,   692,
+     696,   697,   698,   699,   702,   703,   706,   708,   710,   712,
+     714,   716,   718,   720,   722,   724,   726,   730,   731,   734,
+     735,   736,   737,   738,   750,   762,   764,   767,   769,   771,
+     773,   775,   777,   781,   783,   785,   787,   789,   791,   793,
+     795,   797,   801,   807,   809,   811,   815,   817,   821,   825,
+     827,   831,   835,   837,   839,   841,   845,   847,   849,   851,
+     855,   861,   863,   865,   869,   871,   878,   884,   896,   898,
+     910,   912,   916,   918,   927,   940,   941,   950,  1010,  1011,
+    1014,  1015,  1016,  1019,  1022,  1023,  1026,  1027,  1030,  1031,
+    1034,  1037,  1038,  1041
 };
 #endif
 
@@ -741,13 +746,13 @@ yysymbol_name (yysymbol_kind_t yysymbol)
   "indicator", "shape", "keys", "row", "section", "overlay", "text",
   "outline", "solid", "logo", "virtual", "=", "+", "-", "/", "*", "{", "}",
   "(", ")", "[", "]", ".", ",", ";", "!", "~", "string literal",
-  "integer literal", "float literal", "identifier", "key name", "partial",
-  "default", "hidden", "alphanumeric_keys", "modifier_keys", "keypad_keys",
-  "function_keys", "alternate_group", "$accept", "XkbFile",
-  "XkbCompositeMap", "XkbCompositeType", "XkbMapConfigList",
-  "XkbMapConfig", "FileType", "OptFlags", "Flags", "Flag", "DeclList",
-  "Decl", "VarDecl", "KeyNameDecl", "KeyAliasDecl", "VModDecl",
-  "VModDefList", "VModDef", "InterpretDecl", "InterpretMatch",
+  "decimal digit", "integer literal", "float literal", "identifier",
+  "key name", "partial", "default", "hidden", "alphanumeric_keys",
+  "modifier_keys", "keypad_keys", "function_keys", "alternate_group",
+  "$accept", "XkbFile", "XkbCompositeMap", "XkbCompositeType",
+  "XkbMapConfigList", "XkbMapConfig", "FileType", "OptFlags", "Flags",
+  "Flag", "DeclList", "Decl", "VarDecl", "KeyNameDecl", "KeyAliasDecl",
+  "VModDecl", "VModDefList", "VModDef", "InterpretDecl", "InterpretMatch",
   "VarDeclList", "KeyTypeDecl", "SymbolsDecl", "OptSymbolsBody",
   "SymbolsBody", "SymbolsVarDecl", "MultiKeySymOrActionList",
   "NoSymbolOrActionList", "GroupCompatDecl", "ModMapDecl",
@@ -766,12 +771,12 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-267)
+#define YYPACT_NINF (-273)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
 
-#define YYTABLE_NINF (-205)
+#define YYTABLE_NINF (-209)
 
 #define yytable_value_is_error(Yyn) \
   0
@@ -780,43 +785,44 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int16 yypact[] =
 {
-      48,  -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,
-       7,  -267,  -267,   542,   765,  -267,  -267,  -267,  -267,  -267,
-    -267,  -267,  -267,  -267,  -267,    10,    10,  -267,  -267,    52,
-    -267,    59,  -267,  -267,   189,    44,    40,  -267,   287,  -267,
-    -267,  -267,  -267,  -267,    66,  -267,   280,    72,  -267,  -267,
-     -14,    90,    94,  -267,    89,   103,   139,   -14,     1,    90,
-    -267,    90,   132,  -267,  -267,  -267,   194,   -14,  -267,   193,
-    -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,
-    -267,  -267,  -267,  -267,  -267,    90,    16,  -267,   204,   165,
-    -267,   131,  -267,   226,  -267,   192,  -267,  -267,  -267,  -267,
-     213,   231,  -267,  -267,   228,   234,   236,   232,   238,   240,
-     242,   243,   139,   230,   254,   248,   363,   818,   363,  -267,
-     -14,  -267,   363,  -267,  -267,   363,   606,   268,   363,    -6,
-     363,  -267,    93,   486,   289,  -267,  -267,   277,  -267,  -267,
-    -267,  -267,  -267,  -267,  -267,  -267,  -267,  -267,   363,   363,
-     775,   363,   363,   363,  -267,  -267,   -25,   197,  -267,  -267,
-    -267,   301,  -267,  -267,  -267,  -267,  -267,   298,   166,  -267,
-     294,   634,   649,   294,    14,   -14,   306,   303,  -267,  -267,
-     325,   -12,   308,   172,  -267,    31,  -267,  -267,   218,   677,
-     318,    45,   102,  -267,   112,  -267,   329,    90,   326,    90,
-    -267,  -267,   445,  -267,  -267,  -267,   363,  -267,   692,  -267,
-    -267,  -267,  -267,   327,   113,  -267,   316,  -267,  -267,   363,
-     363,   363,   363,   363,  -267,   363,   363,  -267,   319,  -267,
-     320,   335,   503,  -267,   337,    55,    68,  -267,  -267,    83,
-    -267,  -267,  -267,   341,   606,   321,  -267,  -267,   344,    -6,
-    -267,   346,   122,   185,  -267,  -267,   348,  -267,   349,   -29,
-     350,   318,   404,   733,   356,   353,  -267,   279,   354,   363,
-    -267,   818,  -267,   -40,   294,   160,   160,  -267,  -267,   294,
-     283,  -267,  -267,  -267,  -267,   125,  -267,  -267,   544,  -267,
-     790,  -267,    23,  -267,  -267,  -267,   294,  -267,  -267,  -267,
-    -267,  -267,    45,  -267,  -267,  -267,  -267,   747,   294,   364,
-    -267,   563,  -267,   351,  -267,  -267,  -267,    26,  -267,  -267,
-     363,  -267,  -267,   123,   591,   176,   182,  -267,  -267,    39,
-    -267,  -267,  -267,   362,   146,   -28,   360,  -267,   374,   149,
-    -267,  -267,   294,  -267,  -267,  -267,  -267,  -267,  -267,  -267,
-    -267,   363,  -267,   159,  -267,  -267,   355,   371,   351,   178,
-     377,   -28,  -267,  -267,  -267,  -267,  -267,  -267
+     180,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,
+      64,  -273,  -273,   471,   478,  -273,  -273,  -273,  -273,  -273,
+    -273,  -273,  -273,  -273,  -273,    27,    27,  -273,  -273,    63,
+    -273,    86,  -273,  -273,   192,     5,    81,  -273,   371,  -273,
+    -273,  -273,  -273,  -273,   109,  -273,   266,    93,  -273,  -273,
+       6,   138,    88,  -273,   163,   168,    -5,     6,   -29,   138,
+    -273,   138,   160,  -273,  -273,  -273,   203,     6,  -273,   196,
+    -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,
+    -273,  -273,  -273,  -273,  -273,   138,    66,  -273,   200,   214,
+    -273,    87,  -273,   241,  -273,   239,  -273,  -273,  -273,  -273,
+    -273,   252,   259,  -273,   278,   270,  -273,  -273,   285,   283,
+     292,   312,   317,   320,    -5,   318,   155,   329,   331,   800,
+     331,  -273,     6,  -273,   331,  -273,  -273,   331,   174,   314,
+     331,    -2,   331,  -273,    18,   415,   337,  -273,  -273,  -273,
+     340,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,  -273,
+    -273,   331,   331,   756,   331,   331,   331,  -273,  -273,   286,
+     265,  -273,  -273,  -273,   359,  -273,  -273,  -273,  -273,  -273,
+     358,   178,  -273,   380,   598,   613,   380,   432,     6,   363,
+     352,  -273,  -273,   376,    48,   364,   221,  -273,    53,  -273,
+    -273,   298,   655,   386,   128,    84,  -273,   112,  -273,   401,
+     138,   413,   138,  -273,  -273,    11,  -273,  -273,  -273,   331,
+    -273,   670,  -273,  -273,  -273,  -273,   399,   120,  -273,   563,
+    -273,  -273,   331,   331,   331,   331,   331,  -273,   331,   331,
+    -273,   410,  -273,   417,   419,   474,  -273,   421,    52,   189,
+    -273,  -273,   201,  -273,  -273,  -273,   418,   174,   289,  -273,
+    -273,   420,    -2,  -273,   423,   143,   133,  -273,  -273,  -273,
+     422,  -273,   434,    47,   438,   386,   373,   712,   427,   440,
+    -273,   326,   441,   331,  -273,   800,  -273,    70,   380,   382,
+     382,  -273,  -273,   380,   369,  -273,  -273,  -273,  -273,   162,
+    -273,  -273,   494,  -273,   776,  -273,    56,  -273,  -273,  -273,
+     380,  -273,  -273,  -273,  -273,  -273,   128,  -273,  -273,  -273,
+    -273,   727,   380,   455,  -273,   556,  -273,   444,  -273,  -273,
+    -273,   119,  -273,  -273,   331,  -273,  -273,    96,   536,   218,
+     230,  -273,  -273,     4,  -273,  -273,  -273,   458,   165,   -35,
+     459,  -273,   473,   220,  -273,  -273,   380,  -273,  -273,  -273,
+    -273,  -273,  -273,  -273,  -273,   331,  -273,   225,  -273,  -273,
+     464,   475,   444,   233,   480,   -35,  -273,  -273,  -273,  -273,
+    -273,  -273
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -826,67 +832,68 @@ static const yytype_uint8 yydefact[] =
 {
       18,     4,    21,    22,    23,    24,    25,    26,    27,    28,
        0,     2,     3,     0,    17,    20,     1,     6,    12,    13,
-      15,    14,    16,     7,     8,   208,   208,    19,   209,     0,
-     207,     0,    10,    31,    18,   138,     0,     9,     0,   139,
+      15,    14,    16,     7,     8,   212,   212,    19,   213,     0,
+     211,     0,    10,    31,    18,   138,     0,     9,     0,   139,
      141,   140,   142,   143,     0,    29,     0,   137,     5,    11,
        0,   128,   127,   126,   129,     0,   130,   131,   132,   133,
-     134,   135,   136,   121,   122,   123,     0,     0,   204,     0,
-     205,    32,    34,    35,    30,    33,    36,    37,    39,    38,
+     134,   135,   136,   121,   122,   123,     0,     0,   208,     0,
+     209,    32,    34,    35,    30,    33,    36,    37,    39,    38,
       40,    41,    42,    43,    44,     0,   172,   125,     0,   124,
-      45,     0,    53,    54,   206,     0,   195,   193,   202,   194,
-       0,    58,   192,   196,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,    47,
-       0,    51,     0,    60,    60,     0,    64,     0,     0,     0,
-       0,    60,     0,     0,     0,    48,   203,     0,    60,   128,
-     127,   129,   130,   131,   132,   133,   135,   136,     0,     0,
-       0,     0,     0,     0,   201,   179,   172,     0,   152,   169,
-     159,   157,   160,   178,   177,   124,   176,   173,     0,    52,
-      55,     0,     0,    57,    79,     0,     0,    63,    66,    71,
-       0,   124,     0,     0,    84,     0,    83,    85,     0,     0,
-       0,     0,     0,   112,     0,   117,     0,   132,   134,     0,
-      95,    97,     0,    93,    98,    96,     0,    49,     0,   154,
-     157,   153,   170,     0,     0,   167,     0,   155,   156,   146,
-       0,     0,     0,     0,   174,     0,     0,    46,     0,    59,
-       0,   195,     0,   189,   194,     0,     0,   165,   164,     0,
-     183,   182,    70,     0,     0,     0,    50,    80,     0,     0,
-      87,     0,     0,     0,   200,   199,     0,   198,     0,     0,
-       0,     0,     0,     0,     0,     0,    92,     0,     0,   146,
-     168,     0,   161,     0,   145,   148,   149,   147,   150,   151,
-       0,    61,    56,    78,   187,     0,   186,    76,     0,    74,
-       0,    72,     0,    62,    65,    68,    67,    81,    82,    86,
-     113,   197,     0,    89,   111,    90,   116,     0,   115,     0,
-     102,     0,   100,     0,    91,    88,   119,     0,   166,   158,
-       0,   175,   188,     0,     0,     0,     0,   163,   162,     0,
-     190,   181,   180,     0,     0,     0,     0,    99,     0,     0,
-     109,   171,   144,   185,   184,    77,    75,    73,   191,   118,
-     114,   146,   105,     0,   104,    94,     0,     0,     0,     0,
-       0,     0,   110,   107,   108,   106,   101,   103
+      45,     0,    53,    54,   210,     0,   195,   193,   196,   197,
+     194,     0,    58,   192,     0,     0,   205,   204,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,    47,     0,    51,     0,    60,    60,     0,    64,     0,
+       0,     0,     0,    60,     0,     0,     0,    48,   207,   206,
+       0,    60,   128,   127,   129,   130,   131,   132,   133,   135,
+     136,     0,     0,     0,     0,     0,     0,   203,   179,   172,
+       0,   152,   169,   159,   157,   160,   178,   177,   124,   176,
+     173,     0,    52,    55,     0,     0,    57,    79,     0,     0,
+      63,    66,    71,     0,   124,     0,     0,    84,     0,    83,
+      85,     0,     0,     0,     0,     0,   112,     0,   117,     0,
+     132,   134,     0,    95,    97,     0,    93,    98,    96,     0,
+      49,     0,   154,   157,   153,   170,     0,     0,   167,     0,
+     155,   156,   146,     0,     0,     0,     0,   174,     0,     0,
+      46,     0,    59,     0,   195,     0,   189,   194,     0,     0,
+     165,   164,     0,   183,   182,    70,     0,     0,     0,    50,
+      80,     0,     0,    87,     0,     0,     0,   201,   202,   200,
+       0,   199,     0,     0,     0,     0,     0,     0,     0,     0,
+      92,     0,     0,   146,   168,     0,   161,     0,   145,   148,
+     149,   147,   150,   151,     0,    61,    56,    78,   187,     0,
+     186,    76,     0,    74,     0,    72,     0,    62,    65,    68,
+      67,    81,    82,    86,   113,   198,     0,    89,   111,    90,
+     116,     0,   115,     0,   102,     0,   100,     0,    91,    88,
+     119,     0,   166,   158,     0,   175,   188,     0,     0,     0,
+       0,   163,   162,     0,   190,   181,   180,     0,     0,     0,
+       0,    99,     0,     0,   109,   171,   144,   185,   184,    77,
+      75,    73,   191,   118,   114,   146,   105,     0,   104,    94,
+       0,     0,     0,     0,     0,     0,   110,   107,   108,   106,
+     101,   103
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-    -267,  -267,  -267,  -267,  -267,   378,  -267,   397,  -267,   420,
-    -267,  -267,   -45,  -267,  -267,  -267,  -267,   317,  -267,  -267,
-      58,  -267,  -267,  -267,  -267,   195,   191,  -267,  -267,  -267,
-    -267,   199,   392,  -267,  -267,  -267,  -267,   241,  -267,   129,
-    -267,    85,  -267,  -267,    86,  -267,   190,  -188,   200,   405,
-    -267,   -46,  -267,  -267,  -267,  -266,    65,   111,   162,  -267,
-    -168,   163,  -158,   -31,  -267,   164,  -267,   175,  -267,   428,
-    -155,   170,   229,  -267,   -47,  -267,   -36,   -34,   455,  -267
+    -273,  -273,  -273,  -273,  -273,   497,  -273,   498,  -273,   520,
+    -273,  -273,   -44,  -273,  -273,  -273,  -273,   429,  -273,  -273,
+     -57,  -273,  -273,  -273,  -273,   297,   301,  -273,  -273,  -273,
+    -273,   293,   506,  -273,  -273,  -273,  -273,   353,  -273,   248,
+    -273,   204,  -273,  -273,   206,  -273,   303,  -190,   305,   525,
+    -273,   -46,  -273,  -273,  -273,  -272,   -52,   355,   280,  -273,
+    -169,   279,  -170,   -36,  -273,   294,  -273,   295,  -273,   541,
+    -149,   288,   341,  -273,   -43,  -273,   -41,   -47,   570,  -273
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int16 yydefgoto[] =
 {
        0,    10,    11,    25,    34,    12,    26,    13,    14,    15,
-      35,    45,   229,    72,    73,    74,    91,    92,    75,   100,
-     171,    76,    77,   176,   177,   178,   179,   235,    78,    79,
-     185,   186,   201,    81,    82,    83,   202,   203,   311,   312,
-     353,   354,   204,   339,   340,   192,   193,   194,   195,   205,
-      85,   156,    87,    46,    47,   273,   274,   158,   236,   214,
-     159,   160,   215,   161,   162,   239,   285,   240,   331,   187,
-     102,   256,   257,   163,   164,   137,   165,   166,    29,    30
+      35,    45,   232,    72,    73,    74,    91,    92,    75,   101,
+     174,    76,    77,   179,   180,   181,   182,   238,    78,    79,
+     188,   189,   204,    81,    82,    83,   205,   206,   315,   316,
+     357,   358,   207,   343,   344,   195,   196,   197,   198,   208,
+      85,   159,    87,    46,    47,   277,   278,   161,   239,   217,
+     162,   163,   218,   164,   165,   242,   289,   243,   335,   190,
+     103,   260,   261,   166,   167,   140,   168,   169,    29,    30
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -894,255 +901,253 @@ static const yytype_int16 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int16 yytable[] =
 {
-      86,    71,   252,   317,   319,   103,   237,    16,   320,   106,
-      89,   108,   190,   351,    93,    88,   238,    95,   219,   241,
-     116,   107,   117,    96,   109,   110,    68,   111,   352,    70,
-     -69,   113,   139,   140,    53,   141,   -69,   142,   143,   144,
-     145,    68,    60,   231,    70,   147,    97,    98,     1,    99,
-     184,   115,    96,    94,    98,   232,    39,    40,    41,    42,
-      43,   116,    28,   117,   329,   134,   233,    98,    96,   234,
-     341,   167,    70,   248,   320,   233,    98,   286,    99,   249,
-      86,   348,   103,   253,    93,   359,    44,    86,   200,    48,
-     181,   284,    98,    32,    99,   180,   196,    89,   254,   255,
-      33,   287,    88,   288,   213,     2,     3,     4,     5,     6,
-       7,     8,     9,   318,   289,    49,   290,   210,   210,   334,
-     237,   210,   210,    96,    90,    86,    86,   103,   213,   291,
-     238,   292,   328,   241,   190,    89,    89,   332,   191,   242,
-      88,    88,    94,    86,   258,   104,    97,    98,    68,    99,
-     259,    70,    96,    89,   260,   270,    86,   200,    88,   105,
-     261,   271,    86,   109,   300,   264,    89,   322,   344,   286,
-     261,    88,    89,   323,   286,   343,    98,    88,    99,   120,
-     121,   157,   172,   168,  -120,   103,   213,   170,   350,   189,
-     173,   357,    98,   183,   261,   188,   208,   358,    86,   222,
-     223,   360,   103,   220,   221,   222,   223,   361,   181,   220,
-     221,   222,   223,   180,   119,   227,   216,    86,   310,   112,
-     365,   247,   346,   196,   290,   213,   320,    89,   347,   114,
-     292,    36,    88,   123,   220,   221,   222,   223,   254,   255,
-     118,   103,   213,   224,   213,   103,     2,     3,     4,     5,
-       6,     7,     8,     9,   124,   220,   221,   222,   223,   209,
-     211,   213,   122,   217,   218,    86,   310,   250,   125,   126,
-     127,   267,   128,   129,   130,    89,   103,   103,   213,   135,
-      88,   131,   103,   132,   133,   275,   276,   277,   278,   138,
-     279,   280,    18,    19,    20,    21,    22,    50,    51,    52,
-      53,    54,    55,    56,    57,    58,    59,   136,    60,    61,
-     296,    62,    63,    64,    65,    66,   220,   221,   222,   223,
-     220,   221,   222,   223,   182,   206,   207,   308,   315,   321,
-      67,   220,   221,   222,   223,    68,    69,   225,    70,   139,
-     140,    53,   141,   226,   142,   143,   144,   145,   243,    60,
-     146,   244,   147,   220,   221,   222,   223,   246,   148,   149,
-     272,   245,   150,   191,   151,   262,   174,   263,   281,   282,
-     269,   152,   153,    94,    98,   154,    68,   155,  -135,    70,
-    -204,   139,   140,    53,   141,   342,   142,   143,   144,   145,
-     293,    60,   146,   297,   147,   299,   302,   313,   303,   305,
-     148,   149,   314,   316,   150,   335,   151,   338,   349,   355,
-     356,   362,    37,   152,   153,    94,    98,   154,    68,   155,
-     363,    70,   139,   140,    53,   141,   366,   142,   143,   144,
-     145,    38,    60,   146,    27,   147,   295,   169,    80,   294,
-     337,   148,   149,   266,   364,   307,   367,   151,   298,   304,
-     325,    84,   326,   327,   152,   153,    94,    98,   154,    68,
-     155,   306,    70,   139,   140,    53,   141,   330,   142,   143,
-     197,   145,   333,   198,   146,   199,    62,    63,    64,    65,
-     101,    31,   301,     0,     0,     0,     0,   265,     0,     0,
-       0,     0,     0,     0,     0,    67,     0,     0,     0,     0,
-      68,     0,     0,    70,   139,   140,    53,   141,     0,   142,
-     143,   197,   145,     0,   198,   146,   199,    62,    63,    64,
-      65,   139,   140,    53,   141,     0,   142,   143,   144,   145,
-       0,    60,   231,     0,   147,     0,    67,     0,     0,     0,
-       0,    68,     0,     0,    70,   283,    17,    18,    19,    20,
-      21,    22,    23,    24,     0,   284,    98,     0,   234,     0,
-       0,    70,   139,   140,    53,   141,     0,   142,   143,   144,
-     145,     0,    60,   231,     0,   147,     0,     0,     0,     0,
-       0,   139,   140,    53,   141,   324,   142,   143,   144,   145,
-     309,    60,   146,     0,   147,     0,   233,    98,     0,   234,
-       0,     0,    70,     0,     0,   336,     0,     0,     0,   139,
-     140,    53,   141,    67,   142,   143,   144,   145,    68,    60,
-     231,    70,   147,     0,   139,   140,    53,   141,     0,   142,
-     143,   144,   145,   345,    60,   146,     0,   147,     0,     0,
-       0,     0,     0,   284,    98,     0,   234,     0,     0,    70,
-       0,   174,   139,   140,    53,   141,   175,   142,   143,   144,
-     145,    68,    60,   146,    70,   147,     0,   139,   140,    53,
-     141,     0,   142,   143,   144,   145,   228,    60,   146,     0,
-     147,     0,     0,     0,    67,     0,     0,     0,     0,    68,
-       0,   230,    70,     0,     0,   139,   140,    53,   141,    67,
-     142,   143,   144,   145,    68,    60,   146,    70,   147,     0,
-     139,   140,    53,   141,     0,   142,   143,   144,   145,   251,
-      60,   146,     0,   147,     0,     0,     0,    67,     0,     0,
-       0,     0,    68,     0,   268,    70,     0,     0,     0,     0,
-       0,     0,    67,     0,     0,     0,     0,    68,     0,     0,
-      70,   139,   140,    53,   141,     0,   142,   143,   144,   145,
-     309,    60,   146,     0,   147,   139,   140,    53,   141,     0,
-     142,   143,   144,   145,     0,    60,   146,     0,   147,     0,
-       0,     0,     0,    67,     0,     0,     0,     0,    68,   212,
-       0,    70,   191,   139,   140,    53,   141,     0,   142,   143,
-     144,   145,    68,    60,   146,    70,   147,     0,   139,   140,
-      53,   141,     0,   142,   143,   144,   145,   212,    60,   146,
-       0,   147,     2,     3,     4,     5,     6,     7,     8,     9,
-      68,   150,     0,    70,     0,     0,   139,   140,    53,   141,
-       0,   142,   143,   144,   145,    68,    60,   146,    70,   147,
+      86,   321,    71,   255,    95,    89,   355,   241,   240,    93,
+      88,   111,   112,   108,   113,   110,   109,    39,    40,    41,
+      42,    43,   356,    94,   106,   107,   115,    96,   244,   142,
+     143,    53,   144,    96,   145,   146,   200,   148,   117,   201,
+     149,   202,    62,    63,    64,    65,   352,    44,   106,   107,
+      97,    98,    99,   269,   100,   187,   288,    98,    99,   193,
+     100,    67,    68,   194,    16,    70,   160,    68,   171,   175,
+      70,   136,   173,   170,    68,   176,   192,    70,   186,    28,
+     191,    93,    86,   363,   211,    96,   290,   184,   193,    86,
+     -69,   203,   183,   199,    89,   251,   -69,   333,   291,    88,
+     292,   252,   219,    68,    32,   322,    70,   216,   236,    98,
+      99,   118,   100,   119,   323,   213,   213,    96,   324,   213,
+     213,   338,   241,   240,   332,    96,   262,    33,    86,    86,
+      48,   216,   263,    89,    89,   122,   123,   245,    88,    88,
+      97,    98,    99,   244,   100,    90,    86,   336,   347,    98,
+      99,    89,   100,   111,   264,   268,    88,   271,    49,    86,
+     265,   203,   274,   345,    89,    86,   256,   324,   275,    88,
+      89,   279,   280,   281,   282,    88,   283,   284,   348,   290,
+       1,   257,   258,   259,   290,   304,   257,   258,   259,   216,
+      94,   265,   142,   143,    53,   144,   300,   145,   146,   147,
+     148,    86,    60,   149,   326,   150,   184,   354,   138,   139,
+     327,   183,  -120,   265,   312,   223,   224,   225,   226,   177,
+     104,    86,   199,   314,   178,   105,    89,   230,   114,   216,
+      68,    88,   116,    70,    36,   293,   120,   294,     2,     3,
+       4,     5,     6,     7,     8,     9,   216,   295,   216,   296,
+       2,     3,     4,     5,     6,     7,     8,     9,   223,   224,
+     225,   226,   361,   121,   350,   216,   294,   364,   362,    86,
+     250,   314,   346,   365,    89,   369,   351,   124,   296,    88,
+     125,   324,   216,    50,    51,    52,    53,    54,    55,    56,
+      57,    58,    59,   126,    60,    61,   127,    62,    63,    64,
+      65,    66,   223,   224,   225,   226,   129,   142,   143,    53,
+     144,   227,   145,   146,   147,   148,    67,    60,   149,   128,
+     150,   130,    68,    69,   131,    70,   151,   152,   132,   222,
+     153,   118,   154,   119,   177,   223,   224,   225,   226,   155,
+     156,    94,   106,   107,   157,    68,   158,   253,    70,   142,
+     143,    53,   144,   133,   145,   146,   147,   148,   134,    60,
+     149,   135,   150,   223,   224,   225,   226,   137,   151,   152,
+     141,   185,   153,   209,   154,   319,    18,    19,    20,    21,
+      22,   155,   156,    94,   106,   107,   157,    68,   158,   210,
+      70,   142,   143,    53,   144,   228,   145,   146,   147,   148,
+     247,    60,   149,   229,   150,   246,   223,   224,   225,   226,
+     151,   152,   248,   249,   311,   325,   154,   223,   224,   225,
+     226,   225,   226,   155,   156,    94,   106,   107,   157,    68,
+     158,   194,    70,   142,   143,    53,   144,   266,   145,   146,
+     200,   148,   273,   201,   149,   202,    62,    63,    64,    65,
+     142,   143,    53,   144,   267,   145,   146,   147,   148,   285,
+      60,   234,  -135,   150,  -208,    67,   286,   297,   317,   301,
+     306,    68,   303,   235,    70,    17,    18,    19,    20,    21,
+      22,    23,    24,   307,   236,    98,    99,   309,   237,   318,
+     320,    70,   142,   143,    53,   144,   339,   145,   146,   147,
+     148,   342,    60,   234,   353,   150,   212,   214,   359,   360,
+     220,   221,   142,   143,    53,   144,   287,   145,   146,   147,
+     148,   366,    60,   234,   367,   150,   288,    98,    99,   370,
+     237,    37,    38,    70,    27,   328,     2,     3,     4,     5,
+       6,     7,     8,     9,   298,   302,   236,    98,    99,   299,
+     237,   172,    80,    70,   142,   143,    53,   144,   270,   145,
+     146,   147,   148,   341,    60,   234,   308,   150,   368,   371,
+     310,    84,   329,   331,   142,   143,    53,   144,   349,   145,
+     146,   147,   148,   313,    60,   149,   330,   150,   288,    98,
+      99,   334,   237,   102,   337,    70,    31,   305,   340,     0,
+     223,   224,   225,   226,     0,     0,    67,   276,     0,     0,
+       0,     0,    68,     0,     0,    70,   142,   143,    53,   144,
+       0,   145,   146,   147,   148,     0,    60,   149,     0,   150,
+       0,   142,   143,    53,   144,     0,   145,   146,   147,   148,
+     231,    60,   149,     0,   150,     0,     0,     0,    67,     0,
+       0,     0,     0,     0,    68,   233,     0,    70,     0,     0,
+       0,     0,     0,    67,     0,     0,     0,     0,     0,    68,
+       0,     0,    70,   142,   143,    53,   144,     0,   145,   146,
+     147,   148,     0,    60,   149,     0,   150,     0,   142,   143,
+      53,   144,     0,   145,   146,   147,   148,   254,    60,   149,
+       0,   150,     0,     0,     0,    67,     0,     0,     0,     0,
+       0,    68,   272,     0,    70,     0,     0,     0,     0,     0,
+      67,     0,     0,     0,     0,     0,    68,     0,     0,    70,
+     142,   143,    53,   144,     0,   145,   146,   147,   148,   313,
+      60,   149,     0,   150,     0,   142,   143,    53,   144,     0,
+     145,   146,   147,   148,     0,    60,   149,     0,   150,     0,
+       0,     0,    67,     0,     0,     0,     0,     0,    68,   215,
+       0,    70,   194,     0,   142,   143,    53,   144,     0,   145,
+     146,   147,   148,    68,    60,   149,    70,   150,     0,     0,
+       0,     0,     0,     0,   142,   143,    53,   144,   215,   145,
+     146,   147,   148,     0,    60,   149,     0,   150,     0,     0,
+       0,     0,    68,     0,     0,    70,     0,   153,   142,   143,
+      53,   144,     0,   145,   146,   147,   148,     0,    60,   149,
+       0,   150,    68,     0,     0,    70,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,    68,     0,     0,    70
+       0,     0,     0,     0,     0,     0,    68,     0,     0,    70
 };
 
 static const yytype_int16 yycheck[] =
 {
-      46,    46,   190,   269,    44,    52,   174,     0,    48,    56,
-      46,    58,    41,    41,    50,    46,   174,    51,    43,   174,
-      45,    57,    47,    29,    58,    59,    55,    61,    56,    58,
-      42,    67,    18,    19,    20,    21,    48,    23,    24,    25,
-      26,    55,    28,    29,    58,    31,    52,    53,     0,    55,
-      56,    85,    29,    52,    53,    41,    12,    13,    14,    15,
-      16,    45,    52,    47,    41,   112,    52,    53,    29,    55,
-      44,   117,    58,    42,    48,    52,    53,   232,    55,    48,
-     126,    42,   129,    38,   120,   351,    42,   133,   133,    49,
-     126,    52,    53,    41,    55,   126,   132,   133,    53,    54,
-      41,    46,   133,    48,   150,    57,    58,    59,    60,    61,
-      62,    63,    64,   271,    46,    49,    48,   148,   149,   307,
-     288,   152,   153,    29,    52,   171,   172,   174,   174,    46,
-     288,    48,   290,   288,    41,   171,   172,   292,    45,   175,
-     171,   172,    52,   189,    42,    56,    52,    53,    55,    55,
-      48,    58,    29,   189,    42,    42,   202,   202,   189,    56,
-      48,    48,   208,   197,    42,   199,   202,    42,   323,   324,
-      48,   202,   208,    48,   329,    52,    53,   208,    55,    48,
-      49,   116,   124,   118,    52,   232,   232,   122,    42,   131,
-     125,    42,    53,   128,    48,   130,   138,    48,   244,    39,
-      40,    42,   249,    37,    38,    39,    40,    48,   244,    37,
-      38,    39,    40,   244,    49,    49,   151,   263,   263,    25,
-      42,    49,    46,   259,    48,   271,    48,   263,    46,    36,
-      48,    42,   263,    41,    37,    38,    39,    40,    53,    54,
-      36,   288,   288,    46,   290,   292,    57,    58,    59,    60,
-      61,    62,    63,    64,    41,    37,    38,    39,    40,   148,
-     149,   307,    36,   152,   153,   311,   311,    49,    37,    41,
-      36,   206,    36,    41,    36,   311,   323,   324,   324,    49,
-     311,    41,   329,    41,    41,   220,   221,   222,   223,    41,
-     225,   226,     5,     6,     7,     8,     9,    17,    18,    19,
-      20,    21,    22,    23,    24,    25,    26,    53,    28,    29,
-     245,    31,    32,    33,    34,    35,    37,    38,    39,    40,
-      37,    38,    39,    40,    56,    36,    49,   262,    49,    46,
-      50,    37,    38,    39,    40,    55,    56,    36,    58,    18,
-      19,    20,    21,    45,    23,    24,    25,    26,    42,    28,
-      29,    48,    31,    37,    38,    39,    40,    49,    37,    38,
-      44,    36,    41,    45,    43,    36,    45,    41,    49,    49,
-      43,    50,    51,    52,    53,    54,    55,    56,    43,    58,
-      43,    18,    19,    20,    21,   320,    23,    24,    25,    26,
-      49,    28,    29,    49,    31,    49,    48,    41,    49,    49,
-      37,    38,    49,    49,    41,    41,    43,    56,    46,    49,
-      36,    56,    34,    50,    51,    52,    53,    54,    55,    56,
-      49,    58,    18,    19,    20,    21,    49,    23,    24,    25,
-      26,    34,    28,    29,    14,    31,   245,   120,    46,   244,
-     311,    37,    38,   202,   358,    41,   361,    43,   249,   259,
-     288,    46,   288,   290,    50,    51,    52,    53,    54,    55,
-      56,   261,    58,    18,    19,    20,    21,   292,    23,    24,
-      25,    26,   302,    28,    29,    30,    31,    32,    33,    34,
-      52,    26,   253,    -1,    -1,    -1,    -1,    42,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    50,    -1,    -1,    -1,    -1,
-      55,    -1,    -1,    58,    18,    19,    20,    21,    -1,    23,
-      24,    25,    26,    -1,    28,    29,    30,    31,    32,    33,
-      34,    18,    19,    20,    21,    -1,    23,    24,    25,    26,
-      -1,    28,    29,    -1,    31,    -1,    50,    -1,    -1,    -1,
-      -1,    55,    -1,    -1,    58,    42,     4,     5,     6,     7,
-       8,     9,    10,    11,    -1,    52,    53,    -1,    55,    -1,
-      -1,    58,    18,    19,    20,    21,    -1,    23,    24,    25,
-      26,    -1,    28,    29,    -1,    31,    -1,    -1,    -1,    -1,
-      -1,    18,    19,    20,    21,    41,    23,    24,    25,    26,
-      27,    28,    29,    -1,    31,    -1,    52,    53,    -1,    55,
-      -1,    -1,    58,    -1,    -1,    42,    -1,    -1,    -1,    18,
-      19,    20,    21,    50,    23,    24,    25,    26,    55,    28,
-      29,    58,    31,    -1,    18,    19,    20,    21,    -1,    23,
-      24,    25,    26,    42,    28,    29,    -1,    31,    -1,    -1,
-      -1,    -1,    -1,    52,    53,    -1,    55,    -1,    -1,    58,
-      -1,    45,    18,    19,    20,    21,    50,    23,    24,    25,
-      26,    55,    28,    29,    58,    31,    -1,    18,    19,    20,
-      21,    -1,    23,    24,    25,    26,    42,    28,    29,    -1,
-      31,    -1,    -1,    -1,    50,    -1,    -1,    -1,    -1,    55,
-      -1,    42,    58,    -1,    -1,    18,    19,    20,    21,    50,
-      23,    24,    25,    26,    55,    28,    29,    58,    31,    -1,
-      18,    19,    20,    21,    -1,    23,    24,    25,    26,    42,
-      28,    29,    -1,    31,    -1,    -1,    -1,    50,    -1,    -1,
-      -1,    -1,    55,    -1,    42,    58,    -1,    -1,    -1,    -1,
-      -1,    -1,    50,    -1,    -1,    -1,    -1,    55,    -1,    -1,
-      58,    18,    19,    20,    21,    -1,    23,    24,    25,    26,
-      27,    28,    29,    -1,    31,    18,    19,    20,    21,    -1,
-      23,    24,    25,    26,    -1,    28,    29,    -1,    31,    -1,
-      -1,    -1,    -1,    50,    -1,    -1,    -1,    -1,    55,    42,
-      -1,    58,    45,    18,    19,    20,    21,    -1,    23,    24,
-      25,    26,    55,    28,    29,    58,    31,    -1,    18,    19,
+      46,   273,    46,   193,    51,    46,    41,   177,   177,    50,
+      46,    58,    59,    56,    61,    58,    57,    12,    13,    14,
+      15,    16,    57,    52,    53,    54,    67,    29,   177,    18,
+      19,    20,    21,    29,    23,    24,    25,    26,    85,    28,
+      29,    30,    31,    32,    33,    34,    42,    42,    53,    54,
+      52,    53,    54,    42,    56,    57,    52,    53,    54,    41,
+      56,    50,    56,    45,     0,    59,   118,    56,   120,   126,
+      59,   114,   124,   119,    56,   127,   133,    59,   130,    52,
+     132,   122,   128,   355,   141,    29,   235,   128,    41,   135,
+      42,   135,   128,   134,   135,    42,    48,    41,    46,   135,
+      48,    48,   154,    56,    41,   275,    59,   153,    52,    53,
+      54,    45,    56,    47,    44,   151,   152,    29,    48,   155,
+     156,   311,   292,   292,   294,    29,    42,    41,   174,   175,
+      49,   177,    48,   174,   175,    48,    49,   178,   174,   175,
+      52,    53,    54,   292,    56,    52,   192,   296,    52,    53,
+      54,   192,    56,   200,    42,   202,   192,   209,    49,   205,
+      48,   205,    42,    44,   205,   211,    38,    48,    48,   205,
+     211,   223,   224,   225,   226,   211,   228,   229,   327,   328,
+       0,    53,    54,    55,   333,    42,    53,    54,    55,   235,
+      52,    48,    18,    19,    20,    21,   248,    23,    24,    25,
+      26,   247,    28,    29,    42,    31,   247,    42,    53,    54,
+      48,   247,    52,    48,   266,    37,    38,    39,    40,    45,
+      57,   267,   263,   267,    50,    57,   267,    49,    25,   275,
+      56,   267,    36,    59,    42,    46,    36,    48,    58,    59,
+      60,    61,    62,    63,    64,    65,   292,    46,   294,    48,
+      58,    59,    60,    61,    62,    63,    64,    65,    37,    38,
+      39,    40,    42,    49,    46,   311,    48,    42,    48,   315,
+      49,   315,   324,    48,   315,    42,    46,    36,    48,   315,
+      41,    48,   328,    17,    18,    19,    20,    21,    22,    23,
+      24,    25,    26,    41,    28,    29,    37,    31,    32,    33,
+      34,    35,    37,    38,    39,    40,    36,    18,    19,    20,
+      21,    46,    23,    24,    25,    26,    50,    28,    29,    41,
+      31,    36,    56,    57,    41,    59,    37,    38,    36,    43,
+      41,    45,    43,    47,    45,    37,    38,    39,    40,    50,
+      51,    52,    53,    54,    55,    56,    57,    49,    59,    18,
+      19,    20,    21,    41,    23,    24,    25,    26,    41,    28,
+      29,    41,    31,    37,    38,    39,    40,    49,    37,    38,
+      41,    57,    41,    36,    43,    49,     5,     6,     7,     8,
+       9,    50,    51,    52,    53,    54,    55,    56,    57,    49,
+      59,    18,    19,    20,    21,    36,    23,    24,    25,    26,
+      48,    28,    29,    45,    31,    42,    37,    38,    39,    40,
+      37,    38,    36,    49,    41,    46,    43,    37,    38,    39,
+      40,    39,    40,    50,    51,    52,    53,    54,    55,    56,
+      57,    45,    59,    18,    19,    20,    21,    36,    23,    24,
+      25,    26,    43,    28,    29,    30,    31,    32,    33,    34,
+      18,    19,    20,    21,    41,    23,    24,    25,    26,    49,
+      28,    29,    43,    31,    43,    50,    49,    49,    41,    49,
+      48,    56,    49,    41,    59,     4,     5,     6,     7,     8,
+       9,    10,    11,    49,    52,    53,    54,    49,    56,    49,
+      49,    59,    18,    19,    20,    21,    41,    23,    24,    25,
+      26,    57,    28,    29,    46,    31,   151,   152,    49,    36,
+     155,   156,    18,    19,    20,    21,    42,    23,    24,    25,
+      26,    57,    28,    29,    49,    31,    52,    53,    54,    49,
+      56,    34,    34,    59,    14,    41,    58,    59,    60,    61,
+      62,    63,    64,    65,   247,   252,    52,    53,    54,   248,
+      56,   122,    46,    59,    18,    19,    20,    21,   205,    23,
+      24,    25,    26,   315,    28,    29,   263,    31,   362,   365,
+     265,    46,   292,   294,    18,    19,    20,    21,    42,    23,
+      24,    25,    26,    27,    28,    29,   292,    31,    52,    53,
+      54,   296,    56,    52,   306,    59,    26,   256,    42,    -1,
+      37,    38,    39,    40,    -1,    -1,    50,    44,    -1,    -1,
+      -1,    -1,    56,    -1,    -1,    59,    18,    19,    20,    21,
+      -1,    23,    24,    25,    26,    -1,    28,    29,    -1,    31,
+      -1,    18,    19,    20,    21,    -1,    23,    24,    25,    26,
+      42,    28,    29,    -1,    31,    -1,    -1,    -1,    50,    -1,
+      -1,    -1,    -1,    -1,    56,    42,    -1,    59,    -1,    -1,
+      -1,    -1,    -1,    50,    -1,    -1,    -1,    -1,    -1,    56,
+      -1,    -1,    59,    18,    19,    20,    21,    -1,    23,    24,
+      25,    26,    -1,    28,    29,    -1,    31,    -1,    18,    19,
       20,    21,    -1,    23,    24,    25,    26,    42,    28,    29,
-      -1,    31,    57,    58,    59,    60,    61,    62,    63,    64,
-      55,    41,    -1,    58,    -1,    -1,    18,    19,    20,    21,
-      -1,    23,    24,    25,    26,    55,    28,    29,    58,    31,
+      -1,    31,    -1,    -1,    -1,    50,    -1,    -1,    -1,    -1,
+      -1,    56,    42,    -1,    59,    -1,    -1,    -1,    -1,    -1,
+      50,    -1,    -1,    -1,    -1,    -1,    56,    -1,    -1,    59,
+      18,    19,    20,    21,    -1,    23,    24,    25,    26,    27,
+      28,    29,    -1,    31,    -1,    18,    19,    20,    21,    -1,
+      23,    24,    25,    26,    -1,    28,    29,    -1,    31,    -1,
+      -1,    -1,    50,    -1,    -1,    -1,    -1,    -1,    56,    42,
+      -1,    59,    45,    -1,    18,    19,    20,    21,    -1,    23,
+      24,    25,    26,    56,    28,    29,    59,    31,    -1,    -1,
+      -1,    -1,    -1,    -1,    18,    19,    20,    21,    42,    23,
+      24,    25,    26,    -1,    28,    29,    -1,    31,    -1,    -1,
+      -1,    -1,    56,    -1,    -1,    59,    -1,    41,    18,    19,
+      20,    21,    -1,    23,    24,    25,    26,    -1,    28,    29,
+      -1,    31,    56,    -1,    -1,    59,    -1,    -1,    -1,    -1,
       -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    55,    -1,    -1,    58
+      -1,    -1,    -1,    -1,    -1,    -1,    56,    -1,    -1,    59
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,     0,    57,    58,    59,    60,    61,    62,    63,    64,
-      66,    67,    70,    72,    73,    74,     0,     4,     5,     6,
-       7,     8,     9,    10,    11,    68,    71,    74,    52,   143,
-     144,   143,    41,    41,    69,    75,    42,    70,    72,    12,
-      13,    14,    15,    16,    42,    76,   118,   119,    49,    49,
+       0,     0,    58,    59,    60,    61,    62,    63,    64,    65,
+      67,    68,    71,    73,    74,    75,     0,     4,     5,     6,
+       7,     8,     9,    10,    11,    69,    72,    75,    52,   144,
+     145,   144,    41,    41,    70,    76,    42,    71,    73,    12,
+      13,    14,    15,    16,    42,    77,   119,   120,    49,    49,
       17,    18,    19,    20,    21,    22,    23,    24,    25,    26,
-      28,    29,    31,    32,    33,    34,    35,    50,    55,    56,
-      58,    77,    78,    79,    80,    83,    86,    87,    93,    94,
-      97,    98,    99,   100,   114,   115,   116,   117,   128,   141,
-      52,    81,    82,   141,    52,   142,    29,    52,    53,    55,
-      84,   134,   135,   139,    56,    56,   139,   141,   139,   142,
-     142,   142,    25,   141,    36,   142,    45,    47,    36,    49,
-      48,    49,    36,    41,    41,    37,    41,    36,    36,    41,
-      36,    41,    41,    41,   139,    49,    53,   140,    41,    18,
-      19,    21,    23,    24,    25,    26,    29,    31,    37,    38,
-      41,    43,    50,    51,    54,    56,   116,   121,   122,   125,
-     126,   128,   129,   138,   139,   141,   142,   116,   121,    82,
-     121,    85,    85,   121,    45,    50,    88,    89,    90,    91,
-     128,   141,    56,   121,    56,    95,    96,   134,   121,    85,
-      41,    45,   110,   111,   112,   113,   141,    25,    28,    30,
-      77,    97,   101,   102,   107,   114,    36,    49,    85,   122,
-     128,   122,    42,   116,   124,   127,   121,   122,   122,    43,
-      37,    38,    39,    40,    46,    36,    45,    49,    42,    77,
-      42,    29,    41,    52,    55,    92,   123,   125,   127,   130,
-     132,   135,   141,    42,    48,    36,    49,    49,    42,    48,
-      49,    42,   112,    38,    53,    54,   136,   137,    42,    48,
-      42,    48,    36,    41,   142,    42,   102,   121,    42,    43,
-      42,    48,    44,   120,   121,   121,   121,   121,   121,   121,
-     121,    49,    49,    42,    52,   131,   135,    46,    48,    46,
-      48,    46,    48,    49,    90,    91,   121,    49,    96,    49,
-      42,   137,    48,    49,   111,    49,   113,    41,   121,    27,
-      77,   103,   104,    41,    49,    49,    49,   120,   127,    44,
-      48,    46,    42,    48,    41,   123,   130,   126,   127,    41,
-     132,   133,   135,   136,   112,    41,    42,   104,    56,   108,
-     109,    44,   121,    52,   135,    42,    46,    46,    42,    46,
-      42,    41,    56,   105,   106,    49,    36,    42,    48,   120,
-      42,    48,    56,    49,   109,    42,    49,   106
+      28,    29,    31,    32,    33,    34,    35,    50,    56,    57,
+      59,    78,    79,    80,    81,    84,    87,    88,    94,    95,
+      98,    99,   100,   101,   115,   116,   117,   118,   129,   142,
+      52,    82,    83,   142,    52,   143,    29,    52,    53,    54,
+      56,    85,   135,   136,    57,    57,    53,    54,   140,   142,
+     140,   143,   143,   143,    25,   142,    36,   143,    45,    47,
+      36,    49,    48,    49,    36,    41,    41,    37,    41,    36,
+      36,    41,    36,    41,    41,    41,   140,    49,    53,    54,
+     141,    41,    18,    19,    21,    23,    24,    25,    26,    29,
+      31,    37,    38,    41,    43,    50,    51,    55,    57,   117,
+     122,   123,   126,   127,   129,   130,   139,   140,   142,   143,
+     117,   122,    83,   122,    86,    86,   122,    45,    50,    89,
+      90,    91,    92,   129,   142,    57,   122,    57,    96,    97,
+     135,   122,    86,    41,    45,   111,   112,   113,   114,   142,
+      25,    28,    30,    78,    98,   102,   103,   108,   115,    36,
+      49,    86,   123,   129,   123,    42,   117,   125,   128,   122,
+     123,   123,    43,    37,    38,    39,    40,    46,    36,    45,
+      49,    42,    78,    42,    29,    41,    52,    56,    93,   124,
+     126,   128,   131,   133,   136,   142,    42,    48,    36,    49,
+      49,    42,    48,    49,    42,   113,    38,    53,    54,    55,
+     137,   138,    42,    48,    42,    48,    36,    41,   143,    42,
+     103,   122,    42,    43,    42,    48,    44,   121,   122,   122,
+     122,   122,   122,   122,   122,    49,    49,    42,    52,   132,
+     136,    46,    48,    46,    48,    46,    48,    49,    91,    92,
+     122,    49,    97,    49,    42,   138,    48,    49,   112,    49,
+     114,    41,   122,    27,    78,   104,   105,    41,    49,    49,
+      49,   121,   128,    44,    48,    46,    42,    48,    41,   124,
+     131,   127,   128,    41,   133,   134,   136,   137,   113,    41,
+      42,   105,    57,   109,   110,    44,   122,    52,   136,    42,
+      46,    46,    42,    46,    42,    41,    57,   106,   107,    49,
+      36,    42,    48,   121,    42,    48,    57,    49,   110,    42,
+      49,   107
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,    65,    66,    66,    66,    67,    68,    68,    68,    69,
-      69,    70,    71,    71,    71,    71,    71,    72,    72,    73,
-      73,    74,    74,    74,    74,    74,    74,    74,    74,    75,
-      75,    75,    76,    76,    76,    76,    76,    76,    76,    76,
-      76,    76,    76,    76,    76,    76,    77,    77,    77,    78,
-      79,    80,    81,    81,    82,    82,    83,    84,    84,    85,
-      85,    86,    87,    88,    88,    89,    89,    90,    90,    90,
-      90,    90,    91,    91,    91,    91,    91,    92,    92,    92,
-      93,    94,    95,    95,    96,    96,    97,    98,    98,    99,
-      99,   100,   101,   101,   102,   102,   102,   102,   102,   103,
-     103,   104,   104,   105,   105,   106,   106,   107,   108,   108,
-     109,   110,   110,   111,   111,   111,   112,   112,   113,   114,
-     115,   115,   115,   115,   116,   116,   117,   117,   117,   117,
-     117,   117,   117,   117,   117,   117,   117,   118,   118,   119,
-     119,   119,   119,   119,   120,   120,   120,   121,   121,   121,
-     121,   121,   121,   122,   122,   122,   122,   122,   122,   122,
-     122,   122,   123,   123,   123,   123,   124,   124,   125,   126,
-     126,   127,   128,   128,   128,   128,   129,   129,   129,   129,
-     130,   130,   130,   130,   131,   131,   131,   131,   132,   132,
-     133,   133,   134,   134,   135,   135,   135,   136,   136,   137,
-     137,   138,   139,   140,   141,   141,   142,   143,   143,   144
+       0,    66,    67,    67,    67,    68,    69,    69,    69,    70,
+      70,    71,    72,    72,    72,    72,    72,    73,    73,    74,
+      74,    75,    75,    75,    75,    75,    75,    75,    75,    76,
+      76,    76,    77,    77,    77,    77,    77,    77,    77,    77,
+      77,    77,    77,    77,    77,    77,    78,    78,    78,    79,
+      80,    81,    82,    82,    83,    83,    84,    85,    85,    86,
+      86,    87,    88,    89,    89,    90,    90,    91,    91,    91,
+      91,    91,    92,    92,    92,    92,    92,    93,    93,    93,
+      94,    95,    96,    96,    97,    97,    98,    99,    99,   100,
+     100,   101,   102,   102,   103,   103,   103,   103,   103,   104,
+     104,   105,   105,   106,   106,   107,   107,   108,   109,   109,
+     110,   111,   111,   112,   112,   112,   113,   113,   114,   115,
+     116,   116,   116,   116,   117,   117,   118,   118,   118,   118,
+     118,   118,   118,   118,   118,   118,   118,   119,   119,   120,
+     120,   120,   120,   120,   121,   121,   121,   122,   122,   122,
+     122,   122,   122,   123,   123,   123,   123,   123,   123,   123,
+     123,   123,   124,   124,   124,   124,   125,   125,   126,   127,
+     127,   128,   129,   129,   129,   129,   130,   130,   130,   130,
+     131,   131,   131,   131,   132,   132,   132,   132,   133,   133,
+     134,   134,   135,   135,   136,   136,   136,   136,   137,   137,
+     138,   138,   138,   139,   140,   140,   141,   141,   142,   142,
+     143,   144,   144,   145
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -1167,8 +1172,9 @@ static const yytype_int8 yyr2[] =
        1,     3,     3,     3,     1,     1,     3,     1,     3,     1,
        2,     4,     1,     3,     4,     6,     1,     1,     1,     1,
        3,     3,     1,     1,     3,     3,     1,     1,     3,     1,
-       1,     2,     1,     1,     1,     1,     1,     2,     1,     1,
-       1,     1,     1,     1,     1,     1,     1,     1,     0,     1
+       1,     2,     1,     1,     1,     1,     1,     1,     2,     1,
+       1,     1,     1,     1,     1,     1,     1,     1,     1,     1,
+       1,     1,     0,     1
 };
 
 
@@ -1592,279 +1598,279 @@ yydestruct (const char *yymsg,
   switch (yykind)
     {
     case YYSYMBOL_STRING: /* "string literal"  */
-#line 246 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 250 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { free(((*yyvaluep).str)); }
-#line 1598 "parser.c"
-        break;
-
-    case YYSYMBOL_XkbFile: /* XkbFile  */
-#line 244 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { if (!param->rtrn) FreeXkbFile(((*yyvaluep).file)); }
 #line 1604 "parser.c"
         break;
 
-    case YYSYMBOL_XkbCompositeMap: /* XkbCompositeMap  */
-#line 244 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_XkbFile: /* XkbFile  */
+#line 248 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { if (!param->rtrn) FreeXkbFile(((*yyvaluep).file)); }
 #line 1610 "parser.c"
         break;
 
-    case YYSYMBOL_XkbMapConfigList: /* XkbMapConfigList  */
-#line 245 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeXkbFile(((*yyvaluep).fileList).head); }
+    case YYSYMBOL_XkbCompositeMap: /* XkbCompositeMap  */
+#line 248 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { if (!param->rtrn) FreeXkbFile(((*yyvaluep).file)); }
 #line 1616 "parser.c"
         break;
 
-    case YYSYMBOL_XkbMapConfig: /* XkbMapConfig  */
-#line 244 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { if (!param->rtrn) FreeXkbFile(((*yyvaluep).file)); }
+    case YYSYMBOL_XkbMapConfigList: /* XkbMapConfigList  */
+#line 249 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeXkbFile(((*yyvaluep).fileList).head); }
 #line 1622 "parser.c"
         break;
 
-    case YYSYMBOL_DeclList: /* DeclList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).anyList).head); }
+    case YYSYMBOL_XkbMapConfig: /* XkbMapConfig  */
+#line 248 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { if (!param->rtrn) FreeXkbFile(((*yyvaluep).file)); }
 #line 1628 "parser.c"
         break;
 
-    case YYSYMBOL_Decl: /* Decl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).any)); }
+    case YYSYMBOL_DeclList: /* DeclList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).anyList).head); }
 #line 1634 "parser.c"
         break;
 
-    case YYSYMBOL_VarDecl: /* VarDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).var)); }
+    case YYSYMBOL_Decl: /* Decl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).any)); }
 #line 1640 "parser.c"
         break;
 
-    case YYSYMBOL_KeyNameDecl: /* KeyNameDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).keyCode)); }
+    case YYSYMBOL_VarDecl: /* VarDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).var)); }
 #line 1646 "parser.c"
         break;
 
-    case YYSYMBOL_KeyAliasDecl: /* KeyAliasDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).keyAlias)); }
+    case YYSYMBOL_KeyNameDecl: /* KeyNameDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).keyCode)); }
 #line 1652 "parser.c"
         break;
 
-    case YYSYMBOL_VModDecl: /* VModDecl  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).vmodList).head); }
+    case YYSYMBOL_KeyAliasDecl: /* KeyAliasDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).keyAlias)); }
 #line 1658 "parser.c"
         break;
 
-    case YYSYMBOL_VModDefList: /* VModDefList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_VModDecl: /* VModDecl  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).vmodList).head); }
 #line 1664 "parser.c"
         break;
 
-    case YYSYMBOL_VModDef: /* VModDef  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).vmod)); }
+    case YYSYMBOL_VModDefList: /* VModDefList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).vmodList).head); }
 #line 1670 "parser.c"
         break;
 
-    case YYSYMBOL_InterpretDecl: /* InterpretDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).interp)); }
+    case YYSYMBOL_VModDef: /* VModDef  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).vmod)); }
 #line 1676 "parser.c"
         break;
 
-    case YYSYMBOL_InterpretMatch: /* InterpretMatch  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_InterpretDecl: /* InterpretDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).interp)); }
 #line 1682 "parser.c"
         break;
 
-    case YYSYMBOL_VarDeclList: /* VarDeclList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).varList).head); }
+    case YYSYMBOL_InterpretMatch: /* InterpretMatch  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).interp)); }
 #line 1688 "parser.c"
         break;
 
-    case YYSYMBOL_KeyTypeDecl: /* KeyTypeDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).keyType)); }
+    case YYSYMBOL_VarDeclList: /* VarDeclList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).varList).head); }
 #line 1694 "parser.c"
         break;
 
-    case YYSYMBOL_SymbolsDecl: /* SymbolsDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).syms)); }
+    case YYSYMBOL_KeyTypeDecl: /* KeyTypeDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).keyType)); }
 #line 1700 "parser.c"
         break;
 
-    case YYSYMBOL_OptSymbolsBody: /* OptSymbolsBody  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).varList).head); }
+    case YYSYMBOL_SymbolsDecl: /* SymbolsDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).syms)); }
 #line 1706 "parser.c"
         break;
 
-    case YYSYMBOL_SymbolsBody: /* SymbolsBody  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_OptSymbolsBody: /* OptSymbolsBody  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).varList).head); }
 #line 1712 "parser.c"
         break;
 
-    case YYSYMBOL_SymbolsVarDecl: /* SymbolsVarDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).var)); }
+    case YYSYMBOL_SymbolsBody: /* SymbolsBody  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).varList).head); }
 #line 1718 "parser.c"
         break;
 
-    case YYSYMBOL_MultiKeySymOrActionList: /* MultiKeySymOrActionList  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_SymbolsVarDecl: /* SymbolsVarDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).var)); }
 #line 1724 "parser.c"
         break;
 
-    case YYSYMBOL_GroupCompatDecl: /* GroupCompatDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).groupCompat)); }
+    case YYSYMBOL_MultiKeySymOrActionList: /* MultiKeySymOrActionList  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1730 "parser.c"
         break;
 
-    case YYSYMBOL_ModMapDecl: /* ModMapDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).modMask)); }
+    case YYSYMBOL_GroupCompatDecl: /* GroupCompatDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).groupCompat)); }
 #line 1736 "parser.c"
         break;
 
-    case YYSYMBOL_KeyOrKeySymList: /* KeyOrKeySymList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
+    case YYSYMBOL_ModMapDecl: /* ModMapDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).modMask)); }
 #line 1742 "parser.c"
         break;
 
-    case YYSYMBOL_KeyOrKeySym: /* KeyOrKeySym  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_KeyOrKeySymList: /* KeyOrKeySymList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
 #line 1748 "parser.c"
         break;
 
-    case YYSYMBOL_LedMapDecl: /* LedMapDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).ledMap)); }
+    case YYSYMBOL_KeyOrKeySym: /* KeyOrKeySym  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1754 "parser.c"
         break;
 
-    case YYSYMBOL_LedNameDecl: /* LedNameDecl  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).ledName)); }
+    case YYSYMBOL_LedMapDecl: /* LedMapDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).ledMap)); }
 #line 1760 "parser.c"
         break;
 
-    case YYSYMBOL_CoordList: /* CoordList  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_LedNameDecl: /* LedNameDecl  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).ledName)); }
 #line 1766 "parser.c"
         break;
 
-    case YYSYMBOL_Coord: /* Coord  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_CoordList: /* CoordList  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1772 "parser.c"
         break;
 
-    case YYSYMBOL_ExprList: /* ExprList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
+    case YYSYMBOL_Coord: /* Coord  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1778 "parser.c"
         break;
 
-    case YYSYMBOL_Expr: /* Expr  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_ExprList: /* ExprList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
 #line 1784 "parser.c"
         break;
 
-    case YYSYMBOL_Term: /* Term  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_Expr: /* Expr  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1790 "parser.c"
         break;
 
-    case YYSYMBOL_MultiActionList: /* MultiActionList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
+    case YYSYMBOL_Term: /* Term  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1796 "parser.c"
         break;
 
-    case YYSYMBOL_ActionList: /* ActionList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_MultiActionList: /* MultiActionList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
 #line 1802 "parser.c"
         break;
 
-    case YYSYMBOL_NonEmptyActions: /* NonEmptyActions  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_ActionList: /* ActionList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
 #line 1808 "parser.c"
         break;
 
-    case YYSYMBOL_Actions: /* Actions  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_NonEmptyActions: /* NonEmptyActions  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1814 "parser.c"
         break;
 
-    case YYSYMBOL_Action: /* Action  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_Actions: /* Actions  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1820 "parser.c"
         break;
 
-    case YYSYMBOL_Lhs: /* Lhs  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_Action: /* Action  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1826 "parser.c"
         break;
 
-    case YYSYMBOL_Terminal: /* Terminal  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_Lhs: /* Lhs  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1832 "parser.c"
         break;
 
-    case YYSYMBOL_MultiKeySymList: /* MultiKeySymList  */
-#line 240 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
+    case YYSYMBOL_Terminal: /* Terminal  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1838 "parser.c"
         break;
 
-    case YYSYMBOL_KeySymList: /* KeySymList  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
+    case YYSYMBOL_MultiKeySymList: /* MultiKeySymList  */
+#line 244 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).exprList).head); }
 #line 1844 "parser.c"
         break;
 
-    case YYSYMBOL_NonEmptyKeySyms: /* NonEmptyKeySyms  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_KeySymList: /* KeySymList  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1850 "parser.c"
         break;
 
-    case YYSYMBOL_KeySyms: /* KeySyms  */
-#line 237 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_NonEmptyKeySyms: /* NonEmptyKeySyms  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1856 "parser.c"
         break;
 
-    case YYSYMBOL_OptMapName: /* OptMapName  */
-#line 246 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-            { free(((*yyvaluep).str)); }
+    case YYSYMBOL_KeySyms: /* KeySyms  */
+#line 241 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { FreeStmt((ParseCommon *) ((*yyvaluep).expr)); }
 #line 1862 "parser.c"
         break;
 
-    case YYSYMBOL_MapName: /* MapName  */
-#line 246 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+    case YYSYMBOL_OptMapName: /* OptMapName  */
+#line 250 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
             { free(((*yyvaluep).str)); }
 #line 1868 "parser.c"
+        break;
+
+    case YYSYMBOL_MapName: /* MapName  */
+#line 250 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+            { free(((*yyvaluep).str)); }
+#line 1874 "parser.c"
         break;
 
       default:
@@ -2141,49 +2147,49 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* XkbFile: XkbCompositeMap  */
-#line 263 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 267 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         { (yyval.file) = param->rtrn = (yyvsp[0].file); param->more_maps = !!param->rtrn; (void) yynerrs; }
-#line 2147 "parser.c"
-    break;
-
-  case 3: /* XkbFile: XkbMapConfig  */
-#line 265 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.file) = param->rtrn = (yyvsp[0].file); param->more_maps = !!param->rtrn; YYACCEPT; }
 #line 2153 "parser.c"
     break;
 
-  case 4: /* XkbFile: "end of file"  */
-#line 267 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.file) = param->rtrn = NULL; param->more_maps = false; }
+  case 3: /* XkbFile: XkbMapConfig  */
+#line 269 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.file) = param->rtrn = (yyvsp[0].file); param->more_maps = !!param->rtrn; YYACCEPT; }
 #line 2159 "parser.c"
     break;
 
-  case 5: /* XkbCompositeMap: OptFlags XkbCompositeType OptMapName "{" XkbMapConfigList "}" ";"  */
-#line 273 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.file) = XkbFileCreate((yyvsp[-5].file_type), (yyvsp[-4].str), (ParseCommon *) (yyvsp[-2].fileList).head, (yyvsp[-6].mapFlags)); }
+  case 4: /* XkbFile: "end of file"  */
+#line 271 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.file) = param->rtrn = NULL; param->more_maps = false; }
 #line 2165 "parser.c"
     break;
 
-  case 6: /* XkbCompositeType: "xkb_keymap"  */
-#line 276 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.file_type) = FILE_TYPE_KEYMAP; }
+  case 5: /* XkbCompositeMap: OptFlags XkbCompositeType OptMapName "{" XkbMapConfigList "}" ";"  */
+#line 277 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.file) = XkbFileCreate((yyvsp[-5].file_type), (yyvsp[-4].str), (ParseCommon *) (yyvsp[-2].fileList).head, (yyvsp[-6].mapFlags)); }
 #line 2171 "parser.c"
     break;
 
-  case 7: /* XkbCompositeType: "xkb_semantics"  */
-#line 277 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 6: /* XkbCompositeType: "xkb_keymap"  */
+#line 280 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                         { (yyval.file_type) = FILE_TYPE_KEYMAP; }
 #line 2177 "parser.c"
     break;
 
-  case 8: /* XkbCompositeType: "xkb_layout"  */
-#line 278 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 7: /* XkbCompositeType: "xkb_semantics"  */
+#line 281 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                         { (yyval.file_type) = FILE_TYPE_KEYMAP; }
 #line 2183 "parser.c"
     break;
 
+  case 8: /* XkbCompositeType: "xkb_layout"  */
+#line 282 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.file_type) = FILE_TYPE_KEYMAP; }
+#line 2189 "parser.c"
+    break;
+
   case 9: /* XkbMapConfigList: XkbMapConfigList XkbMapConfig  */
-#line 285 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 289 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if ((yyvsp[0].file)) {
                                 if ((yyvsp[-1].fileList).head) {
@@ -2195,127 +2201,127 @@ yyreduce:
                                 }
                             }
                         }
-#line 2199 "parser.c"
-    break;
-
-  case 10: /* XkbMapConfigList: %empty  */
-#line 296 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.fileList).head = (yyval.fileList).last = NULL; }
 #line 2205 "parser.c"
     break;
 
+  case 10: /* XkbMapConfigList: %empty  */
+#line 300 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.fileList).head = (yyval.fileList).last = NULL; }
+#line 2211 "parser.c"
+    break;
+
   case 11: /* XkbMapConfig: OptFlags FileType OptMapName "{" DeclList "}" ";"  */
-#line 302 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 306 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.file) = XkbFileCreate((yyvsp[-5].file_type), (yyvsp[-4].str), (yyvsp[-2].anyList).head, (yyvsp[-6].mapFlags));
                         }
-#line 2213 "parser.c"
-    break;
-
-  case 12: /* FileType: "xkb_keycodes"  */
-#line 307 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.file_type) = FILE_TYPE_KEYCODES; }
 #line 2219 "parser.c"
     break;
 
-  case 13: /* FileType: "xkb_types"  */
-#line 308 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.file_type) = FILE_TYPE_TYPES; }
+  case 12: /* FileType: "xkb_keycodes"  */
+#line 311 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.file_type) = FILE_TYPE_KEYCODES; }
 #line 2225 "parser.c"
     break;
 
-  case 14: /* FileType: "xkb_compatibility"  */
-#line 309 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.file_type) = FILE_TYPE_COMPAT; }
+  case 13: /* FileType: "xkb_types"  */
+#line 312 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.file_type) = FILE_TYPE_TYPES; }
 #line 2231 "parser.c"
     break;
 
-  case 15: /* FileType: "xkb_symbols"  */
-#line 310 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.file_type) = FILE_TYPE_SYMBOLS; }
+  case 14: /* FileType: "xkb_compatibility"  */
+#line 313 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.file_type) = FILE_TYPE_COMPAT; }
 #line 2237 "parser.c"
     break;
 
-  case 16: /* FileType: "xkb_geometry"  */
-#line 311 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.file_type) = FILE_TYPE_GEOMETRY; }
+  case 15: /* FileType: "xkb_symbols"  */
+#line 314 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.file_type) = FILE_TYPE_SYMBOLS; }
 #line 2243 "parser.c"
     break;
 
-  case 17: /* OptFlags: Flags  */
-#line 314 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = (yyvsp[0].mapFlags); }
+  case 16: /* FileType: "xkb_geometry"  */
+#line 315 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.file_type) = FILE_TYPE_GEOMETRY; }
 #line 2249 "parser.c"
     break;
 
-  case 18: /* OptFlags: %empty  */
-#line 315 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = 0; }
+  case 17: /* OptFlags: Flags  */
+#line 318 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = (yyvsp[0].mapFlags); }
 #line 2255 "parser.c"
     break;
 
-  case 19: /* Flags: Flags Flag  */
-#line 318 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = ((yyvsp[-1].mapFlags) | (yyvsp[0].mapFlags)); }
+  case 18: /* OptFlags: %empty  */
+#line 319 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = 0; }
 #line 2261 "parser.c"
     break;
 
-  case 20: /* Flags: Flag  */
-#line 319 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = (yyvsp[0].mapFlags); }
+  case 19: /* Flags: Flags Flag  */
+#line 322 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = ((yyvsp[-1].mapFlags) | (yyvsp[0].mapFlags)); }
 #line 2267 "parser.c"
     break;
 
-  case 21: /* Flag: "partial"  */
-#line 322 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_IS_PARTIAL; }
+  case 20: /* Flags: Flag  */
+#line 323 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = (yyvsp[0].mapFlags); }
 #line 2273 "parser.c"
     break;
 
-  case 22: /* Flag: "default"  */
-#line 323 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_IS_DEFAULT; }
+  case 21: /* Flag: "partial"  */
+#line 326 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_IS_PARTIAL; }
 #line 2279 "parser.c"
     break;
 
-  case 23: /* Flag: "hidden"  */
-#line 324 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_IS_HIDDEN; }
+  case 22: /* Flag: "default"  */
+#line 327 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_IS_DEFAULT; }
 #line 2285 "parser.c"
     break;
 
-  case 24: /* Flag: "alphanumeric_keys"  */
-#line 325 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_HAS_ALPHANUMERIC; }
+  case 23: /* Flag: "hidden"  */
+#line 328 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_IS_HIDDEN; }
 #line 2291 "parser.c"
     break;
 
-  case 25: /* Flag: "modifier_keys"  */
-#line 326 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_HAS_MODIFIER; }
+  case 24: /* Flag: "alphanumeric_keys"  */
+#line 329 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_HAS_ALPHANUMERIC; }
 #line 2297 "parser.c"
     break;
 
-  case 26: /* Flag: "keypad_keys"  */
-#line 327 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_HAS_KEYPAD; }
+  case 25: /* Flag: "modifier_keys"  */
+#line 330 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_HAS_MODIFIER; }
 #line 2303 "parser.c"
     break;
 
-  case 27: /* Flag: "function_keys"  */
-#line 328 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_HAS_FN; }
+  case 26: /* Flag: "keypad_keys"  */
+#line 331 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_HAS_KEYPAD; }
 #line 2309 "parser.c"
     break;
 
-  case 28: /* Flag: "alternate_group"  */
-#line 329 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.mapFlags) = MAP_IS_ALTGR; }
+  case 27: /* Flag: "function_keys"  */
+#line 332 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_HAS_FN; }
 #line 2315 "parser.c"
     break;
 
+  case 28: /* Flag: "alternate_group"  */
+#line 333 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.mapFlags) = MAP_IS_ALTGR; }
+#line 2321 "parser.c"
+    break;
+
   case 29: /* DeclList: DeclList Decl  */
-#line 333 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 337 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if ((yyvsp[0].any)) {
                                 if ((yyvsp[-1].anyList).head) {
@@ -2325,11 +2331,11 @@ yyreduce:
                                 }
                             }
                         }
-#line 2329 "parser.c"
+#line 2335 "parser.c"
     break;
 
   case 30: /* DeclList: DeclList OptMergeMode VModDecl  */
-#line 348 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 352 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             for (VModDef *vmod = (yyvsp[0].vmodList).head; vmod; vmod = (VModDef *) vmod->common.next)
                                 vmod->merge = (yyvsp[-1].merge);
@@ -2339,212 +2345,212 @@ yyreduce:
                                 (yyval.anyList).head = &(yyvsp[0].vmodList).head->common; (yyval.anyList).last = &(yyvsp[0].vmodList).last->common;
                             }
                         }
-#line 2343 "parser.c"
-    break;
-
-  case 31: /* DeclList: %empty  */
-#line 357 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.anyList).head = (yyval.anyList).last = NULL; }
 #line 2349 "parser.c"
     break;
 
+  case 31: /* DeclList: %empty  */
+#line 361 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.anyList).head = (yyval.anyList).last = NULL; }
+#line 2355 "parser.c"
+    break;
+
   case 32: /* Decl: OptMergeMode VarDecl  */
-#line 361 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 365 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].var)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].var);
                         }
-#line 2358 "parser.c"
+#line 2364 "parser.c"
     break;
 
   case 33: /* Decl: OptMergeMode InterpretDecl  */
-#line 367 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 371 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].interp)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].interp);
                         }
-#line 2367 "parser.c"
+#line 2373 "parser.c"
     break;
 
   case 34: /* Decl: OptMergeMode KeyNameDecl  */
-#line 372 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 376 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].keyCode)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].keyCode);
                         }
-#line 2376 "parser.c"
+#line 2382 "parser.c"
     break;
 
   case 35: /* Decl: OptMergeMode KeyAliasDecl  */
-#line 377 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 381 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].keyAlias)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].keyAlias);
                         }
-#line 2385 "parser.c"
+#line 2391 "parser.c"
     break;
 
   case 36: /* Decl: OptMergeMode KeyTypeDecl  */
-#line 382 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 386 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].keyType)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].keyType);
                         }
-#line 2394 "parser.c"
+#line 2400 "parser.c"
     break;
 
   case 37: /* Decl: OptMergeMode SymbolsDecl  */
-#line 387 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 391 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].syms)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].syms);
                         }
-#line 2403 "parser.c"
+#line 2409 "parser.c"
     break;
 
   case 38: /* Decl: OptMergeMode ModMapDecl  */
-#line 392 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 396 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].modMask)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].modMask);
                         }
-#line 2412 "parser.c"
+#line 2418 "parser.c"
     break;
 
   case 39: /* Decl: OptMergeMode GroupCompatDecl  */
-#line 397 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 401 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].groupCompat)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].groupCompat);
                         }
-#line 2421 "parser.c"
+#line 2427 "parser.c"
     break;
 
   case 40: /* Decl: OptMergeMode LedMapDecl  */
-#line 402 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 406 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].ledMap)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].ledMap);
                         }
-#line 2430 "parser.c"
+#line 2436 "parser.c"
     break;
 
   case 41: /* Decl: OptMergeMode LedNameDecl  */
-#line 407 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 411 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyvsp[0].ledName)->merge = (yyvsp[-1].merge);
                             (yyval.any) = (ParseCommon *) (yyvsp[0].ledName);
                         }
-#line 2439 "parser.c"
-    break;
-
-  case 42: /* Decl: OptMergeMode ShapeDecl  */
-#line 411 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                        { (yyval.any) = NULL; }
 #line 2445 "parser.c"
     break;
 
-  case 43: /* Decl: OptMergeMode SectionDecl  */
-#line 412 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 42: /* Decl: OptMergeMode ShapeDecl  */
+#line 415 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                                         { (yyval.any) = NULL; }
 #line 2451 "parser.c"
     break;
 
-  case 44: /* Decl: OptMergeMode DoodadDecl  */
-#line 413 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 43: /* Decl: OptMergeMode SectionDecl  */
+#line 416 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                                         { (yyval.any) = NULL; }
 #line 2457 "parser.c"
     break;
 
+  case 44: /* Decl: OptMergeMode DoodadDecl  */
+#line 417 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                        { (yyval.any) = NULL; }
+#line 2463 "parser.c"
+    break;
+
   case 45: /* Decl: MergeMode "string literal"  */
-#line 415 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 419 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.any) = (ParseCommon *) IncludeCreate(param->ctx, (yyvsp[0].str), (yyvsp[-1].merge));
                             free((yyvsp[0].str));
                         }
-#line 2466 "parser.c"
-    break;
-
-  case 46: /* VarDecl: Lhs "=" Expr ";"  */
-#line 422 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.var) = VarCreate((yyvsp[-3].expr), (yyvsp[-1].expr)); }
 #line 2472 "parser.c"
     break;
 
-  case 47: /* VarDecl: Ident ";"  */
-#line 424 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.var) = BoolVarCreate((yyvsp[-1].atom), true); }
+  case 46: /* VarDecl: Lhs "=" Expr ";"  */
+#line 426 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.var) = VarCreate((yyvsp[-3].expr), (yyvsp[-1].expr)); }
 #line 2478 "parser.c"
     break;
 
-  case 48: /* VarDecl: "!" Ident ";"  */
-#line 426 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.var) = BoolVarCreate((yyvsp[-1].atom), false); }
+  case 47: /* VarDecl: Ident ";"  */
+#line 428 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.var) = BoolVarCreate((yyvsp[-1].atom), true); }
 #line 2484 "parser.c"
     break;
 
-  case 49: /* KeyNameDecl: "key name" "=" KeyCode ";"  */
-#line 430 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.keyCode) = KeycodeCreate((yyvsp[-3].atom), (yyvsp[-1].num)); }
+  case 48: /* VarDecl: "!" Ident ";"  */
+#line 430 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.var) = BoolVarCreate((yyvsp[-1].atom), false); }
 #line 2490 "parser.c"
     break;
 
-  case 50: /* KeyAliasDecl: "alias" "key name" "=" "key name" ";"  */
-#line 434 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.keyAlias) = KeyAliasCreate((yyvsp[-3].atom), (yyvsp[-1].atom)); }
+  case 49: /* KeyNameDecl: "key name" "=" KeyCode ";"  */
+#line 434 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.keyCode) = KeycodeCreate((yyvsp[-3].atom), (yyvsp[-1].num)); }
 #line 2496 "parser.c"
     break;
 
-  case 51: /* VModDecl: "virtual_modifiers" VModDefList ";"  */
-#line 438 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.vmodList) = (yyvsp[-1].vmodList); }
+  case 50: /* KeyAliasDecl: "alias" "key name" "=" "key name" ";"  */
+#line 438 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.keyAlias) = KeyAliasCreate((yyvsp[-3].atom), (yyvsp[-1].atom)); }
 #line 2502 "parser.c"
     break;
 
-  case 52: /* VModDefList: VModDefList "," VModDef  */
-#line 442 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.vmodList).head = (yyvsp[-2].vmodList).head; (yyval.vmodList).last->common.next = &(yyvsp[0].vmod)->common; (yyval.vmodList).last = (yyvsp[0].vmod); }
+  case 51: /* VModDecl: "virtual_modifiers" VModDefList ";"  */
+#line 442 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.vmodList) = (yyvsp[-1].vmodList); }
 #line 2508 "parser.c"
     break;
 
-  case 53: /* VModDefList: VModDef  */
-#line 444 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.vmodList).head = (yyval.vmodList).last = (yyvsp[0].vmod); }
+  case 52: /* VModDefList: VModDefList "," VModDef  */
+#line 446 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.vmodList).head = (yyvsp[-2].vmodList).head; (yyval.vmodList).last->common.next = &(yyvsp[0].vmod)->common; (yyval.vmodList).last = (yyvsp[0].vmod); }
 #line 2514 "parser.c"
     break;
 
-  case 54: /* VModDef: Ident  */
-#line 448 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.vmod) = VModCreate((yyvsp[0].atom), NULL); }
+  case 53: /* VModDefList: VModDef  */
+#line 448 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.vmodList).head = (yyval.vmodList).last = (yyvsp[0].vmod); }
 #line 2520 "parser.c"
     break;
 
-  case 55: /* VModDef: Ident "=" Expr  */
-#line 450 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.vmod) = VModCreate((yyvsp[-2].atom), (yyvsp[0].expr)); }
+  case 54: /* VModDef: Ident  */
+#line 452 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.vmod) = VModCreate((yyvsp[0].atom), NULL); }
 #line 2526 "parser.c"
     break;
 
-  case 56: /* InterpretDecl: "interpret" InterpretMatch "{" VarDeclList "}" ";"  */
-#line 456 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyvsp[-4].interp)->def = (yyvsp[-2].varList).head; (yyval.interp) = (yyvsp[-4].interp); }
+  case 55: /* VModDef: Ident "=" Expr  */
+#line 454 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.vmod) = VModCreate((yyvsp[-2].atom), (yyvsp[0].expr)); }
 #line 2532 "parser.c"
     break;
 
-  case 57: /* InterpretMatch: KeySym "+" Expr  */
-#line 460 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.interp) = InterpCreate((yyvsp[-2].keysym), (yyvsp[0].expr)); }
+  case 56: /* InterpretDecl: "interpret" InterpretMatch "{" VarDeclList "}" ";"  */
+#line 460 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyvsp[-4].interp)->def = (yyvsp[-2].varList).head; (yyval.interp) = (yyvsp[-4].interp); }
 #line 2538 "parser.c"
     break;
 
-  case 58: /* InterpretMatch: KeySym  */
-#line 462 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.interp) = InterpCreate((yyvsp[0].keysym), NULL); }
+  case 57: /* InterpretMatch: KeySym "+" Expr  */
+#line 464 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.interp) = InterpCreate((yyvsp[-2].keysym), (yyvsp[0].expr)); }
 #line 2544 "parser.c"
     break;
 
+  case 58: /* InterpretMatch: KeySym  */
+#line 466 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.interp) = InterpCreate((yyvsp[0].keysym), NULL); }
+#line 2550 "parser.c"
+    break;
+
   case 59: /* VarDeclList: VarDeclList VarDecl  */
-#line 466 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 470 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if ((yyvsp[0].var)) {
                                 if ((yyvsp[-1].varList).head) {
@@ -2556,89 +2562,89 @@ yyreduce:
                                 }
                             }
                         }
-#line 2560 "parser.c"
-    break;
-
-  case 60: /* VarDeclList: %empty  */
-#line 477 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.varList).head = (yyval.varList).last = NULL; }
 #line 2566 "parser.c"
     break;
 
-  case 61: /* KeyTypeDecl: "type" String "{" VarDeclList "}" ";"  */
-#line 483 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.keyType) = KeyTypeCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
+  case 60: /* VarDeclList: %empty  */
+#line 481 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.varList).head = (yyval.varList).last = NULL; }
 #line 2572 "parser.c"
     break;
 
-  case 62: /* SymbolsDecl: "key" "key name" "{" OptSymbolsBody "}" ";"  */
-#line 489 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.syms) = SymbolsCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
+  case 61: /* KeyTypeDecl: "type" String "{" VarDeclList "}" ";"  */
+#line 487 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.keyType) = KeyTypeCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
 #line 2578 "parser.c"
     break;
 
-  case 63: /* OptSymbolsBody: SymbolsBody  */
-#line 492 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                    { (yyval.varList) = (yyvsp[0].varList); }
+  case 62: /* SymbolsDecl: "key" "key name" "{" OptSymbolsBody "}" ";"  */
+#line 493 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.syms) = SymbolsCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
 #line 2584 "parser.c"
     break;
 
-  case 64: /* OptSymbolsBody: %empty  */
-#line 493 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                    { (yyval.varList).head = (yyval.varList).last = NULL; }
+  case 63: /* OptSymbolsBody: SymbolsBody  */
+#line 496 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                    { (yyval.varList) = (yyvsp[0].varList); }
 #line 2590 "parser.c"
     break;
 
-  case 65: /* SymbolsBody: SymbolsBody "," SymbolsVarDecl  */
-#line 497 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.varList).head = (yyvsp[-2].varList).head; (yyval.varList).last->common.next = &(yyvsp[0].var)->common; (yyval.varList).last = (yyvsp[0].var); }
+  case 64: /* OptSymbolsBody: %empty  */
+#line 497 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                    { (yyval.varList).head = (yyval.varList).last = NULL; }
 #line 2596 "parser.c"
     break;
 
-  case 66: /* SymbolsBody: SymbolsVarDecl  */
-#line 499 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.varList).head = (yyval.varList).last = (yyvsp[0].var); }
+  case 65: /* SymbolsBody: SymbolsBody "," SymbolsVarDecl  */
+#line 501 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.varList).head = (yyvsp[-2].varList).head; (yyval.varList).last->common.next = &(yyvsp[0].var)->common; (yyval.varList).last = (yyvsp[0].var); }
 #line 2602 "parser.c"
     break;
 
-  case 67: /* SymbolsVarDecl: Lhs "=" Expr  */
-#line 502 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.var) = VarCreate((yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 66: /* SymbolsBody: SymbolsVarDecl  */
+#line 503 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.varList).head = (yyval.varList).last = (yyvsp[0].var); }
 #line 2608 "parser.c"
     break;
 
-  case 68: /* SymbolsVarDecl: Lhs "=" MultiKeySymOrActionList  */
-#line 503 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                           { (yyval.var) = VarCreate((yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 67: /* SymbolsVarDecl: Lhs "=" Expr  */
+#line 506 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.var) = VarCreate((yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 2614 "parser.c"
     break;
 
-  case 69: /* SymbolsVarDecl: Ident  */
-#line 504 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.var) = BoolVarCreate((yyvsp[0].atom), true); }
+  case 68: /* SymbolsVarDecl: Lhs "=" MultiKeySymOrActionList  */
+#line 507 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                           { (yyval.var) = VarCreate((yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 2620 "parser.c"
     break;
 
-  case 70: /* SymbolsVarDecl: "!" Ident  */
-#line 505 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.var) = BoolVarCreate((yyvsp[0].atom), false); }
+  case 69: /* SymbolsVarDecl: Ident  */
+#line 508 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.var) = BoolVarCreate((yyvsp[0].atom), true); }
 #line 2626 "parser.c"
     break;
 
-  case 71: /* SymbolsVarDecl: MultiKeySymOrActionList  */
-#line 506 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.var) = VarCreate(NULL, (yyvsp[0].expr)); }
+  case 70: /* SymbolsVarDecl: "!" Ident  */
+#line 509 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.var) = BoolVarCreate((yyvsp[0].atom), false); }
 #line 2632 "parser.c"
     break;
 
-  case 72: /* MultiKeySymOrActionList: "[" MultiKeySymList "]"  */
-#line 522 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[-1].exprList).head; }
+  case 71: /* SymbolsVarDecl: MultiKeySymOrActionList  */
+#line 510 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.var) = VarCreate(NULL, (yyvsp[0].expr)); }
 #line 2638 "parser.c"
     break;
 
+  case 72: /* MultiKeySymOrActionList: "[" MultiKeySymList "]"  */
+#line 526 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[-1].exprList).head; }
+#line 2644 "parser.c"
+    break;
+
   case 73: /* MultiKeySymOrActionList: "[" NoSymbolOrActionList "," MultiKeySymList "]"  */
-#line 524 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 528 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             /* Prepend n times NoSymbol */
                             struct {ExprDef *head; ExprDef *last;} list = {
@@ -2656,17 +2662,17 @@ yyreduce:
                             }
                             (yyval.expr) = list.head;
                         }
-#line 2660 "parser.c"
-    break;
-
-  case 74: /* MultiKeySymOrActionList: "[" MultiActionList "]"  */
-#line 542 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[-1].exprList).head; }
 #line 2666 "parser.c"
     break;
 
+  case 74: /* MultiKeySymOrActionList: "[" MultiActionList "]"  */
+#line 546 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[-1].exprList).head; }
+#line 2672 "parser.c"
+    break;
+
   case 75: /* MultiKeySymOrActionList: "[" NoSymbolOrActionList "," MultiActionList "]"  */
-#line 544 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 548 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             /* Prepend n times NoAction() */
                             struct {ExprDef *head; ExprDef *last;} list = {
@@ -2683,413 +2689,413 @@ yyreduce:
                             }
                             (yyval.expr) = list.head;
                         }
-#line 2687 "parser.c"
-    break;
-
-  case 76: /* MultiKeySymOrActionList: "[" NoSymbolOrActionList "]"  */
-#line 566 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprEmptyList(); }
 #line 2693 "parser.c"
     break;
 
-  case 77: /* NoSymbolOrActionList: NoSymbolOrActionList "," "{" "}"  */
-#line 572 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.noSymbolOrActionList) = (yyvsp[-3].noSymbolOrActionList) + 1; }
+  case 76: /* MultiKeySymOrActionList: "[" NoSymbolOrActionList "]"  */
+#line 570 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprEmptyList(); }
 #line 2699 "parser.c"
     break;
 
-  case 78: /* NoSymbolOrActionList: "{" "}"  */
-#line 574 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.noSymbolOrActionList) = 1; }
+  case 77: /* NoSymbolOrActionList: NoSymbolOrActionList "," "{" "}"  */
+#line 576 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.noSymbolOrActionList) = (yyvsp[-3].noSymbolOrActionList) + 1; }
 #line 2705 "parser.c"
     break;
 
-  case 79: /* NoSymbolOrActionList: %empty  */
-#line 575 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.noSymbolOrActionList) = 0; }
+  case 78: /* NoSymbolOrActionList: "{" "}"  */
+#line 578 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.noSymbolOrActionList) = 1; }
 #line 2711 "parser.c"
     break;
 
-  case 80: /* GroupCompatDecl: "group" Integer "=" Expr ";"  */
-#line 579 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.groupCompat) = GroupCompatCreate((yyvsp[-3].num), (yyvsp[-1].expr)); }
+  case 79: /* NoSymbolOrActionList: %empty  */
+#line 579 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.noSymbolOrActionList) = 0; }
 #line 2717 "parser.c"
     break;
 
-  case 81: /* ModMapDecl: "modifier_map" Ident "{" KeyOrKeySymList "}" ";"  */
-#line 583 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.modMask) = ModMapCreate((yyvsp[-4].atom), (yyvsp[-2].exprList).head); }
+  case 80: /* GroupCompatDecl: "group" Integer "=" Expr ";"  */
+#line 583 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.groupCompat) = GroupCompatCreate((yyvsp[-3].num), (yyvsp[-1].expr)); }
 #line 2723 "parser.c"
     break;
 
-  case 82: /* KeyOrKeySymList: KeyOrKeySymList "," KeyOrKeySym  */
-#line 587 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyvsp[-2].exprList).head; (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
+  case 81: /* ModMapDecl: "modifier_map" Ident "{" KeyOrKeySymList "}" ";"  */
+#line 587 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.modMask) = ModMapCreate((yyvsp[-4].atom), (yyvsp[-2].exprList).head); }
 #line 2729 "parser.c"
     break;
 
-  case 83: /* KeyOrKeySymList: KeyOrKeySym  */
-#line 589 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
+  case 82: /* KeyOrKeySymList: KeyOrKeySymList "," KeyOrKeySym  */
+#line 591 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyvsp[-2].exprList).head; (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 2735 "parser.c"
     break;
 
-  case 84: /* KeyOrKeySym: "key name"  */
-#line 593 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateKeyName((yyvsp[0].atom)); }
+  case 83: /* KeyOrKeySymList: KeyOrKeySym  */
+#line 593 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 2741 "parser.c"
     break;
 
-  case 85: /* KeyOrKeySym: KeySym  */
-#line 595 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateKeySym((yyvsp[0].keysym)); }
+  case 84: /* KeyOrKeySym: "key name"  */
+#line 597 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateKeyName((yyvsp[0].atom)); }
 #line 2747 "parser.c"
     break;
 
-  case 86: /* LedMapDecl: "indicator" String "{" VarDeclList "}" ";"  */
-#line 599 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.ledMap) = LedMapCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
+  case 85: /* KeyOrKeySym: KeySym  */
+#line 599 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateKeySym((yyvsp[0].keysym)); }
 #line 2753 "parser.c"
     break;
 
-  case 87: /* LedNameDecl: "indicator" Integer "=" Expr ";"  */
-#line 603 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.ledName) = LedNameCreate((yyvsp[-3].num), (yyvsp[-1].expr), false); }
+  case 86: /* LedMapDecl: "indicator" String "{" VarDeclList "}" ";"  */
+#line 603 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.ledMap) = LedMapCreate((yyvsp[-4].atom), (yyvsp[-2].varList).head); }
 #line 2759 "parser.c"
     break;
 
-  case 88: /* LedNameDecl: "virtual" "indicator" Integer "=" Expr ";"  */
-#line 605 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.ledName) = LedNameCreate((yyvsp[-3].num), (yyvsp[-1].expr), true); }
+  case 87: /* LedNameDecl: "indicator" Integer "=" Expr ";"  */
+#line 607 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.ledName) = LedNameCreate((yyvsp[-3].num), (yyvsp[-1].expr), false); }
 #line 2765 "parser.c"
     break;
 
-  case 89: /* ShapeDecl: "shape" String "{" OutlineList "}" ";"  */
-#line 609 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 88: /* LedNameDecl: "virtual" "indicator" Integer "=" Expr ";"  */
+#line 609 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.ledName) = LedNameCreate((yyvsp[-3].num), (yyvsp[-1].expr), true); }
 #line 2771 "parser.c"
     break;
 
-  case 90: /* ShapeDecl: "shape" String "{" CoordList "}" ";"  */
-#line 611 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (void) (yyvsp[-2].expr); (yyval.geom) = NULL; }
+  case 89: /* ShapeDecl: "shape" String "{" OutlineList "}" ";"  */
+#line 613 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2777 "parser.c"
     break;
 
-  case 91: /* SectionDecl: "section" String "{" SectionBody "}" ";"  */
-#line 615 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 90: /* ShapeDecl: "shape" String "{" CoordList "}" ";"  */
+#line 615 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (void) (yyvsp[-2].expr); (yyval.geom) = NULL; }
 #line 2783 "parser.c"
     break;
 
-  case 92: /* SectionBody: SectionBody SectionBodyItem  */
-#line 618 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                        { (yyval.geom) = NULL;}
+  case 91: /* SectionDecl: "section" String "{" SectionBody "}" ";"  */
+#line 619 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2789 "parser.c"
     break;
 
-  case 93: /* SectionBody: SectionBodyItem  */
-#line 619 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                        { (yyval.geom) = NULL; }
+  case 92: /* SectionBody: SectionBody SectionBodyItem  */
+#line 622 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                        { (yyval.geom) = NULL;}
 #line 2795 "parser.c"
     break;
 
-  case 94: /* SectionBodyItem: "row" "{" RowBody "}" ";"  */
-#line 623 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 93: /* SectionBody: SectionBodyItem  */
+#line 623 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                        { (yyval.geom) = NULL; }
 #line 2801 "parser.c"
     break;
 
-  case 95: /* SectionBodyItem: VarDecl  */
-#line 625 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[0].var)); (yyval.geom) = NULL; }
+  case 94: /* SectionBodyItem: "row" "{" RowBody "}" ";"  */
+#line 627 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2807 "parser.c"
     break;
 
-  case 96: /* SectionBodyItem: DoodadDecl  */
-#line 627 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 95: /* SectionBodyItem: VarDecl  */
+#line 629 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[0].var)); (yyval.geom) = NULL; }
 #line 2813 "parser.c"
     break;
 
-  case 97: /* SectionBodyItem: LedMapDecl  */
-#line 629 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[0].ledMap)); (yyval.geom) = NULL; }
+  case 96: /* SectionBodyItem: DoodadDecl  */
+#line 631 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2819 "parser.c"
     break;
 
-  case 98: /* SectionBodyItem: OverlayDecl  */
-#line 631 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 97: /* SectionBodyItem: LedMapDecl  */
+#line 633 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[0].ledMap)); (yyval.geom) = NULL; }
 #line 2825 "parser.c"
     break;
 
-  case 99: /* RowBody: RowBody RowBodyItem  */
-#line 634 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.geom) = NULL;}
+  case 98: /* SectionBodyItem: OverlayDecl  */
+#line 635 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2831 "parser.c"
     break;
 
-  case 100: /* RowBody: RowBodyItem  */
-#line 635 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.geom) = NULL; }
+  case 99: /* RowBody: RowBody RowBodyItem  */
+#line 638 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.geom) = NULL;}
 #line 2837 "parser.c"
     break;
 
-  case 101: /* RowBodyItem: "keys" "{" Keys "}" ";"  */
-#line 638 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                     { (yyval.geom) = NULL; }
+  case 100: /* RowBody: RowBodyItem  */
+#line 639 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.geom) = NULL; }
 #line 2843 "parser.c"
     break;
 
-  case 102: /* RowBodyItem: VarDecl  */
-#line 640 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[0].var)); (yyval.geom) = NULL; }
+  case 101: /* RowBodyItem: "keys" "{" Keys "}" ";"  */
+#line 642 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                     { (yyval.geom) = NULL; }
 #line 2849 "parser.c"
     break;
 
-  case 103: /* Keys: Keys "," Key  */
-#line 643 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                { (yyval.geom) = NULL; }
+  case 102: /* RowBodyItem: VarDecl  */
+#line 644 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[0].var)); (yyval.geom) = NULL; }
 #line 2855 "parser.c"
     break;
 
-  case 104: /* Keys: Key  */
-#line 644 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 103: /* Keys: Keys "," Key  */
+#line 647 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                                 { (yyval.geom) = NULL; }
 #line 2861 "parser.c"
     break;
 
-  case 105: /* Key: "key name"  */
-#line 648 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 104: /* Keys: Key  */
+#line 648 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                { (yyval.geom) = NULL; }
 #line 2867 "parser.c"
     break;
 
-  case 106: /* Key: "{" ExprList "}"  */
-#line 650 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[-1].exprList).head); (yyval.geom) = NULL; }
+  case 105: /* Key: "key name"  */
+#line 652 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2873 "parser.c"
     break;
 
-  case 107: /* OverlayDecl: "overlay" String "{" OverlayKeyList "}" ";"  */
-#line 654 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 106: /* Key: "{" ExprList "}"  */
+#line 654 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[-1].exprList).head); (yyval.geom) = NULL; }
 #line 2879 "parser.c"
     break;
 
-  case 108: /* OverlayKeyList: OverlayKeyList "," OverlayKey  */
-#line 657 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                                        { (yyval.geom) = NULL; }
+  case 107: /* OverlayDecl: "overlay" String "{" OverlayKeyList "}" ";"  */
+#line 658 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2885 "parser.c"
     break;
 
-  case 109: /* OverlayKeyList: OverlayKey  */
-#line 658 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 108: /* OverlayKeyList: OverlayKeyList "," OverlayKey  */
+#line 661 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                                         { (yyval.geom) = NULL; }
 #line 2891 "parser.c"
     break;
 
-  case 110: /* OverlayKey: "key name" "=" "key name"  */
-#line 661 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 109: /* OverlayKeyList: OverlayKey  */
+#line 662 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                                         { (yyval.geom) = NULL; }
 #line 2897 "parser.c"
     break;
 
-  case 111: /* OutlineList: OutlineList "," OutlineInList  */
-#line 665 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL;}
+  case 110: /* OverlayKey: "key name" "=" "key name"  */
+#line 665 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                                        { (yyval.geom) = NULL; }
 #line 2903 "parser.c"
     break;
 
-  case 112: /* OutlineList: OutlineInList  */
-#line 667 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.geom) = NULL; }
+  case 111: /* OutlineList: OutlineList "," OutlineInList  */
+#line 669 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL;}
 #line 2909 "parser.c"
     break;
 
-  case 113: /* OutlineInList: "{" CoordList "}"  */
-#line 671 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (void) (yyvsp[-1].expr); (yyval.geom) = NULL; }
+  case 112: /* OutlineList: OutlineInList  */
+#line 671 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.geom) = NULL; }
 #line 2915 "parser.c"
     break;
 
-  case 114: /* OutlineInList: Ident "=" "{" CoordList "}"  */
-#line 673 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 113: /* OutlineInList: "{" CoordList "}"  */
+#line 675 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         { (void) (yyvsp[-1].expr); (yyval.geom) = NULL; }
 #line 2921 "parser.c"
     break;
 
-  case 115: /* OutlineInList: Ident "=" Expr  */
-#line 675 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[0].expr)); (yyval.geom) = NULL; }
+  case 114: /* OutlineInList: Ident "=" "{" CoordList "}"  */
+#line 677 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (void) (yyvsp[-1].expr); (yyval.geom) = NULL; }
 #line 2927 "parser.c"
     break;
 
-  case 116: /* CoordList: CoordList "," Coord  */
-#line 679 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (void) (yyvsp[-2].expr); (void) (yyvsp[0].expr); (yyval.expr) = NULL; }
+  case 115: /* OutlineInList: Ident "=" Expr  */
+#line 679 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[0].expr)); (yyval.geom) = NULL; }
 #line 2933 "parser.c"
     break;
 
-  case 117: /* CoordList: Coord  */
-#line 681 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (void) (yyvsp[0].expr); (yyval.expr) = NULL; }
+  case 116: /* CoordList: CoordList "," Coord  */
+#line 683 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (void) (yyvsp[-2].expr); (void) (yyvsp[0].expr); (yyval.expr) = NULL; }
 #line 2939 "parser.c"
     break;
 
-  case 118: /* Coord: "[" SignedNumber "," SignedNumber "]"  */
-#line 685 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = NULL; }
+  case 117: /* CoordList: Coord  */
+#line 685 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (void) (yyvsp[0].expr); (yyval.expr) = NULL; }
 #line 2945 "parser.c"
     break;
 
-  case 119: /* DoodadDecl: DoodadType String "{" VarDeclList "}" ";"  */
-#line 689 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { FreeStmt((ParseCommon *) (yyvsp[-2].varList).head); (yyval.geom) = NULL; }
+  case 118: /* Coord: "[" SignedNumber "," SignedNumber "]"  */
+#line 689 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = NULL; }
 #line 2951 "parser.c"
     break;
 
-  case 120: /* DoodadType: "text"  */
-#line 692 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.num) = 0; }
+  case 119: /* DoodadDecl: DoodadType String "{" VarDeclList "}" ";"  */
+#line 693 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { FreeStmt((ParseCommon *) (yyvsp[-2].varList).head); (yyval.geom) = NULL; }
 #line 2957 "parser.c"
     break;
 
-  case 121: /* DoodadType: "outline"  */
-#line 693 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 120: /* DoodadType: "text"  */
+#line 696 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.num) = 0; }
 #line 2963 "parser.c"
     break;
 
-  case 122: /* DoodadType: "solid"  */
-#line 694 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 121: /* DoodadType: "outline"  */
+#line 697 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.num) = 0; }
 #line 2969 "parser.c"
     break;
 
-  case 123: /* DoodadType: "logo"  */
-#line 695 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 122: /* DoodadType: "solid"  */
+#line 698 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.num) = 0; }
 #line 2975 "parser.c"
     break;
 
-  case 124: /* FieldSpec: Ident  */
-#line 698 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.atom) = (yyvsp[0].atom); }
+  case 123: /* DoodadType: "logo"  */
+#line 699 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                { (yyval.num) = 0; }
 #line 2981 "parser.c"
     break;
 
-  case 125: /* FieldSpec: Element  */
-#line 699 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 124: /* FieldSpec: Ident  */
+#line 702 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.atom) = (yyvsp[0].atom); }
 #line 2987 "parser.c"
     break;
 
-  case 126: /* Element: "action"  */
-#line 703 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "action"); }
+  case 125: /* FieldSpec: Element  */
+#line 703 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                { (yyval.atom) = (yyvsp[0].atom); }
 #line 2993 "parser.c"
     break;
 
-  case 127: /* Element: "interpret"  */
-#line 705 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "interpret"); }
+  case 126: /* Element: "action"  */
+#line 707 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "action"); }
 #line 2999 "parser.c"
     break;
 
-  case 128: /* Element: "type"  */
-#line 707 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "type"); }
+  case 127: /* Element: "interpret"  */
+#line 709 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "interpret"); }
 #line 3005 "parser.c"
     break;
 
-  case 129: /* Element: "key"  */
-#line 709 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "key"); }
+  case 128: /* Element: "type"  */
+#line 711 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "type"); }
 #line 3011 "parser.c"
     break;
 
-  case 130: /* Element: "group"  */
-#line 711 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "group"); }
+  case 129: /* Element: "key"  */
+#line 713 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "key"); }
 #line 3017 "parser.c"
     break;
 
-  case 131: /* Element: "modifier_map"  */
-#line 713 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        {(yyval.atom) = xkb_atom_intern_literal(param->ctx, "modifier_map");}
+  case 130: /* Element: "group"  */
+#line 715 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "group"); }
 #line 3023 "parser.c"
     break;
 
-  case 132: /* Element: "indicator"  */
-#line 715 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "indicator"); }
+  case 131: /* Element: "modifier_map"  */
+#line 717 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        {(yyval.atom) = xkb_atom_intern_literal(param->ctx, "modifier_map");}
 #line 3029 "parser.c"
     break;
 
-  case 133: /* Element: "shape"  */
-#line 717 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "shape"); }
+  case 132: /* Element: "indicator"  */
+#line 719 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "indicator"); }
 #line 3035 "parser.c"
     break;
 
-  case 134: /* Element: "row"  */
-#line 719 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "row"); }
+  case 133: /* Element: "shape"  */
+#line 721 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "shape"); }
 #line 3041 "parser.c"
     break;
 
-  case 135: /* Element: "section"  */
-#line 721 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "section"); }
+  case 134: /* Element: "row"  */
+#line 723 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "row"); }
 #line 3047 "parser.c"
     break;
 
-  case 136: /* Element: "text"  */
-#line 723 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "text"); }
+  case 135: /* Element: "section"  */
+#line 725 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "section"); }
 #line 3053 "parser.c"
     break;
 
-  case 137: /* OptMergeMode: MergeMode  */
-#line 726 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.merge) = (yyvsp[0].merge); }
+  case 136: /* Element: "text"  */
+#line 727 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "text"); }
 #line 3059 "parser.c"
     break;
 
-  case 138: /* OptMergeMode: %empty  */
-#line 727 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.merge) = MERGE_DEFAULT; }
+  case 137: /* OptMergeMode: MergeMode  */
+#line 730 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.merge) = (yyvsp[0].merge); }
 #line 3065 "parser.c"
     break;
 
-  case 139: /* MergeMode: "include"  */
-#line 730 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 138: /* OptMergeMode: %empty  */
+#line 731 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                         { (yyval.merge) = MERGE_DEFAULT; }
 #line 3071 "parser.c"
     break;
 
-  case 140: /* MergeMode: "augment"  */
-#line 731 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.merge) = MERGE_AUGMENT; }
+  case 139: /* MergeMode: "include"  */
+#line 734 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.merge) = MERGE_DEFAULT; }
 #line 3077 "parser.c"
     break;
 
-  case 141: /* MergeMode: "override"  */
-#line 732 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.merge) = MERGE_OVERRIDE; }
+  case 140: /* MergeMode: "augment"  */
+#line 735 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.merge) = MERGE_AUGMENT; }
 #line 3083 "parser.c"
     break;
 
-  case 142: /* MergeMode: "replace"  */
-#line 733 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                        { (yyval.merge) = MERGE_REPLACE; }
+  case 141: /* MergeMode: "override"  */
+#line 736 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.merge) = MERGE_OVERRIDE; }
 #line 3089 "parser.c"
     break;
 
+  case 142: /* MergeMode: "replace"  */
+#line 737 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                        { (yyval.merge) = MERGE_REPLACE; }
+#line 3095 "parser.c"
+    break;
+
   case 143: /* MergeMode: "alternate"  */
-#line 735 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 739 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                 {
                     /*
                      * This used to be MERGE_ALT_FORM. This functionality was
@@ -3099,11 +3105,11 @@ yyreduce:
                                 "ignored unsupported legacy merge mode \"alternate\"");
                     (yyval.merge) = MERGE_DEFAULT;
                 }
-#line 3103 "parser.c"
+#line 3109 "parser.c"
     break;
 
   case 144: /* ExprList: ExprList "," Expr  */
-#line 747 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 751 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if ((yyvsp[0].expr)) {
                                 if ((yyvsp[-2].exprList).head) {
@@ -3115,280 +3121,280 @@ yyreduce:
                                 }
                             }
                         }
-#line 3119 "parser.c"
-    break;
-
-  case 145: /* ExprList: Expr  */
-#line 759 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3125 "parser.c"
     break;
 
-  case 146: /* ExprList: %empty  */
-#line 760 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = NULL; }
+  case 145: /* ExprList: Expr  */
+#line 763 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3131 "parser.c"
     break;
 
-  case 147: /* Expr: Expr "/" Expr  */
-#line 764 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_DIVIDE, (yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 146: /* ExprList: %empty  */
+#line 764 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = NULL; }
 #line 3137 "parser.c"
     break;
 
-  case 148: /* Expr: Expr "+" Expr  */
-#line 766 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_ADD, (yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 147: /* Expr: Expr "/" Expr  */
+#line 768 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_DIVIDE, (yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 3143 "parser.c"
     break;
 
-  case 149: /* Expr: Expr "-" Expr  */
-#line 768 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_SUBTRACT, (yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 148: /* Expr: Expr "+" Expr  */
+#line 770 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_ADD, (yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 3149 "parser.c"
     break;
 
-  case 150: /* Expr: Expr "*" Expr  */
-#line 770 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_MULTIPLY, (yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 149: /* Expr: Expr "-" Expr  */
+#line 772 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_SUBTRACT, (yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 3155 "parser.c"
     break;
 
-  case 151: /* Expr: Lhs "=" Expr  */
-#line 772 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_ASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr)); }
+  case 150: /* Expr: Expr "*" Expr  */
+#line 774 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_MULTIPLY, (yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 3161 "parser.c"
     break;
 
-  case 152: /* Expr: Term  */
-#line 774 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[0].expr); }
+  case 151: /* Expr: Lhs "=" Expr  */
+#line 776 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateBinary(STMT_EXPR_ASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr)); }
 #line 3167 "parser.c"
     break;
 
-  case 153: /* Term: "-" Term  */
-#line 778 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_NEGATE, (yyvsp[0].expr)); }
+  case 152: /* Expr: Term  */
+#line 778 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3173 "parser.c"
     break;
 
-  case 154: /* Term: "+" Term  */
-#line 780 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_UNARY_PLUS, (yyvsp[0].expr)); }
+  case 153: /* Term: "-" Term  */
+#line 782 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_NEGATE, (yyvsp[0].expr)); }
 #line 3179 "parser.c"
     break;
 
-  case 155: /* Term: "!" Term  */
-#line 782 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_NOT, (yyvsp[0].expr)); }
+  case 154: /* Term: "+" Term  */
+#line 784 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_UNARY_PLUS, (yyvsp[0].expr)); }
 #line 3185 "parser.c"
     break;
 
-  case 156: /* Term: "~" Term  */
-#line 784 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_INVERT, (yyvsp[0].expr)); }
+  case 155: /* Term: "!" Term  */
+#line 786 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_NOT, (yyvsp[0].expr)); }
 #line 3191 "parser.c"
     break;
 
-  case 157: /* Term: Lhs  */
-#line 786 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[0].expr); }
+  case 156: /* Term: "~" Term  */
+#line 788 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateUnary(STMT_EXPR_INVERT, (yyvsp[0].expr)); }
 #line 3197 "parser.c"
     break;
 
-  case 158: /* Term: FieldSpec "(" ExprList ")"  */
-#line 788 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateAction((yyvsp[-3].atom), (yyvsp[-1].exprList).head); }
+  case 157: /* Term: Lhs  */
+#line 790 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3203 "parser.c"
     break;
 
-  case 159: /* Term: Actions  */
-#line 790 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[0].expr); }
+  case 158: /* Term: FieldSpec "(" ExprList ")"  */
+#line 792 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateAction((yyvsp[-3].atom), (yyvsp[-1].exprList).head); }
 #line 3209 "parser.c"
     break;
 
-  case 160: /* Term: Terminal  */
-#line 792 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 159: /* Term: Actions  */
+#line 794 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         { (yyval.expr) = (yyvsp[0].expr); }
 #line 3215 "parser.c"
     break;
 
-  case 161: /* Term: "(" Expr ")"  */
-#line 794 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[-1].expr); }
+  case 160: /* Term: Terminal  */
+#line 796 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3221 "parser.c"
     break;
 
+  case 161: /* Term: "(" Expr ")"  */
+#line 798 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[-1].expr); }
+#line 3227 "parser.c"
+    break;
+
   case 162: /* MultiActionList: MultiActionList "," Action  */
-#line 798 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 802 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             ExprDef *expr = ExprCreateActionList((yyvsp[0].expr));
                             (yyval.exprList) = (yyvsp[-2].exprList);
                             (yyval.exprList).last->common.next = &expr->common; (yyval.exprList).last = expr;
                         }
-#line 3231 "parser.c"
-    break;
-
-  case 163: /* MultiActionList: MultiActionList "," Actions  */
-#line 804 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3237 "parser.c"
     break;
 
-  case 164: /* MultiActionList: Action  */
-#line 806 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = ExprCreateActionList((yyvsp[0].expr)); }
+  case 163: /* MultiActionList: MultiActionList "," Actions  */
+#line 808 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3243 "parser.c"
     break;
 
-  case 165: /* MultiActionList: NonEmptyActions  */
-#line 808 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
+  case 164: /* MultiActionList: Action  */
+#line 810 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = ExprCreateActionList((yyvsp[0].expr)); }
 #line 3249 "parser.c"
     break;
 
-  case 166: /* ActionList: ActionList "," Action  */
-#line 812 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
+  case 165: /* MultiActionList: NonEmptyActions  */
+#line 812 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3255 "parser.c"
     break;
 
-  case 167: /* ActionList: Action  */
-#line 814 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
+  case 166: /* ActionList: ActionList "," Action  */
+#line 816 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3261 "parser.c"
     break;
 
-  case 168: /* NonEmptyActions: "{" ActionList "}"  */
-#line 818 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateActionList((yyvsp[-1].exprList).head); }
+  case 167: /* ActionList: Action  */
+#line 818 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3267 "parser.c"
     break;
 
-  case 169: /* Actions: NonEmptyActions  */
-#line 822 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[0].expr); }
+  case 168: /* NonEmptyActions: "{" ActionList "}"  */
+#line 822 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateActionList((yyvsp[-1].exprList).head); }
 #line 3273 "parser.c"
     break;
 
-  case 170: /* Actions: "{" "}"  */
-#line 824 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateActionList(NULL); }
+  case 169: /* Actions: NonEmptyActions  */
+#line 826 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3279 "parser.c"
     break;
 
-  case 171: /* Action: FieldSpec "(" ExprList ")"  */
-#line 828 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateAction((yyvsp[-3].atom), (yyvsp[-1].exprList).head); }
+  case 170: /* Actions: "{" "}"  */
+#line 828 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateActionList(NULL); }
 #line 3285 "parser.c"
     break;
 
-  case 172: /* Lhs: FieldSpec  */
-#line 832 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateIdent((yyvsp[0].atom)); }
+  case 171: /* Action: FieldSpec "(" ExprList ")"  */
+#line 832 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateAction((yyvsp[-3].atom), (yyvsp[-1].exprList).head); }
 #line 3291 "parser.c"
     break;
 
-  case 173: /* Lhs: FieldSpec "." FieldSpec  */
-#line 834 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateFieldRef((yyvsp[-2].atom), (yyvsp[0].atom)); }
+  case 172: /* Lhs: FieldSpec  */
+#line 836 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateIdent((yyvsp[0].atom)); }
 #line 3297 "parser.c"
     break;
 
-  case 174: /* Lhs: FieldSpec "[" Expr "]"  */
-#line 836 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateArrayRef(XKB_ATOM_NONE, (yyvsp[-3].atom), (yyvsp[-1].expr)); }
+  case 173: /* Lhs: FieldSpec "." FieldSpec  */
+#line 838 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateFieldRef((yyvsp[-2].atom), (yyvsp[0].atom)); }
 #line 3303 "parser.c"
     break;
 
-  case 175: /* Lhs: FieldSpec "." FieldSpec "[" Expr "]"  */
-#line 838 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateArrayRef((yyvsp[-5].atom), (yyvsp[-3].atom), (yyvsp[-1].expr)); }
+  case 174: /* Lhs: FieldSpec "[" Expr "]"  */
+#line 840 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateArrayRef(XKB_ATOM_NONE, (yyvsp[-3].atom), (yyvsp[-1].expr)); }
 #line 3309 "parser.c"
     break;
 
-  case 176: /* Terminal: String  */
-#line 842 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateString((yyvsp[0].atom)); }
+  case 175: /* Lhs: FieldSpec "." FieldSpec "[" Expr "]"  */
+#line 842 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateArrayRef((yyvsp[-5].atom), (yyvsp[-3].atom), (yyvsp[-1].expr)); }
 #line 3315 "parser.c"
     break;
 
-  case 177: /* Terminal: Integer  */
-#line 844 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateInteger((yyvsp[0].num)); }
+  case 176: /* Terminal: String  */
+#line 846 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateString((yyvsp[0].atom)); }
 #line 3321 "parser.c"
     break;
 
-  case 178: /* Terminal: Float  */
-#line 846 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateFloat(/* Discard $1 */); }
+  case 177: /* Terminal: Integer  */
+#line 848 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateInteger((yyvsp[0].num)); }
 #line 3327 "parser.c"
     break;
 
-  case 179: /* Terminal: "key name"  */
-#line 848 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateKeyName((yyvsp[0].atom)); }
+  case 178: /* Terminal: Float  */
+#line 850 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateFloat(/* Discard $1 */); }
 #line 3333 "parser.c"
     break;
 
+  case 179: /* Terminal: "key name"  */
+#line 852 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateKeyName((yyvsp[0].atom)); }
+#line 3339 "parser.c"
+    break;
+
   case 180: /* MultiKeySymList: MultiKeySymList "," KeySymLit  */
-#line 852 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 856 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             ExprDef *expr = ExprCreateKeySymList((yyvsp[0].keysym));
                             (yyval.exprList) = (yyvsp[-2].exprList);
                             (yyval.exprList).last->common.next = &expr->common; (yyval.exprList).last = expr;
                         }
-#line 3343 "parser.c"
-    break;
-
-  case 181: /* MultiKeySymList: MultiKeySymList "," KeySyms  */
-#line 858 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3349 "parser.c"
     break;
 
-  case 182: /* MultiKeySymList: KeySymLit  */
-#line 860 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = ExprCreateKeySymList((yyvsp[0].keysym)); }
+  case 181: /* MultiKeySymList: MultiKeySymList "," KeySyms  */
+#line 862 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList) = (yyvsp[-2].exprList); (yyval.exprList).last->common.next = &(yyvsp[0].expr)->common; (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3355 "parser.c"
     break;
 
-  case 183: /* MultiKeySymList: NonEmptyKeySyms  */
-#line 862 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
+  case 182: /* MultiKeySymList: KeySymLit  */
+#line 864 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = ExprCreateKeySymList((yyvsp[0].keysym)); }
 #line 3361 "parser.c"
     break;
 
-  case 184: /* KeySymList: KeySymList "," KeySymLit  */
-#line 866 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprAppendKeySymList((yyvsp[-2].expr), (yyvsp[0].keysym)); }
+  case 183: /* MultiKeySymList: NonEmptyKeySyms  */
+#line 866 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.exprList).head = (yyval.exprList).last = (yyvsp[0].expr); }
 #line 3367 "parser.c"
     break;
 
+  case 184: /* KeySymList: KeySymList "," KeySymLit  */
+#line 870 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprAppendKeySymList((yyvsp[-2].expr), (yyvsp[0].keysym)); }
+#line 3373 "parser.c"
+    break;
+
   case 185: /* KeySymList: KeySymList "," "string literal"  */
-#line 868 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 872 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.expr) = ExprKeySymListAppendString(param->scanner, (yyvsp[-2].expr), (yyvsp[0].str));
                             free((yyvsp[0].str));
                             if (!(yyval.expr))
                                 YYERROR;
                         }
-#line 3378 "parser.c"
+#line 3384 "parser.c"
     break;
 
   case 186: /* KeySymList: KeySymLit  */
-#line 875 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 879 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.expr) = ExprCreateKeySymList((yyvsp[0].keysym));
                             if (!(yyval.expr))
                                 YYERROR;
                         }
-#line 3388 "parser.c"
+#line 3394 "parser.c"
     break;
 
   case 187: /* KeySymList: "string literal"  */
-#line 881 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 885 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.expr) = ExprCreateKeySymList(XKB_KEY_NoSymbol);
                             if (!(yyval.expr))
@@ -3398,17 +3404,17 @@ yyreduce:
                             if (!(yyval.expr))
                                 YYERROR;
                         }
-#line 3402 "parser.c"
-    break;
-
-  case 188: /* NonEmptyKeySyms: "{" KeySymList "}"  */
-#line 893 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[-1].expr); }
 #line 3408 "parser.c"
     break;
 
+  case 188: /* NonEmptyKeySyms: "{" KeySymList "}"  */
+#line 897 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[-1].expr); }
+#line 3414 "parser.c"
+    break;
+
   case 189: /* NonEmptyKeySyms: "string literal"  */
-#line 895 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 899 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.expr) = ExprCreateKeySymList(XKB_KEY_NoSymbol);
                             if (!(yyval.expr))
@@ -3418,40 +3424,40 @@ yyreduce:
                             if (!(yyval.expr))
                                 YYERROR;
                         }
-#line 3422 "parser.c"
-    break;
-
-  case 190: /* KeySyms: NonEmptyKeySyms  */
-#line 907 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3428 "parser.c"
     break;
 
-  case 191: /* KeySyms: "{" "}"  */
-#line 909 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.expr) = ExprCreateKeySymList(XKB_KEY_NoSymbol); }
+  case 190: /* KeySyms: NonEmptyKeySyms  */
+#line 911 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = (yyvsp[0].expr); }
 #line 3434 "parser.c"
     break;
 
-  case 192: /* KeySym: KeySymLit  */
-#line 913 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                        { (yyval.keysym) = (yyvsp[0].keysym); }
+  case 191: /* KeySyms: "{" "}"  */
+#line 913 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.expr) = ExprCreateKeySymList(XKB_KEY_NoSymbol); }
 #line 3440 "parser.c"
     break;
 
+  case 192: /* KeySym: KeySymLit  */
+#line 917 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        { (yyval.keysym) = (yyvsp[0].keysym); }
+#line 3446 "parser.c"
+    break;
+
   case 193: /* KeySym: "string literal"  */
-#line 915 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 919 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             (yyval.keysym) = KeysymParseString(param->scanner, (yyvsp[0].str));
                             free((yyvsp[0].str));
                             if ((yyval.keysym) == XKB_KEY_NoSymbol)
                                 YYERROR;
                         }
-#line 3451 "parser.c"
+#line 3457 "parser.c"
     break;
 
   case 194: /* KeySymLit: "identifier"  */
-#line 924 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 928 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if (!resolve_keysym(param, (yyvsp[0].sval), &(yyval.keysym))) {
                                 parser_warn(
@@ -3463,17 +3469,30 @@ yyreduce:
                                 (yyval.keysym) = XKB_KEY_NoSymbol;
                             }
                         }
-#line 3467 "parser.c"
-    break;
-
-  case 195: /* KeySymLit: "section"  */
-#line 936 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.keysym) = XKB_KEY_section; }
 #line 3473 "parser.c"
     break;
 
-  case 196: /* KeySymLit: Integer  */
-#line 938 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 195: /* KeySymLit: "section"  */
+#line 940 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                { (yyval.keysym) = XKB_KEY_section; }
+#line 3479 "parser.c"
+    break;
+
+  case 196: /* KeySymLit: "decimal digit"  */
+#line 942 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                        {
+                            /*
+                             * Special case for digits 0..9:
+                             * map to XKB_KEY_0 .. XKB_KEY_9, consistent with
+                             * other keysym names: <name> → XKB_KEY_<name>.
+                             */
+                            (yyval.keysym) = XKB_KEY_0 + (xkb_keysym_t) (yyvsp[0].num);
+                        }
+#line 3492 "parser.c"
+    break;
+
+  case 197: /* KeySymLit: "integer literal"  */
+#line 951 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                         {
                             if ((yyvsp[0].num) < XKB_KEYSYM_MIN) {
                                 /* Negative value */
@@ -3488,11 +3507,14 @@ yyreduce:
                                 );
                                 (yyval.keysym) = XKB_KEY_NoSymbol;
                             }
-                            else if ((yyvsp[0].num) < 10) {
-                                /* Special case for digits 0..9:
-                                 * map to XKB_KEY_0 .. XKB_KEY_9 */
-                                (yyval.keysym) = XKB_KEY_0 + (xkb_keysym_t) (yyvsp[0].num);
-                            }
+                            /*
+                             * Integers 0..9 are handled with DECIMAL_DIGIT if
+                             * they were formatted as single characters '0'..'9'.
+                             * Otherwise they are handled here as raw keysyms
+                             * values. E.g. `01` and `0x1` are interpreted as
+                             * the keysym 0x0001, while `1` is interpreted as
+                             * XKB_KEY_1.
+                             */
                             else {
                                 /* Any other numeric value */
                                 if ((yyvsp[0].num) <= XKB_KEYSYM_MAX) {
@@ -3514,96 +3536,121 @@ yyreduce:
                                     );
                                     (yyval.keysym) = XKB_KEY_NoSymbol;
                                 }
-                                parser_warn(
-                                    param, XKB_WARNING_NUMERIC_KEYSYM,
+                                parser_vrb(
+                                    /*
+                                     * Require an extra high verbosity, because
+                                     * keysyms are formatted as number unless
+                                     * enabling pretty-pretting for the
+                                     * serialization.
+                                     */
+                                    param, XKB_LOG_VERBOSITY_COMPREHENSIVE,
+                                    XKB_WARNING_NUMERIC_KEYSYM,
                                     "numeric keysym \"%#06"PRIx64"\" (%"PRId64")",
                                     (yyvsp[0].num), (yyvsp[0].num)
                                 );
                             }
                         }
-#line 3525 "parser.c"
+#line 3554 "parser.c"
     break;
 
-  case 197: /* SignedNumber: "-" Number  */
-#line 987 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 198: /* SignedNumber: "-" Number  */
+#line 1010 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                         { (yyval.num) = -(yyvsp[0].num); }
-#line 3531 "parser.c"
+#line 3560 "parser.c"
     break;
 
-  case 198: /* SignedNumber: Number  */
-#line 988 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 199: /* SignedNumber: Number  */
+#line 1011 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                         { (yyval.num) = (yyvsp[0].num); }
-#line 3537 "parser.c"
+#line 3566 "parser.c"
     break;
 
-  case 199: /* Number: "float literal"  */
-#line 991 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.num) = (yyvsp[0].num); }
-#line 3543 "parser.c"
+  case 200: /* Number: "float literal"  */
+#line 1014 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3572 "parser.c"
     break;
 
-  case 200: /* Number: "integer literal"  */
-#line 992 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.num) = (yyvsp[0].num); }
-#line 3549 "parser.c"
+  case 201: /* Number: "decimal digit"  */
+#line 1015 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3578 "parser.c"
     break;
 
-  case 201: /* Float: "float literal"  */
-#line 995 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 202: /* Number: "integer literal"  */
+#line 1016 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3584 "parser.c"
+    break;
+
+  case 203: /* Float: "float literal"  */
+#line 1019 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.num) = 0; }
-#line 3555 "parser.c"
+#line 3590 "parser.c"
     break;
 
-  case 202: /* Integer: "integer literal"  */
-#line 998 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.num) = (yyvsp[0].num); }
-#line 3561 "parser.c"
+  case 204: /* Integer: "integer literal"  */
+#line 1022 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3596 "parser.c"
     break;
 
-  case 203: /* KeyCode: "integer literal"  */
-#line 1001 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
-                                { (yyval.num) = (yyvsp[0].num); }
-#line 3567 "parser.c"
+  case 205: /* Integer: "decimal digit"  */
+#line 1023 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3602 "parser.c"
     break;
 
-  case 204: /* Ident: "identifier"  */
-#line 1004 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 206: /* KeyCode: "integer literal"  */
+#line 1026 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3608 "parser.c"
+    break;
+
+  case 207: /* KeyCode: "decimal digit"  */
+#line 1027 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
+                                      { (yyval.num) = (yyvsp[0].num); }
+#line 3614 "parser.c"
+    break;
+
+  case 208: /* Ident: "identifier"  */
+#line 1030 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.atom) = xkb_atom_intern(param->ctx, (yyvsp[0].sval).start, (yyvsp[0].sval).len); }
-#line 3573 "parser.c"
+#line 3620 "parser.c"
     break;
 
-  case 205: /* Ident: "default"  */
-#line 1005 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 209: /* Ident: "default"  */
+#line 1031 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.atom) = xkb_atom_intern_literal(param->ctx, "default"); }
-#line 3579 "parser.c"
+#line 3626 "parser.c"
     break;
 
-  case 206: /* String: "string literal"  */
-#line 1008 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 210: /* String: "string literal"  */
+#line 1034 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.atom) = xkb_atom_intern(param->ctx, (yyvsp[0].str), strlen((yyvsp[0].str))); free((yyvsp[0].str)); }
-#line 3585 "parser.c"
+#line 3632 "parser.c"
     break;
 
-  case 207: /* OptMapName: MapName  */
-#line 1011 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 211: /* OptMapName: MapName  */
+#line 1037 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.str) = (yyvsp[0].str); }
-#line 3591 "parser.c"
+#line 3638 "parser.c"
     break;
 
-  case 208: /* OptMapName: %empty  */
-#line 1012 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 212: /* OptMapName: %empty  */
+#line 1038 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.str) = NULL; }
-#line 3597 "parser.c"
+#line 3644 "parser.c"
     break;
 
-  case 209: /* MapName: "string literal"  */
-#line 1015 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+  case 213: /* MapName: "string literal"  */
+#line 1041 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
                                 { (yyval.str) = (yyvsp[0].str); }
-#line 3603 "parser.c"
+#line 3650 "parser.c"
     break;
 
 
-#line 3607 "parser.c"
+#line 3654 "parser.c"
 
       default: break;
     }
@@ -3827,9 +3874,10 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 1018 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 1044 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
 
 
+/* Parse a specific section */
 XkbFile *
 parse(struct xkb_context *ctx, struct scanner *scanner, const char *map)
 {
@@ -3880,11 +3928,33 @@ parse(struct xkb_context *ctx, struct scanner *scanner, const char *map)
     }
 
     if (first)
-        log_vrb(ctx, 5,
+        log_vrb(ctx, XKB_LOG_VERBOSITY_DETAILED,
                 XKB_WARNING_MISSING_DEFAULT_SECTION,
                 "No map in include statement, but \"%s\" contains several; "
                 "Using first defined map, \"%s\"\n",
                 scanner->file_name, safe_map_name(first));
 
     return first;
+}
+
+/* Parse the next section */
+bool
+parse_next(struct xkb_context *ctx, struct scanner *scanner, XkbFile **xkb_file)
+{
+    int ret;
+    struct parser_param param = {
+        .scanner = scanner,
+        .ctx = ctx,
+        .rtrn = NULL,
+        .more_maps = false,
+    };
+
+    if ((ret = yyparse(&param)) == 0 && param.more_maps) {
+        *xkb_file = param.rtrn;
+        return true;
+    } else {
+        FreeXkbFile(param.rtrn);
+        *xkb_file = NULL;
+        return (ret == 0);
+    }
 }

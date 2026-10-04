@@ -45,7 +45,7 @@
 extern int _xkbcommon_debug;
 #endif
 /* "%code requires" blocks.  */
-#line 14 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 14 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
 
 #include "config.h"
 
@@ -113,10 +113,11 @@ extern int _xkbcommon_debug;
     EXCLAM = 54,                   /* "!"  */
     INVERT = 55,                   /* "~"  */
     STRING = 60,                   /* "string literal"  */
-    INTEGER = 61,                  /* "integer literal"  */
-    FLOAT = 62,                    /* "float literal"  */
-    IDENT = 63,                    /* "identifier"  */
-    KEYNAME = 64,                  /* "key name"  */
+    DECIMAL_DIGIT = 61,            /* "decimal digit"  */
+    INTEGER = 62,                  /* "integer literal"  */
+    FLOAT = 63,                    /* "float literal"  */
+    IDENT = 64,                    /* "identifier"  */
+    KEYNAME = 65,                  /* "key name"  */
     PARTIAL = 70,                  /* "partial"  */
     DEFAULT = 71,                  /* "default"  */
     HIDDEN = 72,                   /* "hidden"  */
@@ -133,7 +134,7 @@ extern int _xkbcommon_debug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 166 "libxkbcommon-xkbcommon-1.11.0/src/xkbcomp/parser.y"
+#line 170 "libxkbcommon-xkbcommon-1.13.2/src/xkbcomp/parser.y"
 
         int64_t          num;
         enum xkb_file_type file_type;
@@ -165,7 +166,7 @@ union YYSTYPE
         XkbFile         *file;
         struct { XkbFile *head; XkbFile *last; } fileList;
 
-#line 169 "parser.h"
+#line 170 "parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
