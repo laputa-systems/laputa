@@ -134,8 +134,8 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
   fs.rename(temporary, output, overwrite: true)?
 }
 
-# Replaces an exact byte range inside an immutable byte value.
-proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
+## Replace an exact byte range inside an immutable byte value.
+export proc image_put_bytes(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
   bytes.concat(
     [
       data[..offset],
@@ -145,9 +145,9 @@ proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] 
   )
 }
 
-# Encodes an unsigned little-endian integer at an exact byte range.
-proc put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
-  put(data, offset, bytes.pack_le(value, width)?)
+## Encode an unsigned little-endian integer at an exact byte range.
+export proc image_put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
+  image_put_bytes(data, offset, bytes.pack_le(value, width)?)
 }
 
 # Encodes a GPT UTF-16LE partition name with its fixed 72-byte width.
@@ -164,14 +164,14 @@ proc gpt_name(name: Str) [error] -> Result[Bytes] {
   bytes.concat([encoded, bytes.zero(72 - encoded.len())?])
 }
 
-# Encodes one GPT partition entry.
-proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes] {
+## Encode one 128-byte GPT partition entry.
+export proc image_gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes] {
   var entry = bytes.zero(128)?
-  entry = put(entry, 0, type_guid)?
-  entry = put(entry, 16, part_guid)?
-  entry = put_le(entry, 32, start_lba, 8)?
-  entry = put_le(entry, 40, end_lba, 8)?
-  put(entry, 56, gpt_name(name)?)
+  entry = image_put_bytes(entry, 0, type_guid)?
+  entry = image_put_bytes(entry, 16, part_guid)?
+  entry = image_put_le(entry, 32, start_lba, 8)?
+  entry = image_put_le(entry, 40, end_lba, 8)?
+  image_put_bytes(entry, 56, gpt_name(name)?)
 }
 
 ## Construct a protective MBR covering the complete disk.
@@ -181,16 +181,16 @@ export proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
   }
 
   var sector = bytes.zero(sector_size)?
-  sector = put(sector, 447, bytes.from_ints([0, 2, 0])?)?
-  sector = put(sector, 450, bytes.from_ints([238])?)?
-  sector = put(sector, 451, bytes.from_ints([255, 255, 255])?)?
-  sector = put_le(sector, 454, 1, 4)?
-  sector = put_le(sector, 458, total_sectors - 1, 4)?
-  put(sector, 510, bytes.from_ints([85, 170])?)
+  sector = image_put_bytes(sector, 447, bytes.from_ints([0, 2, 0])?)?
+  sector = image_put_bytes(sector, 450, bytes.from_ints([238])?)?
+  sector = image_put_bytes(sector, 451, bytes.from_ints([255, 255, 255])?)?
+  sector = image_put_le(sector, 454, 1, 4)?
+  sector = image_put_le(sector, 458, total_sectors - 1, 4)?
+  image_put_bytes(sector, 510, bytes.from_ints([85, 170])?)
 }
 
-# Constructs one GPT header with a correct header checksum.
-proc gpt_header(
+## Construct one GPT header with a correct header checksum.
+export proc image_gpt_header(
   current_lba: Int,
   backup_lba: Int,
   first_usable: Int,
@@ -202,23 +202,23 @@ proc gpt_header(
   entries_crc: Int,
 ) [error] -> Result[Bytes] {
   var header = bytes.zero(sector_size)?
-  header = put(header, 0, bytes.from_text("EFI PART"))?
-  header = put_le(header, 8, 65536, 4)?
-  header = put_le(header, 12, 92, 4)?
-  header = put_le(header, 24, current_lba, 8)?
-  header = put_le(header, 32, backup_lba, 8)?
-  header = put_le(header, 40, first_usable, 8)?
-  header = put_le(header, 48, last_usable, 8)?
-  header = put(header, 56, disk_guid)?
-  header = put_le(header, 72, entries_lba, 8)?
-  header = put_le(header, 80, entry_count, 4)?
-  header = put_le(header, 84, entry_size, 4)?
-  header = put_le(header, 88, entries_crc, 4)?
-  put_le(header, 16, hash.crc32(header[..92]), 4)
+  header = image_put_bytes(header, 0, bytes.from_text("EFI PART"))?
+  header = image_put_le(header, 8, 65536, 4)?
+  header = image_put_le(header, 12, 92, 4)?
+  header = image_put_le(header, 24, current_lba, 8)?
+  header = image_put_le(header, 32, backup_lba, 8)?
+  header = image_put_le(header, 40, first_usable, 8)?
+  header = image_put_le(header, 48, last_usable, 8)?
+  header = image_put_bytes(header, 56, disk_guid)?
+  header = image_put_le(header, 72, entries_lba, 8)?
+  header = image_put_le(header, 80, entry_count, 4)?
+  header = image_put_le(header, 84, entry_size, 4)?
+  header = image_put_le(header, 88, entries_crc, 4)?
+  image_put_le(header, 16, hash.crc32(header[..92]), 4)
 }
 
-# Returns the fixed Linux filesystem partition type GUID in GPT byte order.
-proc root_type_guid() [error] -> Result[Bytes] {
+## Return the Linux filesystem partition type GUID in GPT byte order.
+export proc image_linux_partition_type_guid() [error] -> Result[Bytes] {
   bytes.from_ints([175, 61, 198, 15, 131, 132, 114, 71, 142, 121, 61, 105, 216, 71, 125, 228])
 }
 
@@ -285,13 +285,13 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   tmp.truncate(total_sectors * sector_size)?
   let entries = bytes.concat(
     [
-      gpt_entry(root_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
+      image_gpt_entry(image_linux_partition_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
       bytes.zero(entry_count * entry_size - entry_size)?,
     ],
   )
   let entries_crc = hash.crc32(entries)
   let disk_guid = bytes.zero(16)?
-  let primary_header = gpt_header(
+  let primary_header = image_gpt_header(
     1,
     total_sectors - 1,
     first_usable,
@@ -302,7 +302,7 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
     entry_size,
     entries_crc,
   )?
-  let backup_header = gpt_header(
+  let backup_header = image_gpt_header(
     total_sectors - 1,
     1,
     first_usable,

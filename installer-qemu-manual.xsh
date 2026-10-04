@@ -1,17 +1,5 @@
 #!/bin/xsh
-error InstallerQemuError = Failed(message: Str)
-
-proc env_value(name: Str, fallback: Str) [env] -> Str {
-  let value = env.get(name) ?? ""
-
-  return fallback when value == ""
-
-  value
-}
-
-proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"{env_value(name, fallback.display())}"
-}
+use installer.host as host
 
 proc parse_size(value: Str) [error] -> Result[Int] {
   let trimmed = value.trim()
@@ -33,38 +21,26 @@ proc command_path(name: Str) [process, error] -> Result[Path] {
   process.which(name)?
 }
 
-proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
-  let status = process.run(process.command_argv(target, argv, cwd, envs))?
-
-  return when status.ok
-
-  if status.exited() {
-    abort(status.exit_code()?)
-  }
-
-  return Err(InstallerQemuError.Failed(f"{argv[0]} was signaled"))
-}
-
 proc main() [fs, process, env, error] {
-  let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let work = env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer")?
-  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-manual-aarch64.iso")?
-  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-aarch64.vmlinuz")?
-  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-manual.img")?
-  let target_size = env_value("LAPUTA_INSTALLER_TARGET_SIZE", "1G") |> parse_size(_)?
+  let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
+  let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer")?
+  let installer_iso = host.installer_env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-manual-aarch64.iso")?
+  let installer_kernel = host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-aarch64.vmlinuz")?
+  let target_image = host.installer_env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-manual.img")?
+  let target_size = host.installer_env_value("LAPUTA_INSTALLER_TARGET_SIZE", "1G") |> parse_size(_)?
 
-  let kernel_cmdline = env_value(
+  let kernel_cmdline = host.installer_env_value(
     "LAPUTA_KERNEL_CMDLINE",
     "root=PARTUUID=55555555-5555-5555-5555-555555555555 rootfstype=ext4 rootwait rootdelay=2 rw console=ttyAMA0 console=tty0 loglevel=4 devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1",
-  ) |> env_value(
+  ) |> host.installer_env_value(
     "LAPUTA_INSTALLER_KERNEL_CMDLINE",
     _,
   )
 
-  let qemu_name = env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")
+  let qemu_name = host.installer_env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")
   let qemu = command_path(qemu_name)?
-  let xsh = env_path("XSH_HOST", process.which("xsh")?)?
-  let kernel_source_raw = env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
+  let xsh = host.installer_env_path("XSH_HOST", process.which("xsh")?)?
+  let kernel_source_raw = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
   let local_kernel = fp"{root}/target/laputa-installer/local-linux-aarch64.Image"
 
   let kernel_source = if kernel_source_raw != "" {
@@ -96,7 +72,7 @@ proc main() [fs, process, env, error] {
     }
   }
 
-  run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)?
+  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)?
   let installer_iso_meta = installer_iso.metadata()?
   let installer_kernel_meta = installer_kernel.metadata()?
   let _ = {installer_iso_meta, installer_kernel_meta}
@@ -107,7 +83,7 @@ proc main() [fs, process, env, error] {
   print "inside the installer, run: setup-laputa"
   print "CI-sized disk run: setup-laputa --ci"
 
-  run_argv(
+  host.installer_run_argv(
     qemu,
     [
       qemu_name,

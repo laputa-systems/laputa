@@ -1,30 +1,10 @@
 #!/bin/xsh
+use installer.host as host
+
 error InstallerQemuTestError = Failed(kind: Str, message: Str)
 
-proc env_value(name: Str, fallback: Str) [env] -> Str {
-  let value = (env.get(name) ?? "").trim()
-
-  return fallback when value == ""
-
-  value
-}
-
-proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"{env_value(name, fallback.display())}"
-}
-
 proc env_int(name: Str, fallback: Int) [env, error] -> Result[Int] {
-  env_value(name, f"{fallback}").parse_int()?
-}
-
-pure normalize_arch(arch: Str) -> Result[Str] {
-  return "x86_64" when arch == "amd64"
-
-  return "aarch64" when arch == "arm64"
-
-  return arch when arch == "aarch64" or arch == "x86_64"
-
-  Err(InstallerQemuTestError.Failed("arch", f"unsupported installer arch {arch}"))
+  host.installer_env_value(name, f"{fallback}").parse_int()?
 }
 
 proc command_path(name: Str) [process, error] -> Result[Path] {
@@ -43,41 +23,6 @@ proc ensure_file(path_value: Path, kind: Str) [fs, error] {
   return when fs.exists(path_value)?
 
   return Err(InstallerQemuTestError.Failed(kind, f"missing {path_value}"))
-}
-
-proc remove_tree(path_value: Path) [fs, error] {
-  guard fs.exists(path_value)? else {
-    return
-  }
-
-  let meta = path_value.metadata()?
-
-  if meta.kind != "dir" {
-    path_value.remove()?
-    return
-  }
-
-  for child in fs.children(path_value)? {
-    if child.kind == "dir" {
-      remove_tree(child.path)?
-    } else {
-      child.path.remove()?
-    }
-  }
-
-  path_value.remove_dir()?
-}
-
-proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
-  let status = process.run(process.command_argv(target, argv, cwd, envs))?
-
-  return when status.ok
-
-  if status.exited() {
-    abort(status.exit_code()?)
-  }
-
-  return Err(InstallerQemuTestError.Failed("command", f"{argv[0]} was signaled"))
 }
 
 proc process_live(kill: Path, pid: Int, cwd: Path) [process, error] -> Result[Bool] {
@@ -436,7 +381,7 @@ proc clean_build_state(work: Path) [fs, error] {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    remove_tree(fp"{work}/{name}")?
+    host.installer_remove_tree(fp"{work}/{name}")?
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -453,7 +398,7 @@ proc clean_build_state(work: Path) [fs, error] {
     if fs.exists(out)? {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
-          remove_tree(entry.path)?
+          host.installer_remove_tree(entry.path)?
         }
       }
     }
@@ -461,7 +406,7 @@ proc clean_build_state(work: Path) [fs, error] {
 }
 
 proc kernel_source_env(root: Path, arch: Str) [fs, env, error] -> Result[Str] {
-  let configured = (env.get("LAPUTA_INSTALLER_KERNEL_SOURCE") ?? "").trim()
+  let configured = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
 
   return configured when configured != ""
 
@@ -482,7 +427,7 @@ proc build_installer(
   ssh_pubkey: Path,
   xsh: Path,
 ) [fs, process, env, error] {
-  let kernel_package = env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
+  let kernel_package = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
 
   var build_env: Record = {
     XSH_HOST: xsh.display(),
@@ -511,7 +456,7 @@ proc build_installer(
     }
   }
 
-  run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)?
+  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)?
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
@@ -519,39 +464,39 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     return Err(InstallerQemuTestError.Failed("argv", "installer-qemu-test.xsh does not accept arguments"))
   }
 
-  let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let arch = env_value("LAPUTA_INSTALLER_ARCH", "aarch64") |> normalize_arch(_)?
-  let work = env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}-qemu")?
-  let installer_iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
-  let installer_kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
-  let target_image = env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-128m.img")?
-  let installer_log = env_path("LAPUTA_INSTALLER_QEMU_LOG", fp"{work}/qemu-installer.log")?
-  let target_log = env_path("LAPUTA_TARGET_QEMU_LOG", fp"{work}/qemu-target.log")?
+  let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
+  let arch = host.installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64") |> host.installer_arch(_)?
+  let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}-qemu")?
+  let installer_iso = host.installer_env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
+  let installer_kernel = host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
+  let target_image = host.installer_env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-128m.img")?
+  let installer_log = host.installer_env_path("LAPUTA_INSTALLER_QEMU_LOG", fp"{work}/qemu-installer.log")?
+  let target_log = host.installer_env_path("LAPUTA_TARGET_QEMU_LOG", fp"{work}/qemu-target.log")?
 
-  let installer_cmdline = env_value("LAPUTA_KERNEL_CMDLINE", installer_cmdline_default(arch)) |> env_value(
+  let installer_cmdline = host.installer_env_value("LAPUTA_KERNEL_CMDLINE", installer_cmdline_default(arch)) |> host.installer_env_value(
     "LAPUTA_INSTALLER_KERNEL_CMDLINE",
     _,
   )
 
-  let target_cmdline = env_value("LAPUTA_KERNEL_CMDLINE", target_cmdline_default(arch)) |> env_value(
+  let target_cmdline = host.installer_env_value("LAPUTA_KERNEL_CMDLINE", target_cmdline_default(arch)) |> host.installer_env_value(
     "LAPUTA_TARGET_KERNEL_CMDLINE",
     _,
   )
 
   let qemu_name = if arch == "x86_64" {
-    env_value("QEMU_SYSTEM_X86_64", "qemu-system-x86_64")
+    host.installer_env_value("QEMU_SYSTEM_X86_64", "qemu-system-x86_64")
   } else {
-    env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")
+    host.installer_env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")
   }
 
   let qemu = command_path(qemu_name)?
-  let ssh = env_value("SSH", "ssh") |> command_path(_)?
-  let ssh_keygen = env_value("SSH_KEYGEN", "ssh-keygen") |> command_path(_)?
+  let ssh = host.installer_env_value("SSH", "ssh") |> command_path(_)?
+  let ssh_keygen = host.installer_env_value("SSH_KEYGEN", "ssh-keygen") |> command_path(_)?
   let kill = command_path("kill")?
   let tail = command_path("tail")?
-  let xsh = env_path("XSH_HOST", process.which("xsh")?)?
+  let xsh = host.installer_env_path("XSH_HOST", process.which("xsh")?)?
   let target_ssh_port = env_int("LAPUTA_TARGET_SSH_PORT", 10022)?
-  let ssh_key = env_path("LAPUTA_TARGET_SSH_KEY", fp"{work}/qemu-smoke-ed25519")?
+  let ssh_key = host.installer_env_path("LAPUTA_TARGET_SSH_KEY", fp"{work}/qemu-smoke-ed25519")?
   let ssh_known_hosts = fp"{work}/qemu-smoke-known-hosts"
   let timeout_seconds = env_int("LAPUTA_INSTALLER_QEMU_TIMEOUT", 180)?
   ensure_dir(work)?
@@ -560,7 +505,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   fs.remove(fp"{ssh_key}.pub", missing_ok: true)?
   fs.remove(ssh_known_hosts, missing_ok: true)?
 
-  run_argv(
+  host.installer_run_argv(
     ssh_keygen,
     [
       "ssh-keygen",

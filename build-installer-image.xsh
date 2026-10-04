@@ -1,42 +1,12 @@
 #!/bin/xsh
+use installer.host as host
 use installer.package_roots_host as package_roots_host
+use system.image as system_image
 
 error InstallerBuildError = Failed(message: Str)
 
-proc installer_env_value(name: Str, fallback: Str) [env] -> Str {
-  let value = env.get(name) ?? ""
-
-  return fallback when value == ""
-
-  value
-}
-
-proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"{installer_env_value(name, fallback.display())}"
-}
-
-proc installer_work_path(root: Path, arch: Str) [env, error] -> Result[Path] {
-  let raw = env.get("LAPUTA_INSTALLER_WORK") ?? ""
-
-  return fp"{raw}" when raw.trim() != ""
-
-  fp"{root}/target/laputa-installer-{arch}"
-}
-
-proc run_argv(target: Path, argv: List[Str], cwd: Path, envs: Record = {}) [process, error] {
-  let status = process.run(process.command_argv(target, argv, cwd, envs))?
-
-  return when status.ok
-
-  if status.exited() {
-    abort(status.exit_code()?)
-  }
-
-  return Err(InstallerBuildError.Failed(f"{argv[0]} was signaled"))
-}
-
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
-  run_argv(
+  host.installer_run_argv(
     xsh,
     ["xsh", tool.display(), "--"].extend(argv),
     root,
@@ -129,43 +99,12 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
   append_inittab_line(rootfs, f"{serial_console(arch)}::respawn:/bin/xshi")?
 }
 
-pure normalize_installer_arch(arch: Str) -> Result[Str] {
-  return "aarch64" when arch == "arm64" or arch == "aarch64"
-
-  return "x86_64" when arch == "amd64" or arch == "x86_64"
-
-  Err(InstallerBuildError.Failed(f"unsupported installer arch {arch}"))
-}
-
 pure efi_boot_filename(arch: Str) -> Result[Str] {
   return "BOOTAA64.EFI" when arch == "aarch64"
 
   return "BOOTX64.EFI" when arch == "x86_64"
 
   Err(InstallerBuildError.Failed(f"unsupported installer EFI arch {arch}"))
-}
-
-proc remove_tree(path_value: Path) [fs, error] {
-  guard fs.exists(path_value)? else {
-    return
-  }
-
-  let meta = path_value.metadata()?
-
-  if meta.kind != "dir" {
-    path_value.remove()?
-    return
-  }
-
-  for child in fs.children(path_value)? {
-    if child.kind == "dir" {
-      remove_tree(child.path)?
-    } else {
-      child.path.remove()?
-    }
-  }
-
-  path_value.remove_dir()?
 }
 
 # Image overlays change these roots after package composition, so a package
@@ -244,82 +183,6 @@ proc installer_root_size_mb(rootfs: Path, override_mb: Str) [fs, error] -> Resul
   ceil_div((data + groups * EXT4_GROUP_RESERVED) * EXT4_BLOCK, 1024 * 1024) + 1
 }
 
-proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
-  bytes.concat(
-    [
-      data[..offset],
-      replacement,
-      data[offset + replacement.len()..],
-    ],
-  )
-}
-
-proc put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
-  put(data, offset, bytes.pack_le(value, width)?)?
-}
-
-proc gpt_name(name: Str) [error] -> Result[Bytes] {
-  let raw = bytes.from_text(name)
-  var parts = [bytes.zero(0)?]
-  var index = 0
-
-  while index < raw.len() and index < 36 {
-    parts = parts.push(bytes.from_ints([bytes.unpack_le(raw, 1, offset: index)?, 0])?)
-    index += 1
-  }
-
-  let encoded = bytes.concat(parts)
-  bytes.concat([encoded, bytes.zero(72 - encoded.len())?])
-}
-
-proc gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes] {
-  var entry = bytes.zero(128)?
-  entry = put(entry, 0, type_guid)?
-  entry = put(entry, 16, part_guid)?
-  entry = put_le(entry, 32, start_lba, 8)?
-  entry = put_le(entry, 40, end_lba, 8)?
-  entry = put(entry, 56, gpt_name(name)?)?
-  entry
-}
-
-proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
-  var sector = bytes.zero(512)?
-  sector = put(sector, 447, bytes.from_ints([0, 2, 0])?)?
-  sector = put(sector, 450, bytes.from_ints([238])?)?
-  sector = put(sector, 451, bytes.from_ints([255, 255, 255])?)?
-  sector = put_le(sector, 454, 1, 4)?
-  sector = put_le(sector, 458, total_sectors - 1, 4)?
-  sector = put(sector, 510, bytes.from_ints([85, 170])?)?
-  sector
-}
-
-proc gpt_header(
-  current_lba: Int,
-  backup_lba: Int,
-  first_usable: Int,
-  last_usable: Int,
-  disk_guid: Bytes,
-  entries_lba: Int,
-  entry_count: Int,
-  entry_size: Int,
-  entries_crc: Int,
-) [error] -> Result[Bytes] {
-  var header = bytes.zero(512)?
-  header = put(header, 0, bytes.from_text("EFI PART"))?
-  header = put_le(header, 8, 65536, 4)?
-  header = put_le(header, 12, 92, 4)?
-  header = put_le(header, 24, current_lba, 8)?
-  header = put_le(header, 32, backup_lba, 8)?
-  header = put_le(header, 40, first_usable, 8)?
-  header = put_le(header, 48, last_usable, 8)?
-  header = put(header, 56, disk_guid)?
-  header = put_le(header, 72, entries_lba, 8)?
-  header = put_le(header, 80, entry_count, 4)?
-  header = put_le(header, 84, entry_size, 4)?
-  header = put_le(header, 88, entries_crc, 4)?
-  put_le(header, 16, hash.crc32(header[..92]), 4)?
-}
-
 proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) [fs, error] {
   let entry_count = 8
   let entry_size = 128
@@ -329,27 +192,7 @@ proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, 
   let primary_entries_lba = 2
   let backup_entries_lba = total_sectors - entry_sectors - 1
 
-  let root_type = bytes.from_ints(
-    [
-      175,
-      61,
-      198,
-      15,
-      131,
-      132,
-      114,
-      71,
-      142,
-      121,
-      61,
-      105,
-      216,
-      71,
-      125,
-      228,
-    ],
-  )?
-
+  let root_type = system_image.image_linux_partition_type_guid()?
   let disk_guid = bytes.zero(16)?
 
   let root_guid = bytes.from_ints(
@@ -375,14 +218,14 @@ proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, 
 
   let entries = bytes.concat(
     [
-      gpt_entry(root_type, root_guid, root_start_lba, root_end_lba, "LAPUTA_INSTALLER_ROOT")?,
+      system_image.image_gpt_entry(root_type, root_guid, root_start_lba, root_end_lba, "LAPUTA_INSTALLER_ROOT")?,
       bytes.zero(entry_count * entry_size - entry_size)?,
     ],
   )
 
   let entries_crc = hash.crc32(entries)
 
-  let primary_header = gpt_header(
+  let primary_header = system_image.image_gpt_header(
     1,
     total_sectors - 1,
     first_usable,
@@ -394,7 +237,7 @@ proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, 
     entries_crc,
   )?
 
-  let backup_header = gpt_header(
+  let backup_header = system_image.image_gpt_header(
     total_sectors - 1,
     1,
     first_usable,
@@ -406,7 +249,7 @@ proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, 
     entries_crc,
   )?
 
-  let mbr_written = bytes.write_at(image, 0, protective_mbr(total_sectors)?)?
+  let mbr_written = bytes.write_at(image, 0, system_image.protective_mbr(total_sectors)?)?
   let primary_entries_written = bytes.write_at(image, primary_entries_lba * 512, entries)?
   let primary_header_written = bytes.write_at(image, 512, primary_header)?
   let backup_entries_written = bytes.write_at(image, backup_entries_lba * 512, entries)?
@@ -439,17 +282,17 @@ proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[
     parts = parts.push(value / divisor % 256)
   }
 
-  put(data, offset, bytes.from_ints(parts)?)?
+  system_image.image_put_bytes(data, offset, bytes.from_ints(parts)?)?
 }
 
 proc put_both_16(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
-  var out = put_le(data, offset, value, 2)?
+  var out = system_image.image_put_le(data, offset, value, 2)?
   out = put_be(out, offset + 2, value, 2)?
   out
 }
 
 proc put_both_32(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
-  var out = put_le(data, offset, value, 4)?
+  var out = system_image.image_put_le(data, offset, value, 4)?
   out = put_be(out, offset + 4, value, 4)?
   out
 }
@@ -486,14 +329,14 @@ proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) [erro
   let pad_len = if identifier.len() % 2 == 0 { 1 } else { 0 }
   let length = 33 + identifier.len() + pad_len
   var out = bytes.zero(length)?
-  out = put(out, 0, bytes.from_ints([length, 0])?)?
+  out = system_image.image_put_bytes(out, 0, bytes.from_ints([length, 0])?)?
   out = put_both_32(out, 2, extent)?
   out = put_both_32(out, 10, size)?
-  out = put(out, 18, iso_datetime_7()?)?
-  out = put(out, 25, bytes.from_ints([flags, 0, 0])?)?
+  out = system_image.image_put_bytes(out, 18, iso_datetime_7()?)?
+  out = system_image.image_put_bytes(out, 25, bytes.from_ints([flags, 0, 0])?)?
   out = put_both_16(out, 28, 1)?
-  out = put(out, 32, bytes.from_ints([identifier.len()])?)?
-  out = put(out, 33, identifier)?
+  out = system_image.image_put_bytes(out, 32, bytes.from_ints([identifier.len()])?)?
+  out = system_image.image_put_bytes(out, 33, identifier)?
   out
 }
 
@@ -518,17 +361,17 @@ proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error
 
 proc iso_path_table(root_extent: Int, big_endian: Bool) [error] -> Result[Bytes] {
   var out = bytes.zero(10)?
-  out = put(out, 0, bytes.from_ints([1, 0])?)?
+  out = system_image.image_put_bytes(out, 0, bytes.from_ints([1, 0])?)?
 
   if big_endian {
     out = put_be(out, 2, root_extent, 4)?
     out = put_be(out, 6, 1, 2)?
   } else {
-    out = put_le(out, 2, root_extent, 4)?
-    out = put_le(out, 6, 1, 2)?
+    out = system_image.image_put_le(out, 2, root_extent, 4)?
+    out = system_image.image_put_le(out, 6, 1, 2)?
   }
 
-  out = put(out, 8, bytes.from_ints([0, 0])?)?
+  out = system_image.image_put_bytes(out, 8, bytes.from_ints([0, 0])?)?
   out
 }
 
@@ -542,42 +385,42 @@ proc iso_primary_descriptor(
   path_m: Int,
 ) [error] -> Result[Bytes] {
   var out = bytes.zero(2048)?
-  out = put(out, 0, bytes.from_ints([1])?)?
-  out = put(out, 1, bytes.from_text("CD001"))?
-  out = put(out, 6, bytes.from_ints([1, 0])?)?
-  out = put(out, 8, fixed_ascii("LAPUTA", 32)?)?
-  out = put(out, 40, fixed_ascii(volume_id, 32)?)?
+  out = system_image.image_put_bytes(out, 0, bytes.from_ints([1])?)?
+  out = system_image.image_put_bytes(out, 1, bytes.from_text("CD001"))?
+  out = system_image.image_put_bytes(out, 6, bytes.from_ints([1, 0])?)?
+  out = system_image.image_put_bytes(out, 8, fixed_ascii("LAPUTA", 32)?)?
+  out = system_image.image_put_bytes(out, 40, fixed_ascii(volume_id, 32)?)?
   out = put_both_32(out, 80, volume_sectors)?
   out = put_both_16(out, 120, 1)?
   out = put_both_16(out, 124, 1)?
   out = put_both_16(out, 128, 2048)?
   out = put_both_32(out, 132, path_table_size)?
-  out = put_le(out, 140, path_l, 4)?
-  out = put_le(out, 144, 0, 4)?
+  out = system_image.image_put_le(out, 140, path_l, 4)?
+  out = system_image.image_put_le(out, 144, 0, 4)?
   out = put_be(out, 148, path_m, 4)?
   out = put_be(out, 152, 0, 4)?
-  out = put(out, 156, iso_root_record(root_extent, root_size, 0)?)?
-  out = put(out, 190, fixed_ascii(volume_id, 128)?)?
-  out = put(out, 318, fixed_ascii("LAPUTA SYSTEMS", 128)?)?
-  out = put(out, 446, fixed_ascii("LAPUTA SYSTEMS", 128)?)?
-  out = put(out, 574, fixed_ascii("XSH ISO9660 WRITER", 128)?)?
-  out = put(out, 702, fixed_ascii("", 37)?)?
-  out = put(out, 739, fixed_ascii("", 37)?)?
-  out = put(out, 776, fixed_ascii("", 37)?)?
-  out = put(out, 813, iso_datetime_17()?)?
-  out = put(out, 830, iso_datetime_17()?)?
-  out = put(out, 847, repeated_byte(48, 16)?)?
-  out = put(out, 863, bytes.from_ints([0])?)?
-  out = put(out, 864, repeated_byte(48, 16)?)?
-  out = put(out, 880, bytes.from_ints([0, 1])?)?
+  out = system_image.image_put_bytes(out, 156, iso_root_record(root_extent, root_size, 0)?)?
+  out = system_image.image_put_bytes(out, 190, fixed_ascii(volume_id, 128)?)?
+  out = system_image.image_put_bytes(out, 318, fixed_ascii("LAPUTA SYSTEMS", 128)?)?
+  out = system_image.image_put_bytes(out, 446, fixed_ascii("LAPUTA SYSTEMS", 128)?)?
+  out = system_image.image_put_bytes(out, 574, fixed_ascii("XSH ISO9660 WRITER", 128)?)?
+  out = system_image.image_put_bytes(out, 702, fixed_ascii("", 37)?)?
+  out = system_image.image_put_bytes(out, 739, fixed_ascii("", 37)?)?
+  out = system_image.image_put_bytes(out, 776, fixed_ascii("", 37)?)?
+  out = system_image.image_put_bytes(out, 813, iso_datetime_17()?)?
+  out = system_image.image_put_bytes(out, 830, iso_datetime_17()?)?
+  out = system_image.image_put_bytes(out, 847, repeated_byte(48, 16)?)?
+  out = system_image.image_put_bytes(out, 863, bytes.from_ints([0])?)?
+  out = system_image.image_put_bytes(out, 864, repeated_byte(48, 16)?)?
+  out = system_image.image_put_bytes(out, 880, bytes.from_ints([0, 1])?)?
   out
 }
 
 proc iso_terminator() [error] -> Result[Bytes] {
   var out = bytes.zero(2048)?
-  out = put(out, 0, bytes.from_ints([255])?)?
-  out = put(out, 1, bytes.from_text("CD001"))?
-  out = put(out, 6, bytes.from_ints([1])?)?
+  out = system_image.image_put_bytes(out, 0, bytes.from_ints([255])?)?
+  out = system_image.image_put_bytes(out, 1, bytes.from_text("CD001"))?
+  out = system_image.image_put_bytes(out, 6, bytes.from_ints([1])?)?
   out
 }
 
@@ -755,20 +598,20 @@ proc build_filesystems(
 }
 
 proc build_host() [fs, net, process, env, time, error, io] {
-  let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
-  let arch = normalize_installer_arch(installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
-  let work = installer_work_path(root, arch)?
-  let iso = env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
-  let kernel = env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
-  let kernel_source_raw = installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
-  let repo_url = installer_env_value("LAPUTA_REPO_URL", "http://127.0.0.1:3000")
-  let linux_package_name = installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
-  let xsh = env_path("XSH_HOST", process.which("xsh")?)?
-  let qemu_smoke = installer_env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
-  let qemu_authorized_key = installer_env_value("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY", "")
-  let target_esp_mb = installer_env_value("LAPUTA_TARGET_ESP_MB", "16")
-  let installer_root_mb = installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
-  let installer_ci = installer_env_value("LAPUTA_INSTALLER_CI", "1")
+  let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
+  let arch = host.installer_arch(host.installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
+  let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?
+  let iso = host.installer_env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
+  let kernel = host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
+  let kernel_source_raw = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
+  let repo_url = host.installer_env_value("LAPUTA_REPO_URL", "http://127.0.0.1:3000")
+  let linux_package_name = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
+  let xsh = host.installer_env_path("XSH_HOST", process.which("xsh")?)?
+  let qemu_smoke = host.installer_env_value("LAPUTA_INSTALLER_QEMU_SMOKE", "0")
+  let qemu_authorized_key = host.installer_env_value("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY", "")
+  let target_esp_mb = host.installer_env_value("LAPUTA_TARGET_ESP_MB", "16")
+  let installer_root_mb = host.installer_env_value("LAPUTA_INSTALLER_ROOT_MB", "")
+  let installer_ci = host.installer_env_value("LAPUTA_INSTALLER_CI", "1")
 
   let roots = package_roots_host.InstallerRoots(
     target: fp"{work}/rootfs-target",
@@ -790,7 +633,7 @@ proc build_host() [fs, net, process, env, time, error, io] {
     fp"{work}/target-esp.vfat",
     fp"{work}/linux-kernel",
   ] {
-    remove_tree(path_value)?
+    host.installer_remove_tree(path_value)?
   }
 
   package_roots_host.prepare(
@@ -799,7 +642,7 @@ proc build_host() [fs, net, process, env, time, error, io] {
     repo_url,
     linux_package_name,
     qemu_smoke == "1",
-    installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
+    host.installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
     fp"{work}/packages",
     roots,
   )?

@@ -1,29 +1,9 @@
 #!/bin/xsh
+use installer.host as host
+
 error InstallerSizeError = Failed(message: Str)
 
 type PackageSize = {name: Str, size: Int}
-
-proc env_value(name: Str, fallback: Str) [env] -> Str {
-  let value = env.get(name) ?? ""
-
-  return fallback when value == ""
-
-  value
-}
-
-proc env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
-  fp"{env_value(name, fallback.display())}"
-}
-
-pure normalize_arch(arch: Str) -> Result[Str] {
-  return "x86_64" when arch == "amd64"
-
-  return "aarch64" when arch == "arm64"
-
-  return arch when arch == "aarch64" or arch == "x86_64"
-
-  Err(InstallerSizeError.Failed(f"unsupported installer arch {arch}"))
-}
 
 pure kib(value: Int) -> Int {
   (value + 1024 - 1) / 1024
@@ -113,26 +93,26 @@ proc main(...argv: List[Str]) [fs, env, error] {
     return Err(InstallerSizeError.Failed("usage: installer-size.xsh ARCH [WORK [ISO [KERNEL]]]"))
   }
 
-  let raw_arch = if argv.len() >= 1 { argv[0] } else { env_value("LAPUTA_INSTALLER_ARCH", "aarch64") }
-  let arch = normalize_arch(raw_arch)?
-  let root = env_path("LAPUTA_ROOT", fs.cwd()?)?
+  let raw_arch = if argv.len() >= 1 { argv[0] } else { host.installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64") }
+  let arch = host.installer_arch(raw_arch)?
+  let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
 
   let work = if argv.len() >= 2 {
     fp"{argv[1]}"
   } else {
-    env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?
+    host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?
   }
 
   let iso = if argv.len() >= 3 {
     fp"{argv[2]}"
   } else {
-    env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
+    host.installer_env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
   }
 
   let kernel = if argv.len() >= 4 {
     fp"{argv[3]}"
   } else {
-    env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
+    host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   }
 
   print_report(arch, work, iso, kernel)?
