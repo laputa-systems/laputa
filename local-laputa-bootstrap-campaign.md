@@ -412,3 +412,23 @@ Failures found and fixed, in order:
   change, mostly invisible `n` entries. Normalizing the whole fragment would
   also change generated headers the scratch Kbuild depends on, so it stays
   open.
+- **D13. Upgrade every package to its latest stable release** (2026-10-04),
+  with three exceptions:
+  - LLVM stays on the pinned prebuilt 23.1.0-rc2 (D3). No newer prebuilt is
+    published, and making one means building LLVM and publishing a release.
+  - mdevd stays at 0.1.8.2: 0.1.8.3 is announced, but its tarball returns 404.
+    skalibs goes to 2.15.1.0.
+  - tailscale goes to 1.102.4, the newest on its stable package index.
+  The kernel goes to 7.2.9 (7.0 is EOL). wlroots 0.20 and dwl 0.9 move
+  together, and fontconfig 2.18 moves with muon 0.7. Forks under
+  laputa-systems are never pushed to: a recipe that needs fork commits on a
+  new upstream release carries them as patches.
+- **D14. Real Mesa replaces the `mesa-minimal` shim, with generated sources
+  vendored** (2026-10-04). Mesa's ~60 Python/Mako-generated outputs go under
+  `files/generated/`, regenerated on the host with the documented command.
+  Python is not added to the build world.
+- **D15. terminfo without ncurses comes from our own XSH terminfo compiler**
+  (2026-10-04). It compiles ncurses' pinned `terminfo.src` into the binary
+  database.
+- **D16. deno builds from source with cargo** (2026-10-04), linking rusty_v8's
+  published musl static library, because deno publishes only glibc builds.
