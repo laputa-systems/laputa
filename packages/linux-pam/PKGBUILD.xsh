@@ -8,10 +8,10 @@ export const name = "linux-pam"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.7.2"
+export const ver = "1.7.3"
 
 ## Package recipe export.
-export const rel = "9"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "3d86b6383fb5fd9eb9578d2cd47d92801191f4bf3f9bc61419bfefc8aa1e531a",
+        sha256: "2ce4765fd49df6693771ef2941f81e33d8ee14b94a81a5c7b369aa3b137b85a5",
       },
     ],
   },
