@@ -227,7 +227,6 @@ mirror-deb: mirror-build-x86_64-musl mirror-frontend
 	cd $(MIRROR) && rm -rf target/deb-root
 	cd $(MIRROR) && install -d target/deb-root/DEBIAN target/deb-root/usr/bin target/deb-root/lib/systemd/system target/deb-root/etc/laputa-mirror target/deb-root/usr/share/laputa-mirror
 	cd $(MIRROR) && install -m 755 target/docker-output/laputa-mirror target/deb-root/usr/bin/laputa-mirror
-	cd $(MIRROR) && install -m 755 target/docker-output/laputa-mirror-publish target/deb-root/usr/bin/laputa-mirror-publish
 	cd $(MIRROR) && install -m 644 laputa-mirror.service target/deb-root/lib/systemd/system/laputa-mirror.service
 	cd $(MIRROR) && install -m 600 laputa-mirror.env.example target/deb-root/etc/laputa-mirror/env.example
 	cd $(MIRROR) && cp -R static target/deb-root/usr/share/laputa-mirror/

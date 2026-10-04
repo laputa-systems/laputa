@@ -3,7 +3,6 @@ pub mod db;
 pub mod http;
 pub mod jwt;
 pub mod packages;
-pub mod publish;
 pub mod s3;
 pub mod webauthn_handlers;
 

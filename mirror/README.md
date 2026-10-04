@@ -147,7 +147,6 @@ mirror service, and prints its status.
 The package includes:
 
 - `/usr/bin/laputa-mirror`
-- `/usr/bin/laputa-mirror-publish`
 - `/usr/share/laputa-mirror/static`
 - `/lib/systemd/system/laputa-mirror.service`
 - `/etc/laputa-mirror/env.example`
@@ -297,83 +296,26 @@ https://laputa.17166969.xyz/auth/settings
 Create a named token, for example `github-actions`, and store it once. Tokens
 are shown only at creation time.
 
-## Publish The Bootstrap Repo
+## Publish Packages
 
-Set the publisher environment:
-
-```sh
-export LAPUTA_MIRROR_URL=https://laputa.17166969.xyz
-export LAPUTA_MIRROR_TOKEN=<token_from_settings>
-```
-
-Publish an existing exported PM repo:
-
-```sh
-cargo run --bin laputa-mirror-publish -- \
-  .out/laputa-bootstrap-build-essential-native-repo
-```
-
-The publisher uploads the objects the exported index names, so the export must
-use content-addressed package names (`pm repo publish` to a `file://` tree
-writes them):
-
-1. Uploads every package tarball from `packages/<arch>/`.
-2. Uploads package metadata sidecars from `metadata/<arch>/`.
-3. Maps `.out/source-mirrors/<pkg>-<ver>-<rel>-<arch>.tar.bz2` to
-   `sources/<pkg>/<pkg>-<ver>-<rel>-<arch>-src.tar.bz2`.
-4. Recomputes package/source sha256 and package size metadata.
-5. Uploads `index.json` last.
-
-Large package and source uploads are split into smaller chunk requests to avoid
-Cloudflare Tunnel request body limits. The publisher only talks to
-`laputa-mirror`; the mirror service is the only component that writes to R2.
-
-Verify:
-
-```sh
-curl -fsSL https://laputa.17166969.xyz/index.json | jq '.[].name'
-curl -I https://laputa.17166969.xyz/packages/aarch64/build-essential-native/build-essential-native-1-2.tar.gz
-curl -I https://laputa.17166969.xyz/metadata/aarch64/build-essential-native/build-essential-native-1-2.json
-curl -I https://laputa.17166969.xyz/sources/linux/linux-7.0.5-33-x86_64-src.tar.bz2
-```
-
-## GitHub Actions Publishing
-
-Add repository secrets:
-
-```text
-LAPUTA_MIRROR_TOKEN=<token_from_settings>
-```
-
-Run the manual workflow:
-
-```text
-Laputa Mirror Publish ARM64
-```
-
-Use the workflow run ID that produced:
-
-```text
-laputa-bootstrap-build-essential-native-repo-arm64
-```
-
-The workflow downloads that artifact, validates the expected repo layout,
-publishes it, then checks the public `index.json` and a known package URL.
+`pm.xsh -- repo publish` is the only publisher. It uploads content-addressed
+payload, metadata and proof objects (large ones in chunks, under Cloudflare
+Tunnel's request body limit) and writes `index.json` last. See `docs/PM.md`
+("Publication") and `make publish` for the local mirror. The mirror service is
+the only component that writes to R2.
 
 ## Configure PM Clients
 
-Use the mirror as the public repo:
-
-```sh
-export XSH_PM_PUBLIC_REPO=https://laputa.17166969.xyz
-```
-
-For uploads from local PM tooling, use:
+`XSH_PM_REPO` is the only repository setting; when it is empty, PM plans
+offline. Publishing to the production mirror needs a token from
+`/auth/settings`:
 
 ```sh
 export XSH_PM_REPO=https://laputa.17166969.xyz
 export LAPUTA_TOKEN=<token_from_settings>
 ```
+
+The local mirror (`make mirror`) needs no token.
 
 ## Operations
 

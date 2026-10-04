@@ -40,4 +40,3 @@ RUN cargo build --locked --bins --target x86_64-unknown-linux-musl --release
 
 FROM scratch
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/laputa-mirror /
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/laputa-mirror-publish /
