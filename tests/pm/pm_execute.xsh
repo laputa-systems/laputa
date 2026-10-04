@@ -344,6 +344,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
     let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     test.eq(metadata.arch, "x86_64")?
   }
+
   test.eq([receipt.package_name for receipt in result.artifacts], ["execute-dep", "execute-tool", "execute-app"])?
 }
 
@@ -393,7 +394,7 @@ main(@args)?
   # with an absent-artifact error.
   match execute.build_plan(value, repo_root, object_store, "", 2) {
     Ok(_) => test.fail("parallel executor advanced past a failed dependency level")?
-    Err(problem) => { assert "package proof for execute-app" in problem.message }
+    Err(problem) => assert "package proof for execute-app" in problem.message
   }
 
   test.eq(fs.exists(store.artifact_path(object_store, app.artifact_key))?, false)?
@@ -465,7 +466,13 @@ test test_execute_imports_exact_remote_artifacts_without_remote_index_resolution
   let snapshot = exact_remote_snapshot(local_plan, local_result, remote_root)?
   let catalog_value = catalog.load(repo_root)?
   let remote_plan = plan.resolve(catalog_value, snapshot, policy.aarch64_docker(), ["execute-app"], false)?
-  test.eq([types.plan_action_text(node.action) for node in remote_plan.nodes], ["reuse-remote", "reuse-remote", "reuse-remote"])?
+  test.eq(
+    [
+      types.plan_action_text(node.action)
+      for node in remote_plan.nodes
+    ],
+    ["reuse-remote", "reuse-remote", "reuse-remote"],
+  )?
 
   let imported_store = execute_store(ctx, "execute-remote-imported-store")?
   let imported = execute.build_plan(remote_plan, repo_root, imported_store, f"file://{remote_root}", 1)?
@@ -493,7 +500,7 @@ main(@args)?
 
   match execute.build_plan(failed_plan, repo_root, object_store, "", 1) {
     Ok(_) => test.fail("failed proof unexpectedly published an application artifact")?
-    Err(problem) => { assert "package proof for execute-app" in problem.message }
+    Err(problem) => assert "package proof for execute-app" in problem.message
   }
 
   test.eq(fs.exists(store.artifact_path(object_store, failed_app.artifact_key))?, false)?
@@ -514,7 +521,7 @@ main(@args)?
 
   match store.verify_artifact(healthy_store, healthy_app.artifact_key) {
     Ok(_) => test.fail("corrupt final artifact unexpectedly verified")?
-    Err(problem) => { assert "payload SHA-256 does not match receipt" in problem.message }
+    Err(problem) => assert "payload SHA-256 does not match receipt" in problem.message
   }
 }
 
@@ -538,13 +545,14 @@ test test_execute_rejects_plan_from_another_build_epoch [fs, net, process, env, 
 
   match execute.build_plan(value, repo_root, object_store, "", 1) {
     Ok(_) => test.fail("plan from another BUILD_EPOCH unexpectedly executed")?
-    Err(problem) => { assert f"resolved at BUILD_EPOCH {policy.BUILD_EPOCH + 1}" in problem.message }
+    Err(problem) => assert f"resolved at BUILD_EPOCH {policy.BUILD_EPOCH + 1}" in problem.message
   }
 
   test.eq(fs.exists(fp"{object_store}/v2")?, false)?
 }
 
 type TraceSpanDto = {file: Str}
+
 type TraceEventDto = {kind: Str, name: Str?, source_span: TraceSpanDto?}
 
 # Counts `hash.sha256` calls per PM module in a JSONL trace.

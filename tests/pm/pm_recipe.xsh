@@ -198,7 +198,13 @@ main(@args)?
   fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
   let stderr_path = test.temp_path(ctx, name: "wpa-proof-stderr")
   let status = process.run(
-    process.command_argv(xsh, ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root.display()], fs.cwd()?, {}, stderr: stderr_path),
+    process.command_argv(
+      xsh,
+      ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root.display()],
+      fs.cwd()?,
+      {},
+      stderr: stderr_path,
+    ),
   )?
   test.ok(status.ok, fs.read_text(stderr_path)?)?
 }
@@ -237,7 +243,11 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
   test.eq(pkg.runtime_only_deps, ["service"])?
   test.eq(pkg.deps, ["lib"])?
 
-  let omitted = write_runtime_only_recipe(ctx, "runtime-only-omitted", "export let deps = []\nexport let mkdeps_host = []")?
+  let omitted = write_runtime_only_recipe(
+    ctx,
+    "runtime-only-omitted",
+    "export let deps = []\nexport let mkdeps_host = []",
+  )?
   test.eq(recipe.load_package(omitted)?.runtime_only_deps, [])?
 
   for overlap in [

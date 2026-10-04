@@ -3,6 +3,7 @@ use pm.store
 use pm.types
 
 type TestStage = {root: Path, staged: types.StagedArtifact}
+
 type ReceiptDto = {
   format: Str,
   key: Str,
@@ -64,7 +65,13 @@ pure node_with_shared_runtime_and_build_host_dependency(
   }
 }
 
-proc staged_artifact(ctx: TestContext, name: Str, payload: Str = "payload", metadata: Str = "metadata", proof: Str = "proof") [fs, error] -> Result[TestStage] {
+proc staged_artifact(
+  ctx: TestContext,
+  name: Str,
+  payload: Str = "payload",
+  metadata: Str = "metadata",
+  proof: Str = "proof",
+) [fs, error] -> Result[TestStage] {
   let root = test.temp_dir(ctx, name: name)?
   let payload_path = fp"{root}/payload.tar.gz"
   let metadata_path = fp"{root}/metadata.json"
@@ -91,7 +98,7 @@ proc store_root(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
 proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt], expected: Str) [error] {
   match result {
     Ok(_) => test.fail(f"{expected}: operation unexpectedly succeeded")?
-    Err(problem) => { assert expected in problem.message }
+    Err(problem) => assert expected in problem.message
   }
 }
 
@@ -130,7 +137,7 @@ test test_store_receipt_preserves_x86_64_target [fs, error] { |ctx|
 
   match store.commit(types.target_aarch64(), root, test_node(key), stage.staged) {
     Ok(_) => test.fail("artifact key was reused across targets")?
-    Err(problem) => { assert "target does not match requested aarch64-linux-musl" in problem.message }
+    Err(problem) => assert "target does not match requested aarch64-linux-musl" in problem.message
   }
 }
 
@@ -147,7 +154,12 @@ test test_store_receipts_deduplicate_shared_runtime_and_build_host_artifacts [fs
   test.eq(store.receipt_runtime_dependency_keys(runtime_first), [dependency_key])?
   test.eq(store.receipt_runtime_dependency_keys(build_host_first), [dependency_key])?
 
-  let receipt = store.commit(types.target_aarch64(), root, runtime_first, staged_artifact(ctx, "store-shared-edge-stage")?.staged)?
+  let receipt = store.commit(
+    types.target_aarch64(),
+    root,
+    runtime_first,
+    staged_artifact(ctx, "store-shared-edge-stage")?.staged,
+  )?
   test.eq(receipt.dependency_keys, [dependency_key])?
   test.eq(receipt.runtime_dependency_keys, [dependency_key])?
 
@@ -166,7 +178,12 @@ test test_store_discards_incomplete_temporary_artifacts [fs, error] { |ctx|
   let temporary = fp"{root}/v2/tmp/{key}"
   fs.mkdir(temporary)?
   fs.write(fp"{temporary}/payload.tar.gz", "incomplete")?
-  let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-temporary-stage")?.staged)?
+  let receipt = store.commit(
+    types.target_aarch64(),
+    root,
+    test_node(key),
+    staged_artifact(ctx, "store-temporary-stage")?.staged,
+  )?
   test.eq(receipt.key, key)?
   test.eq(fs.exists(temporary)?, false)?
 }
@@ -174,7 +191,12 @@ test test_store_discards_incomplete_temporary_artifacts [fs, error] { |ctx|
 test test_store_verify_all_ignores_temporary_state_and_checks_finals [fs, error] { |ctx|
   let root = store_root(ctx, "store-verify-all")?
   let key = digest("verify-all")
-  let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-verify-all-stage")?.staged)?
+  let receipt = store.commit(
+    types.target_aarch64(),
+    root,
+    test_node(key),
+    staged_artifact(ctx, "store-verify-all-stage")?.staged,
+  )?
   let temporary = fp"{root}/v2/tmp/{digest("ignored")}"
   fs.mkdir(temporary)?
   fs.write(fp"{temporary}/partial", "interrupted")?
@@ -251,7 +273,12 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
 
   let clean_root = store_root(ctx, "store-key-corrupt")?
   let clean_dir = store.artifact_path(clean_root, key)
-  let _ = store.commit(types.target_aarch64(), clean_root, test_node(key), staged_artifact(ctx, "store-key-corrupt-stage")?.staged)?
+  let _ = store.commit(
+    types.target_aarch64(),
+    clean_root,
+    test_node(key),
+    staged_artifact(ctx, "store-key-corrupt-stage")?.staged,
+  )?
   let raw = json.read(fp"{clean_dir}/artifact.json")?.require(ReceiptDto)?
   fs.write(fp"{clean_dir}/artifact.json", json.encode({...raw, key: digest("other key")})? + "\n")?
   expect_store_error(ctx, store.verify_artifact(clean_root, key), "does not match")?
@@ -297,7 +324,13 @@ test test_store_imports_verified_remote_artifact [fs, net, error] { |ctx|
   let remote_root = remote_fixture(ctx, "store-remote", payload, metadata)?
   let root = store_root(ctx, "store-remote-local")?
   let key = digest("remote")
-  let receipt = store.import_remote(types.target_aarch64(), root, remote_node(key, payload, metadata), f"file://{remote_root}", test.temp_dir(ctx, name: "store-remote-cache")?)?
+  let receipt = store.import_remote(
+    types.target_aarch64(),
+    root,
+    remote_node(key, payload, metadata),
+    f"file://{remote_root}",
+    test.temp_dir(ctx, name: "store-remote-cache")?,
+  )?
   test.eq(receipt.origin, types.Remote)?
   test.eq(receipt.payload_sha256, digest(payload))?
   test.eq(store.verify_artifact(root, key)?, receipt)?
@@ -311,7 +344,17 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
   let root = store_root(ctx, "store-remote-hash-local")?
   let key = digest("remote-hash-mismatch")
   let bad_hash_node = remote_node(key, "different expected payload", metadata)
-  expect_store_error(ctx, store.import_remote(types.target_aarch64(), root, bad_hash_node, repo, test.temp_dir(ctx, name: "store-remote-hash-cache")?), "payload SHA-256 mismatch")?
+  expect_store_error(
+    ctx,
+    store.import_remote(
+      types.target_aarch64(),
+      root,
+      bad_hash_node,
+      repo,
+      test.temp_dir(ctx, name: "store-remote-hash-cache")?,
+    ),
+    "payload SHA-256 mismatch",
+  )?
   test.eq(fs.exists(store.artifact_path(root, key))?, false)?
 
   let bad_metadata = json.encode({name: "not-demo", ver: "1.0.0", rel: "1", executor_sha256: digest("remote executor")})?
@@ -334,13 +377,22 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
 test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs, error] { |ctx|
   let root = store_root(ctx, "store-schema")?
   let key = digest("schema")
-  let receipt = store.commit(types.target_aarch64(), root, test_node(key), staged_artifact(ctx, "store-schema-stage")?.staged)?
+  let receipt = store.commit(
+    types.target_aarch64(),
+    root,
+    test_node(key),
+    staged_artifact(ctx, "store-schema-stage")?.staged,
+  )?
   test.eq(receipt.format, store.receipt_format)?
 
   let final_dir = store.artifact_path(root, key)
   let raw = json.read(fp"{final_dir}/artifact.json")?.require(ReceiptDto)?
   fs.write(fp"{final_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")?
-  expect_store_error(ctx, store.lookup(root, key), f"unsupported receipt format laputa-package-artifact-1; this PM reads {store.receipt_format}")?
+  expect_store_error(
+    ctx,
+    store.lookup(root, key),
+    f"unsupported receipt format laputa-package-artifact-1; this PM reads {store.receipt_format}",
+  )?
 
   # Artifacts under an older layout directory are never read or listed.
   let legacy_root = store_root(ctx, "store-legacy-layout")?

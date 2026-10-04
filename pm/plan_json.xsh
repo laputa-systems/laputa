@@ -4,8 +4,11 @@ use types
 use util
 
 type PlanFormatDto = {format: Str}
+
 type DependencyDto = {name: Str, kind: Str, artifact_key: Str}
+
 type RemoteDto = {arch: Str, tarball: Str, tarball_sha256: Str, metadata: Str, metadata_sha256: Str}
+
 type NodeDto = {
   name: Str,
   ver: Str,
@@ -22,6 +25,7 @@ type NodeDto = {
   dependencies: List[DependencyDto],
   remote: RemoteDto?,
 }
+
 ## Durable build-plan JSON shape, with string wire values before conversion to domain enums and paths.
 export type BuildPlanDto = {
   format: Str,
@@ -241,7 +245,11 @@ export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan] {
   let format_field = raw.require(PlanFormatDto)?.format
 
   if format_field != build_plan.format {
-    return Err(types.PmError.PackageContract(f"unsupported build plan format {format_field}; this PM reads {build_plan.format}, re-run repo plan"))
+    return Err(
+      types.PmError.PackageContract(
+        f"unsupported build plan format {format_field}; this PM reads {build_plan.format}, re-run repo plan",
+      ),
+    )
   }
 
   let dto = raw.require(BuildPlanDto)?

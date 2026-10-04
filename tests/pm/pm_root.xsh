@@ -4,6 +4,7 @@ use pm.store
 use pm.types
 
 type EntrySpec = {path: Str, kind: types.FileKind, content: Str, mode: Int, target: Str}
+
 type PreparedArtifact = {node: types.PlanNode, staged: types.StagedArtifact}
 
 pure digest(value: Str) -> Str {
@@ -23,16 +24,13 @@ pure payload_symlink(rel: Str, target: Str) -> EntrySpec {
 }
 
 pure metadata_rows(entries: List[EntrySpec]) -> List[Record] {
-  [
-    {
-      path: entry.path,
-      kind: types.file_kind_text(entry.kind),
-      mode: entry.mode,
-      sha256: if entry.kind == types.File or entry.kind == types.Binary { digest(entry.content) } else { "" },
-      target: entry.target,
-    }
-    for entry in entries
-  ]
+  [{
+    path: entry.path,
+    kind: types.file_kind_text(entry.kind),
+    mode: entry.mode,
+    sha256: if entry.kind == types.File or entry.kind == types.Binary { digest(entry.content) } else { "" },
+    target: entry.target,
+  } for entry in entries]
 }
 
 proc write_payload_entry(root: Path, entry: EntrySpec) [fs, error] {
@@ -102,7 +100,13 @@ proc stage_artifact(
       dependencies,
       remote: null,
     },
-    staged: {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: digest("root executor")},
+    staged: {
+      payload,
+      payload_sha256: hash.sha256(payload)?.hex(),
+      metadata,
+      proof,
+      executor_sha256: digest("root executor"),
+    },
   }
 }
 
@@ -111,11 +115,7 @@ proc rehashed(staged: types.StagedArtifact) [fs, error] -> Result[types.StagedAr
   {...staged, payload_sha256: hash.sha256(staged.payload)?.hex()}
 }
 
-proc write_legacy_sidecar_metadata(
-  staged: types.StagedArtifact,
-  name: Str,
-  entries: List[EntrySpec],
-) [fs, error] {
+proc write_legacy_sidecar_metadata(staged: types.StagedArtifact, name: Str, entries: List[EntrySpec]) [fs, error] {
   fs.write(
     staged.metadata,
     json.encode({
@@ -152,7 +152,9 @@ proc rewrite_legacy_database_payload(
   let etcsums = [
     {path: entry.path, sha256: digest(entry.content)}
     for entry in entries
-    if (entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary()) and entry.path.starts_with("etc/")
+    if (entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary()) and entry.path.starts_with(
+      "etc/",
+    )
   ]
   fs.write(fp"{database}/etcsums.json", json.encode(etcsums)?)?
   fs.write(
@@ -193,7 +195,7 @@ proc commit_artifact(
 proc expect_root_error(ctx: TestContext, result: Result[types.RootPlan], expected: Str) [error] {
   match result {
     Ok(_) => test.fail(f"{expected}: root preflight unexpectedly succeeded")?
-    Err(problem) => { assert expected in problem.message }
+    Err(problem) => assert expected in problem.message
   }
 }
 
@@ -271,7 +273,12 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   let unexpected = stage_artifact(ctx, "legacy-extra", types.Payload, entries)?
   write_legacy_sidecar_metadata(unexpected.staged, "legacy-extra", entries)?
   rewrite_legacy_database_payload(ctx, unexpected.staged, "legacy-extra", entries, unexpected: true)?
-  let unexpected_receipt = store.commit(types.target_aarch64(), store_root, unexpected.node, rehashed(unexpected.staged)?)?
+  let unexpected_receipt = store.commit(
+    types.target_aarch64(),
+    store_root,
+    unexpected.node,
+    rehashed(unexpected.staged)?,
+  )?
   expect_root_error(
     ctx,
     root.preflight(types.target_aarch64(), [unexpected_receipt]),
@@ -334,7 +341,11 @@ test test_root_rejects_cyclic_payload_link_that_differs_from_receipt [fs, error]
   archive.tar_create(prepared.staged.payload, payload_root, [p"."], compression: "gz", overwrite: true)?
   let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, rehashed(prepared.staged)?)?
 
-  expect_root_error(ctx, root.preflight(types.target_aarch64(), [receipt]), "root symlink usr/lib/link does not match metadata")?
+  expect_root_error(
+    ctx,
+    root.preflight(types.target_aarch64(), [receipt]),
+    "root symlink usr/lib/link does not match metadata",
+  )?
 }
 
 test test_root_plan_and_receipt_are_deterministic_for_multiple_artifacts [fs, error] { |ctx|
@@ -347,7 +358,10 @@ test test_root_plan_and_receipt_are_deterministic_for_multiple_artifacts [fs, er
   test.eq([artifact.package_name for artifact in first.artifacts], ["alpha", "beta"])?
   let first_output = fp"{test.temp_dir(ctx, name: "root-multiple-first")?}/root"
   let second_output = fp"{test.temp_dir(ctx, name: "root-multiple-second")?}/root"
-  test.eq(root.compose_artifacts(first_output, first, [alpha, beta])?, root.compose_artifacts(second_output, second, [beta, alpha])?)?
+  test.eq(
+    root.compose_artifacts(first_output, first, [alpha, beta])?,
+    root.compose_artifacts(second_output, second, [beta, alpha])?,
+  )?
 }
 
 test test_root_coalesces_identical_nested_directories_with_a_canonical_owner [fs, error] { |ctx|
@@ -391,18 +405,46 @@ test test_root_rejects_collisions_and_same_owner_duplicate_entries_before_mutati
 
   match root.compose_artifacts(collision_output, empty_plan, [left, right]) {
     Ok(_) => test.fail("colliding artifacts unexpectedly composed")?
-    Err(problem) => { assert "owned by both" in problem.message }
+    Err(problem) => assert "owned by both" in problem.message
   }
 
   test.eq(fs.exists(collision_output)?, false)?
 
-  let linked_left = commit_artifact(ctx, store_root, "linked-left", types.Payload, [payload_symlink("usr/bin/shared-link", "tool")])?
-  let linked_right = commit_artifact(ctx, store_root, "linked-right", types.Payload, [payload_symlink("usr/bin/shared-link", "tool")])?
+  let linked_left = commit_artifact(
+    ctx,
+    store_root,
+    "linked-left",
+    types.Payload,
+    [payload_symlink("usr/bin/shared-link", "tool")],
+  )?
+  let linked_right = commit_artifact(
+    ctx,
+    store_root,
+    "linked-right",
+    types.Payload,
+    [payload_symlink("usr/bin/shared-link", "tool")],
+  )?
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [linked_left, linked_right]), "owned by both")?
 
-  let directory_left = commit_artifact(ctx, store_root, "directory-left", types.Payload, [payload_tree("usr/share/incompatible", mode: 0o755)])?
-  let directory_right = commit_artifact(ctx, store_root, "directory-right", types.Payload, [payload_tree("usr/share/incompatible", mode: 0o700)])?
-  expect_root_error(ctx, root.preflight(types.target_aarch64(), [directory_left, directory_right]), "incompatible metadata")?
+  let directory_left = commit_artifact(
+    ctx,
+    store_root,
+    "directory-left",
+    types.Payload,
+    [payload_tree("usr/share/incompatible", mode: 0o755)],
+  )?
+  let directory_right = commit_artifact(
+    ctx,
+    store_root,
+    "directory-right",
+    types.Payload,
+    [payload_tree("usr/share/incompatible", mode: 0o700)],
+  )?
+  expect_root_error(
+    ctx,
+    root.preflight(types.target_aarch64(), [directory_left, directory_right]),
+    "incompatible metadata",
+  )?
 
   let duplicate = stage_artifact(ctx, "duplicate", types.Payload, [payload_file("usr/bin/duplicate", "one")])?
   fs.write(
@@ -421,14 +463,46 @@ test test_root_rejects_collisions_and_same_owner_duplicate_entries_before_mutati
 
 test test_root_rejects_file_ownership_across_parent_and_child_paths [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-parent-child-store")?
-  let parent = commit_artifact(ctx, store_root, "alpha-parent", types.Payload, [payload_file("usr/share/item", "parent")])?
-  let child = commit_artifact(ctx, store_root, "beta-child", types.Payload, [payload_file("usr/share/item/child", "child")])?
+  let parent = commit_artifact(
+    ctx,
+    store_root,
+    "alpha-parent",
+    types.Payload,
+    [payload_file("usr/share/item", "parent")],
+  )?
+  let child = commit_artifact(
+    ctx,
+    store_root,
+    "beta-child",
+    types.Payload,
+    [payload_file("usr/share/item/child", "child")],
+  )?
 
-  expect_root_error(ctx, root.preflight(types.target_aarch64(), [parent, child]), "root non-directory usr/share/item owned by alpha-parent conflicts with usr/share/item/child")?
+  expect_root_error(
+    ctx,
+    root.preflight(types.target_aarch64(), [parent, child]),
+    "root non-directory usr/share/item owned by alpha-parent conflicts with usr/share/item/child",
+  )?
 
-  let later_parent = commit_artifact(ctx, store_root, "beta-parent", types.Payload, [payload_file("usr/share/other", "parent")])?
-  let earlier_child = commit_artifact(ctx, store_root, "alpha-child", types.Payload, [payload_file("usr/share/other/child", "child")])?
-  expect_root_error(ctx, root.preflight(types.target_aarch64(), [earlier_child, later_parent]), "root non-directory usr/share/other conflicts with usr/share/other/child owned by alpha-child")?
+  let later_parent = commit_artifact(
+    ctx,
+    store_root,
+    "beta-parent",
+    types.Payload,
+    [payload_file("usr/share/other", "parent")],
+  )?
+  let earlier_child = commit_artifact(
+    ctx,
+    store_root,
+    "alpha-child",
+    types.Payload,
+    [payload_file("usr/share/other/child", "child")],
+  )?
+  expect_root_error(
+    ctx,
+    root.preflight(types.target_aarch64(), [earlier_child, later_parent]),
+    "root non-directory usr/share/other conflicts with usr/share/other/child owned by alpha-child",
+  )?
 }
 
 test test_root_rejects_traversal_and_corrupt_payloads [fs, error] { |ctx|
@@ -490,7 +564,13 @@ test test_root_identifies_the_missing_payload_inventory_entry [fs, error] { |ctx
 test test_root_runtime_closure_ignores_build_only_dependency [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-runtime-store")?
   let runtime = commit_artifact(ctx, store_root, "runtime", types.Payload, [payload_file("usr/lib/runtime", "runtime")])?
-  let toolchain = commit_artifact(ctx, store_root, "toolchain", types.Payload, [payload_file("usr/bin/compiler", "compiler")])?
+  let toolchain = commit_artifact(
+    ctx,
+    store_root,
+    "toolchain",
+    types.Payload,
+    [payload_file("usr/bin/compiler", "compiler")],
+  )?
   let app = commit_artifact(
     ctx,
     store_root,
@@ -514,7 +594,13 @@ test test_root_runtime_closure_ignores_build_only_dependency [fs, error] { |ctx|
 
 test test_root_failed_composition_leaves_completed_output_untouched [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-immutable-store")?
-  let artifact = commit_artifact(ctx, store_root, "immutable", types.Payload, [payload_file("usr/bin/immutable", "new")])?
+  let artifact = commit_artifact(
+    ctx,
+    store_root,
+    "immutable",
+    types.Payload,
+    [payload_file("usr/bin/immutable", "new")],
+  )?
   let plan = root.preflight(types.target_aarch64(), [artifact])?
   let output = fp"{test.temp_dir(ctx, name: "root-immutable-output")?}/root"
   fs.mkdir(output)?
@@ -522,7 +608,7 @@ test test_root_failed_composition_leaves_completed_output_untouched [fs, error] 
 
   match root.compose_artifacts(output, plan, [artifact]) {
     Ok(_) => test.fail("completed root was overwritten")?
-    Err(problem) => { assert "already exists" in problem.message }
+    Err(problem) => assert "already exists" in problem.message
   }
 
   test.eq(fp"{output}/marker".read_text()?, "previous root")?

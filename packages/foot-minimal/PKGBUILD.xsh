@@ -284,8 +284,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    } ?
-  } ?
+    }?
+  }?
 
   write_minimal_config(dest)?
   fs.remove(fp"{dest}/usr/share", missing_ok: true)?

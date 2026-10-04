@@ -24,6 +24,7 @@ type ArtifactReceiptDto = {
 }
 
 type RemoteMetadataDto = {name: Str, ver: Str, rel: Str}
+
 type ReceiptFormatDto = {format: Str}
 
 ## The receipt format this Store writes and reads.
@@ -99,20 +100,24 @@ pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
 ## receipt) serves every plan whatever runtime-only artifacts that plan pairs with it.
 ## Root composition reads them from the plan instead.
 export pure receipt_dependency_keys(node: types.PlanNode) -> List[Str] {
-  store_unique_artifact_keys([
-    dependency.artifact_key
-    for dependency in node.dependencies
-    if dependency.kind != types.dependency_runtime_only()
-  ])
+  store_unique_artifact_keys(
+    [
+      dependency.artifact_key
+      for dependency in node.dependencies
+      if dependency.kind != types.dependency_runtime_only()
+    ],
+  )
 }
 
 ## Returns the canonical runtime-only subset of `receipt_dependency_keys`.
 export pure receipt_runtime_dependency_keys(node: types.PlanNode) -> List[Str] {
-  store_unique_artifact_keys([
-    dependency.artifact_key
-    for dependency in node.dependencies
-    if dependency.kind == types.dependency_runtime()
-  ])
+  store_unique_artifact_keys(
+    [
+      dependency.artifact_key
+      for dependency in node.dependencies
+      if dependency.kind == types.dependency_runtime()
+    ],
+  )
 }
 
 pure receipt_dto(value: types.ArtifactReceipt) -> ArtifactReceiptDto {
@@ -203,7 +208,9 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
     require_sha256(dependency_key, "artifact receipt runtime dependency key")?
 
     if ! (dependency_key in seen) {
-      return Err(types.PmError.PackageContract(f"artifact receipt runtime dependency key {dependency_key} is not a dependency"))
+      return Err(
+        types.PmError.PackageContract(f"artifact receipt runtime dependency key {dependency_key} is not a dependency"),
+      )
     }
 
     if dependency_key in seen_runtime {
@@ -222,7 +229,11 @@ proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.Arti
   let format_field = raw.require(ReceiptFormatDto)?.format
 
   if format_field != receipt_format {
-    return Err(types.PmError.PackageContract(f"artifact {expected_key} has unsupported receipt format {format_field}; this PM reads {receipt_format}"))
+    return Err(
+      types.PmError.PackageContract(
+        f"artifact {expected_key} has unsupported receipt format {format_field}; this PM reads {receipt_format}",
+      ),
+    )
   }
 
   let value = receipt_from_dto(raw.require(ArtifactReceiptDto)?, dir)?
@@ -325,8 +336,11 @@ proc commit_locked(
   if fs.exists(final_dir)? {
     let existing = read_receipt(final_dir, key)?
     if existing.target != target {
-      return Err(types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"))
+      return Err(
+        types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"),
+      )
     }
+
     return existing
   }
 
@@ -397,7 +411,11 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) [fs, error] ->
 
   # Legacy package metadata did not record an executor digest. Its verified metadata digest is a stable fallback.
   let raw: Record = json.read(metadata)?.require(Record)?
-  let value: Str = if "executor_sha256" in raw { raw.get("executor_sha256")?.require(Str)? } else { hash.sha256(metadata)?.hex() }
+  let value: Str = if "executor_sha256" in raw {
+    raw.get("executor_sha256")?.require(Str)?
+  } else {
+    hash.sha256(metadata)?.hex()
+  }
   require_sha256(value, "remote metadata executor_sha256")?
   value
 }
@@ -433,7 +451,11 @@ proc remote_staged_artifact_for(
   {payload, payload_sha256, metadata, proof, executor_sha256}
 }
 
-proc remote_staged_artifact(node: types.PlanNode, remote_repo: Str, cache: Path) [fs, net, error] -> Result[types.StagedArtifact] {
+proc remote_staged_artifact(
+  node: types.PlanNode,
+  remote_repo: Str,
+  cache: Path,
+) [fs, net, error] -> Result[types.StagedArtifact] {
   let retrieval = node.remote
 
   if retrieval != null {
@@ -473,7 +495,12 @@ export proc verify_receipt(value: types.ArtifactReceipt) [fs, error] -> Result[t
 }
 
 ## Commits one locally built artifact through a locked temporary directory and an atomic final rename.
-export proc commit(target: types.Target, root: Path, node: types.PlanNode, staged: types.StagedArtifact) [fs, error] -> Result[types.ArtifactReceipt] {
+export proc commit(
+  target: types.Target,
+  root: Path,
+  node: types.PlanNode,
+  staged: types.StagedArtifact,
+) [fs, error] -> Result[types.ArtifactReceipt] {
   commit_staged(target, root, node, staged, types.artifact_origin_built())?
 }
 
@@ -499,8 +526,11 @@ export proc import_remote(
   if fs.exists(artifact_path(root, key))? {
     let existing = lookup(root, key)?
     if existing.target != target {
-      return Err(types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"))
+      return Err(
+        types.PmError.PackageContract(f"artifact {key} target does not match requested {types.target_text(target)}"),
+      )
     }
+
     return existing
   }
 

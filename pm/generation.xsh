@@ -8,7 +8,9 @@ use types
 use util
 
 type OverlayConfigDto = {format: Str, profile: Str, replacements: List[Str]}
+
 type GenerationArtifactDto = {package_name: Str, package_id: Str, artifact_key: Str}
+
 ## Durable generation-plan JSON shape, validated before interpreting target strings and plan identity.
 export type GenerationPlanDto = {
   format: Str,
@@ -21,6 +23,7 @@ export type GenerationPlanDto = {
   artifacts: List[GenerationArtifactDto],
   generation_sha256: Str,
 }
+
 type GenerationReceiptDto = {
   format: Str,
   generation_sha256: Str,
@@ -33,6 +36,7 @@ type GenerationReceiptDto = {
   artifacts: List[GenerationArtifactDto],
   root_sha256: Str,
 }
+
 type GenerationOverlayEntry = {path: Str, source: Path, kind: Str, mode: Int, sha256: Str, target: Str}
 
 pure generation_format() -> Str {
@@ -409,7 +413,9 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
       generation_validate_symlink_target(relative, target)?
-      lines = lines.push(f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}")
+      lines = lines.push(
+        f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}",
+      )
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }
@@ -438,7 +444,9 @@ proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[G
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
-      entries = entries.push({path: relative, source: entry.path, kind: "file", mode, sha256: hash.sha256(entry.path)?.hex(), target: ""})
+      entries = entries.push(
+        {path: relative, source: entry.path, kind: "file", mode, sha256: hash.sha256(entry.path)?.hex(), target: ""},
+      )
     } else if metadata.kind == "dir" {
       entries = entries.push({path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""})
     } else if metadata.kind == "symlink" {
@@ -466,7 +474,10 @@ pure generation_same_directory_metadata(entry: GenerationOverlayEntry, package_e
     and entry.target == package_entry.target
 }
 
-pure generation_replacement_preserves_file_metadata(entry: GenerationOverlayEntry, package_entry: types.RootEntry) -> Bool {
+pure generation_replacement_preserves_file_metadata(
+  entry: GenerationOverlayEntry,
+  package_entry: types.RootEntry,
+) -> Bool {
   let same_kind = if entry.kind == "file" {
     package_entry.kind == types.file_kind_file() or package_entry.kind == types.file_kind_binary()
   } else {
@@ -503,7 +514,9 @@ proc generation_preflight_overlay(
         }
 
         if entry.path not in profile.replacements {
-          return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts with package {package_entry.package_name}"))
+          return Err(
+            types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts with package {package_entry.package_name}"),
+          )
         }
 
         if ! generation_replacement_preserves_file_metadata(entry, package_entry) {
@@ -516,16 +529,22 @@ proc generation_preflight_overlay(
 
         used_replacements[entry.path] = true
       } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.file_kind_tree() {
-        return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"))
+        return Err(
+          types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"),
+        )
       } else if package_entry.path.starts_with(f"{entry.path}/") and entry.kind != "dir" {
-        return Err(types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts above package path {package_entry.path}"))
+        return Err(
+          types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts above package path {package_entry.path}"),
+        )
       }
     }
   }
 
   for replacement in profile.replacements {
     if ! (replacement in used_replacements) {
-      return Err(types.PmError.PackageContract(f"generation profile replacement {replacement} does not replace a package file"))
+      return Err(
+        types.PmError.PackageContract(f"generation profile replacement {replacement} does not replace a package file"),
+      )
     }
   }
 }
@@ -541,7 +560,9 @@ proc generation_store_artifacts(
     let receipt = artifact_store.lookup(store_root, artifact.artifact_key)?
 
     if receipt.target != value.target or receipt.package_name != artifact.package_name or receipt.package_id != artifact.package_id or receipt.key != artifact.artifact_key {
-      return Err(types.PmError.PackageContract(f"generation artifact {artifact.package_name} does not match its verified Store receipt"))
+      return Err(
+        types.PmError.PackageContract(f"generation artifact {artifact.package_name} does not match its verified Store receipt"),
+      )
     }
 
     keys[receipt.key] = true
@@ -551,7 +572,11 @@ proc generation_store_artifacts(
   for receipt in receipts {
     for dependency_key in receipt.runtime_dependency_keys {
       if ! (dependency_key in keys) {
-        return Err(types.PmError.MissingDependency(f"generation artifact {receipt.package_name} is missing runtime artifact {dependency_key}"))
+        return Err(
+          types.PmError.MissingDependency(
+            f"generation artifact {receipt.package_name} is missing runtime artifact {dependency_key}",
+          ),
+        )
       }
     }
   }
@@ -566,7 +591,9 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
     if entry.kind == "dir" {
       if fs.exists(destination)? {
         if fs.metadata(destination)?.kind != "dir" {
-          return Err(types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"))
+          return Err(
+            types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
+          )
         }
       } else {
         fs.mkdir(destination)?
@@ -647,7 +674,10 @@ proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
   generation_validate_plan(receipt_plan)?
 }
 
-proc generation_receipt_for(value: types.GenerationPlan, root_receipt: types.RootReceipt) [error] -> Result[types.GenerationReceipt] {
+proc generation_receipt_for(
+  value: types.GenerationPlan,
+  root_receipt: types.RootReceipt,
+) [error] -> Result[types.GenerationReceipt] {
   generation_validate_plan(value)?
 
   if root_receipt.target != value.target {

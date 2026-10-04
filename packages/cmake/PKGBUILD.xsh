@@ -964,7 +964,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
         DESTDIR: dest,
       }) {
         run $bc "-P" "cmake_install.cmake" ?
-      } ?
+      }?
     } ?
-  } ?
+  }?
 }

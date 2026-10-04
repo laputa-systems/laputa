@@ -766,8 +766,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    } ?
-  } ?
+    }?
+  }?
 
   prune_xwayland_headers(dest)?
 }

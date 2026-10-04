@@ -6,6 +6,7 @@ use types
 use util
 
 type PackageFileTreeEntryDto = {path: Str, kind: Str}
+
 type PackageFileEntryDto = {path: Str, kind: Str, mode: Int, sha256: Str, target: Str}
 
 ## JSON metadata emitted for one prepared package payload, using string wire kinds and paths.
@@ -215,6 +216,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
       "dir" => kind = types.file_kind_tree()
       _ => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
     }
+
     files = files.push({path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""})
   }
 
@@ -225,10 +227,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
 ## Defines the exact payload inventory shared by archive creation and receipt metadata.
 ## Empty directories created incidentally by a package build remain payload entries: omitting them
 ## from the archive would make a verified receipt describe a root that cannot be materialized.
-export proc collect_archive_paths(
-  root: Path,
-  filetree: List[types.FileTreeEntry],
-) [fs, error] -> Result[List[Path]] {
+export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry]) [fs, error] -> Result[List[Path]] {
   var entries: List[Path] = []
   let root_text = root.display()
 
@@ -264,7 +263,7 @@ export proc collect_archive_paths(
   for entry in entries |> sort-by .display() {
     let key = entry.display()
 
-    if !(key in unique) {
+    if ! (key in unique) {
       unique[key] = true
       canonical = canonical.push(entry)
     }

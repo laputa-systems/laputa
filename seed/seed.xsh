@@ -41,6 +41,7 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
       "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
       _ => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{seed_usage()}"))
     }
+
     index += 2
   }
 
@@ -70,17 +71,21 @@ pure seed_smoke_argv(
     "none",
     "--mount",
     f"type=bind,src={laputa_root},dst=/src/laputa,readonly",
-  ].extend(xsh_seed.xsh_seed_mount_argv(seed)).extend([
-    "--workdir",
-    "/src/laputa",
-    "--env",
-    "XSH_PM_OFFLINE=1",
-    tag,
-    "/bin/xsh",
-    "/src/laputa/seed/smoke.xsh",
-    "--",
-    value.arch,
-  ]).extend(suites)
+  ].extend(xsh_seed.xsh_seed_mount_argv(seed))
+    .extend(
+      [
+        "--workdir",
+        "/src/laputa",
+        "--env",
+        "XSH_PM_OFFLINE=1",
+        tag,
+        "/bin/xsh",
+        "/src/laputa/seed/smoke.xsh",
+        "--",
+        value.arch,
+      ],
+    )
+    .extend(suites)
 }
 
 proc main(...argv: List[Str]) [fs, process, env, error] {

@@ -3,13 +3,20 @@ use pm.make as make
 
 type TaskOutput = {arguments: List[Str], environment: Str}
 
-proc task_runner() [env, process, error] -> Result[Path] {
+proc task_runner() [process, env, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
   if configured != "" { return fp"{configured}" }
   process.which("xsh")?
 }
 
-pure task(name: Str, root: Path, command: List[Any], outputs: List[Path], inputs: List[Path] = [], deps: List[Str] = []) -> make.MakeTask {
+pure task(
+  name: Str,
+  root: Path,
+  command: List[Any],
+  outputs: List[Path],
+  inputs: List[Path] = [],
+  deps: List[Str] = [],
+) -> make.MakeTask {
   {
     name,
     outputs,
@@ -38,8 +45,21 @@ json.write(output, {arguments: args, environment: env.get("TASK_LABEL") ?? ""})?
   let first_counter = fp"{root}/first count"
   let second_counter = fp"{root}/second count"
   let payload = "spaces 'quotes' $literal"
-  let first = task("first", root, [runner, script, "--", first_output, payload, first_counter], [first_output], [script])
-  let second = task("second", root, [runner, script, "--", second_output, payload, second_counter, first_output], [second_output], [script, first_output], ["first"])
+  let first = task(
+    "first",
+    root,
+    [runner, script, "--", first_output, payload, first_counter],
+    [first_output],
+    [script],
+  )
+  let second = task(
+    "second",
+    root,
+    [runner, script, "--", second_output, payload, second_counter, first_output],
+    [second_output],
+    [script, first_output],
+    ["first"],
+  )
   make.run_tasks([second, first], 2)?
   let observed = json.read(second_output)?.require(TaskOutput)?
   assert observed.arguments == [second_output.display(), payload, second_counter.display(), first_output.display()]
@@ -74,6 +94,7 @@ error.fail("task fixture failed")?
       assert problem.message == "make task 'failure' failed"
     }
   }
+
   assert started.exists()?
   time.sleep(1100ms)?
   assert ! late_output.exists()?
@@ -107,5 +128,5 @@ if args == ["--cflags", "libone", "libtwo"] {{
     let flags = make.pkg_config_flags(["libone", "libtwo"])?
     assert flags.cflags == ["-I/usr/include/example", "-DEXAMPLE=1"]
     assert flags.libs == ["-L/usr/lib/example", "-lexample"]
-  } ?
+  }?
 }

@@ -29,7 +29,21 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
     runtime_only_deps: [],
     mkdeps_host: [],
     mkdeps_target: [],
-    upstream_sources: [{source: fp"{url}", kind: types.Auto, architectures: ["all"], checksums: [{arch: "all", sha256}]}],
+    upstream_sources: [
+      {
+        source: fp"{url}",
+        kind: types.Auto,
+        architectures: [
+          "all",
+        ],
+        checksums: [
+          {
+            arch: "all",
+            sha256,
+          },
+        ],
+      },
+    ],
     filetree: [],
     nostrip: false,
     source_mirror: false,
@@ -39,7 +53,11 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
 type DemoTarball = {path: Path, sha256: Str}
 
 # A one-file source tarball and its sha256.
-proc demo_tarball(ctx: TestContext, name: Str, text: Str = "hello from the cache\n") [fs, error] -> Result[DemoTarball] {
+proc demo_tarball(
+  ctx: TestContext,
+  name: Str,
+  text: Str = "hello from the cache\n",
+) [fs, error] -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
   fs.mkdir(fp"{tree}/demo-1.0")?
   fs.write(fp"{tree}/demo-1.0/hello.txt", text)?
@@ -69,7 +87,7 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
-  } ?
+  }?
 
   test.eq(fs.read_text(fp"{src}/hello.txt")?, "hello from the cache\n")?
 }
@@ -87,7 +105,7 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
   # the same resolution order and verification as the HTTP one.
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: f"file://{mirror}/", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
-  } ?
+  }?
 
   test.eq(fs.read_text(fp"{src}/hello.txt")?, "hello from the cache\n")?
   test.eq(hash.sha256(sources.source_cache_entry(cache, tarball.sha256))?.hex(), tarball.sha256)?
@@ -103,7 +121,7 @@ test test_missing_url_source_without_a_mirror_says_to_run_make_fetch [fs, net, e
       src,
       ["https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty, "is not in the source cache", "make fetch"],
     )?
-  } ?
+  }?
 
   test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
 }
@@ -118,7 +136,7 @@ test test_unreachable_http_mirror_is_asked_by_content_address [fs, net, env, err
       src,
       [f"http://127.0.0.1:9/sources/sha256/{sha256_of_empty}", "make fetch"],
     )?
-  } ?
+  }?
 
   test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
 }
@@ -138,7 +156,7 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
       src,
       [f"expected sha256 {sha256_of_empty}, got {tarball.sha256}"],
     )?
-  } ?
+  }?
 
   test.eq(sources.source_cache_entry(cache, sha256_of_empty).exists()?, false)?
 }
@@ -159,7 +177,7 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
       src,
       [f"expected {pinned.sha256}"],
     )?
-  } ?
+  }?
 
   test.eq(fs.children(src)? |> count(), 0)?
 }
@@ -181,11 +199,23 @@ test test_url_sources_must_pin_a_sha256 [error] {
 test test_source_placeholders_expand_only_as_whole_words [error] {
   let pkg = {...url_package("", sha256_of_empty), name: "tailscale", ver: "1.96.4"}
 
-  test.eq(util.expand_source("https://h/tailscale_VERSION_GOARCH.tgz", pkg, "aarch64", "aarch64"), "https://h/tailscale_1.96.4_arm64.tgz")?
-  test.eq(util.expand_source("https://h/vMAJOR.MINOR/x-VERSION-ARCH.tar.xz", pkg, "x86_64", "x86_64"), "https://h/v1.96/x-1.96.4-x86_64.tar.xz")?
-  test.eq(util.expand_source("TARGET_ARCH BUILD_ARCH TARGET_TRIPLE", pkg, "x86_64", "aarch64"), "x86_64 aarch64 x86_64-linux-musl")?
+  test.eq(
+    util.expand_source("https://h/tailscale_VERSION_GOARCH.tgz", pkg, "aarch64", "aarch64"),
+    "https://h/tailscale_1.96.4_arm64.tgz",
+  )?
+  test.eq(
+    util.expand_source("https://h/vMAJOR.MINOR/x-VERSION-ARCH.tar.xz", pkg, "x86_64", "x86_64"),
+    "https://h/v1.96/x-1.96.4-x86_64.tar.xz",
+  )?
+  test.eq(
+    util.expand_source("TARGET_ARCH BUILD_ARCH TARGET_TRIPLE", pkg, "x86_64", "aarch64"),
+    "x86_64 aarch64 x86_64-linux-musl",
+  )?
   # Words that merely contain a placeholder stay as written.
-  test.eq(util.expand_source("PATCHES/SEARCH/ARCHIVE/PACKAGES", pkg, "aarch64", "aarch64"), "PATCHES/SEARCH/ARCHIVE/PACKAGES")?
+  test.eq(
+    util.expand_source("PATCHES/SEARCH/ARCHIVE/PACKAGES", pkg, "aarch64", "aarch64"),
+    "PATCHES/SEARCH/ARCHIVE/PACKAGES",
+  )?
   test.eq(util.expand_source("PATCH-PACKAGE", pkg, "aarch64", "aarch64"), "4-tailscale")?
   # Substituted values are not rescanned for placeholders.
   test.eq(util.expand_source("VERSION", {...pkg, ver: "ARCH"}, "aarch64", "aarch64"), "ARCH")?

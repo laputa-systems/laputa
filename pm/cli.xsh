@@ -17,29 +17,63 @@ use types
 use util
 
 type RepoCheckArgs = {repo: Path}
+
 type RepoPlanArgs = {repo: Path, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
+
 type RepoShowArgs = {input: Path}
+
 type RepoBuildArgs = {input: Path, store: Path, jobs: Int}
+
 type RepoPublishArgs = {input: Path, store: Path}
+
 type RepoPackagesArgs = {repo: Path, packages: List[Str]}
+
 type RootComposeArgs = {input: Path, store: Path, runtime_roots: List[Str], output: Path}
+
 type RootInspectArgs = {input: Path}
+
 type StoreVerifyArgs = {store: Path}
+
 type StoreExtractArgs = {input: Path, store: Path, package: Str, path: Path, output: Path}
+
 type SourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: List[types.Target]}
 
-enum PmCommand { Help(Str), RepoCheck(RepoCheckArgs), RepoPlan(RepoPlanArgs), RepoShow(RepoShowArgs), RepoBuild(RepoBuildArgs), RepoPublish(RepoPublishArgs), RepoChecksum(RepoPackagesArgs), RepoUpdateChecksums(RepoPackagesArgs), SourcesFetch(SourcesFetchArgs), RootCompose(RootComposeArgs), RootInspect(RootInspectArgs), StoreVerify(StoreVerifyArgs), StoreExtract(StoreExtractArgs) }
+enum PmCommand {
+    Help(Str),
+    RepoCheck(RepoCheckArgs),
+    RepoPlan(RepoPlanArgs),
+    RepoShow(RepoShowArgs),
+    RepoBuild(RepoBuildArgs),
+    RepoPublish(RepoPublishArgs),
+    RepoChecksum(RepoPackagesArgs),
+    RepoUpdateChecksums(RepoPackagesArgs),
+    SourcesFetch(SourcesFetchArgs),
+    RootCompose(RootComposeArgs),
+    RootInspect(RootInspectArgs),
+    StoreVerify(StoreVerifyArgs),
+    StoreExtract(StoreExtractArgs),
+}
 
 type RepoCheckOptions = {repo: Str}
+
 type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
+
 type RepoShowOptions = {input: Path}
+
 type RepoBuildOptions = {input: Path, store: Path, jobs: Int}
+
 type RepoPublishOptions = {input: Path, store: Path}
+
 type RepoPackagesOptions = {repo: Str, packages: List[Str]}
+
 type RootComposeOptions = {input: Path, store: Path, runtime_roots: List[Str], output: Path}
+
 type RootInspectOptions = {input: Path}
+
 type StoreVerifyOptions = {store: Path}
+
 type StoreExtractOptions = {input: Path, store: Path, package: Str, path: Path, output: Path}
+
 type SourcesFetchOptions = {repo: Str, all: Bool, packages: List[Str], targets: List[Str]}
 
 pure help_text() -> Str {
@@ -230,10 +264,18 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
       }
+
       return RepoCheck({repo: resolve_repo_root(parsed.repo)?})
     }
     "plan" => {
-      var parsed: RepoPlanOptions = {repo: "", all: false, roots: [], without: [], target: "aarch64-linux-musl", output: p""}
+      var parsed: RepoPlanOptions = {
+        repo: "",
+        all: false,
+        roots: [],
+        without: [],
+        target: "aarch64-linux-musl",
+        output: p"",
+      }
       match cli.parse(
         args,
         {
@@ -259,7 +301,14 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
       }
 
       let _ = types.parse_target(parsed.target)?
-      return RepoPlan({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, roots: parsed.roots, without: parsed.without, target: parsed.target, output: parsed.output})
+      return RepoPlan({
+        repo: resolve_repo_root(parsed.repo)?,
+        all: parsed.all,
+        roots: parsed.roots,
+        without: parsed.without,
+        target: parsed.target,
+        output: parsed.output,
+      })
     }
     "show" => {
       var parsed: RepoShowOptions = {input: p""}
@@ -267,6 +316,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
       }
+
       return RepoShow({input: parsed.input})
     }
     "build" => {
@@ -283,6 +333,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Ok(value) => parsed = value.require(RepoBuildOptions)?
         Err(problem) => return Err(problem)
       }
+
       return RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs})
     }
     "publish" => {
@@ -298,6 +349,7 @@ proc parse_repo_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
       }
+
       return RepoPublish({input: parsed.input, store: parsed.store})
     }
     "checksum" => return RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
@@ -390,7 +442,9 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
       return Err(types.PmError.Usage("pm root compose requires one-or-more --runtime-root PACKAGE"))
     }
 
-    return RootCompose({input: parsed.input, store: parsed.store, runtime_roots: parsed.runtime_roots, output: parsed.output})
+    return RootCompose(
+      {input: parsed.input, store: parsed.store, runtime_roots: parsed.runtime_roots, output: parsed.output},
+    )
   }
 
   var parsed: RootInspectOptions = {input: p""}
@@ -398,6 +452,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
     Ok(value) => parsed = value
     Err(problem) => return Err(problem)
   }
+
   RootInspect({input: parsed.input})
 }
 
@@ -422,7 +477,14 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
       Ok(value) => extracted = value
       Err(problem) => return Err(problem)
     }
-    return StoreExtract({input: extracted.input, store: extracted.store, package: extracted.package, path: extracted.path, output: extracted.output})
+
+    return StoreExtract({
+      input: extracted.input,
+      store: extracted.store,
+      package: extracted.package,
+      path: extracted.path,
+      output: extracted.output,
+    })
   }
 
   if argv[1] != "verify" {
@@ -430,10 +492,15 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   var parsed: StoreVerifyOptions = {store: p""}
-  match cli.parse(tail_after(argv, 2), {store: {form: "--store STORE", kind: "Path", required: true}}, "pm store verify") {
+  match cli.parse(
+    tail_after(argv, 2),
+    {store: {form: "--store STORE", kind: "Path", required: true}},
+    "pm store verify",
+  ) {
     Ok(value) => parsed = value
     Err(problem) => return Err(problem)
   }
+
   StoreVerify({store: parsed.store})
 }
 
@@ -453,7 +520,10 @@ proc parse_command(argv: List[Str]) [fs, error] -> Result[PmCommand] {
 
 # Planning is offline unless XSH_PM_REPO names a package repository; offline
 # plans record the digest of an empty index.
-proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) [fs, net, env, time, error] -> Result[types.RemoteSnapshot] {
+proc remote_snapshot_for_plan(
+  cache_root: Path,
+  target: types.Target,
+) [fs, net, env, time, error] -> Result[types.RemoteSnapshot] {
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()
@@ -539,11 +609,11 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
   # The durable DTO and atomic write are kept behind `write_plan` while the release
   # native-test runner cannot encode a direct reachable call to `plan_json.write`.
   pm_plan_json.write_plan(args.output, value)?
-  print pm_plan.render(value, false)?
+  print (pm_plan.render(value, false)?)
 }
 
 proc command_repo_show(args: RepoShowArgs) [fs, error] {
-  print pm_plan.render(pm_plan_json.read(args.input)?, false)?
+  print (pm_plan.render(pm_plan_json.read(args.input)?, false)?)
 }
 
 proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error] {
@@ -551,6 +621,7 @@ proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error
   if value.target == types.target_x86_64() and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
   }
+
   let result = pm_execute.build_plan(value, execution_repo_root()?, args.store, remote.repo_url(), args.jobs)?
   print "repo" "build" $result.plan_sha256 $result.artifacts.len() "artifacts"
 }
@@ -561,7 +632,9 @@ proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
   let repo_url = remote.repo_url()
 
   if repo_url == "" {
-    return Err(types.PmError.RemoteRepo("pm repo publish needs XSH_PM_REPO, for example http://127.0.0.1:3000 for the local mirror"))
+    return Err(
+      types.PmError.RemoteRepo("pm repo publish needs XSH_PM_REPO, for example http://127.0.0.1:3000 for the local mirror"),
+    )
   }
 
   let work_handle = fs.tempdir()?
@@ -646,7 +719,13 @@ proc command_store_verify(args: StoreVerifyArgs) [fs, error] {
 }
 
 proc command_store_extract(args: StoreExtractArgs) [fs, error] {
-  pm_generation_adapter.generation_adapter_copy_manifest_file(args.input, args.store, args.package, args.path, args.output)?
+  pm_generation_adapter.generation_adapter_copy_manifest_file(
+    args.input,
+    args.store,
+    args.package,
+    args.path,
+    args.output,
+  )?
   print f"store extract {args.package} {args.path}"
 }
 

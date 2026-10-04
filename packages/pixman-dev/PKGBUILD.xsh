@@ -96,8 +96,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    } ?
-  } ?
+    }?
+  }?
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libpixman-1.so.") {

@@ -66,7 +66,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
   }) {
     sudo = run.text fp"{rootfs}/usr/bin/sudo" "--version" ?
-  } ?
+  }?
 
   if ! ("sudo-rs" in sudo or "Sudo version" in sudo or "sudo " in sudo) {
     return Err(SudoRsProofError.Failed("proof-sudo-rs", f"unexpected sudo version: {sudo.trim()}"))

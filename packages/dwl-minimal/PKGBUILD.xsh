@@ -273,7 +273,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cc "-c" "dwl.c" "-o" "dwl.o" @cflags ?
     run $cc "-c" "util.c" "-o" "util.o" @cflags ?
     run $cc "dwl.o" "util.o" "-o" "dwl" @pkg_libs "-lm" ?
-  } ?
+  }?
 
   fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)?
 }

@@ -172,7 +172,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     cd build {
       run $cmake "-P" "cmake_install.cmake" ?
     }
-  } ?
+  }?
 
   fs.symlink(p"libpng16.so", fp"{dest}/usr/lib/libpng.so")?
   fs.remove(fp"{dest}/usr/bin", missing_ok: true)?

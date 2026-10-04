@@ -1,5 +1,6 @@
 ##! XSH module `proof` package and build operations.
 use pm.util as pm_util
+
 error ProofError = Failed(kind: Str, message: Str)
 
 type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payload: Bool}

@@ -13,10 +13,23 @@ export enum PackageKind { Payload, Meta }
 ## their runtime closure, so their artifact keys are artifact-key inputs.
 ## `RuntimeOnly` dependencies are never installed into a build root and never
 ## enter an artifact key; only root composition installs them.
-export enum DependencyKind { Runtime, RuntimeOnly, BuildHost, BuildTarget, Bootstrap }
+export enum DependencyKind {
+    Runtime,
+    RuntimeOnly,
+    BuildHost,
+    BuildTarget,
+    Bootstrap,
+}
 
 ## The source staging strategy selected by a recipe source record.
-export enum SourceKind { Auto, Archive, Zip, Cpio, SourceFile, Directory }
+export enum SourceKind {
+    Auto,
+    Archive,
+    Zip,
+    Cpio,
+    SourceFile,
+    Directory,
+}
 
 ## The expected on-disk kind for a declared package output path.
 export enum FileKind { File, Binary, Symlink, Tree }
@@ -615,4 +628,3 @@ export type ResolvedSource = {path: Path, kind: Str, name: Str}
 
 ## A checksum field update produced by source commands.
 export type ChecksumUpdate = {field: Str, values: List[Str]}
-

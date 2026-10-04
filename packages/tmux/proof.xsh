@@ -98,7 +98,7 @@ set -g focus-events on
     run $dynlinker $tmux "-L" $label "kill-server" ?
     let dead = run.status $dynlinker $tmux "-L" $label "has-session" "-t" "proof" 2> /dev/null
     check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")?
-  } ?
+  }?
 
   print "tmux ok: config, pty capture, window creation, clean stop"
 }

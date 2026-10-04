@@ -422,11 +422,11 @@ export proc build(dest: Path) [fs, process, env, error] {
   run $muon ${setup_args} ?
   run $muon "-C" "build" samu $jobs_flag ?
 
-  env ( {
-    DESTDIR : dest,
+  env ({
+    DESTDIR: dest,
   }) {
     run $muon "-C" "build" install ?
-  } ?
+  }?
 
   fs.remove(fp"{dest}/etc/environment", missing_ok: true)?
   fs.chmod(fp"{dest}/usr/bin/unix_chkpwd", 0o4755)?

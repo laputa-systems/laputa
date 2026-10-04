@@ -100,7 +100,11 @@ ttyS1::poweroff:/bin/echo "login: ttyS1"
 
   test.unix_fake(ctx, {signal: "TERM"})?
   test.linux_fake(ctx, {})?
-  let output = xinit_text(ctx, [valid.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let output = xinit_text(
+    ctx,
+    [valid.display()],
+    {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"},
+  )?
 
   test.eq(
     output,
@@ -111,9 +115,17 @@ down: ok
   )?
 
   test.unix_fake(ctx, {})?
-  let unsupported_status = run_xinit(ctx, [unsupported.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let unsupported_status = run_xinit(
+    ctx,
+    [unsupported.display()],
+    {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"},
+  )?
   assert_failed_with(unsupported_status, "unsupported action 'bogus'")?
-  let shell_status = run_xinit(ctx, [shell_syntax.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let shell_status = run_xinit(
+    ctx,
+    [shell_syntax.display()],
+    {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"},
+  )?
   assert_failed_with(shell_status, "shell syntax")?
 }
 
@@ -131,7 +143,17 @@ test test_wait_once_respawn_and_poweroff [fs, process, error] { |ctx|
 
   test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})?
   test.linux_fake(ctx, {})?
-  let output = xinit_text(ctx, [inittab.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_EXIT_WHEN_IDLE: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_INIT_TEST_RESPAWN_DELAY_MS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let output = xinit_text(
+    ctx,
+    [inittab.display()],
+    {
+      XINIT_TEST_ALLOW_NON_PID1: "1",
+      XSH_INIT_TEST_EXIT_WHEN_IDLE: "1",
+      XSH_INIT_TEST_MAX_RESPAWNS: "1",
+      XSH_INIT_TEST_RESPAWN_DELAY_MS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     output,
@@ -151,7 +173,11 @@ ttyAMA0::poweroff:/bin/xshi --no-config
 
   test.unix_fake(ctx, {event_kind: "child", pid: 1000})?
   test.linux_fake(ctx, {log: linux_log})?
-  let poweroff_output = xinit_text(ctx, [poweroff_inittab.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let poweroff_output = xinit_text(
+    ctx,
+    [poweroff_inittab.display()],
+    {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_UNIX_DRY_RUN: "1"},
+  )?
 
   test.eq(
     poweroff_output,
@@ -176,7 +202,11 @@ ttyAMA0::poweroff:/bin/xshi --no-config
 
   test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})?
   test.linux_fake(ctx, {log: linux_log})?
-  let output = xinit_text(ctx, [inittab.display()], {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_FAST_SHUTDOWN: "1", XSH_INIT_FINAL_CLEANUP: "0", XSH_UNIX_DRY_RUN: "1"})?
+  let output = xinit_text(
+    ctx,
+    [inittab.display()],
+    {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_FAST_SHUTDOWN: "1", XSH_INIT_FINAL_CLEANUP: "0", XSH_UNIX_DRY_RUN: "1"},
+  )?
 
   test.eq(
     output,
@@ -203,7 +233,16 @@ test test_service_start_status_stop_and_check [fs, process, error] { |ctx|
   service_dir.mkdir()
   write_demo_service(fp"{service_dir}/demo.xsh", "process.command_argv(\"service\", [\"service\"])", "never", false, 0)?
   test.unix_fake(ctx, {log: unix_log})?
-  let started = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let started = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     started,
@@ -228,7 +267,11 @@ test test_service_start_status_stop_and_check [fs, process, error] { |ctx|
   )?
 
   test.unix_fake(ctx, {log: unix_log})?
-  let stopped = xinit_text(ctx, ["stop", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let stopped = xinit_text(
+    ctx,
+    ["stop", "demo"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
 
   test.eq(
     stopped,
@@ -322,17 +365,34 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
   assert "net: deps=logger,firewall" in graph
   assert "app: deps=net,logger" in graph
   test.unix_fake(ctx, {log: unix_log})?
-  let boot = xinit_text(ctx, ["boot"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let boot = xinit_text(
+    ctx,
+    ["boot"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   assert "app running" in boot
   test.ok(fp"{run_dir}/logger.json".exists()?)?
   test.ok(fp"{run_dir}/firewall.json".exists()?)?
   test.ok(fp"{run_dir}/net.json".exists()?)?
   test.ok(fp"{run_dir}/app.json".exists()?)?
   test.unix_fake(ctx, {})?
-  let listed = xinit_text(ctx, ["list"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let listed = xinit_text(
+    ctx,
+    ["list"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
   assert "app longrun targets=boot state=running ready=true" in listed
   assert "net longrun targets=boot state=running ready=true" in listed
-  let stop_net = run_xinit(ctx, ["stop", "net"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let stop_net = run_xinit(
+    ctx,
+    ["stop", "net"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
   assert_failed_with(stop_net, "running dependents: app")?
 }
 
@@ -368,7 +428,16 @@ export proc status() [fs, process, env, error] -> Result[Str] {
   )?
 
   test.unix_fake(ctx, {})?
-  let started = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let started = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     started,
@@ -376,7 +445,11 @@ export proc status() [fs, process, env, error] -> Result[Str] {
 """,
   )?
 
-  let status = xinit_text(ctx, ["status", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let status = xinit_text(
+    ctx,
+    ["status", "demo"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
 
   test.eq(
     status,
@@ -400,7 +473,11 @@ test test_append_logs_and_log_none [fs, process, time, error] { |ctx|
     0,
   )?
 
-  let started = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display()})?
+  let started = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display()},
+  )?
   assert "demo running" in started
   time.sleep(100ms)?
   let log_text = fp"{log_root}/demo/current".read_text()?
@@ -422,7 +499,16 @@ test test_append_logs_and_log_none [fs, process, time, error] { |ctx|
   )?
 
   test.unix_fake(ctx, {})?
-  let none_started = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: none_service_dir.display(), XINIT_RUN_DIR: none_run_dir.display(), XINIT_LOG_ROOT: none_log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let none_started = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: none_service_dir.display(),
+      XINIT_RUN_DIR: none_run_dir.display(),
+      XINIT_LOG_ROOT: none_log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     none_started,
@@ -460,7 +546,16 @@ export let service = {
   fp"{log_root}/demo".mkdir()?
   fp"{log_root}/demo/current".write("0123456789AB")?
   test.unix_fake(ctx, {})?
-  let _ = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let _ = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(fp"{log_root}/demo/current.1".read_text()?, "0123456789AB")?
   test.eq(fp"{log_root}/demo/current".read_text()?, "")?
 }
@@ -496,7 +591,16 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
     80,
   )?
 
-  let cgroup = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: cgroup_run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let cgroup = xinit_text(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: cgroup_run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     cgroup,
@@ -508,7 +612,16 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
   let blocker = fp"{root}/not-a-dir"
   let failed_run = fp"{root}/failed-run"
   blocker.write("file")?
-  let failed = run_xinit(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: failed_run.display(), XINIT_LOG_ROOT: blocker.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let failed = run_xinit(
+    ctx,
+    ["start", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: failed_run.display(),
+      XINIT_LOG_ROOT: blocker.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   assert_failed_with(failed, "xinit-log")?
   test.ok(! fp"{root}/failed-run/demo.json".exists()?)?
 }
@@ -524,7 +637,16 @@ test test_idempotent_start_and_supervise_restart [fs, process, error] { |ctx|
 
   for _ in [0, 1] {
     test.unix_fake(ctx, {log: unix_log})?
-    let output = xinit_text(ctx, ["start", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+    let output = xinit_text(
+      ctx,
+      ["start", "demo"],
+      {
+        XINIT_SERVICE_DIR: service_dir.display(),
+        XINIT_RUN_DIR: run_dir.display(),
+        XINIT_LOG_ROOT: log_root.display(),
+        XSH_UNIX_DRY_RUN: "1",
+      },
+    )?
 
     test.eq(
       output,
@@ -549,7 +671,17 @@ test test_idempotent_start_and_supervise_restart [fs, process, error] { |ctx|
   )?
 
   test.unix_fake(ctx, {log: supervise_unix_log, event_kind: "child", pid: 1000, status_code: 1})?
-  let supervise = xinit_text(ctx, ["supervise", "demo"], {XINIT_SERVICE_DIR: supervise_service_dir.display(), XINIT_RUN_DIR: supervise_run_dir.display(), XINIT_LOG_ROOT: supervise_log_root.display(), XINIT_TEST_MAX_EVENTS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let supervise = xinit_text(
+    ctx,
+    ["supervise", "demo"],
+    {
+      XINIT_SERVICE_DIR: supervise_service_dir.display(),
+      XINIT_RUN_DIR: supervise_run_dir.display(),
+      XINIT_LOG_ROOT: supervise_log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(supervise, "")?
   test.unix_fake(ctx, {})?
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: supervise_run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -672,7 +804,17 @@ export let service = {
   )?
 
   test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1000, status_code: 1})?
-  let supervise = xinit_text(ctx, ["supervise", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let supervise = xinit_text(
+    ctx,
+    ["supervise", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(supervise, "")?
   test.unix_fake(ctx, {})?
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -729,7 +871,17 @@ export let service = {
   )?
 
   test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001, status_code: 1})?
-  let scan = xinit_text(ctx, ["scan", "boot"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "boot"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.unix_fake(ctx, {})?
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -793,7 +945,17 @@ export let service = {
   )?
 
   test.unix_fake(ctx, {log: unix_log, event_kind: "poll", ready: 0})?
-  let scan = xinit_text(ctx, ["scan", "app"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "3", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "app"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "3",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.unix_fake(ctx, {})?
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -859,7 +1021,17 @@ export let service = {
   # still comes up — the control plane overriding the default desired state.
   fp"{run_dir}/inbox/app".write("down")?
   test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})?
-  let scan = xinit_text(ctx, ["scan", "app"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "app"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.unix_fake(ctx, {})?
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -909,7 +1081,17 @@ export let service = {
   # ready); the scanner polls notify_ready and promotes it to running. The unix
   # fake reports the service ready (its `ready` setting defaults to 1).
   test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})?
-  let scan = xinit_text(ctx, ["scan", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "2", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "2",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.unix_fake(ctx, {})?
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -952,7 +1134,17 @@ export let service = {
   # timeout is zero, so the scanner promotes it to running but not ready rather
   # than wedging.
   test.unix_fake(ctx, {event_kind: "poll", ready: 0})?
-  let scan = xinit_text(ctx, ["scan", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "2", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "2",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.unix_fake(ctx, {})?
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
@@ -1003,7 +1195,16 @@ export let service = {
   )?
 
   test.unix_fake(ctx, {})?
-  let started = xinit_text(ctx, ["start", "app"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let started = xinit_text(
+    ctx,
+    ["start", "app"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
 
   test.eq(
     started,
@@ -1027,7 +1228,16 @@ export let service = {
 """,
   )?
 
-  let needy_status = run_xinit(ctx, ["start", "needy"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let needy_status = run_xinit(
+    ctx,
+    ["start", "needy"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   assert_failed_with(needy_status, "flaky: start failed")?
 }
 
@@ -1065,7 +1275,11 @@ export proc reload() [fs, process, env, error] -> Result[Unit] {{
   )?
 
   test.unix_fake(ctx, {log: unix_log})?
-  let hooked = xinit_text(ctx, ["reload", "hooked"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let hooked = xinit_text(
+    ctx,
+    ["reload", "hooked"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
   assert "hooked running" in hooked
 
   # The hook ran (wrote the sentinel) and, since reload runs the hook XOR sends
@@ -1095,7 +1309,11 @@ export let service = {
   )?
 
   test.unix_fake(ctx, {log: plain_log})?
-  let _ = xinit_text(ctx, ["reload", "plain"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
+  let _ = xinit_text(
+    ctx,
+    ["reload", "plain"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
+  )?
   let plain_text = plain_log.read_text()?
   assert "\"op\":\"kill_process_group\"" in plain_text
   assert "\"signal\":\"HUP\"" in plain_text
@@ -1131,7 +1349,17 @@ export proc finish() [fs, process, env, error] -> Result[Unit] {{
   )?
 
   test.unix_fake(ctx, {event_kind: "child", pid: 1000, status_code: 1})?
-  let scan = xinit_text(ctx, ["scan", "demo"], {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_MAX_EVENTS: "1", XSH_UNIX_DRY_RUN: "1"})?
+  let scan = xinit_text(
+    ctx,
+    ["scan", "demo"],
+    {
+      XINIT_SERVICE_DIR: service_dir.display(),
+      XINIT_RUN_DIR: run_dir.display(),
+      XINIT_LOG_ROOT: log_root.display(),
+      XINIT_TEST_MAX_EVENTS: "1",
+      XSH_UNIX_DRY_RUN: "1",
+    },
+  )?
   test.eq(scan, "")?
   test.eq(touched.read_text()?, "finished")?
   test.unix_fake(ctx, {})?

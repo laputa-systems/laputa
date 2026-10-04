@@ -253,7 +253,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: x86_64_rustflags,
   }) {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "sudo" "--bin" "su" ?
-  } ?
+  }?
 
   fs.install(fp"target/{triple}/release/sudo", fp"{dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)?
   fs.install(fp"target/{triple}/release/su", fp"{dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)?

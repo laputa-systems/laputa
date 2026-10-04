@@ -62,7 +62,11 @@ proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[P
       target: "aarch64-linux-musl",
       runtime_roots: generation_value.runtime_roots,
       artifacts: [
-        {package_name: artifact.package_name, package_id: artifact.package_id, artifact_key: artifact.artifact_key}
+        {
+          package_name: artifact.package_name,
+          package_id: artifact.package_id,
+          artifact_key: artifact.artifact_key,
+        }
         for artifact in generation_value.artifacts
       ],
       root_sha256: "0000000000000000000000000000000000000000000000000000000000000000",
@@ -134,40 +138,97 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   let payload = fp"{stage}/payload.tar.gz"
   archive.tar_create(payload, contents, [p"."], compression: "gz")?
   let metadata = fp"{stage}/metadata.json"
-  json.write(metadata, {
-    name: selected.name,
-    ver: selected.ver,
-    rel: selected.rel,
-    package_kind: "payload",
-    files: [{path: "boot/vmlinuz", kind: "file", mode: 0o644, sha256: bytes.from_text("kernel payload\n").sha256().hex(), target: ""}],
-  })?
+  json.write(
+    metadata,
+    {
+      name: selected.name,
+      ver: selected.ver,
+      rel: selected.rel,
+      package_kind: "payload",
+      files: [
+        {
+          path: "boot/vmlinuz",
+          kind: "file",
+          mode: 0o644,
+          sha256: bytes.from_text("kernel payload\n").sha256().hex(),
+          target: "",
+        },
+      ],
+    },
+  )?
   let proof = fp"{stage}/proof.json"
   fs.write(proof, "proof\n")?
   let store_root = test.temp_dir(ctx, name: "store-extract-store")?
-  let _ = store.commit(types.target_aarch64(), store_root, selected, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: bytes.from_text("test executor").sha256().hex()})?
+  let _ = store.commit(
+    types.target_aarch64(),
+    store_root,
+    selected,
+    {
+      payload,
+      payload_sha256: hash.sha256(payload)?.hex(),
+      metadata,
+      proof,
+      executor_sha256: bytes.from_text("test executor").sha256().hex(),
+    },
+  )?
   let output = test.temp_path(ctx, name: "extracted-vmlinuz")
 
-  let _ = pm_output([
-    "store", "extract", plan_path.display(), "--store", store_root.display(),
-    "--package", selected.name, "--path", "boot/vmlinuz", "--output", output.display(),
-  ])?
+  let _ = pm_output(
+    [
+      "store",
+      "extract",
+      plan_path.display(),
+      "--store",
+      store_root.display(),
+      "--package",
+      selected.name,
+      "--path",
+      "boot/vmlinuz",
+      "--output",
+      output.display(),
+    ],
+  )?
   test.eq(output.read_text()?, "kernel payload\n")?
 
   fs.write(output, "previous output\n")?
   let error_output = test.temp_path(ctx, name: "store-extract-error.txt")
-  let missing = pm_status([
-    "store", "extract", plan_path.display(), "--store", store_root.display(),
-    "--package", selected.name, "--path", "boot/missing", "--output", output.display(),
-  ], error_output)?
+  let missing = pm_status(
+    [
+      "store",
+      "extract",
+      plan_path.display(),
+      "--store",
+      store_root.display(),
+      "--package",
+      selected.name,
+      "--path",
+      "boot/missing",
+      "--output",
+      output.display(),
+    ],
+    error_output,
+  )?
   test.eq(missing.ok, false)?
   let observed_output_2 = error_output.read_text()?
   assert "artifact metadata does not declare boot/missing" in observed_output_2
   test.eq(output.read_text()?, "previous output\n")?
 
-  let traversal = pm_status([
-    "store", "extract", plan_path.display(), "--store", store_root.display(),
-    "--package", selected.name, "--path", "../outside", "--output", output.display(),
-  ], error_output)?
+  let traversal = pm_status(
+    [
+      "store",
+      "extract",
+      plan_path.display(),
+      "--store",
+      store_root.display(),
+      "--package",
+      selected.name,
+      "--path",
+      "../outside",
+      "--output",
+      output.display(),
+    ],
+    error_output,
+  )?
   test.eq(traversal.ok, false)?
   let observed_output_3 = error_output.read_text()?
   assert "store extraction path must stay relative" in observed_output_3
@@ -201,7 +262,10 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
   let observed_output_4 = err.read_text()?
   assert "requires exactly one of --all or one-or-more --root" in observed_output_4
 
-  let both = pm_status(["repo", "plan", "--repo", root.display(), "--all", "--root", "app", "--output", output.display()], err)?
+  let both = pm_status(
+    ["repo", "plan", "--repo", root.display(), "--all", "--root", "app", "--output", output.display()],
+    err,
+  )?
   test.eq(both.ok, false)?
   let observed_output_5 = err.read_text()?
   assert "requires exactly one of --all or one-or-more --root" in observed_output_5
@@ -211,7 +275,21 @@ test test_repo_plan_requires_explicit_selection_output_and_target [fs, process, 
   let observed_output_6 = err.read_text()?
   assert "missing required argument --output" in observed_output_6
 
-  let unsupported_target = pm_status(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", output.display(), "--target", "sparc64-linux-musl"], err)?
+  let unsupported_target = pm_status(
+    [
+      "repo",
+      "plan",
+      "--repo",
+      root.display(),
+      "--root",
+      "app",
+      "--output",
+      output.display(),
+      "--target",
+      "sparc64-linux-musl",
+    ],
+    err,
+  )?
   test.eq(unsupported_target.ok, false)?
   let observed_output_7 = err.read_text()?
   assert "unsupported target sparc64-linux-musl" in observed_output_7
@@ -221,16 +299,24 @@ test test_repo_plan_without_selects_packages_that_build_before_the_excluded_ones
   let root = copied_repository(ctx, "repo-without")?
   let err = test.temp_path(ctx, name: "repo-without.err")
   let output = fp"{root}/out/plan.json"
-  let _ = pm_output(["repo", "plan", "--repo", root.display(), "--all", "--without", "host-tool", "--output", output.display()])?
+  let _ = pm_output(
+    ["repo", "plan", "--repo", root.display(), "--all", "--without", "host-tool", "--output", output.display()],
+  )?
   let value = plan_json.read(output)?
   test.eq(value.roots, ["runtime-lib", "target-sdk"])?
   test.eq([node.name for node in value.nodes] |> sort, ["runtime-lib", "target-sdk"])?
 
-  let with_roots = pm_status(["repo", "plan", "--repo", root.display(), "--root", "app", "--without", "host-tool", "--output", output.display()], err)?
+  let with_roots = pm_status(
+    ["repo", "plan", "--repo", root.display(), "--root", "app", "--without", "host-tool", "--output", output.display()],
+    err,
+  )?
   test.eq(with_roots.ok, false)?
   assert "--without requires --all" in err.read_text()?
 
-  let unknown = pm_status(["repo", "plan", "--repo", root.display(), "--all", "--without", "absent", "--output", output.display()], err)?
+  let unknown = pm_status(
+    ["repo", "plan", "--repo", root.display(), "--all", "--without", "absent", "--output", output.display()],
+    err,
+  )?
   test.eq(unknown.ok, false)?
   assert "excluded package absent is not in the catalog" in err.read_text()?
 }
@@ -243,7 +329,16 @@ test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |c
   fs.write(fp"{package_like}/PKGBUILD.xsh", "not a command argument\n")?
 
   let status = pm_status(
-    ["repo", "plan", "--repo", root.display(), "--all", "--output", fp"{root}/out/plan.json".display(), package_like.display()],
+    [
+      "repo",
+      "plan",
+      "--repo",
+      root.display(),
+      "--all",
+      "--output",
+      fp"{root}/out/plan.json".display(),
+      package_like.display(),
+    ],
     err,
   )?
 
@@ -272,7 +367,20 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
   let arm_output = fp"{root}/out/arm-plan.json"
   let x86_output = fp"{root}/out/x86-plan.json"
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", arm_output.display()])?
-  let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--target", "x86_64-linux-musl", "--output", x86_output.display()])?
+  let _ = pm_output(
+    [
+      "repo",
+      "plan",
+      "--repo",
+      root.display(),
+      "--root",
+      "app",
+      "--target",
+      "x86_64-linux-musl",
+      "--output",
+      x86_output.display(),
+    ],
+  )?
   let arm = plan_json.read(arm_output)?
   let x86 = plan_json.read(x86_output)?
 

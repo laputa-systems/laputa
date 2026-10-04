@@ -68,7 +68,7 @@ proc compile_hello(
     PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
   }) {
     run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello ?
-  } ?
+  }?
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {

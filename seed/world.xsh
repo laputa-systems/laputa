@@ -59,6 +59,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs] {
       "--repo" => parsed = {...parsed, repo: value}
       _ => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{world_usage()}"))
     }
+
     index += 2
   }
 
@@ -145,15 +146,19 @@ export pure world_container_argv(
     "none",
     "--mount",
     f"type=bind,src={laputa_root},dst=/src/laputa,readonly",
-  ].extend(xsh_seed.xsh_seed_mount_argv(seed)).extend([
-    "--mount",
-    f"type=bind,src={output},dst=/output",
-    "--mount",
-    f"type=bind,src={store},dst=/artifacts",
-    "--workdir",
-    "/src/laputa",
-    tag,
-  ]).extend(inner)
+  ].extend(xsh_seed.xsh_seed_mount_argv(seed))
+    .extend(
+      [
+        "--mount",
+        f"type=bind,src={output},dst=/output",
+        "--mount",
+        f"type=bind,src={store},dst=/artifacts",
+        "--workdir",
+        "/src/laputa",
+        tag,
+      ],
+    )
+    .extend(inner)
 }
 
 type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str}
@@ -165,10 +170,25 @@ proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) [fs, process, 
   {docker, laputa_root, seed, value, tag}
 }
 
-proc world_run(container: WorldContainer, output: Path, store: Path, inner: List[Str], label: Str) [fs, process, error] {
+proc world_run(
+  container: WorldContainer,
+  output: Path,
+  store: Path,
+  inner: List[Str],
+  label: Str,
+) [fs, process, error] {
   fs.mkdir(output)?
   fs.mkdir(store)?
-  let argv = world_container_argv(container.docker, container.laputa_root, container.seed, container.value, container.tag, output, store, inner)
+  let argv = world_container_argv(
+    container.docker,
+    container.laputa_root,
+    container.seed,
+    container.value,
+    container.tag,
+    output,
+    store,
+    inner,
+  )
   let status = process.run(process.command_argv(container.docker, argv, container.laputa_root))?
 
   if ! status.ok {
@@ -192,7 +212,10 @@ proc world_plan(container: WorldContainer, args: WorldArgs) [fs, process, error]
     container,
     world_dir(laputa_root, args.arch),
     world_store(laputa_root, args.arch),
-    pm_argv(["repo", "plan", "--repo", "/src/laputa"].extend(selection).extend(["--target", pm_target(container.value), "--output", "/output/plan.json"])),
+    pm_argv(
+      ["repo", "plan", "--repo", "/src/laputa"].extend(selection)
+        .extend(["--target", pm_target(container.value), "--output", "/output/plan.json"]),
+    ),
     "repo plan",
   )?
 }
@@ -212,7 +235,7 @@ proc world_build(container: WorldContainer, args: WorldArgs) [fs, process, error
 proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo}) {
     pm_cli.run_pm_cli(args)?
-  } ?
+  }?
 }
 
 # Publishing the last plan could upload a stale selection (a reverted rel
@@ -221,7 +244,10 @@ proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
 proc world_publish(container: WorldContainer, args: WorldArgs) [fs, net, process, env, time, error] {
   world_build(container, args)?
   let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
-  host_pm(args.repo, ["repo", "publish", plan.display(), "--store", world_store(container.laputa_root, args.arch).display()])?
+  host_pm(
+    args.repo,
+    ["repo", "publish", plan.display(), "--store", world_store(container.laputa_root, args.arch).display()],
+  )?
 }
 
 ## The `make root` tree: the mirror plan, the store imported from the mirror, and the composed receipt.
@@ -236,7 +262,11 @@ proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   let missing = [node.name for node in value.nodes if pm_types.plan_action_is_build(node.action)]
 
   if missing.len() > 0 {
-    return Err(xsh_seed.SeedError.Missing(f"{repo} lacks exact artifacts for {missing.join(", ")}; run `make publish` with a selection that includes them first"))
+    return Err(
+      xsh_seed.SeedError.Missing(
+        f"{repo} lacks exact artifacts for {missing.join(", ")}; run `make publish` with a selection that includes them first",
+      ),
+    )
   }
 }
 
@@ -257,14 +287,20 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
     selection = selection.extend(["--root", name])
   }
 
-  host_pm(args.repo, ["repo", "plan", "--repo", laputa_root.display()].extend(selection).extend(["--target", pm_target(container.value), "--output", plan.display()]))?
+  host_pm(
+    args.repo,
+    ["repo", "plan", "--repo", laputa_root.display()].extend(selection)
+      .extend(["--target", pm_target(container.value), "--output", plan.display()]),
+  )?
   require_mirror_plan(plan, args.repo)?
   host_pm(args.repo, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{args.jobs}"])?
   world_run(
     container,
     root_dir,
     store,
-    ["/bin/xsh", "/src/laputa/seed/world_root.xsh", "--", args.arch, "/output/plan.json", "/artifacts", "/output"].extend(args.packages),
+    ["/bin/xsh", "/src/laputa/seed/world_root.xsh", "--", args.arch, "/output/plan.json", "/artifacts", "/output"].extend(
+      args.packages,
+    ),
     "root compose",
   )?
 }

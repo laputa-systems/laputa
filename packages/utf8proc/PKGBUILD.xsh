@@ -89,5 +89,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     cd build {
       run $cmake "-P" "cmake_install.cmake" ?
     }
-  } ?
+  }?
 }

@@ -146,7 +146,14 @@ test test_package_tools_requires_its_dockerfile [fs, error] { |ctx|
 
 test test_package_tools_build_is_offline_and_native [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
-  let argv = images.package_tools_build_argv(p"docker", /work/laputa, value, "laputa-host-tools:aarch64-a", "laputa-package-tools:aarch64-b", /work/laputa/.out/package-tools/aarch64/sources)
+  let argv = images.package_tools_build_argv(
+    p"docker",
+    /work/laputa,
+    value,
+    "laputa-host-tools:aarch64-a",
+    "laputa-package-tools:aarch64-b",
+    /work/laputa/.out/package-tools/aarch64/sources,
+  )
   assert "--network" in argv and "none" in argv
   assert "linux/arm64" in argv
   assert "HOST_TOOLS_IMAGE=laputa-host-tools:aarch64-a" in argv
@@ -224,7 +231,16 @@ test test_world_args_reject_ambiguous_or_incomplete_commands [error] {
 # checkout, and only host processes reach the loopback mirror.
 test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
-  let argv = world.world_container_argv(p"docker", /work/laputa, /s, value, "laputa-package-tools:aarch64-b", /work/laputa/.out/world/aarch64, /work/laputa/.out/artifacts/aarch64, ["/bin/xsh", "pm.xsh"])
+  let argv = world.world_container_argv(
+    p"docker",
+    /work/laputa,
+    /s,
+    value,
+    "laputa-package-tools:aarch64-b",
+    /work/laputa/.out/world/aarch64,
+    /work/laputa/.out/artifacts/aarch64,
+    ["/bin/xsh", "pm.xsh"],
+  )
   assert [item for item in argv if item == "--network"].len() == 1
   assert "none" in argv
   assert "linux/arm64" in argv
@@ -250,6 +266,7 @@ pure split_at_image(words: List[Str]) -> ImageSplit {
     if words[index] == xsh_seed.xsh_seed_build_image {
       return {docker: words[..index], cargo: words[index + 1..]}
     }
+
     index += 1
   }
 
@@ -270,7 +287,13 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
     let made = split_at_image(commands[0].words())
     let made_docker = made.docker.join(" ")
 
-    let seed_argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", laputa_root, /work/xsh, xsh_seed.xsh_seed_arch(arch)?, 4)?
+    let seed_argv = xsh_seed.xsh_seed_cargo_build_argv(
+      p"docker",
+      laputa_root,
+      /work/xsh,
+      xsh_seed.xsh_seed_arch(arch)?,
+      4,
+    )?
     let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words())
     assert made.cargo == seed.cargo
     assert seed.cargo.len() > 0
@@ -281,6 +304,7 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
       if seed_options[index] in ["--env", "--mount", "--platform", "--network"] {
         assert f"{seed_options[index]} {shell_word(seed_options[index + 1])}" in made_docker
       }
+
       index += 1
     }
   }

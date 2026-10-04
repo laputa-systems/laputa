@@ -35,7 +35,11 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
   var result: List[types.DependencyEdge] = []
 
   for dependency in pkg.deps {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) { types.dependency_bootstrap() } else { types.dependency_runtime() }
+    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+      types.dependency_bootstrap()
+    } else {
+      types.dependency_runtime()
+    }
     result = result.push({from: pkg.name, to: dependency, kind})
   }
 
@@ -45,19 +49,30 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
   }
 
   for dependency in pkg.mkdeps_host {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) { types.dependency_bootstrap() } else { types.dependency_build_host() }
+    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+      types.dependency_bootstrap()
+    } else {
+      types.dependency_build_host()
+    }
     result = result.push({from: pkg.name, to: dependency, kind})
   }
 
   for dependency in pkg.mkdeps_target {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) { types.dependency_bootstrap() } else { types.dependency_build_target() }
+    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+      types.dependency_bootstrap()
+    } else {
+      types.dependency_build_target()
+    }
     result = result.push({from: pkg.name, to: dependency, kind})
   }
 
   result
 }
 
-pure selected_edges(dependency_edges: List[types.DependencyEdge], kinds: List[types.DependencyKind]) -> List[types.DependencyEdge] {
+pure selected_edges(
+  dependency_edges: List[types.DependencyEdge],
+  kinds: List[types.DependencyKind],
+) -> List[types.DependencyEdge] {
   [edge for edge in dependency_edges if kind_is_selected(edge.kind, kinds)]
 }
 
@@ -79,7 +94,12 @@ pure index_in_path(trail: List[Str], name: Str) -> Int {
   -1
 }
 
-pure cycle_from(name: Str, selected: Map[Bool], dependency_edges: List[types.DependencyEdge], trail: List[Str]) -> List[Str] {
+pure cycle_from(
+  name: Str,
+  selected: Map[Bool],
+  dependency_edges: List[types.DependencyEdge],
+  trail: List[Str],
+) -> List[Str] {
   for dependency in direct_dependencies(name, dependency_edges) {
     continue unless selected.get(dependency) ?? false
     let cycle_index = index_in_path(trail, dependency)

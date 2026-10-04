@@ -82,7 +82,8 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
     "x86-jump-label-patch.c",
   ]
   let local_sources = [
-    input for input in original.upstream_sources
+    input
+    for input in original.upstream_sources
     if input.source.name in required
   ]
   test.eq(local_sources.len(), required.len())?
@@ -193,14 +194,14 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
   sources.stage_package_sources(pkg, source)?
   pm_build.build_prepared_package(recipe_dir, source, dest, archive_path)?
 
-  if !fs.exists(fp"{dest}/dev")? {
+  if ! fs.exists(fp"{dest}/dev")? {
     test.fail("baselayout prepared payload is missing dev")?
   }
 
   archive.tar_extract(archive_path, extracted)?
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    if !fs.exists(fp"{extracted}/{required}")? {
+    if ! fs.exists(fp"{extracted}/{required}")? {
       test.fail(f"baselayout archive is missing {required}")?
     }
 
@@ -314,7 +315,7 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
       let resolved = linux_config.resolve_config_fragments([p"files/config/aarch64/base-aarch64.fragment"])?
       test.eq(resolved, [staged])?
     } ?
-  } ?
+  }?
 
   fs.remove(staged)?
 
@@ -324,9 +325,9 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
   }) {
     match linux_config.resolve_config_fragments([p"files/config/aarch64/base-aarch64.fragment"]) {
       Ok(_) => test.fail("missing staged Linux config fragment unexpectedly resolved")?
-      Err(error) => { assert "missing kernel config fragment files/config/aarch64/base-aarch64.fragment" in error.message }
+      Err(error) => assert "missing kernel config fragment files/config/aarch64/base-aarch64.fragment" in error.message
     }
-  } ?
+  }?
 }
 
 test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, env, time, error] { |ctx|
@@ -349,5 +350,5 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
       let plan = linux_shared.discover_package_plan("arm64")?
       test.ok(p"one.o" in plan.objects)?
     } ?
-  } ?
+  }?
 }

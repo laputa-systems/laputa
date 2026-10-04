@@ -121,10 +121,7 @@ pure gen_types_internal(text: Str, type_name: Str, type_caps: Str, bits: Int) ->
   text.replace("@type@", type_name)
     .replace("@TYPE@", type_caps)
     .replace("@BITS@", f"{bits}")
-    .replace(
-      "@BYTES@",
-      f"{bytes_for_bits(bits)}",
-    )
+    .replace("@BYTES@", f"{bytes_for_bits(bits)}")
 }
 
 pure gen_bits_template(text: Str, bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str) -> Str {

@@ -48,7 +48,15 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "pulseaudio",
     "python",
   ]
-  assert value.forbidden_sonames == ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"]
+  assert value.forbidden_sonames == [
+    "libLLVM",
+    "libclang",
+    "libpython",
+    "libgtk",
+    "libpango",
+    "libpipewire",
+    "libpulse",
+  ]
 }
 
 test test_profile_load_rejects_unknown_and_path_names [fs, error] {

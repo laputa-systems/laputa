@@ -73,20 +73,23 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "linux/arm64",
     "--mount",
     f"type=bind,src={value.laputa_root},dst=/src/laputa,readonly",
-  ].extend(xsh_seed.xsh_seed_mount_argv(value.seed)).extend([
-    "--mount",
-    f"type=bind,src={value.output_root},dst=/output",
-    "--mount",
-    f"type=bind,src={value.artifact_root},dst=/artifacts",
-    "--workdir",
-    "/src/laputa",
-    "--env",
-    "XSH_MODULE_PATH=/src/laputa",
-    "--env",
-    "PATH=/bin:/usr/lib/xsh/core:/usr/bin",
-    "--env",
-    "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
-  ])
+  ].extend(xsh_seed.xsh_seed_mount_argv(value.seed))
+    .extend(
+      [
+        "--mount",
+        f"type=bind,src={value.output_root},dst=/output",
+        "--mount",
+        f"type=bind,src={value.artifact_root},dst=/artifacts",
+        "--workdir",
+        "/src/laputa",
+        "--env",
+        "XSH_MODULE_PATH=/src/laputa",
+        "--env",
+        "PATH=/bin:/usr/lib/xsh/core:/usr/bin",
+        "--env",
+        "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
+      ],
+    )
 
   if value.repo_url != "" {
     argv = argv.extend(["--env", f"XSH_PM_REPO={value.repo_url}"])

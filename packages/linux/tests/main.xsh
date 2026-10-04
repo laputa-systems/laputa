@@ -3,8 +3,11 @@ use pm.make as make
 
 # Serialized report fields and analysis task fields checked by the native assertions.
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}
+
 type ArchivePlanReport = {task_count: Int, tasks: List[ArchiveTaskReport]}
+
 type ArchiveCompileTaskReport = {source: Str, flags: List[Str]}
+
 type ArchiveAnalysisResult = {object: Str, tasks: List[ArchiveCompileTaskReport]}
 
 proc write_fixture(root: Path) [fs, error] {
@@ -738,7 +741,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       test.eq(compact_parallel.tasks.len(), 0)?
       test.eq(compact_serial.tasks.len(), 0)?
       test.ok(compact_parallel.task_specs.len() > 0)?
-    } ?
+    }?
   } ?
 }
 

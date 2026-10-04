@@ -8,7 +8,9 @@ pure canonical_field(value: Str) -> Str {
 
 pure ignored_tree_path(rel: Path) -> Bool {
   let key = rel.display()
-  key == ".git" or key.starts_with(".git/") or key == ".work" or key.starts_with(".work/") or key == "work" or key.starts_with("work/")
+  key == ".git" or key.starts_with(".git/") or key == ".work" or key.starts_with(".work/") or key == "work" or key.starts_with(
+    "work/",
+  )
 }
 
 pure package_input_path(rel: Path) -> Bool {
@@ -17,7 +19,9 @@ pure package_input_path(rel: Path) -> Bool {
   }
 
   let key = rel.display()
-  rel.name.ends_with(".xsh") or key == "files" or key.starts_with("files/") or key == "patches" or key.starts_with("patches/")
+  rel.name.ends_with(".xsh") or key == "files" or key.starts_with("files/") or key == "patches" or key.starts_with(
+    "patches/",
+  )
 }
 
 proc tree_entry_line(root: Path, path_value: Path, prefix: Str) [fs, error] -> Result[Str] {
@@ -102,7 +106,9 @@ proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
       let target = entry.path.readlink()?.display()
 
       if ! symlink_target_stays_within(rel, target) {
-        return Err(types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"))
+        return Err(
+          types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
+        )
       }
     }
 
@@ -123,7 +129,11 @@ proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
 # expansion staging applies, so `repository/.out/seed/ARCH` keys each target by
 # its own seed and another target's inputs never change this key. Builds are
 # native, so the build architecture is the target's.
-proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[List[Str]] {
+proc repository_input_lines(
+  repo_root: Path,
+  pkg: types.Package,
+  target: types.Target,
+) [fs, error] -> Result[List[Str]] {
   let arch = types.pm_target_arch(target)
   var lines: List[Str] = []
 
@@ -158,11 +168,7 @@ proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.T
 }
 
 ## Hashes every semantic package build input without absolute checkout state or modification times.
-export proc package_build_input(
-  repo_root: Path,
-  pkg: types.Package,
-  target: types.Target,
-) [fs, error] -> Result[Str] {
+export proc package_build_input(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[Str] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("package build input target is unsupported"))
   }
@@ -176,19 +182,27 @@ export proc package_build_input(
   ]
 
   for dependency in pkg.deps {
-    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}")
+    lines = lines.push(
+      f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}",
+    )
   }
 
   for dependency in pkg.runtime_only_deps {
-    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}")
+    lines = lines.push(
+      f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}",
+    )
   }
 
   for dependency in pkg.mkdeps_host {
-    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}")
+    lines = lines.push(
+      f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}",
+    )
   }
 
   for dependency in pkg.mkdeps_target {
-    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_target())}\t{canonical_field(dependency)}")
+    lines = lines.push(
+      f"dependency\t{types.dependency_kind_text(types.dependency_build_target())}\t{canonical_field(dependency)}",
+    )
   }
 
   for source in pkg.upstream_sources {
@@ -221,12 +235,14 @@ proc pm_proof_module(pm_root: Path) [fs, error] -> Result[Str] {
 export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str] {
   let proof = fp"{pkg.dir}/proof.xsh"
   let proof_sha256 = if fs.exists(proof)? { hash.sha256(proof)?.hex() } else { "missing" }
-  digest_lines([
-    "format\tlaputa-package-proof-input-1",
-    f"package\t{canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
-    f"proof\t{proof_sha256}",
-    f"pm-proof\t{pm_proof_module(repo_root)?}",
-  ])?
+  digest_lines(
+    [
+      "format\tlaputa-package-proof-input-1",
+      f"package\t{canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
+      f"proof\t{proof_sha256}",
+      f"pm-proof\t{pm_proof_module(repo_root)?}",
+    ],
+  )?
 }
 
 ## Hashes the PM entrypoint and every implementation module below `pm/`.
@@ -272,12 +288,14 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
 
 ## Digests an executor provenance record for receipts and repository metadata.
 export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str] {
-  digest_lines([
-    f"format\t{canonical_field(value.format)}",
-    f"runner\txsh\t{canonical_field(value.xsh_sha256)}",
-    f"runner\txshi\t{canonical_field(value.xshi_sha256)}",
-    f"runner\txsht\t{canonical_field(value.xsht_sha256)}",
-    f"pm\t{canonical_field(value.pm_sha256)}",
-    f"core\t{canonical_field(value.core_sha256 ?? "none")}",
-  ])?
+  digest_lines(
+    [
+      f"format\t{canonical_field(value.format)}",
+      f"runner\txsh\t{canonical_field(value.xsh_sha256)}",
+      f"runner\txshi\t{canonical_field(value.xshi_sha256)}",
+      f"runner\txsht\t{canonical_field(value.xsht_sha256)}",
+      f"pm\t{canonical_field(value.pm_sha256)}",
+      f"core\t{canonical_field(value.core_sha256 ?? "none")}",
+    ],
+  )?
 }

@@ -58,7 +58,13 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
 
 ## Publishes one immutable repository object. A file remote receives a temporary copy and rename;
 ## an existing object is accepted only when its exact bytes already match the requested source.
-export proc upload_immutable_repo_file(repo: Str, rel: Path, source: Path, token: Str, work: Path) [fs, net, error] -> Result[Bool] {
+export proc upload_immutable_repo_file(
+  repo: Str,
+  rel: Path,
+  source: Path,
+  token: Str,
+  work: Path,
+) [fs, net, error] -> Result[Bool] {
   if ! util.is_file_url(repo) {
     let response = net.upload({
       method: "PUT",
@@ -178,7 +184,11 @@ export proc decode_remote_index(rows: List[Record]) [error] -> Result[List[types
 export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePackage] {
   var arch = "aarch64"
   let empty_dependencies: List[Str] = []
-  let mkdeps_host = if "mkdeps_host" in row { row.get("mkdeps_host")?.require(List[Str])? } else { row.get("mkdeps")?.require(List[Str])? }
+  let mkdeps_host = if "mkdeps_host" in row {
+    row.get("mkdeps_host")?.require(List[Str])?
+  } else {
+    row.get("mkdeps")?.require(List[Str])?
+  }
 
   let mkdeps_target = if "mkdeps_target" in row {
     row.get("mkdeps_target")?.require(List[Str])?
@@ -367,7 +377,9 @@ export proc plan_artifact_from_package_at_repo(
   }
 
   if repo == "" {
-    return Err(types.PmError.RemoteRepo(f"legacy remote package {value.name} needs a repository URL to hash its metadata"))
+    return Err(
+      types.PmError.RemoteRepo(f"legacy remote package {value.name} needs a repository URL to hash its metadata"),
+    )
   }
 
   let rel = remote_legacy_metadata_rel(value)?

@@ -182,7 +182,7 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
     if proof_exited {
       proof_exit_code = status.exit_code()?
     }
-  } ?
+  }?
 
   if ! proof_ok {
     if proof_exited {
@@ -225,6 +225,8 @@ export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payl
   }
 
   if value.payload_sha256 != payload_sha256 {
-    return Err(types.PmError.PackageContract(f"proof receipt {path_value} payload hash does not match {node.package_id}"))
+    return Err(
+      types.PmError.PackageContract(f"proof receipt {path_value} payload hash does not match {node.package_id}"),
+    )
   }
 }

@@ -86,24 +86,28 @@ proc artifact_key_for(
 }
 
 proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) [error] -> Result[Str] {
-  plan_digest_lines([
-    "format\tlaputa-legacy-remote-artifact-1",
-    f"arch\t{plan_canonical_field(remote.arch)}",
-    f"package\t{plan_canonical_field(package_id)}",
-    f"tarball\t{plan_canonical_field(remote.tarball)}",
-    f"tarball-sha256\t{plan_canonical_field(remote.tarball_sha256)}",
-    f"metadata\t{plan_canonical_field(remote.metadata)}",
-    f"metadata-sha256\t{plan_canonical_field(remote.metadata_sha256)}",
-  ])?
+  plan_digest_lines(
+    [
+      "format\tlaputa-legacy-remote-artifact-1",
+      f"arch\t{plan_canonical_field(remote.arch)}",
+      f"package\t{plan_canonical_field(package_id)}",
+      f"tarball\t{plan_canonical_field(remote.tarball)}",
+      f"tarball-sha256\t{plan_canonical_field(remote.tarball_sha256)}",
+      f"metadata\t{plan_canonical_field(remote.metadata)}",
+      f"metadata-sha256\t{plan_canonical_field(remote.metadata_sha256)}",
+    ],
+  )?
 }
 
 proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) [error] -> Result[Str] {
-  plan_digest_lines([
-    "format\tlaputa-package-proof-key-1",
-    f"package\t{plan_canonical_field(package_id)}",
-    f"artifact\t{plan_canonical_field(artifact_key)}",
-    f"proof\t{plan_canonical_field(proof_sha256)}",
-  ])?
+  plan_digest_lines(
+    [
+      "format\tlaputa-package-proof-key-1",
+      f"package\t{plan_canonical_field(package_id)}",
+      f"artifact\t{plan_canonical_field(artifact_key)}",
+      f"proof\t{plan_canonical_field(proof_sha256)}",
+    ],
+  )?
 }
 
 proc absolute_recipe_package(value: types.PackageCatalog, pkg: types.Package) [fs, error] -> Result[types.Package] {
@@ -137,10 +141,7 @@ proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) [erro
   plan_digest_lines(lines)?
 }
 
-proc find_remote(
-  snapshot: types.RemoteSnapshot,
-  name: Str,
-) [error] -> Result[types.RemotePlanArtifact?] {
+proc find_remote(snapshot: types.RemoteSnapshot, name: Str) [error] -> Result[types.RemotePlanArtifact?] {
   var selected: types.RemotePlanArtifact? = null
 
   for candidate in snapshot.packages {
@@ -230,10 +231,10 @@ pure remote_is_exact(
     return false
   }
 
-  remote.artifact_key == artifact_key and
-    remote.recipe_sha256 == recipe_sha256 and
-    remote.proof_key == proof_key and
-    remote.proof_sha256 == proof_sha256
+  remote.artifact_key == artifact_key
+    and remote.recipe_sha256 == recipe_sha256
+    and remote.proof_key == proof_key
+    and remote.proof_sha256 == proof_sha256
 }
 
 # Returns the build-input dependencies of one node. Their nodes are on earlier
@@ -250,7 +251,9 @@ proc dependency_nodes(
     continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
 
     if ! (edge.to in keys) {
-      return Err(types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"))
+      return Err(
+        types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"),
+      )
     }
 
     dependencies = dependencies.push({name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?})
@@ -354,7 +357,13 @@ export proc resolve(
       let dependencies = dependency_nodes(name, edges, selected, keys)?
       let recipe_sha256 = recipe_inputs.get(name)?
       let proof_sha256 = pm_fingerprint.package_proof_input(value.root, source_pkg)?
-      let local_artifact_key = artifact_key_for(policy.target, policy.build_epoch, package_id, recipe_sha256, dependencies)?
+      let local_artifact_key = artifact_key_for(
+        policy.target,
+        policy.build_epoch,
+        package_id,
+        recipe_sha256,
+        dependencies,
+      )?
       let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256)?
       let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
       var artifact_key = local_artifact_key
@@ -364,41 +373,41 @@ export proc resolve(
       let candidate = find_remote(snapshot, name)?
 
       if candidate != null {
-          let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
+        let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
 
-          # A remote tuple newer than the recipe means this checkout is behind
-          # what was published; building and publishing it would move the
-          # repository index backwards.
-          if tuple_order < 0 {
-            return Err(
-              types.PmError.PackageContract(
-                f"{name} declares {util.version_id(pkg.ver, pkg.rel)} behind remote {util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
-              ),
-            )
-          }
+        # A remote tuple newer than the recipe means this checkout is behind
+        # what was published; building and publishing it would move the
+        # repository index backwards.
+        if tuple_order < 0 {
+          return Err(
+            types.PmError.PackageContract(
+              f"{name} declares {util.version_id(pkg.ver, pkg.rel)} behind remote {util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
+            ),
+          )
+        }
 
-          if tuple_order > 0 {
-            let reason = if pkg.ver != candidate.ver {
-              f"local version differs from remote {util.version_id(candidate.ver, candidate.rel)}"
-            } else {
-              f"local release is above remote {util.version_id(candidate.ver, candidate.rel)}"
-            }
-            action = types.plan_action_build(reason)
-          } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
-            action = types.plan_action_reuse_remote("exact remote artifact")
-            remote = candidate.retrieval
-          } else if changed_dependencies.len() > 0 {
-            # The remote tuple was built against other dependency artifacts.
-            # Build locally; publishing the result under the same tuple
-            # replaces the remote index row with the new artifact key.
-            action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
-          } else if candidate.artifact_key != "" {
-            action = types.plan_action_build("remote artifact identity differs")
+        if tuple_order > 0 {
+          let reason = if pkg.ver != candidate.ver {
+            f"local version differs from remote {util.version_id(candidate.ver, candidate.rel)}"
           } else {
-            artifact_key = legacy_remote_artifact_key(package_id, candidate.retrieval)?
-            action = types.plan_action_reuse_remote("legacy remote artifact")
-            remote = candidate.retrieval
+            f"local release is above remote {util.version_id(candidate.ver, candidate.rel)}"
           }
+          action = types.plan_action_build(reason)
+        } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
+          action = types.plan_action_reuse_remote("exact remote artifact")
+          remote = candidate.retrieval
+        } else if changed_dependencies.len() > 0 {
+          # The remote tuple was built against other dependency artifacts.
+          # Build locally; publishing the result under the same tuple
+          # replaces the remote index row with the new artifact key.
+          action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
+        } else if candidate.artifact_key != "" {
+          action = types.plan_action_build("remote artifact identity differs")
+        } else {
+          artifact_key = legacy_remote_artifact_key(package_id, candidate.retrieval)?
+          action = types.plan_action_reuse_remote("legacy remote artifact")
+          remote = candidate.retrieval
+        }
       }
 
       let proof_key = proof_key_for(package_id, artifact_key, proof_sha256)?
@@ -459,7 +468,9 @@ export proc require_current_build_epoch(value: types.BuildPlan) [error] {
 
 proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) [error] {
   if value.arch != types.pm_target_arch(target) {
-    return Err(types.PmError.PackageContract(f"remote artifact architecture {value.arch} does not match {types.target_text(target)}"))
+    return Err(
+      types.PmError.PackageContract(f"remote artifact architecture {value.arch} does not match {types.target_text(target)}"),
+    )
   }
 
   let _ = util.ensure_relative_path(fp"{value.tarball}", "plan remote tarball")?
@@ -507,7 +518,9 @@ proc validate_node(
     }
 
     if ! (dependency.name in levels) {
-      return Err(types.PmError.PackageContract(f"build plan node {node.name} has unresolved dependency {dependency.name}"))
+      return Err(
+        types.PmError.PackageContract(f"build plan node {node.name} has unresolved dependency {dependency.name}"),
+      )
     }
 
     if graph.edge_orders_builds(dependency.kind) and levels.get(dependency.name)? >= node.level {
@@ -526,11 +539,19 @@ proc validate_node(
     prior_dependency = dependency
   }
 
-  let expected_local = artifact_key_for(value.target, value.build_epoch, node.package_id, node.recipe_sha256, node.dependencies)?
+  let expected_local = artifact_key_for(
+    value.target,
+    value.build_epoch,
+    node.package_id,
+    node.recipe_sha256,
+    node.dependencies,
+  )?
 
   if types.plan_action_is_build(node.action) {
     if node.remote != null {
-      return Err(types.PmError.PackageContract(f"build plan node {node.name} builds locally but has remote retrieval data"))
+      return Err(
+        types.PmError.PackageContract(f"build plan node {node.name} builds locally but has remote retrieval data"),
+      )
     }
 
     if node.artifact_key != expected_local {
@@ -546,7 +567,9 @@ proc validate_node(
       let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
 
       if node.artifact_key != expected_local and node.artifact_key != expected_legacy {
-        return Err(types.PmError.PackageContract(f"build plan node {node.name} artifact key does not match remote inputs"))
+        return Err(
+          types.PmError.PackageContract(f"build plan node {node.name} artifact key does not match remote inputs"),
+        )
       }
     }
   }
@@ -568,7 +591,13 @@ export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types
   if retrieval == null {
     return false
   } else {
-    let expected_local = artifact_key_for(value.target, value.build_epoch, node.package_id, node.recipe_sha256, node.dependencies)?
+    let expected_local = artifact_key_for(
+      value.target,
+      value.build_epoch,
+      node.package_id,
+      node.recipe_sha256,
+      node.dependencies,
+    )?
 
     if node.artifact_key == expected_local {
       return false
@@ -684,7 +713,7 @@ export proc validate(value: types.BuildPlan) [error] {
 
 pure color(text: Str, code: Str, colors: Bool) -> Str {
   if colors {
-    return f"\u{1b}[{code}m{text}\u{1b}[0m"
+    return f"[{code}m{text}[0m"
   }
 
   text

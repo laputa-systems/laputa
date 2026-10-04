@@ -2603,7 +2603,12 @@ proc scan_discover_batch_parallel(
 }
 
 ## Exported declaration `scan_record_for_dir`.
-export proc scan_record_for_dir(root: Path, config: Kconfig, srcarch: Str, dir: Path) [fs, error] -> Result[ScanRecord] {
+export proc scan_record_for_dir(
+  root: Path,
+  config: Kconfig,
+  srcarch: Str,
+  dir: Path,
+) [fs, error] -> Result[ScanRecord] {
   let scan = scan_discover_dir(root, dir, config, srcarch, default_discover_options())?
   return local_record_record(scan, "")
 }
@@ -3456,7 +3461,10 @@ proc read_archive_plan_tasks(path_value: Path) [fs, error] -> Result[List[make.M
   [task_from_record(row)? for row in stored.tasks]
 }
 
-proc archive_plan_from_summary(summary: ArchivePlanSummaryFile, tasks: List[make.MakeTask]) [error] -> Result[BuiltinArchivePlan] {
+proc archive_plan_from_summary(
+  summary: ArchivePlanSummaryFile,
+  tasks: List[make.MakeTask],
+) [error] -> Result[BuiltinArchivePlan] {
   return {
     tasks: tasks,
     task_specs: [],
@@ -3988,7 +3996,9 @@ proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) [en
       input,
     ],
     deps: deps,
-    argv: [@argv],
+    argv: [
+      @argv,
+    ],
     cwd: p".",
     env: {
       PATH: tool_path,
@@ -4669,7 +4679,9 @@ export proc vmlinux_archive_argv_task(
     ],
     inputs: inputs,
     deps: deps,
-    argv: [@argv],
+    argv: [
+      @argv,
+    ],
     cwd: p".",
     env: {
       PATH: tool_path,
@@ -4728,7 +4740,9 @@ export proc vmlinux_o_argv_task(
       kernel_archive,
     ].extend(libs),
     deps: deps,
-    argv: [@argv],
+    argv: [
+      @argv,
+    ],
     cwd: p".",
     env: {
       PATH: tool_path,
@@ -4812,7 +4826,9 @@ export proc vmlinux_unstripped_argv_task(
       version_obj,
     ].extend(libs),
     deps: deps,
-    argv: [@argv],
+    argv: [
+      @argv,
+    ],
     cwd: p".",
     env: {
       PATH: tool_path,
@@ -6023,7 +6039,9 @@ proc efi_libstub_archive_task(
     ],
     inputs: inputs,
     deps: deps,
-    argv: [@argv],
+    argv: [
+      @argv,
+    ],
     cwd: p".",
     env: {
       PATH: tool_path,

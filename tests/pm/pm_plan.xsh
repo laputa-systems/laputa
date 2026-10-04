@@ -43,8 +43,14 @@ test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx
   let x86_checksum = {arch: "x86_64", sha256: "x86-source"}
   let selected = {...pkg, upstream_sources: [{...source, checksums: [arm_checksum, x86_checksum]}]}
   let baseline = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
-  let arm_changed = {...selected, upstream_sources: [{...source, checksums: [{...arm_checksum, sha256: "changed-arm"}, x86_checksum]}]}
-  let x86_changed = {...selected, upstream_sources: [{...source, checksums: [arm_checksum, {...x86_checksum, sha256: "changed-x86"}]}]}
+  let arm_changed = {
+    ...selected,
+    upstream_sources: [{...source, checksums: [{...arm_checksum, sha256: "changed-arm"}, x86_checksum]}],
+  }
+  let x86_changed = {
+    ...selected,
+    upstream_sources: [{...source, checksums: [arm_checksum, {...x86_checksum, sha256: "changed-x86"}]}],
+  }
 
   test.eq(fingerprint.package_build_input(p".", arm_changed, types.target_x86_64())?, baseline)?
   test.eq(fingerprint.package_build_input(p".", x86_changed, types.target_x86_64())? == baseline, false)?
@@ -116,7 +122,7 @@ test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, erro
   fs.symlink(p"input.txt", fp"{pkg.dir}/files/inside.txt")?
   test.eq(build_input(pkg)? == first, false)?
 
-  for target in [p"../../pm", p"/etc", p"files/../../outside.xsh"] {
+  for target in [../../pm, /etc, p"files/../../outside.xsh"] {
     let link = fp"{pkg.dir}/escape"
     fs.remove(link, missing_ok: true)?
     fs.symlink(target, link)?
@@ -224,7 +230,7 @@ proc expect_plan_rejection(ctx: TestContext, value: types.BuildPlan, expected: S
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail(f"{expected}: malformed plan unexpectedly loaded")?
-    Err(problem) => { assert expected in problem.message }
+    Err(problem) => assert expected in problem.message
   }
 }
 
@@ -303,12 +309,18 @@ test test_build_plan_reports_tuple_reasons_and_rejects_behind_remote [fs, env, e
   let newer = snapshot_replace(snapshot, "runtime-lib", {...remote, ver: "2"})
   let version_build = resolve_plan(value, ["runtime-lib"], older)?
   let release_build = resolve_plan(value, ["runtime-lib"], lower_release)?
-  test.eq(types.plan_action_reason(node_named(version_build, "runtime-lib")?.action), "local version differs from remote 0-1")?
-  test.eq(types.plan_action_reason(node_named(release_build, "runtime-lib")?.action), "local release is above remote 1-0")?
+  test.eq(
+    types.plan_action_reason(node_named(version_build, "runtime-lib")?.action),
+    "local version differs from remote 0-1",
+  )?
+  test.eq(
+    types.plan_action_reason(node_named(release_build, "runtime-lib")?.action),
+    "local release is above remote 1-0",
+  )?
 
   match resolve_plan(value, ["runtime-lib"], newer) {
     Ok(_) => test.fail("behind remote tuple unexpectedly planned")?
-    Err(problem) => { assert "behind remote 2-1" in problem.message }
+    Err(problem) => assert "behind remote 2-1" in problem.message
   }
 }
 
@@ -360,7 +372,11 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
 
   for pkg in original.packages {
     packages = packages.push(
-      if pkg.name == "app" { {...pkg, mkdeps_host: pkg.mkdeps_host.push("runtime-lib")} } else { pkg },
+      if pkg.name == "app" {
+        {...pkg, mkdeps_host: pkg.mkdeps_host.push("runtime-lib")}
+      } else {
+        pkg
+      },
     )
   }
 
@@ -400,7 +416,13 @@ test test_build_plan_rebuilds_dependents_of_rebuilt_dependencies [fs, env, error
     packages: [{...artifact, executor_sha256: plan_test_sha256("other executor")} for artifact in snapshot.packages],
   }
   let reused = resolve_plan(value, ["app"], other_executor)?
-  test.eq([types.plan_action_text(node.action) for node in reused.nodes], ["reuse-remote", "reuse-remote", "reuse-remote", "reuse-remote"])?
+  test.eq(
+    [
+      types.plan_action_text(node.action)
+      for node in reused.nodes
+    ],
+    ["reuse-remote", "reuse-remote", "reuse-remote", "reuse-remote"],
+  )?
 }
 
 test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |ctx|
@@ -418,19 +440,23 @@ test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("unknown plan format unexpectedly loaded")?
-    Err(problem) => { assert "unsupported build plan format unknown-build-plan" in problem.message }
+    Err(problem) => assert "unsupported build plan format unknown-build-plan" in problem.message
   }
 
   fs.write(path_value, original.replace(value.repository_digest, "corrupt-repository-digest"))?
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("corrupt plan digest unexpectedly loaded")?
-    Err(problem) => { assert "digest does not match" in problem.message }
+    Err(problem) => assert "digest does not match" in problem.message
   }
 }
 
 test test_build_plan_json_rejects_duplicate_nodes [fs, env, error] { |ctx|
-  expect_plan_rejection(ctx, resolve_plan(plan_catalog(ctx, "plan-duplicate")?, ["app"], empty_remote_snapshot())?, "duplicate node host-tool")?
+  expect_plan_rejection(
+    ctx,
+    resolve_plan(plan_catalog(ctx, "plan-duplicate")?, ["app"], empty_remote_snapshot())?,
+    "duplicate node host-tool",
+  )?
 }
 
 test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ctx|
@@ -457,7 +483,7 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("dependency key mismatch unexpectedly loaded")?
-    Err(problem) => { assert "dependency host-tool artifact key does not match its referenced node" in problem.message }
+    Err(problem) => assert "dependency host-tool artifact key does not match its referenced node" in problem.message
   }
 }
 
@@ -469,7 +495,7 @@ test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, 
 
   match plan.resolve(value, empty_remote_snapshot(), unsupported, ["app"], false) {
     Ok(_) => test.fail("unsupported target unexpectedly planned")?
-    Err(problem) => { assert "unsupported target" in problem.message }
+    Err(problem) => assert "unsupported target" in problem.message
   }
 }
 
@@ -511,10 +537,19 @@ proc runtime_only_plan_catalog(ctx: TestContext, name: Str) [fs, env, error] -> 
 test test_runtime_only_dependency_is_planned_but_neither_ordered_nor_keyed [fs, env, error] { |ctx|
   let value = runtime_only_plan_catalog(ctx, "plan-runtime-only")?
   let initial = resolve_plan(value, ["consumer"], empty_remote_snapshot())?
-  test.eq([node.name for node in initial.nodes], ["host-tool", "runtime-lib", "service", "target-sdk", "app", "consumer"])?
+  test.eq(
+    [
+      node.name
+      for node in initial.nodes
+    ],
+    ["host-tool", "runtime-lib", "service", "target-sdk", "app", "consumer"],
+  )?
   let service = node_named(initial, "service")?
   test.eq(service.level, 0)?
-  test.eq(service.dependencies, [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}])?
+  test.eq(
+    service.dependencies,
+    [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}],
+  )?
 
   let path_value = fp"{test.temp_dir(ctx, name: "plan-runtime-only-json")?}/plan.json"
   plan_json.write_plan(path_value, initial)?

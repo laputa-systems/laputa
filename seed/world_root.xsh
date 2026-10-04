@@ -8,7 +8,6 @@
 # Alpine's chroot lives in /usr/sbin, which package-tools leaves off PATH.
 const chroot = "/usr/sbin/chroot"
 
-
 ## Errors that fail the root inspection.
 error WorldRootError = Failed(message: Str) : ProcessFailure
 
@@ -58,7 +57,11 @@ proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport
 
   let headers = run.text readelf -lW $file ?
   let dynamic = run.text readelf -dW $file ?
-  let report: ElfReport = {path: f"/{file.strip_prefix(root)?.display()}", interpreter: elf_interpreter(headers), needed: elf_needed(dynamic)}
+  let report: ElfReport = {
+    path: f"/{file.strip_prefix(root)?.display()}",
+    interpreter: elf_interpreter(headers),
+    needed: elf_needed(dynamic),
+  }
   report
 }
 
@@ -122,7 +125,10 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   # The root's own xsh must run a script from inside it. The probe lands after
   # the receipt was copied; the throwaway root is never used again.
   fs.mkdir(fp"{root}/tmp")?
-  fs.write(fp"{root}/tmp/world-root-probe.xsh", "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n")?
+  fs.write(
+    fp"{root}/tmp/world-root-probe.xsh",
+    "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n",
+  )?
   let greeting = run.text $chroot $root /bin/xsh /tmp/world-root-probe.xsh ?
   print greeting.trim()
   print f"root files={files.len()} elf={elves.len()} dynamic={dynamic.len()} failures={failures.len()}"

@@ -69,7 +69,10 @@ proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [e
 
   for dependency in metadata.runtime_only_deps {
     if dependency in build_dependencies {
-      return package_contract_error(name, f"runtime_only_deps entry {dependency} is also a build dependency; a package the build uses belongs in deps")
+      return package_contract_error(
+        name,
+        f"runtime_only_deps entry {dependency} is also a build dependency; a package the build uses belongs in deps",
+      )
     }
   }
 }
@@ -211,7 +214,6 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) [error] -> Result[Lis
 }
 
 pure select_filetree(metadata: PackageMetadata, arch: Str) -> List[Record] {
-
   if arch == "aarch64" and metadata.has_filetree_aarch64 {
     return metadata.filetree_aarch64
   }
@@ -305,6 +307,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   if arch == "" {
     return Err(types.PmError.PackageContract("recipe target is unsupported"))
   }
+
   let pkgbuild = fp"{dir}/PKGBUILD.xsh"
 
   if ! fs.exists(pkgbuild)? {
@@ -332,14 +335,20 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   validate_runtime_only_dependencies(name, metadata)?
 
   if is_production_recipe_directory(dir) and dir.name != name {
-    return Err(types.PmError.PackageContract(f"{name}: production recipe directory {dir.name} does not match package name"))
+    return Err(
+      types.PmError.PackageContract(f"{name}: production recipe directory {dir.name} does not match package name"),
+    )
   }
 
   if is_production_recipe_directory(dir) and ! metadata.has_package_kind {
     return Err(types.PmError.PackageContract(f"{name}: production recipe must export package_kind"))
   }
 
-  let kind = if metadata.has_package_kind { types.parse_package_kind(metadata.package_kind)? } else { types.package_payload() }
+  let kind = if metadata.has_package_kind {
+    types.parse_package_kind(metadata.package_kind)?
+  } else {
+    types.package_payload()
+  }
   let upstream_sources = decode_upstream_sources(name, metadata.upstream_sources)?
   let filetree = decode_filetree(name, select_filetree(metadata, arch))?
 
@@ -394,17 +403,26 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
   if ! ("prepare" in dynamic.keys()) { return }
 
   match dynamic.require(hooks.PrepareFilesystem) {
-    Ok(filesystem_hook) => { filesystem_hook.prepare(src)?; return }
+    Ok(filesystem_hook) => {
+      filesystem_hook.prepare(src)?
+      return
+    }
     Err(_) => {}
   }
 
   match dynamic.require(hooks.PrepareFilesystemEnvironment) {
-    Ok(environment_hook) => { environment_hook.prepare(src)?; return }
+    Ok(environment_hook) => {
+      environment_hook.prepare(src)?
+      return
+    }
     Err(_) => {}
   }
 
   match dynamic.require(hooks.PrepareProcessesEnvironment) {
-    Ok(process_hook) => { process_hook.prepare(src)?; return }
+    Ok(process_hook) => {
+      process_hook.prepare(src)?
+      return
+    }
     Err(_) => {}
   }
 

@@ -93,5 +93,4 @@ export proc build(dest: Path) [fs, error] {
   fs.mkdir(fp"{dest}/etc/network/if-down.d")?
   fs.mkdir(fp"{dest}/etc/network/if-pre-down.d")?
   fs.mkdir(fp"{dest}/etc/network/if-post-down.d")?
-
 }

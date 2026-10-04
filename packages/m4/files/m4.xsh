@@ -145,7 +145,7 @@ proc take_literal_chunk(text: Str, oq: Str, cs: Str) [error] -> Result[TextRest]
 
   if cs == "#" and oq == "`" {
     match regex_captures(text, "(?s)^([^A-Za-z_`#]+)(.*)") {
-      Ok(c) =>       return {content: c[1], rest: c[2]} when c.len() >= 3
+      Ok(c) => return {content: c[1], rest: c[2]} when c.len() >= 3
       Err(_) => {}
     }
   }

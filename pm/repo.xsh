@@ -10,27 +10,31 @@ use util
 # Keep the required tuple typed, then accept only that one omitted legacy field
 # at this boundary.  New metadata must name an explicit valid kind.
 type RepoArtifactMetadataDto = {name: Str, ver: Str, rel: Str}
+
 type RepoIndexMerge = {index: List[types.RemotePackage], already_published: Bool}
+
 type RepoPublishStage = {publication: types.RepoPublication, entry: types.RemotePackage, metadata: Path}
 
-proc repo_verify_node_receipt(
-  value: types.BuildPlan,
-  node: types.PlanNode,
-  receipt: types.ArtifactReceipt,
-) [error] {
+proc repo_verify_node_receipt(value: types.BuildPlan, node: types.PlanNode, receipt: types.ArtifactReceipt) [error] {
   let dependency_keys = store.receipt_dependency_keys(node)
   let runtime_dependency_keys = store.receipt_runtime_dependency_keys(node)
 
   if receipt.key != node.artifact_key or receipt.target != value.target or receipt.package_name != node.name or receipt.package_id != node.package_id or receipt.recipe_sha256 != node.recipe_sha256 or receipt.dependency_keys != dependency_keys or receipt.runtime_dependency_keys != runtime_dependency_keys {
-    return Err(types.PmError.PackageContract(f"artifact receipt {node.artifact_key} does not match BuildPlan node {node.package_id}"))
+    return Err(
+      types.PmError.PackageContract(f"artifact receipt {node.artifact_key} does not match BuildPlan node {node.package_id}"),
+    )
   }
 
   if types.plan_action_is_build(node.action) {
     if receipt.origin != types.artifact_origin_built() {
-      return Err(types.PmError.PackageContract(f"BuildPlan build node {node.package_id} is not a locally proved artifact"))
+      return Err(
+        types.PmError.PackageContract(f"BuildPlan build node {node.package_id} is not a locally proved artifact"),
+      )
     }
   } else if receipt.origin != types.artifact_origin_remote() {
-    return Err(types.PmError.PackageContract(f"BuildPlan remote node {node.package_id} is not a verified imported artifact"))
+    return Err(
+      types.PmError.PackageContract(f"BuildPlan remote node {node.package_id} is not a verified imported artifact"),
+    )
   }
 }
 
@@ -71,7 +75,11 @@ proc repo_verified_proof_path(
   let reproved = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
 
   if ! fs.exists(reproved)? {
-    return Err(types.PmError.PackageTarball(f"{node.package_id} is missing proof {node.proof_key}; execute the BuildPlan before publication"))
+    return Err(
+      types.PmError.PackageTarball(
+        f"{node.package_id} is missing proof {node.proof_key}; execute the BuildPlan before publication",
+      ),
+    )
   }
 
   pm_proof.verify_artifact_receipt(reproved, node, receipt.payload_sha256)?
@@ -123,7 +131,11 @@ proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, outp
   metadata
 }
 
-proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: Path) [fs, error] -> Result[types.RemotePackage] {
+proc repo_publication_entry(
+  value: types.RepoPublication,
+  arch: Str,
+  metadata: Path,
+) [fs, error] -> Result[types.RemotePackage] {
   let node = value.node
   let payload_rel = util.remote_binary_rel(arch, node.name, node.ver, node.rel, node.artifact_key)
   let metadata_rel = util.remote_metadata_rel(arch, node.name, node.ver, node.rel, node.artifact_key, node.proof_key)
@@ -137,9 +149,21 @@ proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: P
     ver: node.ver,
     rel: node.rel,
     deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()],
-    runtime_only_deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()],
-    mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
-    mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
+    runtime_only_deps: [
+      dependency.name
+      for dependency in node.dependencies
+      if dependency.kind == types.dependency_runtime_only()
+    ],
+    mkdeps_host: [
+      dependency.name
+      for dependency in node.dependencies
+      if dependency.kind == types.dependency_build_host()
+    ],
+    mkdeps_target: [
+      dependency.name
+      for dependency in node.dependencies
+      if dependency.kind == types.dependency_build_target()
+    ],
     sha256: if value.kind == types.package_meta() { "" } else { hash.sha256(value.payload)?.hex() },
     size: if value.kind == types.package_meta() { 0 } else { fs.metadata(value.payload)?.size },
     tarball: if value.kind == types.package_meta() { "" } else { payload_rel.display() },
@@ -167,7 +191,10 @@ proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage
 # the row; a row behind the remote's ver-rel is refused, because publishing it
 # would move the index backwards. The same keys with different bytes (another
 # store's payload or executor) fail at the immutable object upload instead.
-proc repo_merge_publication(index: List[types.RemotePackage], entry: types.RemotePackage) [error] -> Result[RepoIndexMerge] {
+proc repo_merge_publication(
+  index: List[types.RemotePackage],
+  entry: types.RemotePackage,
+) [error] -> Result[RepoIndexMerge] {
   var updated: List[types.RemotePackage] = []
   var replaced = false
 
@@ -204,7 +231,12 @@ proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token
 }
 
 ## Publishes a verified repository snapshot: immutable package objects first and the remote index last.
-export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: Str, work: Path) [fs, net, time, error] {
+export proc publish(
+  repo_snapshot: types.RepoSnapshot,
+  remote_repo: Str,
+  token: Str,
+  work: Path,
+) [fs, net, time, error] {
   let arch = types.pm_target_arch(repo_snapshot.target)
 
   if repo_snapshot.format != "laputa-repo-snapshot-1" or arch == "" {
@@ -218,7 +250,9 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
   # The loopback local mirror and file trees need no credentials; any other
   # network remote does.
   if ! util.is_local_repo_url(remote_repo) and token.trim() == "" {
-    return Err(types.PmError.Auth("repository publication needs LAPUTA_TOKEN for network remotes other than the local mirror"))
+    return Err(
+      types.PmError.Auth("repository publication needs LAPUTA_TOKEN for network remotes other than the local mirror"),
+    )
   }
 
   fs.mkdir(work)?
@@ -228,7 +262,9 @@ export proc publish(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: 
     let verified = store.verify_receipt(publication.receipt)?
 
     if verified != publication.receipt {
-      return Err(types.PmError.PackageContract(f"repository snapshot receipt changed for {publication.node.package_id}"))
+      return Err(
+        types.PmError.PackageContract(f"repository snapshot receipt changed for {publication.node.package_id}"),
+      )
     }
 
     if publication.receipt.origin == types.artifact_origin_built() {

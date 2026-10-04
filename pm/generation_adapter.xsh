@@ -14,6 +14,7 @@ use util
 error GenerationAdapterError = Failed(message: Str) : InvalidData
 
 type GenerationAdapterArtifactDto = {package_name: Str, package_id: Str, artifact_key: Str}
+
 type GenerationAdapterPlanDto = {
   format: Str,
   target: Str,
@@ -25,8 +26,16 @@ type GenerationAdapterPlanDto = {
   artifacts: List[GenerationAdapterArtifactDto],
   generation_sha256: Str,
 }
+
 type GenerationAdapterMetadataFileDto = {path: Str, kind: Str, mode: Int, sha256: Str, target: Str}
-type GenerationAdapterMetadataDto = {name: Str, ver: Str, rel: Str, package_kind: Str, files: List[GenerationAdapterMetadataFileDto]}
+
+type GenerationAdapterMetadataDto = {
+  name: Str,
+  ver: Str,
+  rel: Str,
+  package_kind: Str,
+  files: List[GenerationAdapterMetadataFileDto],
+}
 
 ## The only PM-specific result exposed to an external image/profile process.
 export type GenerationAdapterResult = {generation_root: Path}
@@ -40,7 +49,14 @@ pure generation_adapter_plan_dto(value: types.GenerationPlan) -> GenerationAdapt
     overlay_sha256: value.profile.overlay_sha256,
     replacements: value.profile.replacements,
     runtime_roots: value.runtime_roots,
-    artifacts: [{package_name: item.package_name, package_id: item.package_id, artifact_key: item.artifact_key} for item in value.artifacts],
+    artifacts: [
+      {
+        package_name: item.package_name,
+        package_id: item.package_id,
+        artifact_key: item.artifact_key,
+      }
+      for item in value.artifacts
+    ],
     generation_sha256: value.generation_sha256,
   }
 }
@@ -86,8 +102,11 @@ proc generation_adapter_ensure_generation(
   if fs.exists(root)? {
     let receipt = pm_generation.read_generation_receipt(root)?
     if receipt.generation_sha256 != value.generation_sha256 or receipt.build_plan_sha256 != value.build_plan_sha256 {
-      return Err(GenerationAdapterError.Failed(f"existing generation {value.generation_sha256} does not match the saved plan"))
+      return Err(
+        GenerationAdapterError.Failed(f"existing generation {value.generation_sha256} does not match the saved plan"),
+      )
     }
+
     pm_generation.verify_generation(root, receipt)?
     generation_adapter_publish_receipt(root, receipt, receipt_output)?
     return receipt
@@ -99,7 +118,10 @@ proc generation_adapter_ensure_generation(
   receipt
 }
 
-proc generation_adapter_require_no_forbidden_packages(receipt: types.GenerationReceipt, forbidden_packages: List[Str]) [error] {
+proc generation_adapter_require_no_forbidden_packages(
+  receipt: types.GenerationReceipt,
+  forbidden_packages: List[Str],
+) [error] {
   for artifact in receipt.artifacts {
     if artifact.package_name in forbidden_packages {
       return Err(GenerationAdapterError.Failed(f"generation includes forbidden package {artifact.package_name}"))
@@ -109,10 +131,7 @@ proc generation_adapter_require_no_forbidden_packages(receipt: types.GenerationR
 
 # Validate the concrete executor result before this adapter crosses from PM's
 # typed graph into the primitive-only profile process.
-proc generation_adapter_completed_build(
-  expected: types.BuildPlan,
-  actual: types.BuildResult,
-) [error] {
+proc generation_adapter_completed_build(expected: types.BuildPlan, actual: types.BuildResult) [error] {
   if actual.format != "laputa-build-result-1" or actual.plan_sha256 != expected.plan_sha256 {
     return Err(GenerationAdapterError.Failed("executor result does not match the saved BuildPlan"))
   }
@@ -129,6 +148,7 @@ proc generation_adapter_completed_build(
     if receipt.key != node.artifact_key or receipt.package_name != node.name or receipt.package_id != node.package_id {
       return Err(GenerationAdapterError.Failed("executor receipt does not match its BuildPlan node"))
     }
+
     index += 1
   }
 }
@@ -194,6 +214,7 @@ export proc generation_adapter_copy_manifest_file(
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
     return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
   }
+
   if hash.sha256(source)?.hex() != manifest.sha256 {
     return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for {relative_path}"))
   }
@@ -222,10 +243,28 @@ export proc generation_adapter_execute_profile(
   forbidden_packages: List[Str],
 ) [fs, net, process, env, time, error] -> Result[GenerationAdapterResult] {
   let build_plan = pm_plan_json.read(build_plan_path)?
-  let execution: types.BuildResult = pm_execute.build_plan(build_plan, repo_root, store_root, pm_remote.repo_url(), jobs)?
+  let execution: types.BuildResult = pm_execute.build_plan(
+    build_plan,
+    repo_root,
+    store_root,
+    pm_remote.repo_url(),
+    jobs,
+  )?
   generation_adapter_completed_build(build_plan, execution)?
-  let generation = generation_adapter_plan(build_plan_path, runtime_roots, profile_name, overlay_root, generation_plan_output)?
-  let receipt = generation_adapter_ensure_generation(generation, store_root, output_parent, overlay_root, generation_receipt_output)?
+  let generation = generation_adapter_plan(
+    build_plan_path,
+    runtime_roots,
+    profile_name,
+    overlay_root,
+    generation_plan_output,
+  )?
+  let receipt = generation_adapter_ensure_generation(
+    generation,
+    store_root,
+    output_parent,
+    overlay_root,
+    generation_receipt_output,
+  )?
   generation_adapter_require_no_forbidden_packages(receipt, forbidden_packages)?
   {generation_root: fp"{output_parent}/{receipt.generation_sha256}"}
 }

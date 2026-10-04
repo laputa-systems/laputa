@@ -28,14 +28,28 @@ export let upstream_sources = [
   {
     source: p"repository/pm.xsh",
     kind: "auto",
-    architectures: ["all"],
-    checksums: [{arch: "all", sha256: "SKIP"}],
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
   },
   {
     source: p"repository/pm => pm",
     kind: "auto",
-    architectures: ["all"],
-    checksums: [{arch: "all", sha256: "SKIP"}],
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
   },
 ]
 

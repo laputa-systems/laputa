@@ -29,8 +29,15 @@ export let upstream_sources = [
   {
     source: p"repository/.out/seed/ARCH => seed",
     kind: "auto",
-    architectures: ["all"],
-    checksums: [{arch: "all", sha256: "SKIP"}],
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
   },
 ]
 

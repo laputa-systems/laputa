@@ -21,7 +21,7 @@ proc main(repo_root: Path, source_cache: Path, dest: Path) [fs, net, process, en
   fs.mkdir(src)?
   env ({LAPUTA_SOURCE_CACHE: source_cache.display()}) {
     sources.prepare_package_source_tree(pkg, src)?
-  } ?
+  }?
   recipe.call_prepare(pkg, src)?
   fs.remove(dest, missing_ok: true)?
   fs.mkdir(dest)?

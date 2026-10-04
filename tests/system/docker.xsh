@@ -85,6 +85,7 @@ test test_container_xsh_and_core_come_from_one_seed [error] {
   for product in ["xsh", "xshi", "xsht"] {
     assert f"type=bind,src=/work/laputa/.out/seed/aarch64/{product},dst=/bin/{product},readonly" in argv
   }
+
   assert "type=bind,src=/work/laputa/.out/seed/aarch64/core,dst=/usr/lib/xsh/core,readonly" in argv
   assert ! (argv |> any "/work/xsh" in .)
 }

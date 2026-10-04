@@ -8,7 +8,11 @@ proc main(root: Path = /rootfs) [fs, error] {
   # ifup/ifdown belong to the runtime-only `xsh` dependency, which a package
   # proof root does not hold; generations install it beside this payload.
   proof.ensure(fs.metadata(fp"{root}/etc/network/if-pre-down.d")?.kind == "dir", "laputa-net", "missing if-pre-down.d")?
-  proof.ensure(fs.metadata(fp"{root}/etc/network/if-post-down.d")?.kind == "dir", "laputa-net", "missing if-post-down.d")?
+  proof.ensure(
+    fs.metadata(fp"{root}/etc/network/if-post-down.d")?.kind == "dir",
+    "laputa-net",
+    "missing if-post-down.d",
+  )?
   print "laputa-net ok"
 }
 

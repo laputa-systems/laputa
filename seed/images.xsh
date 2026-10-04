@@ -154,7 +154,11 @@ proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, 
 }
 
 ## Construct the networked host-tools build.
-export proc host_tools_build_argv(docker: Path, laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[List[Str]] {
+export proc host_tools_build_argv(
+  docker: Path,
+  laputa_root: Path,
+  value: xsh_seed.SeedArch,
+) [fs, error] -> Result[List[Str]] {
   [
     docker.display(),
     "build",
@@ -189,7 +193,11 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
 }
 
 ## Make the host-tools base available offline: present, or loaded from `.cache/images/`.
-export proc ensure_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.SeedArch) [fs, process, error] -> Result[Str] {
+export proc ensure_host_tools(
+  docker: Path,
+  laputa_root: Path,
+  value: xsh_seed.SeedArch,
+) [fs, process, error] -> Result[Str] {
   let tag = host_tools_tag(laputa_root, value)?
 
   return tag when image_exists(docker, tag, laputa_root)?
@@ -266,7 +274,11 @@ export pure package_tools_build_argv(
 }
 
 ## Ensure the package-tools image for one architecture exists, building it offline when its key is new.
-export proc ensure_package_tools(docker: Path, laputa_root: Path, value: xsh_seed.SeedArch) [fs, process, env, error] -> Result[Str] {
+export proc ensure_package_tools(
+  docker: Path,
+  laputa_root: Path,
+  value: xsh_seed.SeedArch,
+) [fs, process, env, error] -> Result[Str] {
   let tag = package_tools_tag(laputa_root, value)?
 
   return tag when image_exists(docker, tag, laputa_root)?

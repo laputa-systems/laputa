@@ -11,7 +11,7 @@ use pm.types as pm_types
 error ContainerBuildError = Failed(message: Str) : InvalidData
 
 pure container_output_root() -> Path {
-  p"/output"
+  /output
 }
 
 pure container_build_plan_path() -> Path {
@@ -27,15 +27,15 @@ pure container_overlay_root(name: Str) -> Path {
 }
 
 pure container_guest_proof_source() -> Path {
-  p"/src/laputa/guest/qemu-dwl-foot-proof.xsh"
+  /src/laputa/guest/qemu-dwl-foot-proof.xsh
 }
 
 pure container_store_root() -> Path {
-  p"/artifacts"
+  /artifacts
 }
 
 pure container_repo_root() -> Path {
-  p"/src/laputa"
+  /src/laputa
 }
 
 # `/output` is a host bind mount and may be case-folding (notably on macOS),
@@ -63,7 +63,7 @@ pure container_work_disk(work: Path) -> Path {
 }
 
 proc container_load_profile(name: Str) [fs, error] -> Result[types.SystemProfile] {
-  system_profile.load_system_profile(name, p"/src/laputa/profiles")?
+  system_profile.load_system_profile(name, /src/laputa/profiles)?
 }
 
 proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, error] -> Result[Path] {
@@ -126,27 +126,33 @@ pure container_pm_argv(args: List[Str]) -> List[Str] {
 proc container_pm(args: List[Str]) [fs, process, error] {
   let status = process.run(
     process.command_argv(
-      p"/bin/xsh",
+      /bin/xsh,
       container_pm_argv(args),
       container_repo_root(),
     ),
   )?
 
   if ! status.ok {
-    return Err(ContainerBuildError.Failed(f"PM public command failed: {args.join(" ")}; the mounted PM checkout may not support this command"))
+    return Err(
+      ContainerBuildError.Failed(
+        f"PM public command failed: {args.join(" ")}; the mounted PM checkout may not support this command",
+      ),
+    )
   }
 }
 
 proc container_pm_repo_build(build_plan: Path, jobs: Int) [fs, net, process, env, time, error] {
-  container_pm([
-    "repo",
-    "build",
-    build_plan.display(),
-    "--store",
-    container_store_root().display(),
-    "--jobs",
-    f"{jobs}",
-  ])?
+  container_pm(
+    [
+      "repo",
+      "build",
+      build_plan.display(),
+      "--store",
+      container_store_root().display(),
+      "--jobs",
+      f"{jobs}",
+    ],
+  )?
 }
 
 proc container_generation_plan(
@@ -158,6 +164,7 @@ proc container_generation_plan(
   if overlay_profile.name != profile.name {
     return Err(ContainerBuildError.Failed("generation overlay profile does not match the system profile"))
   }
+
   pm_generation.plan_profile(pm_plan_json.read(build_plan)?, profile.package_roots, overlay_profile)?
 }
 
@@ -165,19 +172,21 @@ proc container_generation_plan(
 # Laputa owns no PM archive logic: the child PM process verifies and extracts the
 # immutable artifact before this container can publish an image.
 proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, output: Path) [fs, process, error] {
-  container_pm([
-    "store",
-    "extract",
-    build_plan.display(),
-    "--store",
-    container_store_root().display(),
-    "--package",
-    profile.kernel_package,
-    "--path",
-    profile.kernel_path.display(),
-    "--output",
-    output.display(),
-  ])?
+  container_pm(
+    [
+      "store",
+      "extract",
+      build_plan.display(),
+      "--store",
+      container_store_root().display(),
+      "--package",
+      profile.kernel_package,
+      "--path",
+      profile.kernel_path.display(),
+      "--output",
+      output.display(),
+    ],
+  )?
 
   if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or fs.metadata(output)?.size <= 0 {
     return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel {profile.kernel_path}"))
@@ -185,12 +194,16 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
 }
 
 proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, error] {
-  image.image_write_rootfs(root, p"/src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh", rootfs)?
+  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, rootfs)?
   image.write_disk(rootfs, disk)?
   image.verify_disk(disk, fs.metadata(rootfs)?.size)?
 }
 
-proc container_system_key(build_plan: Path, generation_manifest: Path, profile: types.SystemProfile) [fs, error] -> Result[Str] {
+proc container_system_key(
+  build_plan: Path,
+  generation_manifest: Path,
+  profile: types.SystemProfile,
+) [fs, error] -> Result[Str] {
   let manifest = json.read(generation_manifest)?.require(Record)?
   let generation_sha256: Str = manifest.get("generation_sha256")?.require()?
   let plan_value = json.read(build_plan)?.require(Record)?
@@ -202,10 +215,16 @@ proc container_system_key(build_plan: Path, generation_manifest: Path, profile: 
       kernel_key = node.get("artifact_key")?.require(Str)?
     }
   }
+
   if generation_sha256.count_chars() != 64 or kernel_key.count_chars() != 64 {
     return Err(ContainerBuildError.Failed("saved plan or generation manifest has an invalid system identity"))
   }
-  bytes.from_text(f"laputa-qemu-system-1\ngeneration\t{generation_sha256}\nkernel\t{kernel_key}\nimage-format-epoch\t1\n").sha256().hex()
+
+  bytes.from_text(
+    f"laputa-qemu-system-1\ngeneration\t{generation_sha256}\nkernel\t{kernel_key}\nimage-format-epoch\t1\n",
+  )
+    .sha256()
+    .hex()
 }
 
 proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, error] {
@@ -233,6 +252,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
   if saved_generation_plan != container_generation_plan(build_plan, profile, overlay)? {
     return Err(ContainerBuildError.Failed("saved generation plan differs from the current BuildPlan or overlay"))
   }
+
   container_pm_repo_build(build_plan, jobs)?
   let root = fp"{work}/generation"
   let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?
@@ -240,6 +260,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
   if ! fs.exists(embedded_manifest)? or fs.metadata(embedded_manifest)?.kind != "file" {
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
   }
+
   fs.copy(embedded_manifest, container_work_generation_manifest(work))?
   container_require_no_forbidden_sonames(root, profile)?
   container_extract_kernel(build_plan, profile, container_work_kernel(work))?

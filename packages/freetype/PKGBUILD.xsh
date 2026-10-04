@@ -342,7 +342,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     cd build {
       run $cmake "-P" "cmake_install.cmake" ?
     }
-  } ?
+  }?
 
   fs.remove(fp"{dest}/usr/share/aclocal", missing_ok: true)?
   fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?

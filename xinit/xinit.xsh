@@ -1640,7 +1640,9 @@ proc mark_unit_dead(
 
   run_finish(unit)?
 
-  let should_restart = unit.service.restart_mode == "always" or (unit.service.restart_mode == "on_failure" and ! child_status.exited_with(0))
+  let should_restart = unit.service.restart_mode == "always" or (unit.service.restart_mode == "on_failure" and ! child_status.exited_with(
+    0,
+  ))
 
   if ! should_restart {
     let stopped: ServiceUnit = {

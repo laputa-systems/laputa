@@ -59,7 +59,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       LD_LIBRARY_PATH: host_ld_library_path,
     }) {
       run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap" ?
-    } ?
+    }?
   } else {
     run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap" ?
   }
@@ -103,7 +103,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
       fs.write(build_ninja, patched_ninja)?
       run "build/muon-bootstrap" "-C" "build" "samu" ?
-    } ?
+    }?
   } else {
     run "build/muon-bootstrap" ${setup_args} ?
     run "build/muon-bootstrap" "-C" "build" "samu" ?

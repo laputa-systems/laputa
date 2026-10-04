@@ -39,6 +39,7 @@ test test_publish_bundle_switches_current_only_after_a_complete_verified_directo
 """,
     )?
   }
+
   let key = bytes.from_text("system bundle").sha256().hex()
   let files = [
     {

@@ -64,7 +64,9 @@ proc execute_require_receipt(
   let expected_runtime_dependencies = store.receipt_runtime_dependency_keys(node)
 
   if receipt.target != plan_value.target or receipt.key != node.artifact_key or receipt.package_name != node.name or receipt.package_id != node.package_id or receipt.recipe_sha256 != node.recipe_sha256 or receipt.dependency_keys != expected_dependencies or receipt.runtime_dependency_keys != expected_runtime_dependencies {
-    return Err(types.PmError.PackageContract(f"stored artifact {node.artifact_key} does not match plan node {node.package_id}"))
+    return Err(
+      types.PmError.PackageContract(f"stored artifact {node.artifact_key} does not match plan node {node.package_id}"),
+    )
   }
 }
 
@@ -76,7 +78,10 @@ proc execute_receipt(context: ExecuteContext, key: Str) [fs, error] -> Result[ty
   store.lookup(context.store_root, key)
 }
 
-proc execute_receipt_closure(context: ExecuteContext, keys: List[Str]) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+proc execute_receipt_closure(
+  context: ExecuteContext,
+  keys: List[Str],
+) [fs, error] -> Result[List[types.ArtifactReceipt]] {
   var pending = keys |> sort
   var index = 0
   var seen: Map[Bool] = {}
@@ -154,7 +159,7 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     sources.prepare_package_source_tree(isolated_pkg, source)?
-  } ?
+  }?
 
   # Builds are native, so the composed build root is also the target root.
   # Recipes resolve target files through LAPUTA_ROOT and build tools through
@@ -166,7 +171,7 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     pm_build.build_prepared_package(recipe_dir, source, dest, payload)?
-  } ?
+  }?
 
   let built = local.load_built_package_from_dest(isolated_pkg, node.package_id, payload, dest)?
   local.write_package_metadata(metadata, target_arch, built, executor)?
@@ -224,7 +229,11 @@ proc execute_run_proof(
     return Ok()
   }
 
-  let runtime_keys = [dependency.artifact_key for dependency in node.dependencies if dependency.kind == types.dependency_runtime()]
+  let runtime_keys = [
+    dependency.artifact_key
+    for dependency in node.dependencies
+    if dependency.kind == types.dependency_runtime()
+  ]
   let runtime_artifacts = execute_receipt_closure(context, runtime_keys)?
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
@@ -237,12 +246,15 @@ proc execute_run_proof(
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {
     pm_proof.run_artifact_proof(proof_root, pkg)?
-  } ?
+  }?
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
   return Ok()
 }
 
-proc execute_build_local(context: ExecuteContext, node: types.PlanNode) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+proc execute_build_local(
+  context: ExecuteContext,
+  node: types.PlanNode,
+) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
@@ -270,12 +282,16 @@ proc execute_build_local(context: ExecuteContext, node: types.PlanNode) [fs, net
     Ok(_) => {}
     Err(problem) => return Err(problem)
   }
+
   let receipt = store.commit(context.plan.target, context.store_root, node, staged)?
   execute_require_receipt(context.plan, node, receipt)?
   receipt
 }
 
-proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) [fs, process, env, error] -> Result[types.ArtifactReceipt] {
+proc execute_existing_local(
+  context: ExecuteContext,
+  node: types.PlanNode,
+) [fs, process, env, error] -> Result[types.ArtifactReceipt] {
   let receipt = store.lookup(context.store_root, node.artifact_key)?
   execute_require_receipt(context.plan, node, receipt)?
 
@@ -300,9 +316,14 @@ proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) [fs, 
   receipt
 }
 
-proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) [fs, net, error] -> Result[types.ArtifactReceipt] {
+proc execute_remote_node(
+  context: ExecuteContext,
+  node: types.PlanNode,
+) [fs, net, error] -> Result[types.ArtifactReceipt] {
   if node.remote == null {
-    return Err(types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"))
+    return Err(
+      types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"),
+    )
   }
 
   let cache_handle = fs.tempdir()?
@@ -314,7 +335,10 @@ proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) [fs, net
 }
 
 # Executes one node of a plan that `build_plan` already validated.
-proc execute_node(context: ExecuteContext, node: types.PlanNode) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+proc execute_node(
+  context: ExecuteContext,
+  node: types.PlanNode,
+) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
   if fs.exists(store.artifact_path(context.store_root, node.artifact_key))? {
     return execute_existing_local(context, node)
   }
@@ -367,10 +391,7 @@ proc execute_parallel_level_worker(
   }
 }
 
-proc execute_parallel_level_require_workers(
-  nodes: List[types.PlanNode],
-  status: Path,
-) [fs, error] {
+proc execute_parallel_level_require_workers(nodes: List[types.PlanNode], status: Path) [fs, error] {
   for node in nodes {
     let error_marker = execute_parallel_level_error_marker(status, node)
 
@@ -379,7 +400,7 @@ proc execute_parallel_level_require_workers(
       return Err(types.PmError.ExtensionFailed(f"parallel executor node {node.package_id} failed: {message}"))
     }
 
-    if !fs.exists(execute_parallel_level_ok_marker(status, node))? {
+    if ! fs.exists(execute_parallel_level_ok_marker(status, node))? {
       return Err(types.PmError.PackageContract(f"parallel executor node {node.package_id} did not report completion"))
     }
   }

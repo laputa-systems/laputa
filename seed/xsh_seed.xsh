@@ -355,7 +355,10 @@ export proc xsh_seed_build(
   fs.mkdir(out)?
 
   for product in xsh_seed_binaries {
-    xsh_seed_publish_binary(fp"{xsh_seed_cargo_target(laputa_root)}/{value.triple}/release/{product}", fp"{out}/{product}")?
+    xsh_seed_publish_binary(
+      fp"{xsh_seed_cargo_target(laputa_root)}/{value.triple}/release/{product}",
+      fp"{out}/{product}",
+    )?
   }
 
   let core_archive = fp"{out}/core.tar.xz"
@@ -379,6 +382,7 @@ export proc xsh_seed_build(
   for product in xsh_seed_binaries {
     files[product] = hash.sha256(fp"{out}/{product}")?.hex()
   }
+
   files["core.tar.xz"] = hash.sha256(core_archive)?.hex()
 
   let dirty = xsh_seed_git_text(xsh_root, ["status", "--porcelain"])? != ""

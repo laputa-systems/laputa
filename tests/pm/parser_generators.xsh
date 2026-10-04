@@ -1,5 +1,5 @@
 ##! Parser generator CLI and definition lookup coverage without Linux build modules.
-proc generator_runner() [env, process, error] -> Result[Path] {
+proc generator_runner() [process, env, error] -> Result[Path] {
   let configured = env.get("XSH_HOST") ?? ""
   return fp"{configured}" when configured != ""
   process.which("xsh")?
@@ -42,6 +42,7 @@ test test_bison_parses_linux_kconfig_argv_and_rejects_missing_grammar [fs, proce
   if ! success.ok {
     test.fail(stderr.read_text()?)?
   }
+
   test.ok(success.ok)?
   test.ok(output.exists()?)?
   test.ok(header.exists()?)?
@@ -100,6 +101,7 @@ test test_flex_parses_linux_kconfig_argv_and_rejects_missing_input [fs, process,
   if ! success.ok {
     test.fail(stderr.read_text()?)?
   }
+
   test.ok(output.exists()?)?
   assert "([a-z]+)" in output.read_text()?
 

@@ -65,7 +65,11 @@ proc build_source_cache_root() [fs, env, error] -> Result[Path] {
   let repo_root = (env.get("XSH_PM_REPOSITORY_ROOT") ?? "").trim()
 
   if configured == "" and repo_root == "" {
-    return Err(types.PmError.SourceNotFound("URL sources need LAPUTA_SOURCE_CACHE or XSH_PM_REPOSITORY_ROOT to locate the source cache"))
+    return Err(
+      types.PmError.SourceNotFound(
+        "URL sources need LAPUTA_SOURCE_CACHE or XSH_PM_REPOSITORY_ROOT to locate the source cache",
+      ),
+    )
   }
 
   source_cache_root(fp"{repo_root}")?
@@ -90,7 +94,11 @@ export pure mirror_source_url(mirror: Str, sha256: Str) -> Str {
 ## Validates the pin a URL source is cached under. `SKIP` is only for repository-local sources.
 export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Result[Str] {
   if checksum == "SKIP" {
-    return Err(types.PmError.SourceChecksum(f"{package_name} URL source {url} must pin a sha256; SKIP is only for repository-local sources"))
+    return Err(
+      types.PmError.SourceChecksum(
+        f"{package_name} URL source {url} must pin a sha256; SKIP is only for repository-local sources",
+      ),
+    )
   }
 
   if ! sha256_hex.matches(checksum) {
@@ -150,14 +158,20 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, en
 
   if mirror == "" {
     return Err(
-      types.PmError.SourceNotFound(f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root}; run `make fetch`, or set LAPUTA_MIRROR to a local mirror that serves it"),
+      types.PmError.SourceNotFound(
+        f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root}; run `make fetch`, or set LAPUTA_MIRROR to a local mirror that serves it",
+      ),
     )
   }
 
   match fill_source_cache_entry(root, sha256, mirror_source_url(mirror, sha256))? {
     Cached => entry
     Fetched(_) => entry
-    Unavailable(detail) => Err(types.PmError.DownloadFailed(f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root} or the mirror: {detail}; run `make fetch`"))
+    Unavailable(detail) => Err(
+      types.PmError.DownloadFailed(
+        f"{package_name} source {url} (sha256 {sha256}) is not in the source cache {root} or the mirror: {detail}; run `make fetch`",
+      ),
+    )
     Mismatch(detail) => Err(types.PmError.SourceChecksum(f"{package_name} source {url} from the mirror: {detail}"))
   }
 }
@@ -280,7 +294,9 @@ proc stage_resolved_source(
     return
   }
 
-  if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(name)) {
+  if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(
+    name,
+  )) {
     fs.remove(dest, missing_ok: true)?
     dest.parent.mkdir()?
     archive.tar_extract(source_path, dest, tar_source_strip_components(source_path)?, "auto", true)?

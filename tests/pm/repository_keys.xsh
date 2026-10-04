@@ -36,7 +36,11 @@ proc rebuild_seed(root: Path, arch: Str) [fs, error] {
   fs.write(fp"{root}/.out/seed/{arch}/xsh", f"rebuilt {arch} xsh\n")?
 }
 
-proc plan_for(value: types.PackageCatalog, target: types.Target, roots: List[Str]) [fs, error] -> Result[types.BuildPlan] {
+proc plan_for(
+  value: types.PackageCatalog,
+  target: types.Target,
+  roots: List[Str],
+) [fs, error] -> Result[types.BuildPlan] {
   let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
   plan.resolve(value, {target, index_sha256: "repository-keys-empty-remote", packages: []}, policy_value, roots, false)?
 }
@@ -111,7 +115,11 @@ test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, en
 
 test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-generation")?
-  let value = plan_for(catalog.load_for_target(root, types.target_aarch64())?, types.target_aarch64(), ["foot-minimal", "laputa-net", "tailscale"])?
+  let value = plan_for(
+    catalog.load_for_target(root, types.target_aarch64())?,
+    types.target_aarch64(),
+    ["foot-minimal", "laputa-net", "tailscale"],
+  )?
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?
 
   let tailscale = generation_names(generation.plan(value, ["tailscale"], overlay)?)

@@ -37,6 +37,7 @@ export let upstream_sources = [
 ]
 
 type EventDef = {attr: Str, value: Int, name: Str}
+
 type EventDefinitions = {defs: List[EventDef], max_codes: Map[Int]}
 
 ## Exported declaration `filetree`.
@@ -431,8 +432,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    } ?
-  } ?
+    }?
+  }?
 
   fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
 }

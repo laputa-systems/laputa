@@ -21,7 +21,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let gcc_s = fp"{rootfs}/usr/lib/libgcc_s.so.1"
 
   if ! fs.exists(gcc_s)? {
-    print "cargo ok: (runtime test skipped \u{2014} libgcc_s.so.1 not in root)"
+    print "cargo ok: (runtime test skipped — libgcc_s.so.1 not in root)"
     return
   }
 
@@ -99,7 +99,7 @@ main(@args)?
     cargo = run.text $dynlinker fp"{rootfs}/usr/bin/cargo" "--version" ?
     rustc = run.text $dynlinker fp"{rootfs}/usr/bin/rustc" "--version" ?
     run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple "--manifest-path" fp"{tmp}/Cargo.toml" ?
-  } ?
+  }?
 
   if ! cargo.starts_with("cargo ") {
     return Err(proof.ProofError.Failed("proof-cargo", f"unexpected cargo version: {cargo.trim()}"))
