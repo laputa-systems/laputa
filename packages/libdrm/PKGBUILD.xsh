@@ -8,10 +8,10 @@ export const name = "libdrm"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.4.127"
+export const ver = "2.4.134"
 
 ## Exported declaration `rel`.
-export const rel = "9"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "libudev-zero"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "051aeb3e542a57621018ffc443fb088dd69b78eef0ce4808b604ce0feac9f47f",
+        sha256: "ac5e74d157830eb8bee44c6a6bf3ad49774ef0dd2a72bdad74a8f20308b52a95",
       },
     ],
   },
@@ -137,7 +137,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libdrm.so.2.127.0",
+    path: p"usr/lib/libdrm.so.2.134.0",
     kind: "binary",
   },
   {
@@ -146,6 +146,10 @@ export const filetree = [
   },
 ]
 
+# Port of gen_table_fourcc.py: the same three line patterns, applied per line
+# (its trailing `\s` there matches the newline, hence `(\s|$)` here). Only the
+# listed vendors get named modifier entries; the others, such as GENERIC and
+# MTK, are left to libdrm's per-vendor name lookups.
 proc write_format_modifier_table() [fs, error] {
   let header = p"include/drm/drm_fourcc.h"
   var intel = []
@@ -153,25 +157,22 @@ proc write_format_modifier_table() [fs, error] {
   var vendors = []
 
   for line in header.read_text()?.split("\n") {
-    let words = line.words()
+    if let [_, mod] = rx"^#define I915_FORMAT_MOD_(\w+)".captures(line) {
+      intel = intel.push(mod)
+    }
 
-    if let [_, modifier_name, ..] = words {
-      if modifier_name.starts_with("I915_FORMAT_MOD_") {
-        intel = intel.push(modifier_name.replace("I915_FORMAT_MOD_", ""))
-      } else if modifier_name.starts_with("DRM_FORMAT_MOD_VENDOR_") {
-        vendors = vendors.push(modifier_name.replace("DRM_FORMAT_MOD_VENDOR_", ""))
-      } else if modifier_name.starts_with("DRM_FORMAT_MOD_") and ! ("(" in modifier_name) and ! ("*" in modifier_name) and ! ("-" in modifier_name) {
-        let entry = modifier_name.replace("DRM_FORMAT_MOD_", "")
-        let parts = entry.split("_")
-
-        if let [vendor, _, ..] = parts {
-          let mod = entry.replace(f"{vendor}_", "")
-
-          if ! (vendor == "ARM" and (mod == "TYPE_AFBC" or mod == "TYPE_MISC" or mod == "TYPE_AFRC")) {
-            modifiers = modifiers.push({vendor, mod, name: mod})
-          }
+    if let [_, entry, _] = rx"^#define DRM_FORMAT_MOD_((?:ARM|APPLE|SAMSUNG|QCOM|VIVANTE|NVIDIA|BROADCOM|ALLWINNER)\w+)(\s|$)".captures(
+      line,
+    ) {
+      if let [_, vendor, mod] = rx"^([^_]*)_(.*)$".captures(entry) {
+        if ! (vendor == "ARM" and (mod == "TYPE_AFBC" or mod == "TYPE_MISC" or mod == "TYPE_AFRC")) {
+          modifiers = modifiers.push({vendor, mod, name: mod})
         }
       }
+    }
+
+    if let [_, vendor] = rx"^#define DRM_FORMAT_MOD_VENDOR_(\w+)".captures(line) {
+      vendors = vendors.push(vendor)
     }
   }
 
