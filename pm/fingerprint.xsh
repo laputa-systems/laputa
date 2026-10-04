@@ -58,11 +58,53 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
   Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
 }
 
+# Returns whether a relative symlink target, resolved lexically from the link's
+# own directory, stays inside the tree that contains the link at `rel`.
+pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
+  if target == "" or target.starts_with("/") {
+    return false
+  }
+
+  var depth = rel.display().split("/").len() - 1
+
+  for component in target.split("/") {
+    if component == "" or component == "." {
+      continue
+    }
+
+    if component == ".." {
+      if depth == 0 {
+        return false
+      }
+
+      depth -= 1
+    } else {
+      depth += 1
+    }
+  }
+
+  true
+}
+
+# The digest records a symlink by its target text and never follows it, so a
+# link out of the recipe directory would let content outside the digest reach
+# a build (staging copies the recipe tree) or a module import. Recipes name
+# shared code through the module path and outside inputs as `repository/`
+# sources instead.
 proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
   var lines: List[Str] = []
 
   for entry in fs.walk(pkg.dir) |> sort-by .path {
     let rel = entry.path.strip_prefix(pkg.dir)?
+    continue when ignored_tree_path(rel)
+
+    if entry.kind == "symlink" {
+      let target = entry.path.readlink()?.display()
+
+      if ! symlink_target_stays_within(rel, target) {
+        return Err(types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"))
+      }
+    }
 
     if package_input_path(rel) {
       lines = lines.push(tree_entry_line(pkg.dir, entry.path, "package-file")?)
@@ -76,19 +118,27 @@ proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
 # recipe directory. Hash their complete declared file/tree contents so a PM
 # module edit changes laputa-pm's package build identity without recording an
 # absolute checkout path.
-proc repository_input_lines(repo_root: Path, pkg: types.Package) [fs, error] -> Result[List[Str]] {
+#
+# Only the sources the target stages are hashed, after the same placeholder
+# expansion staging applies, so `repository/.out/seed/ARCH` keys each target by
+# its own seed and another target's inputs never change this key. Builds are
+# native, so the build architecture is the target's.
+proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[List[Str]] {
+  let arch = types.pm_target_arch(target)
   var lines: List[Str] = []
 
   for source in pkg.upstream_sources {
+    continue unless arch in source.architectures or "all" in source.architectures
     let parsed = util.parse_source_line(source.source)?
+    let expanded = util.expand_source(parsed.source, pkg, arch, arch)
 
-    continue unless parsed.source.starts_with("repository/")
-    let relative = fp"{parsed.source.replace("repository/", "")}".normalize()
-    util.ensure_relative_path(relative, f"repository source {parsed.source}")?
+    continue unless expanded.starts_with("repository/")
+    let relative = fp"{expanded.replace("repository/", "")}".normalize()
+    util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 
     if ! fs.exists(input)? {
-      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {parsed.source} is missing"))
+      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
     }
 
     if fs.metadata(input)?.kind == "dir" {
@@ -129,6 +179,10 @@ export proc package_build_input(
     lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}")
   }
 
+  for dependency in pkg.runtime_only_deps {
+    lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}")
+  }
+
   for dependency in pkg.mkdeps_host {
     lines = lines.push(f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}")
   }
@@ -149,7 +203,7 @@ export proc package_build_input(
   }
 
   lines = lines.extend(package_source_lines(pkg)?)
-  lines = lines.extend(repository_input_lines(repo_root, pkg)?)
+  lines = lines.extend(repository_input_lines(repo_root, pkg, target)?)
   digest_lines(lines)?
 }
 

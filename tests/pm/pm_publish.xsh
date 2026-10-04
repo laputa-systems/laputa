@@ -182,6 +182,54 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   test.eq(fs.read_text(fp"{remote_root}/index.json")?, first_index)?
 }
 
+# The index keeps `deps` as the recipe declares them and lists runtime-only
+# dependencies separately; together they are the package's runtime set.
+test test_publish_index_lists_runtime_only_dependencies_beside_deps [fs, net, env, time, error] { |ctx|
+  let repo_root = copied_publish_repository(ctx, "publish-runtime-only-repo")?
+  let service = fp"{repo_root}/packages/service"
+  fs.mkdir(service)?
+  fs.write(
+    fp"{service}/PKGBUILD.xsh",
+    """##! Publication fixture with a runtime-only dependency.
+## Package name.
+export let name = "service"
+## Metadata-only package kind.
+export let package_kind = "meta"
+## Package version.
+export let ver = "1"
+## Package release.
+export let rel = "1"
+## Build-root dependencies.
+export let deps = ["runtime-lib"]
+## Installed only by root composition.
+export let runtime_only_deps = ["app"]
+## No build-host dependencies.
+export let mkdeps_host = []
+## No upstream source inputs.
+export let upstream_sources = []
+## No payload files.
+export let filetree = []
+""",
+  )?
+  let value = plan.resolve(catalog.load(repo_root)?, publish_empty_remote(), policy.aarch64_docker(), ["service"], false)?
+  let store_root = test.temp_dir(ctx, name: "publish-runtime-only-store")?
+  stage_plan_artifacts(ctx, value, store_root)?
+  let remote_root = test.temp_dir(ctx, name: "publish-runtime-only-remote")?
+  repo.publish(repo.snapshot(value, store_root)?, f"file://{remote_root}", "", test.temp_dir(ctx, name: "publish-runtime-only-work")?)?
+
+  let index = remote.load_remote_index_from(fp"{remote_root}/index.json")?
+  test.eq([entry.name for entry in index], ["app", "host-tool", "runtime-lib", "service", "target-sdk"])?
+
+  for entry in index {
+    if entry.name == "service" {
+      test.eq(entry.deps, ["runtime-lib"])?
+      test.eq(entry.runtime_only_deps, ["app"])?
+    } else {
+      test.eq(entry.runtime_only_deps, [])?
+    }
+  }
+}
+
 test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, env, time, error] { |ctx|
   let value = publish_plan(ctx, "publish-conflict-repo")?
   let store_root = test.temp_dir(ctx, name: "publish-conflict-store")?
@@ -272,6 +320,8 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     source_sha256: "",
     metapackage: false,
   })?
+  # Index rows written before runtime-only dependencies existed declare none.
+  test.eq(modern.runtime_only_deps, [])?
   let modern_plan = remote.plan_artifact_from_package(modern)?
   test.eq(modern_plan.artifact_key, "artifact")?
   test.eq(modern_plan.retrieval.metadata_sha256, "metadata")?

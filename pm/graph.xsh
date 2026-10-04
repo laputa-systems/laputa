@@ -20,6 +20,13 @@ pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKi
   kind in kinds
 }
 
+## Returns whether an edge names a build input of its dependent: one whose artifact the
+## dependent's build root holds, so it must be built first and its key enters the
+## dependent's artifact key.
+export pure edge_orders_builds(kind: types.DependencyKind) -> Bool {
+  kind != types.dependency_bootstrap() and kind != types.dependency_runtime_only()
+}
+
 pure edge_key(from: Str, to: Str) -> Str {
   f"{from}->{to}"
 }
@@ -30,6 +37,11 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
   for dependency in pkg.deps {
     let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) { types.dependency_bootstrap() } else { types.dependency_runtime() }
     result = result.push({from: pkg.name, to: dependency, kind})
+  }
+
+  # Bootstrap seeds substitute build inputs; a runtime-only edge is never one.
+  for dependency in pkg.runtime_only_deps {
+    result = result.push({from: pkg.name, to: dependency, kind: types.dependency_runtime_only()})
   }
 
   for dependency in pkg.mkdeps_host {
@@ -187,7 +199,9 @@ export proc closure(
   closure_from_edges(catalog, roots, kinds, edges(catalog, policy.aarch64_docker())?)?
 }
 
-## Produces dependency-first lexical topological levels; bootstrap seed edges are externally provided and do not order local builds.
+## Produces dependency-first lexical topological levels. Bootstrap seed edges are externally
+## provided, and runtime-only edges are not build inputs, so neither orders local builds; a
+## runtime-only dependency may therefore build after its dependent, or close a cycle.
 export proc topological_levels(
   selected: List[Str],
   dependency_edges: List[types.DependencyEdge],
@@ -197,7 +211,7 @@ export proc topological_levels(
   let local_edges = [
     edge
     for edge in dependency_edges
-    if edge.kind != types.dependency_bootstrap() and (selected_map.get(edge.from) ?? false) and (selected_map.get(edge.to) ?? false)
+    if edge_orders_builds(edge.kind) and (selected_map.get(edge.from) ?? false) and (selected_map.get(edge.to) ?? false)
   ]
   var unresolved: Map[Int] = {}
   var emitted: Map[Bool] = {}
@@ -245,12 +259,14 @@ export proc topological_levels(
   levels
 }
 
-## Resolves runtime dependencies only, excluding host and target build dependencies.
+## Resolves runtime and runtime-only dependencies, excluding host and target build dependencies.
 export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [error] -> Result[List[Str]] {
-  closure(catalog, roots, [types.dependency_runtime()])?
+  closure(catalog, roots, [types.dependency_runtime(), types.dependency_runtime_only()])?
 }
 
-## Resolves all runtime, host-build, target-build, and bootstrap dependencies required to build selected roots.
+## Resolves every package a plan for the selected roots must produce: their build inputs
+## (runtime, host-build, target-build, and bootstrap edges) and the runtime-only
+## dependencies root composition installs beside them.
 export proc build_closure(
   catalog: types.PackageCatalog,
   roots: List[Str],
@@ -259,7 +275,13 @@ export proc build_closure(
   closure_from_edges(
     catalog,
     roots,
-    [types.dependency_runtime(), types.dependency_build_host(), types.dependency_build_target(), types.dependency_bootstrap()],
+    [
+      types.dependency_runtime(),
+      types.dependency_runtime_only(),
+      types.dependency_build_host(),
+      types.dependency_build_target(),
+      types.dependency_bootstrap(),
+    ],
     edges(catalog, value)?,
   )?
 }

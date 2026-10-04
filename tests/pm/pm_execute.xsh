@@ -2,6 +2,7 @@
 use pm.catalog
 use pm.execute
 use pm.fingerprint
+use pm.generation
 use pm.local
 use pm.plan
 use pm.plan_json
@@ -134,6 +135,60 @@ main(@args)?
 """)?
 }
 
+# `execute-service` runtime-only depends on `execute-dep`; its build fails if
+# that dependency's payload reached its build root.
+proc write_execute_service(repo_root: Path) [fs, error] {
+  let package = fp"{repo_root}/packages/execute-service"
+  fs.mkdir(package)?
+  fs.write(
+    fp"{package}/PKGBUILD.xsh",
+    r"""##! Executor fixture with a runtime-only dependency.
+## Package name.
+export let name = "execute-service"
+## Payload kind.
+export let package_kind = "payload"
+## Package version.
+export let ver = "1.0.0"
+## Package release.
+export let rel = "1"
+## No build-root dependencies.
+export let deps = []
+## Installed only by root composition.
+export let runtime_only_deps = ["execute-dep"]
+## No build-host dependencies.
+export let mkdeps_host = []
+## No upstream source inputs.
+export let upstream_sources = []
+## Declared output.
+export let filetree = [{path: p"usr/share/execute-service.txt", kind: "file"}]
+
+error ServiceBuildError = Failed(message: Str)
+
+## Builds only when the runtime-only dependency is absent from the build root.
+export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
+  let root = env("LAPUTA_ROOT")?
+  if fs.exists(fp"{root}/usr/share/execute-dep.txt")? {
+    return Err(ServiceBuildError.Failed("execute-dep reached the build root"))
+  }
+  let target = fp"{dest}/usr/share/execute-service.txt"
+  fs.mkdir(target.parent)?
+  fs.write(target, "service\n")?
+}
+""",
+  )?
+  fp"{package}/proof.xsh".write(r"""
+error ProofError = Failed(message: Str)
+
+proc main(root: Path = /rootfs) [fs, error] {
+  if ! fs.exists(fp"{root}/usr/share/execute-service.txt")? {
+    return Err(ProofError.Failed("missing execute-service payload"))
+  }
+}
+
+main(@args)?
+""")?
+}
+
 proc exact_remote_snapshot(
   value: types.BuildPlan,
   result: types.BuildResult,
@@ -183,6 +238,7 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
     rel: "1",
     kind: types.Payload,
     deps: ["runtime-dependency"],
+    runtime_only_deps: [],
     mkdeps_host: [],
     mkdeps_target: [],
     upstream_sources: [],
@@ -548,4 +604,30 @@ main(@args)?
 
   let reuse = runs[1]
   test.eq(reuse.keys() |> sort, [])?
+}
+
+test test_execute_keeps_runtime_only_dependency_out_of_build_root_and_composes_it [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-runtime-only-repo")?
+  write_execute_service(repo_root)?
+  let value = resolve_execute_plan_for_roots(repo_root, ["execute-service"])?
+  # Both nodes share level 0, and execute-dep builds first: only the missing
+  # build-root edge keeps its payload out of execute-service's build root.
+  test.eq([node.name for node in value.nodes], ["execute-dep", "execute-service"])?
+  test.eq([node.level for node in value.nodes], [0, 0])?
+
+  let object_store = execute_store(ctx, "execute-runtime-only-store")?
+  let result = execute.build_plan(value, repo_root, object_store, "", 1)?
+  let service = receipt_named(result, "execute-service")?
+  test.eq(service.dependency_keys, [])?
+  test.eq(service.runtime_dependency_keys, [])?
+
+  let overlay = fp"{test.temp_dir(ctx, name: "execute-runtime-only-overlay")?}/overlay"
+  fs.mkdir(overlay)?
+  let generation_plan = generation.plan(value, ["execute-service"], generation.overlay_digest(overlay)?)?
+  test.eq([artifact.package_name for artifact in generation_plan.artifacts], ["execute-dep", "execute-service"])?
+  let output = fp"{test.temp_dir(ctx, name: "execute-runtime-only-generation")?}/root"
+  let receipt = generation.compose(generation_plan, object_store, output, overlay)?
+  test.eq(fp"{output}/usr/share/execute-dep.txt".read_text()?, "dependency\n")?
+  test.eq(fp"{output}/usr/share/execute-service.txt".read_text()?, "service\n")?
+  generation.verify_generation(output, receipt)?
 }

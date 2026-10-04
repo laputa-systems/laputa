@@ -1,4 +1,4 @@
-use kbuild
+use packages.linux.kbuild as kbuild
 use pm.make as make
 
 # Serialized report fields and analysis task fields checked by the native assertions.

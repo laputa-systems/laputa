@@ -21,6 +21,9 @@ export let deps = ["musl", "m4"]
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = ["llvm-toolchain"]
 
+## The installed flex helper is an XSH script; it needs the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
+
 ## Exported declaration `upstream_sources`.
 export let upstream_sources = [
   {

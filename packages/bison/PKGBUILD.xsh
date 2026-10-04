@@ -22,6 +22,9 @@ export let deps = ["musl"]
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = ["llvm-toolchain"]
 
+## The `yacc` wrapper is an XSH script; it needs the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
+
 ## Exported declaration `upstream_sources`.
 export let upstream_sources = [
   {

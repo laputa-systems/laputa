@@ -12,7 +12,10 @@ export let ver = "1"
 export let rel = "15"
 
 ## Exported declaration `deps`.
-export let deps = ["xsh"]
+export let deps = []
+
+## The build installs PM sources and an XSH wrapper; both need `xsh` at runtime.
+export let runtime_only_deps = ["xsh"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []

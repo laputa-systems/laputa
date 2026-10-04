@@ -20,7 +20,10 @@ export let rel = "5"
 export let deps = ["musl", "linux", "libnl3"]
 
 ## Package recipe export.
-export let mkdeps_host = ["xsh", "llvm-toolchain", "libnl3", "xinit"]
+export let mkdeps_host = ["llvm-toolchain", "libnl3"]
+
+## The build installs an xinit service module; xinit runs it at runtime.
+export let runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
 export let upstream_sources = [

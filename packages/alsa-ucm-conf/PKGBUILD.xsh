@@ -12,7 +12,10 @@ export let ver = "1.2.15.3"
 export let rel = "8"
 
 ## Exported declaration `deps`.
-export let deps = ["alsa-lib"]
+export let deps = []
+
+## UCM configuration is data that alsa-lib reads at runtime; the build copies it.
+export let runtime_only_deps = ["alsa-lib"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []

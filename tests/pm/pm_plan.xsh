@@ -108,6 +108,26 @@ test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { 
   test.eq(build_input(first)?, build_input(second)?)
 }
 
+# The digest records symlinks by target text and never follows them, so a link
+# out of the recipe directory is refused instead of hiding outside content.
+test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, error] { |ctx|
+  let pkg = copied_package(ctx, "fingerprint-symlinks")?
+  let first = build_input(pkg)?
+  fs.symlink(p"input.txt", fp"{pkg.dir}/files/inside.txt")?
+  test.eq(build_input(pkg)? == first, false)?
+
+  for target in [p"../../pm", p"/etc", p"files/../../outside.xsh"] {
+    let link = fp"{pkg.dir}/escape"
+    fs.remove(link, missing_ok: true)?
+    fs.symlink(target, link)?
+
+    match build_input(pkg) {
+      Ok(_) => test.fail(f"recipe symlink to {target} unexpectedly fingerprinted")?
+      Err(problem) => assert "recipe symlink escape -> " in problem.message and "leaves the recipe directory" in problem.message
+    }
+  }
+}
+
 pure empty_remote_snapshot() -> types.RemoteSnapshot {
   {target: types.Aarch64LinuxMusl, index_sha256: "remote-index", packages: []}
 }
@@ -451,4 +471,79 @@ test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, 
     Ok(_) => test.fail("unsupported target unexpectedly planned")?
     Err(problem) => { assert "unsupported target" in problem.message }
   }
+}
+
+proc write_plan_metapackage(root: Path, name: Str, dependencies: Str) [fs, error] {
+  let dir = fp"{root}/packages/{name}"
+  fs.mkdir(dir)?
+  let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
+  fs.write(
+    fp"{dir}/PKGBUILD.xsh",
+    f"""##! Runtime-only dependency fixture recipe.
+## Fixture export.
+export let name = "{name}"
+## Fixture export.
+export let package_kind = "meta"
+## Fixture export.
+export let ver = "1"
+## Fixture export.
+export let rel = "1"
+{documented}
+## Fixture export.
+export let mkdeps_host = []
+## Fixture export.
+export let upstream_sources = []
+## Fixture export.
+export let filetree = []
+""",
+  )?
+}
+
+# `service` runtime-only depends on `app`, whose build inputs are host-tool,
+# runtime-lib, and target-sdk; `consumer` builds against `service`.
+proc runtime_only_plan_catalog(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.PackageCatalog] {
+  let root = copied_plan_repository(ctx, name)?
+  write_plan_metapackage(root, "service", "export let deps = []\nexport let runtime_only_deps = [\"app\"]")?
+  write_plan_metapackage(root, "consumer", "export let deps = [\"service\"]")?
+  catalog.load(root)?
+}
+
+test test_runtime_only_dependency_is_planned_but_neither_ordered_nor_keyed [fs, env, error] { |ctx|
+  let value = runtime_only_plan_catalog(ctx, "plan-runtime-only")?
+  let initial = resolve_plan(value, ["consumer"], empty_remote_snapshot())?
+  test.eq([node.name for node in initial.nodes], ["host-tool", "runtime-lib", "service", "target-sdk", "app", "consumer"])?
+  let service = node_named(initial, "service")?
+  test.eq(service.level, 0)?
+  test.eq(service.dependencies, [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}])?
+
+  let path_value = fp"{test.temp_dir(ctx, name: "plan-runtime-only-json")?}/plan.json"
+  plan_json.write_plan(path_value, initial)?
+  test.eq(plan_json.read(path_value)?, initial)?
+
+  # Rebuilding a runtime-only dependency rebuilds none of its dependents.
+  let app_bumped = resolve_plan(with_release(value, "app", "2")?, ["consumer"], empty_remote_snapshot())?
+  test.eq(changed_key_names(initial, app_bumped)?, ["app"])?
+  test.eq(node_named(app_bumped, "service")?.dependencies[0].artifact_key, node_named(app_bumped, "app")?.artifact_key)?
+
+  # A build dependency still cascades through its build dependents only.
+  let lib_bumped = resolve_plan(with_release(value, "runtime-lib", "2")?, ["consumer"], empty_remote_snapshot())?
+  test.eq(changed_key_names(initial, lib_bumped)?, ["app", "runtime-lib"])?
+  let service_bumped = resolve_plan(with_release(value, "service", "2")?, ["consumer"], empty_remote_snapshot())?
+  test.eq(changed_key_names(initial, service_bumped)?, ["consumer", "service"])?
+
+  # An exact remote dependent stays reusable when its runtime-only dependency is rebuilt.
+  let rebuilt = resolve_plan(with_release(value, "app", "2")?, ["consumer"], exact_remote_snapshot(initial)?)?
+  test.eq(types.plan_action_text(node_named(rebuilt, "app")?.action), "build")?
+  test.eq(types.plan_action_text(node_named(rebuilt, "service")?.action), "reuse-remote")?
+  test.eq(types.plan_action_text(node_named(rebuilt, "consumer")?.action), "reuse-remote")?
+}
+
+test test_runtime_only_dependency_may_close_a_cycle [fs, env, error] { |ctx|
+  let root = copied_plan_repository(ctx, "plan-runtime-only-cycle")?
+  write_plan_metapackage(root, "service", "export let deps = []\nexport let runtime_only_deps = [\"runner\"]")?
+  write_plan_metapackage(root, "runner", "export let deps = [\"service\"]")?
+  let resolved = resolve_plan(catalog.load(root)?, ["runner"], empty_remote_snapshot())?
+  test.eq([node.name for node in resolved.nodes], ["service", "runner"])?
+  test.eq([dependency.kind for dependency in node_named(resolved, "service")?.dependencies], [types.RuntimeOnly])?
+  plan.validate(resolved)?
 }

@@ -12,7 +12,11 @@ export let ver = "1.96.4"
 export let rel = "12"
 
 ## Package recipe export.
-export let deps = ["iptables", "xinit"]
+export let deps = []
+
+## The build only installs the prebuilt static binaries and the service
+## module; tailscaled drives iptables and runs under xinit at runtime.
+export let runtime_only_deps = ["iptables", "xinit"]
 
 ## Package recipe export.
 export let mkdeps_host = ["llvm-toolchain"]

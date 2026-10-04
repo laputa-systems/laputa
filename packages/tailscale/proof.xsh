@@ -15,7 +15,8 @@ proc ensure_file(path_value: Path, label: Str) [fs, error] {
 proc main(rootfs = /rootfs) [fs, error] {
   ensure_executable(fp"{rootfs}/usr/bin/tailscale", "tailscale")?
   ensure_executable(fp"{rootfs}/usr/bin/tailscaled", "tailscaled")?
-  ensure_executable(fp"{rootfs}/usr/bin/iptables", "iptables")?
+  # iptables and xinit are runtime-only dependencies: generations install
+  # them, but a package proof root holds only this payload's `deps` closure.
   ensure_file(fp"{rootfs}/usr/lib/xinit/services/tailscaled.xsh", "tailscaled service")?
   print "tailscale ok"
 }

@@ -12,9 +12,22 @@ Recipes live at `repo/<package>/PKGBUILD.xsh` and export:
 
 - `name: Str`, `ver: Str`, and positive `rel: Str`;
 - `package_kind: "payload" | "meta"`;
-- `deps`, `mkdeps_host`, and optional `mkdeps_target`;
+- `deps`, `mkdeps_host`, and optional `mkdeps_target` and `runtime_only_deps`;
 - `upstream_sources` and `filetree`;
 - `build(dest: Path)` for payload packages.
+
+`deps` and `mkdeps_*` are build inputs: each is installed into the build root
+with its runtime closure, and its artifact key enters the dependent's key.
+`deps` are also runtime dependencies. `runtime_only_deps` are packages a
+runtime root needs but no build uses (the `xsh` runner of an XSH script,
+`xinit` for a service module, a font named by default config): they are never
+installed into a build root (the dependent's or, transitively, its
+dependents'), never order a build, and never enter an artifact key, so
+rebuilding one rebuilds none of its dependents. A package may appear in only
+one of `deps`, `mkdeps_*`, and `runtime_only_deps`; one the build uses belongs
+in `deps`. A build tool's own runtime needs stay `deps` when dependents run it
+at build time (`flex` needs `m4`), except `xsh`, which the executor substrate
+seeds into every build root.
 
 Payload recipes also carry `proof.xsh`. Metapackages declare no payload
 `filetree`; they may contain dependencies only. `filetree` is the exact output
@@ -42,7 +55,11 @@ strings may name the whole-word placeholders `VERSION`, `RELEASE`, `MAJOR`,
 `MINOR`, `PATCH`, `IDENT`, `PACKAGE`, `ARCH`, `GOARCH`, and their
 `TARGET_`/`BUILD_` forms (`pm/util.xsh::expand_source`); a word that merely
 contains one, such as `PATCHES`, is left alone. Source preparation is part of
-the package build identity.
+the package build identity. A `repository/` source is hashed after the same
+expansion and only for the targets it selects, so `repository/.out/seed/ARCH`
+keys each target's `xsh` by that target's seed alone. A recipe directory may
+not hold a symlink that leaves it; shared PM code is imported through the
+module path.
 
 ## Commands
 
@@ -94,8 +111,8 @@ It publishes to `XSH_PM_REPO`. `file://` trees and the loopback local mirror
 sent none; any other remote needs `LAPUTA_TOKEN` from the process environment.
 PM does not store credentials.
 
-`root compose` selects only typed runtime edges from the saved plan and writes
-an immutable generation receipt. It never installs into a live root. `root
+`root compose` selects only typed runtime and runtime-only edges from the saved
+plan and writes an immutable generation receipt. It never installs into a live root. `root
 inspect` and `store verify` are read-only receipt checks.
 `store extract` copies one manifest-declared file from the exact artifact named
 by a saved BuildPlan. `pm/generation_adapter.xsh::generation_adapter_copy_manifest_file`
@@ -132,9 +149,13 @@ pins and add those bytes to the cache.
 `pm/catalog.xsh` is the repository-wide typed catalog boundary. It rejects
 duplicate package names and malformed recipes before resolution.
 `pm/policy.xsh` contains the explicit aarch64 bootstrap exceptions, while
-`pm/graph.xsh` resolves stable runtime, build-host, and build-target edges.
-The graph never adds an implicit package-manager dependency. Its sorted
-topological levels and typed edge kinds are persisted in `BuildPlan`.
+`pm/graph.xsh` resolves stable runtime, runtime-only, build-host, and
+build-target edges. The graph never adds an implicit package-manager
+dependency. Its sorted topological levels and typed edge kinds are persisted
+in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
+(roots compose them), but runtime-only and bootstrap edges order no build, so
+a runtime-only edge may close a cycle; plan format 3 records them as
+`runtime-only` node dependencies.
 The native Docker adapter passes `XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23`
 for `gnu-stubs`: its LLVM edge is a bootstrap seed, so the recipe must use the
 preseeded compiler while the replacement LLVM package is built.
@@ -157,10 +178,12 @@ changes the proof identity without rebuilding the payload.
 An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
 package id, the recipe input digest (recipe files except `proof.xsh`, source
 records and checksums, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
-and the key of every direct dependency. Every direct dependency, runtime ones
-included, is installed into the build root with its runtime closure, because
-recipes link against libraries they declare only in `deps`; each dependency
-key covers that dependency's own closure. The executor (XSH runners, PM tree,
+and the key of every direct `deps` and `mkdeps_*` dependency. Each of those is
+installed into the build root with its runtime closure, because recipes link
+against libraries they declare only in `deps`; each dependency key covers that
+dependency's own closure. Runtime-only dependency keys are excluded, and Store
+receipts omit them (one artifact serves every plan that pairs it with any
+runtime-only artifact). The executor (XSH runners, PM tree,
 core applets) is not a key input, so XSH and PM changes rebuild nothing. The
 executor that built an artifact is recorded as provenance in its metadata
 (`executor`) and receipt (`executor_sha256`). Bump `BUILD_EPOCH` to rebuild
@@ -179,18 +202,22 @@ computed once at staging plus metadata and proof hashes, writes the receipt
 last, and atomically renames the final directory. Lookups trust those
 commit-time hashes; `store verify` and `repo publish` re-hash every object.
 Final artifacts are never overwritten. `pm/repo.xsh` publishes only verified
-plan receipts and updates a file or remote snapshot index last.
+plan receipts and updates a file or remote snapshot index last. An index row's
+`deps` are the recipe's `deps`; `runtime_only_deps` lists the rest of its
+runtime set (rows without the field declare none).
 
 `repo build` composes each build and proof root by extracting every dependency
 payload once, directly into the root, after a metadata-only ownership check
-(`pm/root.xsh::trusted_preflight`). Recipes see the build root as both
+(`pm/root.xsh::trusted_preflight`). A proof root holds the payload's `deps`
+closure only: a runtime-only dependency may not be built yet when its
+dependent is proved, so package proofs never check its files. Recipes see the build root as both
 `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`.
 
 ## Root composition
 
 `pm/root.xsh` preflights the exact artifact inventories and ownership before it
 mutates a generation root. `pm/generation.xsh` chooses direct runtime roots and
-the runtime closure only, then writes the deterministic receipt used by Laputa
+the runtime closure (runtime and runtime-only edges) only, then writes the deterministic receipt used by Laputa
 to construct a disk image. Build tools do not leak into that closure unless a
 separate typed runtime edge requires them.
 Regular files and directories retain permission bits through `0o7777`,

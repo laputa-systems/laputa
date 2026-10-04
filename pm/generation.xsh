@@ -258,9 +258,13 @@ proc generation_runtime_artifacts(
     selected[name] = true
     artifacts = artifacts.push({package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key})
 
-    # BuildPlan dependencies are the typed graph projection; only Runtime edges reach a system root.
+    # BuildPlan dependencies are the typed graph projection; only Runtime and
+    # RuntimeOnly edges reach a system root. Store receipts omit RuntimeOnly
+    # edges, so the plan is their only source.
     for dependency in node.dependencies {
-      if dependency.kind == types.dependency_runtime() and ! (selected.get(dependency.name) ?? false) {
+      let runtime = dependency.kind == types.dependency_runtime() or dependency.kind == types.dependency_runtime_only()
+
+      if runtime and ! (selected.get(dependency.name) ?? false) {
         pending = pending.push(dependency.name)
       }
     }

@@ -22,6 +22,9 @@ export let deps = []
 ## Host-side build dependencies.
 export let mkdeps_host = ["llvm-toolchain"]
 
+## `ldd` is an XSH wrapper; it needs the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
+
 ## Preserve upstream binaries without stripping.
 export let nostrip = true
 

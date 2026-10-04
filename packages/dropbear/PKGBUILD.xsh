@@ -17,7 +17,10 @@ export let rel = "16"
 export let deps = ["musl", "zlib"]
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["llvm-toolchain", "xinit"]
+export let mkdeps_host = ["llvm-toolchain"]
+
+## The build installs an xinit service module; xinit runs it at runtime.
+export let runtime_only_deps = ["xinit"]
 
 # Source is a git commit (no VERSION substitution needed).
 ## Exported declaration `upstream_sources`.

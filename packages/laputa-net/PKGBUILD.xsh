@@ -11,13 +11,16 @@ export let ver = "1"
 ## Exported declaration `rel`.
 export let rel = "11"
 
-# ifup/ifdown are xsh core applets; the net service drives them.
-# wpa_supplicant provides Wi-Fi association for wireless interfaces.
 ## Exported declaration `deps`.
-export let deps = ["xsh", "wpa_supplicant"]
+export let deps = []
 
 ## Exported declaration `mkdeps_host`.
-export let mkdeps_host = ["xinit"]
+export let mkdeps_host = []
+
+## The build only installs the service module and interface config. At runtime
+## xinit runs the service, which drives the xsh core applets ifup/ifdown, and
+## wpa_supplicant provides Wi-Fi association for wireless interfaces.
+export let runtime_only_deps = ["wpa_supplicant", "xinit", "xsh"]
 
 ## Exported declaration `upstream_sources`.
 export let upstream_sources = [

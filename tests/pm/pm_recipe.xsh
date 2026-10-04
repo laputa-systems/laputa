@@ -202,3 +202,65 @@ main(@args)?
   )?
   test.ok(status.ok, fs.read_text(stderr_path)?)?
 }
+
+proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) [fs, error] -> Result[Path] {
+  let dir = test.temp_dir(ctx, name: name)?
+  let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
+  fs.write(
+    fp"{dir}/PKGBUILD.xsh",
+    f"""##! Runtime-only dependency fixture recipe.
+## Fixture export.
+export let name = "runtime-only-probe"
+## Fixture export.
+export let package_kind = "meta"
+## Fixture export.
+export let ver = "1"
+## Fixture export.
+export let rel = "1"
+{documented}
+## Fixture export.
+export let upstream_sources = []
+## Fixture export.
+export let filetree = []
+""",
+  )?
+  dir
+}
+
+test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs, env, error] { |ctx|
+  let valid = write_runtime_only_recipe(
+    ctx,
+    "runtime-only-valid",
+    "export let deps = [\"lib\"]\nexport let mkdeps_host = [\"tool\"]\nexport let runtime_only_deps = [\"service\"]",
+  )?
+  let pkg = recipe.load_package(valid)?
+  test.eq(pkg.runtime_only_deps, ["service"])?
+  test.eq(pkg.deps, ["lib"])?
+
+  let omitted = write_runtime_only_recipe(ctx, "runtime-only-omitted", "export let deps = []\nexport let mkdeps_host = []")?
+  test.eq(recipe.load_package(omitted)?.runtime_only_deps, [])?
+
+  for overlap in [
+    "export let deps = [\"lib\"]\nexport let mkdeps_host = []\nexport let runtime_only_deps = [\"lib\"]",
+    "export let deps = []\nexport let mkdeps_host = [\"lib\"]\nexport let runtime_only_deps = [\"lib\"]",
+    "export let deps = []\nexport let mkdeps_host = []\nexport let mkdeps_target = [\"lib\"]\nexport let runtime_only_deps = [\"lib\"]",
+  ] {
+    let dir = write_runtime_only_recipe(ctx, "runtime-only-overlap", overlap)?
+
+    match recipe.load_package(dir) {
+      Ok(_) => test.fail("runtime-only dependency repeating a build dependency unexpectedly loaded")?
+      Err(problem) => assert "runtime_only_deps entry lib is also a build dependency" in problem.message
+    }
+  }
+
+  let repeated = write_runtime_only_recipe(
+    ctx,
+    "runtime-only-repeated",
+    "export let deps = []\nexport let mkdeps_host = []\nexport let runtime_only_deps = [\"service\", \"service\"]",
+  )?
+
+  match recipe.load_package(repeated) {
+    Ok(_) => test.fail("repeated runtime-only dependency unexpectedly loaded")?
+    Err(problem) => assert "runtime_only_deps contains duplicate dependency service" in problem.message
+  }
+}

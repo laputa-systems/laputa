@@ -12,7 +12,10 @@ export let ver = "1"
 export let rel = "9"
 
 ## Exported declaration `deps`.
-export let deps = ["xsh"]
+export let deps = []
+
+## The build installs XSH scripts; they need the `xsh` runner at runtime.
+export let runtime_only_deps = ["xsh"]
 
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
