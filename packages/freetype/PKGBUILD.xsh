@@ -9,10 +9,10 @@ export const name = "freetype"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.14.1"
+export const ver = "2.14.3"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "zlib", "libpng"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "32427e8c471ac095853212a37aef816c60b42052d4d9e48230bab3bdf2936ccc",
+        sha256: "36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f",
       },
     ],
   },
@@ -288,7 +288,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libfreetype.so.6.20.4",
+    path: p"usr/lib/libfreetype.so.6.20.6",
     kind: "binary",
   },
   {
