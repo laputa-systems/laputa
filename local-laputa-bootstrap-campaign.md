@@ -191,13 +191,17 @@ off here with its measurement or result.
   - also update `INSTALLER.md`, `docs/QEMU.md`, `docs/MAKE.md` and the xinit
     docs.
 - [ ] **Deduplicate the laputa scripts:** the GPT helpers, `env_value`,
-  `run_argv`, `remove_tree` and the installer wrappers. Decide whether
-  `packages/build-essential-native/proof-rootfs.xsh` and `proof-image.xsh`,
-  which nothing references, should be deleted.
+  `run_argv`, `remove_tree` and the installer wrappers.
+- [ ] **Container user:** containers run as root, so on Linux `.out/` gets
+  root-owned files (`make clean` and `make root` delete through a container).
+  Evaluate running builds as the host user (`--user $(id -u):$(id -g)`).
+  Check first that payload ownership in packages stays root:root (PM must
+  normalize ownership when packing) and that no recipe needs root at build
+  time. Adopt it only if the whole world still builds identically.
 
-Known open XSH items:
-- `assert xs |> where . == "a" |> len == 1` reports `check.desugar: pipeline
-  sugar was not desugared` instead of checking or giving a real diagnostic.
+Known open XSH items: none blocking. The `check.desugar` pipeline error is
+fixed in xsh (non-call value stages get `check.ambiguous-grouping` or
+`check.pipeline-stage`).
 - An incremental seed build once failed to link `xshi` while XSH was being
   committed to concurrently. The rerun passed.
 
