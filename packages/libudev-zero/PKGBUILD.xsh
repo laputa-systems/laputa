@@ -9,10 +9,10 @@ export const name = "libudev-zero"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "1.0.3"
+export const ver = "1.0.5"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "0bd89b657d62d019598e6c7ed726ff8fed80e8ba092a83b484d66afb80b77da5",
+        sha256: "bf4372f79ddbe6b0e266a3d2994ffac7018a7edf4f87632aecb5176565d96138",
       },
     ],
   },
@@ -62,8 +62,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
-  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes"]
-  let defs = ["-D_XOPEN_SOURCE=700"]
+  # Flags from the Makefile's XCFLAGS with PREFIX=/usr. libudev looks up USB
+  # vendor and product names in usb.ids and leaves them unset when it is absent.
+  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wno-unused-parameter"]
+  let defs = ["-D_XOPEN_SOURCE=700", "-DUSB_IDS_PATH=\"/usr/share/hwdata/usb.ids\""]
   let includes = []
   let srcs = [p"udev.c", p"udev_list.c", p"udev_device.c", p"udev_monitor.c", p"udev_enumerate.c"]
 
