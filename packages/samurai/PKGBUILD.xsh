@@ -8,10 +8,10 @@ export const name = "samurai"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.2"
+export const ver = "1.3"
 
 ## Package recipe export.
-export const rel = "10"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -30,7 +30,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "3b8cf51548dfc49b7efe035e191ff5e1963ebc4fe8f6064a5eefc5343eaf78a5",
+        sha256: "1bc020a9e133432df51911ac71cc34322f828934d9a2282ba2916d88c15976af",
       },
     ],
   },
@@ -46,8 +46,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   let triple = f"{os.machine}-linux-musl"
 
   # samurai has a simple hand-written Makefile; compile all .c files directly.
-  # Source list from the Makefile's OBJ variable.
-  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wno-unused-parameter"]
+  # Source list and flags from the Makefile's OBJ and ALL_CFLAGS, with OS=posix.
+  # Its LDLIBS=-lrt is omitted: musl's librt is an empty stub.
+  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wshadow", "-Wmissing-prototypes", "-Wpedantic", "-Wno-unused-parameter"]
 
   let samu = make.c_program(
     {
@@ -64,6 +65,7 @@ export proc build(dest: Path) [fs, process, env, error] {
         p"graph.c",
         p"htab.c",
         p"log.c",
+        p"os-posix.c",
         p"parse.c",
         p"samu.c",
         p"scan.c",
