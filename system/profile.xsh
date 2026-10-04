@@ -130,3 +130,21 @@ forbidden-sonames\t{value.forbidden_sonames.join(",")}
 export pure forbidden_runtime_packages(value: types.SystemProfile, runtime_packages: List[Str]) -> List[Str] {
   [name for name in runtime_packages if name in value.forbidden_packages]
 }
+
+# A forbidden entry names a library by its base name (`libLLVM`), while real
+# sonames carry a version (`libLLVM.so.23`, `libLLVM-23.so`,
+# `libpython3.13.so.1.0`). An entry matches when the soname continues it with
+# a `.`, `-`, or digit, so `libLLVM` never matches an unrelated `libLLVMish`.
+## Whether `soname` belongs to a library the profile forbids.
+export pure soname_is_forbidden(value: types.SystemProfile, soname: Str) -> Bool {
+  for entry in value.forbidden_sonames {
+    return true when soname == entry
+
+    if soname.starts_with(entry) and soname.byte_len() > entry.byte_len() {
+      let next = soname.byte_slice(entry.byte_len(), 1)
+      return true when next == "." or next == "-" or next in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    }
+  }
+
+  false
+}

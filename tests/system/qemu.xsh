@@ -261,3 +261,10 @@ test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, time,
     Err(problem) => assert "QEMU exited before qemu-dwl-foot proof" in problem.message, problem.message
   }
 }
+
+test test_qmp_socket_fits_a_unix_socket_path_from_any_checkout_depth [error] {
+  let deep = fp"/{["very-long-directory-name" for _ in range(12)].join("/")}/target/laputa/qemu-dwl-foot"
+  let socket = build.outputs(deep).qmp_socket.display()
+  assert socket.byte_len() < 108, socket
+  assert build.outputs(deep).qmp_socket != build.outputs(p"/other/target/laputa/qemu-dwl-foot").qmp_socket
+}

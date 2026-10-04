@@ -93,12 +93,12 @@ proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemPro
     continue unless entry.kind == "file"
 
     if let Ok(info) = elf.inspect(entry.path) {
-      if info.soname in profile.forbidden_sonames {
+      if system_profile.soname_is_forbidden(profile, info.soname) {
         return Err(ContainerBuildError.Failed(f"generation provides forbidden SONAME {info.soname}"))
       }
 
       for soname in info.needed {
-        if soname in profile.forbidden_sonames {
+        if system_profile.soname_is_forbidden(profile, soname) {
           return Err(ContainerBuildError.Failed(f"generation needs forbidden SONAME {soname}"))
         }
       }

@@ -21,6 +21,14 @@ export type ProfileOutputs = {
   screenshot: Path,
 }
 
+# A Unix socket path must fit sockaddr_un's 108 bytes, and a checkout's
+# target/ can sit deeper than that (a git worktree, say). The QMP socket lives
+# in /tmp, named by the output root so two checkouts never share one.
+## The QMP control socket for the profile whose outputs live in `root`.
+export pure qmp_socket_path(root: Path) -> Path {
+  fp"/tmp/laputa-qmp-{bytes.from_text(root.display()).sha256().hex()[..16]}.sock"
+}
+
 ## Derive every profile output path from one profile-owned root directory.
 export pure outputs(root: Path) -> ProfileOutputs {
   {
@@ -36,7 +44,7 @@ export pure outputs(root: Path) -> ProfileOutputs {
     build_log: fp"{root}/build.log",
     console_log: fp"{root}/console.log",
     qemu_log: fp"{root}/qemu.log",
-    qmp_socket: fp"{root}/qmp.sock",
+    qmp_socket: qmp_socket_path(root),
     screenshot: fp"{root}/screenshot.ppm",
   }
 }
