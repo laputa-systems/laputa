@@ -123,11 +123,14 @@ Stop the mirror with Ctrl-C when done.
   - A new seed rebuilds only `xsh`.
   - A PM edit rebuilds only `laputa-pm`, which packages the PM tree.
   - A recipe `rel` bump rebuilds that package and its build dependents.
-- Published tuples are immutable. A rebuilt `xsh` or `laputa-pm` keeps its
-  `ver`/`rel`, so publishing it conflicts with the mirror's earlier
-  artifact. The local mirror is derived state: stop it, remove
-  `.out/mirror`, restart it, and publish again. The other way is to bump the
-  package's `rel`.
+- Published objects are immutable and content-addressed: each is named by
+  its artifact key (and proof key), and the index row is the only mutable
+  pointer. A rebuilt `xsh` or `laputa-pm` keeps its `ver`/`rel`;
+  `make publish` uploads it under new names and replaces only its index row.
+  A row behind the mirror's `ver`/`rel` is refused. Reverting a change and
+  publishing again moves the row back to the earlier, still-published key.
+  `make root` imports the key each row names, which must be the key the
+  checkout plans. See "Publication" in [PM](PM.md).
 
 ## Profile plan
 

@@ -4,12 +4,19 @@
 bucket and exposes authenticated `PUT` publishing for:
 
 - `index.json`
-- `packages/<arch>/<name>/<name>-<ver>-<rel>.tar.gz`
-- `metadata/<arch>/<name>/<name>-<ver>-<rel>.json`
+- `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`
+- `metadata/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
+- `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
 - `sources/<name>/<name>-<ver>-<rel>-<arch>-src.tar.bz2`
 
-The mirror accepts the older `packages/<name>/...` object path for existing
-arm64 packages, but new PM uploads use the arch-qualified path. Source mirrors
+Package objects are content-addressed: `<artifact12>` and `<proof12>` are the
+first twelve hex digits of the row's `artifact_key` and `proof_key`. A rebuild
+under the same ver-rel uploads new objects and replaces only its `index.json`
+row, which is the sole mutable pointer; PM uploads objects with
+`If-None-Match: *`. An index row that names any content-addressed object must
+name exactly the objects of its keys. Legacy objects (`<name>-<ver>-<rel>`
+names, and the older `packages/<name>/...` path) and the index rows that point
+at them stay readable, but writes accept only content-addressed names. Source mirrors
 are target-architecture-specific and their paths are derived from the package
 index entry; the index does not store a source filename.
 
@@ -30,7 +37,7 @@ make local DATA=.out/mirror SOURCES=.cache/sources PORT=3000
 ```
 
 - Objects live at `DATA_DIR/<key>` (for example
-  `DATA_DIR/packages/aarch64/zlib/zlib-1.3.2-5.tar.gz`). Writes land in a temp
+  `DATA_DIR/packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz`). Writes land in a temp
   file beside the object and are renamed into place, so readers never see a
   partial object. Chunked uploads stage under `DATA_DIR/.uploads`.
 - Reads and writes need no token; a client may send none. `PUT` objects and
@@ -306,7 +313,9 @@ cargo run --bin laputa-mirror-publish -- \
   .out/laputa-bootstrap-build-essential-native-repo
 ```
 
-The publisher:
+The publisher uploads the objects the exported index names, so the export must
+use content-addressed package names (`pm repo publish` to a `file://` tree
+writes them):
 
 1. Uploads every package tarball from `packages/<arch>/`.
 2. Uploads package metadata sidecars from `metadata/<arch>/`.

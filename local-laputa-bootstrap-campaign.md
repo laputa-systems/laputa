@@ -402,10 +402,8 @@ laputa/
       remote.
   - **Open:**
     - **Immutable tuples versus D2.** A new seed or a PM edit rebuilds `xsh`
-      or `laputa-pm` under the same `ver`/`rel`, and publishing it is an
-      immutable-tuple conflict. For now, wipe `.out/mirror` (derived state)
-      or bump `rel`. A real fix needs a decision: derive those packages'
-      release from their inputs, or let the local mirror replace a tuple.
+      or `laputa-pm` under the same `ver`/`rel`, and publishing it was an
+      immutable-tuple conflict. Resolved by D8; see the follow-up below.
     - **One flaky seed build.** An incremental `make seed` once failed
       linking `xshi`: rust-lld could not open an `.rcgu.o` in the
       bind-mounted target dir. XSH was being committed to concurrently, and
@@ -413,6 +411,44 @@ laputa/
     - **XSH checker bug.** `assert xs |> where . == "a" |> len == 1` reports
       `check.desugar: pipeline sugar was not desugared` instead of checking
       or giving a real diagnostic.
+
+**Phase 2 follow-up: content-addressed package identity (D8).**
+- **Done (2026-10-03).**
+  - **Naming:** published objects are named by key:
+    - `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`;
+    - `metadata/` and `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`.
+
+    The proof key is in the JSON names because a proof-only change re-proves
+    the same payload.
+  - **The index row is the only mutable pointer.** The same `ver`-`rel` with
+    a new key replaces the row. A row behind the remote's `ver`-`rel` is
+    refused at publish time; `make publish` plans offline, so the plan-time
+    check never saw the remote. The same keys with different bytes fail at
+    the immutable object upload.
+  - **Retries.** An HTTP `412` on an object whose bytes match is accepted, as
+    `file://` remotes already did, so a retried or reverted publish
+    completes.
+  - **Mirror.** Writes accept only content-addressed package names. An index
+    row that names a content-addressed object must name exactly its keys'
+    objects. Rows that point at legacy tuple-named objects stay valid and
+    readable, so existing indexes keep publishing.
+  - **Generations and system bundles** already followed artifact keys; a
+    test now pins it. No install or upgrade path compared `ver`-`rel`.
+  - **Arch.** Publication takes the arch from the plan target. A test
+    publishes an x86_64 plan.
+  - **The discarded-value lint** (`check.ignored-result`) had nothing left
+    to migrate.
+  - **End to end on macOS,** against the Phase 2 mirror data (31 rows with
+    legacy names):
+
+    | Step | Wall time | Result |
+    |---|---|---|
+    | `make mirror` | ~1 s | binary already built |
+    | `make publish STOP=pre-cmake` | 12.1 s | `laputa-pm` rebuilt by the PM edits and replaced under `1-15`; the other 30 rows moved to content-addressed names, keys unchanged |
+    | `make publish` again | 9.3 s | 31 already published |
+    | scratch comment in `packages/xinit/PKGBUILD.xsh`, `make publish` | 9.3 s | only `xinit` rebuilt; only its row moved (`88dff857…` → `d2f3e271…`, still `1-9`) |
+    | revert, `make publish` | 9.1 s | the row moved back to `88dff857…`; the existing objects were accepted by byte comparison; the index matches the pre-scratch one |
+    | `make root PKGS="baselayout xsh xinit musl"` | 19.2 s | 4 exact mirror artifacts at the current keys; 324 files, 12 ELF, none dynamic; the root's `xsh` runs |
 
 **Phase 3, up to 4 lanes in parallel: cleanup and docs.**
 - **Docs:**
@@ -434,7 +470,6 @@ laputa/
 - Unused build dependencies to drop: tailscale's build-host `llvm-toolchain`, foot's `utf8proc` (grapheme clustering disabled), and m4's `musl` (m4 is an XSH script).
 - The `packages/linux/tests` kbuild tests have no make target. On macOS they fail writing `/var/cache/laputa`; give them a target and a cache under `.out/`.
 
-- `pm/repo.xsh` publication hardcodes `aarch64` (payload, metadata and proof paths and the index `arch`); take the arch from the plan target before publishing x86_64;
 - the x86_64 seed;
 - cmake, linux and the rest of the world;
 - kbuild speed;
@@ -474,6 +509,13 @@ laputa/
   is not compiled in-world.
 - **D7. The mirror gains a local-only mode:** filesystem storage, plain HTTP
   on 127.0.0.1, no auth. Production S3 and WebAuthn behavior stays.
+- **D8. Package identity is content-addressed** (settled 2026-10-03).
+  - Published payload, metadata and proof objects are named by artifact key
+    (and proof key) and are never replaced.
+  - The index row is the only mutable pointer. Publishing a rebuild under the
+    same `ver`-`rel` replaces the row, not the objects.
+  - A row behind the remote's `ver`-`rel` is refused. `ver`-`rel` is for
+    display and ordering; roots and generations follow keys.
 
 ## Sequencing note
 

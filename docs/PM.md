@@ -109,7 +109,9 @@ never a plan or artifact key.
 
 `repo publish` selects the completed plan nodes from verified receipts, uploads
 immutable payload, metadata, and proof objects, then updates the index last.
-It publishes to `XSH_PM_REPO`. `file://` trees and the loopback local mirror
+Objects are named by key and the index row is the only mutable pointer (see
+"Publication" below). It publishes to `XSH_PM_REPO`, under the plan target's
+arch. `file://` trees and the loopback local mirror
 (`http://127.0.0.1[:PORT]`, `http://localhost[:PORT]`) need no token and are
 sent none; any other remote needs `LAPUTA_TOKEN` from the process environment.
 PM does not store credentials.
@@ -197,8 +199,8 @@ every package after an executor change that alters payloads; bump a recipe's
 another `BUILD_EPOCH` is rejected.
 
 When a dependency is rebuilt, `repo plan` builds its dependents even if the
-remote index already holds their tuple; publishing them under the same tuple
-is the immutable-tuple conflict `repo publish` reports. A recipe tuple behind
+remote index already holds their tuple, and when the remote row's artifact key
+differs from the local one it builds rather than reuses. A recipe tuple behind
 the remote's is rejected, because publishing it would move the index back.
 
 `pm/store.xsh` accepts only validated keys under `STORE/v2/`; older layouts
@@ -217,6 +219,43 @@ payload once, directly into the root, after a metadata-only ownership check
 closure only: a runtime-only dependency may not be built yet when its
 dependent is proved, so package proofs never check its files. Recipes see the build root as both
 `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`.
+
+### Publication
+
+Package identity is the artifact key; `ver`-`rel` is for display and ordering.
+Because keys exclude the executor, a new seed, a PM edit, or a rebuilt
+dependency rebuilds a package under the same `ver`-`rel`. Remote objects are
+therefore content-addressed (`pm/util.xsh::remote_binary_rel`,
+`remote_metadata_rel`, `remote_proof_rel`):
+
+```text
+packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz
+metadata/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json
+proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json
+```
+
+`<artifact12>` and `<proof12>` are the first twelve hex digits of the artifact
+and proof keys; the index row carries both in full. Metadata and proof also
+name the proof key because a proof-only change re-proves the same payload.
+Objects are uploaded with `If-None-Match: *` and never replaced; an existing
+object is accepted only when its bytes match, so a retried publication
+completes. `<arch>` and the index row's `arch` come from the plan target.
+
+`pm/repo.xsh::repo_merge_publication` treats the index row (one per arch and
+name) as the only mutable pointer:
+
+- an identical row is already published;
+- a row whose `ver`-`rel` is behind the remote's is refused (`make publish`
+  plans offline, so this is where it meets the remote);
+- otherwise the row is replaced, which publishes a rebuild under the same
+  `ver`-`rel` (a new key) or a newer release. Earlier objects stay published.
+
+The same keys with different bytes (another store's non-reproducible payload)
+fail at the object upload. Root composition and generations follow artifact
+keys, not `ver`-`rel`: a rebuilt package yields a new generation digest and a
+new system bundle key. Rows published before content-addressed names point at
+legacy `<name>-<ver>-<rel>` objects; they stay readable, and republishing the
+artifact moves the row to content-addressed names.
 
 ## Root composition
 
