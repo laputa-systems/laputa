@@ -220,3 +220,102 @@ export proc verify_artifact_receipt(path_value: Path, node: types.PlanNode, payl
     )
   }
 }
+
+# A small C driver for interactive proofs: XSH has no pseudoterminal API, and
+# terminal programs (less, tmux) behave differently without a tty.
+# `ptydrive ROWS COLS TIMEOUT_MS [EXPECT SEND]... -- ARGV...` starts ARGV on a
+# fresh pty of that size; each step waits until the output since the previous
+# step contains EXPECT, then writes SEND. It copies all output to stdout and
+# exits 0 only if every EXPECT arrived and the child exited 0 (2 on timeout).
+const pty_driver_source = """/* ptydrive: see pm/proof.xsh. */
+#define _GNU_SOURCE
+#include <errno.h>
+#include <poll.h>
+#include <pty.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
+static long now_ms(void) {
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static char buf[1 << 20];
+static size_t len, mark;
+
+static int pump(int fd, int wait_ms) {
+	struct pollfd p = {fd, POLLIN, 0};
+	if (poll(&p, 1, wait_ms) <= 0) return 0;
+	ssize_t n = read(fd, buf + len, sizeof(buf) - 1 - len);
+	if (n <= 0) return -1;
+	fwrite(buf + len, 1, (size_t)n, stdout);
+	len += (size_t)n;
+	buf[len] = 0;
+	return 1;
+}
+
+int main(int argc, char **argv) {
+	int sep = 0;
+	for (int i = 4; i < argc; i++) if (strcmp(argv[i], "--") == 0) { sep = i; break; }
+	if (argc < 6 || sep == 0 || (sep - 4) % 2 != 0) {
+		fprintf(stderr, "usage: ptydrive ROWS COLS TIMEOUT_MS [EXPECT SEND]... -- ARGV...\\n");
+		return 64;
+	}
+	struct winsize ws = {(unsigned short)atoi(argv[1]), (unsigned short)atoi(argv[2]), 0, 0};
+	long deadline = now_ms() + atol(argv[3]);
+	int fd;
+	pid_t pid = forkpty(&fd, NULL, NULL, &ws);
+	if (pid < 0) { perror("forkpty"); return 1; }
+	if (pid == 0) {
+		execv(argv[sep + 1], argv + sep + 1);
+		perror("execv");
+		_exit(127);
+	}
+	for (int i = 4; i < sep; i += 2) {
+		while (memmem(buf + mark, len - mark, argv[i], strlen(argv[i])) == NULL) {
+			if (now_ms() > deadline || pump(fd, 50) < 0) {
+				fflush(stdout);
+				fprintf(stderr, "ptydrive: did not see %s\\n", argv[i]);
+				kill(pid, SIGKILL);
+				return 2;
+			}
+		}
+		mark = len;
+		if (write(fd, argv[i + 1], strlen(argv[i + 1])) < 0) { perror("write"); return 1; }
+	}
+	int status;
+	for (;;) {
+		pid_t r = waitpid(pid, &status, WNOHANG);
+		if (r == pid) break;
+		if (now_ms() > deadline) {
+			fflush(stdout);
+			fprintf(stderr, "ptydrive: child did not exit\\n");
+			kill(pid, SIGKILL);
+			return 2;
+		}
+		if (pump(fd, 50) < 0) usleep(10000);
+	}
+	while (pump(fd, 0) > 0) {}
+	fflush(stdout);
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : 3;
+}
+"""
+
+## Compiles the pseudoterminal driver into `dir` with the proof host's `cc`
+## and returns its path. The driver runs on the build host, so only native
+## proofs use it.
+export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path] {
+  let cc = process.which("cc")?
+  let source = fp"{dir}/ptydrive.c"
+  let binary = fp"{dir}/ptydrive"
+  fs.write(source, pty_driver_source)?
+  run $cc "-O2" $source "-o" $binary ?
+  binary
+}
