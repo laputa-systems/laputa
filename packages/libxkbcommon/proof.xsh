@@ -18,6 +18,21 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     "proof-libxkbcommon",
     "the XKB config root has no evdev rules",
   )?
+
+  # Every lookup path must name the installed system, never the build root.
+  let pc = fp"{root}/usr/lib/pkgconfig/xkbcommon.pc".read_text()?
+
+  for lookup in ["/usr/share/xkeyboard-config-2.d", "/usr/share/xkeyboard-config.d", "/etc/xkb"] {
+    proof.ensure(lookup in strings, "proof-libxkbcommon", f"libxkbcommon does not look up {lookup}")?
+    proof.ensure(lookup in pc, "proof-libxkbcommon", f"xkbcommon.pc does not name {lookup}")?
+  }
+
+  proof.ensure("build-root" not in pc, "proof-libxkbcommon", "xkbcommon.pc names the build root")?
+  proof.ensure(
+    [entry for entry in strings if "build-root" in entry] == [],
+    "proof-libxkbcommon",
+    "libxkbcommon names the build root",
+  )?
   print "libxkbcommon ok"
 }
 

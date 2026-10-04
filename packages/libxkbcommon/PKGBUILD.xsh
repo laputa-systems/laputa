@@ -138,11 +138,40 @@ yacc = 'vendored parser'
   fs.write(meson, text)?
 }
 
+error XkbcommonError = Patch(message: Str)
+
+# pkgconf reports xkeyboard-config.pc's path variables under the build root's
+# sysroot, so the legacy root read from xkb_base would name the build root.
+# Without it, meson falls back to prefix/datadir/X11/xkb, the installed path.
+proc patch_legacy_root() [fs, error] {
+  let meson = p"meson.build"
+  let text = meson.read_text()?
+  let lookup = """XKB_LEGACY_ROOT = ''
+foreach v: ['-2', '']
+    xkeyboard_config_dep = dependency(f'xkeyboard-config@v@', required: false)
+    if xkeyboard_config_dep.found()
+        XKB_LEGACY_ROOT = xkeyboard_config_dep.get_variable(
+            pkgconfig: 'xkb_base',
+            default_value: ''
+        )
+        break
+    endif
+endforeach
+"""
+
+  if lookup not in text {
+    return Err(XkbcommonError.Patch("meson.build no longer reads the legacy XKB root from pkg-config"))?
+  }
+
+  fs.write(meson, text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))?
+}
+
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let pc = pm_env.pkg_config_context()?
   patch_vendored_parser()?
+  patch_legacy_root()?
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -151,7 +180,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build" ?
+    # The extension paths default to xkeyboard-config.pc's xkb_root, which pkgconf
+    # reports under the build root's sysroot; name the installed paths instead.
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d" "-Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build" ?
     run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.13.2" ?
 
     env ({
