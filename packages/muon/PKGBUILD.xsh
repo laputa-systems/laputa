@@ -41,20 +41,37 @@ export const filetree = [{path: p"usr/bin/muon", kind: "binary"}]
 
 error MuonError = Patch(message: Str)
 
-# Musl provides realtime interfaces in libc, and its librt.so is a symlink to
-# libc.so, which has no SONAME. muon resolves find_library() to that file's
-# path, so linking it would record the build root's librt.so path as a
-# DT_NEEDED entry that no runtime root can satisfy.
-proc patch_realtime_dependency() [fs, error] {
-  let meson = p"src/platform/meson.build"
-  let text = fs.read_text(meson)?
-  let lookup = "    librt = cc.find_library('rt', required: false)\n"
+# muon links a library that find_library() finds in the compiler's own search
+# directories by its path, where Meson passes `-l<name>`. Musl's libm, librt,
+# libdl, and libpthread are symlinks to libc.so, which has no SONAME, so a
+# path link records the build root's path as DT_NEEDED and the result loads
+# nowhere else. Like Meson, link such a library by name unless a static one
+# was asked for.
+proc patch_system_library_links() [fs, error] {
+  let compiler = p"src/functions/compiler.c"
+  let text = fs.read_text(compiler)?
+  let lookup = """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
+			return (struct find_library_result){ found, find_library_found_location_system_dirs };
+		}
+"""
 
   if lookup not in text {
-    return Err(MuonError.Patch(f"{meson} no longer looks up librt"))?
+    return Err(MuonError.Patch(f"{compiler} no longer resolves libraries in the system directories"))?
   }
 
-  fs.write(meson, text.replace(lookup, "    librt = declare_dependency()\n"))?
+  fs.write(
+    compiler,
+    text.replace(
+      lookup,
+      """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
+			if (!(flags & (find_library_flag_only_static | find_library_flag_prefer_static))) {
+				return (struct find_library_result){ make_str(wk, libname), find_library_found_location_link_arg };
+			}
+			return (struct find_library_result){ found, find_library_found_location_system_dirs };
+		}
+""",
+    ),
+  )?
 }
 
 ## Package recipe export.
@@ -70,7 +87,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }
 
-  patch_realtime_dependency()?
+  patch_system_library_links()?
   fs.mkdir(p"build")?
 
   if cross_build {

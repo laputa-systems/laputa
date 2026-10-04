@@ -20,6 +20,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
       return Err(ScriptError.Failed("proof-muon", "muon version produced no output"))?
     }
 
+    # fontconfig 2.18 requires meson 1.11 semantics.
+    if "meson compatibility version 1.11" not in trimmed {
+      return Err(ScriptError.Failed("proof-muon", f"muon is not meson 1.11 compatible: {trimmed}"))?
+    }
+
     print "muon ok: "${trimmed}
   } else {
     print "muon ok: cross-built "${pm_util.target_arch()?}
