@@ -1,8 +1,17 @@
-target
-.env
-.xsh-linux-host
-.xsh-linux-scratch
-.xsh-linux-tools
-.out
+# Derived state and fetched inputs.
+.out/
+.cache/
+target/
+
+# Mirror build outputs.
+mirror/target/
+mirror/node_modules/
+mirror/static/js/*.js
 *.deb
-tools/__pycache__
+
+# PM build leftovers written beside recipes.
+packages/run-package-build.trace
+packages/*/run-package-build.xsh
+
+# Local secrets; nothing in the tree reads them.
+.env
