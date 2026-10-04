@@ -248,6 +248,7 @@ test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   assert "type=bind,src=/s/xsh,dst=/bin/xsh,readonly" in argv
   assert "type=bind,src=/work/laputa/.out/world/aarch64,dst=/output" in argv
   assert "type=bind,src=/work/laputa/.out/artifacts/aarch64,dst=/artifacts" in argv
+  assert "type=bind,src=/work/laputa/.out/cache/linux-kbuild,dst=/var/cache/laputa/linux-kbuild" in argv
   assert ! (argv |> any .starts_with("XSH_PM_REPO"))
   assert argv[argv.len() - 2] == "/bin/xsh"
 }

@@ -123,6 +123,21 @@ export pure world_store(laputa_root: Path, arch: Str) -> Path {
   fp"{laputa_root}/.out/artifacts/{arch}"
 }
 
+# A kernel build reads and writes its discovered-plan and archive-plan caches
+# at /var/cache/laputa/linux-kbuild. Inside a throwaway container that never
+# survives, so every changed kernel rediscovered its whole Kbuild graph. Each
+# entry is checked against a fingerprint of the kernel source and .config
+# before use, so a stale entry is rebuilt, never trusted.
+## The linux recipe's Kbuild plan cache, kept across builds under `.out/`.
+export pure world_kbuild_cache(laputa_root: Path) -> Path {
+  fp"{laputa_root}/.out/cache/linux-kbuild"
+}
+
+## The container mount of `world_kbuild_cache` at the path the linux recipe uses.
+export pure world_kbuild_cache_mount_argv(laputa_root: Path) -> List[Str] {
+  ["--mount", f"type=bind,src={world_kbuild_cache(laputa_root)},dst=/var/cache/laputa/linux-kbuild"]
+}
+
 ## Construct one offline package-tools run: `output` at /output, `store` at /artifacts.
 export pure world_container_argv(
   docker: Path,
@@ -149,6 +164,7 @@ export pure world_container_argv(
     f"type=bind,src={output},dst=/output",
     "--mount",
     f"type=bind,src={store},dst=/artifacts",
+    @world_kbuild_cache_mount_argv(laputa_root),
     "--workdir",
     "/src/laputa",
     tag,
@@ -174,6 +190,7 @@ proc world_run(
 ) [fs, process, error] {
   fs.mkdir(output)?
   fs.mkdir(store)?
+  fs.mkdir(world_kbuild_cache(container.laputa_root))?
   let argv = world_container_argv(
     container.docker,
     container.laputa_root,

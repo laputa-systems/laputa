@@ -1,5 +1,6 @@
 ##! Native Linux Docker command construction for Laputa profile builds.
 use seed.images as images
+use seed.world as world
 use seed.xsh_seed as xsh_seed
 use system.types as types
 
@@ -47,6 +48,7 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
   let seed = xsh_seed.xsh_seed_require(laputa_root, arch)?
   let artifact_root = artifact_store_root(laputa_root, arch)
   fs.mkdir(artifact_root)?
+  fs.mkdir(world.world_kbuild_cache(laputa_root))?
 
   let image = images.ensure_package_tools(docker, laputa_root, seed_arch)?
   DockerConfig(
@@ -81,6 +83,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     f"type=bind,src={value.output_root},dst=/output",
     "--mount",
     f"type=bind,src={value.artifact_root},dst=/artifacts",
+    @world.world_kbuild_cache_mount_argv(value.laputa_root),
     "--workdir",
     "/src/laputa",
     "--env",

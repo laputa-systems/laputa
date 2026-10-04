@@ -81,6 +81,7 @@ test test_native_docker_command_mounts_only_declared_inputs [error] {
   assert ! (argv |> any "/src/packages" in .)
   assert "type=bind,src=/work/laputa/target/laputa/qemu-dwl-foot,dst=/output" in argv
   assert "type=bind,src=/work/laputa/.out/artifacts/aarch64,dst=/artifacts" in argv
+  assert "type=bind,src=/work/laputa/.out/cache/linux-kbuild,dst=/var/cache/laputa/linux-kbuild" in argv
   assert ! (argv |> any "type=volume" in .)
   assert "XSH_MODULE_PATH=/src/laputa" in argv
   assert "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv
