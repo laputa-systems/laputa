@@ -59,10 +59,13 @@ pure xsh_seed_registry_stamp(laputa_root: Path) -> Path {
   fp"{laputa_root}/.cache/cargo/Cargo.lock.sha256"
 }
 
+## One environment variable for a container command line.
+export type EnvVar = {name: Str, value: Str}
+
 ## The Rust flags XSH's Linux test path sets for a static musl target.
 ## These mirror XSH's `dev/targets.xsh::docker_test_env`; the `__isoc23_*`
 ## aliases match the CRT objects in the `xsh-test` image.
-export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[Record] {
+export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[EnvVar] {
   let flags = [
     "-C target-feature=+crt-static",
     "-C link-arg=--defsym=__isoc23_sscanf=sscanf",
