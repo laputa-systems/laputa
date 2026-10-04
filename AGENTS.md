@@ -46,7 +46,7 @@ sets it.
 | `make root PKGS="…"` | import PKGS from the mirror on the host, compose the root offline in a container, check its ELF files load and its xsh runs |
 | `make seed-smoke`, `make test-pm-docker` | the seed in package-tools with `--network none`: offline plan plus a PM subset, or the full PM suite |
 | `make test` | the `test-pm`, `test-system`, `test-xinit`, and `test-linux` native suites |
-| `make test-linux` | the kernel recipe's Kbuild tests (plan cache in `.out/cache/linux-kbuild`) and linux-headers' `headers_install` tests |
+| `make test-linux` | the kernel recipe's Kbuild tests (their own plan cache in `.out/cache/linux-kbuild-tests`) and linux-headers' `headers_install` tests |
 | `make test-pm-native` | the PM suite against XSH_ROOT's debug build (`make xsh-native`), with coverage under `target/coverage/` |
 | `make update-checksums` | `pm repo update-checksums` for every recipe (networked) |
 | `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` for `mirror/`; on Linux `mirror-test` runs in `xsh-test` offline, so no host Rust |
