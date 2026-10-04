@@ -9,10 +9,10 @@ export const name = "libva"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "2.22.0"
+export const ver = "2.24.1"
 
 ## Exported declaration `rel`.
-export const rel = "8"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "libdrm", "wayland-libs-client"]
@@ -34,7 +34,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "e3da2250654c8d52b3f59f8cb3f3d8e7fb1a2ee64378dbc400fbc5663de7edb8",
+        sha256: "eec6050b52876f229bd35e9df17cd31a06785e18e6f7990c445b584628483d67",
       },
     ],
   },
@@ -175,7 +175,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libva-drm.so.2.2200.0",
+    path: p"usr/lib/libva-drm.so.2.2400.0",
     kind: "binary",
   },
   {
@@ -187,7 +187,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libva-wayland.so.2.2200.0",
+    path: p"usr/lib/libva-wayland.so.2.2400.0",
     kind: "binary",
   },
   {
@@ -199,7 +199,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libva.so.2.2200.0",
+    path: p"usr/lib/libva.so.2.2400.0",
     kind: "binary",
   },
   {
