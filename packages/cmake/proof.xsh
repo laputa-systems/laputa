@@ -19,6 +19,15 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     return
   }
 
+  # The bootstrap's cmVersionConfig.h is written by the recipe; the installed
+  # cmake must report the release it was built from.
+  let ver = proof.package_version(rootfs, "cmake")?
+  let version = run.text $cmake "--version" ?
+
+  if ! version.starts_with(f"cmake version {ver}\n") {
+    Err(ScriptError.Failed("cmake-proof-version", f"cmake --version reported {version.lines()[0]}, expected {ver}"))?
+  }
+
   let tmp = fp"{rootfs}/var/tmp/proof-cmake"
   fs.remove(tmp, missing_ok: true)?
   fs.mkdir(tmp)?

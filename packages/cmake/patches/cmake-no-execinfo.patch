@@ -1,7 +1,7 @@
 diff --git a/Source/kwsys/SystemInformation.cxx b/Source/kwsys/SystemInformation.cxx
 --- a/Source/kwsys/SystemInformation.cxx
 +++ b/Source/kwsys/SystemInformation.cxx
-@@ -154,18 +154,8 @@ using ResourceLimitType = struct rlimit;
+@@ -154,18 +154,8 @@
  #  include <OS.h>
  #endif
  
@@ -23,7 +23,7 @@ diff --git a/Source/kwsys/SystemInformation.cxx b/Source/kwsys/SystemInformation
 diff --git a/Source/kwsys/kwsysPlatformTestsCXX.cxx b/Source/kwsys/kwsysPlatformTestsCXX.cxx
 --- a/Source/kwsys/kwsysPlatformTestsCXX.cxx
 +++ b/Source/kwsys/kwsysPlatformTestsCXX.cxx
-@@ -102,24 +102,6 @@ int main()
+@@ -102,24 +102,6 @@
  }
  #endif
  

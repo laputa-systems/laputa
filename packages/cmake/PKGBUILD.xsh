@@ -12,16 +12,17 @@ export const name = "cmake"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "4.3.1"
+export const ver = "4.4.4"
 
 ## Exported declaration `rel`.
-export const rel = "18"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "llvm-toolchain"]
 
+# The bundled libuv includes <linux/errqueue.h> for UDP error queues.
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "samurai"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
@@ -34,7 +35,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "0798f4be7a1a406a419ac32db90c2956936fecbf50db3057d7af47d69a2d7edb",
+        sha256: "bd24c30d80a7744ae84b845ff080cc8453b06c622ef01066564108e9cefc44cf",
       },
     ],
   },
@@ -47,7 +48,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "d6ebd2eb89ded4e1e12afccfabc9bcac4220c920f424118d411062ea23ece2cb",
+        sha256: "08e674e01c57a48c421e511ebd9c307a1cce0261b7ddcbce62beaa1ae38daabf",
       },
     ],
   },
@@ -60,7 +61,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "eaba0ffc090bf877775e6d94ce63fdd702477962d5366d3f0e260ea2446e4aac",
+        sha256: "6072cd0f85c2d5481e107299f58a435cf890847e2efb9495e9d20abfac5a08d3",
       },
     ],
   },
@@ -73,7 +74,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b334fe4e1718220cd3a0110759575a91e10028d1959959941e198ce90a0e1f4d",
+        sha256: "c52822f9f20143b1224dff25dd341556670cb4be418170d237e6b482439a692f",
       },
     ],
   },
@@ -141,12 +142,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   let bsdir = p"Bootstrap.cmk"
   fs.mkdir(bsdir)?
 
+  let version_parts = ver.split(".")
+
   fs.write(
     fp"{bsdir}/cmVersionConfig.h",
-    """#define CMake_VERSION_MAJOR 4
-#define CMake_VERSION_MINOR 3
-#define CMake_VERSION_PATCH 1
-#define CMake_VERSION "4.3.1"
+    f"""#define CMake_VERSION_MAJOR {version_parts[0]}
+#define CMake_VERSION_MINOR {version_parts[1]}
+#define CMake_VERSION_PATCH {version_parts[2]}
+#define CMake_VERSION "{ver}"
 """,
   )?
 
@@ -351,6 +354,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmBreakCommand",
       "cmBuildCommand",
       "cmBuildDatabase",
+      "cmCMakeDiagnosticCommand",
       "cmCMakeLanguageCommand",
       "cmCMakeMinimumRequired",
       "cmList",
@@ -359,7 +363,9 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmCMakePolicyCommand",
       "cmCMakeString",
       "cmCPackPropertiesGenerator",
+      "cmCacheDocumentationTable",
       "cmCacheManager",
+      "cmCachePatternTable",
       "cmCommands",
       "cmCommonTargetGenerator",
       "cmComputeComponentGraph",
@@ -379,10 +385,14 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmCxxModuleUsageEffects",
       "cmDefinePropertyCommand",
       "cmDefinitions",
+      "cmDiagnostics",
+      "cmDiagnosticContext",
+      "cmDiscoverTestsCommand",
       "cmDocumentationFormatter",
       "cmELF",
       "cmEnableLanguageCommand",
       "cmEnableTestingCommand",
+      "cmEnvironment",
       "cmEvaluatedTargetProperty",
       "cmExecProgramCommand",
       "cmExecuteProcessCommand",
@@ -403,6 +413,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmFileCopier",
       "cmFileInstaller",
       "cmFileSet",
+      "cmFileSetMetadata",
       "cmFileTime",
       "cmFileTimeCache",
       "cmFileTimes",
@@ -419,6 +430,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmFunctionCommand",
       "cmFSPermissions",
       "cmGeneratedFileStream",
+      "cmGeneratorFileSet",
+      "cmGeneratorFileSets",
       "cmGenExContext",
       "cmGenExEvaluation",
       "cmGeneratorExpression",
@@ -430,12 +443,12 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmGeneratorExpressionParser",
       "cmGeneratorTarget",
       "cmGeneratorTarget_CompatibleInterface",
+      "cmGeneratorTarget_HeaderSetVerification",
       "cmGeneratorTarget_IncludeDirectories",
       "cmGeneratorTarget_Link",
       "cmGeneratorTarget_LinkDirectories",
       "cmGeneratorTarget_Options",
       "cmGeneratorTarget_Sources",
-      "cmGeneratorTarget_TargetPropertyEntry",
       "cmGeneratorTarget_TransitiveProperty",
       "cmGetCMakePropertyCommand",
       "cmGetDirectoryPropertyCommand",
@@ -459,6 +472,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmInstallCommand",
       "cmInstallCommandArguments",
       "cmInstallCxxModuleBmiGenerator",
+      "cmInstallDirs",
       "cmInstallDirectoryGenerator",
       "cmInstallExportGenerator",
       "cmInstallFileSetGenerator",
@@ -554,6 +568,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "cmTargetLinkOptionsCommand",
       "cmTargetPrecompileHeadersCommand",
       "cmTargetPropCommandBase",
+      "cmTargetPropertyEntry",
       "cmTargetPropertyComputer",
       "cmTargetSourcesCommand",
       "cmTargetTraceDependencies",

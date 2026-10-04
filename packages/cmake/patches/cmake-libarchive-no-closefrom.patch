@@ -1,7 +1,7 @@
 diff --git a/Utilities/cmlibarchive/CMakeLists.txt b/Utilities/cmlibarchive/CMakeLists.txt
 --- a/Utilities/cmlibarchive/CMakeLists.txt
 +++ b/Utilities/cmlibarchive/CMakeLists.txt
-@@ -1513,7 +1513,9 @@ CHECK_FUNCTION_EXISTS_GLIBC(arc4random_buf HAVE_ARC4RANDOM_BUF)
+@@ -1522,8 +1522,10 @@
  CHECK_FUNCTION_EXISTS_GLIBC(chflags HAVE_CHFLAGS)
  CHECK_FUNCTION_EXISTS_GLIBC(chown HAVE_CHOWN)
  CHECK_FUNCTION_EXISTS_GLIBC(chroot HAVE_CHROOT)
@@ -13,9 +13,8 @@ diff --git a/Utilities/cmlibarchive/CMakeLists.txt b/Utilities/cmlibarchive/CMak
 +set(HAVE_CLOSE_RANGE 0)
  CHECK_FUNCTION_EXISTS_GLIBC(ctime_r HAVE_CTIME_R)
  CHECK_FUNCTION_EXISTS_GLIBC(fchdir HAVE_FCHDIR)
-@@ -1596,10 +1598,12 @@ CHECK_FUNCTION_EXISTS_GLIBC(wctomb HAVE_WCTOMB)
- CHECK_FUNCTION_EXISTS_GLIBC(wcrtomb HAVE_WCRTOMB)
- check_symbol_exists(wcscmp wchar.h HAVE_WCSCMP)
+ CHECK_FUNCTION_EXISTS_GLIBC(fchflags HAVE_FCHFLAGS)
+@@ -1607,8 +1609,10 @@
  check_symbol_exists(wcscpy wchar.h HAVE_WCSCPY)
  check_symbol_exists(wcslen wchar.h HAVE_WCSLEN)
  CHECK_FUNCTION_EXISTS_GLIBC(wctomb HAVE_WCTOMB)
