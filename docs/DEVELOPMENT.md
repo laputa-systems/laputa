@@ -83,6 +83,52 @@ from the source cache; the Docker adapter mounts the seed at
 no image. Image tags are content keys over each image's own inputs
 (`seed/images.xsh`).
 
+## Local bootstrap
+
+The bootstrap needs no remote mirror and contacts the network only in
+`make fetch`. From a clean checkout on Apple Silicon (OrbStack, `linux/arm64`):
+
+```bash
+cd "$LAPUTA_ROOT"
+make clean                     # all derived state; .cache/ survives
+make fetch                     # networked: sources, crates, images; a no-op once cached
+make seed                      # the XSH seed from XSH_ROOT, then package-tools
+make mirror                    # in a second terminal: http://127.0.0.1:3000, data in .out/mirror
+make build STOP=pre-cmake      # offline build of every package that needs neither cmake nor linux
+make publish STOP=pre-cmake    # the same plan's artifacts into the mirror
+make root PKGS="baselayout xsh xinit musl m4 less pkgconf libxkbcommon pixman"
+```
+
+Stop the mirror with Ctrl-C when done.
+
+- `make build` plans and builds in package-tools with `--network none`. The
+  checkout, with the source cache, is mounted read-only. The artifact store
+  `.out/artifacts/<arch>` is the build cache. Plans are offline, so every node
+  reads `build`, and the executor reuses every artifact the store holds. An
+  unchanged rebuild takes about 10 s, most of it planning.
+- `PKGS="a b"` plans those packages' closures. `STOP=pre-cmake` runs
+  `repo plan --all --without cmake --without linux`. With neither, the build
+  covers every package. The plan is `.out/world/<arch>/plan.json`.
+- Containers have no network, so only host processes reach the mirror.
+  `make publish` builds the same selection (a no-op when nothing changed),
+  then `pm repo publish` uploads that plan's verified artifacts from the
+  host.
+- `make root` plans `PKGS` against the mirror on the host and requires every
+  node to be an exact mirror artifact. It imports their closure into a fresh
+  store under `.out/world/<arch>/root/`. Then, in an offline container, it
+  composes the root, runs musl's loader over every dynamic ELF inside it, and
+  runs the root's own `xsh`. `inspection.json`, `files.txt` and
+  `generation.json` land beside that store.
+- Artifact keys exclude the XSH runners and PM:
+  - A new seed rebuilds only `xsh`.
+  - A PM edit rebuilds only `laputa-pm`, which packages the PM tree.
+  - A recipe `rel` bump rebuilds that package and its build dependents.
+- Published tuples are immutable. A rebuilt `xsh` or `laputa-pm` keeps its
+  `ver`/`rel`, so publishing it conflicts with the mirror's earlier
+  artifact. The local mirror is derived state: stop it, remove
+  `.out/mirror`, restart it, and publish again. The other way is to bump the
+  package's `rel`.
+
 ## Profile plan
 
 ```bash

@@ -335,6 +335,84 @@ laputa/
 3. `root compose` a small root from the local mirror.
 4. Run a rebuild with no changes and confirm it is a no-op that finishes in
    seconds.
+- **Done (2026-10-03).** Every pre-cmake package builds offline from the
+  local seed. Measured on Apple Silicon with OrbStack, one step at a time:
+
+  | Step | Wall time | Result |
+  |---|---|---|
+  | `make clean` | 1.3 s | `.out/`, `target/` and Laputa images removed |
+  | `make fetch` | 5.4 s | no-op: 58 sources cached, 0 fetched |
+  | `make seed` (cold) | 336 s | release cargo build in `xsh-test`, then package-tools |
+  | `make mirror` | ~1 s | cargo binary already built |
+  | `make plan STOP=pre-cmake` | 6–9 s | 31 packages |
+  | `make build STOP=pre-cmake` (cold) | 123 s | 31 built and proved, 0 failures |
+  | `make publish` | 3.4 s | 31 artifacts into the mirror |
+  | `make root PKGS="baselayout xsh xinit musl m4 less pkgconf libxkbcommon pixman"` | 34 s | see below |
+  | `make build STOP=pre-cmake` (no change) | 8–11 s | every artifact reused |
+
+  - **The 31 packages:**
+    - alsa-lib, alsa-ucm-conf, baselayout, bison, ca-certificates, cargo,
+      eudev-lite, flex, font-ttf-hack, gnu-stubs, hwdata, iptables;
+    - laputa-fs, laputa-pm, less, libdisplay-info, libxkbcommon,
+      llvm-toolchain, m4, mdevd, muon, musl;
+    - pixman, pixman-dev, pkgconf, samurai, tailscale, tllist, xinit,
+      xkeyboard-config, xsh.
+
+    Nothing in the set needed porting.
+  - **The root:** `make root` imported the 13-artifact closure from the
+    mirror into a fresh store and composed the 10 runtime packages. The root
+    holds 659 files and 19 ELF objects, three of them dynamic executables.
+    Every dynamic object names `/lib/ld-musl-aarch64.so.1` and loads under
+    musl's loader inside the root; the only needed sonames are `libc.so` and
+    `libm.so`. The root's own `xsh` runs a script inside it. No build tool
+    leaked into the root.
+  - **The no-op rebuild** is mostly the offline plan: a container that loads
+    all 70 recipes.
+  - **D2 proofs** (each scratch commit was dropped afterwards):
+
+    | Change | Rebuilt | Time |
+    |---|---|---|
+    | `make seed` again, same XSH | nothing: identical seed bytes | 2.1 s seed, 11 s build |
+    | XSH moved `ff2cfa21` → `58979a17`, plus the port below | `xsh`, `laputa-pm`, `laputa-fs`, `xkeyboard-config`, `libxkbcommon` | 15 s |
+    | a `pm/cli.xsh` comment | `laputa-pm`, which packages the PM tree | 11 s |
+    | m4 `rel` 10 → 11 | `m4`, `flex` (its build dependent) | 12 s |
+
+    `laputa-fs` and `xkeyboard-config` rebuilt because the port edited their
+    inputs, and `libxkbcommon` because it builds against `xkeyboard-config`.
+  - **Publish design.** Containers never get a network. Builds read the
+    read-only source cache, and the store is the build cache. Only host
+    processes reach the loopback mirror:
+    - `make publish` builds the same selection (a no-op when nothing
+      changed), then runs `pm repo publish` on the host;
+    - `make root` plans and imports from the mirror on the host, then
+      composes offline in a container.
+
+    `seed/world.xsh` owns these commands.
+  - **Fixes:**
+    - **`repo plan --all --without PACKAGE...`** computes the stop line from
+      the real graph.
+    - **Bootstrap edges no longer select packages.** musl's seeded `zlib`
+      edge pulled zlib and cmake into every plan, leaving only 10 packages
+      before cmake.
+    - **Ported to current XSH.** It now rejects ignored results. Four sites
+      failed: `pm/sources.xsh`, `pm/fingerprint.xsh`, the xkeyboard-config
+      recipe and `mkfs.ext4.xsh`.
+    - **`make publish` no longer publishes a stale plan.** It had pushed a
+      reverted m4 `rel` bump, and the checkout then planned as behind the
+      remote.
+  - **Open:**
+    - **Immutable tuples versus D2.** A new seed or a PM edit rebuilds `xsh`
+      or `laputa-pm` under the same `ver`/`rel`, and publishing it is an
+      immutable-tuple conflict. For now, wipe `.out/mirror` (derived state)
+      or bump `rel`. A real fix needs a decision: derive those packages'
+      release from their inputs, or let the local mirror replace a tuple.
+    - **One flaky seed build.** An incremental `make seed` once failed
+      linking `xshi`: rust-lld could not open an `.rcgu.o` in the
+      bind-mounted target dir. XSH was being committed to concurrently, and
+      the rerun passed.
+    - **XSH checker bug.** `assert xs |> where . == "a" |> len == 1` reports
+      `check.desugar: pipeline sugar was not desugared` instead of checking
+      or giving a real diagnostic.
 
 **Phase 3, up to 4 lanes in parallel: cleanup and docs.**
 - **Docs:**

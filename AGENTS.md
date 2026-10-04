@@ -19,7 +19,7 @@ read `../xsh/AGENTS.md` before editing there or before writing `.xsh` here.
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 installer image and its QEMU harness (separate from the profile CLI) |
 | `xinit/` | `xinit.xsh`, Laputa's pure-XSH PID 1 and service manager, with tests and docs |
 | `mirror/` | Rust package mirror server, a host tool (not a Laputa package) |
-| `seed/`, `Dockerfile.package-tools`, `bootstrap-llvm-seed.xsh` | local XSH seed build and the content-keyed host-tools and package-tools images |
+| `seed/`, `Dockerfile.package-tools`, `bootstrap-llvm-seed.xsh` | local XSH seed build, the content-keyed host-tools and package-tools images, and the package world on the seed (`seed/world.xsh`) |
 | `tests/pm/`, `tests/system/`, `tests/integration/` | native XSH tests; `*/fixtures/` are staged inputs, not tests |
 | `docs/` | PM, packaging, development, QEMU, and infrastructure notes |
 | `.out/`, `.cache/` | derived state and fetched inputs (gitignored) |
@@ -36,6 +36,9 @@ and the Makefile sets it.
 | `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes) |
 | `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
 | `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
+| `make build [PKGS="a b" \| STOP=pre-cmake]`, `make plan` | PM plan and build in package-tools with `--network none` into `.out/artifacts/<arch>` (the build cache); `STOP=pre-cmake` is `repo plan --all --without cmake --without linux` |
+| `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground); publish builds the selection, then uploads it from the host |
+| `make root PKGS="…"` | import PKGS from the mirror on the host, compose the root offline in a container, check its ELF files load and its xsh runs |
 | `make seed-smoke`, `make test-pm-docker` | the seed in package-tools with `--network none`: offline plan plus a PM subset, or the full PM suite |
 | `make test` | `test-pm`, `test-system`, `test-xinit` native suites |
 | `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` inside `mirror/` |
