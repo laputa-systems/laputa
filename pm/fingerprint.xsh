@@ -58,11 +58,53 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
   Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
 }
 
+# Returns whether a relative symlink target, resolved lexically from the link's
+# own directory, stays inside the tree that contains the link at `rel`.
+pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
+  if target == "" or target.starts_with("/") {
+    return false
+  }
+
+  var depth = rel.display().split("/").len() - 1
+
+  for component in target.split("/") {
+    if component == "" or component == "." {
+      continue
+    }
+
+    if component == ".." {
+      if depth == 0 {
+        return false
+      }
+
+      depth -= 1
+    } else {
+      depth += 1
+    }
+  }
+
+  true
+}
+
+# The digest records a symlink by its target text and never follows it, so a
+# link out of the recipe directory would let content outside the digest reach
+# a build (staging copies the recipe tree) or a module import. Recipes name
+# shared code through the module path and outside inputs as `repository/`
+# sources instead.
 proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
   var lines: List[Str] = []
 
   for entry in fs.walk(pkg.dir) |> sort-by .path {
     let rel = entry.path.strip_prefix(pkg.dir)?
+    continue when ignored_tree_path(rel)
+
+    if entry.kind == "symlink" {
+      let target = entry.path.readlink()?.display()
+
+      if ! symlink_target_stays_within(rel, target) {
+        return Err(types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"))
+      }
+    }
 
     if package_input_path(rel) {
       lines = lines.push(tree_entry_line(pkg.dir, entry.path, "package-file")?)

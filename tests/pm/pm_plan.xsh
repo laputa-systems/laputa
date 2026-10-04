@@ -108,6 +108,26 @@ test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { 
   test.eq(build_input(first)?, build_input(second)?)
 }
 
+# The digest records symlinks by target text and never follows them, so a link
+# out of the recipe directory is refused instead of hiding outside content.
+test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, error] { |ctx|
+  let pkg = copied_package(ctx, "fingerprint-symlinks")?
+  let first = build_input(pkg)?
+  fs.symlink(p"input.txt", fp"{pkg.dir}/files/inside.txt")?
+  test.eq(build_input(pkg)? == first, false)?
+
+  for target in [p"../../pm", p"/etc", p"files/../../outside.xsh"] {
+    let link = fp"{pkg.dir}/escape"
+    fs.remove(link, missing_ok: true)?
+    fs.symlink(target, link)?
+
+    match build_input(pkg) {
+      Ok(_) => test.fail(f"recipe symlink to {target} unexpectedly fingerprinted")?
+      Err(problem) => assert "recipe symlink escape -> " in problem.message and "leaves the recipe directory" in problem.message
+    }
+  }
+}
+
 pure empty_remote_snapshot() -> types.RemoteSnapshot {
   {target: types.Aarch64LinuxMusl, index_sha256: "remote-index", packages: []}
 }
