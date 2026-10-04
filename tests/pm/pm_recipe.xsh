@@ -47,7 +47,7 @@ test test_recipe_loads_valid_metapackage [fs, env, error] {
 test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, error] {
   let pkg = recipe.load_package(p"packages/linux")?
   assert pkg.name == "linux"
-  assert pkg.ver == "7.0.5"
+  assert pkg.ver == "7.2.9"
   assert pkg.kind == types.Payload
 }
 

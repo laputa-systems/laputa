@@ -7,10 +7,10 @@ export const name = "linux"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "7.0.5"
+export const ver = "7.2.9"
 
 ## Exported declaration `rel`.
-export const rel = "37"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps: List[Str] = []
@@ -21,10 +21,30 @@ export const mkdeps_host = ["llvm-toolchain", "flex", "bison"]
 ## Exported declaration `nostrip`.
 export const nostrip = true
 
+# The config fragments and generated inputs track the kernel release; after
+# a version change, regenerate them on the host from an extracted tarball,
+# with the pinned LLVM (the llvm-toolchain tarball) as LLVM=<dir>/bin/ and
+# RUSTC, BINDGEN and PAHOLE pointed at missing tools so host Rust does not
+# leak into Kconfig. Each step uses an out-of-tree O= directory.
+# - files/config/<arch>/base-<arch>.fragment: copy the current fragment to
+#   O/.config, run `make ARCH=<x86_64|arm64> LLVM=... HOSTCC=gcc
+#   olddefconfig`, and keep O/.config.
+# - With that config, `make ... prepare` writes the rest:
+#   - files/generated/bounds.h and rq-offsets.h: O/include/generated/ (arm64;
+#     x86 compiles them during the build);
+#   - files/sysreg-defs.h: O/arch/arm64/include/generated/asm/sysreg-defs.h;
+#   - files/generated/cpufeaturemasks-x86.h:
+#     O/arch/x86/include/generated/asm/cpufeaturemasks.h;
+#   - files/generated/timeconst.h: O/include/generated/timeconst.h (depends
+#     only on CONFIG_HZ, which both arches set to 250).
+# - files/generated/inat-tables-x86.c: `awk -f
+#   arch/x86/tools/gen-insn-attr-x86.awk arch/x86/lib/x86-opcode-map.txt`.
+# - files/generated/sha256-core.S and sha512-core.S: `perl
+#   lib/crypto/arm64/sha2-armv8.pl void <out>` with the output name.
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
-    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.5.tar.xz",
+    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
     kind: "auto",
     architectures: [
       "all",
@@ -32,7 +52,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "965fb0a1c1675399fc60c6063b227c0523041b5f9a662b66462f1212c438ac3c",
+        sha256: "b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba",
       },
     ],
   },
@@ -45,7 +65,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b69717cf35e83b24d971c26e809e0dd60439a7c3d49f0995fb64af8bd9170fe4",
+        sha256: "2c273f3751472adb893fec0a1d8637a940456a737b73f36a665d38988d69bec7",
       },
     ],
   },
@@ -58,7 +78,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b226254e98a98612525d2232fc4eaaab090278cb40c1e3e505a2d7af5a5c4565",
+        sha256: "44fd9e092e8dc9aa994b8d768a306289cd1cd7d2c0369c4c9961686384dd7994",
       },
     ],
   },
@@ -71,7 +91,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "7578877f5978e66b4ac04d66a2fcdbd6d183ae56d2786f4538d32af0c477e317",
+        sha256: "30a702fcb9e77bbe2d2e699f8b8f1986f2e42b362115723faf508087505fd422",
       },
     ],
   },
@@ -102,19 +122,6 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"files/generated/asm-offsets.h",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "bf747255377b322ae454423b1af409d30740196b3403f42ca5b7a38e2549ccb4",
-      },
-    ],
-  },
-  {
     source: p"files/generated/rq-offsets.h",
     kind: "auto",
     architectures: [
@@ -123,7 +130,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "01f07c33f1d15437c763a3bc0a9a8437a0404f6fbef80ef9781698e0d47cf8d4",
+        sha256: "8c4e70118cb529cc043fdbd0ffa3d73a4cc6432df99c33aa63a4a32919389b30",
       },
     ],
   },
@@ -162,20 +169,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "fb569e0a080248ddba05c62f450de98b4916190c9c3bea49afb12dc1e5b95fe9",
-      },
-    ],
-  },
-  {
-    source: p"files/generated/x86-alternative-stubs.h",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "8233e16fc51b623088d439051bc895dc8275d7a4f2f3bd640eb1acc35a888af8",
+        sha256: "7abeb73bfd7ad632543e19348adf7894b4340b237e1ceeb08432692d2492eaae",
       },
     ],
   },

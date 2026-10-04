@@ -3146,6 +3146,7 @@
 #define ID_AA64ZFR0_EL1_B16B16_NI                       UL(0b0000)
 #define ID_AA64ZFR0_EL1_B16B16_IMP                      UL(0b0001)
 #define ID_AA64ZFR0_EL1_B16B16_BFSCALE                  UL(0b0010)
+#define ID_AA64ZFR0_EL1_B16B16_B16MM                    UL(0b0011)
 
 #define ID_AA64ZFR0_EL1_BF16                            GENMASK(23, 20)
 #define ID_AA64ZFR0_EL1_BF16_MASK                       GENMASK(23, 20)
@@ -3191,6 +3192,7 @@
 #define ID_AA64ZFR0_EL1_SVEver_SVE2                     UL(0b0001)
 #define ID_AA64ZFR0_EL1_SVEver_SVE2p1                   UL(0b0010)
 #define ID_AA64ZFR0_EL1_SVEver_SVE2p2                   UL(0b0011)
+#define ID_AA64ZFR0_EL1_SVEver_SVE2p3                   UL(0b0100)
 
 #define ID_AA64ZFR0_EL1_RES0                            (UL(0) | GENMASK_ULL(63, 60) | GENMASK_ULL(39, 36) | GENMASK_ULL(31, 28) | GENMASK_ULL(11, 8))
 #define ID_AA64ZFR0_EL1_RES1                            (UL(0))
@@ -3212,6 +3214,14 @@
 #define ID_AA64SMFR0_EL1_FA64_NI                        UL(0b0)
 #define ID_AA64SMFR0_EL1_FA64_IMP                       UL(0b1)
 
+#define ID_AA64SMFR0_EL1_LUT6                           GENMASK(61, 61)
+#define ID_AA64SMFR0_EL1_LUT6_MASK                      GENMASK(61, 61)
+#define ID_AA64SMFR0_EL1_LUT6_SHIFT                     61
+#define ID_AA64SMFR0_EL1_LUT6_WIDTH                     1
+#define ID_AA64SMFR0_EL1_LUT6_SIGNED                    false
+#define ID_AA64SMFR0_EL1_LUT6_NI                        UL(0b0)
+#define ID_AA64SMFR0_EL1_LUT6_IMP                       UL(0b1)
+
 #define ID_AA64SMFR0_EL1_LUTv2                          GENMASK(60, 60)
 #define ID_AA64SMFR0_EL1_LUTv2_MASK                     GENMASK(60, 60)
 #define ID_AA64SMFR0_EL1_LUTv2_SHIFT                    60
@@ -3229,6 +3239,7 @@
 #define ID_AA64SMFR0_EL1_SMEver_SME2                    UL(0b0001)
 #define ID_AA64SMFR0_EL1_SMEver_SME2p1                  UL(0b0010)
 #define ID_AA64SMFR0_EL1_SMEver_SME2p2                  UL(0b0011)
+#define ID_AA64SMFR0_EL1_SMEver_SME2p3                  UL(0b0100)
 
 #define ID_AA64SMFR0_EL1_I16I64                         GENMASK(55, 52)
 #define ID_AA64SMFR0_EL1_I16I64_MASK                    GENMASK(55, 52)
@@ -3390,7 +3401,7 @@
 #define ID_AA64SMFR0_EL1_SMOP4_NI                       UL(0b0)
 #define ID_AA64SMFR0_EL1_SMOP4_IMP                      UL(0b1)
 
-#define ID_AA64SMFR0_EL1_RES0                           (UL(0) | GENMASK_ULL(62, 61) | GENMASK_ULL(51, 49) | GENMASK_ULL(31, 31) | GENMASK_ULL(27, 26) | GENMASK_ULL(22, 17) | GENMASK_ULL(15, 1))
+#define ID_AA64SMFR0_EL1_RES0                           (UL(0) | GENMASK_ULL(62, 62) | GENMASK_ULL(51, 49) | GENMASK_ULL(31, 31) | GENMASK_ULL(27, 26) | GENMASK_ULL(22, 17) | GENMASK_ULL(15, 1))
 #define ID_AA64SMFR0_EL1_RES1                           (UL(0))
 #define ID_AA64SMFR0_EL1_UNKN                           (UL(0))
 
@@ -3450,6 +3461,14 @@
 #define ID_AA64FPFR0_EL1_F8MM4_NI                       UL(0b0)
 #define ID_AA64FPFR0_EL1_F8MM4_IMP                      UL(0b1)
 
+#define ID_AA64FPFR0_EL1_F16MM2                         GENMASK(15, 15)
+#define ID_AA64FPFR0_EL1_F16MM2_MASK                    GENMASK(15, 15)
+#define ID_AA64FPFR0_EL1_F16MM2_SHIFT                   15
+#define ID_AA64FPFR0_EL1_F16MM2_WIDTH                   1
+#define ID_AA64FPFR0_EL1_F16MM2_SIGNED                  false
+#define ID_AA64FPFR0_EL1_F16MM2_NI                      UL(0b0)
+#define ID_AA64FPFR0_EL1_F16MM2_IMP                     UL(0b1)
+
 #define ID_AA64FPFR0_EL1_F8E4M3                         GENMASK(1, 1)
 #define ID_AA64FPFR0_EL1_F8E4M3_MASK                    GENMASK(1, 1)
 #define ID_AA64FPFR0_EL1_F8E4M3_SHIFT                   1
@@ -3466,7 +3485,7 @@
 #define ID_AA64FPFR0_EL1_F8E5M2_NI                      UL(0b0)
 #define ID_AA64FPFR0_EL1_F8E5M2_IMP                     UL(0b1)
 
-#define ID_AA64FPFR0_EL1_RES0                           (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(25, 2))
+#define ID_AA64FPFR0_EL1_RES0                           (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(25, 16) | GENMASK_ULL(14, 8))
 #define ID_AA64FPFR0_EL1_RES1                           (UL(0))
 #define ID_AA64FPFR0_EL1_UNKN                           (UL(0))
 
@@ -3744,7 +3763,7 @@
 #define ID_AA64DFR2_EL1_BWE_SIGNED                      false
 #define ID_AA64DFR2_EL1_BWE_NI                          UL(0b0000)
 #define ID_AA64DFR2_EL1_BWE_FEAT_BWE                    UL(0b0001)
-#define ID_AA64DFR2_EL1_BWE_FEAT_BWE2                   UL(0b0002)
+#define ID_AA64DFR2_EL1_BWE_FEAT_BWE2                   UL(0b0010)
 
 #define ID_AA64DFR2_EL1_STEP                            GENMASK(3, 0)
 #define ID_AA64DFR2_EL1_STEP_MASK                       GENMASK(3, 0)
@@ -3863,6 +3882,8 @@
 #define ID_AA64ISAR0_EL1_FHM_SIGNED                     false
 #define ID_AA64ISAR0_EL1_FHM_NI                         UL(0b0000)
 #define ID_AA64ISAR0_EL1_FHM_IMP                        UL(0b0001)
+#define ID_AA64ISAR0_EL1_FHM_F16F32DOT                  UL(0b0010)
+#define ID_AA64ISAR0_EL1_FHM_F16F32MM                   UL(0b0011)
 
 #define ID_AA64ISAR0_EL1_DP                             GENMASK(47, 44)
 #define ID_AA64ISAR0_EL1_DP_MASK                        GENMASK(47, 44)
@@ -4132,6 +4153,7 @@
 #define ID_AA64ISAR2_EL1_LUT_SIGNED                     false
 #define ID_AA64ISAR2_EL1_LUT_NI                         UL(0b0000)
 #define ID_AA64ISAR2_EL1_LUT_IMP                        UL(0b0001)
+#define ID_AA64ISAR2_EL1_LUT_LUT6                       UL(0b0010)
 
 #define ID_AA64ISAR2_EL1_CSSC                           GENMASK(55, 52)
 #define ID_AA64ISAR2_EL1_CSSC_MASK                      GENMASK(55, 52)
@@ -8037,6 +8059,33 @@
 #define ICC_IDR0_EL1_RES1                               (UL(0))
 #define ICC_IDR0_EL1_UNKN                               (UL(0))
 
+#define REG_ICC_HPPIR_EL1                               S3_0_C12_C10_3
+#define SYS_ICC_HPPIR_EL1                               sys_reg(3, 0, 12, 10, 3)
+#define SYS_ICC_HPPIR_EL1_Op0                           3
+#define SYS_ICC_HPPIR_EL1_Op1                           0
+#define SYS_ICC_HPPIR_EL1_CRn                           12
+#define SYS_ICC_HPPIR_EL1_CRm                           10
+#define SYS_ICC_HPPIR_EL1_Op2                           3
+
+#define ICC_HPPIR_EL1_HPPIV                             GENMASK(32, 32)
+#define ICC_HPPIR_EL1_HPPIV_MASK                        GENMASK(32, 32)
+#define ICC_HPPIR_EL1_HPPIV_SHIFT                       32
+#define ICC_HPPIR_EL1_HPPIV_WIDTH                       1
+
+#define ICC_HPPIR_EL1_TYPE                              GENMASK(31, 29)
+#define ICC_HPPIR_EL1_TYPE_MASK                         GENMASK(31, 29)
+#define ICC_HPPIR_EL1_TYPE_SHIFT                        29
+#define ICC_HPPIR_EL1_TYPE_WIDTH                        3
+
+#define ICC_HPPIR_EL1_ID                                GENMASK(23, 0)
+#define ICC_HPPIR_EL1_ID_MASK                           GENMASK(23, 0)
+#define ICC_HPPIR_EL1_ID_SHIFT                          0
+#define ICC_HPPIR_EL1_ID_WIDTH                          24
+
+#define ICC_HPPIR_EL1_RES0                              (UL(0) | GENMASK_ULL(63, 33) | GENMASK_ULL(28, 24))
+#define ICC_HPPIR_EL1_RES1                              (UL(0))
+#define ICC_HPPIR_EL1_UNKN                              (UL(0))
+
 #define REG_ICC_ICSR_EL1                                S3_0_C12_C10_4
 #define SYS_ICC_ICSR_EL1                                sys_reg(3, 0, 12, 10, 4)
 #define SYS_ICC_ICSR_EL1_Op0                            3
@@ -8088,6 +8137,23 @@
 #define ICC_ICSR_EL1_RES0                               (UL(0) | GENMASK_ULL(63, 48) | GENMASK_ULL(31, 16) | GENMASK_ULL(10, 6))
 #define ICC_ICSR_EL1_RES1                               (UL(0))
 #define ICC_ICSR_EL1_UNKN                               (UL(0))
+
+#define REG_ICC_IAFFIDR_EL1                             S3_0_C12_C10_5
+#define SYS_ICC_IAFFIDR_EL1                             sys_reg(3, 0, 12, 10, 5)
+#define SYS_ICC_IAFFIDR_EL1_Op0                         3
+#define SYS_ICC_IAFFIDR_EL1_Op1                         0
+#define SYS_ICC_IAFFIDR_EL1_CRn                         12
+#define SYS_ICC_IAFFIDR_EL1_CRm                         10
+#define SYS_ICC_IAFFIDR_EL1_Op2                         5
+
+#define ICC_IAFFIDR_EL1_IAFFID                          GENMASK(15, 0)
+#define ICC_IAFFIDR_EL1_IAFFID_MASK                     GENMASK(15, 0)
+#define ICC_IAFFIDR_EL1_IAFFID_SHIFT                    0
+#define ICC_IAFFIDR_EL1_IAFFID_WIDTH                    16
+
+#define ICC_IAFFIDR_EL1_RES0                            (UL(0) | GENMASK_ULL(63, 16))
+#define ICC_IAFFIDR_EL1_RES1                            (UL(0))
+#define ICC_IAFFIDR_EL1_UNKN                            (UL(0))
 
 #define ICC_PPI_ENABLERx_EL1_EN63                       GENMASK(63, 63)
 #define ICC_PPI_ENABLERx_EL1_EN63_MASK                  GENMASK(63, 63)
@@ -9637,6 +9703,21 @@
 #define SYS_SMIDR_EL1_CRm                               0
 #define SYS_SMIDR_EL1_Op2                               6
 
+#define SMIDR_EL1_NSMC                                  GENMASK(59, 56)
+#define SMIDR_EL1_NSMC_MASK                             GENMASK(59, 56)
+#define SMIDR_EL1_NSMC_SHIFT                            56
+#define SMIDR_EL1_NSMC_WIDTH                            4
+
+#define SMIDR_EL1_HIP                                   GENMASK(55, 52)
+#define SMIDR_EL1_HIP_MASK                              GENMASK(55, 52)
+#define SMIDR_EL1_HIP_SHIFT                             52
+#define SMIDR_EL1_HIP_WIDTH                             4
+
+#define SMIDR_EL1_AFFINITY2                             GENMASK(51, 32)
+#define SMIDR_EL1_AFFINITY2_MASK                        GENMASK(51, 32)
+#define SMIDR_EL1_AFFINITY2_SHIFT                       32
+#define SMIDR_EL1_AFFINITY2_WIDTH                       20
+
 #define SMIDR_EL1_IMPLEMENTER                           GENMASK(31, 24)
 #define SMIDR_EL1_IMPLEMENTER_MASK                      GENMASK(31, 24)
 #define SMIDR_EL1_IMPLEMENTER_SHIFT                     24
@@ -9652,14 +9733,191 @@
 #define SMIDR_EL1_SMPS_SHIFT                            15
 #define SMIDR_EL1_SMPS_WIDTH                            1
 
+#define SMIDR_EL1_SH                                    GENMASK(14, 13)
+#define SMIDR_EL1_SH_MASK                               GENMASK(14, 13)
+#define SMIDR_EL1_SH_SHIFT                              13
+#define SMIDR_EL1_SH_WIDTH                              2
+
 #define SMIDR_EL1_AFFINITY                              GENMASK(11, 0)
 #define SMIDR_EL1_AFFINITY_MASK                         GENMASK(11, 0)
 #define SMIDR_EL1_AFFINITY_SHIFT                        0
 #define SMIDR_EL1_AFFINITY_WIDTH                        12
 
-#define SMIDR_EL1_RES0                                  (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(14, 12))
+#define SMIDR_EL1_RES0                                  (UL(0) | GENMASK_ULL(63, 60) | GENMASK_ULL(12, 12))
 #define SMIDR_EL1_RES1                                  (UL(0))
 #define SMIDR_EL1_UNKN                                  (UL(0))
+
+#define REG_ICC_APR_EL1                                 S3_1_C12_C0_0
+#define SYS_ICC_APR_EL1                                 sys_reg(3, 1, 12, 0, 0)
+#define SYS_ICC_APR_EL1_Op0                             3
+#define SYS_ICC_APR_EL1_Op1                             1
+#define SYS_ICC_APR_EL1_CRn                             12
+#define SYS_ICC_APR_EL1_CRm                             0
+#define SYS_ICC_APR_EL1_Op2                             0
+
+#define ICC_APR_EL1_P31                                 GENMASK(31, 31)
+#define ICC_APR_EL1_P31_MASK                            GENMASK(31, 31)
+#define ICC_APR_EL1_P31_SHIFT                           31
+#define ICC_APR_EL1_P31_WIDTH                           1
+
+#define ICC_APR_EL1_P30                                 GENMASK(30, 30)
+#define ICC_APR_EL1_P30_MASK                            GENMASK(30, 30)
+#define ICC_APR_EL1_P30_SHIFT                           30
+#define ICC_APR_EL1_P30_WIDTH                           1
+
+#define ICC_APR_EL1_P29                                 GENMASK(29, 29)
+#define ICC_APR_EL1_P29_MASK                            GENMASK(29, 29)
+#define ICC_APR_EL1_P29_SHIFT                           29
+#define ICC_APR_EL1_P29_WIDTH                           1
+
+#define ICC_APR_EL1_P28                                 GENMASK(28, 28)
+#define ICC_APR_EL1_P28_MASK                            GENMASK(28, 28)
+#define ICC_APR_EL1_P28_SHIFT                           28
+#define ICC_APR_EL1_P28_WIDTH                           1
+
+#define ICC_APR_EL1_P27                                 GENMASK(27, 27)
+#define ICC_APR_EL1_P27_MASK                            GENMASK(27, 27)
+#define ICC_APR_EL1_P27_SHIFT                           27
+#define ICC_APR_EL1_P27_WIDTH                           1
+
+#define ICC_APR_EL1_P26                                 GENMASK(26, 26)
+#define ICC_APR_EL1_P26_MASK                            GENMASK(26, 26)
+#define ICC_APR_EL1_P26_SHIFT                           26
+#define ICC_APR_EL1_P26_WIDTH                           1
+
+#define ICC_APR_EL1_P25                                 GENMASK(25, 25)
+#define ICC_APR_EL1_P25_MASK                            GENMASK(25, 25)
+#define ICC_APR_EL1_P25_SHIFT                           25
+#define ICC_APR_EL1_P25_WIDTH                           1
+
+#define ICC_APR_EL1_P24                                 GENMASK(24, 24)
+#define ICC_APR_EL1_P24_MASK                            GENMASK(24, 24)
+#define ICC_APR_EL1_P24_SHIFT                           24
+#define ICC_APR_EL1_P24_WIDTH                           1
+
+#define ICC_APR_EL1_P23                                 GENMASK(23, 23)
+#define ICC_APR_EL1_P23_MASK                            GENMASK(23, 23)
+#define ICC_APR_EL1_P23_SHIFT                           23
+#define ICC_APR_EL1_P23_WIDTH                           1
+
+#define ICC_APR_EL1_P22                                 GENMASK(22, 22)
+#define ICC_APR_EL1_P22_MASK                            GENMASK(22, 22)
+#define ICC_APR_EL1_P22_SHIFT                           22
+#define ICC_APR_EL1_P22_WIDTH                           1
+
+#define ICC_APR_EL1_P21                                 GENMASK(21, 21)
+#define ICC_APR_EL1_P21_MASK                            GENMASK(21, 21)
+#define ICC_APR_EL1_P21_SHIFT                           21
+#define ICC_APR_EL1_P21_WIDTH                           1
+
+#define ICC_APR_EL1_P20                                 GENMASK(20, 20)
+#define ICC_APR_EL1_P20_MASK                            GENMASK(20, 20)
+#define ICC_APR_EL1_P20_SHIFT                           20
+#define ICC_APR_EL1_P20_WIDTH                           1
+
+#define ICC_APR_EL1_P19                                 GENMASK(19, 19)
+#define ICC_APR_EL1_P19_MASK                            GENMASK(19, 19)
+#define ICC_APR_EL1_P19_SHIFT                           19
+#define ICC_APR_EL1_P19_WIDTH                           1
+
+#define ICC_APR_EL1_P18                                 GENMASK(18, 18)
+#define ICC_APR_EL1_P18_MASK                            GENMASK(18, 18)
+#define ICC_APR_EL1_P18_SHIFT                           18
+#define ICC_APR_EL1_P18_WIDTH                           1
+
+#define ICC_APR_EL1_P17                                 GENMASK(17, 17)
+#define ICC_APR_EL1_P17_MASK                            GENMASK(17, 17)
+#define ICC_APR_EL1_P17_SHIFT                           17
+#define ICC_APR_EL1_P17_WIDTH                           1
+
+#define ICC_APR_EL1_P16                                 GENMASK(16, 16)
+#define ICC_APR_EL1_P16_MASK                            GENMASK(16, 16)
+#define ICC_APR_EL1_P16_SHIFT                           16
+#define ICC_APR_EL1_P16_WIDTH                           1
+
+#define ICC_APR_EL1_P15                                 GENMASK(15, 15)
+#define ICC_APR_EL1_P15_MASK                            GENMASK(15, 15)
+#define ICC_APR_EL1_P15_SHIFT                           15
+#define ICC_APR_EL1_P15_WIDTH                           1
+
+#define ICC_APR_EL1_P14                                 GENMASK(14, 14)
+#define ICC_APR_EL1_P14_MASK                            GENMASK(14, 14)
+#define ICC_APR_EL1_P14_SHIFT                           14
+#define ICC_APR_EL1_P14_WIDTH                           1
+
+#define ICC_APR_EL1_P13                                 GENMASK(13, 13)
+#define ICC_APR_EL1_P13_MASK                            GENMASK(13, 13)
+#define ICC_APR_EL1_P13_SHIFT                           13
+#define ICC_APR_EL1_P13_WIDTH                           1
+
+#define ICC_APR_EL1_P12                                 GENMASK(12, 12)
+#define ICC_APR_EL1_P12_MASK                            GENMASK(12, 12)
+#define ICC_APR_EL1_P12_SHIFT                           12
+#define ICC_APR_EL1_P12_WIDTH                           1
+
+#define ICC_APR_EL1_P11                                 GENMASK(11, 11)
+#define ICC_APR_EL1_P11_MASK                            GENMASK(11, 11)
+#define ICC_APR_EL1_P11_SHIFT                           11
+#define ICC_APR_EL1_P11_WIDTH                           1
+
+#define ICC_APR_EL1_P10                                 GENMASK(10, 10)
+#define ICC_APR_EL1_P10_MASK                            GENMASK(10, 10)
+#define ICC_APR_EL1_P10_SHIFT                           10
+#define ICC_APR_EL1_P10_WIDTH                           1
+
+#define ICC_APR_EL1_P9                                  GENMASK(9, 9)
+#define ICC_APR_EL1_P9_MASK                             GENMASK(9, 9)
+#define ICC_APR_EL1_P9_SHIFT                            9
+#define ICC_APR_EL1_P9_WIDTH                            1
+
+#define ICC_APR_EL1_P8                                  GENMASK(8, 8)
+#define ICC_APR_EL1_P8_MASK                             GENMASK(8, 8)
+#define ICC_APR_EL1_P8_SHIFT                            8
+#define ICC_APR_EL1_P8_WIDTH                            1
+
+#define ICC_APR_EL1_P7                                  GENMASK(7, 7)
+#define ICC_APR_EL1_P7_MASK                             GENMASK(7, 7)
+#define ICC_APR_EL1_P7_SHIFT                            7
+#define ICC_APR_EL1_P7_WIDTH                            1
+
+#define ICC_APR_EL1_P6                                  GENMASK(6, 6)
+#define ICC_APR_EL1_P6_MASK                             GENMASK(6, 6)
+#define ICC_APR_EL1_P6_SHIFT                            6
+#define ICC_APR_EL1_P6_WIDTH                            1
+
+#define ICC_APR_EL1_P5                                  GENMASK(5, 5)
+#define ICC_APR_EL1_P5_MASK                             GENMASK(5, 5)
+#define ICC_APR_EL1_P5_SHIFT                            5
+#define ICC_APR_EL1_P5_WIDTH                            1
+
+#define ICC_APR_EL1_P4                                  GENMASK(4, 4)
+#define ICC_APR_EL1_P4_MASK                             GENMASK(4, 4)
+#define ICC_APR_EL1_P4_SHIFT                            4
+#define ICC_APR_EL1_P4_WIDTH                            1
+
+#define ICC_APR_EL1_P3                                  GENMASK(3, 3)
+#define ICC_APR_EL1_P3_MASK                             GENMASK(3, 3)
+#define ICC_APR_EL1_P3_SHIFT                            3
+#define ICC_APR_EL1_P3_WIDTH                            1
+
+#define ICC_APR_EL1_P2                                  GENMASK(2, 2)
+#define ICC_APR_EL1_P2_MASK                             GENMASK(2, 2)
+#define ICC_APR_EL1_P2_SHIFT                            2
+#define ICC_APR_EL1_P2_WIDTH                            1
+
+#define ICC_APR_EL1_P1                                  GENMASK(1, 1)
+#define ICC_APR_EL1_P1_MASK                             GENMASK(1, 1)
+#define ICC_APR_EL1_P1_SHIFT                            1
+#define ICC_APR_EL1_P1_WIDTH                            1
+
+#define ICC_APR_EL1_P0                                  GENMASK(0, 0)
+#define ICC_APR_EL1_P0_MASK                             GENMASK(0, 0)
+#define ICC_APR_EL1_P0_SHIFT                            0
+#define ICC_APR_EL1_P0_WIDTH                            1
+
+#define ICC_APR_EL1_RES0                                (UL(0) | GENMASK_ULL(63, 32))
+#define ICC_APR_EL1_RES1                                (UL(0))
+#define ICC_APR_EL1_UNKN                                (UL(0))
 
 #define REG_ICC_CR0_EL1                                 S3_1_C12_C0_1
 #define SYS_ICC_CR0_EL1                                 sys_reg(3, 1, 12, 0, 1)
@@ -9679,12 +9937,22 @@
 #define ICC_CR0_EL1_IPPT_SHIFT                          32
 #define ICC_CR0_EL1_IPPT_WIDTH                          6
 
+#define ICC_CR0_EL1_LINK_IDLE                           GENMASK(2, 2)
+#define ICC_CR0_EL1_LINK_IDLE_MASK                      GENMASK(2, 2)
+#define ICC_CR0_EL1_LINK_IDLE_SHIFT                     2
+#define ICC_CR0_EL1_LINK_IDLE_WIDTH                     1
+
+#define ICC_CR0_EL1_LINK                                GENMASK(1, 1)
+#define ICC_CR0_EL1_LINK_MASK                           GENMASK(1, 1)
+#define ICC_CR0_EL1_LINK_SHIFT                          1
+#define ICC_CR0_EL1_LINK_WIDTH                          1
+
 #define ICC_CR0_EL1_EN                                  GENMASK(0, 0)
 #define ICC_CR0_EL1_EN_MASK                             GENMASK(0, 0)
 #define ICC_CR0_EL1_EN_SHIFT                            0
 #define ICC_CR0_EL1_EN_WIDTH                            1
 
-#define ICC_CR0_EL1_RES0                                (UL(0) | GENMASK_ULL(63, 39) | GENMASK_ULL(31, 1))
+#define ICC_CR0_EL1_RES0                                (UL(0) | GENMASK_ULL(63, 39) | GENMASK_ULL(31, 3))
 #define ICC_CR0_EL1_RES1                                (UL(0))
 #define ICC_CR0_EL1_UNKN                                (UL(0))
 
@@ -9841,6 +10109,174 @@
 #define SVCR_RES0                                       (UL(0) | GENMASK_ULL(63, 2))
 #define SVCR_RES1                                       (UL(0))
 #define SVCR_UNKN                                       (UL(0))
+
+#define REG_FPCR                                        S3_3_C4_C4_0
+#define SYS_FPCR                                        sys_reg(3, 3, 4, 4, 0)
+#define SYS_FPCR_Op0                                    3
+#define SYS_FPCR_Op1                                    3
+#define SYS_FPCR_CRn                                    4
+#define SYS_FPCR_CRm                                    4
+#define SYS_FPCR_Op2                                    0
+
+#define FPCR_AHP                                        GENMASK(26, 26)
+#define FPCR_AHP_MASK                                   GENMASK(26, 26)
+#define FPCR_AHP_SHIFT                                  26
+#define FPCR_AHP_WIDTH                                  1
+
+#define FPCR_DN                                         GENMASK(25, 25)
+#define FPCR_DN_MASK                                    GENMASK(25, 25)
+#define FPCR_DN_SHIFT                                   25
+#define FPCR_DN_WIDTH                                   1
+
+#define FPCR_FZ                                         GENMASK(24, 24)
+#define FPCR_FZ_MASK                                    GENMASK(24, 24)
+#define FPCR_FZ_SHIFT                                   24
+#define FPCR_FZ_WIDTH                                   1
+
+#define FPCR_RMode                                      GENMASK(23, 22)
+#define FPCR_RMode_MASK                                 GENMASK(23, 22)
+#define FPCR_RMode_SHIFT                                22
+#define FPCR_RMode_WIDTH                                2
+#define FPCR_RMode_RN                                   UL(0b00)
+#define FPCR_RMode_RP                                   UL(0b01)
+#define FPCR_RMode_RM                                   UL(0b10)
+#define FPCR_RMode_RZ                                   UL(0b11)
+
+#define FPCR_Stride                                     GENMASK(21, 20)
+#define FPCR_Stride_MASK                                GENMASK(21, 20)
+#define FPCR_Stride_SHIFT                               20
+#define FPCR_Stride_WIDTH                               2
+
+#define FPCR_FZ16                                       GENMASK(19, 19)
+#define FPCR_FZ16_MASK                                  GENMASK(19, 19)
+#define FPCR_FZ16_SHIFT                                 19
+#define FPCR_FZ16_WIDTH                                 1
+
+#define FPCR_Len                                        GENMASK(18, 16)
+#define FPCR_Len_MASK                                   GENMASK(18, 16)
+#define FPCR_Len_SHIFT                                  16
+#define FPCR_Len_WIDTH                                  3
+
+#define FPCR_IDE                                        GENMASK(15, 15)
+#define FPCR_IDE_MASK                                   GENMASK(15, 15)
+#define FPCR_IDE_SHIFT                                  15
+#define FPCR_IDE_WIDTH                                  1
+
+#define FPCR_EBF                                        GENMASK(13, 13)
+#define FPCR_EBF_MASK                                   GENMASK(13, 13)
+#define FPCR_EBF_SHIFT                                  13
+#define FPCR_EBF_WIDTH                                  1
+
+#define FPCR_IXE                                        GENMASK(12, 12)
+#define FPCR_IXE_MASK                                   GENMASK(12, 12)
+#define FPCR_IXE_SHIFT                                  12
+#define FPCR_IXE_WIDTH                                  1
+
+#define FPCR_UFE                                        GENMASK(11, 11)
+#define FPCR_UFE_MASK                                   GENMASK(11, 11)
+#define FPCR_UFE_SHIFT                                  11
+#define FPCR_UFE_WIDTH                                  1
+
+#define FPCR_OFE                                        GENMASK(10, 10)
+#define FPCR_OFE_MASK                                   GENMASK(10, 10)
+#define FPCR_OFE_SHIFT                                  10
+#define FPCR_OFE_WIDTH                                  1
+
+#define FPCR_DZE                                        GENMASK(9, 9)
+#define FPCR_DZE_MASK                                   GENMASK(9, 9)
+#define FPCR_DZE_SHIFT                                  9
+#define FPCR_DZE_WIDTH                                  1
+
+#define FPCR_IOE                                        GENMASK(8, 8)
+#define FPCR_IOE_MASK                                   GENMASK(8, 8)
+#define FPCR_IOE_SHIFT                                  8
+#define FPCR_IOE_WIDTH                                  1
+
+#define FPCR_NEP                                        GENMASK(2, 2)
+#define FPCR_NEP_MASK                                   GENMASK(2, 2)
+#define FPCR_NEP_SHIFT                                  2
+#define FPCR_NEP_WIDTH                                  1
+
+#define FPCR_AH                                         GENMASK(1, 1)
+#define FPCR_AH_MASK                                    GENMASK(1, 1)
+#define FPCR_AH_SHIFT                                   1
+#define FPCR_AH_WIDTH                                   1
+
+#define FPCR_FIZ                                        GENMASK(0, 0)
+#define FPCR_FIZ_MASK                                   GENMASK(0, 0)
+#define FPCR_FIZ_SHIFT                                  0
+#define FPCR_FIZ_WIDTH                                  1
+
+#define FPCR_RES0                                       (UL(0) | GENMASK_ULL(63, 27) | GENMASK_ULL(14, 14) | GENMASK_ULL(7, 3))
+#define FPCR_RES1                                       (UL(0))
+#define FPCR_UNKN                                       (UL(0))
+
+#define REG_FPSR                                        S3_3_C4_C4_1
+#define SYS_FPSR                                        sys_reg(3, 3, 4, 4, 1)
+#define SYS_FPSR_Op0                                    3
+#define SYS_FPSR_Op1                                    3
+#define SYS_FPSR_CRn                                    4
+#define SYS_FPSR_CRm                                    4
+#define SYS_FPSR_Op2                                    1
+
+#define FPSR_N                                          GENMASK(31, 31)
+#define FPSR_N_MASK                                     GENMASK(31, 31)
+#define FPSR_N_SHIFT                                    31
+#define FPSR_N_WIDTH                                    1
+
+#define FPSR_Z                                          GENMASK(30, 30)
+#define FPSR_Z_MASK                                     GENMASK(30, 30)
+#define FPSR_Z_SHIFT                                    30
+#define FPSR_Z_WIDTH                                    1
+
+#define FPSR_C                                          GENMASK(29, 29)
+#define FPSR_C_MASK                                     GENMASK(29, 29)
+#define FPSR_C_SHIFT                                    29
+#define FPSR_C_WIDTH                                    1
+
+#define FPSR_V                                          GENMASK(28, 28)
+#define FPSR_V_MASK                                     GENMASK(28, 28)
+#define FPSR_V_SHIFT                                    28
+#define FPSR_V_WIDTH                                    1
+
+#define FPSR_QC                                         GENMASK(27, 27)
+#define FPSR_QC_MASK                                    GENMASK(27, 27)
+#define FPSR_QC_SHIFT                                   27
+#define FPSR_QC_WIDTH                                   1
+
+#define FPSR_IDC                                        GENMASK(7, 7)
+#define FPSR_IDC_MASK                                   GENMASK(7, 7)
+#define FPSR_IDC_SHIFT                                  7
+#define FPSR_IDC_WIDTH                                  1
+
+#define FPSR_IXC                                        GENMASK(4, 4)
+#define FPSR_IXC_MASK                                   GENMASK(4, 4)
+#define FPSR_IXC_SHIFT                                  4
+#define FPSR_IXC_WIDTH                                  1
+
+#define FPSR_UFC                                        GENMASK(3, 3)
+#define FPSR_UFC_MASK                                   GENMASK(3, 3)
+#define FPSR_UFC_SHIFT                                  3
+#define FPSR_UFC_WIDTH                                  1
+
+#define FPSR_OFC                                        GENMASK(2, 2)
+#define FPSR_OFC_MASK                                   GENMASK(2, 2)
+#define FPSR_OFC_SHIFT                                  2
+#define FPSR_OFC_WIDTH                                  1
+
+#define FPSR_DZC                                        GENMASK(1, 1)
+#define FPSR_DZC_MASK                                   GENMASK(1, 1)
+#define FPSR_DZC_SHIFT                                  1
+#define FPSR_DZC_WIDTH                                  1
+
+#define FPSR_IOC                                        GENMASK(0, 0)
+#define FPSR_IOC_MASK                                   GENMASK(0, 0)
+#define FPSR_IOC_SHIFT                                  0
+#define FPSR_IOC_WIDTH                                  1
+
+#define FPSR_RES0                                       (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(26, 8) | GENMASK_ULL(6, 5))
+#define FPSR_RES1                                       (UL(0))
+#define FPSR_UNKN                                       (UL(0))
 
 #define REG_FPMR                                        S3_3_C4_C4_2
 #define SYS_FPMR                                        sys_reg(3, 3, 4, 4, 2)
@@ -13230,6 +13666,63 @@
 
 /* For GCSPR_EL2 fields see GCSPR_ELx */
 
+#define REG_HDBSSBR_EL2                                 S3_4_C2_C3_2
+#define SYS_HDBSSBR_EL2                                 sys_reg(3, 4, 2, 3, 2)
+#define SYS_HDBSSBR_EL2_Op0                             3
+#define SYS_HDBSSBR_EL2_Op1                             4
+#define SYS_HDBSSBR_EL2_CRn                             2
+#define SYS_HDBSSBR_EL2_CRm                             3
+#define SYS_HDBSSBR_EL2_Op2                             2
+
+#define HDBSSBR_EL2_BADDR                               GENMASK(55, 12)
+#define HDBSSBR_EL2_BADDR_MASK                          GENMASK(55, 12)
+#define HDBSSBR_EL2_BADDR_SHIFT                         12
+#define HDBSSBR_EL2_BADDR_WIDTH                         44
+
+#define HDBSSBR_EL2_SZ                                  GENMASK(3, 0)
+#define HDBSSBR_EL2_SZ_MASK                             GENMASK(3, 0)
+#define HDBSSBR_EL2_SZ_SHIFT                            0
+#define HDBSSBR_EL2_SZ_WIDTH                            4
+#define HDBSSBR_EL2_SZ_4KB                              UL(0b0000)
+#define HDBSSBR_EL2_SZ_8KB                              UL(0b0001)
+#define HDBSSBR_EL2_SZ_16KB                             UL(0b0010)
+#define HDBSSBR_EL2_SZ_32KB                             UL(0b0011)
+#define HDBSSBR_EL2_SZ_64KB                             UL(0b0100)
+#define HDBSSBR_EL2_SZ_128KB                            UL(0b0101)
+#define HDBSSBR_EL2_SZ_256KB                            UL(0b0110)
+#define HDBSSBR_EL2_SZ_512KB                            UL(0b0111)
+#define HDBSSBR_EL2_SZ_1MB                              UL(0b1000)
+#define HDBSSBR_EL2_SZ_2MB                              UL(0b1001)
+
+#define HDBSSBR_EL2_RES0                                (UL(0) | GENMASK_ULL(63, 56) | GENMASK_ULL(11, 4))
+#define HDBSSBR_EL2_RES1                                (UL(0))
+#define HDBSSBR_EL2_UNKN                                (UL(0))
+
+#define REG_HDBSSPROD_EL2                               S3_4_C2_C3_3
+#define SYS_HDBSSPROD_EL2                               sys_reg(3, 4, 2, 3, 3)
+#define SYS_HDBSSPROD_EL2_Op0                           3
+#define SYS_HDBSSPROD_EL2_Op1                           4
+#define SYS_HDBSSPROD_EL2_CRn                           2
+#define SYS_HDBSSPROD_EL2_CRm                           3
+#define SYS_HDBSSPROD_EL2_Op2                           3
+
+#define HDBSSPROD_EL2_FSC                               GENMASK(31, 26)
+#define HDBSSPROD_EL2_FSC_MASK                          GENMASK(31, 26)
+#define HDBSSPROD_EL2_FSC_SHIFT                         26
+#define HDBSSPROD_EL2_FSC_WIDTH                         6
+#define HDBSSPROD_EL2_FSC_OK                            UL(0b000000)
+#define HDBSSPROD_EL2_FSC_ExternalAbort                 UL(0b010000)
+#define HDBSSPROD_EL2_FSC_GPF                           UL(0b101000)
+
+#define HDBSSPROD_EL2_INDEX                             GENMASK(18, 0)
+#define HDBSSPROD_EL2_INDEX_MASK                        GENMASK(18, 0)
+#define HDBSSPROD_EL2_INDEX_SHIFT                       0
+#define HDBSSPROD_EL2_INDEX_WIDTH                       19
+
+#define HDBSSPROD_EL2_RES0                              (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(25, 19))
+#define HDBSSPROD_EL2_RES1                              (UL(0))
+#define HDBSSPROD_EL2_UNKN                              (UL(0))
+
 #define REG_DACR32_EL2                                  S3_4_C3_C0_0
 #define SYS_DACR32_EL2                                  sys_reg(3, 4, 3, 0, 0)
 #define SYS_DACR32_EL2_Op0                              3
@@ -13916,6 +14409,178 @@
 #define MPAMVPM7_EL2_RES1                               (UL(0))
 #define MPAMVPM7_EL2_UNKN                               (UL(0))
 
+#define REG_ICH_APR_EL2                                 S3_4_C12_C8_4
+#define SYS_ICH_APR_EL2                                 sys_reg(3, 4, 12, 8, 4)
+#define SYS_ICH_APR_EL2_Op0                             3
+#define SYS_ICH_APR_EL2_Op1                             4
+#define SYS_ICH_APR_EL2_CRn                             12
+#define SYS_ICH_APR_EL2_CRm                             8
+#define SYS_ICH_APR_EL2_Op2                             4
+
+#define ICH_APR_EL2_P31                                 GENMASK(31, 31)
+#define ICH_APR_EL2_P31_MASK                            GENMASK(31, 31)
+#define ICH_APR_EL2_P31_SHIFT                           31
+#define ICH_APR_EL2_P31_WIDTH                           1
+
+#define ICH_APR_EL2_P30                                 GENMASK(30, 30)
+#define ICH_APR_EL2_P30_MASK                            GENMASK(30, 30)
+#define ICH_APR_EL2_P30_SHIFT                           30
+#define ICH_APR_EL2_P30_WIDTH                           1
+
+#define ICH_APR_EL2_P29                                 GENMASK(29, 29)
+#define ICH_APR_EL2_P29_MASK                            GENMASK(29, 29)
+#define ICH_APR_EL2_P29_SHIFT                           29
+#define ICH_APR_EL2_P29_WIDTH                           1
+
+#define ICH_APR_EL2_P28                                 GENMASK(28, 28)
+#define ICH_APR_EL2_P28_MASK                            GENMASK(28, 28)
+#define ICH_APR_EL2_P28_SHIFT                           28
+#define ICH_APR_EL2_P28_WIDTH                           1
+
+#define ICH_APR_EL2_P27                                 GENMASK(27, 27)
+#define ICH_APR_EL2_P27_MASK                            GENMASK(27, 27)
+#define ICH_APR_EL2_P27_SHIFT                           27
+#define ICH_APR_EL2_P27_WIDTH                           1
+
+#define ICH_APR_EL2_P26                                 GENMASK(26, 26)
+#define ICH_APR_EL2_P26_MASK                            GENMASK(26, 26)
+#define ICH_APR_EL2_P26_SHIFT                           26
+#define ICH_APR_EL2_P26_WIDTH                           1
+
+#define ICH_APR_EL2_P25                                 GENMASK(25, 25)
+#define ICH_APR_EL2_P25_MASK                            GENMASK(25, 25)
+#define ICH_APR_EL2_P25_SHIFT                           25
+#define ICH_APR_EL2_P25_WIDTH                           1
+
+#define ICH_APR_EL2_P24                                 GENMASK(24, 24)
+#define ICH_APR_EL2_P24_MASK                            GENMASK(24, 24)
+#define ICH_APR_EL2_P24_SHIFT                           24
+#define ICH_APR_EL2_P24_WIDTH                           1
+
+#define ICH_APR_EL2_P23                                 GENMASK(23, 23)
+#define ICH_APR_EL2_P23_MASK                            GENMASK(23, 23)
+#define ICH_APR_EL2_P23_SHIFT                           23
+#define ICH_APR_EL2_P23_WIDTH                           1
+
+#define ICH_APR_EL2_P22                                 GENMASK(22, 22)
+#define ICH_APR_EL2_P22_MASK                            GENMASK(22, 22)
+#define ICH_APR_EL2_P22_SHIFT                           22
+#define ICH_APR_EL2_P22_WIDTH                           1
+
+#define ICH_APR_EL2_P21                                 GENMASK(21, 21)
+#define ICH_APR_EL2_P21_MASK                            GENMASK(21, 21)
+#define ICH_APR_EL2_P21_SHIFT                           21
+#define ICH_APR_EL2_P21_WIDTH                           1
+
+#define ICH_APR_EL2_P20                                 GENMASK(20, 20)
+#define ICH_APR_EL2_P20_MASK                            GENMASK(20, 20)
+#define ICH_APR_EL2_P20_SHIFT                           20
+#define ICH_APR_EL2_P20_WIDTH                           1
+
+#define ICH_APR_EL2_P19                                 GENMASK(19, 19)
+#define ICH_APR_EL2_P19_MASK                            GENMASK(19, 19)
+#define ICH_APR_EL2_P19_SHIFT                           19
+#define ICH_APR_EL2_P19_WIDTH                           1
+
+#define ICH_APR_EL2_P18                                 GENMASK(18, 18)
+#define ICH_APR_EL2_P18_MASK                            GENMASK(18, 18)
+#define ICH_APR_EL2_P18_SHIFT                           18
+#define ICH_APR_EL2_P18_WIDTH                           1
+
+#define ICH_APR_EL2_P17                                 GENMASK(17, 17)
+#define ICH_APR_EL2_P17_MASK                            GENMASK(17, 17)
+#define ICH_APR_EL2_P17_SHIFT                           17
+#define ICH_APR_EL2_P17_WIDTH                           1
+
+#define ICH_APR_EL2_P16                                 GENMASK(16, 16)
+#define ICH_APR_EL2_P16_MASK                            GENMASK(16, 16)
+#define ICH_APR_EL2_P16_SHIFT                           16
+#define ICH_APR_EL2_P16_WIDTH                           1
+
+#define ICH_APR_EL2_P15                                 GENMASK(15, 15)
+#define ICH_APR_EL2_P15_MASK                            GENMASK(15, 15)
+#define ICH_APR_EL2_P15_SHIFT                           15
+#define ICH_APR_EL2_P15_WIDTH                           1
+
+#define ICH_APR_EL2_P14                                 GENMASK(14, 14)
+#define ICH_APR_EL2_P14_MASK                            GENMASK(14, 14)
+#define ICH_APR_EL2_P14_SHIFT                           14
+#define ICH_APR_EL2_P14_WIDTH                           1
+
+#define ICH_APR_EL2_P13                                 GENMASK(13, 13)
+#define ICH_APR_EL2_P13_MASK                            GENMASK(13, 13)
+#define ICH_APR_EL2_P13_SHIFT                           13
+#define ICH_APR_EL2_P13_WIDTH                           1
+
+#define ICH_APR_EL2_P12                                 GENMASK(12, 12)
+#define ICH_APR_EL2_P12_MASK                            GENMASK(12, 12)
+#define ICH_APR_EL2_P12_SHIFT                           12
+#define ICH_APR_EL2_P12_WIDTH                           1
+
+#define ICH_APR_EL2_P11                                 GENMASK(11, 11)
+#define ICH_APR_EL2_P11_MASK                            GENMASK(11, 11)
+#define ICH_APR_EL2_P11_SHIFT                           11
+#define ICH_APR_EL2_P11_WIDTH                           1
+
+#define ICH_APR_EL2_P10                                 GENMASK(10, 10)
+#define ICH_APR_EL2_P10_MASK                            GENMASK(10, 10)
+#define ICH_APR_EL2_P10_SHIFT                           10
+#define ICH_APR_EL2_P10_WIDTH                           1
+
+#define ICH_APR_EL2_P9                                  GENMASK(9, 9)
+#define ICH_APR_EL2_P9_MASK                             GENMASK(9, 9)
+#define ICH_APR_EL2_P9_SHIFT                            9
+#define ICH_APR_EL2_P9_WIDTH                            1
+
+#define ICH_APR_EL2_P8                                  GENMASK(8, 8)
+#define ICH_APR_EL2_P8_MASK                             GENMASK(8, 8)
+#define ICH_APR_EL2_P8_SHIFT                            8
+#define ICH_APR_EL2_P8_WIDTH                            1
+
+#define ICH_APR_EL2_P7                                  GENMASK(7, 7)
+#define ICH_APR_EL2_P7_MASK                             GENMASK(7, 7)
+#define ICH_APR_EL2_P7_SHIFT                            7
+#define ICH_APR_EL2_P7_WIDTH                            1
+
+#define ICH_APR_EL2_P6                                  GENMASK(6, 6)
+#define ICH_APR_EL2_P6_MASK                             GENMASK(6, 6)
+#define ICH_APR_EL2_P6_SHIFT                            6
+#define ICH_APR_EL2_P6_WIDTH                            1
+
+#define ICH_APR_EL2_P5                                  GENMASK(5, 5)
+#define ICH_APR_EL2_P5_MASK                             GENMASK(5, 5)
+#define ICH_APR_EL2_P5_SHIFT                            5
+#define ICH_APR_EL2_P5_WIDTH                            1
+
+#define ICH_APR_EL2_P4                                  GENMASK(4, 4)
+#define ICH_APR_EL2_P4_MASK                             GENMASK(4, 4)
+#define ICH_APR_EL2_P4_SHIFT                            4
+#define ICH_APR_EL2_P4_WIDTH                            1
+
+#define ICH_APR_EL2_P3                                  GENMASK(3, 3)
+#define ICH_APR_EL2_P3_MASK                             GENMASK(3, 3)
+#define ICH_APR_EL2_P3_SHIFT                            3
+#define ICH_APR_EL2_P3_WIDTH                            1
+
+#define ICH_APR_EL2_P2                                  GENMASK(2, 2)
+#define ICH_APR_EL2_P2_MASK                             GENMASK(2, 2)
+#define ICH_APR_EL2_P2_SHIFT                            2
+#define ICH_APR_EL2_P2_WIDTH                            1
+
+#define ICH_APR_EL2_P1                                  GENMASK(1, 1)
+#define ICH_APR_EL2_P1_MASK                             GENMASK(1, 1)
+#define ICH_APR_EL2_P1_SHIFT                            1
+#define ICH_APR_EL2_P1_WIDTH                            1
+
+#define ICH_APR_EL2_P0                                  GENMASK(0, 0)
+#define ICH_APR_EL2_P0_MASK                             GENMASK(0, 0)
+#define ICH_APR_EL2_P0_SHIFT                            0
+#define ICH_APR_EL2_P0_WIDTH                            1
+
+#define ICH_APR_EL2_RES0                                (UL(0) | GENMASK_ULL(63, 32))
+#define ICH_APR_EL2_RES1                                (UL(0))
+#define ICH_APR_EL2_UNKN                                (UL(0))
+
 #define REG_ICH_HFGRTR_EL2                              S3_4_C12_C9_4
 #define SYS_ICH_HFGRTR_EL2                              sys_reg(3, 4, 12, 9, 4)
 #define SYS_ICH_HFGRTR_EL2_Op0                          3
@@ -14106,6 +14771,1382 @@
 #define ICH_HFGITR_EL2_RES0                             (UL(0) | GENMASK_ULL(63, 11))
 #define ICH_HFGITR_EL2_RES1                             (UL(0))
 #define ICH_HFGITR_EL2_UNKN                             (UL(0))
+
+#define ICH_PPI_DVIRx_EL2_DVI63                         GENMASK(63, 63)
+#define ICH_PPI_DVIRx_EL2_DVI63_MASK                    GENMASK(63, 63)
+#define ICH_PPI_DVIRx_EL2_DVI63_SHIFT                   63
+#define ICH_PPI_DVIRx_EL2_DVI63_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI62                         GENMASK(62, 62)
+#define ICH_PPI_DVIRx_EL2_DVI62_MASK                    GENMASK(62, 62)
+#define ICH_PPI_DVIRx_EL2_DVI62_SHIFT                   62
+#define ICH_PPI_DVIRx_EL2_DVI62_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI61                         GENMASK(61, 61)
+#define ICH_PPI_DVIRx_EL2_DVI61_MASK                    GENMASK(61, 61)
+#define ICH_PPI_DVIRx_EL2_DVI61_SHIFT                   61
+#define ICH_PPI_DVIRx_EL2_DVI61_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI60                         GENMASK(60, 60)
+#define ICH_PPI_DVIRx_EL2_DVI60_MASK                    GENMASK(60, 60)
+#define ICH_PPI_DVIRx_EL2_DVI60_SHIFT                   60
+#define ICH_PPI_DVIRx_EL2_DVI60_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI59                         GENMASK(59, 59)
+#define ICH_PPI_DVIRx_EL2_DVI59_MASK                    GENMASK(59, 59)
+#define ICH_PPI_DVIRx_EL2_DVI59_SHIFT                   59
+#define ICH_PPI_DVIRx_EL2_DVI59_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI58                         GENMASK(58, 58)
+#define ICH_PPI_DVIRx_EL2_DVI58_MASK                    GENMASK(58, 58)
+#define ICH_PPI_DVIRx_EL2_DVI58_SHIFT                   58
+#define ICH_PPI_DVIRx_EL2_DVI58_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI57                         GENMASK(57, 57)
+#define ICH_PPI_DVIRx_EL2_DVI57_MASK                    GENMASK(57, 57)
+#define ICH_PPI_DVIRx_EL2_DVI57_SHIFT                   57
+#define ICH_PPI_DVIRx_EL2_DVI57_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI56                         GENMASK(56, 56)
+#define ICH_PPI_DVIRx_EL2_DVI56_MASK                    GENMASK(56, 56)
+#define ICH_PPI_DVIRx_EL2_DVI56_SHIFT                   56
+#define ICH_PPI_DVIRx_EL2_DVI56_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI55                         GENMASK(55, 55)
+#define ICH_PPI_DVIRx_EL2_DVI55_MASK                    GENMASK(55, 55)
+#define ICH_PPI_DVIRx_EL2_DVI55_SHIFT                   55
+#define ICH_PPI_DVIRx_EL2_DVI55_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI54                         GENMASK(54, 54)
+#define ICH_PPI_DVIRx_EL2_DVI54_MASK                    GENMASK(54, 54)
+#define ICH_PPI_DVIRx_EL2_DVI54_SHIFT                   54
+#define ICH_PPI_DVIRx_EL2_DVI54_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI53                         GENMASK(53, 53)
+#define ICH_PPI_DVIRx_EL2_DVI53_MASK                    GENMASK(53, 53)
+#define ICH_PPI_DVIRx_EL2_DVI53_SHIFT                   53
+#define ICH_PPI_DVIRx_EL2_DVI53_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI52                         GENMASK(52, 52)
+#define ICH_PPI_DVIRx_EL2_DVI52_MASK                    GENMASK(52, 52)
+#define ICH_PPI_DVIRx_EL2_DVI52_SHIFT                   52
+#define ICH_PPI_DVIRx_EL2_DVI52_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI51                         GENMASK(51, 51)
+#define ICH_PPI_DVIRx_EL2_DVI51_MASK                    GENMASK(51, 51)
+#define ICH_PPI_DVIRx_EL2_DVI51_SHIFT                   51
+#define ICH_PPI_DVIRx_EL2_DVI51_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI50                         GENMASK(50, 50)
+#define ICH_PPI_DVIRx_EL2_DVI50_MASK                    GENMASK(50, 50)
+#define ICH_PPI_DVIRx_EL2_DVI50_SHIFT                   50
+#define ICH_PPI_DVIRx_EL2_DVI50_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI49                         GENMASK(49, 49)
+#define ICH_PPI_DVIRx_EL2_DVI49_MASK                    GENMASK(49, 49)
+#define ICH_PPI_DVIRx_EL2_DVI49_SHIFT                   49
+#define ICH_PPI_DVIRx_EL2_DVI49_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI48                         GENMASK(48, 48)
+#define ICH_PPI_DVIRx_EL2_DVI48_MASK                    GENMASK(48, 48)
+#define ICH_PPI_DVIRx_EL2_DVI48_SHIFT                   48
+#define ICH_PPI_DVIRx_EL2_DVI48_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI47                         GENMASK(47, 47)
+#define ICH_PPI_DVIRx_EL2_DVI47_MASK                    GENMASK(47, 47)
+#define ICH_PPI_DVIRx_EL2_DVI47_SHIFT                   47
+#define ICH_PPI_DVIRx_EL2_DVI47_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI46                         GENMASK(46, 46)
+#define ICH_PPI_DVIRx_EL2_DVI46_MASK                    GENMASK(46, 46)
+#define ICH_PPI_DVIRx_EL2_DVI46_SHIFT                   46
+#define ICH_PPI_DVIRx_EL2_DVI46_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI45                         GENMASK(45, 45)
+#define ICH_PPI_DVIRx_EL2_DVI45_MASK                    GENMASK(45, 45)
+#define ICH_PPI_DVIRx_EL2_DVI45_SHIFT                   45
+#define ICH_PPI_DVIRx_EL2_DVI45_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI44                         GENMASK(44, 44)
+#define ICH_PPI_DVIRx_EL2_DVI44_MASK                    GENMASK(44, 44)
+#define ICH_PPI_DVIRx_EL2_DVI44_SHIFT                   44
+#define ICH_PPI_DVIRx_EL2_DVI44_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI43                         GENMASK(43, 43)
+#define ICH_PPI_DVIRx_EL2_DVI43_MASK                    GENMASK(43, 43)
+#define ICH_PPI_DVIRx_EL2_DVI43_SHIFT                   43
+#define ICH_PPI_DVIRx_EL2_DVI43_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI42                         GENMASK(42, 42)
+#define ICH_PPI_DVIRx_EL2_DVI42_MASK                    GENMASK(42, 42)
+#define ICH_PPI_DVIRx_EL2_DVI42_SHIFT                   42
+#define ICH_PPI_DVIRx_EL2_DVI42_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI41                         GENMASK(41, 41)
+#define ICH_PPI_DVIRx_EL2_DVI41_MASK                    GENMASK(41, 41)
+#define ICH_PPI_DVIRx_EL2_DVI41_SHIFT                   41
+#define ICH_PPI_DVIRx_EL2_DVI41_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI40                         GENMASK(40, 40)
+#define ICH_PPI_DVIRx_EL2_DVI40_MASK                    GENMASK(40, 40)
+#define ICH_PPI_DVIRx_EL2_DVI40_SHIFT                   40
+#define ICH_PPI_DVIRx_EL2_DVI40_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI39                         GENMASK(39, 39)
+#define ICH_PPI_DVIRx_EL2_DVI39_MASK                    GENMASK(39, 39)
+#define ICH_PPI_DVIRx_EL2_DVI39_SHIFT                   39
+#define ICH_PPI_DVIRx_EL2_DVI39_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI38                         GENMASK(38, 38)
+#define ICH_PPI_DVIRx_EL2_DVI38_MASK                    GENMASK(38, 38)
+#define ICH_PPI_DVIRx_EL2_DVI38_SHIFT                   38
+#define ICH_PPI_DVIRx_EL2_DVI38_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI37                         GENMASK(37, 37)
+#define ICH_PPI_DVIRx_EL2_DVI37_MASK                    GENMASK(37, 37)
+#define ICH_PPI_DVIRx_EL2_DVI37_SHIFT                   37
+#define ICH_PPI_DVIRx_EL2_DVI37_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI36                         GENMASK(36, 36)
+#define ICH_PPI_DVIRx_EL2_DVI36_MASK                    GENMASK(36, 36)
+#define ICH_PPI_DVIRx_EL2_DVI36_SHIFT                   36
+#define ICH_PPI_DVIRx_EL2_DVI36_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI35                         GENMASK(35, 35)
+#define ICH_PPI_DVIRx_EL2_DVI35_MASK                    GENMASK(35, 35)
+#define ICH_PPI_DVIRx_EL2_DVI35_SHIFT                   35
+#define ICH_PPI_DVIRx_EL2_DVI35_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI34                         GENMASK(34, 34)
+#define ICH_PPI_DVIRx_EL2_DVI34_MASK                    GENMASK(34, 34)
+#define ICH_PPI_DVIRx_EL2_DVI34_SHIFT                   34
+#define ICH_PPI_DVIRx_EL2_DVI34_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI33                         GENMASK(33, 33)
+#define ICH_PPI_DVIRx_EL2_DVI33_MASK                    GENMASK(33, 33)
+#define ICH_PPI_DVIRx_EL2_DVI33_SHIFT                   33
+#define ICH_PPI_DVIRx_EL2_DVI33_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI32                         GENMASK(32, 32)
+#define ICH_PPI_DVIRx_EL2_DVI32_MASK                    GENMASK(32, 32)
+#define ICH_PPI_DVIRx_EL2_DVI32_SHIFT                   32
+#define ICH_PPI_DVIRx_EL2_DVI32_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI31                         GENMASK(31, 31)
+#define ICH_PPI_DVIRx_EL2_DVI31_MASK                    GENMASK(31, 31)
+#define ICH_PPI_DVIRx_EL2_DVI31_SHIFT                   31
+#define ICH_PPI_DVIRx_EL2_DVI31_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI30                         GENMASK(30, 30)
+#define ICH_PPI_DVIRx_EL2_DVI30_MASK                    GENMASK(30, 30)
+#define ICH_PPI_DVIRx_EL2_DVI30_SHIFT                   30
+#define ICH_PPI_DVIRx_EL2_DVI30_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI29                         GENMASK(29, 29)
+#define ICH_PPI_DVIRx_EL2_DVI29_MASK                    GENMASK(29, 29)
+#define ICH_PPI_DVIRx_EL2_DVI29_SHIFT                   29
+#define ICH_PPI_DVIRx_EL2_DVI29_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI28                         GENMASK(28, 28)
+#define ICH_PPI_DVIRx_EL2_DVI28_MASK                    GENMASK(28, 28)
+#define ICH_PPI_DVIRx_EL2_DVI28_SHIFT                   28
+#define ICH_PPI_DVIRx_EL2_DVI28_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI27                         GENMASK(27, 27)
+#define ICH_PPI_DVIRx_EL2_DVI27_MASK                    GENMASK(27, 27)
+#define ICH_PPI_DVIRx_EL2_DVI27_SHIFT                   27
+#define ICH_PPI_DVIRx_EL2_DVI27_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI26                         GENMASK(26, 26)
+#define ICH_PPI_DVIRx_EL2_DVI26_MASK                    GENMASK(26, 26)
+#define ICH_PPI_DVIRx_EL2_DVI26_SHIFT                   26
+#define ICH_PPI_DVIRx_EL2_DVI26_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI25                         GENMASK(25, 25)
+#define ICH_PPI_DVIRx_EL2_DVI25_MASK                    GENMASK(25, 25)
+#define ICH_PPI_DVIRx_EL2_DVI25_SHIFT                   25
+#define ICH_PPI_DVIRx_EL2_DVI25_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI24                         GENMASK(24, 24)
+#define ICH_PPI_DVIRx_EL2_DVI24_MASK                    GENMASK(24, 24)
+#define ICH_PPI_DVIRx_EL2_DVI24_SHIFT                   24
+#define ICH_PPI_DVIRx_EL2_DVI24_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI23                         GENMASK(23, 23)
+#define ICH_PPI_DVIRx_EL2_DVI23_MASK                    GENMASK(23, 23)
+#define ICH_PPI_DVIRx_EL2_DVI23_SHIFT                   23
+#define ICH_PPI_DVIRx_EL2_DVI23_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI22                         GENMASK(22, 22)
+#define ICH_PPI_DVIRx_EL2_DVI22_MASK                    GENMASK(22, 22)
+#define ICH_PPI_DVIRx_EL2_DVI22_SHIFT                   22
+#define ICH_PPI_DVIRx_EL2_DVI22_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI21                         GENMASK(21, 21)
+#define ICH_PPI_DVIRx_EL2_DVI21_MASK                    GENMASK(21, 21)
+#define ICH_PPI_DVIRx_EL2_DVI21_SHIFT                   21
+#define ICH_PPI_DVIRx_EL2_DVI21_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI20                         GENMASK(20, 20)
+#define ICH_PPI_DVIRx_EL2_DVI20_MASK                    GENMASK(20, 20)
+#define ICH_PPI_DVIRx_EL2_DVI20_SHIFT                   20
+#define ICH_PPI_DVIRx_EL2_DVI20_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI19                         GENMASK(19, 19)
+#define ICH_PPI_DVIRx_EL2_DVI19_MASK                    GENMASK(19, 19)
+#define ICH_PPI_DVIRx_EL2_DVI19_SHIFT                   19
+#define ICH_PPI_DVIRx_EL2_DVI19_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI18                         GENMASK(18, 18)
+#define ICH_PPI_DVIRx_EL2_DVI18_MASK                    GENMASK(18, 18)
+#define ICH_PPI_DVIRx_EL2_DVI18_SHIFT                   18
+#define ICH_PPI_DVIRx_EL2_DVI18_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI17                         GENMASK(17, 17)
+#define ICH_PPI_DVIRx_EL2_DVI17_MASK                    GENMASK(17, 17)
+#define ICH_PPI_DVIRx_EL2_DVI17_SHIFT                   17
+#define ICH_PPI_DVIRx_EL2_DVI17_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI16                         GENMASK(16, 16)
+#define ICH_PPI_DVIRx_EL2_DVI16_MASK                    GENMASK(16, 16)
+#define ICH_PPI_DVIRx_EL2_DVI16_SHIFT                   16
+#define ICH_PPI_DVIRx_EL2_DVI16_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI15                         GENMASK(15, 15)
+#define ICH_PPI_DVIRx_EL2_DVI15_MASK                    GENMASK(15, 15)
+#define ICH_PPI_DVIRx_EL2_DVI15_SHIFT                   15
+#define ICH_PPI_DVIRx_EL2_DVI15_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI14                         GENMASK(14, 14)
+#define ICH_PPI_DVIRx_EL2_DVI14_MASK                    GENMASK(14, 14)
+#define ICH_PPI_DVIRx_EL2_DVI14_SHIFT                   14
+#define ICH_PPI_DVIRx_EL2_DVI14_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI13                         GENMASK(13, 13)
+#define ICH_PPI_DVIRx_EL2_DVI13_MASK                    GENMASK(13, 13)
+#define ICH_PPI_DVIRx_EL2_DVI13_SHIFT                   13
+#define ICH_PPI_DVIRx_EL2_DVI13_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI12                         GENMASK(12, 12)
+#define ICH_PPI_DVIRx_EL2_DVI12_MASK                    GENMASK(12, 12)
+#define ICH_PPI_DVIRx_EL2_DVI12_SHIFT                   12
+#define ICH_PPI_DVIRx_EL2_DVI12_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI11                         GENMASK(11, 11)
+#define ICH_PPI_DVIRx_EL2_DVI11_MASK                    GENMASK(11, 11)
+#define ICH_PPI_DVIRx_EL2_DVI11_SHIFT                   11
+#define ICH_PPI_DVIRx_EL2_DVI11_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI10                         GENMASK(10, 10)
+#define ICH_PPI_DVIRx_EL2_DVI10_MASK                    GENMASK(10, 10)
+#define ICH_PPI_DVIRx_EL2_DVI10_SHIFT                   10
+#define ICH_PPI_DVIRx_EL2_DVI10_WIDTH                   1
+
+#define ICH_PPI_DVIRx_EL2_DVI9                          GENMASK(9, 9)
+#define ICH_PPI_DVIRx_EL2_DVI9_MASK                     GENMASK(9, 9)
+#define ICH_PPI_DVIRx_EL2_DVI9_SHIFT                    9
+#define ICH_PPI_DVIRx_EL2_DVI9_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI8                          GENMASK(8, 8)
+#define ICH_PPI_DVIRx_EL2_DVI8_MASK                     GENMASK(8, 8)
+#define ICH_PPI_DVIRx_EL2_DVI8_SHIFT                    8
+#define ICH_PPI_DVIRx_EL2_DVI8_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI7                          GENMASK(7, 7)
+#define ICH_PPI_DVIRx_EL2_DVI7_MASK                     GENMASK(7, 7)
+#define ICH_PPI_DVIRx_EL2_DVI7_SHIFT                    7
+#define ICH_PPI_DVIRx_EL2_DVI7_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI6                          GENMASK(6, 6)
+#define ICH_PPI_DVIRx_EL2_DVI6_MASK                     GENMASK(6, 6)
+#define ICH_PPI_DVIRx_EL2_DVI6_SHIFT                    6
+#define ICH_PPI_DVIRx_EL2_DVI6_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI5                          GENMASK(5, 5)
+#define ICH_PPI_DVIRx_EL2_DVI5_MASK                     GENMASK(5, 5)
+#define ICH_PPI_DVIRx_EL2_DVI5_SHIFT                    5
+#define ICH_PPI_DVIRx_EL2_DVI5_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI4                          GENMASK(4, 4)
+#define ICH_PPI_DVIRx_EL2_DVI4_MASK                     GENMASK(4, 4)
+#define ICH_PPI_DVIRx_EL2_DVI4_SHIFT                    4
+#define ICH_PPI_DVIRx_EL2_DVI4_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI3                          GENMASK(3, 3)
+#define ICH_PPI_DVIRx_EL2_DVI3_MASK                     GENMASK(3, 3)
+#define ICH_PPI_DVIRx_EL2_DVI3_SHIFT                    3
+#define ICH_PPI_DVIRx_EL2_DVI3_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI2                          GENMASK(2, 2)
+#define ICH_PPI_DVIRx_EL2_DVI2_MASK                     GENMASK(2, 2)
+#define ICH_PPI_DVIRx_EL2_DVI2_SHIFT                    2
+#define ICH_PPI_DVIRx_EL2_DVI2_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI1                          GENMASK(1, 1)
+#define ICH_PPI_DVIRx_EL2_DVI1_MASK                     GENMASK(1, 1)
+#define ICH_PPI_DVIRx_EL2_DVI1_SHIFT                    1
+#define ICH_PPI_DVIRx_EL2_DVI1_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_DVI0                          GENMASK(0, 0)
+#define ICH_PPI_DVIRx_EL2_DVI0_MASK                     GENMASK(0, 0)
+#define ICH_PPI_DVIRx_EL2_DVI0_SHIFT                    0
+#define ICH_PPI_DVIRx_EL2_DVI0_WIDTH                    1
+
+#define ICH_PPI_DVIRx_EL2_RES0                          (UL(0))
+#define ICH_PPI_DVIRx_EL2_RES1                          (UL(0))
+#define ICH_PPI_DVIRx_EL2_UNKN                          (UL(0))
+
+#define REG_ICH_PPI_DVIR0_EL2                           S3_4_C12_C10_0
+#define SYS_ICH_PPI_DVIR0_EL2                           sys_reg(3, 4, 12, 10, 0)
+#define SYS_ICH_PPI_DVIR0_EL2_Op0                       3
+#define SYS_ICH_PPI_DVIR0_EL2_Op1                       4
+#define SYS_ICH_PPI_DVIR0_EL2_CRn                       12
+#define SYS_ICH_PPI_DVIR0_EL2_CRm                       10
+#define SYS_ICH_PPI_DVIR0_EL2_Op2                       0
+
+/* For ICH_PPI_DVIR0_EL2 fields see ICH_PPI_DVIRx_EL2 */
+
+#define REG_ICH_PPI_DVIR1_EL2                           S3_4_C12_C10_1
+#define SYS_ICH_PPI_DVIR1_EL2                           sys_reg(3, 4, 12, 10, 1)
+#define SYS_ICH_PPI_DVIR1_EL2_Op0                       3
+#define SYS_ICH_PPI_DVIR1_EL2_Op1                       4
+#define SYS_ICH_PPI_DVIR1_EL2_CRn                       12
+#define SYS_ICH_PPI_DVIR1_EL2_CRm                       10
+#define SYS_ICH_PPI_DVIR1_EL2_Op2                       1
+
+/* For ICH_PPI_DVIR1_EL2 fields see ICH_PPI_DVIRx_EL2 */
+
+#define ICH_PPI_ENABLERx_EL2_EN63                       GENMASK(63, 63)
+#define ICH_PPI_ENABLERx_EL2_EN63_MASK                  GENMASK(63, 63)
+#define ICH_PPI_ENABLERx_EL2_EN63_SHIFT                 63
+#define ICH_PPI_ENABLERx_EL2_EN63_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN62                       GENMASK(62, 62)
+#define ICH_PPI_ENABLERx_EL2_EN62_MASK                  GENMASK(62, 62)
+#define ICH_PPI_ENABLERx_EL2_EN62_SHIFT                 62
+#define ICH_PPI_ENABLERx_EL2_EN62_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN61                       GENMASK(61, 61)
+#define ICH_PPI_ENABLERx_EL2_EN61_MASK                  GENMASK(61, 61)
+#define ICH_PPI_ENABLERx_EL2_EN61_SHIFT                 61
+#define ICH_PPI_ENABLERx_EL2_EN61_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN60                       GENMASK(60, 60)
+#define ICH_PPI_ENABLERx_EL2_EN60_MASK                  GENMASK(60, 60)
+#define ICH_PPI_ENABLERx_EL2_EN60_SHIFT                 60
+#define ICH_PPI_ENABLERx_EL2_EN60_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN59                       GENMASK(59, 59)
+#define ICH_PPI_ENABLERx_EL2_EN59_MASK                  GENMASK(59, 59)
+#define ICH_PPI_ENABLERx_EL2_EN59_SHIFT                 59
+#define ICH_PPI_ENABLERx_EL2_EN59_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN58                       GENMASK(58, 58)
+#define ICH_PPI_ENABLERx_EL2_EN58_MASK                  GENMASK(58, 58)
+#define ICH_PPI_ENABLERx_EL2_EN58_SHIFT                 58
+#define ICH_PPI_ENABLERx_EL2_EN58_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN57                       GENMASK(57, 57)
+#define ICH_PPI_ENABLERx_EL2_EN57_MASK                  GENMASK(57, 57)
+#define ICH_PPI_ENABLERx_EL2_EN57_SHIFT                 57
+#define ICH_PPI_ENABLERx_EL2_EN57_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN56                       GENMASK(56, 56)
+#define ICH_PPI_ENABLERx_EL2_EN56_MASK                  GENMASK(56, 56)
+#define ICH_PPI_ENABLERx_EL2_EN56_SHIFT                 56
+#define ICH_PPI_ENABLERx_EL2_EN56_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN55                       GENMASK(55, 55)
+#define ICH_PPI_ENABLERx_EL2_EN55_MASK                  GENMASK(55, 55)
+#define ICH_PPI_ENABLERx_EL2_EN55_SHIFT                 55
+#define ICH_PPI_ENABLERx_EL2_EN55_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN54                       GENMASK(54, 54)
+#define ICH_PPI_ENABLERx_EL2_EN54_MASK                  GENMASK(54, 54)
+#define ICH_PPI_ENABLERx_EL2_EN54_SHIFT                 54
+#define ICH_PPI_ENABLERx_EL2_EN54_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN53                       GENMASK(53, 53)
+#define ICH_PPI_ENABLERx_EL2_EN53_MASK                  GENMASK(53, 53)
+#define ICH_PPI_ENABLERx_EL2_EN53_SHIFT                 53
+#define ICH_PPI_ENABLERx_EL2_EN53_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN52                       GENMASK(52, 52)
+#define ICH_PPI_ENABLERx_EL2_EN52_MASK                  GENMASK(52, 52)
+#define ICH_PPI_ENABLERx_EL2_EN52_SHIFT                 52
+#define ICH_PPI_ENABLERx_EL2_EN52_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN51                       GENMASK(51, 51)
+#define ICH_PPI_ENABLERx_EL2_EN51_MASK                  GENMASK(51, 51)
+#define ICH_PPI_ENABLERx_EL2_EN51_SHIFT                 51
+#define ICH_PPI_ENABLERx_EL2_EN51_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN50                       GENMASK(50, 50)
+#define ICH_PPI_ENABLERx_EL2_EN50_MASK                  GENMASK(50, 50)
+#define ICH_PPI_ENABLERx_EL2_EN50_SHIFT                 50
+#define ICH_PPI_ENABLERx_EL2_EN50_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN49                       GENMASK(49, 49)
+#define ICH_PPI_ENABLERx_EL2_EN49_MASK                  GENMASK(49, 49)
+#define ICH_PPI_ENABLERx_EL2_EN49_SHIFT                 49
+#define ICH_PPI_ENABLERx_EL2_EN49_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN48                       GENMASK(48, 48)
+#define ICH_PPI_ENABLERx_EL2_EN48_MASK                  GENMASK(48, 48)
+#define ICH_PPI_ENABLERx_EL2_EN48_SHIFT                 48
+#define ICH_PPI_ENABLERx_EL2_EN48_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN47                       GENMASK(47, 47)
+#define ICH_PPI_ENABLERx_EL2_EN47_MASK                  GENMASK(47, 47)
+#define ICH_PPI_ENABLERx_EL2_EN47_SHIFT                 47
+#define ICH_PPI_ENABLERx_EL2_EN47_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN46                       GENMASK(46, 46)
+#define ICH_PPI_ENABLERx_EL2_EN46_MASK                  GENMASK(46, 46)
+#define ICH_PPI_ENABLERx_EL2_EN46_SHIFT                 46
+#define ICH_PPI_ENABLERx_EL2_EN46_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN45                       GENMASK(45, 45)
+#define ICH_PPI_ENABLERx_EL2_EN45_MASK                  GENMASK(45, 45)
+#define ICH_PPI_ENABLERx_EL2_EN45_SHIFT                 45
+#define ICH_PPI_ENABLERx_EL2_EN45_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN44                       GENMASK(44, 44)
+#define ICH_PPI_ENABLERx_EL2_EN44_MASK                  GENMASK(44, 44)
+#define ICH_PPI_ENABLERx_EL2_EN44_SHIFT                 44
+#define ICH_PPI_ENABLERx_EL2_EN44_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN43                       GENMASK(43, 43)
+#define ICH_PPI_ENABLERx_EL2_EN43_MASK                  GENMASK(43, 43)
+#define ICH_PPI_ENABLERx_EL2_EN43_SHIFT                 43
+#define ICH_PPI_ENABLERx_EL2_EN43_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN42                       GENMASK(42, 42)
+#define ICH_PPI_ENABLERx_EL2_EN42_MASK                  GENMASK(42, 42)
+#define ICH_PPI_ENABLERx_EL2_EN42_SHIFT                 42
+#define ICH_PPI_ENABLERx_EL2_EN42_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN41                       GENMASK(41, 41)
+#define ICH_PPI_ENABLERx_EL2_EN41_MASK                  GENMASK(41, 41)
+#define ICH_PPI_ENABLERx_EL2_EN41_SHIFT                 41
+#define ICH_PPI_ENABLERx_EL2_EN41_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN40                       GENMASK(40, 40)
+#define ICH_PPI_ENABLERx_EL2_EN40_MASK                  GENMASK(40, 40)
+#define ICH_PPI_ENABLERx_EL2_EN40_SHIFT                 40
+#define ICH_PPI_ENABLERx_EL2_EN40_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN39                       GENMASK(39, 39)
+#define ICH_PPI_ENABLERx_EL2_EN39_MASK                  GENMASK(39, 39)
+#define ICH_PPI_ENABLERx_EL2_EN39_SHIFT                 39
+#define ICH_PPI_ENABLERx_EL2_EN39_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN38                       GENMASK(38, 38)
+#define ICH_PPI_ENABLERx_EL2_EN38_MASK                  GENMASK(38, 38)
+#define ICH_PPI_ENABLERx_EL2_EN38_SHIFT                 38
+#define ICH_PPI_ENABLERx_EL2_EN38_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN37                       GENMASK(37, 37)
+#define ICH_PPI_ENABLERx_EL2_EN37_MASK                  GENMASK(37, 37)
+#define ICH_PPI_ENABLERx_EL2_EN37_SHIFT                 37
+#define ICH_PPI_ENABLERx_EL2_EN37_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN36                       GENMASK(36, 36)
+#define ICH_PPI_ENABLERx_EL2_EN36_MASK                  GENMASK(36, 36)
+#define ICH_PPI_ENABLERx_EL2_EN36_SHIFT                 36
+#define ICH_PPI_ENABLERx_EL2_EN36_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN35                       GENMASK(35, 35)
+#define ICH_PPI_ENABLERx_EL2_EN35_MASK                  GENMASK(35, 35)
+#define ICH_PPI_ENABLERx_EL2_EN35_SHIFT                 35
+#define ICH_PPI_ENABLERx_EL2_EN35_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN34                       GENMASK(34, 34)
+#define ICH_PPI_ENABLERx_EL2_EN34_MASK                  GENMASK(34, 34)
+#define ICH_PPI_ENABLERx_EL2_EN34_SHIFT                 34
+#define ICH_PPI_ENABLERx_EL2_EN34_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN33                       GENMASK(33, 33)
+#define ICH_PPI_ENABLERx_EL2_EN33_MASK                  GENMASK(33, 33)
+#define ICH_PPI_ENABLERx_EL2_EN33_SHIFT                 33
+#define ICH_PPI_ENABLERx_EL2_EN33_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN32                       GENMASK(32, 32)
+#define ICH_PPI_ENABLERx_EL2_EN32_MASK                  GENMASK(32, 32)
+#define ICH_PPI_ENABLERx_EL2_EN32_SHIFT                 32
+#define ICH_PPI_ENABLERx_EL2_EN32_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN31                       GENMASK(31, 31)
+#define ICH_PPI_ENABLERx_EL2_EN31_MASK                  GENMASK(31, 31)
+#define ICH_PPI_ENABLERx_EL2_EN31_SHIFT                 31
+#define ICH_PPI_ENABLERx_EL2_EN31_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN30                       GENMASK(30, 30)
+#define ICH_PPI_ENABLERx_EL2_EN30_MASK                  GENMASK(30, 30)
+#define ICH_PPI_ENABLERx_EL2_EN30_SHIFT                 30
+#define ICH_PPI_ENABLERx_EL2_EN30_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN29                       GENMASK(29, 29)
+#define ICH_PPI_ENABLERx_EL2_EN29_MASK                  GENMASK(29, 29)
+#define ICH_PPI_ENABLERx_EL2_EN29_SHIFT                 29
+#define ICH_PPI_ENABLERx_EL2_EN29_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN28                       GENMASK(28, 28)
+#define ICH_PPI_ENABLERx_EL2_EN28_MASK                  GENMASK(28, 28)
+#define ICH_PPI_ENABLERx_EL2_EN28_SHIFT                 28
+#define ICH_PPI_ENABLERx_EL2_EN28_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN27                       GENMASK(27, 27)
+#define ICH_PPI_ENABLERx_EL2_EN27_MASK                  GENMASK(27, 27)
+#define ICH_PPI_ENABLERx_EL2_EN27_SHIFT                 27
+#define ICH_PPI_ENABLERx_EL2_EN27_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN26                       GENMASK(26, 26)
+#define ICH_PPI_ENABLERx_EL2_EN26_MASK                  GENMASK(26, 26)
+#define ICH_PPI_ENABLERx_EL2_EN26_SHIFT                 26
+#define ICH_PPI_ENABLERx_EL2_EN26_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN25                       GENMASK(25, 25)
+#define ICH_PPI_ENABLERx_EL2_EN25_MASK                  GENMASK(25, 25)
+#define ICH_PPI_ENABLERx_EL2_EN25_SHIFT                 25
+#define ICH_PPI_ENABLERx_EL2_EN25_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN24                       GENMASK(24, 24)
+#define ICH_PPI_ENABLERx_EL2_EN24_MASK                  GENMASK(24, 24)
+#define ICH_PPI_ENABLERx_EL2_EN24_SHIFT                 24
+#define ICH_PPI_ENABLERx_EL2_EN24_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN23                       GENMASK(23, 23)
+#define ICH_PPI_ENABLERx_EL2_EN23_MASK                  GENMASK(23, 23)
+#define ICH_PPI_ENABLERx_EL2_EN23_SHIFT                 23
+#define ICH_PPI_ENABLERx_EL2_EN23_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN22                       GENMASK(22, 22)
+#define ICH_PPI_ENABLERx_EL2_EN22_MASK                  GENMASK(22, 22)
+#define ICH_PPI_ENABLERx_EL2_EN22_SHIFT                 22
+#define ICH_PPI_ENABLERx_EL2_EN22_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN21                       GENMASK(21, 21)
+#define ICH_PPI_ENABLERx_EL2_EN21_MASK                  GENMASK(21, 21)
+#define ICH_PPI_ENABLERx_EL2_EN21_SHIFT                 21
+#define ICH_PPI_ENABLERx_EL2_EN21_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN20                       GENMASK(20, 20)
+#define ICH_PPI_ENABLERx_EL2_EN20_MASK                  GENMASK(20, 20)
+#define ICH_PPI_ENABLERx_EL2_EN20_SHIFT                 20
+#define ICH_PPI_ENABLERx_EL2_EN20_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN19                       GENMASK(19, 19)
+#define ICH_PPI_ENABLERx_EL2_EN19_MASK                  GENMASK(19, 19)
+#define ICH_PPI_ENABLERx_EL2_EN19_SHIFT                 19
+#define ICH_PPI_ENABLERx_EL2_EN19_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN18                       GENMASK(18, 18)
+#define ICH_PPI_ENABLERx_EL2_EN18_MASK                  GENMASK(18, 18)
+#define ICH_PPI_ENABLERx_EL2_EN18_SHIFT                 18
+#define ICH_PPI_ENABLERx_EL2_EN18_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN17                       GENMASK(17, 17)
+#define ICH_PPI_ENABLERx_EL2_EN17_MASK                  GENMASK(17, 17)
+#define ICH_PPI_ENABLERx_EL2_EN17_SHIFT                 17
+#define ICH_PPI_ENABLERx_EL2_EN17_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN16                       GENMASK(16, 16)
+#define ICH_PPI_ENABLERx_EL2_EN16_MASK                  GENMASK(16, 16)
+#define ICH_PPI_ENABLERx_EL2_EN16_SHIFT                 16
+#define ICH_PPI_ENABLERx_EL2_EN16_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN15                       GENMASK(15, 15)
+#define ICH_PPI_ENABLERx_EL2_EN15_MASK                  GENMASK(15, 15)
+#define ICH_PPI_ENABLERx_EL2_EN15_SHIFT                 15
+#define ICH_PPI_ENABLERx_EL2_EN15_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN14                       GENMASK(14, 14)
+#define ICH_PPI_ENABLERx_EL2_EN14_MASK                  GENMASK(14, 14)
+#define ICH_PPI_ENABLERx_EL2_EN14_SHIFT                 14
+#define ICH_PPI_ENABLERx_EL2_EN14_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN13                       GENMASK(13, 13)
+#define ICH_PPI_ENABLERx_EL2_EN13_MASK                  GENMASK(13, 13)
+#define ICH_PPI_ENABLERx_EL2_EN13_SHIFT                 13
+#define ICH_PPI_ENABLERx_EL2_EN13_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN12                       GENMASK(12, 12)
+#define ICH_PPI_ENABLERx_EL2_EN12_MASK                  GENMASK(12, 12)
+#define ICH_PPI_ENABLERx_EL2_EN12_SHIFT                 12
+#define ICH_PPI_ENABLERx_EL2_EN12_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN11                       GENMASK(11, 11)
+#define ICH_PPI_ENABLERx_EL2_EN11_MASK                  GENMASK(11, 11)
+#define ICH_PPI_ENABLERx_EL2_EN11_SHIFT                 11
+#define ICH_PPI_ENABLERx_EL2_EN11_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN10                       GENMASK(10, 10)
+#define ICH_PPI_ENABLERx_EL2_EN10_MASK                  GENMASK(10, 10)
+#define ICH_PPI_ENABLERx_EL2_EN10_SHIFT                 10
+#define ICH_PPI_ENABLERx_EL2_EN10_WIDTH                 1
+
+#define ICH_PPI_ENABLERx_EL2_EN9                        GENMASK(9, 9)
+#define ICH_PPI_ENABLERx_EL2_EN9_MASK                   GENMASK(9, 9)
+#define ICH_PPI_ENABLERx_EL2_EN9_SHIFT                  9
+#define ICH_PPI_ENABLERx_EL2_EN9_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN8                        GENMASK(8, 8)
+#define ICH_PPI_ENABLERx_EL2_EN8_MASK                   GENMASK(8, 8)
+#define ICH_PPI_ENABLERx_EL2_EN8_SHIFT                  8
+#define ICH_PPI_ENABLERx_EL2_EN8_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN7                        GENMASK(7, 7)
+#define ICH_PPI_ENABLERx_EL2_EN7_MASK                   GENMASK(7, 7)
+#define ICH_PPI_ENABLERx_EL2_EN7_SHIFT                  7
+#define ICH_PPI_ENABLERx_EL2_EN7_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN6                        GENMASK(6, 6)
+#define ICH_PPI_ENABLERx_EL2_EN6_MASK                   GENMASK(6, 6)
+#define ICH_PPI_ENABLERx_EL2_EN6_SHIFT                  6
+#define ICH_PPI_ENABLERx_EL2_EN6_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN5                        GENMASK(5, 5)
+#define ICH_PPI_ENABLERx_EL2_EN5_MASK                   GENMASK(5, 5)
+#define ICH_PPI_ENABLERx_EL2_EN5_SHIFT                  5
+#define ICH_PPI_ENABLERx_EL2_EN5_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN4                        GENMASK(4, 4)
+#define ICH_PPI_ENABLERx_EL2_EN4_MASK                   GENMASK(4, 4)
+#define ICH_PPI_ENABLERx_EL2_EN4_SHIFT                  4
+#define ICH_PPI_ENABLERx_EL2_EN4_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN3                        GENMASK(3, 3)
+#define ICH_PPI_ENABLERx_EL2_EN3_MASK                   GENMASK(3, 3)
+#define ICH_PPI_ENABLERx_EL2_EN3_SHIFT                  3
+#define ICH_PPI_ENABLERx_EL2_EN3_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN2                        GENMASK(2, 2)
+#define ICH_PPI_ENABLERx_EL2_EN2_MASK                   GENMASK(2, 2)
+#define ICH_PPI_ENABLERx_EL2_EN2_SHIFT                  2
+#define ICH_PPI_ENABLERx_EL2_EN2_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN1                        GENMASK(1, 1)
+#define ICH_PPI_ENABLERx_EL2_EN1_MASK                   GENMASK(1, 1)
+#define ICH_PPI_ENABLERx_EL2_EN1_SHIFT                  1
+#define ICH_PPI_ENABLERx_EL2_EN1_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_EN0                        GENMASK(0, 0)
+#define ICH_PPI_ENABLERx_EL2_EN0_MASK                   GENMASK(0, 0)
+#define ICH_PPI_ENABLERx_EL2_EN0_SHIFT                  0
+#define ICH_PPI_ENABLERx_EL2_EN0_WIDTH                  1
+
+#define ICH_PPI_ENABLERx_EL2_RES0                       (UL(0))
+#define ICH_PPI_ENABLERx_EL2_RES1                       (UL(0))
+#define ICH_PPI_ENABLERx_EL2_UNKN                       (UL(0))
+
+#define REG_ICH_PPI_ENABLER0_EL2                        S3_4_C12_C10_2
+#define SYS_ICH_PPI_ENABLER0_EL2                        sys_reg(3, 4, 12, 10, 2)
+#define SYS_ICH_PPI_ENABLER0_EL2_Op0                    3
+#define SYS_ICH_PPI_ENABLER0_EL2_Op1                    4
+#define SYS_ICH_PPI_ENABLER0_EL2_CRn                    12
+#define SYS_ICH_PPI_ENABLER0_EL2_CRm                    10
+#define SYS_ICH_PPI_ENABLER0_EL2_Op2                    2
+
+/* For ICH_PPI_ENABLER0_EL2 fields see ICH_PPI_ENABLERx_EL2 */
+
+#define REG_ICH_PPI_ENABLER1_EL2                        S3_4_C12_C10_3
+#define SYS_ICH_PPI_ENABLER1_EL2                        sys_reg(3, 4, 12, 10, 3)
+#define SYS_ICH_PPI_ENABLER1_EL2_Op0                    3
+#define SYS_ICH_PPI_ENABLER1_EL2_Op1                    4
+#define SYS_ICH_PPI_ENABLER1_EL2_CRn                    12
+#define SYS_ICH_PPI_ENABLER1_EL2_CRm                    10
+#define SYS_ICH_PPI_ENABLER1_EL2_Op2                    3
+
+/* For ICH_PPI_ENABLER1_EL2 fields see ICH_PPI_ENABLERx_EL2 */
+
+#define ICH_PPI_PENDRx_EL2_PEND63                       GENMASK(63, 63)
+#define ICH_PPI_PENDRx_EL2_PEND63_MASK                  GENMASK(63, 63)
+#define ICH_PPI_PENDRx_EL2_PEND63_SHIFT                 63
+#define ICH_PPI_PENDRx_EL2_PEND63_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND62                       GENMASK(62, 62)
+#define ICH_PPI_PENDRx_EL2_PEND62_MASK                  GENMASK(62, 62)
+#define ICH_PPI_PENDRx_EL2_PEND62_SHIFT                 62
+#define ICH_PPI_PENDRx_EL2_PEND62_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND61                       GENMASK(61, 61)
+#define ICH_PPI_PENDRx_EL2_PEND61_MASK                  GENMASK(61, 61)
+#define ICH_PPI_PENDRx_EL2_PEND61_SHIFT                 61
+#define ICH_PPI_PENDRx_EL2_PEND61_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND60                       GENMASK(60, 60)
+#define ICH_PPI_PENDRx_EL2_PEND60_MASK                  GENMASK(60, 60)
+#define ICH_PPI_PENDRx_EL2_PEND60_SHIFT                 60
+#define ICH_PPI_PENDRx_EL2_PEND60_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND59                       GENMASK(59, 59)
+#define ICH_PPI_PENDRx_EL2_PEND59_MASK                  GENMASK(59, 59)
+#define ICH_PPI_PENDRx_EL2_PEND59_SHIFT                 59
+#define ICH_PPI_PENDRx_EL2_PEND59_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND58                       GENMASK(58, 58)
+#define ICH_PPI_PENDRx_EL2_PEND58_MASK                  GENMASK(58, 58)
+#define ICH_PPI_PENDRx_EL2_PEND58_SHIFT                 58
+#define ICH_PPI_PENDRx_EL2_PEND58_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND57                       GENMASK(57, 57)
+#define ICH_PPI_PENDRx_EL2_PEND57_MASK                  GENMASK(57, 57)
+#define ICH_PPI_PENDRx_EL2_PEND57_SHIFT                 57
+#define ICH_PPI_PENDRx_EL2_PEND57_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND56                       GENMASK(56, 56)
+#define ICH_PPI_PENDRx_EL2_PEND56_MASK                  GENMASK(56, 56)
+#define ICH_PPI_PENDRx_EL2_PEND56_SHIFT                 56
+#define ICH_PPI_PENDRx_EL2_PEND56_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND55                       GENMASK(55, 55)
+#define ICH_PPI_PENDRx_EL2_PEND55_MASK                  GENMASK(55, 55)
+#define ICH_PPI_PENDRx_EL2_PEND55_SHIFT                 55
+#define ICH_PPI_PENDRx_EL2_PEND55_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND54                       GENMASK(54, 54)
+#define ICH_PPI_PENDRx_EL2_PEND54_MASK                  GENMASK(54, 54)
+#define ICH_PPI_PENDRx_EL2_PEND54_SHIFT                 54
+#define ICH_PPI_PENDRx_EL2_PEND54_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND53                       GENMASK(53, 53)
+#define ICH_PPI_PENDRx_EL2_PEND53_MASK                  GENMASK(53, 53)
+#define ICH_PPI_PENDRx_EL2_PEND53_SHIFT                 53
+#define ICH_PPI_PENDRx_EL2_PEND53_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND52                       GENMASK(52, 52)
+#define ICH_PPI_PENDRx_EL2_PEND52_MASK                  GENMASK(52, 52)
+#define ICH_PPI_PENDRx_EL2_PEND52_SHIFT                 52
+#define ICH_PPI_PENDRx_EL2_PEND52_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND51                       GENMASK(51, 51)
+#define ICH_PPI_PENDRx_EL2_PEND51_MASK                  GENMASK(51, 51)
+#define ICH_PPI_PENDRx_EL2_PEND51_SHIFT                 51
+#define ICH_PPI_PENDRx_EL2_PEND51_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND50                       GENMASK(50, 50)
+#define ICH_PPI_PENDRx_EL2_PEND50_MASK                  GENMASK(50, 50)
+#define ICH_PPI_PENDRx_EL2_PEND50_SHIFT                 50
+#define ICH_PPI_PENDRx_EL2_PEND50_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND49                       GENMASK(49, 49)
+#define ICH_PPI_PENDRx_EL2_PEND49_MASK                  GENMASK(49, 49)
+#define ICH_PPI_PENDRx_EL2_PEND49_SHIFT                 49
+#define ICH_PPI_PENDRx_EL2_PEND49_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND48                       GENMASK(48, 48)
+#define ICH_PPI_PENDRx_EL2_PEND48_MASK                  GENMASK(48, 48)
+#define ICH_PPI_PENDRx_EL2_PEND48_SHIFT                 48
+#define ICH_PPI_PENDRx_EL2_PEND48_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND47                       GENMASK(47, 47)
+#define ICH_PPI_PENDRx_EL2_PEND47_MASK                  GENMASK(47, 47)
+#define ICH_PPI_PENDRx_EL2_PEND47_SHIFT                 47
+#define ICH_PPI_PENDRx_EL2_PEND47_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND46                       GENMASK(46, 46)
+#define ICH_PPI_PENDRx_EL2_PEND46_MASK                  GENMASK(46, 46)
+#define ICH_PPI_PENDRx_EL2_PEND46_SHIFT                 46
+#define ICH_PPI_PENDRx_EL2_PEND46_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND45                       GENMASK(45, 45)
+#define ICH_PPI_PENDRx_EL2_PEND45_MASK                  GENMASK(45, 45)
+#define ICH_PPI_PENDRx_EL2_PEND45_SHIFT                 45
+#define ICH_PPI_PENDRx_EL2_PEND45_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND44                       GENMASK(44, 44)
+#define ICH_PPI_PENDRx_EL2_PEND44_MASK                  GENMASK(44, 44)
+#define ICH_PPI_PENDRx_EL2_PEND44_SHIFT                 44
+#define ICH_PPI_PENDRx_EL2_PEND44_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND43                       GENMASK(43, 43)
+#define ICH_PPI_PENDRx_EL2_PEND43_MASK                  GENMASK(43, 43)
+#define ICH_PPI_PENDRx_EL2_PEND43_SHIFT                 43
+#define ICH_PPI_PENDRx_EL2_PEND43_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND42                       GENMASK(42, 42)
+#define ICH_PPI_PENDRx_EL2_PEND42_MASK                  GENMASK(42, 42)
+#define ICH_PPI_PENDRx_EL2_PEND42_SHIFT                 42
+#define ICH_PPI_PENDRx_EL2_PEND42_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND41                       GENMASK(41, 41)
+#define ICH_PPI_PENDRx_EL2_PEND41_MASK                  GENMASK(41, 41)
+#define ICH_PPI_PENDRx_EL2_PEND41_SHIFT                 41
+#define ICH_PPI_PENDRx_EL2_PEND41_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND40                       GENMASK(40, 40)
+#define ICH_PPI_PENDRx_EL2_PEND40_MASK                  GENMASK(40, 40)
+#define ICH_PPI_PENDRx_EL2_PEND40_SHIFT                 40
+#define ICH_PPI_PENDRx_EL2_PEND40_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND39                       GENMASK(39, 39)
+#define ICH_PPI_PENDRx_EL2_PEND39_MASK                  GENMASK(39, 39)
+#define ICH_PPI_PENDRx_EL2_PEND39_SHIFT                 39
+#define ICH_PPI_PENDRx_EL2_PEND39_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND38                       GENMASK(38, 38)
+#define ICH_PPI_PENDRx_EL2_PEND38_MASK                  GENMASK(38, 38)
+#define ICH_PPI_PENDRx_EL2_PEND38_SHIFT                 38
+#define ICH_PPI_PENDRx_EL2_PEND38_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND37                       GENMASK(37, 37)
+#define ICH_PPI_PENDRx_EL2_PEND37_MASK                  GENMASK(37, 37)
+#define ICH_PPI_PENDRx_EL2_PEND37_SHIFT                 37
+#define ICH_PPI_PENDRx_EL2_PEND37_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND36                       GENMASK(36, 36)
+#define ICH_PPI_PENDRx_EL2_PEND36_MASK                  GENMASK(36, 36)
+#define ICH_PPI_PENDRx_EL2_PEND36_SHIFT                 36
+#define ICH_PPI_PENDRx_EL2_PEND36_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND35                       GENMASK(35, 35)
+#define ICH_PPI_PENDRx_EL2_PEND35_MASK                  GENMASK(35, 35)
+#define ICH_PPI_PENDRx_EL2_PEND35_SHIFT                 35
+#define ICH_PPI_PENDRx_EL2_PEND35_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND34                       GENMASK(34, 34)
+#define ICH_PPI_PENDRx_EL2_PEND34_MASK                  GENMASK(34, 34)
+#define ICH_PPI_PENDRx_EL2_PEND34_SHIFT                 34
+#define ICH_PPI_PENDRx_EL2_PEND34_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND33                       GENMASK(33, 33)
+#define ICH_PPI_PENDRx_EL2_PEND33_MASK                  GENMASK(33, 33)
+#define ICH_PPI_PENDRx_EL2_PEND33_SHIFT                 33
+#define ICH_PPI_PENDRx_EL2_PEND33_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND32                       GENMASK(32, 32)
+#define ICH_PPI_PENDRx_EL2_PEND32_MASK                  GENMASK(32, 32)
+#define ICH_PPI_PENDRx_EL2_PEND32_SHIFT                 32
+#define ICH_PPI_PENDRx_EL2_PEND32_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND31                       GENMASK(31, 31)
+#define ICH_PPI_PENDRx_EL2_PEND31_MASK                  GENMASK(31, 31)
+#define ICH_PPI_PENDRx_EL2_PEND31_SHIFT                 31
+#define ICH_PPI_PENDRx_EL2_PEND31_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND30                       GENMASK(30, 30)
+#define ICH_PPI_PENDRx_EL2_PEND30_MASK                  GENMASK(30, 30)
+#define ICH_PPI_PENDRx_EL2_PEND30_SHIFT                 30
+#define ICH_PPI_PENDRx_EL2_PEND30_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND29                       GENMASK(29, 29)
+#define ICH_PPI_PENDRx_EL2_PEND29_MASK                  GENMASK(29, 29)
+#define ICH_PPI_PENDRx_EL2_PEND29_SHIFT                 29
+#define ICH_PPI_PENDRx_EL2_PEND29_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND28                       GENMASK(28, 28)
+#define ICH_PPI_PENDRx_EL2_PEND28_MASK                  GENMASK(28, 28)
+#define ICH_PPI_PENDRx_EL2_PEND28_SHIFT                 28
+#define ICH_PPI_PENDRx_EL2_PEND28_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND27                       GENMASK(27, 27)
+#define ICH_PPI_PENDRx_EL2_PEND27_MASK                  GENMASK(27, 27)
+#define ICH_PPI_PENDRx_EL2_PEND27_SHIFT                 27
+#define ICH_PPI_PENDRx_EL2_PEND27_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND26                       GENMASK(26, 26)
+#define ICH_PPI_PENDRx_EL2_PEND26_MASK                  GENMASK(26, 26)
+#define ICH_PPI_PENDRx_EL2_PEND26_SHIFT                 26
+#define ICH_PPI_PENDRx_EL2_PEND26_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND25                       GENMASK(25, 25)
+#define ICH_PPI_PENDRx_EL2_PEND25_MASK                  GENMASK(25, 25)
+#define ICH_PPI_PENDRx_EL2_PEND25_SHIFT                 25
+#define ICH_PPI_PENDRx_EL2_PEND25_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND24                       GENMASK(24, 24)
+#define ICH_PPI_PENDRx_EL2_PEND24_MASK                  GENMASK(24, 24)
+#define ICH_PPI_PENDRx_EL2_PEND24_SHIFT                 24
+#define ICH_PPI_PENDRx_EL2_PEND24_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND23                       GENMASK(23, 23)
+#define ICH_PPI_PENDRx_EL2_PEND23_MASK                  GENMASK(23, 23)
+#define ICH_PPI_PENDRx_EL2_PEND23_SHIFT                 23
+#define ICH_PPI_PENDRx_EL2_PEND23_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND22                       GENMASK(22, 22)
+#define ICH_PPI_PENDRx_EL2_PEND22_MASK                  GENMASK(22, 22)
+#define ICH_PPI_PENDRx_EL2_PEND22_SHIFT                 22
+#define ICH_PPI_PENDRx_EL2_PEND22_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND21                       GENMASK(21, 21)
+#define ICH_PPI_PENDRx_EL2_PEND21_MASK                  GENMASK(21, 21)
+#define ICH_PPI_PENDRx_EL2_PEND21_SHIFT                 21
+#define ICH_PPI_PENDRx_EL2_PEND21_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND20                       GENMASK(20, 20)
+#define ICH_PPI_PENDRx_EL2_PEND20_MASK                  GENMASK(20, 20)
+#define ICH_PPI_PENDRx_EL2_PEND20_SHIFT                 20
+#define ICH_PPI_PENDRx_EL2_PEND20_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND19                       GENMASK(19, 19)
+#define ICH_PPI_PENDRx_EL2_PEND19_MASK                  GENMASK(19, 19)
+#define ICH_PPI_PENDRx_EL2_PEND19_SHIFT                 19
+#define ICH_PPI_PENDRx_EL2_PEND19_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND18                       GENMASK(18, 18)
+#define ICH_PPI_PENDRx_EL2_PEND18_MASK                  GENMASK(18, 18)
+#define ICH_PPI_PENDRx_EL2_PEND18_SHIFT                 18
+#define ICH_PPI_PENDRx_EL2_PEND18_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND17                       GENMASK(17, 17)
+#define ICH_PPI_PENDRx_EL2_PEND17_MASK                  GENMASK(17, 17)
+#define ICH_PPI_PENDRx_EL2_PEND17_SHIFT                 17
+#define ICH_PPI_PENDRx_EL2_PEND17_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND16                       GENMASK(16, 16)
+#define ICH_PPI_PENDRx_EL2_PEND16_MASK                  GENMASK(16, 16)
+#define ICH_PPI_PENDRx_EL2_PEND16_SHIFT                 16
+#define ICH_PPI_PENDRx_EL2_PEND16_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND15                       GENMASK(15, 15)
+#define ICH_PPI_PENDRx_EL2_PEND15_MASK                  GENMASK(15, 15)
+#define ICH_PPI_PENDRx_EL2_PEND15_SHIFT                 15
+#define ICH_PPI_PENDRx_EL2_PEND15_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND14                       GENMASK(14, 14)
+#define ICH_PPI_PENDRx_EL2_PEND14_MASK                  GENMASK(14, 14)
+#define ICH_PPI_PENDRx_EL2_PEND14_SHIFT                 14
+#define ICH_PPI_PENDRx_EL2_PEND14_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND13                       GENMASK(13, 13)
+#define ICH_PPI_PENDRx_EL2_PEND13_MASK                  GENMASK(13, 13)
+#define ICH_PPI_PENDRx_EL2_PEND13_SHIFT                 13
+#define ICH_PPI_PENDRx_EL2_PEND13_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND12                       GENMASK(12, 12)
+#define ICH_PPI_PENDRx_EL2_PEND12_MASK                  GENMASK(12, 12)
+#define ICH_PPI_PENDRx_EL2_PEND12_SHIFT                 12
+#define ICH_PPI_PENDRx_EL2_PEND12_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND11                       GENMASK(11, 11)
+#define ICH_PPI_PENDRx_EL2_PEND11_MASK                  GENMASK(11, 11)
+#define ICH_PPI_PENDRx_EL2_PEND11_SHIFT                 11
+#define ICH_PPI_PENDRx_EL2_PEND11_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND10                       GENMASK(10, 10)
+#define ICH_PPI_PENDRx_EL2_PEND10_MASK                  GENMASK(10, 10)
+#define ICH_PPI_PENDRx_EL2_PEND10_SHIFT                 10
+#define ICH_PPI_PENDRx_EL2_PEND10_WIDTH                 1
+
+#define ICH_PPI_PENDRx_EL2_PEND9                        GENMASK(9, 9)
+#define ICH_PPI_PENDRx_EL2_PEND9_MASK                   GENMASK(9, 9)
+#define ICH_PPI_PENDRx_EL2_PEND9_SHIFT                  9
+#define ICH_PPI_PENDRx_EL2_PEND9_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND8                        GENMASK(8, 8)
+#define ICH_PPI_PENDRx_EL2_PEND8_MASK                   GENMASK(8, 8)
+#define ICH_PPI_PENDRx_EL2_PEND8_SHIFT                  8
+#define ICH_PPI_PENDRx_EL2_PEND8_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND7                        GENMASK(7, 7)
+#define ICH_PPI_PENDRx_EL2_PEND7_MASK                   GENMASK(7, 7)
+#define ICH_PPI_PENDRx_EL2_PEND7_SHIFT                  7
+#define ICH_PPI_PENDRx_EL2_PEND7_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND6                        GENMASK(6, 6)
+#define ICH_PPI_PENDRx_EL2_PEND6_MASK                   GENMASK(6, 6)
+#define ICH_PPI_PENDRx_EL2_PEND6_SHIFT                  6
+#define ICH_PPI_PENDRx_EL2_PEND6_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND5                        GENMASK(5, 5)
+#define ICH_PPI_PENDRx_EL2_PEND5_MASK                   GENMASK(5, 5)
+#define ICH_PPI_PENDRx_EL2_PEND5_SHIFT                  5
+#define ICH_PPI_PENDRx_EL2_PEND5_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND4                        GENMASK(4, 4)
+#define ICH_PPI_PENDRx_EL2_PEND4_MASK                   GENMASK(4, 4)
+#define ICH_PPI_PENDRx_EL2_PEND4_SHIFT                  4
+#define ICH_PPI_PENDRx_EL2_PEND4_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND3                        GENMASK(3, 3)
+#define ICH_PPI_PENDRx_EL2_PEND3_MASK                   GENMASK(3, 3)
+#define ICH_PPI_PENDRx_EL2_PEND3_SHIFT                  3
+#define ICH_PPI_PENDRx_EL2_PEND3_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND2                        GENMASK(2, 2)
+#define ICH_PPI_PENDRx_EL2_PEND2_MASK                   GENMASK(2, 2)
+#define ICH_PPI_PENDRx_EL2_PEND2_SHIFT                  2
+#define ICH_PPI_PENDRx_EL2_PEND2_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND1                        GENMASK(1, 1)
+#define ICH_PPI_PENDRx_EL2_PEND1_MASK                   GENMASK(1, 1)
+#define ICH_PPI_PENDRx_EL2_PEND1_SHIFT                  1
+#define ICH_PPI_PENDRx_EL2_PEND1_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_PEND0                        GENMASK(0, 0)
+#define ICH_PPI_PENDRx_EL2_PEND0_MASK                   GENMASK(0, 0)
+#define ICH_PPI_PENDRx_EL2_PEND0_SHIFT                  0
+#define ICH_PPI_PENDRx_EL2_PEND0_WIDTH                  1
+
+#define ICH_PPI_PENDRx_EL2_RES0                         (UL(0))
+#define ICH_PPI_PENDRx_EL2_RES1                         (UL(0))
+#define ICH_PPI_PENDRx_EL2_UNKN                         (UL(0))
+
+#define REG_ICH_PPI_PENDR0_EL2                          S3_4_C12_C10_4
+#define SYS_ICH_PPI_PENDR0_EL2                          sys_reg(3, 4, 12, 10, 4)
+#define SYS_ICH_PPI_PENDR0_EL2_Op0                      3
+#define SYS_ICH_PPI_PENDR0_EL2_Op1                      4
+#define SYS_ICH_PPI_PENDR0_EL2_CRn                      12
+#define SYS_ICH_PPI_PENDR0_EL2_CRm                      10
+#define SYS_ICH_PPI_PENDR0_EL2_Op2                      4
+
+/* For ICH_PPI_PENDR0_EL2 fields see ICH_PPI_PENDRx_EL2 */
+
+#define REG_ICH_PPI_PENDR1_EL2                          S3_4_C12_C10_5
+#define SYS_ICH_PPI_PENDR1_EL2                          sys_reg(3, 4, 12, 10, 5)
+#define SYS_ICH_PPI_PENDR1_EL2_Op0                      3
+#define SYS_ICH_PPI_PENDR1_EL2_Op1                      4
+#define SYS_ICH_PPI_PENDR1_EL2_CRn                      12
+#define SYS_ICH_PPI_PENDR1_EL2_CRm                      10
+#define SYS_ICH_PPI_PENDR1_EL2_Op2                      5
+
+/* For ICH_PPI_PENDR1_EL2 fields see ICH_PPI_PENDRx_EL2 */
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE63                   GENMASK(63, 63)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE63_MASK              GENMASK(63, 63)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE63_SHIFT             63
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE63_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE62                   GENMASK(62, 62)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE62_MASK              GENMASK(62, 62)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE62_SHIFT             62
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE62_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE61                   GENMASK(61, 61)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE61_MASK              GENMASK(61, 61)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE61_SHIFT             61
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE61_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE60                   GENMASK(60, 60)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE60_MASK              GENMASK(60, 60)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE60_SHIFT             60
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE60_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE59                   GENMASK(59, 59)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE59_MASK              GENMASK(59, 59)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE59_SHIFT             59
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE59_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE58                   GENMASK(58, 58)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE58_MASK              GENMASK(58, 58)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE58_SHIFT             58
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE58_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE57                   GENMASK(57, 57)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE57_MASK              GENMASK(57, 57)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE57_SHIFT             57
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE57_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE56                   GENMASK(56, 56)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE56_MASK              GENMASK(56, 56)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE56_SHIFT             56
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE56_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE55                   GENMASK(55, 55)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE55_MASK              GENMASK(55, 55)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE55_SHIFT             55
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE55_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE54                   GENMASK(54, 54)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE54_MASK              GENMASK(54, 54)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE54_SHIFT             54
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE54_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE53                   GENMASK(53, 53)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE53_MASK              GENMASK(53, 53)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE53_SHIFT             53
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE53_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE52                   GENMASK(52, 52)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE52_MASK              GENMASK(52, 52)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE52_SHIFT             52
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE52_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE51                   GENMASK(51, 51)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE51_MASK              GENMASK(51, 51)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE51_SHIFT             51
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE51_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE50                   GENMASK(50, 50)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE50_MASK              GENMASK(50, 50)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE50_SHIFT             50
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE50_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE49                   GENMASK(49, 49)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE49_MASK              GENMASK(49, 49)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE49_SHIFT             49
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE49_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE48                   GENMASK(48, 48)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE48_MASK              GENMASK(48, 48)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE48_SHIFT             48
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE48_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE47                   GENMASK(47, 47)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE47_MASK              GENMASK(47, 47)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE47_SHIFT             47
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE47_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE46                   GENMASK(46, 46)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE46_MASK              GENMASK(46, 46)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE46_SHIFT             46
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE46_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE45                   GENMASK(45, 45)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE45_MASK              GENMASK(45, 45)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE45_SHIFT             45
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE45_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE44                   GENMASK(44, 44)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE44_MASK              GENMASK(44, 44)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE44_SHIFT             44
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE44_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE43                   GENMASK(43, 43)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE43_MASK              GENMASK(43, 43)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE43_SHIFT             43
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE43_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE42                   GENMASK(42, 42)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE42_MASK              GENMASK(42, 42)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE42_SHIFT             42
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE42_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE41                   GENMASK(41, 41)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE41_MASK              GENMASK(41, 41)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE41_SHIFT             41
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE41_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE40                   GENMASK(40, 40)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE40_MASK              GENMASK(40, 40)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE40_SHIFT             40
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE40_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE39                   GENMASK(39, 39)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE39_MASK              GENMASK(39, 39)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE39_SHIFT             39
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE39_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE38                   GENMASK(38, 38)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE38_MASK              GENMASK(38, 38)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE38_SHIFT             38
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE38_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE37                   GENMASK(37, 37)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE37_MASK              GENMASK(37, 37)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE37_SHIFT             37
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE37_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE36                   GENMASK(36, 36)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE36_MASK              GENMASK(36, 36)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE36_SHIFT             36
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE36_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE35                   GENMASK(35, 35)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE35_MASK              GENMASK(35, 35)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE35_SHIFT             35
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE35_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE34                   GENMASK(34, 34)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE34_MASK              GENMASK(34, 34)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE34_SHIFT             34
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE34_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE33                   GENMASK(33, 33)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE33_MASK              GENMASK(33, 33)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE33_SHIFT             33
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE33_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE32                   GENMASK(32, 32)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE32_MASK              GENMASK(32, 32)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE32_SHIFT             32
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE32_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE31                   GENMASK(31, 31)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE31_MASK              GENMASK(31, 31)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE31_SHIFT             31
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE31_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE30                   GENMASK(30, 30)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE30_MASK              GENMASK(30, 30)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE30_SHIFT             30
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE30_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE29                   GENMASK(29, 29)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE29_MASK              GENMASK(29, 29)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE29_SHIFT             29
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE29_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE28                   GENMASK(28, 28)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE28_MASK              GENMASK(28, 28)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE28_SHIFT             28
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE28_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE27                   GENMASK(27, 27)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE27_MASK              GENMASK(27, 27)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE27_SHIFT             27
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE27_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE26                   GENMASK(26, 26)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE26_MASK              GENMASK(26, 26)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE26_SHIFT             26
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE26_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE25                   GENMASK(25, 25)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE25_MASK              GENMASK(25, 25)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE25_SHIFT             25
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE25_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE24                   GENMASK(24, 24)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE24_MASK              GENMASK(24, 24)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE24_SHIFT             24
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE24_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE23                   GENMASK(23, 23)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE23_MASK              GENMASK(23, 23)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE23_SHIFT             23
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE23_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE22                   GENMASK(22, 22)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE22_MASK              GENMASK(22, 22)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE22_SHIFT             22
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE22_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE21                   GENMASK(21, 21)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE21_MASK              GENMASK(21, 21)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE21_SHIFT             21
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE21_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE20                   GENMASK(20, 20)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE20_MASK              GENMASK(20, 20)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE20_SHIFT             20
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE20_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE19                   GENMASK(19, 19)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE19_MASK              GENMASK(19, 19)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE19_SHIFT             19
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE19_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE18                   GENMASK(18, 18)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE18_MASK              GENMASK(18, 18)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE18_SHIFT             18
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE18_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE17                   GENMASK(17, 17)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE17_MASK              GENMASK(17, 17)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE17_SHIFT             17
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE17_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE16                   GENMASK(16, 16)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE16_MASK              GENMASK(16, 16)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE16_SHIFT             16
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE16_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE15                   GENMASK(15, 15)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE15_MASK              GENMASK(15, 15)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE15_SHIFT             15
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE15_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE14                   GENMASK(14, 14)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE14_MASK              GENMASK(14, 14)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE14_SHIFT             14
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE14_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE13                   GENMASK(13, 13)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE13_MASK              GENMASK(13, 13)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE13_SHIFT             13
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE13_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE12                   GENMASK(12, 12)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE12_MASK              GENMASK(12, 12)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE12_SHIFT             12
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE12_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE11                   GENMASK(11, 11)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE11_MASK              GENMASK(11, 11)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE11_SHIFT             11
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE11_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE10                   GENMASK(10, 10)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE10_MASK              GENMASK(10, 10)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE10_SHIFT             10
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE10_WIDTH             1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE9                    GENMASK(9, 9)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE9_MASK               GENMASK(9, 9)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE9_SHIFT              9
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE9_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE8                    GENMASK(8, 8)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE8_MASK               GENMASK(8, 8)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE8_SHIFT              8
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE8_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE7                    GENMASK(7, 7)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE7_MASK               GENMASK(7, 7)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE7_SHIFT              7
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE7_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE6                    GENMASK(6, 6)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE6_MASK               GENMASK(6, 6)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE6_SHIFT              6
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE6_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE5                    GENMASK(5, 5)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE5_MASK               GENMASK(5, 5)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE5_SHIFT              5
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE5_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE4                    GENMASK(4, 4)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE4_MASK               GENMASK(4, 4)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE4_SHIFT              4
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE4_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE3                    GENMASK(3, 3)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE3_MASK               GENMASK(3, 3)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE3_SHIFT              3
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE3_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE2                    GENMASK(2, 2)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE2_MASK               GENMASK(2, 2)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE2_SHIFT              2
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE2_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE1                    GENMASK(1, 1)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE1_MASK               GENMASK(1, 1)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE1_SHIFT              1
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE1_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE0                    GENMASK(0, 0)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE0_MASK               GENMASK(0, 0)
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE0_SHIFT              0
+#define ICH_PPI_ACTIVERx_EL2_ACTIVE0_WIDTH              1
+
+#define ICH_PPI_ACTIVERx_EL2_RES0                       (UL(0))
+#define ICH_PPI_ACTIVERx_EL2_RES1                       (UL(0))
+#define ICH_PPI_ACTIVERx_EL2_UNKN                       (UL(0))
+
+#define REG_ICH_PPI_ACTIVER0_EL2                        S3_4_C12_C10_6
+#define SYS_ICH_PPI_ACTIVER0_EL2                        sys_reg(3, 4, 12, 10, 6)
+#define SYS_ICH_PPI_ACTIVER0_EL2_Op0                    3
+#define SYS_ICH_PPI_ACTIVER0_EL2_Op1                    4
+#define SYS_ICH_PPI_ACTIVER0_EL2_CRn                    12
+#define SYS_ICH_PPI_ACTIVER0_EL2_CRm                    10
+#define SYS_ICH_PPI_ACTIVER0_EL2_Op2                    6
+
+/* For ICH_PPI_ACTIVER0_EL2 fields see ICH_PPI_ACTIVERx_EL2 */
+
+#define REG_ICH_PPI_ACTIVER1_EL2                        S3_4_C12_C10_7
+#define SYS_ICH_PPI_ACTIVER1_EL2                        sys_reg(3, 4, 12, 10, 7)
+#define SYS_ICH_PPI_ACTIVER1_EL2_Op0                    3
+#define SYS_ICH_PPI_ACTIVER1_EL2_Op1                    4
+#define SYS_ICH_PPI_ACTIVER1_EL2_CRn                    12
+#define SYS_ICH_PPI_ACTIVER1_EL2_CRm                    10
+#define SYS_ICH_PPI_ACTIVER1_EL2_Op2                    7
+
+/* For ICH_PPI_ACTIVER1_EL2 fields see ICH_PPI_ACTIVERx_EL2 */
 
 #define REG_ICH_HCR_EL2                                 S3_4_C12_C11_0
 #define SYS_ICH_HCR_EL2                                 sys_reg(3, 4, 12, 11, 0)
@@ -14330,6 +16371,53 @@
 #define ICH_VCTLR_EL2_RES1                              (UL(0))
 #define ICH_VCTLR_EL2_UNKN                              (UL(0))
 
+#define REG_ICH_CONTEXTR_EL2                            S3_4_C12_C11_6
+#define SYS_ICH_CONTEXTR_EL2                            sys_reg(3, 4, 12, 11, 6)
+#define SYS_ICH_CONTEXTR_EL2_Op0                        3
+#define SYS_ICH_CONTEXTR_EL2_Op1                        4
+#define SYS_ICH_CONTEXTR_EL2_CRn                        12
+#define SYS_ICH_CONTEXTR_EL2_CRm                        11
+#define SYS_ICH_CONTEXTR_EL2_Op2                        6
+
+#define ICH_CONTEXTR_EL2_V                              GENMASK(63, 63)
+#define ICH_CONTEXTR_EL2_V_MASK                         GENMASK(63, 63)
+#define ICH_CONTEXTR_EL2_V_SHIFT                        63
+#define ICH_CONTEXTR_EL2_V_WIDTH                        1
+
+#define ICH_CONTEXTR_EL2_F                              GENMASK(62, 62)
+#define ICH_CONTEXTR_EL2_F_MASK                         GENMASK(62, 62)
+#define ICH_CONTEXTR_EL2_F_SHIFT                        62
+#define ICH_CONTEXTR_EL2_F_WIDTH                        1
+
+#define ICH_CONTEXTR_EL2_IRICHPPIDIS                    GENMASK(61, 61)
+#define ICH_CONTEXTR_EL2_IRICHPPIDIS_MASK               GENMASK(61, 61)
+#define ICH_CONTEXTR_EL2_IRICHPPIDIS_SHIFT              61
+#define ICH_CONTEXTR_EL2_IRICHPPIDIS_WIDTH              1
+
+#define ICH_CONTEXTR_EL2_DB                             GENMASK(60, 60)
+#define ICH_CONTEXTR_EL2_DB_MASK                        GENMASK(60, 60)
+#define ICH_CONTEXTR_EL2_DB_SHIFT                       60
+#define ICH_CONTEXTR_EL2_DB_WIDTH                       1
+
+#define ICH_CONTEXTR_EL2_DBPM                           GENMASK(59, 55)
+#define ICH_CONTEXTR_EL2_DBPM_MASK                      GENMASK(59, 55)
+#define ICH_CONTEXTR_EL2_DBPM_SHIFT                     55
+#define ICH_CONTEXTR_EL2_DBPM_WIDTH                     5
+
+#define ICH_CONTEXTR_EL2_VPE                            GENMASK(47, 32)
+#define ICH_CONTEXTR_EL2_VPE_MASK                       GENMASK(47, 32)
+#define ICH_CONTEXTR_EL2_VPE_SHIFT                      32
+#define ICH_CONTEXTR_EL2_VPE_WIDTH                      16
+
+#define ICH_CONTEXTR_EL2_VM                             GENMASK(15, 0)
+#define ICH_CONTEXTR_EL2_VM_MASK                        GENMASK(15, 0)
+#define ICH_CONTEXTR_EL2_VM_SHIFT                       0
+#define ICH_CONTEXTR_EL2_VM_WIDTH                       16
+
+#define ICH_CONTEXTR_EL2_RES0                           (UL(0) | GENMASK_ULL(54, 48) | GENMASK_ULL(31, 16))
+#define ICH_CONTEXTR_EL2_RES1                           (UL(0))
+#define ICH_CONTEXTR_EL2_UNKN                           (UL(0))
+
 #define REG_ICH_VMCR_EL2                                S3_4_C12_C11_7
 #define SYS_ICH_VMCR_EL2                                sys_reg(3, 4, 12, 11, 7)
 #define SYS_ICH_VMCR_EL2_Op0                            3
@@ -14400,6 +16488,210 @@
 #define ICH_VMCR_EL2_RES0                               (UL(0) | GENMASK_ULL(63, 32) | GENMASK_ULL(17, 10) | GENMASK_ULL(8, 5))
 #define ICH_VMCR_EL2_RES1                               (UL(0))
 #define ICH_VMCR_EL2_UNKN                               (UL(0))
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority7                GENMASK(60, 56)
+#define ICH_PPI_PRIORITYRx_EL2_Priority7_MASK           GENMASK(60, 56)
+#define ICH_PPI_PRIORITYRx_EL2_Priority7_SHIFT          56
+#define ICH_PPI_PRIORITYRx_EL2_Priority7_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority6                GENMASK(52, 48)
+#define ICH_PPI_PRIORITYRx_EL2_Priority6_MASK           GENMASK(52, 48)
+#define ICH_PPI_PRIORITYRx_EL2_Priority6_SHIFT          48
+#define ICH_PPI_PRIORITYRx_EL2_Priority6_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority5                GENMASK(44, 40)
+#define ICH_PPI_PRIORITYRx_EL2_Priority5_MASK           GENMASK(44, 40)
+#define ICH_PPI_PRIORITYRx_EL2_Priority5_SHIFT          40
+#define ICH_PPI_PRIORITYRx_EL2_Priority5_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority4                GENMASK(36, 32)
+#define ICH_PPI_PRIORITYRx_EL2_Priority4_MASK           GENMASK(36, 32)
+#define ICH_PPI_PRIORITYRx_EL2_Priority4_SHIFT          32
+#define ICH_PPI_PRIORITYRx_EL2_Priority4_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority3                GENMASK(28, 24)
+#define ICH_PPI_PRIORITYRx_EL2_Priority3_MASK           GENMASK(28, 24)
+#define ICH_PPI_PRIORITYRx_EL2_Priority3_SHIFT          24
+#define ICH_PPI_PRIORITYRx_EL2_Priority3_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority2                GENMASK(20, 16)
+#define ICH_PPI_PRIORITYRx_EL2_Priority2_MASK           GENMASK(20, 16)
+#define ICH_PPI_PRIORITYRx_EL2_Priority2_SHIFT          16
+#define ICH_PPI_PRIORITYRx_EL2_Priority2_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority1                GENMASK(12, 8)
+#define ICH_PPI_PRIORITYRx_EL2_Priority1_MASK           GENMASK(12, 8)
+#define ICH_PPI_PRIORITYRx_EL2_Priority1_SHIFT          8
+#define ICH_PPI_PRIORITYRx_EL2_Priority1_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_Priority0                GENMASK(4, 0)
+#define ICH_PPI_PRIORITYRx_EL2_Priority0_MASK           GENMASK(4, 0)
+#define ICH_PPI_PRIORITYRx_EL2_Priority0_SHIFT          0
+#define ICH_PPI_PRIORITYRx_EL2_Priority0_WIDTH          5
+
+#define ICH_PPI_PRIORITYRx_EL2_RES0                     (UL(0) | GENMASK_ULL(63, 61) | GENMASK_ULL(55, 53) | GENMASK_ULL(47, 45) | GENMASK_ULL(39, 37) | GENMASK_ULL(31, 29) | GENMASK_ULL(23, 21) | GENMASK_ULL(15, 13) | GENMASK_ULL(7, 5))
+#define ICH_PPI_PRIORITYRx_EL2_RES1                     (UL(0))
+#define ICH_PPI_PRIORITYRx_EL2_UNKN                     (UL(0))
+
+#define REG_ICH_PPI_PRIORITYR0_EL2                      S3_4_C12_C14_0
+#define SYS_ICH_PPI_PRIORITYR0_EL2                      sys_reg(3, 4, 12, 14, 0)
+#define SYS_ICH_PPI_PRIORITYR0_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR0_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR0_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR0_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR0_EL2_Op2                  0
+
+/* For ICH_PPI_PRIORITYR0_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR1_EL2                      S3_4_C12_C14_1
+#define SYS_ICH_PPI_PRIORITYR1_EL2                      sys_reg(3, 4, 12, 14, 1)
+#define SYS_ICH_PPI_PRIORITYR1_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR1_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR1_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR1_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR1_EL2_Op2                  1
+
+/* For ICH_PPI_PRIORITYR1_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR2_EL2                      S3_4_C12_C14_2
+#define SYS_ICH_PPI_PRIORITYR2_EL2                      sys_reg(3, 4, 12, 14, 2)
+#define SYS_ICH_PPI_PRIORITYR2_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR2_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR2_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR2_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR2_EL2_Op2                  2
+
+/* For ICH_PPI_PRIORITYR2_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR3_EL2                      S3_4_C12_C14_3
+#define SYS_ICH_PPI_PRIORITYR3_EL2                      sys_reg(3, 4, 12, 14, 3)
+#define SYS_ICH_PPI_PRIORITYR3_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR3_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR3_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR3_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR3_EL2_Op2                  3
+
+/* For ICH_PPI_PRIORITYR3_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR4_EL2                      S3_4_C12_C14_4
+#define SYS_ICH_PPI_PRIORITYR4_EL2                      sys_reg(3, 4, 12, 14, 4)
+#define SYS_ICH_PPI_PRIORITYR4_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR4_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR4_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR4_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR4_EL2_Op2                  4
+
+/* For ICH_PPI_PRIORITYR4_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR5_EL2                      S3_4_C12_C14_5
+#define SYS_ICH_PPI_PRIORITYR5_EL2                      sys_reg(3, 4, 12, 14, 5)
+#define SYS_ICH_PPI_PRIORITYR5_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR5_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR5_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR5_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR5_EL2_Op2                  5
+
+/* For ICH_PPI_PRIORITYR5_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR6_EL2                      S3_4_C12_C14_6
+#define SYS_ICH_PPI_PRIORITYR6_EL2                      sys_reg(3, 4, 12, 14, 6)
+#define SYS_ICH_PPI_PRIORITYR6_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR6_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR6_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR6_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR6_EL2_Op2                  6
+
+/* For ICH_PPI_PRIORITYR6_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR7_EL2                      S3_4_C12_C14_7
+#define SYS_ICH_PPI_PRIORITYR7_EL2                      sys_reg(3, 4, 12, 14, 7)
+#define SYS_ICH_PPI_PRIORITYR7_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR7_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR7_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR7_EL2_CRm                  14
+#define SYS_ICH_PPI_PRIORITYR7_EL2_Op2                  7
+
+/* For ICH_PPI_PRIORITYR7_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR8_EL2                      S3_4_C12_C15_0
+#define SYS_ICH_PPI_PRIORITYR8_EL2                      sys_reg(3, 4, 12, 15, 0)
+#define SYS_ICH_PPI_PRIORITYR8_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR8_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR8_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR8_EL2_CRm                  15
+#define SYS_ICH_PPI_PRIORITYR8_EL2_Op2                  0
+
+/* For ICH_PPI_PRIORITYR8_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR9_EL2                      S3_4_C12_C15_1
+#define SYS_ICH_PPI_PRIORITYR9_EL2                      sys_reg(3, 4, 12, 15, 1)
+#define SYS_ICH_PPI_PRIORITYR9_EL2_Op0                  3
+#define SYS_ICH_PPI_PRIORITYR9_EL2_Op1                  4
+#define SYS_ICH_PPI_PRIORITYR9_EL2_CRn                  12
+#define SYS_ICH_PPI_PRIORITYR9_EL2_CRm                  15
+#define SYS_ICH_PPI_PRIORITYR9_EL2_Op2                  1
+
+/* For ICH_PPI_PRIORITYR9_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR10_EL2                     S3_4_C12_C15_2
+#define SYS_ICH_PPI_PRIORITYR10_EL2                     sys_reg(3, 4, 12, 15, 2)
+#define SYS_ICH_PPI_PRIORITYR10_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR10_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR10_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR10_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR10_EL2_Op2                 2
+
+/* For ICH_PPI_PRIORITYR10_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR11_EL2                     S3_4_C12_C15_3
+#define SYS_ICH_PPI_PRIORITYR11_EL2                     sys_reg(3, 4, 12, 15, 3)
+#define SYS_ICH_PPI_PRIORITYR11_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR11_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR11_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR11_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR11_EL2_Op2                 3
+
+/* For ICH_PPI_PRIORITYR11_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR12_EL2                     S3_4_C12_C15_4
+#define SYS_ICH_PPI_PRIORITYR12_EL2                     sys_reg(3, 4, 12, 15, 4)
+#define SYS_ICH_PPI_PRIORITYR12_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR12_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR12_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR12_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR12_EL2_Op2                 4
+
+/* For ICH_PPI_PRIORITYR12_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR13_EL2                     S3_4_C12_C15_5
+#define SYS_ICH_PPI_PRIORITYR13_EL2                     sys_reg(3, 4, 12, 15, 5)
+#define SYS_ICH_PPI_PRIORITYR13_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR13_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR13_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR13_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR13_EL2_Op2                 5
+
+/* For ICH_PPI_PRIORITYR13_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR14_EL2                     S3_4_C12_C15_6
+#define SYS_ICH_PPI_PRIORITYR14_EL2                     sys_reg(3, 4, 12, 15, 6)
+#define SYS_ICH_PPI_PRIORITYR14_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR14_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR14_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR14_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR14_EL2_Op2                 6
+
+/* For ICH_PPI_PRIORITYR14_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
+
+#define REG_ICH_PPI_PRIORITYR15_EL2                     S3_4_C12_C15_7
+#define SYS_ICH_PPI_PRIORITYR15_EL2                     sys_reg(3, 4, 12, 15, 7)
+#define SYS_ICH_PPI_PRIORITYR15_EL2_Op0                 3
+#define SYS_ICH_PPI_PRIORITYR15_EL2_Op1                 4
+#define SYS_ICH_PPI_PRIORITYR15_EL2_CRn                 12
+#define SYS_ICH_PPI_PRIORITYR15_EL2_CRm                 15
+#define SYS_ICH_PPI_PRIORITYR15_EL2_Op2                 7
+
+/* For ICH_PPI_PRIORITYR15_EL2 fields see ICH_PPI_PRIORITYRx_EL2 */
 
 #define REG_CONTEXTIDR_EL2                              S3_4_C13_C0_1
 #define SYS_CONTEXTIDR_EL2                              sys_reg(3, 4, 13, 0, 1)
@@ -15560,6 +17852,28 @@
 #define MPAM0_EL1_RES0                                  (UL(0) | GENMASK_ULL(63, 48))
 #define MPAM0_EL1_RES1                                  (UL(0))
 #define MPAM0_EL1_UNKN                                  (UL(0))
+
+#define REG_MPAMSM_EL1                                  S3_0_C10_C5_3
+#define SYS_MPAMSM_EL1                                  sys_reg(3, 0, 10, 5, 3)
+#define SYS_MPAMSM_EL1_Op0                              3
+#define SYS_MPAMSM_EL1_Op1                              0
+#define SYS_MPAMSM_EL1_CRn                              10
+#define SYS_MPAMSM_EL1_CRm                              5
+#define SYS_MPAMSM_EL1_Op2                              3
+
+#define MPAMSM_EL1_PMG_D                                GENMASK(47, 40)
+#define MPAMSM_EL1_PMG_D_MASK                           GENMASK(47, 40)
+#define MPAMSM_EL1_PMG_D_SHIFT                          40
+#define MPAMSM_EL1_PMG_D_WIDTH                          8
+
+#define MPAMSM_EL1_PARTID_D                             GENMASK(31, 16)
+#define MPAMSM_EL1_PARTID_D_MASK                        GENMASK(31, 16)
+#define MPAMSM_EL1_PARTID_D_SHIFT                       16
+#define MPAMSM_EL1_PARTID_D_WIDTH                       16
+
+#define MPAMSM_EL1_RES0                                 (UL(0) | GENMASK_ULL(63, 48) | GENMASK_ULL(39, 32) | GENMASK_ULL(15, 0))
+#define MPAMSM_EL1_RES1                                 (UL(0))
+#define MPAMSM_EL1_UNKN                                 (UL(0))
 
 #define REG_ISR_EL1                                     S3_0_C12_C1_0
 #define SYS_ISR_EL1                                     sys_reg(3, 0, 12, 1, 0)

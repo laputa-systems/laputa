@@ -503,6 +503,22 @@ export proc write_config_headers(config_path: Path, root: Path, release: Str, ar
   )?
 }
 
+# linux/version.h for MAJOR.MINOR.SUB, as the top-level Makefile writes it.
+proc version_header(release: Str) [error] -> Result[Str] {
+  let parts = [part.parse_int()? for part in release.split(".")]
+
+  guard parts.len() == 3 else {
+    return Err(ScriptError.Failed("kbuild-version", f"kernel release {release} is not MAJOR.MINOR.SUB"))
+  }
+
+  f"""#define LINUX_VERSION_CODE {parts[0] * 65536 + parts[1] * 256 + parts[2]}
+#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
+#define LINUX_VERSION_MAJOR {parts[0]}
+#define LINUX_VERSION_PATCHLEVEL {parts[1]}
+#define LINUX_VERSION_SUBLEVEL {parts[2]}
+"""
+}
+
 ## Exported declaration `write_build_headers`.
 export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [fs, error] {
   fs.mkdir(fp"{root}/include/generated/uapi/linux")?
@@ -549,154 +565,91 @@ export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [
     )?
   }
 
-  write_text_if_changed(
-    fp"{root}/include/generated/uapi/linux/version.h",
-    """#define LINUX_VERSION_CODE 458757
-#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#define LINUX_VERSION_MAJOR 7
-#define LINUX_VERSION_PATCHLEVEL 0
-#define LINUX_VERSION_SUBLEVEL 5
+  write_text_if_changed(fp"{root}/include/generated/uapi/linux/version.h", version_header(release)?)?
+}
+
+# The `NAME += header.h` entries of one Kbuild variable.
+proc kbuild_header_list(file: Path, variable: Str) [fs, error] -> Result[List[Str]] {
+  var names: List[Str] = []
+
+  for line in file.read_text()?.lines() {
+    let fields = line.fields()
+    continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
+    names += [fields[2]]
+  }
+
+  names
+}
+
+# scripts/Makefile.asm-headers for one asm directory: asm-generic's
+# mandatory-y headers the arch does not provide, plus the arch's generic-y,
+# minus its generated-y, each become a one-line include of the asm-generic
+# header in the arch's generated directory.
+proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, generated_dir: Path) [fs, error] {
+  let arch_kbuild = fp"{root}/{arch_dir}/Kbuild"
+  let arch_lists_exist = arch_kbuild.exists()?
+  let generic = if arch_lists_exist { kbuild_header_list(arch_kbuild, "generic-y")? } else { [] }
+  let generated = if arch_lists_exist { kbuild_header_list(arch_kbuild, "generated-y")? } else { [] }
+  var wanted = generic
+
+  for header in kbuild_header_list(fp"{root}/{mandatory_kbuild}", "mandatory-y")? {
+    continue when fs.exists(fp"{root}/{arch_dir}/{header}")?
+    wanted += [header]
+  }
+
+  fs.mkdir(fp"{root}/{generated_dir}")?
+
+  for header in wanted {
+    continue when header in generated
+
+    write_text_if_changed(
+      fp"{root}/{generated_dir}/{header}",
+      f"""#include <asm-generic/{header}>
 """,
+    )?
+  }
+}
+
+## Writes the kernel and uapi asm-generic wrapper headers Kbuild generates for `srcarch`.
+export proc write_asm_generic_wrappers(root: Path, srcarch: Str) [fs, error] {
+  write_asm_wrapper_dir(
+    root,
+    p"include/asm-generic/Kbuild",
+    fp"arch/{srcarch}/include/asm",
+    fp"arch/{srcarch}/include/generated/asm",
+  )?
+
+  write_asm_wrapper_dir(
+    root,
+    p"include/uapi/asm-generic/Kbuild",
+    fp"arch/{srcarch}/include/uapi/asm",
+    fp"arch/{srcarch}/include/generated/uapi/asm",
   )?
 }
 
-## Exported declaration `write_asm_generic_wrappers`.
-export proc write_asm_generic_wrappers(root: Path, srcarch: Str = "arm64") [fs, error] {
-  let arch_dir = if srcarch == "x86" { "x86" } else { "arm64" }
-  fs.mkdir(fp"{root}/arch/{arch_dir}/include/generated/uapi/asm")?
-  fs.mkdir(fp"{root}/arch/{arch_dir}/include/generated/asm")?
+## Writes asm/kernel-hwcap.h from the uapi hwcap.h, as arch/arm64/tools/gen-kernel-hwcaps.sh does:
+## one KERNEL_HWCAP_<NAME> per `#define HWCAP<n>_<NAME>`, through __khwcap<n>_feature.
+export proc generate_arm64_kernel_hwcaps(root: Path) [fs, error] {
+  let define_re = rx"^#define HWCAP[0-9]*_[A-Z0-9_]+"
+  let name_re = rx".*HWCAP([0-9]*)_([A-Z0-9_]+).*"
+  var lines = ["#ifndef __ASM_KERNEL_HWCAPS_H", "#define __ASM_KERNEL_HWCAPS_H", "", "/* Generated file - do not edit */", ""]
 
-  for name in [
-    "bpf_perf_event.h",
-    "errno-base.h",
-    "errno.h",
-    "fcntl.h",
-    "hugetlb_encode.h",
-    "int-l64.h",
-    "int-ll64.h",
-    "ioctl.h",
-    "ioctls.h",
-    "ipcbuf.h",
-    "kvm_para.h",
-    "mman-common.h",
-    "msgbuf.h",
-    "param.h",
-    "poll.h",
-    "resource.h",
-    "sembuf.h",
-    "shmbuf.h",
-    "signal-defs.h",
-    "siginfo.h",
-    "socket.h",
-    "sockios.h",
-    "stat.h",
-    "swab.h",
-    "termbits-common.h",
-    "termbits.h",
-    "termios.h",
-    "types.h",
-  ] {
-    write_text_if_changed(
-      fp"{root}/arch/{arch_dir}/include/generated/uapi/asm/{name}",
-      f"""#include <asm-generic/{name}>
-""",
-    )?
+  for line in fp"{root}/arch/arm64/include/uapi/asm/hwcap.h".read_text()?.lines() {
+    continue unless define_re.matches(line)
+
+    if let [_, index, name, ..] = name_re.captures(line) {
+      lines += [f"#define KERNEL_HWCAP_{name}\t__khwcap{index}_feature({name})"]
+    }
   }
 
-  for name in [
-    "__ffs.h",
-    "__fls.h",
-    "access_ok.h",
-    "atomic.h",
-    "atomic64.h",
-    "audit_change_attr.h",
-    "audit_dir_write.h",
-    "audit_read.h",
-    "audit_signal.h",
-    "audit_write.h",
-    "bitsperlong.h",
-    "builtin-__ffs.h",
-    "builtin-__fls.h",
-    "builtin-ffs.h",
-    "builtin-fls.h",
-    "cmpxchg-local.h",
-    "codetag.lds.h",
-    "const_hweight.h",
-    "delay.h",
-    "div64.h",
-    "dma-mapping.h",
-    "dma.h",
-    "early_ioremap.h",
-    "emergency-restart.h",
-    "error-injection.h",
-    "ext2-atomic-setbit.h",
-    "ext2-atomic.h",
-    "ffs.h",
-    "ffz.h",
-    "flat.h",
-    "fls.h",
-    "fls64.h",
-    "fprobe.h",
-    "generic-non-atomic.h",
-    "getorder.h",
-    "hw_irq.h",
-    "hweight.h",
-    "instrumented-atomic.h",
-    "instrumented-lock.h",
-    "instrumented-non-atomic.h",
-    "int-ll64.h",
-    "ioctl.h",
-    "irq_regs.h",
-    "kdebug.h",
-    "kmap_size.h",
-    "le.h",
-    "local.h",
-    "local64.h",
-    "lock.h",
-    "logic_io.h",
-    "mcs_spinlock.h",
-    "memory_model.h",
-    "mm_hooks.h",
-    "mmiowb.h",
-    "mmiowb_types.h",
-    "mmzone.h",
-    "module.lds.h",
-    "msi.h",
-    "nommu_context.h",
-    "non-atomic.h",
-    "non-instrumented-non-atomic.h",
-    "param.h",
-    "parport.h",
-    "pci_iomap.h",
-    "pgtable-nop4d.h",
-    "pgtable-nopmd.h",
-    "pgtable-nopud.h",
-    "pgtable_uffd.h",
-    "qrwlock.h",
-    "qrwlock_types.h",
-    "qspinlock.h",
-    "qspinlock_types.h",
-    "resource.h",
-    "rwonce.h",
-    "serial.h",
-    "softirq_stack.h",
-    "statfs.h",
-    "switch_to.h",
-    "thread_info_tif.h",
-    "ticket_spinlock.h",
-    "trace_clock.h",
-    "unwind_user.h",
-    "user.h",
-    "vga.h",
-    "video.h",
-    "vmlinux.lds.h",
-  ] {
-    write_text_if_changed(
-      fp"{root}/arch/{arch_dir}/include/generated/asm/{name}",
-      f"""#include <asm-generic/{name}>
+  lines += ["", "#endif /* __ASM_KERNEL_HWCAPS_H */"]
+  fs.mkdir(fp"{root}/arch/arm64/include/generated/asm")?
+
+  write_text_if_changed(
+    fp"{root}/arch/arm64/include/generated/asm/kernel-hwcap.h",
+    f"""{lines.join("\n")}
 """,
-    )?
-  }
+  )?
 }
 
 ## Exported declaration `generate_arm64_cpucap_defs`.
@@ -1446,12 +1399,21 @@ proc cached_kbuild_compile_flags_for_dirs(
   flags
 }
 
-pure kbuild_compile_flags_for_object(by_dir: Map[Map[List[Str]]], obj: Path) -> List[Str] {
-  let dir_key = path_key(object_dir(obj))
+pure kbuild_compile_flags_in_makefile_dir(by_dir: Map[Map[List[Str]]], makefile_dir: Path, obj: Path) -> List[Str] {
   let empty_dir_flags: Map[List[Str]] = {}
-  let dir_flags = by_dir.get(dir_key) ?? empty_dir_flags
+  let dir_flags = by_dir.get(path_key(makefile_dir)) ?? empty_dir_flags
   let object_flags = dir_flags.get(path_key(obj)) ?? []
   (dir_flags.get("*") ?? []).extend(object_flags)
+}
+
+pure kbuild_compile_flags_for_object(by_dir: Map[Map[List[Str]]], obj: Path) -> List[Str] {
+  kbuild_compile_flags_in_makefile_dir(by_dir, object_dir(obj), obj)
+}
+
+# A composite's members build under the Makefile that lists them, which is
+# the composite's directory even for a member such as x86/xor-avx.o.
+pure kbuild_compile_flags_for_member(by_dir: Map[Map[List[Str]]], composite: Path, member: Path) -> List[Str] {
+  kbuild_compile_flags_in_makefile_dir(by_dir, object_dir(composite), member)
 }
 
 ## Exported declaration `augment_missing_composites`.
@@ -3977,7 +3939,7 @@ export proc generate_crc32table_header(root: Path, cc: Path) [fs, process, env, 
 
 ## Exported declaration `generate_raid6_sources`.
 export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, error] {
-  let int_uc = fp"{root}/lib/raid6/int.uc".read_text()?
+  let int_uc = fp"{root}/lib/raid/raid6/int.uc".read_text()?
 
   for n in [1, 2, 4, 8] {
     var lines: List[Str] = []
@@ -3993,14 +3955,14 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
     }
 
     write_text_if_changed(
-      fp"{root}/lib/raid6/int{n}.c",
+      fp"{root}/lib/raid/raid6/int{n}.c",
       f"""{lines.join("\n")}
 """,
     )?
   }
 
-  let gen = fp"{root}/lib/raid6/mktables"
-  let source = fp"{root}/lib/raid6/mktables.c"
+  let gen = fp"{root}/lib/raid/raid6/mktables"
+  let source = fp"{root}/lib/raid/raid6/mktables.c"
 
   let argv = [
     cc.display(),
@@ -4029,7 +3991,7 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
   }
 
   let tables = run.text $gen ?
-  write_text_if_changed(fp"{root}/lib/raid6/tables.c", tables)?
+  write_text_if_changed(fp"{root}/lib/raid/raid6/tables.c", tables)?
 }
 
 pure dir_archive(dir: Path) -> Path {
@@ -4849,7 +4811,6 @@ pure efi_libstub_stems_x86() -> List[Str] {
     "printk",
     "random",
     "randomalloc",
-    "relocate",
     "secureboot",
     "skip_spaces",
     "smbios",
@@ -5582,7 +5543,6 @@ pure efi_libstub_stems() -> List[Str] {
     "printk",
     "random",
     "randomalloc",
-    "relocate",
     "secureboot",
     "skip_spaces",
     "smbios",
@@ -6193,7 +6153,7 @@ pure archive_analysis_record_for_object(
       composite: path_key(composite.object),
       member_objects: [path_key(member) for member in composite.members],
       member_flags: [
-        kbuild_compile_flags_for_object(compile_flags_by_dir, member)
+        kbuild_compile_flags_for_member(compile_flags_by_dir, composite.object, member)
         for member in composite.members
       ],
       flags: [],
@@ -6389,7 +6349,7 @@ proc archive_analysis_items_with_compile_flags(
     let object = fp"{item.object}"
     let flags_object = if item.pi { pi_base_object(object) } else { object }
     let member_flags = [
-      kbuild_compile_flags_for_object(compile_flags_by_dir, fp"{member}")
+      kbuild_compile_flags_for_member(compile_flags_by_dir, fp"{item.composite}", fp"{member}")
       for member in item.member_objects
     ]
 

@@ -26,6 +26,10 @@ pure native_kbuild_cflags() -> List[Str] {
     "-fno-omit-frame-pointer",
     "-fno-optimize-sibling-calls",
     "-ftrivial-auto-var-init=zero",
+    # The config has CC_HAS_COUNTED_BY_PTR, so __counted_by_ptr() names
+    # members declared after the pointer; clang parses those only with
+    # late-parsed attributes, which the top-level Makefile turns on.
+    "-fexperimental-late-parse-attributes",
     "-fno-stack-clash-protection",
     "-fstrict-flex-arrays=3",
     "-fno-strict-overflow",
@@ -345,10 +349,6 @@ pure native_nvhe_objects() -> List[NvheObject] {
       out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/entry.nvhe.o",
     },
     {
-      source: p"arch/arm64/kvm/hyp/fpsimd.S",
-      out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/fpsimd.nvhe.o",
-    },
-    {
       source: p"arch/arm64/kvm/hyp/hyp-entry.S",
       out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/hyp-entry.nvhe.o",
     },
@@ -359,6 +359,10 @@ pure native_nvhe_objects() -> List[NvheObject] {
     {
       source: p"arch/arm64/kvm/hyp/pgtable.c",
       out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/pgtable.nvhe.o",
+    },
+    {
+      source: p"arch/arm64/kvm/hyp/vgic-v5-sr.c",
+      out: p".xsh-kbuild/obj/arch/arm64/kvm/hyp/vgic-v5-sr.nvhe.o",
     },
     {
       source: p"arch/arm64/kernel/smccc-call.S",
@@ -379,6 +383,10 @@ pure native_nvhe_objects() -> List[NvheObject] {
     {
       source: p"arch/arm64/lib/memset.S",
       out: p".xsh-kbuild/obj/arch/arm64/lib/memset.nvhe.o",
+    },
+    {
+      source: p"arch/arm64/lib/tishift.S",
+      out: p".xsh-kbuild/obj/arch/arm64/lib/tishift.nvhe.o",
     },
   ]
 }
@@ -570,8 +578,9 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   kbuild.write_build_headers(p".", ver)?
   kbuild.copy_text_if_changed(p"timeconst.h", p"include/generated/timeconst.h")?
   kbuild.copy_text_if_changed(p"bounds.h", p"include/generated/bounds.h")?
-  kbuild.write_asm_generic_wrappers(p".")?
+  kbuild.write_asm_generic_wrappers(p".", srcarch)?
   kbuild.generate_arm64_cpucap_defs(p".")?
+  kbuild.generate_arm64_kernel_hwcaps(p".")?
   kbuild.copy_text_if_changed(p"sysreg-defs.h", p"arch/arm64/include/generated/asm/sysreg-defs.h")?
   kbuild.generate_arm64_syscall_tables(p".")?
   write_native_asm_offsets(cc)?

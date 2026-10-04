@@ -856,6 +856,52 @@ CFLAGS_intel.o := -I$(src)
   } ?
 }
 
+# Kbuild compiles a composite's members with the flags of the Makefile that
+# lists them, so a member in a subdirectory without its own Makefile (as
+# lib/raid/xor's x86/ objects are) still gets that Makefile's ccflags-y and
+# its CFLAGS_<member> entry.
+test test_kbuild_applies_composite_makefile_cflags_to_subdir_members [fs, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-composite-cflags")?
+  fs.mkdir(fp"{root}/lib/xor/x86")?
+  fs.write(fp"{root}/.config", "")?
+
+  fs.write(
+    fp"{root}/lib/xor/Makefile",
+    """ccflags-y += -I $(src)
+obj-y += xor.o
+xor-y += core.o x86/avx.o
+CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
+""",
+  )?
+
+  fs.write(fp"{root}/lib/xor/core.c", "int core(void) { return 0; }\n")?
+  fs.write(fp"{root}/lib/xor/x86/avx.c", "int avx(void) { return 0; }\n")?
+
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"lib/xor"],
+    objects: [p"lib/xor/xor.o"],
+    lib_objects: [],
+    archive_owners: [],
+    composites: [kbuild.CompositeObject(object: p"lib/xor/xor.o", members: [p"lib/xor/core.o", p"lib/xor/x86/avx.o"])],
+    unsupported: [],
+  )
+
+  cd root {
+    let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    var saw_member = false
+
+    for task in archive_plan.tasks {
+      if task.name == ".xsh-kbuild/obj/lib/xor/x86/avx.o" {
+        saw_member = true
+        assert "./lib/xor" in task.argv
+        assert "-DXOR_MEMBER_FLAG" in task.argv
+      }
+    }
+
+    assert saw_member
+  } ?
+}
+
 test test_kbuild_generates_config_headers [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-config-headers")?
   let config = fp"{root}/.config"

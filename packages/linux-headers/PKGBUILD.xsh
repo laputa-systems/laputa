@@ -9,7 +9,7 @@ export const name = "linux-headers"
 export const package_kind = "payload"
 
 ## The kernel release these headers come from; `linux` pins the same tarball.
-export const ver = "7.0.5"
+export const ver = "7.2.9"
 
 ## Package recipe export.
 export const rel = "1"
@@ -23,7 +23,7 @@ export const mkdeps_host: List[Str] = []
 ## Package recipe export.
 export const upstream_sources = [
   {
-    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.5.tar.xz",
+    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
     kind: "auto",
     architectures: [
       "all",
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "965fb0a1c1675399fc60c6063b227c0523041b5f9a662b66462f1212c438ac3c",
+        sha256: "b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba",
       },
     ],
   },

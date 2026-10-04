@@ -126,7 +126,7 @@ proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots
 }
 
 proc prune_runtime_root(rootfs: Path, arch: Str) [fs, error] {
-  fs.remove(fp"{rootfs}/boot/vmlinuz-7.0.5", missing_ok: true)?
+  fs.remove(fp"{rootfs}/boot/vmlinuz-7.2.9", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/include", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)?
   fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a", missing_ok: true)?
