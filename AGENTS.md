@@ -53,6 +53,7 @@ sets it.
 | `make profile-{plan,build,test,boot,clean}` | the typed profile CLI on the host: builds in native Docker for the host arch, boots QEMU with HVF (macOS) or KVM (Linux) |
 | `make installer-image`, `make installer-qemu-test [ARCH=…]` | installer ISO and its QEMU install-and-boot proof; roots come from the local mirror, so `make mirror` and `make publish` come first |
 | `make installer-qemu-manual` | interactive installer boot in QEMU |
+| `make store-gc` | remove store artifacts that neither the last world plan nor a profile plan names (between builds only) |
 | `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |
 | `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images), through a container on Linux because rootful Docker leaves root-owned files; `make distclean` also removes `.cache/` |
 

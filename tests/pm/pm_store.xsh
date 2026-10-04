@@ -402,3 +402,29 @@ test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs
   expect_store_error(ctx, store.lookup(legacy_root, key), "is missing")?
   test.eq(store.verify_all(legacy_root)?, [])?
 }
+
+# Garbage collection keeps exactly the artifacts the kept plans name, with
+# their re-proof receipts, and removes the rest with their leftover state.
+test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx|
+  let root = store_root(ctx, "store-gc")?
+  let kept = digest("gc-kept")
+  let dropped = digest("gc-dropped")
+  let _ = store.commit(types.target_aarch64(), root, test_node(kept), staged_artifact(ctx, "store-gc-kept")?.staged)?
+  let _ = store.commit(types.target_aarch64(), root, test_node(dropped), staged_artifact(ctx, "store-gc-dropped")?.staged)?
+  let kept_reproof = store.reproof_receipt_path(root, kept, digest("gc-kept-proof"))
+  let dropped_reproof = store.reproof_receipt_path(root, dropped, digest("gc-dropped-proof"))
+  fs.mkdir(kept_reproof.parent)?
+  fs.write(kept_reproof, "{}")?
+  fs.mkdir(dropped_reproof.parent)?
+  fs.write(dropped_reproof, "{}")?
+  fs.mkdir(fp"{root}/v2/tmp/{digest("gc-interrupted")}")?
+
+  let removed = store.gc(root, [kept])?
+  assert removed.artifacts == 1
+  assert fs.exists(store.artifact_path(root, kept))?
+  assert ! fs.exists(store.artifact_path(root, dropped))?
+  assert fs.exists(kept_reproof)?
+  assert ! fs.exists(dropped_reproof.parent)?
+  assert fs.children(fp"{root}/v2/tmp")?.collect().len() == 0
+  test.eq(store.verify_all(root)?.len(), 1)?
+}

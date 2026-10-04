@@ -567,3 +567,48 @@ export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactRece
 
   receipts
 }
+
+## What one garbage collection removed.
+export type StoreGcResult = {artifacts: Int, kept: Int}
+
+# The store only grows: every rebuild under a new key adds an artifact, and
+# nothing else ever removes one. A collection keeps exactly the artifacts in
+# `keep` (the keys of the plans still in use), with their re-proof receipts,
+# and removes every other final artifact, its proofs and lock, and any
+# interrupted temporary build. It must not run while a build writes the store.
+## Remove every artifact not in `keep`, with its proofs, lock, and temporary state.
+export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult] {
+  for key in keep {
+    require_key(key)?
+  }
+
+  let kept: Map[Bool] = {key: true for key in keep}
+  var removed = 0
+  var remaining = 0
+  let objects = object_root(root)
+
+  if fs.exists(objects)? {
+    for entry in fs.children(objects)? |> sort-by .name {
+      if kept.get(entry.name) ?? false {
+        remaining += 1
+        continue
+      }
+
+      # fs.remove deletes a directory tree without following symlinks.
+      fs.remove(entry.path)?
+      fs.remove(fp"{store_layout(root)}/proofs/{entry.name}", missing_ok: true)?
+      fs.remove(lock_path(root, entry.name), missing_ok: true)?
+      removed += 1
+    }
+  }
+
+  let temporary = fp"{store_layout(root)}/tmp"
+
+  if fs.exists(temporary)? {
+    for entry in fs.children(temporary)? {
+      fs.remove(entry.path)?
+    }
+  }
+
+  {artifacts: removed, kept: remaining}
+}

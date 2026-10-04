@@ -36,6 +36,8 @@ type RootInspectArgs = {input: Path}
 
 type StoreVerifyArgs = {store: Path}
 
+type StoreGcArgs = {store: Path, keep: List[Str]}
+
 type StoreExtractArgs = {input: Path, store: Path, package: Str, path: Path, output: Path}
 
 type SourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: List[types.Target]}
@@ -54,6 +56,7 @@ enum PmCommand {
     RootCompose(RootComposeArgs),
     RootInspect(RootInspectArgs),
     StoreVerify(StoreVerifyArgs),
+    StoreGc(StoreGcArgs),
     StoreExtract(StoreExtractArgs),
 }
 
@@ -76,6 +79,8 @@ type RootComposeOptions = {input: Path, store: Path, runtime_roots: List[Str], o
 type RootInspectOptions = {input: Path}
 
 type StoreVerifyOptions = {store: Path}
+
+type StoreGcOptions = {store: Path, keep: List[Str]}
 
 type StoreExtractOptions = {input: Path, store: Path, package: Str, path: Path, output: Path}
 
@@ -103,6 +108,7 @@ root commands:
 
 store commands:
   store verify --store STORE
+  store gc --store STORE --keep PLAN...
   store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 
 targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
@@ -161,6 +167,7 @@ pure store_help_text() -> Str {
   """usage: pm store COMMAND [OPTIONS]
 
   verify --store STORE
+  gc --store STORE --keep PLAN...
   extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 """
 }
@@ -516,6 +523,25 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
     })
   }
 
+  if argv[1] == "gc" {
+    var collected: StoreGcOptions = StoreGcOptions(store: p"", keep: [])
+    match cli.parse(
+      tail_after(argv, 2),
+      {
+        store: {form: "--store STORE", kind: "Path", required: true},
+        keep: {form: "--keep PLAN", repeated: true},
+      },
+      "pm store gc",
+    ) {
+      Ok(value) => collected = value
+      Err(problem) => return Err(problem)
+    }
+
+    return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when collected.keep.len() == 0
+
+    return StoreGc({store: collected.store, keep: collected.keep})
+  }
+
   if argv[1] != "verify" {
     return Err(types.PmError.Usage(f"unknown pm store command {argv[1]}"))
   }
@@ -746,6 +772,19 @@ proc command_root_inspect(args: RootInspectArgs) [fs, error] {
   print "artifacts" receipt.artifacts.len()
 }
 
+# Every artifact a kept plan names stays, whatever its action: a plan that
+# reuses a remote artifact still runs from the imported copy.
+proc command_store_gc(args: StoreGcArgs) [fs, error] {
+  var keep: List[Str] = []
+
+  for plan_file in args.keep {
+    keep += [node.artifact_key for node in pm_plan_json.read(fp"{plan_file}")?.nodes]
+  }
+
+  let result = store.gc(args.store, keep)?
+  print "store" "gc" $result.artifacts "removed" $result.kept "kept"
+}
+
 proc command_store_verify(args: StoreVerifyArgs) [fs, error] {
   let receipts = store.verify_all(args.store)?
   print "store" "verify" receipts.len() "artifacts"
@@ -777,6 +816,7 @@ proc handle(command: PmCommand) [fs, net, process, env, time, error] {
     RootCompose(args) => command_root_compose(args)?
     RootInspect(args) => command_root_inspect(args)?
     StoreVerify(args) => command_store_verify(args)?
+    StoreGc(args) => command_store_gc(args)?
     StoreExtract(args) => command_store_extract(args)?
   }
 }

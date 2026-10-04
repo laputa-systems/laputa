@@ -86,7 +86,7 @@ DEPLOY_HOST ?= oracle
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit test-linux verify clean distclean fetch fetch-seed seed seed-smoke \
+.PHONY: check lint test test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	profile-plan profile-build profile-test profile-boot profile-clean \
@@ -136,6 +136,13 @@ test-linux: need-xsh
 # at a time. Logs and the timing table go to .out/verify/.
 verify: need-xsh
 	$(HOST_XSH_ENV) $(XSH) seed/verify.xsh -- $(ARCH)
+
+# The artifact store only grows; this removes every artifact that neither the
+# last world plan nor a profile's last plan names. Run it between builds, never
+# during one.
+STORE_GC_PLANS = $(wildcard .out/world/$(ARCH)/plan.json target/laputa/*/build-plan.json)
+store-gc: need-xsh
+	$(HOST_XSH_ENV) $(XSH) pm.xsh -- store gc --store .out/artifacts/$(ARCH) $(foreach plan,$(STORE_GC_PLANS),--keep $(plan))
 
 # All derived state: .out/ (seed, artifact store, cargo target, image
 # contexts), target/ (profile and installer outputs), mirror build outputs,
