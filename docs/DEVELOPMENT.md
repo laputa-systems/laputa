@@ -61,13 +61,29 @@ cd "$LAPUTA_ROOT"
 make test-pm
 ```
 
-## Profile plan
+## Seed and package-tools image
 
-For a checked-out Linux XSH build, run `make xsh-local-bins` and set
-`LAPUTA_LOCAL_XSH_BIN="$XSH_ROOT/target/aarch64-unknown-linux-musl/debug/xsh"`.
-The Docker adapter mounts that binary read-only at `/bin/xsh` for profile
-commands; the package-tools image itself still comes from the pinned release.
-Leave the variable unset to test the published binary.
+Containers run the local XSH seed, never a published release. `make fetch`
+does the networked part once: XSH's crates into `.cache/cargo`, XSH's
+`xsh-test` image, and the `laputa-host-tools` base (pinned Alpine plus apk),
+saved to `.cache/images/`. Then, offline:
+
+```bash
+cd "$LAPUTA_ROOT"
+make seed        # static musl xsh/xshi/xsht + core.tar.xz under .out/seed/aarch64, then the image
+make seed-smoke  # the seed runs, plans, and passes PM suites in the image with --network none
+```
+
+`make seed` builds `XSH_ROOT` with the release profile inside `xsh-test`, as
+XSH's Linux test path does, reusing the cargo target dir `.out/xsh-target`.
+`.out/seed/<arch>/manifest.json` records each product's sha256 and the XSH
+commit and dirty flag. The `laputa-package-tools` image adds only the LLVM seed
+from the source cache; the Docker adapter mounts the seed at
+`/bin/{xsh,xshi,xsht}` and `/usr/lib/xsh/core`, so an XSH or PM change rebuilds
+no image. Image tags are content keys over each image's own inputs
+(`seed/images.xsh`).
+
+## Profile plan
 
 ```bash
 cd "$LAPUTA_ROOT"
@@ -110,7 +126,7 @@ cd "$LAPUTA_ROOT"
 "$XSH_HOST" laputa.xsh -- clean qemu-dwl-foot
 ```
 
-This removes only `target/laputa/qemu-dwl-foot`; it must not remove the immutable package-artifact store.
+This removes only `target/laputa/qemu-dwl-foot`; it must not remove the immutable package-artifact store at `.out/artifacts/aarch64`. `make clean` removes all derived state, the store included; `make distclean` also removes `.cache/`.
 
 ## Verify the artifact store
 
@@ -119,11 +135,13 @@ The final public Laputa CLI intentionally has no store command. Invoke the PM ve
 ```bash
 cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
-  --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/artifacts/aarch64",dst=/artifacts,readonly \
   --mount type=bind,src="$LAPUTA_ROOT",dst=/src/laputa,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/seed/aarch64/xsh",dst=/bin/xsh,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/seed/aarch64/core",dst=/usr/lib/xsh/core,readonly \
   --workdir /src/laputa \
   --env XSH_MODULE_PATH=/src/laputa \
-  laputa-package-tools \
+  "$(docker image ls --format '{{.Repository}}:{{.Tag}}' laputa-package-tools | head -n 1)" \
   /bin/xsh /src/laputa/pm.xsh -- store verify --store /artifacts
 ```
 
@@ -134,12 +152,14 @@ Every artifact must verify. This is `pm store verify --store STORE` running in t
 ```bash
 cd "$LAPUTA_ROOT"
 docker run --rm --platform linux/arm64 \
-  --mount type=volume,src=laputa-artifacts-aarch64-v2,dst=/artifacts,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/artifacts/aarch64",dst=/artifacts,readonly \
   --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \
   --mount type=bind,src="$LAPUTA_ROOT",dst=/src/laputa,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/seed/aarch64/xsh",dst=/bin/xsh,readonly \
+  --mount type=bind,src="$LAPUTA_ROOT/.out/seed/aarch64/core",dst=/usr/lib/xsh/core,readonly \
   --workdir /src/laputa \
   --env XSH_MODULE_PATH=/src/laputa \
-  laputa-package-tools \
+  "$(docker image ls --format '{{.Repository}}:{{.Tag}}' laputa-package-tools | head -n 1)" \
   /bin/xsh /src/laputa/pm.xsh -- generation inspect /profile/current/generation.json
 ```
 

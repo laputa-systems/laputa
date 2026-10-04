@@ -217,7 +217,7 @@ loading recipes or starting package builds. Run it against the checked-out
 debug tools with `../xsh/target/debug/xsht test --jobs 1 tests/xsh/pm_graph_contracts.xsh`.
 `pm_recipe_hooks.xsh` likewise exercises checked hook dispatch, absence, rejected
 contracts, and cwd restoration with temporary fixtures. These host checks do not
-validate the published runner pin or Linux package execution. `pm_make.xsh`
+validate Linux package execution. `pm_make.xsh`
 uses temporary native child scripts to verify argument and environment preservation,
 dependency order, stamp reuse, failed-peer cancellation, and checked pkg-config
 flag lists without package builds. `ca_certificates_recipe.xsh` checks the proof
@@ -227,10 +227,6 @@ checks Bison token definitions, Flex definition expansion, generated output path
 and missing-input diagnostics independently of Linux build modules.
 
 Run a host-native suite with `make test-native XSH_ROOT=$HOME/d/laputa-systems/xsh`.
-The Docker-backed suite is `make test`. The migrated enum declarations, explicit
-environment overlays, collection APIs, and checked module contracts target the
-checked-out XSH implementation. Update `XSH_RELEASE` and its binary hashes together
-to a release containing those contracts before treating the published runner gate
-as evidence for this checkout.
-Use `make test-local-linux` to test the checked-out XSH ARM64 debug binaries in
-the pinned Linux test image before updating the published release pin.
+`make test-pm-docker` runs the same suite on Linux with the local XSH seed
+(`make seed`) inside the package-tools image, offline. There is no published
+runner pin: the seed is always the current `XSH_ROOT` checkout.
