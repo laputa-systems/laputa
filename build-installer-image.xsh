@@ -633,7 +633,7 @@ proc build_host() [fs, net, process, env, time, error, io] {
     fp"{work}/target-esp.vfat",
     fp"{work}/linux-kernel",
   ] {
-    host.installer_remove_tree(path_value)?
+    fs.remove(path_value, missing_ok: true)?
   }
 
   package_roots_host.prepare(

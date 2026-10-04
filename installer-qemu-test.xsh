@@ -381,7 +381,7 @@ proc clean_build_state(work: Path) [fs, error] {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    host.installer_remove_tree(fp"{work}/{name}")?
+    fs.remove(fp"{work}/{name}", missing_ok: true)?
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -398,7 +398,7 @@ proc clean_build_state(work: Path) [fs, error] {
     if fs.exists(out)? {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
-          host.installer_remove_tree(entry.path)?
+          fs.remove(entry.path)?
         }
       }
     }

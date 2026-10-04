@@ -44,27 +44,3 @@ export proc installer_run_argv(target: Path, argv: List[Str], cwd: Path, envs: R
 
   return Err(InstallerHostError.Failed(f"{argv[0]} was signaled"))
 }
-
-## Remove a file or directory tree if it exists; `fs.remove` does not recurse.
-export proc installer_remove_tree(path_value: Path) [fs, error] {
-  guard fs.exists(path_value)? else {
-    return
-  }
-
-  let meta = path_value.metadata()?
-
-  if meta.kind != "dir" {
-    path_value.remove()?
-    return
-  }
-
-  for child in fs.children(path_value)? {
-    if child.kind == "dir" {
-      installer_remove_tree(child.path)?
-    } else {
-      child.path.remove()?
-    }
-  }
-
-  path_value.remove_dir()?
-}
