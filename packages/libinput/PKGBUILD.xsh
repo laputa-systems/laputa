@@ -1,0 +1,443 @@
+##! XSH module `PKGBUILD` package and build operations.
+use pm.env as pm_env
+use pm.util as pm_util
+
+## Exported declaration `name`.
+export let name = "libinput"
+
+## Explicit payload or metapackage classification.
+export let package_kind = "payload"
+
+## Exported declaration `ver`.
+export let ver = "1.31.2"
+
+## Exported declaration `rel`.
+export let rel = "9"
+
+## Exported declaration `deps`.
+export let deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
+
+## Exported declaration `mkdeps_host`.
+export let mkdeps_host = [
+  "llvm-toolchain",
+  "linux",
+  "muon",
+  "samurai",
+  "pkgconf",
+  "libudev-zero",
+  "libevdev",
+  "mtdev",
+]
+
+## Exported declaration `upstream_sources`.
+export let upstream_sources = [
+  {
+    source: p"https://gitlab.freedesktop.org/libinput/libinput/-/archive/VERSION/libinput-VERSION.tar.gz",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "507a40b8a74568ed7c2bd05acf2e15ee3d9f4703102dca86d4f6a804e73bf1f6",
+      },
+    ],
+  },
+]
+
+## Exported declaration `filetree`.
+export let filetree = [
+  {
+    path: p"usr/bin/libinput",
+    kind: "binary",
+  },
+  {
+    path: p"usr/include/libinput.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/libinput.so",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/lib/libinput.so.10",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/lib/libinput.so.10.13.0",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/pkgconfig/libinput.pc",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/udev/libinput-device-group",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/udev/libinput-fuzz-extract",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/udev/libinput-fuzz-to-zero",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/udev/rules.d/80-libinput-device-groups.rules",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/udev/rules.d/90-libinput-fuzz-override.rules",
+    kind: "file",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-analyze",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-debug-events",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-debug-tablet",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-debug-tablet-pad",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-list-devices",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-measure",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-quirks",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-record",
+    kind: "binary",
+  },
+  {
+    path: p"usr/libexec/libinput/libinput-test",
+    kind: "binary",
+  },
+  {
+    path: p"usr/share/libinput/10-generic-keyboard.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/10-generic-mouse.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/10-generic-trackball.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-a4tech.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-aiptek.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-alps.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-clevetura.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-contour.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-cypress.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-elantech.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-glorious.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-goodix.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-hantick.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-huion.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-ite.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-kensington.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-logitech.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-madcatz.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-microsoft.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-nulea.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-oracle.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-pixart.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-qemu.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-razer.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-synaptics.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-trust.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-vmware.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/30-vendor-wacom.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-acer.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-apple.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-asus.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-cyborg.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-dell.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-framework.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-gigabyte.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-google.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-gpd.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-graviton.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-honor.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-hp.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-huawei.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-icl.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-lenovo.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-lg.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-minisforum.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-pine64.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-positivo.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-sony.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-starlabs.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-system76.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-toshiba.quirks",
+    kind: "file",
+  },
+  {
+    path: p"usr/share/libinput/50-system-wareus.quirks",
+    kind: "file",
+  },
+]
+
+proc patch_python_tools() [fs, env, error] {
+  let meson = p"meson.build"
+  var text = meson.read_text()?
+  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_arch = pm_util.target_arch()?
+  let builtins = f"${target_root}/usr/lib/libclang_rt.builtins-${target_arch}.a"
+
+  let compiler_rt_dep = if target_root != "" and target_root != "/" {
+    f"declare_dependency(link_args: ['${builtins}'])"
+  } else {
+    "declare_dependency()"
+  }
+
+  text = text.replace(
+    """src_python_tools = files(
+	'tools/libinput-analyze-buttons.py',
+	'tools/libinput-analyze-per-slot-delta.py',
+	'tools/libinput-analyze-recording.py',
+	'tools/libinput-analyze-touch-down-state.py',
+	'tools/libinput-list-kernel-devices.py',
+	'tools/libinput-measure-fuzz.py',
+	'tools/libinput-measure-touchpad-size.py',
+	'tools/libinput-measure-touchpad-tap.py',
+	'tools/libinput-measure-touchpad-pressure.py',
+	'tools/libinput-measure-touch-size.py',
+	'tools/libinput-replay.py'
+)
+
+foreach t : src_python_tools
+	configure_file(input: t,
+		       output: '@BASENAME@',
+		       copy: true,
+		       install_dir : libinput_tool_path
+		      )
+endforeach
+""",
+    "",
+  )
+
+  text = text.replace(
+    "dep_lm = cc.find_library('m', required : false)",
+    """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
+dep_lm = declare_dependency(link_args: ['-lm'])""",
+  )
+
+  text = text.replace(
+    "dep_rt = cc.find_library('rt', required : false)",
+    f"""# musl provides realtime interfaces in libc; avoid recording the build-env librt.
+dep_rt = declare_dependency()
+dep_compiler_rt = ${compiler_rt_dep}""",
+  )
+
+  text = text.replace(
+    """# test including from C++ (in case CPP compiler is available)
+if add_languages('cpp', native: false, required: false)
+	executable('test-build-cxx',
+		   'test/build-cxx.cc',
+		   dependencies : [dep_udev],
+		   include_directories : [includes_src, includes_include],
+		   install : false)
+endif
+""",
+    "",
+  )
+
+  fs.write(meson, text)?
+}
+
+## Exported declaration `build`.
+export proc build(dest: Path) [fs, process, env, error] {
+  let muon = process.which("muon")?
+  let jobs_flag = f"-j${cpu.count()}"
+  let pc = pm_env.pkg_config_context()?
+  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_arch = pm_util.target_arch()?
+  let builtins = f"${target_root}/usr/lib/libclang_rt.builtins-${target_arch}.a"
+  patch_python_tools()?
+
+  env ({
+    LD_LIBRARY_PATH: pc.ld_library_path,
+    PKG_CONFIG: pc.pkg_config,
+    PKG_CONFIG_LIBDIR: pc.pkg_config_libdir,
+    PKG_CONFIG_PATH: pc.pkg_config_path,
+    PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
+  }) {
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Dlibexecdir=libexec" "-Ddefault_library=shared" "-Ddocumentation=false" "-Dlibwacom=false" "-Ddebug-gui=false" "-Dtests=false" "-Dinstall-tests=false" "-Dmtdev=true" "-Dzshcompletiondir=no" "-Dlua-plugins=disabled" "-Dautoload-plugins=false" "build" ?
+
+    if target_root != "" and target_root != "/" {
+      let ninja = p"build/build.ninja"
+      fs.write(ninja, ninja.read_text()?.replace(" -Wl,--end-group", f" -Wl,--end-group ${builtins}"))?
+    }
+
+    run $muon "-C" "build" samu $jobs_flag ?
+
+    env ({
+      DESTDIR: dest,
+    }) {
+      run $muon "-C" "build" install ?
+    } ?
+  } ?
+
+  fs.remove(fp"${dest}/usr/share/man", missing_ok: true)?
+}

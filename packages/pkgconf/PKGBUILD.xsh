@@ -1,0 +1,290 @@
+##! Package recipe metadata and build operations.
+use pm.configure as configure
+use pm.make as make
+use pm.util as pm_util
+
+## Package recipe export.
+export let name = "pkgconf"
+
+## Explicit payload or metapackage classification.
+export let package_kind = "payload"
+
+## Package recipe export.
+export let ver = "2.5.1"
+
+## Package recipe export.
+export let rel = "13"
+
+## Package recipe export.
+export let deps = ["musl"]
+
+## Package recipe export.
+export let mkdeps_host = ["llvm-toolchain"]
+
+## Package recipe export.
+export let upstream_sources = [
+  {
+    source: p"https://distfiles.ariadne.space/pkgconf/pkgconf-VERSION.tar.xz",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "cd05c9589b9f86ecf044c10a2269822bc9eb001eced2582cfffd658b0a50c243",
+      },
+    ],
+  },
+]
+
+## Package recipe export.
+export let filetree = [
+  {
+    path: p"usr/bin/bomtool",
+    kind: "binary",
+  },
+  {
+    path: p"usr/bin/pkg-config",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/bin/pkgconf",
+    kind: "binary",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/bsdstubs.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/config.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/iter.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/libpkgconf-api.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/libpkgconf.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/stdinc.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/pkgconf/libpkgconf/win-dirent.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/libpkgconf.a",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/libpkgconf.so",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/lib/libpkgconf.so.7",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/lib/libpkgconf.so.7.0.0",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/pkgconfig/libpkgconf.pc",
+    kind: "file",
+  },
+]
+
+## Package recipe export.
+export proc build(dest: Path) [fs, process, env, error] {
+  let cc = process.which("cc")?
+  let arch = pm_util.target_arch()?
+  let triple = f"${arch}-linux-musl"
+
+  # Step 1: generate libpkgconf/config.h.
+  # All HAVE_* values are precomputed for Clang + musl on aarch64 and x86_64.
+  # Captured from: configure CC="cc" --prefix=/usr --sysconfdir=/etc --disable-dependency-tracking
+  var defines: Map[Str] = {}
+  defines["HAVE_DECL_PLEDGE"] = "0"
+  defines["HAVE_DECL_REALLOCARRAY"] = "1"
+  defines["HAVE_DECL_STRLCAT"] = "1"
+  defines["HAVE_DECL_STRLCPY"] = "1"
+  defines["HAVE_DECL_STRNDUP"] = "1"
+  defines["HAVE_DECL_UNVEIL"] = "0"
+  defines["HAVE_DLFCN_H"] = "1"
+  defines["HAVE_INTTYPES_H"] = "1"
+  defines["HAVE_STDINT_H"] = "1"
+  defines["HAVE_STDIO_H"] = "1"
+  defines["HAVE_STDLIB_H"] = "1"
+  defines["HAVE_STRINGS_H"] = "1"
+  defines["HAVE_STRING_H"] = "1"
+  defines["HAVE_SYS_STAT_H"] = "1"
+  defines["HAVE_SYS_TYPES_H"] = "1"
+  defines["HAVE_UNISTD_H"] = "1"
+  defines["LT_OBJDIR"] = "\".libs/\""
+  defines["PACKAGE"] = "\"pkgconf\""
+  defines["PACKAGE_BUGREPORT"] = "\"https://github.com/pkgconf/pkgconf/issues/new\""
+  defines["PACKAGE_NAME"] = "\"pkgconf\""
+  defines["PACKAGE_STRING"] = f"\"pkgconf ${ver}\""
+  defines["PACKAGE_TARNAME"] = "\"pkgconf\""
+  defines["PACKAGE_URL"] = "\"\""
+  defines["PACKAGE_VERSION"] = f"\"${ver}\""
+  defines["STDC_HEADERS"] = "1"
+  defines["VERSION"] = f"\"${ver}\""
+  configure.config_h(p"libpkgconf/config.h.in", p"libpkgconf/config.h", defines)?
+
+  # Compile flags matching configure's detected values.
+  let cflags = ["-g", "-O2", "-Wall", "-Wextra", "-Wformat=2", "-std=gnu99"]
+
+  # HAVE_CONFIG_H pulls in libpkgconf/config.h. The PKG_* and SYSTEM_* constants
+  # are set by autoconf as -D flags (not in config.h) based on configure options.
+  let defs = [
+    "-DHAVE_CONFIG_H",
+    "-DPKG_DEFAULT_PATH=\"/usr/lib/pkgconfig:/usr/share/pkgconfig\"",
+    "-DSYSTEM_INCLUDEDIR=\"/usr/include\"",
+    "-DSYSTEM_LIBDIR=\"/usr/lib\"",
+    "-DPERSONALITY_PATH=\"/usr/share/pkgconf/personality.d\"",
+  ]
+
+  # -I. finds libpkgconf/config.h; -Ilibpkgconf allows #include <config.h> in libpkgconf sources.
+  # -Icli needed for cli/bomtool/main.c to find getopt_long.h
+  let includes = ["-I.", "-Ilibpkgconf", "-Icli"]
+  fs.mkdir(p"obj")?
+
+  # Step 2: compile libpkgconf (15 source files → PIC .lo objects).
+  # File list from Makefile's am_libpkgconf_la_OBJECTS.
+  let lib_srcs = [
+    p"libpkgconf/audit.c",
+    p"libpkgconf/buffer.c",
+    p"libpkgconf/cache.c",
+    p"libpkgconf/client.c",
+    p"libpkgconf/pkg.c",
+    p"libpkgconf/bsdstubs.c",
+    p"libpkgconf/fragment.c",
+    p"libpkgconf/argvsplit.c",
+    p"libpkgconf/fileio.c",
+    p"libpkgconf/tuple.c",
+    p"libpkgconf/dependency.c",
+    p"libpkgconf/queue.c",
+    p"libpkgconf/path.c",
+    p"libpkgconf/personality.c",
+    p"libpkgconf/parser.c",
+  ]
+
+  let lib = make.c_shared_library({
+    cc,
+    triple,
+    cflags,
+    defs,
+    includes,
+    root: p".",
+    sources: lib_srcs,
+    out_dir: p"obj",
+    out: p"obj/libpkgconf.so.7.0.0",
+    soname: "libpkgconf.so.7",
+    ldflags: [],
+    deps: [],
+  })
+
+  # Step 3: link libpkgconf.so.7.0.0 and static archive.
+  let sofile = lib.output
+  let static_lib = p"obj/libpkgconf.a"
+
+  let static_target = make.c_static_library({
+    cc,
+    triple,
+    cflags,
+    defs,
+    includes,
+    root: p".",
+    sources: lib_srcs,
+    out_dir: p"obj/static",
+    out: static_lib,
+    deps: [],
+  })
+
+  # Step 4: compile and link pkgconf binary.
+  # Source files from am_pkgconf_OBJECTS. Automake prefixes objects with the
+  # binary name (pkgconf-main.o from main.c) but the sources use plain names.
+  let pkgconf_srcs = [p"cli/main.c", p"cli/getopt_long.c", p"cli/renderer-msvc.c"]
+
+  let pkgconf = make.c_program({
+    cc,
+    triple,
+    cflags,
+    defs,
+    includes,
+    root: p".",
+    sources: pkgconf_srcs,
+    out_dir: p"obj/pkgconf-objs",
+    out: p"obj/pkgconf",
+    libs: [static_target.output],
+    ldflags: [],
+    deps: static_target.deps,
+  })
+
+  let pkgconf_bin = pkgconf.output
+
+  # Step 5: compile and link bomtool binary.
+  # cli/getopt_long.c is shared with pkgconf; compile separately to a different obj.
+  let bomtool_srcs = [p"cli/bomtool/main.c", p"cli/getopt_long.c"]
+
+  let bomtool = make.c_program({
+    cc,
+    triple,
+    cflags,
+    defs,
+    includes,
+    root: p".",
+    sources: bomtool_srcs,
+    out_dir: p"obj/bomtool-objs",
+    out: p"obj/bomtool",
+    libs: [static_target.output],
+    ldflags: [],
+    deps: static_target.deps,
+  })
+
+  let bomtool_bin = bomtool.output
+  make.run_tasks(lib.tasks.extend(static_target.tasks).extend(pkgconf.tasks).extend(bomtool.tasks), make.jobs()?)?
+
+  # Step 6: install into dest.
+  fs.install(sofile, fp"${dest}/usr/lib/libpkgconf.so.7.0.0", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"libpkgconf.so.7.0.0", fp"${dest}/usr/lib/libpkgconf.so.7")?
+  fs.symlink(p"libpkgconf.so.7.0.0", fp"${dest}/usr/lib/libpkgconf.so")?
+  fs.install(static_target.output, fp"${dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)?
+  fs.install(pkgconf_bin, fp"${dest}/usr/bin/pkgconf", 0o755, parents: true, overwrite: true)?
+  fs.install(bomtool_bin, fp"${dest}/usr/bin/bomtool", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"pkgconf", fp"${dest}/usr/bin/pkg-config")?
+
+  # Headers: libpkgconf/libpkgconf-api.h, bsdstubs.h, iter.h, libpkgconf.h, stdinc.h
+  let headers = fs.files(p"libpkgconf")? |> where .ext == "h"
+
+  for hdr in headers {
+    fs.install(hdr.path, fp"${dest}/usr/include/pkgconf/libpkgconf/${hdr.name}", 0o644, parents: true, overwrite: true)?
+  }
+
+  # libpkgconf.pc (pkg-config metadata).
+  # ${prefix} etc. are pkg-config variable references, not XSH interpolation.
+  # Use a template with a placeholder for the version.
+  let pc_template = f"""prefix=/usr
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: libpkgconf
+Description: a library for accessing and manipulating development framework configuration
+Version: PKG_VER
+Libs: -L\${libdir} -lpkgconf
+Cflags: -I\${includedir}/pkgconf
+"""
+
+  fs.mkdir(fp"${dest}/usr/lib/pkgconfig")?
+  fs.write(fp"${dest}/usr/lib/pkgconfig/libpkgconf.pc", pc_template.replace("PKG_VER", ver))?
+}
