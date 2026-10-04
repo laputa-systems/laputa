@@ -18,8 +18,12 @@ export type MuslAbi = {
   signed_wchar_t: Bool,
 }
 
-## Exported PM declaration `lp64_musl_abi`.
+# The arch's musl bits/alltypes.h.in decides wchar_t: `unsigned` on aarch64,
+# `int` on x86_64.
+## The C type properties of a 64-bit musl target, for gnulib-style configure substitutes.
 export pure lp64_musl_abi(arch: Str) -> MuslAbi {
+  let signed_wchar_t = arch != "aarch64"
+
   {
     arch,
     ptrdiff_bits: "64",
@@ -30,10 +34,10 @@ export pure lp64_musl_abi(arch: Str) -> MuslAbi {
     ptrdiff_suffix: "\"L\"",
     sig_atomic_suffix: "\"INT\"",
     size_t_suffix: "\"UL\"",
-    wchar_t_suffix: "\"INT\"",
+    wchar_t_suffix: if signed_wchar_t { "\"INT\"" } else { "\"UINT\"" },
     wint_t_suffix: "\"UINT\"",
     signed_sig_atomic_t: true,
-    signed_wchar_t: true,
+    signed_wchar_t,
   }
 }
 

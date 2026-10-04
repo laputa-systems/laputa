@@ -239,23 +239,22 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let includes = [f"-I./arch/{arch}", "-I./arch/generic", "-I./src/include", "-I./src/internal", "-I./include"]
 
-  # Collect arch-override stems and files from two sources, matching musl's
-  # Makefile ARCH_SRCS = arch/$(ARCH)/*.{c,s} + src/*/{arch}/*.[csS]:
-  # 1. arch/${arch}/*.{c,s} — top-level arch overrides (empty for aarch64/x86_64)
+  # Collect arch sources from two places, matching musl's Makefile:
+  # 1. arch/${arch}/*.{c,s} — top-level arch files (empty for aarch64/x86_64)
   # 2. src/{subsystem}/${arch}/*.[csS] — in-source arch overrides (math, thread,
   #    signal, etc. optimised assembly/C for the target architecture)
-  # A file in either location with stem FOO shadows any src/*/FOO.c generic file.
-  var arch_stems = []
+  # An override replaces only the generic file at its own path, as the
+  # Makefile's REPLACED_OBJS (`/$(ARCH)/` removed) does: src/thread/x86_64/clone.s
+  # replaces src/thread/clone.c (__clone), never src/linux/clone.c (clone()).
+  var replaced: List[Str] = []
   var arch_c_files = []
   var arch_s_files = []
 
   # 1. arch/${arch}/ direct children (headers only for aarch64/x86_64 in practice).
   for e in fs.children(fp"arch/{arch}")? |> where .kind == "file" {
     if e.ext == "c" {
-      arch_stems = arch_stems.push(e.name.replace(".c", ""))
       arch_c_files = arch_c_files.push(e.path)
     } else if e.ext == "s" or e.ext == "S" {
-      arch_stems = arch_stems.push(e.name.replace(f".{e.ext}", ""))
       arch_s_files = arch_s_files.push(e.path)
     }
   }
@@ -267,10 +266,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     if fs.exists(arch_subdir)? {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
         if e.ext == "c" {
-          arch_stems = arch_stems.push(e.name.replace(".c", ""))
+          replaced = replaced.push(f"{subsys.name}/{e.name.replace(".c", "")}")
           arch_c_files = arch_c_files.push(e.path)
         } else if e.ext == "s" or e.ext == "S" {
-          arch_stems = arch_stems.push(e.name.replace(f".{e.ext}", ""))
+          replaced = replaced.push(f"{subsys.name}/{e.name.replace(f".{e.ext}", "")}")
           arch_s_files = arch_s_files.push(e.path)
         }
       }
@@ -279,15 +278,14 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Enumerate src/ .c files, matching musl's Makefile: SRC_DIRS = src/* (one
   # level deep per subsystem) plus src/malloc/mallocng (two levels, the default
-  # malloc implementation). Files with stems matching any arch-override entry are
-  # excluded — their arch version is compiled instead.
+  # malloc implementation), minus the generic files an arch override replaces.
   # fs.children is non-recursive here intentionally: src/{subsystem}/{arch}/*.c files
   # at two levels deep must not be included (they are wrong-arch implementations).
   var libc_srcs = [
     e.path
     for subsys in fs.children(p"src")? |> where .kind == "dir"
     for e in fs.children(subsys.path)? |> where .ext == "c"
-    if ! (e.name.replace(".c", "") in arch_stems)
+    if ! (f"{subsys.name}/{e.name.replace(".c", "")}" in replaced)
   ]
   # src/malloc/mallocng/*.c — the default malloc implementation (two levels deep).
   for e in fs.children(p"src/malloc/mallocng")? |> where .ext == "c" {

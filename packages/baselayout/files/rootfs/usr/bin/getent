@@ -6,15 +6,15 @@ pure entry_matches(database: Str, line: Str, key: Str) -> Bool {
 
   let fields = line.split(":")
 
-  if fields.get(0, "") == key {
+  if (fields.get(0) ?? "") == key {
     return true
   }
 
-  if database == "passwd" and fields.get(2, "") == key {
+  if database == "passwd" and (fields.get(2) ?? "") == key {
     return true
   }
 
-  if database == "group" and fields.get(2, "") == key {
+  if database == "group" and (fields.get(2) ?? "") == key {
     return true
   }
 

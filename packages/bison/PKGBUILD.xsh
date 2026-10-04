@@ -14,7 +14,7 @@ export const package_kind = "payload"
 export const ver = "3.8.2"
 
 ## Exported declaration `rel`.
-export const rel = "11"
+export const rel = "12"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]

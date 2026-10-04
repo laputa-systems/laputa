@@ -79,8 +79,13 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   fs.write(
     hello_src,
-    """#include <stdio.h>
-int main(void) { puts("hello musl"); return 0; }
+    """#define _GNU_SOURCE
+#include <sched.h>
+#include <stdio.h>
+/* Linking takes clone's address, so a libc that lost the public clone()
+   wrapper (src/linux/clone.c) to an arch file of the same name fails here. */
+int (*volatile clone_entry)(int (*)(void *), void *, int, void *, ...) = clone;
+int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
 """,
   )?
 

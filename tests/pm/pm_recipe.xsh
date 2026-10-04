@@ -2,6 +2,7 @@
 use pm.recipe
 use pm.sources
 use pm.types
+use pm.target
 use pm.util
 
 pure fixture(name: Str) -> Path {
@@ -279,4 +280,15 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
     Ok(_) => test.fail("repeated runtime-only dependency unexpectedly loaded")?
     Err(problem) => assert "runtime_only_deps contains duplicate dependency service" in problem.message
   }
+}
+
+# musl's arch/*/bits/alltypes.h.in: aarch64 declares `unsigned wchar_t`,
+# x86_64 `int wchar_t`; gnulib-configured packages (bison) take this table.
+test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
+  let arm = target.lp64_musl_abi("aarch64")
+  assert ! arm.signed_wchar_t
+  assert arm.wchar_t_suffix == "\"UINT\""
+  let x86 = target.lp64_musl_abi("x86_64")
+  assert x86.signed_wchar_t
+  assert x86.wchar_t_suffix == "\"INT\""
 }
