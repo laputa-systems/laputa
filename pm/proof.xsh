@@ -29,6 +29,13 @@ export proc package_metadata(root: Path, name: Str) [fs, error] {
   ensure(fs.exists(db)?, f"proof-{name}", f"missing package metadata: {db}")?
 }
 
+## The installed package's recipe `ver`, so a proof can check that the
+## binary it runs reports the version the recipe pins.
+export proc package_version(root: Path, name: Str) [fs, error] -> Result[Str] {
+  let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
+  json.read(db)?.require(Record)?.get("ver")?.require(Str)
+}
+
 proc package_dependency_map(root: Path) [fs, error] -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
   let packages_db = fp"{root}/var/lib/xsh-pm/packages"
