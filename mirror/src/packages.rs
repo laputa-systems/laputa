@@ -132,9 +132,11 @@ impl Response {
     }
 }
 
-pub fn load_index(storage: &s3::Storage) -> Option<Vec<RemotePackage>> {
-    let bytes = storage.get("index.json")?;
-    serde_json::from_slice(&bytes).ok()
+pub fn load_index(storage: &s3::Storage) -> Result<Vec<RemotePackage>, String> {
+    let Some(bytes) = storage.get("index.json")? else {
+        return Ok(Vec::new());
+    };
+    serde_json::from_slice(&bytes).map_err(|e| format!("parse index.json: {e}"))
 }
 
 pub fn route(
@@ -276,10 +278,15 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
         return Response::not_found();
     };
     // `If-None-Match: *` publishes an immutable object only if it is absent.
-    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*")
-        && state.storage.object_size(&key).is_some()
-    {
-        return Response::json(412, r#"{"error":"object already exists"}"#);
+    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*") {
+        match state.storage.object_size(&key) {
+            Ok(Some(_)) => return Response::json(412, r#"{"error":"object already exists"}"#),
+            Ok(None) => {}
+            Err(error) => {
+                tracing::error!("object check failed for {key}: {error}");
+                return Response::error("object check failed");
+            }
+        }
     }
 
     match state.storage.put(&key, body.to_vec(), content_type_for(&key)) {
@@ -453,13 +460,17 @@ fn get_object(key: &str, state: &AppState) -> Response {
         return file_response(store.open(key), content_type_for(key));
     }
     match state.storage.get(key) {
-        Some(bytes) => Response {
+        Ok(Some(bytes)) => Response {
             status: 200,
             content_type: content_type_for(key),
             body: Body::Bytes(bytes),
             extra_headers: vec![],
         },
-        None => Response::not_found(),
+        Ok(None) => Response::not_found(),
+        Err(error) => {
+            tracing::error!("object read failed: {error}");
+            Response::error("object read failed")
+        }
     }
 }
 
@@ -889,6 +900,15 @@ fn json_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_index_is_empty_but_corrupt_index_is_an_error() {
+        let storage = s3::Storage::memory();
+        assert_eq!(load_index(&storage).unwrap(), Vec::<RemotePackage>::new());
+
+        storage.put("index.json", b"{".to_vec(), "application/json").unwrap();
+        assert!(load_index(&storage).is_err());
+    }
 
     #[test]
     fn object_paths_are_flat_pm_paths() {

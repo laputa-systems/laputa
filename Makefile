@@ -80,9 +80,9 @@ REMOVE_DERIVED = rm -rf
 endif
 
 MIRROR := mirror
-DEB_ARCH ?= amd64
-DEB_NAME ?= laputa-mirror_0.1.0_$(DEB_ARCH).deb
-DEPLOY_HOST ?= oracle
+ifneq ($(origin DEPLOY_HOST),undefined)
+export DEPLOY_HOST
+endif
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
@@ -93,7 +93,7 @@ PNPM_ROOT ?= target/pnpm
 	test-pm-native test-pm-docker xsh-native update-checksums \
 	installer-image installer-qemu-test \
 	installer-qemu-manual \
-	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl mirror-deb mirror-deploy mirror-clean
+	mirror mirror-build mirror-test mirror-frontend mirror-demo mirror-build-x86_64-musl deploy-mirror deploy-mirror-fresh preflight-mirror mirror-clean
 
 # xsht-config.ini owns the module path and the excluded fixture and mirror trees.
 # xsht finds only *.xsh files; XSH programs installed under other names (boot
@@ -283,8 +283,8 @@ root: need-xsh
 	$(REMOVE_DERIVED) .out/world/$(ARCH)/root
 	$(WORLD) root --arch $(ARCH) --jobs $(JOBS) --repo $(MIRROR_URL) $(WORLD_SELECTION)
 
-# The only networked step: every pinned upstream source the recipes use on
-# ARCH (the LLVM seed included), sha256-verified into the content-addressed
+# Fetch every pinned upstream source the recipes use on ARCH (the LLVM seed
+# included), sha256-verified into the content-addressed
 # cache at $(SOURCE_CACHE)/sha256/<hash>, which `make mirror` serves, plus the
 # seed inputs. Builds read that cache or LAPUTA_MIRROR and never contact
 # upstream hosts.
@@ -371,6 +371,7 @@ mirror: $(MIRROR_SERVER_DEPS)
 # offline from the crates `make fetch` stores, so no host Rust is needed.
 ifeq ($(HOST_OS),Linux)
 mirror-test:
+	sh infra/mirror/test.sh
 	mkdir -p "$(MIRROR_CARGO_TARGET)"
 	$(HOST_CARGO_BUILD) --env RUSTUP_TOOLCHAIN=$(MIRROR_TOOLCHAIN) \
 	    --mount type=bind,src=$(CURDIR)/$(MIRROR),dst=/work,readonly \
@@ -378,6 +379,7 @@ mirror-test:
 	    $(XSH_TEST_IMAGE) cargo test --locked --offline -j $(CARGO_JOBS) --target $(HOST_TRIPLE)
 else
 mirror-test:
+	sh infra/mirror/test.sh
 	cd $(MIRROR) && $(CARGO) test -j $(CARGO_JOBS) --locked
 endif
 
@@ -389,7 +391,7 @@ mirror-build-x86_64-musl:
 	  .
 
 mirror-frontend:
-	cd $(MIRROR) && deno install --global --allow-all --unsafe-proto --root "$(PNPM_ROOT)" --name pnpm npm:pnpm@$(PNPM_VERSION)
+	cd $(MIRROR) && deno install --global --force --allow-all --unsafe-proto --root "$(PNPM_ROOT)" --name pnpm npm:pnpm@$(PNPM_VERSION)
 	cd $(MIRROR) && "$(PNPM_ROOT)/bin/pnpm" install --frozen-lockfile
 	cd $(MIRROR) && "$(PNPM_ROOT)/bin/pnpm" run build
 
@@ -397,41 +399,23 @@ mirror-frontend:
 mirror-demo: mirror-frontend
 	cd $(MIRROR) && $(CARGO) run -j $(CARGO_JOBS) --example demo
 
-mirror-deb: mirror-build-x86_64-musl mirror-frontend
-	cd $(MIRROR) && rm -rf target/deb-root
-	cd $(MIRROR) && install -d target/deb-root/DEBIAN target/deb-root/usr/bin target/deb-root/lib/systemd/system target/deb-root/etc/laputa-mirror target/deb-root/usr/share/laputa-mirror
-	cd $(MIRROR) && install -m 755 target/docker-output/laputa-mirror target/deb-root/usr/bin/laputa-mirror
-	cd $(MIRROR) && install -m 644 laputa-mirror.service target/deb-root/lib/systemd/system/laputa-mirror.service
-	cd $(MIRROR) && install -m 600 laputa-mirror.env.example target/deb-root/etc/laputa-mirror/env.example
-	cd $(MIRROR) && cp -R static target/deb-root/usr/share/laputa-mirror/
-	cd $(MIRROR) && printf '%s\n' \
-	  'Package: laputa-mirror' \
-	  'Version: 0.1.0' \
-	  "Architecture: $(DEB_ARCH)" \
-	  'Maintainer: Laputa Systems' \
-	  'Description: Laputa package mirror' \
-	  > target/deb-root/DEBIAN/control
-	cd $(MIRROR) && printf '%s\n' \
-	  '#!/bin/sh' \
-	  'set -e' \
-	  'if ! getent passwd laputa-mirror >/dev/null; then' \
-	  '  useradd --system --home /var/lib/laputa-mirror --shell /usr/sbin/nologin laputa-mirror' \
-	  'fi' \
-	  'install -d -o laputa-mirror -g laputa-mirror /var/lib/laputa-mirror' \
-	  'if [ ! -f /etc/laputa-mirror/env ]; then' \
-	  '  install -m 600 -o root -g root /etc/laputa-mirror/env.example /etc/laputa-mirror/env' \
-	  'fi' \
-	  'if command -v systemctl >/dev/null; then' \
-	  '  systemctl daemon-reload || true' \
-	  'fi' \
-	  > target/deb-root/DEBIAN/postinst
-	cd $(MIRROR) && chmod 755 target/deb-root/DEBIAN/postinst
-	cd $(MIRROR) && dpkg-deb --root-owner-group --build target/deb-root $(DEB_NAME)
+preflight-mirror:
+	./infra/mirror/deploy.sh --preflight
 
-mirror-deploy: mirror-deb
-	scp "$(MIRROR)/$(DEB_NAME)" "$(DEPLOY_HOST):/tmp/$(DEB_NAME)"
-	ssh "$(DEPLOY_HOST)" "set -eu; sudo dpkg -i /tmp/$(DEB_NAME); sudo systemctl daemon-reload; sudo systemctl restart laputa-mirror; sudo systemctl enable --now laputa-mirror; sudo systemctl status --no-pager laputa-mirror"
+# Run all read-only checks before building; the deploy script repeats preflight
+# before it reconciles Cloudflare and the host.
+deploy-mirror:
+	./infra/mirror/deploy.sh --preflight
+	$(MAKE) mirror-build-x86_64-musl mirror-frontend
+	./infra/mirror/deploy.sh
+
+# One-time reset path: after the replacement route is healthy, clear every R2
+# object, restart the mirror, and only then retire the old tunnel.
+deploy-mirror-fresh:
+	./infra/mirror/deploy.sh --preflight
+	$(MAKE) mirror-build-x86_64-musl mirror-frontend
+	./infra/mirror/deploy.sh --fresh-start
 
 mirror-clean:
-	rm -rf $(MIRROR)/node_modules $(MIRROR)/target/pnpm $(MIRROR)/target/deb-root $(MIRROR)/target/docker-output
+	rm -rf $(MIRROR)/node_modules $(MIRROR)/target/pnpm $(MIRROR)/target/docker-output
 	rm -f $(MIRROR)/static/js/auth.js $(MIRROR)/static/js/settings.js

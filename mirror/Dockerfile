@@ -21,7 +21,10 @@ ENV PATH="/opt/llvm-musl/bin:/root/.cargo/bin:$PATH" \
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER="rust-lld" \
     CFLAGS_x86_64_unknown_linux_musl="--target=x86_64-unknown-linux-musl -I/usr/include"
 
-RUN rustup toolchain install nightly-2026-04-20 \
+# The local toolchain pin is for native development; pin the MUSL build to a
+# nightly that publishes the cross-target component and invoke it explicitly.
+ARG MUSL_TOOLCHAIN=nightly-2026-04-20
+RUN rustup toolchain install "$MUSL_TOOLCHAIN" \
     --target x86_64-unknown-linux-musl
 
 # Host proc-macro crates link dynamically while Cargo is building. The musl
@@ -36,7 +39,7 @@ RUN host_libdir="$(rustc --print target-libdir)" \
 WORKDIR /build
 COPY . .
 
-RUN cargo build --locked --bins --target x86_64-unknown-linux-musl --release
+RUN cargo +"$MUSL_TOOLCHAIN" build --locked --bins --target x86_64-unknown-linux-musl --release
 
 FROM scratch
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/laputa-mirror /

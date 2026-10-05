@@ -278,6 +278,7 @@ fn authenticated_puts_store_objects_and_index() {
         state
             .storage
             .get("packages/aarch64/zlib/zlib-1.3.2-5-0123456789ab.tar.gz")
+            .unwrap()
             .unwrap(),
         b"package"
     );
@@ -303,6 +304,7 @@ fn authenticated_puts_store_objects_and_index() {
         state
             .storage
             .get("metadata/aarch64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json")
+            .unwrap()
             .unwrap(),
         br#"{"metadata_sha256":"abc"}"#
     );
@@ -348,7 +350,7 @@ fn chunked_uploads_are_assembled_by_the_mirror() {
     );
     assert_eq!(resp.status, 201);
     assert_eq!(
-        state.storage.get("sources/zlib/zlib-1.3.2-5-aarch64-src.tar.bz2"),
+        state.storage.get("sources/zlib/zlib-1.3.2-5-aarch64-src.tar.bz2").unwrap(),
         Some(b"hello world".to_vec())
     );
     assert!(!state.upload_dir.join(upload_id).exists());
@@ -530,25 +532,25 @@ fn fs_storage_round_trips_objects() {
     let tmp = TempDir::new();
     let storage = s3::Storage::fs(tmp.path());
 
-    assert_eq!(storage.get(PACKAGE), None);
-    assert_eq!(storage.object_size(PACKAGE), None);
+    assert_eq!(storage.get(PACKAGE).unwrap(), None);
+    assert_eq!(storage.object_size(PACKAGE).unwrap(), None);
 
     storage
         .put(PACKAGE, b"first".to_vec(), "application/octet-stream")
         .unwrap();
-    assert_eq!(storage.get(PACKAGE), Some(b"first".to_vec()));
-    assert_eq!(storage.object_size(PACKAGE), Some(5));
+    assert_eq!(storage.get(PACKAGE).unwrap(), Some(b"first".to_vec()));
+    assert_eq!(storage.object_size(PACKAGE).unwrap(), Some(5));
     assert_eq!(std::fs::read(tmp.path().join(PACKAGE)).unwrap(), b"first");
 
     storage
         .put(PACKAGE, b"replaced".to_vec(), "application/octet-stream")
         .unwrap();
-    assert_eq!(storage.get(PACKAGE), Some(b"replaced".to_vec()));
+    assert_eq!(storage.get(PACKAGE).unwrap(), Some(b"replaced".to_vec()));
 
     let staged = tmp.path().join("staged");
     std::fs::write(&staged, b"from a file").unwrap();
     storage.put_file(SOURCE, &staged, "application/octet-stream").unwrap();
-    assert_eq!(storage.get(SOURCE), Some(b"from a file".to_vec()));
+    assert_eq!(storage.get(SOURCE).unwrap(), Some(b"from a file".to_vec()));
     assert!(staged.exists(), "put_file copies, leaving the staged file");
 
     // Only the final names remain next to each object: temp files were renamed away.
@@ -572,7 +574,8 @@ fn fs_storage_rejects_keys_outside_its_root() {
             storage.put(key, b"x".to_vec(), "").is_err(),
             "put {key:?} must fail"
         );
-        assert_eq!(storage.get(key), None, "get {key:?}");
+        assert!(storage.get(key).is_err(), "get {key:?} must fail");
+        assert!(storage.object_size(key).is_err(), "size {key:?} must fail");
     }
     assert!(!tmp.path().join("escape").exists());
     assert!(!Path::new("/abs/path").exists());
@@ -585,13 +588,13 @@ fn fs_failed_write_leaves_no_partial_object() {
     let missing = tmp.path().join("no-such-staged-file");
 
     assert!(storage.put_file(PACKAGE, &missing, "").is_err());
-    assert_eq!(storage.get(PACKAGE), None);
+    assert_eq!(storage.get(PACKAGE).unwrap(), None);
     assert!(dir_entries(&tmp.path().join("packages/aarch64/zlib")).is_empty());
 
     // A failed replacement keeps the previous object intact.
     storage.put(PACKAGE, b"old".to_vec(), "").unwrap();
     assert!(storage.put_file(PACKAGE, &missing, "").is_err());
-    assert_eq!(storage.get(PACKAGE), Some(b"old".to_vec()));
+    assert_eq!(storage.get(PACKAGE).unwrap(), Some(b"old".to_vec()));
     assert_eq!(
         dir_entries(&tmp.path().join("packages/aarch64/zlib")),
         ["zlib-1.3.2-5-0123456789ab.tar.gz"]

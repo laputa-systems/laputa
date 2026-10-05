@@ -39,7 +39,7 @@ sets it.
 | `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker (no host XSH or Rust); shares the seed's cargo target |
 | `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes), plus XSH scripts without a `.xsh` name (boot hooks, `getent`), found by their `#!/bin/xsh` shebang |
 | `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
-| `make fetch [ARCH=x86_64]` | the only networked step: pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
+| `make fetch [ARCH=x86_64]` | fetches pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base for offline builds |
 | `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
 | `make build [PKGS="a b" \| STOP=pre-cmake]`, `make plan` | PM plan and build in package-tools with `--network none` into `.out/artifacts/<arch>` (the build cache); `STOP=pre-cmake` is `repo plan --all --without cmake --without linux` |
 | `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground; on Linux built by `make host-mirror` in `xsh-test`, elsewhere run through cargo); publish builds the selection, then uploads it from the host |
@@ -49,7 +49,8 @@ sets it.
 | `make test-linux` | the kernel recipe's Kbuild tests (their own plan cache in `.out/cache/linux-kbuild-tests`) and linux-headers' `headers_install` tests |
 | `make test-pm-native` | the PM suite against XSH_ROOT's debug build (`make xsh-native`), with coverage under `target/coverage/` |
 | `make update-checksums` | `pm repo update-checksums` for every recipe (networked) |
-| `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` for `mirror/`; on Linux `mirror-test` runs in `xsh-test` offline, so no host Rust |
+| `make mirror-build`, `make mirror-test` | `cargo build`/`cargo test` for `mirror/` plus fake-command checks for the POSIX deploy scripts; on Linux Cargo runs in `xsh-test` offline, so no host Rust |
+| `make preflight-mirror`, `make deploy-mirror` | read-only deployment checks, then build and converge the production mirror over SSH and Cloudflare `cf` |
 | `make profile-{plan,build,test,boot,clean}` | the typed profile CLI on the host: builds in native Docker for the host arch, boots QEMU with HVF (macOS) or KVM (Linux) |
 | `make installer-image`, `make installer-qemu-test [ARCH=…]` | installer ISO and its QEMU install-and-boot proof; roots come from the local mirror, so `make mirror` and `make publish` come first |
 | `make installer-qemu-manual` | interactive installer boot in QEMU |
@@ -57,8 +58,8 @@ sets it.
 | `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |
 | `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images), through a container on Linux because rootful Docker leaves root-owned files; `make distclean` also removes `.cache/` |
 
-The `mirror-frontend`, `mirror-demo`, `mirror-deb`, and `mirror-deploy`
-targets belong to the production mirror; see `mirror/README.md`.
+The `mirror-frontend`, `mirror-demo`, and `deploy-mirror` targets belong to the
+production mirror; see `mirror/README.md`.
 
 Start with the narrowest proof: `xsht check` on changed modules, then their
 focused tests (`xsht test tests/pm/pm_plan.xsh`), then the Docker profile

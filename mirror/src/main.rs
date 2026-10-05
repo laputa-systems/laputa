@@ -163,11 +163,12 @@ fn run_production() {
     let storage = s3::Storage::s3(
         &env_required("S3_ENDPOINT"),
         &env_required("S3_BUCKET"),
-        &env_required("S3_ACCESS_KEY_ID"),
-        &env_required("S3_SECRET_ACCESS_KEY"),
+        &env_credential_required("S3_ACCESS_KEY_ID"),
+        &env_credential_required("S3_SECRET_ACCESS_KEY"),
         &env_or("S3_REGION", "auto"),
     );
-    let index = packages::load_index(&storage).unwrap_or_default();
+    let index = packages::load_index(&storage)
+        .unwrap_or_else(|e| panic!("failed to load R2 index: {e}"));
 
     let r2_public_url = std::env::var("R2_PUBLIC_URL")
         .ok()
@@ -206,4 +207,122 @@ fn env_required(key: &str) -> String {
 
 fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+fn env_credential_required(key: &str) -> String {
+    credential_required(key, std::env::var(key), std::env::var_os(format!("{key}_FILE")))
+        .unwrap_or_else(|e| panic!("{e}"))
+}
+
+// A direct value wins even when empty. File credentials may have one terminal
+// LF from text-file creation; every other character is part of the credential.
+fn credential_required(
+    key: &str,
+    value: Result<String, std::env::VarError>,
+    file: Option<std::ffi::OsString>,
+) -> Result<String, String> {
+    match value {
+        Ok(value) => return Ok(value),
+        Err(std::env::VarError::NotPresent) => {},
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(format!("{key} must contain valid UTF-8"));
+        }
+    }
+    let path = file.map(PathBuf::from).ok_or_else(|| format!("{key} must be set"))?;
+    let mut value = std::fs::read_to_string(&path)
+        .map_err(|e| format!("read {key}_FILE {}: {e}", path.display()))?;
+    if value.ends_with('\n') {
+        value.pop();
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env::VarError;
+    use std::ffi::OsString;
+
+    struct CredentialFile(PathBuf);
+
+    impl CredentialFile {
+        fn new(bytes: &[u8]) -> Self {
+            let path = std::env::temp_dir().join(format!("laputa-credential-{}", uuid::Uuid::new_v4()));
+            std::fs::write(&path, bytes).unwrap();
+            Self(path)
+        }
+
+        fn setting(&self) -> Option<OsString> {
+            Some(self.0.clone().into_os_string())
+        }
+    }
+
+    impl Drop for CredentialFile {
+        fn drop(&mut self) {
+            std::fs::remove_file(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn credential_environment_takes_precedence_over_file() {
+        let missing = Some(OsString::from("/no-such-laputa-credential"));
+        for value in ["direct\n", ""] {
+            assert_eq!(
+                credential_required("S3_ACCESS_KEY_ID", Ok(value.into()), missing.clone()).unwrap(),
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn credential_file_removes_only_one_terminal_newline() {
+        for (bytes, expected) in [
+            ("secret\n", "secret"),
+            ("secret", "secret"),
+            (" secret \n", " secret "),
+            ("secret\n\n", "secret\n"),
+            ("secret\r\n", "secret\r"),
+            ("sec\nret\t", "sec\nret\t"),
+            ("", ""),
+        ] {
+            let file = CredentialFile::new(bytes.as_bytes());
+            assert_eq!(
+                credential_required("S3_SECRET_ACCESS_KEY", Err(VarError::NotPresent), file.setting()).unwrap(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn credential_is_required_without_environment_or_file() {
+        assert_eq!(
+            credential_required("S3_ACCESS_KEY_ID", Err(VarError::NotPresent), None).unwrap_err(),
+            "S3_ACCESS_KEY_ID must be set"
+        );
+    }
+
+    #[test]
+    fn credential_file_read_failures_are_errors() {
+        let file = CredentialFile::new(b"secret");
+        let missing = file.0.join("missing").into_os_string();
+        let error = credential_required("S3_SECRET_ACCESS_KEY", Err(VarError::NotPresent), Some(missing)).unwrap_err();
+        assert!(error.starts_with("read S3_SECRET_ACCESS_KEY_FILE "));
+
+        let invalid = CredentialFile::new(&[0xff]);
+        assert!(credential_required("S3_SECRET_ACCESS_KEY", Err(VarError::NotPresent), invalid.setting()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn credential_invalid_environment_does_not_fall_back_to_file() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let file = CredentialFile::new(b"fallback");
+        let error = credential_required(
+            "S3_ACCESS_KEY_ID",
+            Err(VarError::NotUnicode(OsString::from_vec(vec![0xff]))),
+            file.setting(),
+        ).unwrap_err();
+        assert_eq!(error, "S3_ACCESS_KEY_ID must contain valid UTF-8");
+    }
 }

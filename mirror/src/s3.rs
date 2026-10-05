@@ -383,41 +383,44 @@ impl Storage {
     }
 
     /// Return the stored size of an object via HEAD, without downloading it.
-    pub fn object_size(&self, key: &str) -> Option<u64> {
+    pub fn object_size(&self, key: &str) -> Result<Option<u64>, String> {
         match self {
-            Self::Memory(map) => map.read().unwrap().get(key).map(|b| b.len() as u64),
-            Self::Fs(store) => fs_read(store.open(key)).map(|(_, length)| length),
+            Self::Memory(map) => Ok(map.read().unwrap().get(key).map(|b| b.len() as u64)),
+            Self::Fs(store) => Ok(store.open(key)?.map(|(_, length)| length)),
             Self::S3(bucket) => {
-                let reply = bucket
-                    .request("HEAD", key, None, Payload::Bytes(&[]))
-                    .ok()?;
-                if reply.is_success() {
-                    reply.content_length
-                } else {
-                    None
+                let reply = bucket.request("HEAD", key, None, Payload::Bytes(&[]))?;
+                match reply.status {
+                    404 => Ok(None),
+                    status if (200..300).contains(&status) => reply
+                        .content_length
+                        .map(Some)
+                        .ok_or_else(|| "S3 HEAD response had no Content-Length".to_string()),
+                    status => Err(format!("S3 HEAD returned {status}")),
                 }
             }
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
+    pub fn get(&self, key: &str) -> Result<Option<Vec<u8>>, String> {
         match self {
             Self::S3(bucket) => {
-                let reply = bucket.request("GET", key, None, Payload::Bytes(&[])).ok()?;
-                (reply.status == 200).then_some(reply.body)
-            }
-            Self::Fs(store) => {
-                let (mut file, _) = fs_read(store.open(key))?;
-                let mut body = Vec::new();
-                match file.read_to_end(&mut body) {
-                    Ok(_) => Some(body),
-                    Err(e) => {
-                        tracing::error!("read {key}: {e}");
-                        None
-                    }
+                let reply = bucket.request("GET", key, None, Payload::Bytes(&[]))?;
+                match reply.status {
+                    200 => Ok(Some(reply.body)),
+                    404 => Ok(None),
+                    status => Err(format!("S3 GET returned {status}")),
                 }
             }
-            Self::Memory(map) => map.read().unwrap().get(key).cloned(),
+            Self::Fs(store) => {
+                let Some((mut file, _)) = store.open(key)? else {
+                    return Ok(None);
+                };
+                let mut body = Vec::new();
+                file.read_to_end(&mut body)
+                    .map_err(|e| format!("read {key}: {e}"))?;
+                Ok(Some(body))
+            }
+            Self::Memory(map) => Ok(map.read().unwrap().get(key).cloned()),
         }
     }
 
@@ -488,15 +491,6 @@ impl Storage {
     }
 }
 
-/// Collapse an `FsStore::open` result into the `Option` the `Storage` read API
-/// returns, logging real I/O errors so they are not mistaken for a missing object.
-fn fs_read(opened: Result<Option<(File, u64)>, String>) -> Option<(File, u64)> {
-    opened.unwrap_or_else(|e| {
-        tracing::error!("{e}");
-        None
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Write};
@@ -512,6 +506,30 @@ mod tests {
             secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".into(),
             region: "us-east-1".into(),
         }
+    }
+
+    fn storage_returning_status(status: u16) -> (Storage, std::thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                let mut piece = [0_u8; 1024];
+                let read = stream.read(&mut piece).unwrap();
+                assert!(read > 0, "client closed before sending the request");
+                request.extend_from_slice(&piece[..read]);
+            }
+            write!(
+                stream,
+                "HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+            .unwrap();
+        });
+        (
+            Storage::s3(&endpoint, "mirror", "AKID", "secret", "auto"),
+            server,
+        )
     }
 
     #[test]
@@ -590,5 +608,26 @@ mod tests {
         assert!(lower.contains(
             "signedheaders=content-length;content-type;host;x-amz-content-sha256;x-amz-date,"
         ));
+    }
+
+    #[test]
+    fn get_reports_unexpected_server_status() {
+        let (storage, server) = storage_returning_status(403);
+        assert_eq!(storage.get("index.json").unwrap_err(), "S3 GET returned 403");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn head_reports_unexpected_server_status() {
+        let (storage, server) = storage_returning_status(403);
+        assert_eq!(storage.object_size("index.json").unwrap_err(), "S3 HEAD returned 403");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn get_treats_a_missing_object_as_absent() {
+        let (storage, server) = storage_returning_status(404);
+        assert_eq!(storage.get("index.json").unwrap(), None);
+        server.join().unwrap();
     }
 }

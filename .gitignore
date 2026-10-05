@@ -15,3 +15,6 @@ packages/*/run-package-build.xsh
 
 # Local secrets; nothing in the tree reads them.
 .env
+
+# cf cli
+.cloudflare/
