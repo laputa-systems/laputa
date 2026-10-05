@@ -15,7 +15,7 @@ pure runtime_packages() -> List[Str] {
 }
 
 proc runner() [process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   return fp"{configured}" when configured != ""
 

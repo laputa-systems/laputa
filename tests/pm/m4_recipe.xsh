@@ -1,7 +1,7 @@
 ##! Regression coverage for the XSH m4: its package proof and GNU m4 1.4
 ##! compatibility on the constructs bison's and flex's skeletons use.
 proc runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {
     let selected = fp"{configured}"

@@ -1,6 +1,6 @@
 ##! Parser generator CLI and definition lookup coverage without Linux build modules.
 proc generator_runner() [process, env, error] -> Result[Path] {
-  let configured = env.get("XSH_HOST") ?? ""
+  let configured = e"XSH_HOST" ?? ""
   return fp"{configured}" when configured != ""
   process.which("xsh")?
 }

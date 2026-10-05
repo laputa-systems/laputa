@@ -33,7 +33,7 @@ const ncurses_sample = [
 ]
 
 proc runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {
     let selected = fp"{configured}"

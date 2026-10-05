@@ -44,7 +44,7 @@ export const filetree = [{path: p"usr/include", kind: "tree"}]
 ## recipe's Kbuild does, so this module stays plain recipe metadata for the
 ## PM loader.
 export proc build(dest: Path) [process, env, error] {
-  let recipe_dir = env.get("XSH_PM_RECIPE_DIR") ?? ""
+  let recipe_dir = e"XSH_PM_RECIPE_DIR" ?? ""
   let xsh = process.which("xsh")?
   run $xsh fp"{recipe_dir}/PKGBUILD-build.xsh" "--" $dest ?
 }
