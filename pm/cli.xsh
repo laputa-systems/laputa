@@ -230,17 +230,14 @@ proc resolve_repo_root(raw: Str) -> Result[Path] {
 proc parse_repo_packages(args: List[Str], command: Str) -> Result[RepoPackagesArgs] {
   var parsed: RepoPackagesOptions = RepoPackagesOptions("", [])
 
-  match cli.parse(
+  parsed = cli.parse(
     args,
     {
       repo: {form: "--repo PATH", default: ""},
       packages: {form: "...PACKAGE"},
     },
     command,
-  ) {
-    Ok(value) => parsed = value
-    Err(problem) => return Err(problem)
-  }
+  )?
 
   if parsed.packages.is_empty() {
     return Err(types.PmError.Usage(f"{command} requires one-or-more PACKAGE arguments"))
@@ -268,10 +265,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
   match action {
     "check" => {
       var parsed: RepoCheckOptions = RepoCheckOptions("")
-      match cli.parse(args, {repo: {form: "--repo PATH", default: ""}}, "pm repo check") {
-        Ok(value) => parsed = value
-        Err(problem) => return Err(problem)
-      }
+      parsed = cli.parse(args, {repo: {form: "--repo PATH", default: ""}}, "pm repo check")?
 
       RepoCheck({repo: resolve_repo_root(parsed.repo)?})
     }
@@ -284,7 +278,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
         target: "",
         output: p"",
       )
-      match cli.parse(
+      parsed = cli.parse(
         args,
         {
           repo: {form: "--repo PATH", default: ""},
@@ -295,10 +289,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
           output: {form: "--output PLAN", kind: "Path", required: true},
         },
         "pm repo plan",
-      ) {
-        Ok(value) => parsed = value
-        Err(problem) => return Err(problem)
-      }
+      )?
 
       if parsed.all == ! parsed.roots.is_empty() {
         return Err(types.PmError.Usage("pm repo plan requires exactly one of --all or one-or-more --root"))
@@ -323,10 +314,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
     }
     "show" => {
       var parsed: RepoShowOptions = RepoShowOptions(p"")
-      match cli.parse(args, {input: {form: "PLAN", kind: "Path", required: true}}, "pm repo show") {
-        Ok(value) => parsed = value
-        Err(problem) => return Err(problem)
-      }
+      parsed = cli.parse(args, {input: {form: "PLAN", kind: "Path", required: true}}, "pm repo show")?
 
       RepoShow({input: parsed.input})
     }
@@ -368,17 +356,14 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
     }
     "publish" => {
       var parsed: RepoPublishOptions = RepoPublishOptions(input: p"", store: p"")
-      match cli.parse(
+      parsed = cli.parse(
         args,
         {
           input: {form: "PLAN", kind: "Path", required: true},
           store: {form: "--store STORE", kind: "Path", required: true},
         },
         "pm repo publish",
-      ) {
-        Ok(value) => parsed = value
-        Err(problem) => return Err(problem)
-      }
+      )?
 
       RepoPublish({input: parsed.input, store: parsed.store})
     }
@@ -404,7 +389,7 @@ proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
   }
 
   var parsed: SourcesFetchOptions = SourcesFetchOptions(repo: "", all: false, packages: [], targets: [])
-  match cli.parse(
+  parsed = cli.parse(
     args,
     {
       repo: {form: "--repo PATH", default: ""},
@@ -413,10 +398,7 @@ proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
       packages: {form: "...PACKAGE"},
     },
     "pm sources fetch",
-  ) {
-    Ok(value) => parsed = value
-    Err(problem) => return Err(problem)
-  }
+  )?
 
   if parsed.all == ! parsed.packages.is_empty() {
     return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
@@ -454,7 +436,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
 
   if action == "compose" {
     var parsed: RootComposeOptions = RootComposeOptions(input: p"", store: p"", runtime_roots: [], output: p"")
-    match cli.parse(
+    parsed = cli.parse(
       args,
       {
         input: {form: "PLAN", kind: "Path", required: true},
@@ -463,10 +445,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
         output: {form: "--output GENERATION", kind: "Path", required: true},
       },
       "pm root compose",
-    ) {
-      Ok(value) => parsed = value
-      Err(problem) => return Err(problem)
-    }
+    )?
 
     if parsed.runtime_roots.is_empty() {
       return Err(types.PmError.Usage("pm root compose requires one-or-more --runtime-root PACKAGE"))
@@ -478,10 +457,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   var parsed: RootInspectOptions = RootInspectOptions(p"")
-  match cli.parse(args, {input: {form: "GENERATION", kind: "Path", required: true}}, "pm root inspect") {
-    Ok(value) => parsed = value
-    Err(problem) => return Err(problem)
-  }
+  parsed = cli.parse(args, {input: {form: "GENERATION", kind: "Path", required: true}}, "pm root inspect")?
 
   RootInspect({input: parsed.input})
 }
@@ -499,7 +475,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
       path: p"",
       output: p"",
     )
-    match cli.parse(
+    extracted = cli.parse(
       tail_after(argv, 2),
       {
         input: {form: "PLAN", kind: "Path", required: true},
@@ -509,10 +485,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
         output: {form: "--output FILE", kind: "Path", required: true},
       },
       "pm store extract",
-    ) {
-      Ok(value) => extracted = value
-      Err(problem) => return Err(problem)
-    }
+    )?
 
     return StoreExtract({
       input: extracted.input,
@@ -525,17 +498,14 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
 
   if argv[1] == "gc" {
     var collected: StoreGcOptions = StoreGcOptions(p"", [])
-    match cli.parse(
+    collected = cli.parse(
       tail_after(argv, 2),
       {
         store: {form: "--store STORE", kind: "Path", required: true},
         keep: {form: "--keep PLAN", repeated: true},
       },
       "pm store gc",
-    ) {
-      Ok(value) => collected = value
-      Err(problem) => return Err(problem)
-    }
+    )?
 
     return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when collected.keep.is_empty()
 
@@ -547,14 +517,11 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   var parsed: StoreVerifyOptions = StoreVerifyOptions(p"")
-  match cli.parse(
+  parsed = cli.parse(
     tail_after(argv, 2),
     {store: {form: "--store STORE", kind: "Path", required: true}},
     "pm store verify",
-  ) {
-    Ok(value) => parsed = value
-    Err(problem) => return Err(problem)
-  }
+  )?
 
   StoreVerify({store: parsed.store})
 }
