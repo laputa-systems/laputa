@@ -86,8 +86,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     files += [f"/{entry.path.strip_prefix(root)?.display()}"]
     continue unless entry.kind == "file"
     let found = elf_report(root, entry.path)?
-    guard found != null else { continue }
-    let report: ElfReport = found
+    guard let report: ElfReport = found else { continue }
     elves += [report]
 
     if report.interpreter != "" and report.interpreter != musl_interpreter {

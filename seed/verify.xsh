@@ -53,9 +53,9 @@ proc mirror_ready(curl: Path) [process, error] -> Result[Bool] {
 # Cancelling the `make mirror` handle signals its whole process group, the
 # server included.
 proc stop_mirror(mirror: ProcessHandle?) [process, error] {
-  return when mirror == null
-
-  let handle: ProcessHandle = mirror
+  guard let handle = mirror else {
+    return
+  }
   handle.cancel(signal: "TERM", kill_after: 5s)?
 }
 
