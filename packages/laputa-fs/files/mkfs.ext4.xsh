@@ -687,7 +687,7 @@ proc write_headers(
   total_blocks: Int,
   label: Str,
 ) {
-  let max_inode = if entries.is_empty() { 10 } else { entries[entries.len() - 1].inode }
+  let max_inode = if entries.is_empty() { 10 } else { entries[-1].inode }
   var desc_parts = []
   var free_blocks_total = 0
   var group_index = 0

@@ -227,7 +227,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
     # A directive continued with backslashes is one logical line.
     var physical = [lines[index]]
 
-    while physical[physical.len() - 1].ends_with("\\") and index + 1 < lines.len() {
+    while physical[-1].ends_with("\\") and index + 1 < lines.len() {
       index += 1
       physical += [lines[index]]
     }
@@ -271,7 +271,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
       return Err(UapiError.Failed(kind: "uapi-conditional", message: f"#{current.kind} without #if"))
     }
 
-    let top = frames[frames.len() - 1]
+    let top = frames[-1]
 
     if current.kind == "endif" {
       frames = frames[..frames.len() - 1]

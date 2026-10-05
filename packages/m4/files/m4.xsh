@@ -638,16 +638,16 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
     }
 
     if t == ")" {
-      while ! ops.is_empty() and ops[ops.len() - 1] != "(" {
-        let op = ops[ops.len() - 1]
+      while ! ops.is_empty() and ops[-1] != "(" {
+        let op = ops[-1]
         ops = ops[0..ops.len() - 1]
 
         if op.starts_with("u") {
-          let y = values[values.len() - 1]
+          let y = values[-1]
           values = values[0..values.len() - 1] + [eval_apply(op, {v: 0, err: ""}, y)]
         } else {
-          let y = values[values.len() - 1]
-          let x = values[values.len() - 2]
+          let y = values[-1]
+          let x = values[-2]
           values = values[0..values.len() - 2] + [eval_apply(op, x, y)]
         }
       }
@@ -665,7 +665,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
     }
 
     while ! ops.is_empty() {
-      let top = ops[ops.len() - 1]
+      let top = ops[-1]
 
       if top == "(" {
         break
@@ -680,11 +680,11 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
       ops = ops[0..ops.len() - 1]
 
       if top.starts_with("u") {
-        let y = values[values.len() - 1]
+        let y = values[-1]
         values = values[0..values.len() - 1] + [eval_apply(top, {v: 0, err: ""}, y)]
       } else {
-        let y = values[values.len() - 1]
-        let x = values[values.len() - 2]
+        let y = values[-1]
+        let x = values[-2]
         values = values[0..values.len() - 2] + [eval_apply(top, x, y)]
       }
     }
@@ -696,17 +696,17 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
   return {v: 0, err: "bad expression"} when expect_operand
 
   while ! ops.is_empty() {
-    let op = ops[ops.len() - 1]
+    let op = ops[-1]
     ops = ops[0..ops.len() - 1]
 
     return {v: 0, err: "missing right parenthesis"} when op == "("
 
     if op.starts_with("u") {
-      let y = values[values.len() - 1]
+      let y = values[-1]
       values = values[0..values.len() - 1] + [eval_apply(op, {v: 0, err: ""}, y)]
     } else {
-      let y = values[values.len() - 1]
-      let x = values[values.len() - 2]
+      let y = values[-1]
+      let x = values[-2]
       values = values[0..values.len() - 2] + [eval_apply(op, x, y)]
     }
   }
@@ -1086,7 +1086,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
           return {pattern: "", error: "Unmatched ) or \\)", groups}
         }
 
-        last_atom = group_starts[group_starts.len() - 1]
+        last_atom = group_starts[-1]
         group_starts = group_starts[0..group_starts.len() - 1]
         out += [")"]
         at_start = false
@@ -1954,7 +1954,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           k += 1
         }
 
-        text = wraps[wraps.len() - 1]
+        text = wraps[-1]
         pos = 0
         tlen = text.byte_len()
         kind = 3
@@ -2416,7 +2416,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
             let older = stacks.get(target) ?? []
 
             if ! older.is_empty() {
-              defs[target] = older[older.len() - 1]
+              defs[target] = older[-1]
 
               if older.len() == 1 {
                 stacks = stacks.remove(target)

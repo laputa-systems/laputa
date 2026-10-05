@@ -251,7 +251,7 @@ test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   assert "type=bind,src=/work/laputa/.out/artifacts/aarch64,dst=/artifacts" in argv
   assert "type=bind,src=/work/laputa/.out/cache/linux-kbuild,dst=/var/cache/laputa/linux-kbuild" in argv
   assert ! (argv |> any .starts_with("XSH_PM_REPO"))
-  assert argv[argv.len() - 2] == "/bin/xsh"
+  assert argv[-2] == "/bin/xsh"
   # The command runs through the entry that hands the writable mounts back.
   assert "/src/laputa/seed/container_entry.xsh" in argv
   assert "1000" in argv

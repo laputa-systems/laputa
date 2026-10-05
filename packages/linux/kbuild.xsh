@@ -964,7 +964,7 @@ proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
 }
 
 pure active_conditional(stack: List[Bool]) -> Bool {
-  stack[stack.len() - 1]
+  stack[-1]
 }
 
 pure object_stem(item: Str) -> Str {
@@ -1064,7 +1064,7 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Resul
     }
 
     if line == "else" {
-      let parent = if active_stack.len() > 1 { active_stack[active_stack.len() - 2] } else { true }
+      let parent = if active_stack.len() > 1 { active_stack[-2] } else { true }
       let current = active_conditional(active_stack)
       active_stack = active_stack |> take(active_stack.len() - 1).push(parent and ! current)
       continue
@@ -1160,7 +1160,7 @@ proc kbuild_compile_flags_for_dir(
     }
 
     if line == "else" {
-      let parent = if active_stack.len() > 1 { active_stack[active_stack.len() - 2] } else { true }
+      let parent = if active_stack.len() > 1 { active_stack[-2] } else { true }
       let current = active_conditional(active_stack)
       active_stack = active_stack |> take(active_stack.len() - 1).push(parent and ! current)
       continue
@@ -2298,7 +2298,7 @@ proc scan_discover_dir(
     }
 
     if line == "else" {
-      let parent = if active_stack.len() > 1 { active_stack[active_stack.len() - 2] } else { true }
+      let parent = if active_stack.len() > 1 { active_stack[-2] } else { true }
       let current = active_conditional(active_stack)
       active_stack = active_stack |> take(active_stack.len() - 1).push(parent and ! current)
       continue

@@ -107,8 +107,8 @@ proc check_rendering(mandir: Path) [fs, process, env, error] {
       fail f"man {label} rendered unexpectedly:\n{out}"
     }
 
-    guard f"Linux man-pages {ver}" in lines[lines.len() - 1] else {
-      fail f"man {label} footer lacks the release version: {lines[lines.len() - 1]}"
+    guard f"Linux man-pages {ver}" in lines[-1] else {
+      fail f"man {label} footer lacks the release version: {lines[-1]}"
     }
   }
 }
