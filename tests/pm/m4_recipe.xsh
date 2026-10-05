@@ -167,7 +167,7 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   let status = process.run(
     process.command_argv(
       xsh,
-      [xsh.display(), "packages/m4/proof.xsh", "--", root.display()],
+      [xsh, "packages/m4/proof.xsh", "--", root],
       stderr:,
     ),
   )?

@@ -268,15 +268,15 @@ main(@args)?
       process.command_argv(
         xsht,
         [
-          xsht.display(),
+          xsht,
           "trace",
           "--trace-file",
-          trace_path.display(),
-          runner.display(),
+          trace_path,
+          runner,
           "--",
-          pkg_dir.display(),
-          src.display(),
-          dest.display(),
+          pkg_dir,
+          src,
+          dest,
         ],
       ),
     )?

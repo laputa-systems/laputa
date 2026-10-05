@@ -33,12 +33,12 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
     process.command_argv(
       xsh,
       [
-        xsh.display(),
+        xsh,
         "packages/laputa-fs/files/mkfs.ext4.xsh",
         "--",
         "-d",
-        source.display(),
-        image.display(),
+        source,
+        image,
       ],
     ),
   )?

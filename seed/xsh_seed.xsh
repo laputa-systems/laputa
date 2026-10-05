@@ -179,7 +179,7 @@ proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, er
   defer handle.close()?
   let quiet = fp"{handle.host_path()?}/inspect"
   let status = process.run(
-    process.command_argv(docker, [docker.display(), "image", "inspect", image], cwd, stdout: quiet, stderr: quiet),
+    process.command_argv(docker, [docker, "image", "inspect", image], cwd, stdout: quiet, stderr: quiet),
   )?
   status.ok
 }

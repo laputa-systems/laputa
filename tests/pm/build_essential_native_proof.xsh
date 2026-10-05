@@ -82,7 +82,7 @@ proc run_build_essential_proof(xsh: Path, arch: Str, root: Path, stderr: Path) [
     process.run(
       process.command_argv(
         xsh,
-        [xsh.display(), "packages/build-essential-native/proof.xsh", "--", root.display()],
+        [xsh, "packages/build-essential-native/proof.xsh", "--", root],
         stderr:,
       ),
     )?

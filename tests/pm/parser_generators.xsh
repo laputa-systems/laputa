@@ -24,8 +24,8 @@ test test_bison_parses_linux_kconfig_argv_and_rejects_missing_grammar [fs, proce
     process.command_argv(
       xsh,
       [
-        xsh.display(),
-        bison.display(),
+        xsh,
+        bison,
         "--",
         "-o",
         "scripts/kconfig/parser.tab.c",
@@ -52,8 +52,8 @@ test test_bison_parses_linux_kconfig_argv_and_rejects_missing_grammar [fs, proce
     process.command_argv(
       xsh,
       [
-        xsh.display(),
-        bison.display(),
+        xsh,
+        bison,
         "--",
         "-o",
         "scripts/kconfig/parser.tab.c",
@@ -86,8 +86,8 @@ test test_flex_parses_linux_kconfig_argv_and_rejects_missing_input [fs, process,
     process.command_argv(
       xsh,
       [
-        xsh.display(),
-        flex.display(),
+        xsh,
+        flex,
         "--",
         "-oscripts/kconfig/lexer.lex.c",
         "-L",
@@ -109,8 +109,8 @@ test test_flex_parses_linux_kconfig_argv_and_rejects_missing_input [fs, process,
     process.command_argv(
       xsh,
       [
-        xsh.display(),
-        flex.display(),
+        xsh,
+        flex,
         "--",
         "-oscripts/kconfig/lexer.lex.c",
         "-L",

@@ -152,7 +152,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   fs.write(unterminated, "define(`x', `y')x(\n")?
   let unterminated_stderr = fp"{tmp}/unterminated.stderr"
   let unterminated_status = process.run(
-    process.command_argv(m4, [m4.display(), unterminated.display()], stderr: unterminated_stderr),
+    process.command_argv(m4, [m4, unterminated], stderr: unterminated_stderr),
   )?
 
   if unterminated_status.ok {
@@ -167,7 +167,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   # be silently resolved as the proof cwd by the published XSH runner.
   let directory_stderr = fp"{tmp}/directory-input.stderr"
   let directory_input = process.run(
-    process.command_argv(m4, [m4.display(), tmp.display()], stderr: directory_stderr),
+    process.command_argv(m4, [m4, tmp], stderr: directory_stderr),
   )?
 
   if directory_input.ok {

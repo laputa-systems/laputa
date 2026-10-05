@@ -82,7 +82,7 @@ export proc upload_immutable_repo_file(
     # Objects are content-addressed, so a retried publication meets the
     # objects its failed attempt already uploaded; identical bytes are done.
     if response.status == 409 or response.status == 412 {
-      let existing = fp"{work}/immutable-existing/{bytes.from_text(rel.display()).sha256().hex()}"
+      let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
       fs.mkdir(existing.parent)?
       defer fs.remove(existing, missing_ok: true)?
       let failure = try_fetch_repo_file(repo, rel, existing)?
@@ -383,7 +383,7 @@ export proc plan_artifact_from_package_at_repo(
   }
 
   let rel = remote_legacy_metadata_rel(value)?
-  let cache_path = fp"{cache}/legacy-metadata/{bytes.from_text(rel.display()).sha256().hex()}.json"
+  let cache_path = fp"{cache}/legacy-metadata/{rel.bytes().sha256().hex()}.json"
   let failure = try_fetch_repo_file(repo, rel, cache_path)?
 
   if failure != "" {

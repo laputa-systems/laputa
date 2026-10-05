@@ -172,7 +172,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   let status = process.run(
     process.command_argv(
       xsh,
-      ["xsh", "packages/cargo/proof.xsh", "--", root.display()],
+      ["xsh", "packages/cargo/proof.xsh", "--", root],
       fs.cwd()?,
       {XSH_PM_BUILD_ARCH: build_arch, XSH_PM_TARGET_ARCH: target_arch},
       stderr: stderr_path,
@@ -219,7 +219,7 @@ proc run_wpa_proof(ctx: TestContext, name: Str, psk: Str) [fs, process, env, err
   let status = process.run(
     process.command_argv(
       xsh,
-      ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root.display()],
+      ["xsh", "packages/wpa_supplicant/proof.xsh", "--", root],
       fs.cwd()?,
       {},
       stderr: stderr_path,

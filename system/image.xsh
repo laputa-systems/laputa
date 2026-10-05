@@ -110,7 +110,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
       xsh,
       [
         "xsh",
-        formatter.display(),
+        formatter,
         "--",
         "-q",
         "-O",
@@ -120,8 +120,8 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
         "-L",
         "LAPUTA_ROOT",
         "-d",
-        generation_root.display(),
-        temporary.display(),
+        generation_root,
+        temporary,
       ],
     ),
   )?

@@ -53,14 +53,14 @@ pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_ke
   process.command_argv(
     timeout_bin,
     [
-      timeout_bin.display(),
+      timeout_bin,
       "1",
-      loader.display(),
-      dbclient.display(),
+      loader,
+      dbclient,
       "-N",
       "-y",
       "-i",
-      client_key.display(),
+      client_key,
       "-p",
       port_text,
       "root@127.0.0.1",
