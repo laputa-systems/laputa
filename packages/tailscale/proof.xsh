@@ -34,7 +34,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   for tool in ["tailscale", "tailscaled"] {
     let binary = fp"{rootfs}/usr/bin/{tool}"
-    let reported = run.text $binary "--version" ?
+    let reported = run.text $binary "--version"
     let first = reported.trim().split("\n")[0].trim()
     proof.ensure(first == ver, "proof-tailscale", f"{tool} --version reported {first}, expected {ver}")
   }

@@ -117,14 +117,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DEXPAT_SHARED_LIBS=ON",
   ]
 
-  run $cmake ${cmake_args} ?
-  run $samu "-C" "build" $jobs_flag ?
+  run $cmake ${cmake_args}
+  run $samu "-C" "build" $jobs_flag
 
   env ({
     DESTDIR: dest,
   }) {
     cd build {
-      run $cmake "-P" "cmake_install.cmake" ?
+      run $cmake "-P" "cmake_install.cmake"
     }
   }
 

@@ -106,7 +106,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-mandoc"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   let manpath = fp"{tmp}/man"
   let mdoc_file = fp"{manpath}/man1/laputa-hello.1"
@@ -124,19 +124,19 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
     # makewhatis indexes the tree into mandoc.db; apropos and whatis then
     # answer from that database, and man finds the page by section and name.
-    run $loader fp"{bin}/makewhatis" $manpath ?
+    run $loader fp"{bin}/makewhatis" $manpath
     proof.ensure(fp"{manpath}/mandoc.db".exists()?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
-    let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island" ?
+    let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island"
     let found_expected = "laputa-hello(1) - greet the floating island\nlaputa-island(7) - overview of the flying island\n"
     proof.ensure(found == found_expected, "mandoc-apropos", f"unexpected apropos output:\n{found}")
-    let by_name = run.text $loader fp"{bin}/apropos" "-M" $manpath "Nm=laputa-hello" ?
+    let by_name = run.text $loader fp"{bin}/apropos" "-M" $manpath "Nm=laputa-hello"
     proof.ensure(by_name == "laputa-hello(1) - greet the floating island\n", "mandoc-apropos", f"unexpected apropos Nm= output:\n{by_name}")
-    let what = run.text $loader fp"{bin}/whatis" "-M" $manpath "laputa-island" ?
+    let what = run.text $loader fp"{bin}/whatis" "-M" $manpath "laputa-island"
     proof.ensure(what == "laputa-island(7) - overview of the flying island\n", "mandoc-whatis", f"unexpected whatis output:\n{what}")
     let shown = overstrike.replace(run.text $loader fp"{bin}/man" "-M" $manpath "-T" "ascii" "-O" "width=60" "7" "laputa-island" ?, "")
     proof.ensure(shown == man_text, "mandoc-man-lookup", f"unexpected man 7 laputa-island output:\n{shown}")
 
-    let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file ?
+    let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file
     proof.ensure("laputa-hello\ngreet\nthe\nfloating\nisland\n" in words, "mandoc-demandoc", f"unexpected demandoc words:\n{words}")
   }
 
@@ -144,7 +144,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   fp"{tmp}/part.man".write("from the part\n")
 
   cd $tmp {
-    let inlined = run.text $loader fp"{bin}/soelim" "top.man" ?
+    let inlined = run.text $loader fp"{bin}/soelim" "top.man"
     proof.ensure(inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n", "mandoc-soelim", f"unexpected soelim output:\n{inlined}")
   }
 

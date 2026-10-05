@@ -180,13 +180,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   }) {
     # The extension paths default to xkeyboard-config.pc's xkb_root, which pkgconf
     # reports under the build root's sysroot; name the installed paths instead.
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d" "-Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build" ?
-    run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.13.2" ?
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d" "-Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build"
+    run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.13.2"
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }
 

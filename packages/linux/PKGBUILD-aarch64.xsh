@@ -110,7 +110,7 @@ pure native_vdso_cc_base(cc: Path) -> List[Str] {
 proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
   let symbol_re = rx"^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$"
   let leading_zero_re = rx"^00*"
-  let symbols = run.text $nm "arch/arm64/kernel/vdso/vdso.so.dbg" ?
+  let symbols = run.text $nm "arch/arm64/kernel/vdso/vdso.so.dbg"
   var out = ""
 
   for raw in symbols.lines() {
@@ -427,7 +427,7 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) {
 }
 
 proc write_native_nvhe_hyprel(gen: Path, input: Path, out: Path) {
-  let reloc = run.text $gen $input ?
+  let reloc = run.text $gen $input
   kbuild.write_text_if_changed(out, reloc)
 }
 

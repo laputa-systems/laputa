@@ -21,10 +21,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   # Boot scripts call `udevadm trigger` and `udevadm settle`; both must succeed,
   # and an unsupported subcommand must fail rather than pretend.
   let ver = proof.package_version(root, "eudev-lite")?
-  let version = run.text $dynlinker $udevadm "--version" ?
+  let version = run.text $dynlinker $udevadm "--version"
   proof.ensure(version.trim() == ver, "proof-eudev-lite", f"udevadm --version reported {version.trim()}, expected {ver}")
-  run $dynlinker $udevadm "trigger" ?
-  run $dynlinker $udevadm "settle" ?
+  run $dynlinker $udevadm "trigger"
+  run $dynlinker $udevadm "settle"
   let info = run.status $dynlinker $udevadm "info" 2> /dev/null
   proof.ensure(! info.ok, "proof-eudev-lite", "udevadm info succeeded without an implementation")
   print "eudev-lite ok: version, trigger, settle, unsupported subcommand"

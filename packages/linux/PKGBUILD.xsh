@@ -211,5 +211,5 @@ export const filetree = [{path: p"boot", kind: "tree"}, {path: p"usr", kind: "tr
 export proc build(dest: Path) [process, env, error] {
   let recipe_dir = e"XSH_PM_RECIPE_DIR" ?? ""
   let xsh = process.which("xsh")?
-  run $xsh fp"{recipe_dir}/PKGBUILD-build.xsh" "--" $dest ?
+  run $xsh fp"{recipe_dir}/PKGBUILD-build.xsh" "--" $dest
 }

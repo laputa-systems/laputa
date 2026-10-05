@@ -247,13 +247,13 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
-  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output ?
+  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
 }
 
 proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, process, env, error] {
   let program = fp"{tmp}/{source}.bin"
   compile_root_c_program(rootfs, fp"{tmp}/{source}", program)
-  let out = run.text $program ?
+  let out = run.text $program
 
   if out != expected {
     return Err(ScriptError.Failed(kind: "proof-bison", message: f"{source} parser output:\n{out}"))?
@@ -264,7 +264,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-bison"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let stderr = fp"{tmp}/bison.stderr"
 
   # Name the root's m4 and skeletons so the proof cannot pass on another m4
@@ -311,7 +311,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let bison = fp"{rootfs}/usr/bin/bison"
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
-    let version = run.text $bison "--version" ?
+    let version = run.text $bison "--version"
 
     if "GNU Bison) 3.8.2" not in version {
       return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison --version: {version.trim()}"))?

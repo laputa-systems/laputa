@@ -115,13 +115,13 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   partial_dir.mkdir()
   # Packages built in parallel can share one source, so one writer fills an entry.
   let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
-  defer fs.unlock(lock)?
+  defer fs.unlock(lock)
 
   return Cached when entry.exists()
 
   let partial = fp"{partial_dir}/{sha256}"
   partial.remove(missing_ok: true)
-  defer partial.remove(missing_ok: true)?
+  defer partial.remove(missing_ok: true)
   let failure = util.download_file(url, partial)?
 
   return Unavailable(failure) when failure != ""
@@ -492,7 +492,7 @@ proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[St
   let partial_dir = fp"{cache_root}/partial"
   partial_dir.mkdir()
   let scratch = fs.tempdir()?
-  defer scratch.close()?
+  defer scratch.close()
   let download = fp"{scratch.host_path()?}/download"
   let failure = util.download_file(url, download)?
 

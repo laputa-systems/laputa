@@ -31,11 +31,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-uv"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
-  let uv_version = run.text $uv "--version" ?
+  let uv_version = run.text $uv "--version"
   proof.ensure(uv_version.trim() == f"uv 0.12.23 ({arch}-unknown-linux-musl)", "uv-version", f"unexpected uv --version: {uv_version.trim()}")
-  let uvx_version = run.text $uvx "--version" ?
+  let uvx_version = run.text $uvx "--version"
   proof.ensure(uvx_version.trim() == f"uvx 0.12.23 ({arch}-unknown-linux-musl)", "uvx-version", f"unexpected uvx --version: {uvx_version.trim()}")
 
   let project = fp"{tmp}/laputa-proof"
@@ -52,13 +52,13 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     UV_PYTHON_DOWNLOADS: "never",
   }) {
     cd $tmp {
-      run $uv "init" "--bare" "--no-workspace" "--vcs" "none" "--name" "laputa-proof" "--python" "3.13" $project ?
+      run $uv "init" "--bare" "--no-workspace" "--vcs" "none" "--name" "laputa-proof" "--python" "3.13" $project
     }
 
     cd $project {
-      let current = run.text $uv "version" ?
+      let current = run.text $uv "version"
       proof.ensure(current.trim() == "laputa-proof 0.1.0", "uv-version-read", f"unexpected uv version: {current.trim()}")
-      let bumped = run.text $uv "version" "--short" "--bump" "minor" "--frozen" ?
+      let bumped = run.text $uv "version" "--short" "--bump" "minor" "--frozen"
       proof.ensure(bumped.trim() == "0.2.0", "uv-version-bump", f"unexpected bumped version: {bumped.trim()}")
     }
   }

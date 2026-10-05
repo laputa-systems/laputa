@@ -60,13 +60,13 @@ set -g focus-events on
     TERM: "tmux-256color",
     TMUX_TMPDIR: tmp,
   }) {
-    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell "--no-config" ?
+    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell "--no-config"
     time.sleep(500ms)
-    let sessions = run.text $dynlinker $tmux "-L" $label "list-sessions" ?
+    let sessions = run.text $dynlinker $tmux "-L" $label "list-sessions"
     check("proof:" in sessions, "tmux-session", f"tmux did not report proof session: {sessions.trim()}")
-    let default_terminal = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "default-terminal" ?
+    let default_terminal = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "default-terminal"
     check(default_terminal.trim() == "tmux-256color", "tmux-config", f"default-terminal was {default_terminal.trim()}")
-    let terminal_features = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "terminal-features" ?
+    let terminal_features = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "terminal-features"
 
     check(
       "tmux-256color:Sync" in terminal_features,
@@ -80,22 +80,22 @@ set -g focus-events on
       f"missing screen terminal features: {terminal_features.trim()}",
     )
 
-    let set_clipboard = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "set-clipboard" ?
+    let set_clipboard = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "set-clipboard"
     check(set_clipboard.trim() == "external", "tmux-config", f"set-clipboard was {set_clipboard.trim()}")
-    let escape_time = run.text $dynlinker $tmux "-L" $label "show-options" "-sgqv" "escape-time" ?
+    let escape_time = run.text $dynlinker $tmux "-L" $label "show-options" "-sgqv" "escape-time"
     check(escape_time.trim() == "0", "tmux-config", f"escape-time was {escape_time.trim()}")
-    let focus_events = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "focus-events" ?
+    let focus_events = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "focus-events"
     check(focus_events.trim() == "on", "tmux-config", f"focus-events was {focus_events.trim()}")
-    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-alpha\"" "C-m" ?
-    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" "ok\"" "C-m" ?
+    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-alpha\"" "C-m"
+    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" "ok\"" "C-m"
     time.sleep(1000ms)
-    let pane = run.text $dynlinker $tmux "-L" $label "capture-pane" "-pt" "proof:0.0" ?
+    let pane = run.text $dynlinker $tmux "-L" $label "capture-pane" "-pt" "proof:0.0"
     check("tmux-proof-alpha" in pane, "tmux-pane", f"tmux pane did not capture alpha output: {pane.trim()}")
     check("tmux-proof-edit:ok" in pane, "tmux-pane", f"tmux pane did not capture edited command output: {pane.trim()}")
-    run $dynlinker $tmux "-L" $label "new-window" "-d" "-n" "check" $shell "--no-config" ?
-    let windows = run.text $dynlinker $tmux "-L" $label "list-windows" ?
+    run $dynlinker $tmux "-L" $label "new-window" "-d" "-n" "check" $shell "--no-config"
+    let windows = run.text $dynlinker $tmux "-L" $label "list-windows"
     check("check" in windows, "tmux-window", f"tmux did not report created window: {windows.trim()}")
-    run $dynlinker $tmux "-L" $label "kill-server" ?
+    run $dynlinker $tmux "-L" $label "kill-server"
     let dead = run.status $dynlinker $tmux "-L" $label "has-session" "-t" "proof" 2> /dev/null
     check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")
   }

@@ -14,7 +14,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-utf8proc"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # tmux asks utf8proc for display widths, so the proof checks a wide CJK
   # character and a combining mark alongside NFC composition.
@@ -38,12 +38,12 @@ int main(void) {
   )
 
   let binary = fp"{tmp}/proof-utf8proc"
-  run $cc fp"{tmp}/proof-utf8proc.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lutf8proc" "-o" $binary ?
+  run $cc fp"{tmp}/proof-utf8proc.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lutf8proc" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
-    run $binary ?
+    run $binary
   }
 
   print "utf8proc ok: NFC, character widths"

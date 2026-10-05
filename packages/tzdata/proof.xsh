@@ -79,14 +79,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-tzdata"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   fp"{tmp}/proof-tzdata.c".write(program)
   let binary = fp"{tmp}/proof-tzdata"
-  run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary ?
+  run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary
 
   for case in expected {
     let tz = fp"{zoneinfo}/{case.zone}".display()
-    let out = run.text TZ=$tz $binary ?
+    let out = run.text TZ=$tz $binary
     proof.ensure(out == case.output, "tzdata-localtime", f"{case.zone}: unexpected local time:\n{out}")
   }
 

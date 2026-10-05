@@ -79,24 +79,24 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-iptables"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let lock = fp"{tmp}/xtables.lock"
 
   for command in ["iptables", "ip6tables", "iptables-save", "ip6tables-save", "iptables-restore", "ip6tables-restore"] {
-    let version = run.text $loader fp"{rootfs}/usr/bin/{command}" "-V" ?
+    let version = run.text $loader fp"{rootfs}/usr/bin/{command}" "-V"
     proof.ensure(version.trim() == f"{command} v1.8.13 (legacy)", "iptables-version", f"unexpected {command} -V: {version.trim()}")
   }
 
   let cc = process.which("cc")?
   let unprivileged = fp"{tmp}/without-net-caps"
   fp"{tmp}/without-net-caps.c".write(unprivileged_program)
-  run $cc fp"{tmp}/without-net-caps.c" "-o" $unprivileged ?
+  run $cc fp"{tmp}/without-net-caps.c" "-o" $unprivileged
 
   for case in rule_cases {
     let program = fp"{rootfs}/usr/bin/{case.command}"
     let table = case.table
     let args = case.args
-    let result = run.capture --text XTABLES_LOCKFILE=$lock $unprivileged $loader $program "-t" $table @args ?
+    let result = run.capture --text XTABLES_LOCKFILE=$lock $unprivileged $loader $program "-t" $table @args
     proof.ensure(! result.status.ok, "iptables-rule", f"{case.command} -t {table} succeeded without CAP_NET_ADMIN")
     let boundary = f"can't initialize {case.command} table `{table}': "
 
@@ -107,7 +107,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     )
   }
 
-  let rejected = run.capture --text XTABLES_LOCKFILE=$lock $unprivileged $loader fp"{rootfs}/usr/bin/iptables" "-A" "INPUT" "-m" "conntrack" "--ctstate" "BOGUS" "-j" "ACCEPT" ?
+  let rejected = run.capture --text XTABLES_LOCKFILE=$lock $unprivileged $loader fp"{rootfs}/usr/bin/iptables" "-A" "INPUT" "-m" "conntrack" "--ctstate" "BOGUS" "-j" "ACCEPT"
   proof.ensure(! rejected.status.ok, "iptables-parse", "iptables accepted a bogus conntrack state")
   proof.ensure("Bad ctstate \"BOGUS\"" in rejected.stderr, "iptables-parse", f"unexpected parse error: {rejected.stderr.trim()}")
   print "iptables ok: legacy -V for every command, extension rules parsed up to the kernel table, bad option rejected"

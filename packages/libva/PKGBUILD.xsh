@@ -252,7 +252,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dbuildtype=release" "-Ddriverdir=/usr/lib/dri" "-Ddisable_drm=false" "-Dwith_x11=no" "-Dwith_glx=no" "-Dwith_wayland=yes" "-Dwith_win32=no" "-Denable_docs=false" "build" ?
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dbuildtype=release" "-Ddriverdir=/usr/lib/dri" "-Ddisable_drm=false" "-Dwith_x11=no" "-Dwith_glx=no" "-Dwith_wayland=yes" "-Dwith_win32=no" "-Denable_docs=false" "build"
 
     if native_scanner {
       let ninja = p"build/build.ninja"
@@ -260,12 +260,12 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja.write(ninja.read_text()?.replace("../../../../root/usr/bin/wayland-scanner", scanner_text))
     }
 
-    run $muon "-C" "build" samu $jobs_flag ?
+    run $muon "-C" "build" samu $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }
 

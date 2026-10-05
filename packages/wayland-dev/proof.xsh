@@ -26,9 +26,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib"}) {
     # The scanner reports its version on stderr.
-    let version = (run.capture --text $dynlinker $scanner "--version" ?).stderr
+    let version = (run.capture --text $dynlinker $scanner "--version").stderr
     proof.ensure("1.26.0" in version, "proof-wayland-dev", f"unexpected scanner version: {version.trim()}")
-    let header = run.text $dynlinker $scanner "client-header" $protocol "/dev/stdout" ?
+    let header = run.text $dynlinker $scanner "client-header" $protocol "/dev/stdout"
     proof.ensure(
       "wl_display_get_registry" in header,
       "proof-wayland-dev",

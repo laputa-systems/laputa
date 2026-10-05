@@ -17,7 +17,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-deno"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # A relative import and a type annotation: `deno run` strips the types and
   # resolves the module graph, `deno check` runs the TypeScript checker.
@@ -61,11 +61,11 @@ console.log(total);
     DENO_NO_UPDATE_CHECK: "1",
   }) {
     cd $tmp {
-      version = run.text $dynlinker $deno "--version" ?
-      evaluated = run.text $dynlinker $deno "eval" "console.log(1+1)" ?
-      ran = run.text $dynlinker $deno "run" "--no-remote" "main.ts" ?
-      checked = (run.capture --text $dynlinker $deno "check" "--no-remote" "main.ts" ?).stderr
-      let rejected = run.capture --text --accept=[1] $dynlinker $deno "check" "--no-remote" "mistyped.ts" ?
+      version = run.text $dynlinker $deno "--version"
+      evaluated = run.text $dynlinker $deno "eval" "console.log(1+1)"
+      ran = run.text $dynlinker $deno "run" "--no-remote" "main.ts"
+      checked = (run.capture --text $dynlinker $deno "check" "--no-remote" "main.ts").stderr
+      let rejected = run.capture --text --accept=[1] $dynlinker $deno "check" "--no-remote" "mistyped.ts"
       mistyped = rejected.stderr
     }
   }

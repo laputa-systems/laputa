@@ -91,10 +91,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     env ({
       LD_LIBRARY_PATH: host_ld_library_path,
     }) {
-      run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap" ?
+      run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap"
     }
   } else {
-    run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap" ?
+    run $bootstrap_cc "-std=c99" "-O2" "-Iinclude" "src/amalgam.c" "-o" "build/muon-bootstrap"
   }
 
   let setup_args = [
@@ -118,7 +118,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     env ({
       LD_LIBRARY_PATH: host_ld_library_path,
     }) {
-      run "build/muon-bootstrap" ${setup_args} ?
+      run "build/muon-bootstrap" ${setup_args}
       let build_ninja = p"build/build.ninja"
       var patched_ninja = build_ninja.read_text()?
 
@@ -137,11 +137,11 @@ export proc build(dest: Path) [fs, process, env, error] {
       )
 
       build_ninja.write(patched_ninja)
-      run "build/muon-bootstrap" "-C" "build" "samu" ?
+      run "build/muon-bootstrap" "-C" "build" "samu"
     }
   } else {
-    run "build/muon-bootstrap" ${setup_args} ?
-    run "build/muon-bootstrap" "-C" "build" "samu" ?
+    run "build/muon-bootstrap" ${setup_args}
+    run "build/muon-bootstrap" "-C" "build" "samu"
   }
 
   fs.install(p"build/muon", fp"{dest}/usr/bin/muon", 0o755, parents: true, overwrite: true)

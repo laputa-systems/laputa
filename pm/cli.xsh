@@ -632,7 +632,7 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
   let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
 
   let cache_handle = fs.tempdir()?
-  defer cache_handle.close()?
+  defer cache_handle.close()
   let cache_root = cache_handle.host_path()?
   let catalog_value = catalog.load_for_target(args.repo, target)?
   var roots = args.roots
@@ -695,7 +695,7 @@ proc command_repo_publish(args: RepoPublishArgs) {
   }
 
   let work_handle = fs.tempdir()?
-  defer work_handle.close()?
+  defer work_handle.close()
   let token = (e"LAPUTA_TOKEN" ?? "").trim()
   repo.publish(snapshot, repo_url, token, work_handle.host_path()?)
   print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
@@ -771,7 +771,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) {
 proc command_root_compose(args: RootComposeArgs) {
   let value = pm_plan_json.read(args.input)?
   let overlay_handle = fs.tempdir()?
-  defer overlay_handle.close()?
+  defer overlay_handle.close()
   let overlay = overlay_handle.host_path()?
   let generation_plan = generation.plan(value, args.runtime_roots, generation.overlay_digest(overlay)?)?
   let receipt = generation.compose(generation_plan, args.store, args.output, overlay)?

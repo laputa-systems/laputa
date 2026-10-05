@@ -16,7 +16,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-libffi"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # wayland marshals every request through ffi_call and dispatches events
   # through closures, which use the static trampolines on Linux; the proof
@@ -72,17 +72,17 @@ int main(int argc, char **argv) {
   )
 
   let binary = fp"{tmp}/proof-libffi"
-  run $cc fp"{tmp}/proof-libffi.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lffi" "-o" $binary ?
+  run $cc fp"{tmp}/proof-libffi.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lffi" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
-    run $binary $ver ?
+    run $binary $ver
   }
 
   # The version script must export the symbol nodes consumers bind to.
   let readelf = proof.readelf_tool()?
-  let symbols = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libffi.so.8" ?
+  let symbols = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libffi.so.8"
 
   for symbol in ["ffi_call@@LIBFFI_BASE_8.0", "ffi_closure_alloc@@LIBFFI_CLOSURE_8.0", "ffi_get_version@@LIBFFI_BASE_8.1", "ffi_type_sint128@@LIBFFI_INT128_8.3"] {
     proof.ensure(symbol in symbols, "proof-libffi", f"libffi does not export {symbol}")

@@ -25,7 +25,7 @@ proc main(root: Path = /rootfs) [fs, process, error] {
   let tmp = fp"{root}/var/tmp/proof-tic"
   tmp.remove(missing_ok: true)
   tmp.mkdir(parents: true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let input = fp"{tmp}/proof.src"
   input.write(source + "\n")
   let out = fp"{tmp}/terminfo"

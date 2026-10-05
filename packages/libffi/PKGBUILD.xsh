@@ -187,7 +187,7 @@ proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: Lis
     "libffi.map.in",
   ])
 
-  run $cc ${argv} ?
+  run $cc ${argv}
 }
 
 ## Exported declaration `build`.

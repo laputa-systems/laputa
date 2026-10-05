@@ -145,7 +145,7 @@ proc run_upstream_bison(argv: List[Str], reason: Str) {
   return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("bison") {
-    run $bin @argv ?
+    run $bin @argv
   } else {
     return Err(ToolError.Failed(kind: "unsupported", message: reason))
   }

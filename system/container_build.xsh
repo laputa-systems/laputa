@@ -248,7 +248,7 @@ proc container_publish_execution(work: Path, profile: types.SystemProfile) {
 
 proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
   let handle = fs.tempdir()?
-  defer handle.close()?
+  defer handle.close()
   let work = handle.host_path()?
   let build_plan = container_stage_build_plan(work)?
   let overlay = container_prepare_overlay(profile, work)?
@@ -292,7 +292,7 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
 
   if argv[0] == "plan" {
     let handle = fs.tempdir()?
-    defer handle.close()?
+    defer handle.close()
     let work = handle.host_path()?
     let overlay = container_prepare_overlay(profile, work)?
     let generation_plan = container_generation_plan(container_build_plan_path(), profile, overlay)?

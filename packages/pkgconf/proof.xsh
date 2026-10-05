@@ -58,7 +58,7 @@ proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: L
     PKG_CONFIG_PATH: libdir,
     PKG_CONFIG_SYSROOT_DIR: sysroot,
   }) {
-    out = run.text $dynlinker $pkg_config @args ?
+    out = run.text $dynlinker $pkg_config @args
   }
 
   out.trim()
@@ -109,7 +109,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   tmp.remove(missing_ok: true)
   fp"{tmp}/sysroot/usr/lib/pkgconfig".mkdir(true)
   fp"{tmp}/sysroot/usr/share/pkgconfig".mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let sysroot = fp"{tmp}/sysroot".display()
   fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc".write(base_pc)
   fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc".write(priv_pc)
@@ -163,7 +163,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   # The shared library loads and exports only the public pkgconf_ API.
   let readelf = proof.readelf_tool()?
-  let symbols = run.text $readelf "--dyn-syms" "-W" fp"{rootfs}/usr/lib/libpkgconf.so.8" ?
+  let symbols = run.text $readelf "--dyn-syms" "-W" fp"{rootfs}/usr/lib/libpkgconf.so.8"
   proof.ensure(" pkgconf_compare_version" in symbols, "proof-pkgconf", "libpkgconf does not export pkgconf_compare_version")
 
   for line in symbols.lines() {

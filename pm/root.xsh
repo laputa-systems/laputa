@@ -186,7 +186,7 @@ proc root_legacy_package_db_entries(
   payload_entries: List[types.ArtifactEntry],
 ) -> Result[List[types.ArtifactEntry]] {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()?
+  defer sandbox.close()
   let extracted = fp"{sandbox.host_path()?}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
   let manifest_file = root_legacy_package_db_file(extracted, receipt, "manifest.json")?
@@ -343,7 +343,7 @@ pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry)
 
 proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()?
+  defer sandbox.close()
   let sandbox_path = sandbox.host_path()?
   let extracted = fp"{sandbox_path}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
@@ -606,7 +606,7 @@ proc root_materialize_artifact(
   entries: List[types.RootEntry],
 ) {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()?
+  defer sandbox.close()
   let extracted = fp"{sandbox.host_path()?}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
 
@@ -804,7 +804,7 @@ export proc compose_artifacts(
 
   let temporary = fp"{output}.tmp"
   temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)?
+  defer temporary.remove(missing_ok: true)
   temporary.mkdir()
   # preflight above verified these receipts and payloads.
   let verified = root_checked_artifacts(artifacts)?

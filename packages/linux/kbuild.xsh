@@ -2513,8 +2513,8 @@ proc discover_records_process_pool(
   let prefix = f"/tmp/xsh-kbuild-pool-{time.now()}"
   let state_path = fp"{prefix}-state.json"
   let lock_path = fp"{prefix}-lock"
-  defer state_path.remove(missing_ok: true)?
-  defer lock_path.remove(missing_ok: true)?
+  defer state_path.remove(missing_ok: true)
+  defer lock_path.remove(missing_ok: true)
 
   json.write(
     state_path,
@@ -3903,7 +3903,7 @@ export proc generate_crc32table_header(root: Path, cc: Path) [fs, process, env, 
     return Err(ScriptError.Failed(kind: "linux-crc32table-compile", message: f"command failed: {argv.join(" ")}"))
   }
 
-  let output = run.text $gen ?
+  let output = run.text $gen
   write_text_if_changed(fp"{root}/lib/crc/crc32table.h", output)
 }
 
@@ -3960,7 +3960,7 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
     return Err(ScriptError.Failed(kind: "linux-raid6-mktables-compile", message: f"command failed: {argv.join(" ")}"))
   }
 
-  let tables = run.text $gen ?
+  let tables = run.text $gen
   write_text_if_changed(fp"{root}/lib/raid/raid6/tables.c", tables)
 }
 
@@ -4693,7 +4693,7 @@ proc generate_vmlinux_lds(cc: Path, out: Path) [fs, process, error] {
     "-o"
     $out
     $src
-  ) ?
+  )
 }
 
 proc generate_vmlinux_lds_x86(cc: Path, out: Path) [fs, process, error] {
@@ -4730,7 +4730,7 @@ proc generate_vmlinux_lds_x86(cc: Path, out: Path) [fs, process, error] {
     "-o"
     $out
     $src
-  ) ?
+  )
 }
 
 ## Exported declaration `x86_vmlinux_ldflags`.
@@ -4795,13 +4795,13 @@ pure efi_libstub_source_x86(stem: Str) -> Path {
 
 proc append_x86_relocs(relocs: Path, input: Path, out: Path) {
   let input_text = input.display()
-  let reloc_data = run.capture --bytes $relocs $input_text ?
+  let reloc_data = run.capture --bytes $relocs $input_text
 
   if ! reloc_data.status.ok {
     return Err(ScriptError.Failed(kind: "linux-x86-relocs", message: f"relocs failed for {input}"))?
   }
 
-  let abs_relocs = run.capture --bytes $relocs "--abs-relocs" $input_text ?
+  let abs_relocs = run.capture --bytes $relocs "--abs-relocs" $input_text
 
   if ! abs_relocs.status.ok {
     return Err(ScriptError.Failed(kind: "linux-x86-relocs", message: f"relocs --abs-relocs failed for {input}"))?
@@ -4813,7 +4813,7 @@ proc append_x86_relocs(relocs: Path, input: Path, out: Path) {
 proc write_x86_voffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [ABbCDGRSTtVW] (_text|__start_rodata|_sinittext|__inittext_end|__bss_start|_end)$"
 
-  let symbols = run.text $nm $input ?
+  let symbols = run.text $nm $input
   var lines: List[Str] = []
 
   for raw in symbols.lines() {
@@ -4838,7 +4838,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) {
 proc write_x86_zoffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [a-zA-Z] (startup_32|efi.._stub_entry|efi(32)?_pe_entry|input_data|kernel_info|_end|_ehead|_text|_e?data|_e?sbat|z_.*)$"
 
-  let symbols = run.text $nm $input ?
+  let symbols = run.text $nm $input
   var lines: List[Str] = []
 
   for raw in symbols.lines() {
@@ -5000,7 +5000,7 @@ proc preprocess_x86_boot_lds(cc: Path, source: Path, out: Path, includes: List[S
     out.display(),
   ]
 
-  run $cc ${argv |> drop(1)} ?
+  run $cc ${argv |> drop(1)}
 }
 
 proc build_x86_compressed_kernel(
@@ -5028,8 +5028,8 @@ proc build_x86_compressed_kernel(
   make.run_tasks([x86_compressed_vmlinux_bin_task(objcopy, vmlinux, kernel_bin)], 1)
   append_x86_relocs(relocs, vmlinux, kernel_all)
   archive.compress(kernel_all, kernel_gz, format: "gzip", level: 9, overwrite: true)
-  run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-o" $mkpiggy "arch/x86/boot/compressed/mkpiggy.c" ?
-  let piggy_text = run.text $mkpiggy $kernel_gz ?
+  run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-o" $mkpiggy "arch/x86/boot/compressed/mkpiggy.c"
+  let piggy_text = run.text $mkpiggy $kernel_gz
   write_text_if_changed(piggy_s, piggy_text)
   write_x86_voffset_header(nm, unstripped)
   preprocess_x86_boot_lds(cc, fp"{compressed}/vmlinux.lds.S", compressed_lds, x86_linker_script_includes())
@@ -5156,7 +5156,7 @@ proc build_x86_compressed_kernel(
 
   argv += [efi_lib.display()]
   argv += [".xsh-kbuild/arch/x86/boot/startup/lib.a"]
-  run $ld ${argv |> drop(1)} ?
+  run $ld ${argv |> drop(1)}
   write_x86_zoffset_header(nm, compressed_vmlinux)
   make.run_tasks([image_task(objcopy, compressed_vmlinux, boot_vmlinux_bin)], 1)
 }
@@ -5167,7 +5167,7 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) {
   let boot = p"arch/x86/boot"
   p".xsh-kbuild/host/arch/x86/boot".mkdir()
   let mkcpustr = p".xsh-kbuild/host/arch/x86/boot/mkcpustr"
-  run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-include" "include/generated/autoconf.h" "-D__EXPORTED_HEADERS__" "-o" $mkcpustr "arch/x86/boot/mkcpustr.c" ?
+  run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-include" "include/generated/autoconf.h" "-D__EXPORTED_HEADERS__" "-o" $mkcpustr "arch/x86/boot/mkcpustr.c"
   write_text_if_changed(fp"{boot}/cpustr.h", run.text $mkcpustr?)
   let base_cflags = x86_setup_cflags()
   let includes = x86_setup_includes()
@@ -5325,8 +5325,8 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) {
     argv += [object.display()]
   }
 
-  run $ld ${argv |> drop(1)} ?
-  run $objcopy "-O" "binary" "arch/x86/boot/setup.elf" "arch/x86/boot/setup.bin" ?
+  run $ld ${argv |> drop(1)}
+  run $objcopy "-O" "binary" "arch/x86/boot/setup.elf" "arch/x86/boot/setup.bin"
 }
 
 proc write_x86_bzimage(setup: Path, payload: Path, image: Path) {
@@ -5959,7 +5959,7 @@ proc x86_jump_label_helper() -> Result[Path] {
   let helper = p".xsh-kbuild/host/x86-jump-label-patch"
   let source = x86_jump_label_helper_source()?
   helper.parent.mkdir()
-  run $cc "-O2" "-std=c11" "-Wall" "-Wextra" "-o" $helper $source ?
+  run $cc "-O2" "-std=c11" "-Wall" "-Wextra" "-o" $helper $source
   helper
 }
 
@@ -5994,7 +5994,7 @@ export proc patch_x86_jump_label_outputs(outputs: List[Path]) [fs, process, erro
   let helper = x86_jump_label_helper()?
   var argv = [output.display() for output in outputs if output.exists()?]
   archive_plan_progress(f"xsh-kbuild-x86-jump-label-scan start {argv.len()} objects")
-  let output = run.text $helper @argv ?
+  let output = run.text $helper @argv
   let summary = parse_jump_label_helper_summary(output.trim())
 
   archive_plan_progress(
@@ -6766,10 +6766,10 @@ proc archive_analysis_process_pool(
   let prefix = f"/tmp/xsh-kbuild-archive-analysis-{time.now()}"
   let context_path = fp"{prefix}-context.json"
   json.write(context_path, archive_analysis_plan_context(plan))
-  defer context_path.remove(missing_ok: true)?
+  defer context_path.remove(missing_ok: true)
   let flags_path = fp"{prefix}-flags.json"
   json.write(flags_path, ArchiveAnalysisFlags(flag_entries))
-  defer flags_path.remove(missing_ok: true)?
+  defer flags_path.remove(missing_ok: true)
   var handles = []
   var output_paths: List[Path] = []
   var input_paths: List[Path] = []

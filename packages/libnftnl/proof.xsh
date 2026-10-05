@@ -139,12 +139,12 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-libnftnl"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   fp"{tmp}/proof-libnftnl.c".write(program)
   let binary = fp"{tmp}/proof-libnftnl"
-  run $cc fp"{tmp}/proof-libnftnl.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lnftnl" "-o" $binary ?
+  run $cc fp"{tmp}/proof-libnftnl.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lnftnl" "-o" $binary
   let libdir = fp"{root}/usr/lib".display()
-  let out = run.text LD_LIBRARY_PATH=$libdir $binary ?
+  let out = run.text LD_LIBRARY_PATH=$libdir $binary
   proof.ensure(out.trim() == "libnftnl: table chain rule set", "libnftnl", f"unexpected round-trip output: {out.trim()}")
   print "libnftnl ok: table, base chain, rule, and set round-trip through netlink messages"
 }

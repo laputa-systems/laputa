@@ -6,7 +6,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libdrm.so.2.134.0"
   proof.target_elf(root, lib, "libdrm")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libdrm.so.2]" in dynamic, "proof-libdrm", "libdrm has no libdrm.so.2 SONAME")
 
   let pc = fp"{root}/usr/lib/pkgconfig/libdrm.pc".read_text()?

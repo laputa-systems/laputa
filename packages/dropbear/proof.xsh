@@ -25,8 +25,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
 
   # RSA: exercises libtommath (big-integer arithmetic) + libtomcrypt (RSA ops).
   let rsa_key = fp"{tmp}/host_rsa"
-  run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_key ?
-  let rsa_out = run.text $dynlinker $dropbearkey "-y" "-f" $rsa_key ?
+  run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_key
+  let rsa_out = run.text $dynlinker $dropbearkey "-y" "-f" $rsa_key
 
   if "ssh-rsa" not in rsa_out {
     Err(ScriptError.Failed(kind: "dropbear-proof", message: f"rsa: unexpected output: {rsa_out.trim()}"))?
@@ -36,8 +36,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
 
   # ed25519: exercises curve25519 (ECC) in libtomcrypt.
   let ed_key = fp"{tmp}/host_ed25519"
-  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $ed_key ?
-  let ed_out = run.text $dynlinker $dropbearkey "-y" "-f" $ed_key ?
+  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $ed_key
+  let ed_out = run.text $dynlinker $dropbearkey "-y" "-f" $ed_key
 
   if "ssh-ed25519" not in ed_out {
     Err(ScriptError.Failed(kind: "dropbear-proof", message: f"ed25519: unexpected output: {ed_out.trim()}"))?
@@ -47,8 +47,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
 
   # ecdsa-256: exercises ECDSA / prime256v1 in libtomcrypt.
   let ec_key = fp"{tmp}/host_ecdsa"
-  run $dynlinker $dropbearkey "-t" "ecdsa" "-s" "256" "-f" $ec_key ?
-  let ec_out = run.text $dynlinker $dropbearkey "-y" "-f" $ec_key ?
+  run $dynlinker $dropbearkey "-t" "ecdsa" "-s" "256" "-f" $ec_key
+  let ec_out = run.text $dynlinker $dropbearkey "-y" "-f" $ec_key
 
   if "ecdsa-sha2-nistp256" not in ec_out {
     Err(ScriptError.Failed(kind: "dropbear-proof", message: f"ecdsa: unexpected output: {ec_out.trim()}"))?
@@ -103,8 +103,8 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let stranger_key = fp"{tmp}/stranger_ed25519"
   client_key.remove(missing_ok: true)
   stranger_key.remove(missing_ok: true)
-  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
-  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key ?
+  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key
+  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key
   let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?)?
 
   # dropbear accepts authorized_keys only when every directory up to the
@@ -114,7 +114,7 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let auth_dir = fp"{me.home}/.laputa-proof-dropbear-{pid}"
   auth_dir.remove(missing_ok: true)
   auth_dir.mkdir()
-  defer auth_dir.remove(missing_ok: true)?
+  defer auth_dir.remove(missing_ok: true)
   auth_dir.chmod(0o700)
   fp"{auth_dir}/authorized_keys".write(f"{client_public}\n", mode: 0o600)
   let client_home = fp"{tmp}/client-home"

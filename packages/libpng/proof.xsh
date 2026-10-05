@@ -9,7 +9,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   # nonexistent DSO.  The historical broken artifact passed metadata checks
   # but failed only when foot loaded it in the guest.
   let readelf = proof.readelf_tool()?
-  let symbols = run.text $readelf "-Ws" fp"{root}/usr/lib/libpng16.so.16" ?
+  let symbols = run.text $readelf "-Ws" fp"{root}/usr/lib/libpng16.so.16"
 
   for symbol in [
     "png_riffle_palette_neon",

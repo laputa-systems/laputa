@@ -126,7 +126,7 @@ pure x86_vdso_base(cc: Path) -> List[Str] {
 proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
   let symbol_re = rx"^([0-9a-fA-F]*) . VDSO_([a-zA-Z0-9_]*)$"
   let leading_zero_re = rx"^00*"
-  let symbols = run.text $nm "arch/x86/entry/vdso/vdso64/vdso64.so.dbg" ?
+  let symbols = run.text $nm "arch/x86/entry/vdso/vdso64/vdso64.so.dbg"
   var out = ""
 
   for raw in symbols.lines() {
@@ -459,7 +459,7 @@ pure realmode_object_paths(objects: List[Str]) -> List[Str] {
 proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, error] {
   let symbol_re = rx"^([0-9a-fA-F]+) [ABCDGRSTVW] (.+)$"
   let paths = realmode_object_paths(objects)
-  let symbols = run.text $nm @paths ?
+  let symbols = run.text $nm @paths
   var lines: List[Str] = []
 
   for raw in symbols.lines() {
@@ -680,7 +680,7 @@ proc build_x86_realmode_payload(cc: Path) {
     ].extend(realmode_object_paths(realmode_objects)),
   )
 
-  let relocs_out = run.capture --bytes $relocs "--realmode" "arch/x86/realmode/rm/realmode.elf" ?
+  let relocs_out = run.capture --bytes $relocs "--realmode" "arch/x86/realmode/rm/realmode.elf"
 
   if ! relocs_out.status.ok {
     return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-relocs", message: "relocs --realmode failed"))

@@ -1,13 +1,13 @@
 #!/bin/xsh
 for hook in g"/usr/lib/init/rc.d/*.pre.shutdown" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }
 
 for hook in g"/etc/rc.d/*.pre.shutdown" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }
 
@@ -18,12 +18,12 @@ fs.sync()
 
 for hook in g"/usr/lib/init/rc.d/*.post.shutdown" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }
 
 for hook in g"/etc/rc.d/*.post.shutdown" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }

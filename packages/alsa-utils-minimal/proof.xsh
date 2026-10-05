@@ -20,7 +20,7 @@ proc tool(root: Path, name: Str, args: List[Str]) [fs, process, env, error] -> R
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     ALSA_CONFIG_DIR: fp"{root}/usr/share/alsa".display(),
   }) {
-    run.capture --text $loader $program @args ?
+    run.capture --text $loader $program @args
   }?
 
   {code: result.status.exit_code()?, stdout: result.stdout, stderr: result.stderr}
@@ -68,7 +68,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-alsa-utils-minimal"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # Playback of a WAVE file through the null PCM parses the header and
   # configures the stream from it.

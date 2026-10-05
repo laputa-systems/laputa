@@ -236,13 +236,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dudev=true" "-Dtests=false" "-Dinstall-test-programs=false" "-Dman-pages=disabled" "-Dvalgrind=disabled" "-Dcairo-tests=disabled" "-Dintel=disabled" "-Dradeon=disabled" "-Damdgpu=disabled" "-Dnouveau=disabled" "-Dvmwgfx=disabled" "-Domap=disabled" "-Dexynos=disabled" "-Dfreedreno=disabled" "-Dtegra=disabled" "-Dvc4=disabled" "-Detnaviv=disabled" "build" ?
-    run $muon "-C" "build" samu $jobs_flag ?
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dudev=true" "-Dtests=false" "-Dinstall-test-programs=false" "-Dman-pages=disabled" "-Dvalgrind=disabled" "-Dcairo-tests=disabled" "-Dintel=disabled" "-Dradeon=disabled" "-Damdgpu=disabled" "-Dnouveau=disabled" "-Dvmwgfx=disabled" "-Domap=disabled" "-Dexynos=disabled" "-Dfreedreno=disabled" "-Dtegra=disabled" "-Dvc4=disabled" "-Detnaviv=disabled" "build"
+    run $muon "-C" "build" samu $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }?
 }

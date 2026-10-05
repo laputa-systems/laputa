@@ -49,7 +49,7 @@ proc compile_hello(
   let lib_dir = fp"{rootfs}/usr/lib"
 
   if build_arch == target_arch {
-    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-dynamic" f"-I{include_dir}" f"-L{lib_dir}" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" $hello_src "-o" $hello ?
+    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-dynamic" f"-I{include_dir}" f"-L{lib_dir}" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" $hello_src "-o" $hello
     return
   }
 
@@ -59,7 +59,7 @@ proc compile_hello(
     LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{e"PATH" ?? ""}",
   }) {
-    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello ?
+    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello
   }?
 }
 
@@ -74,7 +74,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-musl"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let hello_src = fp"{tmp}/hello.c"
 
   hello_src.write(
@@ -95,11 +95,11 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
   let hello = fp"{tmp}/hello"
   let dynlinker = fp"{rootfs}/usr/lib/{ldso}"
   compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)
-  let header = run.text $readelf "-h" $hello ?
+  let header = run.text $readelf "-h" $hello
   ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")
 
   if build_arch == arch {
-    let out = run.text $dynlinker $hello ?
+    let out = run.text $dynlinker $hello
     let trimmed = out.trim()
 
     if trimmed != "hello musl" {

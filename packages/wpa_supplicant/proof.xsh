@@ -26,8 +26,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   var psk = ""
 
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
-    version = run.text $wpa_supplicant "-v" ?
-    psk = run.text $wpa_passphrase "IEEE" "password" ?
+    version = run.text $wpa_supplicant "-v"
+    psk = run.text $wpa_passphrase "IEEE" "password"
   }
 
   proof.ensure(

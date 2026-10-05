@@ -541,13 +541,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() "-Dtests=false" "build" ?
-    run $muon "-C" "build" samu f"-j{cpu.count()}" ?
+    run $muon "setup" pm_env.meson_prefix_arg() "-Dtests=false" "build"
+    run $muon "-C" "build" samu f"-j{cpu.count()}"
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }
 

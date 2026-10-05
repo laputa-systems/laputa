@@ -28,7 +28,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-linux-pam"
   tmp.remove(missing_ok: true)
   fp"{tmp}/pam.d".mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # Two services in a private config directory: libpam must parse each stack,
   # dlopen the named module from the payload, and return that module's verdict.
@@ -64,12 +64,12 @@ int main(int argc, char **argv) {
   )
 
   let binary = fp"{tmp}/proof-pam"
-  run $cc fp"{tmp}/proof-pam.c" f"-I{rootfs}/usr/include" f"-L{rootfs}/usr/lib" "-lpam" "-o" $binary ?
+  run $cc fp"{tmp}/proof-pam.c" f"-I{rootfs}/usr/include" f"-L{rootfs}/usr/lib" "-lpam" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
   }) {
-    run $binary fp"{tmp}/pam.d" ?
+    run $binary fp"{tmp}/pam.d"
   }
 
   print f"linux-pam ok: {arch} permit and deny stacks"

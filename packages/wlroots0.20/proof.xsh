@@ -5,7 +5,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libwlroots-0.20.so"
   proof.target_elf(root, lib, "wlroots0.20")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libwlroots-0.20.so]" in dynamic, "proof-wlroots0.20", "wlroots has no libwlroots-0.20.so SONAME")
 
   # The built-in feature set the profile relies on: DRM and libinput backends,

@@ -213,7 +213,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_LIBDIR: fp"{build_root}/usr/lib/pkgconfig".display(),
     PKG_CONFIG_SYSROOT_DIR: build_root.display(),
   }) {
-    run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "-p" "deno" "--bin" "deno" ?
+    run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "-p" "deno" "--bin" "deno"
   }
 
   fs.install(p"target/release/deno", fp"{dest}/usr/bin/deno", 0o755, parents: true, overwrite: true)

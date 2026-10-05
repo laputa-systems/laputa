@@ -24,8 +24,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   # library was built from the 3.12 sources; genl_connect proves the genl
   # library carries the API wpa_supplicant's nl80211 driver links against.
   let readelf = proof.readelf_tool()?
-  let core_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-3.so.200" ?
-  let genl_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-genl-3.so.200" ?
+  let core_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-3.so.200"
+  let genl_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-genl-3.so.200"
   proof.ensure(exports_symbol(core_syms, "nl_cache_resync_v2"), "libnl3", "libnl-3 does not export nl_cache_resync_v2")
   proof.ensure(exports_symbol(genl_syms, "genl_connect"), "libnl3", "libnl-genl-3 does not export genl_connect")
   print "libnl3 ok"

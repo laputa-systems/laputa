@@ -7,7 +7,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libfontconfig.so.1.17.0"
   proof.target_elf(root, lib, "fontconfig")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libfontconfig.so.1]" in dynamic, "proof-fontconfig", "fontconfig has no libfontconfig.so.1 SONAME")
 
   # fonts.conf includes conf.d and skips what it cannot read, so a dangling
@@ -37,9 +37,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     HOME: home,
     XDG_CACHE_HOME: fp"{home}/cache",
   }) {
-    let version = run.capture --text $dynlinker fp"{root}/usr/bin/fc-match" "--version" ?
+    let version = run.capture --text $dynlinker fp"{root}/usr/bin/fc-match" "--version"
     proof.ensure("2.18.3" in f"{version.stdout}{version.stderr}", "proof-fontconfig", "fc-match is not fontconfig 2.18.3")
-    let cache = run.capture --text $dynlinker fp"{root}/usr/bin/fc-cache" "--really-force" ?
+    let cache = run.capture --text $dynlinker fp"{root}/usr/bin/fc-cache" "--really-force"
     proof.ensure(cache.status.ok, "proof-fontconfig", f"fc-cache failed: {cache.stderr.trim()}")
     proof.ensure("Fontconfig" not in cache.stderr, "proof-fontconfig", f"fontconfig reported: {cache.stderr.trim()}")
   }

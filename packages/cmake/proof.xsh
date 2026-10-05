@@ -22,7 +22,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   # The bootstrap's cmVersionConfig.h is written by the recipe; the installed
   # cmake must report the release it was built from.
   let ver = proof.package_version(rootfs, "cmake")?
-  let version = run.text $cmake "--version" ?
+  let version = run.text $cmake "--version"
 
   if ! version.starts_with(f"cmake version {ver}\n") {
     Err(ScriptError.Failed(kind: "cmake-proof-version", message: f"cmake --version reported {version.lines()[0]}, expected {ver}"))?
@@ -31,7 +31,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-cmake"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # Artifact proofs deliberately compose runtime edges only. `samurai` is a
   # build-host tool, so use this explicit proof-local generator instead of

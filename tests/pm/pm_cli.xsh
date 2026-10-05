@@ -77,7 +77,7 @@ proc published_generation_receipt(ctx: TestContext) -> Result[Path] {
 proc pm_output(args: List[Str]) -> Result[Str] {
   let xsh = runner()?
   let modules = module_root()?
-  return run.text XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args ?
+  return run.text XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args
 }
 
 proc pm_status(args: List[Str], err: Path) -> Result[Status] {
@@ -433,7 +433,7 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
 
   for revision in ["first", "second"] {
     let output = test.temp_path(ctx, name: f"plan-executor-{revision}.json")
-    let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output ?
+    let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output
     plans += [plan_json.read(output)?]
 
     for name in ["xsh", "xshi", "xsht"] {

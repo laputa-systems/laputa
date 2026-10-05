@@ -89,41 +89,41 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-libcap"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   let cc = process.which("cc")?
   fp"{tmp}/proof-libcap.c".write(program)
   let binary = fp"{tmp}/proof-libcap"
-  run $cc fp"{tmp}/proof-libcap.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lcap" "-o" $binary ?
+  run $cc fp"{tmp}/proof-libcap.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lcap" "-o" $binary
   var checks = ["text round-trip"]
 
   env ({LD_LIBRARY_PATH: libdir}) {
-    let text = run.text $binary ?
+    let text = run.text $binary
     proof.ensure(text == "cap_chown=i cap_net_bind_service,cap_net_raw+ep\n40 cap_setfcap\n", "libcap-text", f"unexpected capability text:\n{text}")
 
     # The executable library reads its argv from /proc/self/cmdline, so when
     # started through the loader it sees the library path as an unknown
     # option: it prints its banner, then usage, and exits 1.
-    let banner = run.text --accept=[1] $loader fp"{root}/usr/lib/libcap.so.2.78" ?
+    let banner = run.text --accept=[1] $loader fp"{root}/usr/lib/libcap.so.2.78"
     proof.ensure("is the shared library version: libcap-2.78." in banner, "libcap-execable", f"unexpected library banner:\n{banner}")
 
-    let decoded = run.text $loader fp"{bin}/capsh" "--decode=0x3000" ?
+    let decoded = run.text $loader fp"{bin}/capsh" "--decode=0x3000"
     proof.ensure(decoded.trim() == "0x0000000000003000=cap_net_admin,cap_net_raw", "libcap-decode", f"unexpected capsh --decode: {decoded.trim()}")
 
-    let printed = run.text $loader fp"{bin}/capsh" "--print" ?
+    let printed = run.text $loader fp"{bin}/capsh" "--print"
     let current = current_caps(printed)
     proof.ensure(current != "" and "Bounding set =" in printed, "libcap-capsh", f"unexpected capsh --print:\n{printed}")
 
     # capsh and getpcaps run as children of this proof with its capabilities.
     let pid = process.current_pid()?
-    let pcaps = run.text $loader fp"{bin}/getpcaps" f"{pid}" ?
+    let pcaps = run.text $loader fp"{bin}/getpcaps" f"{pid}"
     proof.ensure(pcaps.trim() == f"{pid}: {current}", "libcap-getpcaps", f"getpcaps disagrees with capsh: {pcaps.trim()} vs {current}")
     checks += ["capsh --print/--decode", "getpcaps"]
 
     # `--drop` removes cap_net_raw from the bounding set, then capsh runs
     # its shell (/bin/xshi) with `-c`, which prints the bounding set again.
     let inner = f"{loader} {bin}/capsh --print"
-    let dropped = run.capture --text $loader fp"{bin}/capsh" "--drop=cap_net_raw" "--" "-c" $inner ?
+    let dropped = run.capture --text $loader fp"{bin}/capsh" "--drop=cap_net_raw" "--" "-c" $inner
 
     if "cap_setpcap" in current and "cap_net_raw" in current {
       proof.ensure(dropped.status.ok, "libcap-drop", f"capsh --drop failed: {dropped.stderr.trim()}")
@@ -136,11 +136,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
     let target = fp"{tmp}/capable"
     fs.install(fp"{bin}/getcap", target, 0o755, overwrite: true)
-    let setcap_run = run.capture --text $loader fp"{bin}/setcap" "cap_net_raw,cap_net_bind_service+ep" $target ?
+    let setcap_run = run.capture --text $loader fp"{bin}/setcap" "cap_net_raw,cap_net_bind_service+ep" $target
 
     if "cap_setfcap" in current {
       proof.ensure(setcap_run.status.ok, "libcap-setcap", f"setcap failed: {setcap_run.stderr.trim()}")
-      let got = run.text $loader fp"{bin}/getcap" $target ?
+      let got = run.text $loader fp"{bin}/getcap" $target
       proof.ensure(got.trim() == f"{target} cap_net_bind_service,cap_net_raw=ep", "libcap-getcap", f"unexpected getcap: {got.trim()}")
       checks += ["setcap/getcap file capabilities"]
     } else {

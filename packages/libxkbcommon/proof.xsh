@@ -6,7 +6,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libxkbcommon.so.0.13.2"
   proof.target_elf(root, lib, "libxkbcommon")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libxkbcommon.so.0]" in dynamic, "proof-libxkbcommon", "libxkbcommon has no libxkbcommon.so.0 SONAME")
 
   # The library looks up keymaps under its built-in root, which must be the

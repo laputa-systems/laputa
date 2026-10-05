@@ -644,7 +644,7 @@ export proc write_default_builtin_initramfs(cc: Path) [fs, process, env, error] 
   p".xsh-kbuild/host".mkdir()
   let gen = p".xsh-kbuild/host/gen_init_cpio"
   run_native_command([cc.display(), "-O2", "-o", gen.display(), "usr/gen_init_cpio.c"])
-  let output = run.capture --bytes $gen "usr/default_cpio_list" ?
+  let output = run.capture --bytes $gen "usr/default_cpio_list"
 
   if ! output.status.ok {
     return Err(kbuild.ScriptError.Failed(kind: "linux-initramfs-default-cpio", message: "gen_init_cpio failed"))

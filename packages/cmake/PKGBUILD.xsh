@@ -969,12 +969,12 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
         Err(ScriptError.Failed(kind: "cmake-configure-failed", message: "bootstrap cmake configure failed"))?
       }
 
-      run $samu $jobs_flag ?
+      run $samu $jobs_flag
 
       env ({
         DESTDIR: dest,
       }) {
-        run $bc "-P" "cmake_install.cmake" ?
+        run $bc "-P" "cmake_install.cmake"
       }
     }
   }?

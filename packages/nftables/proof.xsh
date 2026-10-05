@@ -63,14 +63,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-nftables"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
-  let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version" ?
+  let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version"
   proof.ensure(version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)", "nftables-version", f"unexpected version: {version.trim()}")
 
   let rules = fp"{tmp}/laputa.nft"
   rules.write(ruleset)
-  let checked = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $rules ?
+  let checked = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $rules
 
   let kernel = if checked.status.ok {
     "accepted by the kernel"
@@ -88,7 +88,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let mismatched = fp"{tmp}/mismatched.nft"
   mismatched.write(mismatched_ruleset)
-  let rejected = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $mismatched ?
+  let rejected = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $mismatched
   proof.ensure(! rejected.status.ok, "nftables-evaluate", "nft accepted an IPv4 match against an IPv6 set")
 
   proof.ensure(

@@ -171,17 +171,17 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-mesa"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let source = fp"{tmp}/proof-mesa.c"
   let binary = fp"{tmp}/proof-mesa"
   source.write(program_source)
-  run $cc $source f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lEGL" "-lGLESv2" "-lgbm" "-o" $binary ?
+  run $cc $source f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lEGL" "-lGLESv2" "-lgbm" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     GBM_BACKENDS_PATH: fp"{root}/usr/lib/gbm".display(),
   }) {
-    let out = run.text $binary ?
+    let out = run.text $binary
     proof.ensure("GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected renderer: {out}")
     proof.ensure("OpenGL ES 3.1 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")
     proof.ensure("rendered" in out, "proof-mesa", f"render check failed: {out}")

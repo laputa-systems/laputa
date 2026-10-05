@@ -14,7 +14,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-libevent"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # tmux drives its whole client and server through an event_base, a pipe
   # read event, and timers. Both events here are one-shot, so dispatch returns
@@ -65,12 +65,12 @@ int main(void) {
   )
 
   let binary = fp"{tmp}/proof-libevent"
-  run $cc fp"{tmp}/proof-libevent.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-levent_core" "-o" $binary ?
+  run $cc fp"{tmp}/proof-libevent.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-levent_core" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
-    run $binary ?
+    run $binary
   }
 
   print "libevent ok: event loop, pipe read, timer, evbuffer"

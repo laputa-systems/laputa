@@ -30,7 +30,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-cargo"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   fp"{tmp}/src".mkdir()
   fp"{tmp}/cargo-home".mkdir()
@@ -90,9 +90,9 @@ main(@args)?
     RUSTC: rustc_wrapper.display(),
     RUSTFLAGS: f"-L native={rootfs}/usr/lib -C linker={linker_wrapper}",
   }) {
-    cargo = run.text $dynlinker fp"{rootfs}/usr/bin/cargo" "--version" ?
-    rustc = run.text $dynlinker fp"{rootfs}/usr/bin/rustc" "--version" ?
-    run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple "--manifest-path" fp"{tmp}/Cargo.toml" ?
+    cargo = run.text $dynlinker fp"{rootfs}/usr/bin/cargo" "--version"
+    rustc = run.text $dynlinker fp"{rootfs}/usr/bin/rustc" "--version"
+    run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple "--manifest-path" fp"{tmp}/Cargo.toml"
   }
 
   if ! cargo.starts_with("cargo ") {
@@ -108,7 +108,7 @@ main(@args)?
   }
 
   let hello = fp"{tmp}/target/{rust_triple}/release/cargo-proof-hello"
-  let out = run.text $hello ?
+  let out = run.text $hello
   let trimmed = out.trim()
 
   if trimmed != "hello cargo" {

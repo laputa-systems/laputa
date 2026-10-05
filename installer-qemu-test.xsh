@@ -161,7 +161,7 @@ proc ssh_guest(
   remote_command: Str,
 ) -> Result[Str] {
   let argv = ssh_args(ssh_key, port, known_hosts, remote_command)
-  return run.text $ssh @argv ?
+  return run.text $ssh @argv
 }
 
 proc wait_for_ssh(

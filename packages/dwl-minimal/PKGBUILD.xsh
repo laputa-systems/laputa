@@ -66,23 +66,23 @@ proc sysroot_path(root: Str, raw: Str) -> Result[Path] {
 }
 
 proc pkg_config_flags(pkg_config: Path, mode: Str, packages: List[Str]) -> Result[List[Str]] {
-  let out = run.text $pkg_config $mode @packages ?
+  let out = run.text $pkg_config $mode @packages
   out.words()
 }
 
 proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) -> Result[Str] {
-  let out = run.text $pkg_config f"--variable={variable}" $package ?
+  let out = run.text $pkg_config f"--variable={variable}" $package
   out.trim()
 }
 
 proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) {
   let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
-  run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h" ?
-  run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" "ext-image-copy-capture-v1-protocol.h" ?
-  run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h" ?
-  run $scanner "enum-header" "protocols/wlr-layer-shell-unstable-v1.xml" "wlr-layer-shell-unstable-v1-protocol.h" ?
-  run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" "wlr-output-power-management-unstable-v1-protocol.h" ?
-  run $scanner "server-header" fp"{protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h" ?
+  run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h"
+  run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" "ext-image-copy-capture-v1-protocol.h"
+  run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h"
+  run $scanner "enum-header" "protocols/wlr-layer-shell-unstable-v1.xml" "wlr-layer-shell-unstable-v1-protocol.h"
+  run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" "wlr-output-power-management-unstable-v1-protocol.h"
+  run $scanner "server-header" fp"{protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h"
 }
 
 proc patch_startup() {
@@ -294,7 +294,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       "-O2",
     ].extend(pkg_cflags)
 
-    run $cc "dwl.c" "-o" "dwl" @cflags @pkg_libs "-lm" ?
+    run $cc "dwl.c" "-o" "dwl" @cflags @pkg_libs "-lm"
   }
 
   fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)

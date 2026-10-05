@@ -133,10 +133,10 @@ __gttf2
   env ({
     LD_LIBRARY_PATH: f"{llvm_root}/lib:{e"LD_LIBRARY_PATH" ?? ""}",
   }) {
-    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o" ?
-    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o" ?
+    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o"
+    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o"
     cd builtins_dir {
-      run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o" ?
+      run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o"
     }
     for object in [
       comparetf2,
@@ -149,12 +149,12 @@ __gttf2
       clear_cache,
     ] {
       let visible = fp"{object}.visible"
-      run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible ?
+      run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible
       visible.rename(object, overwrite: true)
     }
 
     stub_src.remove(missing_ok: false)
-    run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache ?
+    run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache
   }
 
   builtins_dir.remove(missing_ok: false)

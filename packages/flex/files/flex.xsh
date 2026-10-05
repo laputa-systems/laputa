@@ -294,7 +294,7 @@ proc run_upstream_flex(argv: List[Str], reason: Str) {
   return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("flex") {
-    run $bin @argv ?
+    run $bin @argv
   } else {
     return Err(ToolError.Failed(kind: "unsupported", message: reason))
   }

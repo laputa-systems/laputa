@@ -189,7 +189,7 @@ proc pkg_config_words(
 ) [process, env, error] -> Result[List[Str]] {
   let {pkg_config_path, pkg_config_libdir, pkg_config_sysroot, ld_library_path, ..} = pc
   let pkg_config = pc.pkg_config.display()
-  let out = run.text LD_LIBRARY_PATH=$ld_library_path PKG_CONFIG=$pkg_config PKG_CONFIG_LIBDIR=$pkg_config_libdir PKG_CONFIG_PATH=$pkg_config_path PKG_CONFIG_SYSROOT_DIR=$pkg_config_sysroot $pc.pkg_config $mode @packages ?
+  let out = run.text LD_LIBRARY_PATH=$ld_library_path PKG_CONFIG=$pkg_config PKG_CONFIG_LIBDIR=$pkg_config_libdir PKG_CONFIG_PATH=$pkg_config_path PKG_CONFIG_SYSROOT_DIR=$pkg_config_sysroot $pc.pkg_config $mode @packages
   out.words()
 }
 

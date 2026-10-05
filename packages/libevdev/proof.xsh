@@ -6,7 +6,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libevdev.so.2.3.0"
   proof.target_elf(root, lib, "libevdev")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libevdev.so.2]" in dynamic, "proof-libevdev", "libevdev has no libevdev.so.2 SONAME")
 
   # The event-name tables come from the recipe's port of make-event-names.py.

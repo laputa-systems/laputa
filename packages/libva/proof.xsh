@@ -8,7 +8,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   for lib in ["libva", "libva-drm", "libva-wayland"] {
     let rel = fp"usr/lib/{lib}.so.2.2400.0"
     proof.target_elf(root, rel, "libva")
-    let dynamic = run.text $readelf "-d" fp"{root}/{rel}" ?
+    let dynamic = run.text $readelf "-d" fp"{root}/{rel}"
     proof.ensure(f"[{lib}.so.2]" in dynamic, "proof-libva", f"{lib} has no {lib}.so.2 SONAME")
   }
 

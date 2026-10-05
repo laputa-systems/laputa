@@ -431,19 +431,19 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Dlibexecdir=libexec" "-Ddefault_library=shared" "-Ddocumentation=false" "-Dlibwacom=false" "-Ddebug-gui=false" "-Dtests=false" "-Dinstall-tests=false" "-Dmtdev=true" "-Dzshcompletiondir=no" "-Dlua-plugins=disabled" "-Dautoload-plugins=false" "build" ?
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Dlibexecdir=libexec" "-Ddefault_library=shared" "-Ddocumentation=false" "-Dlibwacom=false" "-Ddebug-gui=false" "-Dtests=false" "-Dinstall-tests=false" "-Dmtdev=true" "-Dzshcompletiondir=no" "-Dlua-plugins=disabled" "-Dautoload-plugins=false" "build"
 
     if target_root != "" and target_root != "/" {
       let ninja = p"build/build.ninja"
       ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", f" -Wl,--end-group {builtins}"))
     }
 
-    run $muon "-C" "build" samu $jobs_flag ?
+    run $muon "-C" "build" samu $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }
 

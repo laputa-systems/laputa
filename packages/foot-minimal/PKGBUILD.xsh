@@ -271,7 +271,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dwerror=false" "-Ddocs=disabled" "-Dthemes=false" "-Dtests=false" "-Dime=false" "-Dgrapheme-clustering=disabled" "-Dterminfo=disabled" "-Dutmp-backend=none" "build" ?
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dwerror=false" "-Ddocs=disabled" "-Dthemes=false" "-Dtests=false" "-Dime=false" "-Dgrapheme-clustering=disabled" "-Dterminfo=disabled" "-Dutmp-backend=none" "build"
 
     if cross_build {
       let ninja = p"build/build.ninja"
@@ -283,12 +283,12 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja.write(ninja_text)
     }
 
-    run $muon "-C" "build" samu $jobs_flag ?
+    run $muon "-C" "build" samu $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install ?
+      run $muon "-C" "build" install
     }
   }
 

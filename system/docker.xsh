@@ -162,7 +162,7 @@ export proc require_image_architecture(platform: Str, architecture: Str) [error]
 
 ## Reject Docker images that are not the native execution substrate.
 export proc verify_image_architecture(value: DockerConfig) [process, error] {
-  let output = run.text $value.docker image inspect --format "{{.Architecture}}" $value.image ?
+  let output = run.text $value.docker image inspect --format "{{.Architecture}}" $value.image
   require_image_architecture(value.platform, output.trim())
 }
 
@@ -182,7 +182,7 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   let temporary = fp"{log}.tmp"
   log.parent.mkdir()
   temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)?
+  defer temporary.remove(missing_ok: true)
   let status = process.run(
     process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
   )?

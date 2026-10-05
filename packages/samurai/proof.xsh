@@ -20,7 +20,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-samurai"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # A dry run parses the manifest and orders the graph without spawning the
   # rule commands, so the proof needs no shell.
@@ -39,15 +39,15 @@ default prog
   fp"{tmp}/a.c".write("")
   fp"{tmp}/b.c".write("")
 
-  let version = run.text $dynlinker $samu "--version" ?
+  let version = run.text $dynlinker $samu "--version"
   proof.ensure(version.trim().starts_with("1."), "proof-samurai", f"unexpected samu --version: {version.trim()}")
 
-  let plan = run.text $dynlinker $samu "-C" $tmp "-n" "-v" 2> /dev/null ?
+  let plan = run.text $dynlinker $samu "-C" $tmp "-n" "-v" 2> /dev/null
   let lines = plan.trim().split("\n")
   proof.ensure(lines.len() == 3, "proof-samurai", f"dry run did not plan three edges: {plan.trim()}")
   proof.ensure("cc a.o b.o -o prog" in lines[2], "proof-samurai", f"link edge did not run last: {plan.trim()}")
 
-  let query = run.text $dynlinker $samu "-C" $tmp "-t" "query" "prog" 2> /dev/null ?
+  let query = run.text $dynlinker $samu "-C" $tmp "-t" "query" "prog" 2> /dev/null
   proof.ensure("a.o" in query and "b.o" in query, "proof-samurai", f"query did not report prog's inputs: {query.trim()}")
   print "samurai ok: manifest parse, dry-run order, query tool"
 }

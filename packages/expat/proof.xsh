@@ -15,7 +15,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-expat"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # wayland-scanner and fontconfig parse their XML through expat: the proof
   # parses a well-formed document with namespaces and rejects a malformed one.
@@ -58,12 +58,12 @@ int main(void) {
   )
 
   let binary = fp"{tmp}/proof-expat"
-  run $cc fp"{tmp}/proof-expat.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lexpat" "-o" $binary ?
+  run $cc fp"{tmp}/proof-expat.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lexpat" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
-    run $binary ?
+    run $binary
   }
 
   print "expat ok: namespaced parse, tag mismatch rejected"

@@ -178,7 +178,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   let strip = process.which("llvm-strip")?
 
   for rel_path in binaries {
-    run $strip "--strip-unneeded" fp"{dest}/{rel_path}" ?
+    run $strip "--strip-unneeded" fp"{dest}/{rel_path}"
   }
 }
 

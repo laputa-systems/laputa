@@ -134,7 +134,7 @@ export proc package_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, 
 
 proc quiet_status(docker: Path, argv: List[Str], cwd: Path) -> Result[Bool] {
   let handle = fs.tempdir()?
-  defer handle.close()?
+  defer handle.close()
   let quiet = fp"{handle.host_path()?}/output"
   let status = process.run(process.command_argv(docker, argv, cwd, stdout: quiet, stderr: quiet))?
   status.ok

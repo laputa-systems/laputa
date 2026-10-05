@@ -52,8 +52,8 @@ proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport
   let status = run.status readelf -h $file > /dev/null 2> /dev/null
   return null unless status.ok
 
-  let headers = run.text readelf -lW $file ?
-  let dynamic = run.text readelf -dW $file ?
+  let headers = run.text readelf -lW $file
+  let dynamic = run.text readelf -dW $file
   let report: ElfReport = ElfReport(
     path: f"/{file.strip_prefix(root)?.display()}",
     interpreter: elf_interpreter(headers),
@@ -66,7 +66,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   # Every dynamic ELF in a Laputa root must name musl's loader.
   let musl_interpreter = f"/lib/ld-musl-{arch}.so.1"
   let handle = fs.tempdir()?
-  defer handle.close()?
+  defer handle.close()
   let root = fp"{handle.host_path()?}/root"
   let loader_err = fp"{handle.host_path()?}/loader.err"
   var compose_args = ["root", "compose", plan, "--store", store, "--output", root.display()]
@@ -75,8 +75,8 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     compose_args += ["--runtime-root", name]
   }
 
-  run /bin/xsh /src/laputa/pm.xsh -- @compose_args ?
-  run /bin/xsh /src/laputa/pm.xsh -- root inspect $root ?
+  run /bin/xsh /src/laputa/pm.xsh -- @compose_args
+  run /bin/xsh /src/laputa/pm.xsh -- root inspect $root
 
   var files = []
   var elves: List[ElfReport] = []
@@ -124,7 +124,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   fp"{root}/tmp/world-root-probe.xsh".write(
     "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n",
   )
-  let greeting = run.text $chroot $root /bin/xsh /tmp/world-root-probe.xsh ?
+  let greeting = run.text $chroot $root /bin/xsh /tmp/world-root-probe.xsh
   print greeting.trim()
   print f"root files={files.len()} elf={elves.len()} dynamic={dynamic.len()} failures={failures.len()}"
 

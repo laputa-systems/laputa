@@ -18,7 +18,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-mdevd"
   tmp.remove(missing_ok: true)
   fp"{tmp}/dev".mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # `-N` opens the uevent netlink socket, parses the configuration in both
   # passes, and exits: 0 for a valid file, 2 for a syntax error. That
@@ -34,7 +34,7 @@ $MODALIAS=.* root:root 0660 @modprobe -q "$MODALIAS"
   )
 
   bad.write("null root:root 0666 =\n")
-  run $dynlinker $mdevd "-N" "-f" $good "-d" fp"{tmp}/dev" ?
+  run $dynlinker $mdevd "-N" "-f" $good "-d" fp"{tmp}/dev"
   let rejected = run.status $dynlinker $mdevd "-N" "-f" $bad "-d" fp"{tmp}/dev" 2> /dev/null
   proof.ensure(rejected.exited() and rejected.exit_code()? == 2, "proof-mdevd", "mdevd -N accepted a configuration with a syntax error")
   print "mdevd ok: configuration parse accepts valid rules and rejects a syntax error"

@@ -434,7 +434,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # empty: stack protector support is disabled in the toolchain wrapper.
   let ar = process.which("ar")?
   let libssp = p"obj/libssp_nonshared.a"
-  run $ar "rcs" $libssp ?
+  run $ar "rcs" $libssp
   fs.install(libssp, fp"{dest}/usr/lib/libssp_nonshared.a", 0o644, parents: true, overwrite: true)
 
   # Install public headers from include/ (.h.in templates are excluded by the

@@ -17,16 +17,16 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-less"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let ver = proof.package_version(rootfs, "less")?
-  let version = run.text $dynlinker $less "--version" ?
+  let version = run.text $dynlinker $less "--version"
   proof.ensure(version.starts_with(f"less {ver} "), "proof-less", f"less --version reported {version.lines()[0]}")
 
   let text = fp"{tmp}/lines.txt"
   text.write([f"line {i}" for i in range(1, 101)].join("\n") + "\n")
 
   # Without a tty less copies its input, like cat.
-  let copied = run.text $dynlinker $less $text ?
+  let copied = run.text $dynlinker $less $text
   proof.ensure(copied == text.read_text()?, "proof-less", "less did not copy its input to a non-terminal")
 
   # On a 10-row terminal less pages lines 1-9, then the down-arrow key (sent

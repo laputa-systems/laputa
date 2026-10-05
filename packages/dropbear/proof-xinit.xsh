@@ -43,7 +43,7 @@ proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) {
 
   device_path.parent.mkdir()
   let mknod = process.which("mknod")?
-  run $mknod "-m" "666" $device_path "c" $major $minor ?
+  run $mknod "-m" "666" $device_path "c" $major $minor
 }
 
 pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_key: Path, port: Int) -> Command {
@@ -168,7 +168,7 @@ proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) {
     XINIT_DROPBEAR_PORT: f"{port}",
     XINIT_DROPBEAR_HOST_KEY: host_key.display(),
   }) {
-    run $chroot $rootfs "/usr/bin/xinit" start dropbear ?
+    run $chroot $rootfs "/usr/bin/xinit" start dropbear
   }?
 }
 
@@ -209,18 +209,18 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let client_key = fp"{tmp}/dropbear_client_ed25519"
   host_key.remove(missing_ok: true)
   rsa_host_key.remove(missing_ok: true)
-  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $host_key ?
-  run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_host_key ?
-  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
+  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $host_key
+  run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_host_key
+  run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key
   client_key.chmod(0o600)
-  let public_key_text = run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?
+  let public_key_text = run.text $dynlinker $dropbearkey "-y" "-f" $client_key
   let public_key = public_key_line(public_key_text)?
   authorize_root_key(rootfs, public_key)
   print_direct_dropbear_probe(rootfs, chroot, port + 1, "default-keys", [])
   print_direct_dropbear_probe(rootfs, chroot, port + 2, "ed25519", ["-r", "/tmp/dropbear_host_ed25519"])
   print_direct_dropbear_probe(rootfs, chroot, port + 3, "rsa", ["-r", "/tmp/dropbear_host_rsa"])
   xinit_start(rootfs, chroot, port, /tmp/dropbear_host_ed25519)
-  let running = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear ?
+  let running = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear
 
   ensure(
     "pid=0" not in running and "log=append" in running,
@@ -239,8 +239,8 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   )
 
   print "xinit dropbear logs ok"
-  run $chroot $rootfs "/usr/bin/xinit" stop dropbear ?
-  let stopped_status = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear ?
+  run $chroot $rootfs "/usr/bin/xinit" stop dropbear
+  let stopped_status = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear
   ensure("pid=0" in stopped_status, "dropbear-stop", "xinit status still reported a service pid after stop")
   let listeners = process.port(port)? |> map .argv
 

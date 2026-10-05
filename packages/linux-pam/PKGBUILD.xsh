@@ -423,13 +423,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     "build",
   ]
 
-  run $muon ${setup_args} ?
-  run $muon "-C" "build" samu $jobs_flag ?
+  run $muon ${setup_args}
+  run $muon "-C" "build" samu $jobs_flag
 
   env ({
     DESTDIR: dest,
   }) {
-    run $muon "-C" "build" install ?
+    run $muon "-C" "build" install
   }
 
   fp"{dest}/etc/environment".remove(missing_ok: true)

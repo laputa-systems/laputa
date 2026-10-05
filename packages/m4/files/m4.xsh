@@ -2720,7 +2720,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
                 let ran = run.status sh -c $cmd
                 sysval = ran.exit_code() ?? 127
               } else {
-                let ran = run.capture --text sh -c $cmd ?
+                let ran = run.capture --text sh -c $cmd
                 push_text = ran.stdout
                 sysval = ran.status.exit_code() ?? 127
 

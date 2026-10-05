@@ -15,7 +15,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-libudev-zero"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
   # libinput and wlroots find input and DRM devices by enumerating sysfs and
   # reading each device's uevent; /sys/class/mem/null exists in every
@@ -48,12 +48,12 @@ int main(void) {
   )
 
   let binary = fp"{tmp}/proof-libudev"
-  run $cc fp"{tmp}/proof-libudev.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-ludev" "-o" $binary ?
+  run $cc fp"{tmp}/proof-libudev.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-ludev" "-o" $binary
 
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
-    run $binary ?
+    run $binary
   }
 
   print "libudev-zero ok: enumerated /dev/null through the mem subsystem"

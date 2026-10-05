@@ -36,13 +36,13 @@ int main(void) {
     )
 
     let binary = fp"{tmp}/proof-zlib"
-    run $cc fp"{tmp}/proof-zlib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lz" "-o" $binary ?
+    run $cc fp"{tmp}/proof-zlib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lz" "-o" $binary
 
     if pm_util.build_arch()? == pm_util.target_arch()? {
       env ({
         LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
       }) {
-        run $binary ?
+        run $binary
       }
     } else {
       proof.target_elf(root, p"usr/lib/libz.so", "zlib")

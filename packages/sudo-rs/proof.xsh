@@ -9,7 +9,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/lib/security/pam_unix.so", "sudo-rs")
   let readelf = proof.readelf_tool()?
   let pam_unix_so = fp"{rootfs}/usr/lib/security/pam_unix.so"
-  let pam_unix = run.text $readelf "-d" $pam_unix_so ?
+  let pam_unix = run.text $readelf "-d" $pam_unix_so
 
   if "/build-env/" in pam_unix {
     return Err(SudoRsProofError.Failed(kind: "proof-sudo-rs", message: "pam_unix.so depends on build-env path"))
@@ -65,7 +65,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   env ({
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
   }) {
-    sudo = run.text fp"{rootfs}/usr/bin/sudo" "--version" ?
+    sudo = run.text fp"{rootfs}/usr/bin/sudo" "--version"
   }
 
   let ver = proof.package_version(rootfs, "sudo-rs")?

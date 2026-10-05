@@ -176,7 +176,7 @@ proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
 
 proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] {
   let handle = fs.tempdir()?
-  defer handle.close()?
+  defer handle.close()
   let quiet = fp"{handle.host_path()?}/inspect"
   let status = process.run(
     process.command_argv(docker, [docker, "image", "inspect", image], cwd, stdout: quiet, stderr: quiet),
@@ -311,7 +311,7 @@ proc xsh_seed_publish_binary(source: Path, dest: Path) {
 }
 
 proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) -> Result[Str] {
-  let output = run.text git -C $xsh_root @argv ?
+  let output = run.text git -C $xsh_root @argv
   output.trim()
 }
 

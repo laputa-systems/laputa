@@ -14,11 +14,11 @@ proc recorded_version(rootfs: Path) -> Result[Str] {
 }
 
 proc prove_perf(loader: Path, perf: Path, ver: Str) {
-  let version = (run.text $loader $perf "--version" ?).trim()
+  let version = (run.text $loader $perf "--version").trim()
   proof.ensure(version == f"perf version {ver}", "perf-version", f"perf --version printed '{version}'")
 
   # The minimal feature set links only musl: every optional library is off.
-  let options = run.text $loader $perf "version" "--build-options" ?
+  let options = run.text $loader $perf "version" "--build-options"
 
   for feature in ["libelf", "libtraceevent", "libpython", "zlib", "libunwind"] {
     proof.ensure(
@@ -28,7 +28,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) {
     )
   }
 
-  let software = run.text $loader $perf "list" "sw" ?
+  let software = run.text $loader $perf "list" "sw"
 
   for event in ["task-clock", "cpu-clock", "context-switches", "page-faults"] {
     proof.ensure(event in software, "perf-list", f"perf list sw lacks {event}")
@@ -39,7 +39,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) {
   # perf event. `perf test` exits 0 whatever its tests do, so the proof reads
   # the summary, where a suite name that matches nothing passes zero tests.
   for suite in ["Simple expression parser", "Sysfs PMU tests", "PMU JSON event tests", "Tool PMU"] {
-    let result = run.capture --text $loader $perf "test" $suite ?
+    let result = run.capture --text $loader $perf "test" $suite
     let report = f"{result.stdout}{result.stderr}"
     let passed = result.status.ok and passed_suite.matches(report) and no_failures.matches(report)
     proof.ensure(passed, "perf-test", f"perf test '{suite}' did not pass: {report.trim()}")
@@ -48,7 +48,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) {
   # A counted run needs perf_event_open. Docker's default seccomp profile
   # denies it without CAP_PERFMON or CAP_SYS_ADMIN, and perf then reports the
   # denial for the event it parsed; any other failure is a perf failure.
-  let stat = run.capture --text $loader $perf "stat" "-x," "-e" "task-clock" "--" $loader $perf "--version" ?
+  let stat = run.capture --text $loader $perf "stat" "-x," "-e" "task-clock" "--" $loader $perf "--version"
 
   if stat.status.ok {
     proof.ensure(

@@ -7,7 +7,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let dwl = fp"{root}/usr/bin/dwl"
   proof.target_elf(root, p"usr/bin/dwl", "dwl-minimal")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" $dwl ?
+  let dynamic = run.text $readelf "-d" $dwl
   proof.ensure("[libwlroots-0.20.so]" in dynamic, "proof-dwl-minimal", "dwl does not link wlroots 0.20")
 
   # The startup command runs through execvp, never a shell.
@@ -24,7 +24,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
 
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib"}) {
-    let version = run.text $dynlinker $dwl "-v" ?
+    let version = run.text $dynlinker $dwl "-v"
     proof.ensure(version.trim() == "dwl 0.9", "proof-dwl-minimal", f"unexpected dwl version: {version.trim()}")
   }
 

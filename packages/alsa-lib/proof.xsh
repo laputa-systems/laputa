@@ -95,7 +95,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     let so = fp"usr/lib/{lib}.so.2.0.0"
     proof.target_elf(root, so, "alsa-lib")
     let readelf = proof.readelf_tool()?
-    let dynamic = run.text $readelf "-d" fp"{root}/{so}" ?
+    let dynamic = run.text $readelf "-d" fp"{root}/{so}"
     proof.ensure(f"[{lib}.so.2]" in dynamic, "proof-alsa-lib", f"{lib} has no {lib}.so.2 SONAME")
   }
 
@@ -121,10 +121,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-alsa-lib"
   tmp.remove(missing_ok: true)
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   fp"{tmp}/proof-alsa-lib.c".write(program)
   let binary = fp"{tmp}/proof-alsa-lib"
-  run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary ?
+  run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary
 
   # ALSA_CONFIG_DIR points libasound at the proof root's tree instead of the
   # compiled-in /usr/share/alsa.
@@ -132,7 +132,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     ALSA_CONFIG_DIR: share.display(),
   }) {
-    run.text $binary ?
+    run.text $binary
   }?
 
   proof.ensure(out.trim() == expected, "proof-alsa-lib", f"unexpected software PCM run:\n{out.trim()}")

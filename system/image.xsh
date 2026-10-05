@@ -98,7 +98,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
   let temporary = fp"{output}.tmp"
   output.parent.mkdir()
   temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)?
+  defer temporary.remove(missing_ok: true)
   temporary.write(b"")
   temporary.truncate(target_size)
 
@@ -278,7 +278,7 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   let tmp = fp"{image}.tmp"
   image.parent.mkdir()
   tmp.remove(missing_ok: true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   tmp.write(b"")
   tmp.truncate(total_sectors * sector_size)
   let entries = bytes.concat(

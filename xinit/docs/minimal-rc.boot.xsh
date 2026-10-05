@@ -28,12 +28,12 @@ if p"/etc/hostname".exists() {
 
 for hook in g"/usr/lib/init/rc.d/*.boot" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }
 
 for hook in g"/etc/rc.d/*.boot" {
   if hook.is_file() {
-    run hook ?
+    run hook
   }
 }

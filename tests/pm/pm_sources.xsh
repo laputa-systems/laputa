@@ -267,7 +267,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   let modules = path.absolute(p".")?
   let argv = ["sources", "fetch", "--repo", repository.display(), "--all", "--target", "aarch64-linux-musl"]
 
-  let first = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- @argv ?
+  let first = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- @argv
   assert first.status.ok == false
   assert "fetched" in first.stderr
   assert "dead fetchdemo" in first.stderr
@@ -279,7 +279,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   assert sources.source_cache_entry(cache, good_sha256).read_text()? == "good bytes\n"
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 
-  let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository fetchdemo ?
+  let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository fetchdemo
   assert "1 cached" in second.stdout
   assert "0 fetched" in second.stdout
 }
@@ -299,7 +299,7 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
   var output = ""
 
   cd $cwd {
-    output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo ?
+    output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo
   }
 
   assert output.trim() == f"fetchdemo {new_sha256}"
@@ -477,7 +477,7 @@ test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, e
   let xsh = runner()?
   let modules = path.absolute(p".")?
 
-  let output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository --all --target aarch64-linux-musl ?
+  let output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository --all --target aarch64-linux-musl
 
   assert "0 cached 1 fetched" in output
   assert "1 cached 0 fetched" in output

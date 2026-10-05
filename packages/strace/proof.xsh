@@ -22,14 +22,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let tmp = fp"{root}/var/tmp/proof-strace"
   tmp.remove(missing_ok: true)
   tmp.mkdir(parents: true)
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
 
-  let version = run.text $loader $strace "-V" ?
+  let version = run.text $loader $strace "-V"
   let banner = version.lines().get(0) ?? ""
   proof.ensure(banner == "strace -- version 7.2", "strace-version", f"unexpected version banner: {banner}")
 
   let out = fp"{tmp}/trace.out"
-  let traced = run.text $loader $strace "-f" "-s" "256" "-e" "trace=execve,open,openat,write,writev" "-o" $out $loader $strace "-V" ?
+  let traced = run.text $loader $strace "-f" "-s" "256" "-e" "trace=execve,open,openat,write,writev" "-o" $out $loader $strace "-V"
   proof.ensure((traced.lines().get(0) ?? "") == "strace -- version 7.2", "strace-traced", f"traced program printed: {traced.trim()}")
 
   let lines = out.read_lines()?

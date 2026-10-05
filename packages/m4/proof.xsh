@@ -110,7 +110,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-m4"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   let m4 = fp"{rootfs}/usr/bin/m4"
 
   return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()
@@ -124,7 +124,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   # resolve as the current directory in the published runner and would pass
   # `proof-m4` itself instead of this file.
   let input = fp"{tmp}/test.m4"
-  let out = run.text $m4 $input ?
+  let out = run.text $m4 $input
   let trimmed = out.trim()
 
   if trimmed != "hello from m4" {
@@ -137,12 +137,12 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   fp"{include_dir}/proof-inc.m4".write(semantics_include)
   let semantics = fp"{tmp}/semantics.m4"
   semantics.write(semantics_input)
-  let semantics_out = run.text $m4 "-I" $include_dir $semantics ?
+  let semantics_out = run.text $m4 "-I" $include_dir $semantics
   expect_text("semantics", semantics_out, semantics_expected)
 
   let prefixed = fp"{tmp}/prefixed.m4"
   prefixed.write(prefixed_input)
-  let prefixed_out = run.text $m4 "-P" < $prefixed ?
+  let prefixed_out = run.text $m4 "-P" < $prefixed
   expect_text("prefixed", prefixed_out, prefixed_expected)
 
   # An unterminated macro call is a fatal error with a nonzero status, never

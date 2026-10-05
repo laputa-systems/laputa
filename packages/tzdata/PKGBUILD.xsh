@@ -152,7 +152,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   zoneinfo.mkdir(parents: true)
   let zic_bin = zic.output
   let sources = zic_sources
-  run $zic_bin "-b" "slim" "-d" $zoneinfo @sources ?
+  run $zic_bin "-b" "slim" "-d" $zoneinfo @sources
 
   for table in table_files {
     fs.install(fp"{table}", fp"{zoneinfo}/{table}", 0o644, overwrite: true)

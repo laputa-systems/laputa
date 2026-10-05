@@ -54,14 +54,14 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
-  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output ?
+  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
 }
 
 proc prove_scanner(rootfs: Path, flex: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-flex"
   tmp.remove(missing_ok: true)
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)?
+  defer tmp.remove(missing_ok: true)
   fp"{tmp}/words.l".write(lexer)
   let stderr = fp"{tmp}/flex.stderr"
 
@@ -97,7 +97,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)
   let input = fp"{tmp}/input.txt"
   input.write(scanner_input)
-  let out = run.text $scanner < $input ?
+  let out = run.text $scanner < $input
 
   if out != scanner_expected {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"scanner output:\n{out}"))?
@@ -119,7 +119,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/flex", "flex")
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
-    let out = run.text $flex "--version" ?
+    let out = run.text $flex "--version"
 
     if "flex 2.6.4" not in out {
       return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex --version: {out.trim()}"))?

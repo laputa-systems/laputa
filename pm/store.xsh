@@ -346,7 +346,7 @@ proc commit_locked(
 
   let temporary = temporary_path(root, key)
   temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)?
+  defer temporary.remove(missing_ok: true)
   temporary.mkdir()
   copy_staged(temporary, staged)
   # The staged payload digest was computed when the payload was produced or
@@ -376,7 +376,7 @@ proc commit_staged(
   let lock_file = lock_path(root, key)
   lock_file.parent.mkdir()
   let lock = fs.lock(lock_file)?
-  defer fs.unlock(lock)?
+  defer fs.unlock(lock)
   commit_locked(target, root, node, staged, origin)?
 }
 
@@ -518,7 +518,7 @@ export proc import_remote(
   let lock_file = lock_path(root, key)
   lock_file.parent.mkdir()
   let lock = fs.lock(lock_file)?
-  defer fs.unlock(lock)?
+  defer fs.unlock(lock)
 
   if artifact_path(root, key).exists() {
     let existing = lookup(root, key)?

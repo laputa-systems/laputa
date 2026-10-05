@@ -6,7 +6,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let lib = p"usr/lib/libfreetype.so.6.20.6"
   proof.target_elf(root, lib, "freetype")
   let readelf = proof.readelf_tool()?
-  let dynamic = run.text $readelf "-d" fp"{root}/{lib}" ?
+  let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libfreetype.so.6]" in dynamic, "proof-freetype", "freetype has no libfreetype.so.6 SONAME")
 
   # Color emoji glyphs need PNG support, and compressed fonts need zlib; both

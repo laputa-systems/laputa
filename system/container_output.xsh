@@ -75,7 +75,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
     }
   } else {
     temporary.remove(missing_ok: true)
-    defer temporary.remove(missing_ok: true)?
+    defer temporary.remove(missing_ok: true)
     temporary.mkdir()
     for item in files {
       let destination = fp"{temporary}/{item.name}"
@@ -90,7 +90,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
   let current = fp"{output_root}/current"
   let current_temporary = fp"{output_root}/.current.tmp"
   current_temporary.remove(missing_ok: true)
-  defer current_temporary.remove(missing_ok: true)?
+  defer current_temporary.remove(missing_ok: true)
   fs.symlink(fp"builds/{key}", current_temporary)
   current_temporary.rename(current, overwrite: true)
 }

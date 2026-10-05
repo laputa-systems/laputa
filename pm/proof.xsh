@@ -122,7 +122,7 @@ export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, erro
   let path_value = fp"{root}/{rel}"
   ensure(path_value.exists()?, f"proof-{name}", f"missing ELF: {path_value}")
   let readelf = readelf_tool()?
-  let header = run.text $readelf "-h" $path_value ?
+  let header = run.text $readelf "-h" $path_value
   let arch = pm_util.target_arch()?
   ensure(elf_machine_name(arch) in header, f"proof-{name}", f"{rel} is not {arch}")
 }
@@ -317,6 +317,6 @@ export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path, Erro
   let source = fp"{dir}/ptydrive.c"
   let binary = fp"{dir}/ptydrive"
   source.write(pty_driver_source)
-  run $cc "-O2" $source "-o" $binary ?
+  run $cc "-O2" $source "-o" $binary
   binary
 }
