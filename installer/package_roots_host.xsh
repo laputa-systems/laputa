@@ -3,7 +3,7 @@
 # node to be an exact mirror artifact, and imports them into a fresh store.
 # Composing is file extraction, so it runs on the host as well: no container
 # writes root-owned files into the work tree, and no package builds here.
-use seed.world as world
+use seed.world
 
 error InstallerPackageHostError = Failed(message: Str) : InvalidData
 

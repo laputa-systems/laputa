@@ -1,6 +1,6 @@
 ##! Behavior coverage for native Docker command construction.
-use system.docker as docker
-use system.profile as profile
+use system.docker
+use system.profile
 
 pure fixture_config() -> docker.DockerConfig {
   {

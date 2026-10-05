@@ -1,7 +1,7 @@
 ##! Unit coverage for deterministic rootfs sizing and GPT disk output.
-use system.image as image
-use system.qemu as qemu
-use system.types as types
+use system.image
+use system.qemu
+use system.types
 
 test test_rootfs_size_has_expected_margin_rounding_and_floor [error] {
   assert image.rootfs_size_bytes(0) == 256 * 1024 * 1024

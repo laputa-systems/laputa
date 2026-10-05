@@ -1,6 +1,6 @@
 ##! XSH module `PKGBUILD-shared` package and build operations.
 use kbuild
-use pm.make as make
+use pm.make
 
 ## Exported declaration `build_jobs`.
 export proc build_jobs() [env, error] -> Result[Int, Error] {

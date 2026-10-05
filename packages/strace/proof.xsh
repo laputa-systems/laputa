@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 # strace traces the root's musl loader running `strace -V`: the loader opens

@@ -1,4 +1,4 @@
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 # The proof runs headless in the build container with no /dev/dri. It renders

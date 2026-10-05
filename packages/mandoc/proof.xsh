@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 # One page in each input language mandoc parses: mdoc(7) semantic markup

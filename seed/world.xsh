@@ -14,8 +14,8 @@
 use pm.cli as pm_cli
 use pm.plan_json as pm_plan_json
 use pm.types as pm_types
-use seed.images as images
-use seed.xsh_seed as xsh_seed
+use seed.images
+use seed.xsh_seed
 
 pure world_usage() -> Str {
   """usage: world_cli.xsh COMMAND --arch ARCH [OPTIONS]

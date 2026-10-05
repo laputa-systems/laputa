@@ -1,5 +1,5 @@
 ##! XSH module `kbuild` package and build operations.
-use pm.make as make
+use pm.make
 
 ## Exported declaration `ScriptError`.
 export error ScriptError = Failed(kind: Str, message: Str)

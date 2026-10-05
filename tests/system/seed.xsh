@@ -2,9 +2,9 @@
 use pm.fingerprint as pm_fingerprint
 use pm.recipe as pm_recipe
 use pm.types as pm_types
-use seed.images as images
-use seed.world as world
-use seed.xsh_seed as xsh_seed
+use seed.images
+use seed.world
+use seed.xsh_seed
 
 test test_seed_arch_names_each_tool_target [error] {
   let arm = xsh_seed.xsh_seed_arch("aarch64")?

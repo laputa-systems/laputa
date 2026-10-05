@@ -1,7 +1,7 @@
 ##! Profile-output paths and the typed package-plan Docker adapter.
-use system.docker as docker
-use system.image as image
-use system.types as types
+use system.docker
+use system.image
+use system.types
 
 ## The durable host output paths owned by one system profile.
 export type ProfileOutputs = {

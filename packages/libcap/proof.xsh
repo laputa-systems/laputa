@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 # The program parses capability text into a capability set, prints it back in

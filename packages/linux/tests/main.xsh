@@ -1,5 +1,5 @@
-use packages.linux.kbuild as kbuild
-use pm.make as make
+use packages.linux.kbuild
+use pm.make
 
 # Serialized report fields and analysis task fields checked by the native assertions.
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}

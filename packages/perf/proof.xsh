@@ -1,5 +1,5 @@
 ##! perf proof: version, build options, the generated parsers, and a counted run.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 const passed_suite = rx"(?m)^Passed (main tests|subtests) *: [1-9]"

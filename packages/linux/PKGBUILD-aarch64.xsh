@@ -1,7 +1,7 @@
 ##! XSH module `PKGBUILD-aarch64` package and build operations.
 use PKGBUILD-shared as PKGBUILD_shared
 use kbuild
-use pm.make as make
+use pm.make
 
 pure native_kbuild_cflags() -> List[Str] {
   [

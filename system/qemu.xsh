@@ -1,8 +1,8 @@
 ##! Structured QEMU construction and supervision for qemu-dwl-foot.
-use system.build as build
-use system.image as image
-use system.proof as proof
-use system.types as types
+use system.build
+use system.image
+use system.proof
+use system.types
 
 ## The host half of a QEMU invocation, which the profile does not choose: the
 ## guest machine with its hardware accelerator and board options, the CPU

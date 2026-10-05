@@ -1,5 +1,5 @@
 ##! Behavior of the headers_install port that turns kernel uapi headers into installed ones.
-use packages.linux-headers.uapi as uapi
+use packages.linux-headers.uapi
 
 test test_rewrite_drops_kernel_annotations_and_uapi_guards [error] {
   test.eq(uapi.rewrite_line("long f(void __user *p, int __force x);"), "long f(void *p, int x);")?

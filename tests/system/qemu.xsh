@@ -1,8 +1,8 @@
 ##! Unit coverage for QEMU construction and QEMU proof marker handling.
-use system.build as build
-use system.proof as proof
-use system.qemu as qemu
-use system.types as types
+use system.build
+use system.proof
+use system.qemu
+use system.types
 
 type SupervisorFixture = {
   config: qemu.QemuConfig,

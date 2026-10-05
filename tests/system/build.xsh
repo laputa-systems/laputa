@@ -1,5 +1,5 @@
 ##! Behavior coverage for durable profile build output locations.
-use system.build as build
+use system.build
 
 test test_profile_outputs_have_one_exact_generation_and_image_layout [error] {
   let outputs = build.outputs(p"target/laputa/qemu-dwl-foot")

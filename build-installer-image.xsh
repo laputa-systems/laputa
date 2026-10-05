@@ -1,6 +1,6 @@
 #!/bin/xsh
-use installer.host as host
-use installer.package_roots_host as package_roots_host
+use installer.host
+use installer.package_roots_host
 use system.image as system_image
 
 error InstallerBuildError = Failed(message: Str)

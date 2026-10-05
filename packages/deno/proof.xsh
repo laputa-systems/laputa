@@ -1,5 +1,5 @@
 ##! Proof that the built deno runs JavaScript and type-checks TypeScript offline.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {

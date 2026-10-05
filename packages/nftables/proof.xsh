@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 # `nft --check` evaluates the whole ruleset and sends it to the kernel as a

@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 use pm.util as pm_util
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {

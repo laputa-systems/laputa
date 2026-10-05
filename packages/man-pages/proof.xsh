@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use pm.proof as proof
+use pm.proof
 
 # The proof root holds man-pages alone (it has no runtime dependencies), so
 # rendering through mandoc happens at the end of the build; this proof checks

@@ -1,8 +1,8 @@
 ##! Native Linux Docker command construction for Laputa profile builds.
-use seed.images as images
-use seed.world as world
-use seed.xsh_seed as xsh_seed
-use system.types as types
+use seed.images
+use seed.world
+use seed.xsh_seed
+use system.types
 
 ## The fixed host paths mounted into the profile build container.
 ## `laputa_root` is the monorepo checkout: PM, recipes, profiles, and system modules.
