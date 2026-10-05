@@ -2,7 +2,7 @@
 use kbuild
 
 proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
-  let source_root = (env.get("XSH_PM_SOURCE_DIR") ?? "").trim()
+  let source_root = (e"XSH_PM_SOURCE_DIR" ?? "").trim()
 
   if source_root != "" {
     let staged = fp"{source_root}/.laputa-inputs/{input}"
@@ -10,7 +10,7 @@ proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
     return staged when staged.exists()?
   }
 
-  let recipe_root = (env.get("XSH_PM_RECIPE_DIR") ?? "").trim()
+  let recipe_root = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
 
   if recipe_root != "" {
     let copied = fp"{recipe_root}/{input}"

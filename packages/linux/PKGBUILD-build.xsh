@@ -67,7 +67,7 @@ proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, en
 }
 
 proc build_cc() [fs, process, env, error] -> Result[Path] {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   if root != "" {
     let cc = fp"{root}/usr/bin/cc"
@@ -83,7 +83,7 @@ proc build_cc() [fs, process, env, error] -> Result[Path] {
 }
 
 proc main(dest: Path) [fs, process, env, time, error] {
-  let version = env.get("XSH_PM_VERSION") ?? ""
+  let version = e"XSH_PM_VERSION" ?? ""
   let package_start = PKGBUILD_shared.timing_start("package-total")
   let cc = build_cc()?
   let arch = package_arch()?

@@ -22,7 +22,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
     return
   }
 
-  match env.get("XSH_PM_IN_CHROOT") {
+  match e"XSH_PM_IN_CHROOT" {
     Ok(_) => {
       print "tmux ok: windowed proof skipped in chroot (no pty under QEMU)"
       return

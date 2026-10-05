@@ -4,7 +4,7 @@ use pm.make as make
 
 ## Exported declaration `build_jobs`.
 export proc build_jobs() [env, error] -> Result[Int, Error] {
-  let raw = env.get("XSH_LINUX_KBUILD_JOBS") ?? ""
+  let raw = e"XSH_LINUX_KBUILD_JOBS" ?? ""
 
   if raw != "" {
     let parsed = raw.parse_int()?
@@ -21,7 +21,7 @@ export proc build_jobs() [env, error] -> Result[Int, Error] {
 
 ## Exported declaration `archive_analysis_jobs`.
 export proc archive_analysis_jobs() [env, error] -> Result[Int, Error] {
-  let raw = env.get("XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS") ?? ""
+  let raw = e"XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS" ?? ""
 
   return 8 when raw == ""
 
@@ -41,18 +41,16 @@ export proc archive_analysis_jobs() [env, error] -> Result[Int, Error] {
 
 ## Exported declaration `discover_options_from_env`.
 export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOptions, Error] {
-  let every_text = env.get("XSH_LINUX_KBUILD_PROGRESS_EVERY") ?? "100"
-  let jobs_text = env.get("XSH_LINUX_KBUILD_DISCOVER_JOBS") ?? ""
+  let every_text = e"XSH_LINUX_KBUILD_PROGRESS_EVERY" ?? "100"
+  let jobs_text = e"XSH_LINUX_KBUILD_DISCOVER_JOBS" ?? ""
   let jobs_count = if jobs_text == "" { build_jobs()? } else { jobs_text.parse_int()? }
 
   {
-    progress: (env.get("XSH_LINUX_KBUILD_PROGRESS") ?? "") == "1",
+    progress: (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1",
     progress_every: every_text.parse_int()?,
     jobs: jobs_count,
-    local_records: (env.get("XSH_LINUX_KBUILD_LOCAL_RECORDS") ?? "") == "1",
-    local_record_cache: (env.get("XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE") ?? "") == "1" and (env.get(
-      "XSH_LINUX_KBUILD_FORCE_DISCOVER",
-    ) ?? "") != "1",
+    local_records: (e"XSH_LINUX_KBUILD_LOCAL_RECORDS" ?? "") == "1",
+    local_record_cache: (e"XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE" ?? "") == "1" and (e"XSH_LINUX_KBUILD_FORCE_DISCOVER" ?? "") != "1",
     build_plan: true,
   }
 }
@@ -62,7 +60,7 @@ export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOp
 # fingerprinted with the package build input; resolving from ../pkg silently
 # depended on a legacy staging layout that no longer exists.
 proc staged_recipe_helper(name: Str) [fs, env, error] -> Result[Path] {
-  let recipe_dir = (env.get("XSH_PM_RECIPE_DIR") ?? "").trim()
+  let recipe_dir = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
 
   if recipe_dir == "" {
     return Err(kbuild.ScriptError.Failed(kind: "linux-recipe-helper", message: f"missing XSH_PM_RECIPE_DIR for {name}"))
@@ -113,7 +111,7 @@ export proc write_materialized_outputs(outputs: List[Path]) [fs, error] {
 
 ## Exported declaration `requested_stop_after`.
 export proc requested_stop_after() [env, error] -> Result[Str, Error] {
-  let requested = env.get("XSH_LINUX_KBUILD_STOP_AFTER") ?? ""
+  let requested = e"XSH_LINUX_KBUILD_STOP_AFTER" ?? ""
 
   return "" when requested == ""
 
@@ -138,7 +136,7 @@ export proc stop_after(stage: Str) [env, error] {
 
 ## Exported declaration `timing_start`.
 export proc timing_start(stage: Str) [env, time] -> Int {
-  if (env.get("XSH_LINUX_KBUILD_TIMING") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     print "linux-kbuild-timing-start" $stage
     return time.now()
   }
@@ -148,7 +146,7 @@ export proc timing_start(stage: Str) [env, time] -> Int {
 
 ## Exported declaration `timing_done`.
 export proc timing_done(stage: Str, start: Int) [env, time] {
-  if (env.get("XSH_LINUX_KBUILD_TIMING") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     let elapsed = time.now() - start
     print "linux-kbuild-timing-done" $stage $elapsed "ms"
   }
@@ -156,7 +154,7 @@ export proc timing_done(stage: Str, start: Int) [env, time] {
 
 ## Exported declaration `emit_plan_if_enabled`.
 export proc emit_plan_if_enabled(plan: kbuild.KbuildPlan) [fs, env, error] {
-  if (env.get("XSH_LINUX_KBUILD_PLAN") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_PLAN" ?? "") == "1" {
     kbuild.write_discovered_plan(plan, p".xsh-kbuild-plan.json")?
     print "xsh-kbuild-plan" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.unsupported.len() "unsupported"
   }
@@ -164,7 +162,7 @@ export proc emit_plan_if_enabled(plan: kbuild.KbuildPlan) [fs, env, error] {
 
 ## Exported declaration `emit_kbuild_progress`.
 export proc emit_kbuild_progress(message: Str) [fs, env, error] {
-  if (env.get("XSH_LINUX_KBUILD_PROGRESS") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1" {
     kbuild.write_text_if_changed(
       p".xsh-kbuild-progress",
       f"""{message}
@@ -249,17 +247,17 @@ export proc cached_archive_plan(
 
   let archive_report = p".xsh-kbuild-archive-plan.json"
   let archive_fingerprint = p".xsh-kbuild-archive-plan.fingerprint"
-  let stable_cache_dir = fp"{env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
+  let stable_cache_dir = fp"{e"XSH_LINUX_KBUILD_PLAN_CACHE_DIR" ?? "/var/cache/laputa/linux-kbuild"}"
   let stable_archive_report = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.json"
   let stable_archive_fingerprint = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.fingerprint"
   let fingerprint_start = timing_start("archive-fingerprint")
   let fingerprint = archive_plan_cache_fingerprint(plan, srcarch, triple, cflags, includes)?
   timing_done("archive-fingerprint", fingerprint_start)
-  let reuse_archive_plan = (env.get("XSH_LINUX_KBUILD_REUSE_ARCHIVE_PLAN") ?? "") == "1"
-  let archive_only = (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") == "1"
-  let plan_only = requested_stop_after()? == "plan" and (env.get("XSH_LINUX_KBUILD_ONLY") ?? "") == ""
+  let reuse_archive_plan = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVE_PLAN" ?? "") == "1"
+  let archive_only = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") == "1"
+  let plan_only = requested_stop_after()? == "plan" and (e"XSH_LINUX_KBUILD_ONLY" ?? "") == ""
 
-  if reuse_archive_plan and (env.get("XSH_LINUX_KBUILD_FORCE_ARCHIVES") ?? "") != "1" {
+  if reuse_archive_plan and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
     if archive_report.exists()? and archive_plan_fingerprint_matches(archive_fingerprint, fingerprint)? {
       if plan_only {
         match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(archive_report)) {
@@ -376,9 +374,9 @@ export proc cached_archive_plan(
 ## Exported declaration `cached_package_plan`.
 export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] -> Result[kbuild.KbuildPlan, Error] {
   let config = kbuild.load_config(p".config")?
-  let explicit_inline = env.get("XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE") ?? ""
-  let explicit_text = env.get("XSH_LINUX_KBUILD_USE_PLAN_TEXT") ?? ""
-  let explicit = env.get("XSH_LINUX_KBUILD_USE_PLAN") ?? ""
+  let explicit_inline = e"XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE" ?? ""
+  let explicit_text = e"XSH_LINUX_KBUILD_USE_PLAN_TEXT" ?? ""
+  let explicit = e"XSH_LINUX_KBUILD_USE_PLAN" ?? ""
 
   if explicit_inline != "" {
     emit_kbuild_progress("xsh-kbuild-plan-cache explicit-inline-read")?
@@ -401,10 +399,10 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     return plan
   }
 
-  let force_discover = (env.get("XSH_LINUX_KBUILD_FORCE_DISCOVER") ?? "") == "1"
+  let force_discover = (e"XSH_LINUX_KBUILD_FORCE_DISCOVER" ?? "") == "1"
   let plan_path = p".xsh-kbuild-plan.json"
   let fingerprint_path = p".xsh-kbuild-plan.fingerprint"
-  let stable_cache_dir = fp"{env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
+  let stable_cache_dir = fp"{e"XSH_LINUX_KBUILD_PLAN_CACHE_DIR" ?? "/var/cache/laputa/linux-kbuild"}"
   let stable_plan_path = fp"{stable_cache_dir}/linux-{srcarch}.plan.json"
   let stable_fingerprint_path = fp"{stable_cache_dir}/linux-{srcarch}.plan.fingerprint"
 
@@ -417,7 +415,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     let plan = kbuild.read_discovered_plan(plan_path)?
     emit_kbuild_progress(f"xsh-kbuild-plan-cache fingerprint {plan.dirs.len()} dirs {plan.objects.len()} objects")?
 
-    if (env.get("XSH_LINUX_KBUILD_TRUST_PLAN_CACHE") ?? "") == "1" {
+    if (e"XSH_LINUX_KBUILD_TRUST_PLAN_CACHE" ?? "") == "1" {
       print "xsh-kbuild-plan-cache" "trusted" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
       return plan
     }
@@ -501,7 +499,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
 ## Exported declaration `add_extra_objects_from_env`.
 export proc add_extra_objects_from_env(plan: kbuild.KbuildPlan) [env, error] -> Result[kbuild.KbuildPlan, Error] {
-  let raw = (env.get("XSH_LINUX_KBUILD_EXTRA_OBJECTS") ?? "").replace(",", " ")
+  let raw = (e"XSH_LINUX_KBUILD_EXTRA_OBJECTS" ?? "").replace(",", " ")
   var objects = [fp"{item}" for item in raw.words()]
   kbuild.add_plan_objects(plan, objects)
 }
@@ -604,7 +602,7 @@ export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchiv
 
 ## Exported declaration `native_tool`.
 export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path, Error] {
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   if build_root != "" {
     let tool = fp"{build_root}/usr/bin/{name}"
@@ -617,10 +615,10 @@ export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path, Err
 
 ## Exported declaration `run_native_command`.
 export proc run_native_command(argv: List[Str]) [process, env, error] {
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   let command = if build_root != "" {
-    process.command_argv(argv[0], argv, env: {PATH: f"{build_root}/usr/bin:{env.get("PATH") ?? ""}"})
+    process.command_argv(argv[0], argv, env: {PATH: f"{build_root}/usr/bin:{e"PATH" ?? ""}"})
   } else {
     process.command_argv(argv[0], argv)
   }

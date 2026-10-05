@@ -698,7 +698,7 @@ proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
 
   let work_handle = fs.tempdir()?
   defer work_handle.close()?
-  let token = (env.get("LAPUTA_TOKEN") ?? "").trim()
+  let token = (e"LAPUTA_TOKEN" ?? "").trim()
   repo.publish(snapshot, repo_url, token, work_handle.host_path()?)?
   print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
 }

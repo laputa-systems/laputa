@@ -170,7 +170,7 @@ proc execute_stage_local(
   env ({
     LAPUTA_ROOT: build_root.display(),
     XSH_PM_BUILD_ROOT: build_root.display(),
-    PATH: f"{build_root}/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
+    PATH: f"{build_root}/bin:{build_root}/usr/bin:{e"PATH" ?? ""}",
     CC: "cc",
     CXX: "c++",
     XSH_PM_TARGET_ARCH: target_arch,

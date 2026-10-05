@@ -6,7 +6,7 @@ export type ParserGen = {name: Str, tool: Path, argv: List[Str], outputs: List[P
 
 ## Exported declaration `bison_tool`.
 export proc bison_tool() [env, error] -> Result[Path, Error] {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? e"LAPUTA_ROOT" ?? ""
 
   return fp"{root}/usr/lib/pm/repo/bison/files/bison.xsh" when root != ""
 
@@ -15,7 +15,7 @@ export proc bison_tool() [env, error] -> Result[Path, Error] {
 
 ## Exported declaration `flex_tool`.
 export proc flex_tool() [env, error] -> Result[Path, Error] {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? e"LAPUTA_ROOT" ?? ""
 
   return fp"{root}/usr/lib/pm/repo/flex/files/flex.xsh" when root != ""
 

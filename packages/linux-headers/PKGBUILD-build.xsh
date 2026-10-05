@@ -111,7 +111,7 @@ proc main(dest: Path) [fs, env, error] {
   let generated_asm = fp"arch/{srcarch}/include/generated/uapi/asm"
   fs.mkdir(generated_linux)?
   fs.mkdir(generated_asm)?
-  generate_version_header(env.get("XSH_PM_VERSION") ?? "", fp"{generated_linux}/version.h")?
+  generate_version_header(e"XSH_PM_VERSION" ?? "", fp"{generated_linux}/version.h")?
   generate_asm_wrappers(srcarch, generated_asm)?
 
   for header in syscall_headers(srcarch) {

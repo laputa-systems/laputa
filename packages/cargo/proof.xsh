@@ -91,7 +91,7 @@ main(@args)?
 
   env ({
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
-    PATH: f"{rootfs}/usr/bin:{env.get("PATH") ?? ""}",
+    PATH: f"{rootfs}/usr/bin:{e"PATH" ?? ""}",
     CARGO_HOME: fp"{tmp}/cargo-home".display(),
     RUSTC: rustc_wrapper.display(),
     RUSTFLAGS: f"-L native={rootfs}/usr/lib -C linker={linker_wrapper}",

@@ -130,7 +130,7 @@ export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, erro
 }
 
 proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {
     let selected = fp"{configured}"
@@ -165,10 +165,10 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 
   env ({
     LAPUTA_ROOT: root.display(),
-    PATH: f"{root}/bin:{root}/usr/bin:{env.get("PATH") ?? ""}",
-    XSH_MODULE_PATH: env.get("XSH_MODULE_PATH") ?? "",
+    PATH: f"{root}/bin:{root}/usr/bin:{e"PATH" ?? ""}",
+    XSH_MODULE_PATH: e"XSH_MODULE_PATH" ?? "",
     XSH_PM_PROOF_ROOT: root.display(),
-    XSH_PM_PROOF_HOST_PATH: env.get("PATH") ?? "",
+    XSH_PM_PROOF_HOST_PATH: e"PATH" ?? "",
     SHELL: fp"{root}/bin/xshi",
   }) {
     let status = process.run(process.command_argv(xsh, [xsh.display(), script.display(), "--", root.display()]))?

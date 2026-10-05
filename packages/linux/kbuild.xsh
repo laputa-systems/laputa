@@ -1341,10 +1341,10 @@ proc cached_kbuild_compile_flags_for_dirs(
   config: Kconfig,
   srcarch: Str,
 ) [fs, env, error] -> Result[Map[Map[List[Str]]]] {
-  let cache_dir = fp"{env.get("XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR") ?? env.get("XSH_LINUX_KBUILD_PLAN_CACHE_DIR") ?? "/var/cache/laputa/linux-kbuild"}"
+  let cache_dir = fp"{e"XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR" ?? e"XSH_LINUX_KBUILD_PLAN_CACHE_DIR" ?? "/var/cache/laputa/linux-kbuild"}"
   let stable_cache_path = fp"{cache_dir}/linux-{srcarch}.compile-flags.json"
   let local_cache_path = fp"{root}/.xsh-kbuild-compile-flags.json"
-  let trust_cache = (env.get("XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE") ?? "") == "1"
+  let trust_cache = (e"XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE" ?? "") == "1"
   let fingerprint = if trust_cache {
     ""
   } else {
@@ -3770,7 +3770,7 @@ pure pi_relacheck_path() -> Path {
 }
 
 proc host_build_cc() [env] -> Path {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   return fp"{root}/usr/bin/cc" when root != ""
 
@@ -3778,8 +3778,8 @@ proc host_build_cc() [env] -> Path {
 }
 
 proc host_build_path() [env] -> Str {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
-  let current = env.get("PATH") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? ""
+  let current = e"PATH" ?? ""
 
   return f"{root}/usr/lib/llvm-toolchain/bin:{root}/usr/bin:{current}" when root != ""
 
@@ -3787,8 +3787,8 @@ proc host_build_path() [env] -> Str {
 }
 
 proc host_build_ld_library_path() [env] -> Str {
-  let root = env.get("XSH_PM_BUILD_ROOT") ?? ""
-  let current = env.get("LD_LIBRARY_PATH") ?? ""
+  let root = e"XSH_PM_BUILD_ROOT" ?? ""
+  let current = e"LD_LIBRARY_PATH" ?? ""
 
   return current when root == ""
 
@@ -3898,8 +3898,8 @@ export proc generate_crc32table_header(root: Path, cc: Path) [fs, process, env, 
   let gen = fp"{root}/lib/crc/gen_crc32table"
   let source = fp"{root}/lib/crc/gen_crc32table.c"
   let argv = [cc.display(), "-Iinclude", "-Iinclude/generated", "-o", gen.display(), source.display()]
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
-  let build_env = {PATH: f"{build_root}/usr/bin:{env.get("PATH") ?? ""}"}
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
+  let build_env = {PATH: f"{build_root}/usr/bin:{e"PATH" ?? ""}"}
 
   let compile_command = if build_root != "" {
     process.command_argv(argv[0], argv, env: build_env)
@@ -3955,8 +3955,8 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
     source.display(),
   ]
 
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
-  let build_env = {PATH: f"{build_root}/usr/bin:{env.get("PATH") ?? ""}"}
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
+  let build_env = {PATH: f"{build_root}/usr/bin:{e"PATH" ?? ""}"}
 
   let compile_command = if build_root != "" {
     process.command_argv(argv[0], argv, env: build_env)
@@ -6086,7 +6086,7 @@ proc archive_plan_progress(message: Str) [fs, error] {
 }
 
 proc archive_plan_timing_start(stage: Str) [env, time] -> Int {
-  if (env.get("XSH_LINUX_KBUILD_TIMING") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     print "linux-kbuild-archive-timing-start" $stage
     return time.now()
   }
@@ -6095,7 +6095,7 @@ proc archive_plan_timing_start(stage: Str) [env, time] -> Int {
 }
 
 proc archive_plan_timing_done(stage: Str, start: Int) [env, time] {
-  if (env.get("XSH_LINUX_KBUILD_TIMING") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     print "linux-kbuild-archive-timing-done" $stage ${time.now() - start} "ms"
   }
 }
@@ -6779,7 +6779,7 @@ proc archive_analysis_process_pool(
   let item_count = plan.objects.len() + plan.lib_objects.len()
   let flag_entries = compile_flags_cache_entries(compile_flags_by_dir)
   let worker_count = archive_analysis_worker_count(requested_jobs, item_count)
-  let emit_task_specs = (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") != "1"
+  let emit_task_specs = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
 
   if worker_count <= 1 {
     let config = load_config_if_present(p".config")?
@@ -6882,7 +6882,7 @@ proc assemble_builtin_archive_plan(
   cc: Path,
   analysis_results: List[ArchiveAnalysisResult],
 ) [fs, env, time, error] -> Result[BuiltinArchivePlan] {
-  let materialize_tasks = (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") != "1"
+  let materialize_tasks = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let result_merge_start = archive_plan_timing_start("merge-results")
   var tasks: List[make.MakeTask] = []
   var deferred_task_specs: List[Record] = []
@@ -7179,7 +7179,7 @@ export proc plan_builtin_archives(
   includes: List[Str],
 ) [fs, env, time, error] -> Result[BuiltinArchivePlan, Error] {
   let items = archive_analysis_items_for_plan(plan, triple)?
-  let emit_task_specs = (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") != "1"
+  let emit_task_specs = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let results = analyze_archive_items_impl(
     items,
     cc,

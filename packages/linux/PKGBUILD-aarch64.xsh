@@ -550,7 +550,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     )
   }
 
-  if (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") == "1" {
+  if (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") == "1" {
     let plan_start = PKGBUILD_shared.timing_start("plan")
     let plan = PKGBUILD_shared.cached_package_plan(srcarch)?
     let archive_plan_start = PKGBUILD_shared.timing_start("archive-plan")
@@ -629,7 +629,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   )?
   PKGBUILD_shared.timing_done("archive-plan", archive_plan_start)
 
-  let only = env.get("XSH_LINUX_KBUILD_ONLY") ?? ""
+  let only = e"XSH_LINUX_KBUILD_ONLY" ?? ""
 
   if only != "" {
     PKGBUILD_shared.run_targeted_kbuild_outputs(archive_plan, only)?
@@ -643,12 +643,10 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     var archives: List[Path] = []
     let archive_report = p".xsh-kbuild-archive-plan.json"
     let root_archive = p".xsh-kbuild/built-in.a"
-    let reuse_archives = (env.get("XSH_LINUX_KBUILD_REUSE_ARCHIVES") ?? "") == "1"
+    let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"
     let compile_start = PKGBUILD_shared.timing_start("compile")
 
-    if reuse_archives and root_archive.exists()? and archive_report.exists()? and (env.get(
-      "XSH_LINUX_KBUILD_FORCE_ARCHIVES",
-    ) ?? "") != "1" {
+    if reuse_archives and root_archive.exists()? and archive_report.exists()? and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
       print "xsh-kbuild-archives" "reuse" archive_plan.archives.len() "archives"
       archives = archive_plan.archives
     } else {

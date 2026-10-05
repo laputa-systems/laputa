@@ -16,7 +16,7 @@ pure fixture(name: Str) -> Path {
 }
 
 proc runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   return path.absolute(fp"{configured}")? when configured != ""
 
