@@ -84,7 +84,7 @@ proc main(...argv: List[Str]) [process, env, error] {
 
   if ! status.ok {
     if status.exited() {
-      abort(status.exit_code()?)
+      exit status.exit_code()?
     }
 
     return Err(WrapperError.Failed("pm command was signaled"))
