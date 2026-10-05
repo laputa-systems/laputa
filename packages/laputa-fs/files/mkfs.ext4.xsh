@@ -800,6 +800,17 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
 
   let total_blocks = size / BLOCK_SIZE
   let groups = ceil_div(total_blocks, BLOCKS_PER_GROUP)
+  let last_group_blocks = total_blocks % BLOCKS_PER_GROUP
+
+  if last_group_blocks > 0 and last_group_blocks < 4 + INODE_TABLE_BLOCKS {
+    return Err(
+      Ext4ToolError.Failed(
+        "bad-size",
+        "last ext4 block group is too small for its metadata",
+      ),
+    )
+  }
+
   var used = reserve_metadata_blocks(total_blocks, groups)
   var next = 4 + INODE_TABLE_BLOCKS
   let source_root = source_root.resolve()?
