@@ -3,7 +3,7 @@
 const ext4_block_size = 4096
 const ext4_blocks_per_group = 32768
 const ext4_group_metadata_blocks = 516
-const blocks_per_mib = 1024 * 1024 / ext4_block_size
+const blocks_per_mib = 1MiB / ext4_block_size
 const minimum_image_mib = 8
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
