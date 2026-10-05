@@ -215,13 +215,11 @@ export proc generation_adapter_copy_manifest_file(
       return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for {relative_path}"))
     }
 
-    let temporary = fp"{output}.tmp"
     fs.mkdir(output.parent)
-    fs.remove(temporary, missing_ok: true)
-    defer fs.remove(temporary, missing_ok: true)?
-    fs.copy(source, temporary)
-    fs.fsync(temporary)
-    fs.rename(temporary, output, overwrite: true)
+    atomically replace output as temporary {
+      fs.copy(source, temporary)
+      fs.fsync(temporary)
+    }
   }
 }
 

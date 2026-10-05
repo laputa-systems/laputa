@@ -80,18 +80,16 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
 
 ## Atomically copy one manifest-verified kernel to its profile-owned host output path.
 export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
-  let temporary = fp"{output}.tmp"
   fs.mkdir(output.parent)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary)
+  atomically replace output as temporary {
+    fs.copy(source, temporary)
 
-  if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
-    return Err(ImageError.Failed(f"kernel copy does not match {source}"))
+    if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
+      return Err(ImageError.Failed(f"kernel copy does not match {source}"))
+    }
+
+    fs.fsync(temporary)
   }
-
-  fs.fsync(temporary)
-  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.
