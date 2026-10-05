@@ -22,7 +22,7 @@
 # - writing into a directory that already holds entries replaces each path
 #   this run writes, without tic's file-timestamp heuristics.
 
-error TicError = Usage(message: Str) | Source(message: Str) | Resolve(message: Str) | Output(message: Str)
+error TicError = Usage | Source | Resolve | Output
 
 const BOOLEAN = 0
 const NUMBER = 1

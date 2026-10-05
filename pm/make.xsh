@@ -147,7 +147,7 @@ pure argv_word(arg: Any) -> Result[Str] {
   match arg {
     word is Str => Ok(word)
     operand is Path => Ok(f"{operand}")
-    else => Err(MakeError.InvalidTask(message: "make task argv words must be Str or Path"))
+    else => Err(MakeError.InvalidTask("make task argv words must be Str or Path"))
   }
 }
 
@@ -258,7 +258,7 @@ pure parse_jobs(value: Str, source: Str) -> Result[Int] {
   let parsed = value as Int
 
   if parsed <= 0 {
-    return Err(MakeError.InvalidJobs(message: f"{source} must be a positive integer"))
+    return Err(MakeError.InvalidJobs(f"{source} must be a positive integer"))
   }
 
   parsed
@@ -274,7 +274,7 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
 
     if word == "-j" or word == "--jobs" {
       if index + 1 >= words.len() {
-        return Err(MakeError.InvalidJobs(message: f"MAKEFLAGS {word} requires a job count"))
+        return Err(MakeError.InvalidJobs(f"MAKEFLAGS {word} requires a job count"))
       }
 
       return parse_jobs(words[index + 1], f"MAKEFLAGS {word}")?
@@ -309,7 +309,7 @@ export proc effective_task_env(_: List[Any], task_env: Record) [error] -> Result
 
 proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
   guard jobs_count > 0 else {
-    return Err(MakeError.InvalidJobs(message: "job count must be positive"))
+    return Err(MakeError.InvalidJobs("job count must be positive"))
   }
 
   var names: Map[Bool] = {}
@@ -317,15 +317,15 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
 
   for task in tasks {
     if task.name == "" {
-      return Err(MakeError.InvalidTask(message: "make task name must not be empty"))
+      return Err(MakeError.InvalidTask("make task name must not be empty"))
     }
 
     if names.get(task.name) ?? false {
-      return Err(MakeError.DuplicateTask(message: f"duplicate make task '{task.name}'"))
+      return Err(MakeError.DuplicateTask(f"duplicate make task '{task.name}'"))
     }
 
     if task.argv.is_empty() {
-      return Err(MakeError.InvalidTask(message: f"make task '{task.name}' has empty argv"))
+      return Err(MakeError.InvalidTask(f"make task '{task.name}' has empty argv"))
     }
 
     names[task.name] = true
@@ -334,11 +334,11 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
       let key = output.display()
 
       if key == "" {
-        return Err(MakeError.InvalidTask(message: f"make task '{task.name}' has empty output path"))
+        return Err(MakeError.InvalidTask(f"make task '{task.name}' has empty output path"))
       }
 
       if outputs.get(key) ?? false {
-        return Err(MakeError.DuplicateOutput(message: f"duplicate make output '{key}'"))
+        return Err(MakeError.DuplicateOutput(f"duplicate make output '{key}'"))
       }
 
       outputs[key] = true
@@ -348,7 +348,7 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
   for task in tasks {
     for dep in task.deps {
       guard names.get(dep) ?? false else {
-        return Err(MakeError.MissingDependency(message: f"make task '{task.name}' depends on missing task '{dep}'"))
+        return Err(MakeError.MissingDependency(f"make task '{task.name}' depends on missing task '{dep}'"))
       }
     }
   }
@@ -653,7 +653,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
     break when done_count >= tasks.len()
 
     if running.is_empty() {
-      return Err(MakeError.DependencyCycle(message: "cycle in make task graph"))
+      return Err(MakeError.DependencyCycle("cycle in make task graph"))
     }
 
     let wait_is_idle = running.len() < jobs_count and ready_index >= ready.len()
@@ -683,7 +683,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
 
       if ! completed.status.ok {
         cancel_running_uncompleted(running, completed_indices)
-        return Err(MakeError.CommandFailed(message: f"make task '{row.task.name}' failed"))
+        return Err(MakeError.CommandFailed(f"make task '{row.task.name}' failed"))
       }
 
       completed_tasks += [row]
@@ -1156,7 +1156,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
 
   for source_group in spec.groups {
     if source_group.name in groups {
-      return Err(MakeError.DuplicateTask(message: f"duplicate source group '{source_group.name}'"))
+      return Err(MakeError.DuplicateTask(f"duplicate source group '{source_group.name}'"))
     }
 
     let cflags = spec.cflags.extend(source_group.cflags)
@@ -1196,7 +1196,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
       guard group_name in groups else {
         return Err(
           MakeError.MissingDependency(
-            message: f"target '{target.name}' references missing source group '{group_name}'",
+            f"target '{target.name}' references missing source group '{group_name}'",
           ),
         )
       }

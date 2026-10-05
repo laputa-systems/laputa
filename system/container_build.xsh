@@ -9,7 +9,7 @@ use system.image
 use system.profile as system_profile
 use system.types
 
-error ContainerBuildError = Failed(message: Str) : InvalidData
+error ContainerBuildError = Failed : InvalidData
 
 pure container_output_root() -> Path {
   /output

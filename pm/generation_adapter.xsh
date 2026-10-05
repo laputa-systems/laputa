@@ -11,7 +11,7 @@ use store as pm_store
 use types
 use util
 
-error GenerationAdapterError = Failed(message: Str) : InvalidData
+error GenerationAdapterError = Failed : InvalidData
 
 type GenerationAdapterArtifactDto = {package_name: Str, package_id: Str, artifact_key: Str}
 

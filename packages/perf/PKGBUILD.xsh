@@ -2,7 +2,7 @@
 use pm.make
 use pm.util as pm_util
 
-error PerfBuildError = UnsupportedArch(message: Str) | MissingKernelVersion(message: Str)
+error PerfBuildError = UnsupportedArch | MissingKernelVersion
 
 ## Package recipe export.
 export const name = "perf"

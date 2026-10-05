@@ -549,7 +549,7 @@ export const filetree = [
   },
 ]
 
-error WlrootsError = Generate(message: Str) | Patch(message: Str)
+error WlrootsError = Generate | Patch
 
 proc replace_required(file: Path, old: Str, new: Str) {
   let text = file.read_text()?

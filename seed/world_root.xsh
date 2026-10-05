@@ -9,7 +9,7 @@
 const chroot = "/usr/sbin/chroot"
 
 ## Errors that fail the root inspection.
-error WorldRootError = Failed(message: Str) : ProcessFailure
+error WorldRootError = Failed : ProcessFailure
 
 type ElfReport = {path: Str, interpreter: Str, needed: List[Str]}
 

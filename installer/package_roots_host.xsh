@@ -5,7 +5,7 @@
 # writes root-owned files into the work tree, and no package builds here.
 use seed.world
 
-error InstallerPackageHostError = Failed(message: Str) : InvalidData
+error InstallerPackageHostError = Failed : InvalidData
 
 ## Where `prepare` composes the installer's three roots.
 export type InstallerRoots = {target: Path, installer: Path, tools: Path}
