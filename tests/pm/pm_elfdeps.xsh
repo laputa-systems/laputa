@@ -1,5 +1,5 @@
 ##! ELF runtime-dependency checks applied to package proofs.
-use pm.elfdeps as elfdeps
+use pm.elfdeps
 
 test test_elfdeps_rejects_a_needed_build_time_path [error] { |ctx|
   let failures = elfdeps.missing_elf_runtime_dependencies(

@@ -1,6 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
-use pm.configure as configure
-use pm.make as make
+use pm.configure
+use pm.make
 use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)

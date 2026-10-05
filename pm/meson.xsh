@@ -1,6 +1,6 @@
 ##! PM meson operations and shared package-manager policy.
 use pm.env as pm_env
-use pm.make as make
+use pm.make
 
 ## Exported PM declaration `pkg_config_env`.
 export proc pkg_config_env() [process, env, error] -> Result[pm_env.PkgConfigContext, Error] {

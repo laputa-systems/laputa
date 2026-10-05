@@ -1,5 +1,5 @@
 ##! musl libc package definition and build operations.
-use pm.make as make
+use pm.make
 use pm.util as pm_util
 
 error MuslError = Failed(message: Str)

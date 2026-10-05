@@ -1,5 +1,5 @@
 #!/bin/xsh
-use installer.host as host
+use installer.host
 
 proc parse_size(value: Str) [error] -> Result[Int] {
   let trimmed = value.trim()

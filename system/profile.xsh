@@ -1,5 +1,5 @@
 ##! Loading, validation, and deterministic identity for typed Laputa profiles.
-use system.types as types
+use system.types
 
 type SystemProfileModule = module {
   export let profile: types.SystemProfile

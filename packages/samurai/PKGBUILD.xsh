@@ -1,5 +1,5 @@
 ##! Package recipe metadata and build operations.
-use pm.make as make
+use pm.make
 
 ## Package recipe export.
 export const name = "samurai"

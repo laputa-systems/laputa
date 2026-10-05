@@ -1,6 +1,6 @@
 ##! Behavior coverage for loading and validating the qemu-dwl-foot profile.
-use system.profile as profile
-use system.types as types
+use system.profile
+use system.types
 
 pure profiles_root() -> Path {
   p"profiles"

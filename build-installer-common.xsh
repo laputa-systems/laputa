@@ -1,5 +1,5 @@
 #!/bin/xsh
-use installer.host as host
+use installer.host
 
 error InstallerReportError = Failed(message: Str)
 

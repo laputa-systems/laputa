@@ -4,10 +4,10 @@ use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
 use pm.types as pm_types
 use pm.util as pm_util
-use system.container_output as container_output
-use system.image as image
+use system.container_output
+use system.image
 use system.profile as system_profile
-use system.types as types
+use system.types
 
 error ContainerBuildError = Failed(message: Str) : InvalidData
 

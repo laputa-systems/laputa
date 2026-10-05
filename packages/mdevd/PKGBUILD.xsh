@@ -1,5 +1,5 @@
 ##! Package recipe metadata and build operations.
-use pm.make as make
+use pm.make
 use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)

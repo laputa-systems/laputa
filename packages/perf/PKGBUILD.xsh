@@ -1,5 +1,5 @@
 ##! perf, the Linux performance tool, built from the kernel tarball's tools/perf.
-use pm.make as make
+use pm.make
 use pm.util as pm_util
 
 error PerfBuildError = UnsupportedArch(message: Str) | MissingKernelVersion(message: Str)

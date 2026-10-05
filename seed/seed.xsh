@@ -1,7 +1,7 @@
 ##! Seed entrypoint behind `make fetch`, `make seed`, and `make seed-smoke`.
 #!/bin/xsh
-use seed.images as images
-use seed.xsh_seed as xsh_seed
+use seed.images
+use seed.xsh_seed
 
 pure seed_usage() -> Str {
   """usage: seed.xsh <fetch|build|smoke> --arch ARCH --xsh-root PATH [--jobs N] [SUITE...]

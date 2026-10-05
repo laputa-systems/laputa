@@ -15,7 +15,7 @@
 use pm.recipe as pm_recipe
 use pm.sources as pm_sources
 use pm.types as pm_types
-use seed.xsh_seed as xsh_seed
+use seed.xsh_seed
 
 ## Errors raised when an image input is missing or a Docker step fails.
 export error SeedImageError = Missing(message: Str) : NotFound | Failed(message: Str) : ProcessFailure

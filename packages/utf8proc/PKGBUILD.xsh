@@ -1,6 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
-use pm.make as make
+use pm.make
 
 ## Package recipe export.
 export const name = "utf8proc"

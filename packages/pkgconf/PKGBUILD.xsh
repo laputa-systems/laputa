@@ -1,6 +1,6 @@
 ##! Package recipe metadata and build operations.
-use pm.configure as configure
-use pm.make as make
+use pm.configure
+use pm.make
 use pm.util as pm_util
 
 ## Package recipe export.

@@ -1,5 +1,5 @@
 ##! Typed task scheduling, argv, stamp reuse, and failed-peer cleanup.
-use pm.make as make
+use pm.make
 
 type TaskOutput = {arguments: List[Str], environment: Str}
 
