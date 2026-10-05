@@ -114,7 +114,8 @@ test make_pkg_config_flags_preserve_checked_compiler_and_linker_lists [fs, proce
   let root = test.temp_dir(ctx, name: "pkg config flags")?
   let runner = task_runner()?
   let tool = fp"{root}/pkg-config"
-  tool.write(f"""#!{runner}
+  tool.write(
+    f"""#!{runner}
 if args == ["--cflags", "libone", "libtwo"] {{
   print "-I/usr/include/example -DEXAMPLE=1"
 }} else if args == ["--libs", "libone", "libtwo"] {{
@@ -122,7 +123,9 @@ if args == ["--cflags", "libone", "libtwo"] {{
 }} else {{
   error.fail("unexpected pkg-config arguments")?
 }}
-""", mode: 0o755)
+""",
+    mode: 0o755,
+  )
   env ({PATH: f"{root}:{e"PATH" ?? ""}", XSH_PM_TARGET_ROOT: ""}) {
     let flags = make.pkg_config_flags(["libone", "libtwo"])?
     assert flags.cflags == ["-I/usr/include/example", "-DEXAMPLE=1"]

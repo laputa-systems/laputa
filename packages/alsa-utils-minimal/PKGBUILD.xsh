@@ -153,12 +153,28 @@ type AlsaTool = {name: Str, sources: List[Str], cflags: List[Str]}
 
 pure alsa_tools() -> List[AlsaTool] {
   [
-    {name: "aplay", sources: ["aplay/aplay.c"], cflags: []},
-    {name: "amixer", sources: ["amixer/amixer.c", "amixer/volume_mapping.c"], cflags: ["-D_GNU_SOURCE"]},
+    {
+      name: "aplay",
+      sources: [
+        "aplay/aplay.c",
+      ],
+      cflags: [],
+    },
+    {
+      name: "amixer",
+      sources: [
+        "amixer/amixer.c",
+        "amixer/volume_mapping.c",
+      ],
+      cflags: [
+        "-D_GNU_SOURCE",
+      ],
+    },
     {
       name: "alsactl",
       sources: [
-        f"alsactl/{source}" for source in """
+        f"alsactl/{source}"
+        for source in """
 alsactl.c state.c lock.c utils.c wait.c init_parse.c init_ucm.c
 boot_params.c daemon.c monitor.c clean.c info.c export.c
 """.words()
@@ -172,8 +188,25 @@ boot_params.c daemon.c monitor.c clean.c info.c export.c
         "-DSYS_PIDFILE=\"/var/run/alsactl.pid\"",
       ],
     },
-    {name: "alsaucm", sources: ["alsaucm/usecase.c", "alsaucm/dump.c"], cflags: ["-Wall"]},
-    {name: "speaker-test", sources: ["speaker-test/speaker-test.c", "speaker-test/pink.c", "speaker-test/st2095.c"], cflags: []},
+    {
+      name: "alsaucm",
+      sources: [
+        "alsaucm/usecase.c",
+        "alsaucm/dump.c",
+      ],
+      cflags: [
+        "-Wall",
+      ],
+    },
+    {
+      name: "speaker-test",
+      sources: [
+        "speaker-test/speaker-test.c",
+        "speaker-test/pink.c",
+        "speaker-test/st2095.c",
+      ],
+      cflags: [],
+    },
   ]
 }
 

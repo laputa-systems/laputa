@@ -368,7 +368,18 @@ test test_repo_plan_records_x86_64_target_and_distinct_artifact_keys [fs, proces
   let arm_output = fp"{root}/out/arm-plan.json"
   let x86_output = fp"{root}/out/x86-plan.json"
   let _ = pm_output(
-    ["repo", "plan", "--repo", root.display(), "--root", "app", "--target", "aarch64-linux-musl", "--output", arm_output.display()],
+    [
+      "repo",
+      "plan",
+      "--repo",
+      root.display(),
+      "--root",
+      "app",
+      "--target",
+      "aarch64-linux-musl",
+      "--output",
+      arm_output.display(),
+    ],
   )?
   let _ = pm_output(
     [
@@ -433,7 +444,8 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
 
   for revision in ["first", "second"] {
     let output = test.temp_path(ctx, name: f"plan-executor-{revision}.json")
-    let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output
+    let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan \
+      --repo $repository --root app --output $output
     plans += [plan_json.read(output)?]
 
     for name in ["xsh", "xshi", "xsht"] {

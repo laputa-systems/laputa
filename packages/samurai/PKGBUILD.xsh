@@ -48,7 +48,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   # samurai has a simple hand-written Makefile; compile all .c files directly.
   # Source list and flags from the Makefile's OBJ and ALL_CFLAGS, with OS=posix.
   # Its LDLIBS=-lrt is omitted: musl's librt is an empty stub.
-  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wshadow", "-Wmissing-prototypes", "-Wpedantic", "-Wno-unused-parameter"]
+  let cflags = [
+    "-std=c99",
+    "-Wall",
+    "-Wextra",
+    "-Wshadow",
+    "-Wmissing-prototypes",
+    "-Wpedantic",
+    "-Wno-unused-parameter",
+  ]
 
   let samu = make.c_program(
     {

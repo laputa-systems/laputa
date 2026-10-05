@@ -425,7 +425,9 @@ proc perf_arch(target: Str) [error] -> Result[PerfArch] {
   if target == "x86_64" {
     return {
       srcarch: "x86",
-      defs: ["-DHAVE_ARCH_X86_64_SUPPORT"],
+      defs: [
+        "-DHAVE_ARCH_X86_64_SUPPORT",
+      ],
       sources: """
 arch/x86/tests/amd-ibs-period.c arch/x86/tests/amd-ibs-via-core-pmu.c
 arch/x86/tests/arch-tests.c arch/x86/tests/bp-modify.c arch/x86/tests/hybrid.c
@@ -469,7 +471,13 @@ proc library_headers() -> List[HeaderSet] {
       dest: "libsubcmd/include/subcmd",
       names: "exec-cmd.h help.h pager.h parse-options.h run-command.h".words(),
     },
-    {src: "tools/lib/symbol", dest: "libsymbol/include/symbol", names: ["kallsyms.h"]},
+    {
+      src: "tools/lib/symbol",
+      dest: "libsymbol/include/symbol",
+      names: [
+        "kallsyms.h",
+      ],
+    },
     {
       src: "tools/lib/perf/include/perf",
       dest: "libperf/include/perf",
@@ -654,17 +662,15 @@ proc write_perf_version_file() {
 }
 
 proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[Str]) -> List[make.MakeTask] {
-  [
-    make.compile_c_task(
-      cc,
-      triple,
-      [@cflags, @unit_cflags(unit.obj)],
-      [],
-      [],
-      fp"{unit.src}",
-      fp"{out}/{unit.obj}",
-    ) for unit in units
-  ]
+  [make.compile_c_task(
+    cc,
+    triple,
+    [@cflags, @unit_cflags(unit.obj)],
+    [],
+    [],
+    fp"{unit.src}",
+    fp"{out}/{unit.obj}",
+  ) for unit in units]
 }
 
 proc install_library_headers() {
@@ -782,11 +788,17 @@ proc build_perf(cc: Path) -> Result[Path] {
   let link = make.link_executable_task(
     cc,
     triple,
-    [task.outputs[0] for task in compiled],
+    [
+      task.outputs[0]
+      for task in compiled
+    ],
     [],
     ["-Wl,-z,noexecstack", "-lpthread", "-lrt", "-lm", "-ldl"],
     fp"{out}/perf",
-    [task.name for task in compiled],
+    [
+      task.name
+      for task in compiled
+    ],
   )
 
   make.run_tasks(compiled.push(link), make.jobs()?)

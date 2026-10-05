@@ -92,6 +92,7 @@ proc main(...argv: List[Str]) [process, env, error] {
 }
 
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 }

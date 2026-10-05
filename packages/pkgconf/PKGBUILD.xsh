@@ -240,8 +240,24 @@ export proc build(dest: Path) [fs, process, env, error] {
   # static archive so they need no libpkgconf.so at run time.
   # cli/getopt_long.c is compiled once per program, as automake does.
   let programs = [
-    {name: "pkgconf", sources: [p"cli/main.c", p"cli/core.c", p"cli/getopt_long.c", p"cli/renderer-msvc.c"], include: "-Icli"},
-    {name: "bomtool", sources: [p"cli/bomtool/main.c", p"cli/getopt_long.c"], include: "-Icli/bomtool"},
+    {
+      name: "pkgconf",
+      sources: [
+        p"cli/main.c",
+        p"cli/core.c",
+        p"cli/getopt_long.c",
+        p"cli/renderer-msvc.c",
+      ],
+      include: "-Icli",
+    },
+    {
+      name: "bomtool",
+      sources: [
+        p"cli/bomtool/main.c",
+        p"cli/getopt_long.c",
+      ],
+      include: "-Icli/bomtool",
+    },
     {
       name: "spdxtool",
       sources: [
@@ -256,7 +272,15 @@ export proc build(dest: Path) [fs, process, env, error] {
       ],
       include: "-Icli/spdxtool",
     },
-    {name: "pccritic", sources: [p"cli/pccritic/main.c", p"cli/pccritic/critic.c", p"cli/getopt_long.c"], include: "-Icli/pccritic"},
+    {
+      name: "pccritic",
+      sources: [
+        p"cli/pccritic/main.c",
+        p"cli/pccritic/critic.c",
+        p"cli/getopt_long.c",
+      ],
+      include: "-Icli/pccritic",
+    },
   ]
 
   var tasks = lib.tasks.extend(static_target.tasks)
@@ -299,7 +323,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Makefile.am's nobase_pkginclude_HEADERS; config.h and the Windows
   # dirent shim stay private to the build.
   for hdr in ["bsdstubs.h", "iter.h", "libpkgconf.h", "stdinc.h", "libpkgconf-api.h"] {
-    fs.install(fp"libpkgconf/{hdr}", fp"{dest}/usr/include/pkgconf/libpkgconf/{hdr}", 0o644, parents: true, overwrite: true)
+    fs.install(
+      fp"libpkgconf/{hdr}",
+      fp"{dest}/usr/include/pkgconf/libpkgconf/{hdr}",
+      0o644,
+      parents: true,
+      overwrite: true,
+    )
   }
 
   # libpkgconf.pc names its license file, which dist_doc_DATA installs.

@@ -30,11 +30,7 @@ type ExecuteContext = {
   published: Map[types.ArtifactReceipt],
 }
 
-proc execute_load_package(
-  plan_value: types.BuildPlan,
-  node: types.PlanNode,
-  repo_root: Path,
-) -> Result[types.Package] {
+proc execute_load_package(plan_value: types.BuildPlan, node: types.PlanNode, repo_root: Path) -> Result[types.Package] {
   let relative = util.ensure_relative_path(node.recipe_dir, f"plan recipe directory for {node.name}")?
   let pkg = recipe.load_package_for_target(fp"{repo_root}/{relative}", plan_value.target)?
 
@@ -77,10 +73,7 @@ proc execute_receipt(context: ExecuteContext, key: Str) -> Result[types.Artifact
   store.lookup(context.store_root, key)
 }
 
-proc execute_receipt_closure(
-  context: ExecuteContext,
-  keys: List[Str],
-) -> Result[List[types.ArtifactReceipt]] {
+proc execute_receipt_closure(context: ExecuteContext, keys: List[Str]) -> Result[List[types.ArtifactReceipt]] {
   var pending = keys |> sort
   var index = 0
   var seen: Map[Bool] = {}
@@ -249,10 +242,7 @@ proc execute_run_proof(
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)
 }
 
-proc execute_build_local(
-  context: ExecuteContext,
-  node: types.PlanNode,
-) -> Result[types.ArtifactReceipt] {
+proc execute_build_local(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
   defer root_handle.close()
@@ -283,10 +273,7 @@ proc execute_build_local(
   receipt
 }
 
-proc execute_existing_local(
-  context: ExecuteContext,
-  node: types.PlanNode,
-) -> Result[types.ArtifactReceipt] {
+proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   let receipt = store.lookup(context.store_root, node.artifact_key)?
   execute_require_receipt(context.plan, node, receipt)
 
@@ -309,10 +296,7 @@ proc execute_existing_local(
   receipt
 }
 
-proc execute_remote_node(
-  context: ExecuteContext,
-  node: types.PlanNode,
-) -> Result[types.ArtifactReceipt] {
+proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   guard node.remote != null else {
     return Err(
       types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"),
@@ -328,10 +312,7 @@ proc execute_remote_node(
 }
 
 # Executes one node of a plan that `build_plan` already validated.
-proc execute_node(
-  context: ExecuteContext,
-  node: types.PlanNode,
-) -> Result[types.ArtifactReceipt] {
+proc execute_node(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   if store.artifact_path(context.store_root, node.artifact_key).exists() {
     return execute_existing_local(context, node)
   }
@@ -382,7 +363,7 @@ proc execute_log_errors(log: Path) -> Result[Str] {
 proc execute_report_slowest(finished: List[FinishedNode]) {
   return when finished.is_empty()
 
-  let ascending = finished |> sort-by .seconds |> collect
+  let ascending = finished |> sort-by .seconds |> collect()
   var index = ascending.len() - 1
   var shown = 0
   print "repo build slowest packages:"
@@ -540,7 +521,11 @@ export proc build_plan_node(
     repo_root,
     store_root,
     remote_repo,
-    executor: if execute_plan_builds({...plan_value, nodes: [node]}, store_root) { pm_build.executor_provenance()? } else { null },
+    executor: if execute_plan_builds({...plan_value, nodes: [node]}, store_root) {
+      pm_build.executor_provenance()?
+    } else {
+      null
+    },
     published: {},
   }
   let receipt = execute_node(context, node)?

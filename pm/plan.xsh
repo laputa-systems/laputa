@@ -112,12 +112,12 @@ proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) -> Res
 }
 
 proc absolute_recipe_package(value: types.PackageCatalog, pkg: types.Package) [fs, error] -> Result[types.Package] {
-  let dir = if pkg.dir.starts_with(p"/") { pkg.dir } else { fp"{value.root}/{pkg.dir}" }
+  let dir = if pkg.dir.starts_with(/) { pkg.dir } else { fp"{value.root}/{pkg.dir}" }
   {...pkg, dir}
 }
 
 proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) -> Result[Path] {
-  let durable = if pkg.dir.starts_with(p"/") { pkg.dir.relative_to(value.root) } else { pkg.dir }
+  let durable = if pkg.dir.starts_with(/) { pkg.dir.relative_to(value.root) } else { pkg.dir }
   util.ensure_relative_path(durable, "plan recipe directory")?
 }
 
@@ -607,7 +607,10 @@ proc validate_node(
 
 ## Reports whether one validated remote node uses the retrieval-derived legacy artifact identity.
 ## Legacy metadata predates semantic artifact keys, so its key is bound to verified retrieval bytes instead.
-export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types.PlanNode) [error] -> Result[Bool, Error] {
+export proc node_uses_legacy_remote_identity(
+  value: types.BuildPlan,
+  node: types.PlanNode,
+) [error] -> Result[Bool, Error] {
   if types.plan_action_is_build(node.action) {
     return false
   }

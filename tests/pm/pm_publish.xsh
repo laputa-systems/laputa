@@ -54,12 +54,7 @@ proc plan_publish_repository(repo_root: Path) -> Result[types.BuildPlan] {
 }
 
 # Builds, stores and publishes one plan of `repo_root` to the file remote.
-proc publish_repository_once(
-  ctx: TestContext,
-  repo_root: Path,
-  remote_url: Str,
-  name: Str,
-) -> Result[types.BuildPlan] {
+proc publish_repository_once(ctx: TestContext, repo_root: Path, remote_url: Str, name: Str) -> Result[types.BuildPlan] {
   let value = plan_publish_repository(repo_root)?
   let store_root = test.temp_dir(ctx, name: f"{name}-store")?
   stage_plan_artifacts(ctx, value, store_root)

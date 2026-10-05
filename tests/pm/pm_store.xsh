@@ -245,8 +245,10 @@ main(@args)?
   )
   let configured = e"XSH_HOST" ?? ""
   let runner = if configured != "" { fp"{configured}" } else { process.which("xsh")? }
-  let first = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} ${stage.staged.proof} ?
-  let second = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} ${stage.staged.proof} ?
+  let first = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} \
+    ${stage.staged.proof} ?
+  let second = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} \
+    ${stage.staged.proof} ?
   let statuses = wait [first, second]?
   assert statuses[0].ok
   assert statuses[1].ok
@@ -408,7 +410,12 @@ test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx
   let kept = digest("gc-kept")
   let dropped = digest("gc-dropped")
   let _ = store.commit(types.target_aarch64(), root, test_node(kept), staged_artifact(ctx, "store-gc-kept")?.staged)?
-  let _ = store.commit(types.target_aarch64(), root, test_node(dropped), staged_artifact(ctx, "store-gc-dropped")?.staged)?
+  let _ = store.commit(
+    types.target_aarch64(),
+    root,
+    test_node(dropped),
+    staged_artifact(ctx, "store-gc-dropped")?.staged,
+  )?
   let kept_reproof = store.reproof_receipt_path(root, kept, digest("gc-kept-proof"))
   let dropped_reproof = store.reproof_receipt_path(root, dropped, digest("gc-dropped-proof"))
   kept_reproof.parent.mkdir()

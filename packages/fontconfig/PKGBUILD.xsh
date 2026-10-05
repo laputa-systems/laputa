@@ -513,8 +513,12 @@ proc patch_generated_build_inputs() {
   write_empty_alias_headers()
   let meson = p"meson.build"
 
-  replace_required(meson, """    'rust_std=2021',
-""", "")
+  replace_required(
+    meson,
+    """    'rust_std=2021',
+""",
+    "",
+  )
 
   replace_required(
     meson,
@@ -737,7 +741,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() pm_env.meson_localstatedir_arg() "-Ddefault_library=shared" "-Ddoc=disabled" "-Dtests=disabled" "-Dnls=disabled" "-Diconv=disabled" "-Dxml-backend=expat" "-Dfontations=disabled" "-Dcache-build=disabled" "-Dtools=enabled" "build"
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() \
+      pm_env.meson_localstatedir_arg() "-Ddefault_library=shared" "-Ddoc=disabled" "-Dtests=disabled" "-Dnls=disabled" \
+      "-Diconv=disabled" "-Dxml-backend=expat" "-Dfontations=disabled" "-Dcache-build=disabled" "-Dtools=enabled" \
+      "build"
     run $muon "-C" "build" samu $jobs_flag
 
     env ({

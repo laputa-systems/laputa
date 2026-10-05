@@ -371,11 +371,7 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
   var packages: List[types.Package] = []
 
   for pkg in original.packages {
-    packages += [if pkg.name == "app" {
-        {...pkg, mkdeps_host: pkg.mkdeps_host.push("runtime-lib")}
-      } else {
-        pkg
-      }]
+    packages += [if pkg.name == "app" { {...pkg, mkdeps_host: pkg.mkdeps_host.push("runtime-lib")} } else { pkg }]
   }
 
   let value = catalog.from_packages(original.root, packages)?

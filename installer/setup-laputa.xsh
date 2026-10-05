@@ -319,14 +319,7 @@ proc prompt_network_method(ci: Bool) -> Result[Str] {
   "dhcp"
 }
 
-proc write_target_config(
-  root: Path,
-  esp_part: Path,
-  swap_part: Path,
-  root_part: Path,
-  ci: Bool,
-  network_method: Str,
-) {
+proc write_target_config(root: Path, esp_part: Path, swap_part: Path, root_part: Path, ci: Bool, network_method: Str) {
   # laputa-net provides /usr/bin/ifup as a symlink into xsh core.
   # The target rootfs already has laputa-net installed, so the symlink
   # is already present after extraction. No need to copy anything.

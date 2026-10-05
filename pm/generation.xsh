@@ -542,10 +542,7 @@ proc generation_preflight_overlay(
   }
 }
 
-proc generation_store_artifacts(
-  value: types.GenerationPlan,
-  store_root: Path,
-) -> Result[List[types.ArtifactReceipt]] {
+proc generation_store_artifacts(value: types.GenerationPlan, store_root: Path) -> Result[List[types.ArtifactReceipt]] {
   var keys: Set[Str] = set.empty()
 
   let receipts: List[types.ArtifactReceipt] = collect {

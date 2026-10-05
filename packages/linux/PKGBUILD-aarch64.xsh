@@ -412,16 +412,16 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) {
   argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
 
   argv += [
-      "-D__ASSEMBLY__",
-      "-DLINKER_SCRIPT",
-      "-E",
-      "-P",
-      "-C",
-      "-Uarm64",
-      "arch/arm64/kvm/hyp/nvhe/hyp.lds.S",
-      "-o",
-      out.display(),
-    ]
+    "-D__ASSEMBLY__",
+    "-DLINKER_SCRIPT",
+    "-E",
+    "-P",
+    "-C",
+    "-Uarm64",
+    "arch/arm64/kvm/hyp/nvhe/hyp.lds.S",
+    "-o",
+    out.display(),
+  ]
 
   PKGBUILD_shared.run_native_command(argv)
 }
@@ -495,7 +495,8 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   var object_outputs: List[Path] = []
 
   for item in native_nvhe_objects() {
-    object_tasks += [kbuild.compile_kbuild_task(
+    object_tasks += [
+      kbuild.compile_kbuild_task(
         cc,
         "aarch64-linux-gnu",
         native_nvhe_cflags(),
@@ -503,7 +504,8 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
         native_nvhe_includes(),
         item.source,
         item.out,
-      )]
+      ),
+    ]
 
     object_outputs += [item.out]
   }
@@ -518,7 +520,8 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   write_native_nvhe_hyprel(gen, tmp, reloc_asm)
   var final_tasks: List[make.MakeTask] = []
 
-  final_tasks += [kbuild.compile_kbuild_task(
+  final_tasks += [
+    kbuild.compile_kbuild_task(
       cc,
       "aarch64-linux-gnu",
       native_nvhe_cflags(),
@@ -526,7 +529,8 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
       native_nvhe_includes(),
       reloc_asm,
       reloc_o,
-    )]
+    ),
+  ]
 
   final_tasks += [nvhe_ld_task(ld, rel, [tmp, reloc_o], [reloc_o.display()])]
   final_tasks += [nvhe_objcopy_task(objcopy, rel, out, [rel.display()])]

@@ -64,7 +64,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   let triple = f"{arch}-linux-musl"
   # Flags from the Makefile's XCFLAGS with PREFIX=/usr. libudev looks up USB
   # vendor and product names in usb.ids and leaves them unset when it is absent.
-  let cflags = ["-std=c99", "-Wall", "-Wextra", "-Wpedantic", "-Wmissing-prototypes", "-Wstrict-prototypes", "-Wno-unused-parameter"]
+  let cflags = [
+    "-std=c99",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Wmissing-prototypes",
+    "-Wstrict-prototypes",
+    "-Wno-unused-parameter",
+  ]
   let defs = ["-D_XOPEN_SOURCE=700", "-DUSB_IDS_PATH=\"/usr/share/hwdata/usb.ids\""]
   let includes = []
   let srcs = [p"udev.c", p"udev_list.c", p"udev_device.c", p"udev_monitor.c", p"udev_enumerate.c"]

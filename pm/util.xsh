@@ -337,7 +337,12 @@ export pure checkout_mode(kind: Str, mode: Int) -> Int {
 
 ## Give every file and directory below `root`, and `root` itself, its checkout mode. Symlinks have no mode of their own.
 export proc normalize_checkout_tree(root: Path) [fs, error] {
-  for entry in [{path: root, kind: "dir"}].extend([{path: found.path, kind: found.kind} for found in fs.walk(root, hidden: true)]) {
+  for entry in [{path: root, kind: "dir"}].extend(
+    [
+      {path: found.path, kind: found.kind}
+      for found in fs.walk(root, hidden: true)
+    ],
+  ) {
     continue when entry.kind == "symlink"
     entry.path.chmod(checkout_mode(entry.kind, entry.path.metadata()?.mode))
   }

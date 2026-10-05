@@ -176,7 +176,8 @@ proc remove_comments(text: Str) [error] -> Result[Str] {
 }
 
 proc parse_rules(text: Str) -> Result[List[GrammarRule]] {
-  let grammar = remove_comments(remove_actions(text)?)?.replace(":", with: " : ").replace("|", with: " | ").replace(";", with: " ; ")
+  let grammar = remove_comments(remove_actions(text)?)?.replace(":", with: " : ").replace("|", with: " | ")
+    .replace(";", with: " ; ")
   var rules = []
   var lhs = ""
   var rhs = []
@@ -1182,13 +1183,7 @@ proc generate_verbose_report(rules: List[GrammarRule], start: Str) [error] -> Re
   lines.join("\n")
 }
 
-proc generate_c(
-  tokens: Map[Int],
-  rules: List[GrammarRule],
-  start: Str,
-  prologue: Str,
-  epilogue: Str,
-) -> Result[Str] {
+proc generate_c(tokens: Map[Int], rules: List[GrammarRule], start: Str, prologue: Str, epilogue: Str) -> Result[Str] {
   let names = nonterminals(rules)?
   let defines = generate_token_defines(tokens)?
   let tables = generate_rule_tables(rules, names, tokens)?

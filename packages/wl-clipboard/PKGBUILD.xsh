@@ -80,7 +80,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=static" "-Dprotocols=enabled" "-Dzshcompletiondir=no" "-Dfishcompletiondir=no" "build"
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=static" \
+      "-Dprotocols=enabled" "-Dzshcompletiondir=no" "-Dfishcompletiondir=no" "build"
 
     if native_scanner {
       let ninja = p"build/build.ninja"

@@ -121,22 +121,24 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
       }
       for dependency in node.dependencies
     ]
-    nodes += [{
-      name: node.name,
-      ver: node.ver,
-      rel: node.rel,
-      package_id: node.package_id,
-      recipe_dir: node.recipe_dir.display(),
-      recipe_sha256: node.recipe_sha256,
-      proof_sha256: node.proof_sha256,
-      artifact_key: node.artifact_key,
-      proof_key: node.proof_key,
-      action: types.plan_action_text(node.action),
-      reason: types.plan_action_reason(node.action),
-      level: node.level,
-      dependencies,
-      remote,
-    }]
+    nodes += [
+      {
+        name: node.name,
+        ver: node.ver,
+        rel: node.rel,
+        package_id: node.package_id,
+        recipe_dir: node.recipe_dir.display(),
+        recipe_sha256: node.recipe_sha256,
+        proof_sha256: node.proof_sha256,
+        artifact_key: node.artifact_key,
+        proof_key: node.proof_key,
+        action: types.plan_action_text(node.action),
+        reason: types.plan_action_reason(node.action),
+        level: node.level,
+        dependencies,
+        remote,
+      },
+    ]
   }
 
   {

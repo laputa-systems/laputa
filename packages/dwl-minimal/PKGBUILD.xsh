@@ -78,10 +78,13 @@ proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) -> Resul
 proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) {
   let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
   run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h"
-  run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" "ext-image-copy-capture-v1-protocol.h"
-  run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" "pointer-constraints-unstable-v1-protocol.h"
+  run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" \
+    "ext-image-copy-capture-v1-protocol.h"
+  run $scanner "enum-header" fp"{protocols}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" \
+    "pointer-constraints-unstable-v1-protocol.h"
   run $scanner "enum-header" "protocols/wlr-layer-shell-unstable-v1.xml" "wlr-layer-shell-unstable-v1-protocol.h"
-  run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" "wlr-output-power-management-unstable-v1-protocol.h"
+  run $scanner "server-header" "protocols/wlr-output-power-management-unstable-v1.xml" \
+    "wlr-output-power-management-unstable-v1-protocol.h"
   run $scanner "server-header" fp"{protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h"
 }
 

@@ -155,4 +155,3 @@ Version: {ver}
 
   fp"{dest}/usr/share/pkgconfig/xkeyboard-config.pc".symlink(to: p"xkeyboard-config-2.pc")
 }
-

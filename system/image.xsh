@@ -163,7 +163,13 @@ proc gpt_name(name: Str) -> Result[Bytes] {
 }
 
 ## Encode one 128-byte GPT partition entry.
-export proc image_gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes, Error] {
+export proc image_gpt_entry(
+  type_guid: Bytes,
+  part_guid: Bytes,
+  start_lba: Int,
+  end_lba: Int,
+  name: Str,
+) [error] -> Result[Bytes, Error] {
   var entry = bytes.zero(128)?
   entry = image_put_bytes(entry, 0, type_guid)?
   entry = image_put_bytes(entry, 16, part_guid)?

@@ -59,15 +59,15 @@ proc patch_system_library_links() {
 
   compiler.write(
     text.replace(
-      lookup,
-      with: """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
+  lookup,
+  with: """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
 			if (!(flags & (find_library_flag_only_static | find_library_flag_prefer_static))) {
 				return (struct find_library_result){ make_str(wk, libname), find_library_found_location_link_arg };
 			}
 			return (struct find_library_result){ found, find_library_found_location_system_dirs };
 		}
 """,
-    ),
+),
   )
 }
 

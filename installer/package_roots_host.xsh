@@ -40,7 +40,16 @@ pure root_args(flag: Str, names: List[Str]) -> List[Str] {
 proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[Str]) {
   world.host_pm(
     repo_url,
-    ["root", "compose", plan.display(), "--store", store.display(), @root_args("--runtime-root", roots), "--output", output.display()],
+    [
+      "root",
+      "compose",
+      plan.display(),
+      "--store",
+      store.display(),
+      @root_args("--runtime-root", roots),
+      "--output",
+      output.display(),
+    ],
   )
 }
 
@@ -60,7 +69,9 @@ export proc prepare(
   }
 
   guard repo_url != "" else {
-    return Err(InstallerPackageHostError.Failed("the installer needs LAPUTA_REPO_URL, the local mirror (`make mirror`)"))
+    return Err(
+      InstallerPackageHostError.Failed("the installer needs LAPUTA_REPO_URL, the local mirror (`make mirror`)"),
+    )
   }
 
   if packages.exists() {

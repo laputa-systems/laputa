@@ -263,5 +263,5 @@ test test_qmp_socket_fits_a_unix_socket_path_from_any_checkout_depth [error] {
   let deep = fp"/{["very-long-directory-name" for _ in range(12)].join("/")}/target/laputa/qemu-dwl-foot"
   let socket = build.outputs(deep).qmp_socket.display()
   assert socket.byte_len() < 108, socket
-  assert build.outputs(deep).qmp_socket != build.outputs(p"/other/target/laputa/qemu-dwl-foot").qmp_socket
+  assert build.outputs(deep).qmp_socket != build.outputs(/other/target/laputa/qemu-dwl-foot).qmp_socket
 }

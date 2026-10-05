@@ -386,9 +386,7 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
   }
 }
 
-proc root_verified_artifacts(
-  artifacts: List[types.ArtifactReceipt],
-) -> Result[List[types.ArtifactReceipt]] {
+proc root_verified_artifacts(artifacts: List[types.ArtifactReceipt]) -> Result[List[types.ArtifactReceipt]] {
   root_checked_artifacts([artifact_store.verify_receipt(artifact)? for artifact in artifacts])
 }
 
@@ -601,11 +599,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
   root_verify_entry_at(output, entry)
 }
 
-proc root_materialize_artifact(
-  output: Path,
-  receipt: types.ArtifactReceipt,
-  entries: List[types.RootEntry],
-) {
+proc root_materialize_artifact(output: Path, receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
   defer sandbox.close()
   let extracted = fp"{sandbox.host_path()?}/payload"
@@ -647,12 +641,14 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
 
     let metadata = root_artifact_metadata(receipt)?
     let payload = metadata.kind != types.package_meta()
-    planned_artifacts += [{
-      package_name: receipt.package_name,
-      package_id: receipt.package_id,
-      artifact_key: receipt.key,
-      payload,
-    }]
+    planned_artifacts += [
+      {
+        package_name: receipt.package_name,
+        package_id: receipt.package_id,
+        artifact_key: receipt.key,
+        payload,
+      },
+    ]
     var artifact_entries: List[types.RootEntry] = []
 
     for entry in metadata.entries {

@@ -483,7 +483,9 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   }
 
   if unique.is_empty() {
-    return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-pasyms", message: "llvm-nm did not report realmode symbols"))
+    return Err(
+      kbuild.ScriptError.Failed(kind: "linux-x86-realmode-pasyms", message: "llvm-nm did not report realmode symbols"),
+    )
   }
 
   kbuild.write_text_if_changed(
@@ -523,16 +525,16 @@ proc build_x86_realmode_payload(cc: Path) {
 
   if acpi_sleep {
     realmode_objects += [
-        "wakeup_asm.o",
-        "wakemain.o",
-        "video-mode.o",
-        "copy.o",
-        "bioscall.o",
-        "regs.o",
-        "video-vga.o",
-        "video-vesa.o",
-        "video-bios.o",
-      ]
+      "wakeup_asm.o",
+      "wakemain.o",
+      "video-mode.o",
+      "copy.o",
+      "bioscall.o",
+      "regs.o",
+      "video-vga.o",
+      "video-vesa.o",
+      "video-bios.o",
+    ]
   }
 
   let realmode_cflags = [

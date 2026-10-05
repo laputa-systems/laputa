@@ -203,23 +203,25 @@ proc exact_remote_snapshot(
     fp"{receipt.artifact_dir}/payload.tar.gz".copy(to: tarball, overwrite: true)
     let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     metadata.write(json.encode({...raw, executor_sha256})? + "\n")
-    packages += [{
-      name: node.name,
-      ver: node.ver,
-      rel: node.rel,
-      retrieval: {
-        arch: "aarch64",
-        tarball: tarball.relative_to(remote_root).display(),
-        tarball_sha256: hash.sha256(tarball)?.hex(),
-        metadata: metadata.relative_to(remote_root).display(),
-        metadata_sha256: hash.sha256(metadata)?.hex(),
+    packages += [
+      {
+        name: node.name,
+        ver: node.ver,
+        rel: node.rel,
+        retrieval: {
+          arch: "aarch64",
+          tarball: tarball.relative_to(remote_root).display(),
+          tarball_sha256: hash.sha256(tarball)?.hex(),
+          metadata: metadata.relative_to(remote_root).display(),
+          metadata_sha256: hash.sha256(metadata)?.hex(),
+        },
+        artifact_key: node.artifact_key,
+        recipe_sha256: node.recipe_sha256,
+        executor_sha256,
+        proof_key: node.proof_key,
+        proof_sha256: node.proof_sha256,
       },
-      artifact_key: node.artifact_key,
-      recipe_sha256: node.recipe_sha256,
-      executor_sha256,
-      proof_key: node.proof_key,
-      proof_sha256: node.proof_sha256,
-    }]
+    ]
   }
 
   {target: value.target, index_sha256: "execute-remote-snapshot", packages}

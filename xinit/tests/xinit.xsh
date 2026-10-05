@@ -48,14 +48,7 @@ export let service = {{
 """)
 }
 
-proc write_named_service(
-  path_value: Path,
-  name: Str,
-  command: Str,
-  targets: List[Str],
-  deps: Str,
-  extra = "",
-) {
+proc write_named_service(path_value: Path, name: Str, command: Str, targets: List[Str], deps: Str, extra = "") {
   path_value.write(f"""##! Service fixture.
 
 ## The service declaration.

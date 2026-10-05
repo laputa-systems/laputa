@@ -364,17 +364,21 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   so_argv += ["-o", libc_so]
 
-  tasks += [{
-    name: libc_so.display(),
-    outputs: [libc_so],
-    inputs: all_so_objs,
-    deps: all_so_deps,
-    argv: so_argv,
-    cwd: p".",
-    env: {},
-    depfile: p"",
-    stamp: fp"{libc_so}.cmd",
-  }]
+  tasks += [
+    {
+      name: libc_so.display(),
+      outputs: [
+        libc_so,
+      ],
+      inputs: all_so_objs,
+      deps: all_so_deps,
+      argv: so_argv,
+      cwd: p".",
+      env: {},
+      depfile: p"",
+      stamp: fp"{libc_so}.cmd",
+    },
+  ]
 
   make.run_tasks(tasks, make.jobs()?)
 
@@ -479,7 +483,8 @@ proc main(...argv: List[Str]) [process, error] {{{{
 }}}}
 
 main(@args)?
-""", mode: 0o755,
+""",
+      mode: 0o755,
     )
   }
 }

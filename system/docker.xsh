@@ -37,7 +37,11 @@ export pure artifact_store_root(laputa_root: Path, arch: Str) -> Path {
 }
 
 ## Resolve the allowed Docker configuration surface for building `profile_name` natively for `arch`.
-export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, process, env, error] -> Result[DockerConfig, Error] {
+export proc build_config(
+  laputa_root: Path,
+  profile_name: Str,
+  arch: Str,
+) [fs, process, env, error] -> Result[DockerConfig, Error] {
   let docker = fp"{env_value("DOCKER", "docker")}"
   let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 

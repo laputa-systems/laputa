@@ -160,7 +160,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks([{...task, env: build_task_env} for task in makenames.tasks], make.jobs()?)
   let makenames_bin = makenames.output
-  p"libcap/cap_names.h".write(run.text $makenames_bin ?)
+  p"libcap/cap_names.h".write(run.text $makenames_bin?)
 
   let lib_cflags = ["-O2", "-D_LIBPSX_PTHREAD_LINKAGE"]
   let objects = make.compile_lo_tasks(cc, triple, lib_cflags, [], cppflags, p".", libcap_sources, p"obj/libcap")
@@ -245,12 +245,17 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(library, fp"{libdir}/libcap.so.2.78", 0o755, parents: true, overwrite: true)
   fp"{libdir}/libcap.so.2".symlink(to: p"libcap.so.2.78")
   fp"{libdir}/libcap.so".symlink(to: p"libcap.so.2")
-  fs.install(p"libcap/include/sys/capability.h", fp"{dest}/usr/include/sys/capability.h", 0o644, parents: true, overwrite: true)
+  fs.install(
+    p"libcap/include/sys/capability.h",
+    fp"{dest}/usr/include/sys/capability.h",
+    0o644,
+    parents: true,
+    overwrite: true,
+  )
 
   # libcap.pc.in with the substitutions libcap/Makefile applies; @deps@ is
   # empty because the library links nothing beyond libc.
-  let pc = p"libcap/libcap.pc.in".read_text()?
-    .replace("@prefix@", with: "/usr")
+  let pc = (p"libcap/libcap.pc.in".read_text()?).replace("@prefix@", with: "/usr")
     .replace("@exec_prefix@", with: "/usr")
     .replace("@libdir@", with: "/usr/lib")
     .replace("@includedir@", with: "/usr/include")

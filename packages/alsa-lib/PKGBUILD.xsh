@@ -266,7 +266,13 @@ proc install_headers(dest: Path) {
   }
 
   for header in sound_headers() {
-    fs.install(fp"include/sound/uapi/{header}", fp"{inc}/alsa/sound/uapi/{header}", 0o644, parents: true, overwrite: true)
+    fs.install(
+      fp"include/sound/uapi/{header}",
+      fp"{inc}/alsa/sound/uapi/{header}",
+      0o644,
+      parents: true,
+      overwrite: true,
+    )
   }
 
   # include/Makefile.am's install-data-hook: deprecated forwarding headers.

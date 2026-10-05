@@ -71,16 +71,20 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
     }
   }
 
-  Err(types.LaputaError.Profile(f"no QEMU target for {os} {arch}; qemu-dwl-foot runs natively on macOS aarch64 or Linux aarch64/x86_64"))
+  Err(
+    types.LaputaError.Profile(
+      f"no QEMU target for {os} {arch}; qemu-dwl-foot runs natively on macOS aarch64 or Linux aarch64/x86_64",
+    ),
+  )
 }
 
 ## The running host's QEMU target.
 export proc host_qemu_target() [env, error] -> Result[QemuTarget, Error] {
   let os = system.uname()?
   let arch = match os.machine {
-    "arm64" | "aarch64" => "aarch64"
-    "amd64" | "x86_64" => "x86_64"
-    other => other
+    "arm64" | "aarch64" => "aarch64",
+    "amd64" | "x86_64" => "x86_64",
+    other => other,
   }
 
   qemu_target(os.sysname, arch)?

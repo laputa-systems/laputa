@@ -123,7 +123,10 @@ test test_profile_digest_is_deterministic [fs, error] {
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
   test.eq(profile.forbidden_runtime_packages(value, ["baselayout", "foot-minimal", "musl"]), [])
-  test.eq(profile.forbidden_runtime_packages(value, ["baselayout", "llvm-toolchain", "pkgconf"]), ["llvm-toolchain", "pkgconf"])
+  test.eq(
+    profile.forbidden_runtime_packages(value, ["baselayout", "llvm-toolchain", "pkgconf"]),
+    ["llvm-toolchain", "pkgconf"],
+  )
 }
 
 # Profiles name libraries by their base name; real sonames carry versions.

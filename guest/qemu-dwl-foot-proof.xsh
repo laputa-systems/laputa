@@ -73,7 +73,8 @@ p"/run/laputa-foot-read-ready".write("ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
 let input = io.stdin_text()?
 p"/run/laputa-foot-input.txt".write(input)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
   let command = process.command_argv(
     /usr/bin/dwl,

@@ -145,7 +145,10 @@ export proc installed_file_elf_dependency_failures(
       providers,
     )
 
-    failures = [{pkg: failure.pkg, file: rel_path, soname: failure.soname, provider: failure.provider} for failure in failures]
+    failures = [
+      {pkg: failure.pkg, file: rel_path, soname: failure.soname, provider: failure.provider}
+      for failure in failures
+    ]
     failures
   } else {
     []

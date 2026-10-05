@@ -58,10 +58,9 @@ const excluded_pages = ["man7/man.7"]
 pure release_page(text: Str) -> Str {
   return text unless "(unreleased)" in text
 
-  [
-    if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", with: ver) } else { line }
-    for line in text.split("\n")
-  ].join("\n")
+  [if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", with: ver) } else { line } for line in text.split(
+    "\n",
+  )].join("\n")
 }
 
 # Renders pages with mandoc's man(1) from this build's tree, and checks each
@@ -69,22 +68,34 @@ pure release_page(text: Str) -> Str {
 # links resolve to their target page as installed.
 const rendered_pages = [
   {
-    args: ["2", "open"],
+    args: [
+      "2",
+      "open",
+    ],
     header: "open(2)                        System Calls Manual                       open(2)",
     name_line: "       open, openat, creat - open and possibly create a file",
   },
   {
-    args: ["3", "printf"],
+    args: [
+      "3",
+      "printf",
+    ],
     header: "printf(3)                   Library Functions Manual                   printf(3)",
     name_line: "       printf, fprintf, dprintf, vprintf, vfprintf, vdprintf, - formatted output",
   },
   {
-    args: ["3", "fprintf"],
+    args: [
+      "3",
+      "fprintf",
+    ],
     header: "printf(3)                   Library Functions Manual                   printf(3)",
     name_line: "       printf, fprintf, dprintf, vprintf, vfprintf, vdprintf, - formatted output",
   },
   {
-    args: ["3type", "FILE"],
+    args: [
+      "3type",
+      "FILE",
+    ],
     header: "FILE(3type)                                                          FILE(3type)",
     name_line: "       FILE - input/output stream",
   },
@@ -99,7 +110,7 @@ proc check_rendering(mandir: Path) [fs, process, env, error] {
 
   for page in rendered_pages {
     let args = page.args
-    let out = overstrike.replace(run.text $man "-M" $mandir "-T" "ascii" "-O" "width=80" @args ?, with: "")
+    let out = overstrike.replace(run.text $man "-M" $mandir "-T" "ascii" "-O" "width=80" @args?, with: "")
     let lines = out.lines()
     let label = args.join(" ")
 

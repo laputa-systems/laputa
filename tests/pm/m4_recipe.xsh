@@ -31,7 +31,12 @@ proc run_m4(ctx: TestContext, name: Str, input: Str, argv: List[Str] = []) -> Re
     ),
   )?
 
-  {ok: status.ok, code: if status.exited() { status.exit_code()? } else { -1 }, stdout: stdout.read_text()?, stderr: stderr.read_text()?}
+  {
+    ok: status.ok,
+    code: if status.exited() { status.exit_code()? } else { -1 },
+    stdout: stdout.read_text()?,
+    stderr: stderr.read_text()?,
+  }
 }
 
 # Expected text below is GNU m4 1.4.20's output for the same input.

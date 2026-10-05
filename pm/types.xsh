@@ -1,6 +1,31 @@
 ##! Stable typed package-manager domains and shared PM context types.
 ## The package-manager error family is returned by PM operations.
-export error PmError = Usage : Usage | MissingDependency : Dependency | DependencyCycle : Dependency | ExtensionFailed | LifecycleHook | PackageTarball : NotFound | PackageConflict : Conflict | DirtyFilesystem : Conflict | PackageContract : InvalidData | DependentPackage : Dependency | PackageNotInstalled : NotFound | RemoteRepo : Remote | Auth : PermissionDenied | RemoteFetch : Remote | RemoteUpload : Remote | RemoteIndex : Remote | RemotePackage : NotFound | SourceDestination : InvalidData | SourceName : InvalidData | DownloadFailed : Remote | DownloadTool : NotFound | SourceNotFound : NotFound | SourceChecksum : InvalidData | ChecksumField : InvalidData
+export error PmError {
+    Usage : Usage
+    MissingDependency : Dependency
+    DependencyCycle : Dependency
+    ExtensionFailed
+    LifecycleHook
+    PackageTarball : NotFound
+    PackageConflict : Conflict
+    DirtyFilesystem : Conflict
+    PackageContract : InvalidData
+    DependentPackage : Dependency
+    PackageNotInstalled : NotFound
+    RemoteRepo : Remote
+    Auth : PermissionDenied
+    RemoteFetch : Remote
+    RemoteUpload : Remote
+    RemoteIndex : Remote
+    RemotePackage : NotFound
+    SourceDestination : InvalidData
+    SourceName : InvalidData
+    DownloadFailed : Remote
+    DownloadTool : NotFound
+    SourceNotFound : NotFound
+    SourceChecksum : InvalidData
+    ChecksumField : InvalidData
+}
 
 ## The package build target carried by plans, artifacts, and roots.
 export enum Target { Aarch64LinuxMusl, X86_64LinuxMusl, TargetReserved }
