@@ -12,7 +12,7 @@ proc parse_size(value: Str) -> Result[Int] {
 
   return trimmed.split("K")[0] as Int * 1024 when trimmed.ends_with("K")
 
-  (trimmed as Int)
+  trimmed as Int
 }
 
 proc command_path(name: Str) -> Result[Path] {

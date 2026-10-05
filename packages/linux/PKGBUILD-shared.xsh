@@ -43,7 +43,7 @@ export proc archive_analysis_jobs() [env, error] -> Result[Int, Error] {
 export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOptions, Error] {
   let every_text = e"XSH_LINUX_KBUILD_PROGRESS_EVERY" ?? "100"
   let jobs_text = e"XSH_LINUX_KBUILD_DISCOVER_JOBS" ?? ""
-  let jobs_count = if jobs_text == "" { build_jobs()? } else { (jobs_text as Int) }
+  let jobs_count = if jobs_text == "" { build_jobs()? } else { jobs_text as Int }
 
   {
     progress: (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1",
