@@ -675,6 +675,6 @@ export proc build(dest: Path) [fs, error] {
   # marker would leave a directory that is neither empty nor archived; without
   # it the directory is empty, and the archive keeps empty directories.
   for marker in fs.walk(fp"{dest}/usr/share/alsa/ucm2", gitignore: false, hidden: true) |> where .kind == "file" and .name == ".gitignore" {
-    marker.path.remove()
+    marker.path.remove(missing_ok: false)
   }
 }

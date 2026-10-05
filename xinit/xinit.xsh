@@ -1772,7 +1772,7 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       out = apply_request(out, entry.name, desired)?
     }
 
-    entry.path.remove()
+    entry.path.remove(missing_ok: false)
   }
 
   out

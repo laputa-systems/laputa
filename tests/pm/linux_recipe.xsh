@@ -330,7 +330,7 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
     }
   }
 
-  staged.remove()
+  staged.remove(missing_ok: false)
 
   env ({
     XSH_PM_SOURCE_DIR: source.display(),

@@ -594,7 +594,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
       }
 
       # fs.remove deletes a directory tree without following symlinks.
-      entry.path.remove()
+      entry.path.remove(missing_ok: false)
       fp"{store_layout(root)}/proofs/{entry.name}".remove(missing_ok: true)
       lock_path(root, entry.name).remove(missing_ok: true)
       removed += 1
@@ -605,7 +605,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
 
   if temporary.exists() {
     for entry in fs.children(temporary)? {
-      entry.path.remove()
+      entry.path.remove(missing_ok: false)
     }
   }
 

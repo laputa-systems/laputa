@@ -173,7 +173,7 @@ test test_snapshot_rejects_missing_unproved_and_corrupt_plan_artifacts [fs, env,
   let incomplete_store = test.temp_dir(ctx, name: "publish-incomplete-store")?
   stage_plan_artifacts(ctx, value, incomplete_store)
   let incomplete_app = node_named(value, "app")?
-  fp"{store.artifact_path(incomplete_store, incomplete_app.artifact_key)}/metadata.json".remove()
+  fp"{store.artifact_path(incomplete_store, incomplete_app.artifact_key)}/metadata.json".remove(missing_ok: false)
   expect_snapshot_error(ctx, value, incomplete_store, "incomplete")
 
   let corrupt_store = test.temp_dir(ctx, name: "publish-corrupt-store")?

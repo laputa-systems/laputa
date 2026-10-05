@@ -591,7 +591,7 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
       destination.parent.mkdir()
 
       if destination.exists() {
-        destination.remove()
+        destination.remove(missing_ok: false)
       }
 
       if entry.kind == "file" {

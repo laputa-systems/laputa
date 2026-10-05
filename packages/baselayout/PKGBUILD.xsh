@@ -283,6 +283,6 @@ export proc build(dest: Path) [fs, error] {
   # behind makes every declared directory non-empty and drops the real
   # mountpoint from the immutable archive.
   for keep in fs.walk(dest, hidden: true) |> where .kind == "file" and .name == ".keep" {
-    keep.path.remove()
+    keep.path.remove(missing_ok: false)
   }
 }

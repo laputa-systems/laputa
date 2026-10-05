@@ -13,7 +13,7 @@ test test_publish_final_file_replaces_only_after_the_verified_copy [fs, error] {
   container_output.publish_final_file(source, output)
   assert output.read_text()? == "verified disk image"
 
-  source.remove()
+  source.remove(missing_ok: false)
 
   match container_output.publish_final_file(source, output) {
     Ok(_) => test.fail("missing local source unexpectedly replaced host output")

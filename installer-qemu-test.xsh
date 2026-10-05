@@ -398,7 +398,7 @@ proc clean_build_state(work: Path) {
     if out.exists() {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
-          entry.path.remove()
+          entry.path.remove(missing_ok: false)
         }
       }
     }

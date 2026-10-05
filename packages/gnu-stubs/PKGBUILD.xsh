@@ -153,12 +153,12 @@ __gttf2
       visible.rename(object, overwrite: true)
     }
 
-    stub_src.remove()
+    stub_src.remove(missing_ok: false)
     run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache ?
   }
 
-  builtins_dir.remove()
-  visibility_map.remove()
-  export_map.remove()
+  builtins_dir.remove(missing_ok: false)
+  visibility_map.remove(missing_ok: false)
+  export_map.remove(missing_ok: false)
   fs.symlink(p"libgcc_s.so", fp"{libdir}/libgcc_s.so.1")
 }
