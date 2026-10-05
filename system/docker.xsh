@@ -42,7 +42,7 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
   let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 
   if ! docker.exists() {
-    let _ = process.which(docker.display())?
+    let _ = process.which(docker)?
   }
 
   let seed_arch = xsh_seed.xsh_seed_arch(arch)?
