@@ -105,7 +105,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
 proc format_fat16(image: Path, label: Str) [fs, error] {
   let size = image_size(image)?
 
-  if size < 2 * 1024 * 1024 {
+  if size < 2MiB {
     return Err(FatToolError.Failed(kind: "too-small", message: "FAT16 image must be at least 2MiB"))
   }
 

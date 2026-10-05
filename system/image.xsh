@@ -38,7 +38,7 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
 
 ## Calculate a graphical rootfs size from used bytes, rounded to MiB with a 256-MiB floor.
 export pure rootfs_size_bytes(used_bytes: Int) -> Int {
-  let raw = used_bytes + used_bytes / 4 + 64 * 1024 * 1024
+  let raw = used_bytes + used_bytes / 4 + 64MiB
   let mib = 1024 * 1024
   let rounded = (raw + mib - 1) / mib * mib
   return 256 * mib when rounded < 256 * mib

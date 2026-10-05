@@ -788,7 +788,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
 proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
   let size = image_size(image)?
 
-  if size < 8 * 1024 * 1024 {
+  if size < 8MiB {
     return Err(Ext4ToolError.Failed(kind: "too-small", message: "ext image must be at least 8MiB"))
   }
 
