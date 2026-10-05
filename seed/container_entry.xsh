@@ -44,7 +44,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   let gid = argv[1].parse_int()?
   let dirs = [fp"{dir}" for dir in argv[2..separator]]
   let command = argv[separator + 1..]
-  let status = process.run(process.command_argv(command[0], command))?
+  let status = run.status @command ?
 
   for dir in dirs {
     give_tree(dir, uid, gid)?
