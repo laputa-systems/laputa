@@ -8,7 +8,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let target_arch = pm_util.target_arch()?
   let rust_triple = if target_arch == "aarch64" { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
 
-  if ! fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib".exists()? {
+  if ! fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib".exists() {
     return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"missing rust std for {rust_triple}"))
   }
 
@@ -20,7 +20,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{target_arch}.so.1"
   let gcc_s = fp"{rootfs}/usr/lib/libgcc_s.so.1"
 
-  if ! gcc_s.exists()? {
+  if ! gcc_s.exists() {
     print "cargo ok: (runtime test skipped — libgcc_s.so.1 not in root)"
     return
   }

@@ -385,7 +385,7 @@ pure normalize_rel_path(path_value: Path) -> Path {
 export proc write_text_if_changed(path_value: Path, data: Str) [fs, error] {
   path_value.parent.mkdir()
 
-  return when path_value.exists()? and path_value.read_text()? == data
+  return when path_value.exists() and path_value.read_text()? == data
 
   path_value.write(data)
 }
@@ -458,7 +458,7 @@ pure empty_kconfig() -> Kconfig {
 }
 
 proc load_config_if_present(path_value: Path) -> Result[Kconfig] {
-  return load_config(path_value)? when path_value.exists()?
+  return load_config(path_value)? when path_value.exists()
 
   empty_kconfig()
 }
@@ -593,7 +593,7 @@ proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, g
   var wanted = generic
 
   for header in kbuild_header_list(fp"{root}/{mandatory_kbuild}", "mandatory-y")? {
-    continue when fp"{root}/{arch_dir}/{header}".exists()?
+    continue when fp"{root}/{arch_dir}/{header}".exists()
     wanted += [header]
   }
 
@@ -1297,7 +1297,7 @@ proc compile_flags_fingerprint(
     |> par-map(jobs: planner_jobs()) { |dir|
       fingerprint_dir_line(root, dir)?
     }
-  let config_hash = if config_path.exists()? { hash.sha256(config_path)?.hex() } else { "missing" }
+  let config_hash = if config_path.exists() { hash.sha256(config_path)?.hex() } else { "missing" }
 
   f"""format {compile_flags_cache_format()}
 srcarch {srcarch}
@@ -1351,7 +1351,7 @@ proc cached_kbuild_compile_flags_for_dirs(
     compile_flags_fingerprint(root, dirs, fp"{root}/.config", srcarch)?
   }
 
-  if stable_cache_path.exists()? {
+  if stable_cache_path.exists() {
     match read_compile_flags_cache(stable_cache_path, fingerprint) {
       Ok(flags) => {
         write_text_if_changed(
@@ -1371,7 +1371,7 @@ proc cached_kbuild_compile_flags_for_dirs(
     }
   }
 
-  if local_cache_path.exists()? {
+  if local_cache_path.exists() {
     match read_compile_flags_cache(local_cache_path, fingerprint) {
       Ok(flags) => {
         write_text_if_changed(
@@ -2678,7 +2678,7 @@ pure local_record_cache_path(root: Path) -> Path {
 }
 
 proc local_record_cache_key(config: Path, srcarch: Str) -> Result[Str] {
-  let config_hash = if config.exists()? { hash.sha256(config)?.hex() } else { "missing" }
+  let config_hash = if config.exists() { hash.sha256(config)?.hex() } else { "missing" }
   bytes.from_text(f"linux-local-records-v1\t{srcarch}\t{config_hash}").sha256().hex()
 }
 
@@ -2725,7 +2725,7 @@ proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: Loc
 proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[LocalRecordGraph] {
   let cache = local_record_cache_path(root)
 
-  if ! cache.exists()? {
+  if ! cache.exists() {
     return Err(ScriptError.Failed(kind: "local-record-cache-missing", message: "local-record cache does not exist"))
   }
 
@@ -3425,15 +3425,15 @@ proc source_for_object(obj: Path) -> Result[Path] {
   for candidate in candidates {
     let c_src = candidate.with_ext("c")
 
-    return c_src when c_src.exists()?
+    return c_src when c_src.exists()
 
     let asm_src = candidate.with_ext("S")
 
-    return asm_src when asm_src.exists()?
+    return asm_src when asm_src.exists()
 
     let raw_asm_src = candidate.with_ext("s")
 
-    return raw_asm_src when raw_asm_src.exists()?
+    return raw_asm_src when raw_asm_src.exists()
   }
 
   Err(ScriptError.Failed(kind: "kbuild-missing-source", message: f"missing source for {obj}"))
@@ -5949,7 +5949,7 @@ export proc run_builtin_archive_plan(
 }
 
 proc x86_jump_label_helper_source() -> Result[Path] {
-  return p"x86-jump-label-patch.c" when p"x86-jump-label-patch.c".exists()?
+  return p"x86-jump-label-patch.c" when p"x86-jump-label-patch.c".exists()
 
   Err(ScriptError.Failed(kind: "kbuild-x86-jump-label-helper", message: "missing x86-jump-label-patch.c"))
 }
@@ -6607,7 +6607,7 @@ proc analyze_archive_items_impl(
     } else if pi {
       let source = pi_source(obj)
 
-      if source.exists()? {
+      if source.exists() {
         let base_out = obj_out_path(pi_base_object(obj))
         let out = obj_out_path(obj)
         let base_task_spec = archive_compile_task_spec(
@@ -6661,7 +6661,7 @@ proc analyze_archive_items_impl(
       } else {
         let out = obj_out_path(obj)
 
-        if out.exists()? {
+        if out.exists() {
           link_inputs += [out]
         } else if is_known_generated_object(obj) {
           generated_objects += [obj]

@@ -318,7 +318,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
   let laputa_root = container.laputa_root
   let root_dir = world_root_dir(laputa_root, args.arch)
 
-  if root_dir.exists()? {
+  if root_dir.exists() {
     return Err(xsh_seed.SeedError.Failed(f"{root_dir} already exists; `make root` removes it first"))
   }
 
@@ -360,7 +360,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
 
 ## Run one parsed command from the Laputa checkout root.
 export proc world_command(laputa_root: Path, args: WorldArgs) [fs, net, process, env, time, error] {
-  if ! fp"{laputa_root}/pm.xsh".exists()? or ! fp"{laputa_root}/packages".exists()? {
+  if ! fp"{laputa_root}/pm.xsh".exists() or ! fp"{laputa_root}/packages".exists() {
     return Err(xsh_seed.SeedError.Usage(f"run world_cli.xsh from the Laputa checkout root, not {laputa_root}"))
   }
 

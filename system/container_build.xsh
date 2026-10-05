@@ -72,11 +72,11 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Resu
   let overlay = fp"{work}/overlay"
   let guest_proof = container_guest_proof_source()
 
-  if ! source.exists()? or ! source.is_dir()? {
+  if ! source.exists() or ! source.is_dir() {
     return Err(ContainerBuildError.Failed(f"profile overlay is missing: {source}"))
   }
 
-  if ! guest_proof.exists()? or ! guest_proof.is_file()? {
+  if ! guest_proof.exists() or ! guest_proof.is_file() {
     return Err(ContainerBuildError.Failed(f"guest proof source is missing: {guest_proof}"))
   }
 
@@ -110,7 +110,7 @@ proc container_stage_build_plan(work: Path) -> Result[Path] {
   let source = container_build_plan_path()
   let staged = container_work_build_plan(work)
 
-  if ! source.exists()? or ! source.is_file()? or source.metadata()?.size <= 0 {
+  if ! source.exists() or ! source.is_file() or source.metadata()?.size <= 0 {
     return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: {source}"))
   }
 
@@ -192,7 +192,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
     ],
   )
 
-  if ! output.exists()? or ! output.is_file()? or output.metadata()?.size <= 0 {
+  if ! output.exists() or ! output.is_file() or output.metadata()?.size <= 0 {
     return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel {profile.kernel_path}"))
   }
 }
@@ -270,7 +270,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
   let root = fp"{work}/generation"
   let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?
   let embedded_manifest = fp"{root}/var/lib/laputa/generation.json"
-  if ! embedded_manifest.exists()? or ! embedded_manifest.is_file()? {
+  if ! embedded_manifest.exists() or ! embedded_manifest.is_file() {
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
   }
 

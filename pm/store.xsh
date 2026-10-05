@@ -239,7 +239,7 @@ proc read_receipt(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt]
   let value = receipt_from_dto(raw.require()?, dir)?
   validate_receipt(value, expected_key)
 
-  if ! payload_path(dir).exists()? or ! metadata_path(dir).exists()? or ! proof_path(dir).exists()? {
+  if ! payload_path(dir).exists() or ! metadata_path(dir).exists() or ! proof_path(dir).exists() {
     return Err(types.PmError.PackageContract(f"artifact {expected_key} is incomplete"))
   }
 
@@ -290,7 +290,7 @@ proc receipt_for(
   let metadata = metadata_path(dir)
   let proof = proof_path(dir)
 
-  if ! payload.exists()? or ! metadata.exists()? or ! proof.exists()? {
+  if ! payload.exists() or ! metadata.exists() or ! proof.exists() {
     return Err(types.PmError.PackageContract(f"staged artifact for {node.package_id} is incomplete"))
   }
 
@@ -333,7 +333,7 @@ proc commit_locked(
   let key = node.artifact_key
   let final_dir = artifact_path(root, key)
 
-  if final_dir.exists()? {
+  if final_dir.exists() {
     let existing = read_receipt(final_dir, key)?
     if existing.target != target {
       return Err(
@@ -474,7 +474,7 @@ export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactRec
   require_key(key)
   let final_dir = artifact_path(root, key)
 
-  if ! final_dir.exists()? {
+  if ! final_dir.exists() {
     return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
@@ -520,7 +520,7 @@ export proc import_remote(
   let lock = fs.lock(lock_file)?
   defer fs.unlock(lock)?
 
-  if artifact_path(root, key).exists()? {
+  if artifact_path(root, key).exists() {
     let existing = lookup(root, key)?
     if existing.target != target {
       return Err(
@@ -540,7 +540,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
   require_key(key)
   let final_dir = artifact_path(root, key)
 
-  if ! final_dir.exists()? {
+  if ! final_dir.exists() {
     return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
@@ -552,7 +552,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
 export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactReceipt], Error] {
   let objects = object_root(root)
 
-  return [] unless objects.exists()?
+  return [] unless objects.exists()
 
   var receipts: List[types.ArtifactReceipt] = []
 
@@ -586,7 +586,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
   var remaining = 0
   let objects = object_root(root)
 
-  if objects.exists()? {
+  if objects.exists() {
     for entry in fs.children(objects)? |> sort-by .name {
       if kept.get(entry.name) ?? false {
         remaining += 1
@@ -603,7 +603,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
 
   let temporary = fp"{store_layout(root)}/tmp"
 
-  if temporary.exists()? {
+  if temporary.exists() {
     for entry in fs.children(temporary)? {
       entry.path.remove()
     }

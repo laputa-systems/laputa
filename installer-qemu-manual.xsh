@@ -45,7 +45,7 @@ proc main() [fs, process, env, error] {
 
   let kernel_source = if kernel_source_raw != "" {
     kernel_source_raw
-  } else if local_kernel.exists()? {
+  } else if local_kernel.exists() {
     local_kernel.display()
   } else {
     ""

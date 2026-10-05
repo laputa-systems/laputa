@@ -113,7 +113,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   defer tmp.remove(missing_ok: true)?
   let m4 = fp"{rootfs}/usr/bin/m4"
 
-  return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()?
+  return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()
 
   fp"{tmp}/test.m4".write(
     """define(GREETING, hello from m4)GREETING

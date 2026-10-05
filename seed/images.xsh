@@ -54,13 +54,13 @@ pure short_key(key: Str) -> Str {
 }
 
 proc require_file(file: Path) {
-  if ! file.exists()? or ! file.is_file()? {
+  if ! file.exists() or ! file.is_file() {
     return Err(SeedImageError.Missing(f"image input is missing: {file}"))
   }
 }
 
 proc tree_digest(root: Path) -> Result[Str] {
-  guard root.exists()? else {
+  guard root.exists() else {
     return Err(SeedImageError.Missing(f"image input is missing: {root}"))
   }
 
@@ -175,9 +175,9 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   let tag = host_tools_tag(laputa_root, value)?
   let saved = host_tools_saved_image(laputa_root, value)?
 
-  return when saved.exists()?
+  return when saved.exists()
 
-  if ! image_exists(docker, tag, laputa_root)? {
+  if ! image_exists(docker, tag, laputa_root) {
     docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")
   }
 
@@ -196,16 +196,16 @@ export proc ensure_host_tools(
 ) [fs, process, error] -> Result[Str, Error] {
   let tag = host_tools_tag(laputa_root, value)?
 
-  return tag when image_exists(docker, tag, laputa_root)?
+  return tag when image_exists(docker, tag, laputa_root)
 
   let saved = host_tools_saved_image(laputa_root, value)?
-  if ! saved.exists()? {
+  if ! saved.exists() {
     return Err(SeedImageError.Missing(f"{tag} is neither loaded nor saved at {saved}; run `make fetch`"))
   }
 
   docker_step(docker, [docker.display(), "load", "--input", saved.display()], laputa_root, f"loading {saved}")
 
-  if ! image_exists(docker, tag, laputa_root)? {
+  if ! image_exists(docker, tag, laputa_root) {
     return Err(SeedImageError.Failed(f"{saved} did not provide {tag}"))
   }
 
@@ -219,14 +219,14 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) -> Result[Path] {
   let source = llvm_seed_source(laputa_root, arch)?
   let digest = llvm_seed_sha256(laputa_root, arch)?
 
-  if ! source.exists()? {
+  if ! source.exists() {
     return Err(SeedImageError.Missing(f"the {arch} LLVM seed {source} is not fetched; run `make fetch`"))
   }
 
   let context = fp"{laputa_root}/.out/package-tools/{arch}/sources"
   let staged = fp"{context}/sha256/{digest}"
 
-  if ! staged.exists()? {
+  if ! staged.exists() {
     context.remove(missing_ok: true)
     staged.parent.mkdir()
     source.copy(staged)
@@ -277,7 +277,7 @@ export proc ensure_package_tools(
 ) [fs, process, env, error] -> Result[Str, Error] {
   let tag = package_tools_tag(laputa_root, value)?
 
-  return tag when image_exists(docker, tag, laputa_root)?
+  return tag when image_exists(docker, tag, laputa_root)
 
   let host_tag = ensure_host_tools(docker, laputa_root, value)?
   let _ = xsh_seed.xsh_seed_require(laputa_root, value.arch)?

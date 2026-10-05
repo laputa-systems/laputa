@@ -95,7 +95,7 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
   var providers: Map[Str] = {}
   let packages_db = util.packages_db_path(root)
 
-  return providers unless packages_db.exists()?
+  return providers unless packages_db.exists()
 
   let entries = fs.children(packages_db)
     |> where .kind == "dir"
@@ -106,8 +106,8 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
 
     for rel_path in manifest {
       let path_value = fp"{root}/{rel_path}"
-      continue unless path_value.exists()?
-      continue unless path_value.is_file()?
+      continue unless path_value.exists()
+      continue unless path_value.is_file()
 
       if let Ok(info) = elf.inspect(path_value) {
         if info.soname != "" {
@@ -134,7 +134,7 @@ export proc installed_file_elf_dependency_failures(
   path_value: Path,
   providers: Map[Str],
 ) [fs, error] -> Result[List[ElfDependencyFailure], Error] {
-  return [] when path_value.is_symlink()?
+  return [] when path_value.is_symlink()
 
   if let Ok(info) = elf.inspect(path_value) {
     var failures = missing_elf_runtime_dependencies_with_allowed(

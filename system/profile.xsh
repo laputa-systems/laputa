@@ -23,7 +23,7 @@ export proc valid_package_name(value: Str) [error] -> Result[Bool, Error] {
 
 ## Validate a complete profile before it is used to construct any build command.
 export proc validate_system_profile(value: types.SystemProfile) [error] -> Result[Unit, Error] {
-  guard valid_profile_name(value.name)? else {
+  guard valid_profile_name(value.name) else {
     return Err(types.LaputaError.Profile(f"invalid profile name {value.name}"))
   }
 
@@ -34,7 +34,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
   var roots: Map[Bool] = {}
 
   for package_name in value.package_roots {
-    guard valid_package_name(package_name)? else {
+    guard valid_package_name(package_name) else {
       return Err(types.LaputaError.Profile(f"{value.name} has invalid package root {package_name}"))
     }
 
@@ -45,7 +45,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     roots[package_name] = true
   }
 
-  if ! valid_package_name(value.kernel_package)? {
+  if ! valid_package_name(value.kernel_package) {
     return Err(types.LaputaError.Profile(f"{value.name} has invalid kernel package {value.kernel_package}"))
   }
 
@@ -65,7 +65,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 
   var forbidden_packages: Map[Bool] = {}
   for package_name in value.forbidden_packages {
-    guard valid_package_name(package_name)? else {
+    guard valid_package_name(package_name) else {
       return Err(types.LaputaError.Profile(f"{value.name} has invalid forbidden package {package_name}"))
     }
 
@@ -92,13 +92,13 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 
 ## Load one named profile from `profiles_root` and validate its typed export.
 export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile, Error] {
-  guard valid_profile_name(name)? else {
+  guard valid_profile_name(name) else {
     return Err(types.LaputaError.Profile(f"invalid profile name {name}"))
   }
 
   let source = fp"{profiles_root}/{name}.xsh"
 
-  if ! source.exists()? {
+  if ! source.exists() {
     return Err(types.LaputaError.Profile(f"unknown profile {name}"))
   }
 

@@ -309,7 +309,7 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
   # Do not let an absent declaration escape as an unlabelled fs-root-stat
   # error: the caller needs the exact immutable inventory entry to diagnose a
   # malformed artifact, including from a parallel executor worker.
-  if ! root_handle.exists(rel)? {
+  if ! root_handle.exists(rel) {
     return Err(types.PmError.PackageContract(f"root entry {entry.path} is absent or unreadable"))
   }
 
@@ -571,7 +571,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
   let destination = fp"{output}/{entry.path}"
 
   if entry.kind == types.file_kind_tree() {
-    if destination.exists()? {
+    if destination.exists() {
       root_verify_entry_at(output, entry)
       return
     }
@@ -582,7 +582,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
     return
   }
 
-  if destination.exists()? {
+  if destination.exists() {
     return Err(
       types.PmError.PackageConflict(f"root path {entry.path} already exists while applying {entry.package_name}"),
     )
@@ -798,7 +798,7 @@ export proc compose_artifacts(
     return Err(types.PmError.PackageContract("root plan does not match verified artifacts"))
   }
 
-  if output.exists()? {
+  if output.exists() {
     return Err(types.PmError.PackageConflict(f"immutable root {output} already exists"))
   }
 

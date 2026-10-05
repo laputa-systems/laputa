@@ -2,7 +2,7 @@
 error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure_file(path_value: Path, label: Str) {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing {label}: {path_value}"))?
   }
 
@@ -14,7 +14,7 @@ proc ensure_file(path_value: Path, label: Str) {
 }
 
 proc ensure_config(config_path: Path, key: Str, label: Str) {
-  guard config_path.exists()? else {
+  guard config_path.exists() else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing config for {label} check: {config_path}"))?
   }
 

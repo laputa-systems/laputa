@@ -207,14 +207,14 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
   sources.stage_package_sources(pkg, source)
   pm_build.build_prepared_package(recipe_dir, source, dest, archive_path)
 
-  if ! fp"{dest}/dev".exists()? {
+  if ! fp"{dest}/dev".exists() {
     test.fail("baselayout prepared payload is missing dev")
   }
 
   archive.tar_extract(archive_path, extracted)
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    if ! fp"{extracted}/{required}".exists()? {
+    if ! fp"{extracted}/{required}".exists() {
       test.fail(f"baselayout archive is missing {required}")
     }
 

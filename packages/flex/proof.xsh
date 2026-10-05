@@ -82,7 +82,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"
 
-    if ! file.exists()? {
+    if ! file.exists() {
       return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex did not write {output.name}"))?
     }
 
@@ -108,11 +108,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let flex = fp"{rootfs}/usr/bin/flex"
   let lex = fp"{rootfs}/usr/bin/lex"
 
-  if ! flex.exists()? {
+  if ! flex.exists() {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing flex: {flex}"))?
   }
 
-  if ! lex.exists()? {
+  if ! lex.exists() {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing lex symlink: {lex}"))?
   }
 

@@ -5,11 +5,11 @@ proc main(root = /rootfs) [fs, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/laputa-pm/metadata.json"
   let pm = fp"{root}/usr/bin/pm"
 
-  if ! db.exists()? {
+  if ! db.exists() {
     return Err(ProofError.Failed(kind: "proof-laputa-pm", message: f"missing package metadata: {db}"))
   }
 
-  if ! pm.exists()? {
+  if ! pm.exists() {
     return Err(ProofError.Failed(kind: "proof-laputa-pm", message: f"missing pm wrapper: {pm}"))
   }
 

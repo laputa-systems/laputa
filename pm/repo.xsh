@@ -74,7 +74,7 @@ proc repo_verified_proof_path(
 
   let reproved = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
 
-  if ! reproved.exists()? {
+  if ! reproved.exists() {
     return Err(
       types.PmError.PackageTarball(
         f"{node.package_id} is missing proof {node.proof_key}; execute the BuildPlan before publication",

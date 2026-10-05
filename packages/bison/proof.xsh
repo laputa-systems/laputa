@@ -290,7 +290,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"
 
-    if ! file.exists()? {
+    if ! file.exists() {
       return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison did not write {output.name}"))?
     }
 

@@ -83,7 +83,7 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
   let absolute_root = path.absolute(root)?
   let recipe_root = fp"{absolute_root}/packages"
 
-  if ! recipe_root.exists()? {
+  if ! recipe_root.exists() {
     return Err(types.PmError.PackageContract(f"{absolute_root} does not contain packages"))
   }
 
@@ -93,7 +93,7 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
 
   for entry in fs.children(recipe_root)? |> sort-by .name {
     continue unless entry.kind == "dir"
-    continue unless fp"{entry.path}/PKGBUILD.xsh".exists()?
+    continue unless fp"{entry.path}/PKGBUILD.xsh".exists()
 
     let pkg = recipe.load_package_for_target(entry.path, target)?
 

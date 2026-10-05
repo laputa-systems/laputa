@@ -119,7 +119,7 @@ proc verified_seed(arch: Str) -> Result[Path] {
   let seed = p"seed"
   let manifest_path = fp"{seed}/manifest.json"
 
-  if ! manifest_path.exists()? {
+  if ! manifest_path.exists() {
     fail f"the {arch} XSH seed has no manifest; run `make seed ARCH={arch}`"
   }
 

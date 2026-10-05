@@ -471,7 +471,7 @@ pure builtin_facilities() -> List[Str] {
 }
 
 proc require_service_file(path_value: Path) {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return Err(
       XinitError.Failed(
         kind: "xinit-service",
@@ -615,7 +615,7 @@ proc load_service(target: Str) -> Result[Service] {
 proc all_services() -> Result[List[Service]] {
   let dir = service_dir()?
 
-  return [] unless dir.exists()?
+  return [] unless dir.exists()
 
   [load_service_path(entry.path)? for entry in fs.children(dir)?
     |> where .kind == "file" and .name.ends_with(".xsh")
@@ -825,7 +825,7 @@ proc pid_live_and_ours(pid: Int, start_time_ms: Int) -> Result[Bool] {
 proc read_status(name: Str) -> Result[SavedStatus] {
   let path_value = state_path(name)?
 
-  return default_status(name) unless path_value.exists()?
+  return default_status(name) unless path_value.exists()
 
   let raw = json.read(path_value)?
   let status_name = json.get(raw, ["name"], name).require(Str)?
@@ -861,7 +861,7 @@ proc read_status(name: Str) -> Result[SavedStatus] {
   if status.state == "running" and status.pid > 0 and ! env_enabled("XSH_UNIX_DRY_RUN") and ! pid_live_and_ours(
     status.pid,
     status.start_time_ms,
-  )? {
+  ) {
     return {
       name: status.name,
       desired: status.desired,
@@ -919,7 +919,7 @@ proc rotate_log(name: Str, keep: Int) {
   while index >= 1 {
     let older = rotated_log_path(current, index)?
 
-    if older.exists()? {
+    if older.exists() {
       older.rename(rotated_log_path(current, index + 1)?, overwrite: true)
     }
 
@@ -935,7 +935,7 @@ proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) {
 
   let current = log_path(name)?
 
-  return unless current.exists()?
+  return unless current.exists()
 
   if current.metadata()?.size >= max_size {
     rotate_log(name, keep)
@@ -951,7 +951,7 @@ proc wait_ready(service: Service) -> Result[Bool] {
   let deadline = time.now() + service.ready_timeout_ms
 
   while time.now() <= deadline {
-    return true when loaded.ready()?
+    return true when loaded.ready()
 
     time.sleep(100ms)
   }
@@ -998,7 +998,7 @@ proc run_reload_proc(service: Service) -> Result[Bool] {
 # Reload a running service in place: run its `reload()` hook if it has one,
 # otherwise send SIGHUP to its process group (the usual reload convention).
 proc reload_unit(service: Service, pid: Int) {
-  if run_reload_proc(service)? {} else if pid > 0 {
+  if run_reload_proc(service) {} else if pid > 0 {
     unix.kill_process_group(pid, "HUP")
   }
 }
@@ -1020,7 +1020,7 @@ proc spawn_service(
   }
 
   if service.kind == "oneshot" or service.kind == "scripted" {
-    if ! run_start_proc(service)? {
+    if ! run_start_proc(service) {
       let status = process.run(service.command)?
 
       if ! status.ok {
@@ -1139,7 +1139,7 @@ proc scanner_active() -> Result[Bool] {
 
   let marker = scanner_marker_path()?
 
-  return false unless marker.exists()?
+  return false unless marker.exists()
 
   let raw = json.read(marker)?
   let pid = json.get(raw, ["pid"], 0).require(Int)?
@@ -1156,7 +1156,7 @@ proc request_desired(name: Str, desired: Str) [fs, process, env, error] {
 proc start_service(name: Str) {
   # When a scanner owns the tree it is the source of truth: post a desired-state
   # request rather than spawning a second, unsupervised copy.
-  if scanner_active()? {
+  if scanner_active() {
     request_desired(name, "up")
     return
   }
@@ -1197,7 +1197,7 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
 }
 
 proc stop_service(name: Str) {
-  if scanner_active()? {
+  if scanner_active() {
     request_desired(name, "down")
     return
   }
@@ -1211,7 +1211,7 @@ proc stop_service(name: Str) {
   let current = read_status(name)?
   let service = load_service(name)?
 
-  if run_stop_proc(service)? {} else if current.pid > 0 {
+  if run_stop_proc(service) {} else if current.pid > 0 {
     unix.kill_process_group(current.pid, "TERM")
     time.sleep(time.millis(service.stop_timeout_ms))
 
@@ -1241,7 +1241,7 @@ proc restart_service(name: Str) {
   # Under a scanner, restart is a single inbox action so the scanner does the
   # teardown-and-respawn itself; a direct stop+start here would race it and
   # spawn an unsupervised second copy.
-  if scanner_active()? {
+  if scanner_active() {
     request_desired(name, "restart")
     return
   }
@@ -1252,7 +1252,7 @@ proc restart_service(name: Str) {
 }
 
 proc reload_service(name: Str) [fs, process, env, time, error] {
-  if scanner_active()? {
+  if scanner_active() {
     request_desired(name, "reload")
     return
   }
@@ -1286,7 +1286,7 @@ proc show_status(name: Str) {
 proc show_logs(name: Str) {
   let current = log_path(name)?
 
-  if current.exists()? {
+  if current.exists() {
     io.write_stdout(current.read_text()?)
   }
 }
@@ -1616,7 +1616,7 @@ proc kill_unit(unit: ServiceUnit) {
     unix.notify_close(unit.notify_fd)
   }
 
-  if run_stop_proc(unit.service)? {} else if unit.pid > 0 {
+  if run_stop_proc(unit.service) {} else if unit.pid > 0 {
     unix.kill_process_group(unit.pid, "TERM")
     time.sleep(time.millis(unit.service.stop_timeout_ms))
 
@@ -1759,7 +1759,7 @@ proc apply_request(
 proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   let dir = inbox_dir()?
 
-  return units unless dir.exists()?
+  return units unless dir.exists()
 
   var out = units
 

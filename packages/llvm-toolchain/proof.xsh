@@ -25,7 +25,7 @@ proc build_root_path() -> Result[Path] {
 proc proof_readelf_path(root: Path) -> Result[Path] {
   let target_readelf = fp"{root}/usr/bin/readelf"
 
-  return target_readelf when target_readelf.exists()?
+  return target_readelf when target_readelf.exists()
 
   let build_root = build_root_path()?
   fp"{build_root}/usr/bin/readelf"
@@ -260,7 +260,7 @@ proc prove_target_tools(root: Path, arch: Str) {
 proc main(root: Path = /rootfs) [fs, process, env, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"
 
-  if ! db.exists()? {
+  if ! db.exists() {
     return Err(ProofError.Failed(kind: "proof-llvm-toolchain", message: f"missing package metadata: {db}"))
   }
 

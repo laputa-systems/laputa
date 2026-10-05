@@ -485,7 +485,7 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
 }
 
 proc require_file(path_value: Path, label: Str) {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     fail f"missing {label}: {path_value}"
   }
 }
@@ -502,7 +502,7 @@ proc require_executable(path_value: Path, label: Str) {
 proc install_tool_alias(bin: Path, tool_name: Str, target: Str) {
   let link = fp"{bin}/{tool_name}"
 
-  return when link.exists()?
+  return when link.exists()
 
   require_file(fp"{bin}/{target}", target)
   fs.symlink(fp"{target}", link)
@@ -513,7 +513,7 @@ proc install_prebuilt_tree(dest: Path) {
   let source = p"llvm-prebuilt"
   let target = fp"{dest}/usr/lib/llvm23"
 
-  if ! source.exists()? {
+  if ! source.exists() {
     fail "missing staged LLVM prebuilt tree"
   }
 

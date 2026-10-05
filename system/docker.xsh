@@ -41,7 +41,7 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
   let docker = fp"{env_value("DOCKER", "docker")}"
   let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 
-  if ! docker.exists()? {
+  if ! docker.exists() {
     let _ = process.which(docker.display())?
   }
 

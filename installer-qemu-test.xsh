@@ -14,13 +14,13 @@ proc command_path(name: Str) -> Result[Path] {
 }
 
 proc ensure_dir(path_value: Path) {
-  return when path_value.exists()?
+  return when path_value.exists()
 
   path_value.mkdir()
 }
 
 proc ensure_file(path_value: Path, kind: Str) {
-  return when path_value.exists()?
+  return when path_value.exists()
 
   return Err(InstallerQemuTestError.Failed(kind:, message: f"missing {path_value}"))
 }
@@ -41,7 +41,7 @@ proc terminate_if_live(pid: Int) {
 }
 
 proc dump_tail(tail: Path, log: Path, lines: Int) {
-  guard log.exists()? else {
+  guard log.exists() else {
     return
   }
 
@@ -53,7 +53,7 @@ proc dump_tail(tail: Path, log: Path, lines: Int) {
 }
 
 proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
-  guard log.exists()? else {
+  guard log.exists() else {
     return false
   }
 
@@ -67,7 +67,7 @@ proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
 }
 
 proc has_panic(log: Path) -> Result[Bool] {
-  guard log.exists()? else {
+  guard log.exists() else {
     return false
   }
 
@@ -88,11 +88,11 @@ proc wait_for_marker(
 ) {
   var elapsed = 0
 
-  while process_live(kill, pid, cwd)? {
-    if has_line_marker(log, ok)? {
+  while process_live(kill, pid, cwd) {
+    if has_line_marker(log, ok) {
       time.sleep(2s)
 
-      if has_panic(log)? {
+      if has_panic(log) {
         dump_tail(tail, log, 120)
         terminate_if_live(pid)
         return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"{ok} was followed by a kernel panic"))
@@ -104,7 +104,7 @@ proc wait_for_marker(
       return
     }
 
-    if has_line_marker(log, failed)? or has_panic(log)? {
+    if has_line_marker(log, failed) or has_panic(log) {
       dump_tail(tail, log, 120)
       terminate_if_live(pid)
       return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"failed while waiting for {ok}"))
@@ -178,7 +178,7 @@ proc wait_for_ssh(
 ) {
   var elapsed = 0
 
-  while process_live(kill, pid, cwd)? {
+  while process_live(kill, pid, cwd) {
     if let Ok(output) = ssh_guest(ssh, ssh_key, port, known_hosts, "print \"LAPUTA_SSH_OK\"") {
       return when output.trim() == "LAPUTA_SSH_OK"
     }
@@ -395,7 +395,7 @@ proc clean_build_state(work: Path) {
   ] {
     let out = fp"{work}/{name}"
 
-    if out.exists()? {
+    if out.exists() {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
           entry.path.remove()
@@ -413,7 +413,7 @@ proc kernel_source_env(root: Path, arch: Str) -> Result[Str] {
   let local_name = if arch == "x86_64" { "local-linux-x86_64.bzImage" } else { "local-linux-aarch64.Image" }
   let local_kernel = fp"{root}/target/laputa-installer/{local_name}"
 
-  return local_kernel.display() when local_kernel.exists()?
+  return local_kernel.display() when local_kernel.exists()
 
   ""
 }

@@ -117,7 +117,7 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
   defer fs.unlock(lock)?
 
-  return Cached when entry.exists()?
+  return Cached when entry.exists()
 
   let partial = fp"{partial_dir}/{sha256}"
   partial.remove(missing_ok: true)
@@ -140,7 +140,7 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) -> Result[Pa
   let root = build_source_cache_root()?
   let entry = source_cache_entry(root, sha256)
 
-  return entry when entry.exists()?
+  return entry when entry.exists()
 
   let mirror = (e"LAPUTA_MIRROR" ?? "").trim()
 
@@ -203,7 +203,7 @@ export proc resolve_source(
     local = fp"{pkg.dir}/{source_path}".normalize()
   }
 
-  if ! local.exists()? {
+  if ! local.exists() {
     return Err(types.PmError.SourceNotFound(f"{pkg.name} source not found: {source}"))
   }
 
@@ -505,7 +505,7 @@ proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[St
   let digest = hash.sha256(download)?.hex()
   let entry = source_cache_entry(cache_root, digest)
 
-  if ! entry.exists()? {
+  if ! entry.exists() {
     let partial = fp"{partial_dir}/{digest}.checksum"
     entry.parent.mkdir()
     download.copy(partial, overwrite: true)
@@ -675,7 +675,7 @@ export proc cargo_crate_fetch_items(
       if util.is_url_source(expanded) {
         lockfile = source_cache_entry(root, pinned_url_sha256(pkg.name, expanded, checksum)?)
 
-        guard lockfile.exists()? else {
+        guard lockfile.exists() else {
           return Err(types.PmError.SourceNotFound(f"{pkg.name} lockfile {expanded} is not in the source cache {root}"))
         }
       } else {
@@ -696,7 +696,7 @@ export proc cargo_crate_fetch_items(
 # A dead host or a transient failure gets a few spaced retries. A checksum
 # mismatch or a missing `file://` path is deterministic, so neither is retried.
 proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchOutcome] {
-  return Cached when source_cache_entry(root, item.sha256).exists()?
+  return Cached when source_cache_entry(root, item.sha256).exists()
 
   var unavailable: List[Str] = []
   var mismatched: List[Str] = []

@@ -259,7 +259,7 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
   if is_file_url(url) {
     let source = file_url_path(url)?
 
-    return f"{url}: missing file" unless source.exists()?
+    return f"{url}: missing file" unless source.exists()
 
     let partial = fp"{dest.parent}/.{dest.name}.partial"
     source.copy(partial, overwrite: true)

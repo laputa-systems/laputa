@@ -511,7 +511,7 @@ proc stage_vendored_outputs() {
   for output in split.vendored {
     let vendored = fp"generated/{output}"
 
-    if vendored.exists()? {
+    if vendored.exists() {
       fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)
     } else {
       unvendored += [output]

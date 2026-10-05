@@ -10,7 +10,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")
   proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")
 
-  if ! fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake".exists()? {
+  if ! fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake".exists() {
     Err(ScriptError.Failed(kind: "cmake-proof", message: "missing CMake module tree"))?
   }
 

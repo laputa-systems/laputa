@@ -144,7 +144,7 @@ proc compiler_rt_builtins(arch: Str) -> Result[List[Path]] {
   ]
 
   for candidate in candidates {
-    return [candidate] when candidate.exists()?
+    return [candidate] when candidate.exists()
   }
 
   []
@@ -264,7 +264,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   for subsys in fs.children(p"src")? |> where .kind == "dir" {
     let arch_subdir = fp"{subsys.path}/{arch}"
 
-    if arch_subdir.exists()? {
+    if arch_subdir.exists() {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
         if e.ext == "c" {
           replaced += [f"{subsys.name}/{e.name.replace(".c", "")}"]
@@ -417,7 +417,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let packaged_builtin = fp"llvm-toolchain-target/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a"
 
-  if packaged_builtin.exists()? {
+  if packaged_builtin.exists() {
     fs.install(packaged_builtin, fp"{dest}/usr/lib/{packaged_builtin.name()}", 0o644, parents: true, overwrite: true)
   }
 

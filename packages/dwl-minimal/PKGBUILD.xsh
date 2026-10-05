@@ -58,7 +58,7 @@ export const filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
 proc sysroot_path(root: Str, raw: Str) -> Result[Path] {
   let path_value = fp"{raw.trim()}"
 
-  return path_value when path_value.exists()?
+  return path_value when path_value.exists()
 
   return fp"{root}{raw.trim()}" when root != "" and root != "/" and raw.starts_with("/")
 

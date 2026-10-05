@@ -36,7 +36,7 @@ export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str], Err
 export proc load_manifest(db: Path) [fs, error] -> Result[List[Path], Error] {
   var manifest = []
 
-  if fp"{db}/manifest.json".exists()? {
+  if fp"{db}/manifest.json".exists() {
     let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require()?
 
     for rel_text in stored {
@@ -88,7 +88,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     if entry.kind == types.file_kind_tree() {
-      guard fp"{dest}/{entry.path}".is_dir()? else {
+      guard fp"{dest}/{entry.path}".is_dir() else {
         return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
       }
     }
@@ -168,7 +168,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   for entry in pkg.filetree {
     let key = entry.path.display()
 
-    if entry.kind != types.file_kind_tree() and ! fp"{dest}/{entry.path}".exists()? {
+    if entry.kind != types.file_kind_tree() and ! fp"{dest}/{entry.path}".exists() {
       return Err(types.PmError.PackageContract(f"{pkg.name} declares missing file {key}"))
     }
   }
@@ -229,7 +229,7 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
   for entry in fs.walk(root) {
     var include = entry.kind == "file" or entry.kind == "symlink"
 
-    if entry.kind == "dir" and entry.path.display() != root_text and dir_empty(entry.path)? {
+    if entry.kind == "dir" and entry.path.display() != root_text and dir_empty(entry.path) {
       include = true
     }
 
@@ -246,7 +246,7 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
     if entry.kind == types.file_kind_tree() {
       let tree = fp"{root}/{entry.path}"
 
-      if dir_empty(tree)? {
+      if dir_empty(tree) {
         entries += [entry.path]
       }
     }

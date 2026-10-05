@@ -81,7 +81,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let version_h = fp"{src}/include/netlink/version.h"
   let version_in = fp"{src}/include/netlink/version.h.in"
 
-  if ! version_h.exists()? and version_in.exists()? {
+  if ! version_h.exists() and version_in.exists() {
     let tmpl = version_in.read_text()?
     let parts = ver.split(".")
     let major = parts[0]
@@ -101,7 +101,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # live in libc.
   let config_h = fp"{src}/include/config.h"
 
-  if ! config_h.exists()? {
+  if ! config_h.exists() {
     let cfg_body = f"""#ifndef LIBNL_CONFIG_H
 #define LIBNL_CONFIG_H
 #define HAVE_DECL_GETPROTOBYNAME_R 0

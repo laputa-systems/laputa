@@ -40,12 +40,12 @@ proc package_dependency_map(root: Path) -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
   let packages_db = fp"{root}/var/lib/xsh-pm/packages"
 
-  return package_deps unless packages_db.exists()?
+  return package_deps unless packages_db.exists()
 
   for entry in fs.children(packages_db) |> where .kind == "dir" {
     let metadata_path = fp"{entry.path}/metadata.json"
 
-    if metadata_path.exists()? {
+    if metadata_path.exists() {
       let metadata = json.read(metadata_path)?.require(Record)?
       var deps: List[Str] = []
 
@@ -71,7 +71,7 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
   for rel_path in manifest {
     let path_value = fp"{root}/{rel_path}"
 
-    if path_value.exists()? {
+    if path_value.exists() {
       failures += elfdeps.installed_file_elf_dependency_failures(name, allowed, rel_path, path_value, providers)?
     }
   }
@@ -106,9 +106,9 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
   let host_readelf = /usr/bin/readelf
   let host_llvm_readelf = /usr/bin/llvm-readelf
 
-  return host_readelf when host_readelf.exists()?
+  return host_readelf when host_readelf.exists()
 
-  return host_llvm_readelf when host_llvm_readelf.exists()?
+  return host_llvm_readelf when host_llvm_readelf.exists()
 
   if let Ok(tool) = process.which("readelf") {
     return tool
@@ -133,10 +133,10 @@ proc proof_xsh_runner() -> Result[Path] {
   if configured != "" {
     let selected = fp"{configured}"
 
-    return selected when selected.exists()?
+    return selected when selected.exists()
   }
 
-  return /bin/xsh when p"/bin/xsh".exists()?
+  return /bin/xsh when p"/bin/xsh".exists()
 
   process.which("xsh")?
 }
@@ -146,7 +146,7 @@ proc proof_xsh_runner() -> Result[Path] {
 export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env, error] -> Result[Unit, Error] {
   let script = fp"{pkg.dir}/proof.xsh"
 
-  if ! script.exists()? {
+  if ! script.exists() {
     return Err(types.PmError.PackageContract(f"{pkg.name} is missing proof.xsh"))
   }
 

@@ -58,7 +58,7 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) {
   wanted += kbuild_list(fp"{arch_uapi}/Kbuild", "generic-y")?
 
   for header in wanted {
-    continue when fp"{arch_uapi}/{header}".exists()?
+    continue when fp"{arch_uapi}/{header}".exists()
     fp"{generated}/{header}".write(f"""#include <asm-generic/{header}>
 """)
   }
@@ -130,7 +130,7 @@ proc main(dest: Path) [fs, env, error] {
   # include/uapi/Kbuild's no-export-headers: these linux/ headers only make
   # sense on an arch that provides the asm/ header of the same name.
   for header in ["a.out.h", "kvm.h", "kvm_para.h"] {
-    if ! fp"arch/{srcarch}/include/uapi/asm/{header}".exists()? and ! fp"{generated_asm}/{header}".exists()? {
+    if ! fp"arch/{srcarch}/include/uapi/asm/{header}".exists() and ! fp"{generated_asm}/{header}".exists() {
       fp"{include}/linux/{header}".remove(missing_ok: true)
     }
   }

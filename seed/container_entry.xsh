@@ -10,7 +10,7 @@
 # usage: container_entry.xsh UID GID DIR... -- COMMAND ARG...
 
 proc give_tree(root: Path, uid: Int, gid: Int) {
-  return unless root.exists()?
+  return unless root.exists()
 
   # The ids need not exist in the image's /etc/passwd or /etc/group.
   let owner = {uid, gid, name: "", home: /, shell: ""}

@@ -13,10 +13,10 @@ export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
   for entry in (e"XSH_MODULE_PATH" ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 
-    return root when fp"{root}/pm.xsh".exists()? and fp"{root}/pm".exists()?
+    return root when fp"{root}/pm.xsh".exists() and fp"{root}/pm".exists()
   }
 
-  return path.absolute(p".")? when p"pm.xsh".exists()? and p"pm".exists()?
+  return path.absolute(p".")? when p"pm.xsh".exists() and p"pm".exists()
 
   /usr/lib/pm
 }
@@ -73,10 +73,10 @@ proc xsh_runner() -> Result[Path] {
   if host != "" {
     let host_path = fp"{host}"
 
-    return host_path when host_path.exists()?
+    return host_path when host_path.exists()
   }
 
-  return /bin/xsh when p"/bin/xsh".exists()?
+  return /bin/xsh when p"/bin/xsh".exists()
 
   process.which("xsh")?
 }
@@ -102,7 +102,7 @@ proc direct_xsh_source(xsh: Path, name: Str) -> Result[Path] {
   return regular_xsh_source(xsh) when name == "xsh"
 
   let sibling = fp"{xsh.parent}/{name}"
-  if ! sibling.exists()? {
+  if ! sibling.exists() {
     return Err(types.PmError.PackageContract(f"missing direct XSH release binary {sibling}"))
   }
 
@@ -127,7 +127,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   let xsh = xsh_runner()?
   seed_xsh_runners(root, xsh)
 
-  if p"/usr/lib/xsh".exists()? {
+  if p"/usr/lib/xsh".exists() {
     let _ = fs.copy_tree(/usr/lib/xsh, fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
   }
 
@@ -156,7 +156,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     match source.metadata() {
       Ok(metadata) if metadata.kind == "file" => source.copy(dest, overwrite: true)
       else => {
-        if ! dest.exists()? {
+        if ! dest.exists() {
           dest.write("")
         }
       }
@@ -188,7 +188,7 @@ export proc executor_provenance() [fs, process, env, error] -> Result[types.Exec
     xshi_sha256: hash.sha256(direct_xsh_source(xsh, "xshi")?)?.hex(),
     xsht_sha256: hash.sha256(direct_xsh_source(xsh, "xsht")?)?.hex(),
     pm_sha256: fingerprint.pm_tree(pm_source_root()?)?,
-    core_sha256: if core.exists()? { fingerprint.core_tree(core)? } else { null },
+    core_sha256: if core.exists() { fingerprint.core_tree(core)? } else { null },
   }
 }
 
@@ -196,9 +196,9 @@ proc xsht_runner() -> Result[Path] {
   let xsh = xsh_runner()?
   let sibling = fp"{xsh.parent}/xsht"
 
-  return sibling when sibling.exists()?
+  return sibling when sibling.exists()
 
-  return /bin/xsht when p"/bin/xsht".exists()?
+  return /bin/xsht when p"/bin/xsht".exists()
 
   process.which("xsht")?
 }

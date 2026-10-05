@@ -361,7 +361,7 @@ pure dep_path(cwd: Path, dep: Str) -> Path {
 }
 
 proc depfile_inputs(depfile: Path, cwd: Path) -> Result[List[Path]] {
-  guard depfile.exists()? else {
+  guard depfile.exists() else {
     let deps = []
     return deps
   }
@@ -396,7 +396,7 @@ proc all_inputs(task: MakeTask) -> Result[List[Path]] {
 
 proc output_missing(task: MakeTask) -> Result[Bool] {
   for output in task.outputs {
-    guard output.exists()? else {
+    guard output.exists() else {
       return true
     }
   }
@@ -424,7 +424,7 @@ proc input_newer(task: MakeTask) -> Result[Bool] {
   let oldest_output = oldest_output_mtime(task.outputs)?
 
   for input in all_inputs(task)? {
-    guard input.exists()? else {
+    guard input.exists() else {
       return true
     }
 
@@ -447,17 +447,17 @@ proc stamp_changed(task: MakeTask) -> Result[Bool] {
     return false
   }
 
-  return true unless task.stamp.exists()?
+  return true unless task.stamp.exists()
 
   task.stamp.read_text()? != command_signature(task)?
 }
 
 proc should_run(task: MakeTask) -> Result[Bool] {
-  return true when output_missing(task)?
+  return true when output_missing(task)
 
-  return true when stamp_changed(task)?
+  return true when stamp_changed(task)
 
-  return true when has_path(task.depfile) and ! task.depfile.exists()?
+  return true when has_path(task.depfile) and ! task.depfile.exists()
 
   input_newer(task)?
 }
@@ -599,7 +599,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
         let task = task_by_name.get(task_name)?
         scheduled[task.name] = true
 
-        if should_run(task)? {
+        if should_run(task) {
           running += [spawn_task(task)?]
           spawn_count += 1
           if running.len() > peak_running {
@@ -713,7 +713,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
           let task = task_by_name.get(task_name)?
           scheduled[task.name] = true
 
-          if should_run(task)? {
+          if should_run(task) {
             running += [spawn_task(task)?]
             spawn_count += 1
             if running.len() > peak_running {

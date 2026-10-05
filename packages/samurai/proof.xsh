@@ -5,7 +5,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.package_metadata(rootfs, "samurai")
   proof.target_elf(rootfs, p"usr/bin/samu", "samurai")
 
-  if ! fp"{rootfs}/usr/bin/ninja".exists()? {
+  if ! fp"{rootfs}/usr/bin/ninja".exists() {
     return Err(proof.ProofError.Failed(kind: "proof-samurai", message: "missing ninja symlink"))?
   }
 

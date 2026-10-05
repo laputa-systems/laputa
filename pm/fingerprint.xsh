@@ -136,11 +136,11 @@ proc repository_input_lines(
     let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 
-    if ! input.exists()? {
+    if ! input.exists() {
       return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
     }
 
-    if input.is_dir()? {
+    if input.is_dir() {
       for entry in fs.walk(input) |> sort-by .path {
         let rel = entry.path.strip_prefix(repo_root)?
 
@@ -209,7 +209,7 @@ export proc package_build_input(repo_root: Path, pkg: types.Package, target: typ
 proc pm_proof_module(pm_root: Path) -> Result[Str] {
   let proof = fp"{pm_root}/pm/proof.xsh"
 
-  if ! proof.exists()? {
+  if ! proof.exists() {
     return Err(types.PmError.PackageContract(f"{proof} is missing"))
   }
 
@@ -219,7 +219,7 @@ proc pm_proof_module(pm_root: Path) -> Result[Str] {
 ## Hashes proof-only inputs independently from build inputs so an unchanged artifact can be re-proved.
 export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str, Error] {
   let proof = fp"{pkg.dir}/proof.xsh"
-  let proof_sha256 = if proof.exists()? { hash.sha256(proof)?.hex() } else { "missing" }
+  let proof_sha256 = if proof.exists() { hash.sha256(proof)?.hex() } else { "missing" }
   digest_lines(
     [
       "format\tlaputa-package-proof-input-1",
@@ -235,7 +235,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
   let entrypoint = fp"{pm_root}/pm.xsh"
   let modules = fp"{pm_root}/pm"
 
-  if ! entrypoint.exists()? or ! modules.exists()? {
+  if ! entrypoint.exists() or ! modules.exists() {
     return Err(types.PmError.PackageContract(f"{pm_root} is not a PM source root"))
   }
 
@@ -254,7 +254,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
 
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
 export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
-  guard core_root.exists()? else {
+  guard core_root.exists() else {
     return Err(types.PmError.PackageContract(f"{core_root} is missing"))
   }
 

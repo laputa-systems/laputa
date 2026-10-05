@@ -189,7 +189,7 @@ proc current_pm_repo_root() -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
-    return dir when fp"{dir}/pm.xsh".exists()? and fp"{dir}/packages".exists()?
+    return dir when fp"{dir}/pm.xsh".exists() and fp"{dir}/packages".exists()
 
     let parent = dir.parent
 
@@ -589,7 +589,7 @@ proc remote_snapshot_for_plan(
     remote.write_remote_index_cache(cache_root, index)
   }
 
-  let index_sha256 = if cache.exists()? { hash.sha256(cache)?.hex() } else { bytes.from_text("[]\n").sha256().hex() }
+  let index_sha256 = if cache.exists() { hash.sha256(cache)?.hex() } else { bytes.from_text("[]\n").sha256().hex() }
   var packages: List[types.RemotePlanArtifact] = []
 
   for entry in index {
@@ -784,7 +784,7 @@ proc command_root_inspect(args: RootInspectArgs) {
   # Image builders retain the receipt JSON after atomically publishing their final
   # image and removing container-local generation staging. Accept that durable
   # boundary as well as an intact generation root.
-  let receipt = if args.input.is_file()? {
+  let receipt = if args.input.is_file() {
     generation.read_generation_receipt_file(args.input)?
   } else {
     generation.read_generation_receipt(args.input)?

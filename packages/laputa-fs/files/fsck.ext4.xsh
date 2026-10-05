@@ -48,7 +48,7 @@ proc used_bits(bitmap: Bytes, limit: Int) -> Result[Int] {
   var bit = 0
 
   while bit < limit {
-    if bit_set(bitmap, bit)? {
+    if bit_set(bitmap, bit) {
       used += 1
     }
 

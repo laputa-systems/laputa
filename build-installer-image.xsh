@@ -17,7 +17,7 @@ proc ensure_dev_dirs(rootfs: Path) {
   for sub in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     let dir = fp"{rootfs}/{sub}"
 
-    if ! dir.exists()? {
+    if ! dir.exists() {
       dir.mkdir()
     }
   }
@@ -26,7 +26,7 @@ proc ensure_dev_dirs(rootfs: Path) {
 proc append_inittab_line(rootfs: Path, line: Str) {
   let inittab = fp"{rootfs}/etc/inittab"
 
-  return unless inittab.exists()?
+  return unless inittab.exists()
 
   var text = inittab.read_text()?
 
@@ -647,7 +647,7 @@ proc build_host() {
 
     let key_path = fp"{qemu_authorized_key}"
 
-    if ! key_path.exists()? {
+    if ! key_path.exists() {
       fail f"missing {key_path}"
     }
 
@@ -660,7 +660,7 @@ proc build_host() {
   let packaged_kernel = fp"{work}/rootfs-target/boot/vmlinuz"
   let boot_kernel = if kernel_source_raw == "" { packaged_kernel } else { fp"{kernel_source_raw}" }
 
-  if ! boot_kernel.exists()? {
+  if ! boot_kernel.exists() {
     fail f"missing installer kernel source {boot_kernel}"
   }
 

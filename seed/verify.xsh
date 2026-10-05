@@ -90,7 +90,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
       mirror = handle
       var waited = 0
 
-      while ! mirror_ready(curl)? {
+      while ! mirror_ready(curl) {
         if waited >= 600 {
           fail "the mirror did not start; see .out/verify/mirror.log"
         }

@@ -962,7 +962,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
       if ! cmake_status.ok {
         let err_log = fp"CMakeFiles/CMakeError.log"
 
-        if err_log.exists()? {
+        if err_log.exists() {
           print (err_log.read_text()?)
         }
 

@@ -354,11 +354,11 @@ export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.G
 export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.GenerationProfile, Error] {
   let config = generation_overlay_config_path(overlay_root)
 
-  if ! config.exists()? {
+  if ! config.exists() {
     return {name: "default", overlay_sha256: overlay_digest(overlay_root)?, replacements: []}
   }
 
-  if ! config.is_file()? {
+  if ! config.is_file() {
     return Err(types.PmError.PackageContract("generation overlay.json must be a file"))
   }
 
@@ -375,11 +375,11 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
 
 ## Computes the canonical content identity of a profile overlay, including its explicit `overlay.json` policy metadata.
 export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error] {
-  guard overlay_root.exists()? else {
+  guard overlay_root.exists() else {
     return generation_empty_overlay_sha256()
   }
 
-  if ! overlay_root.is_dir()? {
+  if ! overlay_root.is_dir() {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
@@ -414,7 +414,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
 }
 
 proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOverlayEntry]] {
-  if ! overlay_root.exists()? or ! overlay_root.is_dir()? {
+  if ! overlay_root.exists() or ! overlay_root.is_dir() {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
@@ -576,8 +576,8 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
     let destination = fp"{output_root}/{entry.path}"
 
     if entry.kind == "dir" {
-      if destination.exists()? {
-        guard destination.is_dir()? else {
+      if destination.exists() {
+        guard destination.is_dir() else {
           return Err(
             types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
           )
@@ -590,7 +590,7 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
     } else {
       destination.parent.mkdir()
 
-      if destination.exists()? {
+      if destination.exists() {
         destination.remove()
       }
 
@@ -722,7 +722,7 @@ export proc compose(
   let entries = generation_overlay_entries(overlay_root)?
   generation_preflight_overlay(entries, root_plan, value.profile)
 
-  if output_root.exists()? {
+  if output_root.exists() {
     return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 

@@ -66,7 +66,7 @@ pure prefix_to_netmask(prefix_len: Int) -> Str {
 # system's login runs on: the PL011 UART on aarch64 virt, the 16550 UART on
 # x86_64 pc. The kernel's /dev/console may be tty0 instead.
 proc serial_console_name() -> Result[Str] {
-  return "ttyAMA0" when p"/dev/ttyAMA0".exists()?
+  return "ttyAMA0" when p"/dev/ttyAMA0".exists()
 
   "ttyS0"
 }
@@ -74,7 +74,7 @@ proc serial_console_name() -> Result[Str] {
 proc write_text(text: Str) {
   let serial = fp"/dev/{serial_console_name()?}"
 
-  if serial.exists()? {
+  if serial.exists() {
     serial.write(text)
   } else {
     io.write_stdout(text)
@@ -91,7 +91,7 @@ proc usage() {
 }
 
 proc require_file(path_value: Path) {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return Err(InstallerError.Failed(kind: "missing-file", message: path_value.display()))
   }
 }
@@ -132,7 +132,7 @@ proc normalize_target_ownership(root: Path) {
     fp"{root}/usr/bin/sudo",
     fp"{root}/usr/bin/unix_chkpwd",
   ] {
-    if path_value.exists()? {
+    if path_value.exists() {
       path_value.chmod(0o4755)
     }
   }
@@ -141,7 +141,7 @@ proc normalize_target_ownership(root: Path) {
 proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
   let public_key_path = fp"{root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
 
-  return false unless public_key_path.exists()?
+  return false unless public_key_path.exists()
 
   let public_key = public_key_path.read_text()?.trim()
 
@@ -196,7 +196,7 @@ proc print_disks(disks: List[Path]) {
 
 proc disk_has_partitions(disk: Path) -> Result[Bool] {
   for entry in fs.children(fp"/sys/block/{disk.name}")? {
-    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fp"/sys/block/{disk.name}/{entry.name}/partition".exists()? {
+    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fp"/sys/block/{disk.name}/{entry.name}/partition".exists() {
       return true
     }
   }
@@ -206,7 +206,7 @@ proc disk_has_partitions(disk: Path) -> Result[Bool] {
 
 proc ci_default_disk(disks: List[Path]) -> Result[Path] {
   for disk in disks {
-    guard disk_has_partitions(disk)? else {
+    guard disk_has_partitions(disk) else {
       return disk
     }
   }
@@ -228,7 +228,7 @@ proc wait_for(path_value: Path) {
   var tries = 50
 
   while tries > 0 {
-    return when path_value.exists()?
+    return when path_value.exists()
 
     time.sleep(100ms)
     tries -= 1
@@ -454,7 +454,7 @@ tty1::respawn:/usr/bin/login -f pazu
 proc configured_ci_esp_bytes() -> Result[Int] {
   let path_value = /etc/laputa-installer/target-esp-mb
 
-  return 16 * 1024 * 1024 unless path_value.exists()?
+  return 16 * 1024 * 1024 unless path_value.exists()
 
   let mb = path_value.read_text()?.trim().parse_int()?
   mb * 1024 * 1024
@@ -530,7 +530,7 @@ proc install_to_disk(disk: Path, ci: Bool) {
   p"/mnt/target/boot".mkdir()
   linux.mount(parts.esp.display(), /mnt/target/boot, fstype: "vfat")
 
-  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI".exists()? {
+  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI".exists() {
     fs.install(
       /usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI,
       /mnt/target/boot/EFI/BOOT/BOOTAA64.EFI,
@@ -540,7 +540,7 @@ proc install_to_disk(disk: Path, ci: Bool) {
     )
   }
 
-  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI".exists()? {
+  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI".exists() {
     fs.install(
       /usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI,
       /mnt/target/boot/EFI/BOOT/BOOTX64.EFI,
@@ -595,7 +595,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
   print_disks(disks)
 
-  if ci and disk_text == "" and disk_selection.ci_target_installed(/sys/block, disks, TARGET_ROOT_PARTUUID)? {
+  if ci and disk_text == "" and disk_selection.ci_target_installed(/sys/block, disks, TARGET_ROOT_PARTUUID) {
     write_stdout_line("Laputa CI target already installed.")
     return
   }

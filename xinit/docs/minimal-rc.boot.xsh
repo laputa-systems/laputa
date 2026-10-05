@@ -1,6 +1,6 @@
 #!/bin/xsh
 for dir in [/proc, /sys, /run, /dev, /dev/pts, /dev/shm] {
-  if ! dir.exists()? {
+  if ! dir.exists() {
     dir.mkdir()
   }
 }
@@ -18,7 +18,7 @@ if "devpts" in p"/proc/filesystems".read_text()? {
 
 let mount_shm = linux.mount("shm", /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
 
-if p"/etc/hostname".exists()? {
+if p"/etc/hostname".exists() {
   let hostname = p"/etc/hostname".read_text()?.trim()
 
   match unix.set_hostname(hostname) {
@@ -27,13 +27,13 @@ if p"/etc/hostname".exists()? {
 }
 
 for hook in g"/usr/lib/init/rc.d/*.boot" {
-  if hook.is_file()? {
+  if hook.is_file() {
     run hook ?
   }
 }
 
 for hook in g"/etc/rc.d/*.boot" {
-  if hook.is_file()? {
+  if hook.is_file() {
     run hook ?
   }
 }

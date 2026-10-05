@@ -12,7 +12,7 @@ pure size_label(value: Int) -> Str {
 }
 
 proc path_size(path_value: Path) -> Result[Int] {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return 0
   }
 
@@ -30,7 +30,7 @@ proc path_size(path_value: Path) -> Result[Int] {
 }
 
 proc print_path_size(label: Str, path_value: Path) {
-  if path_value.exists()? {
+  if path_value.exists() {
     print ${label}: size_label(path_size(path_value)?) $path_value
   } else {
     print ${label}: missing $path_value
@@ -52,7 +52,7 @@ proc package_size_rows(rootfs: Path) -> Result[List[PackageSize]] {
   let db = fp"{rootfs}/var/lib/xsh-pm/packages"
   var rows: List[PackageSize] = []
 
-  return rows unless db.exists()?
+  return rows unless db.exists()
 
   for entry in fs.children(db)? |> where .kind == "dir" {
     rows += [{name: entry.name, size: package_size(rootfs, fp"{entry.path}/manifest.json")?}]

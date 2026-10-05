@@ -99,7 +99,7 @@ export proc upload_immutable_repo_file(
 
   let dest = util.repo_file_path(repo, rel)?
 
-  if dest.exists()? {
+  if dest.exists() {
     if hash.sha256(dest)?.hex() == hash.sha256(source)?.hex() {
       return false
     }
@@ -118,7 +118,7 @@ export proc upload_immutable_repo_file(
 
 ## Exported PM declaration `load_remote_index_from`.
 export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[types.RemotePackage], Error] {
-  if index_path.exists()? {
+  if index_path.exists() {
     let rows: List[Record] = json.read(index_path)?.require(List[Record])?
     return decode_remote_index(rows)
   }

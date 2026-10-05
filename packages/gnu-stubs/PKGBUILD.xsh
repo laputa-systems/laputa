@@ -75,7 +75,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let libunwind = fp"{llvm_root}/lib/libunwind.a"
   let builtins = fp"{llvm_root}/lib/clang/23/lib/linux/libclang_rt.builtins-{target_arch}.a"
 
-  if ! clang.exists()? or ! lld.exists()? or ! llvm_ar.exists()? or ! llvm_objcopy.exists()? {
+  if ! clang.exists() or ! lld.exists() or ! llvm_ar.exists() or ! llvm_objcopy.exists() {
     fail f"gnu-stubs bootstrap LLVM tools are missing from {llvm_root}"
   }
 

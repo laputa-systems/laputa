@@ -38,7 +38,7 @@ proc runner() -> Result[Path] {
   if configured != "" {
     let selected = fp"{configured}"
 
-    return selected when selected.exists()?
+    return selected when selected.exists()
   }
 
   process.which("xsh")?

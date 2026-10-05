@@ -7,7 +7,7 @@ proc resolved_fragment_input(input: Path) -> Result[Path] {
   if source_root != "" {
     let staged = fp"{source_root}/.laputa-inputs/{input}"
 
-    return staged when staged.exists()?
+    return staged when staged.exists()
   }
 
   let recipe_root = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
@@ -15,7 +15,7 @@ proc resolved_fragment_input(input: Path) -> Result[Path] {
   if recipe_root != "" {
     let copied = fp"{recipe_root}/{input}"
 
-    return copied when copied.exists()?
+    return copied when copied.exists()
   }
 
   Err(
@@ -39,7 +39,7 @@ proc render_fragments(fragments: List[Path]) -> Result[Str] {
 """
 
   for fragment in fragments {
-    guard fragment.exists()? else {
+    guard fragment.exists() else {
       return Err(
         kbuild.ScriptError.Failed(kind: "linux-config-fragment-missing", message: f"missing kernel config fragment {fragment}"),
       )

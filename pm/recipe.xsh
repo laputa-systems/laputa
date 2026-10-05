@@ -342,7 +342,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
 
   let pkgbuild = fp"{dir}/PKGBUILD.xsh"
 
-  if ! pkgbuild.exists()? {
+  if ! pkgbuild.exists() {
     return Err(types.PmError.PackageContract(f"{dir} does not contain PKGBUILD.xsh"))
   }
 
@@ -385,7 +385,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
       return Err(types.PmError.PackageContract(f"{name}: payload package must export build"))
     }
 
-    if ! fp"{dir}/proof.xsh".exists()? {
+    if ! fp"{dir}/proof.xsh".exists() {
       return Err(types.PmError.PackageContract(f"{name}: payload package must contain proof.xsh"))
     }
   } else if filetree.len() > 0 {
@@ -418,7 +418,7 @@ export proc load_package(dir: Path) [fs, env, error] -> Result[types.Package, Er
 proc dynamic_recipe_path(pkg: types.Package) -> Result[Path] {
   let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
 
-  if ! pkgbuild.exists()? {
+  if ! pkgbuild.exists() {
     return Err(types.PmError.PackageContract(f"{pkg.name}: dynamic recipe is unavailable at {pkgbuild}"))
   }
 

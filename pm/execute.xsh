@@ -196,7 +196,7 @@ proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload
   let lock = fs.lock(fp"{cached.parent}/{node.proof_key}.lock")?
   defer fs.unlock(lock)?
 
-  if cached.exists()? {
+  if cached.exists() {
     pm_proof.verify_artifact_receipt(cached, node, payload_sha256)
     return
   }
@@ -276,7 +276,7 @@ proc execute_build_local(
   # Keep the proof outcome as Result data through this build-node boundary.
   # The published runner otherwise propagates a failing Unit proc directly out
   # of a par-map worker before its node-status marker can be written.
-  execute_run_proof(context, node, pkg, staged.payload, staged.payload_sha256, staged.proof)?
+  execute_run_proof(context, node, pkg, staged.payload, staged.payload_sha256, staged.proof)
 
   let receipt = store.commit(context.plan.target, context.store_root, node, staged)?
   execute_require_receipt(context.plan, node, receipt)
@@ -295,7 +295,7 @@ proc execute_existing_local(
 
   let cached = store.reproof_receipt_path(context.store_root, node.artifact_key, node.proof_key)
 
-  if cached.exists()? {
+  if cached.exists() {
     pm_proof.verify_artifact_receipt(cached, node, receipt.payload_sha256)
     return receipt
   }
@@ -332,7 +332,7 @@ proc execute_node(
   context: ExecuteContext,
   node: types.PlanNode,
 ) -> Result[types.ArtifactReceipt] {
-  if store.artifact_path(context.store_root, node.artifact_key).exists()? {
+  if store.artifact_path(context.store_root, node.artifact_key).exists() {
     return execute_existing_local(context, node)
   }
 
@@ -359,7 +359,7 @@ type FinishedNode = {name: Str, seconds: Int, log: Path}
 # The last lines of a failed node's log: the cause, without the rest of a
 # build that can run to tens of thousands of lines.
 proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
-  return "" unless log.exists()?
+  return "" unless log.exists()
 
   let lines = log.read_lines()?
   let first = if lines.len() > count { lines.len() - count } else { 0 }
@@ -369,7 +369,7 @@ proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
 # The `error:` lines of a failed node's log, which name the cause above the
 # runtime traceback; the plain tail when there are none.
 proc execute_log_errors(log: Path) -> Result[Str] {
-  return "" unless log.exists()?
+  return "" unless log.exists()
 
   let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
 
@@ -540,7 +540,7 @@ export proc build_plan_node(
     repo_root,
     store_root,
     remote_repo,
-    executor: if execute_plan_builds({...plan_value, nodes: [node]}, store_root)? { pm_build.executor_provenance()? } else { null },
+    executor: if execute_plan_builds({...plan_value, nodes: [node]}, store_root) { pm_build.executor_provenance()? } else { null },
     published: {},
   }
   let receipt = execute_node(context, node)?
@@ -552,7 +552,7 @@ export proc build_plan_node(
 # when some node will actually build.
 proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) -> Result[Bool] {
   for node in plan_value.nodes {
-    if types.plan_action_is_build(node.action) and ! store.artifact_path(store_root, node.artifact_key).exists()? {
+    if types.plan_action_is_build(node.action) and ! store.artifact_path(store_root, node.artifact_key).exists() {
       return true
     }
   }
@@ -579,7 +579,7 @@ export proc build_plan(
     repo_root,
     store_root,
     remote_repo,
-    executor: if execute_plan_builds(plan_value, store_root)? { pm_build.executor_provenance()? } else { null },
+    executor: if execute_plan_builds(plan_value, store_root) { pm_build.executor_provenance()? } else { null },
     published: {},
   }
   var done: Map[types.ArtifactReceipt] = {}

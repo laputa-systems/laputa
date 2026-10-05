@@ -62,7 +62,7 @@ export proc prepare(
     return Err(InstallerPackageHostError.Failed("the installer needs LAPUTA_REPO_URL, the local mirror (`make mirror`)"))
   }
 
-  if packages.exists()? {
+  if packages.exists() {
     return Err(InstallerPackageHostError.Failed(f"{packages} already exists; the installer build removes it first"))
   }
 

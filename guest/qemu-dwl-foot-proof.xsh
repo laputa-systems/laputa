@@ -16,7 +16,7 @@ proc guest_fail(phase: Str, message: Str) {
 
 proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) {
   var elapsed = 0
-  while ! path_value.exists()? {
+  while ! path_value.exists() {
     if elapsed >= seconds {
       guest_fail(phase, f"missing {path_value}")
     }
@@ -60,7 +60,7 @@ proc main() [fs, process, time, error] {
   )?
   let _ = _seatd
   guest_wait_for(/run/seatd.sock, "seatd", 20)
-  if ! p"/run/user/0".exists()? {
+  if ! p"/run/user/0".exists() {
     p"/run/user/0".mkdir()
   }
 

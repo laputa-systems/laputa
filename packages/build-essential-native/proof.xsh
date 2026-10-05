@@ -8,7 +8,7 @@ type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payl
 type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], entries: List[Any], root_sha256: Str}
 
 proc ensure_exists(path_value: Path, label: Str) {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return Err(ProofError.Failed(kind: "proof-build-essential-native", message: f"missing {label}: {path_value}"))
   }
 }

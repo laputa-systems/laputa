@@ -62,13 +62,13 @@ export proc plan_system_profile(
   let result = outputs(value.output_root)
   docker.docker_plan(value, profile)
 
-  if ! result.build_plan.exists()? {
+  if ! result.build_plan.exists() {
     return Err(types.LaputaError.Docker(f"PM plan command did not write {result.build_plan}"))
   }
 
   docker.docker_generation_plan(value, profile)
 
-  if ! result.generation_plan.exists()? {
+  if ! result.generation_plan.exists() {
     return Err(types.LaputaError.Docker(f"PM generation plan command did not write {result.generation_plan}"))
   }
 
@@ -84,12 +84,12 @@ export proc build_profile(
   let result = plan_system_profile(value, profile)?
   docker.docker_profile_build(value, profile, jobs, result.build_log)
 
-  if ! result.current.exists()? or ! result.current.is_symlink()? {
+  if ! result.current.exists() or ! result.current.is_symlink() {
     return Err(types.LaputaError.Docker(f"profile build did not atomically select {result.current}"))
   }
 
   for path_value in [result.generation, result.rootfs, result.disk, result.kernel] {
-    if ! path_value.exists()? or path_value.metadata()?.size <= 0 {
+    if ! path_value.exists() or path_value.metadata()?.size <= 0 {
       return Err(types.LaputaError.Docker(f"profile build did not publish {path_value}"))
     }
   }

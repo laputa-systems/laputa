@@ -127,7 +127,7 @@ export proc run_generator(spec: ParserGen) [fs, process, error] {
   }
 
   for out in spec.outputs {
-    guard out.exists()? else {
+    guard out.exists() else {
       return Err(ParserGenError.Failed(kind: "linux-parser-generator", message: f"{spec.name} did not write {out}"))
     }
   }

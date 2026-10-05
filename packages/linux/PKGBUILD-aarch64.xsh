@@ -640,7 +640,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"
     let compile_start = PKGBUILD_shared.timing_start("compile")
 
-    if reuse_archives and root_archive.exists()? and archive_report.exists()? and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
+    if reuse_archives and root_archive.exists() and archive_report.exists() and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
       print "xsh-kbuild-archives" "reuse" archive_plan.archives.len() "archives"
       archives = archive_plan.archives
     } else {

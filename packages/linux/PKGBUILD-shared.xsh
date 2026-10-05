@@ -68,7 +68,7 @@ proc staged_recipe_helper(name: Str) -> Result[Path] {
 
   let helper = fp"{recipe_dir}/{name}"
 
-  if ! helper.exists()? {
+  if ! helper.exists() {
     return Err(kbuild.ScriptError.Failed(kind: "linux-recipe-helper", message: f"missing staged recipe helper: {helper}"))
   }
 
@@ -199,7 +199,7 @@ includes
 }
 
 proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) -> Result[Bool] {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     return false
   }
 
@@ -215,14 +215,14 @@ proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) {
 }
 
 proc copy_archive_plan_cache(source: Path, dest: Path) {
-  guard source.exists()? else {
+  guard source.exists() else {
     return
   }
 
   fs.install(source, dest, 0o644, parents: true, overwrite: true)
   let source_summary = kbuild.archive_plan_summary_path(source)
 
-  if source_summary.exists()? {
+  if source_summary.exists() {
     fs.install(source_summary, kbuild.archive_plan_summary_path(dest), 0o644, parents: true, overwrite: true)
   }
 }
@@ -258,7 +258,7 @@ export proc cached_archive_plan(
   let plan_only = requested_stop_after()? == "plan" and (e"XSH_LINUX_KBUILD_ONLY" ?? "") == ""
 
   if reuse_archive_plan and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
-    if archive_report.exists()? and archive_plan_fingerprint_matches(archive_fingerprint, fingerprint)? {
+    if archive_report.exists() and archive_plan_fingerprint_matches(archive_fingerprint, fingerprint) {
       if plan_only {
         match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(archive_report)) {
           Ok(archive_plan) => {
@@ -292,7 +292,7 @@ export proc cached_archive_plan(
       }
     }
 
-    if stable_archive_report.exists()? and archive_plan_fingerprint_matches(stable_archive_fingerprint, fingerprint)? {
+    if stable_archive_report.exists() and archive_plan_fingerprint_matches(stable_archive_fingerprint, fingerprint) {
       if plan_only {
         match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(stable_archive_report)) {
           Ok(archive_plan) => {
@@ -410,7 +410,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     emit_kbuild_progress("xsh-kbuild-plan-cache force-discover")
   }
 
-  if ! force_discover and plan_path.exists()? and fingerprint_path.exists()? {
+  if ! force_discover and plan_path.exists() and fingerprint_path.exists() {
     emit_kbuild_progress("xsh-kbuild-plan-cache read")
     let plan = kbuild.read_discovered_plan(plan_path)?
     emit_kbuild_progress(f"xsh-kbuild-plan-cache fingerprint {plan.dirs.len()} dirs {plan.objects.len()} objects")
@@ -427,7 +427,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
       return plan
     }
 
-    if stable_plan_path.exists()? and stable_fingerprint_path.exists()? {
+    if stable_plan_path.exists() and stable_fingerprint_path.exists() {
       emit_kbuild_progress("xsh-kbuild-plan-cache stale-stable-read")
       let stable_plan = kbuild.read_discovered_plan(stable_plan_path)?
       let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan)?
@@ -449,7 +449,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     emit_kbuild_progress("xsh-kbuild-plan-cache stale")
   }
 
-  if ! force_discover and stable_plan_path.exists()? and stable_fingerprint_path.exists()? {
+  if ! force_discover and stable_plan_path.exists() and stable_fingerprint_path.exists() {
     emit_kbuild_progress("xsh-kbuild-plan-cache stable-read")
     let stable_plan = kbuild.read_discovered_plan(stable_plan_path)?
     let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan)?
@@ -607,7 +607,7 @@ export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path, Err
   if build_root != "" {
     let tool = fp"{build_root}/usr/bin/{name}"
 
-    return tool when tool.exists()?
+    return tool when tool.exists()
   }
 
   process.which(name)?

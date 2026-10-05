@@ -48,7 +48,7 @@ export pure rootfs_size_bytes(used_bytes: Int) -> Int {
 
 ## Sum regular-file payload bytes in a verified immutable generation before allocating its ext4 image.
 export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int, Error] {
-  if ! root.exists()? or ! root.is_dir()? {
+  if ! root.exists() or ! root.is_dir() {
     return Err(ImageError.Failed(f"generation root is missing or not a directory: {root}"))
   }
 
@@ -71,7 +71,7 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
   }
 
   let source = fp"{root}/{relative}"
-  if ! source.exists()? or ! source.is_file()? or source.metadata()?.size <= 0 {
+  if ! source.exists() or ! source.is_file() or source.metadata()?.size <= 0 {
     return Err(ImageError.Failed(f"kernel manifest path is missing or empty: {relative}"))
   }
 

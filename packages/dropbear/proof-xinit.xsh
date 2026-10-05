@@ -23,7 +23,7 @@ proc authorize_root_key(rootfs: Path, public_key: Str) {
   ssh_dir.mkdir()
   var existing = ""
 
-  if auth_keys.exists()? {
+  if auth_keys.exists() {
     existing = auth_keys.read_text()?
   }
 
@@ -39,7 +39,7 @@ proc authorize_root_key(rootfs: Path, public_key: Str) {
 proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) {
   let device_path = fp"{rootfs}/dev/{name}"
 
-  return when device_path.exists()?
+  return when device_path.exists()
 
   device_path.parent.mkdir()
   let mknod = process.which("mknod")?

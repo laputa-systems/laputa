@@ -136,7 +136,7 @@ proc stage_rustlib(source: Path, dest: Path) {
     if entry.kind == "dir" {
       out.mkdir()
     } else if entry.kind == "file" {
-      let mode = if entry.path.executable()? { 0o755 } else { 0o644 }
+      let mode = if entry.path.executable() { 0o755 } else { 0o644 }
       fs.install(entry.path, out, mode, parents: true, overwrite: true)
     } else if entry.kind == "symlink" {
       out.parent.mkdir()
@@ -184,7 +184,7 @@ proc mark_vendored_crates(lockfile: Path, vendor: Path) {
   for item in locked_registry_crates(lockfile)? {
     let dir = fp"{vendor}/{item.name}-{item.version}"
 
-    if ! fp"{dir}/Cargo.toml".exists()? {
+    if ! fp"{dir}/Cargo.toml".exists() {
       return Err(SudoRsBuildError.MissingVendoredCrate(f"{item.name}-{item.version}"))
     }
 
@@ -202,20 +202,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   let target_root = if target_root_value != "" { fp"{target_root_value}" } else { cc.parent.parent }
   var libdir = fp"{target_root}/usr/lib"
 
-  if ! libdir.exists()? {
+  if ! libdir.exists() {
     libdir = fp"{cc.parent.parent}/lib"
   }
 
   let build_arch = pm_util.build_arch()?
   let triple = rust_triple(target_arch)
   let host_triple = rust_triple(build_arch)
-  let host_cc = if fp"{build_root}/usr/bin/cc".exists()? { fp"{build_root}/usr/bin/cc" } else { cc }
+  let host_cc = if fp"{build_root}/usr/bin/cc".exists() { fp"{build_root}/usr/bin/cc" } else { cc }
   let host_libdir = fp"{build_root}/usr/lib"
   let target_rustlib = fp"rust-std/rust-std-{triple}/lib/rustlib/{triple}"
   let staged_rustlib = fp"{target_root}/usr/lib/rustlib/{triple}"
 
-  if ! fp"{staged_rustlib}/lib".exists()? {
-    guard target_rustlib.exists()? else {
+  if ! fp"{staged_rustlib}/lib".exists() {
+    guard target_rustlib.exists() else {
       return Err(SudoRsBuildError.MissingRustStd(target_rustlib.display()))
     }
 

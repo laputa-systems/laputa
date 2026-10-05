@@ -99,7 +99,7 @@ proc generation_adapter_ensure_generation(
 ) -> Result[types.GenerationReceipt] {
   let root = fp"{output_parent}/{value.generation_sha256}"
 
-  if root.exists()? {
+  if root.exists() {
     let receipt = pm_generation.read_generation_receipt(root)?
     if receipt.generation_sha256 != value.generation_sha256 or receipt.build_plan_sha256 != value.build_plan_sha256 {
       return Err(
@@ -207,7 +207,7 @@ export proc generation_adapter_copy_manifest_file(
     archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
     let source = fp"{extracted}/{relative_path}"
 
-    if ! source.exists()? or ! source.is_file()? {
+    if ! source.exists() or ! source.is_file() {
       return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
     }
 
