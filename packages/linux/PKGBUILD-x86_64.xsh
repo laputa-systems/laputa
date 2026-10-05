@@ -414,7 +414,7 @@ proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: 
     continue unless line.starts_with(f"#define {prefix}")
     let rest = (line.split(f"#define {prefix}").get(1) ?? "").trim()
     let fields = rest.fields()
-    continue when fields.len() == 0
+    continue when fields.is_empty()
     let quote_parts = line.split("\"")
     continue when quote_parts.len() < 3
     let name = fields[0]
@@ -481,7 +481,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
     }
   }
 
-  if unique.len() == 0 {
+  if unique.is_empty() {
     return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-pasyms", message: "llvm-nm did not report realmode symbols"))
   }
 

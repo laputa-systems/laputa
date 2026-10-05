@@ -638,7 +638,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
     }
 
     if t == ")" {
-      while ops.len() > 0 and ops[ops.len() - 1] != "(" {
+      while ! ops.is_empty() and ops[ops.len() - 1] != "(" {
         let op = ops[ops.len() - 1]
         ops = ops[0..ops.len() - 1]
 
@@ -652,7 +652,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
         }
       }
 
-      return {v: 0, err: "excess input"} when ops.len() == 0
+      return {v: 0, err: "excess input"} when ops.is_empty()
 
       ops = ops[0..ops.len() - 1]
       continue
@@ -664,7 +664,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
       return {v: 0, err: "excess input"}
     }
 
-    while ops.len() > 0 {
+    while ! ops.is_empty() {
       let top = ops[ops.len() - 1]
 
       if top == "(" {
@@ -695,7 +695,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
 
   return {v: 0, err: "bad expression"} when expect_operand
 
-  while ops.len() > 0 {
+  while ! ops.is_empty() {
     let op = ops[ops.len() - 1]
     ops = ops[0..ops.len() - 1]
 
@@ -1082,7 +1082,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
       }
 
       if d == 41 {
-        if group_starts.len() == 0 {
+        if group_starts.is_empty() {
           return {pattern: "", error: "Unmatched ) or \\)", groups}
         }
 
@@ -1246,7 +1246,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
     last_was_repeat = false
   }
 
-  if group_starts.len() > 0 {
+  if ! group_starts.is_empty() {
     return {pattern: "", error: "Unmatched ( or \\(", groups}
   }
 
@@ -1342,7 +1342,7 @@ pure captures_at(text: Str, s: Int, e: Int, at_start: Regex, at_offset: Regex) -
   let pw = char_width_before(text, s)
   let caps = at_offset.captures(text.byte_slice(s - pw, e + tail - s + pw))
 
-  return [] when caps.len() == 0
+  return [] when caps.is_empty()
 
   [caps[0].byte_slice(pw, caps[0].byte_len() - pw)] + caps[1..]
 }
@@ -1361,7 +1361,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
   let re = regex.compile(tr.pattern)?
   let found = re.find(text)
 
-  return {text, notes: []} when found.len() == 0
+  return {text, notes: []} when found.is_empty()
 
   let body = tr.pattern.byte_slice(4, tr.pattern.byte_len() - 4)
   let at_start = regex.compile(f"(?m)\\A(?:{body})")?
@@ -1376,7 +1376,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
     if m.end > m.start and (i + 1 == found.len() or found[i + 1].start != m.end) {
       let probe = captures_at(text, m.end, m.end, at_start, at_offset)
 
-      if probe.len() > 0 and probe[0] == "" {
+      if ! probe.is_empty() and probe[0] == "" {
         spans += [m.end, m.end]
       }
     }
@@ -1399,7 +1399,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
       out += [repl]
     } else {
       let caps = captures_at(text, s, e, at_start, at_offset)
-      let sub = substitute_captures(repl, if caps.len() > 0 { caps } else { [text.byte_slice(s, e - s)] })
+      let sub = substitute_captures(repl, if ! caps.is_empty() { caps } else { [text.byte_slice(s, e - s)] })
       out += [sub.text]
       notes += sub.notes
     }
@@ -1433,12 +1433,12 @@ pure regexp_text(text: Str, pat: Str, repl: Str, has_repl: Bool) -> Result[Built
 
   if ! has_repl {
     let found = re.find(text)
-    return {text: if found.len() == 0 { "-1" } else { f"{found[0].start}" }, notes: []}
+    return {text: if found.is_empty() { "-1" } else { f"{found[0].start}" }, notes: []}
   }
 
   let caps = re.captures(text)
 
-  return {text: "", notes: []} when caps.len() == 0
+  return {text: "", notes: []} when caps.is_empty()
 
   substitute_captures(repl, caps)
 }
@@ -1931,7 +1931,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         continue
       }
 
-      if wraps.len() > 0 {
+      if ! wraps.is_empty() {
         # Wrapped text is read last-registered first, each as its own block.
         var k = 0
 
@@ -1975,7 +1975,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       # A builtin token from `defn`: it becomes an argument's definition when
       # it starts that argument, and is dropped anywhere else.
       if nc > 0 {
-        if cur.parts.len() == 0 and cur.func == "" {
+        if cur.parts.is_empty() and cur.func == "" {
           cur.func = iname
         }
 
@@ -2341,7 +2341,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
             push_text = r.text
             notes += r.notes
 
-            if memo_key != "" and r.notes.len() == 0 {
+            if memo_key != "" and r.notes.is_empty() {
               eval_memo[memo_key] = r.text
             }
           }
@@ -2415,7 +2415,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           for target in args {
             let older = stacks.get(target) ?? []
 
-            if older.len() > 0 {
+            if ! older.is_empty() {
               defs[target] = older[older.len() - 1]
 
               if older.len() == 1 {
@@ -2506,7 +2506,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           if target != div {
             if div == 0 {
               io.write_stdout(sink.join(""))
-            } else if div > 0 and sink.len() > 0 {
+            } else if div > 0 and ! sink.is_empty() {
               diversions[f"{div}"] = f"{diversions.get(f"{div}") ?? ""}{sink.join("")}"
             }
 
@@ -2828,7 +2828,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       break
     }
 
-    if notes.len() > 0 {
+    if ! notes.is_empty() {
       # Diagnostics name the line of the macro name when it was read from a
       # file, else the current position in the innermost file.
       var where = ""
@@ -2910,7 +2910,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   # End of input: diversions are emitted in numeric order.
   if div == 0 {
     io.write_stdout(sink.join(""))
-  } else if div > 0 and sink.len() > 0 {
+  } else if div > 0 and ! sink.is_empty() {
     diversions[f"{div}"] = f"{diversions.get(f"{div}") ?? ""}{sink.join("")}"
   }
 
@@ -3011,7 +3011,7 @@ proc parse_options(argv: List[Str]) -> Result[Options?] {
     }
   }
 
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     inputs = [{name: "-", stdin: true}]
   }
 

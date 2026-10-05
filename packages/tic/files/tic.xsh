@@ -839,7 +839,7 @@ proc parse_cap_table(standard_rows: Str, ncurses_rows: Str) [error] -> Result[Ca
 
   for row in standard_rows.split("\n") {
     let fields = row.fields()
-    if fields.len() == 0 {
+    if fields.is_empty() {
       continue
     }
 
@@ -862,7 +862,7 @@ proc parse_cap_table(standard_rows: Str, ncurses_rows: Str) [error] -> Result[Ca
   var user_types: Map[Str, Int] = {}
   for row in ncurses_rows.split("\n") {
     let fields = row.fields()
-    if fields.len() == 0 {
+    if fields.is_empty() {
       continue
     }
 
@@ -2028,7 +2028,7 @@ proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   }
 
   let built = bytes.concat(out)
-  if built.len() == 0 {
+  if built.is_empty() {
     return term
   }
 
@@ -2218,7 +2218,7 @@ pure merge_uses(term: Term, targets: List[Term]) -> Term {
     n -= 1
   }
 
-  if targets.len() > 0 {
+  if ! targets.is_empty() {
     merged = merge_term(merged, term)
   }
 
@@ -2292,7 +2292,7 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
       }
 
       let targets = links[pending]
-      if [target for target in targets if target not in resolved].len() > 0 {
+      if ! [target for target in targets if target not in resolved].is_empty() {
         continue
       }
 
@@ -2471,11 +2471,11 @@ proc write_object(term: Term) -> Result[Bytes] {
   ] + strings
 
   let ext = term.ext
-  let extended = TRUE_BOOLEAN in ext.bools or [value for value in ext.nums if value != ABSENT_NUMERIC].len() > 0 or [
+  let extended = TRUE_BOOLEAN in ext.bools or ! [value for value in ext.nums if value != ABSENT_NUMERIC].is_empty() or ! [
     value
     for value in ext.strs
     if ! is_absent(value)
-  ].len() > 0
+  ].is_empty()
 
   var parts = standard
   if extended {
@@ -2561,7 +2561,7 @@ proc write_entry(term: Term, outdir: Path) {
 }
 
 pure selected(names: Str, wanted: List[Str]) -> Bool {
-  if wanted.len() == 0 {
+  if wanted.is_empty() {
     return true
   }
 

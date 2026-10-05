@@ -460,7 +460,7 @@ proc build_installer(
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
-  if argv.len() > 0 {
+  if ! argv.is_empty() {
     return Err(InstallerQemuTestError.Failed(kind: "argv", message: "installer-qemu-test.xsh does not accept arguments"))
   }
 

@@ -301,7 +301,7 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
     )?
     let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words())
     assert made.cargo == seed.cargo
-    assert seed.cargo.len() > 0
+    assert ! seed.cargo.is_empty()
 
     let seed_options = split_at_image(seed_argv).docker
     var index = 0

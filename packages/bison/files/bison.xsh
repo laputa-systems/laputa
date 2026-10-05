@@ -203,7 +203,7 @@ proc parse_rules(text: Str) -> Result[List[GrammarRule]] {
     }
   }
 
-  return Err(ToolError.Failed(kind: "yacc", message: "no grammar rules found")) when rules.len() == 0
+  return Err(ToolError.Failed(kind: "yacc", message: "no grammar rules found")) when rules.is_empty()
 
   rules
 }
@@ -1114,7 +1114,7 @@ proc index_of(names: List[Str], name: Str) [error] -> Int {
 }
 
 proc generate_int_array(name: Str, values: List[Str]) [error] -> Result[Str] {
-  let body = if values.len() == 0 { "0" } else { values.join(", ") }
+  let body = if values.is_empty() { "0" } else { values.join(", ") }
   f"static const int {name}[] = {{ {body} }};"
 }
 
@@ -1173,7 +1173,7 @@ proc generate_verbose_report(rules: List[GrammarRule], start: Str) [error] -> Re
   var i = 0
 
   for rule in rules {
-    let rhs = if rule.rhs.len() == 0 { "/* empty */" } else { rule.rhs.join(" ") }
+    let rhs = if rule.rhs.is_empty() { "/* empty */" } else { rule.rhs.join(" ") }
     lines += [f"{i}: {rule.lhs}: {rhs}"]
     i = i + 1
   }

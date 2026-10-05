@@ -281,7 +281,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
     }
   }
 
-  if kind == types.package_meta() and entries.len() != 0 {
+  if kind == types.package_meta() and ! entries.is_empty() {
     return Err(types.PmError.PackageContract(f"metapackage {receipt.package_name} must have no payload entries"))
   }
 

@@ -176,7 +176,7 @@ test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
   assert composite_has_member(plan, "fs/proc/proc.o", "fs/proc/task_mmu.o")
   assert composite_has_member(plan, "fs/ramfs/ramfs.o", "fs/ramfs/file-mmu.o")
   assert composite_has_member(plan, "fs/devpts/devpts.o", "fs/devpts/inode.o")
-  assert plan.unsupported.len() == 0
+  assert plan.unsupported.is_empty()
 }
 
 test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
@@ -355,8 +355,8 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
       ],
     )?
 
-    assert archive_plan.missing_sources.len() == 0
-    assert archive_plan.generated_objects.len() == 0
+    assert archive_plan.missing_sources.is_empty()
+    assert archive_plan.generated_objects.is_empty()
     assert archive_plan.tasks.len() == 29
     assert contains_path(archive_plan.archives, ".xsh-kbuild/built-in.a")
     assert contains_path(archive_plan.archives, ".xsh-kbuild/lib.a")
@@ -370,8 +370,8 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
     assert tasks.len() == archive_plan.tasks.len()
     let first = tasks[0]
     let {argv, outputs, ..} = first
-    assert argv.len() > 0
-    assert outputs.len() > 0
+    assert ! argv.is_empty()
+    assert ! outputs.is_empty()
     var saw_asm = false
 
     for task in archive_plan.tasks {
@@ -553,7 +553,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
   cd root {
     let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
     assert archive_plan.missing_sources.len() == 1
-    assert archive_plan.generated_objects.len() == 0
+    assert archive_plan.generated_objects.is_empty()
     assert contains_path(archive_plan.missing_sources, "missing.o")
     assert archive_plan.archives.len() == 1
   }
@@ -694,9 +694,9 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       assert compact_parallel.missing_sources == compact_serial.missing_sources
       assert compact_parallel.task_count == compact_serial.task_count
       assert compact_parallel.task_specs == compact_serial.task_specs
-      assert compact_parallel.tasks.len() == 0
-      assert compact_serial.tasks.len() == 0
-      assert compact_parallel.task_specs.len() > 0
+      assert compact_parallel.tasks.is_empty()
+      assert compact_serial.tasks.is_empty()
+      assert ! compact_parallel.task_specs.is_empty()
     }
   }
 }

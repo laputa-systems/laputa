@@ -589,7 +589,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
   let disks = list_disks()?
 
-  if disks.len() == 0 {
+  if disks.is_empty() {
     return Err(InstallerError.Failed(kind: "no-disks", message: "no installable disks found"))
   }
 

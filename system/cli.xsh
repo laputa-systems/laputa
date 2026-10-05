@@ -39,7 +39,7 @@ aarch64 under HVF on macOS, aarch64 or x86_64 under KVM on Linux.
 
 ## Decode command arguments without filesystem-dependent interpretation.
 export proc parse(argv: List[Str]) [error] -> Result[CliArgs, Error] {
-  if argv.len() == 0 or argv[0] == "--help" or argv[0] == "-h" {
+  if argv.is_empty() or argv[0] == "--help" or argv[0] == "-h" {
     return Err(types.LaputaError.Usage(usage()))
   }
 

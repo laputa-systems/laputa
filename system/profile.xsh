@@ -27,7 +27,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     return Err(types.LaputaError.Profile(f"invalid profile name {value.name}"))
   }
 
-  if value.package_roots.len() == 0 {
+  if value.package_roots.is_empty() {
     return Err(types.LaputaError.Profile(f"{value.name} has no runtime package roots"))
   }
 

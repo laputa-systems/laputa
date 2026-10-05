@@ -116,7 +116,7 @@ pure cycle_from(
 
     let nested = cycle_from(dependency, selected, dependency_edges, trail.push(dependency))
 
-    return nested when nested.len() > 0
+    return nested when ! nested.is_empty()
   }
 
   []
@@ -128,7 +128,7 @@ pure find_cycle(selected_names: List[Str], dependency_edges: List[types.Dependen
   for name in selected_names {
     let cycle = cycle_from(name, selected, dependency_edges, [name])
 
-    return cycle when cycle.len() > 0
+    return cycle when ! cycle.is_empty()
   }
 
   []
@@ -247,9 +247,9 @@ export proc topological_levels(
       for name in selected_names
       if ! (emitted.get(name) ?? false) and (unresolved.get(name) ?? 0) == 0
     ]
-    if ready.len() == 0 {
+    if ready.is_empty() {
       let cycle = find_cycle(selected_names, local_edges)
-      let rendered = if cycle.len() > 0 { cycle.join(" -> ") } else { selected_names.join(", ") }
+      let rendered = if ! cycle.is_empty() { cycle.join(" -> ") } else { selected_names.join(", ") }
       return Err(types.PmError.DependencyCycle(f"package dependency cycle: {rendered}"))
     }
 
@@ -320,7 +320,7 @@ export proc packages_buildable_without(
   for pkg in catalog.packages {
     let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
 
-    if [name for name in closure if name in excluded].len() == 0 {
+    if [name for name in closure if name in excluded].is_empty() {
       selected += [pkg.name]
     }
   }

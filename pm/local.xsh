@@ -173,7 +173,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
   }
 
-  return when pkg.nostrip or binaries.len() == 0
+  return when pkg.nostrip or binaries.is_empty()
 
   let strip = process.which("llvm-strip")?
 
@@ -285,7 +285,7 @@ deps	{pkg.deps.join(" ")}
 mkdeps_host	{pkg.mkdeps_host.join(" ")}
 """
 
-  if pkg.mkdeps_target.len() > 0 {
+  if ! pkg.mkdeps_target.is_empty() {
     body = f"""{body}mkdeps_target	{pkg.mkdeps_target.join(" ")}
 """
   }

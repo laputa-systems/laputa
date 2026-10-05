@@ -82,7 +82,7 @@ pure standard_rows(caps: Str) -> Str {
   [
     line.fields()[0..3].join(" ")
     for line in caps.split("\n")
-    if ! line.starts_with("#") and line.fields().len() > 0
+    if ! line.starts_with("#") and ! line.fields().is_empty()
   ].join("\n")
 }
 
@@ -91,7 +91,7 @@ pure ncurses_rows(caps: Str) -> Str {
   [
     line.fields()[0..3].join(" ")
     for line in caps.split("\n")
-    if line.fields().len() > 0 and (line.fields()[0] == "infoalias" or line.fields()[0] == "userdef")
+    if ! line.fields().is_empty() and (line.fields()[0] == "infoalias" or line.fields()[0] == "userdef")
   ].join("\n")
 }
 
@@ -111,7 +111,7 @@ proc check_caps_table() {
       let want = expected.split("\n")
       let have = embedded.split("\n")
       let differing = [k for k in range(want.len()) if k >= have.len() or want[k] != have[k]]
-      let row = if differing.len() > 0 { want[differing[0]] } else { have[want.len()] }
+      let row = if ! differing.is_empty() { want[differing[0]] } else { have[want.len()] }
       return Err(CapsTableError.Mismatch(block:, row:))
     }
   }

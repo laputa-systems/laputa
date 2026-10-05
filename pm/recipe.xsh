@@ -48,7 +48,7 @@ proc validate_positive_release(name: Str, rel: Str) {
 # A package architecture list names each supported target at most once and
 # never `all`: omitting the export is the one way to say every target.
 proc validate_package_architectures(name: Str, architectures: List[Str]) {
-  if architectures.len() == 0 {
+  if architectures.is_empty() {
     return package_contract_error(name, "architectures must name at least one target architecture")
   }
 
@@ -127,7 +127,7 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
   let architectures: List[Str] = raw.get("architectures")?.require()?
   let raw_checksums: List[Record] = raw.get("checksums")?.require()?
 
-  if architectures.len() == 0 {
+  if architectures.is_empty() {
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
@@ -388,7 +388,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
     if ! fp"{dir}/proof.xsh".exists() {
       return Err(types.PmError.PackageContract(f"{name}: payload package must contain proof.xsh"))
     }
-  } else if filetree.len() > 0 {
+  } else if ! filetree.is_empty() {
     return Err(types.PmError.PackageContract(f"{name}: metapackage may not declare payload filetree entries"))
   }
 

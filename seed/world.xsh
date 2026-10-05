@@ -38,7 +38,7 @@ export type WorldArgs = {command: Str, arch: Str, packages: List[Str], stop: Str
 
 ## Parse `world_cli.xsh` argv; selection, repository, and root rules fail here, before any Docker run.
 export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error] {
-  if argv.len() == 0 or argv[0] not in ["plan", "build", "publish", "root"] {
+  if argv.is_empty() or argv[0] not in ["plan", "build", "publish", "root"] {
     return Err(xsh_seed.SeedError.Usage(world_usage()))
   }
 
@@ -67,7 +67,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error
     return Err(xsh_seed.SeedError.Usage(world_usage()))
   }
 
-  if parsed.packages.len() > 0 and parsed.stop != "" {
+  if ! parsed.packages.is_empty() and parsed.stop != "" {
     return Err(xsh_seed.SeedError.Usage("select packages with either --package (PKGS) or --stop (STOP), not both"))
   }
 
@@ -75,7 +75,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error
     return Err(xsh_seed.SeedError.Usage(f"{parsed.command} needs --repo URL, the local mirror\n\n{world_usage()}"))
   }
 
-  if parsed.command == "root" and (parsed.packages.len() == 0 or parsed.stop != "") {
+  if parsed.command == "root" and (parsed.packages.is_empty() or parsed.stop != "") {
     return Err(xsh_seed.SeedError.Usage(f"root needs one or more --package runtime roots\n\n{world_usage()}"))
   }
 
@@ -92,7 +92,7 @@ export pure world_stop_line(name: Str) -> Result[List[Str], Error] {
 
 ## The `pm repo plan` selection for explicit packages, a stop line, or (neither) every package.
 export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[Str], Error] {
-  if packages.len() > 0 {
+  if ! packages.is_empty() {
     var argv: List[Str] = []
 
     for name in packages {
@@ -305,7 +305,7 @@ export proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   let value = pm_plan_json.read(plan)?
   let missing = [node.name for node in value.nodes if pm_types.plan_action_is_build(node.action)]
 
-  if missing.len() > 0 {
+  if ! missing.is_empty() {
     return Err(
       xsh_seed.SeedError.Missing(
         f"{repo} lacks exact artifacts for {missing.join(", ")}; run `make publish` with a selection that includes them first",

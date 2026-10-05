@@ -147,7 +147,7 @@ proc parse_primary(tokens: List[Str], start: Int) -> Result[Parsed] {
     at += 1
   }
 
-  if words.len() == 0 {
+  if words.is_empty() {
     return Err(UapiError.Failed(kind: "uapi-expression", message: f"empty term in `{tokens.join(" ")}`"))
   }
 
@@ -267,7 +267,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
       continue
     }
 
-    if frames.len() == 0 {
+    if frames.is_empty() {
       return Err(UapiError.Failed(kind: "uapi-conditional", message: f"#{current.kind} without #if"))
     }
 
@@ -324,7 +324,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
     }
   }
 
-  if frames.len() > 0 {
+  if ! frames.is_empty() {
     return Err(UapiError.Failed(kind: "uapi-conditional", message: "#if without #endif"))
   }
 
@@ -336,7 +336,7 @@ export proc install_text(text: Str) [error] -> Result[Str, Error] {
   let lines = [rewrite_line(line) for line in text.lines()]
   let kept = unifdef(lines)?
 
-  return "" when kept.len() == 0
+  return "" when kept.is_empty()
 
   kept.join("\n") + "\n"
 }

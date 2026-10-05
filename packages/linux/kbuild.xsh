@@ -366,7 +366,7 @@ pure normalize_rel_path(path_value: Path) -> Path {
     continue when part == "" or part == "."
 
     if part == ".." {
-      if parts.len() > 0 {
+      if ! parts.is_empty() {
         parts = parts |> take(parts.len() - 1)
       }
 
@@ -376,7 +376,7 @@ pure normalize_rel_path(path_value: Path) -> Path {
     parts += [part]
   }
 
-  return p"." when parts.len() == 0
+  return p"." when parts.is_empty()
 
   fp"{parts.join("/")}"
 }
@@ -1191,7 +1191,7 @@ proc kbuild_compile_flags_for_dir(
 
         if assign.op == "+=" {
           subdir_flags += rhs_flags
-        } else if assign.op != "?=" or subdir_flags.len() == 0 {
+        } else if assign.op != "?=" or subdir_flags.is_empty() {
           subdir_flags = rhs_flags
         }
 
@@ -1206,7 +1206,7 @@ proc kbuild_compile_flags_for_dir(
 
         if assign.op == "+=" {
           flags[key] = current.extend(rhs.fields())
-        } else if assign.op != "?=" or current.len() == 0 {
+        } else if assign.op != "?=" or current.is_empty() {
           flags[key] = rhs.fields()
         }
 
@@ -1225,7 +1225,7 @@ proc kbuild_compile_flags_for_dir(
     }
   }
 
-  if subdir_flags.len() > 0 {
+  if ! subdir_flags.is_empty() {
     flags["*"] = subdir_flags
   }
 
@@ -1439,7 +1439,7 @@ export proc augment_missing_composites(
               let dir_key = path_key(dir)
               let current = missing_by_dir.get(dir_key) ?? []
 
-              if current.len() == 0 {
+              if current.is_empty() {
                 dirs += [dir]
               }
 
@@ -1459,7 +1459,7 @@ export proc augment_missing_composites(
       for obj in missing_by_dir.get(path_key(dir)) ?? [] {
         let members = composite_members(dir, obj.name, vars)
 
-        if members.len() > 0 {
+        if ! members.is_empty() {
           found += [{object: obj, members: members}]
         }
       }
@@ -1540,7 +1540,7 @@ export proc refresh_plan_dirs(
       objects += [obj]
       let members = composite_members(dir, obj.name, vars)
 
-      if members.len() > 0 {
+      if ! members.is_empty() {
         composites += [{object: obj, members: members}]
       }
     }
@@ -1784,11 +1784,11 @@ export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan)
 
   var next = plan
 
-  if objects.len() > 0 {
+  if ! objects.is_empty() {
     next = add_plan_objects(add_dir(next, p"arch/x86/kernel"), objects)
   }
 
-  if dirs.len() > 0 {
+  if ! dirs.is_empty() {
     next = refresh_plan_dirs(p".", config, next, "x86", dirs)?
   }
 
@@ -1860,7 +1860,7 @@ export proc refresh_plan_composite_members(
     let vars = vars_for_dir(root, dir, config, srcarch)?
     let members = composite_members(dir, obj.name, vars)
 
-    if members.len() > 0 {
+    if ! members.is_empty() {
       refreshed[path_key(obj)] = {object: obj, members: members}
 
       for member in members {
@@ -1939,7 +1939,7 @@ proc apply_item(
       add_object_at(plan, obj, dir)
     }
 
-    if members.len() > 0 {
+    if ! members.is_empty() {
       next = add_composite(next, {object: obj, members: members})
     }
 
@@ -2449,7 +2449,7 @@ export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result
   var plan_composites: List[CompositeRecord] = []
   var plan_unsupported: List[Str] = []
 
-  while frontier.len() > 0 {
+  while ! frontier.is_empty() {
     let pending = unique_unseen_paths(frontier, seen)
     frontier = []
 
@@ -2597,7 +2597,7 @@ proc discover_scans(
   var aggregate = empty_plan()
   var visited = 0
 
-  while frontier.len() > 0 {
+  while ! frontier.is_empty() {
     emit_stage_progress(root, options, f"xsh-kbuild-frontier-start frontier={frontier.len()}")
     let pending = unique_unseen_paths(frontier, seen)
     emit_stage_progress(root, options, f"xsh-kbuild-frontier-pending pending={pending.len()}")
@@ -4065,7 +4065,7 @@ pure pi_source(obj: Path) -> Path {
 }
 
 pure abi_enabled(abi: Str, abis: List[Str]) -> Bool {
-  return true when abis.len() == 0
+  return true when abis.is_empty()
 
   abi in abis
 }
@@ -4755,7 +4755,7 @@ export pure x86_vmlinux_ldflags(config: Kconfig) -> List[Str] {
 # them into vmlinux.a defines those symbols twice.
 ## The archives and objects whole-archived into the x86 vmlinux.a.
 export pure vmlinux_x86_archive_inputs(link_inputs: List[Path]) -> List[Path] {
-  if link_inputs.len() > 0 {
+  if ! link_inputs.is_empty() {
     return [input for input in link_inputs if ! path_key(input).starts_with(".xsh-kbuild/obj/drivers/firmware/efi/libstub/")]
   }
 
@@ -4824,7 +4824,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) {
     }
   }
 
-  if lines.len() == 0 {
+  if lines.is_empty() {
     return Err(ScriptError.Failed(kind: "linux-x86-voffset", message: f"no voffset symbols found in {input}"))?
   }
 
@@ -4849,7 +4849,7 @@ proc write_x86_zoffset_header(nm: Path, input: Path) {
     }
   }
 
-  if lines.len() == 0 {
+  if lines.is_empty() {
     return Err(ScriptError.Failed(kind: "linux-x86-zoffset", message: f"no zoffset symbols found in {input}"))?
   }
 
@@ -5931,11 +5931,11 @@ export proc run_builtin_archive_plan(
   archive_plan: BuiltinArchivePlan,
   jobs_count: Int,
 ) [fs, process, env, error] -> Result[List[Path], Error] {
-  if archive_plan.missing_sources.len() > 0 {
+  if ! archive_plan.missing_sources.is_empty() {
     print "xsh-kbuild-missing-objects" archive_plan.missing_sources.len() "tolerated"
   }
 
-  if archive_plan.generated_objects.len() > 0 {
+  if ! archive_plan.generated_objects.is_empty() {
     return Err(
       ScriptError.Failed(
         kind: "kbuild-generated-objects",
@@ -7036,7 +7036,7 @@ proc assemble_builtin_archive_plan(
     dir_index -= 1
     let dir = plan.dirs[dir_index]
     let dir_key = path_key(dir)
-    let needed = (objects_by_dir.get(dir_key) ?? []).len() > 0 or (archive_needed.get(dir_key) ?? false)
+    let needed = ! (objects_by_dir.get(dir_key) ?? []).is_empty() or (archive_needed.get(dir_key) ?? false)
 
     archive_needed[dir_key] = needed
 
@@ -7068,7 +7068,7 @@ proc assemble_builtin_archive_plan(
     let dir_key = path_key(dir)
     let lib_objs = lib_objects_by_dir.get(dir_key) ?? []
 
-    if lib_objs.len() > 0 {
+    if ! lib_objs.is_empty() {
       let sorted_lib_objs = sorted_paths(lib_objs)
       let lib_archive = dir_lib_archive(dir)
       let lib_deps = lib_deps_by_dir.get(dir_key) ?? []

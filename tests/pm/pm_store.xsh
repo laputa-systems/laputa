@@ -423,6 +423,6 @@ test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx
   assert ! store.artifact_path(root, dropped).exists()?
   assert kept_reproof.exists()?
   assert ! dropped_reproof.parent.exists()?
-  assert fs.children(fp"{root}/v2/tmp")?.collect().len() == 0
+  assert fs.children(fp"{root}/v2/tmp")?.collect().is_empty()
   test.eq(store.verify_all(root)?.len(), 1)
 }

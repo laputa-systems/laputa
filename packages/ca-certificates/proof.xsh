@@ -12,7 +12,7 @@ proc verify_package_metadata(rootfs: Path) {
   ensure(metadata_path.exists()?, "ca-certificates-metadata", "missing package metadata")
   let metadata = json.read(metadata_path)?.require(Record)?
   let deps = metadata.get("deps")?.require(List[Str])?
-  ensure(deps.len() == 0, "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")
+  ensure(deps.is_empty(), "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")
 }
 
 proc main(rootfs = /rootfs) [fs, error] {

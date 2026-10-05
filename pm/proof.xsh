@@ -76,7 +76,7 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
     }
   }
 
-  if failures.len() > 0 {
+  if ! failures.is_empty() {
     let first = failures[0]
 
     if first.provider == "" {

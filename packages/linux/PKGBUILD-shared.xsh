@@ -515,7 +515,7 @@ proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
     }
   }
 
-  if outputs.len() == 0 {
+  if outputs.is_empty() {
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-native-kbuild-target-empty",
@@ -555,7 +555,7 @@ export proc run_targeted_kbuild_outputs(
 
 ## Exported declaration `require_valid_archive_plan`.
 export proc require_valid_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) [error] {
-  if archive_plan.duplicate_outputs.len() > 0 {
+  if ! archive_plan.duplicate_outputs.is_empty() {
     return Err(kbuild.ScriptError.Failed(kind: "linux-native-kbuild-duplicate-output", message: "archive plan has duplicate output"))
   }
 
@@ -581,7 +581,7 @@ export proc require_valid_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) 
 export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) [error] {
   require_valid_archive_plan(archive_plan)
 
-  if archive_plan.generated_objects.len() > 0 {
+  if ! archive_plan.generated_objects.is_empty() {
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-native-kbuild-generated-incomplete",
@@ -590,7 +590,7 @@ export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchiv
     )
   }
 
-  if archive_plan.missing_sources.len() > 0 {
+  if ! archive_plan.missing_sources.is_empty() {
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-native-kbuild-missing-sources",

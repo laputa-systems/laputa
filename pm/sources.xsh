@@ -165,7 +165,7 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) -> Result[Pa
 }
 
 pure source_selected(source: types.UpstreamSource, arch: Str) -> Bool {
-  source.architectures.len() == 0 or "all" in source.architectures or arch in source.architectures
+  source.architectures.is_empty() or "all" in source.architectures or arch in source.architectures
 }
 
 ## Resolves one source line to a local file or directory. URL sources resolve only through the content-addressed cache or the local mirror.
@@ -727,7 +727,7 @@ proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchO
     }
   }
 
-  return Mismatch(mismatched.extend(unavailable).join("; ")) when mismatched.len() > 0
+  return Mismatch(mismatched.extend(unavailable).join("; ")) when ! mismatched.is_empty()
 
   Unavailable(unavailable.join("; "))
 }
@@ -780,7 +780,7 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
     eprint $failure
   }
 
-  if failures.len() > 0 {
+  if ! failures.is_empty() {
     return Err(types.PmError.DownloadFailed(f"{failures.len()} pinned source(s) could not be fetched"))
   }
 }

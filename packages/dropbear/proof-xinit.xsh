@@ -245,7 +245,7 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let listeners = process.port(port)? |> map .argv
 
   ensure(
-    listeners.len() == 0,
+    listeners.is_empty(),
     "dropbear-stop",
     f"dropbear still had listeners after stop: {live_dropbear_diagnostics(port)?}",
   )

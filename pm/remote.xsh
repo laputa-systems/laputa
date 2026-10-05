@@ -320,7 +320,7 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
   let fields = [value.artifact_key, value.recipe_sha256, value.executor_sha256, value.proof_key, value.proof_sha256]
   let populated = [field for field in fields if field != ""]
 
-  if populated.len() != 0 and populated.len() != fields.len() {
+  if ! populated.is_empty() and populated.len() != fields.len() {
     return Err(types.PmError.PackageContract(f"remote package {value.name} has a partial immutable identity"))
   }
 

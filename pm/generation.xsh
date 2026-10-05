@@ -190,7 +190,7 @@ proc generation_validate_plan(value: types.GenerationPlan) {
 
   let canonical_roots = generation_sorted_unique(value.runtime_roots)
 
-  if value.runtime_roots.len() == 0 or value.runtime_roots != canonical_roots {
+  if value.runtime_roots.is_empty() or value.runtime_roots != canonical_roots {
     return Err(types.PmError.PackageContract("generation runtime roots must be non-empty, sorted, and unique"))
   }
 
@@ -291,7 +291,7 @@ export proc plan_profile(
   generation_validate_profile(profile)
   let roots = generation_sorted_unique(runtime_roots)
 
-  if roots.len() == 0 {
+  if roots.is_empty() {
     return Err(types.PmError.Usage("generation plan needs one or more runtime roots"))
   }
 

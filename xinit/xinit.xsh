@@ -191,7 +191,7 @@ proc parse_inittab_line(line: Str, index: Int) [process, error] -> Result[Initta
 
   let argv = process.argv_words(command)?
 
-  if argv.len() == 0 or argv[0] == "" {
+  if argv.is_empty() or argv[0] == "" {
     return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing command"))
   }
 
@@ -366,7 +366,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
     }
   }
 
-  if groups.len() > 0 {
+  if ! groups.is_empty() {
     let timeout = if fast { 0ms } else { 2s }
     let _ = unix.shutdown_process_groups(groups, timeout)?
   }
@@ -1204,7 +1204,7 @@ proc stop_service(name: Str) {
 
   let dependents = running_dependents(name)?
 
-  if dependents.len() > 0 {
+  if ! dependents.is_empty() {
     return Err(XinitError.Failed(kind: "xinit-deps", message: f"{name}: running dependents: {dependents.join(", ")}"))
   }
 
@@ -1292,7 +1292,7 @@ proc show_logs(name: Str) {
 }
 
 proc check_service(...targets: List[Str]) {
-  let services = if targets.len() == 0 { all_services()? } else { [load_service(targets[0])?] }
+  let services = if targets.is_empty() { all_services()? } else { [load_service(targets[0])?] }
   check_service_graph(services)
   let names = [service.name for service in services].join(" ")
 
@@ -2015,13 +2015,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
   )?
 
   if parsed.command == "pid1" {
-    if parsed.args.len() > 0 {
+    if ! parsed.args.is_empty() {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit"))
     }
 
     run_pid1(fp"{env_value("XSH_INIT_INITTAB", "/etc/inittab")}")
   } else if parsed.command == "help" {
-    if parsed.args.len() > 0 {
+    if ! parsed.args.is_empty() {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit help"))
     }
 
@@ -2039,7 +2039,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
 
     scan_command(parsed.args.get(0) ?? "boot")
   } else if parsed.command == "list" {
-    if parsed.args.len() > 0 {
+    if ! parsed.args.is_empty() {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit list"))
     }
 
@@ -2055,7 +2055,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       Err(_) => graph_target(target)
     }
   } else if parsed.command == "start" or parsed.command == "stop" or parsed.command == "restart" or parsed.command == "reload" or parsed.command == "status" or parsed.command == "logs" or parsed.command == "supervise" {
-    if parsed.args.len() > 0 {
+    if ! parsed.args.is_empty() {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
@@ -2065,13 +2065,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit check [SERVICE|PATH]"))
     }
 
-    if parsed.args.len() == 0 {
+    if parsed.args.is_empty() {
       check_service()
     } else {
       check_service(parsed.args[0])
     }
   } else {
-    if parsed.args.len() > 0 {
+    if ! parsed.args.is_empty() {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit INITTAB"))
     }
 

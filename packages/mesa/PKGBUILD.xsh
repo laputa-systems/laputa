@@ -465,7 +465,7 @@ proc edge_outputs(build_line: Str) [error] -> Result[List[Str]] {
 }
 
 proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
-  return split when block.len() == 0
+  return split when block.is_empty()
 
   for line in block {
     if line.starts_with(" COMMAND = ") and vendored_generator in line {
@@ -488,7 +488,7 @@ proc stage_vendored_outputs() {
   var block: List[Str] = []
 
   for line in ninja.read_text()?.split("\n") {
-    if block.len() > 0 and line.starts_with(" ") {
+    if ! block.is_empty() and line.starts_with(" ") {
       block += [line]
       continue
     }

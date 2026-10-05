@@ -297,7 +297,7 @@ export proc publish(
     repo_publish_immutable_object(remote_repo, fp"{stage.entry.proof}", stage.publication.proof, token, work)
   }
 
-  if pending.len() > 0 {
+  if ! pending.is_empty() {
     remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)
   }
 }

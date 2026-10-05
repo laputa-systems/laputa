@@ -45,7 +45,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
     return Err(ContainerOutputError.Failed("system bundle key must be a lowercase SHA-256 digest"))
   }
 
-  if files.len() == 0 {
+  if files.is_empty() {
     return Err(ContainerOutputError.Failed("system bundle must contain files"))
   }
 

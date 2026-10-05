@@ -242,7 +242,7 @@ proc parse_repo_packages(args: List[Str], command: Str) -> Result[RepoPackagesAr
     Err(problem) => return Err(problem)
   }
 
-  if parsed.packages.len() == 0 {
+  if parsed.packages.is_empty() {
     return Err(types.PmError.Usage(f"{command} requires one-or-more PACKAGE arguments"))
   }
 
@@ -300,11 +300,11 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
         Err(problem) => return Err(problem)
       }
 
-      if parsed.all == (parsed.roots.len() > 0) {
+      if parsed.all == ! parsed.roots.is_empty() {
         return Err(types.PmError.Usage("pm repo plan requires exactly one of --all or one-or-more --root"))
       }
 
-      if parsed.without.len() > 0 and ! parsed.all {
+      if ! parsed.without.is_empty() and ! parsed.all {
         return Err(types.PmError.Usage("pm repo plan --without requires --all"))
       }
 
@@ -418,11 +418,11 @@ proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
     Err(problem) => return Err(problem)
   }
 
-  if parsed.all == (parsed.packages.len() > 0) {
+  if parsed.all == ! parsed.packages.is_empty() {
     return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
   }
 
-  let names = if parsed.targets.len() == 0 { [f"{util.host_arch()?}-linux-musl"] } else { parsed.targets }
+  let names = if parsed.targets.is_empty() { [f"{util.host_arch()?}-linux-musl"] } else { parsed.targets }
   var targets: List[types.Target] = []
 
   for name in names {
@@ -468,7 +468,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
       Err(problem) => return Err(problem)
     }
 
-    if parsed.runtime_roots.len() == 0 {
+    if parsed.runtime_roots.is_empty() {
       return Err(types.PmError.Usage("pm root compose requires one-or-more --runtime-root PACKAGE"))
     }
 
@@ -537,7 +537,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
       Err(problem) => return Err(problem)
     }
 
-    return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when collected.keep.len() == 0
+    return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when collected.keep.is_empty()
 
     return StoreGc({store: collected.store, keep: collected.keep})
   }
@@ -560,7 +560,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
 }
 
 proc parse_command(argv: List[Str]) -> Result[PmCommand] {
-  return Help(help_text()) when argv.len() == 0 or argv[0] in ["-h", "--help", "help"]
+  return Help(help_text()) when argv.is_empty() or argv[0] in ["-h", "--help", "help"]
 
   match argv[0] {
     "repo" => parse_repo_command(argv)?
@@ -640,11 +640,11 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
 
   # `--all --without` plans an explicit root set: every package that builds
   # without the excluded ones, so the plan records exactly what it selected.
-  if args.without.len() > 0 {
+  if ! args.without.is_empty() {
     roots = graph.packages_buildable_without(catalog_value, args.without, policy_value)?
     all = false
 
-    if roots.len() == 0 {
+    if roots.is_empty() {
       return Err(types.PmError.Usage(f"no package builds without {args.without.join(", ")}"))
     }
   }
@@ -763,7 +763,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) {
     }
   }
 
-  if crate_items.len() > 0 {
+  if ! crate_items.is_empty() {
     sources.fetch_sources(cache_root, crate_items)
   }
 }
@@ -843,6 +843,6 @@ proc handle(command: PmCommand) {
 
 ## Parses only the final explicit PM command surface; there are no extension or legacy fallbacks.
 export proc run_pm_cli(argv: List[Str]) [fs, net, process, env, time, error] {
-  let args = if argv.len() > 0 and argv[0] == "--" { tail_after(argv, 1) } else { argv }
+  let args = if ! argv.is_empty() and argv[0] == "--" { tail_after(argv, 1) } else { argv }
   handle(parse_command(args)?)
 }

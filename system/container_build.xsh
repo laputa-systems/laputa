@@ -262,7 +262,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
     profile,
     [artifact.package_name for artifact in saved_generation_plan.artifacts],
   )
-  if forbidden.len() > 0 {
+  if ! forbidden.is_empty() {
     return Err(ContainerBuildError.Failed(f"{profile.name} generation includes forbidden packages: {forbidden.join(", ")}"))
   }
 

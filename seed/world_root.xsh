@@ -94,7 +94,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     }
 
     # musl's loader resolves every NEEDED soname inside the root, as at boot.
-    if report.interpreter != "" or report.needed.len() > 0 {
+    if report.interpreter != "" or ! report.needed.is_empty() {
       let listed = run.status $chroot $root $musl_interpreter --list $report.path > /dev/null 2> $loader_err
 
       if ! listed.ok {
@@ -132,7 +132,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     print f"root failure {failure}"
   }
 
-  if failures.len() > 0 {
+  if ! failures.is_empty() {
     return Err(WorldRootError.Failed(f"{failures.len()} ELF files in the composed root do not load"))
   }
 }

@@ -179,7 +179,7 @@ pure source_path(root: Path, src: Path) -> Path {
 ## Exported PM declaration `task_deps`.
 export pure task_deps(tasks: List[MakeTask], outputs: List[Path]) -> List[Str] {
   var wanted = {[output.display()]: true for output in outputs}
-  [task.name for task in tasks if task.outputs.len() > 0 and (wanted.get(task.outputs[0].display()) ?? false)]
+  [task.name for task in tasks if ! task.outputs.is_empty() and (wanted.get(task.outputs[0].display()) ?? false)]
 }
 
 proc pkg_config_words(
@@ -324,7 +324,7 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
       return Err(MakeError.DuplicateTask(message: f"duplicate make task '{task.name}'"))
     }
 
-    if task.argv.len() == 0 {
+    if task.argv.is_empty() {
       return Err(MakeError.InvalidTask(message: f"make task '{task.name}' has empty argv"))
     }
 
@@ -419,7 +419,7 @@ proc oldest_output_mtime(outputs: List[Path]) -> Result[Int] {
 }
 
 proc input_newer(task: MakeTask) -> Result[Bool] {
-  return true when task.outputs.len() == 0
+  return true when task.outputs.is_empty()
 
   let oldest_output = oldest_output_mtime(task.outputs)?
 
@@ -579,7 +579,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
     task_by_name[task.name] = task
     remaining_deps[task.name] = task.deps.len()
 
-    if task.deps.len() == 0 {
+    if task.deps.is_empty() {
       ready += [task.name]
     }
 
@@ -652,7 +652,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
 
     break when done_count >= tasks.len()
 
-    if running.len() == 0 {
+    if running.is_empty() {
       return Err(MakeError.DependencyCycle(message: "cycle in make task graph"))
     }
 
@@ -1207,7 +1207,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
       needs_cxx_link = needs_cxx_link or (cxx_groups.get(group_name) ?? false)
     }
 
-    if target.sources.len() > 0 {
+    if ! target.sources.is_empty() {
       let target_compile = compile_mixed_tasks(
         spec.cc,
         spec.triple,

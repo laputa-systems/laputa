@@ -246,7 +246,7 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
     }
   }
 
-  if parts.len() > 0 {
+  if ! parts.is_empty() {
     blocks += [bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?])]
   }
 
@@ -514,7 +514,7 @@ proc inode_bytes(
   # ext4's 60-byte inline inode field cannot represent a 60-byte fast link:
   # Linux treats that exact length as block-backed.  Keep the boundary strict
   # so the final byte is never misread as an inode block pointer.
-  if fast_symlink.len() > 0 and fast_symlink.len() < 60 {
+  if ! fast_symlink.is_empty() and fast_symlink.len() < 60 {
     out = put(out, 40, bytes.concat([fast_symlink, bytes.zero(60 - fast_symlink.len())?]))?
   } else {
     var index = 0
@@ -687,7 +687,7 @@ proc write_headers(
   total_blocks: Int,
   label: Str,
 ) {
-  let max_inode = if entries.len() == 0 { 10 } else { entries[entries.len() - 1].inode }
+  let max_inode = if entries.is_empty() { 10 } else { entries[entries.len() - 1].inode }
   var desc_parts = []
   var free_blocks_total = 0
   var group_index = 0

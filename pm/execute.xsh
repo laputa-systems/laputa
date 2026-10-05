@@ -373,14 +373,14 @@ proc execute_log_errors(log: Path) -> Result[Str] {
 
   let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
 
-  return execute_log_tail(log, 12)? when errors.len() == 0
+  return execute_log_tail(log, 12)? when errors.is_empty()
 
   let first = if errors.len() > 6 { errors.len() - 6 } else { 0 }
   errors[first..].join("\n")
 }
 
 proc execute_report_slowest(finished: List[FinishedNode]) {
-  return when finished.len() == 0
+  return when finished.is_empty()
 
   let ascending = finished |> sort-by .seconds |> collect
   var index = ascending.len() - 1
@@ -415,11 +415,11 @@ proc execute_scheduled(
   var failure = ""
   logs.mkdir()
 
-  while pending.len() > 0 or running.len() > 0 {
+  while ! pending.is_empty() or ! running.is_empty() {
     var waiting: List[types.PlanNode] = []
 
     for node in pending {
-      let ready = [key for key in execute_wait_keys(node) if key not in done].len() == 0
+      let ready = [key for key in execute_wait_keys(node) if key not in done].is_empty()
 
       if failure != "" or ! ready or running.len() >= jobs {
         waiting += [node]
@@ -468,12 +468,12 @@ proc execute_scheduled(
 
     pending = waiting
 
-    if running.len() == 0 {
+    if running.is_empty() {
       # Nothing runs and nothing can start: a failure drained the running
       # builds, or no pending node has its dependencies (an invalid plan).
       return Err(types.PmError.ExtensionFailed(failure)) when failure != ""
 
-      return Err(types.PmError.PackageContract(f"no plan node can start; {pending.len()} wait on missing dependencies")) when pending.len() > 0
+      return Err(types.PmError.PackageContract(f"no plan node can start; {pending.len()} wait on missing dependencies")) when ! pending.is_empty()
 
       break
     }

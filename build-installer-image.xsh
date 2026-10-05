@@ -673,7 +673,7 @@ proc build_host() {
 }
 
 proc main(...argv: List[Str]) [fs, net, process, env, time, error, io] {
-  if argv.len() > 0 {
+  if ! argv.is_empty() {
     fail "build-installer-image.xsh does not accept subcommands"
   }
 

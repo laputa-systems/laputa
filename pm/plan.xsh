@@ -185,7 +185,7 @@ pure plan_version_runs(value: Str) -> List[VersionRun] {
       continue
     }
 
-    runs += [{text, numeric: rx"^[0-9]+$".matches(text), separated: separated or runs.len() == 0}]
+    runs += [{text, numeric: rx"^[0-9]+$".matches(text), separated: separated or runs.is_empty()}]
     separated = false
   }
 
@@ -350,7 +350,7 @@ export proc resolve(
   let canonical_roots = plan_sorted_unique_names(roots)
   let selected_roots = if all { catalog.package_names(value) } else { canonical_roots }
 
-  if selected_roots.len() == 0 {
+  if selected_roots.is_empty() {
     return Err(types.PmError.Usage("build plan requires --all or one or more roots"))
   }
 
@@ -421,7 +421,7 @@ export proc resolve(
         } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
           action = types.plan_action_reuse_remote("exact remote artifact")
           remote = candidate.retrieval
-        } else if changed_dependencies.len() > 0 {
+        } else if ! changed_dependencies.is_empty() {
           # The remote tuple was built against other dependency artifacts.
           # Build locally; publishing the result under the same tuple
           # replaces the remote index row with the new artifact key.
@@ -643,7 +643,7 @@ proc validate_structure(value: types.BuildPlan) {
 
   let canonical_roots = plan_sorted_unique_names(value.roots)
 
-  if value.roots.len() == 0 or value.roots != canonical_roots {
+  if value.roots.is_empty() or value.roots != canonical_roots {
     return Err(types.PmError.PackageContract("build plan roots must be non-empty, sorted, and unique"))
   }
 

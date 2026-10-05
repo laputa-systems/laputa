@@ -16,7 +16,7 @@ pure seed_usage() -> Str {
 type SeedArgs = {command: Str, arch: Str, xsh_root: Str, jobs: Int, suites: List[Str]}
 
 proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
-  if argv.len() == 0 or argv[0] not in ["fetch", "build", "smoke"] {
+  if argv.is_empty() or argv[0] not in ["fetch", "build", "smoke"] {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }
 
@@ -45,7 +45,7 @@ proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
     index += 2
   }
 
-  if parsed.arch == "" or parsed.xsh_root == "" or (parsed.command != "smoke" and parsed.suites.len() > 0) {
+  if parsed.arch == "" or parsed.xsh_root == "" or (parsed.command != "smoke" and ! parsed.suites.is_empty()) {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }
 

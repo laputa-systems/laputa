@@ -21,7 +21,7 @@ proc main(...argv: List[Str]) [fs, time, error] {
       break
     }
 
-    if pending.len() == 0 {
+    if pending.is_empty() {
       if active == 0 {
         json.write(state_path, {...state, done: true})
         fs.unlock(lock)

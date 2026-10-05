@@ -632,7 +632,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   PKGBUILD_shared.timing_done("plan", plan_start)
   PKGBUILD_shared.stop_after("plan")
 
-  if archive_plan.generated_objects.len() == 0 and archive_plan.missing_sources.len() == 0 {
+  if archive_plan.generated_objects.is_empty() and archive_plan.missing_sources.is_empty() {
     let jobs_count = PKGBUILD_shared.build_jobs()?
     var archives: List[Path] = []
     let archive_report = p".xsh-kbuild-archive-plan.json"

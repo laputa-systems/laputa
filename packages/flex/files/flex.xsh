@@ -244,7 +244,7 @@ proc parse_rules(text: Str, defs: Map[Str]) -> Result[List[LexRule]] {
 
     pattern = strip_quotes(expand_definitions(pattern, defs)?)?
 
-    if qualified.states.len() == 0 {
+    if qualified.states.is_empty() {
       rules += [{pattern, action, bol, state: ""}]
     } else {
       for state in qualified.states {
@@ -253,7 +253,7 @@ proc parse_rules(text: Str, defs: Map[Str]) -> Result[List[LexRule]] {
     }
   }
 
-  return Err(ToolError.Failed(kind: "lex", message: "no rules found")) when rules.len() == 0
+  return Err(ToolError.Failed(kind: "lex", message: "no rules found")) when rules.is_empty()
 
   rules
 }
