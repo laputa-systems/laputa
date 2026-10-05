@@ -55,7 +55,7 @@ proc main(root: Path = /rootfs) [fs, error] {
     }
   }
 
-  let open_th = [line for line in fp"{mandir}/man2/open.2".read_text()?.lines() if line.starts_with(".TH ")]
+  let open_th = [line for line in fp"{mandir}/man2/open.2".read_lines()? if line.starts_with(".TH ")]
   proof.ensure(open_th == [".TH open 2 2026-02-08 \"Linux man-pages 6.19\""], "man-pages-release", f"unexpected open(2) header: {open_th.join(" | ")}")?
   proof.ensure(fs.exists(fp"{mandir}/man3type/FILE.3type")?, "man-pages-sections", "missing man3type/FILE.3type")?
   print f"man-pages ok: {pages.len()} pages in {sections.len()} sections, {links} .so links resolve"

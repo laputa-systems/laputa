@@ -32,7 +32,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let traced = run.text $loader $strace "-f" "-s" "256" "-e" "trace=execve,open,openat,write,writev" "-o" $out $loader $strace "-V" ?
   proof.ensure((traced.lines().get(0) ?? "") == "strace -- version 7.2", "strace-traced", f"traced program printed: {traced.trim()}")?
 
-  let lines = out.read_text()?.lines()
+  let lines = out.read_lines()?
   let execve = [line for line in lines if f"execve(\"{loader}\", [\"{loader}\", \"{strace}\", \"-V\"]" in line and line.ends_with(" = 0")]
   let opened = [line for line in lines if f"\"{strace}\", O_RDONLY" in line and (" open(" in line or " openat(AT_FDCWD, " in line)]
   let wrote = [line for line in lines if (" write(1, " in line or " writev(1, " in line) and "\"strace -- version 7.2" in line]

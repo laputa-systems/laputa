@@ -364,7 +364,7 @@ type FinishedNode = {name: Str, seconds: Int, log: Path}
 proc execute_log_tail(log: Path, count: Int) [fs, error] -> Result[Str] {
   return "" unless fs.exists(log)?
 
-  let lines = fs.read_text(log)?.lines()
+  let lines = log.read_lines()?
   let first = if lines.len() > count { lines.len() - count } else { 0 }
   lines[first..].join("\n")
 }
@@ -374,7 +374,7 @@ proc execute_log_tail(log: Path, count: Int) [fs, error] -> Result[Str] {
 proc execute_log_errors(log: Path) [fs, error] -> Result[Str] {
   return "" unless fs.exists(log)?
 
-  let errors = [line.trim() for line in fs.read_text(log)?.lines() if line.trim().starts_with("error:")]
+  let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
 
   return execute_log_tail(log, 12)? when errors.len() == 0
 
