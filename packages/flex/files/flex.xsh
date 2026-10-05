@@ -80,7 +80,7 @@ proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
         "^" => out = f"{out}\\^"
         "$" => out = f"{out}\\$"
         "\\" => out = f"{out}\\\\"
-        _ => out = f"{out}{ch.content}"
+        else => out = f"{out}{ch.content}"
       }
     }
   }

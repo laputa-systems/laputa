@@ -51,7 +51,7 @@ pure literal_code(token: Str) -> Int {
     "'{'" => 123
     "'|'" => 124
     "'}'" => 125
-    _ => -1
+    else => -1
   }
 }
 

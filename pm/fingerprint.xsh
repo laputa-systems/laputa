@@ -32,7 +32,7 @@ proc tree_entry_line(root: Path, path_value: Path, prefix: Str) [fs, error] -> R
     "file" => f"{prefix}\tfile\t{label}\t{mode}\t{hash.sha256(path_value)?.hex()}"
     "symlink" => f"{prefix}\tsymlink\t{label}\t{canonical_field(path_value.readlink()?.display())}"
     "dir" => f"{prefix}\tdir\t{label}\t{mode}"
-    _ => f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
+    else => f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
   }
 }
 

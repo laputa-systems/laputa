@@ -804,21 +804,21 @@ pure empty_term(names: Str) -> Term {
 pure is_cancelled(value: StrCap) -> Bool {
   match value {
     Cancelled => true
-    _ => false
+    else => false
   }
 }
 
 pure is_absent(value: StrCap) -> Bool {
   match value {
     Absent => true
-    _ => false
+    else => false
   }
 }
 
 pure text_of(value: StrCap) -> Bytes? {
   match value {
     Text(text) => text
-    _ => null
+    else => null
   }
 }
 
@@ -828,7 +828,7 @@ pure cap_kind(type_name: Str) -> Int {
     "bool" => BOOLEAN
     "num" => NUMBER
     "str" => STRING
-    _ => -1
+    else => -1
   }
 }
 
@@ -1453,7 +1453,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
               108 => 10
               115 => 32
               58 => 58
-              _ => c
+              else => c
             }
 
             # The \E \n \r \b \f \t \\ \^ \, forms leave `c` as the escape
@@ -2408,7 +2408,7 @@ pure string_table(values: List[StrCap]) -> List[Bytes] {
 pure string_parts(value: StrCap) -> List[Bytes] {
   match value {
     Text(text) => [text, b"\x00"]
-    _ => []
+    else => []
   }
 }
 
@@ -2516,7 +2516,7 @@ proc write_entry(term: Term, outdir: Path) [fs, error] {
           strs[key] = Text(shorter)
         }
       }
-      _ => {}
+      else => {}
     }
   }
 

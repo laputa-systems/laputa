@@ -624,7 +624,7 @@ pure unit_cflags(obj: Str) -> List[Str] {
     "util/parse-events-flex.o" => flex_cflags.push("-Wno-unused-label")
     "tests/workloads/brstack.o" | "tests/workloads/datasym.o" | "tests/workloads/deterministic.o" | "tests/workloads/leafloop.o" | "tests/workloads/named_threads.o" | "tests/workloads/sqrtloop.o" | "tests/workloads/traploop.o" => workload_cflags
     "tests/workloads/inlineloop.o" => ["-g", "-O2"]
-    _ => []
+    else => []
   }
 }
 

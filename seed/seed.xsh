@@ -39,7 +39,7 @@ proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
       "--arch" => parsed = {...parsed, arch: value}
       "--xsh-root" => parsed = {...parsed, xsh_root: value}
       "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
-      _ => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{seed_usage()}"))
+      else => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{seed_usage()}"))
     }
 
     index += 2
@@ -108,7 +108,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
       print f"seed {xsh_seed.xsh_seed_dir(laputa_root, value.arch)}"
       print f"image {tag}"
     }
-    _ => {
+    else => {
       let seed = xsh_seed.xsh_seed_require(laputa_root, value.arch)?
       let tag = images.ensure_package_tools(docker, laputa_root, value)?
       let status = process.run(

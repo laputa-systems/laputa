@@ -209,7 +209,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
     match meta.kind {
       "file" => kind = types.file_kind_file()
       "dir" => kind = types.file_kind_tree()
-      _ => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
+      else => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
     }
 
     files += [{path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""}]

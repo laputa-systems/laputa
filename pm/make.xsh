@@ -147,7 +147,7 @@ pure argv_word(arg: Any) -> Result[Str] {
   match arg {
     word is Str => Ok(word)
     operand is Path => Ok(f"{operand}")
-    _ => Err(MakeError.InvalidTask(message: "make task argv words must be Str or Path"))
+    else => Err(MakeError.InvalidTask(message: "make task argv words must be Str or Path"))
   }
 }
 

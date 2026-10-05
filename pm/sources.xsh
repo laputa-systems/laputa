@@ -720,7 +720,7 @@ proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error]
           last_failure = ""
           break
         }
-        _ => return outcome
+        else => return outcome
       }
     }
 

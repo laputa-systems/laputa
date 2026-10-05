@@ -156,7 +156,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
 
     match fs.metadata(source) {
       Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
-      _ => {
+      else => {
         if ! fs.exists(dest)? {
           fs.write(dest, "")?
         }
@@ -173,7 +173,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     match fs.metadata(source) {
       Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
       Ok(metadata) if metadata.kind == "symlink" => fs.write(dest, source.read_text()?)?
-      _ => {}
+      else => {}
     }
   }
 }

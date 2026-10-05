@@ -191,7 +191,7 @@ export pure parse_target(raw: Str) -> Result[Target, Error] {
   match raw {
     "aarch64-linux-musl" | "aarch64" | "arm64" | "arm64-linux-musl" => Aarch64LinuxMusl
     "x86_64-linux-musl" | "x86_64" | "amd64" | "amd64-linux-musl" => X86_64LinuxMusl
-    _ => Err(PmError.PackageContract(f"unsupported target {raw}"))
+    else => Err(PmError.PackageContract(f"unsupported target {raw}"))
   }
 }
 
@@ -223,7 +223,7 @@ export pure parse_plan_action(raw: Str, reason: Str) -> Result[PlanAction, Error
   match raw {
     "build" => Build(reason)
     "reuse-remote" => ReuseRemote(reason)
-    _ => Err(PmError.PackageContract(f"invalid build-plan action {raw}"))
+    else => Err(PmError.PackageContract(f"invalid build-plan action {raw}"))
   }
 }
 
@@ -240,7 +240,7 @@ export pure parse_artifact_origin(raw: Str) -> Result[ArtifactOrigin, Error] {
   match raw {
     "built" => Built
     "remote" => Remote
-    _ => Err(PmError.PackageContract(f"invalid artifact origin {raw}"))
+    else => Err(PmError.PackageContract(f"invalid artifact origin {raw}"))
   }
 }
 
@@ -257,7 +257,7 @@ export pure parse_package_kind(raw: Str) -> Result[PackageKind, Error] {
   match raw {
     "payload" => Payload
     "meta" => Meta
-    _ => Err(PmError.PackageContract(f"invalid package kind {raw}"))
+    else => Err(PmError.PackageContract(f"invalid package kind {raw}"))
   }
 }
 
@@ -280,7 +280,7 @@ export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind, Error] {
     "build-host" => BuildHost
     "build-target" => BuildTarget
     "bootstrap" => Bootstrap
-    _ => Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
+    else => Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
   }
 }
 
@@ -307,7 +307,7 @@ export pure parse_source_kind(raw: Str) -> Result[SourceKind, Error] {
     "file" => SourceFile
     "directory" => Directory
     "cargo-vendor" => CargoVendor
-    _ => Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
+    else => Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
   }
 }
 
@@ -328,7 +328,7 @@ export pure parse_file_kind(raw: Str) -> Result[FileKind, Error] {
     "binary" => Binary
     "symlink" => Symlink
     "tree" => Tree
-    _ => Err(PmError.PackageContract(f"invalid filetree kind {raw}"))
+    else => Err(PmError.PackageContract(f"invalid filetree kind {raw}"))
   }
 }
 

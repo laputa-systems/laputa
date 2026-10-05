@@ -529,7 +529,7 @@ pure eval_prec(op: Str) -> Int {
     "*" | "/" | "%" => 10
     "**" => 11
     "u+" | "u-" | "u~" | "u!" => 12
-    _ => 0
+    else => 0
   }
 }
 
@@ -583,7 +583,7 @@ pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
     "+" => wrap32(x + y)
     "-" => wrap32(x - y)
     "*" => wrap32(x * y)
-    _ => 0
+    else => 0
   }
 
   if op == "/" or op == "%" {
@@ -1122,7 +1122,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
         62 => r"(?-u:\b{end})"
         96 => "\\A"
         39 => "\\z"
-        _ => ""
+        else => ""
       }
 
       if piece != "" {
@@ -1572,7 +1572,7 @@ pure builtin_names() -> List[Str] {
 pure builtin_blind(name: Str) -> Bool {
   match name {
     "builtin" | "decr" | "define" | "defn" | "errprint" | "esyscmd" | "eval" | "format" | "ifdef" | "ifelse" | "include" | "incr" | "index" | "indir" | "len" | "m4wrap" | "maketemp" | "mkstemp" | "patsubst" | "popdef" | "pushdef" | "regexp" | "shift" | "sinclude" | "substr" | "syscmd" | "translit" | "undefine" => true
-    _ => false
+    else => false
   }
 }
 
@@ -1765,7 +1765,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
 pure is_argument_builtin(name: Str) -> Bool {
   match name {
     "ifelse" | "shift" | "len" | "index" | "substr" | "translit" | "patsubst" | "regexp" | "format" | "eval" | "incr" | "decr" => true
-    _ => false
+    else => false
   }
 }
 
@@ -2834,7 +2834,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         "traceon" | "traceoff" | "debugmode" | "debugfile" => {
           let _ = bi
         }
-        _ => {
+        else => {
           return Err(ScriptError.Failed(kind: "m4-internal", message: f"unhandled builtin {bi}"))
         }
       }
@@ -2988,7 +2988,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
       flag = match a.byte_slice(0, eq) {
         "--include" => "I"
         "--define" => "D"
-        _ => "U"
+        else => "U"
       }
       value = a.byte_slice(eq + 1, a.byte_len() - eq - 1)
       has_value = true
@@ -2996,7 +2996,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
       flag = match a {
         "--include" => "I"
         "--define" => "D"
-        _ => "U"
+        else => "U"
       }
     } else if a.byte_len() >= 2 and (a.starts_with("-I") or a.starts_with("-D") or a.starts_with("-U")) {
       flag = a.byte_slice(1, 1)
@@ -3021,7 +3021,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
     match flag {
       "I" => include_paths += [value]
       "D" => defines += [parse_define_arg(value)]
-      _ => defines += [[value]]
+      else => defines += [[value]]
     }
   }
 

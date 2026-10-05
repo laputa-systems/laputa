@@ -32,7 +32,7 @@ export pure xsh_seed_arch(arch: Str) -> Result[SeedArch, Error] {
   match arch {
     "aarch64" => {arch: "aarch64", triple: "aarch64-unknown-linux-musl", docker_platform: "linux/arm64"}
     "x86_64" => {arch: "x86_64", triple: "x86_64-unknown-linux-musl", docker_platform: "linux/amd64"}
-    _ => Err(SeedError.Usage(f"unsupported seed architecture {arch}; expected aarch64 or x86_64"))
+    else => Err(SeedError.Usage(f"unsupported seed architecture {arch}; expected aarch64 or x86_64"))
   }
 }
 
@@ -75,7 +75,7 @@ export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[SeedEnvVar, Error]
   match value.triple {
     "x86_64-unknown-linux-musl" => {name: "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS", value: flags}
     "aarch64-unknown-linux-musl" => {name: "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS", value: flags}
-    _ => Err(SeedError.Usage(f"no musl link flags for {value.triple}"))
+    else => Err(SeedError.Usage(f"no musl link flags for {value.triple}"))
   }
 }
 
