@@ -32,7 +32,7 @@ pure elf_needed(dynamic: Str) -> List[Str] {
     continue unless "(NEEDED)" in line
     let start = line.find("[") ?? -1
     continue unless start >= 0
-    needed = needed.push(line.byte_slice(start + 1).replace("]", "").trim())
+    needed += [line.byte_slice(start + 1).replace("]", "").trim()]
   }
 
   needed
@@ -83,7 +83,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   var failures = []
 
   for entry in fs.files(root, hidden: true)? {
-    files = files.push(f"/{entry.path.strip_prefix(root)?.display()}")
+    files += [f"/{entry.path.strip_prefix(root)?.display()}"]
     continue unless entry.kind == "file"
     let found = elf_report(root, entry.path)?
     guard found != null else { continue }
@@ -91,7 +91,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     elves += [report]
 
     if report.interpreter != "" and report.interpreter != musl_interpreter {
-      failures = failures.push(f"{report.path} requests interpreter {report.interpreter}")
+      failures += [f"{report.path} requests interpreter {report.interpreter}"]
     }
 
     # musl's loader resolves every NEEDED soname inside the root, as at boot.
@@ -99,7 +99,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       let listed = run.status $chroot $root $musl_interpreter --list $report.path > /dev/null 2> $loader_err
 
       if ! listed.ok {
-        failures = failures.push(f"{report.path}: {fs.read_text(loader_err)?.trim()}")
+        failures += [f"{report.path}: {fs.read_text(loader_err)?.trim()}"]
       }
     }
   }
