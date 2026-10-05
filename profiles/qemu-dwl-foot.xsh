@@ -1,5 +1,5 @@
 ##! The one canonical Laputa graphical QEMU reference system profile.
-use system.types as types
+use system.types
 
 ## The direct package intent for a real dwl and foot system; dependencies are resolved by PM.
 export let profile: types.SystemProfile = types.SystemProfile(
