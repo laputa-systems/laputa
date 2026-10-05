@@ -102,7 +102,7 @@ export proc remove_outputs(spec: ParserGen) [fs, error] {
   match spec.name {
     "bison-kconfig" => fs.remove(p"scripts/kconfig/.parser.tab.h.cmd", missing_ok: true)?
     "bison-dtc" => fs.remove(p"scripts/dtc/.dtc-parser.tab.h.cmd", missing_ok: true)?
-    _ => {}
+    else => {}
   }
 }
 

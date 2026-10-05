@@ -303,7 +303,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
           }
         }
       }
-      _ => {
+      else => {
         if current.kind == "else" or ! touched {
           frames = set_top(frames, {...top, taking: true})
           out += physical

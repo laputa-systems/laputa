@@ -3079,7 +3079,7 @@ export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan, 
       "archive" => archive_owners += [{object: fp"{parts.get(1) ?? ""}", dir: fp"{parts.get(2) ?? "."}"}]
       "composite" => composites += [{object: fp"{parts.get(1) ?? ""}", members: paths_from_strings(parts |> drop(2))?}]
       "unsupported" => unsupported += [parts.get(1) ?? ""]
-      _ => {}
+      else => {}
     }
   }
 

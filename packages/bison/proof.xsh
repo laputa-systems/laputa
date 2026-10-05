@@ -236,7 +236,7 @@ pure grammar_text(file: Str) -> Str {
   match file {
     "calc.y" => calc_grammar
     "glr.y" => glr_grammar
-    _ => list_grammar
+    else => list_grammar
   }
 }
 

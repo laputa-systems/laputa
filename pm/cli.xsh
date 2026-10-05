@@ -384,7 +384,7 @@ proc parse_repo_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
     }
     "checksum" => RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
     "update-checksums" => RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
-    _ => Err(types.PmError.Usage(f"unknown pm repo command {action}"))
+    else => Err(types.PmError.Usage(f"unknown pm repo command {action}"))
   }
 }
 
@@ -567,7 +567,7 @@ proc parse_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
     "sources" => parse_sources_command(argv)?
     "root" => parse_root_command(argv)?
     "store" => parse_store_command(argv)?
-    _ => Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
+    else => Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
   }
 }
 

@@ -57,7 +57,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error
       "--stop" => parsed = {...parsed, stop: value}
       "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
       "--repo" => parsed = {...parsed, repo: value}
-      _ => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{world_usage()}"))
+      else => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{world_usage()}"))
     }
 
     index += 2
@@ -86,7 +86,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error
 export pure world_stop_line(name: Str) -> Result[List[Str], Error] {
   match name {
     "pre-cmake" => ["cmake", "linux"]
-    _ => Err(xsh_seed.SeedError.Usage(f"unknown stop line {name}; the stop lines are: pre-cmake"))
+    else => Err(xsh_seed.SeedError.Usage(f"unknown stop line {name}; the stop lines are: pre-cmake"))
   }
 }
 
@@ -370,6 +370,6 @@ export proc world_command(laputa_root: Path, args: WorldArgs) [fs, net, process,
     "plan" => world_plan(world_container(laputa_root, value)?, args)?
     "build" => world_build(world_container(laputa_root, value)?, args)?
     "publish" => world_publish(world_container(laputa_root, value)?, args)?
-    _ => world_root(world_container(laputa_root, value)?, args)?
+    else => world_root(world_container(laputa_root, value)?, args)?
   }
 }
