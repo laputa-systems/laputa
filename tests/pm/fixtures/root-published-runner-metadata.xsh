@@ -9,21 +9,20 @@ pure digest(value: Str) -> Str {
 
 proc main() [fs, error] {
   let workspace = p"/tmp/laputa-root-published-metadata"
-  fs.remove(workspace, missing_ok: true)?
-  defer fs.remove(workspace, missing_ok: true)?
+  workspace.remove(missing_ok: true)?
+  defer workspace.remove(missing_ok: true)?
   let stage = fp"{workspace}/stage"
   let contents = fp"{stage}/contents"
   let payload = fp"{stage}/payload.tar.gz"
   let metadata = fp"{stage}/metadata.json"
   let proof = fp"{stage}/proof.json"
   let store_root = fp"{workspace}/store"
-  fs.mkdir(fp"{contents}/usr/bin", parents: true)?
-  fs.write(fp"{contents}/usr/bin/demo", "published root metadata\n")?
-  fs.chmod(fp"{contents}/usr/bin/demo", 0o755)?
+  fp"{contents}/usr/bin".mkdir(parents: true)?
+  fp"{contents}/usr/bin/demo".write("published root metadata\n")?
+  fp"{contents}/usr/bin/demo".chmod(0o755)?
   # This is the legacy remote metadata shape: it has an exact payload inventory
   # but predates `package_kind` and its package DB was appended to the archive.
-  fs.write(
-    metadata,
+  metadata.write(
     json.encode({
       arch: "aarch64",
       name: "demo",
@@ -45,11 +44,10 @@ proc main() [fs, error] {
     })? + "\n",
   )?
   let database = fp"{contents}/var/lib/xsh-pm/packages/demo"
-  fs.mkdir(database, parents: true)?
-  fs.write(fp"{database}/manifest.json", json.encode(["usr/bin/demo"])?)?
-  fs.write(fp"{database}/etcsums.json", json.encode([])?)?
-  fs.write(
-    fp"{database}/metadata.json",
+  database.mkdir(parents: true)?
+  fp"{database}/manifest.json".write(json.encode(["usr/bin/demo"])?)?
+  fp"{database}/etcsums.json".write(json.encode([])?)?
+  fp"{database}/metadata.json".write(
     json.encode({
       name: "demo",
       ver: "1.0.0",
@@ -64,7 +62,7 @@ proc main() [fs, error] {
     })?,
   )?
   archive.tar_create(payload, contents, [p"."], compression: "gz")?
-  fs.write(proof, "published proof\n")?
+  proof.write("published proof\n")?
   let node: types.PlanNode = {
     name: "demo",
     ver: "1.0.0",
@@ -95,13 +93,12 @@ proc main() [fs, error] {
   let shared_alpha_payload = fp"{shared_alpha_stage}/payload.tar.gz"
   let shared_alpha_metadata = fp"{shared_alpha_stage}/metadata.json"
   let shared_alpha_proof = fp"{shared_alpha_stage}/proof.json"
-  fs.mkdir(fp"{shared_alpha_contents}/usr/share", parents: true)?
-  fs.chmod(fp"{shared_alpha_contents}/usr", 0o755)?
-  fs.chmod(fp"{shared_alpha_contents}/usr/share", 0o755)?
-  fs.write(fp"{shared_alpha_contents}/usr/share/alpha", "alpha\n")?
+  fp"{shared_alpha_contents}/usr/share".mkdir(parents: true)?
+  fp"{shared_alpha_contents}/usr".chmod(0o755)?
+  fp"{shared_alpha_contents}/usr/share".chmod(0o755)?
+  fp"{shared_alpha_contents}/usr/share/alpha".write("alpha\n")?
   archive.tar_create(shared_alpha_payload, shared_alpha_contents, [p"."], compression: "gz")?
-  fs.write(
-    shared_alpha_metadata,
+  shared_alpha_metadata.write(
     json.encode({
       name: "shared-alpha",
       ver: "1.0.0",
@@ -114,7 +111,7 @@ proc main() [fs, error] {
       ],
     })? + "\n",
   )?
-  fs.write(shared_alpha_proof, "shared alpha proof\n")?
+  shared_alpha_proof.write("shared alpha proof\n")?
   let shared_alpha_node: types.PlanNode = {
     name: "shared-alpha",
     ver: "1.0.0",
@@ -142,13 +139,12 @@ proc main() [fs, error] {
   let shared_beta_payload = fp"{shared_beta_stage}/payload.tar.gz"
   let shared_beta_metadata = fp"{shared_beta_stage}/metadata.json"
   let shared_beta_proof = fp"{shared_beta_stage}/proof.json"
-  fs.mkdir(fp"{shared_beta_contents}/usr/share", parents: true)?
-  fs.chmod(fp"{shared_beta_contents}/usr", 0o755)?
-  fs.chmod(fp"{shared_beta_contents}/usr/share", 0o755)?
-  fs.write(fp"{shared_beta_contents}/usr/share/beta", "beta\n")?
+  fp"{shared_beta_contents}/usr/share".mkdir(parents: true)?
+  fp"{shared_beta_contents}/usr".chmod(0o755)?
+  fp"{shared_beta_contents}/usr/share".chmod(0o755)?
+  fp"{shared_beta_contents}/usr/share/beta".write("beta\n")?
   archive.tar_create(shared_beta_payload, shared_beta_contents, [p"."], compression: "gz")?
-  fs.write(
-    shared_beta_metadata,
+  shared_beta_metadata.write(
     json.encode({
       name: "shared-beta",
       ver: "1.0.0",
@@ -161,7 +157,7 @@ proc main() [fs, error] {
       ],
     })? + "\n",
   )?
-  fs.write(shared_beta_proof, "shared beta proof\n")?
+  shared_beta_proof.write("shared beta proof\n")?
   let shared_beta_node: types.PlanNode = {
     name: "shared-beta",
     ver: "1.0.0",

@@ -4,8 +4,8 @@ proc main() [fs, process, env, error] {
   let lexer = p"/tmp/linux-flex-kconfig/scripts/kconfig/lexer.l"
   let output = p"/tmp/linux-flex-kconfig/scripts/kconfig/lexer.lex.c"
   let missing_log = p"/tmp/linux-flex-kconfig/missing.err"
-  fs.mkdir(lexer.parent)?
-  fs.write(lexer, "%%\n[a-z]+ return 1;\n%%\n")?
+  lexer.parent.mkdir()?
+  lexer.write("%%\n[a-z]+ return 1;\n%%\n")?
 
   let success = process.run(
     process.command_argv(

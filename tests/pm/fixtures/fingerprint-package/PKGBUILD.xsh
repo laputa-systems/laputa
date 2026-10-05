@@ -19,5 +19,5 @@ export let upstream_sources = [{source: p"https://example.invalid/source.tar.xz"
 export let filetree = []
 ## Builds the fixture payload.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(dest)?
+  dest.mkdir()?
 }

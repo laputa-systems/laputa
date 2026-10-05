@@ -593,7 +593,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
         continue
       }
 
-      # fs.remove deletes a directory tree without following symlinks.
+      # `Path.remove` deletes a directory tree without following symlinks.
       entry.path.remove(missing_ok: false)
       fp"{store_layout(root)}/proofs/{entry.name}".remove()
       lock_path(root, entry.name).remove()

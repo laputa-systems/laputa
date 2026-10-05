@@ -5,8 +5,8 @@ proc main() [fs, process, env, error] {
   let output = p"/tmp/linux-bison-kconfig/scripts/kconfig/parser.tab.c"
   let header = p"/tmp/linux-bison-kconfig/scripts/kconfig/parser.tab.h"
   let missing_log = p"/tmp/linux-bison-kconfig/missing.err"
-  fs.mkdir(grammar.parent)?
-  fs.write(grammar, "%token WORD\n%start input\n%%\ninput: WORD ;\n%%\n")?
+  grammar.parent.mkdir()?
+  grammar.write("%token WORD\n%start input\n%%\ninput: WORD ;\n%%\n")?
 
   let success = process.run(
     process.command_argv(

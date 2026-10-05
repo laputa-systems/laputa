@@ -28,6 +28,6 @@ export let filetree = [{path: p"usr/share/remote-app/payload.txt", kind: "file"}
 
 export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/remote-app/payload.txt"
-  fs.mkdir(target.parent)?
+  target.parent.mkdir()?
   fs.install(p"payload.txt", target, 0o644)?
 }

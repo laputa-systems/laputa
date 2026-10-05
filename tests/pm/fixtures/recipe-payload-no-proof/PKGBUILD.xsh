@@ -7,5 +7,5 @@ export let mkdeps_host = []
 export let upstream_sources = []
 export let filetree = []
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(dest)?
+  dest.mkdir()?
 }

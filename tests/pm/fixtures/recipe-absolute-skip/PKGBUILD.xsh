@@ -17,5 +17,5 @@ export let upstream_sources = [{source: p"/tmp/foo", kind: "auto", architectures
 export let filetree = []
 ## Fixture payload build.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(dest)?
+  dest.mkdir()?
 }

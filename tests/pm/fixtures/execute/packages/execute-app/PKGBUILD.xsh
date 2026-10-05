@@ -23,10 +23,10 @@ export let filetree = [{path: p"usr/share/execute-app.txt", kind: "file"}]
 export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   let root = env("LAPUTA_ROOT")?
   let build_root = env("XSH_PM_BUILD_ROOT")?
-  let _ = fs.read_text(fp"{root}/usr/share/execute-dep.txt")?
-  let _ = fs.read_text(fp"{build_root}/usr/share/execute-tool.txt")?
+  let _ = fp"{root}/usr/share/execute-dep.txt".read_text()?
+  let _ = fp"{build_root}/usr/share/execute-tool.txt".read_text()?
 
   let target = fp"{dest}/usr/share/execute-app.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "application v1\n")?
+  target.parent.mkdir()?
+  target.write("application v1\n")?
 }

@@ -4,11 +4,11 @@ proc main(root = /rootfs) [fs, error] {
   let dep = fp"{root}/usr/share/world-lib.txt"
   let payload = fp"{root}/usr/share/world-app.txt"
 
-  if ! fs.exists(dep)? {
+  if ! dep.exists()? {
     return Err(ProofError.Failed("proof-world-app", f"missing rebuilt dependency: {dep.display()}"))
   }
 
-  if ! fs.exists(payload)? {
+  if ! payload.exists()? {
     return Err(ProofError.Failed("proof-world-app", f"missing payload: {payload.display()}"))
   }
 

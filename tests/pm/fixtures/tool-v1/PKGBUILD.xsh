@@ -14,10 +14,9 @@ export let filetree = [{path: p"usr/bin/tool", kind: "file"}]
 
 export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/bin/tool"
-  fs.mkdir(target.parent)?
+  target.parent.mkdir()?
 
-  fs.write(
-    target,
+  target.write(
     """v1
 """,
   )?

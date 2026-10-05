@@ -13,9 +13,8 @@ use pm.types
 
 proc write_dep_recipe(repo: Path) [fs, error] {
   let package = fp"{repo}/direct-dep"
-  fs.mkdir(package)?
-  fs.write(
-    fp"{package}/PKGBUILD.xsh",
+  package.mkdir()?
+  fp"{package}/PKGBUILD.xsh".write(
     r"""##! Published executor payload fixture.
 ## Package name.
 export let name = "direct-dep"
@@ -38,17 +37,16 @@ export let filetree = [{path: p"usr/share/direct-dep.txt", kind: "file"}]
 ## Package build operation.
 export proc build(dest: Path) [fs, error] {
   let target = fp"{dest}/usr/share/direct-dep.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "direct dependency\\n")?
+  target.parent.mkdir()?
+  target.write("direct dependency\\n")?
 }
 """,
   )?
-  fs.write(
-    fp"{package}/proof.xsh",
+  fp"{package}/proof.xsh".write(
     r"""error ProofError = Failed(message: Str)
 
 proc main(root: Path) [fs, error] {
-  if ! fs.exists(fp"{root}/var/lib/xsh-pm/packages/direct-dep/metadata.json")? {
+  if ! fp"{root}/var/lib/xsh-pm/packages/direct-dep/metadata.json".exists()? {
     return Err(ProofError.Failed("dependency proof did not receive package metadata"))
   }
 }
@@ -60,9 +58,8 @@ main(@args)?
 
 proc write_meta_recipe(repo: Path) [fs, error] {
   let package = fp"{repo}/direct-meta"
-  fs.mkdir(package)?
-  fs.write(
-    fp"{package}/PKGBUILD.xsh",
+  package.mkdir()?
+  fp"{package}/PKGBUILD.xsh".write(
     r"""##! Published executor metapackage fixture without a proof script.
 ## Package name.
 export let name = "direct-meta"
@@ -88,9 +85,8 @@ export let filetree = []
 
 proc write_level_barrier_recipes(repo: Path) [fs, error] {
   let tool = fp"{repo}/direct-tool"
-  fs.mkdir(tool)?
-  fs.write(
-    fp"{tool}/PKGBUILD.xsh",
+  tool.mkdir()?
+  fp"{tool}/PKGBUILD.xsh".write(
     r"""##! Independent executor tool fixture for the parallel-level barrier.
 ## Package name.
 export let name = "direct-tool"
@@ -113,13 +109,12 @@ export let filetree = [{path: p"usr/share/direct-tool.txt", kind: "file"}]
 ## Package build operation.
 export proc build(dest: Path) [fs, error] {
   let target = fp"{dest}/usr/share/direct-tool.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "direct tool\n")?
+  target.parent.mkdir()?
+  target.write("direct tool\n")?
 }
 """,
   )?
-  fs.write(
-    fp"{tool}/proof.xsh",
+  fp"{tool}/proof.xsh".write(
     r"""proc main(root: Path) [error] {}
 
 main(@args)?
@@ -127,9 +122,8 @@ main(@args)?
   )?
 
   let app = fp"{repo}/direct-app"
-  fs.mkdir(app)?
-  fs.write(
-    fp"{app}/PKGBUILD.xsh",
+  app.mkdir()?
+  fp"{app}/PKGBUILD.xsh".write(
     r"""##! Level-one executor fixture that fails only after its payload is staged.
 ## Package name.
 export let name = "direct-app"
@@ -152,16 +146,15 @@ export let filetree = [{path: p"usr/share/direct-app.txt", kind: "file"}]
 ## Package build operation.
 export proc build(dest: Path) [fs, env, error] {
   let root = env("LAPUTA_ROOT")?
-  let _ = fs.read_text(fp"{root}/usr/share/direct-dep.txt")?
-  let _ = fs.read_text(fp"{root}/usr/share/direct-tool.txt")?
+  let _ = fp"{root}/usr/share/direct-dep.txt".read_text()?
+  let _ = fp"{root}/usr/share/direct-tool.txt".read_text()?
   let target = fp"{dest}/usr/share/direct-app.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "direct app\n")?
+  target.parent.mkdir()?
+  target.write("direct app\n")?
 }
 """,
   )?
-  fs.write(
-    fp"{app}/proof.xsh",
+  fp"{app}/proof.xsh".write(
     r"""error ProofError = Failed(message: Str)
 
 proc main(root: Path) [error] {
@@ -175,9 +168,8 @@ main(@args)?
   # A successful peer forces direct-app's proof failure through the actual
   # multi-node par-map bridge rather than the executor's sequential fast path.
   let peer = fp"{repo}/direct-peer"
-  fs.mkdir(peer)?
-  fs.write(
-    fp"{peer}/PKGBUILD.xsh",
+  peer.mkdir()?
+  fp"{peer}/PKGBUILD.xsh".write(
     r"""##! Parallel peer fixture for the executor failure barrier.
 ## Package name.
 export let name = "direct-peer"
@@ -200,15 +192,14 @@ export let filetree = [{path: p"usr/share/direct-peer.txt", kind: "file"}]
 ## Package build operation.
 export proc build(dest: Path) [fs, env, error] {
   let root = env("LAPUTA_ROOT")?
-  let _ = fs.read_text(fp"{root}/usr/share/direct-dep.txt")?
+  let _ = fp"{root}/usr/share/direct-dep.txt".read_text()?
   let target = fp"{dest}/usr/share/direct-peer.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "direct peer\n")?
+  target.parent.mkdir()?
+  target.write("direct peer\n")?
 }
 """,
   )?
-  fs.write(
-    fp"{peer}/proof.xsh",
+  fp"{peer}/proof.xsh".write(
     r"""proc main(root: Path) [error] {}
 
 main(@args)?
@@ -216,9 +207,8 @@ main(@args)?
   )?
 
   let leaf = fp"{repo}/direct-leaf"
-  fs.mkdir(leaf)?
-  fs.write(
-    fp"{leaf}/PKGBUILD.xsh",
+  leaf.mkdir()?
+  fp"{leaf}/PKGBUILD.xsh".write(
     r"""##! Level-two executor fixture that must not start after a failed level one.
 ## Package name.
 export let name = "direct-leaf"
@@ -241,15 +231,14 @@ export let filetree = [{path: p"usr/share/direct-leaf.txt", kind: "file"}]
 ## Package build operation.
 export proc build(dest: Path) [fs, env, error] {
   let root = env("LAPUTA_ROOT")?
-  let _ = fs.read_text(fp"{root}/usr/share/direct-app.txt")?
+  let _ = fp"{root}/usr/share/direct-app.txt".read_text()?
   let target = fp"{dest}/usr/share/direct-leaf.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "direct leaf\n")?
+  target.parent.mkdir()?
+  target.write("direct leaf\n")?
 }
 """,
   )?
-  fs.write(
-    fp"{leaf}/proof.xsh",
+  fp"{leaf}/proof.xsh".write(
     r"""proc main(root: Path) [error] {}
 
 main(@args)?
@@ -290,11 +279,11 @@ proc published_parallel_level_barrier_regression(
     }
   }
 
-  if !fs.exists(artifact_store.artifact_path(store, peer.artifact_key))? {
+  if !artifact_store.artifact_path(store, peer.artifact_key).exists()? {
     return error.fail("published executor did not wait for the successful parallel peer")
   }
 
-  if fs.exists(artifact_store.artifact_path(store, app.artifact_key))? or fs.exists(artifact_store.artifact_path(store, leaf.artifact_key))? {
+  if artifact_store.artifact_path(store, app.artifact_key).exists()? or artifact_store.artifact_path(store, leaf.artifact_key).exists()? {
     return error.fail("published executor materialized a failed-level artifact or its dependent")
   }
 }
@@ -309,8 +298,8 @@ proc published_legacy_package_kind_regression(
   let payload = fp"{stage}/payload.tar.gz"
   let metadata = fp"{stage}/metadata.json"
   let proof = fp"{stage}/proof.json"
-  fs.mkdir(stage)?
-  fs.write(payload, "published legacy payload\n")?
+  stage.mkdir()?
+  payload.write("published legacy payload\n")?
   # The only legacy exception is an omitted package_kind.  The store receipt
   # binds these exact bytes before repo publication decodes them.
   json.write(metadata, {arch: "aarch64", name: node.name, ver: node.ver, rel: node.rel, files: []})?
@@ -329,8 +318,8 @@ proc published_legacy_package_kind_regression(
   let invalid_payload = fp"{invalid_stage}/payload.tar.gz"
   let invalid_metadata = fp"{invalid_stage}/metadata.json"
   let invalid_proof = fp"{invalid_stage}/proof.json"
-  fs.mkdir(invalid_stage)?
-  fs.write(invalid_payload, "published invalid payload\n")?
+  invalid_stage.mkdir()?
+  invalid_payload.write("published invalid payload\n")?
   json.write(invalid_metadata, {arch: "aarch64", name: node.name, ver: node.ver, rel: node.rel, package_kind: "", files: []})?
   let invalid_payload_sha256 = hash.sha256(invalid_payload)?.hex()
   pm_proof.write_artifact_receipt(invalid_proof, node, invalid_payload_sha256)?
@@ -362,7 +351,7 @@ proc published_generation_adapter_regression(
   let generation_plan = fp"{workspace}/adapter-generation-plan.json"
   let generation_receipt = fp"{workspace}/adapter-generation.json"
   write_level_barrier_recipes(repo)?
-  fs.mkdir(overlay)?
+  overlay.mkdir()?
 
   let value = plan.resolve(
     catalog.load(workspace)?,
@@ -386,23 +375,23 @@ proc published_generation_adapter_regression(
     [],
   )?
 
-  if !fs.exists(result.generation_root)? or !fs.exists(generation_plan)? or !fs.exists(generation_receipt)? {
+  if !result.generation_root.exists()? or !generation_plan.exists()? or !generation_receipt.exists()? {
     return error.fail("published generation adapter did not compose its verified generation")
   }
 }
 
 proc main() [fs, net, process, env, time, error] {
   let workspace = p"/tmp/laputa-published-metapackage"
-  fs.remove(workspace, missing_ok: true)?
-  defer fs.remove(workspace, missing_ok: true)?
+  workspace.remove(missing_ok: true)?
+  defer workspace.remove(missing_ok: true)?
   let repo = fp"{workspace}/packages"
   let store = fp"{workspace}/store"
-  fs.mkdir(repo)?
-  fs.mkdir(fp"{workspace}/pm")?
+  repo.mkdir()?
+  fp"{workspace}/pm".mkdir()?
   # The fixture runs from the mounted package checkout.  Keep its copied proof
   # helper repository-relative so the published runner does not depend on a
   # particular mount prefix.
-  fs.copy(p"pm/proof.xsh", fp"{workspace}/pm/proof.xsh", overwrite: true)?
+  p"pm/proof.xsh".copy(to: fp"{workspace}/pm/proof.xsh", overwrite: true)?
   write_dep_recipe(repo)?
   write_meta_recipe(repo)?
   let catalog_value = catalog.load(workspace)?
@@ -429,11 +418,11 @@ proc main() [fs, net, process, env, time, error] {
     return error.fail("published metapackage did not retain an empty typed payload inventory")
   }
 
-  if fs.read_text(fp"{meta.artifact_dir}/payload.tar.gz")? != "laputa metapackage payload marker\n" {
+  if fp"{meta.artifact_dir}/payload.tar.gz".read_text()? != "laputa metapackage payload marker\n" {
     return error.fail("published metapackage payload marker changed or was extracted")
   }
 
-  if ! fs.exists(fp"{result.artifacts[0].artifact_dir}/proof.json")? or ! fs.exists(fp"{meta.artifact_dir}/proof.json")? {
+  if ! fp"{result.artifacts[0].artifact_dir}/proof.json".exists()? or ! fp"{meta.artifact_dir}/proof.json".exists()? {
     return error.fail("published metapackage execution did not retain dependency and selector proof receipts")
   }
 

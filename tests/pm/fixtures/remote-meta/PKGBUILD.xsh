@@ -13,5 +13,5 @@ export let upstream_sources = []
 export let filetree = []
 
 export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
-  fs.mkdir(dest)?
+  dest.mkdir()?
 }

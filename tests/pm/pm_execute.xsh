@@ -109,10 +109,10 @@ export let filetree = [{path: p"usr/share/execute-leaf.txt", kind: "file"}]
 ## Builds only after the application payload is available.
 export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   let root = env("LAPUTA_ROOT")?
-  let _ = fs.read_text(fp"{root}/usr/share/execute-app.txt")?
+  let _ = fp"{root}/usr/share/execute-app.txt".read_text()?
   let target = fp"{dest}/usr/share/execute-leaf.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "leaf\\n")?
+  target.parent.mkdir()?
+  target.write("leaf\\n")?
 }
 """,
   )
@@ -120,7 +120,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
 error ProofError = MissingPayload
 
 proc main(root: Path = /rootfs) [fs, error] {
-  if ! fs.exists(fp"{root}/usr/share/execute-leaf.txt")? {
+  if ! fp"{root}/usr/share/execute-leaf.txt".exists()? {
     return Err(ProofError.MissingPayload)
   }
 }
@@ -161,15 +161,15 @@ error ServiceBuildError = Failed(message: Str)
 ## and the environment names the compilers PATH resolves in it.
 export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   let root = env("LAPUTA_ROOT")?
-  if fs.exists(fp"{root}/usr/share/execute-dep.txt")? {
+  if fp"{root}/usr/share/execute-dep.txt".exists()? {
     return Err(ServiceBuildError.Failed("execute-dep reached the build root"))
   }
   if env("CC")? != "cc" or env("CXX")? != "c++" {
     return Err(ServiceBuildError.Failed("the build environment does not name the compilers"))
   }
   let target = fp"{dest}/usr/share/execute-service.txt"
-  fs.mkdir(target.parent)?
-  fs.write(target, "service\n")?
+  target.parent.mkdir()?
+  target.write("service\n")?
 }
 """,
   )
@@ -177,7 +177,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
 error ProofError = Failed(message: Str)
 
 proc main(root: Path = /rootfs) [fs, error] {
-  if ! fs.exists(fp"{root}/usr/share/execute-service.txt")? {
+  if ! fp"{root}/usr/share/execute-service.txt".exists()? {
     return Err(ProofError.Failed("missing execute-service payload"))
   }
 }

@@ -10,5 +10,5 @@ export let filetree = [
   {path: p"usr/bin/example", kind: "binary"},
 ]
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(dest)?
+  dest.mkdir()?
 }

@@ -384,7 +384,7 @@ env ({
       exec_args = exec_args.extend(["-isystem", rooted(sysroot, "usr/lib/llvm23/include/c++/v1").display()])
       let cxx_target = rooted(sysroot, f"usr/lib/llvm23/include/{arch}-linux-musl/c++/v1")
 
-      if fs.exists(cxx_target)? {
+      if cxx_target.exists()? {
         exec_args = exec_args.extend(["-isystem", cxx_target.display()])
       }
     }
@@ -436,7 +436,7 @@ env ({
     exec_args = exec_args.extend(["-lc++", "-lc++abi"])
     let unwind = rooted(sysroot, "usr/lib/llvm23/lib/libunwind.a")
 
-    if fs.exists(unwind)? {
+    if unwind.exists()? {
       exec_args = exec_args.push(unwind.display())
     }
 
@@ -449,7 +449,7 @@ env ({
 
   let builtins = rooted(sysroot, f"usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a")
 
-  if linking and runtime and fs.exists(builtins)? {
+  if linking and runtime and builtins.exists()? {
     exec_args = exec_args.push(builtins.display())
   }
 

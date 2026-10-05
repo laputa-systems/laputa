@@ -117,7 +117,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
     }
   }
 
-  print fs.read_text(fp"{logs}/report.md")?
+  print (fp"{logs}/report.md".read_text()?)
 }
 
 main(@args)

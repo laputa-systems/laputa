@@ -1163,7 +1163,7 @@ export let service = {{
 
 ## The `reload` lifecycle hook.
 export proc reload() [fs, process, env, error] -> Result[Unit, Error] {{
-  fs.write(Path({json.encode(touched.display())?}), "reloaded")?
+  Path({json.encode(touched.display())?}).write("reloaded")?
 }}
 """,
   )
@@ -1239,7 +1239,7 @@ export let service = {{
 
 ## The `finish` lifecycle hook.
 export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
-  fs.write(Path({json.encode(touched.display())?}), "finished")?
+  Path({json.encode(touched.display())?}).write("finished")?
 }}
 """,
   )

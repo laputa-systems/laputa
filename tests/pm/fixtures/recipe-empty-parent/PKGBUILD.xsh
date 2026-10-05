@@ -25,8 +25,8 @@ export let filetree = [{path: p"usr/bin/recipe-empty-parent", kind: "file"}]
 
 ## Creates a payload file and removes the only child of an incidental directory.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/usr/bin")?
-  fs.write(fp"{dest}/usr/bin/recipe-empty-parent", "payload")?
-  fs.mkdir(fp"{dest}/usr/share/man")?
-  fs.remove(fp"{dest}/usr/share/man")?
+  fp"{dest}/usr/bin".mkdir()?
+  fp"{dest}/usr/bin/recipe-empty-parent".write("payload")?
+  fp"{dest}/usr/share/man".mkdir()?
+  fp"{dest}/usr/share/man".remove()?
 }

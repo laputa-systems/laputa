@@ -69,10 +69,10 @@ proc main() [fs, process, time, error] {
   p"/run/laputa-foot-read-ready".remove()
   p"/run/laputa-foot-read.xsh".write(
     """#!/bin/xsh
-fs.write(p"/run/laputa-foot-read-ready", "ready\\n")?
+p"/run/laputa-foot-read-ready".write("ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
 let input = io.stdin_text()?
-fs.write(p"/run/laputa-foot-input.txt", input)?
+p"/run/laputa-foot-input.txt".write(input)?
 """, mode: 0o755,
   )
   let command = process.command_argv(

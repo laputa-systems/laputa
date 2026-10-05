@@ -14,10 +14,9 @@ export let filetree = [{path: p"usr/share/world-app.txt", kind: "file"}]
 
 export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/world-app.txt"
-  fs.mkdir(target.parent)?
+  target.parent.mkdir()?
 
-  fs.write(
-    target,
+  target.write(
     """world-app
 """,
   )?

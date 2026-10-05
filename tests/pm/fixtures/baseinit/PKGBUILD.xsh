@@ -34,8 +34,8 @@ export let filetree = [
 ]
 
 proc write_file(path_value: Path, text: Str) [fs, error] {
-  fs.mkdir(path_value.parent)?
-  fs.write(path_value, text)?
+  path_value.parent.mkdir()?
+  path_value.write(text)?
 }
 
 export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {

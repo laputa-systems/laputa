@@ -3,7 +3,7 @@ error ProofError = Failed(kind: Str, message: Str)
 proc require_file(root: Path, rel: Str) [fs, error] {
   let path_value = fp"{root}/{rel}"
 
-  if ! fs.exists(path_value)? {
+  if ! path_value.exists()? {
     return Err(ProofError.Failed("proof-baseinit", f"missing {rel}"))
   }
 }

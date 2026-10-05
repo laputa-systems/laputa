@@ -24,5 +24,5 @@ export let upstream_sources = [{
 export let filetree = [{path: p"usr/share/recipe-valid-payload.txt", kind: "file"}]
 ## Builds the payload.
 export proc build(dest: Path) [fs, error] {
-  fs.write(fp"{dest}/usr/share/recipe-valid-payload.txt", "payload")?
+  fp"{dest}/usr/share/recipe-valid-payload.txt".write("payload")?
 }
