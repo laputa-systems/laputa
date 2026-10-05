@@ -591,10 +591,10 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
   destination.parent.mkdir()
 
   if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
-    source.copy(destination)
+    source.copy(to: destination)
     destination.chmod(entry.mode)
   } else if entry.kind == types.file_kind_symlink() {
-    fs.symlink(fp"{entry.target}", destination)
+    destination.symlink(to: fp"{entry.target}")
   }
 
   root_verify_entry_at(output, entry)
@@ -821,7 +821,7 @@ export proc compose_artifacts(
   root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
   verify(temporary, receipt)
   output.parent.mkdir()
-  temporary.rename(output)
+  temporary.rename(to: output)
   verify(output, receipt)
   receipt
 }

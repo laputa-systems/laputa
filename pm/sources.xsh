@@ -13,7 +13,7 @@ pure sources_is_repository_input(source: Str) -> Bool {
 
 proc sources_repository_input_path(source: Str) [fs, env, error] -> Result[Path] {
   let root = (e"XSH_PM_REPOSITORY_ROOT" ?? "").trim()
-  let relative = fp"{source.replace("repository/", "")}".normalize()
+  let relative = fp"{source.replace("repository/", with: "")}".normalize()
 
   if root == "" {
     return Err(types.PmError.PackageContract(f"repository source {source} needs XSH_PM_REPOSITORY_ROOT"))
@@ -131,7 +131,7 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   return Mismatch(f"{url}: expected sha256 {sha256}, got {actual}") when actual != sha256
 
   let size = partial.metadata()?.size
-  partial.rename(entry)
+  partial.rename(to: entry)
   Fetched(size)
 }
 
@@ -506,8 +506,8 @@ proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[St
   if ! entry.exists() {
     let partial = fp"{partial_dir}/{digest}.checksum"
     entry.parent.mkdir()
-    download.copy(partial, overwrite: true)
-    partial.rename(entry, overwrite: true)
+    download.copy(to: partial, overwrite: true)
+    partial.rename(to: entry, overwrite: true)
   }
 
   digest
@@ -597,7 +597,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
         let parts = line.split(marker)
         let old = (parts.get(1) ?? "").split("\"").get(0) ?? ""
         let value = values.get(value_index)?
-        output += [line.replace(f"{old}\"", f"{value}\"")]
+        output += [line.replace(f"{old}\"", with: f"{value}\"")]
         value_index += 1
         found = true
         continue

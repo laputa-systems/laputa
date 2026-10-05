@@ -499,7 +499,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 
 ## Exported declaration `add_extra_objects_from_env`.
 export proc add_extra_objects_from_env(plan: kbuild.KbuildPlan) [env, error] -> Result[kbuild.KbuildPlan, Error] {
-  let raw = (e"XSH_LINUX_KBUILD_EXTRA_OBJECTS" ?? "").replace(",", " ")
+  let raw = (e"XSH_LINUX_KBUILD_EXTRA_OBJECTS" ?? "").replace(",", with: " ")
   var objects = [fp"{item}" for item in raw.words()]
   kbuild.add_plan_objects(plan, objects)
 }

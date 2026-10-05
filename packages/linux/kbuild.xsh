@@ -404,7 +404,7 @@ pure dirname_for_item(dir: Path, item: Str) -> Path {
 }
 
 pure clean_config_value(raw: Str) -> Str {
-  raw.trim().replace("\"", "")
+  raw.trim().replace("\"", with: "")
 }
 
 pure config_header_value(value: Str) -> Str {
@@ -438,7 +438,7 @@ export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig, Error] 
       # Only the first `=` ends the name: string values such as CONFIG_CMDLINE
       # contain more of them.
       let split_at = line.find("=") ?? 0
-      let name = line.byte_slice(0, split_at).replace("CONFIG_", "")
+      let name = line.byte_slice(0, split_at).replace("CONFIG_", with: "")
       let value = clean_config_value(line.byte_slice(split_at + 1))
       values[name] = value
 
@@ -787,7 +787,7 @@ pure expand_vars(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str
     return expand_make_vars(raw, vars)
   }
 
-  var out = expand_braced_config_refs(expand_subst(raw, config).replace("$(SRCARCH)", srcarch), config)
+  var out = expand_braced_config_refs(expand_subst(raw, config).replace("$(SRCARCH)", with: srcarch), config)
 
   return out unless "$(" in out
 
@@ -828,7 +828,7 @@ proc logical_lines(body: Str) -> List[Str] {
     }
 
     if trimmed.ends_with("\\") {
-      current = f"{current} {trimmed.replace("\\", "")}"
+      current = f"{current} {trimmed.replace("\\", with: "")}"
     } else {
       lines += [f"{current} {trimmed}".trim()]
       current = ""
@@ -913,7 +913,7 @@ proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
   let expanded = expand_vars(raw, vars, config, srcarch)
 
   if expanded.starts_with("CONFIG_") {
-    return config_value(config, expanded.replace("CONFIG_", ""))
+    return config_value(config, expanded.replace("CONFIG_", with: ""))
   }
 
   expanded
@@ -932,7 +932,7 @@ proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig,
   return Err(ScriptError.Failed(kind: "kbuild-not-conditional", message: line)) when parts.len() < 2
 
   let left = conditional_value(parts[0].trim(), vars, config, srcarch)
-  let right = expand_vars(parts |> drop(1).join(",").replace(")", "").trim(), vars, config, srcarch)
+  let right = expand_vars(parts |> drop(1).join(",").replace(")", with: "").trim(), vars, config, srcarch)
 
   return left == right when keyword == "ifeq"
 
@@ -968,7 +968,7 @@ pure active_conditional(stack: List[Bool]) -> Bool {
 }
 
 pure object_stem(item: Str) -> Str {
-  item.replace(".o", "")
+  item.replace(".o", with: "")
 }
 
 pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
@@ -1115,7 +1115,7 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Resul
 
 pure object_cflags_lhs(expanded: Str) -> Str {
   if expanded.starts_with("CFLAGS_") and expanded.ends_with(".o") {
-    return expanded.replace("CFLAGS_", "")
+    return expanded.replace("CFLAGS_", with: "")
   }
 
   ""
@@ -3408,10 +3408,10 @@ proc composite_member_map(composites: List[CompositeObject]) -> Map[CompositeObj
 
 proc source_for_object(obj: Path) -> Result[Path] {
   var candidates = [obj]
-  let stem = obj.name.replace(".o", "")
+  let stem = obj.name.replace(".o", with: "")
 
   if path_key(obj).starts_with("drivers/firmware/efi/libstub/lib-") {
-    candidates += [fp"lib/{stem.replace("lib-", "")}.c"]
+    candidates += [fp"lib/{stem.replace("lib-", with: "")}.c"]
   }
 
   if stem.ends_with("_") {
@@ -3496,18 +3496,18 @@ proc asm_cflags(_: List[Str]) -> List[Str] {
 }
 
 pure object_key_from_out(out: Path) -> Str {
-  out.display().replace(".xsh-kbuild/obj/", "").replace(".o", "")
+  out.display().replace(".xsh-kbuild/obj/", with: "").replace(".o", with: "")
 }
 
 pure object_base_name_from_out(out: Path) -> Str {
-  out.name.replace(".o", "").replace("-", "_")
+  out.name.replace(".o", with: "").replace("-", with: "_")
 }
 
 pure kbuild_object_defs_for_module(out: Path, mod_out: Path) -> List[Str] {
   let modfile = object_key_from_out(mod_out)
   let basename = object_base_name_from_out(out)
   let modname = object_base_name_from_out(mod_out)
-  let identifier = modname.replace("-", "_")
+  let identifier = modname.replace("-", with: "_")
 
   let base = [
     f"-DKBUILD_MODFILE=\"{modfile}\"",
@@ -3919,7 +3919,7 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
       var i = 0
 
       while i < reps {
-        lines += [line.replace("$$", f"{i}").replace("$#", f"{n}").replace("$*", "$")]
+        lines += [line.replace("$$", with: f"{i}").replace("$#", with: f"{n}").replace("$*", with: "$")]
         i += 1
       }
     }
@@ -4049,7 +4049,7 @@ pure archive_object_cflags_from_extra(cflags: List[Str], extra_flags: List[Str],
 }
 
 pure pi_base_name(obj: Path) -> Str {
-  obj.name.replace(".pi.o", "")
+  obj.name.replace(".pi.o", with: "")
 }
 
 pure pi_base_object(obj: Path) -> Path {
@@ -4059,7 +4059,7 @@ pure pi_base_object(obj: Path) -> Path {
 pure pi_source(obj: Path) -> Path {
   let base = pi_base_name(obj)
 
-  return fp"lib/{base.replace("lib-", "")}.c" when base.starts_with("lib-")
+  return fp"lib/{base.replace("lib-", with: "")}.c" when base.starts_with("lib-")
 
   join_rel(object_dir(obj), f"{base}.c")
 }
@@ -4278,7 +4278,7 @@ export proc generate_offsets_header(asm_path: Path, out: Path, header_guard: Str
           } else {
             let parts = body.fields()
             let name = parts.get(0) ?? ""
-            let value = (parts.get(1) ?? "").replace("$", "")
+            let value = (parts.get(1) ?? "").replace("$", with: "")
             let comment = parts |> drop(2)
 
             if name != "" and value != "" {
@@ -4786,7 +4786,7 @@ pure efi_libstub_stems_x86() -> List[Str] {
 }
 
 pure efi_libstub_source_x86(stem: Str) -> Path {
-  return fp"lib/{stem.replace("lib-", "")}.c" when stem.starts_with("lib-")
+  return fp"lib/{stem.replace("lib-", with: "")}.c" when stem.starts_with("lib-")
 
   return fp"drivers/firmware/efi/libstub/x86-stub.c" when stem == "x86-stub"
 
@@ -5533,7 +5533,7 @@ pure final_support_lib_sources() -> List[Path] {
 }
 
 pure efi_libstub_source(stem: Str) -> Path {
-  return fp"lib/{stem.replace("lib-", "")}.c" when stem.starts_with("lib-")
+  return fp"lib/{stem.replace("lib-", with: "")}.c" when stem.starts_with("lib-")
 
   fp"drivers/firmware/efi/libstub/{stem}.c"
 }

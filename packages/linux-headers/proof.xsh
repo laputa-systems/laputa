@@ -23,7 +23,7 @@ proc main(root: Path = /rootfs) [fs, env, error] {
   for entry in fs.children(fp"{include}/asm")? {
     let text = entry.path.read_text()?
     continue unless text.starts_with("#include <asm-generic/") and text.lines().len() == 1
-    let target = text.trim().replace("#include <", "").replace(">", "")
+    let target = text.trim().replace("#include <", with: "").replace(">", with: "")
     require(fp"{include}/{target}".exists()?, f"asm/{entry.name} wraps missing {target}")
   }
 

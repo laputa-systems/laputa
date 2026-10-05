@@ -22,7 +22,7 @@ proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("execute/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fp"{root}/pm".mkdir()
-  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
+  p"pm/proof.xsh".copy(to: fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -200,7 +200,7 @@ proc exact_remote_snapshot(
     let metadata = fp"{remote_root}/metadata/aarch64/{node.name}/{node.package_id}.json"
     tarball.parent.mkdir()
     metadata.parent.mkdir()
-    fp"{receipt.artifact_dir}/payload.tar.gz".copy(tarball, overwrite: true)
+    fp"{receipt.artifact_dir}/payload.tar.gz".copy(to: tarball, overwrite: true)
     let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     metadata.write(json.encode({...raw, executor_sha256})? + "\n")
     packages += [{
@@ -315,14 +315,14 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
   pkgbuild.write(
     pkgbuild.read_text()?.replace(
       "export let filetree = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
-      "export let filetree = []\n## Target-specific declared output.\nexport let filetree_x86_64 = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
+      with: "export let filetree = []\n## Target-specific declared output.\nexport let filetree_x86_64 = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
     ),
   )
   let proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   proof.write(
     proof.read_text()?.replace(
       "proc main(root: Path = /rootfs) [fs, error] {",
-      "proc main(root: Path = /rootfs) [fs, env, error] {\n  if env(\"XSH_PM_TARGET_ARCH\")? != \"x86_64\" {\n    return Err(ProofError.Failed(\"proof ran under the wrong target\"))\n  }",
+      with: "proc main(root: Path = /rootfs) [fs, env, error] {\n  if env(\"XSH_PM_TARGET_ARCH\")? != \"x86_64\" {\n    return Err(ProofError.Failed(\"proof ran under the wrong target\"))\n  }",
     ),
   )
   let value = plan.resolve(
@@ -404,7 +404,7 @@ test test_execute_rebuilds_changed_recipe_and_dependents [fs, net, process, env,
   let initial_dep = node_named(initial, "execute-dep")?
   let initial_app = node_named(initial, "execute-app")?
   let pkgbuild = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
-  pkgbuild.write(pkgbuild.read_text()?.replace("dependency\\n", "dependency revision two\\n"))
+  pkgbuild.write(pkgbuild.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))
   let changed = resolve_execute_plan(repo_root)?
   let changed_dep = node_named(changed, "execute-dep")?
   let changed_app = node_named(changed, "execute-app")?

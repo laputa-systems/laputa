@@ -133,7 +133,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     proof.ensure(by_name == "laputa-hello(1) - greet the floating island\n", "mandoc-apropos", f"unexpected apropos Nm= output:\n{by_name}")
     let what = run.text $loader fp"{bin}/whatis" "-M" $manpath "laputa-island"
     proof.ensure(what == "laputa-island(7) - overview of the flying island\n", "mandoc-whatis", f"unexpected whatis output:\n{what}")
-    let shown = overstrike.replace(run.text $loader fp"{bin}/man" "-M" $manpath "-T" "ascii" "-O" "width=60" "7" "laputa-island" ?, "")
+    let shown = overstrike.replace(run.text $loader fp"{bin}/man" "-M" $manpath "-T" "ascii" "-O" "width=60" "7" "laputa-island" ?, with: "")
     proof.ensure(shown == man_text, "mandoc-man-lookup", f"unexpected man 7 laputa-island output:\n{shown}")
 
     let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file

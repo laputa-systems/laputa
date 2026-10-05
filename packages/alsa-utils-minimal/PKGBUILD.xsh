@@ -214,7 +214,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(outputs[tool.name], fp"{dest}/usr/bin/{tool.name}", 0o755, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"aplay", fp"{dest}/usr/bin/arecord")
+  fp"{dest}/usr/bin/arecord".symlink(to: p"aplay")
 
   # alsactl init reads its card database from DATADIR/init; `alsactl store`
   # writes SYS_ASOUNDRC, whose directory it does not create.
@@ -228,5 +228,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(page, fp"{dest}/usr/share/man/man1/{page.name}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"aplay.1", fp"{dest}/usr/share/man/man1/arecord.1")
+  fp"{dest}/usr/share/man/man1/arecord.1".symlink(to: p"aplay.1")
 }

@@ -19,7 +19,7 @@ pure elf_interpreter(program_headers: Str) -> Str {
     let start = line.find(marker) ?? -1
     continue unless start >= 0
     let rest = line.byte_slice(start + marker.byte_len())
-    return rest.replace("]", "").trim()
+    return rest.replace("]", with: "").trim()
   }
 
   ""
@@ -32,7 +32,7 @@ pure elf_needed(dynamic: Str) -> List[Str] {
     continue unless "(NEEDED)" in line
     let start = line.find("[") ?? -1
     continue unless start >= 0
-    needed += [line.byte_slice(start + 1).replace("]", "").trim()]
+    needed += [line.byte_slice(start + 1).replace("]", with: "").trim()]
   }
 
   needed
@@ -116,7 +116,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     },
   )
   fp"{output}/files.txt".write((files |> sort).join("\n") + "\n")
-  fp"{root}/var/lib/laputa/generation.json".copy(fp"{output}/generation.json", overwrite: true)
+  fp"{root}/var/lib/laputa/generation.json".copy(to: fp"{output}/generation.json", overwrite: true)
 
   # The root's own xsh must run a script from inside it. The probe lands after
   # the receipt was copied; the throwaway root is never used again.

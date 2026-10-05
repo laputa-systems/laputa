@@ -48,7 +48,7 @@ proc main(root: Path = /rootfs) [fs, error] {
       }
 
       if line.starts_with(".so ") {
-        let target = line.replace(".so ", "")
+        let target = line.replace(".so ", with: "")
         proof.ensure(fp"{mandir}/{target}".exists()?, "man-pages-links", f"{page.path} sources missing {target}")
         links += 1
       }

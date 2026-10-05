@@ -169,6 +169,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(flex.output, fp"{dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)
 
   # POSIX requires a 'lex' command; flex is the canonical implementation.
-  fs.symlink(p"flex", fp"{dest}/usr/bin/lex")
+  fp"{dest}/usr/bin/lex".symlink(to: p"flex")
   fs.install(p"flex.xsh", fp"{dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)
 }

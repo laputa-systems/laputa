@@ -292,7 +292,7 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
     let temporary = fp"{archive_path}.tmp"
     temporary.remove(missing_ok: true)
     archive.tar_create(temporary, stage, entries, "xz", true)
-    temporary.rename(archive_path, overwrite: true)
+    temporary.rename(to: archive_path, overwrite: true)
   }
 }
 
@@ -307,7 +307,7 @@ proc xsh_seed_publish_binary(source: Path, dest: Path) {
 
   let temporary = fp"{dest}.tmp"
   fs.install(source, temporary, 0o755, parents: true, overwrite: true)
-  temporary.rename(dest, overwrite: true)
+  temporary.rename(to: dest, overwrite: true)
 }
 
 proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) -> Result[Str] {

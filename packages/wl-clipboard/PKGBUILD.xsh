@@ -86,9 +86,9 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
-      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)
       ninja.write(ninja_text)
     }
 

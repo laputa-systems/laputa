@@ -116,7 +116,7 @@ proc patch_generated_inputs() {
   write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
-  text = text.replace("math = cc.find_library('m')", "math = declare_dependency(link_args: ['-lm'])")
+  text = text.replace("math = cc.find_library('m')", with: "math = declare_dependency(link_args: ['-lm'])")
 
   text = text.replace(
     """env = find_program('env', native: true)
@@ -142,7 +142,7 @@ version = custom_target(
   output: 'version.h',
   command: [env, 'LC_ALL=C', generate_version_sh, meson.project_version(), '@CURRENT_SOURCE_DIR@', '@OUTPUT@'])
 """,
-    """unicode_data = files('unicode-compose-table.h')
+    with: """unicode_data = files('unicode-compose-table.h')
 emoji_data = files('emoji-data.h')
 version = files('version.h')
 """,

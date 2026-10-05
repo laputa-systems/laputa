@@ -23,8 +23,8 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
   assert fast_target.byte_len() == 59
   assert block_target.byte_len() == 60
   source.mkdir()
-  fs.symlink(fp"{fast_target}", fp"{source}/fast")
-  fs.symlink(fp"{block_target}", fp"{source}/block")
+  fp"{source}/fast".symlink(to: fp"{fast_target}")
+  fp"{source}/block".symlink(to: fp"{block_target}")
   image.write(b"")
   image.truncate(8 * 1024 * 1024)
 

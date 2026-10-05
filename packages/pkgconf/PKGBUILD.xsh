@@ -286,15 +286,15 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Step 4: install into dest.
   fs.install(lib.output, fp"{dest}/usr/lib/libpkgconf.so.8.0.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so.8")
-  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so")
+  fp"{dest}/usr/lib/libpkgconf.so.8".symlink(to: p"libpkgconf.so.8.0.0")
+  fp"{dest}/usr/lib/libpkgconf.so".symlink(to: p"libpkgconf.so.8.0.0")
   fs.install(static_target.output, fp"{dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)
 
   for output in outputs {
     fs.install(output, fp"{dest}/usr/bin/{output.name}", 0o755, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"pkgconf", fp"{dest}/usr/bin/pkg-config")
+  fp"{dest}/usr/bin/pkg-config".symlink(to: p"pkgconf")
 
   # Makefile.am's nobase_pkginclude_HEADERS; config.h and the Windows
   # dirent shim stay private to the build.

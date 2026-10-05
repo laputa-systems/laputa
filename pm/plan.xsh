@@ -12,7 +12,7 @@ use util
 export let format: Str = "laputa-build-plan-3"
 
 pure plan_canonical_field(value: Str) -> Str {
-  value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
 }
 
 proc plan_digest_lines(lines: List[Str]) [error] -> Result[Str] {

@@ -149,11 +149,11 @@ proc patch_generated_inputs() {
   write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
-  text = text.replace("math = cc.find_library('m')", "math = declare_dependency(link_args: ['-lm'])")
+  text = text.replace("math = cc.find_library('m')", with: "math = declare_dependency(link_args: ['-lm'])")
 
   text = text.replace(
     "threads = [dependency('threads'), cc.find_library('stdthreads', required: false)]",
-    "threads = [declare_dependency(), cc.find_library('stdthreads', required: false)]",
+    with: "threads = [declare_dependency(), cc.find_library('stdthreads', required: false)]",
   )
 
   text = text.replace(
@@ -190,7 +190,7 @@ srgb_funcs = custom_target(
   command: [python, generate_srgb_funcs, '@OUTPUT0@', '@OUTPUT1@']
 )
 """,
-    """version = files('version.h')
+    with: """version = files('version.h')
 builtin_terminfo = files('foot-terminfo.h')
 emoji_variation_sequences = files('emoji-variation-sequences.h')
 srgb_funcs = files('srgb.c', 'srgb.h')
@@ -209,7 +209,7 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   link_with: [common, misc],
   install: true)
 """,
-    """executable(
+    with: """executable(
   'footclient',
   'client.c', 'client-protocol.h',
   'foot-features.c', 'foot-features.h',
@@ -227,13 +227,13 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   'foot.desktop', 'foot-server.desktop', 'footclient.desktop',
   install_dir: join_paths(get_option('datadir'), 'applications'))
 """,
-    "",
+    with: "",
   )
 
   text = text.replace("install_data('foot.ini', install_dir: join_paths(get_option('sysconfdir'), 'xdg', 'foot'))", "")
-  text = text.replace("subdir('completions')", "")
-  text = text.replace("subdir('icons')", "")
-  text = text.replace("subdir('utils')", "")
+  text = text.replace("subdir('completions')", with: "")
+  text = text.replace("subdir('icons')", with: "")
+  text = text.replace("subdir('utils')", with: "")
   meson.write(text)
 }
 
@@ -277,9 +277,9 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
-      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)
       ninja.write(ninja_text)
     }
 

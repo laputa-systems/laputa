@@ -253,5 +253,5 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fs.install(fp"target/{triple}/release/sudo", fp"{dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)
   fs.install(fp"target/{triple}/release/su", fp"{dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)
-  fs.symlink(p"sudo", fp"{dest}/usr/bin/sudoedit")
+  fp"{dest}/usr/bin/sudoedit".symlink(to: p"sudo")
 }

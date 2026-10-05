@@ -73,7 +73,7 @@ test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx
   let pkg = copied_package(ctx, "fingerprint-pkgbuild")?
   let first = build_input(pkg)?
   let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
-  pkgbuild.write(pkgbuild.read_text()?.replace("1.0.0", "1.0.1"))
+  pkgbuild.write(pkgbuild.read_text()?.replace("1.0.0", with: "1.0.1"))
   assert build_input(pkg)? == first == false
 }
 
@@ -132,13 +132,13 @@ test test_package_fingerprint_ignores_absolute_checkout_path [fs, env, error] { 
 test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-symlinks")?
   let first = build_input(pkg)?
-  fs.symlink(p"input.txt", fp"{pkg.dir}/files/inside.txt")
+  fp"{pkg.dir}/files/inside.txt".symlink(to: p"input.txt")
   assert build_input(pkg)? == first == false
 
   for target in [../../pm, /etc, p"files/../../outside.xsh"] {
     let link = fp"{pkg.dir}/escape"
     link.remove(missing_ok: true)
-    fs.symlink(target, link)
+    link.symlink(to: target)
 
     match build_input(pkg) {
       Ok(_) => test.fail(f"recipe symlink to {target} unexpectedly fingerprinted")
@@ -155,7 +155,7 @@ proc copied_plan_repository(ctx: TestContext, name: Str) [fs, env, error] -> Res
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fp"{root}/pm".mkdir()
-  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
+  p"pm/proof.xsh".copy(to: fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -433,14 +433,14 @@ test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |
   let original = path_value.read_text()?
   assert repeat_path.read_text()? == original
   assert original == fixture("plans/basic-aarch64.json").read_text()?
-  path_value.write(original.replace(plan.format, "unknown-build-plan"))
+  path_value.write(original.replace(plan.format, with: "unknown-build-plan"))
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("unknown plan format unexpectedly loaded")
     Err(problem) => assert "unsupported build plan format unknown-build-plan" in problem.message
   }
 
-  path_value.write(original.replace(value.repository_digest, "corrupt-repository-digest"))
+  path_value.write(original.replace(value.repository_digest, with: "corrupt-repository-digest"))
 
   match plan_json.read(path_value) {
     Ok(_) => test.fail("corrupt plan digest unexpectedly loaded")
@@ -499,7 +499,7 @@ test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, 
 proc write_plan_metapackage(root: Path, name: Str, dependencies: Str) {
   let dir = fp"{root}/packages/{name}"
   dir.mkdir()
-  let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
+  let documented = dependencies.replace("export let ", with: "## Fixture export.\nexport let ")
   fp"{dir}/PKGBUILD.xsh".write(
     f"""##! Runtime-only dependency fixture recipe.
 ## Fixture export.

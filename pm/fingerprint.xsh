@@ -3,7 +3,7 @@ use types
 use util
 
 pure canonical_field(value: Str) -> Str {
-  value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
 }
 
 pure ignored_tree_path(rel: Path) -> Bool {
@@ -132,7 +132,7 @@ proc repository_input_lines(
     let expanded = util.expand_source(parsed.source, pkg, arch, arch)
 
     continue unless expanded.starts_with("repository/")
-    let relative = fp"{expanded.replace("repository/", "")}".normalize()
+    let relative = fp"{expanded.replace("repository/", with: "")}".normalize()
     let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 

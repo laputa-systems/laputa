@@ -49,7 +49,7 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, rel)?
     dest.parent.mkdir()
-    source.copy(dest, overwrite: true)
+    source.copy(to: dest, overwrite: true)
     return
   }
 
@@ -111,8 +111,8 @@ export proc upload_immutable_repo_file(
   dest.parent.mkdir()
   temporary.remove(missing_ok: true)
   defer temporary.remove(missing_ok: true)
-  source.copy(temporary, overwrite: true)
-  temporary.rename(dest)
+  source.copy(to: temporary, overwrite: true)
+  temporary.rename(to: dest)
   true
 }
 
@@ -252,8 +252,8 @@ export proc write_remote_index_to_repo(
     dest.parent.mkdir()
     temporary.remove(missing_ok: true)
     defer temporary.remove(missing_ok: true)
-    util.remote_index_cache_path(out).copy(temporary, overwrite: true)
-    temporary.rename(dest, overwrite: true)
+    util.remote_index_cache_path(out).copy(to: temporary, overwrite: true)
+    temporary.rename(to: dest, overwrite: true)
     return
   }
 

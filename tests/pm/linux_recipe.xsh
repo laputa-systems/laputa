@@ -99,7 +99,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
   let package_dir = fp"{root}/packages/laputa-pm"
   let source = fp"{root}/source"
   let _ = fs.copy_tree(p"packages/laputa-pm", package_dir, parents: true, overwrite: true)?
-  p"pm.xsh".copy(fp"{root}/pm.xsh", overwrite: true)
+  p"pm.xsh".copy(to: fp"{root}/pm.xsh", overwrite: true)
   let _ = fs.copy_tree(p"pm", fp"{root}/pm", parents: true, overwrite: true)?
   source.mkdir()
   let pkg = recipe.load_package(package_dir)?
@@ -273,7 +273,7 @@ proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "repository-with-seed")?
 
   for name in ["packages", "pm", "pm.xsh", "xinit"] {
-    fs.symlink(fp"{checkout}/{name}", fp"{root}/{name}")
+    fp"{root}/{name}".symlink(to: fp"{checkout}/{name}")
   }
 
   let seed = fp"{root}/.out/seed/aarch64"

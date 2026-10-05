@@ -114,7 +114,7 @@ proc container_stage_build_plan(work: Path) -> Result[Path] {
     return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: {source}"))
   }
 
-  source.copy(staged)
+  source.copy(to: staged)
 
   if hash.sha256(source)?.hex() != hash.sha256(staged)?.hex() {
     return Err(ContainerBuildError.Failed("container-local BuildPlan staging does not match the saved manifest"))
@@ -274,7 +274,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
   }
 
-  embedded_manifest.copy(container_work_generation_manifest(work))
+  embedded_manifest.copy(to: container_work_generation_manifest(work))
   container_require_no_forbidden_sonames(root, profile)
   container_extract_kernel(build_plan, profile, container_work_kernel(work))
   container_build_images(root, container_work_rootfs(work), container_work_disk(work))

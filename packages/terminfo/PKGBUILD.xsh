@@ -66,7 +66,7 @@ proc linux_terminfo_source(text: Str) [error] -> Result[Str] {
     return Err(TerminfoSourceError.Unexpected(file: "terminfo.src", message: "the xterm+kbs fragment no longer reads kbs=^H"))
   }
 
-  text.replace(fragment, "xterm+kbs|fragment for backspace key,\n\tkbs=^?,\n")
+  text.replace(fragment, with: "xterm+kbs|fragment for backspace key,\n\tkbs=^?,\n")
 }
 
 # foot's meson substitutes its terminfo base name into foot.info before
@@ -76,7 +76,7 @@ proc foot_terminfo_source(text: Str) [error] -> Result[Str] {
     return Err(TerminfoSourceError.Unexpected(file: "foot.info", message: "the foot entry is no longer named @default_terminfo@"))
   }
 
-  text.replace("@default_terminfo@", "foot")
+  text.replace("@default_terminfo@", with: "foot")
 }
 
 ## Package recipe export.

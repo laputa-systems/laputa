@@ -217,7 +217,7 @@ export proc generation_adapter_copy_manifest_file(
 
     output.parent.mkdir()
     atomically replace output as temporary {
-      source.copy(temporary)
+      source.copy(to: temporary)
       fs.fsync(temporary)
     }
   }

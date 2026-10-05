@@ -208,7 +208,7 @@ pure replace_required(text: Str, old: Str, new: Str, what: Str) -> Result[Str] {
     fail f"dwl's sources no longer hold {what}"
   }
 
-  text.replace(old, new)
+  text.replace(old, with: new)
 }
 
 # The runtime has no /bin/sh, so the configuration drops SHCMD and the

@@ -27,7 +27,7 @@ export proc publish_final_file(source: Path, output: Path) [fs, error] {
 
   output.parent.mkdir()
   atomically replace output as temporary {
-    source.copy(temporary)
+    source.copy(to: temporary)
 
     if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
       return Err(ContainerOutputError.Failed(f"final publication copy does not match {source}"))
@@ -79,18 +79,18 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
     temporary.mkdir()
     for item in files {
       let destination = fp"{temporary}/{item.name}"
-      item.source.copy(destination)
+      item.source.copy(to: destination)
       bundle_verify_file(item.source, destination)
       fs.fsync(destination)
     }
 
-    temporary.rename(final_dir)
+    temporary.rename(to: final_dir)
   }
 
   let current = fp"{output_root}/current"
   let current_temporary = fp"{output_root}/.current.tmp"
   current_temporary.remove(missing_ok: true)
   defer current_temporary.remove(missing_ok: true)
-  fs.symlink(fp"builds/{key}", current_temporary)
-  current_temporary.rename(current, overwrite: true)
+  current_temporary.symlink(to: fp"builds/{key}")
+  current_temporary.rename(to: current, overwrite: true)
 }

@@ -213,7 +213,7 @@ proc fail_on_m4_status() {
     complain (NULL, fatal, _("%s subprocess failed"), "m4");
 """
 
-  output_c.write(text.replace(wait_call, checked_wait))
+  output_c.write(text.replace(wait_call, with: checked_wait))
 }
 
 proc install_data_tree(src: Path, dest: Path) {
@@ -709,9 +709,9 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for line in p"lib/malloc/scratch_buffer.h".lines()? {
     if ! ("libc_hidden_proto" in line) {
-      var generated = line.replace("__always_inline", "inline _GL_ATTRIBUTE_ALWAYS_INLINE")
-      generated = generated.replace("__glibc_likely", "_GL_LIKELY")
-      generated = generated.replace("__glibc_unlikely", "_GL_UNLIKELY")
+      var generated = line.replace("__always_inline", with: "inline _GL_ATTRIBUTE_ALWAYS_INLINE")
+      generated = generated.replace("__glibc_likely", with: "_GL_LIKELY")
+      generated = generated.replace("__glibc_unlikely", with: "_GL_UNLIKELY")
       scratch_lines += [generated]
     }
   }
@@ -806,14 +806,14 @@ getprogname (void)
     var chunk: Str = line
 
     if line.starts_with("lib_libbison_a_SOURCES +=") {
-      chunk = line.replace("lib_libbison_a_SOURCES +=", "")
+      chunk = line.replace("lib_libbison_a_SOURCES +=", with: "")
       in_sources = true
     }
 
     if in_sources {
       let keep_going = chunk.trim().ends_with("\\")
 
-      for word in chunk.replace("\\", "").trim().split(" ") |> where . != "" {
+      for word in chunk.replace("\\", with: "").trim().split(" ") |> where . != "" {
         if word.ends_with(".c") {
           lib_sources += [fp"{word}"]
         }

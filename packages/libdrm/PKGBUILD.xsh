@@ -215,7 +215,7 @@ format_mod_static_table = custom_target(
   input : 'include/drm/drm_fourcc.h',
   command : [python3, files('gen_table_fourcc.py'), '@INPUT@', '@OUTPUT@'])
 """,
-    """format_mod_static_table = files('generated_static_table_fourcc.h')
+    with: """format_mod_static_table = files('generated_static_table_fourcc.h')
 """,
   )
 

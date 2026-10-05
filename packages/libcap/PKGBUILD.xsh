@@ -243,19 +243,19 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let libdir = fp"{dest}/usr/lib"
   fs.install(library, fp"{libdir}/libcap.so.2.78", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libcap.so.2.78", fp"{libdir}/libcap.so.2")
-  fs.symlink(p"libcap.so.2", fp"{libdir}/libcap.so")
+  fp"{libdir}/libcap.so.2".symlink(to: p"libcap.so.2.78")
+  fp"{libdir}/libcap.so".symlink(to: p"libcap.so.2")
   fs.install(p"libcap/include/sys/capability.h", fp"{dest}/usr/include/sys/capability.h", 0o644, parents: true, overwrite: true)
 
   # libcap.pc.in with the substitutions libcap/Makefile applies; @deps@ is
   # empty because the library links nothing beyond libc.
   let pc = p"libcap/libcap.pc.in".read_text()?
-    .replace("@prefix@", "/usr")
-    .replace("@exec_prefix@", "/usr")
-    .replace("@libdir@", "/usr/lib")
-    .replace("@includedir@", "/usr/include")
-    .replace("@VERSION@", ver)
-    .replace("@deps@", "")
+    .replace("@prefix@", with: "/usr")
+    .replace("@exec_prefix@", with: "/usr")
+    .replace("@libdir@", with: "/usr/lib")
+    .replace("@includedir@", with: "/usr/include")
+    .replace("@VERSION@", with: ver)
+    .replace("@deps@", with: "")
 
   fp"{libdir}/pkgconfig".mkdir()
   fp"{libdir}/pkgconfig/libcap.pc".write(pc)

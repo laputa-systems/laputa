@@ -251,7 +251,7 @@ proc replace_once(text: Str, file: Str, old: Str, new: Str) [error] -> Result[St
     return Err(MesaBuildError.Failed(kind: "mesa-patch", message: f"{file} no longer contains the text this recipe replaces:\n{old}"))
   }
 
-  text.replace(old, new)
+  text.replace(old, with: new)
 }
 
 proc patch_file(file: Path, replacements: List[TextReplacement]) {

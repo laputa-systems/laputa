@@ -86,7 +86,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(libudev.tasks, make.jobs()?)
   fs.install(libudev.output, fp"{dest}/usr/lib/libudev.so.1", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libudev.so.1", fp"{dest}/usr/lib/libudev.so")
+  fp"{dest}/usr/lib/libudev.so".symlink(to: p"libudev.so.1")
   fs.install(p"udev.h", fp"{dest}/usr/include/libudev.h", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 

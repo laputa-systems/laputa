@@ -57,7 +57,7 @@ proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
     return false
   }
 
-  let body = log.read_text()?.replace("\r", "")
+  let body = log.read_text()?.replace("\r", with: "")
 
   for line in body.lines() {
     return true when line.trim() == marker

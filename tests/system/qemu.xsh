@@ -129,7 +129,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[Supervi
   let outputs = build.outputs(root)
   let bundle = fp"{outputs.builds}/fixture"
   bundle.mkdir()
-  fs.symlink(p"builds/fixture", outputs.current)
+  outputs.current.symlink(to: p"builds/fixture")
   let fake_qemu = fp"{root}/fake-qemu.sh"
   let fake_qmp = fp"{root}/fake-qmp.sh"
   let attempt_one = fp"{root}/qmp-attempt-one"

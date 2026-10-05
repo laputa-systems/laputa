@@ -204,8 +204,8 @@ proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload
   let temporary = fp"{cached}.tmp"
   temporary.remove(missing_ok: true)
   defer temporary.remove(missing_ok: true)
-  proof.copy(temporary, overwrite: true)
-  temporary.rename(cached)
+  proof.copy(to: temporary, overwrite: true)
+  temporary.rename(to: cached)
 }
 
 # Runs the package proof against `payload` in a fresh root holding its runtime

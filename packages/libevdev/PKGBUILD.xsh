@@ -331,20 +331,20 @@ event_names_h = configure_file(input: 'libevdev/libevdev.h',
 			       command: [make_event_names, input_h, input_event_codes_h],
 			       capture: true)
 """,
-    """# event-names.h
+    with: """# event-names.h
 event_names_h = files('event-names.h')
 """,
   )
 
   text = text.replace(
     "dep_lm = cc.find_library('m')",
-    """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
+    with: """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
 dep_lm = declare_dependency(link_args: ['-lm'])""",
   )
 
   text = text.replace(
     "dep_rt = cc.find_library('rt')",
-    """# musl provides realtime interfaces in libc; avoid recording the build-env librt.
+    with: """# musl provides realtime interfaces in libc; avoid recording the build-env librt.
 dep_rt = declare_dependency()""",
   )
 

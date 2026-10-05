@@ -66,7 +66,7 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) {
 
 # One asm/unistd header, as scripts/syscallhdr.sh --emit-nr writes it.
 proc generate_syscall_header(header: SyscallHeader, generated: Path) {
-  let header_guard = "_UAPI_ASM_" + rx"__".replace(rx"[^A-Z0-9_]".replace(header.name.upper(), "_"), "_")
+  let header_guard = "_UAPI_ASM_" + rx"__".replace(rx"[^A-Z0-9_]".replace(header.name.upper(), with: "_"), with: "_")
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
   var last = -1
 

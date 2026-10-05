@@ -114,7 +114,7 @@ proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
   var out = ""
 
   for raw in symbols.lines() {
-    let line = leading_zero_re.replace(raw, "0")
+    let line = leading_zero_re.replace(raw, with: "0")
     let caps = symbol_re.captures(line)
 
     if caps.len() >= 3 {
@@ -606,7 +606,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   ]
 
   for item in native_nvhe_objects() {
-    materialized_outputs += [fp"{item.out.display().replace(".xsh-kbuild/obj/", "")}"]
+    materialized_outputs += [fp"{item.out.display().replace(".xsh-kbuild/obj/", with: "")}"]
   }
 
   PKGBUILD_shared.write_materialized_outputs(materialized_outputs)

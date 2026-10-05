@@ -43,7 +43,7 @@ proc write_payload_entry(root: Path, entry: EntrySpec) {
     output.mkdir()
     output.chmod(entry.mode)
   } else if entry.kind == .Symlink {
-    fs.symlink(fp"{entry.target}", output)
+    output.symlink(to: fp"{entry.target}")
   }
 }
 
@@ -332,7 +332,7 @@ test test_root_rejects_cyclic_payload_link_that_differs_from_receipt [fs, error]
   )?
   let payload_root = test.temp_dir(ctx, name: "root-symlink-loop-payload")?
   fp"{payload_root}/usr/lib".mkdir()
-  fs.symlink(p"link", fp"{payload_root}/usr/lib/link")
+  fp"{payload_root}/usr/lib/link".symlink(to: p"link")
   archive.tar_create(prepared.staged.payload, payload_root, [p"."], compression: "gz", overwrite: true)
   let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, rehashed(prepared.staged)?)?
 

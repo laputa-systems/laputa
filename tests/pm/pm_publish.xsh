@@ -39,7 +39,7 @@ proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fp"{root}/pm".mkdir()
-  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
+  p"pm/proof.xsh".copy(to: fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -352,7 +352,7 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
   assert hash.sha256(fp"{remote_root}/{old_row.tarball}")?.hex() == old_row.sha256
 
   # Publishing the first build again moves the row back; its objects already exist.
-  recipe.write(recipe.read_text()?.replace("# A rebuild input without a rel bump.\n", ""))
+  recipe.write(recipe.read_text()?.replace("# A rebuild input without a rel bump.\n", with: ""))
   let _ = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-revert")?
   assert index_row(remote.load_remote_index_from(fp"{remote_root}/index.json")?, "app")?.artifact_key == old_app.artifact_key
 }
@@ -363,7 +363,7 @@ test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, e
   # Separate checkouts: one process loads each recipe path once.
   let ahead_root = copied_publish_repository(ctx, "publish-behind-ahead-repo")?
   let recipe = fp"{ahead_root}/packages/app/PKGBUILD.xsh"
-  recipe.write(recipe.read_text()?.replace("export let rel = \"1\"", "export let rel = \"2\""))
+  recipe.write(recipe.read_text()?.replace("export let rel = \"1\"", with: "export let rel = \"2\""))
   let _ = publish_repository_once(ctx, ahead_root, remote_url, "publish-behind-ahead")?
   let published = fp"{remote_root}/index.json".read_text()?
 

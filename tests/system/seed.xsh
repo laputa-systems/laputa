@@ -287,7 +287,7 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
   for arch in ["aarch64", "x86_64"] {
     let host_arch = f"HOST_ARCH={arch}"
     let dry_run = run.text make -n --no-print-directory host-xsh HOST_OS=Linux $host_arch XSH_ROOT=/work/xsh
-    let commands = dry_run.replace("\\\n", " ").lines() |> where "cargo build" in .
+    let commands = dry_run.replace("\\\n", with: " ").lines() |> where "cargo build" in .
     assert commands.len() == 1
     let made = split_at_image(commands[0].words())
     let made_docker = made.docker.join(" ")

@@ -192,7 +192,7 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   }
 
   fs.fsync(temporary)
-  temporary.rename(log, overwrite: true)
+  temporary.rename(to: log, overwrite: true)
 }
 
 ## Run the sole profile PM-plan adapter through the checked native runner.

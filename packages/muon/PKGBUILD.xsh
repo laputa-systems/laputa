@@ -60,7 +60,7 @@ proc patch_system_library_links() {
   compiler.write(
     text.replace(
       lookup,
-      """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
+      with: """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
 			if (!(flags & (find_library_flag_only_static | find_library_flag_prefer_static))) {
 				return (struct find_library_result){ make_str(wk, libname), find_library_found_location_link_arg };
 			}
@@ -125,14 +125,14 @@ export proc build(dest: Path) [fs, process, env, error] {
       patched_ninja = patched_ninja.replace(
         """rule muon_build_c_linker
  command = cc""",
-        f"""rule muon_build_c_linker
+        with: f"""rule muon_build_c_linker
  command = {bootstrap_cc}""",
       )
 
       patched_ninja = patched_ninja.replace(
         """rule muon_build_c_compiler
  command = cc""",
-        f"""rule muon_build_c_compiler
+        with: f"""rule muon_build_c_compiler
  command = {bootstrap_cc}""",
       )
 

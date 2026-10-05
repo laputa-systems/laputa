@@ -468,7 +468,7 @@ proc replace_required(file: Path, old: Str, new: Str) {
     return Err(error.failure(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  file.write(text.replace(old, new))
+  file.write(text.replace(old, with: new))
 }
 
 # Upstream's makealias.py emits hidden internal aliases for the public
@@ -754,7 +754,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
   # makes them, so they resolve in any root the package is installed into.
   for conf in conf_links {
-    fs.symlink(fp"../../../usr/share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")
+    fp"{dest}/etc/fonts/conf.d/{conf}".symlink(to: fp"../../../usr/share/fontconfig/conf.avail/{conf}")
   }
 
   fp"{dest}/usr/share/man".remove(missing_ok: true)

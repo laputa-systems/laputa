@@ -194,7 +194,7 @@ pnp_id_table = custom_target(
 	output: 'pnp-id-table.c',
 )
 """,
-    """pnp_id_table = files('pnp-id-table.c')
+    with: """pnp_id_table = files('pnp-id-table.c')
 """,
   )
 
@@ -203,7 +203,7 @@ pnp_id_table = custom_target(
 subdir('di-edid-decode')
 subdir('test')
 """,
-    "\n",
+    with: "\n",
   )
 
   text = text.replace("math = cc.find_library('m', required: false)", "math = declare_dependency(link_args: ['-lm'])")

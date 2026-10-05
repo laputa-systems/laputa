@@ -70,7 +70,7 @@ proc generation_require_sha256(value: Str, label: Str) [error] {
 }
 
 pure generation_canonical_field(value: Str) -> Str {
-  value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
 }
 
 pure generation_sorted_unique(values: List[Str]) -> List[Str] {
@@ -595,10 +595,10 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
       }
 
       if entry.kind == "file" {
-        entry.source.copy(destination)
+        entry.source.copy(to: destination)
         destination.chmod(entry.mode)
       } else if entry.kind == "symlink" {
-        fs.symlink(fp"{entry.target}", destination)
+        destination.symlink(to: fp"{entry.target}")
       } else {
         return Err(types.PmError.PackageContract(f"generation overlay has invalid entry {entry.path}"))
       }
@@ -742,7 +742,7 @@ export proc compose(
   }
 
   output_root.parent.mkdir()
-  temporary.rename(output_root)
+  temporary.rename(to: output_root)
   let final_receipt = read_generation_receipt(output_root)?
 
   if final_receipt != receipt {

@@ -89,7 +89,7 @@ proc patch_realtime_dependency() {
   """# needed for cross-compilation
 realtime = meson.get_compiler('c').find_library('rt')
 private_deps += realtime""",
-  """# musl provides realtime interfaces in libc; avoid recording the build-env librt.
+  with: """# musl provides realtime interfaces in libc; avoid recording the build-env librt.
 realtime = declare_dependency()""",
 ),
   )

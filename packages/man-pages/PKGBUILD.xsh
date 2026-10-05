@@ -59,7 +59,7 @@ pure release_page(text: Str) -> Str {
   return text unless "(unreleased)" in text
 
   [
-    if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", ver) } else { line }
+    if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", with: ver) } else { line }
     for line in text.split("\n")
   ].join("\n")
 }
@@ -99,7 +99,7 @@ proc check_rendering(mandir: Path) [fs, process, env, error] {
 
   for page in rendered_pages {
     let args = page.args
-    let out = overstrike.replace(run.text $man "-M" $mandir "-T" "ascii" "-O" "width=80" @args ?, "")
+    let out = overstrike.replace(run.text $man "-M" $mandir "-T" "ascii" "-O" "width=80" @args ?, with: "")
     let lines = out.lines()
     let label = args.join(" ")
 

@@ -272,7 +272,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       cc,
       triple,
       regular_flags,
-      [@regular_defs, f"-D_INIT={ext_archive.initext.replace("init", "")}_init"],
+      [@regular_defs, f"-D_INIT={ext_archive.initext.replace("init", with: "")}_init"],
       ["-I.", "-Iinclude"],
       initext,
       fp"obj/extensions/{ext_archive.initext}.o",
@@ -335,6 +335,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(multi_out, fp"{dest}/usr/bin/xtables-legacy-multi", 0o755, parents: true, overwrite: true)
 
   for command in command_links {
-    fs.symlink(p"xtables-legacy-multi", fp"{dest}/usr/bin/{command}")
+    fp"{dest}/usr/bin/{command}".symlink(to: p"xtables-legacy-multi")
   }
 }

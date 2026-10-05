@@ -270,7 +270,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(soelim.output, fp"{bindir}/soelim", 0o755, overwrite: true)
 
   for link in mandoc_links {
-    fs.symlink(p"mandoc", fp"{bindir}/{link}")
+    fp"{bindir}/{link}".symlink(to: p"mandoc")
   }
 
   let mandir = fp"{dest}/usr/share/man"
@@ -279,5 +279,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(fp"{manual[0]}", fp"{mandir}/{manual[1]}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"apropos.1", fp"{mandir}/man1/whatis.1")
+  fp"{mandir}/man1/whatis.1".symlink(to: p"apropos.1")
 }

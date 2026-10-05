@@ -2556,7 +2556,7 @@ proc write_entry(term: Term, outdir: Path) {
     alias_leaf.mkdir()
     let link = fp"{alias_leaf}/{alias}"
     link.remove(missing_ok: true)
-    file.hardlink(link)
+    file.hardlink(at: link)
   }
 }
 

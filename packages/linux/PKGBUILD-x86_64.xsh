@@ -130,7 +130,7 @@ proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
   var out = ""
 
   for raw in symbols.lines() {
-    let line = leading_zero_re.replace(raw, "0")
+    let line = leading_zero_re.replace(raw, with: "0")
     let caps = symbol_re.captures(line)
 
     if caps.len() >= 3 {
@@ -410,7 +410,7 @@ proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: 
   var lines = [f"const char * const {array}[{size}] = {{"]
 
   for raw in input.read_text()?.split("\n") {
-    let line = raw.replace("\t", " ").trim()
+    let line = raw.replace("\t", with: " ").trim()
     continue unless line.starts_with(f"#define {prefix}")
     let rest = (line.split(f"#define {prefix}").get(1) ?? "").trim()
     let fields = rest.fields()
@@ -633,7 +633,7 @@ proc build_x86_realmode_payload(cc: Path) {
             "-c",
             fp"{realmode_dir}/{source}".display(),
             "-o",
-            fp"{realmode_dir}/{source.replace(".c", ".o")}".display(),
+            fp"{realmode_dir}/{source.replace(".c", with: ".o")}".display(),
           ],
         ),
       )

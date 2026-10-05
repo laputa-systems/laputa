@@ -58,7 +58,7 @@ int main(void) {
 
 pure current_caps(print_out: Str) -> Str {
   for line in print_out.lines() {
-    return line.replace("Current: ", "") when line.starts_with("Current: ")
+    return line.replace("Current: ", with: "") when line.starts_with("Current: ")
   }
 
   ""

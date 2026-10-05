@@ -90,7 +90,7 @@ export proc host_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, err
 
 ## Where `make fetch` saves the host-tools base so later runs load it offline.
 export proc host_tools_saved_image(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Path, Error] {
-  let name = host_tools_tag(laputa_root, value)?.replace(":", "-")
+  let name = host_tools_tag(laputa_root, value)?.replace(":", with: "-")
   fp"{laputa_root}/.cache/images/{name}.tar"
 }
 
@@ -185,7 +185,7 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   let temporary = fp"{saved}.tmp"
   temporary.remove(missing_ok: true)
   docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
-  temporary.rename(saved, overwrite: true)
+  temporary.rename(to: saved, overwrite: true)
 }
 
 ## Make the host-tools base available offline: present, or loaded from `.cache/images/`.
@@ -229,7 +229,7 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) -> Result[Path] {
   if ! staged.exists() {
     context.remove(missing_ok: true)
     staged.parent.mkdir()
-    source.copy(staged)
+    source.copy(to: staged)
   }
 
   context

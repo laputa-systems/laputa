@@ -318,9 +318,9 @@ proc write_receipt(dir: Path, value: types.ArtifactReceipt) {
 }
 
 proc copy_staged(dir: Path, staged: types.StagedArtifact) {
-  staged.payload.copy(payload_path(dir))
-  staged.metadata.copy(metadata_path(dir))
-  staged.proof.copy(proof_path(dir))
+  staged.payload.copy(to: payload_path(dir))
+  staged.metadata.copy(to: metadata_path(dir))
+  staged.proof.copy(to: proof_path(dir))
 }
 
 proc commit_locked(
@@ -356,7 +356,7 @@ proc commit_locked(
   # artifact.json is intentionally the final temporary write: a directory with it is complete.
   write_receipt(temporary, value)
   final_dir.parent.mkdir()
-  temporary.rename(final_dir)
+  temporary.rename(to: final_dir)
   read_receipt(final_dir, key)
 }
 

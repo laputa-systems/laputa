@@ -10,12 +10,12 @@ export error UapiError = Failed(kind: Str, message: Str)
 
 ## Apply headers_install.sh's sed rewrites to one header line.
 export pure rewrite_line(line: Str) -> Str {
-  var out = rx"([[:space:](])(__user|__force|__iomem)[[:space:]]".replace(line, "$1")
-  out = rx"__attribute_const__([[:space:]]|$)".replace(out, "$1")
-  out = rx"^#include <linux/compiler.h>".replace(out, "")
-  out = rx"(^|[^a-zA-Z0-9])__packed([^a-zA-Z0-9_]|$)".replace(out, r"${1}__attribute__((packed))${2}")
-  out = rx"(^|[[:space:](])(inline|asm|volatile)([[:space:](]|$)".replace(out, r"${1}__${2}__${3}")
-  rx"#(ifndef|define|endif[[:space:]]*/[*])[[:space:]]*_UAPI".replace(out, "#$1 ")
+  var out = rx"([[:space:](])(__user|__force|__iomem)[[:space:]]".replace(line, with: "$1")
+  out = rx"__attribute_const__([[:space:]]|$)".replace(out, with: "$1")
+  out = rx"^#include <linux/compiler.h>".replace(out, with: "")
+  out = rx"(^|[^a-zA-Z0-9])__packed([^a-zA-Z0-9_]|$)".replace(out, with: r"${1}__attribute__((packed))${2}")
+  out = rx"(^|[[:space:](])(inline|asm|volatile)([[:space:](]|$)".replace(out, with: r"${1}__${2}__${3}")
+  rx"#(ifndef|define|endif[[:space:]]*/[*])[[:space:]]*_UAPI".replace(out, with: "#$1 ")
 }
 
 # A preprocessor condition after substituting the two symbols unifdef knows:
@@ -175,7 +175,7 @@ pure directive(line: Str) -> Directive? {
 
   # Comments in the condition are not part of the expression.
   let tail = if parts.len() > 2 { parts[2] } else { "" }
-  let expr = rx"//.*$".replace(rx"/\*.*?\*/".replace(tail, " "), "").trim()
+  let expr = rx"//.*$".replace(rx"/\*.*?\*/".replace(tail, with: " "), with: "").trim()
   {kind: parts[1], expr}
 }
 
@@ -233,7 +233,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
     }
 
     index += 1
-    let logical = [rx"\\$".replace(line, "") for line in physical].join(" ")
+    let logical = [rx"\\$".replace(line, with: "") for line in physical].join(" ")
     let found = directive(logical)
 
     if found == null {
@@ -299,7 +299,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
             # The first surviving branch opens the block: unifdef overwrites
             # `elif` with `if  ` in place and keeps the rest of the line.
             frames = set_top(frames, {mode: "kept", taking: true, done: false})
-            out += [rx"^([[:space:]]*#[[:space:]]*)elif".replace(physical[0], r"${1}if  ")].extend(physical[1..])
+            out += [rx"^([[:space:]]*#[[:space:]]*)elif".replace(physical[0], with: r"${1}if  ")].extend(physical[1..])
           }
         }
       }

@@ -112,8 +112,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(libmnl.tasks, make.jobs()?)
   fs.install(libmnl.output, fp"{dest}/usr/lib/libmnl.so.0.2.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so.0")
-  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so")
+  fp"{dest}/usr/lib/libmnl.so.0".symlink(to: p"libmnl.so.0.2.0")
+  fp"{dest}/usr/lib/libmnl.so".symlink(to: p"libmnl.so.0.2.0")
   # include/libmnl/Makefile.am pkginclude_HEADERS; include/linux/ is noinst.
   fs.install(p"include/libmnl/libmnl.h", fp"{dest}/usr/include/libmnl/libmnl.h", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/lib/pkgconfig".mkdir()

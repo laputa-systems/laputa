@@ -17,7 +17,7 @@ proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
 
   for entry in ["packages", "pm", "pm.xsh", "xinit"] {
-    fs.symlink(fp"{checkout}/{entry}", fp"{root}/{entry}")
+    fp"{root}/{entry}".symlink(to: fp"{checkout}/{entry}")
   }
 
   for arch in ["aarch64", "x86_64"] {

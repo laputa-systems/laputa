@@ -272,7 +272,7 @@ proc patch_cmake() {
                     "${LIB_LINK_NAME}"
                 WORKING_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 """,
-    "",
+    with: "",
   )
 
   path_value.write(text)
@@ -282,7 +282,7 @@ proc create_unversioned_links() {
   let libdir = p"build/lib"
 
   for library_name in ["event_core", "event_extra", "event_pthreads", "event"] {
-    fs.symlink(fp"lib{library_name}-2.1.so.7.0.2", fp"{libdir}/lib{library_name}.so")
+    fp"{libdir}/lib{library_name}.so".symlink(to: fp"lib{library_name}-2.1.so.7.0.2")
   }
 }
 

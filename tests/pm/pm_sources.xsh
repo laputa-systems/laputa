@@ -81,7 +81,7 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
   let cache = test.temp_dir(ctx, name: "cache-hit-cache")?
   let entry = sources.source_cache_entry(cache, tarball.sha256)
   entry.parent.mkdir()
-  tarball.path.copy(entry)
+  tarball.path.copy(to: entry)
   let src = test.temp_dir(ctx, name: "cache-hit-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
@@ -96,7 +96,7 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
   let mirror = test.temp_dir(ctx, name: "mirror-fill-mirror")?
   let served = fp"{mirror}/sources/sha256/{tarball.sha256}"
   served.parent.mkdir()
-  tarball.path.copy(served)
+  tarball.path.copy(to: served)
   let cache = test.temp_dir(ctx, name: "mirror-fill-cache")?
   let src = test.temp_dir(ctx, name: "mirror-fill-src")?
 
@@ -145,7 +145,7 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
   let mirror = test.temp_dir(ctx, name: "mirror-mismatch-mirror")?
   let served = fp"{mirror}/sources/sha256/{sha256_of_empty}"
   served.parent.mkdir()
-  tarball.path.copy(served)
+  tarball.path.copy(to: served)
   let cache = test.temp_dir(ctx, name: "mirror-mismatch-cache")?
   let src = test.temp_dir(ctx, name: "mirror-mismatch-src")?
 
@@ -167,7 +167,7 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
   let entry = sources.source_cache_entry(cache, pinned.sha256)
   entry.parent.mkdir()
   # A well-formed archive with other bytes: only checksum verification can reject it.
-  impostor.path.copy(entry)
+  impostor.path.copy(to: entry)
   let src = test.temp_dir(ctx, name: "corrupt-entry-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
@@ -364,7 +364,7 @@ proc cache_file(cache: Path, file: Path) -> Result[Str] {
   let sha256 = hash.sha256(file)?.hex()
   let entry = sources.source_cache_entry(cache, sha256)
   entry.parent.mkdir()
-  file.copy(entry, overwrite: true)
+  file.copy(to: entry, overwrite: true)
   sha256
 }
 

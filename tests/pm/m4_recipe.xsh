@@ -160,7 +160,7 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   # The proof invokes the staged runner as an executable.  Its shebang points
   # at this host test runner solely so the behavior can be checked without a
   # target rootfs; the package payload still ships `#!/bin/xsh`.
-  let staged = p"packages/m4/files/m4.xsh".read_text()?.replace("#!/bin/xsh", f"#!{xsh}")
+  let staged = p"packages/m4/files/m4.xsh".read_text()?.replace("#!/bin/xsh", with: f"#!{xsh}")
   m4.write(staged, mode: 0o755)
 
   let status = process.run(

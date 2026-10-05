@@ -138,7 +138,7 @@ export proc build(dest: Path) [fs, error] {
 
   fs.install(p"rules/xkb.dtd", fp"{base}/rules/xkb.dtd", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/share/X11".mkdir()
-  fs.symlink(../xkeyboard-config-2, fp"{dest}/usr/share/X11/xkb")
+  fp"{dest}/usr/share/X11/xkb".symlink(to: ../xkeyboard-config-2)
   fp"{dest}/usr/share/pkgconfig".mkdir()
 
   fp"{dest}/usr/share/pkgconfig/xkeyboard-config-2.pc".write(
@@ -153,6 +153,6 @@ Version: {ver}
 """,
   )
 
-  fs.symlink(p"xkeyboard-config-2.pc", fp"{dest}/usr/share/pkgconfig/xkeyboard-config.pc")
+  fp"{dest}/usr/share/pkgconfig/xkeyboard-config.pc".symlink(to: p"xkeyboard-config-2.pc")
 }
 

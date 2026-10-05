@@ -125,8 +125,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(libmtdev.tasks, make.jobs()?)
   fs.install(libmtdev.output, fp"{dest}/usr/lib/libmtdev.so.1.0.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so.1")
-  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so")
+  fp"{dest}/usr/lib/libmtdev.so.1".symlink(to: p"libmtdev.so.1.0.0")
+  fp"{dest}/usr/lib/libmtdev.so".symlink(to: p"libmtdev.so.1.0.0")
   make.install_header_tree(p"include", fp"{dest}/usr/include")
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 

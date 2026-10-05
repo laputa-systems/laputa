@@ -324,8 +324,8 @@ proc install_config_tree(dest: Path) {
 
 proc install_library(output: Path, dest: Path, stem: Str) {
   fs.install(output, fp"{dest}/usr/lib/{stem}.so.2.0.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so.2")
-  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so")
+  fp"{dest}/usr/lib/{stem}.so.2".symlink(to: fp"{stem}.so.2.0.0")
+  fp"{dest}/usr/lib/{stem}.so".symlink(to: fp"{stem}.so.2.0.0")
 }
 
 ## Exported declaration `build`.

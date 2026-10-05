@@ -63,7 +63,7 @@ proc patch_musl_math() {
   meson.write(
     meson.read_text()?.replace(
       "dep_m = cc.find_library('m', required : false)",
-      "dep_m = declare_dependency(link_args : ['-lm'])",
+      with: "dep_m = declare_dependency(link_args : ['-lm'])",
     ),
   )
 }

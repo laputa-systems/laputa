@@ -18,7 +18,7 @@ proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
     fail "downloaded CA bundle does not contain a PEM certificate"
   }
 
-  tmp.rename(dest, overwrite: true)
+  tmp.rename(to: dest, overwrite: true)
   print f"update-certdata: updated {dest}"
 }
 

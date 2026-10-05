@@ -167,12 +167,12 @@ pure parse_start_symbol(decls: Str, fallback: Str) -> Str {
 
 proc remove_actions(text: Str) [error] -> Result[Str] {
   let re = rx"(?s)\{[^{}]*\}"
-  re.replace(text, " ")
+  re.replace(text, with: " ")
 }
 
 proc remove_comments(text: Str) [error] -> Result[Str] {
   let re = rx"(?s)/\*.*?\*/"
-  re.replace(text, " ")
+  re.replace(text, with: " ")
 }
 
 proc parse_rules(text: Str) -> Result[List[GrammarRule]] {
@@ -369,7 +369,7 @@ int yyparse(void);
 }
 
 proc output_header_name(output: Str) [error] -> Result[Str] {
-  fp"{output}".name.replace(".c", ".h")
+  fp"{output}".name.replace(".c", with: ".h")
 }
 
 pure is_kconfig_parser(decls: Str) -> Bool {
@@ -1495,7 +1495,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
       fp"{opt.output}".write(generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)
 
       if opt.defines {
-        let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
+        let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", with: ".h") }
         fp"{header}".write(generate_linux_header(decls, tokens)?)
       }
 
@@ -1513,7 +1513,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   out.write(code)
 
   if opt.defines {
-    let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
+    let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", with: ".h") }
     fp"{header}".write(generate_header(tokens)?)
   }
 

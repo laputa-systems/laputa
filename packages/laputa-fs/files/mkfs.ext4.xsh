@@ -107,8 +107,8 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) -> Result[L
   for child in fs.children(dir)? |> sort-by .path {
     continue when child.kind != "file" and child.kind != "dir" and child.kind != "symlink"
     let rel_path = child.path.strip_prefix(root)?
-    let rel = rel_path.display().replace("\\", "/")
-    let parent_raw = rel_path.parent().display().replace("\\", "/")
+    let rel = rel_path.display().replace("\\", with: "/")
+    let parent_raw = rel_path.parent().display().replace("\\", with: "/")
     let parent = if parent_raw == "." { "" } else { parent_raw }
 
     let target = if child.kind == "symlink" {

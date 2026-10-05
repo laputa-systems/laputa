@@ -92,7 +92,7 @@ export pure is_file_url(url: Str) -> Bool {
 
 ## Exported PM declaration `file_url_path`.
 export pure file_url_path(url: Str) -> Result[Path, Error] {
-  fp"{url.replace("file://", "")}"
+  fp"{url.replace("file://", with: "")}"
 }
 
 ## Exported PM declaration `repo_file_path`.
@@ -217,7 +217,7 @@ export pure expand_source_placeholders(source: Str, values: Map[Str]) -> Str {
 
 ## The placeholder values a recipe source string may name for one target and build architecture.
 export pure source_placeholder_values(pkg: types.Package, arch: Str, build: Str) -> Map[Str] {
-  let parts = pkg.ver.replace("+", ".").replace("-", ".").replace("_", ".").split(".")
+  let parts = pkg.ver.replace("+", with: ".").replace("-", with: ".").replace("_", with: ".").split(".")
 
   {
     VERSION: pkg.ver,
@@ -262,8 +262,8 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
     return f"{url}: missing file" unless source.exists()
 
     let partial = fp"{dest.parent}/.{dest.name}.partial"
-    source.copy(partial, overwrite: true)
-    partial.rename(dest, overwrite: true)
+    source.copy(to: partial, overwrite: true)
+    partial.rename(to: dest, overwrite: true)
     return ""
   }
 

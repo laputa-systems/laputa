@@ -160,12 +160,12 @@ proc write_generated_headers(target: LibffiTarget) {
 """,
   )
 
-  let ffi_h = p"include/ffi.h.in".read_text()?.replace("@VERSION@", ver).replace("@TARGET@", target.target)
-    .replace("@HAVE_LONG_DOUBLE@", "1")
-    .replace("@HAVE_LONG_DOUBLE_VARIANT@", "0")
-    .replace("@FFI_VERSION_STRING@", ver)
-    .replace("@FFI_VERSION_NUMBER@", f"{ffi_version_number()?}")
-    .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", "0")
+  let ffi_h = p"include/ffi.h.in".read_text()?.replace("@VERSION@", with: ver).replace("@TARGET@", with: target.target)
+    .replace("@HAVE_LONG_DOUBLE@", with: "1")
+    .replace("@HAVE_LONG_DOUBLE_VARIANT@", with: "0")
+    .replace("@FFI_VERSION_STRING@", with: ver)
+    .replace("@FFI_VERSION_NUMBER@", with: f"{ffi_version_number()?}")
+    .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", with: "0")
 
   p"include/ffi.h".write(ffi_h)
   fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)
@@ -224,8 +224,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(libffi.tasks, make.jobs()?)
   fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.5.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so.8")
-  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so")
+  fp"{dest}/usr/lib/libffi.so.8".symlink(to: p"libffi.so.8.5.0")
+  fp"{dest}/usr/lib/libffi.so".symlink(to: p"libffi.so.8.5.0")
   # include/Makefile.am installs only the generated ffi.h and the target's
   # ffitarget.h; the other headers there are private to the build.
   fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)

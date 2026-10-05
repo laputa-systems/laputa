@@ -242,7 +242,7 @@ test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, err
 
 proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) -> Result[Path] {
   let dir = test.temp_dir(ctx, name:)?
-  let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
+  let documented = dependencies.replace("export let ", with: "## Fixture export.\nexport let ")
   fp"{dir}/PKGBUILD.xsh".write(
     f"""##! Runtime-only dependency fixture recipe.
 ## Fixture export.

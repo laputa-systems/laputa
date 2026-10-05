@@ -28,7 +28,7 @@ proc copied_repository(ctx: TestContext, name: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fp"{root}/pm".mkdir()
-  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
+  p"pm/proof.xsh".copy(to: fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -407,7 +407,7 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   let output = fp"{root}/out/plan.json"
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", output.display()])?
   let value = plan_json.read(output)?
-  output.write(output.read_text()?.replace(value.plan_sha256, "corrupt-plan-digest"))
+  output.write(output.read_text()?.replace(value.plan_sha256, with: "corrupt-plan-digest"))
   let err = test.temp_path(ctx, name: "repo-corrupt.err")
   let status = pm_status(["repo", "show", output.display()], err)?
 
@@ -421,7 +421,7 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
 test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, error] { |ctx|
   let repository = copied_repository(ctx, "plan-executor-repository")?
   let pm_copy = test.temp_dir(ctx, name: "plan-executor-pm")?
-  p"pm.xsh".copy(fp"{pm_copy}/pm.xsh")
+  p"pm.xsh".copy(to: fp"{pm_copy}/pm.xsh")
   let _ = fs.copy_tree(p"pm", fp"{pm_copy}/pm", parents: true, overwrite: true)?
   let runners = test.temp_dir(ctx, name: "plan-executor-runners")?
   let _ = fs.copy_tree(fixture("fingerprint-executor/runners"), runners, parents: true, overwrite: true)?

@@ -558,7 +558,7 @@ proc replace_required(file: Path, old: Str, new: Str) {
     return Err(WlrootsError.Patch(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  file.write(text.replace(old, new))
+  file.write(text.replace(old, with: new))
 }
 
 # Port of render/gles2/shaders/embed.sh: the shader source as a
@@ -582,7 +582,7 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) {
 
 proc write_shader_headers() {
   for name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
-    let symbol = f"{name.replace(".", "_")}_src"
+    let symbol = f"{name.replace(".", with: "_")}_src"
     write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)
   }
 }
@@ -733,9 +733,9 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
-      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
-      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
+      ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
+      ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)
       ninja.write(ninja_text)
     }
 

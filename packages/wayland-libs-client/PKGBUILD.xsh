@@ -93,7 +93,7 @@ proc patch_python_generator(native_scanner: Str) {
 
 	wayland_scanner_sources = [ 'scanner.c', embed_dtd ]
 """,
-    """	wayland_scanner_sources = [ 'scanner.c' ]
+    with: """	wayland_scanner_sources = [ 'scanner.c' ]
 """,
   )
 
@@ -110,7 +110,7 @@ proc patch_python_generator(native_scanner: Str) {
 		endif
 	endif
 """,
-  """	# musl provides realtime interfaces in libc.
+  with: """	# musl provides realtime interfaces in libc.
 	rt_dep = declare_dependency()
 """,
 ),
@@ -119,7 +119,7 @@ proc patch_python_generator(native_scanner: Str) {
   meson_path.write(
     meson_path.read_text()?.replace(
       "\tmathlib_dep = cc.find_library('m', required: false)",
-      "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
+      with: "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
     ),
   )
 
@@ -133,7 +133,7 @@ else
 wayland_scanner_for_build = wayland_scanner
 endif
 """,
-  f"""wayland_scanner_for_build = find_program('{native_scanner}')
+  with: f"""wayland_scanner_for_build = find_program('{native_scanner}')
 """,
 ),
     )
@@ -180,10 +180,10 @@ proc build_wayland(dest: Path) {
 
       let ninja_text_build_root = ninja_text.replace(
         f" -- {build_root}/usr/bin/wayland-scanner ",
-        f" -- {scanner_text} ",
+        with: f" -- {scanner_text} ",
       )
 
-      ninja.write(ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
+      ninja.write(ninja_text_build_root.replace(" -- src/wayland-scanner ", with: f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag

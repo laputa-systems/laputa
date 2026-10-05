@@ -22,7 +22,7 @@ proc copied_generation_repository(ctx: TestContext, name: Str) [fs, env, error] 
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fp"{root}/pm".mkdir()
-  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
+  p"pm/proof.xsh".copy(to: fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 

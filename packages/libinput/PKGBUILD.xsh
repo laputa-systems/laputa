@@ -382,18 +382,18 @@ foreach t : src_python_tools
 		      )
 endforeach
 """,
-    "",
+    with: "",
   )
 
   text = text.replace(
     "dep_lm = cc.find_library('m', required : false)",
-    """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
+    with: """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
 dep_lm = declare_dependency(link_args: ['-lm'])""",
   )
 
   text = text.replace(
     "dep_rt = cc.find_library('rt', required : false)",
-    f"""# musl provides realtime interfaces in libc; avoid recording the build-env librt.
+    with: f"""# musl provides realtime interfaces in libc; avoid recording the build-env librt.
 dep_rt = declare_dependency()
 dep_compiler_rt = {compiler_rt_dep}""",
   )
@@ -408,7 +408,7 @@ if add_languages('cpp', native: false, required: false)
 		   install : false)
 endif
 """,
-    "",
+    with: "",
   )
 
   meson.write(text)
@@ -435,7 +435,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if target_root != "" and target_root != "/" {
       let ninja = p"build/build.ninja"
-      ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", f" -Wl,--end-group {builtins}"))
+      ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", with: f" -Wl,--end-group {builtins}"))
     }
 
     run $muon "-C" "build" samu $jobs_flag

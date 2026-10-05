@@ -154,7 +154,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     let dest = fp"{root}/proc/{name}"
 
     match source.metadata() {
-      Ok(metadata) if metadata.kind == "file" => source.copy(dest, overwrite: true)
+      Ok(metadata) if metadata.kind == "file" => source.copy(to: dest, overwrite: true)
       else => {
         if ! dest.exists() {
           dest.write("")
@@ -170,7 +170,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
     let dest = fp"{root}/etc/{name}"
 
     match source.metadata() {
-      Ok(metadata) if metadata.kind == "file" => source.copy(dest, overwrite: true)
+      Ok(metadata) if metadata.kind == "file" => source.copy(to: dest, overwrite: true)
       Ok(metadata) if metadata.kind == "symlink" => dest.write(source.read_text()?)
       else => {}
     }

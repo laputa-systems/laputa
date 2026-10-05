@@ -150,7 +150,7 @@ __gttf2
     ] {
       let visible = fp"{object}.visible"
       run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible
-      visible.rename(object, overwrite: true)
+      visible.rename(to: object, overwrite: true)
     }
 
     stub_src.remove(missing_ok: false)
@@ -160,5 +160,5 @@ __gttf2
   builtins_dir.remove(missing_ok: false)
   visibility_map.remove(missing_ok: false)
   export_map.remove(missing_ok: false)
-  fs.symlink(p"libgcc_s.so", fp"{libdir}/libgcc_s.so.1")
+  fp"{libdir}/libgcc_s.so.1".symlink(to: p"libgcc_s.so")
 }

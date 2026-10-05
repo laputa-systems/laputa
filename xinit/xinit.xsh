@@ -920,13 +920,13 @@ proc rotate_log(name: Str, keep: Int) {
     let older = rotated_log_path(current, index)?
 
     if older.exists() {
-      older.rename(rotated_log_path(current, index + 1)?, overwrite: true)
+      older.rename(to: rotated_log_path(current, index + 1)?, overwrite: true)
     }
 
     index -= 1
   }
 
-  current.copy(rotated_log_path(current, 1)?, overwrite: true)
+  current.copy(to: rotated_log_path(current, 1)?, overwrite: true)
   current.truncate(0)
 }
 

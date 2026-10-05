@@ -208,7 +208,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # as is, then a SYS_* copy of each __NR_ line (`sed -n s/__NR_/SYS_/p`).
   # Programs use both names.
   let syscall_in = fp"arch/{arch}/bits/syscall.h.in".read_text()?
-  let sys_names = [line.replace("__NR_", "SYS_") for line in syscall_in.lines() if "__NR_" in line]
+  let sys_names = [line.replace("__NR_", with: "SYS_") for line in syscall_in.lines() if "__NR_" in line]
   let base = if syscall_in.ends_with("\n") { syscall_in } else { syscall_in + "\n" }
   p"include/bits/syscall.h".write(base + sys_names.join("\n") + "\n")
 
@@ -267,10 +267,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     if arch_subdir.exists() {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
         if e.ext == "c" {
-          replaced += [f"{subsys.name}/{e.name.replace(".c", "")}"]
+          replaced += [f"{subsys.name}/{e.name.replace(".c", with: "")}"]
           arch_c_files += [e.path]
         } else if e.ext == "s" or e.ext == "S" {
-          replaced += [f"{subsys.name}/{e.name.replace(f".{e.ext}", "")}"]
+          replaced += [f"{subsys.name}/{e.name.replace(f".{e.ext}", with: "")}"]
           arch_s_files += [e.path]
         }
       }
@@ -286,7 +286,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     e.path
     for subsys in fs.children(p"src")? |> where .kind == "dir"
     for e in fs.children(subsys.path)? |> where .ext == "c"
-    if ! (f"{subsys.name}/{e.name.replace(".c", "")}" in replaced)
+    if ! (f"{subsys.name}/{e.name.replace(".c", with: "")}" in replaced)
   ]
   # src/malloc/mallocng/*.c — the default malloc implementation (two levels deep).
   for e in fs.children(p"src/malloc/mallocng")? |> where .ext == "c" {
@@ -426,8 +426,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Keep the aliases as relative symlinks so they do not duplicate libc in the
   # installed root or package archive.
   for lib in ["m", "dl", "rt", "crypt", "pthread"] {
-    fs.symlink(p"libc.so", fp"{dest}/usr/lib/lib{lib}.so")
-    fs.symlink(p"libc.a", fp"{dest}/usr/lib/lib{lib}.a")
+    fp"{dest}/usr/lib/lib{lib}.so".symlink(to: p"libc.so")
+    fp"{dest}/usr/lib/lib{lib}.a".symlink(to: p"libc.a")
   }
 
   # Clang's musl driver links libssp_nonshared by default. Keep the archive
@@ -468,7 +468,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   if ldso != "" {
-    fs.symlink(p"libc.so", fp"{dest}/usr/lib/{ldso}")
+    fp"{dest}/usr/lib/{ldso}".symlink(to: p"libc.so")
     fp"{dest}/usr/bin".mkdir()
     fp"{dest}/usr/bin/ldd".remove(missing_ok: true)
 

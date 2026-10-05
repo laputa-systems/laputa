@@ -542,7 +542,7 @@ proc build_filesystems(
   fp"{work}/rootfs-installer/etc/laputa-installer/target-esp-mb".write(target_esp_mb)
 
   boot_kernel.copy(
-    fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT/{efi_boot}",
+    to: fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT/{efi_boot}",
     overwrite: true,
   )
 
@@ -555,7 +555,7 @@ proc build_filesystems(
   )
 
   fp"{work}/target-root.tar.gz".copy(
-    fp"{work}/rootfs-installer/usr/share/laputa-installer/target-root.tar.gz",
+    to: fp"{work}/rootfs-installer/usr/share/laputa-installer/target-root.tar.gz",
     overwrite: true,
   )
 
@@ -652,7 +652,7 @@ proc build_host() {
     }
 
     fp"{work}/rootfs-target/etc/laputa-installer".mkdir()
-    key_path.copy(fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)
+    key_path.copy(to: fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)
   }
 
   prune_runtime_root(roots.target, arch)
@@ -664,7 +664,7 @@ proc build_host() {
     fail f"missing installer kernel source {boot_kernel}"
   }
 
-  boot_kernel.copy(kernel, overwrite: true)
+  boot_kernel.copy(to: kernel, overwrite: true)
   build_filesystems(root, work, xsh, arch, target_esp_mb, boot_kernel, installer_root_mb, installer_ci)
   build_installer_iso(work, iso, kernel, arch)
 

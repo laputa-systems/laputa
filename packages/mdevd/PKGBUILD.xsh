@@ -85,32 +85,32 @@ export const filetree = [
 ]
 
 pure upper_ascii(text: Str) -> Str {
-  text.replace("a", "A")
-    .replace("b", "B")
-    .replace("c", "C")
-    .replace("d", "D")
-    .replace("e", "E")
-    .replace("f", "F")
-    .replace("g", "G")
-    .replace("h", "H")
-    .replace("i", "I")
-    .replace("j", "J")
-    .replace("k", "K")
-    .replace("l", "L")
-    .replace("m", "M")
-    .replace("n", "N")
-    .replace("o", "O")
-    .replace("p", "P")
-    .replace("q", "Q")
-    .replace("r", "R")
-    .replace("s", "S")
-    .replace("t", "T")
-    .replace("u", "U")
-    .replace("v", "V")
-    .replace("w", "W")
-    .replace("x", "X")
-    .replace("y", "Y")
-    .replace("z", "Z")
+  text.replace("a", with: "A")
+    .replace("b", with: "B")
+    .replace("c", with: "C")
+    .replace("d", with: "D")
+    .replace("e", with: "E")
+    .replace("f", with: "F")
+    .replace("g", with: "G")
+    .replace("h", with: "H")
+    .replace("i", with: "I")
+    .replace("j", with: "J")
+    .replace("k", with: "K")
+    .replace("l", with: "L")
+    .replace("m", with: "M")
+    .replace("n", with: "N")
+    .replace("o", with: "O")
+    .replace("p", with: "P")
+    .replace("q", with: "Q")
+    .replace("r", with: "R")
+    .replace("s", with: "S")
+    .replace("t", with: "T")
+    .replace("u", with: "U")
+    .replace("v", with: "V")
+    .replace("w", with: "W")
+    .replace("x", with: "X")
+    .replace("y", with: "Y")
+    .replace("z", with: "Z")
 }
 
 pure bytes_for_bits(bits: Int) -> Int {
@@ -118,18 +118,18 @@ pure bytes_for_bits(bits: Int) -> Int {
 }
 
 pure gen_types_internal(text: Str, type_name: Str, type_caps: Str, bits: Int) -> Str {
-  text.replace("@type@", type_name)
-    .replace("@TYPE@", type_caps)
-    .replace("@BITS@", f"{bits}")
-    .replace("@BYTES@", f"{bytes_for_bits(bits)}")
+  text.replace("@type@", with: type_name)
+    .replace("@TYPE@", with: type_caps)
+    .replace("@BITS@", with: f"{bits}")
+    .replace("@BYTES@", with: f"{bytes_for_bits(bits)}")
 }
 
 pure gen_bits_template(text: Str, bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str) -> Str {
-  text.replace("@BITS@", f"{bits}")
-    .replace("@DFMT@", dfmt)
-    .replace("@OFMT@", ofmt)
-    .replace("@XFMT@", xfmt)
-    .replace("@BFMT@", bfmt)
+  text.replace("@BITS@", with: f"{bits}")
+    .replace("@DFMT@", with: dfmt)
+    .replace("@OFMT@", with: ofmt)
+    .replace("@XFMT@", with: xfmt)
+    .replace("@BFMT@", with: bfmt)
 }
 
 proc read_sysdeps(path_value: Path) -> Result[Map[Str]] {
@@ -139,7 +139,7 @@ proc read_sysdeps(path_value: Path) -> Result[Map[Str]] {
     let words = line.words()
 
     if words.len() >= 2 {
-      sysdeps[words[0].replace(":", "")] = words[1]
+      sysdeps[words[0].replace(":", with: "")] = words[1]
     }
   }
 
@@ -291,7 +291,7 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) {
   for line in p"skalibs/sysdeps.cfg/sysdeps".read_text()?.split("\n") {
     let words = line.words()
     continue when words.len() < 2
-    let key = upper_ascii(words[0].replace(":", ""))
+    let key = upper_ascii(words[0].replace(":", with: ""))
     let value = words[1]
 
     if key.starts_with("SIGNED") {

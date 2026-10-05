@@ -20,7 +20,7 @@ export pure image_root_partuuid() -> Str {
 export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
   let trimmed = value.trim()
   if trimmed.ends_with("M") {
-    let mebibytes = trimmed.replace("M", "") as Int
+    let mebibytes = trimmed.replace("M", with: "") as Int
     if mebibytes <= 0 {
       return Err(ImageError.Failed(f"image size must be positive: {value}"))
     }
@@ -82,7 +82,7 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
 export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
   output.parent.mkdir()
   atomically replace output as temporary {
-    source.copy(temporary)
+    source.copy(to: temporary)
 
     if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
       return Err(ImageError.Failed(f"kernel copy does not match {source}"))
@@ -129,7 +129,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
   }
 
   fs.fsync(temporary)
-  temporary.rename(output, overwrite: true)
+  temporary.rename(to: output, overwrite: true)
 }
 
 ## Replace an exact byte range inside an immutable byte value.
@@ -327,6 +327,6 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   )?
   fs.fsync(tmp)
   verify_disk(tmp, rootfs_bytes)
-  tmp.rename(image, overwrite: true)
+  tmp.rename(to: image, overwrite: true)
   verify_disk(image, rootfs_bytes)
 }

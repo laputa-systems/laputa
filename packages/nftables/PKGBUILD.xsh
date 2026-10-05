@@ -136,7 +136,7 @@ proc write_config_h() [fs, error] {
 # STABLE_RELEASE (0 without --with-stable-release), and BUILD_STAMP.
 proc write_nftversion_h() {
   let version_template = p"nftversion.h.in".read_text()?
-  let body = version_template.replace("@BUILD_STAMP@", build_stamp).replace("@NFT_VERSION@", ver.replace(".", ",")).replace("@STABLE_RELEASE@", "0")
+  let body = version_template.replace("@BUILD_STAMP@", with: build_stamp).replace("@NFT_VERSION@", with: ver.replace(".", with: ",")).replace("@STABLE_RELEASE@", with: "0")
   p"nftversion.h".write(body)
 }
 
@@ -219,8 +219,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fs.install(nft_out, fp"{dest}/usr/bin/nft", 0o755, parents: true, overwrite: true)
   fs.install(library_so, fp"{dest}/usr/lib/libnftables.so.1.1.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so.1")
-  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so")
+  fp"{dest}/usr/lib/libnftables.so.1".symlink(to: p"libnftables.so.1.1.0")
+  fp"{dest}/usr/lib/libnftables.so".symlink(to: p"libnftables.so.1.1.0")
 
   fs.install(
     p"include/nftables/libnftables.h",

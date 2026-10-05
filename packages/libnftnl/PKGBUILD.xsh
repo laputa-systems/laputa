@@ -139,8 +139,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(libnftnl.tasks, make.jobs()?)
   fs.install(libnftnl.output, fp"{dest}/usr/lib/libnftnl.so.11.8.0", 0o755, parents: true, overwrite: true)
-  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so.11")
-  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so")
+  fp"{dest}/usr/lib/libnftnl.so.11".symlink(to: p"libnftnl.so.11.8.0")
+  fp"{dest}/usr/lib/libnftnl.so".symlink(to: p"libnftnl.so.11.8.0")
 
   for header in public_headers() {
     fs.install(

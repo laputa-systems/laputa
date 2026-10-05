@@ -42,7 +42,7 @@ proc drop_prefix(text: Str, prefix: Str) -> Result[Str] {
 }
 
 pure c_quote(text: Str) -> Str {
-  text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+  text.replace("\\", with: "\\\\").replace("\"", with: "\\\"").replace("\n", with: "\\n")
 }
 
 proc lex_literal_to_regex(raw: Str) -> Result[Str] {
@@ -100,7 +100,7 @@ proc expand_definitions(pattern: Str, defs: Map[Str]) [error] -> Result[Str] {
   var out = pattern
 
   for name in defs.keys() {
-    out = out.replace(f"{{{name}}}", f"({defs.get(name) ?? ""})")
+    out = out.replace(f"{{{name}}}", with: f"({defs.get(name) ?? ""})")
   }
 
   out

@@ -153,13 +153,13 @@ pure argv_word(arg: Any) -> Result[Str] {
 
 pure object_name_for_source(src: Path, ext: Str) -> Str {
   src.display()
-    .replace("/", "_")
-    .replace(".cxx", ext)
-    .replace(".cpp", ext)
-    .replace(".cc", ext)
-    .replace(".c", ext)
-    .replace(".S", ext)
-    .replace(".s", ext)
+    .replace("/", with: "_")
+    .replace(".cxx", with: ext)
+    .replace(".cpp", with: ext)
+    .replace(".cc", with: ext)
+    .replace(".c", with: ext)
+    .replace(".S", with: ext)
+    .replace(".s", with: ext)
 }
 
 pure object_path_for_source(src: Path, out_dir: Path, ext: Str) -> Path {
@@ -269,7 +269,7 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
 
   for index, word in words {
     if word.starts_with("-j") and word.count_chars() > 2 {
-      return parse_jobs(word.replace("-j", ""), "MAKEFLAGS -j")?
+      return parse_jobs(word.replace("-j", with: ""), "MAKEFLAGS -j")?
     }
 
     if word == "-j" or word == "--jobs" {
@@ -281,7 +281,7 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
     }
 
     if word.starts_with("--jobs=") {
-      return parse_jobs(word.replace("--jobs=", ""), "MAKEFLAGS --jobs")?
+      return parse_jobs(word.replace("--jobs=", with: ""), "MAKEFLAGS --jobs")?
     }
   }
 
@@ -369,7 +369,7 @@ proc depfile_inputs(depfile: Path, cwd: Path) -> Result[List[Path]] {
   let normalized = depfile.read_text()?.replace(
     """\\
 """,
-    " ",
+    with: " ",
   )
 
   let first = normalized.split("\n")[0]

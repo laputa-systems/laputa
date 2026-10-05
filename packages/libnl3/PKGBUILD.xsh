@@ -88,9 +88,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     let minor = if parts.len() > 1 { parts[1] } else { "0" }
     let micro = if parts.len() > 2 { parts[2] } else { "0" }
 
-    let body = tmpl.replace("@MAJOR_VERSION@", major)
-      .replace("@MINOR_VERSION@", minor)
-      .replace("@MICRO_VERSION@", micro)
+    let body = tmpl.replace("@MAJOR_VERSION@", with: major)
+      .replace("@MINOR_VERSION@", with: minor)
+      .replace("@MICRO_VERSION@", with: micro)
 
     version_h.write(body)
   }
@@ -224,8 +224,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     let parts = basename.split(".so.")
     let soname = f"{parts[0]}.so.{parts[1].split(".")[0]}"
     let linker = f"{parts[0]}.so"
-    fs.symlink(fp"{basename}", fp"{dest}/usr/lib/{soname}")
-    fs.symlink(fp"{soname}", fp"{dest}/usr/lib/{linker}")
+    fp"{dest}/usr/lib/{soname}".symlink(to: fp"{basename}")
+    fp"{dest}/usr/lib/{linker}".symlink(to: fp"{soname}")
   }
 
   # Install public headers at /usr/include/netlink/

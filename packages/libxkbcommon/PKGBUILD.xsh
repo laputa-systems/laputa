@@ -123,18 +123,18 @@ yacc_gen = generator(
     arguments: ['--defines=@OUTPUT1@', '-o', '@OUTPUT0@', '-p', '_xkbcommon_', '@INPUT@'],
 )
 """,
-    """# libxkbcommon.
+    with: """# libxkbcommon.
 yacc = 'vendored parser'
 """,
   )
 
   text = text.replace(
     "    yacc_gen.process('src/xkbcomp/parser.y'),",
-    """    'src/xkbcomp/parser.c',
+    with: """    'src/xkbcomp/parser.c',
     'src/xkbcomp/parser.h',""",
   )
 
-  text = text.replace("'yacc': yacc.full_path() + ' ' + yacc.version(),", "'yacc': yacc,")
+  text = text.replace("'yacc': yacc.full_path() + ' ' + yacc.version(),", with: "'yacc': yacc,")
   meson.write(text)
 }
 
@@ -161,7 +161,7 @@ endforeach
     return Err(error.failure("meson.build no longer reads the legacy XKB root from pkg-config"))?
   }
 
-  meson.write(text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))
+  meson.write(text.replace(lookup, with: "XKB_LEGACY_ROOT = ''\n"))
 }
 
 ## Exported declaration `build`.

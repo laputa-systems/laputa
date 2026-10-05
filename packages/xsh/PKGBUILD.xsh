@@ -150,13 +150,13 @@ export proc build(dest: Path) [fs, env, error] {
 
   let shell = fp"{dest}/usr/bin/sh"
   shell.remove(missing_ok: true)
-  fs.symlink(p"xshi", shell)
+  shell.symlink(to: p"xshi")
 
   let core = fp"{dest}/usr/lib/xsh/core"
   core.parent.mkdir()
   archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
 
   for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {
-    fs.symlink(fp"../lib/xsh/core/{entry.name}", fp"{dest}/usr/bin/{entry.name}")
+    fp"{dest}/usr/bin/{entry.name}".symlink(to: fp"../lib/xsh/core/{entry.name}")
   }
 }

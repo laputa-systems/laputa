@@ -367,7 +367,7 @@ proc patch_modules() {
   root_text = root_text.replace(
     """subdir('conf' / 'pam_conv1')
 """,
-    "",
+    with: "",
   )
 
   root_text = root_text.replace(
@@ -376,7 +376,7 @@ if not libcrypt.found()
   libcrypt = cc.find_library('crypt')
 endif
 """,
-    """libcrypt = declare_dependency(link_args: ['-lcrypt'])
+    with: """libcrypt = declare_dependency(link_args: ['-lcrypt'])
 """,
   )
 
@@ -386,7 +386,7 @@ endif
   let modules_text = modules_build.read_text()?.replace(
     """subdir('pam_setquota')
 """,
-    "",
+    with: "",
   )
 
   modules_build.write(modules_text)

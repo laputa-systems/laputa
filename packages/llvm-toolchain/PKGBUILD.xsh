@@ -467,11 +467,11 @@ env ({
 main(@args)?
 """
 
-  wrapper_template.replace("__REAL__", real.display())
-    .replace("__CLANG__", bool_literal(clang))
+  wrapper_template.replace("__REAL__", with: real.display())
+    .replace("__CLANG__", with: bool_literal(clang))
     .replace(
       "__CXX__",
-      bool_literal(
+      with: bool_literal(
         cxx,
       ),
     )
@@ -505,7 +505,7 @@ proc install_tool_alias(bin: Path, tool_name: Str, target: Str) {
   return when link.exists()
 
   require_file(fp"{bin}/{target}", target)
-  fs.symlink(fp"{target}", link)
+  link.symlink(to: fp"{target}")
 }
 
 proc install_prebuilt_tree(dest: Path) {

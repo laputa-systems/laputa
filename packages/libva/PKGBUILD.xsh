@@ -219,7 +219,7 @@ export const filetree = [
 ## Exported declaration `prepare_sources`.
 export proc prepare_sources(src: Path) [fs, error] {
   let trace = fp"{src}/va/va_trace.c"
-  trace.write(trace.read_text()?.replace("syscall(__NR_gettid)", "syscall(SYS_gettid)"))
+  trace.write(trace.read_text()?.replace("syscall(__NR_gettid)", with: "syscall(SYS_gettid)"))
 }
 
 proc prune_install(dest: Path) {
@@ -257,7 +257,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     if native_scanner {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
-      ninja.write(ninja.read_text()?.replace("../../../../root/usr/bin/wayland-scanner", scanner_text))
+      ninja.write(ninja.read_text()?.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text))
     }
 
     run $muon "-C" "build" samu $jobs_flag
