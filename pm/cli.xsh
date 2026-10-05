@@ -590,13 +590,11 @@ proc remote_snapshot_for_plan(
   }
 
   let index_sha256 = if cache.exists() { hash.sha256(cache)?.hex() } else { bytes.from_text("[]\n").sha256().hex() }
-  var packages: List[types.RemotePlanArtifact] = []
-
-  for entry in index {
-    continue unless entry.arch == types.pm_target_arch(target)
-    packages += [remote.plan_artifact_from_package_at_repo(entry, repo_url, cache_root)?]
-  }
-
+  var packages: List[types.RemotePlanArtifact] = [
+    remote.plan_artifact_from_package_at_repo(entry, repo_url, cache_root)?
+    for entry in index
+    if entry.arch == types.pm_target_arch(target)
+  ]
   {target, index_sha256, packages}
 }
 

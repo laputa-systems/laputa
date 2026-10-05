@@ -181,16 +181,12 @@ pure strace_cppflags(arch: Str) -> List[Str] {
 # `sys_func.h`: `sed -n 's/^SYS_FUNC(.*/extern &;/p'` over the strace sources,
 # then `sort -u`.
 proc write_sys_func_h(sources: List[Path]) {
-  var decls = []
-
-  for src in sources {
-    for line in src.read_text()?.lines() {
-      if line.starts_with("SYS_FUNC(") {
-        decls += [f"extern {line};"]
-      }
-    }
-  }
-
+  var decls = [
+    f"extern {line};"
+    for src in sources
+    for line in src.read_text()?.lines()
+    if line.starts_with("SYS_FUNC(")
+  ]
   p"src/sys_func.h".write([f"{decl}\n" for decl in sorted_unique(decls)].join(""))
 }
 

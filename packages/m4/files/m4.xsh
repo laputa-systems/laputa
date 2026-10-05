@@ -821,12 +821,7 @@ pure translit_text(text: Str, from_spec: Str, to_spec: Str) -> Str {
     }
   }
 
-  var out: List[Str] = []
-
-  for c in text {
-    out += [mapping.get(c) ?? c]
-  }
-
+  var out: List[Str] = [mapping.get(c) ?? c for c in text]
   out.join("")
 }
 
@@ -1794,12 +1789,7 @@ pure new_call(name: Str, defn: Str, at_text: Str, at_pos: Int, at_name: Str) -> 
 }
 
 pure numeric_key_order(keys: List[Str]) -> List[Int] {
-  var numbers: List[Int] = []
-
-  for k in keys {
-    numbers += [k.parse_int() ?? 0]
-  }
-
+  var numbers: List[Int] = [k.parse_int() ?? 0 for k in keys]
   numbers |> sort
 }
 

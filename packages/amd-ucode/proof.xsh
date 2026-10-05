@@ -45,12 +45,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   let magic = bytes.read_at(image, 0, 6)?
   proof.ensure(magic == bytes.from_text("070701"), "amd-ucode", "amd-ucode.img is not an uncompressed newc cpio")
 
-  var members: List[Str] = []
-
-  for entry in archive.cpio_list(image)? {
-    members += [entry.path.display()]
-  }
-
+  var members: List[Str] = [entry.path.display() for entry in archive.cpio_list(image)?]
   proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")
 
   tempdir extracted {

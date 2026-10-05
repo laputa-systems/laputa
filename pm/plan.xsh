@@ -321,16 +321,12 @@ proc built_dependency_names(
   selected: Map[Bool],
   actions: Map[types.PlanAction],
 ) -> Result[List[Str]] {
-  var changed: List[Str] = []
-
-  for edge in edges {
-    continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
-
-    if types.plan_action_is_build(actions.get(edge.to)?) {
-      changed += [edge.to]
-    }
-  }
-
+  var changed: List[Str] = [
+    edge.to
+    for edge in edges
+    if edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
+    if types.plan_action_is_build(actions.get(edge.to)?)
+  ]
   changed |> sort
 }
 

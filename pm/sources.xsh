@@ -309,12 +309,10 @@ proc resolve_locked_crates(
   checksum: Str,
 ) -> Result[List[ResolvedCrate]] {
   verify_source_checksum(resolved.path, checksum, resolved.kind)
-  var crates: List[ResolvedCrate] = []
-
-  for item in cargo_lock_crates(resolved.path)? {
-    crates += [{item, path: resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?}]
-  }
-
+  var crates: List[ResolvedCrate] = [
+    {item, path: resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?}
+    for item in cargo_lock_crates(resolved.path)?
+  ]
   crates
 }
 
