@@ -4,9 +4,9 @@ use system.qemu
 use system.types
 
 test test_rootfs_size_has_expected_margin_rounding_and_floor [error] {
-  assert image.rootfs_size_bytes(0) == 256 * 1024 * 1024
-  assert image.rootfs_size_bytes(256 * 1024 * 1024) == 384 * 1024 * 1024
-  assert image.rootfs_size_bytes(257 * 1024 * 1024) == 386 * 1024 * 1024
+  assert image.rootfs_size_bytes(0) == 256MiB
+  assert image.rootfs_size_bytes(256 * 1024 * 1024) == 384MiB
+  assert image.rootfs_size_bytes(257 * 1024 * 1024) == 386MiB
 }
 
 test test_protective_mbr_has_signature_and_protective_partition [error] {
