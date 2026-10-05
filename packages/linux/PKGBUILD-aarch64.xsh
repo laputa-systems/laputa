@@ -440,7 +440,7 @@ proc nvhe_ld_task(
 ) [] -> make.MakeTask {
   var argv = [ld.display(), "-r"]
 
-  if linker_script.display() != "" {
+  if linker_script != "" {
     argv += ["-T", linker_script.display()]
   }
 

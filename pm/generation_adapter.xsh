@@ -189,7 +189,7 @@ export proc generation_adapter_copy_manifest_file(
   output: Path,
 ) [fs, error] {
   let relative_path = util.ensure_relative_path(package_path, "store extraction path")?
-  if relative_path.display() == "" or relative_path.display() == "." or relative_path.display() != package_path.display() {
+  if relative_path == "" or relative_path == "." or relative_path.display() != package_path.display() {
     return Err(GenerationAdapterError.Failed("store extraction path must be canonical and nonempty"))
   }
 

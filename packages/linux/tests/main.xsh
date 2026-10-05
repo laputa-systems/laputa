@@ -168,7 +168,7 @@ test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
   assert contains_path(plan.lib_objects, "libhelper.o")
   assert contains_path(plan.objects, "combo.o")
   assert plan.composites.len() == 4
-  assert plan.composites[0].object.display() == "combo.o"
+  assert plan.composites[0].object == "combo.o"
   assert contains_path(plan.composites[0].members, "combo-a.o")
   assert contains_path(plan.composites[0].members, "combo-b.o")
   assert contains_path(plan.objects, "hyperv.o")

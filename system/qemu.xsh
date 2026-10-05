@@ -186,7 +186,7 @@ proc qemu_process_live(pid: Int) [process, error] -> Result[Bool] {
 # Invokes the retained focused Python QMP helper with structured arguments.
 proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") [process, error] {
   var argv = [value.python.display(), value.qmp_helper.display(), mode, socket.display()]
-  if screenshot.display() != "" {
+  if screenshot != "" {
     argv += [screenshot.display()]
   }
 

@@ -601,7 +601,7 @@ export proc build_plan(
     # Children read the plan from disk; write_plan seals it with its digest.
     let plan_path = fp"{scratch}/plan.json"
     plan_json.write_plan(plan_path, plan_value)?
-    let log_dir = if logs.display() == "" { fp"{scratch}/logs" } else { logs }
+    let log_dir = if logs == "" { fp"{scratch}/logs" } else { logs }
     done = execute_scheduled(context, plan_path, log_dir, jobs)?
   }
 

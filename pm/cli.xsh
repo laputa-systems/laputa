@@ -204,7 +204,7 @@ proc current_pm_repo_root() [fs, error] -> Result[Path] {
 proc repo_default_root() [fs, error] -> Result[Path] {
   let root = current_pm_repo_root()?
 
-  if root.display() == "" {
+  if root == "" {
     return Err(types.PmError.Usage("pm repo requires --repo outside a package repository"))
   }
 
@@ -214,7 +214,7 @@ proc repo_default_root() [fs, error] -> Result[Path] {
 proc execution_repo_root() [fs, error] -> Result[Path] {
   let root = current_pm_repo_root()?
 
-  if root.display() == "" {
+  if root == "" {
     return Err(types.PmError.Usage("pm repo build requires running inside a package repository"))
   }
 
