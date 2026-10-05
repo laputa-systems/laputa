@@ -369,7 +369,7 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
     let rel = actual.path.strip_prefix(extracted)?
     var owned = actual.kind == "file" or actual.kind == "symlink"
 
-    if actual.kind == "dir" and rel.display() != "." {
+    if actual.kind == "dir" and rel != "." {
       var empty = true
 
       for _ in fs.children(actual.path)? {

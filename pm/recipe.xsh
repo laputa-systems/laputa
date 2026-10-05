@@ -133,7 +133,7 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
 
   # A crate set replaces its destination directory, so it may not be the
   # source root that other sources stage into.
-  if kind == types.source_cargo_vendor() and util.parse_source_line(source)?.dest.normalize().display() == "." {
+  if kind == types.source_cargo_vendor() and util.parse_source_line(source)?.dest.normalize() == "." {
     return Err(types.PmError.PackageContract(f"{name}: cargo-vendor source {source} needs a `=> DIR` destination"))
   }
 
@@ -202,7 +202,7 @@ proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileT
   let normalized = path_value.normalize()
   let raw_path = path_value.display()
 
-  if raw_path == "" or normalized.display() == "" or normalized.display() == "." {
+  if raw_path == "" or normalized == "" or normalized == "." {
     return Err(types.PmError.PackageContract(f"{name}: filetree path must be nonempty"))
   }
 

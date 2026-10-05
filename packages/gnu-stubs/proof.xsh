@@ -17,7 +17,7 @@ proc main(rootfs: Path = /rootfs) [fs, error] {
 
   let link = fp"{rootfs}/usr/lib/libgcc_s.so.1".readlink()?
 
-  if link.display() != "libgcc_s.so" {
+  if link != "libgcc_s.so" {
     return Err(ProofError.Failed(kind: "proof-gnu-stubs", message: f"libgcc_s.so.1 symlink points to {link}"))
   }
 

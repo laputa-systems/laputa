@@ -51,7 +51,7 @@ proc expect_catalog_rejection(root: Path, expected: Str) [fs, env, error] {
 test test_catalog_loads_packages_in_name_order_with_relative_dirs [fs, env, error] {
   let value = catalog.load(fixture("graph-catalog"))?
   assert catalog.package_names(value) == ["app", "host-tool", "runtime-lib", "target-sdk"]
-  assert value.packages[0].dir.display() == "packages/app"
+  assert value.packages[0].dir == "packages/app"
 }
 
 test test_catalog_rejects_missing_dependency [fs, env, error] {

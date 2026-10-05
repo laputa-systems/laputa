@@ -158,7 +158,7 @@ export pure parse_source_line(raw: Path) -> Result[types.SourceLine, Error] {
 export pure source_stage_dir(src: Path, line: types.SourceLine) -> Path {
   let dest = line.dest.normalize()
 
-  return src when dest.display() == "."
+  return src when dest == "."
 
   fp"{src}/{dest}"
 }

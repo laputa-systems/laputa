@@ -263,7 +263,7 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
   for entry in fs.walk(core_root) |> sort-by .path {
     let rel = entry.path.strip_prefix(core_root)?
 
-    if ! ignored_tree_path(rel) and rel.display() != "" {
+    if ! ignored_tree_path(rel) and rel != "" {
       lines += [tree_entry_line(core_root, entry.path, "core")?]
     }
   }

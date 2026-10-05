@@ -125,7 +125,7 @@ export type CMultiTarget = {
 }
 
 pure has_path(path_value: Path) -> Bool {
-  path_value.display() != ""
+  path_value != ""
 }
 
 pure stamp_path(out: Path) -> Path {
@@ -171,7 +171,7 @@ pure source_is_cxx(src: Path) -> Bool {
 }
 
 pure source_path(root: Path, src: Path) -> Path {
-  return src when root.display() == "" or root.display() == "."
+  return src when root == "" or root == "."
 
   fp"{root}/{src}"
 }
@@ -1167,9 +1167,9 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
     let cflags = spec.cflags.extend(source_group.cflags)
     let defs = spec.defs.extend(source_group.defs)
     let includes = spec.includes.extend(source_group.includes)
-    let root = if source_group.root.display() == "" { spec.root } else { source_group.root }
+    let root = if source_group.root == "" { spec.root } else { source_group.root }
 
-    let out_dir = if source_group.out_dir.display() == "" {
+    let out_dir = if source_group.out_dir == "" {
       fp"{spec.out_dir}/{source_group.name}"
     } else {
       source_group.out_dir

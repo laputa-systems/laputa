@@ -4,7 +4,7 @@ pure restart_policy() -> Record {
 }
 
 pure dropbear_argv(bind: Str, port: Int, host_key: Path) -> List[Str] {
-  guard host_key.display() == "" else {
+  guard host_key == "" else {
     return ["dropbear", "-F", "-E", "-p", f"{bind}:{port}", "-r", host_key.display()]
   }
 
