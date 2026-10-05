@@ -154,7 +154,7 @@ proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCra
   var crates: List[LockedCrate] = []
   var current: LockedCrate = LockedCrate(name: "", version: "", checksum: "")
 
-  for raw in lockfile.read_text()?.lines().push("[[package]]") {
+  for raw in lockfile.read_lines()?.push("[[package]]") {
     let line = raw.trim()
 
     if line == "[[package]]" {

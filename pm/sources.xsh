@@ -269,7 +269,7 @@ export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedC
   var in_package = false
 
   # The trailing header flushes the last record.
-  for raw in lockfile.read_text()?.lines().push("[end]") {
+  for raw in lockfile.read_lines()?.push("[end]") {
     let line = raw.trim()
 
     if line.starts_with("[") {

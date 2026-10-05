@@ -262,10 +262,10 @@ proc write_printer_headers(mpers_sources: List[Str], preprocessed: List[Path]) [
 # rewritten into #undef/#define pairs, so a personality's ioctl numbers
 # replace the native ones where they differ.
 proc write_ioctl_redefs(personality: Str) [fs, error] {
-  let native = {[line]: true for line in p"src/ioctlent0.h".read_text()?.lines()}
+  let native = {[line]: true for line in p"src/ioctlent0.h".read_lines()?}
   var out = ""
 
-  for line in sorted_unique(fp"src/ioctlent{personality}.h".read_text()?.lines()) {
+  for line in sorted_unique(fp"src/ioctlent{personality}.h".read_lines()?) {
     continue when native.get(line) ?? false
 
     if let [_, ioctl, code] = ioctlent_pattern.captures(line) {
@@ -331,7 +331,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   write_sys_func_h([src for src in sources if src != p"src/bpf_attr_check.c"])?
   write_sen_h()?
 
-  let mpers_line = [line for line in p"src/mpers.am".read_text()?.lines() if line.starts_with("mpers_source_files = ")]
+  let mpers_line = [line for line in p"src/mpers.am".read_lines()? if line.starts_with("mpers_source_files = ")]
   let mpers_sources = mpers_line[0].split(" = ")[1].words()
   fs.mkdir(p"obj/cpp", parents: true)?
 
@@ -356,7 +356,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   write_scno_h(syscallent_i)?
   write_printer_headers(mpers_sources, mpers_i)?
 
-  let iocdef = [f"#define {line.split("DEFINE HOST")[1]}\n" for line in iocdef_i.read_text()?.lines() if line.starts_with("DEFINE HOST")]
+  let iocdef = [f"#define {line.split("DEFINE HOST")[1]}\n" for line in iocdef_i.read_lines()? if line.starts_with("DEFINE HOST")]
   fs.write(p"src/ioctl_iocdef.h", iocdef.join(""))?
 
   # One ioctl table per personality the architecture ships ioctls_inc<N>.h
