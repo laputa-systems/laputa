@@ -28,7 +28,7 @@ const xsh_seed_features = "xsh/net xsh/tools xsht/native-tests"
 export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
 
 ## Resolve a seed architecture name.
-export pure xsh_seed_arch(arch: Str) -> Result[SeedArch] {
+export pure xsh_seed_arch(arch: Str) -> Result[SeedArch, Error] {
   match arch {
     "aarch64" => {arch: "aarch64", triple: "aarch64-unknown-linux-musl", docker_platform: "linux/arm64"}
     "x86_64" => {arch: "x86_64", triple: "x86_64-unknown-linux-musl", docker_platform: "linux/amd64"}
@@ -65,7 +65,7 @@ pure xsh_seed_registry_stamp(laputa_root: Path) -> Path {
 ## The Rust flags XSH's Linux test path sets for a static musl target.
 ## These mirror XSH's `dev/targets.xsh::docker_test_env`; the `__isoc23_*`
 ## aliases match the CRT objects in the `xsh-test` image.
-export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[SeedEnvVar] {
+export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[SeedEnvVar, Error] {
   let flags = [
     "-C target-feature=+crt-static",
     "-C link-arg=--defsym=__isoc23_sscanf=sscanf",
@@ -86,7 +86,7 @@ export pure xsh_seed_cargo_build_argv(
   xsh_root: Path,
   value: SeedArch,
   jobs: Int,
-) -> Result[List[Str]] {
+) -> Result[List[Str], Error] {
   let rustflags = xsh_seed_rustflags_env(value)?
   [
     docker.display(),
@@ -397,7 +397,7 @@ export proc xsh_seed_build(
 }
 
 ## Verify a built seed: every product exists and matches the digest its manifest records.
-export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result[Path] {
+export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result[Path, Error] {
   let out = xsh_seed_dir(laputa_root, arch)
   let manifest = xsh_seed_manifest_path(laputa_root, arch)
 

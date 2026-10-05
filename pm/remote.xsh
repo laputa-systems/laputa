@@ -24,7 +24,7 @@ export proc try_fetch_repo_file(
   rel: Path,
   dest: Path,
   timeout: Duration = 1800s,
-) [fs, net, error] -> Result[Str] {
+) [fs, net, error] -> Result[Str, Error] {
   util.download_file(util.repo_url_for(repo, rel)?, dest, timeout)?
 }
 
@@ -64,7 +64,7 @@ export proc upload_immutable_repo_file(
   source: Path,
   token: Str,
   work: Path,
-) [fs, net, error] -> Result[Bool] {
+) [fs, net, error] -> Result[Bool, Error] {
   if ! util.is_file_url(repo) {
     let response = net.upload({
       method: "PUT",
@@ -117,7 +117,7 @@ export proc upload_immutable_repo_file(
 }
 
 ## Exported PM declaration `load_remote_index_from`.
-export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[types.RemotePackage]] {
+export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[types.RemotePackage], Error] {
   if fs.exists(index_path)? {
     let rows: List[Record] = json.read(index_path)?.require(List[Record])?
     return decode_remote_index(rows)
@@ -164,7 +164,7 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) [fs, net, error] -> R
 export proc load_remote_index_from_repo(
   repo: Str,
   out: Path,
-) [fs, net, time, error] -> Result[List[types.RemotePackage]] {
+) [fs, net, time, error] -> Result[List[types.RemotePackage], Error] {
   if util.is_file_url(repo) {
     return try_load_remote_index_from_repo(repo, out)?
   }
@@ -175,13 +175,13 @@ export proc load_remote_index_from_repo(
 }
 
 ## Exported PM declaration `decode_remote_index`.
-export proc decode_remote_index(rows: List[Record]) [error] -> Result[List[types.RemotePackage]] {
+export proc decode_remote_index(rows: List[Record]) [error] -> Result[List[types.RemotePackage], Error] {
   var items = [decode_remote_package(row)? for row in rows]
   items
 }
 
 ## Exported PM declaration `decode_remote_package`.
-export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePackage] {
+export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePackage, Error] {
   var arch = "aarch64"
   let empty_dependencies: List[Str] = []
   let mkdeps_host = if "mkdeps_host" in row {
@@ -264,7 +264,7 @@ export proc write_remote_index_to_repo(
 export proc upsert_remote_package(
   index: List[types.RemotePackage],
   entry: types.RemotePackage,
-) [error] -> Result[List[types.RemotePackage]] {
+) [error] -> Result[List[types.RemotePackage], Error] {
   var updated = []
   var replaced = false
 
@@ -316,7 +316,7 @@ pure legacy_snapshot_digest(value: types.RemotePackage) -> Str {
 }
 
 ## Decodes new immutable index identities while retaining the legacy empty-identity fallback.
-export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Result[types.RemotePlanArtifact] {
+export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Result[types.RemotePlanArtifact, Error] {
   let fields = [value.artifact_key, value.recipe_sha256, value.executor_sha256, value.proof_key, value.proof_sha256]
   let populated = [field for field in fields if field != ""]
 
@@ -371,7 +371,7 @@ export proc plan_artifact_from_package_at_repo(
   value: types.RemotePackage,
   repo: Str,
   cache: Path,
-) [fs, net, error] -> Result[types.RemotePlanArtifact] {
+) [fs, net, error] -> Result[types.RemotePlanArtifact, Error] {
   if value.metadata_sha256 != "" {
     return plan_artifact_from_package(value)?
   }

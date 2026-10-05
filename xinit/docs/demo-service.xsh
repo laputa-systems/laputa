@@ -28,6 +28,6 @@ export let service = {
 }
 
 ## Reports readiness once the demo socket exists.
-export proc ready() [fs, process, env, time, error] -> Result[Bool] {
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {
   fs.exists(/run/demo.sock)?
 }

@@ -590,7 +590,7 @@ proc write_shader_headers() [fs, error] {
 ## Port of backend/drm/gen_pnpids.sh: a switch case per pnp.ids line, in file
 ## order, with the vendor name as written. Like the script, a line whose first
 ## field is not a three-character ID is an error.
-export pure pnpids_source(pnp_ids: Str) -> Result[Str] {
+export pure pnpids_source(pnp_ids: Str) -> Result[Str, Error] {
   var cases = []
 
   for line in pnp_ids.split("\n") {

@@ -341,7 +341,7 @@ export proc resolve(
   policy: types.BuildPolicy,
   roots: List[Str],
   all: Bool,
-) [fs, error] -> Result[types.BuildPlan] {
+) [fs, error] -> Result[types.BuildPlan, Error] {
   require_supported_target(policy.target, "build policy")?
   require_supported_target(policy.build_target, "build policy")?
   require_supported_target(snapshot.target, "remote snapshot")?
@@ -610,7 +610,7 @@ proc validate_node(
 
 ## Reports whether one validated remote node uses the retrieval-derived legacy artifact identity.
 ## Legacy metadata predates semantic artifact keys, so its key is bound to verified retrieval bytes instead.
-export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types.PlanNode) [error] -> Result[Bool] {
+export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types.PlanNode) [error] -> Result[Bool, Error] {
   if types.plan_action_is_build(node.action) {
     return false
   }
@@ -725,7 +725,7 @@ proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
 }
 
 ## Computes the plan's canonical line-oriented fingerprint without its own digest field.
-export proc fingerprint(value: types.BuildPlan) [error] -> Result[Str] {
+export proc fingerprint(value: types.BuildPlan) [error] -> Result[Str, Error] {
   validate_structure(value)?
   fingerprint_unchecked(value)?
 }
@@ -749,7 +749,7 @@ pure color(text: Str, code: Str, colors: Bool) -> Str {
 }
 
 ## Renders a concise deterministic human view of a verified plan.
-export proc render(value: types.BuildPlan, colors: Bool) [error] -> Result[Str] {
+export proc render(value: types.BuildPlan, colors: Bool) [error] -> Result[Str, Error] {
   validate(value)?
   var lines = [
     f"plan {value.plan_sha256}",

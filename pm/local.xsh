@@ -27,13 +27,13 @@ export type PackageMetadataDto = {
 }
 
 ## Exported PM declaration `collect_manifest_text`.
-export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str]] {
+export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str], Error] {
   let lines = [rel_path.display() for rel_path in manifest]
   lines
 }
 
 ## Exported PM declaration `load_manifest`.
-export proc load_manifest(db: Path) [fs, error] -> Result[List[Path]] {
+export proc load_manifest(db: Path) [fs, error] -> Result[List[Path], Error] {
   var manifest = []
 
   if fs.exists(fp"{db}/manifest.json")? {
@@ -48,7 +48,7 @@ export proc load_manifest(db: Path) [fs, error] -> Result[List[Path]] {
 }
 
 ## Exported PM declaration `collect_etcsums`.
-export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Result[List[types.EtcSum]] {
+export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Result[List[types.EtcSum], Error] {
   var sums = []
 
   for rel_path in manifest {
@@ -183,7 +183,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 }
 
 ## Exported PM declaration `collect_metadata_files`.
-export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error] -> Result[List[types.ArtifactEntry]] {
+export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
   var files: List[types.ArtifactEntry] = []
   let root_handle = fs.open_root(root)?
   defer root_handle.close()
@@ -222,7 +222,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
 ## Defines the exact payload inventory shared by archive creation and receipt metadata.
 ## Empty directories created incidentally by a package build remain payload entries: omitting them
 ## from the archive would make a verified receipt describe a root that cannot be materialized.
-export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry]) [fs, error] -> Result[List[Path]] {
+export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry]) [fs, error] -> Result[List[Path], Error] {
   var entries: List[Path] = []
   let root_text = root.display()
 
@@ -272,13 +272,13 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
 export proc collect_artifact_entries(
   root: Path,
   filetree: List[types.FileTreeEntry],
-) [fs, error] -> Result[List[types.ArtifactEntry]] {
+) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
   let canonical = collect_archive_paths(root, filetree)?
   collect_metadata_files(root, canonical)?
 }
 
 ## Exported PM declaration `metadata_files_sha256`.
-export proc metadata_files_sha256(pkg: types.Package, files: List[types.ArtifactEntry]) [error] -> Result[Str] {
+export proc metadata_files_sha256(pkg: types.Package, files: List[types.ArtifactEntry]) [error] -> Result[Str, Error] {
   var body = f"""name	{pkg.name}
 ver	{pkg.ver}
 deps	{pkg.deps.join(" ")}
@@ -346,7 +346,7 @@ export proc write_package_metadata(
 }
 
 ## Exported PM declaration `dir_empty`.
-export proc dir_empty(path_value: Path) [fs, error] -> Result[Bool] {
+export proc dir_empty(path_value: Path) [fs, error] -> Result[Bool, Error] {
   for _ in fs.children(path_value)? {
     return false
   }
@@ -385,7 +385,7 @@ export proc write_package_db(
 }
 
 ## Exported PM declaration `load_package_dirs`.
-export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[types.Package]] {
+export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[types.Package], Error] {
   var packages = []
   var seen: Map[Bool] = {}
 
@@ -409,7 +409,7 @@ export proc load_built_package_from_dest(
   id: Str,
   tarball: Path,
   dest: Path,
-) [fs, error] -> Result[types.BuiltPackage] {
+) [fs, error] -> Result[types.BuiltPackage, Error] {
   if pkg.kind == types.package_meta() {
     let metadata_files: List[types.ArtifactEntry] = []
 

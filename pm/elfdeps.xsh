@@ -91,7 +91,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
 }
 
 ## Exported PM declaration `collect_library_providers`.
-export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]] {
+export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str], Error] {
   var providers: Map[Str] = {}
   let packages_db = util.packages_db_path(root)
 
@@ -133,7 +133,7 @@ export proc installed_file_elf_dependency_failures(
   rel_path: Path,
   path_value: Path,
   providers: Map[Str],
-) [fs, error] -> Result[List[ElfDependencyFailure]] {
+) [fs, error] -> Result[List[ElfDependencyFailure], Error] {
   return [] when fs.metadata(path_value)?.kind == "symlink"
 
   if let Ok(info) = elf.inspect(path_value) {

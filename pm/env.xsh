@@ -129,7 +129,7 @@ export proc build_ld_library_path_env(root: Path) [env] -> Str {
 }
 
 ## Exported PM declaration `pkg_config_context`.
-export proc pkg_config_context() [process, env, error] -> Result[PkgConfigContext] {
+export proc pkg_config_context() [process, env, error] -> Result[PkgConfigContext, Error] {
   let pkg_config = process.which("pkg-config")?
   var pkg_config_path = f"{libdir}/pkgconfig:/usr/share/pkgconfig"
   var pkg_config_libdir = pkg_config_path

@@ -139,7 +139,7 @@ pure depfile_path(out: Path) -> Path {
 ## Task argv is `List[Any]` because it mixes `Str` flags with `Path` operands
 ## and lists are invariant. Words are validated here, once, as they become
 ## process text; any other value is a malformed task.
-export pure argv_text(argv: List[Any]) -> Result[List[Str]] {
+export pure argv_text(argv: List[Any]) -> Result[List[Str], Error] {
   [argv_word(arg)? for arg in argv]
 }
 
@@ -197,7 +197,7 @@ proc pkg_config_words(
 export type PkgConfigFlags = {cflags: List[Str], libs: List[Str]}
 
 ## Exported PM declaration `pkg_config_flags`.
-export proc pkg_config_flags(packages: List[Str]) [process, env, error] -> Result[PkgConfigFlags] {
+export proc pkg_config_flags(packages: List[Str]) [process, env, error] -> Result[PkgConfigFlags, Error] {
   let pc = pm_env.pkg_config_context()?
 
   {
@@ -221,7 +221,7 @@ export proc discover_sources(
   root: Path,
   extensions: List[Str],
   exclude: List[Path] = [],
-) [fs, error] -> Result[List[Path]] {
+) [fs, error] -> Result[List[Path], Error] {
   let source_root = path.absolute(root)?
   var sources = []
 
@@ -294,7 +294,7 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
 }
 
 ## Exported PM declaration `jobs`.
-export proc jobs() [env, error] -> Result[Int] {
+export proc jobs() [env, error] -> Result[Int, Error] {
   let value = env.get("MAKEFLAGS") ?? ""
 
   return cpu.count() when value == ""
@@ -303,12 +303,12 @@ export proc jobs() [env, error] -> Result[Int] {
 }
 
 ## Exported PM declaration `effective_task_argv`.
-export proc effective_task_argv(raw_argv: List[Any], _: Record) [error] -> Result[List[Str]] {
+export proc effective_task_argv(raw_argv: List[Any], _: Record) [error] -> Result[List[Str], Error] {
   argv_text(raw_argv)?
 }
 
 ## Exported PM declaration `effective_task_env`.
-export proc effective_task_env(_: List[Any], task_env: Record) [error] -> Result[Record] {
+export proc effective_task_env(_: List[Any], task_env: Record) [error] -> Result[Record, Error] {
   task_env
 }
 
@@ -562,7 +562,7 @@ pure should_log_dynamic_progress(tasks_count: Int, event_count: Int, running_cou
 }
 
 ## Exported PM declaration `run_tasks`.
-export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env, error] -> Result[Unit] {
+export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env, error] -> Result[Unit, Error] {
   check_tasks(tasks, jobs_count)?
   var task_by_name: Map[MakeTask] = {}
   var dependents: Map[List[Str]] = {}
@@ -1152,7 +1152,7 @@ export proc c_static_library(spec: CStaticLibrary) [] -> CTarget {
 }
 
 ## Exported PM declaration `c_multi_program`.
-export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget] {
+export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Error] {
   var tasks = []
   var groups: Map[CompileTasks] = {}
   var cxx_groups: Map[Bool] = {}
@@ -1364,7 +1364,7 @@ export proc compile_lo(
   includes: List[Str],
   src: Path,
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([compile_lo_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
 }
 
@@ -1378,7 +1378,7 @@ export proc compile_cxx(
   includes: List[Str],
   src: Path,
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([compile_cxx_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
 }
 
@@ -1392,7 +1392,7 @@ export proc compile_c(
   includes: List[Str],
   src: Path,
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([compile_c_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
 }
 
@@ -1405,7 +1405,7 @@ export proc link_shared(
   soname: Str,
   ldflags: List[Str],
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([link_shared_task(toolchain, triple, objs, soname, ldflags, out)], 1)?
 }
 
@@ -1418,7 +1418,7 @@ export proc link_executable_cxx(
   libs: List[Path],
   ldflags: List[Str],
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([link_executable_cxx_task(toolchain, triple, objs, libs, ldflags, out)], 1)?
 }
 
@@ -1430,12 +1430,12 @@ export proc link_executable(
   libs: List[Path],
   ldflags: List[Str],
   out: Path,
-) [fs, process, env, error] -> Result[Unit] {
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([link_executable_task(toolchain, triple, objs, libs, ldflags, out)], 1)?
 }
 
 # Create a static archive from .lo/.o objects.
 ## Exported PM declaration `link_archive`.
-export proc link_archive(toolchain: Path, objs: List[Path], out: Path) [fs, process, env, error] -> Result[Unit] {
+export proc link_archive(toolchain: Path, objs: List[Path], out: Path) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([link_archive_task(toolchain, objs, out)], 1)?
 }

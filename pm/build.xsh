@@ -9,7 +9,7 @@ use util
 # The PM tree is the monorepo root (pm.xsh beside pm/) in a checkout and
 # /usr/lib/pm on an installed system.
 ## The directory holding this PM's pm.xsh and pm/ tree.
-export proc pm_source_root() [fs, env, error] -> Result[Path] {
+export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
   for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 
@@ -180,7 +180,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
 
 ## Records the XSH runners, PM tree, and core applets that `seed_executor_substrate`
 ## installs, as artifact provenance. Builds compute this once per execution.
-export proc executor_provenance() [fs, process, env, error] -> Result[types.ExecutorProvenance] {
+export proc executor_provenance() [fs, process, env, error] -> Result[types.ExecutorProvenance, Error] {
   let xsh = xsh_runner()?
   let core = /usr/lib/xsh
   {

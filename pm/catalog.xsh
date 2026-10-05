@@ -55,7 +55,7 @@ export proc from_packages(
   root: Path,
   packages: List[types.Package],
   remote_names: List[Str] = [],
-) [error] -> Result[types.PackageCatalog] {
+) [error] -> Result[types.PackageCatalog, Error] {
   make_catalog(root, packages, remote_names)?
 }
 
@@ -63,7 +63,7 @@ export proc from_packages(
 export proc with_remote_names(
   value: types.PackageCatalog,
   remote_names: List[Str],
-) [error] -> Result[types.PackageCatalog] {
+) [error] -> Result[types.PackageCatalog, Error] {
   make_catalog(value.root, value.packages, value.remote_names.extend(remote_names))?
 }
 
@@ -79,7 +79,7 @@ export pure package_map(value: types.PackageCatalog) -> Map[types.Package] {
 
 ## Discovers every recipe that exists for the explicit plan target, with filetrees selected by it.
 ## A package whose `architectures` excludes the target is omitted, and a package depending on one fails.
-export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -> Result[types.PackageCatalog] {
+export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -> Result[types.PackageCatalog, Error] {
   let absolute_root = path.absolute(root)?
   let recipe_root = fp"{absolute_root}/packages"
 
@@ -120,6 +120,6 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
 }
 
 ## Discovers recipes using the ambient target architecture for legacy PM callers.
-export proc load(root: Path) [fs, env, error] -> Result[types.PackageCatalog] {
+export proc load(root: Path) [fs, env, error] -> Result[types.PackageCatalog, Error] {
   load_for_target(root, types.parse_target(util.machine_arch()?)?)?
 }

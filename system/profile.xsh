@@ -6,7 +6,7 @@ type SystemProfileModule = module {
 }
 
 ## Return whether `value` is a simple profile file stem rather than a path.
-export proc valid_profile_name(value: Str) [error] -> Result[Bool] {
+export proc valid_profile_name(value: Str) [error] -> Result[Bool, Error] {
   if value == "" or "/" in value or "\\" in value or value == "." or value == ".." {
     return false
   }
@@ -16,13 +16,13 @@ export proc valid_profile_name(value: Str) [error] -> Result[Bool] {
 }
 
 ## Return whether `value` can name a package at a typed profile boundary.
-export proc valid_package_name(value: Str) [error] -> Result[Bool] {
+export proc valid_package_name(value: Str) [error] -> Result[Bool, Error] {
   let package_re = rx"^[a-z0-9][a-z0-9+._-]*$"
   package_re.matches(value)
 }
 
 ## Validate a complete profile before it is used to construct any build command.
-export proc validate_system_profile(value: types.SystemProfile) [error] -> Result[Unit] {
+export proc validate_system_profile(value: types.SystemProfile) [error] -> Result[Unit, Error] {
   guard valid_profile_name(value.name)? else {
     return Err(types.LaputaError.Profile(f"invalid profile name {value.name}"))
   }
@@ -91,7 +91,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
 }
 
 ## Load one named profile from `profiles_root` and validate its typed export.
-export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile] {
+export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> Result[types.SystemProfile, Error] {
   guard valid_profile_name(name)? else {
     return Err(types.LaputaError.Profile(f"invalid profile name {name}"))
   }
@@ -109,7 +109,7 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 }
 
 ## Compute a canonical digest from all semantic profile fields.
-export proc digest(value: types.SystemProfile) [error] -> Result[Str] {
+export proc digest(value: types.SystemProfile) [error] -> Result[Str, Error] {
   validate_system_profile(value)?
   let body = f"""laputa-system-profile-1
 name\t{value.name}

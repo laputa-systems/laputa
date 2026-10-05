@@ -24,12 +24,12 @@ proc sources_repository_input_path(source: Str) [fs, env, error] -> Result[Path]
 }
 
 ## Exported PM declaration `ensure_source_dest`.
-export pure ensure_source_dest(dest: Path) -> Result[Unit] {
+export pure ensure_source_dest(dest: Path) -> Result[Unit, Error] {
   let _ = util.ensure_relative_path(dest, "source destination")?
 }
 
 ## Exported PM declaration `source_checksum`.
-export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> Result[Str] {
+export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> Result[Str, Error] {
   for checksum in source.checksums {
     return checksum.sha256 when checksum.arch == arch or checksum.arch == "all"
   }
@@ -46,7 +46,7 @@ const sha256_hex = rx"^[0-9a-f]{64}$"
 
 ## The source cache root for a package repository: LAPUTA_SOURCE_CACHE when set,
 ## otherwise `.cache/sources` under the repository root.
-export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path] {
+export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path, Error] {
   let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
 
   return path.absolute(fp"{configured}")? when configured != ""
@@ -88,7 +88,7 @@ export pure mirror_source_url(mirror: Str, sha256: Str) -> Str {
 }
 
 ## Validates the pin a URL source is cached under. `SKIP` is only for repository-local sources.
-export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Result[Str] {
+export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Result[Str, Error] {
   if checksum == "SKIP" {
     return Err(
       types.PmError.SourceChecksum(
@@ -108,7 +108,7 @@ export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Res
 export enum SourceFetchOutcome { Cached, Fetched(Int), Unavailable(Str), Mismatch(Str) }
 
 ## Downloads `url` into the cache entry for `sha256`, publishing only verified bytes.
-export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome] {
+export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome, Error] {
   let entry = source_cache_entry(root, sha256)
   let partial_dir = fp"{root}/partial"
   fs.mkdir(entry.parent)?
@@ -175,7 +175,7 @@ export proc resolve_source(
   checksum: Str,
   arch: Str,
   build: Str,
-) [fs, net, env, error] -> Result[types.ResolvedSource] {
+) [fs, net, env, error] -> Result[types.ResolvedSource, Error] {
   ensure_source_dest(line.dest)?
   let source = util.expand_source(line.source, pkg, arch, build)
 
@@ -263,7 +263,7 @@ pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[Locke
 ## Reads the crates.io packages a Cargo.lock pins, in file order. Its
 ## `[[package]]` records are flat `key = "value"` lines, so no TOML parser is
 ## needed.
-export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate]] {
+export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate], Error] {
   var crates: List[LockedCrate] = []
   var current = empty_lock_record()
   var in_package = false
@@ -354,7 +354,7 @@ pure first_archive_path_component(path_value: Path) -> Str {
 }
 
 ## Exported PM declaration `tar_source_strip_components`.
-export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result[Int] {
+export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result[Int, Error] {
   let entries = archive.tar_list(source_path)?
   var first = ""
   var saw_entry = false
@@ -520,7 +520,7 @@ export proc generate_checksums_for(
   cache_root: Path,
   pkg: types.Package,
   arch: Str,
-) [fs, net, env, error] -> Result[List[Str]] {
+) [fs, net, env, error] -> Result[List[Str], Error] {
   let build = util.build_arch()?
   var generated = []
 
@@ -552,7 +552,7 @@ export proc generate_checksums_for(
 export proc collect_checksum_updates(
   cache_root: Path,
   pkg: types.Package,
-) [fs, net, env, error] -> Result[List[types.ChecksumUpdate]] {
+) [fs, net, env, error] -> Result[List[types.ChecksumUpdate], Error] {
   let arch = util.machine_arch()?
   let generated = generate_checksums_for(cache_root, pkg, arch)?
   [{field: f"upstream_sources:{arch}", values: generated}]
@@ -621,7 +621,7 @@ export type SourceFetchItem = {sha256: Str, urls: List[Str], packages: List[Str]
 
 ## Collects the pinned URL sources `packages` select for `arch`, one item per
 ## sha256. Builds run natively, so the build architecture equals the target.
-export proc source_fetch_items(packages: List[types.Package], arch: Str) [error] -> Result[List[SourceFetchItem]] {
+export proc source_fetch_items(packages: List[types.Package], arch: Str) [error] -> Result[List[SourceFetchItem], Error] {
   var by_sha256: Map[SourceFetchItem] = {}
 
   for pkg in packages {
@@ -661,7 +661,7 @@ export proc cargo_crate_fetch_items(
   root: Path,
   packages: List[types.Package],
   arch: Str,
-) [fs, net, env, error] -> Result[List[SourceFetchItem]] {
+) [fs, net, env, error] -> Result[List[SourceFetchItem], Error] {
   var by_sha256: Map[SourceFetchItem] = {}
 
   for pkg in packages {

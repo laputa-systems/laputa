@@ -24,7 +24,7 @@ const host_tools_contract_epoch = "laputa-host-tools-1"
 const package_tools_contract_epoch = "laputa-package-tools-2"
 
 ## The Docker client: `DOCKER` when set, else `docker` on PATH.
-export proc docker_program() [process, env, error] -> Result[Path] {
+export proc docker_program() [process, env, error] -> Result[Path, Error] {
   let configured = (env.get("DOCKER") ?? "").trim()
   return fp"{configured}" unless configured == ""
 
@@ -73,7 +73,7 @@ proc tree_digest(root: Path) [fs, error] -> Result[Str] {
 }
 
 ## The content key for the host-tools base: its Dockerfile and platform.
-export proc host_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
+export proc host_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   let dockerfile = host_tools_dockerfile(laputa_root)
   require_file(dockerfile)?
   let body = f"""{host_tools_contract_epoch}
@@ -84,18 +84,18 @@ platform\t{value.docker_platform}
 }
 
 ## The host-tools tag for one architecture.
-export proc host_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
+export proc host_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   f"laputa-host-tools:{value.arch}-{short_key(host_tools_key(laputa_root, value)?)}"
 }
 
 ## Where `make fetch` saves the host-tools base so later runs load it offline.
-export proc host_tools_saved_image(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Path] {
+export proc host_tools_saved_image(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Path, Error] {
   let name = host_tools_tag(laputa_root, value)?.replace(":", "-")
   fp"{laputa_root}/.cache/images/{name}.tar"
 }
 
 ## The pinned LLVM seed archive digest for one architecture, read through the typed recipe boundary.
-export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Str] {
+export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Str, Error] {
   let pkg = pm_recipe.load_package_for_target(llvm_recipe_dir(laputa_root), pm_types.parse_target(arch)?)?
 
   if pkg.upstream_sources.len() != 1 {
@@ -106,13 +106,13 @@ export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> R
 }
 
 ## The fetched LLVM seed archive in the content-addressed source cache.
-export proc llvm_seed_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Path] {
+export proc llvm_seed_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Path, Error] {
   fp"{laputa_root}/.cache/sources/sha256/{llvm_seed_sha256(laputa_root, arch)?}"
 }
 
 ## The content key for package-tools: its Dockerfile, the LLVM bootstrap helper and recipe, and the base tag.
 ## XSH and PM only run the bootstrap helper; like artifact keys, the key records neither.
-export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
+export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   let dockerfile = package_tools_dockerfile(laputa_root)
   let helper = package_tools_bootstrap_helper(laputa_root)
   require_file(dockerfile)?
@@ -128,7 +128,7 @@ platform\t{value.docker_platform}
 }
 
 ## The package-tools tag for one architecture.
-export proc package_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str] {
+export proc package_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   f"laputa-package-tools:{value.arch}-{short_key(package_tools_key(laputa_root, value)?)}"
 }
 
@@ -141,7 +141,7 @@ proc quiet_status(docker: Path, argv: List[Str], cwd: Path) [fs, process, error]
 }
 
 ## Report whether a local image tag exists.
-export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error] -> Result[Bool] {
+export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error] -> Result[Bool, Error] {
   quiet_status(docker, [docker.display(), "image", "inspect", tag], cwd)?
 }
 
@@ -156,7 +156,7 @@ export proc host_tools_build_argv(
   docker: Path,
   laputa_root: Path,
   value: xsh_seed.SeedArch,
-) [fs, error] -> Result[List[Str]] {
+) [fs, error] -> Result[List[Str], Error] {
   [
     docker.display(),
     "build",
@@ -193,7 +193,7 @@ export proc ensure_host_tools(
   docker: Path,
   laputa_root: Path,
   value: xsh_seed.SeedArch,
-) [fs, process, error] -> Result[Str] {
+) [fs, process, error] -> Result[Str, Error] {
   let tag = host_tools_tag(laputa_root, value)?
 
   return tag when image_exists(docker, tag, laputa_root)?
@@ -274,7 +274,7 @@ export proc ensure_package_tools(
   docker: Path,
   laputa_root: Path,
   value: xsh_seed.SeedArch,
-) [fs, process, env, error] -> Result[Str] {
+) [fs, process, env, error] -> Result[Str, Error] {
   let tag = package_tools_tag(laputa_root, value)?
 
   return tag when image_exists(docker, tag, laputa_root)?

@@ -231,7 +231,7 @@ export proc write(path_value: Path, value: types.BuildPlan) [fs, error] {
 ## Reads a build plan through its JSON DTO and verifies every durable invariant.
 ## The format is checked before the DTO so a plan from another PM schema fails
 ## with its format name instead of a missing-field error.
-export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan] {
+export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan, Error] {
   let raw = json.read(path_value)?
   let format_field = raw.require(PlanFormatDto)?.format
 

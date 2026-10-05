@@ -174,7 +174,7 @@ proc closure_from_edges(
 export proc edges(
   catalog: types.PackageCatalog,
   value: types.BuildPolicy,
-) [error] -> Result[List[types.DependencyEdge]] {
+) [error] -> Result[List[types.DependencyEdge], Error] {
   let local_names = {pkg.name: true for pkg in catalog.packages}
   let remote_names = {name: true for name in catalog.remote_names}
   var result: List[types.DependencyEdge] = []
@@ -209,7 +209,7 @@ export proc closure(
   catalog: types.PackageCatalog,
   roots: List[Str],
   kinds: List[types.DependencyKind],
-) [error] -> Result[List[Str]] {
+) [error] -> Result[List[Str], Error] {
   closure_from_edges(catalog, roots, kinds, edges(catalog, policy.aarch64_docker())?)?
 }
 
@@ -219,7 +219,7 @@ export proc closure(
 export proc topological_levels(
   selected: List[Str],
   dependency_edges: List[types.DependencyEdge],
-) [error] -> Result[List[List[Str]]] {
+) [error] -> Result[List[List[Str]], Error] {
   let selected_names = graph_sorted_unique_names(selected)
   let selected_map = {name: true for name in selected_names}
   let local_edges = [
@@ -271,7 +271,7 @@ export proc topological_levels(
 }
 
 ## Resolves runtime and runtime-only dependencies, excluding host and target build dependencies.
-export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [error] -> Result[List[Str]] {
+export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [error] -> Result[List[Str], Error] {
   closure(catalog, roots, [types.dependency_runtime(), types.dependency_runtime_only()])?
 }
 
@@ -294,7 +294,7 @@ export proc build_closure(
   catalog: types.PackageCatalog,
   roots: List[Str],
   value: types.BuildPolicy,
-) [error] -> Result[List[Str]] {
+) [error] -> Result[List[Str], Error] {
   closure_from_edges(catalog, roots, build_closure_kinds(), edges(catalog, value)?)?
 }
 
@@ -305,7 +305,7 @@ export proc packages_buildable_without(
   catalog: types.PackageCatalog,
   excluded: List[Str],
   value: types.BuildPolicy,
-) [error] -> Result[List[Str]] {
+) [error] -> Result[List[Str], Error] {
   let local_names = {pkg.name: true for pkg in catalog.packages}
 
   for name in excluded {

@@ -157,7 +157,7 @@ proc repository_input_lines(
 }
 
 ## Hashes every semantic package build input without absolute checkout state or modification times.
-export proc package_build_input(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[Str] {
+export proc package_build_input(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[Str, Error] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("package build input target is unsupported"))
   }
@@ -221,7 +221,7 @@ proc pm_proof_module(pm_root: Path) [fs, error] -> Result[Str] {
 }
 
 ## Hashes proof-only inputs independently from build inputs so an unchanged artifact can be re-proved.
-export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str] {
+export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str, Error] {
   let proof = fp"{pkg.dir}/proof.xsh"
   let proof_sha256 = if fs.exists(proof)? { hash.sha256(proof)?.hex() } else { "missing" }
   digest_lines(
@@ -235,7 +235,7 @@ export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error]
 }
 
 ## Hashes the PM entrypoint and every implementation module below `pm/`.
-export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str] {
+export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
   let entrypoint = fp"{pm_root}/pm.xsh"
   let modules = fp"{pm_root}/pm"
 
@@ -257,7 +257,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str] {
 }
 
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
-export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
+export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
   guard fs.exists(core_root)? else {
     return Err(types.PmError.PackageContract(f"{core_root} is missing"))
   }
@@ -276,7 +276,7 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str] {
 }
 
 ## Digests an executor provenance record for receipts and repository metadata.
-export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str] {
+export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str, Error] {
   digest_lines(
     [
       f"format\t{canonical_field(value.format)}",

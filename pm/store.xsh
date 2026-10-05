@@ -471,7 +471,7 @@ export pure artifact_path(root: Path, key: Str) -> Path {
 ## Returns one completed artifact's validated receipt without re-hashing its objects.
 ## A final directory appears only through `commit`, which recorded those hashes; use
 ## `verify_artifact` where an artifact must be re-checked against its receipt.
-export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
+export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt, Error] {
   require_key(key)?
   let final_dir = artifact_path(root, key)
 
@@ -488,7 +488,7 @@ export pure reproof_receipt_path(root: Path, artifact_key: Str, proof_key: Str) 
 }
 
 ## Re-verifies a receipt at its returned immutable artifact directory before another domain consumes its payload.
-export proc verify_receipt(value: types.ArtifactReceipt) [fs, error] -> Result[types.ArtifactReceipt] {
+export proc verify_receipt(value: types.ArtifactReceipt) [fs, error] -> Result[types.ArtifactReceipt, Error] {
   verify_dir(value.artifact_dir, value.key)
 }
 
@@ -498,7 +498,7 @@ export proc commit(
   root: Path,
   node: types.PlanNode,
   staged: types.StagedArtifact,
-) [fs, error] -> Result[types.ArtifactReceipt] {
+) [fs, error] -> Result[types.ArtifactReceipt, Error] {
   commit_staged(target, root, node, staged, types.artifact_origin_built())?
 }
 
@@ -509,7 +509,7 @@ export proc import_remote(
   node: types.PlanNode,
   remote_repo: Str,
   cache: Path,
-) [fs, net, error] -> Result[types.ArtifactReceipt] {
+) [fs, net, error] -> Result[types.ArtifactReceipt, Error] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("artifact import target is unsupported"))
   }
@@ -537,7 +537,7 @@ export proc import_remote(
 
 ## Verifies a completed artifact receipt, its key, and hashes of payload, metadata, and proof objects.
 ## XSH currently lowers exported user-module procedures into one runtime symbol table: keeping this as `verify` would collide with the required `root.verify` when root imports this module. `verify_artifact` is therefore the unambiguous store boundary; no `verify` alias may be added.
-export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
+export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt, Error] {
   require_key(key)?
   let final_dir = artifact_path(root, key)
 
@@ -550,7 +550,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
 
 ## Verifies every completed immutable object beneath one Store root in canonical key order.
 ## Temporary directories and locks are intentionally ignored because they never constitute artifacts.
-export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactReceipt], Error] {
   let objects = object_root(root)
 
   return [] unless fs.exists(objects)?
@@ -577,7 +577,7 @@ export type StoreGcResult = {artifacts: Int, kept: Int}
 # and removes every other final artifact, its proofs and lock, and any
 # interrupted temporary build. It must not run while a build writes the store.
 ## Remove every artifact not in `keep`, with its proofs, lock, and temporary state.
-export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult] {
+export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult, Error] {
   for key in keep {
     require_key(key)?
   }

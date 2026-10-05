@@ -758,7 +758,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
 export proc preflight(
   target: types.Target,
   artifacts: List[types.ArtifactReceipt],
-) [fs, error] -> Result[types.RootPlan] {
+) [fs, error] -> Result[types.RootPlan, Error] {
   let verified = root_verified_artifacts(artifacts)?
   let ownership = root_ownership(target, verified)?
 
@@ -781,7 +781,7 @@ export proc preflight(
 export proc trusted_preflight(
   target: types.Target,
   artifacts: List[types.ArtifactReceipt],
-) [fs, error] -> Result[types.RootPlan] {
+) [fs, error] -> Result[types.RootPlan, Error] {
   root_ownership(target, root_checked_artifacts(artifacts)?)?.plan
 }
 
@@ -791,7 +791,7 @@ export proc compose_artifacts(
   output: Path,
   plan: types.RootPlan,
   artifacts: List[types.ArtifactReceipt],
-) [fs, error] -> Result[types.RootReceipt] {
+) [fs, error] -> Result[types.RootReceipt, Error] {
   let expected = preflight(plan.target, artifacts)?
 
   if expected != plan {

@@ -17,7 +17,7 @@ export pure image_root_partuuid() -> Str {
 }
 
 ## Parse a byte count or a whole-MiB string without accepting ambiguous units.
-export proc parse_size_bytes(value: Str) [error] -> Result[Int] {
+export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
   let trimmed = value.trim()
   if trimmed.ends_with("M") {
     let mebibytes = trimmed.replace("M", "").parse_int()?
@@ -47,7 +47,7 @@ export pure rootfs_size_bytes(used_bytes: Int) -> Int {
 }
 
 ## Sum regular-file payload bytes in a verified immutable generation before allocating its ext4 image.
-export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int] {
+export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int, Error] {
   if ! fs.exists(root)? or fs.metadata(root)?.kind != "dir" {
     return Err(ImageError.Failed(f"generation root is missing or not a directory: {root}"))
   }
@@ -63,7 +63,7 @@ export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int] {
 }
 
 ## Resolve a nonempty regular kernel file from its profile-declared relative manifest path.
-export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Result[Path] {
+export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Result[Path, Error] {
   let relative = kernel_path.display()
 
   if relative == "" or relative.starts_with("/") or ".." in relative.split("/") {
@@ -135,7 +135,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
 }
 
 ## Replace an exact byte range inside an immutable byte value.
-export proc image_put_bytes(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
+export proc image_put_bytes(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes, Error] {
   bytes.concat(
     [
       data[..offset],
@@ -146,7 +146,7 @@ export proc image_put_bytes(data: Bytes, offset: Int, replacement: Bytes) [error
 }
 
 ## Encode an unsigned little-endian integer at an exact byte range.
-export proc image_put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
+export proc image_put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes, Error] {
   image_put_bytes(data, offset, bytes.pack_le(value, width)?)
 }
 
@@ -165,7 +165,7 @@ proc gpt_name(name: Str) [error] -> Result[Bytes] {
 }
 
 ## Encode one 128-byte GPT partition entry.
-export proc image_gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes] {
+export proc image_gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, end_lba: Int, name: Str) [error] -> Result[Bytes, Error] {
   var entry = bytes.zero(128)?
   entry = image_put_bytes(entry, 0, type_guid)?
   entry = image_put_bytes(entry, 16, part_guid)?
@@ -175,7 +175,7 @@ export proc image_gpt_entry(type_guid: Bytes, part_guid: Bytes, start_lba: Int, 
 }
 
 ## Construct a protective MBR covering the complete disk.
-export proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes] {
+export proc protective_mbr(total_sectors: Int) [error] -> Result[Bytes, Error] {
   guard total_sectors > 1 else {
     return Err(ImageError.Failed("GPT disk needs at least two sectors"))
   }
@@ -200,7 +200,7 @@ export proc image_gpt_header(
   entry_count: Int,
   entry_size: Int,
   entries_crc: Int,
-) [error] -> Result[Bytes] {
+) [error] -> Result[Bytes, Error] {
   var header = bytes.zero(sector_size)?
   header = image_put_bytes(header, 0, bytes.from_text("EFI PART"))?
   header = image_put_le(header, 8, 65536, 4)?
@@ -218,12 +218,12 @@ export proc image_gpt_header(
 }
 
 ## Return the Linux filesystem partition type GUID in GPT byte order.
-export proc image_linux_partition_type_guid() [error] -> Result[Bytes] {
+export proc image_linux_partition_type_guid() [error] -> Result[Bytes, Error] {
   bytes.from_ints([175, 61, 198, 15, 131, 132, 114, 71, 142, 121, 61, 105, 216, 71, 125, 228])
 }
 
 ## Return the root partition GUID in GPT byte order.
-export proc root_partition_guid() [error] -> Result[Bytes] {
+export proc root_partition_guid() [error] -> Result[Bytes, Error] {
   bytes.from_ints([51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51])
 }
 

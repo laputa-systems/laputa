@@ -68,7 +68,7 @@ export pure legacy_remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str)
 }
 
 ## Exported PM declaration `ensure_relative_path`.
-export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path] {
+export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path, Error] {
   let normalized = path_value.normalize()
   let text = normalized.display()
 
@@ -91,17 +91,17 @@ export pure is_file_url(url: Str) -> Bool {
 }
 
 ## Exported PM declaration `file_url_path`.
-export pure file_url_path(url: Str) -> Result[Path] {
+export pure file_url_path(url: Str) -> Result[Path, Error] {
   fp"{url.replace("file://", "")}"
 }
 
 ## Exported PM declaration `repo_file_path`.
-export pure repo_file_path(repo: Str, rel: Path) -> Result[Path] {
+export pure repo_file_path(repo: Str, rel: Path) -> Result[Path, Error] {
   fp"{file_url_path(repo)?}/{ensure_relative_path(rel, "repo path")?}"
 }
 
 ## Exported PM declaration `repo_url_for`.
-export pure repo_url_for(repo: Str, rel: Path) -> Result[Str] {
+export pure repo_url_for(repo: Str, rel: Path) -> Result[Str, Error] {
   f"{repo}/{ensure_relative_path(rel, "repo path")?.display()}"
 }
 
@@ -135,13 +135,13 @@ export pure is_url_source(source: Str) -> Bool {
 }
 
 ## The file name a URL source stages under, without query or fragment.
-export pure source_basename(source: Str) -> Result[Str] {
+export pure source_basename(source: Str) -> Result[Str, Error] {
   let parsed_path = fp"{source.split("#")[0].split("?")[0]}"
   parsed_path.name
 }
 
 ## Exported PM declaration `parse_source_line`.
-export pure parse_source_line(raw: Path) -> Result[types.SourceLine] {
+export pure parse_source_line(raw: Path) -> Result[types.SourceLine, Error] {
   let raw_text = raw.display()
   let spaced = raw_text.split(" => ")
 
@@ -253,7 +253,7 @@ export pure is_local_repo_url(url: Str) -> Bool {
 ## text, or "" on success. `dest` only ever holds complete bytes. net.download
 ## follows redirects itself, so release hosts and mirrors that redirect need no
 ## separate probe.
-export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, net, error] -> Result[Str] {
+export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, net, error] -> Result[Str, Error] {
   fs.mkdir(dest.parent)?
 
   if is_file_url(url) {
@@ -283,13 +283,13 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
 }
 
 ## Exported PM declaration `host_arch`.
-export proc host_arch() [env, error] -> Result[Str] {
+export proc host_arch() [env, error] -> Result[Str, Error] {
   let os = system.uname()?
   normalize_arch(os.machine)
 }
 
 ## Exported PM declaration `build_arch`.
-export proc build_arch() [env, error] -> Result[Str] {
+export proc build_arch() [env, error] -> Result[Str, Error] {
   let override = (env.get("XSH_PM_BUILD_ARCH") ?? "").trim()
 
   return normalize_arch(override) when override != ""
@@ -298,7 +298,7 @@ export proc build_arch() [env, error] -> Result[Str] {
 }
 
 ## Exported PM declaration `target_arch`.
-export proc target_arch() [env, error] -> Result[Str] {
+export proc target_arch() [env, error] -> Result[Str, Error] {
   let target_override = (env.get("XSH_PM_TARGET_ARCH") ?? "").trim()
 
   return normalize_arch(target_override) when target_override != ""
@@ -311,7 +311,7 @@ export proc target_arch() [env, error] -> Result[Str] {
 }
 
 ## Exported PM declaration `machine_arch`.
-export proc machine_arch() [env, error] -> Result[Str] {
+export proc machine_arch() [env, error] -> Result[Str, Error] {
   target_arch()?
 }
 

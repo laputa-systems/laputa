@@ -273,7 +273,7 @@ export proc plan(
   value: types.BuildPlan,
   runtime_roots: List[Str],
   overlay_sha256: Str,
-) [error] -> Result[types.GenerationPlan] {
+) [error] -> Result[types.GenerationPlan, Error] {
   plan_profile(
     value,
     runtime_roots,
@@ -286,7 +286,7 @@ export proc plan_profile(
   value: types.BuildPlan,
   runtime_roots: List[Str],
   profile: types.GenerationProfile,
-) [error] -> Result[types.GenerationPlan] {
+) [error] -> Result[types.GenerationPlan, Error] {
   build_plan.validate(value)?
   generation_validate_profile(profile)?
   let roots = generation_sorted_unique(runtime_roots)
@@ -343,7 +343,7 @@ export proc write_generation_plan(path_value: Path, value: types.GenerationPlan)
 }
 
 ## Reads a saved generation plan and verifies its canonical content identity.
-export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.GenerationPlan] {
+export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.GenerationPlan, Error] {
   let dto = json.read(path_value)?.require(GenerationPlanDto)?
   let value = generation_plan_from_dto(dto)?
   generation_validate_plan(value)?
@@ -351,7 +351,7 @@ export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.G
 }
 
 ## Decodes profile-owned overlay metadata. An overlay without `overlay.json` is the strict default profile with no replacements.
-export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.GenerationProfile] {
+export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.GenerationProfile, Error] {
   let config = generation_overlay_config_path(overlay_root)
 
   if ! fs.exists(config)? {
@@ -374,7 +374,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
 }
 
 ## Computes the canonical content identity of a profile overlay, including its explicit `overlay.json` policy metadata.
-export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str] {
+export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error] {
   guard fs.exists(overlay_root)? else {
     return generation_empty_overlay_sha256()
   }
@@ -687,7 +687,7 @@ proc generation_receipt_for(
 
 ## Reads and validates a standalone completed generation receipt without consulting a package repository.
 ## Profile builders publish this file next to disk images after their temporary generation root is removed.
-export proc read_generation_receipt_file(receipt_path: Path) [fs, error] -> Result[types.GenerationReceipt] {
+export proc read_generation_receipt_file(receipt_path: Path) [fs, error] -> Result[types.GenerationReceipt, Error] {
   let dto = json.read(receipt_path)?.require(GenerationReceiptDto)?
   let receipt = generation_receipt_from_dto(dto)?
   generation_validate_receipt(receipt)?
@@ -695,7 +695,7 @@ export proc read_generation_receipt_file(receipt_path: Path) [fs, error] -> Resu
 }
 
 ## Reads and validates the receipt embedded in a completed generation root.
-export proc read_generation_receipt(output_root: Path) [fs, error] -> Result[types.GenerationReceipt] {
+export proc read_generation_receipt(output_root: Path) [fs, error] -> Result[types.GenerationReceipt, Error] {
   read_generation_receipt_file(generation_receipt_path(output_root))?
 }
 
@@ -705,7 +705,7 @@ export proc compose(
   store_root: Path,
   output_root: Path,
   overlay_root: Path,
-) [fs, error] -> Result[types.GenerationReceipt] {
+) [fs, error] -> Result[types.GenerationReceipt, Error] {
   generation_validate_plan(value)?
   let actual_overlay_sha256 = overlay_digest(overlay_root)?
 

@@ -17,12 +17,12 @@ export proc installer_env_value(name: Str, fallback: Str) [env] -> Str {
 }
 
 ## Read a path-valued environment setting with `installer_env_value` rules.
-export proc installer_env_path(name: Str, fallback: Path) [env, error] -> Result[Path] {
+export proc installer_env_path(name: Str, fallback: Path) [env, error] -> Result[Path, Error] {
   fp"{installer_env_value(name, fallback.display())}"
 }
 
 ## Normalize a Docker or kernel architecture spelling to the installer's arch name.
-export pure installer_arch(arch: Str) -> Result[Str] {
+export pure installer_arch(arch: Str) -> Result[Str, Error] {
   return "aarch64" when arch == "arm64" or arch == "aarch64"
 
   return "x86_64" when arch == "amd64" or arch == "x86_64"

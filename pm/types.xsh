@@ -187,7 +187,7 @@ export pure pm_target_arch(target: Target) -> Str {
 }
 
 ## Decodes a supported target from a public text boundary.
-export pure parse_target(raw: Str) -> Result[Target] {
+export pure parse_target(raw: Str) -> Result[Target, Error] {
   match raw {
     "aarch64-linux-musl" | "aarch64" | "arm64" | "arm64-linux-musl" => Aarch64LinuxMusl
     "x86_64-linux-musl" | "x86_64" | "amd64" | "amd64-linux-musl" => X86_64LinuxMusl
@@ -219,7 +219,7 @@ export pure plan_action_is_build(action: PlanAction) -> Bool {
 }
 
 ## Decodes one build-plan action at a JSON boundary.
-export pure parse_plan_action(raw: Str, reason: Str) -> Result[PlanAction] {
+export pure parse_plan_action(raw: Str, reason: Str) -> Result[PlanAction, Error] {
   match raw {
     "build" => Build(reason)
     "reuse-remote" => ReuseRemote(reason)
@@ -236,7 +236,7 @@ export pure artifact_origin_text(origin: ArtifactOrigin) -> Str {
 }
 
 ## Decodes an artifact origin at the durable receipt boundary.
-export pure parse_artifact_origin(raw: Str) -> Result[ArtifactOrigin] {
+export pure parse_artifact_origin(raw: Str) -> Result[ArtifactOrigin, Error] {
   match raw {
     "built" => Built
     "remote" => Remote
@@ -253,7 +253,7 @@ export pure package_kind_text(kind: PackageKind) -> Str {
 }
 
 ## Decodes a package kind at the recipe metadata boundary.
-export pure parse_package_kind(raw: Str) -> Result[PackageKind] {
+export pure parse_package_kind(raw: Str) -> Result[PackageKind, Error] {
   match raw {
     "payload" => Payload
     "meta" => Meta
@@ -273,7 +273,7 @@ export pure dependency_kind_text(kind: DependencyKind) -> Str {
 }
 
 ## Decodes a dependency kind at a serialized graph boundary.
-export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind] {
+export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind, Error] {
   match raw {
     "runtime" => Runtime
     "runtime-only" => RuntimeOnly
@@ -298,7 +298,7 @@ export pure source_kind_text(kind: SourceKind) -> Str {
 }
 
 ## Decodes a source kind before a recipe enters typed PM code.
-export pure parse_source_kind(raw: Str) -> Result[SourceKind] {
+export pure parse_source_kind(raw: Str) -> Result[SourceKind, Error] {
   match raw {
     "auto" => Auto
     "archive" => Archive
@@ -322,7 +322,7 @@ export pure file_kind_text(kind: FileKind) -> Str {
 }
 
 ## Decodes a file kind before a recipe enters typed PM code.
-export pure parse_file_kind(raw: Str) -> Result[FileKind] {
+export pure parse_file_kind(raw: Str) -> Result[FileKind, Error] {
   match raw {
     "file" => File
     "binary" => Binary

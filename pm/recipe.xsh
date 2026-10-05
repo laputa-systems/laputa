@@ -334,7 +334,7 @@ proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
 }
 
 ## Loads, decodes, and validates one package recipe into its typed metadata record.
-export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, error] -> Result[types.Package] {
+export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, error] -> Result[types.Package, Error] {
   let arch = types.pm_target_arch(target)
   if arch == "" {
     return Err(types.PmError.PackageContract("recipe target is unsupported"))
@@ -411,7 +411,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
 }
 
 ## Loads a recipe using the ambient target architecture for legacy PM callers.
-export proc load_package(dir: Path) [fs, env, error] -> Result[types.Package] {
+export proc load_package(dir: Path) [fs, env, error] -> Result[types.Package, Error] {
   load_package_for_target(dir, types.parse_target(util.machine_arch()?)?)?
 }
 
