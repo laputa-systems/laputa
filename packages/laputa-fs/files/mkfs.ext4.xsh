@@ -219,10 +219,8 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
   var blocks = []
   var parts = []
   var used = 0
-  var index = 0
 
-  while index < items.len() {
-    let item = items[index]
+  for index, item in items {
     let min_len = min_dirent_len(item)
 
     if used > 0 and used + min_len > BLOCK_SIZE {
@@ -246,8 +244,6 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
       parts = []
       used = 0
     }
-
-    index += 1
   }
 
   if parts.len() > 0 {

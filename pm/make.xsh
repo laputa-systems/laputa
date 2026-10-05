@@ -266,11 +266,8 @@ pure parse_jobs(value: Str, source: Str) -> Result[Int] {
 
 pure makeflags_jobs(flags: Str) -> Result[Int] {
   let words = flags.words()
-  var index = 0
 
-  while index < words.len() {
-    let word = words[index]
-
+  for index, word in words {
     if word.starts_with("-j") and word.count_chars() > 2 {
       return parse_jobs(word.replace("-j", ""), "MAKEFLAGS -j")?
     }
@@ -286,8 +283,6 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
     if word.starts_with("--jobs=") {
       return parse_jobs(word.replace("--jobs=", ""), "MAKEFLAGS --jobs")?
     }
-
-    index += 1
   }
 
   cpu.count()

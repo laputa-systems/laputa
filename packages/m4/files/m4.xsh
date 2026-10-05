@@ -1374,10 +1374,8 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
   let literal = repl.find("\\") == null
   let n = text.byte_len()
   var spans: List[Int] = []
-  var i = 0
 
-  while i < found.len() {
-    let m = found[i]
+  for i, m in found {
     spans += [m.start, m.end]
 
     if m.end > m.start and (i + 1 == found.len() or found[i + 1].start != m.end) {
@@ -1387,8 +1385,6 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
         spans += [m.end, m.end]
       }
     }
-
-    i += 1
   }
 
   var out: List[Str] = []
