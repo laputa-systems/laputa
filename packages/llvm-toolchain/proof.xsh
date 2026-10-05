@@ -121,89 +121,80 @@ proc prove_default_compile(root: Path, arch: Str) [fs, process, env, error] {
   let machine = elf_machine_name(arch)
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-default"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
-  defer fs.remove(tmp, missing_ok: true)?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-default" {
 
-  fs.write(
-    fp"{tmp}/default-target.c",
-    """int laputa_default_target(void) {
+    fs.write(
+      fp"{tmp}/default-target.c",
+      """int laputa_default_target(void) {
   return 9;
 }
 """,
-  )?
+    )?
 
-  let object = fp"{tmp}/default-target.o"
-  run $cc "-target" f"{arch}-linux-musl" "-O2" "-c" fp"{tmp}/default-target.c" "-o" $object ?
-  let header = run.text $readelf "-h" $object ?
-  ensure(machine in header, "proof-llvm-toolchain", f"cc wrapper did not produce a {arch} object")?
+    let object = fp"{tmp}/default-target.o"
+    run $cc "-target" f"{arch}-linux-musl" "-O2" "-c" fp"{tmp}/default-target.c" "-o" $object ?
+    let header = run.text $readelf "-h" $object ?
+    ensure(machine in header, "proof-llvm-toolchain", f"cc wrapper did not produce a {arch} object")?
+  }
 }
 
 proc prove_native_link(root: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-native"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
-  defer fs.remove(tmp, missing_ok: true)?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native" {
 
-  fs.write(
-    fp"{tmp}/hello.c",
-    """int main(void) {
+    fs.write(
+      fp"{tmp}/hello.c",
+      """int main(void) {
   return 0;
 }
 """,
-  )?
+    )?
 
-  let exe = fp"{tmp}/hello"
-  run $cc fp"{tmp}/hello.c" "-o" $exe ?
-  run $exe ?
-  let dynamic = run.text $readelf "-d" $exe ?
-  ensure(! ("libunwind" in dynamic), "proof-llvm-toolchain", "native hello links libunwind")?
-  ensure(! ("libgcc" in dynamic), "proof-llvm-toolchain", "native hello links libgcc")?
-  ensure(! ("libstdc++" in dynamic), "proof-llvm-toolchain", "native hello links libstdc++")?
+    let exe = fp"{tmp}/hello"
+    run $cc fp"{tmp}/hello.c" "-o" $exe ?
+    run $exe ?
+    let dynamic = run.text $readelf "-d" $exe ?
+    ensure(! ("libunwind" in dynamic), "proof-llvm-toolchain", "native hello links libunwind")?
+    ensure(! ("libgcc" in dynamic), "proof-llvm-toolchain", "native hello links libgcc")?
+    ensure(! ("libstdc++" in dynamic), "proof-llvm-toolchain", "native hello links libstdc++")?
+  }
 }
 
 proc prove_native_cxx_link(root: Path) [fs, process, env, error] {
   let cxx = process.which("c++")?
   let readelf = process.which("llvm-readelf")?
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-native-cxx"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
-  defer fs.remove(tmp, missing_ok: true)?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native-cxx" {
 
-  fs.write(
-    fp"{tmp}/hello.cc",
-    """#include <string>
+    fs.write(
+      fp"{tmp}/hello.cc",
+      """#include <string>
 
 int main(void) {
   std::string value = "laputa";
   return value.size() == 6 ? 0 : 1;
 }
 """,
-  )?
+    )?
 
-  let exe = fp"{tmp}/hello-cxx"
-  run $cxx fp"{tmp}/hello.cc" "-o" $exe ?
-  run $exe ?
-  let dynamic = run.text $readelf "-d" $exe ?
-  ensure(! ("libunwind" in dynamic), "proof-llvm-toolchain", "native C++ hello links libunwind")?
-  ensure(! ("libgcc" in dynamic), "proof-llvm-toolchain", "native C++ hello links libgcc")?
-  ensure(! ("libstdc++" in dynamic), "proof-llvm-toolchain", "native C++ hello links libstdc++")?
+    let exe = fp"{tmp}/hello-cxx"
+    run $cxx fp"{tmp}/hello.cc" "-o" $exe ?
+    run $exe ?
+    let dynamic = run.text $readelf "-d" $exe ?
+    ensure(! ("libunwind" in dynamic), "proof-llvm-toolchain", "native C++ hello links libunwind")?
+    ensure(! ("libgcc" in dynamic), "proof-llvm-toolchain", "native C++ hello links libgcc")?
+    ensure(! ("libstdc++" in dynamic), "proof-llvm-toolchain", "native C++ hello links libstdc++")?
+  }
 }
 
 proc prove_x86_64_v3(root: Path) [fs, process, error] {
   let cc = process.which("cc")?
   let objdump = process.which("llvm-objdump")?
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-v3"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
-  defer fs.remove(tmp, missing_ok: true)?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-v3" {
 
-  fs.write(
-    fp"{tmp}/v3-toy.c",
-    """#include <immintrin.h>
+    fs.write(
+      fp"{tmp}/v3-toy.c",
+      """#include <immintrin.h>
 
 __attribute__((noinline))
 void laputa_v3_toy(const unsigned long long *a, const unsigned long long *b, unsigned long long *out, unsigned long long mask) {
@@ -214,35 +205,34 @@ void laputa_v3_toy(const unsigned long long *a, const unsigned long long *b, uns
   out[4] = _pdep_u64(out[0], mask);
 }
 """,
-  )?
+    )?
 
-  let object = fp"{tmp}/v3-toy.o"
-  run $cc "-O2" "-c" fp"{tmp}/v3-toy.c" "-o" $object ?
-  let asm = run.text $objdump "-d" "--no-show-raw-insn" $object ?
-  ensure("vpaddq" in asm, "proof-llvm-toolchain", "x86-64-v3 proof did not emit AVX2 vpaddq")?
-  ensure("pdep" in asm, "proof-llvm-toolchain", "x86-64-v3 proof did not emit BMI2 pdep")?
+    let object = fp"{tmp}/v3-toy.o"
+    run $cc "-O2" "-c" fp"{tmp}/v3-toy.c" "-o" $object ?
+    let asm = run.text $objdump "-d" "--no-show-raw-insn" $object ?
+    ensure("vpaddq" in asm, "proof-llvm-toolchain", "x86-64-v3 proof did not emit AVX2 vpaddq")?
+    ensure("pdep" in asm, "proof-llvm-toolchain", "x86-64-v3 proof did not emit BMI2 pdep")?
+  }
 }
 
 proc prove_explicit_aarch64_target(root: Path) [fs, process, error] {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-aarch64"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
-  defer fs.remove(tmp, missing_ok: true)?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-aarch64" {
 
-  fs.write(
-    fp"{tmp}/aarch64-target-toy.c",
-    """int laputa_aarch64_target_toy(void) {
+    fs.write(
+      fp"{tmp}/aarch64-target-toy.c",
+      """int laputa_aarch64_target_toy(void) {
   return 42;
 }
 """,
-  )?
+    )?
 
-  let object = fp"{tmp}/aarch64-target-toy.o"
-  run $cc "-target" "aarch64-linux-musl" "-O2" "-c" fp"{tmp}/aarch64-target-toy.c" "-o" $object ?
-  let header = run.text $readelf "-h" $object ?
-  ensure("AArch64" in header, "proof-llvm-toolchain", "explicit aarch64 target did not produce an AArch64 object")?
+    let object = fp"{tmp}/aarch64-target-toy.o"
+    run $cc "-target" "aarch64-linux-musl" "-O2" "-c" fp"{tmp}/aarch64-target-toy.c" "-o" $object ?
+    let header = run.text $readelf "-h" $object ?
+    ensure("AArch64" in header, "proof-llvm-toolchain", "explicit aarch64 target did not produce an AArch64 object")?
+  }
 }
 
 proc prove_target_tools(root: Path, arch: Str) [fs, process, env, error] {
