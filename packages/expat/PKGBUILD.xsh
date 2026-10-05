@@ -126,7 +126,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     cd build {
       run $cmake "-P" "cmake_install.cmake" ?
     }
-  }?
+  }
 
   fs.remove(fp"{dest}/usr/lib/libexpat.a", missing_ok: true)
 }

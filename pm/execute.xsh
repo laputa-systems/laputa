@@ -157,7 +157,7 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     sources.prepare_package_source_tree(isolated_pkg, source)
-  }?
+  }
 
   # Builds are native, so the composed build root is also the target root.
   # Recipes resolve target files through LAPUTA_ROOT and build tools through
@@ -176,7 +176,7 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     pm_build.build_prepared_package(recipe_dir, source, dest, payload)
-  }?
+  }
 
   let built = local.load_built_package_from_dest(isolated_pkg, node.package_id, payload, dest)?
   local.write_package_metadata(metadata, target_arch, built, executor)
@@ -245,7 +245,7 @@ proc execute_run_proof(
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {
     pm_proof.run_artifact_proof(proof_root, pkg)
-  }?
+  }
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)
 }
 

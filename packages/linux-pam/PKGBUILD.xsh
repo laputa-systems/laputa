@@ -430,7 +430,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     DESTDIR: dest,
   }) {
     run $muon "-C" "build" install ?
-  }?
+  }
 
   fs.remove(fp"{dest}/etc/environment", missing_ok: true)
   fs.chmod(fp"{dest}/usr/bin/unix_chkpwd", 0o4755)

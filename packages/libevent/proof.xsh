@@ -72,7 +72,7 @@ int main(void) {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
     run $binary ?
-  }?
+  }
 
   print "libevent ok: event loop, pipe read, timer, evbuffer"
 }

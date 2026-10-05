@@ -70,8 +70,8 @@ console.log(total);
       checked = (run.capture --text $dynlinker $deno "check" "--no-remote" "main.ts" ?).stderr
       let rejected = run.capture --text --accept=[1] $dynlinker $deno "check" "--no-remote" "mistyped.ts" ?
       mistyped = rejected.stderr
-    } ?
-  }?
+    }
+  }
 
   let first = version.trim().split("\n")[0]
   proof.ensure(first.starts_with(f"deno {ver} "), "proof-deno", f"deno --version reported {first}, expected deno {ver}")

@@ -283,9 +283,9 @@ proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
         if ! status.ok or diagnostics != "" {
           return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison {grammar.file}: {diagnostics}"))?
         }
-      }?
+      }
     }
-  }?
+  }
 
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"

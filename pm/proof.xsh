@@ -176,7 +176,7 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
     if proof_exited {
       proof_exit_code = status.exit_code()?
     }
-  }?
+  }
 
   if ! proof_ok {
     if proof_exited {

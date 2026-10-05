@@ -138,7 +138,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
     let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file ?
     proof.ensure("laputa-hello\ngreet\nthe\nfloating\nisland\n" in words, "mandoc-demandoc", f"unexpected demandoc words:\n{words}")
-  }?
+  }
 
   fs.write(fp"{tmp}/top.man", ".SH INCLUDED\n.so part.man\n.SH AFTER\n")
   fs.write(fp"{tmp}/part.man", "from the part\n")
@@ -146,7 +146,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   cd $tmp {
     let inlined = run.text $loader fp"{bin}/soelim" "top.man" ?
     proof.ensure(inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n", "mandoc-soelim", f"unexpected soelim output:\n{inlined}")
-  }?
+  }
 
   print "mandoc ok: mdoc and man rendered, makewhatis/apropos/whatis/man lookup, demandoc, soelim"
 }

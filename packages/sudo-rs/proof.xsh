@@ -66,7 +66,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
   }) {
     sudo = run.text fp"{rootfs}/usr/bin/sudo" "--version" ?
-  }?
+  }
 
   let ver = proof.package_version(rootfs, "sudo-rs")?
 

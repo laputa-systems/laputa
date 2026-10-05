@@ -34,7 +34,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
       "proof-wayland-dev",
       "scanner did not generate the core client protocol header",
     )
-  }?
+  }
 
   print "wayland-dev ok"
 }

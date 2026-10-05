@@ -86,7 +86,7 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
-  }?
+  }
 
   assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
 }
@@ -104,7 +104,7 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
   # the same resolution order and verification as the HTTP one.
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: f"file://{mirror}/", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
-  }?
+  }
 
   assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
   assert hash.sha256(sources.source_cache_entry(cache, tarball.sha256))?.hex() == tarball.sha256
@@ -120,7 +120,7 @@ test test_missing_url_source_without_a_mirror_says_to_run_make_fetch [fs, net, e
       src,
       ["https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty, "is not in the source cache", "make fetch"],
     )
-  }?
+  }
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
@@ -135,7 +135,7 @@ test test_unreachable_http_mirror_is_asked_by_content_address [fs, net, env, err
       src,
       [f"http://127.0.0.1:9/sources/sha256/{sha256_of_empty}", "make fetch"],
     )
-  }?
+  }
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
@@ -155,7 +155,7 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
       src,
       [f"expected sha256 {sha256_of_empty}, got {tarball.sha256}"],
     )
-  }?
+  }
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 }
@@ -176,7 +176,7 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
       src,
       [f"expected {pinned.sha256}"],
     )
-  }?
+  }
 
   assert (fs.children(src)? |> count()) == 0
 }
@@ -301,7 +301,7 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
 
   cd $cwd {
     output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo ?
-  } ?
+  }
 
   assert output.trim() == f"fetchdemo {new_sha256}"
   assert fs.read_text(sources.source_cache_entry(cache, new_sha256))? == "new upstream bytes\n"
@@ -449,14 +449,14 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   # fails the whole source and names the fix.
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     expect_stage_error(pkg, src, [sources.crate_download_url(crate_file.item), "make fetch"])
-  }?
+  }
 
   assert (fs.children(src)? |> count()) == 0
   assert cache_file(cache, crate_file.path)? == crate_file.item.checksum
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(pkg, src)
-  }?
+  }
 
   let vendored = fp"{src}/vendor/demo_crate-0.1.0"
   assert "name = \"demo_crate\"" in fs.read_text(fp"{vendored}/Cargo.toml")?

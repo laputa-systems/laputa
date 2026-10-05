@@ -112,7 +112,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
     # inputs must still stage from the explicit repository root, not parent
     # traversal from that directory.
     sources.stage_package_sources(pkg, source)
-  } ?
+  }
 
   assert fs.exists(fp"{source}/pm.xsh")?
   assert fs.exists(fp"{source}/pm/execute.xsh")?
@@ -327,8 +327,8 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
     cd unrelated {
       let resolved = linux_config.resolve_config_fragments([p"files/config/aarch64/base-aarch64.fragment"])?
       assert resolved == [staged]
-    } ?
-  }?
+    }
+  }
 
   fs.remove(staged)
 
@@ -362,6 +362,6 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
     cd source {
       let plan = linux_shared.discover_package_plan("arm64")?
       assert p"one.o" in plan.objects
-    } ?
+    }
   }?
 }

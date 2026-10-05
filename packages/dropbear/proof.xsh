@@ -83,7 +83,7 @@ proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, 
     HOME: home.display(),
   }) {
     ok = (run.status --timeout=10s $dynlinker $dbclient "-y" "-y" "-o" "BatchMode=yes" "-i" $key "-p" f"{port}" f"{login}@127.0.0.1" "echo laputa-ssh-ok" > $out 2> /dev/null).ok
-  }?
+  }
 
   return "" unless ok
 

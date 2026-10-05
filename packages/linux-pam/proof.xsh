@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
   }) {
     run $binary fp"{tmp}/pam.d" ?
-  }?
+  }
 
   print f"linux-pam ok: {arch} permit and deny stacks"
 }

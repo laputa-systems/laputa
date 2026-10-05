@@ -26,7 +26,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib"}) {
     let version = run.text $dynlinker $dwl "-v" ?
     proof.ensure(version.trim() == "dwl 0.9", "proof-dwl-minimal", f"unexpected dwl version: {version.trim()}")
-  }?
+  }
 
   print "dwl-minimal ok"
 }

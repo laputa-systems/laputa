@@ -176,7 +176,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
         LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
       }) {
         run $clang "-o" $native_scanner_path "src/scanner.c" "src/wayland-util.c" "-Ibuild" "-Ibuild/src" "-Isrc" f"-I{build_root}/usr/include" f"-L{build_root}/usr/lib" f"-Wl,-rpath,{build_root}/usr/lib" "-lexpat" ?
-      }?
+      }
 
       let ninja = p"build/build.ninja"
       let scanner_text = native_scanner_path.display()
@@ -196,7 +196,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    }?
+    }
   }?
 }
 

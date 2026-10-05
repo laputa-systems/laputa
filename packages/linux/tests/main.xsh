@@ -424,7 +424,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
     }
 
     assert saw_asm
-  } ?
+  }
 }
 
 test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
@@ -498,7 +498,7 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
     assert saw_build_task
     assert saw_check_task
     assert saw_archive_dep
-  } ?
+  }
 }
 
 test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { |ctx|
@@ -592,7 +592,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
     assert archive_plan.generated_objects.len() == 0
     assert contains_path(archive_plan.missing_sources, "missing.o")
     assert archive_plan.archives.len() == 1
-  } ?
+  }
 }
 
 test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
@@ -645,7 +645,7 @@ test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
     assert second_tasks[0].source == "second.c"
     assert first_tasks[0].flags == ["-DFIRST"]
     assert second_tasks[0].flags == ["-DSECOND"]
-  } ?
+  }
 }
 
 test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, time, error] { |ctx|
@@ -737,8 +737,8 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       assert compact_parallel.tasks.len() == 0
       assert compact_serial.tasks.len() == 0
       assert compact_parallel.task_specs.len() > 0
-    }?
-  } ?
+    }
+  }
 }
 
 test test_kbuild_adds_x86_kvm_local_include [fs, env, time, error] { |ctx|
@@ -784,7 +784,7 @@ int mmu(void) { return 0; }
     }
 
     assert saw_mmu
-  } ?
+  }
 }
 
 test test_kbuild_applies_object_and_subdir_cflags [fs, env, time, error] { |ctx|
@@ -853,7 +853,7 @@ CFLAGS_intel.o := -I$(src)
 
     assert saw_controller
     assert saw_intel
-  } ?
+  }
 }
 
 # Kbuild compiles a composite's members with the flags of the Makefile that
@@ -899,7 +899,7 @@ CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
     }
 
     assert saw_member
-  } ?
+  }
 }
 
 test test_kbuild_generates_config_headers [fs, error] { |ctx|

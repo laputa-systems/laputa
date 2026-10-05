@@ -44,7 +44,7 @@ int main(void) {
         LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
       }) {
         run $binary ?
-      }?
+      }
     } else {
       proof.target_elf(root, p"usr/lib/libz.so", "zlib")
     }

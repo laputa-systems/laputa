@@ -444,8 +444,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    }?
-  }?
+    }
+  }
 
   fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
 }

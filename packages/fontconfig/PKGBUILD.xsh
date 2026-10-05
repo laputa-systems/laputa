@@ -746,8 +746,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    }?
-  }?
+    }
+  }
 
   for bin in ["fc-cat", "fc-conflist", "fc-genconf", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
     fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)

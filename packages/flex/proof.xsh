@@ -76,8 +76,8 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
       if ! status.ok {
         return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex failed: {stderr.read_text()?}"))?
       }
-    }?
-  }?
+    }
+  }
 
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"

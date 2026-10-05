@@ -53,15 +53,15 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   }) {
     cd $tmp {
       run $uv "init" "--bare" "--no-workspace" "--vcs" "none" "--name" "laputa-proof" "--python" "3.13" $project ?
-    }?
+    }
 
     cd $project {
       let current = run.text $uv "version" ?
       proof.ensure(current.trim() == "laputa-proof 0.1.0", "uv-version-read", f"unexpected uv version: {current.trim()}")
       let bumped = run.text $uv "version" "--short" "--bump" "minor" "--frozen" ?
       proof.ensure(bumped.trim() == "0.2.0", "uv-version-bump", f"unexpected bumped version: {bumped.trim()}")
-    }?
-  }?
+    }
+  }
 
   let pyproject = fp"{project}/pyproject.toml".read_text()?
   proof.ensure(pyproject == expected_pyproject, "uv-init", f"unexpected pyproject.toml:\n{pyproject}")

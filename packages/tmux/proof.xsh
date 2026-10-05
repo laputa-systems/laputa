@@ -99,7 +99,7 @@ set -g focus-events on
     run $dynlinker $tmux "-L" $label "kill-server" ?
     let dead = run.status $dynlinker $tmux "-L" $label "has-session" "-t" "proof" 2> /dev/null
     check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")
-  }?
+  }
 
   outer_terminals(rootfs, dynlinker, tmux, shell, tmp, config)
   print "tmux ok: config, pty capture, window creation, clean stop, attach under xterm-256color, foot, linux, tmux-256color"
@@ -128,7 +128,7 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
     }) {
       let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
       check(status.ok, "tmux-attach", f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}")
-    }?
+    }
 
     let screen = out.read_text()?
 
@@ -153,7 +153,7 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
   }) {
     let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
     check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")
-  }?
+  }
 
   let refused = fp"{tmp}/unknown.out".read_text()?
   check("missing or unsuitable terminal: laputa-unknown-terminal" in refused, "tmux-attach", f"unknown terminal not reported: {refused}")

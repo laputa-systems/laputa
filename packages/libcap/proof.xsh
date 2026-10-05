@@ -146,7 +146,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     } else {
       proof.ensure(! setcap_run.status.ok, "libcap-setcap", "setcap succeeded without CAP_SETFCAP")
     }
-  }?
+  }
 
   print f"libcap ok: {checks.join(", ")}"
 }

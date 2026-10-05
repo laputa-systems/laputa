@@ -189,8 +189,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    }?
-  }?
+    }
+  }
 
   fs.remove(fp"{dest}/usr/share/bash-completion", missing_ok: true)
 }

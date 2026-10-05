@@ -23,7 +23,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib"}) {
     let version = run.text $dynlinker fp"{root}/usr/bin/foot" "--version" ?
     proof.ensure("1.28.0" in version, "proof-foot-minimal", f"unexpected foot version: {version.trim()}")
-  }?
+  }
 
   print "foot-minimal ok"
 }

@@ -618,4 +618,4 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
 
 env XSH_LINUX_REAL="1" {
   main(@args)
-} ?
+}

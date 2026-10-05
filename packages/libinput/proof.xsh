@@ -22,7 +22,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib"}) {
     let version = run.text $dynlinker $libinput "--version" ?
     proof.ensure(version.trim() == "1.32.0", "proof-libinput", f"unexpected libinput version: {version.trim()}")
-  }?
+  }
 
   print "libinput ok"
 }

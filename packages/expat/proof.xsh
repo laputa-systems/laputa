@@ -65,7 +65,7 @@ int main(void) {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
     run $binary ?
-  }?
+  }
 
   print "expat ok: namespaced parse, tag mismatch rejected"
 }

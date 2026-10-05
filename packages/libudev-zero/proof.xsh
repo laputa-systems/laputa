@@ -55,7 +55,7 @@ int main(void) {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
     run $binary ?
-  }?
+  }
 
   print "libudev-zero ok: enumerated /dev/null through the mem subsystem"
 }

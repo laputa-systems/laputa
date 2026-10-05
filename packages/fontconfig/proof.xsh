@@ -42,7 +42,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     let cache = run.capture --text $dynlinker fp"{root}/usr/bin/fc-cache" "--really-force" ?
     proof.ensure(cache.status.ok, "proof-fontconfig", f"fc-cache failed: {cache.stderr.trim()}")
     proof.ensure("Fontconfig" not in cache.stderr, "proof-fontconfig", f"fontconfig reported: {cache.stderr.trim()}")
-  }?
+  }
 
   print "fontconfig ok"
 }

@@ -461,22 +461,22 @@ export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, 
   }
 
   if let Ok(filesystem_hook) = dynamic.require(hooks.BuildFilesystem) {
-    cd src { filesystem_hook.build(dest) } ?
+    cd src { filesystem_hook.build(dest) }
     return
   }
 
   if let Ok(environment_hook) = dynamic.require(hooks.BuildFilesystemEnvironment) {
-    cd src { environment_hook.build(dest) } ?
+    cd src { environment_hook.build(dest) }
     return
   }
 
   if let Ok(process_hook) = dynamic.require(hooks.BuildProcessesEnvironment) {
-    cd src { process_hook.build(dest) } ?
+    cd src { process_hook.build(dest) }
     return
   }
 
   let build_hook = dynamic.require(hooks.BuildFilesystemProcessesEnvironment)?
-  cd src { build_hook.build(dest) } ?
+  cd src { build_hook.build(dest) }
 }
 
 ## Invokes the optional dynamic `prepare_sources` procedure for a loaded package.

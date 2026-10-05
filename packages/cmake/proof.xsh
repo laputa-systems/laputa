@@ -85,7 +85,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
     }
 
     print "cmake ok: runtime configure"
-  } ?
+  }
 }
 
 main(@args)

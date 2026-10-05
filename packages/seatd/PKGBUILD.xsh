@@ -117,8 +117,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       DESTDIR: dest,
     }) {
       run $muon "-C" "build" install ?
-    }?
-  }?
+    }
+  }
 
   fs.remove(fp"{dest}/usr/bin/seatd-launch", missing_ok: true)
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)

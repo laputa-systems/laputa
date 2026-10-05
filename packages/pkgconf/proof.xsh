@@ -59,7 +59,7 @@ proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: L
     PKG_CONFIG_SYSROOT_DIR: sysroot,
   }) {
     out = run.text $dynlinker $pkg_config @args ?
-  }?
+  }
 
   out.trim()
 }
@@ -77,7 +77,7 @@ proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[St
     PKG_CONFIG_PATH: libdir,
   }) {
     status_ok = (run.status $dynlinker $pkg_config @args 2> /dev/null).ok
-  }?
+  }
 
   proof.ensure(status_ok == ok, "proof-pkgconf", f"pkg-config {args.join(" ")} exit status ok={status_ok}, want ok={ok}")
 }

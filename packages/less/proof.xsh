@@ -43,7 +43,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     }) {
       let status = run.status --timeout=30s $driver "10" "80" "20000" "line 9" "\x1bOB" "line 10" "q" "--" $dynlinker $less $text > $out
       proof.ensure(status.ok, "proof-less", f"less under TERM={term} did not page, scroll, and quit: {out.read_text()?}")
-    }?
+    }
 
     let screen = out.read_text()?
 

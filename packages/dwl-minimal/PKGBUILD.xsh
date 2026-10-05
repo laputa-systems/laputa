@@ -297,7 +297,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     ].extend(pkg_cflags)
 
     run $cc "dwl.c" "-o" "dwl" @cflags @pkg_libs "-lm" ?
-  }?
+  }
 
   fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)
 }

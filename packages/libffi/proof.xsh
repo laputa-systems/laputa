@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
     run $binary $ver ?
-  }?
+  }
 
   # The version script must export the symbol nodes consumers bind to.
   let readelf = proof.readelf_tool()?

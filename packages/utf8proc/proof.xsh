@@ -45,7 +45,7 @@ int main(void) {
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
   }) {
     run $binary ?
-  }?
+  }
 
   print "utf8proc ok: NFC, character widths"
 }

@@ -288,7 +288,7 @@ main(@args)?
 
       return Err(types.PmError.ExtensionFailed(f"package build for {pkg.name} was signaled"))
     }
-  } ?
+  }
 
   let manifest = fs.walk(dest)
     |> where .kind == "file" or .kind == "symlink"

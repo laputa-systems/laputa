@@ -82,7 +82,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     DESTDIR: dest,
   }) {
     run "muon" "-C" "build" install ?
-  }?
+  }
 
   fs.remove(fp"{dest}/usr/include", missing_ok: true)
   fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)

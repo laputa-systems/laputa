@@ -99,7 +99,7 @@ main(@args)?
     cargo = run.text $dynlinker fp"{rootfs}/usr/bin/cargo" "--version" ?
     rustc = run.text $dynlinker fp"{rootfs}/usr/bin/rustc" "--version" ?
     run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple "--manifest-path" fp"{tmp}/Cargo.toml" ?
-  }?
+  }
 
   if ! cargo.starts_with("cargo ") {
     return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"unexpected cargo version: {cargo.trim()}"))
