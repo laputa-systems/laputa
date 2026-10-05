@@ -156,7 +156,7 @@ proc gpt_name(name: Str) [error] -> Result[Bytes] {
   var parts = [bytes.zero(0)?]
   var index = 0
   while index < raw.len() and index < 36 {
-    parts = parts.push(bytes.from_ints([bytes.unpack_le(raw, 1, offset: index)?, 0])?)
+    parts += [bytes.from_ints([bytes.unpack_le(raw, 1, offset: index)?, 0])?]
     index += 1
   }
 

@@ -68,7 +68,7 @@ export pure bootstrap_dependencies(value: types.BuildPolicy, package: Str) -> Li
 
   for rule in value.bootstrap_seeds {
     if rule.package == package and (! rule.native_only or value.native_build) and rule.dependency not in dependencies {
-      dependencies = dependencies.push(rule.dependency)
+      dependencies += [rule.dependency]
     }
   }
 

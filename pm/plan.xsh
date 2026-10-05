@@ -33,7 +33,7 @@ pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
 
   for name in names |> sort {
     if ! (seen.get(name) ?? false) {
-      result = result.push(name)
+      result += [name]
       seen[name] = true
     }
   }
@@ -77,9 +77,9 @@ proc artifact_key_for(
 
   for dependency in dependencies |> sort-by { |dependency| dependency_key(dependency) } {
     continue unless graph.edge_orders_builds(dependency.kind)
-    lines = lines.push(
+    lines += [
       f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
-    )
+    ]
   }
 
   plan_digest_lines(lines)?
@@ -135,7 +135,7 @@ proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) [erro
   var lines = ["format\tlaputa-package-repository-1", f"target\t{types.target_text(target)}"]
 
   for name in recipe_inputs.keys() |> sort {
-    lines = lines.push(f"package\t{plan_canonical_field(name)}\t{recipe_inputs.get(name)?}")
+    lines += [f"package\t{plan_canonical_field(name)}\t{recipe_inputs.get(name)?}"]
   }
 
   plan_digest_lines(lines)?
@@ -285,7 +285,7 @@ proc dependency_nodes(
       )
     }
 
-    dependencies = dependencies.push({name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?})
+    dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
   }
 
   dependencies |> sort-by { |dependency| dependency_key(dependency) }
@@ -306,10 +306,10 @@ proc with_runtime_only_dependencies(
 
     for edge in edges {
       continue unless edge.from == node.name and edge.kind == types.dependency_runtime_only() and (selected.get(edge.to) ?? false)
-      dependencies = dependencies.push({name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?})
+      dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
     }
 
-    result = result.push({...node, dependencies: dependencies |> sort-by { |dependency| dependency_key(dependency) }})
+    result += [{...node, dependencies: dependencies |> sort-by { |dependency| dependency_key(dependency) }}]
   }
 
   result
@@ -327,7 +327,7 @@ proc built_dependency_names(
     continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
 
     if types.plan_action_is_build(actions.get(edge.to)?) {
-      changed = changed.push(edge.to)
+      changed += [edge.to]
     }
   }
 
@@ -457,7 +457,7 @@ export proc resolve(
       }
       keys[name] = artifact_key
       actions[name] = action
-      nodes = nodes.push(node)
+      nodes += [node]
     }
 
     level += 1
@@ -698,26 +698,26 @@ proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
   ]
 
   for root in value.roots {
-    lines = lines.push(f"root\t{plan_canonical_field(root)}")
+    lines += [f"root\t{plan_canonical_field(root)}"]
   }
 
   for node in value.nodes {
-    lines = lines.push(
+    lines += [
       f"node\t{node.level}\t{plan_canonical_field(node.name)}\t{plan_canonical_field(node.ver)}\t{plan_canonical_field(node.rel)}\t{plan_canonical_field(node.package_id)}\t{plan_canonical_field(node.recipe_dir.display())}\t{plan_canonical_field(node.recipe_sha256)}\t{plan_canonical_field(node.proof_sha256)}\t{plan_canonical_field(node.artifact_key)}\t{plan_canonical_field(node.proof_key)}\t{types.plan_action_text(node.action)}\t{plan_canonical_field(types.plan_action_reason(node.action))}",
-    )
+    ]
 
     for dependency in node.dependencies {
-      lines = lines.push(
+      lines += [
         f"dependency\t{plan_canonical_field(node.name)}\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
-      )
+      ]
     }
 
     let retrieval = node.remote
 
     if retrieval != null {
-      lines = lines.push(
+      lines += [
         f"remote\t{plan_canonical_field(node.name)}\t{plan_canonical_field(retrieval.arch)}\t{plan_canonical_field(retrieval.tarball)}\t{plan_canonical_field(retrieval.tarball_sha256)}\t{plan_canonical_field(retrieval.metadata)}\t{plan_canonical_field(retrieval.metadata_sha256)}",
-      )
+      ]
     }
   }
 
@@ -760,7 +760,7 @@ export proc render(value: types.BuildPlan, colors: Bool) [error] -> Result[Str, 
   for node in value.nodes {
     let action = types.plan_action_text(node.action)
     let line = f"level {node.level} {node.name} {action} {node.artifact_key} {types.plan_action_reason(node.action)}"
-    lines = lines.push(color(line, if action == "build" { "1;33" } else { "1;32" }, colors))
+    lines += [color(line, if action == "build" { "1;33" } else { "1;32" }, colors)]
   }
 
   lines.join("\n") + "\n"

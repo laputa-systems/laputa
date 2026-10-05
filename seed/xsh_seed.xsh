@@ -435,7 +435,7 @@ export pure xsh_seed_mount_argv(seed: Path) -> List[Str] {
   var argv = []
 
   for product in xsh_seed_binaries {
-    argv = argv.extend(["--mount", f"type=bind,src={seed}/{product},dst=/bin/{product},readonly"])
+    argv += ["--mount", f"type=bind,src={seed}/{product},dst=/bin/{product},readonly"]
   }
 
   argv.extend(["--mount", f"type=bind,src={seed}/core,dst=/usr/lib/xsh/core,readonly"])

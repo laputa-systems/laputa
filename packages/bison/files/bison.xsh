@@ -189,10 +189,10 @@ proc parse_rules(text: Str) [error] -> Result[List[GrammarRule]] {
       lhs = pending_lhs
       rhs = []
     } else if item == "|" {
-      rules = rules.push({lhs, rhs})
+      rules += [{lhs, rhs}]
       rhs = []
     } else if item == ";" {
-      rules = rules.push({lhs, rhs})
+      rules += [{lhs, rhs}]
       lhs = ""
       pending_lhs = ""
       rhs = []
@@ -213,7 +213,7 @@ proc nonterminals(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
 
   for rule in rules {
     if rule.lhs not in names {
-      names = names.push(rule.lhs)
+      names += [rule.lhs]
     }
   }
 
@@ -295,7 +295,7 @@ proc token_enum_lines(names: List[Str]) [error] -> Result[List[Str]] {
 
   while i < names.len() {
     let comma = if i + 1 < names.len() { "," } else { "" }
-    lines = lines.push(f"    {names[i]} = {code}{comma}")
+    lines += [f"    {names[i]} = {code}{comma}"]
     code = code + 1
     i = i + 1
   }
@@ -1127,7 +1127,7 @@ proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]
   var offset = 0
 
   for rule in rules {
-    values = values.push(f"{offset}")
+    values += [f"{offset}"]
     offset = offset + rule.rhs.len()
   }
 
@@ -1146,9 +1146,9 @@ proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: 
       let nt = index_of(names, item)
 
       if nt >= 0 {
-        values = values.push(f"{0 - nt - 1}")
+        values += [f"{0 - nt - 1}"]
       } else {
-        values = values.push(token_code_expr(item, tokens))
+        values += [token_code_expr(item, tokens)]
       }
     }
   }
@@ -1174,7 +1174,7 @@ proc generate_verbose_report(rules: List[GrammarRule], start: Str) [error] -> Re
 
   for rule in rules {
     let rhs = if rule.rhs.len() == 0 { "/* empty */" } else { rule.rhs.join(" ") }
-    lines = lines.push(f"{i}: {rule.lhs}: {rhs}")
+    lines += [f"{i}: {rule.lhs}: {rhs}"]
     i = i + 1
   }
 

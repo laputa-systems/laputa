@@ -434,7 +434,7 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
   for revision in ["first", "second"] {
     let output = test.temp_path(ctx, name: f"plan-executor-{revision}.json")
     let _ = run.text XSH_HOST=$declared_runner XSH_MODULE_PATH=$pm_copy XSH_PM_REPO="" $xsh $entrypoint -- repo plan --repo $repository --root app --output $output ?
-    plans = plans.push(plan_json.read(output)?)
+    plans += [plan_json.read(output)?]
 
     for name in ["xsh", "xshi", "xsht"] {
       fs.write(fp"{runners}/{name}", f"rebuilt {name} runner\n")?

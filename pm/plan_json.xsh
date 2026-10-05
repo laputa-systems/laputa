@@ -121,7 +121,7 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
       }
       for dependency in node.dependencies
     ]
-    nodes = nodes.push({
+    nodes += [{
       name: node.name,
       ver: node.ver,
       rel: node.rel,
@@ -136,7 +136,7 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
       level: node.level,
       dependencies,
       remote,
-    })
+    }]
   }
 
   {

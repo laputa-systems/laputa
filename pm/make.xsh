@@ -393,7 +393,7 @@ proc all_inputs(task: MakeTask) [fs, error] -> Result[List[Path]] {
   var inputs: List[Path] = task.inputs
 
   if has_path(task.depfile) {
-    inputs = inputs.extend(depfile_inputs(task.depfile, task.cwd)?)
+    inputs += depfile_inputs(task.depfile, task.cwd)?
   }
 
   inputs
@@ -585,7 +585,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
     remaining_deps[task.name] = task.deps.len()
 
     if task.deps.len() == 0 {
-      ready = ready.push(task.name)
+      ready += [task.name]
     }
 
     for dep in task.deps {
@@ -605,7 +605,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
         scheduled[task.name] = true
 
         if should_run(task)? {
-          running = running.push(spawn_task(task)?)
+          running += [spawn_task(task)?]
           spawn_count += 1
           if running.len() > peak_running {
             peak_running = running.len()
@@ -719,7 +719,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
           scheduled[task.name] = true
 
           if should_run(task)? {
-            running = running.push(spawn_task(task)?)
+            running += [spawn_task(task)?]
             spawn_count += 1
             if running.len() > peak_running {
               peak_running = running.len()
@@ -1187,7 +1187,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
       source_group.deps,
     )
 
-    tasks = tasks.extend(compiled.tasks)
+    tasks += compiled.tasks
     groups[source_group.name] = compiled
     cxx_groups[source_group.name] = true in [source_is_cxx(src) for src in source_group.sources]
   }
@@ -1207,8 +1207,8 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
       }
 
       let compiled: CompileTasks = groups.get(group_name) ?? {tasks: [], objects: [], deps: []}
-      objects = objects.extend(compiled.objects)
-      target_deps = target_deps.extend(compiled.deps)
+      objects += compiled.objects
+      target_deps += compiled.deps
       needs_cxx_link = needs_cxx_link or (cxx_groups.get(group_name) ?? false)
     }
 
@@ -1224,9 +1224,9 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
         fp"{spec.out_dir}/{target.name}",
       )
 
-      tasks = tasks.extend(target_compile.tasks)
-      objects = objects.extend(target_compile.objects)
-      target_deps = target_deps.extend(target_compile.deps)
+      tasks += target_compile.tasks
+      objects += target_compile.objects
+      target_deps += target_compile.deps
     }
 
     let link = if needs_cxx_link {
@@ -1237,7 +1237,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
 
     tasks += [link]
     outputs[target.name] = target.out
-    deps = deps.push(link.name)
+    deps += [link.name]
   }
 
   {tasks, groups, outputs, deps}

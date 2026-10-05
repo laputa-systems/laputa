@@ -11,7 +11,7 @@ pure lines_between(text: Str, start: Str, end: Str) -> List[Str] {
     } else if inside and line == end {
       inside = false
     } else if inside {
-      lines = lines.push(line)
+      lines += [line]
     }
   }
 

@@ -179,26 +179,26 @@ export proc build(dest: Path) [fs, process, env, error] {
       let caps = regex_captures(line, "^TYPEDEF (.+) ([^ ]+);$")?
       let type_expr = caps[1]
       let type_name = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_{type_name}) && !defined(__DEFINED_{type_name})")
-      at_lines = at_lines.push(f"typedef {type_expr} {type_name};")
-      at_lines = at_lines.push(f"#define __DEFINED_{type_name}")
-      at_lines = at_lines.push("#endif")
+      at_lines += [f"#if defined(__NEED_{type_name}) && !defined(__DEFINED_{type_name})"]
+      at_lines += [f"typedef {type_expr} {type_name};"]
+      at_lines += [f"#define __DEFINED_{type_name}"]
+      at_lines += ["#endif"]
     } else if line.starts_with("STRUCT ") {
       let caps = regex_captures(line, "^STRUCT +([^ ]+) (.+);$")?
       let sname = caps[1]
       let sbody = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_struct_{sname}) && !defined(__DEFINED_struct_{sname})")
-      at_lines = at_lines.push(f"struct {sname} {sbody};")
-      at_lines = at_lines.push(f"#define __DEFINED_struct_{sname}")
-      at_lines = at_lines.push("#endif")
+      at_lines += [f"#if defined(__NEED_struct_{sname}) && !defined(__DEFINED_struct_{sname})"]
+      at_lines += [f"struct {sname} {sbody};"]
+      at_lines += [f"#define __DEFINED_struct_{sname}"]
+      at_lines += ["#endif"]
     } else if line.starts_with("UNION ") {
       let caps = regex_captures(line, "^UNION +([^ ]+) (.+);$")?
       let uname = caps[1]
       let ubody = caps[2]
-      at_lines = at_lines.push(f"#if defined(__NEED_union_{uname}) && !defined(__DEFINED_union_{uname})")
-      at_lines = at_lines.push(f"union {uname} {ubody};")
-      at_lines = at_lines.push(f"#define __DEFINED_union_{uname}")
-      at_lines = at_lines.push("#endif")
+      at_lines += [f"#if defined(__NEED_union_{uname}) && !defined(__DEFINED_union_{uname})"]
+      at_lines += [f"union {uname} {ubody};"]
+      at_lines += [f"#define __DEFINED_union_{uname}"]
+      at_lines += ["#endif"]
     } else {
       at_lines += [line]
     }
@@ -257,9 +257,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   # 1. arch/${arch}/ direct children (headers only for aarch64/x86_64 in practice).
   for e in fs.children(fp"arch/{arch}")? |> where .kind == "file" {
     if e.ext == "c" {
-      arch_c_files = arch_c_files.push(e.path)
+      arch_c_files += [e.path]
     } else if e.ext == "s" or e.ext == "S" {
-      arch_s_files = arch_s_files.push(e.path)
+      arch_s_files += [e.path]
     }
   }
 
@@ -270,11 +270,11 @@ export proc build(dest: Path) [fs, process, env, error] {
     if fs.exists(arch_subdir)? {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
         if e.ext == "c" {
-          replaced = replaced.push(f"{subsys.name}/{e.name.replace(".c", "")}")
-          arch_c_files = arch_c_files.push(e.path)
+          replaced += [f"{subsys.name}/{e.name.replace(".c", "")}"]
+          arch_c_files += [e.path]
         } else if e.ext == "s" or e.ext == "S" {
-          replaced = replaced.push(f"{subsys.name}/{e.name.replace(f".{e.ext}", "")}")
-          arch_s_files = arch_s_files.push(e.path)
+          replaced += [f"{subsys.name}/{e.name.replace(f".{e.ext}", "")}"]
+          arch_s_files += [e.path]
         }
       }
     }
@@ -293,7 +293,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   ]
   # src/malloc/mallocng/*.c — the default malloc implementation (two levels deep).
   for e in fs.children(p"src/malloc/mallocng")? |> where .ext == "c" {
-    libc_srcs = libc_srcs.push(e.path)
+    libc_srcs += [e.path]
   }
 
   fs.mkdir(p"obj")?
@@ -301,20 +301,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Compile all src/ sources → LOBJS (PIC; go into both libc.a and libc.so).
   var tasks = []
   let libc = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", libc_srcs, p"obj/libc")
-  tasks = tasks.extend(libc.tasks)
+  tasks += libc.tasks
 
   # Compile arch/ C overrides → LOBJS.
   let arch_c = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", arch_c_files, p"obj/arch")
-  tasks = tasks.extend(arch_c.tasks)
+  tasks += arch_c.tasks
   var lobjs = libc.objects.extend(arch_c.objects)
   var lobj_deps = libc.deps.extend(arch_c.deps)
 
   # Compile arch/ assembly overrides → LOBJS (skip C-specific flags; include
   # paths still passed for any .S files that use the C preprocessor).
   let arch_asm = make.compile_asm_lo_tasks(cc, triple, includes, p"", arch_s_files, p"obj/arch-asm")
-  tasks = tasks.extend(arch_asm.tasks)
-  lobj_deps = lobj_deps.extend(arch_asm.deps)
-  lobjs = lobjs.extend(arch_asm.objects)
+  tasks += arch_asm.tasks
+  lobj_deps += arch_asm.deps
+  lobjs += arch_asm.objects
 
   # Compile top-level ldso/ → LDSO_OBJS (PIC; libc.so only, not in libc.a).
   # ldso/dlstart.c defines _dlstart (ELF entry of libc.so / the dynamic linker).
@@ -325,13 +325,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.mkdir(p"obj/ldso")?
   let ldso_sources = [fp"ldso/{src_name}.c" for src_name in ["dlstart", "dynlink"]]
   let ldso_compile = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", ldso_sources, p"obj/ldso")
-  tasks = tasks.extend(ldso_compile.tasks)
+  tasks += ldso_compile.tasks
   ldso_objs = ldso_compile.objects
   ldso_deps = ldso_compile.deps
 
   # libc.a — static archive from LOBJS only (ldso not needed for static linking).
   let libc_a = p"obj/libc.a"
-  tasks = tasks.push(make.link_archive_task(cc, lobjs, libc_a, lobj_deps))
+  tasks += [make.link_archive_task(cc, lobjs, libc_a, lobj_deps)]
 
   # libc.so — LOBJS + LDSO_OBJS. musl's floating-point paths can use compiler-rt
   # helpers, so link the builtins archive after musl's own objects when it is
@@ -367,7 +367,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   so_argv += ["-o", libc_so]
 
-  tasks = tasks.push({
+  tasks += [{
     name: libc_so.display(),
     outputs: [libc_so],
     inputs: all_so_objs,
@@ -377,7 +377,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     env: {},
     depfile: p"",
     stamp: fp"{libc_so}.cmd",
-  })
+  }]
 
   make.run_tasks(tasks, make.jobs()?)?
 
@@ -392,7 +392,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let src = fp"crt/{src_name}.c"
     let out = fp"obj/{src_name}.o"
     let task = make.compile_c_task(cc, triple, crt_cflags, [], includes, src, out)
-    crt_tasks = crt_tasks.push({...task, stamp: p""})
+    crt_tasks += [{...task, stamp: p""}]
     crt_outs += [out]
   }
 
@@ -400,7 +400,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let src = fp"crt/{src_name}.c"
     let out = fp"obj/{src_name}.o"
     let task = make.compile_lo_task(cc, triple, crt_cflags, [], includes, src, out)
-    crt_tasks = crt_tasks.push({...task, stamp: p""})
+    crt_tasks += [{...task, stamp: p""}]
     crt_outs += [out]
   }
 

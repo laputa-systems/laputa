@@ -274,7 +274,7 @@ export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedC
 
     if line.starts_with("[") {
       if in_package {
-        crates = crates.extend(lock_record_crates(lockfile, current)?)
+        crates += lock_record_crates(lockfile, current)?
       }
 
       in_package = line == "[[package]]"
@@ -451,7 +451,7 @@ export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, 
       crates = resolve_locked_crates(pkg, resolved, checksum)?
     }
 
-    staged = staged.push({line, resolved, kind: source.kind, checksum, crates})
+    staged += [{line, resolved, kind: source.kind, checksum, crates}]
   }
 
   for entry in staged {
@@ -533,14 +533,14 @@ export proc generate_checksums_for(
     if stored == "SKIP" {
       generated += ["SKIP"]
     } else if util.is_url_source(expanded) {
-      generated = generated.push(upstream_sha256(cache_root, pkg.name, expanded)?)
+      generated += [upstream_sha256(cache_root, pkg.name, expanded)?]
     } else {
       let resolved = resolve_source(pkg, line, stored, arch, build)?
 
       if resolved.kind == "dir" {
         generated += ["SKIP"]
       } else {
-        generated = generated.push(hash.sha256(resolved.path)?.hex())
+        generated += [hash.sha256(resolved.path)?.hex()]
       }
     }
   }
@@ -599,7 +599,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
         let parts = line.split(marker)
         let old = (parts.get(1) ?? "").split("\"").get(0) ?? ""
         let value = values.get(value_index)?
-        output = output.push(line.replace(f"{old}\"", f"{value}\""))
+        output += [line.replace(f"{old}\"", f"{value}\"")]
         value_index += 1
         found = true
         continue
@@ -771,8 +771,8 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
         fetched += 1
         fetched_bytes += size
       }
-      Unavailable(detail) => failures = failures.push(f"dead {result.item.packages.join(",")}: {detail}")
-      Mismatch(detail) => failures = failures.push(f"mismatch {result.item.packages.join(",")}: {detail}")
+      Unavailable(detail) => failures += [f"dead {result.item.packages.join(",")}: {detail}"]
+      Mismatch(detail) => failures += [f"mismatch {result.item.packages.join(",")}: {detail}"]
     }
   }
 

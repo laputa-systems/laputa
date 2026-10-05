@@ -562,7 +562,7 @@ export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactRece
       return Err(types.PmError.PackageContract(f"artifact store object {entry.path} is not a directory"))
     }
 
-    receipts = receipts.push(verify_artifact(root, entry.name)?)
+    receipts += [verify_artifact(root, entry.name)?]
   }
 
   receipts

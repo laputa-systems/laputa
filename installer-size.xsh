@@ -57,7 +57,7 @@ proc package_size_rows(rootfs: Path) [fs, error] -> Result[List[PackageSize]] {
   return rows unless fs.exists(db)?
 
   for entry in fs.children(db)? |> where .kind == "dir" {
-    rows = rows.push({name: entry.name, size: package_size(rootfs, fp"{entry.path}/manifest.json")?})
+    rows += [{name: entry.name, size: package_size(rootfs, fp"{entry.path}/manifest.json")?}]
   }
 
   rows |> sort-by .size

@@ -492,7 +492,7 @@ proc stage_vendored_outputs() [fs, error] {
 
   for line in ninja.read_text()?.split("\n") {
     if block.len() > 0 and line.starts_with(" ") {
-      block = block.push(line)
+      block += [line]
       continue
     }
 
@@ -517,7 +517,7 @@ proc stage_vendored_outputs() [fs, error] {
     if fs.exists(vendored)? {
       fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)?
     } else {
-      unvendored = unvendored.push(output)
+      unvendored += [output]
     }
   }
 

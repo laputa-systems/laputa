@@ -278,8 +278,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       deps: static_target.deps,
     })
 
-    tasks = tasks.extend(target.tasks)
-    outputs = outputs.push(target.output)
+    tasks += target.tasks
+    outputs += [target.output]
   }
 
   make.run_tasks(tasks, make.jobs()?)?

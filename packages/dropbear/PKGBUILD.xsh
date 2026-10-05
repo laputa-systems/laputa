@@ -160,9 +160,9 @@ proc ifndef_wrapped_defines(source: Path) [fs, error] -> Result[Str] {
     let words = line.words()
 
     if words.len() >= 3 and words[0] == "#define" {
-      lines = lines.push(f"#ifndef {words[1]}")
+      lines += [f"#ifndef {words[1]}"]
       lines += [line]
-      lines = lines.push("#endif")
+      lines += ["#endif"]
     } else {
       lines += [line]
     }

@@ -62,7 +62,7 @@ proc write_embedded_dtd() [fs, error] {
     var index = 1
 
     while index < words.len() {
-      values = values.push(f"0x{words[index]},")
+      values += [f"0x{words[index]},"]
       index += 1
     }
   }

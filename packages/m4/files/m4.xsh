@@ -1410,7 +1410,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
       let caps = captures_at(text, s, e, at_start, at_offset)
       let sub = substitute_captures(repl, if caps.len() > 0 { caps } else { [text.byte_slice(s, e - s)] })
       out += [sub.text]
-      notes = notes.extend(sub.notes)
+      notes += sub.notes
     }
 
     offset = e
@@ -2353,7 +2353,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         match call_builtin(bi, args, lq, rq) {
           Ok(r) => {
             push_text = r.text
-            notes = notes.extend(r.notes)
+            notes += r.notes
 
             if memo_key != "" and r.notes.len() == 0 {
               eval_memo[memo_key] = r.text

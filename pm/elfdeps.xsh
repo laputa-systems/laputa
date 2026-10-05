@@ -37,7 +37,7 @@ export pure runtime_dependency_closure(initial: List[Str], package_deps: Map[Lis
     closure[name] = true
 
     if name in package_deps {
-      pending = pending.extend(package_deps.get(name) ?? [])
+      pending += package_deps.get(name) ?? []
     }
   }
 
@@ -67,7 +67,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
   var failures: List[ElfDependencyFailure] = []
 
   if elf_info_mentions_musl(needed, interpreter) and pkg_name != "musl" and ! (allowed.get("musl") ?? false) {
-    failures = failures.push({pkg: pkg_name, file: fp"", soname: "libc.so", provider: "musl"})
+    failures += [{pkg: pkg_name, file: fp"", soname: "libc.so", provider: "musl"}]
   }
 
   for soname in needed {
@@ -75,7 +75,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
     # (one without a SONAME); the loader looks for that path, not a name, so
     # no runtime root satisfies it.
     if "/" in soname {
-      failures = failures.push({pkg: pkg_name, file: fp"", soname, provider: ""})
+      failures += [{pkg: pkg_name, file: fp"", soname, provider: ""}]
       continue
     }
 
@@ -83,7 +83,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
     let provider = providers.get(soname) ?? ""
 
     if provider != pkg_name and ! (allowed.get(provider) ?? false) {
-      failures = failures.push({pkg: pkg_name, file: fp"", soname, provider})
+      failures += [{pkg: pkg_name, file: fp"", soname, provider}]
     }
   }
 

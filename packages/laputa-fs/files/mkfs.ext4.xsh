@@ -117,7 +117,7 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error]
       bytes.zero(0)?
     }
 
-    out = out.push({
+    out += [{
       rel,
       parent,
       name: child.name,
@@ -130,7 +130,7 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error]
       size: child.size,
       target,
       inode: 0,
-    })
+    }]
 
     if child.kind == "dir" {
       out = collect_entries(root, child.path, out)?
@@ -145,7 +145,7 @@ proc assign_inodes(entries: List[ExtEntry]) [] -> List[ExtEntry] {
   var index = 0
 
   for entry in entries |> sort-by .rel {
-    out = out.push({...entry, inode: 11 + index})
+    out += [{...entry, inode: 11 + index}]
     index += 1
   }
 
@@ -203,7 +203,7 @@ proc dir_items(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode:
 
   for entry in entries {
     if entry.parent == rel {
-      items = items.push({inode: entry.inode, name: entry.name, kind: entry.kind})
+      items += [{inode: entry.inode, name: entry.name, kind: entry.kind}]
     }
   }
 
@@ -226,7 +226,7 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
     let min_len = min_dirent_len(item)
 
     if used > 0 and used + min_len > BLOCK_SIZE {
-      blocks = blocks.push(bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?]))
+      blocks += [bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?])]
       parts = []
       used = 0
     }
@@ -238,11 +238,11 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
     }
 
     let rec_len = if next_fits { min_len } else { BLOCK_SIZE - used }
-    parts = parts.push(dirent(item, rec_len)?)
+    parts += [dirent(item, rec_len)?]
     used += rec_len
 
     if used == BLOCK_SIZE {
-      blocks = blocks.push(bytes.concat(parts))
+      blocks += [bytes.concat(parts)]
       parts = []
       used = 0
     }
@@ -251,7 +251,7 @@ proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: 
   }
 
   if parts.len() > 0 {
-    blocks = blocks.push(bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?]))
+    blocks += [bytes.concat([bytes.concat(parts), bytes.zero(BLOCK_SIZE - used)?])]
   }
 
   bytes.concat(blocks)
@@ -330,7 +330,7 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
       let indirect = allocate_block(current_used, current_next, total_blocks)?
       current_used = indirect.used
       current_next = indirect.next
-      indirects = indirects.push(indirect.block)
+      indirects += [indirect.block]
       remaining -= if remaining > 1024 { 1024 } else { remaining }
     }
   }
@@ -733,16 +733,14 @@ proc write_headers(
       local += 1
     }
 
-    desc_parts = desc_parts.push(
-      group_desc(
+    desc_parts += [group_desc(
         block_bitmap,
         inode_bitmap,
         inode_table,
         free_blocks,
         INODES_PER_GROUP - used_inodes,
         used_dirs_in_group(entries, group_index),
-      )?,
-    )
+      )?]
 
     group_index += 1
   }

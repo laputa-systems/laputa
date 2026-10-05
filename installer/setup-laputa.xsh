@@ -177,9 +177,9 @@ proc list_disks() [process, error] -> Result[List[Path]] {
   for device in devices {
     if is_disk_name(device.name) {
       if device.partitioned {
-        partitioned = partitioned.push(device.path)
+        partitioned += [device.path]
       } else {
-        blank = blank.push(device.path)
+        blank += [device.path]
       }
     }
   }

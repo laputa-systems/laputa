@@ -270,15 +270,15 @@ export proc upsert_remote_package(
 
   for existing in index {
     if existing.arch == entry.arch and existing.name == entry.name {
-      updated = updated.push(entry)
+      updated += [entry]
       replaced = true
     } else {
-      updated = updated.push(existing)
+      updated += [existing]
     }
   }
 
   if ! replaced {
-    updated = updated.push(entry)
+    updated += [entry]
   }
 
   let sorted = updated |> sort-by .name
@@ -301,15 +301,15 @@ pure legacy_snapshot_digest(value: types.RemotePackage) -> Str {
   ]
 
   for dependency in value.deps |> sort {
-    lines = lines.push(f"runtime\t{dependency}")
+    lines += [f"runtime\t{dependency}"]
   }
 
   for dependency in value.mkdeps_host |> sort {
-    lines = lines.push(f"build-host\t{dependency}")
+    lines += [f"build-host\t{dependency}"]
   }
 
   for dependency in value.mkdeps_target |> sort {
-    lines = lines.push(f"build-target\t{dependency}")
+    lines += [f"build-target\t{dependency}"]
   }
 
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()

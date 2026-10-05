@@ -361,7 +361,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
       let current = runtime_get(runtime, entry.key)
 
       if current.pid > 0 {
-        groups = groups.push(current.pid)
+        groups += [current.pid]
       }
     }
   }
@@ -723,7 +723,7 @@ proc required_names(name: Str) [fs, process, env, error] -> Result[List[Str]] {
   var services = all_services()?
 
   if ! contains_name(services, name) {
-    services = services.push(load_service(name)?)
+    services += [load_service(name)?]
   }
 
   required_closure(services, name, [])?
@@ -733,7 +733,7 @@ proc plan_service_start(name: Str) [fs, process, env, error] -> Result[List[Str]
   var services = all_services()?
 
   if ! contains_name(services, name) {
-    services = services.push(load_service(name)?)
+    services += [load_service(name)?]
   }
 
   check_service_graph(services)?
@@ -1188,7 +1188,7 @@ proc running_dependents(name: Str) [fs, process, env, error] -> Result[List[Str]
       let status = read_status(service.name)?
 
       if status.state == "running" {
-        out = out.push(service.name)
+        out += [service.name]
       }
     }
   }
@@ -1363,7 +1363,7 @@ pure reverse_units(units: List[ServiceUnit]) -> List[ServiceUnit] {
   var i = units.len() - 1
 
   while i >= 0 {
-    out = out.push(units[i])
+    out += [units[i]]
     i -= 1
   }
 
@@ -1599,7 +1599,7 @@ proc mark_children_dead(
 
   for unit in units {
     if unit.pid > 0 and unit.pid == child_pid and (unit.state == "running" or unit.state == "starting") {
-      out = out.push(mark_unit_dead(unit, child_status, now)?)
+      out += [mark_unit_dead(unit, child_status, now)?]
     } else {
       out += [unit]
     }

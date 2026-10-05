@@ -40,7 +40,7 @@ export proc load_manifest(db: Path) [fs, error] -> Result[List[Path], Error] {
     let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require()?
 
     for rel_text in stored {
-      manifest = manifest.push(fp"{rel_text}")
+      manifest += [fp"{rel_text}"]
     }
   }
 
@@ -57,7 +57,7 @@ export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Res
 
       if meta.kind == "file" {
         let sha256 = hash.sha256(fp"{dest}/{rel_path}")?.hex()
-        sums = sums.push({path: rel_path.display(), sha256})
+        sums += [{path: rel_path.display(), sha256}]
       }
     }
   }
@@ -84,7 +84,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     declared[key] = entry.kind
 
     if entry.kind == types.file_kind_binary() {
-      binaries = binaries.push(entry.path)
+      binaries += [entry.path]
     }
 
     if entry.kind == types.file_kind_tree() {
@@ -190,9 +190,9 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
 
   for rel_path in manifest {
     if let Ok(target) = root_handle.readlink(rel_path) {
-      files = files.push(
+      files += [
         {path: rel_path.display(), kind: types.file_kind_symlink(), mode: 0o777, sha256: "", target: target.display()},
-      )
+      ]
 
       continue
     }
@@ -212,7 +212,7 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
       _ => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
     }
 
-    files = files.push({path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""})
+    files += [{path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""}]
   }
 
   files
@@ -234,7 +234,7 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
     }
 
     if include {
-      entries = entries.push(entry.path.strip_prefix(root)?)
+      entries += [entry.path.strip_prefix(root)?]
     }
   }
 
@@ -247,7 +247,7 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
       let tree = fp"{root}/{entry.path}"
 
       if dir_empty(tree)? {
-        entries = entries.push(entry.path)
+        entries += [entry.path]
       }
     }
   }

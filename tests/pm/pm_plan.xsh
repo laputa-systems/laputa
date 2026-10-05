@@ -371,13 +371,11 @@ test test_build_plan_keeps_same_package_dependency_edges_by_kind [fs, env, error
   var packages: List[types.Package] = []
 
   for pkg in original.packages {
-    packages = packages.push(
-      if pkg.name == "app" {
+    packages += [if pkg.name == "app" {
         {...pkg, mkdeps_host: pkg.mkdeps_host.push("runtime-lib")}
       } else {
         pkg
-      },
-    )
+      }]
   }
 
   let value = catalog.from_packages(original.root, packages)?
@@ -472,7 +470,7 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
     if name == "app" {
       let dependencies = node.dependencies
       let dependency = dependencies[0]
-      nodes = nodes.push({...node, dependencies: [{...dependency, artifact_key: "tampered"}]})
+      nodes += [{...node, dependencies: [{...dependency, artifact_key: "tampered"}]}]
     } else {
       nodes += [node]
     }

@@ -40,12 +40,12 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
     } else {
       types.dependency_runtime()
     }
-    result = result.push({from: pkg.name, to: dependency, kind})
+    result += [{from: pkg.name, to: dependency, kind}]
   }
 
   # Bootstrap seeds substitute build inputs; a runtime-only edge is never one.
   for dependency in pkg.runtime_only_deps {
-    result = result.push({from: pkg.name, to: dependency, kind: types.dependency_runtime_only()})
+    result += [{from: pkg.name, to: dependency, kind: types.dependency_runtime_only()}]
   }
 
   for dependency in pkg.mkdeps_host {
@@ -54,7 +54,7 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
     } else {
       types.dependency_build_host()
     }
-    result = result.push({from: pkg.name, to: dependency, kind})
+    result += [{from: pkg.name, to: dependency, kind}]
   }
 
   for dependency in pkg.mkdeps_target {
@@ -63,7 +63,7 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
     } else {
       types.dependency_build_target()
     }
-    result = result.push({from: pkg.name, to: dependency, kind})
+    result += [{from: pkg.name, to: dependency, kind}]
   }
 
   result
@@ -107,7 +107,7 @@ pure cycle_from(
       var index = cycle_index
 
       while index < trail.len() {
-        cycle = cycle.push(trail[index])
+        cycle += [trail[index]]
         index += 1
       }
 
@@ -197,7 +197,7 @@ export proc edges(
     let key = edge_key(rule.package, rule.dependency)
 
     if ! (declared_pairs.get(key) ?? false) {
-      result = result.push({from: rule.package, to: rule.dependency, kind: types.dependency_bootstrap()})
+      result += [{from: rule.package, to: rule.dependency, kind: types.dependency_bootstrap()}]
     }
   }
 
@@ -321,7 +321,7 @@ export proc packages_buildable_without(
     let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
 
     if [name for name in closure if name in excluded].len() == 0 {
-      selected = selected.push(pkg.name)
+      selected += [pkg.name]
     }
   }
 

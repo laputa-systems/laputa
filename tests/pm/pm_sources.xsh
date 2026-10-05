@@ -331,8 +331,7 @@ pure crate_set_lock(crates: List[sources.LockedCrate]) -> Str {
     } else {
       "sparse+https://index.crates.io/"
     }
-    lines = lines.extend(
-      [
+    lines += [
         "",
         "[[package]]",
         f"name = \"{item.name}\"",
@@ -342,8 +341,7 @@ pure crate_set_lock(crates: List[sources.LockedCrate]) -> Str {
         "dependencies = [",
         " \"libc\",",
         "]",
-      ],
-    )
+      ]
     index += 1
   }
 

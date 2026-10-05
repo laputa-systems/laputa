@@ -18,9 +18,9 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
 
       if varname in defines {
         let value = defines.get(varname)?
-        out_lines = out_lines.push(f"#define {varname} {value}")
+        out_lines += [f"#define {varname} {value}"]
       } else {
-        out_lines = out_lines.push(f"/* #undef {varname} */")
+        out_lines += [f"/* #undef {varname} */"]
       }
     } else {
       out_lines += [line]

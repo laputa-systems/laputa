@@ -102,7 +102,7 @@ proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
     }
 
     if package_input_path(rel) {
-      lines = lines.push(tree_entry_line(pkg.dir, entry.path, "package-file")?)
+      lines += [tree_entry_line(pkg.dir, entry.path, "package-file")?]
     }
   }
 
@@ -145,11 +145,11 @@ proc repository_input_lines(
         let rel = entry.path.strip_prefix(repo_root)?
 
         if ! ignored_tree_path(rel) {
-          lines = lines.push(tree_entry_line(repo_root, entry.path, "repository-input")?)
+          lines += [tree_entry_line(repo_root, entry.path, "repository-input")?]
         }
       }
     } else {
-      lines = lines.push(tree_entry_line(repo_root, input, "repository-input")?)
+      lines += [tree_entry_line(repo_root, input, "repository-input")?]
     }
   }
 
@@ -171,42 +171,38 @@ export proc package_build_input(repo_root: Path, pkg: types.Package, target: typ
   ]
 
   for dependency in pkg.deps {
-    lines = lines.push(
-      f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}",
-    )
+    lines += [f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}"]
   }
 
   for dependency in pkg.runtime_only_deps {
-    lines = lines.push(
+    lines += [
       f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}",
-    )
+    ]
   }
 
   for dependency in pkg.mkdeps_host {
-    lines = lines.push(
-      f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}",
-    )
+    lines += [f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}"]
   }
 
   for dependency in pkg.mkdeps_target {
-    lines = lines.push(
+    lines += [
       f"dependency\t{types.dependency_kind_text(types.dependency_build_target())}\t{canonical_field(dependency)}",
-    )
+    ]
   }
 
   for source in pkg.upstream_sources {
     continue unless types.pm_target_arch(target) in source.architectures or "all" in source.architectures
-    lines = lines.push(
+    lines += [
       f"source\t{canonical_field(source.source.display())}\t{types.source_kind_text(source.kind)}\t{canonical_field(applicable_checksum(source, target)?)}",
-    )
+    ]
   }
 
   for entry in pkg.filetree {
-    lines = lines.push(f"filetree\t{canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}")
+    lines += [f"filetree\t{canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}"]
   }
 
-  lines = lines.extend(package_source_lines(pkg)?)
-  lines = lines.extend(repository_input_lines(repo_root, pkg, target)?)
+  lines += package_source_lines(pkg)?
+  lines += repository_input_lines(repo_root, pkg, target)?
   digest_lines(lines)?
 }
 
@@ -249,7 +245,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
     let rel = entry.path.strip_prefix(pm_root)?
 
     if ! ignored_tree_path(rel) and entry.kind != "dir" and entry.path.name.ends_with(".xsh") {
-      lines = lines.push(tree_entry_line(pm_root, entry.path, "pm")?)
+      lines += [tree_entry_line(pm_root, entry.path, "pm")?]
     }
   }
 
@@ -268,7 +264,7 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
     let rel = entry.path.strip_prefix(core_root)?
 
     if ! ignored_tree_path(rel) and rel.display() != "" {
-      lines = lines.push(tree_entry_line(core_root, entry.path, "core")?)
+      lines += [tree_entry_line(core_root, entry.path, "core")?]
     }
   }
 

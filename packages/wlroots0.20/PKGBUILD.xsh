@@ -571,7 +571,7 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
     var index = 1
 
     while index < words.len() {
-      lines = lines.push(f"\t0x{words[index]},")
+      lines += [f"\t0x{words[index]},"]
       index += 1
     }
   }
@@ -599,9 +599,9 @@ export pure pnpids_source(pnp_ids: Str) -> Result[Str, Error] {
         return Err(WlrootsError.Generate(f"pnp.ids holds an ID that is not three characters: {id}"))
       }
 
-      cases = cases.push(
+      cases += [
         f"\tcase PNP_ID('{id.byte_slice(0, 1)}', '{id.byte_slice(1, 1)}', '{id.byte_slice(2, 1)}'): return \"{vendor.trim()}\";",
-      )
+      ]
     }
   }
 

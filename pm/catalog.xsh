@@ -103,7 +103,7 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
     }
 
     let durable_dir = pkg.dir.relative_to(absolute_root)
-    packages = packages.push({...pkg, dir: durable_dir})
+    packages += [{...pkg, dir: durable_dir}]
   }
 
   for pkg in packages {

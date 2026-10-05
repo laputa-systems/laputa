@@ -161,9 +161,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   let target_root = e"LAPUTA_ROOT" ?? "/"
 
   if target_root != "" and target_root != "/" {
-    cmake_args = cmake_args.push(f"-DZLIB_ROOT={target_root}/usr")
-    cmake_args = cmake_args.push(f"-DZLIB_LIBRARY={target_root}/usr/lib/libz.so")
-    cmake_args = cmake_args.push(f"-DZLIB_INCLUDE_DIR={target_root}/usr/include")
+    cmake_args += [f"-DZLIB_ROOT={target_root}/usr"]
+    cmake_args += [f"-DZLIB_LIBRARY={target_root}/usr/lib/libz.so"]
+    cmake_args += [f"-DZLIB_INCLUDE_DIR={target_root}/usr/include"]
   }
 
   run $cmake @cmake_args ?

@@ -134,7 +134,7 @@ proc parse_start_conditions(text: Str) [error] -> Result[List[Str]] {
 
       while i < words.len() {
         if words[i] not in states {
-          states = states.push(words[i])
+          states += [words[i]]
         }
 
         i = i + 1
@@ -156,7 +156,7 @@ proc parse_exclusive_start_conditions(text: Str) [error] -> Result[List[Str]] {
 
       while i < words.len() {
         if words[i] not in states {
-          states = states.push(words[i])
+          states += [words[i]]
         }
 
         i = i + 1
@@ -245,10 +245,10 @@ proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
     pattern = strip_quotes(expand_definitions(pattern, defs)?)?
 
     if qualified.states.len() == 0 {
-      rules = rules.push({pattern, action, bol, state: ""})
+      rules += [{pattern, action, bol, state: ""}]
     } else {
       for state in qualified.states {
-        rules = rules.push({pattern, action, bol, state})
+        rules += [{pattern, action, bol, state}]
       }
     }
   }
@@ -473,7 +473,7 @@ proc generate_state_defines(states: List[Str]) [error] -> Result[Str] {
   var i = 0
 
   while i < states.len() {
-    lines = lines.push(f"#define {states[i]} {i + 1}")
+    lines += [f"#define {states[i]} {i + 1}"]
     i = i + 1
   }
 
@@ -484,7 +484,7 @@ proc generate_exclusive_table(states: List[Str], exclusive: List[Str]) [error] -
   var values = ["0"]
 
   for state in states {
-    values = values.push(if state in exclusive { "1" } else { "0" })
+    values += [if state in exclusive { "1" } else { "0" }]
   }
 
   values.join(", ")
@@ -508,7 +508,7 @@ proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Res
       return Err(ToolError.Failed(kind: "lex", message: f"unknown start condition: {rule.state}"))
     }
 
-    lines = lines.push(f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},")
+    lines += [f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},"]
   }
 
   lines.join("\n")
@@ -519,7 +519,7 @@ proc generate_actions(rules: List[LexRule]) [error] -> Result[Str] {
   var i = 0
 
   for rule in rules {
-    lines = lines.push(f"    case {i}: {{ {rule.action} }} break;")
+    lines += [f"    case {i}: {{ {rule.action} }} break;"]
     i = i + 1
   }
 

@@ -324,8 +324,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"obj/iptables",
   )
 
-  tasks = tasks.extend(multi.tasks)
-  objects = objects.extend(multi.objects)
+  tasks += multi.tasks
+  objects += multi.objects
   let multi_out = p"obj/xtables-legacy-multi"
 
   # The static extension archives are linked whole in practice: initext*.c

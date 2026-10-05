@@ -852,7 +852,7 @@ getprogname (void)
 
       for word in chunk.replace("\\", "").trim().split(" ") |> where . != "" {
         if word.ends_with(".c") {
-          lib_sources = lib_sources.push(fp"{word}")
+          lib_sources += [fp"{word}"]
         }
       }
 

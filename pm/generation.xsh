@@ -160,17 +160,17 @@ proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
   ]
 
   for root in value.runtime_roots {
-    lines = lines.push(f"runtime-root\t{generation_canonical_field(root)}")
+    lines += [f"runtime-root\t{generation_canonical_field(root)}"]
   }
 
   for replacement in value.profile.replacements {
-    lines = lines.push(f"replacement\t{generation_canonical_field(replacement)}")
+    lines += [f"replacement\t{generation_canonical_field(replacement)}"]
   }
 
   for artifact in value.artifacts {
-    lines = lines.push(
+    lines += [
       f"artifact\t{generation_canonical_field(artifact.package_name)}\t{generation_canonical_field(artifact.package_id)}\t{artifact.artifact_key}",
-    )
+    ]
   }
 
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
@@ -251,7 +251,7 @@ proc generation_runtime_artifacts(
 
     let node: types.PlanNode = nodes.get(name)?
     selected[name] = true
-    artifacts = artifacts.push({package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key})
+    artifacts += [{package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key}]
 
     # BuildPlan dependencies are the typed graph projection; only Runtime and
     # RuntimeOnly edges reach a system root. Store receipts omit RuntimeOnly
@@ -260,7 +260,7 @@ proc generation_runtime_artifacts(
       let runtime = dependency.kind == types.dependency_runtime() or dependency.kind == types.dependency_runtime_only()
 
       if runtime and ! (selected.get(dependency.name) ?? false) {
-        pending = pending.push(dependency.name)
+        pending += [dependency.name]
       }
     }
   }
@@ -398,15 +398,13 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
-      lines = lines.push(f"file\t{generation_canonical_field(relative)}\t{mode}\t{hash.sha256(entry.path)?.hex()}")
+      lines += [f"file\t{generation_canonical_field(relative)}\t{mode}\t{hash.sha256(entry.path)?.hex()}"]
     } else if metadata.kind == "dir" {
-      lines = lines.push(f"dir\t{generation_canonical_field(relative)}\t{mode}")
+      lines += [f"dir\t{generation_canonical_field(relative)}\t{mode}"]
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
       generation_validate_symlink_target(relative, target)?
-      lines = lines.push(
-        f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}",
-      )
+      lines += [f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}"]
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }
@@ -435,15 +433,15 @@ proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[G
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
-      entries = entries.push(
+      entries += [
         {path: relative, source: entry.path, kind: "file", mode, sha256: hash.sha256(entry.path)?.hex(), target: ""},
-      )
+      ]
     } else if metadata.kind == "dir" {
-      entries = entries.push({path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""})
+      entries += [{path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""}]
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
       generation_validate_symlink_target(relative, target)?
-      entries = entries.push({path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target})
+      entries += [{path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target}]
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }

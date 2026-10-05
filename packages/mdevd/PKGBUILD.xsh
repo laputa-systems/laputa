@@ -298,28 +298,28 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
     let value = words[1]
 
     if key.starts_with("SIGNED") {
-      lines = lines.push(f"#undef SKALIBS_HASUN{key}")
-      lines = lines.push(f"#undef SKALIBS_HAS{key}")
+      lines += [f"#undef SKALIBS_HASUN{key}"]
+      lines += [f"#undef SKALIBS_HAS{key}"]
 
       if value == "yes" {
-        lines = lines.push(f"#define SKALIBS_HAS{key}")
+        lines += [f"#define SKALIBS_HAS{key}"]
       } else {
-        lines = lines.push(f"#define SKALIBS_HASUN{key}")
+        lines += [f"#define SKALIBS_HASUN{key}"]
       }
     } else if key.starts_with("SIZEOF") {
-      lines = lines.push(f"#undef SKALIBS_{key}")
-      lines = lines.push(f"#define SKALIBS_{key} {value}")
+      lines += [f"#undef SKALIBS_{key}"]
+      lines += [f"#define SKALIBS_{key} {value}"]
     } else {
       if value == "yes" {
-        lines = lines.push(f"#undef SKALIBS_HAS{key}")
-        lines = lines.push(f"#define SKALIBS_HAS{key}")
+        lines += [f"#undef SKALIBS_HAS{key}"]
+        lines += [f"#define SKALIBS_HAS{key}"]
       } else if value == "no" {
-        lines = lines.push(f"#undef SKALIBS_HAS{key}")
+        lines += [f"#undef SKALIBS_HAS{key}"]
       } else {
-        lines = lines.push(f"#undef SKALIBS_{key}")
+        lines += [f"#undef SKALIBS_{key}"]
 
         if value != "none" {
-          lines = lines.push(f"#define SKALIBS_{key} \"{value}\"")
+          lines += [f"#define SKALIBS_{key} \"{value}\""]
         }
       }
     }
@@ -327,38 +327,38 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
     lines += [""]
   }
 
-  lines = lines.push("#endif")
+  lines += ["#endif"]
   fs.write(p"skalibs/src/include/skalibs/sysdeps.h", lines.join("\n"))?
 }
 
 proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sysdeps: Map[Str]) [fs, error] {
   var parts = []
-  parts = parts.push(gen_types_internal(p"skalibs/src/headers/bits-header".read_text()?, "", "", bits))
+  parts += [gen_types_internal(p"skalibs/src/headers/bits-header".read_text()?, "", "", bits)]
 
   if bits == 64 {
-    parts = parts.push(p"skalibs/src/headers/uint64-defs".read_text()?)
+    parts += [p"skalibs/src/headers/uint64-defs".read_text()?]
 
     if (sysdeps.get("uint64t") ?? "") == "no" {
       if (sysdeps.get("sizeofulong") ?? "") == "8" {
-        parts = parts.push(p"skalibs/src/headers/uint64-ulong64".read_text()?)
+        parts += [p"skalibs/src/headers/uint64-ulong64".read_text()?]
       } else {
-        parts = parts.push(p"skalibs/src/headers/uint64-noulong64".read_text()?)
+        parts += [p"skalibs/src/headers/uint64-noulong64".read_text()?]
       }
 
-      parts = parts.push(p"skalibs/src/headers/uint64-macros".read_text()?)
+      parts += [p"skalibs/src/headers/uint64-macros".read_text()?]
     }
   } else {
-    parts = parts.push(p"skalibs/src/headers/uint64-include".read_text()?)
+    parts += [p"skalibs/src/headers/uint64-include".read_text()?]
   }
 
   if (sysdeps.get("endianness") ?? "") != "little" {
     return Err(ScriptError.Failed(kind: "skalibs-gen-bits", message: "unsupported non-little-endian target"))
   }
 
-  parts = parts.push(fp"skalibs/src/headers/uint{bits}-bswap".read_text()?)
-  parts = parts.push(gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits))
-  parts = parts.push(gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt))
-  parts = parts.push(gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits))
+  parts += [fp"skalibs/src/headers/uint{bits}-bswap".read_text()?]
+  parts += [gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits)]
+  parts += [gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt)]
+  parts += [gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits)]
   fs.write(fp"skalibs/src/include/skalibs/uint{bits}.h", parts.join(""))?
 }
 
@@ -405,7 +405,7 @@ proc write_types_h(sysdeps: Map[Str]) [fs, error] {
     parts = append_type_template(parts, header_template, type_name, upper_ascii(type_name), bits)?
   }
 
-  parts = parts.push(p"skalibs/src/headers/types-footer".read_text()?)
+  parts += [p"skalibs/src/headers/types-footer".read_text()?]
   fs.write(p"skalibs/src/include/skalibs/types.h", parts.join(""))?
 }
 
@@ -478,7 +478,7 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, erro
     let src_display = entry.path.display()
 
     if src_display.starts_with("skalibs/src/lib") or "/skalibs/src/lib" in src_display {
-      skalibs_sources = skalibs_sources.push(entry.path)
+      skalibs_sources += [entry.path]
     }
   }
 

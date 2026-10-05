@@ -429,15 +429,15 @@ pure root_digest(target: types.Target, artifacts: List[types.RootArtifact], entr
   var lines = [f"target\t{types.target_text(target)}"]
 
   for artifact in artifacts {
-    lines = lines.push(
+    lines += [
       f"artifact\t{artifact.package_name}\t{artifact.package_id}\t{artifact.artifact_key}\t{if artifact.payload { "payload" } else { "meta" }}",
-    )
+    ]
   }
 
   for entry in entries {
-    lines = lines.push(
+    lines += [
       f"entry\t{entry.package_name}\t{entry.package_id}\t{entry.artifact_key}\t{entry.path}\t{types.file_kind_text(entry.kind)}\t{entry.mode}\t{entry.sha256}\t{entry.target}",
-    )
+    ]
   }
 
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
@@ -525,11 +525,11 @@ proc root_receipt_from_dto(value: RootReceiptDto) [error] -> Result[types.RootRe
   var entries: List[types.RootEntry] = []
 
   for artifact in value.artifacts {
-    artifacts = artifacts.push(root_artifact_from_dto(artifact)?)
+    artifacts += [root_artifact_from_dto(artifact)?]
   }
 
   for entry in value.entries {
-    entries = entries.push(root_entry_from_dto(entry)?)
+    entries += [root_entry_from_dto(entry)?]
   }
 
   {format: value.format, target: types.parse_target(value.target)?, artifacts, entries, root_sha256: value.root_sha256}
@@ -646,12 +646,12 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
 
     let metadata = root_artifact_metadata(receipt)?
     let payload = metadata.kind != types.package_meta()
-    planned_artifacts = planned_artifacts.push({
+    planned_artifacts += [{
       package_name: receipt.package_name,
       package_id: receipt.package_id,
       artifact_key: receipt.key,
       payload,
-    })
+    }]
     var artifact_entries: List[types.RootEntry] = []
 
     for entry in metadata.entries {
