@@ -111,12 +111,12 @@ proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) [error
 }
 
 proc absolute_recipe_package(value: types.PackageCatalog, pkg: types.Package) [fs, error] -> Result[types.Package] {
-  let dir = if pkg.dir.display().starts_with("/") { pkg.dir } else { fp"{value.root}/{pkg.dir}" }
+  let dir = if pkg.dir.starts_with(p"/") { pkg.dir } else { fp"{value.root}/{pkg.dir}" }
   {...pkg, dir}
 }
 
 proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) [error] -> Result[Path] {
-  let durable = if pkg.dir.display().starts_with("/") { pkg.dir.relative_to(value.root) } else { pkg.dir }
+  let durable = if pkg.dir.starts_with(p"/") { pkg.dir.relative_to(value.root) } else { pkg.dir }
   util.ensure_relative_path(durable, "plan recipe directory")?
 }
 

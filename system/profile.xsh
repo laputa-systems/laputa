@@ -55,7 +55,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     )
   }
 
-  if value.kernel_path.display() == "" or value.kernel_path.display().starts_with("/") {
+  if value.kernel_path.display() == "" or value.kernel_path.starts_with(p"/") {
     return Err(types.LaputaError.Profile(f"{value.name} has an invalid kernel manifest path"))
   }
 

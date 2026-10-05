@@ -91,7 +91,7 @@ proc regular_xsh_source(xsh: Path) [fs, error] -> Result[Path] {
     return source when metadata.kind != "symlink"
 
     let target = source.readlink()?
-    source = if target.display().starts_with("/") { target } else { fp"{source.parent}/{target}" }
+    source = if target.starts_with(p"/") { target } else { fp"{source.parent}/{target}" }
     depth += 1
   }
 
