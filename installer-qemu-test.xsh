@@ -4,7 +4,7 @@ use installer.host
 error InstallerQemuTestError = Failed(kind: Str, message: Str)
 
 proc env_int(name: Str, fallback: Int) -> Result[Int] {
-  host.installer_env_value(name, f"{fallback}").parse_int()?
+  host.installer_env_value(name, f"{fallback}") as Int
 }
 
 proc command_path(name: Str) -> Result[Path] {

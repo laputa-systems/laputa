@@ -5,14 +5,14 @@ proc parse_size(value: Str) -> Result[Int] {
   let trimmed = value.trim()
 
   if trimmed.ends_with("G") {
-    return trimmed.split("G")[0].parse_int()? * 1024 * 1024 * 1024
+    return trimmed.split("G")[0] as Int * 1024 * 1024 * 1024
   }
 
-  return trimmed.split("M")[0].parse_int()? * 1024 * 1024 when trimmed.ends_with("M")
+  return trimmed.split("M")[0] as Int * 1024 * 1024 when trimmed.ends_with("M")
 
-  return trimmed.split("K")[0].parse_int()? * 1024 when trimmed.ends_with("K")
+  return trimmed.split("K")[0] as Int * 1024 when trimmed.ends_with("K")
 
-  trimmed.parse_int()?
+  (trimmed as Int)
 }
 
 proc command_path(name: Str) -> Result[Path] {

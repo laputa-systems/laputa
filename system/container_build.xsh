@@ -287,7 +287,7 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
   }
 
   let profile = container_load_profile(argv[1])?
-  let jobs = argv[2].parse_int()?
+  let jobs = argv[2] as Int
   return Err(ContainerBuildError.Failed("jobs must be positive")) when jobs < 1
 
   if argv[0] == "plan" {

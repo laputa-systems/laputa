@@ -7,7 +7,7 @@ export proc build_jobs() [env, error] -> Result[Int, Error] {
   let raw = e"XSH_LINUX_KBUILD_JOBS" ?? ""
 
   if raw != "" {
-    let parsed = raw.parse_int()?
+    let parsed = raw as Int
 
     if parsed <= 0 {
       return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-jobs", message: "XSH_LINUX_KBUILD_JOBS must be a positive integer"))
@@ -25,7 +25,7 @@ export proc archive_analysis_jobs() [env, error] -> Result[Int, Error] {
 
   return 8 when raw == ""
 
-  let parsed = raw.parse_int()?
+  let parsed = raw as Int
 
   if parsed <= 0 {
     return Err(
@@ -43,11 +43,11 @@ export proc archive_analysis_jobs() [env, error] -> Result[Int, Error] {
 export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOptions, Error] {
   let every_text = e"XSH_LINUX_KBUILD_PROGRESS_EVERY" ?? "100"
   let jobs_text = e"XSH_LINUX_KBUILD_DISCOVER_JOBS" ?? ""
-  let jobs_count = if jobs_text == "" { build_jobs()? } else { jobs_text.parse_int()? }
+  let jobs_count = if jobs_text == "" { build_jobs()? } else { (jobs_text as Int) }
 
   {
     progress: (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1",
-    progress_every: every_text.parse_int()?,
+    progress_every: every_text as Int,
     jobs: jobs_count,
     local_records: (e"XSH_LINUX_KBUILD_LOCAL_RECORDS" ?? "") == "1",
     local_record_cache: (e"XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE" ?? "") == "1" and (e"XSH_LINUX_KBUILD_FORCE_DISCOVER" ?? "") != "1",

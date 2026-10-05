@@ -38,8 +38,8 @@ proc main(...argv: List[Str]) [fs, process, error] {
     fail "usage: container_entry.xsh UID GID DIR... -- COMMAND ARG..."
   }
 
-  let uid = argv[0].parse_int()?
-  let gid = argv[1].parse_int()?
+  let uid = argv[0] as Int
+  let gid = argv[1] as Int
   let dirs = [fp"{dir}" for dir in argv[2..separator]]
   let command = argv[separator + 1..]
   let status = run.status @command ?

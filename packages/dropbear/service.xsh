@@ -17,7 +17,7 @@ pure dropbear_service(bind: Str, port: Int, host_key: Path) -> Record {
 }
 
 let bind = e"XINIT_DROPBEAR_BIND" ?? "0.0.0.0"
-let port = (e"XINIT_DROPBEAR_PORT" ?? "22").parse_int()?
+let port = (e"XINIT_DROPBEAR_PORT" ?? "22") as Int
 let host_key = env.path("XINIT_DROPBEAR_HOST_KEY", p"")?
 let service_record = dropbear_service(bind, port, host_key)
 

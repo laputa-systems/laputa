@@ -152,7 +152,7 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
     return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP {response.status}"))
   }
 
-  let body = response.body.utf8()?
+  let body = response.body as Str
   let rows: List[Record] = json.decode(body)?.require(List[Record])?
   let items = decode_remote_index(rows)?
   out.mkdir()

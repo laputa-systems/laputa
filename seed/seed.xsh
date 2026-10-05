@@ -38,7 +38,7 @@ proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
     match argv[index] {
       "--arch" => parsed = {...parsed, arch: value}
       "--xsh-root" => parsed = {...parsed, xsh_root: value}
-      "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
+      "--jobs" => parsed = {...parsed, jobs: value as Int}
       else => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{seed_usage()}"))
     }
 

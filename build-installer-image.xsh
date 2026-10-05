@@ -171,7 +171,7 @@ proc tree_blocks(path_value: Path) -> Result[Int] {
 
 proc installer_root_size_mb(rootfs: Path, override_mb: Str) -> Result[Int] {
   guard override_mb == "" else {
-    return override_mb.parse_int()?
+    return override_mb as Int
   }
 
   rootfs_size.image_size_mib(tree_blocks(rootfs)?)
@@ -634,7 +634,7 @@ proc build_host() {
     repo_url,
     linux_package_name,
     qemu_smoke == "1",
-    host.installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
+    host.installer_env_value("LAPUTA_INSTALLER_JOBS", "4") as Int,
     fp"{work}/packages",
     roots,
   )

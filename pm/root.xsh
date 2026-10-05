@@ -193,7 +193,7 @@ proc root_legacy_package_db_entries(
   let etcsums_file = root_legacy_package_db_file(extracted, receipt, "etcsums.json")?
   let metadata_file = root_legacy_package_db_file(extracted, receipt, "metadata.json")?
   let sidecar_manifest = sidecar.get("manifest")?.require(List[Str])?
-  let stored_manifest = json.decode(manifest_file.body.utf8()?)?.require(List[Str])?
+  let stored_manifest = json.decode(manifest_file.body as Str)?.require(List[Str])?
   let expected_manifest = [entry.path for entry in payload_entries]
 
   if sidecar_manifest != expected_manifest or stored_manifest != sidecar_manifest {
@@ -204,7 +204,7 @@ proc root_legacy_package_db_entries(
     )
   }
 
-  let stored_etcsums = json.decode(etcsums_file.body.utf8()?)?.require(List[types.EtcSum])?
+  let stored_etcsums = json.decode(etcsums_file.body as Str)?.require(List[types.EtcSum])?
   var expected_etcsums: List[types.EtcSum] = [
     {path: entry.path, sha256: entry.sha256}
     for entry in payload_entries
@@ -218,7 +218,7 @@ proc root_legacy_package_db_entries(
     )
   }
 
-  let stored_metadata = json.decode(metadata_file.body.utf8()?)?.require(LegacyPackageDbMetadataDto)?
+  let stored_metadata = json.decode(metadata_file.body as Str)?.require(LegacyPackageDbMetadataDto)?
   let sidecar_deps = sidecar.get("deps")?.require(List[Str])?
   let sidecar_mkdeps_host = sidecar.get("mkdeps_host")?.require(List[Str])?
   let sidecar_mkdeps_target = sidecar.get("mkdeps_target")?.require(List[Str])?

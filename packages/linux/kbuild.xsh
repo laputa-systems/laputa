@@ -505,7 +505,7 @@ export proc write_config_headers(config_path: Path, root: Path, release: Str, ar
 
 # linux/version.h for MAJOR.MINOR.SUB, as the top-level Makefile writes it.
 proc version_header(release: Str) -> Result[Str] {
-  let parts = [part.parse_int()? for part in release.split(".")]
+  let parts = [part as Int for part in release.split(".")]
 
   guard parts.len() == 3 else {
     return Err(ScriptError.Failed(kind: "kbuild-version", message: f"kernel release {release} is not MAJOR.MINOR.SUB"))
@@ -4094,7 +4094,7 @@ export proc generate_syscall_table(table: Path, out: Path, abis: List[Str] = [])
 
     if line != "" {
       let fields = line.fields()
-      let nr = fields[0].parse_int()?
+      let nr = fields[0] as Int
       let abi = fields[1]
 
       if abi_enabled(abi, abis) {
@@ -4145,7 +4145,7 @@ export proc generate_syscall_numbers(
 
     if line != "" {
       let fields = line.fields()
-      let nr = fields[0].parse_int()?
+      let nr = fields[0] as Int
       let abi = fields[1]
 
       if abi_enabled(abi, abis) {

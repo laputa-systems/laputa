@@ -87,7 +87,7 @@ pure libffi_target(machine: Str) -> LibffiTarget {
 # configure.ac encodes X.Y.Z as X*10000 + Y*100 + Z.
 proc ffi_version_number() -> Result[Int] {
   let parts = ver.split(".")
-  parts[0].parse_int()? * 10000 + parts[1].parse_int()? * 100 + parts[2].parse_int()?
+  parts[0] as Int * 10000 + parts[1] as Int * 100 + parts[2] as Int
 }
 
 proc write_generated_headers(target: LibffiTarget) {

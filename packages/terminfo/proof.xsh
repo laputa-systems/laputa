@@ -72,7 +72,7 @@ proc read_compiled(file: Path) -> Result[Compiled] {
   let num_count = u16(data, 6)
   let str_count = u16(data, 8)
   let table_size = u16(data, 10)
-  let names = c_string(data, 12).utf8()?
+  let names = c_string(data, 12) as Str
   let bool_at = 12 + name_size
   let bools = [data.byte_at(bool_at + k) ?? 0 for k in range(bool_count)]
   let num_at = bool_at + bool_count + (name_size + bool_count) % 2
@@ -105,7 +105,7 @@ proc read_compiled(file: Path) -> Result[Compiled] {
       }
     }
 
-    let ext_names = [c_string(data, names_at + s16(data, ext_offset_at + 2 * (es + k))).utf8()? for k in range(total)]
+    let ext_names = [c_string(data, names_at + s16(data, ext_offset_at + 2 * (es + k))) as Str for k in range(total)]
     ext_bools = {[ext_names[k]]: data.byte_at(ext_bool_at + k) ?? 0 for k in range(eb)}
     ext_nums = {
       [ext_names[eb + k]]: if width == 4 { s32(data, ext_num_at + 4 * k) } else { s16(data, ext_num_at + 2 * k) }

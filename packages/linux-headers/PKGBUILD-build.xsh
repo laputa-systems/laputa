@@ -73,7 +73,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) {
   for raw in header.table.read_text()?.lines() {
     let fields = raw.split("#")[0].fields()
     continue when fields.len() < 3 or fields[1] not in header.abis
-    last = fields[0].parse_int()?
+    last = fields[0] as Int
     let nr = if header.offset == "" { f"{last}" } else { f"({header.offset} + {last})" }
     lines += [f"#define __NR_{fields[2]} {nr}"]
   }
@@ -85,7 +85,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) {
 
 # linux/version.h for this release, as the top-level Makefile writes it.
 proc generate_version_header(version: Str, out: Path) {
-  let parts = [part.parse_int()? for part in version.split(".")]
+  let parts = [part as Int for part in version.split(".")]
 
   guard parts.len() == 3 else {
     return Err(uapi.UapiError.Failed(kind: "linux-headers-version", message: f"kernel version {version} is not MAJOR.MINOR.SUB"))

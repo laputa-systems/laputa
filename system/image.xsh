@@ -20,7 +20,7 @@ export pure image_root_partuuid() -> Str {
 export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
   let trimmed = value.trim()
   if trimmed.ends_with("M") {
-    let mebibytes = trimmed.replace("M", "").parse_int()?
+    let mebibytes = trimmed.replace("M", "") as Int
     if mebibytes <= 0 {
       return Err(ImageError.Failed(f"image size must be positive: {value}"))
     }
@@ -28,7 +28,7 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
     return mebibytes * 1024 * 1024
   }
 
-  let byte_count = trimmed.parse_int()?
+  let byte_count = trimmed as Int
   if byte_count <= 0 {
     return Err(ImageError.Failed(f"image size must be positive: {value}"))
   }

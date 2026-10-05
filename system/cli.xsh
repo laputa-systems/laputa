@@ -84,7 +84,7 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs, Error] {
         return Err(types.LaputaError.Usage(f"invalid {token} for laputa {command_name}"))
       }
 
-      jobs = argv[index + 1].parse_int()?
+      jobs = argv[index + 1] as Int
       return Err(types.LaputaError.Usage("--jobs must be positive")) when jobs <= 0
 
       index += 2

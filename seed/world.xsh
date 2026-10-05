@@ -55,7 +55,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error
       "--arch" => parsed = {...parsed, arch: value}
       "--package" => parsed = {...parsed, packages: parsed.packages.push(value)}
       "--stop" => parsed = {...parsed, stop: value}
-      "--jobs" => parsed = {...parsed, jobs: value.parse_int()?}
+      "--jobs" => parsed = {...parsed, jobs: value as Int}
       "--repo" => parsed = {...parsed, repo: value}
       else => return Err(xsh_seed.SeedError.Usage(f"unknown option {argv[index]}\n\n{world_usage()}"))
     }

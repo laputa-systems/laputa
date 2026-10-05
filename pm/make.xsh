@@ -255,7 +255,7 @@ export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Pat
 }
 
 pure parse_jobs(value: Str, source: Str) -> Result[Int] {
-  let parsed = value.parse_int()?
+  let parsed = value as Int
 
   if parsed <= 0 {
     return Err(MakeError.InvalidJobs(message: f"{source} must be a positive integer"))

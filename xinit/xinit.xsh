@@ -127,7 +127,7 @@ proc env_int(name: Str, fallback: Int) -> Result[Int] {
 
   return fallback when value == ""
 
-  value.parse_int()?
+  (value as Int)
 }
 
 proc service_dir() [env, error] -> Result[Path] {
