@@ -95,7 +95,7 @@ export pure root_partuuid() -> Str {
 export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode) -> Str {
   let base = f"{target.console} ignore_loglevel devtmpfs.mount=1 root=PARTUUID={root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 
-  return f"{base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == types.Test
+  return f"{base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == .Test
 
   base
 }
@@ -123,7 +123,7 @@ export pure qemu_command_argv(
   mode: types.QemuMode,
 ) -> List[Str] {
   let target = value.target
-  let display = if mode == types.Test { ["-display", "none"] } else { target.interactive_display }
+  let display = if mode == .Test { ["-display", "none"] } else { target.interactive_display }
 
   [
     value.qemu.display(),

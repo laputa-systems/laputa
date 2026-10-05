@@ -36,7 +36,7 @@ pure test_node(key: Str) -> types.PlanNode {
     proof_sha256: digest("proof-input"),
     artifact_key: key,
     proof_key: digest("proof-key"),
-    action: types.Build("test build"),
+    action: .Build("test build"),
     level: 0,
     dependencies: [],
     remote: null,
@@ -115,7 +115,7 @@ test test_store_commits_atomically_and_reuses_exact_artifact [fs, error] { |ctx|
   let first_stage = staged_artifact(ctx, "store-commit-first", payload: "first payload")?
   let first = store.commit(types.target_aarch64(), root, test_node(key), first_stage.staged)?
   let final_dir = store.artifact_path(root, key)
-  assert first.origin == types.Built
+  assert first.origin == .Built
   assert first.key == key
   assert fp"{final_dir}/artifact.json".exists()?
   assert store.lookup(root, key)? == first
@@ -294,7 +294,7 @@ test test_store_staging_failure_never_publishes_final [fs, error] { |ctx|
 pure remote_node(key: Str, payload: Str, metadata: Str) -> types.PlanNode {
   {
     ...test_node(key),
-    action: types.ReuseRemote("exact remote artifact"),
+    action: .ReuseRemote("exact remote artifact"),
     remote: {
       arch: "aarch64",
       tarball: "packages/aarch64/demo/demo-1.0.0-1.tar.gz",
@@ -329,7 +329,7 @@ test test_store_imports_verified_remote_artifact [fs, net, error] { |ctx|
     f"file://{remote_root}",
     test.temp_dir(ctx, name: "store-remote-cache")?,
   )?
-  assert receipt.origin == types.Remote
+  assert receipt.origin == .Remote
   assert receipt.payload_sha256 == digest(payload)
   assert store.verify_artifact(root, key)? == receipt
 }

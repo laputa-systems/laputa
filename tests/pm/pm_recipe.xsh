@@ -32,16 +32,16 @@ proc assert_local_source_checksums(package: Str) {
 
 test test_recipe_loads_valid_payload_with_relative_skip_checksum [fs, env, error] {
   let pkg = recipe.load_package(fixture("recipe-valid-payload"))?
-  assert pkg.kind == types.Payload
+  assert pkg.kind == .Payload
   assert pkg.upstream_sources.len() == 1
-  assert pkg.upstream_sources[0].kind == types.Auto
+  assert pkg.upstream_sources[0].kind == .Auto
   assert pkg.upstream_sources[0].checksums[0].sha256 == "SKIP"
-  assert pkg.filetree[0].kind == types.File
+  assert pkg.filetree[0].kind == .File
 }
 
 test test_recipe_loads_valid_metapackage [fs, env, error] {
   let pkg = recipe.load_package(fixture("recipe-valid-meta"))?
-  assert pkg.kind == types.Meta
+  assert pkg.kind == .Meta
   test.eq(pkg.filetree, [])
 }
 
@@ -49,7 +49,7 @@ test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, er
   let pkg = recipe.load_package(p"packages/linux")?
   assert pkg.name == "linux"
   assert pkg.ver == "7.2.9"
-  assert pkg.kind == types.Payload
+  assert pkg.kind == .Payload
 }
 
 test test_ca_certificates_local_sources_match_declared_checksums [fs, env, error] {

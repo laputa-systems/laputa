@@ -28,7 +28,7 @@ pure metadata_rows(entries: List[EntrySpec]) -> List[Record] {
     path: entry.path,
     kind: types.file_kind_text(entry.kind),
     mode: entry.mode,
-    sha256: if entry.kind == types.File or entry.kind == types.Binary { digest(entry.content) } else { "" },
+    sha256: if entry.kind == .File or entry.kind == .Binary { digest(entry.content) } else { "" },
     target: entry.target,
   } for entry in entries]
 }
@@ -37,12 +37,12 @@ proc write_payload_entry(root: Path, entry: EntrySpec) {
   let output = fp"{root}/{entry.path}"
   output.parent.mkdir()
 
-  if entry.kind == types.File or entry.kind == types.Binary {
+  if entry.kind == .File or entry.kind == .Binary {
     output.write(entry.content, mode: entry.mode)
-  } else if entry.kind == types.Tree {
+  } else if entry.kind == .Tree {
     output.mkdir()
     output.chmod(entry.mode)
-  } else if entry.kind == types.Symlink {
+  } else if entry.kind == .Symlink {
     fs.symlink(fp"{entry.target}", output)
   }
 }
@@ -65,7 +65,7 @@ proc stage_artifact(
     write_payload_entry(contents, entry)
   }
 
-  if kind == types.Meta {
+  if kind == .Meta {
     payload.write("metapackages have no root payload")
   } else {
     archive.tar_create(payload, contents, [p"."], compression: "gz")
@@ -93,7 +93,7 @@ proc stage_artifact(
       proof_sha256: digest(f"proof input {name}"),
       artifact_key: key,
       proof_key: digest(f"proof key {name}"),
-      action: types.Build("root test"),
+      action: .Build("root test"),
       level: 0,
       dependencies,
       remote: null,
@@ -380,7 +380,7 @@ test test_root_coalesces_identical_nested_directories_with_a_canonical_owner [fs
   assert first == second
   assert first.entries.len() == 4
   assert [entry.path for entry in first.entries] == ["usr", "usr/share", "usr/share/alpha", "usr/share/beta"]
-  assert [entry.package_name for entry in first.entries if entry.kind == types.Tree] == ["alpha", "alpha"]
+  assert [entry.package_name for entry in first.entries if entry.kind == .Tree] == ["alpha", "alpha"]
 
   let output = fp"{test.temp_dir(ctx, name: "root-shared-directories-output")?}/root"
   let receipt = root.compose_artifacts(output, first, [beta, alpha])?

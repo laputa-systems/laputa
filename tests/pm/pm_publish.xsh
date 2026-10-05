@@ -508,7 +508,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     imported_store,
     {
       ...node,
-      action: types.ReuseRemote("legacy remote artifact"),
+      action: .ReuseRemote("legacy remote artifact"),
       remote: {
         arch: "aarch64",
         tarball: payload.relative_to(remote_root).display(),
@@ -520,7 +520,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     f"file://{remote_root}",
     test.temp_dir(ctx, name: "publish-legacy-import-cache")?,
   )?
-  assert imported.origin == types.Remote
+  assert imported.origin == .Remote
 }
 
 test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import [fs, net, env, error] { |ctx|

@@ -485,8 +485,8 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
 }
 
 test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, env, error] { |ctx|
-  assert types.parse_target("arm64")? == types.Aarch64LinuxMusl
-  assert types.parse_target("amd64")? == types.X86_64LinuxMusl
+  assert types.parse_target("arm64")? == .Aarch64LinuxMusl
+  assert types.parse_target("amd64")? == .X86_64LinuxMusl
   let value = plan_catalog(ctx, "plan-target")?
   let unsupported = {...policy.aarch64_docker(), target: types.TargetReserved}
 
