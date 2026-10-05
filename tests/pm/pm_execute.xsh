@@ -597,7 +597,7 @@ main(@args)?
       source,
       ["--raw", "--trace-format", "jsonl", "--trace-file", trace.display()],
       [plan_path.display(), repo_root.display(), object_store.display()],
-      {XSH_MODULE_PATH: modules.display()},
+      {XSH_MODULE_PATH: modules},
     )?
     assert outcome.success
     runs += [sha256_calls_by_module(trace)?]

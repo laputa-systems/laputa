@@ -2541,15 +2541,15 @@ proc discover_records_process_pool(
     let command = process.command_argv(
       xsh_bin,
       [
-        xsh_bin.display(),
-        worker.display(),
+        xsh_bin,
+        worker,
         "--",
-        root.display(),
-        config.display(),
+        root,
+        config,
         srcarch,
-        state_path.display(),
-        lock_path.display(),
-        output_path.display(),
+        state_path,
+        lock_path,
+        output_path,
       ],
     )
     handles += [spawn command?]
@@ -6810,11 +6810,11 @@ proc archive_analysis_process_pool(
     let command = process.command_argv(
       xsh_bin,
       [
-        xsh_bin.display(),
-        worker.display(),
+        xsh_bin,
+        worker,
         "--",
-        input_path.display(),
-        output_path.display(),
+        input_path,
+        output_path,
       ],
     )
     handles += [spawn command?]

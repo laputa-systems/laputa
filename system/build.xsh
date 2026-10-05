@@ -26,7 +26,7 @@ export type ProfileOutputs = {
 # in /tmp, named by the output root so two checkouts never share one.
 ## The QMP control socket for the profile whose outputs live in `root`.
 export pure qmp_socket_path(root: Path) -> Path {
-  fp"/tmp/laputa-qmp-{bytes.from_text(root.display()).sha256().hex()[..16]}.sock"
+  fp"/tmp/laputa-qmp-{root.bytes().sha256().hex()[..16]}.sock"
 }
 
 ## Derive every profile output path from one profile-owned root directory.

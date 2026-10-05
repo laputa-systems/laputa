@@ -70,7 +70,7 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
   env ({M4: fp"{rootfs}/usr/bin/m4".display()}) {
     cd $tmp {
       let status = process.run(
-        process.command_argv(flex, [flex.display(), "--header-file=words.h", "-o", "words.c", "words.l"], stderr:),
+        process.command_argv(flex, [flex, "--header-file=words.h", "-o", "words.c", "words.l"], stderr:),
       )?
 
       if ! status.ok {

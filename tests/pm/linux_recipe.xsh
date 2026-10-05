@@ -248,9 +248,9 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
   let status = process.run(
     process.command_argv(
       xsh,
-      [xsh.display(), "packages/xsh/proof.xsh", "--", root.display()],
+      [xsh, "packages/xsh/proof.xsh", "--", root],
       cwd: modules,
-      env: {XSH_MODULE_PATH: modules.display()},
+      env: {XSH_MODULE_PATH: modules},
       stderr:,
     ),
   )?

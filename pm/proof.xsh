@@ -169,7 +169,7 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
     XSH_PM_PROOF_HOST_PATH: e"PATH" ?? "",
     SHELL: fp"{root}/bin/xshi",
   }) {
-    let status = process.run(process.command_argv(xsh, [xsh.display(), script.display(), "--", root.display()]))?
+    let status = process.run(process.command_argv(xsh, [xsh, script, "--", root]))?
     proof_ok = status.ok
     proof_exited = status.exited()
 
