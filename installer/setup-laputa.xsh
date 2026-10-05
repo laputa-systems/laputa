@@ -102,7 +102,7 @@ proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
   return when status.ok
 
   if status.exited() {
-    abort(status.exit_code()?)
+    exit status.exit_code()?
   }
 
   return Err(InstallerError.Failed(kind: "command-signaled", message: argv[0]))

@@ -39,7 +39,7 @@ export proc installer_run_argv(target: Path, argv: List[Str], cwd: Path, envs: R
   return when status.ok
 
   if status.exited() {
-    abort(status.exit_code()?)
+    exit status.exit_code()?
   }
 
   return Err(InstallerHostError.Failed(f"{argv[0]} was signaled"))

@@ -1431,11 +1431,11 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
 
     if token.kind == "long" and token.name == "help" {
       usage()?
-      abort(0)
+      exit 0
     } else if token.kind == "long" and token.name == "version" {
       io.write_stdout("""bison.xsh 0.1
 """)?
-      abort(0)
+      exit 0
     } else if token.name == "d" or token.name == "defines" {
       defines = true
 

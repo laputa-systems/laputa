@@ -743,11 +743,11 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
 
     if token.kind == "long" and token.name == "help" {
       usage()?
-      abort(0)
+      exit 0
     } else if token.kind == "long" and token.name == "version" {
       io.write_stdout("""flex.xsh 0.1
 """)?
-      abort(0)
+      exit 0
     } else if token.name == "t" or token.name == "stdout" {
       to_stdout = true
     } else if token.name == "L" or token.name == "noline" or token.name == "n" or token.name == "nounput" or token.name == "noyywrap" {

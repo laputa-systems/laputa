@@ -51,7 +51,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   }
 
   if ! status.ok {
-    abort(status.exit_code() ?? 1)
+    exit status.exit_code() ?? 1
   }
 }
 

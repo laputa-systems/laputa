@@ -3039,7 +3039,7 @@ proc main(margs: List[Str] = []) [fs, process, env, error, io] {
     Ok(o) => parsed = o
     Err(failure) => {
       eprint f"m4: {failure.message}"
-      abort(1)
+      exit 1
     }
   }
 
@@ -3056,7 +3056,7 @@ proc main(margs: List[Str] = []) [fs, process, env, error, io] {
   }
 
   if status != 0 {
-    abort(status)
+    exit status
   }
 }
 
