@@ -419,7 +419,7 @@ proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
   SourcesFetch({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, packages: parsed.packages, targets})
 }
 
-proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
+proc parse_root_command(argv: List[Str]) -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(root_help_text())
   }
@@ -463,7 +463,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
   RootInspect({input: parsed.input})
 }
 
-proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
+proc parse_store_command(argv: List[Str]) -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(store_help_text())
   }
