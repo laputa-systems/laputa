@@ -58,5 +58,3 @@ int main(void) {
 
   print "libudev-zero ok: enumerated /dev/null through the mem subsystem"
 }
-
-main(@args)

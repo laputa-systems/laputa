@@ -49,7 +49,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   }
 
   if ! ("/usr/lib/security/pam_rootok.so" in pam_su_l and "/usr/lib/security/pam_permit.so" in pam_su_l) {
-    return Err(SudoRsProofError.Failed(kind: "proof-sudo-rs", message: "su-l PAM service does not allow root login handoff"))
+    return Err(
+      SudoRsProofError.Failed(kind: "proof-sudo-rs", message: "su-l PAM service does not allow root login handoff"),
+    )
   }
 
   let build_arch = pm_util.build_arch()?
@@ -71,10 +73,13 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let ver = proof.package_version(rootfs, "sudo-rs")?
 
   if f"sudo-rs {ver}" not in sudo {
-    return Err(SudoRsProofError.Failed(kind: "proof-sudo-rs", message: f"sudo --version reported {sudo.trim()}, expected sudo-rs {ver}"))
+    return Err(
+      SudoRsProofError.Failed(
+        kind: "proof-sudo-rs",
+        message: f"sudo --version reported {sudo.trim()}, expected sudo-rs {ver}",
+      ),
+    )
   }
 
   print "sudo-rs ok"
 }
-
-main(@args)

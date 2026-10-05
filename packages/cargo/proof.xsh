@@ -55,7 +55,8 @@ proc main(...args: List[Str]) [process, error] {{
   run fp"{dynlinker}" fp"{rootfs}/usr/bin/rustc" @args ?
 }}
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 
   let linker_wrapper = fp"{tmp}/linker-wrapper"
@@ -80,7 +81,8 @@ proc main(...args: List[Str]) [process, error] {{
   run fp"{dynlinker}" fp"{linker}" @linker_args ?
 }}
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 
   env ({
@@ -92,7 +94,8 @@ main(@args)?
   }) {
     cargo = run.text $dynlinker fp"{rootfs}/usr/bin/cargo" "--version"
     rustc = run.text $dynlinker fp"{rootfs}/usr/bin/rustc" "--version"
-    run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple "--manifest-path" fp"{tmp}/Cargo.toml"
+    run $dynlinker fp"{rootfs}/usr/bin/cargo" "build" "--release" "--offline" "--target" $rust_triple \
+      "--manifest-path" fp"{tmp}/Cargo.toml"
   }
 
   if ! cargo.starts_with("cargo ") {
@@ -104,7 +107,9 @@ main(@args)?
   let ver = proof.package_version(rootfs, "cargo")?
 
   if ! rustc.starts_with(f"rustc {ver} ") {
-    return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"rustc --version reported {rustc.trim()}, expected {ver}"))
+    return Err(
+      proof.ProofError.Failed(kind: "proof-cargo", message: f"rustc --version reported {rustc.trim()}, expected {ver}"),
+    )
   }
 
   let hello = fp"{tmp}/target/{rust_triple}/release/cargo-proof-hello"
@@ -117,5 +122,3 @@ main(@args)?
 
   print "cargo ok: "${trimmed}
 }
-
-main(@args)

@@ -45,18 +45,17 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
     filetree: [],
     nostrip: false,
     source_mirror: false,
-    architectures: ["aarch64", "x86_64"],
+    architectures: [
+      "aarch64",
+      "x86_64",
+    ],
   }
 }
 
 type DemoTarball = {path: Path, sha256: Str}
 
 # A one-file source tarball and its sha256.
-proc demo_tarball(
-  ctx: TestContext,
-  name: Str,
-  text: Str = "hello from the cache\n",
-) -> Result[DemoTarball] {
+proc demo_tarball(ctx: TestContext, name: Str, text: Str = "hello from the cache\n") -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
   fp"{tree}/demo-1.0".mkdir()
   fp"{tree}/demo-1.0/hello.txt".write(text)
@@ -279,7 +278,8 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   assert sources.source_cache_entry(cache, good_sha256).read_text()? == "good bytes\n"
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 
-  let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository fetchdemo
+  let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch \
+    --repo $repository fetchdemo
   assert "1 cached" in second.stdout
   assert "0 fetched" in second.stdout
 }
@@ -299,7 +299,8 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
   var output = ""
 
   cd $cwd {
-    output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint -- repo checksum --repo $repository fetchdemo
+    output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint \
+      -- repo checksum --repo $repository fetchdemo
   }
 
   assert output.trim() == f"fetchdemo {new_sha256}"
@@ -331,16 +332,16 @@ pure crate_set_lock(crates: List[sources.LockedCrate]) -> Str {
       "sparse+https://index.crates.io/"
     }
     lines += [
-        "",
-        "[[package]]",
-        f"name = \"{item.name}\"",
-        f"version = \"{item.version}\"",
-        f"source = \"{source}\"",
-        f"checksum = \"{item.checksum}\"",
-        "dependencies = [",
-        " \"libc\",",
-        "]",
-      ]
+      "",
+      "[[package]]",
+      f"name = \"{item.name}\"",
+      f"version = \"{item.version}\"",
+      f"source = \"{source}\"",
+      f"checksum = \"{item.checksum}\"",
+      "dependencies = [",
+      " \"libc\",",
+      "]",
+    ]
     index += 1
   }
 
@@ -392,13 +393,21 @@ pure crate_set_package(lock_url: Str, lock_sha256: Str) -> types.Package {
 
 test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
   let crates = [
-    {name: "demo_crate", version: "0.1.0", checksum: "1111111111111111111111111111111111111111111111111111111111111111"},
-    {name: "zstd-sys", version: "2.0.15+zstd.1.5.7", checksum: "2222222222222222222222222222222222222222222222222222222222222222"},
+    {
+      name: "demo_crate",
+      version: "0.1.0",
+      checksum: "1111111111111111111111111111111111111111111111111111111111111111",
+    },
+    {
+      name: "zstd-sys",
+      version: "2.0.15+zstd.1.5.7",
+      checksum: "2222222222222222222222222222222222222222222222222222222222222222",
+    },
   ]
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
   lockfile.write(crate_set_lock(crates))
 
-  test.eq(sources.cargo_lock_crates(lockfile)?, crates)
+  assert sources.cargo_lock_crates(lockfile)? == crates
   assert sources.crate_download_url(crates[1]) == "https://static.crates.io/crates/zstd-sys/zstd-sys-2.0.15+zstd.1.5.7.crate"
 }
 
@@ -477,7 +486,8 @@ test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, e
   let xsh = runner()?
   let modules = path.absolute(p".")?
 
-  let output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository --all --target aarch64-linux-musl
+  let output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo \
+    $repository --all --target aarch64-linux-musl
 
   assert "0 cached 1 fetched" in output
   assert "1 cached 0 fetched" in output

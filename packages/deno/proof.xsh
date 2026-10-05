@@ -79,5 +79,3 @@ console.log(total);
   proof.ensure("TS2322" in mistyped, "proof-deno", f"deno check accepted a mistyped program: {mistyped.trim()}")
   print f"deno ok: {first}"
 }
-
-main(@args)

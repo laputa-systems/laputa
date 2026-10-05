@@ -38,7 +38,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     XDG_CACHE_HOME: fp"{home}/cache",
   }) {
     let version = run.capture --text $dynlinker fp"{root}/usr/bin/fc-match" "--version"
-    proof.ensure("2.18.3" in f"{version.stdout}{version.stderr}", "proof-fontconfig", "fc-match is not fontconfig 2.18.3")
+    proof.ensure(
+      "2.18.3" in f"{version.stdout}{version.stderr}",
+      "proof-fontconfig",
+      "fc-match is not fontconfig 2.18.3",
+    )
     let cache = run.capture --text $dynlinker fp"{root}/usr/bin/fc-cache" "--really-force"
     proof.ensure(cache.status.ok, "proof-fontconfig", f"fc-cache failed: {cache.stderr.trim()}")
     proof.ensure("Fontconfig" not in cache.stderr, "proof-fontconfig", f"fontconfig reported: {cache.stderr.trim()}")
@@ -46,5 +50,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "fontconfig ok"
 }
-
-main(@args)

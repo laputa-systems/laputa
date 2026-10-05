@@ -339,7 +339,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
     }
     "build-node" => {
       var parsed: RepoBuildNodeOptions = RepoBuildNodeOptions(input: p"", repo: "", store: p"", node: "")
-      match cli.parse(
+      parsed = cli.parse(
         args,
         {
           input: {form: "PLAN", kind: "Path", required: true},
@@ -348,10 +348,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
           node: {form: "--node ARTIFACT_KEY", required: true},
         },
         "pm repo build-node",
-      ) {
-        Ok(value) => parsed = value.require(RepoBuildNodeOptions)?
-        Err(problem) => return Err(problem)
-      }
+      )?
 
       RepoBuildNode({input: parsed.input, repo: fp"{parsed.repo}", store: parsed.store, node: parsed.node})
     }
@@ -541,10 +538,7 @@ proc parse_command(argv: List[Str]) -> Result[PmCommand] {
 
 # Planning is offline unless XSH_PM_REPO names a package repository; offline
 # plans record the digest of an empty index.
-proc remote_snapshot_for_plan(
-  cache_root: Path,
-  target: types.Target,
-) -> Result[types.RemoteSnapshot] {
+proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) -> Result[types.RemoteSnapshot] {
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()

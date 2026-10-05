@@ -80,5 +80,3 @@ proc main(rootfs = /rootfs) [fs, env, error] {
 
   print "linux ok: vmlinuz"
 }
-
-main(@args)

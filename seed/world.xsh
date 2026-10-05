@@ -92,7 +92,7 @@ export pure world_stop_line(name: Str) -> Result[List[Str], Error] {
 
 ## The `pm repo plan` selection for explicit packages, a stop line, or (neither) every package.
 export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[Str], Error] {
-  if ! packages.is_empty() {
+  guard packages.is_empty() else {
     let argv: List[Str] = collect {
       for name in packages {
         yield @["--root", name]
@@ -192,7 +192,14 @@ export pure world_container_argv(
   ]
 }
 
-type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str, owner: WorldOwner}
+type WorldContainer = {
+  docker: Path,
+  laputa_root: Path,
+  seed: Path,
+  value: xsh_seed.SeedArch,
+  tag: Str,
+  owner: WorldOwner,
+}
 
 proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) -> Result[WorldContainer] {
   let docker = images.docker_program()?
@@ -202,13 +209,7 @@ proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) -> Result[Worl
   {docker, laputa_root, seed, value, tag, owner: {uid: id.uid, gid: id.gid}}
 }
 
-proc world_run(
-  container: WorldContainer,
-  output: Path,
-  store: Path,
-  inner: List[Str],
-  label: Str,
-) {
+proc world_run(container: WorldContainer, output: Path, store: Path, inner: List[Str], label: Str) {
   output.mkdir()
   store.mkdir()
   world_kbuild_cache(container.laputa_root).mkdir()
@@ -269,7 +270,9 @@ proc world_build(container: WorldContainer, args: WorldArgs) {
     container,
     world_dir(container.laputa_root, args.arch),
     world_store(container.laputa_root, args.arch),
-    pm_argv(["repo", "build", "/output/plan.json", "--store", "/artifacts", "--jobs", f"{args.jobs}", "--logs", "/output/logs"]),
+    pm_argv(
+      ["repo", "build", "/output/plan.json", "--store", "/artifacts", "--jobs", f"{args.jobs}", "--logs", "/output/logs"],
+    ),
     "repo build",
   )
 }

@@ -42,5 +42,3 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   build_installer(argv[0])
 }
-
-main(@args)

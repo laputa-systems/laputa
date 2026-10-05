@@ -18,5 +18,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "libevdev ok"
 }
-
-main(@args)

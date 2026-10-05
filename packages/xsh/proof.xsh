@@ -15,5 +15,3 @@ proc main(root: Path = /rootfs) [fs, error] {
   proof.ensure(fp"{root}/usr/bin/env".exists()?, "proof-xsh", "missing xsh env applet")
   print "xsh ok"
 }
-
-main(@args)

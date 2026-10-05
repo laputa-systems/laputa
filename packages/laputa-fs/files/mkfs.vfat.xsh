@@ -96,9 +96,7 @@ proc image_size(image: Path) -> Result[Int] {
 
   let sectors_path = fp"/sys/class/block/{image.name}/size"
 
-  if sectors_path.exists() {
-    return sectors_path.read_text()?.trim() as Int * 512
-  }
+  return sectors_path.read_text()?.trim() as Int * 512 when sectors_path.exists()
 
   size
 }
@@ -122,7 +120,9 @@ proc format_fat16(image: Path, label: Str) {
   let clusters = data_sectors / spc
 
   if clusters < 4085 or clusters >= 65525 {
-    return Err(FatToolError.Failed(kind: "unsupported-size", message: "native mkfs.vfat currently supports FAT16-sized images"))
+    return Err(
+      FatToolError.Failed(kind: "unsupported-size", message: "native mkfs.vfat currently supports FAT16-sized images"),
+    )
   }
 
   let cleared = bytes.zero_at(image, 0, size)?
@@ -161,5 +161,3 @@ proc main(...argv: List[Str]) [fs, error] {
 
   format_fat16(fp"{opts.image[0]}", opts.label)
 }
-
-main(@args)

@@ -260,9 +260,7 @@ proc xsh_seed_core_sources(xsh_root: Path) -> Result[List[Path]] {
       if entry.kind == "file" and entry.path.ext() == "xsh" {
         let relative = entry.path.relative_to(core)
 
-        if ! relative.display().starts_with("tests/") {
-          yield relative
-        }
+        yield relative unless relative.display().starts_with("tests/")
       }
     }
   }

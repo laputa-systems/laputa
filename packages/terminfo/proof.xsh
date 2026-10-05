@@ -52,7 +52,7 @@ pure c_string(data: Bytes, at: Int) -> Bytes {
 }
 
 pure table_string(data: Bytes, base: Int, offset: Int) -> Bytes? {
-  if offset < 0 {
+  guard offset >= 0 else {
     return null
   }
 
@@ -156,7 +156,11 @@ proc main(root: Path = /rootfs) [fs, error] {
   expect_string(foot, KEY_UP, b"\x1bOA", "kcuu1")
   expect_string(foot, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")
   proof.ensure((foot.ext_bools.get("Tc") ?? 0) == 1, "proof-terminfo", "foot is not foot's own entry (no Tc)")
-  proof.ensure("Smulx" in foot.ext_strs and foot.ext_strs["Smulx"] == b"\x1b[4:%p1%dm", "proof-terminfo", "foot lost Smulx")
+  proof.ensure(
+    "Smulx" in foot.ext_strs and foot.ext_strs["Smulx"] == b"\x1b[4:%p1%dm",
+    "proof-terminfo",
+    "foot lost Smulx",
+  )
 
   # Direct color needs the 32-bit number format.
   let foot_direct = read_compiled(fp"{database}/f/foot-direct")?
@@ -180,5 +184,3 @@ proc main(root: Path = /rootfs) [fs, error] {
 
   print f"terminfo ok: {paths.len()} names; xterm-256color, foot, foot-direct, linux, dumb read back"
 }
-
-main(@args)

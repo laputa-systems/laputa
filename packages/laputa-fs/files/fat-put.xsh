@@ -37,12 +37,7 @@ proc dir_entry(name: Str, attr: Int, cluster: Int, size: Int) -> Result[Bytes] {
   )
 }
 
-proc dir_block(
-  self_cluster: Int,
-  parent_cluster: Int,
-  entries: List[Bytes],
-  cluster_size: Int,
-) -> Result[Bytes] {
+proc dir_block(self_cluster: Int, parent_cluster: Int, entries: List[Bytes], cluster_size: Int) -> Result[Bytes] {
   var parts = [dir_entry(".          ", 16, self_cluster, 0)?, dir_entry("..         ", 16, parent_cluster, 0)?]
   parts += entries
   bytes.concat([bytes.concat(parts), bytes.zero(cluster_size - bytes.concat(parts).len())?])
@@ -78,7 +73,9 @@ type FatPutOptions = {operands: List[Str]}
 proc main(...argv: List[Str]) [fs, error] {
   let opts: FatPutOptions = cli.applet(argv, {operands: {form: "...ARG"}})?
   if opts.operands.len() != 3 {
-    return Err(FatPutError.Failed(kind: "usage", message: "usage: fat-put IMAGE SOURCE EFI/BOOT/{BOOTAA64.EFI,BOOTX64.EFI}"))
+    return Err(
+      FatPutError.Failed(kind: "usage", message: "usage: fat-put IMAGE SOURCE EFI/BOOT/{BOOTAA64.EFI,BOOTX64.EFI}"),
+    )
   }
 
   let fat_name = fallback_fat_name(opts.operands[2])?
@@ -94,7 +91,9 @@ proc main(...argv: List[Str]) [fs, error] {
   let fat_sectors = bytes.unpack_le(boot, 2, offset: 22)?
 
   if bytes_per_sector != 512 or fats != 2 {
-    return Err(FatPutError.Failed(kind: "unsupported-fat", message: "only 512-byte-sector FAT16 with two FATs is supported"))
+    return Err(
+      FatPutError.Failed(kind: "unsupported-fat", message: "only 512-byte-sector FAT16 with two FATs is supported"),
+    )
   }
 
   let cluster_size = sectors_per_cluster * 512
@@ -139,5 +138,3 @@ proc main(...argv: List[Str]) [fs, error] {
     cluster_size,
   )
 }
-
-main(@args)

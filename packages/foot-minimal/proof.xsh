@@ -27,5 +27,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "foot-minimal ok"
 }
-
-main(@args)

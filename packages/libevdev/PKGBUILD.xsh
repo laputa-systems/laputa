@@ -236,7 +236,7 @@ pure collect_event_defs(headers: List[Str]) -> EventDefinitions {
 export pure event_names_header(headers: List[Str]) -> Str {
   let collected = collect_event_defs(headers)
   let defs: List[EventDef] = collected.defs
-  let max_codes: Map[Int] = collected.max_codes
+  let max_codes = collected.max_codes
   var lines = ["/* THIS FILE IS GENERATED, DO NOT EDIT */", "", "#ifndef EVENT_NAMES_H", "#define EVENT_NAMES_H", ""]
 
   for prefix in event_prefixes() {
@@ -365,7 +365,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dtests=disabled" "-Dtools=disabled" "-Ddocumentation=disabled" "-Dcoverity=false" "build"
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
+      "-Dtests=disabled" "-Dtools=disabled" "-Ddocumentation=disabled" "-Dcoverity=false" "build"
     run $muon "-C" "build" samu $jobs_flag
 
     env ({

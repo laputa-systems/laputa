@@ -116,7 +116,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
     # capsh and getpcaps run as children of this proof with its capabilities.
     let pid = process.current_pid()?
-    let pcaps = run.text $loader fp"{bin}/getpcaps" f"{pid}"
+    let pcaps = run.text $loader fp"{bin}/getpcaps" $pid
     proof.ensure(pcaps.trim() == f"{pid}: {current}", "libcap-getpcaps", f"getpcaps disagrees with capsh: {pcaps.trim()} vs {current}")
     checks += ["capsh --print/--decode", "getpcaps"]
 
@@ -150,5 +150,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print f"libcap ok: {checks.join(", ")}"
 }
-
-main(@args)

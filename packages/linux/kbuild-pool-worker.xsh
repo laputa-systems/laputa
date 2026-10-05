@@ -74,5 +74,3 @@ proc main(...argv: List[Str]) [fs, time, error] {
 
   json.write(output_path, records)
 }
-
-main(@args)

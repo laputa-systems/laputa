@@ -30,5 +30,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(exports_symbol(genl_syms, "genl_connect"), "libnl3", "libnl-genl-3 does not export genl_connect")
   print "libnl3 ok"
 }
-
-main(@args)

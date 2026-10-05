@@ -252,5 +252,3 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
 
   print "xinit dropbear ok"
 }
-
-main(@args)

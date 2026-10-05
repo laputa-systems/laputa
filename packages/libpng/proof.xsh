@@ -26,5 +26,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "libpng ok"
 }
-
-main(@args)

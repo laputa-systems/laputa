@@ -22,5 +22,3 @@ proc main(...argv: List[Str]) [fs, error] {
   )?
   json.write(output_path, results)
 }
-
-main(@args)

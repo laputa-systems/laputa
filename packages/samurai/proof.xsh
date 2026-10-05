@@ -48,8 +48,10 @@ default prog
   proof.ensure("cc a.o b.o -o prog" in lines[2], "proof-samurai", f"link edge did not run last: {plan.trim()}")
 
   let query = run.text $dynlinker $samu "-C" $tmp "-t" "query" "prog" 2> /dev/null
-  proof.ensure("a.o" in query and "b.o" in query, "proof-samurai", f"query did not report prog's inputs: {query.trim()}")
+  proof.ensure(
+    "a.o" in query and "b.o" in query,
+    "proof-samurai",
+    f"query did not report prog's inputs: {query.trim()}",
+  )
   print "samurai ok: manifest parse, dry-run order, query tool"
 }
-
-main(@args)

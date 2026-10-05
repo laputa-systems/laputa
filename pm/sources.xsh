@@ -108,7 +108,11 @@ export pure pinned_url_sha256(package_name: Str, url: Str, checksum: Str) -> Res
 export enum SourceFetchOutcome { Cached, Fetched(Int), Unavailable(Str), Mismatch(Str) }
 
 ## Downloads `url` into the cache entry for `sha256`, publishing only verified bytes.
-export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome, Error] {
+export proc fill_source_cache_entry(
+  root: Path,
+  sha256: Str,
+  url: Str,
+) [fs, net, error] -> Result[SourceFetchOutcome, Error] {
   let entry = source_cache_entry(root, sha256)
   let partial_dir = fp"{root}/partial"
   entry.parent.mkdir()
@@ -217,7 +221,10 @@ export proc resolve_source(
 # and a build stages them offline as a cargo directory source. Cargo.lock
 # names crates.io by its git index or, with the sparse protocol, its HTTP
 # index; both serve the same archives.
-const crates_io_lock_sources = ["registry+https://github.com/rust-lang/crates.io-index", "sparse+https://index.crates.io/"]
+const crates_io_lock_sources = [
+  "registry+https://github.com/rust-lang/crates.io-index",
+  "sparse+https://index.crates.io/",
+]
 
 # Crate names and versions become vendor directory names, so neither may
 # carry a path separator.
@@ -243,10 +250,12 @@ pure empty_lock_record() -> LockRecord {
 pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[LockedCrate]] {
   return [] when record.source == ""
 
-  let label = f"{lockfile.display()}: {record.name} {record.version}"
+  let label = f"{lockfile}: {record.name} {record.version}"
 
   if record.source not in crates_io_lock_sources {
-    return Err(types.PmError.PackageContract(f"{label} comes from {record.source}; only crates.io crates can be vendored"))
+    return Err(
+      types.PmError.PackageContract(f"{label} comes from {record.source}; only crates.io crates can be vendored"),
+    )
   }
 
   if ! crate_name_pattern.matches(record.name) or ! crate_version_pattern.matches(record.version) {
@@ -254,7 +263,9 @@ pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[Locke
   }
 
   if ! sha256_hex.matches(record.checksum) {
-    return Err(types.PmError.SourceChecksum(f"{label} has no sha256 checksum; regenerate the lockfile with current cargo"))
+    return Err(
+      types.PmError.SourceChecksum(f"{label} has no sha256 checksum; regenerate the lockfile with current cargo"),
+    )
   }
 
   [{name: record.name, version: record.version, checksum: record.checksum}]
@@ -620,7 +631,10 @@ export type SourceFetchItem = {sha256: Str, urls: List[Str], packages: List[Str]
 
 ## Collects the pinned URL sources `packages` select for `arch`, one item per
 ## sha256. Builds run natively, so the build architecture equals the target.
-export proc source_fetch_items(packages: List[types.Package], arch: Str) [error] -> Result[List[SourceFetchItem], Error] {
+export proc source_fetch_items(
+  packages: List[types.Package],
+  arch: Str,
+) [error] -> Result[List[SourceFetchItem], Error] {
   var by_sha256: Map[SourceFetchItem] = {}
 
   for pkg in packages {
@@ -637,7 +651,12 @@ export proc source_fetch_items(packages: List[types.Package], arch: Str) [error]
   sorted_fetch_items(by_sha256)
 }
 
-pure with_fetch_item(by_sha256: Map[SourceFetchItem], sha256: Str, url: Str, package_name: Str) -> Map[SourceFetchItem] {
+pure with_fetch_item(
+  by_sha256: Map[SourceFetchItem],
+  sha256: Str,
+  url: Str,
+  package_name: Str,
+) -> Map[SourceFetchItem] {
   let empty: List[Str] = []
   let existing = by_sha256.get(sha256) ?? {sha256, urls: empty, packages: empty}
   var updated = by_sha256
@@ -650,7 +669,7 @@ pure with_fetch_item(by_sha256: Map[SourceFetchItem], sha256: Str, url: Str, pac
 }
 
 pure sorted_fetch_items(by_sha256: Map[SourceFetchItem]) -> List[SourceFetchItem] {
-  by_sha256.values() |> sort-by { f"{.packages[0]}\t{.urls[0]}" }
+  by_sha256.values() |> sort-by f"{.packages[0]}\t{.urls[0]}"
 }
 
 ## Collects the `.crate` downloads the `cargo-vendor` sources of `packages`
@@ -775,7 +794,8 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
     }
   }
 
-  print "sources" "summary" $cached "cached" $fetched "fetched" $fetched_bytes "bytes" failures.len() "failed" "cache" $root
+  print "sources" "summary" $cached "cached" $fetched "fetched" $fetched_bytes "bytes" failures.len() "failed" "cache" \
+    $root
 
   for failure in failures {
     eprint $failure

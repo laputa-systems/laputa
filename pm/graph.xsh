@@ -322,9 +322,7 @@ export proc packages_buildable_without(
     for pkg in catalog.packages {
       let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
 
-      if [name for name in closure if name in excluded].is_empty() {
-        yield pkg.name
-      }
+      yield pkg.name when [name for name in closure if name in excluded].is_empty()
     }
   }
 

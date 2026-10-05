@@ -35,5 +35,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   )
   print "libxkbcommon ok"
 }
-
-main(@args)

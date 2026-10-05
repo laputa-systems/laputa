@@ -68,7 +68,6 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
   Err(ScriptError.Failed(kind: "dropbear-proof", message: "dropbearkey did not print an SSH public key"))
 }
 
-
 # Runs one command over SSH as `login` on loopback and returns its output, or
 # "" when the login fails. `-y -y` skips host key checking entirely, so the
 # client writes no known_hosts; BatchMode keeps it from prompting; HOME keeps
@@ -82,7 +81,8 @@ proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, 
   env ({
     HOME: home.display(),
   }) {
-    ok = (run.status --timeout=10s $dynlinker $dbclient "-y" "-y" "-o" "BatchMode=yes" "-i" $key "-p" f"{port}" f"{login}@127.0.0.1" "echo laputa-ssh-ok" > $out 2> /dev/null).ok
+    ok = (run.status --timeout=10s $dynlinker $dbclient "-y" "-y" "-o" "BatchMode=yes" "-i" $key "-p" $port \
+      f"{login}@127.0.0.1" "echo laputa-ssh-ok" > $out 2> /dev/null).ok
   }
 
   return "" unless ok
@@ -105,7 +105,7 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   stranger_key.remove()
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key
-  let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?)?
+  let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key?)?
 
   # dropbear accepts authorized_keys only when every directory up to the
   # user's home (or /) is owned by the user or root and not group or world
@@ -122,7 +122,8 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let log_path = fp"{tmp}/dropbear.log"
   let port = 22000 + pid % 20000
   let listen = f"127.0.0.1:{port}"
-  let server = spawn run $dynlinker $dropbear "-F" "-E" "-s" "-r" $host_key "-D" $auth_dir "-p" $listen > /dev/null 2> $log_path ?
+  let server = spawn run $dynlinker $dropbear "-F" "-E" "-s" "-r" $host_key "-D" $auth_dir "-p" $listen > /dev/null \
+    2> $log_path ?
 
   var output = ""
   var tries = 50
@@ -141,9 +142,12 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   process.kill(server.pid, "TERM")
   let _ = wait server
   let log = log_path.read_text()?
-  proof.ensure(output == "laputa-ssh-ok", "dropbear-ssh", f"authorized client did not run its command: {output}; server log: {log}")
+  proof.ensure(
+    output == "laputa-ssh-ok",
+    "dropbear-ssh",
+    f"authorized client did not run its command: {output}; server log: {log}",
+  )
   proof.ensure("Pubkey auth succeeded" in log, "dropbear-ssh", f"server did not log public-key auth: {log}")
   proof.ensure(stranger == "", "dropbear-ssh", "dropbear accepted a client key missing from authorized_keys")
   print "dropbear ok: ed25519 host key, public-key login runs a command, unknown key refused"
 }
-main(@args)

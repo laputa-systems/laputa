@@ -18,5 +18,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure("ALLWINNER" in strings, "proof-libdrm", "libdrm lacks the generated modifier vendor table")
   print "libdrm ok"
 }
-
-main(@args)

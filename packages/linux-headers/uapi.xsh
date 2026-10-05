@@ -28,7 +28,7 @@ pure constant(value: Bool) -> Cond {
   {known: true, value}
 }
 
-const unknown: Cond = {known: false, value: false}
+const unknown: Cond = Cond(known: false, value: false)
 
 pure negate(cond: Cond) -> Cond {
   return constant(! cond.value) when cond.known
@@ -219,7 +219,7 @@ pure set_top(frames: List[Frame], frame: Frame) -> List[Frame] {
 # byte.
 ## Remove kernel-only conditional blocks as `unifdef -U__KERNEL__ -D__EXPORTED_HEADERS__` does.
 export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
-  var out: List[Str] = []
+  var out = []
   var frames: List[Frame] = []
   var index = 0
 

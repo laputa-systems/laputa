@@ -64,35 +64,27 @@ error CapsTableError = Missing(block: Str) | Mismatch(block: Str, row: Str)
 proc embedded_block(script: Str, name: Str) [error] -> Result[Str] {
   let opening = f"const {name} = r\"\"\"\n"
   let start = script.find(opening)
-  if start == null {
-    return Err(CapsTableError.Missing(name))
-  }
+  return Err(CapsTableError.Missing(name)) when start == null
 
   let body = start + opening.byte_len()
   let end = script.find("\n\"\"\"", body)
-  if end == null {
-    return Err(CapsTableError.Missing(name))
-  }
+  return Err(CapsTableError.Missing(name)) when end == null
 
   script.byte_slice(body, end - body)
 }
 
 # `awk '!/^#/ && NF {print $1, $2, $3}' include/Caps`
 pure standard_rows(caps: Str) -> Str {
-  [
-    line.fields()[0..3].join(" ")
-    for line in caps.split("\n")
-    if ! line.starts_with("#") and ! line.fields().is_empty()
-  ].join("\n")
+  [line.fields()[0..3].join(" ") for line in caps.split("\n") if ! line.starts_with("#") and ! line.fields().is_empty()].join(
+    "\n",
+  )
 }
 
 # `awk '$1 == "infoalias" || $1 == "userdef" {print $1, $2, $3}' include/Caps-ncurses`
 pure ncurses_rows(caps: Str) -> Str {
-  [
-    line.fields()[0..3].join(" ")
-    for line in caps.split("\n")
-    if ! line.fields().is_empty() and (line.fields()[0] == "infoalias" or line.fields()[0] == "userdef")
-  ].join("\n")
+  [line.fields()[0..3].join(" ") for line in caps.split("\n") if ! line.fields().is_empty() and (line.fields()[0] == "infoalias" or line.fields()[0] == "userdef")].join(
+    "\n",
+  )
 }
 
 # The binary format's capability order is the order of include/Caps; a

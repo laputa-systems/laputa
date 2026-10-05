@@ -594,7 +594,7 @@ export pure pnpids_source(pnp_ids: Str) -> Result[Str, Error] {
   let cases = collect {
     for line in pnp_ids.split("\n") {
       if let [_, id, vendor] = rx"^\s*(\S+)\s*(.*)$".captures(line) {
-        if id.byte_len() != 3 {
+        guard id.byte_len() == 3 else {
           return Err(WlrootsError.Generate(f"pnp.ids holds an ID that is not three characters: {id}"))
         }
 
@@ -674,8 +674,12 @@ rt = declare_dependency()""",
 
   let shader_meson = p"render/gles2/shaders/meson.build"
 
-  replace_required(shader_meson, """embed = find_program('./embed.sh', native: true)
-""", "")
+  replace_required(
+    shader_meson,
+    """embed = find_program('./embed.sh', native: true)
+""",
+    "",
+  )
 
   replace_required(
     shader_meson,
@@ -725,7 +729,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dauto_features=disabled" "-Dwerror=false" "-Dbackends=drm,libinput" "-Drenderers=gles2" "-Dallocators=gbm" "-Dsession=enabled" "-Dxwayland=disabled" "-Dcolor-management=disabled" "-Dlibliftoff=disabled" "-Dxcb-errors=disabled" "-Dexamples=false" "build"
+    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
+      "-Dauto_features=disabled" "-Dwerror=false" "-Dbackends=drm,libinput" "-Drenderers=gles2" "-Dallocators=gbm" \
+      "-Dsession=enabled" "-Dxwayland=disabled" "-Dcolor-management=disabled" "-Dlibliftoff=disabled" \
+      "-Dxcb-errors=disabled" "-Dexamples=false" "build"
 
     if native_scanner {
       let ninja = p"build/build.ninja"

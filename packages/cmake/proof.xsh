@@ -25,7 +25,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let version = run.text $cmake "--version"
 
   if ! version.starts_with(f"cmake version {ver}\n") {
-    Err(ScriptError.Failed(kind: "cmake-proof-version", message: f"cmake --version reported {version.lines()[0]}, expected {ver}"))?
+    Err(
+      ScriptError.Failed(
+        kind: "cmake-proof-version",
+        message: f"cmake --version reported {version.lines()[0]}, expected {ver}",
+      ),
+    )?
   }
 
   let tmp = fp"{rootfs}/var/tmp/proof-cmake"
@@ -46,7 +51,8 @@ proc main(...argv: List[Str]) [] {
 }
 
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 
   fp"{tmp}/CMakeLists.txt".write(
@@ -84,5 +90,3 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
     print "cmake ok: runtime configure"
   }
 }
-
-main(@args)

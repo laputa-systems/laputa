@@ -175,7 +175,11 @@ proc write_generated_headers(target: LibffiTarget) {
 # target's ffitarget.h, which select the closure, Go closure, complex, and
 # int128 symbol nodes the target exports.
 proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: List[Str], includes: List[Str]) {
-  let argv = ["-target", triple].extend(defs).extend(includes).extend([
+  let argv = [
+    "-target",
+    triple,
+    @defs,
+    @includes,
     f"-D{target.target}",
     "-DGENERATE_LIBFFI_MAP",
     "-E",
@@ -185,7 +189,7 @@ proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: Lis
     "-o",
     "libffi.map",
     "libffi.map.in",
-  ])
+  ]
 
   run $cc ${argv}
 }

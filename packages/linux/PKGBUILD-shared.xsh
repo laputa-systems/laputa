@@ -10,7 +10,9 @@ export proc build_jobs() [env, error] -> Result[Int, Error] {
     let parsed = raw as Int
 
     if parsed <= 0 {
-      return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-jobs", message: "XSH_LINUX_KBUILD_JOBS must be a positive integer"))
+      return Err(
+        kbuild.ScriptError.Failed(kind: "linux-kbuild-jobs", message: "XSH_LINUX_KBUILD_JOBS must be a positive integer"),
+      )
     }
 
     return parsed
@@ -69,7 +71,9 @@ proc staged_recipe_helper(name: Str) -> Result[Path] {
   let helper = fp"{recipe_dir}/{name}"
 
   if ! helper.exists() {
-    return Err(kbuild.ScriptError.Failed(kind: "linux-recipe-helper", message: f"missing staged recipe helper: {helper}"))
+    return Err(
+      kbuild.ScriptError.Failed(kind: "linux-recipe-helper", message: f"missing staged recipe helper: {helper}"),
+    )
   }
 
   helper
@@ -381,21 +385,24 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   if explicit_inline != "" {
     emit_kbuild_progress("xsh-kbuild-plan-cache explicit-inline-read")
     let plan = kbuild.parse_discovered_plan_text(explicit_inline)?
-    print "xsh-kbuild-plan-cache" "explicit-inline" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
+    print "xsh-kbuild-plan-cache" "explicit-inline" plan.dirs.len() "dirs" plan.objects.len() "objects" \
+      plan.composites.len() "composites"
     return plan
   }
 
   if explicit_text != "" {
     emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-text-read {explicit_text}")
     let plan = kbuild.read_discovered_plan_text(fp"{explicit_text}")?
-    print "xsh-kbuild-plan-cache" "explicit-text" $explicit_text plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
+    print "xsh-kbuild-plan-cache" "explicit-text" $explicit_text plan.dirs.len() "dirs" plan.objects.len() "objects" \
+      plan.composites.len() "composites"
     return plan
   }
 
   if explicit != "" {
     emit_kbuild_progress(f"xsh-kbuild-plan-cache explicit-read {explicit}")
     let plan = kbuild.read_discovered_plan(fp"{explicit}")?
-    print "xsh-kbuild-plan-cache" "explicit" $explicit plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
+    print "xsh-kbuild-plan-cache" "explicit" $explicit plan.dirs.len() "dirs" plan.objects.len() "objects" \
+      plan.composites.len() "composites"
     return plan
   }
 
@@ -416,14 +423,16 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     emit_kbuild_progress(f"xsh-kbuild-plan-cache fingerprint {plan.dirs.len()} dirs {plan.objects.len()} objects")
 
     if (e"XSH_LINUX_KBUILD_TRUST_PLAN_CACHE" ?? "") == "1" {
-      print "xsh-kbuild-plan-cache" "trusted" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
+      print "xsh-kbuild-plan-cache" "trusted" plan.dirs.len() "dirs" plan.objects.len() "objects" \
+        plan.composites.len() "composites"
       return plan
     }
 
     let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan)?
 
     if fingerprint_path.read_text()?.trim() == fingerprint.trim() {
-      print "xsh-kbuild-plan-cache" "hit" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() "composites"
+      print "xsh-kbuild-plan-cache" "hit" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() \
+        "composites"
       return plan
     }
 
@@ -441,7 +450,8 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 """,
         )
 
-        print "xsh-kbuild-plan-cache" "stale-stable-hit" stable_plan.dirs.len() "dirs" stable_plan.objects.len() "objects" stable_plan.composites.len() "composites"
+        print "xsh-kbuild-plan-cache" "stale-stable-hit" stable_plan.dirs.len() "dirs" stable_plan.objects.len() \
+          "objects" stable_plan.composites.len() "composites"
         return stable_plan
       }
     }
@@ -463,7 +473,8 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 """,
       )
 
-      print "xsh-kbuild-plan-cache" "stable-hit" stable_plan.dirs.len() "dirs" stable_plan.objects.len() "objects" stable_plan.composites.len() "composites"
+      print "xsh-kbuild-plan-cache" "stable-hit" stable_plan.dirs.len() "dirs" stable_plan.objects.len() "objects" \
+        stable_plan.composites.len() "composites"
       return stable_plan
     }
 
@@ -509,9 +520,7 @@ proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
     for item in raw.split(",") {
       let trimmed = item.trim()
 
-      if trimmed != "" {
-        yield fp"{trimmed}"
-      }
+      yield fp"{trimmed}" when trimmed != ""
     }
   }
 
@@ -555,8 +564,10 @@ export proc run_targeted_kbuild_outputs(
 
 ## Exported declaration `require_valid_archive_plan`.
 export proc require_valid_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) [error] {
-  if ! archive_plan.duplicate_outputs.is_empty() {
-    return Err(kbuild.ScriptError.Failed(kind: "linux-native-kbuild-duplicate-output", message: "archive plan has duplicate output"))
+  guard archive_plan.duplicate_outputs.is_empty() else {
+    return Err(
+      kbuild.ScriptError.Failed(kind: "linux-native-kbuild-duplicate-output", message: "archive plan has duplicate output"),
+    )
   }
 
   var outputs: Map[Bool] = {}
@@ -626,7 +637,9 @@ export proc run_native_command(argv: List[Str]) [process, env, error] {
   let status = process.run(command)?
 
   if ! status.ok {
-    return Err(kbuild.ScriptError.Failed(kind: "linux-native-kbuild-command", message: f"command failed: {argv.join(" ")}"))
+    return Err(
+      kbuild.ScriptError.Failed(kind: "linux-native-kbuild-command", message: f"command failed: {argv.join(" ")}"),
+    )
   }
 }
 

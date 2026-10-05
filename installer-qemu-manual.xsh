@@ -4,9 +4,7 @@ use installer.host
 proc parse_size(value: Str) -> Result[Int] {
   let trimmed = value.trim()
 
-  if trimmed.ends_with("G") {
-    return trimmed.split("G")[0] as Int * 1024 * 1024 * 1024
-  }
+  return trimmed.split("G")[0] as Int * 1024 * 1024 * 1024 when trimmed.ends_with("G")
 
   return trimmed.split("M")[0] as Int * 1024 * 1024 when trimmed.ends_with("M")
 

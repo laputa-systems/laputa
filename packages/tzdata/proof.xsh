@@ -62,7 +62,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let zone1970 = fp"{zoneinfo}/zone1970.tab".read_text()?
   proof.ensure("\tEurope/Berlin\t" in zone1970, "tzdata-tables", "zone1970.tab lacks Europe/Berlin")
 
-  let tzif = fs.walk(zoneinfo) |> where .kind == "file" and ! .name.ends_with(".tab") and .name != "leapseconds" and .name != "leap-seconds.list"
+  let tzif = fs.walk(zoneinfo)
+    |> where .kind == "file" and ! .name.ends_with(".tab") and .name != "leapseconds" and .name != "leap-seconds.list"
   proof.ensure(tzif.len() == 598, "tzdata-zones", f"expected 598 TZif files, found {tzif.len()}")
 
   for entry in tzif {
@@ -92,5 +93,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "tzdata ok: 598 TZif zones, tables, Berlin/New York/Tokyo offsets and DST names"
 }
-
-main(@args)

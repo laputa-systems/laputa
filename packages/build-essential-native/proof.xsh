@@ -81,5 +81,3 @@ proc main(root = /rootfs) [fs, env, error] {
 
   print "build-essential-native ok"
 }
-
-main(@args)

@@ -48,5 +48,3 @@ int main(void) {
 
   print "utf8proc ok: NFC, character widths"
 }
-
-main(@args)

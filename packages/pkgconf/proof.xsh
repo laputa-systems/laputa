@@ -66,7 +66,11 @@ proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: L
 
 proc expect(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str], want: Str) {
   let got = query(pkg_config, dynlinker, libdir, sysroot, args)?
-  proof.ensure(got == want, "proof-pkgconf", f"pkg-config {args.join(" ")} (sysroot {sysroot}) gave `{got}`, want `{want}`")
+  proof.ensure(
+    got == want,
+    "proof-pkgconf",
+    f"pkg-config {args.join(" ")} (sysroot {sysroot}) gave `{got}`, want `{want}`",
+  )
 }
 
 proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[Str], ok: Bool) {
@@ -79,7 +83,11 @@ proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[St
     status_ok = (run.status $dynlinker $pkg_config @args 2> /dev/null).ok
   }
 
-  proof.ensure(status_ok == ok, "proof-pkgconf", f"pkg-config {args.join(" ")} exit status ok={status_ok}, want ok={ok}")
+  proof.ensure(
+    status_ok == ok,
+    "proof-pkgconf",
+    f"pkg-config {args.join(" ")} exit status ok={status_ok}, want ok={ok}",
+  )
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
@@ -141,7 +149,14 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     f"-L{s}/usr/lib -lapp -lbase -lm -L{s}/usr/lib/priv -lpriv -lpthread",
   )
 
-  expect(pkg_config, dynlinker, libdir, s, ["--libs", "laputa-base", "laputa-priv"], f"-L{s}/usr/lib -lbase -L{s}/usr/lib/priv -lpriv")
+  expect(
+    pkg_config,
+    dynlinker,
+    libdir,
+    s,
+    ["--libs", "laputa-base", "laputa-priv"],
+    f"-L{s}/usr/lib -lbase -L{s}/usr/lib/priv -lpriv",
+  )
   expect(pkg_config, dynlinker, libdir, s, ["--variable=pkgdatadir", "laputa-data"], f"{s}/usr/share/laputa-data")
   expect(pkg_config, dynlinker, libdir, s, ["--print-requires", "laputa-app"], "laputa-base >= 1.2")
   expect(pkg_config, dynlinker, libdir, s, ["--print-requires-private", "laputa-app"], "laputa-priv")
@@ -164,7 +179,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   # The shared library loads and exports only the public pkgconf_ API.
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "--dyn-syms" "-W" fp"{rootfs}/usr/lib/libpkgconf.so.8"
-  proof.ensure(" pkgconf_compare_version" in symbols, "proof-pkgconf", "libpkgconf does not export pkgconf_compare_version")
+  proof.ensure(
+    " pkgconf_compare_version" in symbols,
+    "proof-pkgconf",
+    "libpkgconf does not export pkgconf_compare_version",
+  )
 
   for line in symbols.lines() {
     let words = line.words()
@@ -174,5 +193,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   print f"pkgconf ok: {ver} cflags, libs, static, sysroot, system filtering, constraints, exports"
 }
-
-main(@args)

@@ -36,8 +36,10 @@ $MODALIAS=.* root:root 0660 @modprobe -q "$MODALIAS"
   bad.write("null root:root 0666 =\n")
   run $dynlinker $mdevd "-N" "-f" $good "-d" fp"{tmp}/dev"
   let rejected = run.status $dynlinker $mdevd "-N" "-f" $bad "-d" fp"{tmp}/dev" 2> /dev/null
-  proof.ensure(rejected.exited() and rejected.exit_code()? == 2, "proof-mdevd", "mdevd -N accepted a configuration with a syntax error")
+  proof.ensure(
+    rejected.exited() and rejected.exit_code()? == 2,
+    "proof-mdevd",
+    "mdevd -N accepted a configuration with a syntax error",
+  )
   print "mdevd ok: configuration parse accepts valid rules and rejects a syntax error"
 }
-
-main(@args)

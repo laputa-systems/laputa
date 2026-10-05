@@ -9,7 +9,11 @@ proc main(root: Path = /rootfs) [fs, error] {
   # alsa-lib (ALSA_CONFIG_DIR /usr/share/alsa) opens ucm2/ucm.conf first,
   # then finds a card's profile through conf.d/<driver>/<driver>.conf, a
   # symlink into the shared tree, so those links must resolve.
-  proof.ensure("Syntax" in fp"{ucm}/ucm.conf".read_text()?, "proof-alsa-ucm-conf", "ucm2/ucm.conf is not a UCM configuration")
+  proof.ensure(
+    "Syntax" in fp"{ucm}/ucm.conf".read_text()?,
+    "proof-alsa-ucm-conf",
+    "ucm2/ucm.conf is not a UCM configuration",
+  )
 
   for conf in [p"conf.d/HDA-Intel/HDA-Intel.conf", p"conf.d/USB-Audio/USB-Audio.conf", p"conf.d/SOF/SOF.conf"] {
     let text = fp"{ucm}/{conf}".read_text()?
@@ -33,8 +37,10 @@ proc main(root: Path = /rootfs) [fs, error] {
     }
   }
 
-  proof.ensure(links == 155 and files == 674, "proof-alsa-ucm-conf", f"ucm2 holds {files} files and {links} links, expected 674 and 155")
+  proof.ensure(
+    links == 155 and files == 674,
+    "proof-alsa-ucm-conf",
+    f"ucm2 holds {files} files and {links} links, expected 674 and 155",
+  )
   print f"alsa-ucm-conf ok: {files} files, {links} resolving links under /usr/share/alsa/ucm2"
 }
-
-main(@args)

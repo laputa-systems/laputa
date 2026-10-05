@@ -132,5 +132,3 @@ proc main(...argv: List[Str]) [error] {
 
   check_image(fp"{opts.image[0]}")
 }
-
-main(@args)

@@ -37,7 +37,9 @@ proc run_step(root: Path, logs: Path, step: Step) [fs, process, time, error] -> 
   let make = process.which("make")?
   let log = fp"{logs}/{step.name}.log"
   let started = time.now()
-  let status = process.run(process.command_argv(make, step.argv, root, stdout: log, stderr: log, stdout_append: true, stderr_append: true))?
+  let status = process.run(
+    process.command_argv(make, step.argv, root, stdout: log, stderr: log, stdout_append: true, stderr_append: true),
+  )?
   let timed = {name: step.name, seconds: (time.now() - started) / 1000, ok: status.ok}
   print f"verify {step.name}: {if timed.ok { "ok" } else { "FAILED" }} {timed.seconds}s"
   timed
@@ -80,13 +82,19 @@ proc main(arch: Str) [fs, process, env, time, error] {
   var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
   let logs = fp"{root}/.out/verify"
   logs.mkdir()
-  var mirror: ProcessHandle? = null
+  var mirror = null
 
   for step in steps(arch) {
     if step.name == "publish" {
       # Started after the world build, so its own first-run build does not
       # overlap the heaviest step.
-      let handle = spawn process.command_argv(make, ["make", "mirror"], root, stdout: fp"{logs}/mirror.log", stderr: fp"{logs}/mirror.log")?
+      let handle = spawn process.command_argv(
+        make,
+        ["make", "mirror"],
+        root,
+        stdout: fp"{logs}/mirror.log",
+        stderr: fp"{logs}/mirror.log",
+      )?
       mirror = handle
       var waited = 0
 
@@ -119,5 +127,3 @@ proc main(arch: Str) [fs, process, env, time, error] {
 
   print (fp"{logs}/report.md".read_text()?)
 }
-
-main(@args)

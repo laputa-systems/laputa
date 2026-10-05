@@ -100,9 +100,7 @@ proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
         }
       }
 
-      if package_input_path(rel) {
-        yield tree_entry_line(pkg.dir, entry.path, "package-file")?
-      }
+      yield tree_entry_line(pkg.dir, entry.path, "package-file")? when package_input_path(rel)
     }
   }
 
@@ -118,11 +116,7 @@ proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
 # expansion staging applies, so `repository/.out/seed/ARCH` keys each target by
 # its own seed and another target's inputs never change this key. Builds are
 # native, so the build architecture is the target's.
-proc repository_input_lines(
-  repo_root: Path,
-  pkg: types.Package,
-  target: types.Target,
-) -> Result[List[Str]] {
+proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) -> Result[List[Str]] {
   let arch = types.pm_target_arch(target)
   let lines: List[Str] = collect {
     for source in pkg.upstream_sources {
@@ -157,7 +151,11 @@ proc repository_input_lines(
 }
 
 ## Hashes every semantic package build input without absolute checkout state or modification times.
-export proc package_build_input(repo_root: Path, pkg: types.Package, target: types.Target) [fs, error] -> Result[Str, Error] {
+export proc package_build_input(
+  repo_root: Path,
+  pkg: types.Package,
+  target: types.Target,
+) [fs, error] -> Result[Str, Error] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("package build input target is unsupported"))
   }
@@ -209,9 +207,7 @@ export proc package_build_input(repo_root: Path, pkg: types.Package, target: typ
 proc pm_proof_module(pm_root: Path) -> Result[Str] {
   let proof = fp"{pm_root}/pm/proof.xsh"
 
-  if ! proof.exists() {
-    return Err(types.PmError.PackageContract(f"{proof} is missing"))
-  }
+  return Err(types.PmError.PackageContract(f"{proof} is missing")) unless proof.exists()
 
   hash.sha256(proof)?.hex()
 }

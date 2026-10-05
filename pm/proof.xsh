@@ -33,7 +33,7 @@ export proc package_metadata(root: Path, name: Str) [fs, error] {
 ## binary it runs reports the version the recipe pins.
 export proc package_version(root: Path, name: Str) [fs, error] -> Result[Str, Error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
-  json.read(db)?.require(Record)?.get("ver")?.require(Str)
+  json.read(db)?.require(Record)?.get("ver")?.require()
 }
 
 proc package_dependency_map(root: Path) -> Result[Map[List[Str]]] {
@@ -80,7 +80,9 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
     let first = failures[0]
 
     if first.provider == "" {
-      return Err(ProofError.Failed(kind: f"proof-{name}", message: f"{first.file} needs {first.soname} by its build-time path"))
+      return Err(
+        ProofError.Failed(kind: f"proof-{name}", message: f"{first.file} needs {first.soname} by its build-time path"),
+      )
     }
 
     return Err(

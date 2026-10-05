@@ -11,9 +11,7 @@ export proc repo_url() [env] -> Str {
 
 # The local mirror and `file://` trees accept writes without credentials.
 pure remote_auth_headers(token: Str) -> List[NetHeader] {
-  if token == "" {
-    return []
-  }
+  return [] when token == ""
 
   [{name: "Authorization", value: f"Bearer {token}"}]
 }
@@ -65,7 +63,7 @@ export proc upload_immutable_repo_file(
   token: Str,
   work: Path,
 ) [fs, net, error] -> Result[Bool, Error] {
-  if ! util.is_file_url(repo) {
+  guard util.is_file_url(repo) else {
     let response = net.upload({
       method: "PUT",
       url: util.repo_url_for(repo, rel)?,
@@ -75,9 +73,7 @@ export proc upload_immutable_repo_file(
       fail_status: false,
     })?
 
-    if response.status >= 200 and response.status < 300 {
-      return true
-    }
+    return true when response.status >= 200 and response.status < 300
 
     # Objects are content-addressed, so a retried publication meets the
     # objects its failed attempt already uploaded; identical bytes are done.
@@ -100,9 +96,7 @@ export proc upload_immutable_repo_file(
   let dest = util.repo_file_path(repo, rel)?
 
   if dest.exists() {
-    if hash.sha256(dest)?.hex() == hash.sha256(source)?.hex() {
-      return false
-    }
+    return false when hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
 
     return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
   }
@@ -119,7 +113,7 @@ export proc upload_immutable_repo_file(
 ## Exported PM declaration `load_remote_index_from`.
 export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[types.RemotePackage], Error] {
   if index_path.exists() {
-    let rows: List[Record] = json.read(index_path)?.require(List[Record])?
+    let rows: List[Record] = json.read(index_path)?.require()?
     return decode_remote_index(rows)
   }
 
@@ -153,7 +147,7 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
   }
 
   let body = response.body as Str
-  let rows: List[Record] = json.decode(body)?.require(List[Record])?
+  let rows: List[Record] = json.decode(body)?.require()?
   let items = decode_remote_index(rows)?
   out.mkdir()
   util.remote_index_cache_path(out).write_atomic(body)
@@ -165,9 +159,7 @@ export proc load_remote_index_from_repo(
   repo: Str,
   out: Path,
 ) [fs, net, time, error] -> Result[List[types.RemotePackage], Error] {
-  if util.is_file_url(repo) {
-    return try_load_remote_index_from_repo(repo, out)?
-  }
+  return try_load_remote_index_from_repo(repo, out)? when util.is_file_url(repo)
 
   retry [1s, 2s, 4s, 15s, 60s] {
     try_load_remote_index_from_repo(repo, out)?
@@ -199,34 +191,34 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
   }
 
   if "arch" in row {
-    let stored_arch: Str = row.get("arch")?.require(Str)?
+    let stored_arch: Str = row.get("arch")?.require()?
     arch = util.normalize_arch(stored_arch)
   }
 
   {
     arch,
-    name: row.get("name")?.require(Str)?,
-    ver: row.get("ver")?.require(Str)?,
-    rel: row.get("rel")?.require(Str)?,
-    deps: row.get("deps")?.require(List[Str])?,
+    name: row.get("name")?.require()?,
+    ver: row.get("ver")?.require()?,
+    rel: row.get("rel")?.require()?,
+    deps: row.get("deps")?.require()?,
     # Index rows written before runtime-only dependencies existed declare none.
-    runtime_only_deps: if "runtime_only_deps" in row { row.get("runtime_only_deps")?.require(List[Str])? } else { empty_dependencies },
+    runtime_only_deps: if "runtime_only_deps" in row { row.get("runtime_only_deps")?.require()? } else { empty_dependencies },
     mkdeps_host,
     mkdeps_target,
-    sha256: row.get("sha256")?.require(Str)?,
-    size: row.get("size")?.require(Int)?,
-    tarball: row.get("tarball")?.require(Str)?,
-    metadata: if "metadata" in row { row.get("metadata")?.require(Str)? } else { "" },
-    metadata_sha256: if "metadata_sha256" in row { row.get("metadata_sha256")?.require(Str)? } else { "" },
-    artifact_key: if "artifact_key" in row { row.get("artifact_key")?.require(Str)? } else { "" },
-    recipe_sha256: if "recipe_sha256" in row { row.get("recipe_sha256")?.require(Str)? } else { "" },
-    executor_sha256: if "executor_sha256" in row { row.get("executor_sha256")?.require(Str)? } else { "" },
-    proof_key: if "proof_key" in row { row.get("proof_key")?.require(Str)? } else { "" },
-    proof_sha256: if "proof_sha256" in row { row.get("proof_sha256")?.require(Str)? } else { "" },
-    proof: if "proof" in row { row.get("proof")?.require(Str)? } else { "" },
-    proof_receipt_sha256: if "proof_receipt_sha256" in row { row.get("proof_receipt_sha256")?.require(Str)? } else { "" },
-    source_sha256: row.get("source_sha256")?.require(Str)?,
-    metapackage: row.get("metapackage")?.require(Bool)?,
+    sha256: row.get("sha256")?.require()?,
+    size: row.get("size")?.require()?,
+    tarball: row.get("tarball")?.require()?,
+    metadata: if "metadata" in row { row.get("metadata")?.require()? } else { "" },
+    metadata_sha256: if "metadata_sha256" in row { row.get("metadata_sha256")?.require()? } else { "" },
+    artifact_key: if "artifact_key" in row { row.get("artifact_key")?.require()? } else { "" },
+    recipe_sha256: if "recipe_sha256" in row { row.get("recipe_sha256")?.require()? } else { "" },
+    executor_sha256: if "executor_sha256" in row { row.get("executor_sha256")?.require()? } else { "" },
+    proof_key: if "proof_key" in row { row.get("proof_key")?.require()? } else { "" },
+    proof_sha256: if "proof_sha256" in row { row.get("proof_sha256")?.require()? } else { "" },
+    proof: if "proof" in row { row.get("proof")?.require()? } else { "" },
+    proof_receipt_sha256: if "proof_receipt_sha256" in row { row.get("proof_receipt_sha256")?.require()? } else { "" },
+    source_sha256: row.get("source_sha256")?.require()?,
+    metapackage: row.get("metapackage")?.require()?,
   }
 }
 
@@ -277,9 +269,7 @@ export proc upsert_remote_package(
       }
     }
 
-    if ! replaced {
-      yield entry
-    }
+    yield entry unless replaced
   }
 
   let sorted = updated |> sort-by .name
@@ -373,7 +363,7 @@ export proc plan_artifact_from_package_at_repo(
   repo: Str,
   cache: Path,
 ) [fs, net, error] -> Result[types.RemotePlanArtifact, Error] {
-  if value.metadata_sha256 != "" {
+  guard value.metadata_sha256 == "" else {
     return plan_artifact_from_package(value)?
   }
 
@@ -387,9 +377,7 @@ export proc plan_artifact_from_package_at_repo(
   let cache_path = fp"{cache}/legacy-metadata/{rel.bytes().sha256().hex()}.json"
   let failure = try_fetch_repo_file(repo, rel, cache_path)?
 
-  if failure != "" {
-    return Err(types.PmError.RemoteFetch(failure))
-  }
+  return Err(types.PmError.RemoteFetch(failure)) when failure != ""
 
   let metadata_sha256 = hash.sha256(cache_path)?.hex()
   plan_artifact_from_package({...value, metadata: rel.display(), metadata_sha256})?

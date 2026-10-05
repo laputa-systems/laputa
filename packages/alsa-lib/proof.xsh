@@ -108,7 +108,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   # The configuration tree libasound reads from ALSA_CONFIG_DIR.
   let share = fp"{root}/usr/share/alsa"
 
-  for conf in [p"alsa.conf", p"pcm/default.conf", p"pcm/dmix.conf", p"ctl/default.conf", p"cards/HDA-Intel.conf", p"cards/aliases.conf"] {
+  for conf in [
+    p"alsa.conf",
+    p"pcm/default.conf",
+    p"pcm/dmix.conf",
+    p"ctl/default.conf",
+    p"cards/HDA-Intel.conf",
+    p"cards/aliases.conf",
+  ] {
     proof.ensure(fp"{share}/{conf}".exists()?, "proof-alsa-lib", f"missing /usr/share/alsa/{conf}")
   }
 
@@ -138,5 +145,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(out.trim() == expected, "proof-alsa-lib", f"unexpected software PCM run:\n{out.trim()}")
   print "alsa-lib ok: snd_config_load parsed, null and plug->null PCMs ran PREPARED -> RUNNING -> SETUP"
 }
-
-main(@args)

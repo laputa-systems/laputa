@@ -135,5 +135,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(out.trim() == "libmnl: lo", "libmnl", f"unexpected link dump output: {out.trim()}")
   print "libmnl ok: RTM_GETLINK dump over NETLINK_ROUTE found lo"
 }
-
-main(@args)

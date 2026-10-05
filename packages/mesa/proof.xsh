@@ -132,7 +132,11 @@ int main(void)
 
 # The gallium library is named for the Mesa version.
 proc gallium_library(root: Path) -> Result[Path] {
-  let found = [entry.path for entry in fs.children(fp"{root}/usr/lib") if entry.name.starts_with("libgallium-") and entry.name.ends_with(".so")]
+  let found = [
+    entry.path
+    for entry in fs.children(fp"{root}/usr/lib")
+    if entry.name.starts_with("libgallium-") and entry.name.ends_with(".so")
+  ]
   proof.ensure(found.len() == 1, "proof-mesa", f"expected one libgallium, found {found.len()}")
   found[0].relative_to(root)
 }
@@ -142,7 +146,11 @@ proc gallium_library(root: Path) -> Result[Path] {
 proc check_runtime_needs(root: Path, rels: List[Path]) {
   for rel in rels {
     for needed in elf.inspect(fp"{root}/{rel}")?.needed {
-      proof.ensure(! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"), "proof-mesa", f"{rel} links {needed}")
+      proof.ensure(
+        ! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"),
+        "proof-mesa",
+        f"{rel} links {needed}",
+      )
     }
   }
 }
@@ -188,5 +196,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     print f"mesa ok: {out.trim().split("\n").join("; ")}"
   }?
 }
-
-main(@args)

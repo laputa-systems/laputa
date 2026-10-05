@@ -33,5 +33,3 @@ proc main(arch: Str, ...suites: List[Str]) [fs, process, env, error] {
     }
   }
 }
-
-main(@args)

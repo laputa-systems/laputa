@@ -136,5 +136,3 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
     return Err(WorldRootError.Failed(f"{failures.len()} ELF files in the composed root do not load"))
   }
 }
-
-main(@args)

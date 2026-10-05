@@ -74,5 +74,3 @@ int main(int argc, char **argv) {
 
   print f"linux-pam ok: {arch} permit and deny stacks"
 }
-
-main(@args)

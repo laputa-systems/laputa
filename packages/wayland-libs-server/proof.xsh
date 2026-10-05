@@ -12,5 +12,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   )
   print "wayland-libs-server ok"
 }
-
-main(@args)

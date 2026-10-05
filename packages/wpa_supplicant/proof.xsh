@@ -46,5 +46,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "wpa_supplicant ok"
 }
-
-main(@args)

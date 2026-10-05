@@ -55,7 +55,7 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     )
   }
 
-  if value.kernel_path == "" or value.kernel_path.starts_with(p"/") {
+  if value.kernel_path == "" or value.kernel_path.starts_with(/) {
     return Err(types.LaputaError.Profile(f"{value.name} has an invalid kernel manifest path"))
   }
 
@@ -98,9 +98,7 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 
   let source = fp"{profiles_root}/{name}.xsh"
 
-  if ! source.exists() {
-    return Err(types.LaputaError.Profile(f"unknown profile {name}"))
-  }
+  return Err(types.LaputaError.Profile(f"unknown profile {name}")) unless source.exists()
 
   let exports = module.load(source)?.require(SystemProfileModule)?
   let value = exports.profile

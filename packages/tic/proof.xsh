@@ -22,22 +22,18 @@ proc main(root: Path = /rootfs) [fs, process, error] {
   let tic = fp"{root}/usr/bin/tic"
   proof.ensure(tic.executable()?, "proof-tic", f"missing executable {tic}")
 
-  let tmp = fp"{root}/var/tmp/proof-tic"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  let input = fp"{tmp}/proof.src"
-  input.write(source + "\n")
-  let out = fp"{tmp}/terminfo"
+  tempdir tmp at fp"{root}/var/tmp/proof-tic" {
+    let input = fp"{tmp}/proof.src"
+    input.write(source + "\n")
+    let out = fp"{tmp}/terminfo"
 
-  run $tic -x -o $out -e laputa-proof $input
+    run $tic -x -o $out -e laputa-proof $input
 
-  let compiled = fp"{out}/l/laputa-proof".read_bytes()?
-  let expected = expected_base64.base64_decode()?
-  proof.ensure(compiled == expected, "proof-tic", "laputa-proof differs from ncurses tic's output")
-  proof.ensure(fp"{out}/l/laputa-tic".read_bytes()? == expected, "proof-tic", "the laputa-tic alias differs")
-  proof.ensure(! fp"{out}/l/laputa+base".exists()?, "proof-tic", "-e wrote an unselected entry")
-  print f"tic ok: {compiled.len()}-byte 32-bit entry with extended capabilities matches ncurses tic"
+    let compiled = fp"{out}/l/laputa-proof".read_bytes()?
+    let expected = expected_base64.base64_decode()?
+    proof.ensure(compiled == expected, "proof-tic", "laputa-proof differs from ncurses tic's output")
+    proof.ensure(fp"{out}/l/laputa-tic".read_bytes()? == expected, "proof-tic", "the laputa-tic alias differs")
+    proof.ensure(! fp"{out}/l/laputa+base".exists()?, "proof-tic", "-e wrote an unselected entry")
+    print f"tic ok: {compiled.len()}-byte 32-bit entry with extended capabilities matches ncurses tic"
+  }
 }
-
-main(@args)

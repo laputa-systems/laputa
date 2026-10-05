@@ -10,7 +10,7 @@ const counted_task_clock = rx"(?m)^[0-9.]+,msec,task-clock"
 
 proc recorded_version(rootfs: Path) -> Result[Str] {
   let metadata = json.read(fp"{rootfs}/var/lib/xsh-pm/packages/perf/metadata.json")?.require(Record)?
-  metadata.get("ver")?.require(Str)
+  metadata.get("ver")?.require()
 }
 
 proc prove_perf(loader: Path, perf: Path, ver: Str) {
@@ -89,5 +89,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     prove_perf(loader, fp"{rootfs}/usr/bin/perf", ver)
   }?
 }
-
-main(@args)

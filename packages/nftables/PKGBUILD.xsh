@@ -136,7 +136,9 @@ proc write_config_h() [fs, error] {
 # STABLE_RELEASE (0 without --with-stable-release), and BUILD_STAMP.
 proc write_nftversion_h() {
   let version_template = p"nftversion.h.in".read_text()?
-  let body = version_template.replace("@BUILD_STAMP@", with: build_stamp).replace("@NFT_VERSION@", with: ver.replace(".", with: ",")).replace("@STABLE_RELEASE@", with: "0")
+  let body = version_template.replace("@BUILD_STAMP@", with: build_stamp)
+    .replace("@NFT_VERSION@", with: ver.replace(".", with: ","))
+    .replace("@STABLE_RELEASE@", with: "0")
   p"nftversion.h".write(body)
 }
 
@@ -160,7 +162,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     defs,
     includes,
     p".",
-    [fp"{source}" for source in library_sources()],
+    [
+      fp"{source}"
+      for source in library_sources()
+    ],
     p"obj/libnftables",
   )
 
@@ -168,18 +173,23 @@ export proc build(dest: Path) [fs, process, env, error] {
   let parser = make.compile_lo_tasks(
     cc,
     triple,
-    cflags.extend([
-      "-Wno-missing-declarations",
-      "-Wno-missing-prototypes",
-      "-Wno-nested-externs",
-      "-Wno-redundant-decls",
-      "-Wno-undef",
-      "-Wno-unused-but-set-variable",
-    ]),
+    cflags.extend(
+      [
+        "-Wno-missing-declarations",
+        "-Wno-missing-prototypes",
+        "-Wno-nested-externs",
+        "-Wno-redundant-decls",
+        "-Wno-undef",
+        "-Wno-unused-but-set-variable",
+      ],
+    ),
     defs,
     includes,
     p".",
-    [fp"{source}" for source in parser_sources],
+    [
+      fp"{source}"
+      for source in parser_sources
+    ],
     p"obj/libparser",
   )
 
@@ -203,18 +213,30 @@ export proc build(dest: Path) [fs, process, env, error] {
   let link_library = make.link_shared_task(
     cc,
     triple,
-    library.objects.extend(parser.objects).extend(minigmp.objects),
+    [@library.objects, @parser.objects, @minigmp.objects],
     "libnftables.so.1",
     ["-Wl,--version-script=src/libnftables.map"].extend(netfilter.libs),
     library_so,
-    library.deps.extend(parser.deps).extend(minigmp.deps),
+    [@library.deps, @parser.deps, @minigmp.deps],
   )
 
   # Makefile.am src_nft_SOURCES without BUILD_CLI, linked to libnftables.
   let nft = make.compile_c_tasks(cc, triple, cflags, defs, includes, p".", [p"src/main.c"], p"obj/nft")
   let nft_out = p"obj/nft/nft"
-  let link_nft = make.link_executable_task(cc, triple, nft.objects, [library_so], [], nft_out, nft.deps.push(link_library.name))
-  let tasks = library.tasks.extend(parser.tasks).extend(minigmp.tasks).push(link_library).extend(nft.tasks).push(link_nft)
+  let link_nft = make.link_executable_task(
+    cc,
+    triple,
+    nft.objects,
+    [library_so],
+    [],
+    nft_out,
+    nft.deps.push(link_library.name),
+  )
+  let tasks = library.tasks.extend(parser.tasks)
+    .extend(minigmp.tasks)
+    .push(link_library)
+    .extend(nft.tasks)
+    .push(link_nft)
   make.run_tasks(tasks, make.jobs()?)
 
   fs.install(nft_out, fp"{dest}/usr/bin/nft", 0o755, parents: true, overwrite: true)

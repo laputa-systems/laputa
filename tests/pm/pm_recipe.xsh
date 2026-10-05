@@ -2,8 +2,8 @@
 use pm.catalog
 use pm.recipe
 use pm.sources
-use pm.types
 use pm.target
+use pm.types
 use pm.util
 
 pure fixture(name: Str) -> Path {
@@ -194,7 +194,8 @@ proc main(...argv: List[Str]) [env, error] {{
   print "{output}"
 }}
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 }
 
@@ -350,7 +351,12 @@ test test_recipe_architectures_default_to_every_target_and_reject_invalid_lists 
   let omitted = write_arch_recipe(repo, "arch-omitted", "[]", "")?
   assert recipe.load_package(omitted)?.architectures == ["aarch64", "x86_64"]
 
-  let x86_only = write_arch_recipe(repo, "arch-x86-only", "[]", "## Fixture export.\nexport let architectures = [\"x86_64\"]")?
+  let x86_only = write_arch_recipe(
+    repo,
+    "arch-x86-only",
+    "[]",
+    "## Fixture export.\nexport let architectures = [\"x86_64\"]",
+  )?
   assert recipe.load_package_for_target(x86_only, types.target_aarch64())?.architectures == ["x86_64"]
 
   for case in [

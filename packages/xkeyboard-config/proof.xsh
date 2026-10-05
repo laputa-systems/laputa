@@ -22,5 +22,3 @@ proc main(root: Path = /rootfs) [fs, error] {
 
   print "xkeyboard-config ok"
 }
-
-main(@args)

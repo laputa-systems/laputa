@@ -206,7 +206,9 @@ proc fail_on_m4_status() {
 """
 
   if wait_call not in text {
-    return Err(BisonBuildError.Failed(kind: "bison-patch", message: "src/output.c no longer waits for m4 as this recipe expects"))
+    return Err(
+      BisonBuildError.Failed(kind: "bison-patch", message: "src/output.c no longer waits for m4 as this recipe expects"),
+    )
   }
 
   let checked_wait = """  if (wait_subprocess (pid, "m4", false, false, true, true, NULL) != 0)
@@ -803,7 +805,7 @@ getprogname (void)
 
   let lib_sources = collect {
     for line in p"lib/gnulib.mk".lines()? {
-      var chunk: Str = line
+      var chunk = line
 
       if line.starts_with("lib_libbison_a_SOURCES +=") {
         chunk = line.replace("lib_libbison_a_SOURCES +=", with: "")
@@ -814,9 +816,7 @@ getprogname (void)
         let keep_going = chunk.trim().ends_with("\\")
 
         for word in chunk.replace("\\", with: "").trim().split(" ") |> where . != "" {
-          if word.ends_with(".c") {
-            yield fp"{word}"
-          }
+          yield fp"{word}" when word.ends_with(".c")
         }
 
         in_sources = keep_going
@@ -871,7 +871,8 @@ proc main(...argv: List[Str]) [process, error] {
 }
 
 main(@args)?
-""", mode: 0o755,
+""",
+    mode: 0o755,
   )
 
   # Install bison's data files to /usr/share/bison/.

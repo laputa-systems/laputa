@@ -52,5 +52,3 @@ proc main(...argv: List[Str]) [fs, process, error] {
     exit status.exit_code() ?? 1
   }
 }
-
-main(@args)

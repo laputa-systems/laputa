@@ -41,5 +41,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   print f"tailscale ok: {ver}"
 }
-
-main(@args)

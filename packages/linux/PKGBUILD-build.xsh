@@ -21,7 +21,10 @@ pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
   return "x86" when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(
+      kind: "linux-unsupported-arch",
+      message: f"unsupported linux package arch {package_arch_value}",
+    ),
   )
 }
 
@@ -33,7 +36,10 @@ pure kernel_config_fragments_for(package_arch_value: Str) -> Result[List[Path]] 
   return [p"files/config/x86_64/base-x86_64.fragment"] when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(
+      kind: "linux-unsupported-arch",
+      message: f"unsupported linux package arch {package_arch_value}",
+    ),
   )
 }
 
@@ -43,7 +49,10 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
   return p"arch/x86/boot/bzImage" when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(
+      kind: "linux-unsupported-arch",
+      message: f"unsupported linux package arch {package_arch_value}",
+    ),
   )
 }
 
@@ -106,5 +115,3 @@ proc main(dest: Path) [fs, process, env, time, error] {
   PKGBUILD_shared.timing_done("install", install_start)
   PKGBUILD_shared.timing_done("package-total", package_start)
 }
-
-main(@args)

@@ -38,5 +38,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "wayland-dev ok"
 }
-
-main(@args)

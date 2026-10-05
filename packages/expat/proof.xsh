@@ -68,5 +68,3 @@ int main(void) {
 
   print "expat ok: namespaced parse, tag mismatch rejected"
 }
-
-main(@args)

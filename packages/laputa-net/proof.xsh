@@ -15,5 +15,3 @@ proc main(root: Path = /rootfs) [fs, error] {
   )
   print "laputa-net ok"
 }
-
-main(@args)

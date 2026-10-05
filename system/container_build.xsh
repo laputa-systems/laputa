@@ -203,11 +203,7 @@ proc container_build_images(root: Path, rootfs: Path, disk: Path) {
   image.verify_disk(disk, rootfs.metadata()?.size)
 }
 
-proc container_system_key(
-  build_plan: Path,
-  generation_manifest: Path,
-  profile: types.SystemProfile,
-) -> Result[Str] {
+proc container_system_key(build_plan: Path, generation_manifest: Path, profile: types.SystemProfile) -> Result[Str] {
   let manifest = json.read(generation_manifest)?.require(Record)?
   let generation_sha256: Str = manifest.get("generation_sha256")?.require()?
   let plan_value = json.read(build_plan)?.require(Record)?
@@ -260,10 +256,15 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
   # A forbidden package in the runtime closure fails before anything builds.
   let forbidden = system_profile.forbidden_runtime_packages(
     profile,
-    [artifact.package_name for artifact in saved_generation_plan.artifacts],
+    [
+      artifact.package_name
+      for artifact in saved_generation_plan.artifacts
+    ],
   )
   if ! forbidden.is_empty() {
-    return Err(ContainerBuildError.Failed(f"{profile.name} generation includes forbidden packages: {forbidden.join(", ")}"))
+    return Err(
+      ContainerBuildError.Failed(f"{profile.name} generation includes forbidden packages: {forbidden.join(", ")}"),
+    )
   }
 
   container_pm_repo_build(build_plan, jobs)
@@ -304,5 +305,3 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
 
   container_execute_profile(profile, jobs)
 }
-
-main(@args)

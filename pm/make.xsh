@@ -2,7 +2,15 @@
 use pm.env as pm_env
 
 ## Exported PM declaration `MakeError`.
-export error MakeError = InvalidJobs : InvalidData | InvalidTask : InvalidData | DuplicateTask : Conflict | DuplicateOutput : Conflict | MissingDependency : Dependency | DependencyCycle : Dependency | CommandFailed : ProcessFailure
+export error MakeError {
+    InvalidJobs : InvalidData
+    InvalidTask : InvalidData
+    DuplicateTask : Conflict
+    DuplicateOutput : Conflict
+    MissingDependency : Dependency
+    DependencyCycle : Dependency
+    CommandFailed : ProcessFailure
+}
 
 ## Exported PM declaration `MakeTask`.
 export type MakeTask = {
@@ -189,7 +197,8 @@ proc pkg_config_words(
 ) [process, env, error] -> Result[List[Str]] {
   let {pkg_config_path, pkg_config_libdir, pkg_config_sysroot, ld_library_path, ..} = pc
   let pkg_config = pc.pkg_config.display()
-  let out = run.text LD_LIBRARY_PATH=$ld_library_path PKG_CONFIG=$pkg_config PKG_CONFIG_LIBDIR=$pkg_config_libdir PKG_CONFIG_PATH=$pkg_config_path PKG_CONFIG_SYSROOT_DIR=$pkg_config_sysroot $pc.pkg_config $mode @packages
+  let out = run.text LD_LIBRARY_PATH=$ld_library_path PKG_CONFIG=$pkg_config PKG_CONFIG_LIBDIR=$pkg_config_libdir \
+    PKG_CONFIG_PATH=$pkg_config_path PKG_CONFIG_SYSROOT_DIR=$pkg_config_sysroot $pc.pkg_config $mode @packages
   out.words()
 }
 
@@ -498,9 +507,7 @@ proc remove_running_indices(running: List[RunningTask], completed_indices: Map[B
 
   let next = collect {
     for row in running {
-      if ! (completed_indices.get(completed_index_key(index)) ?? false) {
-        yield row
-      }
+      yield row unless completed_indices.get(completed_index_key(index)) ?? false
 
       index += 1
     }
@@ -1432,6 +1439,10 @@ export proc link_executable(
 
 # Create a static archive from .lo/.o objects.
 ## Exported PM declaration `link_archive`.
-export proc link_archive(toolchain: Path, objs: List[Path], out: Path) [fs, process, env, error] -> Result[Unit, Error] {
+export proc link_archive(
+  toolchain: Path,
+  objs: List[Path],
+  out: Path,
+) [fs, process, env, error] -> Result[Unit, Error] {
   run_tasks([link_archive_task(toolchain, objs, out)], 1)
 }

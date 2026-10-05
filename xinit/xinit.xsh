@@ -205,9 +205,7 @@ proc parse_inittab(path_value: Path) -> Result[List[InittabEntry]] {
     for line in path_value.read_text()?.lines() {
       let entry = parse_inittab_line(line, index)?
 
-      if entry.action != "" {
-        yield entry
-      }
+      yield entry when entry.action != ""
 
       index += 1
     }
@@ -247,9 +245,7 @@ proc runtime_set(runtime: List[RuntimeEntry], value: RuntimeEntry) [error] -> Li
       }
     }
 
-    if ! found {
-      yield value
-    }
+    yield value unless found
   }
 
   out
@@ -361,9 +357,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
       if entry_spawns(entry) {
         let current = runtime_get(runtime, entry.key)
 
-        if current.pid > 0 {
-          yield current.pid
-        }
+        yield current.pid when current.pid > 0
       }
     }
   }
@@ -1010,11 +1004,7 @@ proc reload_unit(service: Service, pid: Int) {
 # child not-yet-ready (the scanner polls the returned `notify_fd`). Otherwise
 # readiness is resolved inline via the `ready()` hook (or spawned == ready), and
 # `notify_fd` is -1.
-proc spawn_service(
-  service: Service,
-  restarts: Int,
-  notify: Bool,
-) -> Result[SpawnResult] {
+proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[SpawnResult] {
   let cgroup_path = if service.cpu_max > 0 and env_enabled("XSH_UNIX_DRY_RUN") and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
   } else {
@@ -1188,9 +1178,7 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
       if service.name != name and name in required_dependencies(service) {
         let status = read_status(service.name)?
 
-        if status.state == "running" {
-          yield service.name
-        }
+        yield service.name when status.state == "running"
       }
     }
   }
@@ -1456,11 +1444,7 @@ pure unit_blocked(units: List[ServiceUnit], unit: ServiceUnit) -> Bool {
   unit.desired == "up" and unit.state == "pending" and ! gate_satisfied(units, unit.service)
 }
 
-proc reconcile_one(
-  unit: ServiceUnit,
-  units: List[ServiceUnit],
-  now: Int,
-) -> Result[ServiceUnit] {
+proc reconcile_one(unit: ServiceUnit, units: List[ServiceUnit], now: Int) -> Result[ServiceUnit] {
   return advance_readiness(unit, now)? when unit.state == "starting"
 
   return unit when unit.desired != "up"
@@ -1535,11 +1519,7 @@ proc run_finish(unit: ServiceUnit) {
   }
 }
 
-proc mark_unit_dead(
-  unit: ServiceUnit,
-  child_status: Status,
-  now: Int,
-) -> Result[ServiceUnit] {
+proc mark_unit_dead(unit: ServiceUnit, child_status: Status, now: Int) -> Result[ServiceUnit] {
   # The child is already gone; release any readiness fd it held, then run the
   # finish() cleanup hook before deciding the unit's next state.
   if unit.notify_fd > 0 {
@@ -1747,11 +1727,7 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
   }
 }
 
-proc apply_request(
-  units: List[ServiceUnit],
-  name: Str,
-  desired: Str,
-) -> Result[List[ServiceUnit]] {
+proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[List[ServiceUnit]] {
   [apply_one(unit, name, desired)? for unit in units]
 }
 
@@ -1944,7 +1920,10 @@ proc control(verb: Str, name: Str) {
     supervise_service(name)
   } else {
     return Err(
-      XinitError.Failed(kind: "xinit-control", message: "usage: xinit <start|stop|restart|reload|status|logs|supervise> SERVICE"),
+      XinitError.Failed(
+        kind: "xinit-control",
+        message: "usage: xinit <start|stop|restart|reload|status|logs|supervise> SERVICE",
+      ),
     )
   }
 }
@@ -2018,13 +1997,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
   )?
 
   if parsed.command == "pid1" {
-    if ! parsed.args.is_empty() {
+    guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit"))
     }
 
     run_pid1(fp"{env_value("XSH_INIT_INITTAB", "/etc/inittab")}")
   } else if parsed.command == "help" {
-    if ! parsed.args.is_empty() {
+    guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit help"))
     }
 
@@ -2042,7 +2021,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
 
     scan_command(parsed.args.get(0) ?? "boot")
   } else if parsed.command == "list" {
-    if ! parsed.args.is_empty() {
+    guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit list"))
     }
 
@@ -2058,7 +2037,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       Err(_) => graph_target(target)
     }
   } else if parsed.command == "start" or parsed.command == "stop" or parsed.command == "restart" or parsed.command == "reload" or parsed.command == "status" or parsed.command == "logs" or parsed.command == "supervise" {
-    if ! parsed.args.is_empty() {
+    guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
@@ -2074,12 +2053,10 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       check_service(parsed.args[0])
     }
   } else {
-    if ! parsed.args.is_empty() {
+    guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit INITTAB"))
     }
 
     run_pid1(parsed.get("inittab")?.require()?)
   }
 }
-
-main(@args)

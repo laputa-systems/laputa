@@ -84,11 +84,14 @@ int main(int argc, char **argv) {
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libffi.so.8"
 
-  for symbol in ["ffi_call@@LIBFFI_BASE_8.0", "ffi_closure_alloc@@LIBFFI_CLOSURE_8.0", "ffi_get_version@@LIBFFI_BASE_8.1", "ffi_type_sint128@@LIBFFI_INT128_8.3"] {
+  for symbol in [
+    "ffi_call@@LIBFFI_BASE_8.0",
+    "ffi_closure_alloc@@LIBFFI_CLOSURE_8.0",
+    "ffi_get_version@@LIBFFI_BASE_8.1",
+    "ffi_type_sint128@@LIBFFI_INT128_8.3",
+  ] {
     proof.ensure(symbol in symbols, "proof-libffi", f"libffi does not export {symbol}")
   }
 
   print f"libffi ok: {ver} call, struct return, closure, versioned exports"
 }
-
-main(@args)

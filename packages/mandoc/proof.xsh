@@ -91,7 +91,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   }
 
   for link in ["man", "apropos", "whatis", "makewhatis"] {
-    proof.ensure(fp"{root}/usr/bin/{link}".readlink()?.display() == "mandoc", "mandoc-links", f"usr/bin/{link} is not a link to mandoc")
+    proof.ensure(
+      fp"{root}/usr/bin/{link}".readlink()?.display() == "mandoc",
+      "mandoc-links",
+      f"usr/bin/{link} is not a link to mandoc",
+    )
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -145,10 +149,12 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   cd $tmp {
     let inlined = run.text $loader fp"{bin}/soelim" "top.man"
-    proof.ensure(inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n", "mandoc-soelim", f"unexpected soelim output:\n{inlined}")
+    proof.ensure(
+      inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n",
+      "mandoc-soelim",
+      f"unexpected soelim output:\n{inlined}",
+    )
   }
 
   print "mandoc ok: mdoc and man rendered, makewhatis/apropos/whatis/man lookup, demandoc, soelim"
 }
-
-main(@args)

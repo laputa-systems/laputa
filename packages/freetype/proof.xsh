@@ -19,5 +19,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure("Version: 26.6.20" in pc, "proof-freetype", "freetype2.pc has the wrong libtool version")
   print "freetype ok"
 }
-
-main(@args)

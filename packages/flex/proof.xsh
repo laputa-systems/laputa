@@ -54,7 +54,8 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
-  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
+  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" \
+    f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
 }
 
 proc prove_scanner(rootfs: Path, flex: Path) {
@@ -129,5 +130,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     print "flex ok: cross-built "${pm_util.target_arch()?}
   }
 }
-
-main(@args)

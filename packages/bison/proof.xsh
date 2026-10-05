@@ -229,7 +229,6 @@ const gnu_outputs: List[GeneratedFile] = [
   {name: "list.cc", sha256: "ca8adfc87f38e4b0703af9aa9280541473273b10454400e6a97d31b06ad1a50d"},
   {name: "list.hh", sha256: "c991f25cd4cf9dc0de608c919c362da602d63a89038ab908cab0c6691d7eb352"},
   {name: "location.hh", sha256: "41e4940385a37f8b2aa292dc51620c0f28f0c6680392050cc67cd7d356853b08"},
-
 ]
 
 pure grammar_text(file: Str) -> Str {
@@ -247,7 +246,8 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
-  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
+  run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" \
+    f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output
 }
 
 proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, process, env, error] {
@@ -321,5 +321,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     print "bison ok: cross-built "${pm_util.target_arch()?}
   }
 }
-
-main(@args)

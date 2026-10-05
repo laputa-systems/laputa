@@ -816,9 +816,10 @@ pure is_absent(value: StrCap) -> Bool {
 }
 
 pure text_of(value: StrCap) -> Bytes? {
-  match value {
-    Text(text) => text
-    else => null
+  if let Text(text) = value {
+    text
+  } else {
+    null
   }
 }
 
@@ -839,9 +840,7 @@ proc parse_cap_table(standard_rows: Str, ncurses_rows: Str) [error] -> Result[Ca
 
   for row in standard_rows.split("\n") {
     let fields = row.fields()
-    if fields.is_empty() {
-      continue
-    }
+    continue when fields.is_empty()
 
     guard fields.len() == 3 else {
       return Err(TicError.Source(f"malformed capability row: {row}"))
@@ -862,9 +861,7 @@ proc parse_cap_table(standard_rows: Str, ncurses_rows: Str) [error] -> Result[Ca
   var user_types: Map[Str, Int] = {}
   for row in ncurses_rows.split("\n") {
     let fields = row.fields()
-    if fields.is_empty() {
-      continue
-    }
+    continue when fields.is_empty()
 
     guard fields.len() == 3 else {
       return Err(TicError.Source(f"malformed ncurses capability row: {row}"))
@@ -961,7 +958,10 @@ pure char_stream(source: Str) -> CharStream {
   CharStream(
     chars: [line.body for line in kept].join(""),
     cols: [line.cols for line in kept].join(""),
-    lines: [line.number for line in kept],
+    lines: [
+      line.number
+      for line in kept
+    ],
   )
 }
 
@@ -981,7 +981,7 @@ pure last_char(chars: Str, index: Int, from_end: Int) -> Int {
   while j >= index {
     let c = chars.byte_at(j) ?? 0
     if ! is_space(c) {
-      if from_end <= j - index {
+      guard from_end > j - index else {
         return chars.byte_at(j - from_end) ?? 0
       }
 
@@ -1036,9 +1036,7 @@ pure parse_c_long(text: Bytes, start: Int) -> CLong {
       99
     }
 
-    if digit >= base {
-      break
-    }
+    break when digit >= base
 
     if ! saturated {
       value = value * base + digit
@@ -1050,22 +1048,19 @@ pure parse_c_long(text: Bytes, start: Int) -> CLong {
     i += 1
   }
 
-  if i == digits_start {
-    return {value: 0, end: start}
-  }
+  return {value: 0, end: start} when i == digits_start
 
   {value: if negative { -value } else { value }, end: i}
 }
 
 # Report a malformed source from inside the scanner's stream.
-proc source_error(message: Str) [error] -> Result[Unit] {
+proc source_error(message: Str) [error] {
   Err(TicError.Source(message))
 }
 
 stream scan(source: Str, table: CapTable) -> Stream[Token] {
   let input = char_stream(source)
-  let chars = input.chars
-  let cols = input.cols
+  let {chars, cols, ..} = input
   var i = 0
   var col = 0
   var c = 0
@@ -1078,9 +1073,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
     # Skip blanks and newlines between tokens.
     loop {
       c = chars.byte_at(i) ?? -1
-      if c < 0 {
-        break
-      }
+      break when c < 0
 
       col = (cols.byte_at(i) ?? 49) - 48
       i += 1
@@ -1088,18 +1081,14 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
         line_index += 1
       }
 
-      if ! (c == 10 or is_white(c)) {
-        break
-      }
+      break unless c == 10 or is_white(c)
     }
 
     # A backslash before a newline continues a termcap line.
     if c == 92 {
       loop {
         c = chars.byte_at(i) ?? -1
-        if c < 0 {
-          break
-        }
+        break when c < 0
 
         col = (cols.byte_at(i) ?? 49) - 48
         i += 1
@@ -1107,15 +1096,11 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           line_index += 1
         }
 
-        if ! (c == 10 or is_white(c)) {
-          break
-        }
+        break unless c == 10 or is_white(c)
       }
     }
 
-    if c < 0 {
-      break
-    }
+    break when c < 0
 
     # A leading `.` comments out the capability that follows.
     var dot = false
@@ -1123,9 +1108,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       dot = true
       loop {
         c = chars.byte_at(i) ?? -1
-        if c < 0 {
-          break
-        }
+        break when c < 0
 
         col = (cols.byte_at(i) ?? 49) - 48
         i += 1
@@ -1133,14 +1116,10 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           line_index += 1
         }
 
-        if ! (c == 46 or is_white(c)) {
-          break
-        }
+        break unless c == 46 or is_white(c)
       }
 
-      if c < 0 {
-        break
-      }
+      break when c < 0
     }
 
     let line = input.lines.get(line_index) ?? 0
@@ -1149,9 +1128,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       # Panic mode: skip to the next separator.
       loop {
         let d = chars.byte_at(i) ?? -1
-        if d < 0 {
-          break
-        }
+        break when d < 0
 
         col = (cols.byte_at(i) ?? 49) - 48
         i += 1
@@ -1159,9 +1136,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           line_index += 1
         }
 
-        if d == separator {
-          break
-        }
+        break when d == separator
       }
 
       continue
@@ -1196,9 +1171,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
         } else if c == 44 {
           syntax = 1
           separator = 44
-          if after_name < 0 {
-            break
-          }
+          break when after_name < 0
 
           let c0 = last_char(chars, i, 0)
           let c1 = last_char(chars, i, 1)
@@ -1225,16 +1198,12 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
               }
             }
 
-            if capability {
-              break
-            }
+            break when capability
           }
         } else if c == 92 {
           loop {
             c = chars.byte_at(i) ?? -1
-            if c < 0 {
-              break
-            }
+            break when c < 0
 
             col = (cols.byte_at(i) ?? 49) - 48
             i += 1
@@ -1242,9 +1211,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
               line_index += 1
             }
 
-            if ! (c == 10 or is_white(c)) {
-              break
-            }
+            break unless c == 10 or is_white(c)
           }
         }
 
@@ -1266,9 +1233,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       }
 
       let names = bytes.from_ints(tok[0..keep])?.utf8()?
-      if ! dot {
-        yield Token(kind: NAMES, name: names, number: 0, text: null, line:)
-      }
+      yield Token(kind: NAMES, name: names, number: 0, text: null, line:) unless dot
 
       continue
     }
@@ -1277,9 +1242,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
     let name_start = i - 1
     loop {
       c = chars.byte_at(i) ?? -1
-      if c < 0 {
-        break
-      }
+      break when c < 0
 
       col = (cols.byte_at(i) ?? 49) - 48
       i += 1
@@ -1287,9 +1250,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
         line_index += 1
       }
 
-      if ! is_alnum(c) and c != 95 {
-        break
-      }
+      break when ! is_alnum(c) and c != 95
     }
 
     let name_end = if c < 0 { i } else { i - 1 }
@@ -1314,12 +1275,10 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
 
       token = {...token, kind: CANCEL}
     } else if c == 35 {
-      var digits: List[Int] = []
+      var digits = []
       loop {
         c = chars.byte_at(i) ?? -1
-        if c < 0 {
-          break
-        }
+        break when c < 0
 
         col = (cols.byte_at(i) ?? 49) - 48
         i += 1
@@ -1327,14 +1286,10 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           line_index += 1
         }
 
-        if ! is_alnum(c) {
-          break
-        }
+        break unless is_alnum(c)
 
         digits += [c]
-        if digits.len() >= 79 {
-          break
-        }
+        break when digits.len() >= 79
       }
 
       let parsed = parse_c_long(bytes.from_ints(digits)?, 0)
@@ -1342,13 +1297,11 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       token = {...token, kind: NUMBER, number}
     } else if c == 61 {
       # The string value, translating escapes as ncurses' _nc_trans_string.
-      var out: List[Int] = []
+      var out = []
       var last_ch = 0
       loop {
         c = chars.byte_at(i) ?? -1
-        if c < 0 {
-          break
-        }
+        break when c < 0
 
         col = (cols.byte_at(i) ?? 49) - 48
         i += 1
@@ -1356,9 +1309,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           line_index += 1
         }
 
-        if c == separator {
-          break
-        }
+        break when c == separator
 
         if out.len() >= MAX_ENTRY_SIZE - 2 {
           source_error(f"line {line}: string value of {name} is too long")
@@ -1439,21 +1390,21 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
             continue
           } else {
             let translated = match c {
-              69 => 27
-              110 => 10
-              114 => 13
-              98 => 8
-              102 => 12
-              116 => 9
-              92 => 92
-              94 => 94
-              44 => 44
-              97 => 7
-              101 => 27
-              108 => 10
-              115 => 32
-              58 => 58
-              else => c
+              69 => 27,
+              110 => 10,
+              114 => 13,
+              98 => 8,
+              102 => 12,
+              116 => 9,
+              92 => 92,
+              94 => 94,
+              44 => 44,
+              97 => 7,
+              101 => 27,
+              108 => 10,
+              115 => 32,
+              58 => 58,
+              else => c,
             }
 
             # The \E \n \r \b \f \t \\ \^ \, forms leave `c` as the escape
@@ -1472,7 +1423,7 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
         }
 
         if ! ignored {
-          if col <= 1 {
+          guard col > 1 else {
             # A character in the first column starts the next entry.
             i -= 1
             col -= 1
@@ -1492,13 +1443,9 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       token = {...token, kind: EOF_TOKEN}
     }
 
-    if token.kind == EOF_TOKEN {
-      break
-    }
+    break when token.kind == EOF_TOKEN
 
-    if ! dot {
-      yield token
-    }
+    yield token unless dot
   }
 }
 
@@ -1513,9 +1460,7 @@ pure valid_entry_name(name: Str) -> Bool {
       return false
     }
 
-    if ! first and (c == 35 or c == 64) {
-      return false
-    }
+    return false when ! first and (c == 35 or c == 64)
 
     first = false
     i += 1
@@ -1539,7 +1484,7 @@ pure ext_range(ext: Ext, kind: Int) -> ExtSpan {
 }
 
 pure insert_at(items: List[Str], pos: Int, item: Str) -> List[Str] {
-  items[0..pos] + [item] + items[pos..]
+  [@items[0..pos], item, @items[pos..]]
 }
 
 pure remove_at(items: List[Str], pos: Int) -> List[Str] {
@@ -1593,15 +1538,13 @@ pure extend_names(ext: Ext, name: Str, kind: Int) -> Extended {
     n += 1
   }
 
-  if found {
-    return {ext, ref: ExtRef(kind:, pos:)}
-  }
+  return {ext, ref: ExtRef(kind:, pos:)} when found
 
   let names = insert_at(ext.names, offset, name)
   let grown = if kind == BOOLEAN {
-    {...ext, names, nb: ext.nb + 1, bools: ext.bools[0..pos] + [FALSE_BOOLEAN] + ext.bools[pos..]}
+    {...ext, names, nb: ext.nb + 1, bools: [@ext.bools[0..pos], FALSE_BOOLEAN, @ext.bools[pos..]]}
   } else if kind == NUMBER {
-    {...ext, names, nn: ext.nn + 1, nums: ext.nums[0..pos] + [ABSENT_NUMERIC] + ext.nums[pos..]}
+    {...ext, names, nn: ext.nn + 1, nums: [@ext.nums[0..pos], ABSENT_NUMERIC, @ext.nums[pos..]]}
   } else {
     {...ext, names, ns: ext.ns + 1, strs: ext.strs[0..pos] + [Absent] + ext.strs[pos..]}
   }
@@ -1613,9 +1556,7 @@ pure find_ext_name(ext: Ext, name: Str, kind: Int) -> Int {
   let range = ext_range(ext, kind)
   var j = range.first
   while j < range.last {
-    if ext.names[j] == name {
-      return j
-    }
+    return j when ext.names[j] == name
 
     j += 1
   }
@@ -1625,9 +1566,7 @@ pure find_ext_name(ext: Ext, name: Str, kind: Int) -> Int {
 
 pure delete_ext_name(ext: Ext, name: Str, kind: Int) -> Ext? {
   let flat = find_ext_name(ext, name, kind)
-  if flat < 0 {
-    return null
-  }
+  return null when flat < 0
 
   let names = remove_at(ext.names, flat)
   if kind == BOOLEAN {
@@ -1644,9 +1583,7 @@ pure delete_ext_name(ext: Ext, name: Str, kind: Int) -> Ext? {
 # Delete `name` from the `first` group, else from the `second`.
 pure delete_either(ext: Ext, name: Str, first: Int, second: Int) -> Ext? {
   let removed = delete_ext_name(ext, name, first)
-  if removed != null {
-    return removed
-  }
+  return removed when removed != null
 
   delete_ext_name(ext, name, second)
 }
@@ -1657,13 +1594,9 @@ pure insert_ext_name(ext: Ext, name: Str, kind: Int) -> Inserted {
   var j = range.first
   while j < range.last {
     let other = ext.names[j]
-    if name == other {
-      return {ext, pos: j - range.first}
-    }
+    return {ext, pos: j - range.first} when name == other
 
-    if name < other {
-      break
-    }
+    break when name < other
 
     j += 1
   }
@@ -1671,9 +1604,9 @@ pure insert_ext_name(ext: Ext, name: Str, kind: Int) -> Inserted {
   let names = insert_at(ext.names, j, name)
   let pos = j - range.first
   let grown = if kind == BOOLEAN {
-    {...ext, names, nb: ext.nb + 1, bools: ext.bools[0..pos] + [FALSE_BOOLEAN] + ext.bools[pos..]}
+    {...ext, names, nb: ext.nb + 1, bools: [@ext.bools[0..pos], FALSE_BOOLEAN, @ext.bools[pos..]]}
   } else if kind == NUMBER {
-    {...ext, names, nn: ext.nn + 1, nums: ext.nums[0..pos] + [ABSENT_NUMERIC] + ext.nums[pos..]}
+    {...ext, names, nn: ext.nn + 1, nums: [@ext.nums[0..pos], ABSENT_NUMERIC, @ext.nums[pos..]]}
   } else {
     {...ext, names, ns: ext.ns + 1, strs: ext.strs[0..pos] + [Absent] + ext.strs[pos..]}
   }
@@ -1690,9 +1623,7 @@ pure adjust_cancels(start: Ext, other: Ext) -> Ext {
   let last = first + ext.ns
   var j = first
   while j < last {
-    if j - first > ext.ns {
-      break
-    }
+    break when j - first > ext.ns
 
     let slot = j - first
     let cancelled = slot < ext.ns and is_cancelled(ext.strs[slot])
@@ -1759,15 +1690,13 @@ pure merge_names(a: List[Str], b: List[Str]) -> List[Str] {
     }
   }
 
-  out + a[i..] + b[j..]
+  [@out, @a[i..], @b[j..]]
 }
 
 pure name_in(names: List[Str], from: Int, to: Int, name: Str) -> Bool {
   var n = from
   while n < to {
-    if names[n] == name {
-      return true
-    }
+    return true when names[n] == name
 
     n += 1
   }
@@ -1779,15 +1708,15 @@ pure name_in(names: List[Str], from: Int, to: Int, name: Str) -> Bool {
 pure realign(ext: Ext, merged: List[Str], eb: Int, en: Int, es: Int) -> Ext {
   var out = ext
   if ext.nb != eb {
-    var bools: List[Int] = []
+    var bools = []
     var n = ext.nb - 1
     var m = eb - 1
     while m >= 0 {
       if name_in(ext.names, 0, ext.nb, merged[m]) {
-        bools = [ext.bools[n]] + bools
+        bools = [ext.bools[n], @bools]
         n -= 1
       } else {
-        bools = [FALSE_BOOLEAN] + bools
+        bools = [FALSE_BOOLEAN, @bools]
       }
 
       m -= 1
@@ -1797,15 +1726,15 @@ pure realign(ext: Ext, merged: List[Str], eb: Int, en: Int, es: Int) -> Ext {
   }
 
   if ext.nn != en {
-    var nums: List[Int] = []
+    var nums = []
     var n = ext.nn - 1
     var m = en - 1
     while m >= 0 {
       if name_in(ext.names, ext.nb, ext.nb + ext.nn, merged[m + eb]) {
-        nums = [ext.nums[n]] + nums
+        nums = [ext.nums[n], @nums]
         n -= 1
       } else {
-        nums = [ABSENT_NUMERIC] + nums
+        nums = [ABSENT_NUMERIC, @nums]
       }
 
       m -= 1
@@ -1845,13 +1774,9 @@ pure align(to_start: Ext, from_start: Ext) -> Aligned {
   var from = from_start
   let na = ext_count(to)
   let nb = ext_count(from)
-  if na == 0 and nb == 0 {
-    return {to, from}
-  }
+  return {to, from} when na == 0 and nb == 0
 
-  if na == nb and same_names(to, from) {
-    return {to, from}
-  }
+  return {to, from} when na == nb and same_names(to, from)
 
   if to.ns > 0 and from.nb + from.nn > 0 {
     to = adjust_cancels(to, from)
@@ -1864,7 +1789,7 @@ pure align(to_start: Ext, from_start: Ext) -> Aligned {
   let bools = merge_names(to.names[0..to.nb], from.names[0..from.nb])
   let nums = merge_names(to.names[to.nb..to.nb + to.nn], from.names[from.nb..from.nb + from.nn])
   let strs = merge_names(to.names[to.nb + to.nn..], from.names[from.nb + from.nn..])
-  let merged = bools + nums + strs
+  let merged = [@bools, @nums, @strs]
   let total = merged.len()
   if na != total {
     to = {...realign(to, merged, bools.len(), nums.len(), strs.len()), names: merged}
@@ -2007,11 +1932,9 @@ pure first_name(names: Str) -> Str {
 # postprocess_terminfo: AIX box1 characters become acsc pairs.
 proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   let box = text_of(term.strs.get(table.box1) ?? Absent)
-  if box == null {
-    return term
-  }
+  return term when box == null
 
-  var out: List[Bytes] = []
+  var out = []
   let acs = text_of(term.strs.get(table.acsc) ?? Absent)
   if acs != null {
     out += [acs]
@@ -2029,9 +1952,7 @@ proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   }
 
   let built = bytes.concat(out)
-  if built.is_empty() {
-    return term
-  }
+  return term when built.is_empty()
 
   eprint f"tic: {first_name(term.names)}: acsc string synthesized from AIX capabilities"
   var strs = term.strs
@@ -2043,17 +1964,13 @@ proc postprocess(term: Term, table: CapTable) -> Result[Term] {
 # A standard capability by terminfo name, by Caps-ncurses alias, or by its
 # variable name, in the order ncurses tries them.
 pure lookup_cap(table: CapTable, name: Str) -> CapRef? {
-  if name in table.info_names {
-    return table.info_names[name]
-  }
+  return table.info_names[name] when name in table.info_names
 
   if name in table.aliases and table.aliases[name] in table.info_names {
     return table.info_names[table.aliases[name]]
   }
 
-  if name in table.full_names {
-    return table.full_names[name]
-  }
+  return table.full_names[name] when name in table.full_names
 
   null
 }
@@ -2105,7 +2022,7 @@ proc apply_token(entry: Entry, token: Token, table: CapTable) [error] -> Result[
     }
   }
 
-  let found_kind = if cap != null { cap.kind } else { (ext_ref ?? ExtRef(kind: 0, pos: 0)).kind }
+  let found_kind = cap?.kind ?? (ext_ref ?? ExtRef(kind: 0, pos: 0)).kind
   if kind != CANCEL and found_kind != kind {
     if kind == BOOLEAN and found_kind == STRING {
       # A string capability without `=` is an empty string.
@@ -2168,9 +2085,7 @@ proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]
   let entries: List[Entry] = collect {
     for token in tokens {
       if token.kind == NAMES {
-        if started {
-          yield finish_entry(entry, table)?
-        }
+        yield finish_entry(entry, table)? when started
 
         guard is_alnum(token.name.byte_at(0) ?? 0) else {
           return Err(TicError.Source(f"line {token.line}: terminal names must start with letter or digit"))
@@ -2192,9 +2107,7 @@ proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]
       entry = apply_token(entry, token, table)?
     }
 
-    if started {
-      yield finish_entry(entry, table)?
-    }
+    yield finish_entry(entry, table)? when started
   }
 
   entries
@@ -2259,7 +2172,7 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
     index += 1
   }
 
-  var links: List[List[Int]] = []
+  var links = []
   index = 0
   for entry in entries {
     let targets: List[Int] = collect {
@@ -2292,14 +2205,10 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
   while resolved.len() < entries.len() {
     var progress = false
     for pending in range(entries.len()) {
-      if pending in resolved {
-        continue
-      }
+      continue when pending in resolved
 
       let targets = links[pending]
-      if ! [target for target in targets if target not in resolved].is_empty() {
-        continue
-      }
+      continue unless [target for target in targets if target not in resolved].is_empty()
 
       resolved[pending] = merge_uses(entries[pending].term, [resolved[target] for target in targets])
       progress = true
@@ -2342,9 +2251,7 @@ proc shorten_constants(text: Bytes) -> Result[Bytes] {
       t += 1
       yield ch
       if ch == 92 {
-        if t >= n {
-          break
-        }
+        break when t >= n
 
         yield text.byte_at(t) ?? 0
         t += 1
@@ -2361,9 +2268,7 @@ proc shorten_constants(text: Bytes) -> Result[Bytes] {
     }
   }
 
-  if ! changed {
-    return text
-  }
+  return text unless changed
 
   bytes.from_ints(out)?
 }
@@ -2413,9 +2318,10 @@ pure string_table(values: List[StrCap]) -> List[Bytes] {
 }
 
 pure string_parts(value: StrCap) -> List[Bytes] {
-  match value {
-    Text(text) => [text, b"\x00"]
-    else => []
+  if let Text(text) = value {
+    [text, b"\0"]
+  } else {
+    []
   }
 }
 
@@ -2473,16 +2379,15 @@ proc write_object(term: Term) -> Result[Bytes] {
   let standard = [
     bytes.from_ints(header)?,
     names,
-    b"\x00",
-    bytes.from_ints(flags + pad + nums + le_fields(offsets, 2))?,
-  ] + strings
+    b"\0",
+    bytes.from_ints([@flags, @pad, @nums, @le_fields(offsets, 2)])?,
+    @strings,
+  ]
 
   let ext = term.ext
-  let extended = TRUE_BOOLEAN in ext.bools or ! [value for value in ext.nums if value != ABSENT_NUMERIC].is_empty() or ! [
-    value
-    for value in ext.strs
-    if ! is_absent(value)
-  ].is_empty()
+  let extended = TRUE_BOOLEAN in ext.bools or ! [value for value in ext.nums if value != ABSENT_NUMERIC].is_empty() or ! [value for value in ext.strs if ! is_absent(
+    value,
+  )].is_empty()
 
   var parts = standard
   if extended {
@@ -2497,11 +2402,19 @@ proc write_object(term: Term) -> Result[Bytes] {
     # Extended booleans are written as stored, so a cancelled one is 0376.
     let ext_flags = [(value + 256) % 256 for value in ext.bools]
     let ext_pad = if ext.nb % 2 != 0 { [0] } else { [] }
-    let ext_fields = lead + ext_header + ext_flags + ext_pad + le_fields(ext.nums, width) + le_fields(ext_offsets, 2)
-    parts = standard + [bytes.from_ints(ext_fields)?] + ext_strings + [
-      part
-      for name in encoded_names
-      for part in [name, b"\x00"]
+    let ext_fields = [@lead, @ext_header, @ext_flags, @ext_pad, @le_fields(ext.nums, width), @le_fields(ext_offsets, 2)]
+    parts = [
+      @standard,
+      bytes.from_ints(ext_fields)?,
+      @ext_strings,
+      @[
+        part
+        for name in encoded_names
+        for part in [
+          name,
+          b"\0",
+        ]
+      ],
     ]
   }
 
@@ -2516,14 +2429,11 @@ proc write_object(term: Term) -> Result[Bytes] {
 proc write_entry(term: Term, outdir: Path) {
   var strs = term.strs
   for {key, value} in term.strs {
-    match value {
-      Text(text) => {
-        let shorter = shorten_constants(text)?
-        if shorter.len() < text.len() {
-          strs[key] = Text(shorter)
-        }
+    if let Text(text) = value {
+      let shorter = shorten_constants(text)?
+      if shorter.len() < text.len() {
+        strs[key] = Text(shorter)
       }
-      else => {}
     }
   }
 
@@ -2540,9 +2450,7 @@ proc write_entry(term: Term, outdir: Path) {
   file.remove()
   file.write(object)
 
-  if names.len() < 3 {
-    return
-  }
+  return when names.len() < 3
 
   for alias in names[1..names.len() - 1] {
     guard alias != "" else {
@@ -2568,15 +2476,11 @@ proc write_entry(term: Term, outdir: Path) {
 }
 
 pure selected(names: Str, wanted: List[Str]) -> Bool {
-  if wanted.is_empty() {
-    return true
-  }
+  return true when wanted.is_empty()
 
   let have = entry_names(names)
   for name in wanted {
-    if name in have {
-      return true
-    }
+    return true when name in have
   }
 
   false
@@ -2600,10 +2504,10 @@ pure usage() -> Str {
   "usage: tic -x [-o DIR] [-e NAME[,NAME...]] FILE"
 }
 
-proc main(...argv: List[Str]) [fs, error] -> Result[Unit] {
+proc main(...argv: List[Str]) [fs, error] {
   var extended = false
-  var outdir: Path? = null
-  var wanted: List[Str] = []
+  var outdir = null
+  var wanted = []
   var k = 0
   let files: List[Str] = collect {
     while k < argv.len() {
@@ -2619,7 +2523,7 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit] {
         let value = argv[k]
         k += 1
         if arg == "-o" {
-          outdir = Path(value)
+          outdir = fp"{value}"
         } else {
           wanted = wanted + [name.trim() for name in value.split(",") if name.trim() != ""]
         }
@@ -2643,5 +2547,5 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit] {
     return Err(TicError.Usage(f"an output directory (-o) is required; {usage()}"))
   }
 
-  compile(Path(files[0]), outdir, wanted)
+  compile(fp"{files[0]}", outdir, wanted)
 }

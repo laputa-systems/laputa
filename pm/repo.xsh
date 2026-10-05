@@ -55,11 +55,7 @@ proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) -> 
   types.package_payload()
 }
 
-proc repo_verified_proof_path(
-  store_root: Path,
-  node: types.PlanNode,
-  receipt: types.ArtifactReceipt,
-) -> Result[Path] {
+proc repo_verified_proof_path(store_root: Path, node: types.PlanNode, receipt: types.ArtifactReceipt) -> Result[Path] {
   let primary = fp"{receipt.artifact_dir}/proof.json"
 
   if receipt.origin == types.artifact_origin_remote() {
@@ -98,14 +94,16 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
     repo_verify_node_receipt(value, node, receipt)
     let kind = repo_package_kind(receipt, node)?
     let proof = repo_verified_proof_path(store_root, node, receipt)?
-    packages += [{
-      node,
-      receipt,
-      payload: fp"{receipt.artifact_dir}/payload.tar.gz",
-      metadata: fp"{receipt.artifact_dir}/metadata.json",
-      proof,
-      kind,
-    }]
+    packages += [
+      {
+        node,
+        receipt,
+        payload: fp"{receipt.artifact_dir}/payload.tar.gz",
+        metadata: fp"{receipt.artifact_dir}/metadata.json",
+        proof,
+        kind,
+      },
+    ]
   }
 
   {format: "laputa-repo-snapshot-1", target: value.target, plan_sha256: value.plan_sha256, packages}
@@ -130,11 +128,7 @@ proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, outp
   metadata
 }
 
-proc repo_publication_entry(
-  value: types.RepoPublication,
-  arch: Str,
-  metadata: Path,
-) -> Result[types.RemotePackage] {
+proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: Path) -> Result[types.RemotePackage] {
   let node = value.node
   let payload_rel = util.remote_binary_rel(arch, node.name, node.ver, node.rel, node.artifact_key)
   let metadata_rel = util.remote_metadata_rel(arch, node.name, node.ver, node.rel, node.artifact_key, node.proof_key)
@@ -216,12 +210,10 @@ proc repo_merge_publication(
       }
     }
 
-    if ! replaced {
-      yield entry
-    }
+    yield entry unless replaced
   }
 
-  {index: updated |> sort-by { f"{.arch}\t{.name}" }, already_published: false}
+  {index: updated |> sort-by f"{.arch}\t{.name}", already_published: false}
 }
 
 proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token: Str, work: Path) {

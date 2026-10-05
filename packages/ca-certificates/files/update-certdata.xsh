@@ -21,5 +21,3 @@ proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   tmp.rename(to: dest, overwrite: true)
   print f"update-certdata: updated {dest}"
 }
-
-main(@args)

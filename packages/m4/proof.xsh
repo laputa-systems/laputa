@@ -101,8 +101,13 @@ later
 """
 
 proc expect_text(label: Str, actual: Str, expected: Str) {
-  if actual != expected {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: f"{label}: output differs from GNU m4\n--- expected\n{expected}--- actual\n{actual}"))?
+  guard actual == expected else {
+    return Err(
+      ScriptError.Failed(
+        kind: "proof-m4",
+        message: f"{label}: output differs from GNU m4\n--- expected\n{expected}--- actual\n{actual}",
+      ),
+    )?
   }
 }
 
@@ -177,5 +182,3 @@ proc main(rootfs = /rootfs) [fs, process, error] {
     print "m4 ok: "${trimmed}
   }
 }
-
-main(@args)

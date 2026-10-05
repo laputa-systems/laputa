@@ -380,13 +380,7 @@ proc commit_staged(
   commit_locked(target, root, node, staged, origin)?
 }
 
-proc fetch_remote_object(
-  remote_repo: Str,
-  rel: Path,
-  cache_path: Path,
-  expected_sha256: Str,
-  label: Str,
-) {
+proc fetch_remote_object(remote_repo: Str, rel: Path, cache_path: Path, expected_sha256: Str, label: Str) {
   require_sha256(expected_sha256, f"remote {label} SHA-256")
   let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote {label}")?, cache_path)?
 
@@ -448,11 +442,7 @@ proc remote_staged_artifact_for(
   {payload, payload_sha256, metadata, proof, executor_sha256}
 }
 
-proc remote_staged_artifact(
-  node: types.PlanNode,
-  remote_repo: Str,
-  cache: Path,
-) -> Result[types.StagedArtifact] {
+proc remote_staged_artifact(node: types.PlanNode, remote_repo: Str, cache: Path) -> Result[types.StagedArtifact] {
   let retrieval = node.remote
 
   if retrieval != null {
@@ -581,7 +571,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
     require_key(key)
   }
 
-  let kept: Map[Bool] = {key: true for key in keep}
+  let kept = {key: true for key in keep}
   var removed = 0
   var remaining = 0
   let objects = object_root(root)

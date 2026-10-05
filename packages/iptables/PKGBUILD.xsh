@@ -254,7 +254,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   )
 
   tasks = tasks.extend(libiptc.tasks).extend(libxtables.tasks)
-  objects = objects.extend(libiptc.objects).extend(libxtables.objects)
+  objects = [@objects, @libiptc.objects, @libxtables.objects]
 
   # extensions/GNUmakefile.in libext.a, libext4.a, and libext6.a: each
   # extension object names its registration hook through _INIT.

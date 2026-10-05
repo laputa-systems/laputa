@@ -41,18 +41,29 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     env ({
       TERM: term,
     }) {
-      let status = run.status --timeout=30s $driver "10" "80" "20000" "line 9" "\x1bOB" "line 10" "q" "--" $dynlinker $less $text > $out
-      proof.ensure(status.ok, "proof-less", f"less under TERM={term} did not page, scroll, and quit: {out.read_text()?}")
+      let status = run.status --timeout=30s $driver "10" "80" "20000" "line 9" "\u{1b}OB" "line 10" "q" "--" \
+        $dynlinker $less $text > $out
+      proof.ensure(
+        status.ok,
+        "proof-less",
+        f"less under TERM={term} did not page, scroll, and quit: {out.read_text()?}",
+      )
     }
 
     let screen = out.read_text()?
 
-    proof.ensure("\x1b[?1049h" in screen, "proof-less", f"less did not switch to the alternate screen under TERM={term}")
-    proof.ensure("\x1b[?1h\x1b=" in screen, "proof-less", f"less did not enable keypad mode under TERM={term}")
-    proof.ensure(screen.ends_with("\x1b[?1049l"), "proof-less", f"less did not restore the screen on quit under TERM={term}")
+    proof.ensure(
+      "\u{1b}[?1049h" in screen,
+      "proof-less",
+      f"less did not switch to the alternate screen under TERM={term}",
+    )
+    proof.ensure("\u{1b}[?1h\u{1b}=" in screen, "proof-less", f"less did not enable keypad mode under TERM={term}")
+    proof.ensure(
+      screen.ends_with("\u{1b}[?1049l"),
+      "proof-less",
+      f"less did not restore the screen on quit under TERM={term}",
+    )
   }
 
   print f"less ok: {ver} copies to a pipe; pages, scrolls by arrow key, and quits on a pty for xterm-256color, foot, tmux-256color, linux"
 }
-
-main(@args)

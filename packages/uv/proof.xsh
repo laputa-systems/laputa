@@ -34,9 +34,17 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   defer tmp.remove()
 
   let uv_version = run.text $uv "--version"
-  proof.ensure(uv_version.trim() == f"uv 0.12.23 ({arch}-unknown-linux-musl)", "uv-version", f"unexpected uv --version: {uv_version.trim()}")
+  proof.ensure(
+    uv_version.trim() == f"uv 0.12.23 ({arch}-unknown-linux-musl)",
+    "uv-version",
+    f"unexpected uv --version: {uv_version.trim()}",
+  )
   let uvx_version = run.text $uvx "--version"
-  proof.ensure(uvx_version.trim() == f"uvx 0.12.23 ({arch}-unknown-linux-musl)", "uvx-version", f"unexpected uvx --version: {uvx_version.trim()}")
+  proof.ensure(
+    uvx_version.trim() == f"uvx 0.12.23 ({arch}-unknown-linux-musl)",
+    "uvx-version",
+    f"unexpected uvx --version: {uvx_version.trim()}",
+  )
 
   let project = fp"{tmp}/laputa-proof"
 
@@ -57,7 +65,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
     cd $project {
       let current = run.text $uv "version"
-      proof.ensure(current.trim() == "laputa-proof 0.1.0", "uv-version-read", f"unexpected uv version: {current.trim()}")
+      proof.ensure(
+        current.trim() == "laputa-proof 0.1.0",
+        "uv-version-read",
+        f"unexpected uv version: {current.trim()}",
+      )
       let bumped = run.text $uv "version" "--short" "--bump" "minor" "--frozen"
       proof.ensure(bumped.trim() == "0.2.0", "uv-version-bump", f"unexpected bumped version: {bumped.trim()}")
     }
@@ -67,5 +79,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(pyproject == expected_pyproject, "uv-init", f"unexpected pyproject.toml:\n{pyproject}")
   print "uv ok: uv/uvx --version, offline init --bare, version read and bump"
 }
-
-main(@args)

@@ -31,5 +31,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure("Version: 0.20.2" in pc, "proof-wlroots0.20", "wlroots-0.20.pc has the wrong version")
   print "wlroots0.20 ok"
 }
-
-main(@args)

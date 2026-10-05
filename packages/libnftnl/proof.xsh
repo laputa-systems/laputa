@@ -145,8 +145,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   run $cc fp"{tmp}/proof-libnftnl.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lnftnl" "-o" $binary
   let libdir = fp"{root}/usr/lib".display()
   let out = run.text LD_LIBRARY_PATH=$libdir $binary
-  proof.ensure(out.trim() == "libnftnl: table chain rule set", "libnftnl", f"unexpected round-trip output: {out.trim()}")
+  proof.ensure(
+    out.trim() == "libnftnl: table chain rule set",
+    "libnftnl",
+    f"unexpected round-trip output: {out.trim()}",
+  )
   print "libnftnl ok: table, base chain, rule, and set round-trip through netlink messages"
 }
-
-main(@args)

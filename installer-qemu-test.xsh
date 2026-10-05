@@ -153,13 +153,7 @@ pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) 
   ]
 }
 
-proc ssh_guest(
-  ssh: Path,
-  ssh_key: Path,
-  port: Int,
-  known_hosts: Path,
-  remote_command: Str,
-) -> Result[Str] {
+proc ssh_guest(ssh: Path, ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) -> Result[Str] {
   let argv = ssh_args(ssh_key, port, known_hosts, remote_command)
   return run.text $ssh @argv
 }
@@ -460,8 +454,10 @@ proc build_installer(
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
-  if ! argv.is_empty() {
-    return Err(InstallerQemuTestError.Failed(kind: "argv", message: "installer-qemu-test.xsh does not accept arguments"))
+  guard argv.is_empty() else {
+    return Err(
+      InstallerQemuTestError.Failed(kind: "argv", message: "installer-qemu-test.xsh does not accept arguments"),
+    )
   }
 
   let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
@@ -601,5 +597,3 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   terminate_if_live(target.pid)
   print "installer qemu logs:" $installer_log $target_log
 }
-
-main(@args)

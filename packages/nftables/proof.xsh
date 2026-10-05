@@ -66,7 +66,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   defer tmp.remove()
 
   let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version"
-  proof.ensure(version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)", "nftables-version", f"unexpected version: {version.trim()}")
+  proof.ensure(
+    version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)",
+    "nftables-version",
+    f"unexpected version: {version.trim()}",
+  )
 
   let rules = fp"{tmp}/laputa.nft"
   rules.write(ruleset)
@@ -99,5 +103,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print f"nftables ok: --version, ruleset evaluated ({kernel}), type mismatch rejected"
 }
-
-main(@args)

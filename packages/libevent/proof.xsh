@@ -75,5 +75,3 @@ int main(void) {
 
   print "libevent ok: event loop, pipe read, timer, evbuffer"
 }
-
-main(@args)

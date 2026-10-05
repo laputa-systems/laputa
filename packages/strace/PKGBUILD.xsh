@@ -151,7 +151,7 @@ const ioctlent_pattern = rx"""^\{ "([^"]+)", (0x[0-9A-Fa-f]+) \},$"""
 
 # Map keys iterate in byte order, which is `LC_ALL=C sort -u`.
 pure sorted_unique(items: List[Str]) -> List[Str] {
-  let seen = {[item]: true for item in items}
+  let seen = {item: true for item in items}
   seen.keys()
 }
 
@@ -184,7 +184,7 @@ proc write_sys_func_h(sources: List[Path]) {
   var decls = [
     f"extern {line};"
     for src in sources
-    for line in src.read_text()?.lines()
+    for line in src.read_lines()?
     if line.starts_with("SYS_FUNC(")
   ]
   p"src/sys_func.h".write([f"{decl}\n" for decl in sorted_unique(decls)].join(""))
@@ -258,7 +258,7 @@ proc write_printer_headers(mpers_sources: List[Str], preprocessed: List[Path]) {
 # rewritten into #undef/#define pairs, so a personality's ioctl numbers
 # replace the native ones where they differ.
 proc write_ioctl_redefs(personality: Str) {
-  let native = {[line]: true for line in p"src/ioctlent0.h".read_lines()?}
+  let native = {line: true for line in p"src/ioctlent0.h".read_lines()?}
   var out = ""
 
   for line in sorted_unique(fp"src/ioctlent{personality}.h".read_lines()?) {
@@ -320,7 +320,13 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # configure's workaround for musl, whose <signal.h> conflicts with the
   # kernel's <linux/signal.h>: shadow the latter with the libc header.
-  fs.install(p"src/linux/generic/signal.h.in", p"src/linux/generic/linux/signal.h", 0o644, parents: true, overwrite: true)
+  fs.install(
+    p"src/linux/generic/signal.h.in",
+    p"src/linux/generic/linux/signal.h",
+    0o644,
+    parents: true,
+    overwrite: true,
+  )
 
   let library_sources = [fp"src/{src}" for src in libstrace_sources.words()]
   let sources = [p"src/strace.c", @library_sources]
@@ -352,7 +358,11 @@ export proc build(dest: Path) [fs, process, env, error] {
   write_scno_h(syscallent_i)
   write_printer_headers(mpers_sources, mpers_i)
 
-  let iocdef = [f"#define {line.split("DEFINE HOST")[1]}\n" for line in iocdef_i.read_lines()? if line.starts_with("DEFINE HOST")]
+  let iocdef = [
+    f"#define {line.split("DEFINE HOST")[1]}\n"
+    for line in iocdef_i.read_lines()?
+    if line.starts_with("DEFINE HOST")
+  ]
   p"src/ioctl_iocdef.h".write(iocdef.join(""))
 
   # One ioctl table per personality the architecture ships ioctls_inc<N>.h
@@ -360,7 +370,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # the build machine and prints each table sorted by code.
   let personalities = fs.walk(fp"src/linux/{arch}")?
     |> where .kind == "file" and .name.starts_with("ioctls_inc") and .name.ends_with(".h")
-    |> map { .name.split("ioctls_inc")[1].split(".h")[0] }
+    |> map .name.split("ioctls_inc")[1].split(".h")[0]
     |> sort
 
   var ioctlsort_tasks = []
@@ -397,7 +407,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for personality in personalities {
     let ioctlsort = fp"obj/ioctlsort{personality}"
-    fp"src/ioctlent{personality}.h".write(run.text $ioctlsort ?)
+    fp"src/ioctlent{personality}.h".write(run.text $ioctlsort?)
   }
 
   for personality in personalities {
@@ -411,7 +421,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   let library = make.compile_c_tasks(cc, triple, cflags, [], cppflags, p".", library_sources, p"obj/libstrace")
   let libstrace = make.link_archive_task(cc, library.objects, p"obj/libstrace.a", library.deps)
   let main = make.compile_c_tasks(cc, triple, cflags, [], cppflags, p".", [p"src/strace.c"], p"obj/strace")
-  let link = make.link_executable_task(cc, triple, main.objects, [p"obj/libstrace.a"], [], p"obj/strace/strace", [@main.deps, libstrace.name])
+  let link = make.link_executable_task(
+    cc,
+    triple,
+    main.objects,
+    [p"obj/libstrace.a"],
+    [],
+    p"obj/strace/strace",
+    [@main.deps, libstrace.name],
+  )
   make.run_tasks([@library.tasks, libstrace, @main.tasks, link], make.jobs()?)
   fs.install(link.outputs[0], fp"{dest}/usr/bin/strace", 0o755, parents: true, overwrite: true)
 }

@@ -16,5 +16,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure("Version: 1.24.0" in pc, "proof-libva", "libva.pc does not report VA-API 1.24.0")
   print "libva ok"
 }
-
-main(@args)

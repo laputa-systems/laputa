@@ -30,5 +30,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "dwl-minimal ok"
 }
-
-main(@args)

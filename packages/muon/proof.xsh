@@ -30,5 +30,3 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     print "muon ok: cross-built "${pm_util.target_arch()?}
   }
 }
-
-main(@args)

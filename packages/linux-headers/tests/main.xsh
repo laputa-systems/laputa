@@ -2,11 +2,11 @@
 use packages.linux-headers.uapi
 
 test test_rewrite_drops_kernel_annotations_and_uapi_guards [error] {
-  test.eq(uapi.rewrite_line("long f(void __user *p, int __force x);"), "long f(void *p, int x);")
-  test.eq(uapi.rewrite_line("#include <linux/compiler.h>"), "")
-  test.eq(uapi.rewrite_line("#ifndef _UAPI_ASM_X86_SWAB_H"), "#ifndef _ASM_X86_SWAB_H")
-  test.eq(uapi.rewrite_line("#endif /* _UAPI_ASM_X86_SWAB_H */"), "#endif /* _ASM_X86_SWAB_H */")
-  test.eq(uapi.rewrite_line("static inline __u32 f(void)"), "static __inline__ __u32 f(void)")
+  assert uapi.rewrite_line("long f(void __user *p, int __force x);") == "long f(void *p, int x);"
+  assert uapi.rewrite_line("#include <linux/compiler.h>") == ""
+  assert uapi.rewrite_line("#ifndef _UAPI_ASM_X86_SWAB_H") == "#ifndef _ASM_X86_SWAB_H"
+  assert uapi.rewrite_line("#endif /* _UAPI_ASM_X86_SWAB_H */") == "#endif /* _ASM_X86_SWAB_H */"
+  assert uapi.rewrite_line("static inline __u32 f(void)") == "static __inline__ __u32 f(void)"
   test.eq(uapi.rewrite_line("} __packed;"), "} __attribute__((packed));")
 }
 

@@ -115,5 +115,3 @@ proc main(...argv: List[Str]) [fs, env, error] {
 
   print_report(arch, work, iso, kernel)
 }
-
-main(@args)

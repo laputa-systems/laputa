@@ -304,13 +304,13 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
   let filetree = recipe.filetree
   let mkdeps_target: List[Str] = recipe.get("mkdeps_target") ?? []
   # A recipe without an `architectures` export exists for every supported target.
-  let architectures: List[Str] = recipe.get("architectures") ?? ["aarch64", "x86_64"]
+  let architectures = recipe.get("architectures") ?? ["aarch64", "x86_64"]
   let runtime_only_deps: List[Str] = recipe.get("runtime_only_deps") ?? []
   let filetree_aarch64: List[Record] = recipe.get("filetree_aarch64") ?? []
   let filetree_x86_64: List[Record] = recipe.get("filetree_x86_64") ?? []
-  let package_kind: Str = recipe.get("package_kind") ?? ""
-  let nostrip: Bool = recipe.get("nostrip") ?? false
-  let source_mirror: Bool = recipe.get("source_mirror") ?? true
+  let package_kind = recipe.get("package_kind") ?? ""
+  let nostrip = recipe.get("nostrip") ?? false
+  let source_mirror = recipe.get("source_mirror") ?? true
 
   {
     name,

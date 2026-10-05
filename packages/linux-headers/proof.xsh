@@ -16,7 +16,10 @@ proc main(root: Path = /rootfs) [fs, env, error] {
     require(fp"{include}/{header}".exists()?, f"missing {header}")
   }
 
-  require("#define LINUX_VERSION_CODE " in fp"{include}/linux/version.h".read_text()?, "version.h has no LINUX_VERSION_CODE")
+  require(
+    "#define LINUX_VERSION_CODE " in fp"{include}/linux/version.h".read_text()?,
+    "version.h has no LINUX_VERSION_CODE",
+  )
   require("#define __NR_openat " in fp"{include}/asm/unistd_64.h".read_text()?, "unistd_64.h has no __NR_openat")
 
   # Every asm-generic wrapper must name a header that exists.
@@ -35,5 +38,3 @@ proc main(root: Path = /rootfs) [fs, env, error] {
 
   print "linux-headers ok"
 }
-
-main(@args)

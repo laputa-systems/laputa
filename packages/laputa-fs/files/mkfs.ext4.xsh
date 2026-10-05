@@ -117,20 +117,22 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) -> Result[L
       bytes.zero(0)?
     }
 
-    out += [{
-      rel,
-      parent,
-      name: child.name,
-      path: child.path,
-      kind: child.kind,
-      mode: child.mode,
-      uid: 0,
-      gid: 0,
-      mtime: FIXED_TIME,
-      size: child.size,
-      target,
-      inode: 0,
-    }]
+    out += [
+      {
+        rel,
+        parent,
+        name: child.name,
+        path: child.path,
+        kind: child.kind,
+        mode: child.mode,
+        uid: 0,
+        gid: 0,
+        mtime: FIXED_TIME,
+        size: child.size,
+        target,
+        inode: 0,
+      },
+    ]
 
     if child.kind == "dir" {
       out = collect_entries(root, child.path, out)?
@@ -419,13 +421,7 @@ proc write_indirect_blocks(image: Path, alloc: ExtAlloc) {
   }
 }
 
-proc allocate_bytes(
-  image: Path,
-  used: Map[Bool],
-  next: Int,
-  total_blocks: Int,
-  data: Bytes,
-) -> Result[AllocResult] {
+proc allocate_bytes(image: Path, used: Map[Bool], next: Int, total_blocks: Int, data: Bytes) -> Result[AllocResult] {
   let result = allocate_blocks(used, next, total_blocks, ceil_div(data.len(), BLOCK_SIZE))?
   var index = 0
 
@@ -559,13 +555,7 @@ proc group_desc(
   out
 }
 
-proc superblock(
-  total_inodes: Int,
-  total_blocks: Int,
-  free_blocks: Int,
-  free_inodes: Int,
-  label: Str,
-) -> Result[Bytes] {
+proc superblock(total_inodes: Int, total_blocks: Int, free_blocks: Int, free_inodes: Int, label: Str) -> Result[Bytes] {
   var out = bytes.zero(1024)?
   out = put_le(out, 0, total_inodes, 4)?
   out = put_le(out, 4, total_blocks, 4)?
@@ -734,13 +724,13 @@ proc write_headers(
       }
 
       yield group_desc(
-          block_bitmap,
-          inode_bitmap,
-          inode_table,
-          free_blocks,
-          INODES_PER_GROUP - used_inodes,
-          used_dirs_in_group(entries, group_index),
-        )?
+        block_bitmap,
+        inode_bitmap,
+        inode_table,
+        free_blocks,
+        INODES_PER_GROUP - used_inodes,
+        used_dirs_in_group(entries, group_index),
+      )?
 
       group_index += 1
     }
@@ -779,9 +769,7 @@ proc image_size(image: Path) -> Result[Int] {
 
   let sectors_path = fp"/sys/class/block/{image.name}/size"
 
-  if sectors_path.exists() {
-    return sectors_path.read_text()?.trim() as Int * 512
-  }
+  return sectors_path.read_text()?.trim() as Int * 512 when sectors_path.exists()
 
   size
 }
@@ -951,5 +939,3 @@ proc main(...argv: List[Str]) [fs, error] {
 
   format_ext_image(fp"{image}", source_root, label)
 }
-
-main(@args)

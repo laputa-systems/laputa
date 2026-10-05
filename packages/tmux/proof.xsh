@@ -60,7 +60,8 @@ set -g focus-events on
     TERM: "tmux-256color",
     TMUX_TMPDIR: tmp,
   }) {
-    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell "--no-config"
+    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell \
+      "--no-config"
     time.sleep(500ms)
     let sessions = run.text $dynlinker $tmux "-L" $label "list-sessions"
     check("proof:" in sessions, "tmux-session", f"tmux did not report proof session: {sessions.trim()}")
@@ -87,7 +88,8 @@ set -g focus-events on
     let focus_events = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "focus-events"
     check(focus_events.trim() == "on", "tmux-config", f"focus-events was {focus_events.trim()}")
     run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-alpha\"" "C-m"
-    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" "ok\"" "C-m"
+    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" \
+      "ok\"" "C-m"
     time.sleep(1000ms)
     let pane = run.text $dynlinker $tmux "-L" $label "capture-pane" "-pt" "proof:0.0"
     check("tmux-proof-alpha" in pane, "tmux-pane", f"tmux pane did not capture alpha output: {pane.trim()}")
@@ -125,8 +127,13 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
       TERM: term,
       TMUX_TMPDIR: tmp,
     }) {
-      let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
-      check(status.ok, "tmux-attach", f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}")
+      let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" \
+        $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
+      check(
+        status.ok,
+        "tmux-attach",
+        f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}",
+      )
     }
 
     let screen = out.read_text()?
@@ -136,10 +143,10 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
     # linux has no alternate screen and resets the cursor with its own
     # cnorm; the others switch to the alternate screen.
     if term == "linux" {
-      check("\x1b[?1049h" not in screen, "tmux-attach", "client used an alternate screen the linux console lacks")
-      check("\x1b[?25h\x1b[?0c" in screen, "tmux-attach", "client did not use the linux console's cnorm")
+      check("\u{1b}[?1049h" not in screen, "tmux-attach", "client used an alternate screen the linux console lacks")
+      check("\u{1b}[?25h\u{1b}[?0c" in screen, "tmux-attach", "client did not use the linux console's cnorm")
     } else {
-      check("\x1b[?1049h" in screen, "tmux-attach", f"client under TERM={term} did not enter the alternate screen")
+      check("\u{1b}[?1049h" in screen, "tmux-attach", f"client under TERM={term} did not enter the alternate screen")
     }
   }
 
@@ -150,12 +157,15 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
     TERM: "laputa-unknown-terminal",
     TMUX_TMPDIR: tmp,
   }) {
-    let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
+    let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config \
+      "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
     check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")
   }
 
   let refused = fp"{tmp}/unknown.out".read_text()?
-  check("missing or unsuitable terminal: laputa-unknown-terminal" in refused, "tmux-attach", f"unknown terminal not reported: {refused}")
+  check(
+    "missing or unsuitable terminal: laputa-unknown-terminal" in refused,
+    "tmux-attach",
+    f"unknown terminal not reported: {refused}",
+  )
 }
-
-main(@args)

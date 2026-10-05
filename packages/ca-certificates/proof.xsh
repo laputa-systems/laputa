@@ -33,5 +33,3 @@ proc main(rootfs = /rootfs) [fs, error] {
   verify_package_metadata(rootfs)
   print f"ca-certificates ok: {cert_count} PEM certificates"
 }
-
-main(@args)

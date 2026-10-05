@@ -944,7 +944,7 @@ test test_kbuild_config_keeps_string_values_that_contain_equals_signs [fs, error
 CONFIG_CMDLINE="root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0"
 """)
   let config = kbuild.load_config(fp"{root}/.config")?
-  test.eq(config.values.get("CMDLINE") ?? "", "root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0")
+  assert (config.values.get("CMDLINE") ?? "") == "root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0"
   kbuild.write_config_headers(fp"{root}/.config", root, "7.0.5", "x86")
   assert "#define CONFIG_CMDLINE \"root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0\"" in fp"{root}/include/generated/autoconf.h".read_text()?
 }

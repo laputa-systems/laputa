@@ -26,5 +26,3 @@ proc main(repo_root: Path, source_cache: Path, dest: Path) [fs, net, process, en
     recipe.call_build(pkg, src, dest)
   }
 }
-
-main(@args)

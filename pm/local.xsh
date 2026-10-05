@@ -82,9 +82,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 
       declared[key] = entry.kind
 
-      if entry.kind == types.file_kind_binary() {
-        yield entry.path
-      }
+      yield entry.path when entry.kind == types.file_kind_binary()
 
       if entry.kind == types.file_kind_tree() {
         guard fp"{dest}/{entry.path}".is_dir() else {
@@ -183,7 +181,10 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 }
 
 ## Exported PM declaration `collect_metadata_files`.
-export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
+export proc collect_metadata_files(
+  root: Path,
+  manifest: List[Path],
+) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
   let root_handle = fs.open_root(root)?
   defer root_handle.close()
 
@@ -227,7 +228,10 @@ export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error]
 ## Defines the exact payload inventory shared by archive creation and receipt metadata.
 ## Empty directories created incidentally by a package build remain payload entries: omitting them
 ## from the archive would make a verified receipt describe a root that cannot be materialized.
-export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry]) [fs, error] -> Result[List[Path], Error] {
+export proc collect_archive_paths(
+  root: Path,
+  filetree: List[types.FileTreeEntry],
+) [fs, error] -> Result[List[Path], Error] {
   var entries: List[Path] = []
   let root_text = root.display()
 

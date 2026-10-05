@@ -17,5 +17,3 @@ proc main(root: Path = /rootfs) [fs, error] {
   proof.ensure("\nVersion: 0." in pc, "proof-hwdata", "hwdata.pc lacks a version")
   print "hwdata ok: pnp and pci vendor tables, pkg-config data dir"
 }
-
-main(@args)

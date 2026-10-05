@@ -77,11 +77,11 @@ const int32_span = 4294967296
 const nesting_limit = 1024
 
 # Every ASCII character at its own byte offset, for `translit` ranges and `%c`.
-const ascii_table = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\t\n\u{b}\u{c}\r\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f} !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u{7f}"
+const ascii_table = "\0\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\t\n\u{b}\u{c}\r\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f} !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u{7f}"
 
 # U+0080..U+00FF, two bytes each: `%c` of a byte above 127 yields the Latin-1
 # character, since text here is UTF-8 and cannot hold the raw byte.
-const latin1_table = "\u{80}\u{81}\u{82}\u{83}\u{84}\u{85}\u{86}\u{87}\u{88}\u{89}\u{8a}\u{8b}\u{8c}\u{8d}\u{8e}\u{8f}\u{90}\u{91}\u{92}\u{93}\u{94}\u{95}\u{96}\u{97}\u{98}\u{99}\u{9a}\u{9b}\u{9c}\u{9d}\u{9e}\u{9f}\u{a0}\u{a1}\u{a2}\u{a3}\u{a4}\u{a5}\u{a6}\u{a7}\u{a8}\u{a9}\u{aa}\u{ab}\u{ac}\u{ad}\u{ae}\u{af}\u{b0}\u{b1}\u{b2}\u{b3}\u{b4}\u{b5}\u{b6}\u{b7}\u{b8}\u{b9}\u{ba}\u{bb}\u{bc}\u{bd}\u{be}\u{bf}\u{c0}\u{c1}\u{c2}\u{c3}\u{c4}\u{c5}\u{c6}\u{c7}\u{c8}\u{c9}\u{ca}\u{cb}\u{cc}\u{cd}\u{ce}\u{cf}\u{d0}\u{d1}\u{d2}\u{d3}\u{d4}\u{d5}\u{d6}\u{d7}\u{d8}\u{d9}\u{da}\u{db}\u{dc}\u{dd}\u{de}\u{df}\u{e0}\u{e1}\u{e2}\u{e3}\u{e4}\u{e5}\u{e6}\u{e7}\u{e8}\u{e9}\u{ea}\u{eb}\u{ec}\u{ed}\u{ee}\u{ef}\u{f0}\u{f1}\u{f2}\u{f3}\u{f4}\u{f5}\u{f6}\u{f7}\u{f8}\u{f9}\u{fa}\u{fb}\u{fc}\u{fd}\u{fe}\u{ff}"
+const latin1_table = "\u{80}\u{81}\u{82}\u{83}\u{84}\u{85}\u{86}\u{87}\u{88}\u{89}\u{8a}\u{8b}\u{8c}\u{8d}\u{8e}\u{8f}\u{90}\u{91}\u{92}\u{93}\u{94}\u{95}\u{96}\u{97}\u{98}\u{99}\u{9a}\u{9b}\u{9c}\u{9d}\u{9e}\u{9f}\u{a0}¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
 
 proc read_input_file(filepath: Str) -> Result[Str] {
   # `fp"${...}"` is a literal-path form in the pinned published runner: it
@@ -117,9 +117,7 @@ pure space_end(text: Str, pos: Int, len: Int) -> Int {
   while i < len {
     let b = text.byte_at(i) ?? 0
 
-    if b != 32 and (b < 9 or b > 13) {
-      return i
-    }
+    return i when b != 32 and (b < 9 or b > 13)
 
     i += 1
   }
@@ -155,9 +153,7 @@ pure plain_end(text: Str, pos: Int, len: Int, lq0: Int, bc0: Int, in_args: Bool)
       return i
     }
 
-    if in_args and (b == 40 or b == 41 or b == 44) {
-      return i
-    }
+    return i when in_args and (b == 40 or b == 41 or b == 44)
 
     i += 1
   }
@@ -170,7 +166,7 @@ pure match_at(text: Str, pos: Int, needle: Str) -> Bool {
   var i = 0
 
   while i < n {
-    if text.byte_at(pos + i) != needle.byte_at(i) {
+    guard text.byte_at(pos + i) == needle.byte_at(i) else {
       return false
     }
 
@@ -210,9 +206,7 @@ pure scan_quoted(text: Str, pos: Int, len: Int, lq: Str, rq: Str, depth: Int) ->
       d -= 1
       p = next_r + rql
 
-      if d == 0 {
-        return {end: p, depth: 0}
-      }
+      return {end: p, depth: 0} when d == 0
 
       if next_l >= 0 and next_l < p {
         next_l = text.find(lq, p) ?? -1
@@ -233,9 +227,7 @@ pure count_lines(text: Str, pos: Int) -> Int {
   while true {
     let nl = text.find("\n", p) ?? -1
 
-    if nl < 0 or nl >= pos - 1 {
-      return line
-    }
+    return line when nl < 0 or nl >= pos - 1
 
     line += 1
     p = nl + 1
@@ -283,9 +275,7 @@ pure parse_c_long(text: Str) -> NumArg {
   while i < n {
     let b = text.byte_at(i) ?? 0
 
-    if b < 48 or b > 57 {
-      return {ok: false, value: 0, note: ""}
-    }
+    return {ok: false, value: 0, note: ""} when b < 48 or b > 57
 
     if value < 1000000000000000 {
       value = value * 10 + (b - 48)
@@ -294,9 +284,7 @@ pure parse_c_long(text: Str) -> NumArg {
     i += 1
   }
 
-  if i == digits_start {
-    return {ok: false, value: 0, note: ""}
-  }
+  return {ok: false, value: 0, note: ""} when i == digits_start
 
   {ok: true, value: if negative { -value } else { value }, note: if leading { "leading" } else { "" }}
 }
@@ -374,7 +362,7 @@ pure format_radix(value: Int, radix: Int, width: Int) -> Str {
 # follows GNU m4 1.4: 0x/0b/0r prefixes, octal after a leading zero, and a
 # number ends at the first character that is not a digit of its base.
 pure eval_tokens(expr: Str) -> List[Str] {
-  var tokens: List[Str] = []
+  var tokens = []
   let n = expr.byte_len()
   var i = 0
 
@@ -507,9 +495,7 @@ pure shift_value(value: Int, count: Int, left: Bool) -> Int {
     j += 1
   }
 
-  if left {
-    return wrap32(to_u32(value) * factor)
-  }
+  return wrap32(to_u32(value) * factor) when left
 
   if value >= 0 { value / factor } else { -((-value - 1) / factor) - 1 }
 }
@@ -566,25 +552,25 @@ pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
   let y = b.v
 
   let v = match op {
-    "u+" => y
-    "u-" => wrap32(-y)
-    "u~" => wrap32(4294967295.clear_bits(to_u32(y)))
-    "u!" => if y == 0 { 1 } else { 0 }
-    "|" => wrap32(to_u32(x).bit_or(to_u32(y)))
-    "^" => wrap32(to_u32(x).bit_or(to_u32(y)).clear_bits(to_u32(x).bit_and(to_u32(y))))
-    "&" => wrap32(to_u32(x).bit_and(to_u32(y)))
-    "==" | "=" => if x == y { 1 } else { 0 }
-    "!=" => if x != y { 1 } else { 0 }
-    "<" => if x < y { 1 } else { 0 }
-    "<=" => if x <= y { 1 } else { 0 }
-    ">" => if x > y { 1 } else { 0 }
-    ">=" => if x >= y { 1 } else { 0 }
-    "<<" => shift_value(x, y, true)
-    ">>" => shift_value(x, y, false)
-    "+" => wrap32(x + y)
-    "-" => wrap32(x - y)
-    "*" => wrap32(x * y)
-    else => 0
+    "u+" => y,
+    "u-" => wrap32(-y),
+    "u~" => wrap32(4294967295.clear_bits(to_u32(y))),
+    "u!" => if y == 0 { 1 } else { 0 },
+    "|" => wrap32(to_u32(x).bit_or(to_u32(y))),
+    "^" => wrap32(to_u32(x).bit_or(to_u32(y)).clear_bits(to_u32(x).bit_and(to_u32(y)))),
+    "&" => wrap32(to_u32(x).bit_and(to_u32(y))),
+    "==" | "=" => if x == y { 1 } else { 0 },
+    "!=" => if x != y { 1 } else { 0 },
+    "<" => if x < y { 1 } else { 0 },
+    "<=" => if x <= y { 1 } else { 0 },
+    ">" => if x > y { 1 } else { 0 },
+    ">=" => if x >= y { 1 } else { 0 },
+    "<<" => shift_value(x, y, true),
+    ">>" => shift_value(x, y, false),
+    "+" => wrap32(x + y),
+    "-" => wrap32(x - y),
+    "*" => wrap32(x * y),
+    else => 0,
   }
 
   if op == "/" or op == "%" {
@@ -592,9 +578,7 @@ pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
       return {v: 0, err: if op == "/" { "divide by zero" } else { "modulo by zero" }}
     }
 
-    if y == -1 {
-      return {v: if op == "/" { wrap32(-x) } else { 0 }, err: ""}
-    }
+    return {v: if op == "/" { wrap32(-x) } else { 0 }, err: ""} when y == -1
 
     return {v: if op == "/" { x / y } else { x % y }, err: ""}
   }
@@ -615,7 +599,7 @@ pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
 # parenthesis") or an arithmetic failure.
 pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
   var values: List[EvalValue] = []
-  var ops: List[Str] = []
+  var ops = []
   var expect_operand = true
   var i = 0
 
@@ -661,22 +645,16 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
 
     let p = eval_prec(t)
 
-    if p == 0 or t == "!" or t == "~" {
-      return {v: 0, err: "excess input"}
-    }
+    return {v: 0, err: "excess input"} when p == 0 or t == "!" or t == "~"
 
     while ! ops.is_empty() {
       let top = ops[-1]
 
-      if top == "(" {
-        break
-      }
+      break when top == "("
 
       let tp = eval_prec(top)
 
-      if tp < p or (tp == p and t == "**") {
-        break
-      }
+      break when tp < p or (tp == p and t == "**")
 
       ops = ops[0..ops.len() - 1]
 
@@ -716,7 +694,7 @@ pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
 }
 
 pure eval_text(expr: Str, radix: Int, width: Int) -> BuiltinOutput {
-  var notes: List[Str] = []
+  var notes = []
 
   if expr == "" {
     notes += ["empty string treated as 0 in builtin `eval'"]
@@ -755,7 +733,7 @@ pure text_chars(text: Str) -> List[Str] {
 # leading or trailing dash is literal.
 pure expand_ranges(spec: Str) -> List[Str] {
   let chars = text_chars(spec)
-  var out: List[Str] = []
+  var out = []
   var i = 0
   var prev = ""
 
@@ -773,7 +751,6 @@ pure expand_ranges(spec: Str) -> List[Str] {
       let to_code = to.byte_at(0) ?? 0
 
       if prev.byte_len() == 1 and to.byte_len() == 1 {
-
         if from_code <= to_code {
           var k = from_code + 1
 
@@ -831,9 +808,7 @@ pure pad_field(body: Str, width: Int, left: Bool, zero: Bool) -> Str {
 
   return body when missing <= 0
 
-  if left {
-    return f"{body}{repeat_text(" ", missing)}"
-  }
+  return f"{body}{repeat_text(" ", missing)}" when left
 
   if zero {
     let first = body.byte_at(0) ?? 0
@@ -861,9 +836,7 @@ pure format_int_arg(text: Str) -> NumArg {
 
   let parsed = parse_c_long(text)
 
-  if ! parsed.ok {
-    return {ok: false, value: 0, note: f"non-numeric argument {text}"}
-  }
+  return {ok: false, value: 0, note: f"non-numeric argument {text}"} unless parsed.ok
 
   {ok: true, value: wrap32(parsed.value), note: ""}
 }
@@ -873,8 +846,8 @@ pure format_int_arg(text: Str) -> NumArg {
 pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
   let fmt = format_arg(args, 0)
   let n = fmt.byte_len()
-  var out: List[Str] = []
-  var notes: List[Str] = []
+  var out = []
+  var notes = []
   var ai = 1
   var p = 0
 
@@ -990,7 +963,11 @@ pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
       ai += 1
       let code = to_u32(c.value).bit_and(255)
 
-      let glyph = if code >= 128 { latin1_table.byte_slice((code - 128) * 2, 2) } else { ascii_table.byte_slice(code, 1) }
+      let glyph = if code >= 128 {
+        latin1_table.byte_slice((code - 128) * 2, 2)
+      } else {
+        ascii_table.byte_slice(code, 1)
+      }
       out += [pad_field(glyph, width, left, false)]
     } else if conv == 100 or conv == 105 or conv == 117 or conv == 111 or conv == 120 or conv == 88 {
       let a = format_int_arg(format_arg(args, ai))
@@ -999,7 +976,19 @@ pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
       let signed = conv == 100 or conv == 105
       let value = if signed { a.value } else { to_u32(a.value) }
       let radix = if conv == 111 { 8 } else if conv == 120 or conv == 88 { 16 } else { 10 }
-      var digits = format_radix(if value < 0 { -value } else { value }, radix, if precision >= 0 { precision } else { 1 })
+      var digits = format_radix(
+        if value < 0 {
+          -value
+        } else {
+          value
+        },
+        radix,
+        if precision >= 0 {
+          precision
+        } else {
+          1
+        },
+      )
 
       if precision == 0 and value == 0 {
         digits = ""
@@ -1020,7 +1009,9 @@ pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
       let sign = if value < 0 { "-" } else if signed and plus { "+" } else if signed and space { " " } else { "" }
       out += [pad_field(f"{sign}{digits}", width, left, zero and precision < 0)]
     } else if conv == 101 or conv == 69 or conv == 102 or conv == 70 or conv == 103 or conv == 71 or conv == 97 or conv == 65 {
-      return Err(ScriptError.Failed(kind: "m4-format", message: f"format: floating-point conversion `{spec}' is not supported"))
+      return Err(
+        ScriptError.Failed(kind: "m4-format", message: f"format: floating-point conversion `{spec}' is not supported"),
+      )
     } else {
       notes += [f"Warning: unrecognized specifier in `{fmt}'"]
       return {text: out.join(""), notes}
@@ -1058,16 +1049,14 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
   var at_start = true
   var last_atom = -1
   var last_was_repeat = false
-  var group_starts: List[Int] = []
+  var group_starts = []
   var groups = 0
 
   while i < n {
     let c = pat.byte_at(i) ?? 0
 
     if c == 92 {
-      if i + 1 >= n {
-        return {pattern: "", error: "Trailing backslash", groups}
-      }
+      return {pattern: "", error: "Trailing backslash", groups} when i + 1 >= n
 
       let d = pat.byte_at(i + 1) ?? 0
       i += 2
@@ -1083,9 +1072,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
       }
 
       if d == 41 {
-        if group_starts.is_empty() {
-          return {pattern: "", error: "Unmatched ) or \\)", groups}
-        }
+        return {pattern: "", error: "Unmatched ) or \\)", groups} when group_starts.is_empty()
 
         last_atom = group_starts[-1]
         group_starts = group_starts[0..group_starts.len() - 1]
@@ -1104,21 +1091,25 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
       }
 
       if d >= 49 and d <= 57 {
-        return {pattern: "", error: f"unsupported: back-reference \\{pat.byte_slice(i - 1, 1)} is not supported in regular expression `{pat}'", groups}
+        return {
+          pattern: "",
+          error: f"unsupported: back-reference \\{pat.byte_slice(i - 1, 1)} is not supported in regular expression `{pat}'",
+          groups,
+        }
       }
 
       let piece = match d {
-        119 => "[0-9A-Za-z_]"
-        87 => "[^0-9A-Za-z_]"
-        115 => "[ \\t\\n\\r\\x{0b}\\x{0c}]"
-        83 => "[^ \\t\\n\\r\\x{0b}\\x{0c}]"
-        98 => "(?-u:\\b)"
-        66 => "(?-u:\\B)"
-        60 => r"(?-u:\b{start})"
-        62 => r"(?-u:\b{end})"
-        96 => "\\A"
-        39 => "\\z"
-        else => ""
+        119 => "[0-9A-Za-z_]",
+        87 => "[^0-9A-Za-z_]",
+        115 => "[ \\t\\n\\r\\x{0b}\\x{0c}]",
+        83 => "[^ \\t\\n\\r\\x{0b}\\x{0c}]",
+        98 => "(?-u:\\b)",
+        66 => "(?-u:\\B)",
+        60 => r"(?-u:\b{start})",
+        62 => r"(?-u:\b{end})",
+        96 => "\\A",
+        39 => "\\z",
+        else => "",
       }
 
       if piece != "" {
@@ -1174,9 +1165,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
         }
       }
 
-      if ! closed {
-        return {pattern: "", error: "Unmatched [, [^, [:, [., or [=", groups}
-      }
+      return {pattern: "", error: "Unmatched [, [^, [:, [., or [=", groups} unless closed
 
       last_atom = out.len()
       out += [f"[{if negate { "^" } else { "" }}{items.join("")}]"]
@@ -1231,7 +1220,7 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
       # GNU applies a second repetition to the repeated atom (`a*?` is
       # `(a*)?`); Rust would read it as a lazy modifier.
       if last_was_repeat {
-        out = out[0..last_atom] + ["(?:"] + out[last_atom..] + [")"]
+        out = [@out[0..last_atom], "(?:", @out[last_atom..], ")"]
       }
 
       out += [pat.byte_slice(i, 1)]
@@ -1248,16 +1237,14 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
     last_was_repeat = false
   }
 
-  if ! group_starts.is_empty() {
-    return {pattern: "", error: "Unmatched ( or \\(", groups}
-  }
+  return {pattern: "", error: "Unmatched ( or \\(", groups} unless group_starts.is_empty()
 
   {pattern: out.join(""), error: "", groups}
 }
 
 pure substitute_captures(repl: Str, captures: List[Str]) -> BuiltinOutput {
-  var out: List[Str] = []
-  var notes: List[Str] = []
+  var out = []
+  var notes = []
   let n = repl.byte_len()
   var p = 0
 
@@ -1269,9 +1256,7 @@ pure substitute_captures(repl: Str, captures: List[Str]) -> BuiltinOutput {
       out += [repl.byte_slice(p, stop - p)]
     }
 
-    if bs < 0 {
-      break
-    }
+    break when bs < 0
 
     if bs + 1 >= n {
       notes += ["Warning: trailing \\ ignored in replacement"]
@@ -1337,16 +1322,14 @@ pure captures_at(text: Str, s: Int, e: Int, at_start: Regex, at_offset: Regex) -
   let n = text.byte_len()
   let tail = if e < n { utf8_width(text.byte_at(e) ?? 0) } else { 0 }
 
-  if s == 0 {
-    return at_start.captures(text.byte_slice(0, e + tail))
-  }
+  return at_start.captures(text.byte_slice(0, e + tail)) when s == 0
 
   let pw = char_width_before(text, s)
   let caps = at_offset.captures(text.byte_slice(s - pw, e + tail - s + pw))
 
   return [] when caps.is_empty()
 
-  [caps[0].byte_slice(pw, caps[0].byte_len() - pw)] + caps[1..]
+  [caps[0].byte_slice(pw, caps[0].byte_len() - pw), @caps[1..]]
 }
 
 # GNU m4's patsubst loop: search from the end of each match, and after an
@@ -1377,14 +1360,12 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
       if m.end > m.start and (i + 1 == found.len() or found[i + 1].start != m.end) {
         let probe = captures_at(text, m.end, m.end, at_start, at_offset)
 
-        if ! probe.is_empty() and probe[0] == "" {
-          yield @[m.end, m.end]
-        }
+        yield @[m.end, m.end] when ! probe.is_empty() and probe[0] == ""
       }
     }
   }
 
-  var notes: List[Str] = []
+  var notes = []
   var offset = 0
   var k = 0
 
@@ -1393,9 +1374,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
       let s = spans[k]
       let e = spans[k + 1]
 
-      if s > offset {
-        yield text.byte_slice(offset, s - offset)
-      }
+      yield text.byte_slice(offset, s - offset) when s > offset
 
       if literal {
         yield repl
@@ -1417,9 +1396,7 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
       k += 2
     }
 
-    if offset < n {
-      yield text.byte_slice(offset, n - offset)
-    }
+    yield text.byte_slice(offset, n - offset) when offset < n
   }
 
   {text: out.join(""), notes}
@@ -1474,9 +1451,7 @@ pure expand_user_body(body: Str, name: Str, args: List[Str], lq: Str, rq: Str) -
         break
       }
 
-      if d > p {
-        yield body.byte_slice(p, d - p)
-      }
+      yield body.byte_slice(p, d - p) when d > p
 
       let c = body.byte_at(d + 1) ?? -1
 
@@ -1573,7 +1548,7 @@ pure builtin_blind(name: Str) -> Bool {
 }
 
 pure argc_notes(name: Str, argc: Int, min: Int, max: Int) -> List[Str] {
-  if argc < min {
+  guard argc >= min else {
     return [f"Warning: too few arguments to builtin `{name}'"]
   }
 
@@ -1596,9 +1571,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   if name == "ifelse" {
     return {text: "", notes: []} when argc == 2
 
-    if argc < 4 {
-      return {text: "", notes: argc_notes(name, argc, 4, -1)}
-    }
+    return {text: "", notes: argc_notes(name, argc, 4, -1)} when argc < 4
 
     let notes = if (argc + 2) % 3 > 1 { [f"Warning: excess arguments to builtin `{name}' ignored"] } else { [] }
     var i = 0
@@ -1625,7 +1598,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   }
 
   if name == "index" {
-    if argc < 3 {
+    guard argc >= 3 else {
       return {text: if argc == 2 { "0" } else { "" }, notes: argc_notes(name, argc, 3, 3)}
     }
 
@@ -1634,7 +1607,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   }
 
   if name == "substr" {
-    if argc < 3 {
+    guard argc >= 3 else {
       return {text: arg_at(args, 0), notes: argc_notes(name, argc, 3, 4)}
     }
 
@@ -1642,9 +1615,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
     let avail = text.byte_len()
     let start = numeric_arg(args[1], name)
 
-    if ! start.ok {
-      return {text: "", notes: [start.note]}
-    }
+    return {text: "", notes: [start.note]} unless start.ok
 
     var length = avail - start.value
     var notes = if start.note != "" { [start.note] } else { [] }
@@ -1652,17 +1623,13 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
     if argc >= 4 {
       let given = numeric_arg(args[2], name)
 
-      if ! given.ok {
-        return {text: "", notes: notes.push(given.note)}
-      }
+      return {text: "", notes: notes.push(given.note)} unless given.ok
 
       notes = if given.note != "" { notes.push(given.note) } else { notes }
       length = given.value
     }
 
-    if start.value < 0 or length <= 0 or start.value >= avail {
-      return {text: "", notes}
-    }
+    return {text: "", notes} when start.value < 0 or length <= 0 or start.value >= avail
 
     if length > avail - start.value {
       length = avail - start.value
@@ -1672,7 +1639,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   }
 
   if name == "translit" {
-    if argc < 3 {
+    guard argc >= 3 else {
       return {text: arg_at(args, 0), notes: argc_notes(name, argc, 3, 4)}
     }
 
@@ -1680,7 +1647,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   }
 
   if name == "patsubst" {
-    if argc < 3 {
+    guard argc >= 3 else {
       return {text: arg_at(args, 0), notes: argc_notes(name, argc, 3, 4)}
     }
 
@@ -1689,7 +1656,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
   }
 
   if name == "regexp" {
-    if argc < 3 {
+    guard argc >= 3 else {
       return {text: if argc == 2 { "0" } else { "" }, notes: argc_notes(name, argc, 3, 4)}
     }
 
@@ -1712,9 +1679,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
     if argc >= 3 and args[1] != "" {
       let r = numeric_arg(args[1], name)
 
-      if ! r.ok {
-        return {text: "", notes: [r.note]}
-      }
+      return {text: "", notes: [r.note]} unless r.ok
 
       radix = r.value
     }
@@ -1726,16 +1691,12 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
     if argc >= 4 and args[2] != "" {
       let w = numeric_arg(args[2], name)
 
-      if ! w.ok {
-        return {text: "", notes: [w.note]}
-      }
+      return {text: "", notes: [w.note]} unless w.ok
 
       width = w.value
     }
 
-    if width < 0 {
-      return {text: "", notes: ["negative width to builtin `eval'"]}
-    }
+    return {text: "", notes: ["negative width to builtin `eval'"]} when width < 0
 
     let r = eval_text(args[0], radix, width)
     return {text: r.text, notes: r.notes.extend(argc_notes(name, argc, 2, 4))}
@@ -1746,9 +1707,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
 
     let v = numeric_arg(args[0], name)
 
-    if ! v.ok {
-      return {text: "", notes: [v.note]}
-    }
+    return {text: "", notes: [v.note]} unless v.ok
 
     let result = wrap32(if name == "incr" { v.value + 1 } else { v.value - 1 })
     let notes = if v.note != "" { [v.note] } else { [] }
@@ -1768,15 +1727,15 @@ pure is_argument_builtin(name: Str) -> Bool {
 # `cat` here-documents are what bison's `b4_cat` passes to `syscmd`; run
 # them without a shell. Returns null for any other command.
 pure cat_heredoc(cmd: Str) -> Heredoc? {
-  let caps = rx"(?s)^cat(?: >>([^ \t\n<>|&;$`'\x22\\]+))? <<('?)([A-Za-z_][A-Za-z0-9_]*)'?\n(.*)\n([A-Za-z_][A-Za-z0-9_]*)\n?$".captures(cmd)
+  let caps = rx"(?s)^cat(?: >>([^ \t\n<>|&;$`'\x22\\]+))? <<('?)([A-Za-z_][A-Za-z0-9_]*)'?\n(.*)\n([A-Za-z_][A-Za-z0-9_]*)\n?$".captures(
+    cmd,
+  )
 
   return null when caps.len() < 6
 
   return null when caps[3] != caps[5]
 
-  if caps[2] == "" and ("$" in caps[4] or "`" in caps[4] or "\\" in caps[4]) {
-    return null
-  }
+  return null when caps[2] == "" and ("$" in caps[4] or "`" in caps[4] or "\\" in caps[4])
 
   {target: caps[1], body: f"{caps[4]}\n"}
 }
@@ -1794,7 +1753,7 @@ pure new_call(name: Str, defn: Str, at_text: Str, at_pos: Int, at_name: Str) -> 
 }
 
 pure numeric_key_order(keys: List[Str]) -> List[Int] {
-  var numbers: List[Int] = [k.parse_int() ?? 0 for k in keys]
+  var numbers = [k.parse_int() ?? 0 for k in keys]
   numbers |> sort
 }
 
@@ -1802,17 +1761,13 @@ pure numeric_key_order(keys: List[Str]) -> List[Int] {
 proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
   let direct = fp"{name}"
 
-  if direct.exists() and direct.is_file() {
-    return name
-  }
+  return name when direct.exists() and direct.is_file()
 
   if ! name.starts_with("/") {
     for dir in include_paths {
       let candidate = fp"{dir}/{name}"
 
-      if candidate.exists() and candidate.is_file() {
-        return f"{dir}/{name}"
-      }
+      return f"{dir}/{name}" when candidate.exists() and candidate.is_file()
     }
   }
 
@@ -1855,11 +1810,11 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var kind = 0
   var iname = ""
   var iline = 0
-  var f_text: List[Str] = []
-  var f_pos: List[Int] = []
-  var f_kind: List[Int] = []
-  var f_name: List[Str] = []
-  var f_line: List[Int] = []
+  var f_text = []
+  var f_pos = []
+  var f_kind = []
+  var f_name = []
+  var f_line = []
   var nf = 0
 
   # Pending calls: `cur` is the innermost, `calls[0..nc - 1]` the outer ones.
@@ -1871,11 +1826,11 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   # Output: `sink` collects the current diversion (stdout for 0, discarded
   # when negative); other diversions accumulate in `diversions`.
   var div = 0
-  var sink: List[Str] = []
+  var sink = []
   var diversions: Map[Str] = {}
-  var wraps: List[Str] = []
-  var wrap_names: List[Str] = []
-  var wrap_lines: List[Int] = []
+  var wraps = []
+  var wrap_names = []
+  var wrap_lines = []
   var sysval = 0
   var status = 0
   var next_input = 0
@@ -1890,8 +1845,8 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var bcl = bc.byte_len()
   var call_name = ""
   var call_def = ""
-  var call_args: List[Str] = []
-  var call_funcs: List[Str] = []
+  var call_args = []
+  var call_funcs = []
   var call_at_text = ""
   var call_at_pos = -1
   var call_at_name = ""
@@ -2060,7 +2015,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         var next_byte = -1
 
         while i >= 0 {
-          if f_pos[i] < f_text[i].byte_len() {
+          guard f_pos[i] >= f_text[i].byte_len() else {
             next_byte = if f_kind[i] == 2 { -1 } else { f_text[i].byte_at(f_pos[i]) ?? -1 }
             break
           }
@@ -2068,9 +2023,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           i -= 1
         }
 
-        if ! is_word_char(next_byte) {
-          break
-        }
+        break unless is_word_char(next_byte)
 
         while pos >= tlen and nf > 0 {
           nf -= 1
@@ -2114,7 +2067,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         var i = nf - 1
 
         while i >= 0 {
-          if f_pos[i] < f_text[i].byte_len() {
+          guard f_pos[i] >= f_text[i].byte_len() else {
             peek = if f_kind[i] == 2 { -1 } else { f_text[i].byte_at(f_pos[i]) ?? -1 }
             break
           }
@@ -2317,7 +2270,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
     # Run the call. `indir` and `builtin` retarget it and loop.
     var push_text = ""
     var push_macdef = ""
-    var notes: List[Str] = []
+    var notes = []
     var name = call_name
     var defn = call_def
     var args = call_args
@@ -2336,9 +2289,9 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         # m4sugar's loops evaluate the same few expressions thousands of
         # times; eval results without diagnostics are remembered.
         let memo_key = if bi == "eval" { args.join("\u{1}") } else { "" }
-        let memo = if memo_key != "" { eval_memo.get(memo_key) ?? "\u{0}" } else { "\u{0}" }
+        let memo = if memo_key != "" { eval_memo.get(memo_key) ?? "\0" } else { "\0" }
 
-        if memo != "\u{0}" {
+        if memo != "\0" {
           push_text = memo
           break
         }
@@ -2368,7 +2321,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       }
 
       if bi == "indir" or bi == "builtin" {
-        if argc < 2 {
+        guard argc >= 2 else {
           notes += argc_notes(bi, argc, 2, -1)
           break
         }
@@ -2438,7 +2391,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           notes += argc_notes(bi, argc, 2, -1)
         }
         "defn" => {
-          var pieces: List[Str] = []
+          var pieces = []
 
           for target in args {
             let found = defs.get(target) ?? ""
@@ -2524,7 +2477,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           notes += argc_notes(bi, argc, 1, 2)
         }
         "undivert" => {
-          var targets: List[Str] = []
+          var targets = []
 
           if argc == 1 {
             for k in numeric_key_order(diversions.keys()) {
@@ -2717,7 +2670,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 
               sysval = 0
             } else {
-              if ! (process.which("sh") is Ok(_)) {
+              guard process.which("sh") is Ok(_) else {
                 let where = if kind == 1 { f"{iname}:{count_lines(text, pos)}" } else { f"{iname}:{iline}" }
                 eprint f"m4:{where}: {bi}: no /bin/sh to run `{cmd}'"
                 return 1
@@ -2740,9 +2693,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
             notes += argc_notes(bi, argc, 2, 2)
           }
         }
-        "sysval" => {
-          push_text = f"{sysval}"
-        }
+        "sysval" => push_text = f"{sysval}"
         "mkstemp" | "maketemp" => {
           if argc < 2 {
             notes += argc_notes(bi, argc, 2, 2)
@@ -2821,15 +2772,9 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 
           push_text = f"{line}"
         }
-        "__program__" => {
-          push_text = f"{lq}m4{rq}"
-        }
-        "traceon" | "traceoff" | "debugmode" | "debugfile" => {
-          let _ = bi
-        }
-        else => {
-          return Err(ScriptError.Failed(kind: "m4-internal", message: f"unhandled builtin {bi}"))
-        }
+        "__program__" => push_text = f"{lq}m4{rq}"
+        "traceon" | "traceoff" | "debugmode" | "debugfile" => let _ = bi
+        else => return Err(ScriptError.Failed(kind: "m4-internal", message: f"unhandled builtin {bi}"))
       }
 
       break
@@ -2868,9 +2813,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       for note in notes {
         # GNU m4 gives the `\0` deprecation once per run.
         if note.starts_with("Warning: \\0 will disappear") {
-          if warned_backslash_zero {
-            continue
-          }
+          continue when warned_backslash_zero
 
           warned_backslash_zero = true
         }
@@ -2933,8 +2876,8 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 # ── command line ─────────────────────────────────────────────────────────────
 proc parse_options(argv: List[Str]) -> Result[Options?] {
   var prefix = false
-  var include_paths: List[Str] = []
-  var defines: List[List[Str]] = []
+  var include_paths = []
+  var defines = []
   var inputs: List[InputSpec] = []
   var i = 0
   var options_done = false
@@ -2963,7 +2906,9 @@ proc parse_options(argv: List[Str]) -> Result[Options?] {
       return null
     }
 
-    if a == "-g" or a == "--gnu" or a == "-Q" or a == "--quiet" or a == "--silent" or a.starts_with("-d") or a.starts_with("--debug") {
+    if a == "-g" or a == "--gnu" or a == "-Q" or a == "--quiet" or a == "--silent" or a.starts_with("-d") or a.starts_with(
+      "--debug",
+    ) {
       continue
     }
 
@@ -2979,17 +2924,17 @@ proc parse_options(argv: List[Str]) -> Result[Options?] {
     if a.starts_with("--include=") or a.starts_with("--define=") or a.starts_with("--undefine=") {
       let eq = a.find("=") ?? 0
       flag = match a.byte_slice(0, eq) {
-        "--include" => "I"
-        "--define" => "D"
-        else => "U"
+        "--include" => "I",
+        "--define" => "D",
+        else => "U",
       }
       value = a.byte_slice(eq + 1, a.byte_len() - eq - 1)
       has_value = true
     } else if a == "--include" or a == "--define" or a == "--undefine" {
       flag = match a {
-        "--include" => "I"
-        "--define" => "D"
-        else => "U"
+        "--include" => "I",
+        "--define" => "D",
+        else => "U",
       }
     } else if a.byte_len() >= 2 and (a.starts_with("-I") or a.starts_with("-D") or a.starts_with("-U")) {
       flag = a.byte_slice(1, 1)
@@ -3040,12 +2985,9 @@ proc main(margs: List[Str] = []) [fs, process, env, error, io] {
 
   return when opts == null
 
-  let status = match expand_inputs(opts) {
-    Ok(code) => code
-    Err(failure) => {
-      eprint f"m4: {failure.message}"
-      1
-    }
+  let status = expand_inputs(opts) ?? {
+    eprint f"m4: {.message}"
+    1
   }
 
   if status != 0 {

@@ -29,7 +29,13 @@ pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
     {
       name: "unistd_64.h",
       table: p"arch/arm64/tools/syscall_64.tbl",
-      abis: ["common", "64", "renameat", "rlimit", "memfd_secret"],
+      abis: [
+        "common",
+        "64",
+        "renameat",
+        "rlimit",
+        "memfd_secret",
+      ],
       offset: "",
     },
   ]
@@ -88,7 +94,9 @@ proc generate_version_header(version: Str, out: Path) {
   let parts = [part as Int for part in version.split(".")]
 
   guard parts.len() == 3 else {
-    return Err(uapi.UapiError.Failed(kind: "linux-headers-version", message: f"kernel version {version} is not MAJOR.MINOR.SUB"))
+    return Err(
+      uapi.UapiError.Failed(kind: "linux-headers-version", message: f"kernel version {version} is not MAJOR.MINOR.SUB"),
+    )
   }
 
   out.write(
@@ -135,5 +143,3 @@ proc main(dest: Path) [fs, env, error] {
     }
   }
 }
-
-main(@args)

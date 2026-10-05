@@ -122,7 +122,6 @@ proc prove_default_compile(root: Path, arch: Str) [fs, process, env, error] {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-default" {
-
     fp"{tmp}/default-target.c".write(
       """int laputa_default_target(void) {
   return 9;
@@ -141,7 +140,6 @@ proc prove_native_link(root: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native" {
-
     fp"{tmp}/hello.c".write(
       """int main(void) {
   return 0;
@@ -163,7 +161,6 @@ proc prove_native_cxx_link(root: Path) [fs, process, env, error] {
   let cxx = process.which("c++")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native-cxx" {
-
     fp"{tmp}/hello.cc".write(
       """#include <string>
 
@@ -188,7 +185,6 @@ proc prove_x86_64_v3(root: Path) {
   let cc = process.which("cc")?
   let objdump = process.which("llvm-objdump")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-v3" {
-
     fp"{tmp}/v3-toy.c".write(
       """#include <immintrin.h>
 
@@ -215,7 +211,6 @@ proc prove_explicit_aarch64_target(root: Path) {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-aarch64" {
-
     fp"{tmp}/aarch64-target-toy.c".write(
       """int laputa_aarch64_target_toy(void) {
   return 42;
@@ -284,5 +279,3 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   print "llvm-toolchain ok"
 }
-
-main(@args)

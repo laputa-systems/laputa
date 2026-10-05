@@ -49,7 +49,8 @@ proc compile_hello(
   let lib_dir = fp"{rootfs}/usr/lib"
 
   if build_arch == target_arch {
-    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-dynamic" f"-I{include_dir}" f"-L{lib_dir}" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" $hello_src "-o" $hello
+    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-dynamic" f"-I{include_dir}" f"-L{lib_dir}" \
+      f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" $hello_src "-o" $hello
     return
   }
 
@@ -59,7 +60,9 @@ proc compile_hello(
     LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{e"PATH" ?? ""}",
   }) {
-    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello
+    run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" \
+      fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" \
+      f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello
   }?
 }
 
@@ -109,5 +112,3 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
     }
   }
 }
-
-main(@args)
