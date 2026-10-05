@@ -292,7 +292,7 @@ main(@args)?
 
   let manifest = fs.walk(dest)
     |> where .kind == "file" or .kind == "symlink"
-    |> map { |entry| entry.path.strip_prefix(dest)? }
+    |> map { .path.strip_prefix(dest)? }
     |> sort-by .display()
 
   local.validate_and_strip_package(pkg, dest, manifest)

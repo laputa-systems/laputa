@@ -64,7 +64,7 @@ proc compile(out: Path, names: List[Str], source: Path) -> Result[Status] {
 proc compiled_paths(root: Path) -> Result[List[Str]] {
   fs.walk(root)?
     |> where .kind == "file"
-    |> map { |entry| f"{entry.path.parent().name()}/{entry.path.name()}" }
+    |> map { f"{.path.parent().name()}/{.path.name()}" }
     |> sort
 }
 

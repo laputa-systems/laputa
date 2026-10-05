@@ -364,7 +364,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # the build machine and prints each table sorted by code.
   let personalities = fs.walk(fp"src/linux/{arch}")?
     |> where .kind == "file" and .name.starts_with("ioctls_inc") and .name.ends_with(".h")
-    |> map { |entry| entry.name.split("ioctls_inc")[1].split(".h")[0] }
+    |> map { .name.split("ioctls_inc")[1].split(".h")[0] }
     |> sort
 
   var ioctlsort_tasks = []

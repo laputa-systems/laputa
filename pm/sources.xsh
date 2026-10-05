@@ -651,7 +651,7 @@ pure with_fetch_item(by_sha256: Map[SourceFetchItem], sha256: Str, url: Str, pac
 }
 
 pure sorted_fetch_items(by_sha256: Map[SourceFetchItem]) -> List[SourceFetchItem] {
-  by_sha256.values() |> sort-by { |item| f"{item.packages[0]}\t{item.urls[0]}" }
+  by_sha256.values() |> sort-by { f"{.packages[0]}\t{.urls[0]}" }
 }
 
 ## Collects the `.crate` downloads the `cargo-vendor` sources of `packages`

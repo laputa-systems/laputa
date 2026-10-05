@@ -221,7 +221,7 @@ proc repo_merge_publication(
     updated += [entry]
   }
 
-  {index: updated |> sort-by { |item| f"{item.arch}\t{item.name}" }, already_published: false}
+  {index: updated |> sort-by { f"{.arch}\t{.name}" }, already_published: false}
 }
 
 proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token: Str, work: Path) {
