@@ -194,30 +194,31 @@ proc repo_merge_publication(
   index: List[types.RemotePackage],
   entry: types.RemotePackage,
 ) [error] -> Result[RepoIndexMerge] {
-  var updated: List[types.RemotePackage] = []
   var replaced = false
 
-  for existing in index {
-    if existing.arch == entry.arch and existing.name == entry.name {
-      return {index, already_published: true} when repo_same_publication(existing, entry)
+  let updated: List[types.RemotePackage] = collect {
+    for existing in index {
+      if existing.arch == entry.arch and existing.name == entry.name {
+        return {index, already_published: true} when repo_same_publication(existing, entry)
 
-      if build_plan.plan_compare_version_release(entry.ver, entry.rel, existing.ver, existing.rel) < 0 {
-        return Err(
-          types.PmError.PackageContract(
-            f"{entry.arch}/{entry.name} {util.version_id(entry.ver, entry.rel)} is behind remote {util.version_id(existing.ver, existing.rel)}; bump PKGBUILD.xsh rel explicitly",
-          ),
-        )
+        if build_plan.plan_compare_version_release(entry.ver, entry.rel, existing.ver, existing.rel) < 0 {
+          return Err(
+            types.PmError.PackageContract(
+              f"{entry.arch}/{entry.name} {util.version_id(entry.ver, entry.rel)} is behind remote {util.version_id(existing.ver, existing.rel)}; bump PKGBUILD.xsh rel explicitly",
+            ),
+          )
+        }
+
+        yield entry
+        replaced = true
+      } else {
+        yield existing
       }
-
-      updated += [entry]
-      replaced = true
-    } else {
-      updated += [existing]
     }
-  }
 
-  if ! replaced {
-    updated += [entry]
+    if ! replaced {
+      yield entry
+    }
   }
 
   {index: updated |> sort-by { f"{.arch}\t{.name}" }, already_published: false}
@@ -275,16 +276,17 @@ export proc publish(
   # This is the sole remote-index read. It rejects rows behind the remote
   # before any object upload.
   var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
-  var pending: List[RepoPublishStage] = []
+  let pending: List[RepoPublishStage] = collect {
+    for stage in stages {
+      let merged = repo_merge_publication(index, stage.entry)?
+      index = merged.index
 
-  for stage in stages {
-    let merged = repo_merge_publication(index, stage.entry)?
-    index = merged.index
-
-    if merged.already_published {
-      print ${stage.entry.arch} ${stage.entry.name} util.version_id(stage.entry.ver, stage.entry.rel) "already-published"
-    } else {
-      pending += [stage]
+      if merged.already_published {
+        print ${stage.entry.arch} ${stage.entry.name} util.version_id(stage.entry.ver, stage.entry.rel) \
+          "already-published"
+      } else {
+        yield stage
+      }
     }
   }
 

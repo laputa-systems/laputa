@@ -184,35 +184,40 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 
 ## Exported PM declaration `collect_metadata_files`.
 export proc collect_metadata_files(root: Path, manifest: List[Path]) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
-  var files: List[types.ArtifactEntry] = []
   let root_handle = fs.open_root(root)?
   defer root_handle.close()
 
-  for rel_path in manifest {
-    if let Ok(target) = root_handle.readlink(rel_path) {
-      files += [
-        {path: rel_path.display(), kind: types.file_kind_symlink(), mode: 0o777, sha256: "", target: target.display()},
-      ]
+  let files: List[types.ArtifactEntry] = collect {
+    for rel_path in manifest {
+      if let Ok(target) = root_handle.readlink(rel_path) {
+        yield {
+          path: rel_path.display(),
+          kind: types.file_kind_symlink(),
+          mode: 0o777,
+          sha256: "",
+          target: target.display(),
+        }
 
-      continue
+        continue
+      }
+
+      let meta = root_handle.metadata(rel_path)?
+      var sha256 = ""
+
+      if meta.kind == "file" {
+        sha256 = root_handle.read_bytes(rel_path)?.sha256().hex()
+      }
+
+      var kind = types.file_kind_file()
+
+      match meta.kind {
+        "file" => kind = types.file_kind_file()
+        "dir" => kind = types.file_kind_tree()
+        else => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
+      }
+
+      yield {path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""}
     }
-
-    let meta = root_handle.metadata(rel_path)?
-    var sha256 = ""
-
-    if meta.kind == "file" {
-      sha256 = root_handle.read_bytes(rel_path)?.sha256().hex()
-    }
-
-    var kind = types.file_kind_file()
-
-    match meta.kind {
-      "file" => kind = types.file_kind_file()
-      "dir" => kind = types.file_kind_tree()
-      else => return Err(types.PmError.PackageContract(f"metadata cannot represent {rel_path} as {meta.kind}"))
-    }
-
-    files += [{path: rel_path.display(), kind, mode: meta.mode % 4096, sha256, target: ""}]
   }
 
   files

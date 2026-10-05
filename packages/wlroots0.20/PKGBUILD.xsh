@@ -591,17 +591,15 @@ proc write_shader_headers() {
 ## order, with the vendor name as written. Like the script, a line whose first
 ## field is not a three-character ID is an error.
 export pure pnpids_source(pnp_ids: Str) -> Result[Str, Error] {
-  var cases = []
+  let cases = collect {
+    for line in pnp_ids.split("\n") {
+      if let [_, id, vendor] = rx"^\s*(\S+)\s*(.*)$".captures(line) {
+        if id.byte_len() != 3 {
+          return Err(WlrootsError.Generate(f"pnp.ids holds an ID that is not three characters: {id}"))
+        }
 
-  for line in pnp_ids.split("\n") {
-    if let [_, id, vendor] = rx"^\s*(\S+)\s*(.*)$".captures(line) {
-      if id.byte_len() != 3 {
-        return Err(WlrootsError.Generate(f"pnp.ids holds an ID that is not three characters: {id}"))
+        yield f"\tcase PNP_ID('{id.byte_slice(0, 1)}', '{id.byte_slice(1, 1)}', '{id.byte_slice(2, 1)}'): return \"{vendor.trim()}\";"
       }
-
-      cases += [
-        f"\tcase PNP_ID('{id.byte_slice(0, 1)}', '{id.byte_slice(1, 1)}', '{id.byte_slice(2, 1)}'): return \"{vendor.trim()}\";",
-      ]
     }
   }
 

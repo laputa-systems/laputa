@@ -2262,21 +2262,24 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
   var links: List[List[Int]] = []
   index = 0
   for entry in entries {
-    var targets: List[Int] = []
-    for wanted_name in entry.uses {
-      let owners = by_name.get(wanted_name) ?? []
-      var found = -1
-      for owner in owners {
-        if owner != index {
-          found = owner
+    let targets: List[Int] = collect {
+      for wanted_name in entry.uses {
+        let owners = by_name.get(wanted_name) ?? []
+        var found = -1
+        for owner in owners {
+          if owner != index {
+            found = owner
+          }
         }
-      }
 
-      guard found >= 0 else {
-        return Err(TicError.Resolve(f"line {entry.line}: {first_name(entry.term.names)}: resolution of use={wanted_name} failed"))
-      }
+        guard found >= 0 else {
+          return Err(
+            TicError.Resolve(f"line {entry.line}: {first_name(entry.term.names)}: resolution of use={wanted_name} failed"),
+          )
+        }
 
-      targets += [found]
+        yield found
+      }
     }
 
     links += [targets]

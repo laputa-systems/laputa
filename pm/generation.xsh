@@ -419,32 +419,37 @@ proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOve
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
-  var entries: List[GenerationOverlayEntry] = []
+  let entries: List[GenerationOverlayEntry] = collect {
+    for entry in fs.walk(overlay_root, gitignore: false, hidden: true) |> sort-by .path {
+      let relative = entry.path.strip_prefix(overlay_root)?.display()
+      continue when relative == "." or relative == "overlay.json"
+      generation_require_overlay_path(relative, "generation overlay path")
 
-  for entry in fs.walk(overlay_root, gitignore: false, hidden: true) |> sort-by .path {
-    let relative = entry.path.strip_prefix(overlay_root)?.display()
-    continue when relative == "." or relative == "overlay.json"
-    generation_require_overlay_path(relative, "generation overlay path")
+      if relative == ".git" or relative.starts_with(".git/") {
+        return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
+      }
 
-    if relative == ".git" or relative.starts_with(".git/") {
-      return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
-    }
+      let metadata = entry.path.metadata()?
+      let mode = metadata.mode % 4096
 
-    let metadata = entry.path.metadata()?
-    let mode = metadata.mode % 4096
-
-    if metadata.kind == "file" {
-      entries += [
-        {path: relative, source: entry.path, kind: "file", mode, sha256: hash.sha256(entry.path)?.hex(), target: ""},
-      ]
-    } else if metadata.kind == "dir" {
-      entries += [{path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""}]
-    } else if metadata.kind == "symlink" {
-      let target = entry.path.readlink()?.display()
-      generation_validate_symlink_target(relative, target)
-      entries += [{path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target}]
-    } else {
-      return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
+      if metadata.kind == "file" {
+        yield {
+          path: relative,
+          source: entry.path,
+          kind: "file",
+          mode,
+          sha256: hash.sha256(entry.path)?.hex(),
+          target: "",
+        }
+      } else if metadata.kind == "dir" {
+        yield {path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""}
+      } else if metadata.kind == "symlink" {
+        let target = entry.path.readlink()?.display()
+        generation_validate_symlink_target(relative, target)
+        yield {path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target}
+      } else {
+        return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
+      }
     }
   }
 
@@ -541,20 +546,21 @@ proc generation_store_artifacts(
   value: types.GenerationPlan,
   store_root: Path,
 ) -> Result[List[types.ArtifactReceipt]] {
-  var receipts: List[types.ArtifactReceipt] = []
   var keys: Set[Str] = set.empty()
 
-  for artifact in value.artifacts {
-    let receipt = artifact_store.lookup(store_root, artifact.artifact_key)?
+  let receipts: List[types.ArtifactReceipt] = collect {
+    for artifact in value.artifacts {
+      let receipt = artifact_store.lookup(store_root, artifact.artifact_key)?
 
-    if receipt.target != value.target or receipt.package_name != artifact.package_name or receipt.package_id != artifact.package_id or receipt.key != artifact.artifact_key {
-      return Err(
-        types.PmError.PackageContract(f"generation artifact {artifact.package_name} does not match its verified Store receipt"),
-      )
+      if receipt.target != value.target or receipt.package_name != artifact.package_name or receipt.package_id != artifact.package_id or receipt.key != artifact.artifact_key {
+        return Err(
+          types.PmError.PackageContract(f"generation artifact {artifact.package_name} does not match its verified Store receipt"),
+        )
+      }
+
+      keys = keys.add(receipt.key)
+      yield receipt
     }
-
-    keys = keys.add(receipt.key)
-    receipts += [receipt]
   }
 
   for receipt in receipts {

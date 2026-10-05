@@ -1574,7 +1574,6 @@ export proc refresh_plan_dirs(
 
 ## Exported declaration `refresh_x86_kernel_config_objects`.
 export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan) [fs, error] -> Result[KbuildPlan, Error] {
-  var objects: List[Path] = []
   var dirs: List[Path] = []
 
   if config_value(config, "UTS_NS") == "y" or config_value(config, "USER_NS") == "y" or config_value(config, "PID_NS") == "y" or config_value(
@@ -1592,24 +1591,26 @@ export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan)
     dirs += [p"mm"]
   }
 
-  if config_value(config, "KVM_GUEST") == "y" {
-    objects += [p"arch/x86/kernel/kvm.o"]
-    objects += [p"arch/x86/kernel/kvmclock.o"]
-  }
+  let objects: List[Path] = collect {
+    if config_value(config, "KVM_GUEST") == "y" {
+      yield p"arch/x86/kernel/kvm.o"
+      yield p"arch/x86/kernel/kvmclock.o"
+    }
 
-  if config_value(config, "PARAVIRT") == "y" {
-    objects += [p"arch/x86/kernel/paravirt.o"]
-    objects += [p"arch/x86/kernel/paravirt-spinlocks.o"]
-  }
+    if config_value(config, "PARAVIRT") == "y" {
+      yield p"arch/x86/kernel/paravirt.o"
+      yield p"arch/x86/kernel/paravirt-spinlocks.o"
+    }
 
-  if config_value(config, "PARAVIRT_CLOCK") == "y" {
-    objects += [p"arch/x86/kernel/pvclock.o"]
-  }
+    if config_value(config, "PARAVIRT_CLOCK") == "y" {
+      yield p"arch/x86/kernel/pvclock.o"
+    }
 
-  if config_value(config, "HYPERVISOR_GUEST") == "y" {
-    objects += [p"arch/x86/kernel/cpu/vmware.o"]
-    objects += [p"arch/x86/kernel/cpu/hypervisor.o"]
-    objects += [p"arch/x86/kernel/cpu/mshyperv.o"]
+    if config_value(config, "HYPERVISOR_GUEST") == "y" {
+      yield p"arch/x86/kernel/cpu/vmware.o"
+      yield p"arch/x86/kernel/cpu/hypervisor.o"
+      yield p"arch/x86/kernel/cpu/mshyperv.o"
+    }
   }
 
   if config_value(config, "WIRELESS") == "y" {
@@ -6314,21 +6315,25 @@ proc archive_analysis_items_with_compile_flags(
   items: List[ArchiveAnalysisItem],
   compile_flags_by_dir: Map[Map[List[Str]]],
 ) [error] -> Result[List[ArchiveAnalysisItem]] {
-  var enriched: List[ArchiveAnalysisItem] = []
+  let enriched: List[ArchiveAnalysisItem] = collect {
+    for item in items {
+      let object = fp"{item.object}"
+      let flags_object = if item.pi { pi_base_object(object) } else { object }
+      let member_flags = [
+        kbuild_compile_flags_for_member(compile_flags_by_dir, fp"{item.composite}", fp"{member}")
+        for member in item.member_objects
+      ]
 
-  for item in items {
-    let object = fp"{item.object}"
-    let flags_object = if item.pi { pi_base_object(object) } else { object }
-    let member_flags = [
-      kbuild_compile_flags_for_member(compile_flags_by_dir, fp"{item.composite}", fp"{member}")
-      for member in item.member_objects
-    ]
-
-    enriched += [{
-      ...item,
-      flags: if item.composite == "" { kbuild_compile_flags_for_object(compile_flags_by_dir, flags_object) } else { [] },
-      member_flags: member_flags,
-    }]
+      yield {
+        ...item,
+        flags: if item.composite == "" {
+          kbuild_compile_flags_for_object(compile_flags_by_dir, flags_object)
+        } else {
+          []
+        },
+        member_flags: member_flags,
+      }
+    }
   }
 
   enriched

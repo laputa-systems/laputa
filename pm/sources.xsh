@@ -569,42 +569,43 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
   let body = pkgbuild.read_text()?
   let lines = body.split("\n")
   let has_arch_specific = f"arch: \"{arch}\"" in body
-  var output = []
   var in_sources = false
   var found = false
   var value_index = 0
 
-  for line in lines {
-    let trimmed = line.trim()
+  let output = collect {
+    for line in lines {
+      let trimmed = line.trim()
 
-    if ! in_sources and trimmed.starts_with("export let upstream_sources = [") {
-      in_sources = true
-      output += [line]
-      continue
-    }
-
-    if in_sources {
-      if trimmed == "]" {
-        in_sources = false
-      } else if (f"arch: \"{arch}\"" in line or (! has_arch_specific and "arch: \"all\"" in line)) and "sha256: \"" in line {
-        if value_index >= values.len() {
-          return Err(
-            types.PmError.ChecksumField(f"{pkgbuild} has fewer {arch} checksum entries than expected"),
-          )
-        }
-
-        let marker = "sha256: \""
-        let parts = line.split(marker)
-        let old = (parts.get(1) ?? "").split("\"").get(0) ?? ""
-        let value = values.get(value_index)?
-        output += [line.replace(f"{old}\"", with: f"{value}\"")]
-        value_index += 1
-        found = true
+      if ! in_sources and trimmed.starts_with("export let upstream_sources = [") {
+        in_sources = true
+        yield line
         continue
       }
-    }
 
-    output += [line]
+      if in_sources {
+        if trimmed == "]" {
+          in_sources = false
+        } else if (f"arch: \"{arch}\"" in line or (! has_arch_specific and "arch: \"all\"" in line)) and "sha256: \"" in line {
+          if value_index >= values.len() {
+            return Err(
+              types.PmError.ChecksumField(f"{pkgbuild} has fewer {arch} checksum entries than expected"),
+            )
+          }
+
+          let marker = "sha256: \""
+          let parts = line.split(marker)
+          let old = (parts.get(1) ?? "").split("\"").get(0) ?? ""
+          let value = values.get(value_index)?
+          yield line.replace(f"{old}\"", with: f"{value}\"")
+          value_index += 1
+          found = true
+          continue
+        }
+      }
+
+      yield line
+    }
   }
 
   if ! found or value_index != values.len() {
