@@ -53,13 +53,13 @@ pure short_key(key: Str) -> Str {
   key.byte_slice(0, length: 16)
 }
 
-proc require_file(file: Path) [fs, error] {
+proc require_file(file: Path) {
   if ! fs.exists(file)? or fs.metadata(file)?.kind != "file" {
     return Err(SeedImageError.Missing(f"image input is missing: {file}"))
   }
 }
 
-proc tree_digest(root: Path) [fs, error] -> Result[Str] {
+proc tree_digest(root: Path) -> Result[Str] {
   guard fs.exists(root)? else {
     return Err(SeedImageError.Missing(f"image input is missing: {root}"))
   }
@@ -132,7 +132,7 @@ export proc package_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, 
   f"laputa-package-tools:{value.arch}-{short_key(package_tools_key(laputa_root, value)?)}"
 }
 
-proc quiet_status(docker: Path, argv: List[Str], cwd: Path) [fs, process, error] -> Result[Bool] {
+proc quiet_status(docker: Path, argv: List[Str], cwd: Path) -> Result[Bool] {
   let handle = fs.tempdir()?
   defer handle.close()?
   let quiet = fp"{handle.host_path()?}/output"
@@ -145,7 +145,7 @@ export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error]
   quiet_status(docker, [docker.display(), "image", "inspect", tag], cwd)?
 }
 
-proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, error] {
+proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) {
   let status = process.run(process.command_argv(docker, argv, cwd))?
 
   return Err(SeedImageError.Failed(f"{what} failed")) unless status.ok
@@ -215,7 +215,7 @@ export proc ensure_host_tools(
 # BuildKit transfers a whole named context, so the LLVM archive is staged
 # alone instead of naming the full source cache. The cache file is copied, not
 # moved: `.cache/` stays the only owner of fetched inputs.
-proc stage_llvm_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Path] {
+proc stage_llvm_source(laputa_root: Path, arch: Str) -> Result[Path] {
   let source = llvm_seed_source(laputa_root, arch)?
   let digest = llvm_seed_sha256(laputa_root, arch)?
 

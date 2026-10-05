@@ -1,7 +1,7 @@
 ##! XSH module `proof-xinit` package and build operations.
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc ensure(condition: Bool, kind: Str, message: Str) [error] {
+proc ensure(condition: Bool, kind: Str, message: Str) {
   if ! condition {
     Err(ScriptError.Failed(kind:, message:))?
   }
@@ -17,7 +17,7 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
   Err(ScriptError.Failed(kind: "dropbear-public-key", message: "dropbearkey did not print an SSH public key"))
 }
 
-proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
+proc authorize_root_key(rootfs: Path, public_key: Str) {
   let ssh_dir = fp"{rootfs}/root/.ssh"
   let auth_keys = fp"{ssh_dir}/authorized_keys"
   fs.mkdir(ssh_dir)
@@ -37,7 +37,7 @@ proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
   fs.chmod(auth_keys, 0o600)
 }
 
-proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) [fs, process, error] {
+proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) {
   let device_path = fp"{rootfs}/dev/{name}"
 
   return when fs.exists(device_path)?
@@ -68,7 +68,7 @@ pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_ke
   )
 }
 
-proc dropbear_auth_logged(rootfs: Path, chroot: Path) [process] -> Bool {
+proc dropbear_auth_logged(rootfs: Path, chroot: Path) -> Bool {
   var logged = false
 
   if let Ok(body) = run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
@@ -78,7 +78,7 @@ proc dropbear_auth_logged(rootfs: Path, chroot: Path) [process] -> Bool {
   logged
 }
 
-proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries: Int) [process, time, error] {
+proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries: Int) {
   var remaining = tries
 
   while remaining > 0 {
@@ -111,7 +111,7 @@ proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries
   )
 }
 
-proc live_dropbear_diagnostics(port: Int) [process, error] -> Result[Str] {
+proc live_dropbear_diagnostics(port: Int) -> Result[Str] {
   let child_events = unix.reap_child_events()? |> map f"{.pid}:{status_summary(.status)}"
 
   let processes = process.list()?
@@ -144,7 +144,7 @@ pure status_summary(status: Status) -> Str {
   status.kind
 }
 
-proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time, error] -> Result[Str] {
+proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) -> Result[Str] {
   var remaining = tries
 
   while remaining > 0 {
@@ -163,7 +163,7 @@ proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time,
   Err(ScriptError.Failed(kind: "dropbear-log", message: "xinit did not write dropbear log content"))
 }
 
-proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) [process, env, error] {
+proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) {
   env ({
     XINIT_DROPBEAR_BIND: "0.0.0.0",
     XINIT_DROPBEAR_PORT: f"{port}",
@@ -173,7 +173,7 @@ proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) [process
   }?
 }
 
-proc print_direct_dropbear_probe(rootfs: Path, chroot: Path, port: Int, label: Str, extra: List[Str]) [process] {
+proc print_direct_dropbear_probe(rootfs: Path, chroot: Path, port: Int, label: Str, extra: List[Str]) {
   let probe = process.command_argv(
     chroot,
     [chroot.display(), rootfs.display(), "/usr/bin/dropbear", "-F", "-E", "-p", f"127.0.0.1:{port}"].extend(extra),

@@ -124,7 +124,7 @@ pure rust_triple(arch: Str) -> Str {
   f"{arch}-unknown-linux-musl"
 }
 
-proc stage_rustlib(source: Path, dest: Path) [fs, error] {
+proc stage_rustlib(source: Path, dest: Path) {
   fs.remove(dest, missing_ok: true)
   fs.mkdir(dest)
 
@@ -150,7 +150,7 @@ type LockedCrate = {name: Str, version: Str, checksum: Str}
 
 # Reads the registry packages from Cargo.lock. Its `[[package]]` records are
 # flat `key = "value"` lines, so no TOML parser is needed.
-proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate]] {
+proc locked_registry_crates(lockfile: Path) -> Result[List[LockedCrate]] {
   var crates: List[LockedCrate] = []
   var current: LockedCrate = LockedCrate(name: "", version: "", checksum: "")
 
@@ -180,7 +180,7 @@ proc locked_registry_crates(lockfile: Path) [fs, error] -> Result[List[LockedCra
 # Cargo's directory sources require `.cargo-checksum.json` beside each crate;
 # its `package` digest must match the Cargo.lock checksum, and an empty `files`
 # map skips per-file verification of the already sha256-verified crate.
-proc mark_vendored_crates(lockfile: Path, vendor: Path) [fs, error] {
+proc mark_vendored_crates(lockfile: Path, vendor: Path) {
   for item in locked_registry_crates(lockfile)? {
     let dir = fp"{vendor}/{item.name}-{item.version}"
 

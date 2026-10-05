@@ -1062,7 +1062,7 @@ proc source_error(message: Str) [error] -> Result[Unit] {
   Err(TicError.Source(message))
 }
 
-stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
+stream scan(source: Str, table: CapTable) -> Stream[Token] {
   let input = char_stream(source)
   let chars = input.chars
   let cols = input.cols
@@ -2004,7 +2004,7 @@ pure first_name(names: Str) -> Str {
 }
 
 # postprocess_terminfo: AIX box1 characters become acsc pairs.
-proc postprocess(term: Term, table: CapTable) [error] -> Result[Term] {
+proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   let box = text_of(term.strs.get(table.box1) ?? Absent)
   if box == null {
     return term
@@ -2156,12 +2156,12 @@ proc apply_token(entry: Entry, token: Token, table: CapTable) [error] -> Result[
   {...entry, term, uses}
 }
 
-proc finish_entry(entry: Entry, table: CapTable) [error] -> Result[Entry] {
+proc finish_entry(entry: Entry, table: CapTable) -> Result[Entry] {
   {...entry, term: postprocess(entry.term, table)?}
 }
 
 # _nc_parse_entry over the token stream: one Entry per names token.
-proc parse_entries(tokens: Stream[Token], table: CapTable) [error] -> Result[List[Entry]] {
+proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]] {
   var entries: List[Entry] = []
   var started = false
   var entry = Entry(term: empty_term(""), uses: [], line: 0)
@@ -2326,7 +2326,7 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
 }
 
 # tic's write-time rewrite of `%{n}` into the shorter `%'c'` for printable n.
-proc shorten_constants(text: Bytes) [error] -> Result[Bytes] {
+proc shorten_constants(text: Bytes) -> Result[Bytes] {
   var out: List[Int] = []
   var t = 0
   let n = text.len()
@@ -2379,7 +2379,7 @@ pure le_fields(values: List[Int], width: Int) -> List[Int] {
 
 # compute_offsets: each string's offset in its table, -1 for absent and -2
 # for cancelled.
-stream string_offsets(values: List[StrCap]) [] -> Stream[Int] {
+stream string_offsets(values: List[StrCap]) -> Stream[Int] {
   var next = 0
   for value in values {
     match value {
@@ -2393,7 +2393,7 @@ stream string_offsets(values: List[StrCap]) [] -> Stream[Int] {
   }
 }
 
-stream name_offsets(names: List[Bytes]) [] -> Stream[Int] {
+stream name_offsets(names: List[Bytes]) -> Stream[Int] {
   var next = 0
   for name in names {
     yield next
@@ -2422,7 +2422,7 @@ pure table_size(parts: List[Bytes]) -> Int {
 }
 
 # _nc_write_object: the compiled form of one resolved entry.
-proc write_object(term: Term) [error] -> Result[Bytes] {
+proc write_object(term: Term) -> Result[Bytes] {
   let names = bytes.from_text(term.names)
   guard names.len() <= MAX_NAME_SIZE else {
     return Err(TicError.Output(f"{first_name(term.names)}: name field longer than {MAX_NAME_SIZE} bytes"))
@@ -2506,7 +2506,7 @@ proc write_object(term: Term) [error] -> Result[Bytes] {
   object
 }
 
-proc write_entry(term: Term, outdir: Path) [fs, error] {
+proc write_entry(term: Term, outdir: Path) {
   var strs = term.strs
   for {key, value} in term.strs {
     match value {
@@ -2575,7 +2575,7 @@ pure selected(names: Str, wanted: List[Str]) -> Bool {
   false
 }
 
-proc compile(source: Path, outdir: Path, wanted: List[Str]) [fs, error] {
+proc compile(source: Path, outdir: Path, wanted: List[Str]) {
   let table = parse_cap_table(standard_caps_rows, ncurses_caps_rows)?
   let text = source.read_text()?
   let tokens = scan(text, table)

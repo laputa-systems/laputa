@@ -75,7 +75,7 @@ proc require_sha256(value: Str, label: Str) [error] {
   }
 }
 
-proc require_key(key: Str) [error] {
+proc require_key(key: Str) {
   require_sha256(key, "artifact key")
 }
 
@@ -139,7 +139,7 @@ pure receipt_dto(value: types.ArtifactReceipt) -> ArtifactReceiptDto {
   }
 }
 
-proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) [error] -> Result[types.ArtifactReceipt] {
+proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) -> Result[types.ArtifactReceipt] {
   {
     format: value.format,
     key: value.key,
@@ -159,7 +159,7 @@ proc receipt_from_dto(value: ArtifactReceiptDto, artifact_dir: Path) [error] -> 
   }
 }
 
-proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
+proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) {
   guard value.format == receipt_format else {
     return Err(types.PmError.PackageContract(f"unsupported artifact receipt format {value.format}"))
   }
@@ -222,7 +222,7 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
 }
 
 # Reads and validates a receipt and checks that its objects exist, without hashing them.
-proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
+proc read_receipt(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt] {
   let raw = json.read(receipt_path(dir))?
   # Check the format before the DTO so a receipt from another Store schema
   # names its format instead of failing on a missing field.
@@ -246,7 +246,7 @@ proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.Arti
   value
 }
 
-proc verify_dir(dir: Path, expected_key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
+proc verify_dir(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt] {
   let value = read_receipt(dir, expected_key)?
   let payload = payload_path(dir)
   let metadata = metadata_path(dir)
@@ -279,7 +279,7 @@ proc receipt_for(
   payload_sha256: Str,
   executor_sha256: Str,
   origin: types.ArtifactOrigin,
-) [fs, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   require_key(node.artifact_key)
   require_sha256(node.recipe_sha256, "plan node recipe_sha256")
   require_sha256(node.proof_key, "plan node proof_key")
@@ -313,11 +313,11 @@ proc receipt_for(
   }
 }
 
-proc write_receipt(dir: Path, value: types.ArtifactReceipt) [fs, error] {
+proc write_receipt(dir: Path, value: types.ArtifactReceipt) {
   fs.write(receipt_path(dir), json.encode(receipt_dto(value))? + "\n")
 }
 
-proc copy_staged(dir: Path, staged: types.StagedArtifact) [fs, error] {
+proc copy_staged(dir: Path, staged: types.StagedArtifact) {
   fs.copy(staged.payload, payload_path(dir))
   fs.copy(staged.metadata, metadata_path(dir))
   fs.copy(staged.proof, proof_path(dir))
@@ -329,7 +329,7 @@ proc commit_locked(
   node: types.PlanNode,
   staged: types.StagedArtifact,
   origin: types.ArtifactOrigin,
-) [fs, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   let key = node.artifact_key
   let final_dir = artifact_path(root, key)
 
@@ -366,7 +366,7 @@ proc commit_staged(
   node: types.PlanNode,
   staged: types.StagedArtifact,
   origin: types.ArtifactOrigin,
-) [fs, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("artifact commit target is unsupported"))
   }
@@ -386,7 +386,7 @@ proc fetch_remote_object(
   cache_path: Path,
   expected_sha256: Str,
   label: Str,
-) [fs, net, error] {
+) {
   require_sha256(expected_sha256, f"remote {label} SHA-256")
   let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote {label}")?, cache_path)?
 
@@ -400,7 +400,7 @@ proc fetch_remote_object(
   }
 }
 
-proc remote_executor_sha256(metadata: Path, node: types.PlanNode) [fs, error] -> Result[Str] {
+proc remote_executor_sha256(metadata: Path, node: types.PlanNode) -> Result[Str] {
   let dto = json.read(metadata)?.require(RemoteMetadataDto)?
 
   if dto.name != node.name or dto.ver != node.ver or dto.rel != node.rel {
@@ -423,7 +423,7 @@ proc remote_staged_artifact_for(
   retrieval: types.RemoteRetrieval,
   remote_repo: Str,
   cache: Path,
-) [fs, net, error] -> Result[types.StagedArtifact] {
+) -> Result[types.StagedArtifact] {
   require_key(node.artifact_key)
   let cache_dir = fp"{cache}/{node.artifact_key}"
   let payload = fp"{cache_dir}/payload.tar.gz"
@@ -453,7 +453,7 @@ proc remote_staged_artifact(
   node: types.PlanNode,
   remote_repo: Str,
   cache: Path,
-) [fs, net, error] -> Result[types.StagedArtifact] {
+) -> Result[types.StagedArtifact] {
   let retrieval = node.remote
 
   if retrieval != null {

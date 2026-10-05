@@ -93,7 +93,7 @@ proc generation_require_profile_name(value: Str) [error] {
   }
 }
 
-proc generation_require_overlay_path(value: Str, label: Str) [error] {
+proc generation_require_overlay_path(value: Str, label: Str) {
   if value == "" or value == "." {
     return Err(types.PmError.PackageContract(f"{label} must not be empty"))
   }
@@ -131,7 +131,7 @@ proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
   }
 }
 
-proc generation_validate_profile(value: types.GenerationProfile) [error] {
+proc generation_validate_profile(value: types.GenerationProfile) {
   generation_require_profile_name(value.name)
   generation_require_sha256(value.overlay_sha256, "generation overlay_sha256")
   let replacements = generation_sorted_unique(value.replacements)
@@ -176,7 +176,7 @@ proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
 }
 
-proc generation_validate_plan(value: types.GenerationPlan) [error] {
+proc generation_validate_plan(value: types.GenerationPlan) {
   guard value.format == generation_format() else {
     return Err(types.PmError.PackageContract(f"unsupported generation plan format {value.format}"))
   }
@@ -232,7 +232,7 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
 proc generation_runtime_artifacts(
   value: types.BuildPlan,
   runtime_roots: List[Str],
-) [error] -> Result[List[types.GenerationArtifact]] {
+) -> Result[List[types.GenerationArtifact]] {
   var nodes: Map[types.PlanNode] = {node.name: node for node in value.nodes}
   var selected: Map[Bool] = {}
   var pending = runtime_roots
@@ -323,7 +323,7 @@ pure generation_plan_dto(value: types.GenerationPlan) -> GenerationPlanDto {
   }
 }
 
-proc generation_plan_from_dto(value: GenerationPlanDto) [error] -> Result[types.GenerationPlan] {
+proc generation_plan_from_dto(value: GenerationPlanDto) -> Result[types.GenerationPlan] {
   {
     format: value.format,
     target: types.parse_target(value.target)?,
@@ -413,7 +413,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
 }
 
-proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[GenerationOverlayEntry]] {
+proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOverlayEntry]] {
   if ! fs.exists(overlay_root)? or fs.metadata(overlay_root)?.kind != "dir" {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
@@ -539,7 +539,7 @@ proc generation_preflight_overlay(
 proc generation_store_artifacts(
   value: types.GenerationPlan,
   store_root: Path,
-) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+) -> Result[List[types.ArtifactReceipt]] {
   var receipts: List[types.ArtifactReceipt] = []
   var keys: Map[Bool] = {}
 
@@ -571,7 +571,7 @@ proc generation_store_artifacts(
   receipts |> sort-by .package_name
 }
 
-proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlayEntry]) [fs, error] {
+proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlayEntry]) {
   for entry in entries {
     let destination = fp"{output_root}/{entry.path}"
 
@@ -625,11 +625,11 @@ pure generation_receipt_dto(value: types.GenerationReceipt) -> GenerationReceipt
   }
 }
 
-proc generation_artifact_from_dto(value: GenerationArtifactDto) [] -> types.GenerationArtifact {
+proc generation_artifact_from_dto(value: GenerationArtifactDto) -> types.GenerationArtifact {
   {package_name: value.package_name, package_id: value.package_id, artifact_key: value.artifact_key}
 }
 
-proc generation_receipt_from_dto(value: GenerationReceiptDto) [error] -> Result[types.GenerationReceipt] {
+proc generation_receipt_from_dto(value: GenerationReceiptDto) -> Result[types.GenerationReceipt] {
   {
     format: value.format,
     generation_sha256: value.generation_sha256,
@@ -642,7 +642,7 @@ proc generation_receipt_from_dto(value: GenerationReceiptDto) [error] -> Result[
   }
 }
 
-proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
+proc generation_validate_receipt(value: types.GenerationReceipt) {
   let receipt_plan: types.GenerationPlan = types.GenerationPlan(
     format: generation_format(),
     target: value.target,
@@ -664,7 +664,7 @@ proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
 proc generation_receipt_for(
   value: types.GenerationPlan,
   root_receipt: types.RootReceipt,
-) [error] -> Result[types.GenerationReceipt] {
+) -> Result[types.GenerationReceipt] {
   generation_validate_plan(value)
 
   if root_receipt.target != value.target {

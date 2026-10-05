@@ -72,7 +72,7 @@ pure native_kbuild_includes() -> List[Str] {
   ]
 }
 
-proc write_native_asm_offsets(cc: Path) [fs, process, env, error] {
+proc write_native_asm_offsets(cc: Path) {
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
   fs.mkdir(asm_out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
@@ -82,7 +82,7 @@ proc write_native_asm_offsets(cc: Path) [fs, process, env, error] {
   kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")
 }
 
-proc write_native_hyp_constants(cc: Path) [fs, process, env, error] {
+proc write_native_hyp_constants(cc: Path) {
   let asm_out = p".xsh-kbuild/generated/hyp-constants.s"
   fs.mkdir(asm_out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
@@ -126,7 +126,7 @@ proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
   kbuild.write_text_if_changed(p"include/generated/vdso-offsets.h", out)
 }
 
-proc build_native_vdso(cc: Path) [fs, process, env, error] {
+proc build_native_vdso(cc: Path) {
   let base = native_vdso_cc_base(cc)
 
   PKGBUILD_shared.run_native_command(
@@ -395,7 +395,7 @@ pure display_paths(paths: List[Path]) -> List[Str] {
   [item.display() for item in paths]
 }
 
-proc build_native_nvhe_helper(cc: Path) [fs, process, env, error] -> Result[Path] {
+proc build_native_nvhe_helper(cc: Path) -> Result[Path] {
   let out = p".xsh-kbuild/host/arch/arm64/kvm/hyp/nvhe/gen-hyprel"
   fs.mkdir(out.parent)
 
@@ -406,7 +406,7 @@ proc build_native_nvhe_helper(cc: Path) [fs, process, env, error] -> Result[Path
   out
 }
 
-proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env, error] {
+proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) {
   fs.mkdir(out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
@@ -426,7 +426,7 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env
   PKGBUILD_shared.run_native_command(argv)
 }
 
-proc write_native_nvhe_hyprel(gen: Path, input: Path, out: Path) [fs, process, error] {
+proc write_native_nvhe_hyprel(gen: Path, input: Path, out: Path) {
   let reloc = run.text $gen $input ?
   kbuild.write_text_if_changed(out, reloc)
 }
@@ -437,7 +437,7 @@ proc nvhe_ld_task(
   inputs: List[Path],
   deps: List[Str],
   linker_script: Path = p"",
-) [] -> make.MakeTask {
+) -> make.MakeTask {
   var argv = [ld.display(), "-r"]
 
   if linker_script != "" {
@@ -461,7 +461,7 @@ proc nvhe_ld_task(
   }
 }
 
-proc nvhe_objcopy_task(objcopy: Path, input: Path, out: Path, deps: List[Str]) [] -> make.MakeTask {
+proc nvhe_objcopy_task(objcopy: Path, input: Path, out: Path, deps: List[Str]) -> make.MakeTask {
   {
     name: out.display(),
     outputs: [

@@ -479,7 +479,7 @@ main(@args)?
     )
 }
 
-proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) [fs, error] {
+proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) {
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
   fs.mkdir(path_value.parent())
   fs.remove(path_value, missing_ok: true)
@@ -487,13 +487,13 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
   fs.chmod(path_value, 0o755)
 }
 
-proc require_file(path_value: Path, label: Str) [fs, error] {
+proc require_file(path_value: Path, label: Str) {
   guard fs.exists(path_value)? else {
     return Err(LlvmToolchainError.Failed(f"missing {label}: {path_value}"))
   }
 }
 
-proc require_executable(path_value: Path, label: Str) [fs, error] {
+proc require_executable(path_value: Path, label: Str) {
   require_file(path_value, label)
   let meta = fs.metadata(path_value)?
 
@@ -502,7 +502,7 @@ proc require_executable(path_value: Path, label: Str) [fs, error] {
   }
 }
 
-proc install_tool_alias(bin: Path, tool_name: Str, target: Str) [fs, error] {
+proc install_tool_alias(bin: Path, tool_name: Str, target: Str) {
   let link = fp"{bin}/{tool_name}"
 
   return when fs.exists(link)?
@@ -511,7 +511,7 @@ proc install_tool_alias(bin: Path, tool_name: Str, target: Str) [fs, error] {
   fs.symlink(fp"{target}", link)
 }
 
-proc install_prebuilt_tree(dest: Path) [fs, env, error] {
+proc install_prebuilt_tree(dest: Path) {
   let arch = pm_util.target_arch()?
   let source = p"llvm-prebuilt"
   let target = fp"{dest}/usr/lib/llvm23"

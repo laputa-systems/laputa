@@ -71,7 +71,7 @@ proc staged_artifact(
   payload: Str = "payload",
   metadata: Str = "metadata",
   proof: Str = "proof",
-) [fs, error] -> Result[TestStage] {
+) -> Result[TestStage] {
   let root = test.temp_dir(ctx, name:)?
   let payload_path = fp"{root}/payload.tar.gz"
   let metadata_path = fp"{root}/metadata.json"
@@ -95,7 +95,7 @@ proc store_root(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   test.temp_dir(ctx, name:)
 }
 
-proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt], expected: Str) [error] {
+proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: operation unexpectedly succeeded")
     Err(problem) => assert expected in problem.message
@@ -307,7 +307,7 @@ pure remote_node(key: Str, payload: Str, metadata: Str) -> types.PlanNode {
   }
 }
 
-proc remote_fixture(ctx: TestContext, name: Str, payload: Str, metadata: Str) [fs, error] -> Result[Path] {
+proc remote_fixture(ctx: TestContext, name: Str, payload: Str, metadata: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let tarball = fp"{root}/packages/aarch64/demo/demo-1.0.0-1.tar.gz"
   let metadata_path = fp"{root}/metadata/aarch64/demo/demo-1.0.0-1.json"

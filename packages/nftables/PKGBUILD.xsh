@@ -135,7 +135,7 @@ proc write_config_h() [fs, error] {
 
 # nftversion.h.in with configure's NFT_VERSION (the version's dotted parts),
 # STABLE_RELEASE (0 without --with-stable-release), and BUILD_STAMP.
-proc write_nftversion_h() [fs, error] {
+proc write_nftversion_h() {
   let version_template = p"nftversion.h.in".read_text()?
   let body = version_template.replace("@BUILD_STAMP@", build_stamp).replace("@NFT_VERSION@", ver.replace(".", ",")).replace("@STABLE_RELEASE@", "0")
   fs.write(p"nftversion.h", body)

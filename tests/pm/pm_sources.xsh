@@ -56,7 +56,7 @@ proc demo_tarball(
   ctx: TestContext,
   name: Str,
   text: Str = "hello from the cache\n",
-) [fs, error] -> Result[DemoTarball] {
+) -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
   fs.mkdir(fp"{tree}/demo-1.0")
   fs.write(fp"{tree}/demo-1.0/hello.txt", text)
@@ -65,7 +65,7 @@ proc demo_tarball(
   {path: tarball, sha256: hash.sha256(tarball)?.hex()}
 }
 
-proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) [fs, net, env, error] {
+proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) {
   match sources.stage_package_sources(pkg, src) {
     Ok(_) => test.fail("staging unexpectedly succeeded")
     Err(problem) => {
@@ -217,7 +217,7 @@ test test_local_repositories_are_loopback_or_file_trees [error] {
   assert ! util.is_local_repo_url("https://packages.example.test")
 }
 
-proc fetch_repository(ctx: TestContext, sources_text: Str) [fs, error] -> Result[Path] {
+proc fetch_repository(ctx: TestContext, sources_text: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "fetch-repository")?
   let recipe = fp"{root}/packages/fetchdemo/PKGBUILD.xsh"
   fs.mkdir(recipe.parent)
@@ -351,7 +351,7 @@ pure crate_set_lock(crates: List[sources.LockedCrate]) -> Str {
 type DemoCrate = {item: sources.LockedCrate, path: Path}
 
 # A `.crate` archive: one `NAME-VERSION/` directory, as crates.io packs it.
-proc demo_crate(ctx: TestContext, name: Str, version: Str) [fs, error] -> Result[DemoCrate] {
+proc demo_crate(ctx: TestContext, name: Str, version: Str) -> Result[DemoCrate] {
   let tree = test.temp_dir(ctx, name: f"{name}-crate-tree")?
   fs.mkdir(fp"{tree}/{name}-{version}/src")
   fs.write(fp"{tree}/{name}-{version}/Cargo.toml", f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")
@@ -361,7 +361,7 @@ proc demo_crate(ctx: TestContext, name: Str, version: Str) [fs, error] -> Result
   {item: {name, version, checksum: hash.sha256(tarball)?.hex()}, path: tarball}
 }
 
-proc cache_file(cache: Path, file: Path) [fs, error] -> Result[Str] {
+proc cache_file(cache: Path, file: Path) -> Result[Str] {
   let sha256 = hash.sha256(file)?.hex()
   let entry = sources.source_cache_entry(cache, sha256)
   fs.mkdir(entry.parent)

@@ -27,7 +27,7 @@ pure take_char(text: Str) -> Result[TextRest] {
   {content: "", rest: ""}
 }
 
-proc drop_prefix(text: Str, prefix: Str) [error] -> Result[Str] {
+proc drop_prefix(text: Str, prefix: Str) -> Result[Str] {
   var cur = text
   var rem = prefix
 
@@ -45,7 +45,7 @@ pure c_quote(text: Str) -> Str {
   text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
 }
 
-proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
+proc lex_literal_to_regex(raw: Str) -> Result[Str] {
   var cur = raw
   var out = ""
 
@@ -88,7 +88,7 @@ proc lex_literal_to_regex(raw: Str) [error] -> Result[Str] {
   out
 }
 
-proc strip_quotes(pattern: Str) [error] -> Result[Str] {
+proc strip_quotes(pattern: Str) -> Result[Str] {
   if let Ok(c) = regex_captures(pattern, "(?s)^\"(.*)\"$") {
     return lex_literal_to_regex(c[1]) when c.len() >= 2
   }
@@ -167,7 +167,7 @@ proc parse_exclusive_start_conditions(text: Str) [error] -> Result[List[Str]] {
   states
 }
 
-proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
+proc split_rule_line(raw: Str) -> Result[PatternAction] {
   var cur = raw
   var pattern = ""
   var in_class = false
@@ -220,7 +220,7 @@ proc split_state_qualifier(pattern: Str) [error] -> Result[StateQualifier] {
   {states, pattern}
 }
 
-proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
+proc parse_rules(text: Str, defs: Map[Str]) -> Result[List[LexRule]] {
   var rules = []
 
   for raw in text.lines() {
@@ -286,11 +286,11 @@ pure upstream_flex_source_reason(text: Str) -> Str {
   ""
 }
 
-proc upstream_disabled() [env] -> Bool {
+proc upstream_disabled() -> Bool {
   (e"XSH_FLEX_NO_UPSTREAM" ?? "") == "1"
 }
 
-proc run_upstream_flex(argv: List[Str], reason: Str) [process, env, error] {
+proc run_upstream_flex(argv: List[Str], reason: Str) {
   return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("flex") {
@@ -300,7 +300,7 @@ proc run_upstream_flex(argv: List[Str], reason: Str) [process, env, error] {
   }
 }
 
-proc parse_lex_file(source: Str) [error] -> Result[LexProgram] {
+proc parse_lex_file(source: Str) -> Result[LexProgram] {
   let parts = source.split("%%")
 
   if parts.len() < 2 {
@@ -351,7 +351,7 @@ proc lex_user_code(source: Str) [error] -> Result[Str] {
   user_code
 }
 
-proc generate_linux_stub(source: Str) [error] -> Result[Str] {
+proc generate_linux_stub(source: Str) -> Result[Str] {
   let parts = source.split("%%")
 
   if parts.len() < 2 {
@@ -490,7 +490,7 @@ proc generate_exclusive_table(states: List[Str], exclusive: List[Str]) [error] -
   values.join(", ")
 }
 
-proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Result[Str] {
+proc generate_rule_table(rules: List[LexRule], states: List[Str]) -> Result[Str] {
   var lines = []
 
   for rule in rules {
@@ -538,7 +538,7 @@ int main(void) {
 """
 }
 
-proc generate_c(rules: List[LexRule], user_code: Str, states: List[Str], exclusive: List[Str]) [error] -> Result[Str] {
+proc generate_c(rules: List[LexRule], user_code: Str, states: List[Str], exclusive: List[Str]) -> Result[Str] {
   let table = generate_rule_table(rules, states)?
   let actions = generate_actions(rules)?
   let generated_main_text = generated_main(user_code)
@@ -722,7 +722,7 @@ Options:
 """)
 }
 
-proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
+proc parse_options(argv: List[Str]) -> Result[LexOptions] {
   var input = "-"
   var output = "lex.yy.c"
   var to_stdout = false

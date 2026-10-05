@@ -36,7 +36,7 @@ pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
 }
 
 # The `NAME += header.h` entries of one Kbuild variable.
-proc kbuild_list(file: Path, variable: Str) [fs, error] -> Result[List[Str]] {
+proc kbuild_list(file: Path, variable: Str) -> Result[List[Str]] {
   var names: List[Str] = []
 
   for line in file.read_text()?.lines() {
@@ -52,7 +52,7 @@ proc kbuild_list(file: Path, variable: Str) [fs, error] -> Result[List[Str]] {
 # mandatory-y, plus the arch's own generic-y) but does not becomes a one-line
 # include of the asm-generic version. A header the arch does provide is never
 # wrapped; x86's own stat.h, for one, does not match asm-generic's layout.
-proc generate_asm_wrappers(srcarch: Str, generated: Path) [fs, error] {
+proc generate_asm_wrappers(srcarch: Str, generated: Path) {
   let arch_uapi = fp"arch/{srcarch}/include/uapi/asm"
   var wanted = kbuild_list(p"include/uapi/asm-generic/Kbuild", "mandatory-y")?
   wanted += kbuild_list(fp"{arch_uapi}/Kbuild", "generic-y")?
@@ -65,7 +65,7 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) [fs, error] {
 }
 
 # One asm/unistd header, as scripts/syscallhdr.sh --emit-nr writes it.
-proc generate_syscall_header(header: SyscallHeader, generated: Path) [fs, error] {
+proc generate_syscall_header(header: SyscallHeader, generated: Path) {
   let header_guard = "_UAPI_ASM_" + rx"__".replace(rx"[^A-Z0-9_]".replace(header.name.upper(), "_"), "_")
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
   var last = -1
@@ -84,7 +84,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) [fs, error]
 }
 
 # linux/version.h for this release, as the top-level Makefile writes it.
-proc generate_version_header(version: Str, out: Path) [fs, error] {
+proc generate_version_header(version: Str, out: Path) {
   let parts = [part.parse_int()? for part in version.split(".")]
 
   guard parts.len() == 3 else {

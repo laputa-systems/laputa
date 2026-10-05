@@ -52,7 +52,7 @@ export const upstream_sources = [
 ## Package recipe export.
 export const filetree = [{path: p"usr/bin/wl-copy", kind: "binary"}, {path: p"usr/bin/wl-paste", kind: "binary"}]
 
-proc patch_optional_installs() [fs, error] {
+proc patch_optional_installs() {
   fs.write(p"data/meson.build", "")
   fs.write(p"completions/meson.build", "")
 }

@@ -111,7 +111,7 @@ proc write_version_header() [fs, error] {
   )
 }
 
-proc patch_generated_inputs() [fs, error] {
+proc patch_generated_inputs() {
   fs.install(p"generated/emoji-data.h", p"emoji-data.h", 0o644, overwrite: true)
   fs.install(p"generated/unicode-compose-table.h", p"unicode-compose-table.h", 0o644, overwrite: true)
   write_version_header()

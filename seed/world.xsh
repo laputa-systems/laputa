@@ -194,7 +194,7 @@ export pure world_container_argv(
 
 type WorldContainer = {docker: Path, laputa_root: Path, seed: Path, value: xsh_seed.SeedArch, tag: Str, owner: WorldOwner}
 
-proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) [fs, process, env, error] -> Result[WorldContainer] {
+proc world_container(laputa_root: Path, value: xsh_seed.SeedArch) -> Result[WorldContainer] {
   let docker = images.docker_program()?
   let seed = xsh_seed.xsh_seed_require(laputa_root, value.arch)?
   let tag = images.ensure_package_tools(docker, laputa_root, value)?
@@ -208,7 +208,7 @@ proc world_run(
   store: Path,
   inner: List[Str],
   label: Str,
-) [fs, process, error] {
+) {
   fs.mkdir(output)
   fs.mkdir(store)
   fs.mkdir(world_kbuild_cache(container.laputa_root))
@@ -239,7 +239,7 @@ pure pm_argv(args: List[Str]) -> List[Str] {
   ["/bin/xsh", "/src/laputa/pm.xsh", "--"].extend(args)
 }
 
-proc world_plan(container: WorldContainer, args: WorldArgs) [fs, process, error] {
+proc world_plan(container: WorldContainer, args: WorldArgs) {
   let laputa_root = container.laputa_root
   let selection = world_selection_argv(args.packages, args.stop)?
   world_run(
@@ -263,7 +263,7 @@ proc world_plan(container: WorldContainer, args: WorldArgs) [fs, process, error]
   )
 }
 
-proc world_build(container: WorldContainer, args: WorldArgs) [fs, process, error] {
+proc world_build(container: WorldContainer, args: WorldArgs) {
   world_plan(container, args)
   world_run(
     container,
@@ -284,7 +284,7 @@ export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, er
 # Publishing the last plan could upload a stale selection (a reverted rel
 # bump, say) under tuples the checkout no longer declares, so publish first
 # builds the current checkout's plan; an unchanged build is a no-op.
-proc world_publish(container: WorldContainer, args: WorldArgs) [fs, net, process, env, time, error] {
+proc world_publish(container: WorldContainer, args: WorldArgs) {
   world_build(container, args)
   let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
   host_pm(
@@ -314,7 +314,7 @@ export proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   }
 }
 
-proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, env, time, error] {
+proc world_root(container: WorldContainer, args: WorldArgs) {
   let laputa_root = container.laputa_root
   let root_dir = world_root_dir(laputa_root, args.arch)
 

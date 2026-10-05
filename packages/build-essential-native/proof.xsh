@@ -7,14 +7,14 @@ type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payl
 
 type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], entries: List[Any], root_sha256: Str}
 
-proc ensure_exists(path_value: Path, label: Str) [fs, error] {
+proc ensure_exists(path_value: Path, label: Str) {
   guard fs.exists(path_value)? else {
     return Err(ProofError.Failed(kind: "proof-build-essential-native", message: f"missing {label}: {path_value}"))
   }
 }
 
 # The root must be composed for the target this proof runs for.
-proc ensure_runtime_artifacts(root: Path, packages: List[Str]) [fs, env, error] {
+proc ensure_runtime_artifacts(root: Path, packages: List[Str]) {
   let path_value = fp"{root}/var/lib/laputa/root.json"
   let receipt = json.read(path_value)?.require(RootReceipt)?
 

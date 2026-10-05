@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc require(condition: Bool, message: Str) [error] {
+proc require(condition: Bool, message: Str) {
   if ! condition {
     Err(proof.ProofError.Failed(kind: "proof-linux-headers", message:))?
   }

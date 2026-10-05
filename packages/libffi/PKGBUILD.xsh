@@ -85,12 +85,12 @@ pure libffi_target(machine: Str) -> LibffiTarget {
 }
 
 # configure.ac encodes X.Y.Z as X*10000 + Y*100 + Z.
-proc ffi_version_number() [error] -> Result[Int] {
+proc ffi_version_number() -> Result[Int] {
   let parts = ver.split(".")
   parts[0].parse_int()? * 10000 + parts[1].parse_int()? * 100 + parts[2].parse_int()?
 }
 
-proc write_generated_headers(target: LibffiTarget) [fs, error] {
+proc write_generated_headers(target: LibffiTarget) {
   let target_defines = if target.target == "X86_64" {
     """#define HAVE_AS_X86_PCREL 1
 #define HAVE_AS_X86_64_UNWIND_SECTION_TYPE 1
@@ -175,7 +175,7 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
 # Upstream's Makefile preprocesses libffi.map.in against fficonfig.h and the
 # target's ffitarget.h, which select the closure, Go closure, complex, and
 # int128 symbol nodes the target exports.
-proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: List[Str], includes: List[Str]) [process, error] {
+proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: List[Str], includes: List[Str]) {
   let argv = ["-target", triple].extend(defs).extend(includes).extend([
     f"-D{target.target}",
     "-DGENERATE_LIBFFI_MAP",

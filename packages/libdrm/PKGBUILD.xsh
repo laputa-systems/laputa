@@ -150,7 +150,7 @@ export const filetree = [
 # (its trailing `\s` there matches the newline, hence `(\s|$)` here). Only the
 # listed vendors get named modifier entries; the others, such as GENERIC and
 # MTK, are left to libdrm's per-vendor name lookups.
-proc write_format_modifier_table() [fs, error] {
+proc write_format_modifier_table() {
   let header = p"include/drm/drm_fourcc.h"
   var intel = []
   var modifiers: List[Modifier] = []
@@ -202,7 +202,7 @@ proc write_format_modifier_table() [fs, error] {
   fs.write(p"generated_static_table_fourcc.h", body.join("\n"))
 }
 
-proc patch_python_generator() [fs, error] {
+proc patch_python_generator() {
   write_format_modifier_table()
   let meson = p"meson.build"
   var text = meson.read_text()?

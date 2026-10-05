@@ -151,7 +151,7 @@ export proc image_put_le(data: Bytes, offset: Int, value: Int, width: Int) [erro
 }
 
 # Encodes a GPT UTF-16LE partition name with its fixed 72-byte width.
-proc gpt_name(name: Str) [error] -> Result[Bytes] {
+proc gpt_name(name: Str) -> Result[Bytes] {
   let raw = bytes.from_text(name)
   var parts = [bytes.zero(0)?]
   var index = 0

@@ -67,7 +67,7 @@ proc generation_adapter_plan(
   profile_name: Str,
   overlay_root: Path,
   output: Path,
-) [fs, error] -> Result[types.GenerationPlan] {
+) -> Result[types.GenerationPlan] {
   let build_plan = pm_plan_json.read(build_plan_path)?
   let profile = pm_generation.overlay_profile(overlay_root)?
 
@@ -80,7 +80,7 @@ proc generation_adapter_plan(
   generation
 }
 
-proc generation_adapter_publish_receipt(root: Path, expected: types.GenerationReceipt, output: Path) [fs, error] {
+proc generation_adapter_publish_receipt(root: Path, expected: types.GenerationReceipt, output: Path) {
   let actual = pm_generation.read_generation_receipt(root)?
 
   if actual != expected {
@@ -96,7 +96,7 @@ proc generation_adapter_ensure_generation(
   output_parent: Path,
   overlay_root: Path,
   receipt_output: Path,
-) [fs, error] -> Result[types.GenerationReceipt] {
+) -> Result[types.GenerationReceipt] {
   let root = fp"{output_parent}/{value.generation_sha256}"
 
   if fs.exists(root)? {

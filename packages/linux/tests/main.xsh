@@ -10,7 +10,7 @@ type ArchiveCompileTaskReport = {source: Str, flags: List[Str]}
 
 type ArchiveAnalysisResult = {object: Str, tasks: List[ArchiveCompileTaskReport]}
 
-proc write_fixture(root: Path) [fs, error] {
+proc write_fixture(root: Path) {
   fs.mkdir(fp"{root}/init/lib")
   fs.mkdir(fp"{root}/block")
   fs.mkdir(fp"{root}/net")

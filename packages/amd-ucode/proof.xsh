@@ -17,7 +17,7 @@ const early_sha256 = "49995102b0a6eac9c25e601d148f0a46176ae3a85fe644b13a66dcbcc4
 
 const early_member = "kernel/x86/microcode/AuthenticAMD.bin"
 
-proc ensure_sha256(file: Path, expected: Str) [fs, error] {
+proc ensure_sha256(file: Path, expected: Str) {
   proof.ensure(fs.exists(file)?, "amd-ucode", f"missing {file}")
   let actual = hash.sha256(file)?.hex()
   proof.ensure(actual == expected, "amd-ucode", f"{file} has sha256 {actual}, expected {expected}")

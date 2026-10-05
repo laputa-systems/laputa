@@ -74,7 +74,7 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
 # client writes no known_hosts; BatchMode keeps it from prompting; HOME keeps
 # it away from the user's own ~/.ssh. Output goes to a file, not a pipe, so a
 # descendant that outlives the client cannot hold the read open.
-proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, port: Int) [fs, process, env, error] -> Result[Str] {
+proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, port: Int) -> Result[Str] {
   let dbclient = fp"{rootfs}/usr/bin/dbclient"
   let out = fp"{home}/ssh.out"
   var ok = false
@@ -95,7 +95,7 @@ proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, 
 # server with an ed25519 host key and no password logins, a client with an
 # authorized key that runs a command, and one with an unknown key that dropbear
 # must refuse.
-proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) [fs, process, env, time, error] {
+proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let dropbearkey = fp"{rootfs}/usr/bin/dropbearkey"
   let dropbear = fp"{rootfs}/usr/bin/dropbear"
   let me = user.current()?

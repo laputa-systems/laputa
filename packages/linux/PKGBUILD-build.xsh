@@ -7,7 +7,7 @@ use linux_config
 use parser_gen
 use pm.util as pm_util
 
-proc package_arch() [env, error] -> Result[Str] {
+proc package_arch() -> Result[Str] {
   let arch = pm_util.target_arch()?
 
   return arch when arch == "aarch64" or arch == "x86_64"
@@ -47,7 +47,7 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
   )
 }
 
-proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, env, time, error] {
+proc build_native_scratch(cc: Path, srcarch: Str, version: Str) {
   if srcarch == "arm64" {
     PKGBUILD_aarch64.build_scratch(cc, srcarch, version)
     return
@@ -66,7 +66,7 @@ proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, en
   )
 }
 
-proc build_cc() [fs, process, env, error] -> Result[Path] {
+proc build_cc() -> Result[Path] {
   let root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   if root != "" {

@@ -218,7 +218,7 @@ export pure planner_jobs() -> Int {
   count
 }
 
-proc root_vars(srcarch: Str) [] -> Map[Str] {
+proc root_vars(srcarch: Str) -> Map[Str] {
   var vars: Map[Str] = {}
   vars["ARCH_CORE"] = ""
   vars["ARCH_DRIVERS"] = ""
@@ -235,7 +235,7 @@ proc root_vars(srcarch: Str) [] -> Map[Str] {
   vars
 }
 
-proc global_vars(srcarch: Str) [] -> Map[Str] {
+proc global_vars(srcarch: Str) -> Map[Str] {
   var vars: Map[Str] = {}
   vars["srctree"] = "."
 
@@ -246,7 +246,7 @@ proc global_vars(srcarch: Str) [] -> Map[Str] {
   vars
 }
 
-proc kbuild_vars_for_dir(dir: Path, srcarch: Str) [] -> Map[Str] {
+proc kbuild_vars_for_dir(dir: Path, srcarch: Str) -> Map[Str] {
   let dir_key = path_key(dir)
   var vars = if dir_key == "." { root_vars(srcarch) } else { global_vars(srcarch) }
   vars["src"] = dir_key
@@ -330,7 +330,7 @@ pure add_unsupported(plan: KbuildPlan, message: Str) -> KbuildPlan {
   {...plan, unsupported: unsupported}
 }
 
-proc merge_plan(base: KbuildPlan, addition: KbuildPlan) [] -> KbuildPlan {
+proc merge_plan(base: KbuildPlan, addition: KbuildPlan) -> KbuildPlan {
   {
     dirs: base.dirs.extend(addition.dirs),
     objects: base.objects.extend(addition.objects),
@@ -457,7 +457,7 @@ pure empty_kconfig() -> Kconfig {
   {enabled: enabled, values: values}
 }
 
-proc load_config_if_present(path_value: Path) [fs, error] -> Result[Kconfig] {
+proc load_config_if_present(path_value: Path) -> Result[Kconfig] {
   return load_config(path_value)? when path_value.exists()?
 
   empty_kconfig()
@@ -504,7 +504,7 @@ export proc write_config_headers(config_path: Path, root: Path, release: Str, ar
 }
 
 # linux/version.h for MAJOR.MINOR.SUB, as the top-level Makefile writes it.
-proc version_header(release: Str) [error] -> Result[Str] {
+proc version_header(release: Str) -> Result[Str] {
   let parts = [part.parse_int()? for part in release.split(".")]
 
   guard parts.len() == 3 else {
@@ -569,7 +569,7 @@ export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [
 }
 
 # The `NAME += header.h` entries of one Kbuild variable.
-proc kbuild_header_list(file: Path, variable: Str) [fs, error] -> Result[List[Str]] {
+proc kbuild_header_list(file: Path, variable: Str) -> Result[List[Str]] {
   var names: List[Str] = []
 
   for line in file.read_text()?.lines() {
@@ -585,7 +585,7 @@ proc kbuild_header_list(file: Path, variable: Str) [fs, error] -> Result[List[St
 # mandatory-y headers the arch does not provide, plus the arch's generic-y,
 # minus its generated-y, each become a one-line include of the asm-generic
 # header in the arch's generated directory.
-proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, generated_dir: Path) [fs, error] {
+proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, generated_dir: Path) {
   let arch_kbuild = fp"{root}/{arch_dir}/Kbuild"
   let arch_lists_exist = arch_kbuild.exists()?
   let generic = if arch_lists_exist { kbuild_header_list(arch_kbuild, "generic-y")? } else { [] }
@@ -795,7 +795,7 @@ pure expand_vars(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str
   expand_make_vars(out, vars)
 }
 
-proc logical_lines(body: Str) [] -> List[Str] {
+proc logical_lines(body: Str) -> List[Str] {
   if ! ("#" in body) and ! ("\\" in body) {
     var direct: List[Str] = []
 
@@ -848,7 +848,7 @@ proc included_kbuild_lines(
   vars: Map[Str],
   config: Kconfig,
   srcarch: Str,
-) [fs, error] -> Result[List[Str]] {
+) -> Result[List[Str]] {
   guard line.starts_with("include ") else {
     return []
   }
@@ -909,7 +909,7 @@ pure active_var_lhs(expanded: Str) -> Str {
   ""
 }
 
-proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Str {
+proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str {
   let expanded = expand_vars(raw, vars, config, srcarch)
 
   if expanded.starts_with("CONFIG_") {
@@ -919,7 +919,7 @@ proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
   expanded
 }
 
-proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Result[Bool] {
+proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[Bool] {
   let prefix = f"{keyword} ("
 
   if ! line.starts_with(prefix) {
@@ -939,7 +939,7 @@ proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig,
   left != right
 }
 
-proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) [] -> Result[Bool] {
+proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[Bool] {
   if line.starts_with("ifeq ($(CONFIG_") or line.starts_with("ifeq ($(SRCARCH)") or line.starts_with("ifeq ($(BITS)") {
     return eval_make_compare(line, "ifeq", vars, config, srcarch)
   }
@@ -979,7 +979,7 @@ pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
   item
 }
 
-proc composite_members(dir: Path, item: Str, vars: Map[Str]) [] -> List[Path] {
+proc composite_members(dir: Path, item: Str, vars: Map[Str]) -> List[Path] {
   var members: List[Path] = []
   let stem = object_stem(item)
 
@@ -998,7 +998,7 @@ proc composite_members(dir: Path, item: Str, vars: Map[Str]) [] -> List[Path] {
   unique_paths(members)
 }
 
-stream active_objects_for_dir(dir: Path, vars: Map[Str]) [] -> Stream[Path] {
+stream active_objects_for_dir(dir: Path, vars: Map[Str]) -> Stream[Path] {
   var objects: List[Path] = []
   var words = (vars.get("obj-y") ?? "").fields()
   words += (vars.get("lib-y") ?? "").fields()
@@ -1043,7 +1043,7 @@ pure plan_objects(plan: KbuildPlan) -> List[Path] {
   plan.objects.extend(plan.lib_objects)
 }
 
-proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) [fs, error] -> Result[Map[Str]] {
+proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[Map[Str]] {
   let file = kbuild_file(join_root(root, dir))?
   var vars = kbuild_vars_for_dir(dir, srcarch)
   var active_stack = [true]
@@ -1126,7 +1126,7 @@ proc kbuild_compile_flags_for_dir(
   dir: Path,
   config: Kconfig,
   srcarch: Str,
-) [fs, error] -> Result[Map[List[Str]]] {
+) -> Result[Map[List[Str]]] {
   var file = p""
 
   if let Ok(value) = kbuild_file(join_root(root, dir)) {
@@ -1237,7 +1237,7 @@ proc kbuild_compile_flags_for_dirs(
   dirs: List[Path],
   config: Kconfig,
   srcarch: Str,
-) [fs, error] -> Result[Map[Map[List[Str]]]] {
+) -> Result[Map[Map[List[Str]]]] {
   var by_dir: Map[Map[List[Str]]] = {}
   var dir_index = 0
 
@@ -1292,7 +1292,7 @@ proc compile_flags_fingerprint(
   dirs: List[Path],
   config_path: Path,
   srcarch: Str,
-) [fs, error] -> Result[Str] {
+) -> Result[Str] {
   let dir_fingerprints = dirs
     |> par-map(jobs: planner_jobs()) { |dir|
       fingerprint_dir_line(root, dir)?
@@ -1309,7 +1309,7 @@ kbuild-files
 """
 }
 
-proc read_compile_flags_cache(path_value: Path, fingerprint: Str) [fs, error] -> Result[Map[Map[List[Str]]]] {
+proc read_compile_flags_cache(path_value: Path, fingerprint: Str) -> Result[Map[Map[List[Str]]]] {
   let stored = json.read(path_value)?.require(Record)?
   let format = if "format" in stored { stored.get("format")?.require(Str)? } else { "" }
 
@@ -1326,7 +1326,7 @@ proc read_compile_flags_cache(path_value: Path, fingerprint: Str) [fs, error] ->
   compile_flags_from_cache_entries(cache.flags)?
 }
 
-proc write_compile_flags_cache(path_value: Path, fingerprint: Str, flags: Map[Map[List[Str]]]) [fs, error] {
+proc write_compile_flags_cache(path_value: Path, fingerprint: Str, flags: Map[Map[List[Str]]]) {
   write_text_if_changed(
     path_value,
     json.encode(
@@ -1340,7 +1340,7 @@ proc cached_kbuild_compile_flags_for_dirs(
   dirs: List[Path],
   config: Kconfig,
   srcarch: Str,
-) [fs, env, error] -> Result[Map[Map[List[Str]]]] {
+) -> Result[Map[Map[List[Str]]]] {
   let cache_dir = fp"{e"XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR" ?? e"XSH_LINUX_KBUILD_PLAN_CACHE_DIR" ?? "/var/cache/laputa/linux-kbuild"}"
   let stable_cache_path = fp"{cache_dir}/linux-{srcarch}.compile-flags.json"
   let local_cache_path = fp"{root}/.xsh-kbuild-compile-flags.json"
@@ -1913,7 +1913,7 @@ proc apply_item(
   vars: Map[Str],
   as_lib: Bool = false,
   build_plan: Bool = true,
-) [] -> ItemResult {
+) -> ItemResult {
   return {plan: plan, dirs: [], entries: []} when item == ""
 
   if "$(" in item {
@@ -1957,7 +1957,7 @@ proc apply_words(
   vars: Map[Str],
   as_lib: Bool = false,
   build_plan: Bool = true,
-) [] -> ItemResult {
+) -> ItemResult {
   var current = plan
   var dirs: List[Path] = []
   var entries: List[Path] = []
@@ -1982,7 +1982,7 @@ proc apply_words(
   {plan: current, dirs: dirs, entries: entries}
 }
 
-proc kbuild_file(dir_abs: Path) [fs, error] -> Result[Path] {
+proc kbuild_file(dir_abs: Path) -> Result[Path] {
   var has_makefile = false
 
   for entry in fs.children(dir_abs, stat: false, ordered: false)? {
@@ -1998,12 +1998,12 @@ proc kbuild_file(dir_abs: Path) [fs, error] -> Result[Path] {
   Err(ScriptError.Failed(kind: "kbuild-missing", message: f"missing Kbuild or Makefile in {dir_abs}"))
 }
 
-proc read_kbuild_source(dir_abs: Path) [fs, error] -> Result[KbuildSource] {
+proc read_kbuild_source(dir_abs: Path) -> Result[KbuildSource] {
   let file = kbuild_file(dir_abs)?
   {file: file, body: file.read_text()?}
 }
 
-proc emit_discover_progress(root: Path, options: DiscoverOptions, state: DiscoverState, rel: Path) [fs, error] {
+proc emit_discover_progress(root: Path, options: DiscoverOptions, state: DiscoverState, rel: Path) {
   if options.progress and options.progress_every > 0 {
     let count = state.visited
 
@@ -2021,7 +2021,7 @@ proc emit_discover_progress(root: Path, options: DiscoverOptions, state: Discove
   }
 }
 
-proc emit_stage_progress(root: Path, options: DiscoverOptions, message: Str) [fs, error] {
+proc emit_stage_progress(root: Path, options: DiscoverOptions, message: Str) {
   if options.progress {
     fs.write(
       fp"{root}/.xsh-kbuild-progress",
@@ -2033,7 +2033,7 @@ proc emit_stage_progress(root: Path, options: DiscoverOptions, message: Str) [fs
   }
 }
 
-proc emit_merge_progress(root: Path, options: DiscoverOptions, state: DiscoverState, rel: Path) [fs, error] {
+proc emit_merge_progress(root: Path, options: DiscoverOptions, state: DiscoverState, rel: Path) {
   if options.progress and options.progress_every > 0 {
     let count = state.visited
 
@@ -2047,7 +2047,7 @@ proc emit_merge_progress(root: Path, options: DiscoverOptions, state: DiscoverSt
   }
 }
 
-proc emit_line_progress(root: Path, options: DiscoverOptions, rel: Path, line_no: Int, line: Str) [fs, error] {
+proc emit_line_progress(root: Path, options: DiscoverOptions, rel: Path, line_no: Int, line: Str) {
   if options.progress and options.progress_every == 1 {
     fs.write(
       fp"{root}/.xsh-kbuild-progress",
@@ -2057,7 +2057,7 @@ proc emit_line_progress(root: Path, options: DiscoverOptions, rel: Path, line_no
   }
 }
 
-proc emit_batch_progress(root: Path, options: DiscoverOptions, pending: List[Path]) [fs, error] {
+proc emit_batch_progress(root: Path, options: DiscoverOptions, pending: List[Path]) {
   if options.progress {
     fs.write(
       fp"{root}/.xsh-kbuild-progress",
@@ -2089,7 +2089,7 @@ proc scan_simple_kbuild(
   lines: List[Str],
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[DirScan] {
+) -> Result[DirScan] {
   var plan = add_dir(empty_plan(), rel)
   let vars = kbuild_vars_for_dir(rel, srcarch)
   var mutable_vars = vars
@@ -2167,7 +2167,7 @@ proc scan_flat_kbuild(
   lines: List[Str],
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[DirScan] {
+) -> Result[DirScan] {
   var plan = add_dir(empty_plan(), rel)
   var vars = kbuild_vars_for_dir(rel, srcarch)
   var child_dirs: List[Path] = []
@@ -2248,7 +2248,7 @@ proc scan_discover_dir(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[DirScan] {
+) -> Result[DirScan] {
   let rel_key = path_key(rel)
   let dir_abs = join_root(root, rel)
   let source_result = read_kbuild_source(dir_abs)
@@ -2384,7 +2384,7 @@ proc scan_discover_dir(
   {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
 }
 
-proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) [] -> List[Path] {
+proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) -> List[Path] {
   var unique: List[Path] = []
   var local_seen = seen
 
@@ -2406,7 +2406,7 @@ proc scan_discover_batch_serial(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[List[DirScan]] {
+) -> Result[List[DirScan]] {
   var scans: List[DirScan] = []
 
   for dir in pending {
@@ -2423,7 +2423,7 @@ proc scan_discover_batch_parallel(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[List[DirScan]] {
+) -> Result[List[DirScan]] {
   pending
     |> par-map(jobs: options.jobs) { |dir|
       scan_discover_dir(root, dir, config, srcarch, options)?
@@ -2513,7 +2513,7 @@ proc discover_records_process_pool(
   options: DiscoverOptions,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, time, error] -> Result[KbuildPlan] {
+) -> Result[KbuildPlan] {
   let prefix = f"/tmp/xsh-kbuild-pool-{time.now()}"
   let state_path = fp"{prefix}-state.json"
   let lock_path = fp"{prefix}-lock"
@@ -2594,7 +2594,7 @@ proc discover_scans(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[DiscoverScans] {
+) -> Result[DiscoverScans] {
   var scans: Map[DirScan] = {}
   var seen: Map[Bool] = {}
   var frontier = [p"."]
@@ -2665,7 +2665,7 @@ proc discover_local_record_graph(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[LocalRecordGraph] {
+) -> Result[LocalRecordGraph] {
   let scans = discover_scans(root, config, srcarch, options)?
   var barriers: Map[AggregateBarriers] = {}
 
@@ -2681,7 +2681,7 @@ pure local_record_cache_path(root: Path) -> Path {
   fp"{root}/.xsh-kbuild-local-records.json"
 }
 
-proc local_record_cache_key(config: Path, srcarch: Str) [fs, error] -> Result[Str] {
+proc local_record_cache_key(config: Path, srcarch: Str) -> Result[Str] {
   let config_hash = if config.exists()? { hash.sha256(config)?.hex() } else { "missing" }
   bytes.from_text(f"linux-local-records-v1\t{srcarch}\t{config_hash}").sha256().hex()
 }
@@ -2696,7 +2696,7 @@ pure local_record_record(scan: DirScan, file_hash: Str) -> ScanRecord {
   }
 }
 
-proc local_record_from_record(item: ScanRecord) [error] -> Result[DirScan] {
+proc local_record_from_record(item: ScanRecord) -> Result[DirScan] {
   {
     dir: fp"{item.dir}",
     plan: {
@@ -2712,7 +2712,7 @@ proc local_record_from_record(item: ScanRecord) [error] -> Result[DirScan] {
   }
 }
 
-proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: LocalRecordGraph) [fs, error] {
+proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: LocalRecordGraph) {
   let cache = local_record_cache_path(root)
   let key = local_record_cache_key(config, srcarch)?
   var records: List[ScanRecord] = []
@@ -2726,7 +2726,7 @@ proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: Loc
   json.write(cache, LocalRecordCache(format: "linux-local-records-v1", key:, records:))
 }
 
-proc read_local_record_graph(root: Path, config: Path, srcarch: Str) [fs, error] -> Result[LocalRecordGraph] {
+proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[LocalRecordGraph] {
   let cache = local_record_cache_path(root)
 
   if ! cache.exists()? {
@@ -2780,7 +2780,7 @@ proc merge_discovered_scans_with_options(
   scan_by_dir: Map[DirScan],
   rel: Path,
   state: DiscoverState,
-) [fs, error] -> Result[DiscoverState] {
+) -> Result[DiscoverState] {
   let rel_key = path_key(rel)
 
   return state when state.seen.get(rel_key) ?? false
@@ -2809,7 +2809,7 @@ proc merge_local_record_graph_with_options(
   graph: LocalRecordGraph,
   rel: Path,
   state: DiscoverState,
-) [fs, error] -> Result[DiscoverState] {
+) -> Result[DiscoverState] {
   let rel_key = path_key(rel)
 
   return state when state.seen.get(rel_key) ?? false
@@ -2904,11 +2904,11 @@ pure path_strings(paths: List[Path]) -> List[Str] {
   [path_key(path_value) for path_value in paths]
 }
 
-proc paths_from_strings(items: List[Str]) [error] -> Result[List[Path]] {
+proc paths_from_strings(items: List[Str]) -> Result[List[Path]] {
   [path_from_string(item)? for item in items]
 }
 
-proc unique_paths(paths: List[Path]) [] -> List[Path] {
+proc unique_paths(paths: List[Path]) -> List[Path] {
   var unique: List[Path] = []
   var seen: Map[Bool] = {}
 
@@ -2924,7 +2924,7 @@ proc unique_paths(paths: List[Path]) [] -> List[Path] {
   unique
 }
 
-proc unique_composites(composites: List[CompositeObject]) [] -> List[CompositeObject] {
+proc unique_composites(composites: List[CompositeObject]) -> List[CompositeObject] {
   var unique: List[CompositeObject] = []
   var seen: Map[Bool] = {}
 
@@ -2940,7 +2940,7 @@ proc unique_composites(composites: List[CompositeObject]) [] -> List[CompositeOb
   unique
 }
 
-proc normalize_plan(plan: KbuildPlan) [] -> KbuildPlan {
+proc normalize_plan(plan: KbuildPlan) -> KbuildPlan {
   let lib_objects = unique_paths(plan.lib_objects)
   var lib_object_seen = {[path_key(obj)]: true for obj in lib_objects}
   {
@@ -2953,7 +2953,7 @@ proc normalize_plan(plan: KbuildPlan) [] -> KbuildPlan {
   }
 }
 
-proc sorted_paths(paths: List[Path]) [] -> List[Path] {
+proc sorted_paths(paths: List[Path]) -> List[Path] {
   paths |> sort-by .display()
 }
 
@@ -2961,7 +2961,7 @@ pure composite_records(composites: List[CompositeObject]) -> List[CompositeRecor
   [{object: path_key(item.object), members: path_strings(item.members)} for item in composites]
 }
 
-proc composites_from_records(items: List[CompositeRecord]) [error] -> Result[List[CompositeObject]] {
+proc composites_from_records(items: List[CompositeRecord]) -> Result[List[CompositeObject]] {
   var composites: List[CompositeObject] = [
     {object: fp"{item.object}", members: paths_from_strings(item.members)?}
     for item in items
@@ -3098,7 +3098,7 @@ export proc read_discovered_plan_text(path_value: Path) [fs, error] -> Result[Kb
   parse_discovered_plan_text(path_value.read_text()?)
 }
 
-proc fingerprint_dir_line(root: Path, dir: Path) [fs, error] -> Result[Str] {
+proc fingerprint_dir_line(root: Path, dir: Path) -> Result[Str] {
   var line = ""
 
   match kbuild_file(join_root(root, dir)) {
@@ -3223,7 +3223,7 @@ proc path_from_string(item: Str) [error] -> Result[Path] {
   fp"{item}"
 }
 
-proc task_from_record(item: ArchiveTaskRecord) [error] -> Result[make.MakeTask] {
+proc task_from_record(item: ArchiveTaskRecord) -> Result[make.MakeTask] {
   {
     name: item.name,
     outputs: paths_from_strings(item.outputs)?,
@@ -3237,7 +3237,7 @@ proc task_from_record(item: ArchiveTaskRecord) [error] -> Result[make.MakeTask] 
   }
 }
 
-proc read_archive_plan_record(path_value: Path, stale_message: Str) [fs, error] -> Result[Record] {
+proc read_archive_plan_record(path_value: Path, stale_message: Str) -> Result[Record] {
   let stored = json.read(path_value)?.require(Record)?
   let format = if "format" in stored { stored.get("format")?.require(Str)? } else { "" }
 
@@ -3248,7 +3248,7 @@ proc read_archive_plan_record(path_value: Path, stale_message: Str) [fs, error] 
   stored
 }
 
-proc read_archive_plan_tasks(path_value: Path) [fs, error] -> Result[List[make.MakeTask]] {
+proc read_archive_plan_tasks(path_value: Path) -> Result[List[make.MakeTask]] {
   let stored = json.read(path_value)?.require(ArchivePlanTasksFile)?
   [task_from_record(row)? for row in stored.tasks]
 }
@@ -3256,7 +3256,7 @@ proc read_archive_plan_tasks(path_value: Path) [fs, error] -> Result[List[make.M
 proc archive_plan_from_summary(
   summary: ArchivePlanSummaryFile,
   tasks: List[make.MakeTask],
-) [error] -> Result[BuiltinArchivePlan] {
+) -> Result[BuiltinArchivePlan] {
   {
     tasks: tasks,
     task_specs: [],
@@ -3312,7 +3312,7 @@ pure find_task_name_by_output(tasks: List[make.MakeTask], output: Path) -> Resul
   Err(ScriptError.Failed(kind: "kbuild-task-output-missing", message: f"no archive-plan task produces {output}"))
 }
 
-proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[Bool]) [] -> Map[Bool] {
+proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[Bool]) -> Map[Bool] {
   return selected when selected.get(target) ?? false
 
   var next = selected.set(target, true)
@@ -3324,7 +3324,7 @@ proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[
   next
 }
 
-proc archive_task_deps_by_name(tasks: List[make.MakeTask]) [] -> Map[List[Str]] {
+proc archive_task_deps_by_name(tasks: List[make.MakeTask]) -> Map[List[Str]] {
   var by_name = {task.name: task.deps for task in tasks}
   by_name
 }
@@ -3396,12 +3396,12 @@ pure composite_for(composites: List[CompositeObject], obj: Path) -> Result[Compo
   Err(ScriptError.Failed(kind: "kbuild-not-composite", message: f"{key} is not a composite object"))
 }
 
-proc composite_map(composites: List[CompositeObject]) [] -> Map[CompositeObject] {
+proc composite_map(composites: List[CompositeObject]) -> Map[CompositeObject] {
   var mapped: Map[CompositeObject] = {[path_key(composite.object)]: composite for composite in composites}
   mapped
 }
 
-proc composite_member_map(composites: List[CompositeObject]) [] -> Map[CompositeObject] {
+proc composite_member_map(composites: List[CompositeObject]) -> Map[CompositeObject] {
   var mapped: Map[CompositeObject] = {
     [path_key(member)]: composite
     for composite in composites
@@ -3410,7 +3410,7 @@ proc composite_member_map(composites: List[CompositeObject]) [] -> Map[Composite
   mapped
 }
 
-proc source_for_object(obj: Path) [fs, error] -> Result[Path] {
+proc source_for_object(obj: Path) -> Result[Path] {
   var candidates = [obj]
   let stem = obj.name.replace(".o", "")
 
@@ -3461,7 +3461,7 @@ pure asm_keeps_forced_include(arg: Str) -> Bool {
   ]
 }
 
-proc asm_includes(args: List[Str]) [] -> List[Str] {
+proc asm_includes(args: List[Str]) -> List[Str] {
   var filtered: List[Str] = []
   var skip_next = false
 
@@ -3486,7 +3486,7 @@ proc asm_includes(args: List[Str]) [] -> List[Str] {
   filtered.push("-include").push("./include/generated/asm-offsets.h")
 }
 
-proc asm_cflags(_: List[Str]) [] -> List[Str] {
+proc asm_cflags(_: List[Str]) -> List[Str] {
   [
     "-D__KERNEL__",
     "-D__ASSEMBLY__",
@@ -3545,7 +3545,7 @@ pure is_x86_startup_pi_base_output(out: Path) -> Bool {
   "/arch/x86/boot/startup/" in out.display()
 }
 
-proc pi_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
+proc pi_compile_cflags(args: List[Str], out: Path) -> List[Str] {
   if is_x86_startup_pi_base_output(out) {
     var out_args = [arg for arg in args if arg != "-O2" and arg != "-fno-PIE" and arg != "-mcmodel=kernel"]
 
@@ -3587,7 +3587,7 @@ proc pi_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
   out_args
 }
 
-proc object_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
+proc object_compile_cflags(args: List[Str], out: Path) -> List[Str] {
   guard out.display().ends_with("/crypto/jitterentropy.o") else {
     return args
   }
@@ -3596,7 +3596,7 @@ proc object_compile_cflags(args: List[Str], out: Path) [] -> List[Str] {
   out_args.push("-O0")
 }
 
-proc pi_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
+proc pi_compile_includes(args: List[Str], out: Path) -> List[Str] {
   if is_x86_startup_pi_base_output(out) {
     var out_args = args
     out_args += ["-include"]
@@ -3611,12 +3611,12 @@ proc pi_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
   out_args.push("include/linux/hidden.h")
 }
 
-proc trace_compile_includes(args: List[Str], src: Path) [] -> List[Str] {
+proc trace_compile_includes(args: List[Str], src: Path) -> List[Str] {
   var out_args = args
   out_args.push(f"-I./{src.parent}")
 }
 
-proc arch_local_compile_includes(args: List[Str], src: Path, triple: Str) [] -> List[Str] {
+proc arch_local_compile_includes(args: List[Str], src: Path, triple: Str) -> List[Str] {
   let dir = path_key(src.parent)
   var out_args = args
 
@@ -3664,7 +3664,7 @@ proc arch_local_compile_includes(args: List[Str], src: Path, triple: Str) [] -> 
   out_args.push(f"-I./{dir}/{local_arch}")
 }
 
-proc libfdt_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
+proc libfdt_compile_includes(args: List[Str], out: Path) -> List[Str] {
   let key = object_key_from_out(out)
 
   if key == "lib/fdt" or key == "lib/fdt_addresses" or key == "lib/fdt_empty_tree" or key == "lib/fdt_ro" or key == "lib/fdt_rw" or key == "lib/fdt_strerror" or key == "lib/fdt_sw" or key == "lib/fdt_wip" {
@@ -3675,7 +3675,7 @@ proc libfdt_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
   args
 }
 
-proc version_compile_includes(args: List[Str], out: Path) [] -> List[Str] {
+proc version_compile_includes(args: List[Str], out: Path) -> List[Str] {
   if object_key_from_out(out) == "init/version" or path_key(out) == "init/version-timestamp.o" {
     var out_args = args
     out_args += ["-include"]
@@ -3709,7 +3709,7 @@ proc compile_kbuild_task_for_module(
   out: Path,
   mod_out: Path,
   deps: List[Str] = [],
-) [] -> make.MakeTask {
+) -> make.MakeTask {
   let compile_cflags = object_compile_cflags(pi_compile_cflags(cflags, out), out)
 
   let object_includes = arch_local_compile_includes(
@@ -3727,7 +3727,7 @@ proc compile_kbuild_task_for_module(
   make.compile_c_task(cc, triple, task_cflags, task_defs, task_includes, src, out, deps)
 }
 
-proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) [env] -> make.MakeTask {
+proc pi_objcopy_task(cc: Path, input: Path, out: Path, deps: List[Str] = []) -> make.MakeTask {
   let _ = cc
   let tool_path = host_build_path()
   var argv = ["llvm-objcopy", "--prefix-symbols=__pi_", "--remove-section=.note.gnu.property"]
@@ -3763,7 +3763,7 @@ pure pi_relacheck_path() -> Path {
   p".xsh-kbuild/host/arch/arm64/kernel/pi/relacheck"
 }
 
-proc host_build_cc() [env] -> Path {
+proc host_build_cc() -> Path {
   let root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   return fp"{root}/usr/bin/cc" when root != ""
@@ -3771,7 +3771,7 @@ proc host_build_cc() [env] -> Path {
   p"cc"
 }
 
-proc host_build_path() [env] -> Str {
+proc host_build_path() -> Str {
   let root = e"XSH_PM_BUILD_ROOT" ?? ""
   let current = e"PATH" ?? ""
 
@@ -3780,7 +3780,7 @@ proc host_build_path() [env] -> Str {
   current
 }
 
-proc host_build_ld_library_path() [env] -> Str {
+proc host_build_ld_library_path() -> Str {
   let root = e"XSH_PM_BUILD_ROOT" ?? ""
   let current = e"LD_LIBRARY_PATH" ?? ""
 
@@ -3791,7 +3791,7 @@ proc host_build_ld_library_path() [env] -> Str {
   f"{root}/usr/lib:{root}/usr/lib/llvm23/lib:{current}"
 }
 
-proc pi_relacheck_build_task(cc: Path) [env] -> make.MakeTask {
+proc pi_relacheck_build_task(cc: Path) -> make.MakeTask {
   let _ = cc
   let host_cc = host_build_cc()
   let host_path = host_build_path()
@@ -3834,7 +3834,7 @@ proc pi_relacheck_build_task(cc: Path) [env] -> make.MakeTask {
   }
 }
 
-proc pi_relacheck_task(relacheck: Path, input: Path, original: Path, deps: List[Str]) [] -> make.MakeTask {
+proc pi_relacheck_task(relacheck: Path, input: Path, original: Path, deps: List[Str]) -> make.MakeTask {
   let stamp = fp"{input}.relacheck.cmd"
 
   {
@@ -3986,7 +3986,7 @@ proc insert_archive_before(
   archive_path: Path,
   dep: Str,
   marker: Path,
-) [] -> ArchiveInputs {
+) -> ArchiveInputs {
   var out_objs: List[Path] = []
   var out_deps: List[Str] = []
   var inserted = false
@@ -4356,7 +4356,7 @@ proc x86_compressed_vmlinux_bin_task(
   vmlinux: Path,
   out: Path,
   deps: List[Str] = [],
-) [] -> make.MakeTask {
+) -> make.MakeTask {
   {
     name: out.display(),
     outputs: [
@@ -4628,7 +4628,7 @@ proc x86_vmlinux_strip_argv_task(
   unstripped: Path,
   out: Path,
   deps: List[Str] = [],
-) [] -> make.MakeTask {
+) -> make.MakeTask {
   {
     name: out.display(),
     outputs: [
@@ -4797,7 +4797,7 @@ pure efi_libstub_source_x86(stem: Str) -> Path {
   fp"drivers/firmware/efi/libstub/{stem}.c"
 }
 
-proc append_x86_relocs(relocs: Path, input: Path, out: Path) [fs, process, error] {
+proc append_x86_relocs(relocs: Path, input: Path, out: Path) {
   let input_text = input.display()
   let reloc_data = run.capture --bytes $relocs $input_text ?
 
@@ -4814,7 +4814,7 @@ proc append_x86_relocs(relocs: Path, input: Path, out: Path) [fs, process, error
   fs.write(out, bytes.concat([p"arch/x86/boot/compressed/vmlinux.bin".read_bytes()?, reloc_data.stdout]))
 }
 
-proc write_x86_voffset_header(nm: Path, input: Path) [fs, process, error] {
+proc write_x86_voffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [ABbCDGRSTtVW] (_text|__start_rodata|_sinittext|__inittext_end|__bss_start|_end)$"
 
   let symbols = run.text $nm $input ?
@@ -4839,7 +4839,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) [fs, process, error] {
   )
 }
 
-proc write_x86_zoffset_header(nm: Path, input: Path) [fs, process, error] {
+proc write_x86_zoffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [a-zA-Z] (startup_32|efi.._stub_entry|efi(32)?_pe_entry|input_data|kernel_info|_end|_ehead|_text|_e?data|_e?sbat|z_.*)$"
 
   let symbols = run.text $nm $input ?
@@ -4987,7 +4987,7 @@ pure x86_setup_includes() -> List[Str] {
   ]
 }
 
-proc preprocess_x86_boot_lds(cc: Path, source: Path, out: Path, includes: List[Str]) [process, error] {
+proc preprocess_x86_boot_lds(cc: Path, source: Path, out: Path, includes: List[Str]) {
   let argv = [
     cc.display(),
     "-target",
@@ -5013,7 +5013,7 @@ proc build_x86_compressed_kernel(
   vmlinux: Path,
   efi_lib: Path,
   jobs_count: Int,
-) [fs, process, env, error] {
+) {
   let objcopy = process.which("llvm-objcopy")?
   let nm = process.which("llvm-nm")?
   let ld = process.which("ld.lld")?
@@ -5165,7 +5165,7 @@ proc build_x86_compressed_kernel(
   make.run_tasks([image_task(objcopy, compressed_vmlinux, boot_vmlinux_bin)], 1)
 }
 
-proc build_x86_setup_image(cc: Path, jobs_count: Int) [fs, process, env, error] {
+proc build_x86_setup_image(cc: Path, jobs_count: Int) {
   let ld = process.which("ld.lld")?
   let objcopy = process.which("llvm-objcopy")?
   let boot = p"arch/x86/boot"
@@ -5333,7 +5333,7 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) [fs, process, env, error] 
   run $objcopy "-O" "binary" "arch/x86/boot/setup.elf" "arch/x86/boot/setup.bin" ?
 }
 
-proc write_x86_bzimage(setup: Path, payload: Path, image: Path) [fs, error] {
+proc write_x86_bzimage(setup: Path, payload: Path, image: Path) {
   let setup_data = setup.read_bytes()?
   let payload_data = payload.read_bytes()?
   let remainder = setup_data.len() % 4096
@@ -5635,7 +5635,7 @@ void __ubsan_handle_alignment_assumption_abort(void) {}
   )
 }
 
-proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) [env] -> make.MakeTask {
+proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) -> make.MakeTask {
   let tool_path = host_build_path()
 
   {
@@ -5664,7 +5664,7 @@ proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) [env] -> make.Ma
   }
 }
 
-proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) [env] -> make.MakeTask {
+proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) -> make.MakeTask {
   let tool_path = host_build_path()
 
   {
@@ -5696,7 +5696,7 @@ proc efi_libstub_archive_task(
   inputs: List[Path],
   out: Path,
   deps: List[Str],
-) [env] -> make.MakeTask {
+) -> make.MakeTask {
   let tool_path = host_build_path()
   var argv = ar_argv.extend(["cDPrsT", out.display()])
 
@@ -5723,7 +5723,7 @@ proc efi_libstub_archive_task(
   }
 }
 
-proc vmlinux_archive_inputs() [] -> List[Path] {
+proc vmlinux_archive_inputs() -> List[Path] {
   [p".xsh-kbuild/built-in.a", p".xsh-kbuild/arch/arm64/lib/lib.a", p".xsh-kbuild/lib/lib.a"]
 }
 
@@ -5952,13 +5952,13 @@ export proc run_builtin_archive_plan(
   archive_plan.archives
 }
 
-proc x86_jump_label_helper_source() [fs, error] -> Result[Path] {
+proc x86_jump_label_helper_source() -> Result[Path] {
   return p"x86-jump-label-patch.c" when p"x86-jump-label-patch.c".exists()?
 
   Err(ScriptError.Failed(kind: "kbuild-x86-jump-label-helper", message: "missing x86-jump-label-patch.c"))
 }
 
-proc x86_jump_label_helper() [fs, process, error] -> Result[Path] {
+proc x86_jump_label_helper() -> Result[Path] {
   let cc = process.which("cc")?
   let helper = p".xsh-kbuild/host/x86-jump-label-patch"
   let source = x86_jump_label_helper_source()?
@@ -6029,7 +6029,7 @@ pure archive_rerun_tasks(tasks: List[make.MakeTask]) -> List[make.MakeTask] {
   rerun
 }
 
-proc rerun_x86_jump_label_archives(tasks: List[make.MakeTask], jobs_count: Int) [fs, process, env, error] {
+proc rerun_x86_jump_label_archives(tasks: List[make.MakeTask], jobs_count: Int) {
   let archive_tasks = archive_rerun_tasks(tasks)
   archive_plan_progress(f"xsh-kbuild-x86-jump-label-archive-rerun start {archive_tasks.len()} archives")
   make.run_tasks(archive_tasks, jobs_count)
@@ -6065,7 +6065,7 @@ export proc run_x86_builtin_archive_plan(
   archives
 }
 
-proc archive_plan_progress(message: Str) [fs, error] {
+proc archive_plan_progress(message: Str) {
   write_text_if_changed(
     p".xsh-kbuild-progress",
     f"""{message}
@@ -6073,7 +6073,7 @@ proc archive_plan_progress(message: Str) [fs, error] {
   )
 }
 
-proc archive_plan_timing_start(stage: Str) [env, time] -> Int {
+proc archive_plan_timing_start(stage: Str) -> Int {
   if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     print "linux-kbuild-archive-timing-start" $stage
     return time.now()
@@ -6082,7 +6082,7 @@ proc archive_plan_timing_start(stage: Str) [env, time] -> Int {
   0
 }
 
-proc archive_plan_timing_done(stage: Str, start: Int) [env, time] {
+proc archive_plan_timing_done(stage: Str, start: Int) {
   if (e"XSH_LINUX_KBUILD_TIMING" ?? "") == "1" {
     print "linux-kbuild-archive-timing-done" $stage ${time.now() - start} "ms"
   }
@@ -6215,7 +6215,7 @@ proc archive_analysis_plan_context_slice(
   }
 }
 
-proc archive_analysis_plan_from_context(context: ArchivePlanContext) [error] -> Result[KbuildPlan] {
+proc archive_analysis_plan_from_context(context: ArchivePlanContext) -> Result[KbuildPlan] {
   {
     dirs: paths_from_strings(context.dirs)?,
     objects: paths_from_strings(context.objects)?,
@@ -6404,7 +6404,7 @@ proc archive_analysis_items(
   plan: KbuildPlan,
   config: Kconfig,
   compile_flags_by_dir: Map[Map[List[Str]]],
-) [env, time, error] -> Result[List[ArchiveAnalysisItem]] {
+) -> Result[List[ArchiveAnalysisItem]] {
   let maps_start = archive_plan_timing_start("item-maps")
   let composites_by_object = composite_map(plan.composites)
   let composite_members_by_object = composite_member_map(plan.composites)
@@ -6450,7 +6450,7 @@ proc archive_analysis_items(
 proc archive_analysis_items_for_plan(
   plan: KbuildPlan,
   triple: Str,
-) [fs, env, time, error] -> Result[List[ArchiveAnalysisItem]] {
+) -> Result[List[ArchiveAnalysisItem]] {
   let config = load_config_if_present(p".config")?
   let compile_flags_by_dir = cached_kbuild_compile_flags_for_dirs(
     p".",
@@ -6555,7 +6555,7 @@ proc analyze_archive_items_impl(
   defs: List[Str],
   includes: List[Str],
   emit_task_specs: Bool,
-) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
+) -> Result[List[ArchiveAnalysisResult]] {
   var results: List[ArchiveAnalysisResult] = []
 
   for item in items {
@@ -6694,7 +6694,7 @@ proc analyze_archive_items_impl(
 }
 
 # Caller-built items may use the legacy `members: [{object, flags}]` composite shape.
-proc archive_analysis_item_from_record(item: Record) [error] -> Result[ArchiveAnalysisItem] {
+proc archive_analysis_item_from_record(item: Record) -> Result[ArchiveAnalysisItem] {
   let members = if "members" in item { item.get("members")?.require(List[Record])? } else { [] }
   let member_objects = if "member_objects" in item {
     item.get("member_objects")?.require(List[Str])?
@@ -6755,7 +6755,7 @@ proc archive_analysis_process_pool(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, process, env, time, error] -> Result[List[ArchiveAnalysisResult]] {
+) -> Result[List[ArchiveAnalysisResult]] {
   let item_count = plan.objects.len() + plan.lib_objects.len()
   let flag_entries = compile_flags_cache_entries(compile_flags_by_dir)
   let worker_count = archive_analysis_worker_count(requested_jobs, item_count)
@@ -6861,7 +6861,7 @@ proc assemble_builtin_archive_plan(
   plan: KbuildPlan,
   cc: Path,
   analysis_results: List[ArchiveAnalysisResult],
-) [fs, env, time, error] -> Result[BuiltinArchivePlan] {
+) -> Result[BuiltinArchivePlan] {
   let materialize_tasks = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let result_merge_start = archive_plan_timing_start("merge-results")
   var tasks: List[make.MakeTask] = []

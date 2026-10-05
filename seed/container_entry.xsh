@@ -11,7 +11,7 @@
 
 error ContainerEntryError = Usage(message: Str)
 
-proc give_tree(root: Path, uid: Int, gid: Int) [fs, error] {
+proc give_tree(root: Path, uid: Int, gid: Int) {
   return unless fs.exists(root)?
 
   # The ids need not exist in the image's /etc/passwd or /etc/group.

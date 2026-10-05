@@ -41,7 +41,7 @@ pure fixture_package(
   }
 }
 
-proc expect_catalog_rejection(root: Path, expected: Str) [fs, env, error] {
+proc expect_catalog_rejection(root: Path, expected: Str) {
   match catalog.load(root) {
     Ok(_) => test.fail(f"{expected}: catalog unexpectedly loaded")
     Err(problem) => assert expected in problem.message

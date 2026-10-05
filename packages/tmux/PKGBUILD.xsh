@@ -133,7 +133,7 @@ proc write_config_h() [fs, error] {
   )
 }
 
-proc build_tmux(cc: Path) [fs, process, env, error] -> Result[Path] {
+proc build_tmux(cc: Path) -> Result[Path] {
   let core_sources = """
 alerts.c arguments.c attributes.c cfg.c client.c cmd.c colour.c
 control.c control-notify.c environ.c file.c format.c format-draw.c

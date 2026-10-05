@@ -67,7 +67,7 @@ main(@args)?
 """
 }
 
-proc xsh_runner() [fs, process, env, error] -> Result[Path] {
+proc xsh_runner() -> Result[Path] {
   let host = (e"XSH_HOST" ?? "").trim()
 
   if host != "" {
@@ -81,7 +81,7 @@ proc xsh_runner() [fs, process, env, error] -> Result[Path] {
   process.which("xsh")?
 }
 
-proc regular_xsh_source(xsh: Path) [fs, error] -> Result[Path] {
+proc regular_xsh_source(xsh: Path) -> Result[Path] {
   var source = xsh
   var depth = 0
 
@@ -98,7 +98,7 @@ proc regular_xsh_source(xsh: Path) [fs, error] -> Result[Path] {
   Err(types.PmError.PackageContract(f"{xsh} has too many symlink levels"))
 }
 
-proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
+proc direct_xsh_source(xsh: Path, name: Str) -> Result[Path] {
   return regular_xsh_source(xsh) when name == "xsh"
 
   let sibling = fp"{xsh.parent}/{name}"
@@ -109,7 +109,7 @@ proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
   regular_xsh_source(sibling)
 }
 
-proc seed_xsh_runners(root: Path, xsh: Path) [fs, error] {
+proc seed_xsh_runners(root: Path, xsh: Path) {
   let bin = fp"{root}/bin"
   fs.mkdir(bin)
 
@@ -193,7 +193,7 @@ export proc executor_provenance() [fs, process, env, error] -> Result[types.Exec
   }
 }
 
-proc xsht_runner() [fs, process, env, error] -> Result[Path] {
+proc xsht_runner() -> Result[Path] {
   let xsh = xsh_runner()?
   let sibling = fp"{xsh.parent}/xsht"
 

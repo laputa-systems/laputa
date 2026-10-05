@@ -22,7 +22,7 @@ pure package_input_path(rel: Path) -> Bool {
   )
 }
 
-proc tree_entry_line(root: Path, path_value: Path, prefix: Str) [fs, error] -> Result[Str] {
+proc tree_entry_line(root: Path, path_value: Path, prefix: Str) -> Result[Str] {
   let rel = path_value.strip_prefix(root)?
   let metadata = fs.metadata(path_value)?
   let label = canonical_field(rel.display())
@@ -84,7 +84,7 @@ pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
 # a build (staging copies the recipe tree) or a module import. Recipes name
 # shared code through the module path and outside inputs as `repository/`
 # sources instead.
-proc package_source_lines(pkg: types.Package) [fs, error] -> Result[List[Str]] {
+proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
   var lines: List[Str] = []
 
   for entry in fs.walk(pkg.dir) |> sort-by .path {
@@ -122,7 +122,7 @@ proc repository_input_lines(
   repo_root: Path,
   pkg: types.Package,
   target: types.Target,
-) [fs, error] -> Result[List[Str]] {
+) -> Result[List[Str]] {
   let arch = types.pm_target_arch(target)
   var lines: List[Str] = []
 
@@ -206,7 +206,7 @@ export proc package_build_input(repo_root: Path, pkg: types.Package, target: typ
   digest_lines(lines)?
 }
 
-proc pm_proof_module(pm_root: Path) [fs, error] -> Result[Str] {
+proc pm_proof_module(pm_root: Path) -> Result[Str] {
   let proof = fp"{pm_root}/pm/proof.xsh"
 
   if ! fs.exists(proof)? {

@@ -13,7 +13,7 @@ pure size_label(value: Int) -> Str {
   f"{kib(value)}K"
 }
 
-proc path_size(path_value: Path) [fs, error] -> Result[Int] {
+proc path_size(path_value: Path) -> Result[Int] {
   guard fs.exists(path_value)? else {
     return 0
   }
@@ -31,7 +31,7 @@ proc path_size(path_value: Path) [fs, error] -> Result[Int] {
   total
 }
 
-proc print_path_size(label: Str, path_value: Path) [fs, error] {
+proc print_path_size(label: Str, path_value: Path) {
   if fs.exists(path_value)? {
     print ${label}: size_label(path_size(path_value)?) $path_value
   } else {
@@ -39,7 +39,7 @@ proc print_path_size(label: Str, path_value: Path) [fs, error] {
   }
 }
 
-proc package_size(rootfs: Path, manifest_path: Path) [fs, error] -> Result[Int] {
+proc package_size(rootfs: Path, manifest_path: Path) -> Result[Int] {
   let manifest = json.read(manifest_path)?.require(List[Str])?
   var total = 0
 
@@ -50,7 +50,7 @@ proc package_size(rootfs: Path, manifest_path: Path) [fs, error] -> Result[Int] 
   total
 }
 
-proc package_size_rows(rootfs: Path) [fs, error] -> Result[List[PackageSize]] {
+proc package_size_rows(rootfs: Path) -> Result[List[PackageSize]] {
   let db = fp"{rootfs}/var/lib/xsh-pm/packages"
   var rows: List[PackageSize] = []
 
@@ -63,7 +63,7 @@ proc package_size_rows(rootfs: Path) [fs, error] -> Result[List[PackageSize]] {
   rows |> sort-by .size
 }
 
-proc print_package_sizes(label: Str, rootfs: Path) [fs, error] {
+proc print_package_sizes(label: Str, rootfs: Path) {
   print $label packages:
   let rows = package_size_rows(rootfs)?
   var index = rows.len()
@@ -75,7 +75,7 @@ proc print_package_sizes(label: Str, rootfs: Path) [fs, error] {
   }
 }
 
-proc print_report(arch: Str, work: Path, iso: Path, kernel: Path) [fs, error] {
+proc print_report(arch: Str, work: Path, iso: Path, kernel: Path) {
   print installer size report: $arch
   print_path_size("iso", iso)
   print_path_size("kernel", kernel)

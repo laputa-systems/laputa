@@ -22,7 +22,7 @@ export type DockerConfig = {
   owner: world.WorldOwner,
 }
 
-proc env_value(name: Str, fallback: Str) [env] -> Str {
+proc env_value(name: Str, fallback: Str) -> Str {
   let value = (env.get(name) ?? "").trim()
   return fallback when value == ""
 

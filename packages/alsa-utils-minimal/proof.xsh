@@ -26,13 +26,13 @@ proc tool(root: Path, name: Str, args: List[Str]) [fs, process, env, error] -> R
   {code: result.status.exit_code()?, stdout: result.stdout, stderr: result.stderr}
 }
 
-proc expect_ok(root: Path, name: Str, args: List[Str]) [fs, process, env, error] -> Result[ToolRun] {
+proc expect_ok(root: Path, name: Str, args: List[Str]) -> Result[ToolRun] {
   let result = tool(root, name, args)?
   proof.ensure(result.code == 0, kind, f"{name} {args.join(" ")} exited {result.code}: {result.stderr.trim()}")
   result
 }
 
-proc expect_failure(root: Path, name: Str, args: List[Str], code: Int, message: Str) [fs, process, env, error] {
+proc expect_failure(root: Path, name: Str, args: List[Str], code: Int, message: Str) {
   let result = tool(root, name, args)?
   proof.ensure(result.code == code, kind, f"{name} {args.join(" ")} exited {result.code}, expected {code}: {result.stderr.trim()}")
   proof.ensure(result.stderr.trim() == message, kind, f"{name} {args.join(" ")} reported: {result.stderr.trim()}")

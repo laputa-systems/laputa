@@ -16,7 +16,7 @@ proc run_xinit(ctx: TestContext, args: List[Str], vars: Record) [fs, process, er
 }
 
 # Run xinit and return its stdout, failing the test unless it exits 0.
-proc xinit_text(ctx: TestContext, args: List[Str], vars: Record) [fs, process, error] -> Result[Str] {
+proc xinit_text(ctx: TestContext, args: List[Str], vars: Record) -> Result[Str] {
   let result = run_xinit(ctx, args, vars)?
   assert result.success, f"xinit {args.join(" ")} failed: {result.stderr}"
   result.stdout
@@ -55,7 +55,7 @@ proc write_named_service(
   targets: List[Str],
   deps: Str,
   extra = "",
-) [fs, error] {
+) {
   path_value.write(f"""##! Service fixture.
 
 ## The service declaration.
@@ -70,7 +70,7 @@ export let service = {{
 """)
 }
 
-proc assert_failed_with(result: XinitRun, expected: Str) [error] {
+proc assert_failed_with(result: XinitRun, expected: Str) {
   assert ! result.success, "expected command to fail"
   assert expected in result.stderr
 }

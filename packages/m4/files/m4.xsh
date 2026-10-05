@@ -83,7 +83,7 @@ const ascii_table = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\t\n\u{b}\u{c}
 # character, since text here is UTF-8 and cannot hold the raw byte.
 const latin1_table = "\u{80}\u{81}\u{82}\u{83}\u{84}\u{85}\u{86}\u{87}\u{88}\u{89}\u{8a}\u{8b}\u{8c}\u{8d}\u{8e}\u{8f}\u{90}\u{91}\u{92}\u{93}\u{94}\u{95}\u{96}\u{97}\u{98}\u{99}\u{9a}\u{9b}\u{9c}\u{9d}\u{9e}\u{9f}\u{a0}\u{a1}\u{a2}\u{a3}\u{a4}\u{a5}\u{a6}\u{a7}\u{a8}\u{a9}\u{aa}\u{ab}\u{ac}\u{ad}\u{ae}\u{af}\u{b0}\u{b1}\u{b2}\u{b3}\u{b4}\u{b5}\u{b6}\u{b7}\u{b8}\u{b9}\u{ba}\u{bb}\u{bc}\u{bd}\u{be}\u{bf}\u{c0}\u{c1}\u{c2}\u{c3}\u{c4}\u{c5}\u{c6}\u{c7}\u{c8}\u{c9}\u{ca}\u{cb}\u{cc}\u{cd}\u{ce}\u{cf}\u{d0}\u{d1}\u{d2}\u{d3}\u{d4}\u{d5}\u{d6}\u{d7}\u{d8}\u{d9}\u{da}\u{db}\u{dc}\u{dd}\u{de}\u{df}\u{e0}\u{e1}\u{e2}\u{e3}\u{e4}\u{e5}\u{e6}\u{e7}\u{e8}\u{e9}\u{ea}\u{eb}\u{ec}\u{ed}\u{ee}\u{ef}\u{f0}\u{f1}\u{f2}\u{f3}\u{f4}\u{f5}\u{f6}\u{f7}\u{f8}\u{f9}\u{fa}\u{fb}\u{fc}\u{fd}\u{fe}\u{ff}"
 
-proc read_input_file(filepath: Str) [fs, error] -> Result[Str] {
+proc read_input_file(filepath: Str) -> Result[Str] {
   # `fp"${...}"` is a literal-path form in the pinned published runner: it
   # resolves a dynamic operand as the current directory. Convert CLI text
   # explicitly so m4 reads the requested file, never its cwd.
@@ -1808,7 +1808,7 @@ pure numeric_key_order(keys: List[Str]) -> List[Int] {
 }
 
 # ── core expander ────────────────────────────────────────────────────────────
-proc include_candidate(name: Str, include_paths: List[Str]) [fs, error] -> Result[Str] {
+proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
   let direct = fp"{name}"
 
   if fs.exists(direct)? and fs.metadata(direct)?.kind == "file" {
@@ -2938,7 +2938,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 }
 
 # ── command line ─────────────────────────────────────────────────────────────
-proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
+proc parse_options(argv: List[Str]) -> Result[Options?] {
   var prefix = false
   var include_paths: List[Str] = []
   var defines: List[List[Str]] = []

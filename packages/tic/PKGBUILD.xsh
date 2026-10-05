@@ -98,7 +98,7 @@ pure ncurses_rows(caps: Str) -> Str {
 # The binary format's capability order is the order of include/Caps; a
 # compiler whose table drifted from the pinned release would write entries
 # that readers misinterpret, so a mismatch fails the build.
-proc check_caps_table() [fs, error] {
+proc check_caps_table() {
   let script = p"tic.xsh".read_text()?
   let checks = [
     {block: "standard_caps_rows", expected: standard_rows(p"ncurses/include/Caps".read_text()?)},

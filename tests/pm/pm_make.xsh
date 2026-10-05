@@ -3,7 +3,7 @@ use pm.make
 
 type TaskOutput = {arguments: List[Str], environment: Str}
 
-proc task_runner() [process, env, error] -> Result[Path] {
+proc task_runner() -> Result[Path] {
   let configured = e"XSH_HOST" ?? ""
   return fp"{configured}" when configured != ""
   process.which("xsh")?

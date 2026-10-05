@@ -20,7 +20,7 @@ pure min_int(left: Int, right: Int) -> Int {
   right
 }
 
-proc bit_value(bit: Int) [] -> Int {
+proc bit_value(bit: Int) -> Int {
   var value = 1
   var index = 0
 
@@ -32,7 +32,7 @@ proc bit_value(bit: Int) [] -> Int {
   value
 }
 
-proc bit_set(bitmap: Bytes, bit: Int) [error] -> Result[Bool] {
+proc bit_set(bitmap: Bytes, bit: Int) -> Result[Bool] {
   let byte = bytes.unpack_le(bitmap, 1, offset: bit / 8)?
   byte / bit_value(bit % 8) % 2 == 1
 }
@@ -43,7 +43,7 @@ proc expect_int(kind: Str, actual: Int, expected: Int) [error] {
   }
 }
 
-proc used_bits(bitmap: Bytes, limit: Int) [error] -> Result[Int] {
+proc used_bits(bitmap: Bytes, limit: Int) -> Result[Int] {
   var used = 0
   var bit = 0
 
@@ -58,7 +58,7 @@ proc used_bits(bitmap: Bytes, limit: Int) [error] -> Result[Int] {
   used
 }
 
-proc check_image(image: Path) [error] {
+proc check_image(image: Path) {
   let super = bytes.read_at(image, 1024, 1024)?
   let total_inodes = bytes.unpack_le(super, 4, offset: 0)?
   let total_blocks = bytes.unpack_le(super, 4, offset: 4)?

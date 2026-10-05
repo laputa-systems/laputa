@@ -10,12 +10,12 @@ proc guest_console(message: Str) [fs, error] {
   )
 }
 
-proc guest_fail(phase: Str, message: Str) [fs, error] {
+proc guest_fail(phase: Str, message: Str) {
   guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED {phase}: {message}")
   return Err(GuestProofError.Failed(phase:, message:))
 }
 
-proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error] {
+proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) {
   var elapsed = 0
   while ! fs.exists(path_value)? {
     if elapsed >= seconds {
@@ -27,7 +27,7 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error
   }
 }
 
-proc guest_run_required(command: Command, phase: Str) [fs, process, error] {
+proc guest_run_required(command: Command, phase: Str) {
   if let Ok(status) = process.run(command) {
     if ! status.ok {
       guest_fail(phase, "command exited unsuccessfully")

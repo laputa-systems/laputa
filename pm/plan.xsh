@@ -66,7 +66,7 @@ proc artifact_key_for(
   package_id: Str,
   recipe_sha256: Str,
   dependencies: List[types.PlanDependency],
-) [error] -> Result[Str] {
+) -> Result[Str] {
   var lines = [
     "format\tlaputa-package-artifact-key-2",
     f"build-epoch\t{build_epoch}",
@@ -85,7 +85,7 @@ proc artifact_key_for(
   plan_digest_lines(lines)?
 }
 
-proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) [error] -> Result[Str] {
+proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) -> Result[Str] {
   plan_digest_lines(
     [
       "format\tlaputa-legacy-remote-artifact-1",
@@ -99,7 +99,7 @@ proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) 
   )?
 }
 
-proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) [error] -> Result[Str] {
+proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) -> Result[Str] {
   plan_digest_lines(
     [
       "format\tlaputa-package-proof-key-1",
@@ -115,13 +115,13 @@ proc absolute_recipe_package(value: types.PackageCatalog, pkg: types.Package) [f
   {...pkg, dir}
 }
 
-proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) [error] -> Result[Path] {
+proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) -> Result[Path] {
   let durable = if pkg.dir.starts_with(p"/") { pkg.dir.relative_to(value.root) } else { pkg.dir }
   util.ensure_relative_path(durable, "plan recipe directory")?
 }
 
 # Hashes each recipe once; resolution reuses these digests for its nodes.
-proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) [fs, error] -> Result[Map[Str]] {
+proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) -> Result[Map[Str]] {
   var inputs: Map[Str] = {}
 
   for pkg in value.packages {
@@ -131,7 +131,7 @@ proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) [fs,
   inputs
 }
 
-proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) [error] -> Result[Str] {
+proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) -> Result[Str] {
   var lines = ["format\tlaputa-package-repository-1", f"target\t{types.target_text(target)}"]
 
   for name in recipe_inputs.keys() |> sort {
@@ -273,7 +273,7 @@ proc dependency_nodes(
   edges: List[types.DependencyEdge],
   selected: Map[Bool],
   keys: Map[Str],
-) [error] -> Result[List[types.PlanDependency]] {
+) -> Result[List[types.PlanDependency]] {
   var dependencies: List[types.PlanDependency] = []
 
   for edge in edges {
@@ -298,7 +298,7 @@ proc with_runtime_only_dependencies(
   edges: List[types.DependencyEdge],
   selected: Map[Bool],
   keys: Map[Str],
-) [error] -> Result[List[types.PlanNode]] {
+) -> Result[List[types.PlanNode]] {
   var result: List[types.PlanNode] = []
 
   for node in nodes {
@@ -320,7 +320,7 @@ proc built_dependency_names(
   edges: List[types.DependencyEdge],
   selected: Map[Bool],
   actions: Map[types.PlanAction],
-) [error] -> Result[List[Str]] {
+) -> Result[List[Str]] {
   var changed: List[Str] = []
 
   for edge in edges {
@@ -495,7 +495,7 @@ export proc require_current_build_epoch(value: types.BuildPlan) [error] {
   }
 }
 
-proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) [error] {
+proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) {
   if value.arch != types.pm_target_arch(target) {
     return Err(
       types.PmError.PackageContract(f"remote artifact architecture {value.arch} does not match {types.target_text(target)}"),
@@ -516,7 +516,7 @@ proc validate_node(
   seen: Map[Bool],
   levels: Map[Int],
   artifact_keys: Map[Str],
-) [error] {
+) {
   if seen.get(node.name) ?? false {
     return Err(types.PmError.PackageContract(f"build plan has duplicate node {node.name}"))
   }
@@ -637,7 +637,7 @@ export proc node_uses_legacy_remote_identity(value: types.BuildPlan, node: types
   }
 }
 
-proc validate_structure(value: types.BuildPlan) [error] {
+proc validate_structure(value: types.BuildPlan) {
   if value.format != format {
     return Err(types.PmError.PackageContract(f"unsupported build plan format {value.format}"))
   }
@@ -687,7 +687,7 @@ proc validate_structure(value: types.BuildPlan) [error] {
   }
 }
 
-proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
+proc fingerprint_unchecked(value: types.BuildPlan) -> Result[Str] {
   var lines = [
     "format\tlaputa-build-plan-fingerprint-1",
     f"plan-format\t{plan_canonical_field(value.format)}",

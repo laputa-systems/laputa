@@ -29,7 +29,7 @@ proc package_contract_error(pkg: Str, message: Str) [error] {
   return Err(types.PmError.PackageContract(f"{pkg}: {message}"))
 }
 
-proc validate_package_name(name: Str) [error] {
+proc validate_package_name(name: Str) {
   let pattern = rx"^[a-z0-9][a-z0-9+._-]*$"
 
   if ! pattern.matches(name) {
@@ -37,7 +37,7 @@ proc validate_package_name(name: Str) [error] {
   }
 }
 
-proc validate_positive_release(name: Str, rel: Str) [error] {
+proc validate_positive_release(name: Str, rel: Str) {
   let pattern = rx"^[1-9][0-9]*$"
 
   if ! pattern.matches(rel) {
@@ -47,7 +47,7 @@ proc validate_positive_release(name: Str, rel: Str) [error] {
 
 # A package architecture list names each supported target at most once and
 # never `all`: omitting the export is the one way to say every target.
-proc validate_package_architectures(name: Str, architectures: List[Str]) [error] {
+proc validate_package_architectures(name: Str, architectures: List[Str]) {
   if architectures.len() == 0 {
     return package_contract_error(name, "architectures must name at least one target architecture")
   }
@@ -67,7 +67,7 @@ proc validate_package_architectures(name: Str, architectures: List[Str]) [error]
   }
 }
 
-proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [error] {
+proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) {
   var seen: Map[Bool] = {}
 
   for dependency in dependencies {
@@ -86,7 +86,7 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [erro
 # A runtime-only dependency is excluded from build roots and artifact keys, so
 # a package the build also uses can never be runtime-only. Such a package is a
 # `deps` entry (installed into the build root and needed at runtime).
-proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [error] {
+proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) {
   validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)
   let build_dependencies = [@metadata.deps, @metadata.mkdeps_host, @metadata.mkdeps_target]
 
@@ -100,12 +100,12 @@ proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [e
   }
 }
 
-proc source_is_repository_local(source: Path) [] -> Bool {
+proc source_is_repository_local(source: Path) -> Bool {
   let raw = source.display()
   ! util.is_url_source(raw) and ! raw.starts_with("/")
 }
 
-proc decode_source_checksum(name: Str, raw: Record) [error] -> Result[types.SourceChecksum] {
+proc decode_source_checksum(name: Str, raw: Record) -> Result[types.SourceChecksum] {
   let arch: Str = raw.get("arch")?.require()?
   let sha256: Str = raw.get("sha256")?.require()?
 
@@ -120,7 +120,7 @@ proc decode_source_checksum(name: Str, raw: Record) [error] -> Result[types.Sour
   {arch, sha256}
 }
 
-proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.UpstreamSource] {
+proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSource] {
   let source: Path = raw.get("source")?.require()?
   let raw_kind: Str = raw.get("kind")?.require()?
   let kind = types.parse_source_kind(raw_kind)?
@@ -195,7 +195,7 @@ proc decode_upstream_source(name: Str, raw: Record) [error] -> Result[types.Upst
   {source, kind, architectures, checksums}
 }
 
-proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileTreeEntry] {
+proc decode_filetree_entry(name: Str, raw: Record) -> Result[types.FileTreeEntry] {
   let path_value: Path = raw.get("path")?.require()?
   let raw_kind: Str = raw.get("kind")?.require()?
   let kind = types.parse_file_kind(raw_kind)?
@@ -213,12 +213,12 @@ proc decode_filetree_entry(name: Str, raw: Record) [error] -> Result[types.FileT
   {path: normalized, kind}
 }
 
-proc decode_upstream_sources(name: Str, raw_sources: List[Record]) [error] -> Result[List[types.UpstreamSource]] {
+proc decode_upstream_sources(name: Str, raw_sources: List[Record]) -> Result[List[types.UpstreamSource]] {
   var sources: List[types.UpstreamSource] = [decode_upstream_source(name, raw_source)? for raw_source in raw_sources]
   sources
 }
 
-proc decode_filetree(name: Str, raw_entries: List[Record]) [error] -> Result[List[types.FileTreeEntry]] {
+proc decode_filetree(name: Str, raw_entries: List[Record]) -> Result[List[types.FileTreeEntry]] {
   var entries: List[types.FileTreeEntry] = []
   var seen: Map[Bool] = {}
 
@@ -265,11 +265,11 @@ type RecipeProcedures = module {
   export let name: Str
 }
 
-proc load_recipe_procedures(pkgbuild: Path) [fs, error] -> Result[RecipeProcedures] {
+proc load_recipe_procedures(pkgbuild: Path) -> Result[RecipeProcedures] {
   module.load(pkgbuild)?.require(RecipeProcedures).context("package-load", pkgbuild.display())?
 }
 
-proc load_recipe_module(pkgbuild: Path) [fs, error] -> Result[RecipeModule] {
+proc load_recipe_module(pkgbuild: Path) -> Result[RecipeModule] {
   module.load(pkgbuild)?.require(RecipeModule).context("package-load", pkgbuild.display())?
 }
 
@@ -283,11 +283,11 @@ pure select_filetree(metadata: PackageMetadata, arch: Str) -> List[Record] {
   metadata.filetree
 }
 
-proc is_production_recipe_directory(dir: Path) [] -> Bool {
+proc is_production_recipe_directory(dir: Path) -> Bool {
   dir.parent.name == "repo"
 }
 
-proc decode_metadata(pkgbuild: Path) [fs, error] -> Result[PackageMetadata] {
+proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
   let recipe = load_recipe_module(pkgbuild)?
   let has_build = recipe.get("build") is Ok(_)
   let has_filetree_aarch64 = recipe.get("filetree_aarch64") is Ok(_)
@@ -415,7 +415,7 @@ export proc load_package(dir: Path) [fs, env, error] -> Result[types.Package, Er
   load_package_for_target(dir, types.parse_target(util.machine_arch()?)?)?
 }
 
-proc dynamic_recipe_path(pkg: types.Package) [fs, error] -> Result[Path] {
+proc dynamic_recipe_path(pkg: types.Package) -> Result[Path] {
   let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
 
   if ! fs.exists(pkgbuild)? {

@@ -185,7 +185,7 @@ pure tail_after(argv: List[Str], start: Int) -> List[Str] {
 }
 
 # Parent discovery is intentionally restricted to a complete package repository.
-proc current_pm_repo_root() [fs, error] -> Result[Path] {
+proc current_pm_repo_root() -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
@@ -201,7 +201,7 @@ proc current_pm_repo_root() [fs, error] -> Result[Path] {
   p""
 }
 
-proc repo_default_root() [fs, error] -> Result[Path] {
+proc repo_default_root() -> Result[Path] {
   let root = current_pm_repo_root()?
 
   if root == "" {
@@ -211,7 +211,7 @@ proc repo_default_root() [fs, error] -> Result[Path] {
   root
 }
 
-proc execution_repo_root() [fs, error] -> Result[Path] {
+proc execution_repo_root() -> Result[Path] {
   let root = current_pm_repo_root()?
 
   if root == "" {
@@ -221,13 +221,13 @@ proc execution_repo_root() [fs, error] -> Result[Path] {
   root
 }
 
-proc resolve_repo_root(raw: Str) [fs, error] -> Result[Path] {
+proc resolve_repo_root(raw: Str) -> Result[Path] {
   return repo_default_root()? when raw == ""
 
   path.absolute(fp"{raw}")?
 }
 
-proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[RepoPackagesArgs] {
+proc parse_repo_packages(args: List[Str], command: Str) -> Result[RepoPackagesArgs] {
   var parsed: RepoPackagesOptions = RepoPackagesOptions(repo: "", packages: [])
 
   match cli.parse(
@@ -249,7 +249,7 @@ proc parse_repo_packages(args: List[Str], command: Str) [fs, error] -> Result[Re
   {repo: resolve_repo_root(parsed.repo)?, packages: parsed.packages}
 }
 
-proc parse_repo_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
+proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(repo_help_text())
   }
@@ -388,7 +388,7 @@ proc parse_repo_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
   }
 }
 
-proc parse_sources_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
+proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
   if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
     return Help(sources_help_text())
   }
@@ -559,7 +559,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   StoreVerify({store: parsed.store})
 }
 
-proc parse_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
+proc parse_command(argv: List[Str]) -> Result[PmCommand] {
   return Help(help_text()) when argv.len() == 0 or argv[0] in ["-h", "--help", "help"]
 
   match argv[0] {
@@ -576,7 +576,7 @@ proc parse_command(argv: List[Str]) [fs, env, error] -> Result[PmCommand] {
 proc remote_snapshot_for_plan(
   cache_root: Path,
   target: types.Target,
-) [fs, net, env, time, error] -> Result[types.RemoteSnapshot] {
+) -> Result[types.RemoteSnapshot] {
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()
@@ -600,7 +600,7 @@ proc remote_snapshot_for_plan(
   {target, index_sha256, packages}
 }
 
-proc selected_packages(repo_root: Path, names: List[Str]) [fs, env, error] -> Result[List[types.Package]] {
+proc selected_packages(repo_root: Path, names: List[Str]) -> Result[List[types.Package]] {
   let value = catalog.load(repo_root)?
   let by_name = catalog.package_map(value)
   var selected: List[types.Package] = []
@@ -623,7 +623,7 @@ proc selected_packages(repo_root: Path, names: List[Str]) [fs, env, error] -> Re
   selected
 }
 
-proc command_repo_check(args: RepoCheckArgs) [fs, env, error] {
+proc command_repo_check(args: RepoCheckArgs) {
   let value = catalog.load(args.repo)?
   let edges = graph.edges(value, policy.aarch64_docker())?
   print "repo" "check" value.packages.len() "packages" edges.len() "edges"
@@ -665,11 +665,11 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
   print (pm_plan.render(value, false)?)
 }
 
-proc command_repo_show(args: RepoShowArgs) [fs, error] {
+proc command_repo_show(args: RepoShowArgs) {
   print (pm_plan.render(pm_plan_json.read(args.input)?, false)?)
 }
 
-proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error] {
+proc command_repo_build(args: RepoBuildArgs) {
   let value = pm_plan_json.read(args.input)?
   if value.target == types.target_x86_64() and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
@@ -679,13 +679,13 @@ proc command_repo_build(args: RepoBuildArgs) [fs, net, process, env, time, error
   print "repo" "build" $result.plan_sha256 result.artifacts.len() "artifacts"
 }
 
-proc command_repo_build_node(args: RepoBuildNodeArgs) [fs, net, process, env, time, error] {
+proc command_repo_build_node(args: RepoBuildNodeArgs) {
   let value = pm_plan_json.read(args.input)?
   let receipt = pm_execute.build_plan_node(value, args.repo, args.store, remote.repo_url(), args.node)?
   print "repo" "build-node" $receipt.package_id $receipt.key
 }
 
-proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
+proc command_repo_publish(args: RepoPublishArgs) {
   let value = pm_plan_json.read(args.input)?
   let snapshot = repo.snapshot(value, args.store)?
   let repo_url = remote.repo_url()
@@ -717,7 +717,7 @@ proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, proc
 
 type FetchSelection = {packages: List[types.Package], arch: Str}
 
-proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
+proc command_sources_fetch(args: SourcesFetchArgs) {
   let cache_root = sources.source_cache_root(args.repo)?
   var items: List[sources.SourceFetchItem] = []
   var seen: List[Str] = []
@@ -770,7 +770,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
   }
 }
 
-proc command_root_compose(args: RootComposeArgs) [fs, error] {
+proc command_root_compose(args: RootComposeArgs) {
   let value = pm_plan_json.read(args.input)?
   let overlay_handle = fs.tempdir()?
   defer overlay_handle.close()?
@@ -780,7 +780,7 @@ proc command_root_compose(args: RootComposeArgs) [fs, error] {
   print "root" "compose" $receipt.generation_sha256 $receipt.root_sha256
 }
 
-proc command_root_inspect(args: RootInspectArgs) [fs, error] {
+proc command_root_inspect(args: RootInspectArgs) {
   # Image builders retain the receipt JSON after atomically publishing their final
   # image and removing container-local generation staging. Accept that durable
   # boundary as well as an intact generation root.
@@ -796,7 +796,7 @@ proc command_root_inspect(args: RootInspectArgs) [fs, error] {
 
 # Every artifact a kept plan names stays, whatever its action: a plan that
 # reuses a remote artifact still runs from the imported copy.
-proc command_store_gc(args: StoreGcArgs) [fs, error] {
+proc command_store_gc(args: StoreGcArgs) {
   var keep: List[Str] = []
 
   for plan_file in args.keep {
@@ -807,12 +807,12 @@ proc command_store_gc(args: StoreGcArgs) [fs, error] {
   print "store" "gc" $result.artifacts "removed" $result.kept "kept"
 }
 
-proc command_store_verify(args: StoreVerifyArgs) [fs, error] {
+proc command_store_verify(args: StoreVerifyArgs) {
   let receipts = store.verify_all(args.store)?
   print "store" "verify" receipts.len() "artifacts"
 }
 
-proc command_store_extract(args: StoreExtractArgs) [fs, error] {
+proc command_store_extract(args: StoreExtractArgs) {
   pm_generation_adapter.generation_adapter_copy_manifest_file(
     args.input,
     args.store,
@@ -823,7 +823,7 @@ proc command_store_extract(args: StoreExtractArgs) [fs, error] {
   print f"store extract {args.package} {args.path}"
 }
 
-proc handle(command: PmCommand) [fs, net, process, env, time, error] {
+proc handle(command: PmCommand) {
   match command {
     Help(text) => print $text
     RepoCheck(args) => command_repo_check(args)

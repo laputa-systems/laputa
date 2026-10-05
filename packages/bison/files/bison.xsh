@@ -137,11 +137,11 @@ pure unsupported_declaration(decls: Str) -> Str {
   ""
 }
 
-proc upstream_disabled() [env] -> Bool {
+proc upstream_disabled() -> Bool {
   (e"XSH_BISON_NO_UPSTREAM" ?? "") == "1"
 }
 
-proc run_upstream_bison(argv: List[Str], reason: Str) [process, env, error] {
+proc run_upstream_bison(argv: List[Str], reason: Str) {
   return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("bison") {
@@ -175,7 +175,7 @@ proc remove_comments(text: Str) [error] -> Result[Str] {
   re.replace(text, " ")
 }
 
-proc parse_rules(text: Str) [error] -> Result[List[GrammarRule]] {
+proc parse_rules(text: Str) -> Result[List[GrammarRule]] {
   let grammar = remove_comments(remove_actions(text)?)?.replace(":", " : ").replace("|", " | ").replace(";", " ; ")
   var rules = []
   var lhs = ""
@@ -235,7 +235,7 @@ proc generate_token_defines(tokens: Map[Int]) [error] -> Result[Str] {
   lines.join("\n")
 }
 
-proc generate_header(tokens: Map[Int]) [error] -> Result[Str] {
+proc generate_header(tokens: Map[Int]) -> Result[Str] {
   let defines = generate_token_defines(tokens)?
 
   f"""#ifndef XSH_YY_TAB_H
@@ -246,7 +246,7 @@ int yyparse(void);
 """
 }
 
-proc extract_union_body(decls: Str) [error] -> Result[Str] {
+proc extract_union_body(decls: Str) -> Result[Str] {
   let parts = decls.split("%union")
 
   return "int token;" when parts.len() < 2
@@ -303,7 +303,7 @@ proc token_enum_lines(names: List[Str]) [error] -> Result[List[Str]] {
   lines
 }
 
-proc generate_linux_header(decls: Str, tokens: Map[Int]) [error] -> Result[Str] {
+proc generate_linux_header(decls: Str, tokens: Map[Int]) -> Result[Str] {
   let _ = tokens
   let names = parse_token_names(decls)?
   let enum_body = token_enum_lines(names)?.join("\n")
@@ -380,7 +380,7 @@ pure is_dtc_parser(decls: Str) -> Bool {
   "\"dtc.h\"" in decls
 }
 
-proc generate_kconfig_stub_c(output: Str, prologue: Str, epilogue: Str) [error] -> Result[Str] {
+proc generate_kconfig_stub_c(output: Str, prologue: Str, epilogue: Str) -> Result[Str] {
   let header = output_header_name(output)?
 
   f"""{prologue}
@@ -848,7 +848,7 @@ int yyparse(void)
 """
 }
 
-proc generate_dtc_stub_c(output: Str, decls: Str, prologue: Str, epilogue: Str) [error] -> Result[Str] {
+proc generate_dtc_stub_c(output: Str, decls: Str, prologue: Str, epilogue: Str) -> Result[Str] {
   let header = output_header_name(output)?
 
   let location_global = if has_locations(decls) {
@@ -1067,7 +1067,7 @@ int yyparse(void)
 """
 }
 
-proc generate_linux_stub_c(output: Str, decls: Str, prologue: Str, epilogue: Str) [error] -> Result[Str] {
+proc generate_linux_stub_c(output: Str, decls: Str, prologue: Str, epilogue: Str) -> Result[Str] {
   if is_kconfig_parser(decls) {
     return generate_kconfig_stub_c(output, prologue, epilogue)?
   }
@@ -1118,7 +1118,7 @@ proc generate_int_array(name: Str, values: List[Str]) [error] -> Result[Str] {
   f"static const int {name}[] = {{ {body} }};"
 }
 
-proc rule_lhs_values(rules: List[GrammarRule], names: List[Str]) [error] -> Result[List[Str]] {
+proc rule_lhs_values(rules: List[GrammarRule], names: List[Str]) -> Result[List[Str]] {
   [f"{index_of(names, rule.lhs)}" for rule in rules]
 }
 
@@ -1138,7 +1138,7 @@ proc rule_rhs_len_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] 
   [f"{rule.rhs.len()}" for rule in rules]
 }
 
-proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) [error] -> Result[List[Str]] {
+proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) -> Result[List[Str]] {
   var values = []
 
   for rule in rules {
@@ -1156,7 +1156,7 @@ proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: 
   values
 }
 
-proc generate_rule_tables(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) [error] -> Result[Str] {
+proc generate_rule_tables(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) -> Result[Str] {
   let lhs = rule_lhs_values(rules, names)? |> generate_int_array("yy_rule_lhs", _)?
   let rhs_start = rule_rhs_start_values(rules)? |> generate_int_array("yy_rule_rhs_start", _)?
   let rhs_len = rule_rhs_len_values(rules)? |> generate_int_array("yy_rule_rhs_len", _)?
@@ -1187,7 +1187,7 @@ proc generate_c(
   start: Str,
   prologue: Str,
   epilogue: Str,
-) [error] -> Result[Str] {
+) -> Result[Str] {
   let names = nonterminals(rules)?
   let defines = generate_token_defines(tokens)?
   let tables = generate_rule_tables(rules, names, tokens)?
@@ -1408,7 +1408,7 @@ Options:
 """)
 }
 
-proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
+proc parse_options(argv: List[Str]) -> Result[YaccOptions] {
   var input = ""
   var output = "y.tab.c"
   var defines = false

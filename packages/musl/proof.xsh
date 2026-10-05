@@ -2,7 +2,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc ensure(condition: Bool, kind: Str, message: Str) [error] {
+proc ensure(condition: Bool, kind: Str, message: Str) {
   if ! condition {
     Err(ScriptError.Failed(kind:, message:))?
   }
@@ -22,13 +22,13 @@ pure elf_machine_name(arch: Str) -> Str {
   arch
 }
 
-proc build_root_path() [env, error] -> Result[Path] {
+proc build_root_path() -> Result[Path] {
   let build_root_value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
   ensure(build_root_value != "", "proof-musl", "XSH_PM_BUILD_ROOT is required for native-cross proof")
   fp"{build_root_value}"
 }
 
-proc cross_cc(default_cc: Path, build_arch: Str, target_arch: Str) [env, error] -> Result[Path] {
+proc cross_cc(default_cc: Path, build_arch: Str, target_arch: Str) -> Result[Path] {
   return default_cc when build_arch == target_arch
 
   let build_root = build_root_path()?
@@ -44,7 +44,7 @@ proc compile_hello(
   dynlinker: Path,
   build_arch: Str,
   target_arch: Str,
-) [process, env, error] {
+) {
   let include_dir = fp"{rootfs}/usr/include"
   let lib_dir = fp"{rootfs}/usr/lib"
 

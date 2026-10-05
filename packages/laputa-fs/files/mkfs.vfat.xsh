@@ -6,7 +6,7 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
   (value + divisor - 1) / divisor
 }
 
-proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
+proc repeated_byte(value: Int, count: Int) -> Result[Bytes] {
   var items = []
   var index = 0
 
@@ -18,7 +18,7 @@ proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
   bytes.from_ints(items)?
 }
 
-proc fixed_text(text: Str, width: Int) [error] -> Result[Bytes] {
+proc fixed_text(text: Str, width: Int) -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
   return raw.slice(offset: 0, length: width) when raw.len() >= width
@@ -57,7 +57,7 @@ proc fat16_sectors(sectors: Int, spc: Int, reserved: Int, fats: Int, root_dir_se
   fat_sectors
 }
 
-proc boot_sector(label: Str, sectors: Int, spc: Int, fat_sectors: Int, serial: Int) [error] -> Result[Bytes] {
+proc boot_sector(label: Str, sectors: Int, spc: Int, fat_sectors: Int, serial: Int) -> Result[Bytes] {
   let total16 = if sectors <= 65535 { sectors } else { 0 }
   let total32 = if sectors > 65535 { sectors } else { 0 }
 
@@ -88,7 +88,7 @@ proc boot_sector(label: Str, sectors: Int, spc: Int, fat_sectors: Int, serial: I
   boot
 }
 
-proc image_size(image: Path) [fs, error] -> Result[Int] {
+proc image_size(image: Path) -> Result[Int] {
   let size = image.metadata()?.size
 
   return size when size > 0
@@ -102,7 +102,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
   size
 }
 
-proc format_fat16(image: Path, label: Str) [fs, error] {
+proc format_fat16(image: Path, label: Str) {
   let size = image_size(image)?
 
   if size < 2MiB {

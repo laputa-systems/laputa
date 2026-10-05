@@ -15,7 +15,7 @@ pure seed_usage() -> Str {
 
 type SeedArgs = {command: Str, arch: Str, xsh_root: Str, jobs: Int, suites: List[Str]}
 
-proc parse_seed_args(argv: List[Str]) [error] -> Result[SeedArgs] {
+proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
   if argv.len() == 0 or argv[0] not in ["fetch", "build", "smoke"] {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }

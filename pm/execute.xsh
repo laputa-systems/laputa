@@ -34,7 +34,7 @@ proc execute_load_package(
   plan_value: types.BuildPlan,
   node: types.PlanNode,
   repo_root: Path,
-) [fs, env, error] -> Result[types.Package] {
+) -> Result[types.Package] {
   let relative = util.ensure_relative_path(node.recipe_dir, f"plan recipe directory for {node.name}")?
   let pkg = recipe.load_package_for_target(fp"{repo_root}/{relative}", plan_value.target)?
 
@@ -71,7 +71,7 @@ proc execute_require_receipt(
   }
 }
 
-proc execute_receipt(context: ExecuteContext, key: Str) [fs, error] -> Result[types.ArtifactReceipt] {
+proc execute_receipt(context: ExecuteContext, key: Str) -> Result[types.ArtifactReceipt] {
   return context.published.get(key)? when key in context.published
 
   store.lookup(context.store_root, key)
@@ -80,7 +80,7 @@ proc execute_receipt(context: ExecuteContext, key: Str) [fs, error] -> Result[ty
 proc execute_receipt_closure(
   context: ExecuteContext,
   keys: List[Str],
-) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+) -> Result[List[types.ArtifactReceipt]] {
   var pending = keys |> sort
   var index = 0
   var seen: Map[Bool] = {}
@@ -111,7 +111,7 @@ proc execute_receipt_closure(
 # ownership conflicts from metadata, so each payload is extracted once,
 # straight into the root. Payload archives share top-level directories such
 # as `usr`, so extraction merges into what earlier payloads created.
-proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) [fs, error] {
+proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) {
   let root_plan = pm_root.trusted_preflight(target, artifacts)?
   let payload_keys = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
   fs.mkdir(root)
@@ -129,7 +129,7 @@ proc execute_stage_local(
   pkg: types.Package,
   build_root: Path,
   work: Path,
-) [fs, net, process, env, time, error] -> Result[types.StagedArtifact] {
+) -> Result[types.StagedArtifact] {
   let executor = context.executor
 
   if executor == null {
@@ -189,7 +189,7 @@ proc execute_stage_local(
   }
 }
 
-proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload_sha256: Str, proof: Path) [fs, error] {
+proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload_sha256: Str, proof: Path) {
   pm_proof.verify_artifact_receipt(proof, node, payload_sha256)
   let cached = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
   fs.mkdir(cached.parent)
@@ -219,7 +219,7 @@ proc execute_run_proof(
   payload: Path,
   payload_sha256: Str,
   proof: Path,
-) [fs, process, env, error] {
+) {
   # Metapackages select an already-proved dependency closure. They own neither
   # a payload archive nor a proof program, but still receive an immutable proof
   # receipt that binds this exact selector node to its opaque Store marker.
@@ -252,7 +252,7 @@ proc execute_run_proof(
 proc execute_build_local(
   context: ExecuteContext,
   node: types.PlanNode,
-) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
@@ -286,7 +286,7 @@ proc execute_build_local(
 proc execute_existing_local(
   context: ExecuteContext,
   node: types.PlanNode,
-) [fs, process, env, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   let receipt = store.lookup(context.store_root, node.artifact_key)?
   execute_require_receipt(context.plan, node, receipt)
 
@@ -312,7 +312,7 @@ proc execute_existing_local(
 proc execute_remote_node(
   context: ExecuteContext,
   node: types.PlanNode,
-) [fs, net, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   guard node.remote != null else {
     return Err(
       types.PmError.PackageContract(f"remote plan node {node.package_id} has no immutable retrieval coordinates"),
@@ -331,7 +331,7 @@ proc execute_remote_node(
 proc execute_node(
   context: ExecuteContext,
   node: types.PlanNode,
-) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   if fs.exists(store.artifact_path(context.store_root, node.artifact_key))? {
     return execute_existing_local(context, node)
   }
@@ -358,7 +358,7 @@ type FinishedNode = {name: Str, seconds: Int, log: Path}
 
 # The last lines of a failed node's log: the cause, without the rest of a
 # build that can run to tens of thousands of lines.
-proc execute_log_tail(log: Path, count: Int) [fs, error] -> Result[Str] {
+proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
   return "" unless fs.exists(log)?
 
   let lines = log.read_lines()?
@@ -368,7 +368,7 @@ proc execute_log_tail(log: Path, count: Int) [fs, error] -> Result[Str] {
 
 # The `error:` lines of a failed node's log, which name the cause above the
 # runtime traceback; the plain tail when there are none.
-proc execute_log_errors(log: Path) [fs, error] -> Result[Str] {
+proc execute_log_errors(log: Path) -> Result[Str] {
   return "" unless fs.exists(log)?
 
   let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
@@ -379,7 +379,7 @@ proc execute_log_errors(log: Path) [fs, error] -> Result[Str] {
   errors[first..].join("\n")
 }
 
-proc execute_report_slowest(finished: List[FinishedNode]) [] {
+proc execute_report_slowest(finished: List[FinishedNode]) {
   return when finished.len() == 0
 
   let ascending = finished |> sort-by .seconds |> collect
@@ -405,7 +405,7 @@ proc execute_scheduled(
   plan_path: Path,
   logs: Path,
   jobs: Int,
-) [fs, net, process, env, time, error] -> Result[Map[types.ArtifactReceipt]] {
+) -> Result[Map[types.ArtifactReceipt]] {
   let pm_root = pm_build.pm_source_root()?
   let xsh = process.which("xsh")?
   var done: Map[types.ArtifactReceipt] = {}
@@ -550,7 +550,7 @@ export proc build_plan_node(
 
 # Executor provenance hashes the XSH runners and the PM tree, so compute it only
 # when some node will actually build.
-proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) [fs, error] -> Result[Bool] {
+proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) -> Result[Bool] {
   for node in plan_value.nodes {
     if types.plan_action_is_build(node.action) and ! fs.exists(store.artifact_path(store_root, node.artifact_key))? {
       return true

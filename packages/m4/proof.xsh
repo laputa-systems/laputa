@@ -100,7 +100,7 @@ wrapped
 later
 """
 
-proc expect_text(label: Str, actual: Str, expected: Str) [error] {
+proc expect_text(label: Str, actual: Str, expected: Str) {
   if actual != expected {
     return Err(ScriptError.Failed(kind: "proof-m4", message: f"{label}: output differs from GNU m4\n--- expected\n{expected}--- actual\n{actual}"))?
   }

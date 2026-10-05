@@ -8,12 +8,12 @@ const no_failures = rx"(?m)^Failed tests *: 0$"
 
 const counted_task_clock = rx"(?m)^[0-9.]+,msec,task-clock"
 
-proc recorded_version(rootfs: Path) [fs, error] -> Result[Str] {
+proc recorded_version(rootfs: Path) -> Result[Str] {
   let metadata = json.read(fp"{rootfs}/var/lib/xsh-pm/packages/perf/metadata.json")?.require(Record)?
   metadata.get("ver")?.require(Str)
 }
 
-proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
+proc prove_perf(loader: Path, perf: Path, ver: Str) {
   let version = (run.text $loader $perf "--version" ?).trim()
   proof.ensure(version == f"perf version {ver}", "perf-version", f"perf --version printed '{version}'")
 

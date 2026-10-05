@@ -268,7 +268,7 @@ test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
 # derived input under `.out/` that only `make seed` produces. Plan a disposable
 # root that shares the checked-in recipes and repository inputs and holds a
 # fixture seed instead.
-proc repository_with_fixture_seed(ctx: TestContext) [fs, error] -> Result[Path] {
+proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name: "repository-with-seed")?
 

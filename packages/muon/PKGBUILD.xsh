@@ -47,7 +47,7 @@ error MuonError = Patch(message: Str)
 # path link records the build root's path as DT_NEEDED and the result loads
 # nowhere else. Like Meson, link such a library by name unless a static one
 # was asked for.
-proc patch_system_library_links() [fs, error] {
+proc patch_system_library_links() {
   let compiler = p"src/functions/compiler.c"
   let text = fs.read_text(compiler)?
   let lookup = """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {

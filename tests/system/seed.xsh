@@ -45,7 +45,7 @@ test test_seed_core_layout_matches_xsh_release_packaging [error] {
   assert xsh_seed.xsh_seed_core_install_path(p"lib/auth.xsh") == p"core/lib/auth.xsh"
 }
 
-proc write_seed(ctx: TestContext) [fs, error] -> Result[Path] {
+proc write_seed(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "seed-root")?
   let seed = xsh_seed.xsh_seed_dir(root, "aarch64")
   fs.mkdir(fp"{seed}/core")
@@ -98,7 +98,7 @@ test test_seed_mounts_binaries_and_core_from_one_directory [error] {
   ]
 }
 
-proc image_fixture(ctx: TestContext) [fs, error] -> Result[Path] {
+proc image_fixture(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "images")?
   fs.mkdir(fp"{root}/seed")
   fs.mkdir(fp"{root}/pm")

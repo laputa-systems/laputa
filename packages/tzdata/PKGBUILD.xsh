@@ -90,7 +90,7 @@ const table_files = [
 
 # The Makefile's `version.h` and `tzdir.h` rules, with the release version
 # and the default TZDIR and TZDEFAULT.
-proc write_zic_headers() [fs, error] {
+proc write_zic_headers() {
   fs.write(
     p"tzcode/version.h",
     f"""static char const PKGVERSION[]="(tzcode) ";

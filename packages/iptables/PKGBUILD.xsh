@@ -189,7 +189,7 @@ proc write_xtables_version_h() [fs, error] {
 
 # extensions/GNUmakefile.in builds every extensions/<prefix><module>.c it finds
 # (a sorted wildcard) except the blacklisted modules.
-proc extension_modules(prefix: Str) [fs, error] -> Result[List[Str]] {
+proc extension_modules(prefix: Str) -> Result[List[Str]] {
   var modules = []
 
   for entry in fs.children(p"extensions")? |> sort-by .name {

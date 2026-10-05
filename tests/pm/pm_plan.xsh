@@ -11,19 +11,19 @@ pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
 }
 
-proc copied_package(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.Package] {
+proc copied_package(ctx: TestContext, name: Str) -> Result[types.Package] {
   let dir = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("fingerprint-package"), dir, parents: true, overwrite: true)?
   recipe.load_package(dir)?
 }
 
-proc copied_executor(ctx: TestContext) [fs, error] -> Result[Path] {
+proc copied_executor(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "fingerprint-executor")?
   let _ = fs.copy_tree(fixture("fingerprint-executor"), root, parents: true, overwrite: true)?
   root
 }
 
-proc build_input(pkg: types.Package) [fs, error] -> Result[Str] {
+proc build_input(pkg: types.Package) -> Result[Str] {
   fingerprint.package_build_input(p".", pkg, types.Aarch64LinuxMusl)?
 }
 
@@ -159,7 +159,7 @@ proc copied_plan_repository(ctx: TestContext, name: Str) [fs, env, error] -> Res
   root
 }
 
-proc plan_catalog(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.PackageCatalog] {
+proc plan_catalog(ctx: TestContext, name: Str) -> Result[types.PackageCatalog] {
   catalog.load(copied_plan_repository(ctx, name)?)?
 }
 
@@ -167,7 +167,7 @@ proc resolve_plan(
   value: types.PackageCatalog,
   roots: List[Str],
   snapshot: types.RemoteSnapshot,
-) [fs, error] -> Result[types.BuildPlan] {
+) -> Result[types.BuildPlan] {
   plan.resolve(value, snapshot, policy.aarch64_docker(), roots, false)?
 }
 
@@ -229,7 +229,7 @@ pure snapshot_replace(
   {...value, packages: [if item.name == name { replacement } else { item } for item in value.packages]}
 }
 
-proc expect_plan_rejection(ctx: TestContext, value: types.BuildPlan, expected: Str) [fs, error] {
+proc expect_plan_rejection(ctx: TestContext, value: types.BuildPlan, expected: Str) {
   let path_value = fp"{test.temp_dir(ctx, name: "invalid-plan")?}/plan.json"
   plan_json.write_plan(path_value, value)
   let raw = json.read(path_value)?.require(plan_json.BuildPlanDto)?
@@ -327,11 +327,11 @@ test test_build_plan_reports_tuple_reasons_and_rejects_behind_remote [fs, env, e
   }
 }
 
-proc with_release(value: types.PackageCatalog, name: Str, rel: Str) [error] -> Result[types.PackageCatalog] {
+proc with_release(value: types.PackageCatalog, name: Str, rel: Str) -> Result[types.PackageCatalog] {
   catalog.from_packages(value.root, [if pkg.name == name { {...pkg, rel} } else { pkg } for pkg in value.packages])?
 }
 
-proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) [error] -> Result[List[Str]] {
+proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) -> Result[List[Str]] {
   var changed = [
     node.name
     for node in before.nodes
@@ -496,7 +496,7 @@ test test_build_plan_normalizes_target_aliases_and_rejects_reserved_target [fs, 
   }
 }
 
-proc write_plan_metapackage(root: Path, name: Str, dependencies: Str) [fs, error] {
+proc write_plan_metapackage(root: Path, name: Str, dependencies: Str) {
   let dir = fp"{root}/packages/{name}"
   fs.mkdir(dir)
   let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
@@ -524,7 +524,7 @@ export let filetree = []
 
 # `service` runtime-only depends on `app`, whose build inputs are host-tool,
 # runtime-lib, and target-sdk; `consumer` builds against `service`.
-proc runtime_only_plan_catalog(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.PackageCatalog] {
+proc runtime_only_plan_catalog(ctx: TestContext, name: Str) -> Result[types.PackageCatalog] {
   let root = copied_plan_repository(ctx, name)?
   write_plan_metapackage(root, "service", "export let deps = []\nexport let runtime_only_deps = [\"app\"]")
   write_plan_metapackage(root, "consumer", "export let deps = [\"service\"]")

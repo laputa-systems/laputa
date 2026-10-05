@@ -55,7 +55,7 @@ export const upstream_sources = [
 ## Exported declaration `filetree`.
 export const filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
 
-proc sysroot_path(root: Str, raw: Str) [fs, error] -> Result[Path] {
+proc sysroot_path(root: Str, raw: Str) -> Result[Path] {
   let path_value = fp"{raw.trim()}"
 
   return path_value when fs.exists(path_value)?
@@ -65,17 +65,17 @@ proc sysroot_path(root: Str, raw: Str) [fs, error] -> Result[Path] {
   path_value
 }
 
-proc pkg_config_flags(pkg_config: Path, mode: Str, packages: List[Str]) [process, error] -> Result[List[Str]] {
+proc pkg_config_flags(pkg_config: Path, mode: Str, packages: List[Str]) -> Result[List[Str]] {
   let out = run.text $pkg_config $mode @packages ?
   out.words()
 }
 
-proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) [process, error] -> Result[Str] {
+proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) -> Result[Str] {
   let out = run.text $pkg_config f"--variable={variable}" $package ?
   out.trim()
 }
 
-proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) [fs, process, error] {
+proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) {
   let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
   run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h" ?
   run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" "ext-image-copy-capture-v1-protocol.h" ?
@@ -85,7 +85,7 @@ proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) [fs, 
   run $scanner "server-header" fp"{protocols}/stable/xdg-shell/xdg-shell.xml" "xdg-shell-protocol.h" ?
 }
 
-proc patch_startup() [fs, error] {
+proc patch_startup() {
   let source = p"dwl.c"
   var text = source.read_text()?
 
@@ -217,7 +217,7 @@ pure replace_required(text: Str, old: Str, new: Str, what: Str) -> Result[Str] {
 # example scroll bindings that use it. dwl skips axis bindings without a
 # function, so one empty entry keeps the array nonempty without binding a
 # scroll direction.
-proc write_config() [fs, error] {
+proc write_config() {
   var config = p"config.def.h".read_text()?
 
   config = replace_required(

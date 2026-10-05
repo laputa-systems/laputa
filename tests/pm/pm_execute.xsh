@@ -26,12 +26,12 @@ proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
   root
 }
 
-proc resolve_execute_plan_for_roots(repo_root: Path, roots: List[Str]) [fs, env, error] -> Result[types.BuildPlan] {
+proc resolve_execute_plan_for_roots(repo_root: Path, roots: List[Str]) -> Result[types.BuildPlan] {
   let value = catalog.load(repo_root)?
   plan.resolve(value, empty_remote_snapshot(), policy.aarch64_docker(), roots, false)?
 }
 
-proc resolve_execute_plan(repo_root: Path) [fs, env, error] -> Result[types.BuildPlan] {
+proc resolve_execute_plan(repo_root: Path) -> Result[types.BuildPlan] {
   resolve_execute_plan_for_roots(repo_root, ["execute-app"])?
 }
 
@@ -55,7 +55,7 @@ proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   test.temp_dir(ctx, name:)
 }
 
-proc write_execute_metapackage(repo_root: Path) [fs, error] {
+proc write_execute_metapackage(repo_root: Path) {
   let package = fp"{repo_root}/packages/execute-meta"
   fs.mkdir(package)
   fs.write(
@@ -83,7 +83,7 @@ export let filetree = []
   )
 }
 
-proc write_execute_leaf(repo_root: Path) [fs, error] {
+proc write_execute_leaf(repo_root: Path) {
   let package = fp"{repo_root}/packages/execute-leaf"
   fs.mkdir(package)
   fs.write(
@@ -133,7 +133,7 @@ main(@args)?
 
 # `execute-service` runtime-only depends on `execute-dep`; its build fails if
 # that dependency's payload reached its build root.
-proc write_execute_service(repo_root: Path) [fs, error] {
+proc write_execute_service(repo_root: Path) {
   let package = fp"{repo_root}/packages/execute-service"
   fs.mkdir(package)
   fs.write(
@@ -193,7 +193,7 @@ proc exact_remote_snapshot(
   value: types.BuildPlan,
   result: types.BuildResult,
   remote_root: Path,
-) [fs, error] -> Result[types.RemoteSnapshot] {
+) -> Result[types.RemoteSnapshot] {
   var packages: List[types.RemotePlanArtifact] = []
 
   for node in value.nodes {
@@ -555,7 +555,7 @@ type TraceSpanDto = {file: Str}
 type TraceEventDto = {kind: Str, name: Str?, source_span: TraceSpanDto?}
 
 # Counts `hash.sha256` calls per PM module in a JSONL trace.
-proc sha256_calls_by_module(trace: Path) [fs, error] -> Result[Map[Int]] {
+proc sha256_calls_by_module(trace: Path) -> Result[Map[Int]] {
   var counts: Map[Int] = {}
 
   for line in fs.read_text(trace)?.split("\n") {

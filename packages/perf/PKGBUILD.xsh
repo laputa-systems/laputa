@@ -298,7 +298,7 @@ type HeaderSet = {src: Str, dest: Str, names: List[Str]}
 # nested `ld -r` objects and --whole-archive libraries; linking them directly
 # is equivalent. The dlfilter examples, the shell scripts (perf-archive,
 # perf-iostat, tests/shell), and the documentation are not built.
-proc perf_sources() [] -> List[Str] {
+proc perf_sources() -> List[Str] {
   """
 perf.c builtin-annotate.c builtin-bench.c builtin-buildid-cache.c
 builtin-buildid-list.c builtin-c2c.c builtin-check.c builtin-config.c
@@ -457,7 +457,7 @@ arch/arm64/util/tsc.c
   Err(PerfBuildError.UnsupportedArch(f"perf has no object list for {target}"))
 }
 
-proc library_headers() [] -> List[HeaderSet] {
+proc library_headers() -> List[HeaderSet] {
   [
     {
       src: "tools/lib/api",
@@ -630,7 +630,7 @@ pure unit_cflags(obj: Str) -> List[Str] {
 
 # PERF-VERSION-GEN outside a git checkout writes the top Makefile's
 # `kernelversion`: VERSION.PATCHLEVEL.SUBLEVEL followed by EXTRAVERSION.
-proc write_perf_version_file() [fs, error] {
+proc write_perf_version_file() {
   var fields: Map[Str] = {}
 
   for line in p"Makefile".read_text()?.lines() {
@@ -653,7 +653,7 @@ proc write_perf_version_file() [fs, error] {
   fs.write(fp"{out}/PERF-VERSION-FILE", f"#define PERF_VERSION \"{release}\"\n")
 }
 
-proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[Str]) [] -> List[make.MakeTask] {
+proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[Str]) -> List[make.MakeTask] {
   [
     make.compile_c_task(
       cc,
@@ -667,7 +667,7 @@ proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[St
   ]
 }
 
-proc install_library_headers() [fs, error] {
+proc install_library_headers() {
   for headers in library_headers() {
     for header in headers.names {
       fs.install(fp"{headers.src}/{header}", fp"{out}/{headers.dest}/{header}", 0o644, parents: true, overwrite: true)
@@ -675,7 +675,7 @@ proc install_library_headers() [fs, error] {
   }
 }
 
-proc build_perf(cc: Path) [fs, process, env, error] -> Result[Path] {
+proc build_perf(cc: Path) -> Result[Path] {
   let target = pm_util.target_arch()?
   let arch = perf_arch(target)?
   let a = arch.srcarch

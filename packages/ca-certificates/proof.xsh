@@ -7,7 +7,7 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   }
 }
 
-proc verify_package_metadata(rootfs: Path) [fs, error] {
+proc verify_package_metadata(rootfs: Path) {
   let metadata_path = fp"{rootfs}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
   ensure(fs.exists(metadata_path)?, "ca-certificates-metadata", "missing package metadata")
   let metadata = json.read(metadata_path)?.require(Record)?

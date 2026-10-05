@@ -199,7 +199,7 @@ error BisonBuildError = Failed(kind: Str, message: Str)
 # with an empty or partial parser. A failed m4 is made a fatal error so a
 # broken skeleton expansion cannot pass silently. m4 failures that bison
 # expects (`b4_fatal`) end bison through `@fatal` before this wait.
-proc fail_on_m4_status() [fs, error] {
+proc fail_on_m4_status() {
   let output_c = p"src/output.c"
   let text = output_c.read_text()?
   let wait_call = """  wait_subprocess (pid, "m4", false, false, true, true, NULL);
@@ -216,7 +216,7 @@ proc fail_on_m4_status() [fs, error] {
   fs.write(output_c, text.replace(wait_call, checked_wait))
 }
 
-proc install_data_tree(src: Path, dest: Path) [fs, error] {
+proc install_data_tree(src: Path, dest: Path) {
   for e in fs.children(src)? {
     if e.kind == "dir" {
       install_data_tree(e.path, fp"{dest}/{e.name}")

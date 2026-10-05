@@ -132,7 +132,7 @@ pure gen_bits_template(text: Str, bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bf
     .replace("@BFMT@", bfmt)
 }
 
-proc read_sysdeps(path_value: Path) [fs, error] -> Result[Map[Str]] {
+proc read_sysdeps(path_value: Path) -> Result[Map[Str]] {
   var sysdeps: Map[Str] = {}
 
   for line in path_value.read_text()?.split("\n") {
@@ -146,7 +146,7 @@ proc read_sysdeps(path_value: Path) [fs, error] -> Result[Map[Str]] {
   sysdeps
 }
 
-proc write_skalibs_sysdeps(target: Str) [fs, error] {
+proc write_skalibs_sysdeps(target: Str) {
   let sysdeps = p"skalibs/sysdeps.cfg"
   fs.mkdir(sysdeps)
 
@@ -277,7 +277,7 @@ proc write_skalibs_config() [fs, error] {
   )
 }
 
-proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
+proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) {
   let _ = sysdeps
 
   var lines = [
@@ -331,7 +331,7 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
   fs.write(p"skalibs/src/include/skalibs/sysdeps.h", lines.join("\n"))
 }
 
-proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sysdeps: Map[Str]) [fs, error] {
+proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sysdeps: Map[Str]) {
   var parts = []
   parts += [gen_types_internal(p"skalibs/src/headers/bits-header".read_text()?, "", "", bits)]
 
@@ -362,7 +362,7 @@ proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sy
   fs.write(fp"skalibs/src/include/skalibs/uint{bits}.h", parts.join(""))
 }
 
-proc sysdep_bits(sysdeps: Map[Str], type_name: Str) [error] -> Result[Int] {
+proc sysdep_bits(sysdeps: Map[Str], type_name: Str) -> Result[Int] {
   sysdeps.get(f"sizeof{type_name}")?.parse_int()? * 8
 }
 
@@ -372,11 +372,11 @@ proc append_type_template(
   type_name: Str,
   type_caps: Str,
   bits: Int,
-) [fs, error] -> Result[List[Str]] {
+) -> Result[List[Str]] {
   parts.push(gen_types_internal(header_template.read_text()?, type_name, type_caps, bits))
 }
 
-proc write_types_h(sysdeps: Map[Str]) [fs, error] {
+proc write_types_h(sysdeps: Map[Str]) {
   var parts = [p"skalibs/src/headers/types-header".read_text()?]
 
   for type_name in ["short", "int", "long"] {
@@ -409,7 +409,7 @@ proc write_types_h(sysdeps: Map[Str]) [fs, error] {
   fs.write(p"skalibs/src/include/skalibs/types.h", parts.join(""))
 }
 
-proc generate_skalibs_headers(target: Str) [fs, error] {
+proc generate_skalibs_headers(target: Str) {
   let sysdeps = read_sysdeps(p"skalibs/sysdeps.cfg/sysdeps")?
   write_sysdeps_h(target, sysdeps)
   write_uint_header(64, "21", "25", "17", "65", sysdeps)
@@ -441,7 +441,7 @@ proc write_mdevd_config() [fs, error] {
   )
 }
 
-proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, error] -> Result[Path] {
+proc compile_skalibs(cc: Path, triple: Str, target: Str) -> Result[Path] {
   write_skalibs_sysdeps(target)
   write_skalibs_config()
   generate_skalibs_headers(target)

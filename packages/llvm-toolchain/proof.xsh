@@ -2,7 +2,7 @@ use pm.util as pm_util
 
 error ProofError = Failed(kind: Str, message: Str)
 
-proc ensure(condition: Bool, kind: Str, message: Str) [error] {
+proc ensure(condition: Bool, kind: Str, message: Str) {
   if ! condition {
     Err(ProofError.Failed(kind:, message:))?
   }
@@ -16,13 +16,13 @@ pure elf_machine_name(arch: Str) -> Str {
   arch
 }
 
-proc build_root_path() [env, error] -> Result[Path] {
+proc build_root_path() -> Result[Path] {
   let build_root_value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
   ensure(build_root_value != "", "proof-llvm-toolchain", "XSH_PM_BUILD_ROOT is required for native-cross proof")
   fp"{build_root_value}"
 }
 
-proc proof_readelf_path(root: Path) [fs, env, error] -> Result[Path] {
+proc proof_readelf_path(root: Path) -> Result[Path] {
   let target_readelf = fp"{root}/usr/bin/readelf"
 
   return target_readelf when fs.exists(target_readelf)?
@@ -31,11 +31,11 @@ proc proof_readelf_path(root: Path) [fs, env, error] -> Result[Path] {
   fp"{build_root}/usr/bin/readelf"
 }
 
-proc ensure_file(path_value: Path, label: Str) [fs, error] {
+proc ensure_file(path_value: Path, label: Str) {
   ensure(fs.exists(path_value)?, "proof-llvm-toolchain", f"missing {label}: {path_value}")
 }
 
-proc ensure_executable(path_value: Path, label: Str) [fs, error] {
+proc ensure_executable(path_value: Path, label: Str) {
   ensure_file(path_value, label)
   let mode = fs.metadata(path_value)?.mode % 4096
 
@@ -46,7 +46,7 @@ proc ensure_executable(path_value: Path, label: Str) [fs, error] {
   )
 }
 
-proc ensure_xsh_wrapper(path_value: Path, label: Str) [fs, error] {
+proc ensure_xsh_wrapper(path_value: Path, label: Str) {
   ensure_file(path_value, label)
   let text = fs.read_text(path_value)?
   ensure(text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", f"{label} is not an XSH wrapper")
@@ -54,7 +54,7 @@ proc ensure_xsh_wrapper(path_value: Path, label: Str) [fs, error] {
   ensure(! ("libstdc++" in text), "proof-llvm-toolchain", f"{label} mentions libstdc++")
 }
 
-proc prove_tool_linkage(readelf: Path, tool: Path) [fs, process, error] {
+proc prove_tool_linkage(readelf: Path, tool: Path) {
   ensure_executable(tool, tool.name)
   let program_headers = run.text $readelf "-l" $tool ?
   ensure(! ("ld-linux" in program_headers), "proof-llvm-toolchain", f"{tool} uses a glibc interpreter")
@@ -69,7 +69,7 @@ proc prove_tool_linkage(readelf: Path, tool: Path) [fs, process, error] {
   ensure(! ("libstdc++" in dynamic), "proof-llvm-toolchain", f"{tool} needs libstdc++")
 }
 
-proc prove_public_surface(root: Path, arch: Str) [fs, process, env, error] {
+proc prove_public_surface(root: Path, arch: Str) {
   let readelf = proof_readelf_path(root)?
   let bin = fp"{root}/usr/lib/llvm23/bin"
 
@@ -187,7 +187,7 @@ int main(void) {
   }
 }
 
-proc prove_x86_64_v3(root: Path) [fs, process, error] {
+proc prove_x86_64_v3(root: Path) {
   let cc = process.which("cc")?
   let objdump = process.which("llvm-objdump")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-v3" {
@@ -215,7 +215,7 @@ void laputa_v3_toy(const unsigned long long *a, const unsigned long long *b, uns
   }
 }
 
-proc prove_explicit_aarch64_target(root: Path) [fs, process, error] {
+proc prove_explicit_aarch64_target(root: Path) {
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-aarch64" {
@@ -235,7 +235,7 @@ proc prove_explicit_aarch64_target(root: Path) [fs, process, error] {
   }
 }
 
-proc prove_target_tools(root: Path, arch: Str) [fs, process, env, error] {
+proc prove_target_tools(root: Path, arch: Str) {
   let readelf = proof_readelf_path(root)?
   let machine = elf_machine_name(arch)
   let cc = fp"{root}/usr/bin/cc"

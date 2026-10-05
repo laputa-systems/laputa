@@ -1,7 +1,7 @@
 #!/bin/xsh
 use installer.host
 
-proc parse_size(value: Str) [error] -> Result[Int] {
+proc parse_size(value: Str) -> Result[Int] {
   let trimmed = value.trim()
 
   if trimmed.ends_with("G") {
@@ -15,7 +15,7 @@ proc parse_size(value: Str) [error] -> Result[Int] {
   trimmed.parse_int()?
 }
 
-proc command_path(name: Str) [process, error] -> Result[Path] {
+proc command_path(name: Str) -> Result[Path] {
   return fp"{name}" when "/" in name
 
   process.which(name)?

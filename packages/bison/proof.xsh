@@ -243,7 +243,7 @@ pure grammar_text(file: Str) -> Str {
 # Compile C against the proof root's own musl: the runner's `cc` builds with
 # the root as sysroot and records the root's dynamic linker, so the program
 # exercises the root's libc rather than the runner's. Native targets only.
-proc compile_root_c_program(rootfs: Path, source: Path, output: Path) [process, env, error] {
+proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
@@ -260,7 +260,7 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
   }
 }
 
-proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
+proc prove_grammars(rootfs: Path, bison: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-bison"
   fs.remove(tmp, missing_ok: true)
   fs.mkdir(tmp)

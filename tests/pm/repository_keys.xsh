@@ -12,7 +12,7 @@ const seed_independent = ["dropbear", "laputa-fs", "laputa-net", "laputa-pm", "t
 # The `xsh` recipe hashes the local seed under `.out/`, which only `make seed`
 # produces. Share the checked-in recipes and repository inputs with a
 # disposable root that holds a fixture seed for each target.
-proc repository_with_seeds(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
+proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name:)?
 
@@ -40,22 +40,22 @@ proc plan_for(
   value: types.PackageCatalog,
   target: types.Target,
   roots: List[Str],
-) [fs, error] -> Result[types.BuildPlan] {
+) -> Result[types.BuildPlan] {
   let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
   plan.resolve(value, {target, index_sha256: "repository-keys-empty-remote", packages: []}, policy_value, roots, false)?
 }
 
-proc plan_repository(root: Path, target: types.Target) [fs, env, error] -> Result[types.BuildPlan] {
+proc plan_repository(root: Path, target: types.Target) -> Result[types.BuildPlan] {
   plan_for(catalog.load_for_target(root, target)?, target, ["xsh"].extend(seed_independent))?
 }
 
-proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) [error] -> Result[List[Str]] {
+proc changed_key_names(before: types.BuildPlan, after: types.BuildPlan) -> Result[List[Str]] {
   var keys = {node.name: node.artifact_key for node in after.nodes}
   var changed = [node.name for node in before.nodes if keys.get(node.name)? != node.artifact_key]
   changed |> sort
 }
 
-proc with_release(value: types.PackageCatalog, name: Str, rel: Str) [error] -> Result[types.PackageCatalog] {
+proc with_release(value: types.PackageCatalog, name: Str, rel: Str) -> Result[types.PackageCatalog] {
   catalog.from_packages(value.root, [if pkg.name == name { {...pkg, rel} } else { pkg } for pkg in value.packages])?
 }
 

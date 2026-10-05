@@ -26,7 +26,7 @@ proc copied_generation_repository(ctx: TestContext, name: Str) [fs, env, error] 
   root
 }
 
-proc generation_build_plan(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.BuildPlan] {
+proc generation_build_plan(ctx: TestContext, name: Str) -> Result[types.BuildPlan] {
   let repo_root = copied_generation_repository(ctx, name)?
   plan.resolve(
     catalog.load(repo_root)?,
@@ -37,7 +37,7 @@ proc generation_build_plan(ctx: TestContext, name: Str) [fs, env, error] -> Resu
   )?
 }
 
-proc generation_baselayout_build_plan(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.BuildPlan] {
+proc generation_baselayout_build_plan(ctx: TestContext, name: Str) -> Result[types.BuildPlan] {
   let repo_root = copied_generation_repository(ctx, name)?
   let _ = fs.copy_tree(
     fixture("generation-overlay/baselayout"),
@@ -54,7 +54,7 @@ proc generation_baselayout_build_plan(ctx: TestContext, name: Str) [fs, env, err
   )?
 }
 
-proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_root: Path) [fs, error] {
+proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_root: Path) {
   let executor_sha256 = bytes.from_text("test executor").sha256().hex()
 
   for node in value.nodes {
@@ -96,7 +96,7 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
   }
 }
 
-proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPlan, store_root: Path) [fs, error] {
+proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPlan, store_root: Path) {
   let node = value.nodes[0]
   let executor_sha256 = bytes.from_text("test executor").sha256().hex()
   let stage = test.temp_dir(ctx, name: "generation-stage-baselayout")?
@@ -136,13 +136,13 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
   )?
 }
 
-proc empty_overlay(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
+proc empty_overlay(ctx: TestContext, name: Str) -> Result[Path] {
   let overlay = test.temp_dir(ctx, name:)?
   fs.mkdir(fp"{overlay}/overlay")
   fp"{overlay}/overlay"
 }
 
-proc expect_generation_error(ctx: TestContext, result: Result[types.GenerationReceipt], expected: Str) [error] {
+proc expect_generation_error(ctx: TestContext, result: Result[types.GenerationReceipt], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: generation unexpectedly succeeded")
     Err(problem) => assert expected in problem.message

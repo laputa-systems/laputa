@@ -65,13 +65,13 @@ pure prefix_to_netmask(prefix_len: Int) -> Str {
 # The serial console the QEMU harness reads, and the one the installed
 # system's login runs on: the PL011 UART on aarch64 virt, the 16550 UART on
 # x86_64 pc. The kernel's /dev/console may be tty0 instead.
-proc serial_console_name() [fs, error] -> Result[Str] {
+proc serial_console_name() -> Result[Str] {
   return "ttyAMA0" when fs.exists(/dev/ttyAMA0)?
 
   "ttyS0"
 }
 
-proc write_text(text: Str) [fs, error, io] {
+proc write_text(text: Str) {
   let serial = fp"/dev/{serial_console_name()?}"
 
   if fs.exists(serial)? {
@@ -81,16 +81,16 @@ proc write_text(text: Str) [fs, error, io] {
   }
 }
 
-proc write_stdout_line(line: Str) [fs, error, io] {
+proc write_stdout_line(line: Str) {
   write_text(f"""{line}
 """)
 }
 
-proc usage() [fs, error, io] {
+proc usage() {
   write_stdout_line("usage: setup-laputa [--auto] [--ci] [--disk DEV]")
 }
 
-proc require_file(path_value: Path) [fs, error] {
+proc require_file(path_value: Path) {
   guard fs.exists(path_value)? else {
     return Err(InstallerError.Failed(kind: "missing-file", message: path_value.display()))
   }
@@ -108,12 +108,12 @@ proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
   return Err(InstallerError.Failed(kind: "command-signaled", message: argv[0]))
 }
 
-proc write_file(path_value: Path, body: Str) [fs, error] {
+proc write_file(path_value: Path, body: Str) {
   path_value.parent.mkdir()
   fs.write(path_value, body)
 }
 
-proc normalize_target_ownership(root: Path) [fs, error] {
+proc normalize_target_ownership(root: Path) {
   let root_user = user.by_uid(0)?
   let root_group = group.by_gid(0)?
   fs.chown(root, root_user)
@@ -138,7 +138,7 @@ proc normalize_target_ownership(root: Path) [fs, error] {
   }
 }
 
-proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
+proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
   let public_key_path = fp"{root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
 
   return false unless fs.exists(public_key_path)?
@@ -169,7 +169,7 @@ proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
   true
 }
 
-proc list_disks() [process, error] -> Result[List[Path]] {
+proc list_disks() -> Result[List[Path]] {
   var blank: List[Path] = []
   var partitioned: List[Path] = []
   let devices = linux.block_devices()?
@@ -187,7 +187,7 @@ proc list_disks() [process, error] -> Result[List[Path]] {
   blank.extend(partitioned)
 }
 
-proc print_disks(disks: List[Path]) [fs, error, io] {
+proc print_disks(disks: List[Path]) {
   write_stdout_line("Available disks:")
 
   for disk in disks {
@@ -195,7 +195,7 @@ proc print_disks(disks: List[Path]) [fs, error, io] {
   }
 }
 
-proc disk_has_partitions(disk: Path) [fs, error] -> Result[Bool] {
+proc disk_has_partitions(disk: Path) -> Result[Bool] {
   for entry in fs.children(fp"/sys/block/{disk.name}")? {
     if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(
       fp"/sys/block/{disk.name}/{entry.name}/partition",
@@ -207,7 +207,7 @@ proc disk_has_partitions(disk: Path) [fs, error] -> Result[Bool] {
   false
 }
 
-proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
+proc ci_default_disk(disks: List[Path]) -> Result[Path] {
   for disk in disks {
     guard disk_has_partitions(disk)? else {
       return disk
@@ -227,7 +227,7 @@ proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
   fp"{trimmed}"
 }
 
-proc wait_for(path_value: Path) [fs, time, error] {
+proc wait_for(path_value: Path) {
   var tries = 50
 
   while tries > 0 {
@@ -240,7 +240,7 @@ proc wait_for(path_value: Path) [fs, time, error] {
   return Err(InstallerError.Failed(kind: "device-timeout", message: path_value.display()))
 }
 
-proc installer_network_interfaces() [process, error] -> Result[InstallerNetwork] {
+proc installer_network_interfaces() -> Result[InstallerNetwork] {
   let interfaces = linux.interfaces()?
   let routes = linux.routes()?
   var iface = ""
@@ -277,7 +277,7 @@ proc installer_network_interfaces() [process, error] -> Result[InstallerNetwork]
   {iface, address, netmask, gateway}
 }
 
-proc target_static_interfaces() [process, error] -> Result[Str] {
+proc target_static_interfaces() -> Result[Str] {
   let netcfg = installer_network_interfaces()?
 
   f"""auto lo
@@ -291,7 +291,7 @@ iface {netcfg.iface} inet static
 """
 }
 
-proc target_dhcp_interfaces() [process, error] -> Result[Str] {
+proc target_dhcp_interfaces() -> Result[Str] {
   let netcfg = installer_network_interfaces()?
 
   f"""auto lo
@@ -302,7 +302,7 @@ iface {netcfg.iface} inet dhcp
 """
 }
 
-proc target_interfaces(network_method: Str) [process, error] -> Result[Str] {
+proc target_interfaces(network_method: Str) -> Result[Str] {
   return target_static_interfaces()? when network_method == "static"
 
   target_dhcp_interfaces()?
@@ -311,7 +311,7 @@ proc target_interfaces(network_method: Str) [process, error] -> Result[Str] {
 # Like Alpine setup, ask whether the target should use DHCP or a static address
 # and write that choice explicitly. Non-interactive (--ci) installs keep the
 # deterministic static configuration derived from the live network.
-proc prompt_network_method(ci: Bool) [fs, error, io] -> Result[Str] {
+proc prompt_network_method(ci: Bool) -> Result[Str] {
   return "static" when ci
 
   write_text("Network configuration - [d]hcp or [s]tatic? [dhcp]: ")
@@ -329,7 +329,7 @@ proc write_target_config(
   root_part: Path,
   ci: Bool,
   network_method: Str,
-) [fs, process, error] {
+) {
   # laputa-net provides /usr/bin/ifup as a symlink into xsh core.
   # The target rootfs already has laputa-net installed, so the symlink
   # is already present after extraction. No need to copy anything.
@@ -454,7 +454,7 @@ tty1::respawn:/usr/bin/login -f pazu
   }
 }
 
-proc configured_ci_esp_bytes() [fs, error] -> Result[Int] {
+proc configured_ci_esp_bytes() -> Result[Int] {
   let path_value = /etc/laputa-installer/target-esp-mb
 
   return 16 * 1024 * 1024 unless fs.exists(path_value)?
@@ -463,7 +463,7 @@ proc configured_ci_esp_bytes() [fs, error] -> Result[Int] {
   mb * 1024 * 1024
 }
 
-proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[DiskParts] {
+proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
   let total_sectors = fs.read_text(fp"/sys/block/{disk.name}/size")?.trim().parse_int()?
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128 * 1024 * 1024 }
   let swap_bytes = if ci { 8 * 1024 * 1024 } else { linux.meminfo()?.total * 2 }
@@ -498,7 +498,7 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Dis
   DiskParts(esp: partition_path(disk, 1), swap: partition_path(disk, 2), root: partition_path(disk, 3))
 }
 
-proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
+proc install_to_disk(disk: Path, ci: Bool) {
   require_file(/usr/bin/mkfs.ext4)
   require_file(/usr/bin/mkfs.vfat)
   require_file(/usr/share/laputa-installer/target-root.tar.gz)

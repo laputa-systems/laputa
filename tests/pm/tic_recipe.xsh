@@ -32,7 +32,7 @@ const ncurses_sample = [
   "screen.xterm-xfree86",
 ]
 
-proc runner() [fs, process, env, error] -> Result[Path] {
+proc runner() -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {
@@ -44,7 +44,7 @@ proc runner() [fs, process, env, error] -> Result[Path] {
   process.which("xsh")?
 }
 
-proc compile(out: Path, names: List[Str], source: Path) [fs, process, env, error] -> Result[Status] {
+proc compile(out: Path, names: List[Str], source: Path) -> Result[Status] {
   let xsh = runner()?
   let argv = [
     xsh.display(),
@@ -61,14 +61,14 @@ proc compile(out: Path, names: List[Str], source: Path) [fs, process, env, error
 }
 
 # Every compiled name under a database root, as `<leaf>/<name>`.
-proc compiled_paths(root: Path) [fs, error] -> Result[List[Str]] {
+proc compiled_paths(root: Path) -> Result[List[Str]] {
   fs.walk(root)?
     |> where .kind == "file"
     |> map { |entry| f"{entry.path.parent().name()}/{entry.path.name()}" }
     |> sort
 }
 
-proc assert_same_tree(expected: Path, actual: Path) [fs, error] {
+proc assert_same_tree(expected: Path, actual: Path) {
   let want = compiled_paths(expected)?
   let have = compiled_paths(actual)?
   assert have == want

@@ -1,6 +1,6 @@
 ##! Certificate package proof checks the runtime dependency metadata boundary.
 
-proc runner() [process, env, error] -> Result[Path] {
+proc runner() -> Result[Path] {
   let configured = e"XSH_HOST" ?? ""
   return fp"{configured}" when configured != ""
   process.which("xsh")?

@@ -175,7 +175,7 @@ proc qemu_stop(launched: ProcessHandle) [process, error] {
 # Returns whether the spawned QEMU group leader is still running, without a
 # shell watcher. An exited QEMU stays a zombie (status `Z`) until it is
 # reaped, and signal 0 still reaches a zombie, so the process table decides.
-proc qemu_process_live(pid: Int) [process, error] -> Result[Bool] {
+proc qemu_process_live(pid: Int) -> Result[Bool] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
   }
@@ -184,7 +184,7 @@ proc qemu_process_live(pid: Int) [process, error] -> Result[Bool] {
 }
 
 # Invokes the retained focused Python QMP helper with structured arguments.
-proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") [process, error] {
+proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
   var argv = [value.python.display(), value.qmp_helper.display(), mode, socket.display()]
   if screenshot != "" {
     argv += [screenshot.display()]
@@ -197,7 +197,7 @@ proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p""
 # Retry idempotent QMP readiness or screenshot requests while QEMU publishes
 # its socket.  Keyboard input is deliberately *not* retried: a late transport
 # error could otherwise duplicate the proof keystrokes.
-proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") [process, time, error] {
+proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
   var attempt = 0
   while attempt < 20 {
     match qemu_qmp(value, mode, socket, screenshot) {

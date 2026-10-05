@@ -168,13 +168,13 @@ export pure xsh_seed_cargo_fetch_argv(docker: Path, laputa_root: Path, xsh_root:
   ]
 }
 
-proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) [process, error] {
+proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
   let status = process.run(process.command_argv(docker, argv, cwd))?
 
   return Err(SeedError.Failed(f"{what} failed")) unless status.ok
 }
 
-proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, error] -> Result[Bool] {
+proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] {
   let handle = fs.tempdir()?
   defer handle.close()?
   let quiet = fp"{handle.host_path()?}/inspect"
@@ -184,7 +184,7 @@ proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, er
   status.ok
 }
 
-proc xsh_seed_require_checkout(xsh_root: Path) [fs, error] {
+proc xsh_seed_require_checkout(xsh_root: Path) {
   for required in [fp"{xsh_root}/Cargo.lock", fp"{xsh_root}/Dockerfile.test", fp"{xsh_root}/core"] {
     guard fs.exists(required)? else {
       return Err(SeedError.Missing(f"XSH_ROOT is not an XSH checkout: {required} is missing"))
@@ -225,7 +225,7 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
   fs.write_atomic(xsh_seed_registry_stamp(laputa_root), hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())
 }
 
-proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) [fs, process, error] {
+proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
   guard xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root)? else {
     return Err(SeedError.Missing(f"Docker image {xsh_seed_build_image} is missing; run `make fetch`"))
   }
@@ -253,7 +253,7 @@ export pure xsh_seed_core_install_path(relative_source: Path) -> Path {
   fp"core/{command}"
 }
 
-proc xsh_seed_core_sources(xsh_root: Path) [fs, error] -> Result[List[Path]] {
+proc xsh_seed_core_sources(xsh_root: Path) -> Result[List[Path]] {
   let core = fp"{xsh_root}/core"
   var sources = []
 
@@ -278,7 +278,7 @@ proc xsh_seed_core_digest(xsh_root: Path, sources: List[Path]) [fs, error] -> Re
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
 }
 
-proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path) [fs, error] {
+proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path) {
   let handle = fs.tempdir()?
   defer handle.close()?
   let stage = handle.host_path()?
@@ -299,7 +299,7 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
 
 # Replace a product only when its bytes changed, so an unchanged rebuild keeps
 # the seed directory, and with it the `xsh` package key, byte-identical.
-proc xsh_seed_publish_binary(source: Path, dest: Path) [fs, error] {
+proc xsh_seed_publish_binary(source: Path, dest: Path) {
   guard fs.exists(source)? else {
     return Err(SeedError.Missing(f"cargo did not produce {source}"))
   }
@@ -311,12 +311,12 @@ proc xsh_seed_publish_binary(source: Path, dest: Path) [fs, error] {
   fs.rename(temporary, dest, overwrite: true)
 }
 
-proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) [process, error] -> Result[Str] {
+proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) -> Result[Str] {
   let output = run.text git -C $xsh_root @argv ?
   output.trim()
 }
 
-proc xsh_seed_previous_core_digest(manifest: Path) [fs, error] -> Result[Str] {
+proc xsh_seed_previous_core_digest(manifest: Path) -> Result[Str] {
   return "" unless fs.exists(manifest)?
 
   let value = json.read(manifest)?.require(Record)?

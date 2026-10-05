@@ -59,7 +59,7 @@ pure table_string(data: Bytes, base: Int, offset: Int) -> Bytes? {
   c_string(data, base + offset)
 }
 
-proc read_compiled(file: Path) [fs, error] -> Result[Compiled] {
+proc read_compiled(file: Path) -> Result[Compiled] {
   let data = file.read_bytes()?
   let magic = u16(data, 0)
   guard magic == 0o432 or magic == 0o1036 else {
@@ -129,7 +129,7 @@ pure string(entry: Compiled, index: Int) -> Bytes? {
   if index < entry.strs.len() { entry.strs[index] } else { null }
 }
 
-proc expect_string(entry: Compiled, index: Int, want: Bytes, what: Str) [error] {
+proc expect_string(entry: Compiled, index: Int, want: Bytes, what: Str) {
   proof.ensure(string(entry, index) == want, "proof-terminfo", f"{entry.names}: unexpected {what}")
 }
 

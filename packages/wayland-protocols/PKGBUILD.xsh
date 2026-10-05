@@ -516,7 +516,7 @@ export const filetree = [
   },
 ]
 
-proc prune_x_compat_protocols(root: Path) [fs, error] {
+proc prune_x_compat_protocols(root: Path) {
   fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-shell-v1-enum.h", missing_ok: false)
   fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-keyboard-grab-unstable-v1-enum.h", missing_ok: false)
   fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)

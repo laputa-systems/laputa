@@ -9,7 +9,7 @@ pure bundle_key_is_valid(value: Str) -> Bool {
   value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
 }
 
-proc bundle_verify_file(source: Path, output: Path) [fs, error] {
+proc bundle_verify_file(source: Path, output: Path) {
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
     return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: {source}"))
   }

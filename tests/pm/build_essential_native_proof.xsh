@@ -14,7 +14,7 @@ pure runtime_packages() -> List[Str] {
   ]
 }
 
-proc runner() [process, env, error] -> Result[Path] {
+proc runner() -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
 
   return fp"{configured}" when configured != ""
@@ -22,7 +22,7 @@ proc runner() [process, env, error] -> Result[Path] {
   process.which("xsh")?
 }
 
-proc proof_root(ctx: TestContext, target: Str) [fs, error] -> Result[Path] {
+proc proof_root(ctx: TestContext, target: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "build-essential-native-proof")?
   fs.mkdir(fp"{root}/usr/bin")
   fs.mkdir(fp"{root}/boot")
@@ -77,7 +77,7 @@ proc write_root_receipt(root: Path, target: Str, packages: List[Str]) [fs, error
 }
 
 # Proofs run with the build's XSH_PM_TARGET_ARCH, as in package-tools.
-proc run_build_essential_proof(xsh: Path, arch: Str, root: Path, stderr: Path) [process, env, error] -> Result[Status] {
+proc run_build_essential_proof(xsh: Path, arch: Str, root: Path, stderr: Path) -> Result[Status] {
   env ({XSH_PM_TARGET_ARCH: arch}) {
     process.run(
       process.command_argv(

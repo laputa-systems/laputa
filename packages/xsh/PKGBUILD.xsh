@@ -117,7 +117,7 @@ export const filetree = [
 # The seed products the build installs, each checked against the seed manifest.
 const seed_products = ["xsh", "xshi", "xsht", "core.tar.xz"]
 
-proc verified_seed(arch: Str) [fs, error] -> Result[Path] {
+proc verified_seed(arch: Str) -> Result[Path] {
   let seed = p"seed"
   let manifest_path = fp"{seed}/manifest.json"
 

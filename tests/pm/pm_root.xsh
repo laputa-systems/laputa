@@ -33,7 +33,7 @@ pure metadata_rows(entries: List[EntrySpec]) -> List[Record] {
   } for entry in entries]
 }
 
-proc write_payload_entry(root: Path, entry: EntrySpec) [fs, error] {
+proc write_payload_entry(root: Path, entry: EntrySpec) {
   let output = fp"{root}/{entry.path}"
   fs.mkdir(output.parent)
 
@@ -54,7 +54,7 @@ proc stage_artifact(
   kind: types.PackageKind,
   entries: List[EntrySpec],
   dependencies: List[types.PlanDependency] = [],
-) [fs, error] -> Result[PreparedArtifact] {
+) -> Result[PreparedArtifact] {
   let stage = test.temp_dir(ctx, name: f"root-stage-{name}")?
   let contents = fp"{stage}/contents"
   let payload = fp"{stage}/payload.tar.gz"
@@ -115,7 +115,7 @@ proc rehashed(staged: types.StagedArtifact) [fs, error] -> Result[types.StagedAr
   {...staged, payload_sha256: hash.sha256(staged.payload)?.hex()}
 }
 
-proc write_legacy_sidecar_metadata(staged: types.StagedArtifact, name: Str, entries: List[EntrySpec]) [fs, error] {
+proc write_legacy_sidecar_metadata(staged: types.StagedArtifact, name: Str, entries: List[EntrySpec]) {
   fs.write(
     staged.metadata,
     json.encode({
@@ -139,7 +139,7 @@ proc rewrite_legacy_database_payload(
   name: Str,
   entries: List[EntrySpec],
   unexpected: Bool = false,
-) [fs, error] {
+) {
   let contents = test.temp_dir(ctx, name: f"root-legacy-payload-{name}")?
 
   for entry in entries {
@@ -187,12 +187,12 @@ proc commit_artifact(
   kind: types.PackageKind,
   entries: List[EntrySpec],
   dependencies: List[types.PlanDependency] = [],
-) [fs, error] -> Result[types.ArtifactReceipt] {
+) -> Result[types.ArtifactReceipt] {
   let prepared = stage_artifact(ctx, name, kind, entries, dependencies)?
   store.commit(types.target_aarch64(), store_root, prepared.node, prepared.staged)?
 }
 
-proc expect_root_error(ctx: TestContext, result: Result[types.RootPlan], expected: Str) [error] {
+proc expect_root_error(ctx: TestContext, result: Result[types.RootPlan], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: root preflight unexpectedly succeeded")
     Err(problem) => assert expected in problem.message

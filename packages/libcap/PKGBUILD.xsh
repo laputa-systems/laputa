@@ -107,7 +107,7 @@ const libcap_sources = [
 # which turns `#define CAP_CHOWN 0` into `{"cap_chown",0},`.
 const capability_define = rx"^#define\s+(CAP_[^\s]+)\s+([0-9]+)\s*$"
 
-proc write_cap_names_list() [fs, error] {
+proc write_cap_names_list() {
   var out = ""
 
   for line in p"libcap/include/uapi/linux/capability.h".read_text()?.lines() {

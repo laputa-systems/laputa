@@ -36,7 +36,7 @@ pure root_args(flag: Str, names: List[Str]) -> List[Str] {
   args
 }
 
-proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[Str]) [fs, net, process, env, time, error] {
+proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[Str]) {
   world.host_pm(
     repo_url,
     ["root", "compose", plan.display(), "--store", store.display(), @root_args("--runtime-root", roots), "--output", output.display()],

@@ -59,7 +59,7 @@ export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOp
 # copies the complete typed recipe into XSH_PM_RECIPE_DIR, whose .xsh inputs are
 # fingerprinted with the package build input; resolving from ../pkg silently
 # depended on a legacy staging layout that no longer exists.
-proc staged_recipe_helper(name: Str) [fs, env, error] -> Result[Path] {
+proc staged_recipe_helper(name: Str) -> Result[Path] {
   let recipe_dir = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
 
   if recipe_dir == "" {
@@ -173,7 +173,7 @@ export proc emit_kbuild_progress(message: Str) [fs, env, error] {
   }
 }
 
-proc remove_archive_plan_cache() [fs, error] {
+proc remove_archive_plan_cache() {
   fs.remove(p".xsh-kbuild-archive-plan.json", missing_ok: true)
   fs.remove(p".xsh-kbuild-archive-plan.json.summary", missing_ok: true)
   fs.remove(p".xsh-kbuild-archive-plan.fingerprint", missing_ok: true)
@@ -185,7 +185,7 @@ proc archive_plan_cache_fingerprint(
   triple: Str,
   cflags: List[Str],
   includes: List[Str],
-) [fs, error] -> Result[Str] {
+) -> Result[Str] {
   f"""format linux-archive-plan-cache-v1
 srcarch {srcarch}
 triple {triple}
@@ -198,7 +198,7 @@ includes
 """
 }
 
-proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) [fs, error] -> Result[Bool] {
+proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) -> Result[Bool] {
   guard path_value.exists()? else {
     return false
   }
@@ -206,7 +206,7 @@ proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) [fs, e
   path_value.read_text()?.trim() == fingerprint.trim()
 }
 
-proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) [fs, error] {
+proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) {
   kbuild.write_text_if_changed(
     path_value,
     f"""{fingerprint}
@@ -214,7 +214,7 @@ proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) [fs, err
   )
 }
 
-proc copy_archive_plan_cache(source: Path, dest: Path) [fs, error] {
+proc copy_archive_plan_cache(source: Path, dest: Path) {
   guard source.exists()? else {
     return
   }

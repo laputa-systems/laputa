@@ -346,7 +346,7 @@ export const filetree = [
   },
 ]
 
-proc patch_python_tools() [fs, env, error] {
+proc patch_python_tools() {
   let meson = p"meson.build"
   var text = meson.read_text()?
   let target_root = e"LAPUTA_ROOT" ?? "/"

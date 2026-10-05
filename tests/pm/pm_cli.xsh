@@ -24,7 +24,7 @@ proc module_root() [fs, error] -> Result[Path] {
   path.absolute(p".")?
 }
 
-proc copied_repository(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
+proc copied_repository(ctx: TestContext, name: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
   fs.mkdir(fp"{root}/pm")
@@ -36,7 +36,7 @@ pure cli_empty_remote() -> types.RemoteSnapshot {
   {target: types.target_aarch64(), index_sha256: "cli-empty-remote", packages: []}
 }
 
-proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[Path] {
+proc published_generation_receipt(ctx: TestContext) -> Result[Path] {
   let repository = copied_repository(ctx, "root-inspect-receipt")?
   let build_value = plan.resolve(
     catalog.load(repository)?,
@@ -74,13 +74,13 @@ proc published_generation_receipt(ctx: TestContext) [fs, env, error] -> Result[P
   receipt
 }
 
-proc pm_output(args: List[Str]) [fs, process, env, error] -> Result[Str] {
+proc pm_output(args: List[Str]) -> Result[Str] {
   let xsh = runner()?
   let modules = module_root()?
   return run.text XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args ?
 }
 
-proc pm_status(args: List[Str], err: Path) [fs, process, env, error] -> Result[Status] {
+proc pm_status(args: List[Str], err: Path) -> Result[Status] {
   let xsh = runner()?
   let modules = module_root()?
   return run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args 2> $err

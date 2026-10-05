@@ -551,7 +551,7 @@ export const filetree = [
 
 error WlrootsError = Generate(message: Str) | Patch(message: Str)
 
-proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
+proc replace_required(file: Path, old: Str, new: Str) {
   let text = fs.read_text(file)?
 
   if old not in text {
@@ -563,7 +563,7 @@ proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
 
 # Port of render/gles2/shaders/embed.sh: the shader source as a
 # NUL-terminated byte array, one byte per line.
-proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
+proc write_shader_header(src: Path, dest: Path, symbol: Str) {
   var lines = [f"static const char {symbol}[] = {{"]
 
   for line in src.read_bytes()?.dump("hex-u8").split("\n") {
@@ -580,7 +580,7 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
   fs.write(dest, lines.join("\n"))
 }
 
-proc write_shader_headers() [fs, error] {
+proc write_shader_headers() {
   for name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
     let symbol = f"{name.replace(".", "_")}_src"
     write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)
@@ -618,12 +618,12 @@ const char *get_pnp_manufacturer(const char code[static 3]) {{
 """
 }
 
-proc write_pnpids(root: Str) [fs, error] {
+proc write_pnpids(root: Str) {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
   fs.write(p"backend/drm/pnpids.c", pnpids_source(pnp.read_text()?)?)
 }
 
-proc patch_build(root: Str) [fs, error] {
+proc patch_build(root: Str) {
   write_pnpids(root)
   write_shader_headers()
 
@@ -695,7 +695,7 @@ rt = declare_dependency()""",
   )
 }
 
-proc prune_xwayland_headers(root: Path) [fs, error] {
+proc prune_xwayland_headers(root: Path) {
   fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h", missing_ok: true)
   fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h", missing_ok: true)
   fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h", missing_ok: true)

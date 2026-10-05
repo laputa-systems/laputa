@@ -153,7 +153,7 @@ proc write_config_h() [fs, error] {
   )
 }
 
-proc ifndef_wrapped_defines(source: Path) [fs, error] -> Result[Str] {
+proc ifndef_wrapped_defines(source: Path) -> Result[Str] {
   var lines = []
 
   for line in source.read_text()?.split("\n") {

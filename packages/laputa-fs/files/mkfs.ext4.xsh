@@ -58,7 +58,7 @@ pure min_int(left: Int, right: Int) -> Int {
   right
 }
 
-proc bit_value(bit: Int) [] -> Int {
+proc bit_value(bit: Int) -> Int {
   var value = 1
   var index = 0
 
@@ -80,11 +80,11 @@ proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] 
   )
 }
 
-proc put_le(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
+proc put_le(data: Bytes, offset: Int, value: Int, width: Int) -> Result[Bytes] {
   put(data, offset, bytes.pack_le(value, width)?)?
 }
 
-proc fixed_text(text: Str, width: Int) [error] -> Result[Bytes] {
+proc fixed_text(text: Str, width: Int) -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
   return raw.slice(offset: 0, length: width) when raw.len() >= width
@@ -96,12 +96,12 @@ pure metadata_reserved(block: Int) -> Bool {
   block % BLOCKS_PER_GROUP < 4 + INODE_TABLE_BLOCKS
 }
 
-proc reserve_metadata_blocks(total_blocks: Int, groups: Int) [] -> Map[Bool] {
+proc reserve_metadata_blocks(total_blocks: Int, groups: Int) -> Map[Bool] {
   let _ = [total_blocks, groups]
   map.empty()
 }
 
-proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error] -> Result[List[ExtEntry]] {
+proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) -> Result[List[ExtEntry]] {
   var out = entries
 
   for child in fs.children(dir)? |> sort-by .path {
@@ -140,7 +140,7 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) [fs, error]
   out
 }
 
-proc assign_inodes(entries: List[ExtEntry]) [] -> List[ExtEntry] {
+proc assign_inodes(entries: List[ExtEntry]) -> List[ExtEntry] {
   var out = []
   var index = 0
 
@@ -152,7 +152,7 @@ proc assign_inodes(entries: List[ExtEntry]) [] -> List[ExtEntry] {
   out
 }
 
-proc inode_for(entries: List[ExtEntry], rel: Str) [] -> Int {
+proc inode_for(entries: List[ExtEntry], rel: Str) -> Int {
   return 2 when rel == ""
 
   for entry in entries {
@@ -162,7 +162,7 @@ proc inode_for(entries: List[ExtEntry], rel: Str) [] -> Int {
   2
 }
 
-proc dir_links(entries: List[ExtEntry], rel: Str) [] -> Int {
+proc dir_links(entries: List[ExtEntry], rel: Str) -> Int {
   var links = 2
 
   for entry in entries {
@@ -184,7 +184,7 @@ proc dir_file_type(kind: Str) [error] -> Result[Int] {
   Err(Ext4ToolError.Failed(kind: "bad-dir-kind", message: kind))
 }
 
-proc dirent(item: DirItem, rec_len: Int) [error] -> Result[Bytes] {
+proc dirent(item: DirItem, rec_len: Int) -> Result[Bytes] {
   let name = bytes.from_text(item.name)
 
   bytes.concat(
@@ -198,7 +198,7 @@ proc dirent(item: DirItem, rec_len: Int) [error] -> Result[Bytes] {
   )
 }
 
-proc dir_items(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: Int) [] -> List[DirItem] {
+proc dir_items(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: Int) -> List[DirItem] {
   var items = [{inode: self_inode, name: ".", kind: "dir"}, {inode: parent_inode, name: "..", kind: "dir"}]
 
   for entry in entries {
@@ -210,11 +210,11 @@ proc dir_items(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode:
   items
 }
 
-proc min_dirent_len(item: DirItem) [] -> Int {
+proc min_dirent_len(item: DirItem) -> Int {
   align4(8 + bytes.from_text(item.name).len())
 }
 
-proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: Int) [error] -> Result[Bytes] {
+proc dir_data(entries: List[ExtEntry], rel: Str, self_inode: Int, parent_inode: Int) -> Result[Bytes] {
   let items = dir_items(entries, rel, self_inode, parent_inode)
   var blocks = []
   var parts = []
@@ -271,7 +271,7 @@ proc allocate_block(used: Map[Bool], next: Int, total_blocks: Int) [error] -> Re
   Err(Ext4ToolError.Failed(kind: "full", message: "image is full"))
 }
 
-proc next_data_block(cursor: Int) [] -> Int {
+proc next_data_block(cursor: Int) -> Int {
   var block = cursor
 
   while metadata_reserved(block) {
@@ -281,7 +281,7 @@ proc next_data_block(cursor: Int) [] -> Int {
   block
 }
 
-proc skip_data_blocks(cursor: Int, count: Int) [] -> Int {
+proc skip_data_blocks(cursor: Int, count: Int) -> Int {
   var block = cursor
   var remaining = count
 
@@ -297,7 +297,7 @@ proc skip_data_blocks(cursor: Int, count: Int) [] -> Int {
   block
 }
 
-proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) [error] -> Result[AllocResult] {
+proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) -> Result[AllocResult] {
   var current_used = used
   var current_next = next_data_block(next)
   let first = current_next
@@ -353,18 +353,18 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
   }
 }
 
-proc write_block(image: Path, block: Int, data: Bytes) [error] {
+proc write_block(image: Path, block: Int, data: Bytes) {
   let payload = if data.len() < BLOCK_SIZE { bytes.concat([data, bytes.zero(BLOCK_SIZE - data.len())?]) } else { data }
   let written = bytes.write_at(image, block * BLOCK_SIZE, payload.slice(offset: 0, length: BLOCK_SIZE))?
   let _ = written
 }
 
-proc u32_block(values: List[Int]) [error] -> Result[Bytes] {
+proc u32_block(values: List[Int]) -> Result[Bytes] {
   var parts = [bytes.pack_le(value, 4)? for value in values]
   bytes.concat(parts)
 }
 
-proc data_block_at(alloc: ExtAlloc, index: Int) [] -> Int {
+proc data_block_at(alloc: ExtAlloc, index: Int) -> Int {
   var block = alloc.first
   var seen = 0
 
@@ -381,7 +381,7 @@ proc data_block_at(alloc: ExtAlloc, index: Int) [] -> Int {
   0
 }
 
-proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int] {
+proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) -> List[Int] {
   var values = []
   var block = alloc.first
   var seen = 0
@@ -401,7 +401,7 @@ proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int
   values
 }
 
-proc write_indirect_blocks(image: Path, alloc: ExtAlloc) [error] {
+proc write_indirect_blocks(image: Path, alloc: ExtAlloc) {
   if alloc.single != 0 {
     write_block(image, alloc.single, u32_block(data_blocks_slice(alloc, 12, min_int(alloc.count, 1036) - 12))?)
   }
@@ -427,7 +427,7 @@ proc allocate_bytes(
   next: Int,
   total_blocks: Int,
   data: Bytes,
-) [error] -> Result[AllocResult] {
+) -> Result[AllocResult] {
   let result = allocate_blocks(used, next, total_blocks, ceil_div(data.len(), BLOCK_SIZE))?
   var index = 0
 
@@ -454,7 +454,7 @@ proc allocate_file(
   total_blocks: Int,
   source: Path,
   size: Int,
-) [error] -> Result[AllocResult] {
+) -> Result[AllocResult] {
   let result = allocate_blocks(used, next, total_blocks, ceil_div(size, BLOCK_SIZE))?
   var source_offset = 0
   var block = result.alloc.first
@@ -503,7 +503,7 @@ proc inode_bytes(
   links: Int,
   alloc: ExtAlloc,
   fast_symlink: Bytes,
-) [error] -> Result[Bytes] {
+) -> Result[Bytes] {
   var out = bytes.zero(INODE_SIZE)?
   out = put_le(out, 0, mode, 2)?
   out = put_le(out, 2, uid % 65536, 2)?
@@ -535,7 +535,7 @@ proc inode_bytes(
   out
 }
 
-proc write_inode(image: Path, inode: Int, data: Bytes) [error] {
+proc write_inode(image: Path, inode: Int, data: Bytes) {
   let group_index = (inode - 1) / INODES_PER_GROUP
   let local = (inode - 1) % INODES_PER_GROUP
   let table = group_index * BLOCKS_PER_GROUP + 4
@@ -550,7 +550,7 @@ proc group_desc(
   free_blocks: Int,
   free_inodes: Int,
   used_dirs: Int,
-) [error] -> Result[Bytes] {
+) -> Result[Bytes] {
   var out = bytes.zero(32)?
   out = put_le(out, 0, block_bitmap, 4)?
   out = put_le(out, 4, inode_bitmap, 4)?
@@ -567,7 +567,7 @@ proc superblock(
   free_blocks: Int,
   free_inodes: Int,
   label: Str,
-) [error] -> Result[Bytes] {
+) -> Result[Bytes] {
   var out = bytes.zero(1024)?
   out = put_le(out, 0, total_inodes, 4)?
   out = put_le(out, 4, total_blocks, 4)?
@@ -620,7 +620,7 @@ proc superblock(
   out
 }
 
-proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) [error] -> Result[Bytes] {
+proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) -> Result[Bytes] {
   var out = []
   var byte_index = 0
 
@@ -645,7 +645,7 @@ proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) [err
   bytes.from_ints(out)?
 }
 
-proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) [error] -> Result[Bytes] {
+proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) -> Result[Bytes] {
   var out = []
   var byte_index = 0
 
@@ -671,7 +671,7 @@ proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) [error] -> Result[Byte
   bytes.from_ints(out)?
 }
 
-proc used_dirs_in_group(entries: List[ExtEntry], group_index: Int) [] -> Int {
+proc used_dirs_in_group(entries: List[ExtEntry], group_index: Int) -> Int {
   var count = if group_index == 0 { 1 } else { 0 }
 
   for entry in entries {
@@ -690,7 +690,7 @@ proc write_headers(
   groups: Int,
   total_blocks: Int,
   label: Str,
-) [error] {
+) {
   let max_inode = if entries.len() == 0 { 10 } else { entries[entries.len() - 1].inode }
   var desc_parts = []
   var free_blocks_total = 0
@@ -760,7 +760,7 @@ proc write_headers(
   }
 }
 
-proc zero_image(image: Path, size: Int) [error] {
+proc zero_image(image: Path, size: Int) {
   let chunk = 1024 * 1024
   var offset = 0
 
@@ -771,7 +771,7 @@ proc zero_image(image: Path, size: Int) [error] {
   }
 }
 
-proc image_size(image: Path) [fs, error] -> Result[Int] {
+proc image_size(image: Path) -> Result[Int] {
   let size = image.metadata()?.size
 
   return size when size > 0
@@ -785,7 +785,7 @@ proc image_size(image: Path) [fs, error] -> Result[Int] {
   size
 }
 
-proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
+proc format_ext_image(image: Path, source_root: Path, label: Str) {
   let size = image_size(image)?
 
   if size < 8MiB {

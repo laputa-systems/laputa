@@ -3,34 +3,34 @@ use installer.host
 
 error InstallerQemuTestError = Failed(kind: Str, message: Str)
 
-proc env_int(name: Str, fallback: Int) [env, error] -> Result[Int] {
+proc env_int(name: Str, fallback: Int) -> Result[Int] {
   host.installer_env_value(name, f"{fallback}").parse_int()?
 }
 
-proc command_path(name: Str) [process, error] -> Result[Path] {
+proc command_path(name: Str) -> Result[Path] {
   return fp"{name}" when "/" in name
 
   process.which(name)?
 }
 
-proc ensure_dir(path_value: Path) [fs, error] {
+proc ensure_dir(path_value: Path) {
   return when fs.exists(path_value)?
 
   path_value.mkdir()
 }
 
-proc ensure_file(path_value: Path, kind: Str) [fs, error] {
+proc ensure_file(path_value: Path, kind: Str) {
   return when fs.exists(path_value)?
 
   return Err(InstallerQemuTestError.Failed(kind:, message: f"missing {path_value}"))
 }
 
-proc process_live(kill: Path, pid: Int, cwd: Path) [process, error] -> Result[Bool] {
+proc process_live(kill: Path, pid: Int, cwd: Path) -> Result[Bool] {
   let status = process.run(process.command_argv(kill, ["kill", "-0", f"{pid}"], cwd, {}))?
   status.ok
 }
 
-proc terminate_if_live(pid: Int) [process] {
+proc terminate_if_live(pid: Int) {
   guard pid > 0 else {
     return
   }
@@ -40,7 +40,7 @@ proc terminate_if_live(pid: Int) [process] {
   }
 }
 
-proc dump_tail(tail: Path, log: Path, lines: Int) [fs, process, error] {
+proc dump_tail(tail: Path, log: Path, lines: Int) {
   guard fs.exists(log)? else {
     return
   }
@@ -52,7 +52,7 @@ proc dump_tail(tail: Path, log: Path, lines: Int) [fs, process, error] {
   }
 }
 
-proc has_line_marker(log: Path, marker: Str) [fs, error] -> Result[Bool] {
+proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
   guard fs.exists(log)? else {
     return false
   }
@@ -66,7 +66,7 @@ proc has_line_marker(log: Path, marker: Str) [fs, error] -> Result[Bool] {
   false
 }
 
-proc has_panic(log: Path) [fs, error] -> Result[Bool] {
+proc has_panic(log: Path) -> Result[Bool] {
   guard fs.exists(log)? else {
     return false
   }
@@ -85,7 +85,7 @@ proc wait_for_marker(
   keep_running: Bool,
   timeout_seconds: Int,
   cwd: Path,
-) [fs, process, time, error] {
+) {
   var elapsed = 0
 
   while process_live(kill, pid, cwd)? {
@@ -159,7 +159,7 @@ proc ssh_guest(
   port: Int,
   known_hosts: Path,
   remote_command: Str,
-) [process, error] -> Result[Str] {
+) -> Result[Str] {
   let argv = ssh_args(ssh_key, port, known_hosts, remote_command)
   return run.text $ssh @argv ?
 }
@@ -175,7 +175,7 @@ proc wait_for_ssh(
   target_log: Path,
   timeout_seconds: Int,
   cwd: Path,
-) [fs, process, time, error] {
+) {
   var elapsed = 0
 
   while process_live(kill, pid, cwd)? {
@@ -207,7 +207,7 @@ proc assert_ssh_smoke(
   target_log: Path,
   timeout_seconds: Int,
   cwd: Path,
-) [fs, process, time, error] {
+) {
   wait_for_ssh(pid, kill, tail, ssh, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
 
   # xinit status uses signal-0 liveness which gets EPERM across UIDs
@@ -369,7 +369,7 @@ pure qemu_target_args(
   with_devices.extend(qemu_console_args(target_log))
 }
 
-proc clean_build_state(work: Path) [fs, error] {
+proc clean_build_state(work: Path) {
   for name in [
     "rootfs-target",
     "rootfs-installer",
@@ -405,7 +405,7 @@ proc clean_build_state(work: Path) [fs, error] {
   }
 }
 
-proc kernel_source_env(root: Path, arch: Str) [fs, env, error] -> Result[Str] {
+proc kernel_source_env(root: Path, arch: Str) -> Result[Str] {
   let configured = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_SOURCE", "")
 
   return configured when configured != ""
@@ -426,7 +426,7 @@ proc build_installer(
   installer_kernel: Path,
   ssh_pubkey: Path,
   xsh: Path,
-) [fs, process, env, error] {
+) {
   let kernel_package = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
 
   var build_env: Record = {

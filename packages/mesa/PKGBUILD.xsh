@@ -254,7 +254,7 @@ proc replace_once(text: Str, file: Str, old: Str, new: Str) [error] -> Result[St
   text.replace(old, new)
 }
 
-proc patch_file(file: Path, replacements: List[TextReplacement]) [fs, error] {
+proc patch_file(file: Path, replacements: List[TextReplacement]) {
   var text = file.read_text()?
 
   for replacement in replacements {
@@ -264,7 +264,7 @@ proc patch_file(file: Path, replacements: List[TextReplacement]) [fs, error] {
   fs.write(file, text)
 }
 
-proc write_vendored_generator() [fs, error] {
+proc write_vendored_generator() {
   let script = fp"{vendored_generator}"
 
   fs.write(
@@ -283,7 +283,7 @@ main(@args)?
   fs.chmod(script, 0o755)
 }
 
-proc patch_build() [fs, error] {
+proc patch_build() {
   write_vendored_generator()
 
   patch_file(
@@ -467,7 +467,7 @@ proc edge_outputs(build_line: Str) [error] -> Result[List[Str]] {
   head.split(" ")
 }
 
-proc split_edge(split: NinjaSplit, block: List[Str]) [error] -> Result[NinjaSplit] {
+proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
   return split when block.len() == 0
 
   for line in block {
@@ -485,7 +485,7 @@ proc split_edge(split: NinjaSplit, block: List[Str]) [error] -> Result[NinjaSpli
 # need (Windows .def files, glvnd and GLX tables) may stay unvendored; samu
 # fails if one is needed. Every vendored file must match a removed edge, so a
 # stale set fails here.
-proc stage_vendored_outputs() [fs, error] {
+proc stage_vendored_outputs() {
   let ninja = p"build/build.ninja"
   var split: NinjaSplit = {kept: [], vendored: []}
   var block: List[Str] = []
@@ -538,7 +538,7 @@ proc stage_vendored_outputs() [fs, error] {
 # and private libraries into the public fields of the egl, gbm, and glesv2
 # pkg-config files. These are the files meson generates for this
 # configuration.
-proc write_pkg_config(dest: Path) [fs, error] {
+proc write_pkg_config(dest: Path) {
   let dir = fp"{dest}/usr/lib/pkgconfig"
   let header = """prefix=/usr
 includedir=\${prefix}/include

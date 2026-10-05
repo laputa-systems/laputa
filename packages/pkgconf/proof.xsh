@@ -50,7 +50,7 @@ Version: 5
 # Runs pkg-config as pm/env.xsh's pkg_config_context does for a build root:
 # both search variables name only the root's pkgconfig directories, and the
 # root is the sysroot. An empty `sysroot` is the installed-system case.
-proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str]) [process, env, error] -> Result[Str] {
+proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str]) -> Result[Str] {
   var out = ""
 
   env ({
@@ -64,12 +64,12 @@ proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: L
   out.trim()
 }
 
-proc expect(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str], want: Str) [process, env, error] {
+proc expect(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str], want: Str) {
   let got = query(pkg_config, dynlinker, libdir, sysroot, args)?
   proof.ensure(got == want, "proof-pkgconf", f"pkg-config {args.join(" ")} (sysroot {sysroot}) gave `{got}`, want `{want}`")
 }
 
-proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[Str], ok: Bool) [process, env, error] {
+proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[Str], ok: Bool) {
   var status_ok = ! ok
 
   env ({

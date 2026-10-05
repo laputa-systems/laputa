@@ -142,7 +142,7 @@ proc write_version_header() [fs, error] {
 #   python3 scripts/generate-emoji-variation-sequences.py \
 #     unicode/emoji-variation-sequences.txt emoji-variation-sequences.h
 #   python3 scripts/srgb.py srgb.c srgb.h
-proc patch_generated_inputs() [fs, error] {
+proc patch_generated_inputs() {
   fs.install(p"generated/emoji-variation-sequences.h", p"emoji-variation-sequences.h", 0o644, overwrite: true)
   fs.install(p"generated/foot-terminfo.h", p"foot-terminfo.h", 0o644, overwrite: true)
   fs.install(p"generated/srgb.c", p"srgb.c", 0o644, overwrite: true)
@@ -238,7 +238,7 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   fs.write(meson, text)
 }
 
-proc write_minimal_config(dest: Path) [fs, error] {
+proc write_minimal_config(dest: Path) {
   fs.mkdir(fp"{dest}/etc/xdg")
   fs.mkdir(fp"{dest}/etc/xdg/foot")
 

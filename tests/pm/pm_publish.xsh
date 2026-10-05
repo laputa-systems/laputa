@@ -43,12 +43,12 @@ proc copied_publish_repository(ctx: TestContext, name: Str) [fs, env, error] -> 
   root
 }
 
-proc publish_plan(ctx: TestContext, name: Str) [fs, env, error] -> Result[types.BuildPlan] {
+proc publish_plan(ctx: TestContext, name: Str) -> Result[types.BuildPlan] {
   let repo_root = copied_publish_repository(ctx, name)?
   plan_publish_repository(repo_root)?
 }
 
-proc plan_publish_repository(repo_root: Path) [fs, env, error] -> Result[types.BuildPlan] {
+proc plan_publish_repository(repo_root: Path) -> Result[types.BuildPlan] {
   let catalog_value = catalog.load_for_target(repo_root, types.target_aarch64())?
   plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false)?
 }
@@ -59,7 +59,7 @@ proc publish_repository_once(
   repo_root: Path,
   remote_url: Str,
   name: Str,
-) [fs, net, env, time, error] -> Result[types.BuildPlan] {
+) -> Result[types.BuildPlan] {
   let value = plan_publish_repository(repo_root)?
   let store_root = test.temp_dir(ctx, name: f"{name}-store")?
   stage_plan_artifacts(ctx, value, store_root)
@@ -91,7 +91,7 @@ proc stage_plan_artifacts(
   include_package_kind: Bool = true,
   package_kind: Str = "payload",
   target: types.Target = types.target_aarch64(),
-) [fs, error] {
+) {
   let executor_sha256 = publish_executor_sha256()
   let arch = types.pm_target_arch(target)
 
@@ -139,7 +139,7 @@ proc stage_plan_artifacts(
   }
 }
 
-proc expect_snapshot_error(ctx: TestContext, value: types.BuildPlan, store_root: Path, expected: Str) [fs, error] {
+proc expect_snapshot_error(ctx: TestContext, value: types.BuildPlan, store_root: Path, expected: Str) {
   match repo.snapshot(value, store_root) {
     Ok(_) => test.fail(f"{expected}: snapshot unexpectedly succeeded")
     Err(problem) => assert expected in problem.message

@@ -36,7 +36,7 @@ export proc package_version(root: Path, name: Str) [fs, error] -> Result[Str, Er
   json.read(db)?.require(Record)?.get("ver")?.require(Str)
 }
 
-proc package_dependency_map(root: Path) [fs, error] -> Result[Map[List[Str]]] {
+proc package_dependency_map(root: Path) -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
   let packages_db = fp"{root}/var/lib/xsh-pm/packages"
 
@@ -127,7 +127,7 @@ export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, erro
   ensure(elf_machine_name(arch) in header, f"proof-{name}", f"{rel} is not {arch}")
 }
 
-proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
+proc proof_xsh_runner() -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {

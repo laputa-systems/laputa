@@ -133,7 +133,7 @@ export const filetree = [
   },
 ]
 
-proc write_embedded_dtd() [fs, error] {
+proc write_embedded_dtd() {
   let dump = p"protocol/wayland.dtd".read_bytes()?.dump("hex-u8")
   var values = []
 
@@ -156,7 +156,7 @@ proc write_embedded_dtd() [fs, error] {
   )
 }
 
-proc patch_python_generator(native_scanner: Str) [fs, error] {
+proc patch_python_generator(native_scanner: Str) {
   write_embedded_dtd()
   let meson_path = p"src/meson.build"
   let text = meson_path.read_text()?

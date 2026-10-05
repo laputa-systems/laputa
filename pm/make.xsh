@@ -365,7 +365,7 @@ pure dep_path(cwd: Path, dep: Str) -> Path {
   fp"{cwd}/{dep}"
 }
 
-proc depfile_inputs(depfile: Path, cwd: Path) [fs, error] -> Result[List[Path]] {
+proc depfile_inputs(depfile: Path, cwd: Path) -> Result[List[Path]] {
   guard depfile.exists()? else {
     let deps = []
     return deps
@@ -389,7 +389,7 @@ proc depfile_inputs(depfile: Path, cwd: Path) [fs, error] -> Result[List[Path]] 
   [dep_path(cwd, dep) for dep in deps_text.words() if dep != "\\"]
 }
 
-proc all_inputs(task: MakeTask) [fs, error] -> Result[List[Path]] {
+proc all_inputs(task: MakeTask) -> Result[List[Path]] {
   var inputs: List[Path] = task.inputs
 
   if has_path(task.depfile) {
@@ -399,7 +399,7 @@ proc all_inputs(task: MakeTask) [fs, error] -> Result[List[Path]] {
   inputs
 }
 
-proc output_missing(task: MakeTask) [fs, error] -> Result[Bool] {
+proc output_missing(task: MakeTask) -> Result[Bool] {
   for output in task.outputs {
     guard output.exists()? else {
       return true
@@ -409,7 +409,7 @@ proc output_missing(task: MakeTask) [fs, error] -> Result[Bool] {
   false
 }
 
-proc oldest_output_mtime(outputs: List[Path]) [fs, error] -> Result[Int] {
+proc oldest_output_mtime(outputs: List[Path]) -> Result[Int] {
   var oldest = outputs[0].metadata()?.modified
 
   for output in outputs {
@@ -423,7 +423,7 @@ proc oldest_output_mtime(outputs: List[Path]) [fs, error] -> Result[Int] {
   oldest
 }
 
-proc input_newer(task: MakeTask) [fs, error] -> Result[Bool] {
+proc input_newer(task: MakeTask) -> Result[Bool] {
   return true when task.outputs.len() == 0
 
   let oldest_output = oldest_output_mtime(task.outputs)?
@@ -447,7 +447,7 @@ proc command_signature(task: MakeTask) [fs, env, error] -> Result[Str] {
   })?
 }
 
-proc stamp_changed(task: MakeTask) [fs, env, error] -> Result[Bool] {
+proc stamp_changed(task: MakeTask) -> Result[Bool] {
   guard has_path(task.stamp) else {
     return false
   }
@@ -457,7 +457,7 @@ proc stamp_changed(task: MakeTask) [fs, env, error] -> Result[Bool] {
   task.stamp.read_text()? != command_signature(task)?
 }
 
-proc should_run(task: MakeTask) [fs, env, error] -> Result[Bool] {
+proc should_run(task: MakeTask) -> Result[Bool] {
   return true when output_missing(task)?
 
   return true when stamp_changed(task)?
@@ -467,7 +467,7 @@ proc should_run(task: MakeTask) [fs, env, error] -> Result[Bool] {
   input_newer(task)?
 }
 
-proc prepare_task_dirs(task: MakeTask) [fs, error] {
+proc prepare_task_dirs(task: MakeTask) {
   for output in task.outputs {
     output.parent.mkdir()
   }
@@ -498,7 +498,7 @@ pure completed_index_key(index: Int) -> Str {
   f"{index}"
 }
 
-proc remove_running_indices(running: List[RunningTask], completed_indices: Map[Bool]) [] -> List[RunningTask] {
+proc remove_running_indices(running: List[RunningTask], completed_indices: Map[Bool]) -> List[RunningTask] {
   var next = []
   var index = 0
 
@@ -513,7 +513,7 @@ proc remove_running_indices(running: List[RunningTask], completed_indices: Map[B
   next
 }
 
-proc cancel_running_uncompleted(running: List[RunningTask], completed_indices: Map[Bool]) [process] {
+proc cancel_running_uncompleted(running: List[RunningTask], completed_indices: Map[Bool]) {
   var index = 0
 
   for row in running {
@@ -528,7 +528,7 @@ proc cancel_running_uncompleted(running: List[RunningTask], completed_indices: M
   }
 }
 
-proc make_progress(message: Str) [env] {
+proc make_progress(message: Str) {
   if (e"XSH_MAKE_PROGRESS" ?? "") == "1" or (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1" {
     print $message
   }
@@ -544,7 +544,7 @@ proc emit_dynamic_state(
   peak_running: Int,
   idle_intervals: Int,
   task: Str = "",
-) [env] {
+) {
   let task_suffix = if task == "" { "" } else { f" task={task}" }
   make_progress(
     f"xsh-make-dynamic-state event={event} tasks={task_count} completed={completed_count} ready={ready_count} running={running_count} slots={jobs_count} peak-running={peak_running} idle-intervals={idle_intervals}{task_suffix}",

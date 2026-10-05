@@ -3,7 +3,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc check(condition: Bool, kind: Str, message: Str) [error] {
+proc check(condition: Bool, kind: Str, message: Str) {
   if ! condition {
     Err(ScriptError.Failed(kind:, message:))?
   }

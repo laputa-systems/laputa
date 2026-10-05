@@ -127,7 +127,7 @@ export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[
   empty
 }
 
-proc try_load_remote_index_from_repo(repo: Str, out: Path) [fs, net, error] -> Result[List[types.RemotePackage]] {
+proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.RemotePackage]] {
   if util.is_file_url(repo) {
     return load_remote_index_from(util.repo_file_path(repo, p"index.json")?)?
   }
@@ -355,7 +355,7 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
   }
 }
 
-proc remote_legacy_metadata_rel(value: types.RemotePackage) [error] -> Result[Path] {
+proc remote_legacy_metadata_rel(value: types.RemotePackage) -> Result[Path] {
   let raw = if value.metadata == "" {
     util.legacy_remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
   } else {

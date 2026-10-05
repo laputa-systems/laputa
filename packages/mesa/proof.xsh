@@ -131,7 +131,7 @@ int main(void)
 """
 
 # The gallium library is named for the Mesa version.
-proc gallium_library(root: Path) [fs, error] -> Result[Path] {
+proc gallium_library(root: Path) -> Result[Path] {
   let found = [entry.path for entry in fs.children(fp"{root}/usr/lib") if entry.name.starts_with("libgallium-") and entry.name.ends_with(".so")]
   proof.ensure(found.len() == 1, "proof-mesa", f"expected one libgallium, found {found.len()}")
   found[0].relative_to(root)
@@ -139,7 +139,7 @@ proc gallium_library(root: Path) [fs, error] -> Result[Path] {
 
 # Mesa is built without LLVM and links libc++ statically, so the runtime
 # closure carries neither libLLVM nor a C++ library.
-proc check_runtime_needs(root: Path, rels: List[Path]) [fs, error] {
+proc check_runtime_needs(root: Path, rels: List[Path]) {
   for rel in rels {
     for needed in elf.inspect(fp"{root}/{rel}")?.needed {
       proof.ensure(! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"), "proof-mesa", f"{rel} links {needed}")

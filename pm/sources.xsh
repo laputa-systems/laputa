@@ -56,7 +56,7 @@ export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path, 
 
 # Builds name their package repository through XSH_PM_REPOSITORY_ROOT, the same
 # root that `repository/` inputs resolve against.
-proc build_source_cache_root() [fs, env, error] -> Result[Path] {
+proc build_source_cache_root() -> Result[Path] {
   let configured = (e"LAPUTA_SOURCE_CACHE" ?? "").trim()
   let repo_root = (e"XSH_PM_REPOSITORY_ROOT" ?? "").trim()
 
@@ -135,7 +135,7 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   Fetched(size)
 }
 
-proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, env, error] -> Result[Path] {
+proc resolve_url_source(package_name: Str, url: Str, checksum: Str) -> Result[Path] {
   let sha256 = pinned_url_sha256(package_name, url, checksum)?
   let root = build_source_cache_root()?
   let entry = source_cache_entry(root, sha256)
@@ -307,7 +307,7 @@ proc resolve_locked_crates(
   pkg: types.Package,
   resolved: types.ResolvedSource,
   checksum: Str,
-) [fs, net, env, error] -> Result[List[ResolvedCrate]] {
+) -> Result[List[ResolvedCrate]] {
   verify_source_checksum(resolved.path, checksum, resolved.kind)
   var crates: List[ResolvedCrate] = []
 
@@ -322,7 +322,7 @@ proc resolve_locked_crates(
 # Its `package` digest must match the Cargo.lock checksum, and an empty `files`
 # map skips per-file verification of the already sha256-verified archive, so
 # a recipe may patch a vendored crate.
-proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) [fs, error] {
+proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) {
   fs.remove(dest, missing_ok: true)
   fs.mkdir(dest)
 
@@ -386,7 +386,7 @@ proc stage_resolved_source(
   checksum: Str,
   crates: List[ResolvedCrate],
   src: Path,
-) [fs, error] {
+) {
   let source_path = resolved.path
   let name = fp"{resolved.name}"
   verify_source_checksum(source_path, checksum, resolved.kind)
@@ -490,7 +490,7 @@ export proc prepare_package_source_tree(pkg: types.Package, src: Path) [fs, net,
 # Checksum generation is a maintainer step that reads upstream directly: a new
 # pin has no cache entry yet. The downloaded bytes enter the cache under the
 # digest they produce, so the next build finds them.
-proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) [fs, net, error] -> Result[Str] {
+proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[Str] {
   let partial_dir = fp"{cache_root}/partial"
   fs.mkdir(partial_dir)
   let scratch = fs.tempdir()?
@@ -695,7 +695,7 @@ export proc cargo_crate_fetch_items(
 
 # A dead host or a transient failure gets a few spaced retries. A checksum
 # mismatch or a missing `file://` path is deterministic, so neither is retried.
-proc fetch_source_item(root: Path, item: SourceFetchItem) [fs, net, time, error] -> Result[SourceFetchOutcome] {
+proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchOutcome] {
   return Cached when fs.exists(source_cache_entry(root, item.sha256))?
 
   var unavailable: List[Str] = []

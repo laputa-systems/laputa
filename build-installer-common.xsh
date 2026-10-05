@@ -3,7 +3,7 @@ use installer.host
 
 error InstallerReportError = Failed(message: Str)
 
-proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) [env] -> Record {
+proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) -> Record {
   {
     LAPUTA_INSTALLER_ARCH: arch,
     LAPUTA_INSTALLER_WORK: work.display(),
@@ -19,7 +19,7 @@ proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: 
   }
 }
 
-proc build_installer(raw_arch: Str) [fs, process, env, error] {
+proc build_installer(raw_arch: Str) {
   let arch = host.installer_arch(raw_arch)?
   let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
   let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?

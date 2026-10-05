@@ -66,7 +66,7 @@ proc root_require_sha256(value: Str, label: Str) [error] {
   }
 }
 
-proc root_require_relative_path(value: Str, label: Str) [error] {
+proc root_require_relative_path(value: Str, label: Str) {
   if value == "" or value == "." {
     return Err(types.PmError.PackageContract(f"{label} must not be empty"))
   }
@@ -104,7 +104,7 @@ proc root_validate_symlink_target(path_value: Str, target: Str) [error] {
   }
 }
 
-proc root_decode_metadata_entry(value: ArtifactEntryDto) [error] -> Result[types.ArtifactEntry] {
+proc root_decode_metadata_entry(value: ArtifactEntryDto) -> Result[types.ArtifactEntry] {
   {
     path: value.path,
     kind: types.parse_file_kind(value.kind)?,
@@ -114,7 +114,7 @@ proc root_decode_metadata_entry(value: ArtifactEntryDto) [error] -> Result[types
   }
 }
 
-proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
+proc root_validate_metadata_entry(value: types.ArtifactEntry) {
   root_require_relative_path(value.path, "artifact metadata path")
 
   if value.path == "var/lib/laputa/root.json" {
@@ -156,7 +156,7 @@ proc root_legacy_package_db_file(
   extracted: Path,
   receipt: types.ArtifactReceipt,
   name: Str,
-) [fs, error] -> Result[LegacyPackageDbFile] {
+) -> Result[LegacyPackageDbFile] {
   let root_handle = fs.open_root(extracted)?
   defer root_handle.close()
   let rel = root_legacy_package_db_path(receipt, name)
@@ -184,7 +184,7 @@ proc root_legacy_package_db_entries(
   sidecar: Record,
   dto: ArtifactMetadataDto,
   payload_entries: List[types.ArtifactEntry],
-) [fs, error] -> Result[List[types.ArtifactEntry]] {
+) -> Result[List[types.ArtifactEntry]] {
   let sandbox = fs.tempdir()?
   defer sandbox.close()?
   let extracted = fp"{sandbox.host_path()?}/payload"
@@ -235,7 +235,7 @@ proc root_legacy_package_db_entries(
   [manifest_file.entry, etcsums_file.entry, metadata_file.entry]
 }
 
-proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Result[DecodedArtifactMetadata] {
+proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArtifactMetadata] {
   let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(Record)?
   let dto = raw.require(ArtifactMetadataDto)?
   let expected_id = util.package_id(dto.name, dto.ver, dto.rel)
@@ -288,7 +288,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Resul
   {kind, entries: entries |> sort-by .path}
 }
 
-proc root_verify_entry_at(root: Path, entry: types.RootEntry) [fs, error] {
+proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
   let root_handle = fs.open_root(root)?
   defer root_handle.close()
   let rel = fp"{entry.path}"
@@ -341,7 +341,7 @@ pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry)
     and left.target == right.target
 }
 
-proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) [fs, error] {
+proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
   defer sandbox.close()?
   let sandbox_path = sandbox.host_path()?
@@ -388,7 +388,7 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
 
 proc root_verified_artifacts(
   artifacts: List[types.ArtifactReceipt],
-) [fs, error] -> Result[List[types.ArtifactReceipt]] {
+) -> Result[List[types.ArtifactReceipt]] {
   root_checked_artifacts([artifact_store.verify_receipt(artifact)? for artifact in artifacts])
 }
 
@@ -497,7 +497,7 @@ proc root_artifact_from_dto(value: RootArtifactDto) [error] -> Result[types.Root
   }
 }
 
-proc root_entry_from_dto(value: RootEntryDto) [error] -> Result[types.RootEntry] {
+proc root_entry_from_dto(value: RootEntryDto) -> Result[types.RootEntry] {
   {
     package_name: value.package_name,
     package_id: value.package_id,
@@ -520,7 +520,7 @@ pure root_receipt_dto(value: types.RootReceipt) -> RootReceiptDto {
   }
 }
 
-proc root_receipt_from_dto(value: RootReceiptDto) [error] -> Result[types.RootReceipt] {
+proc root_receipt_from_dto(value: RootReceiptDto) -> Result[types.RootReceipt] {
   var artifacts: List[types.RootArtifact] = []
   var entries: List[types.RootEntry] = []
 
@@ -535,7 +535,7 @@ proc root_receipt_from_dto(value: RootReceiptDto) [error] -> Result[types.RootRe
   {format: value.format, target: types.parse_target(value.target)?, artifacts, entries, root_sha256: value.root_sha256}
 }
 
-proc root_validate_receipt(value: types.RootReceipt) [error] {
+proc root_validate_receipt(value: types.RootReceipt) {
   let plan: types.RootPlan = types.RootPlan(
     format: "laputa-root-plan-1",
     target: value.target,
@@ -551,7 +551,7 @@ proc root_validate_receipt(value: types.RootReceipt) [error] {
   root_validate_plan(plan)
 }
 
-proc root_receipt_for_plan(value: types.RootPlan) [error] -> Result[types.RootReceipt] {
+proc root_receipt_for_plan(value: types.RootPlan) -> Result[types.RootReceipt] {
   root_validate_plan(value)
   {
     format: "laputa-root-1",
@@ -566,7 +566,7 @@ proc root_receipt_for_plan(value: types.RootPlan) [error] -> Result[types.RootRe
 # has already checked its complete payload inventory; apply only that plan's
 # canonical entries so the archive implementation cannot overwrite a sibling
 # artifact's path after the conflict check has passed.
-proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEntry) [fs, error] {
+proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEntry) {
   let source = fp"{source_root}/{entry.path}"
   let destination = fp"{output}/{entry.path}"
 
@@ -604,7 +604,7 @@ proc root_materialize_artifact(
   output: Path,
   receipt: types.ArtifactReceipt,
   entries: List[types.RootEntry],
-) [fs, error] {
+) {
   let sandbox = fs.tempdir()?
   defer sandbox.close()?
   let extracted = fp"{sandbox.host_path()?}/payload"
@@ -615,7 +615,7 @@ proc root_materialize_artifact(
   }
 }
 
-proc root_read_receipt(output: Path) [fs, error] -> Result[types.RootReceipt] {
+proc root_read_receipt(output: Path) -> Result[types.RootReceipt] {
   let dto = json.read(root_receipt_path(output))?.require(RootReceiptDto)?
   let value = root_receipt_from_dto(dto)?
   root_validate_receipt(value)
@@ -624,7 +624,7 @@ proc root_read_receipt(output: Path) [fs, error] -> Result[types.RootReceipt] {
 
 # Plans path ownership from artifact metadata. Payload archives are read only
 # for legacy metadata, whose package-database entries live in the payload.
-proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt]) [fs, error] -> Result[RootOwnership] {
+proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt]) -> Result[RootOwnership] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("root preflight target is unsupported"))
   }

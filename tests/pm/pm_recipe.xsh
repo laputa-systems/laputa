@@ -10,14 +10,14 @@ pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
 }
 
-proc expect_contract_rejection(dir: Path, description: Str) [fs, env, error] {
+proc expect_contract_rejection(dir: Path, description: Str) {
   match recipe.load_package(dir) {
     Ok(_) => test.fail(f"{description}: recipe unexpectedly loaded")
     Err(error) => test.ok(error.message != "", f"{description}: error has a message")
   }
 }
 
-proc assert_local_source_checksums(package: Str) [fs, env, error] {
+proc assert_local_source_checksums(package: Str) {
   let package_dir = fp"packages/{package}"
   let pkg = recipe.load_package(package_dir)?
 
@@ -183,7 +183,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
 
 # A stand-in executable that prints `output` only when run against the proof
 # root's libraries, and aborts otherwise.
-proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) [fs, error] {
+proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) {
   let bin = fp"{root}/usr/bin/{name}"
   fs.write(
     bin,
@@ -242,7 +242,7 @@ test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, err
   assert "wrong PSK" in bad.stderr
 }
 
-proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) [fs, error] -> Result[Path] {
+proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) -> Result[Path] {
   let dir = test.temp_dir(ctx, name:)?
   let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
   fs.write(
@@ -321,7 +321,7 @@ test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
 
 # Writes a metapackage recipe into `repo`'s packages directory. `extra` is
 # appended exports, such as an `architectures` list.
-proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) [fs, error] -> Result[Path] {
+proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) -> Result[Path] {
   let dir = fp"{repo}/packages/{name}"
   fs.mkdir(dir)
   fs.write(

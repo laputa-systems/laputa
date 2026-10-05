@@ -255,7 +255,7 @@ pure sound_headers() -> List[Str] {
   "asound_fm.h hdsp.h hdspm.h sb16_csp.h sscape_ioctl.h emu10k1.h asoc.h tlv.h".words()
 }
 
-proc install_headers(dest: Path) [fs, error] {
+proc install_headers(dest: Path) {
   let inc = fp"{dest}/usr/include"
 
   for header in alsa_headers() {
@@ -276,7 +276,7 @@ proc install_headers(dest: Path) [fs, error] {
 }
 
 # utils/alsa.pc.in and utils/alsa-topology.pc.in as configure fills them.
-proc install_pkg_config(dest: Path) [fs, error] {
+proc install_pkg_config(dest: Path) {
   fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
@@ -315,7 +315,7 @@ Cflags: -I${{includedir}}
 
 # src/conf and its cards, ctl, and pcm subdirectories install every .conf
 # file under ALSA_CONFIG_DIR with the same layout.
-proc install_config_tree(dest: Path) [fs, error] {
+proc install_config_tree(dest: Path) {
   let conf_root = path.absolute(p"src/conf")?
 
   for entry in fs.walk(conf_root, gitignore: false)? {
@@ -325,7 +325,7 @@ proc install_config_tree(dest: Path) [fs, error] {
   }
 }
 
-proc install_library(output: Path, dest: Path, stem: Str) [fs, error] {
+proc install_library(output: Path, dest: Path, stem: Str) {
   fs.install(output, fp"{dest}/usr/lib/{stem}.so.2.0.0", 0o755, parents: true, overwrite: true)
   fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so.2")
   fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so")

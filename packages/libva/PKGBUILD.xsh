@@ -222,7 +222,7 @@ export proc prepare_sources(src: Path) [fs, error] {
   fs.write(trace, trace.read_text()?.replace("syscall(__NR_gettid)", "syscall(SYS_gettid)"))
 }
 
-proc prune_install(dest: Path) [fs, error] {
+proc prune_install(dest: Path) {
   fs.remove(fp"{dest}/usr/share/doc", missing_ok: true)
   fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
 

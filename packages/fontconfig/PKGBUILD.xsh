@@ -463,7 +463,7 @@ export const filetree = [
 
 error FontconfigError = Patch(message: Str)
 
-proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
+proc replace_required(file: Path, old: Str, new: Str) {
   let text = fs.read_text(file)?
 
   if old not in text {
@@ -476,7 +476,7 @@ proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
 # Upstream's makealias.py emits hidden internal aliases for the public
 # symbols, an optimization only; empty headers build the same library with
 # PLT calls between its own functions.
-proc write_empty_alias_headers() [fs, error] {
+proc write_empty_alias_headers() {
   for header in [p"fcalias.h", p"fcaliastail.h", p"fcftalias.h", p"fcftaliastail.h"] {
     fs.write(header, "")
   }
@@ -505,7 +505,7 @@ proc write_empty_alias_headers() [fs, error] {
 # Run gperf in the directory holding its input so its output names no host path.
 # fcconst.h, fcgenericfamily.h, and fcobjshash.h go beside the sources in src/
 # that include them, where upstream relies on generated-header include paths.
-proc patch_generated_build_inputs() [fs, error] {
+proc patch_generated_build_inputs() {
   fs.install(p"generated/fccase.h", p"fc-case/fccase.h", 0o644, overwrite: true)
   fs.install(p"generated/fclang.h", p"fc-lang/fclang.h", 0o644, overwrite: true)
   fs.install(p"generated/fcconst.h", p"src/fcconst.h", 0o644, overwrite: true)

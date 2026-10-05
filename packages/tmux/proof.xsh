@@ -3,7 +3,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc check(condition: Bool, kind: Str, message: Str) [error] {
+proc check(condition: Bool, kind: Str, message: Str) {
   if ! condition {
     Err(ScriptError.Failed(kind:, message:))?
   }
@@ -110,7 +110,7 @@ set -g focus-events on
 # capabilities without a terminfo database: tmux carries built-in entries
 # compiled from ncurses' terminfo.src. Each attach runs one pane command on a
 # real pty, and the client must draw it with that terminal's own sequences.
-proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp: Path, config: Path) [fs, process, env, error] {
+proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp: Path, config: Path) {
   let driver = proof.pty_driver(tmp)?
   # The marker is assembled at run time so that only the pane's output, never
   # the command text, can match it.

@@ -50,14 +50,14 @@ const gnu_outputs = [
 # Compile C against the proof root's own musl: the runner's `cc` builds with
 # the root as sysroot and records the root's dynamic linker, so the program
 # exercises the root's libc rather than the runner's. Native targets only.
-proc compile_root_c_program(rootfs: Path, source: Path, output: Path) [process, env, error] {
+proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
   let lib = fp"{rootfs}/usr/lib"
   run $cc f"--target={arch}-linux-musl" f"--sysroot={rootfs}" "-dynamic" f"-I{rootfs}/usr/include" f"-L{lib}" f"-Wl,-rpath,{lib}" f"-Wl,-dynamic-linker,{lib}/ld-musl-{arch}.so.1" $source "-o" $output ?
 }
 
-proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
+proc prove_scanner(rootfs: Path, flex: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-flex"
   fs.remove(tmp, missing_ok: true)
   fs.mkdir(tmp)

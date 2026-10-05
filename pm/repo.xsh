@@ -38,7 +38,7 @@ proc repo_verify_node_receipt(value: types.BuildPlan, node: types.PlanNode, rece
   }
 }
 
-proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) [fs, error] -> Result[types.PackageKind] {
+proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) -> Result[types.PackageKind] {
   let metadata = fp"{receipt.artifact_dir}/metadata.json"
   let raw = json.read(metadata)?.require(Record)?
   let core = raw.require(RepoArtifactMetadataDto)?
@@ -59,7 +59,7 @@ proc repo_verified_proof_path(
   store_root: Path,
   node: types.PlanNode,
   receipt: types.ArtifactReceipt,
-) [fs, error] -> Result[Path] {
+) -> Result[Path] {
   let primary = fp"{receipt.artifact_dir}/proof.json"
 
   if receipt.origin == types.artifact_origin_remote() {
@@ -111,7 +111,7 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
   {format: "laputa-repo-snapshot-1", target: value.target, plan_sha256: value.plan_sha256, packages}
 }
 
-proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, output: Path) [fs, error] -> Result[Path] {
+proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, output: Path) -> Result[Path] {
   let raw = json.read(value.metadata)?.require(RepoArtifactMetadataDto)?
   let metadata = fp"{output}/{value.node.artifact_key}.json"
   fs.mkdir(metadata.parent)
@@ -135,7 +135,7 @@ proc repo_publication_entry(
   value: types.RepoPublication,
   arch: Str,
   metadata: Path,
-) [fs, error] -> Result[types.RemotePackage] {
+) -> Result[types.RemotePackage] {
   let node = value.node
   let payload_rel = util.remote_binary_rel(arch, node.name, node.ver, node.rel, node.artifact_key)
   let metadata_rel = util.remote_metadata_rel(arch, node.name, node.ver, node.rel, node.artifact_key, node.proof_key)
@@ -181,7 +181,7 @@ proc repo_publication_entry(
   }
 }
 
-proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage) [] -> Bool {
+proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage) -> Bool {
   left.arch == right.arch and left.name == right.name and left.ver == right.ver and left.rel == right.rel and left.deps == right.deps and left.runtime_only_deps == right.runtime_only_deps and left.mkdeps_host == right.mkdeps_host and left.mkdeps_target == right.mkdeps_target and left.sha256 == right.sha256 and left.size == right.size and left.tarball == right.tarball and left.metadata == right.metadata and left.metadata_sha256 == right.metadata_sha256 and left.artifact_key == right.artifact_key and left.recipe_sha256 == right.recipe_sha256 and left.executor_sha256 == right.executor_sha256 and left.proof_key == right.proof_key and left.proof_sha256 == right.proof_sha256 and left.proof == right.proof and left.proof_receipt_sha256 == right.proof_receipt_sha256 and left.source_sha256 == right.source_sha256 and left.metapackage == right.metapackage
 }
 
@@ -224,7 +224,7 @@ proc repo_merge_publication(
   {index: updated |> sort-by { |item| f"{item.arch}\t{item.name}" }, already_published: false}
 }
 
-proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token: Str, work: Path) [fs, net, error] {
+proc repo_publish_immutable_object(repo_url: Str, rel: Path, source: Path, token: Str, work: Path) {
   let _ = remote.upload_immutable_repo_file(repo_url, rel, source, token, work)?
 }
 

@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 error ProofError = Failed(kind: Str, message: Str)
 
-proc ensure_file(path_value: Path, label: Str) [fs, error] {
+proc ensure_file(path_value: Path, label: Str) {
   guard fs.exists(path_value)? else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing {label}: {path_value}"))?
   }
@@ -13,7 +13,7 @@ proc ensure_file(path_value: Path, label: Str) [fs, error] {
   }
 }
 
-proc ensure_config(config_path: Path, key: Str, label: Str) [fs, error] {
+proc ensure_config(config_path: Path, key: Str, label: Str) {
   guard config_path.exists()? else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing config for {label} check: {config_path}"))?
   }
@@ -27,7 +27,7 @@ proc ensure_config(config_path: Path, key: Str, label: Str) [fs, error] {
   return Err(ProofError.Failed(kind: "proof-linux", message: f"{label}: expected {key}=y not found in {config_path}"))?
 }
 
-proc ensure_x86_bzimage(image_path: Path) [fs, error] {
+proc ensure_x86_bzimage(image_path: Path) {
   let meta = fs.metadata(image_path)?
 
   if meta.size < 518 {

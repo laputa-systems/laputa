@@ -125,7 +125,7 @@ pure rust_triple(arch: Str) -> Str {
   f"{arch}-unknown-linux-musl"
 }
 
-proc ensure_locked_v8(lockfile: Path) [fs, error] {
+proc ensure_locked_v8(lockfile: Path) {
   for item in pm_sources.cargo_lock_crates(lockfile)? {
     if item.name == "v8" and item.version != rusty_v8_ver {
       return Err(DenoBuildError.V8Mismatch(locked: item.version, pinned: rusty_v8_ver))

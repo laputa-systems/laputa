@@ -73,7 +73,7 @@ pure token(tokens: List[Str], index: Int) -> Str {
   ""
 }
 
-proc parse_or(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
+proc parse_or(tokens: List[Str], start: Int) -> Result[Parsed] {
   let first = parse_and(tokens, start)?
   var parts = [first.cond]
   var at = first.next
@@ -87,7 +87,7 @@ proc parse_or(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
   {cond: combine(parts, "||"), next: at}
 }
 
-proc parse_and(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
+proc parse_and(tokens: List[Str], start: Int) -> Result[Parsed] {
   let first = parse_unary(tokens, start)?
   var parts = [first.cond]
   var at = first.next
@@ -101,7 +101,7 @@ proc parse_and(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
   {cond: combine(parts, "&&"), next: at}
 }
 
-proc parse_unary(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
+proc parse_unary(tokens: List[Str], start: Int) -> Result[Parsed] {
   if token(tokens, start) == "!" {
     let inner = parse_unary(tokens, start + 1)?
     return {cond: negate(inner.cond), next: inner.next}
@@ -110,7 +110,7 @@ proc parse_unary(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
   parse_primary(tokens, start)?
 }
 
-proc parse_primary(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
+proc parse_primary(tokens: List[Str], start: Int) -> Result[Parsed] {
   let first = token(tokens, start)
 
   if first == "(" {
@@ -187,7 +187,7 @@ pure touches(expr: Str) -> Bool {
   false
 }
 
-proc directive_cond(found: Directive) [error] -> Result[Cond] {
+proc directive_cond(found: Directive) -> Result[Cond] {
   return defined_cond(found.expr) when found.kind == "ifdef"
 
   return negate(defined_cond(found.expr)) when found.kind == "ifndef"

@@ -261,7 +261,7 @@ export const filetree = [
   },
 ]
 
-proc patch_cmake() [fs, error] {
+proc patch_cmake() {
   let path_value = p"cmake/AddEventLibrary.cmake"
 
   let text = path_value.read_text()?.replace(
@@ -278,7 +278,7 @@ proc patch_cmake() [fs, error] {
   fs.write(path_value, text)
 }
 
-proc create_unversioned_links() [fs, error] {
+proc create_unversioned_links() {
   let libdir = p"build/lib"
 
   for library_name in ["event_core", "event_extra", "event_pthreads", "event"] {

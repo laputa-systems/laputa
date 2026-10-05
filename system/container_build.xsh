@@ -63,11 +63,11 @@ pure container_work_disk(work: Path) -> Path {
   fp"{work}/disk.img"
 }
 
-proc container_load_profile(name: Str) [fs, error] -> Result[types.SystemProfile] {
+proc container_load_profile(name: Str) -> Result[types.SystemProfile] {
   system_profile.load_system_profile(name, /src/laputa/profiles)?
 }
 
-proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, error] -> Result[Path] {
+proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Result[Path] {
   let source = container_overlay_root(profile.name)
   let overlay = fp"{work}/overlay"
   let guest_proof = container_guest_proof_source()
@@ -106,7 +106,7 @@ proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemPro
   }
 }
 
-proc container_stage_build_plan(work: Path) [fs, error] -> Result[Path] {
+proc container_stage_build_plan(work: Path) -> Result[Path] {
   let source = container_build_plan_path()
   let staged = container_work_build_plan(work)
 
@@ -163,7 +163,7 @@ proc container_generation_plan(
   build_plan: Path,
   profile: types.SystemProfile,
   overlay: Path,
-) [fs, error] -> Result[pm_types.GenerationPlan] {
+) -> Result[pm_types.GenerationPlan] {
   let overlay_profile = pm_generation.overlay_profile(overlay)?
   if overlay_profile.name != profile.name {
     return Err(ContainerBuildError.Failed("generation overlay profile does not match the system profile"))
@@ -175,7 +175,7 @@ proc container_generation_plan(
 # Extract only the profile-declared kernel from the exact artifact selected by the saved BuildPlan.
 # Laputa owns no PM archive logic: the child PM process verifies and extracts the
 # immutable artifact before this container can publish an image.
-proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, output: Path) [fs, process, error] {
+proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, output: Path) {
   container_pm(
     [
       "store",
@@ -197,7 +197,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
   }
 }
 
-proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, error] {
+proc container_build_images(root: Path, rootfs: Path, disk: Path) {
   image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, rootfs)
   image.write_disk(rootfs, disk)
   image.verify_disk(disk, fs.metadata(rootfs)?.size)
@@ -207,7 +207,7 @@ proc container_system_key(
   build_plan: Path,
   generation_manifest: Path,
   profile: types.SystemProfile,
-) [fs, error] -> Result[Str] {
+) -> Result[Str] {
   let manifest = json.read(generation_manifest)?.require(Record)?
   let generation_sha256: Str = manifest.get("generation_sha256")?.require()?
   let plan_value = json.read(build_plan)?.require(Record)?
@@ -231,7 +231,7 @@ proc container_system_key(
     .hex()
 }
 
-proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, error] {
+proc container_publish_execution(work: Path, profile: types.SystemProfile) {
   let key = container_system_key(container_work_build_plan(work), container_work_generation_manifest(work), profile)?
   container_output.publish_bundle(
     container_output_root(),
@@ -246,7 +246,7 @@ proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, 
   )
 }
 
-proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net, process, env, time, error] {
+proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
   let handle = fs.tempdir()?
   defer handle.close()?
   let work = handle.host_path()?

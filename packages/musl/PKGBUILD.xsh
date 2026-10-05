@@ -134,7 +134,7 @@ pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   re.captures(text)
 }
 
-proc compiler_rt_builtins(arch: Str) [fs, error] -> Result[List[Path]] {
+proc compiler_rt_builtins(arch: Str) -> Result[List[Path]] {
   let target_root = p"llvm-toolchain-target"
 
   let candidates = [

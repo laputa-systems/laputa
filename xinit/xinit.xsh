@@ -107,7 +107,7 @@ Usage:
 """
 }
 
-proc env_value(name: Str, fallback: Str) [env] -> Str {
+proc env_value(name: Str, fallback: Str) -> Str {
   if let Ok(value) = env.get(name) {
     guard value.trim() == "" else {
       return value
@@ -117,12 +117,12 @@ proc env_value(name: Str, fallback: Str) [env] -> Str {
   fallback
 }
 
-proc env_enabled(name: Str) [env] -> Bool {
+proc env_enabled(name: Str) -> Bool {
   let value = env_value(name, "")
   value == "1" or value == "true" or value == "yes" or value == "on"
 }
 
-proc env_int(name: Str, fallback: Int) [env, error] -> Result[Int] {
+proc env_int(name: Str, fallback: Int) -> Result[Int] {
   let value = env_value(name, "")
 
   return fallback when value == ""
@@ -142,11 +142,11 @@ proc log_root() [env, error] -> Result[Path] {
   fp"{env_value("XINIT_LOG_ROOT", "/var/log")}"
 }
 
-proc inbox_dir() [env, error] -> Result[Path] {
+proc inbox_dir() -> Result[Path] {
   fp"{run_dir()?.display()}/inbox"
 }
 
-proc scanner_marker_path() [env, error] -> Result[Path] {
+proc scanner_marker_path() -> Result[Path] {
   fp"{run_dir()?.display()}/scanner.json"
 }
 
@@ -198,7 +198,7 @@ proc parse_inittab_line(line: Str, index: Int) [process, error] -> Result[Initta
   {key: f"{index}:{fields[0].trim()}", id: fields[0].trim(), action, command, argv}
 }
 
-proc parse_inittab(path_value: Path) [fs, process, error] -> Result[List[InittabEntry]] {
+proc parse_inittab(path_value: Path) -> Result[List[InittabEntry]] {
   var entries: List[InittabEntry] = []
   var index = 1
 
@@ -215,7 +215,7 @@ proc parse_inittab(path_value: Path) [fs, process, error] -> Result[List[Inittab
   entries
 }
 
-proc run_phase(entries: List[InittabEntry], action: Str) [process, error] {
+proc run_phase(entries: List[InittabEntry], action: Str) {
   for entry in entries {
     if entry.action == action {
       let status = process.run(command_from_argv(entry.argv))?
@@ -266,7 +266,7 @@ proc spawn_entries(
   runtime: List[RuntimeEntry],
   launch_limit: Int,
   delay_ms: Int,
-) [process, time, error] -> Result[List[RuntimeEntry]] {
+) -> Result[List[RuntimeEntry]] {
   var out = runtime
   let now = time.now()
 
@@ -306,7 +306,7 @@ proc spawn_entries(
   out
 }
 
-proc mark_dead(entries: List[InittabEntry], runtime: List[RuntimeEntry], pid: Int) [error] -> DeadMark {
+proc mark_dead(entries: List[InittabEntry], runtime: List[RuntimeEntry], pid: Int) -> DeadMark {
   var out = runtime
   var event = ""
 
@@ -353,7 +353,7 @@ pure should_exit_idle(
   true
 }
 
-proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], fast: Bool) [process, error] {
+proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], fast: Bool) {
   var groups = []
 
   for entry in entries {
@@ -372,7 +372,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
   }
 }
 
-proc finalize(kind: Str) [fs, process, env, time, error] {
+proc finalize(kind: Str) {
   let action_log = env_value("XSH_INIT_TEST_ACTION_LOG", "")
 
   if action_log != "" {
@@ -397,7 +397,7 @@ proc finalize(kind: Str) [fs, process, env, time, error] {
   }
 }
 
-proc run_pid1(inittab: Path) [fs, process, env, time, error] {
+proc run_pid1(inittab: Path) {
   let allow = env_enabled("XINIT_TEST_ALLOW_NON_PID1") or env_enabled("XSH_INIT_TEST_ALLOW_NON_PID1")
   unix.pid1_setup(["HUP", "TERM", "USR1", "USR2", "INT"], subreaper: true, allow_non_pid1: allow)
   let entries = parse_inittab(inittab)?
@@ -460,7 +460,7 @@ proc run_pid1(inittab: Path) [fs, process, env, time, error] {
   finalize(event)
 }
 
-proc service_path(target: Str) [env, error] -> Result[Path] {
+proc service_path(target: Str) -> Result[Path] {
   return fp"{target}" when "/" in target or target.ends_with(".xsh")
 
   fp"{service_dir()?.display()}/{target}.xsh"
@@ -470,7 +470,7 @@ pure builtin_facilities() -> List[Str] {
   ["logger", "net", "dns", "firewall"]
 }
 
-proc require_service_file(path_value: Path) [fs, error] {
+proc require_service_file(path_value: Path) {
   guard path_value.exists()? else {
     return Err(
       XinitError.Failed(
@@ -489,19 +489,19 @@ pure field_context(source: Path, field: Str) -> Str {
 
 # Optional service-record keys. An absent key yields the fallback; a present
 # key must hold the declared type (a present null is a type error, not absence).
-proc field_str(raw: Record, field: Str, fallback: Str, source: Path) [error] -> Result[Str] {
+proc field_str(raw: Record, field: Str, fallback: Str, source: Path) -> Result[Str] {
   return fallback when field not in raw
 
   raw.get(field)?.require(Str).context("xinit-service", field_context(source, field))?
 }
 
-proc field_int(raw: Record, field: Str, fallback: Int, source: Path) [error] -> Result[Int] {
+proc field_int(raw: Record, field: Str, fallback: Int, source: Path) -> Result[Int] {
   return fallback when field not in raw
 
   raw.get(field)?.require(Int).context("xinit-service", field_context(source, field))?
 }
 
-proc field_str_list(raw: Record, field: Str, source: Path) [error] -> Result[List[Str]] {
+proc field_str_list(raw: Record, field: Str, source: Path) -> Result[List[Str]] {
   return [] when field not in raw
 
   raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, field))?
@@ -509,7 +509,7 @@ proc field_str_list(raw: Record, field: Str, source: Path) [error] -> Result[Lis
 
 # A nested optional section (`restart`, `dependencies`, ...); absent reads as an
 # empty record so every key inside it takes its default.
-proc field_record(raw: Record, field: Str, source: Path) [error] -> Result[Record] {
+proc field_record(raw: Record, field: Str, source: Path) -> Result[Record] {
   if field not in raw {
     let empty: Record = {}
     return empty
@@ -598,7 +598,7 @@ proc load_service_path(path_value: Path) [fs, process, env, error] -> Result[Ser
   service_from_record(path_value, loaded.service)?
 }
 
-proc load_service(target: Str) [fs, process, env, error] -> Result[Service] {
+proc load_service(target: Str) -> Result[Service] {
   let path_value = service_path(target)?
   let service = load_service_path(path_value)?
 
@@ -612,7 +612,7 @@ proc load_service(target: Str) [fs, process, env, error] -> Result[Service] {
   )
 }
 
-proc all_services() [fs, process, env, error] -> Result[List[Service]] {
+proc all_services() -> Result[List[Service]] {
   let dir = service_dir()?
 
   return [] unless dir.exists()?
@@ -719,7 +719,7 @@ pure required_closure(services: List[Service], name: Str, out: List[Str]) -> Res
   next
 }
 
-proc required_names(name: Str) [fs, process, env, error] -> Result[List[Str]] {
+proc required_names(name: Str) -> Result[List[Str]] {
   var services = all_services()?
 
   if ! contains_name(services, name) {
@@ -729,7 +729,7 @@ proc required_names(name: Str) [fs, process, env, error] -> Result[List[Str]] {
   required_closure(services, name, [])?
 }
 
-proc plan_service_start(name: Str) [fs, process, env, error] -> Result[List[Str]] {
+proc plan_service_start(name: Str) -> Result[List[Str]] {
   var services = all_services()?
 
   if ! contains_name(services, name) {
@@ -741,7 +741,7 @@ proc plan_service_start(name: Str) [fs, process, env, error] -> Result[List[Str]
   planned.out
 }
 
-proc plan_target_start(target: Str) [fs, process, env, error] -> Result[List[Str]] {
+proc plan_target_start(target: Str) -> Result[List[Str]] {
   let services = all_services()?
   check_service_graph(services)
   var out = []
@@ -758,7 +758,7 @@ proc plan_target_start(target: Str) [fs, process, env, error] -> Result[List[Str
   out
 }
 
-proc state_path(name: Str) [env, error] -> Result[Path] {
+proc state_path(name: Str) -> Result[Path] {
   fp"{run_dir()?.display()}/{name}.json"
 }
 
@@ -783,7 +783,7 @@ pure default_status(name: Str) -> SavedStatus {
 # another user's process); in both cases the saved state is stale, so we treat
 # it as not alive. xinit runs as root over its own children, so EPERM does not
 # arise for legitimately-owned services in practice.
-proc pid_alive(pid: Int) [process] -> Bool {
+proc pid_alive(pid: Int) -> Bool {
   guard pid > 0 else {
     return false
   }
@@ -795,7 +795,7 @@ proc pid_alive(pid: Int) [process] -> Bool {
 }
 
 # The kernel start time (epoch ms) of a live pid, or 0 if it is not found.
-proc pid_start_time(pid: Int) [process, error] -> Result[Int] {
+proc pid_start_time(pid: Int) -> Result[Int] {
   guard pid > 0 else {
     return 0
   }
@@ -812,7 +812,7 @@ proc pid_start_time(pid: Int) [process, error] -> Result[Int] {
 # start-time check closes the window the bare liveness probe leaves open when a
 # dead service's pid is recycled into an unrelated process. A baseline of 0
 # (e.g. scanner-managed units, which clear the pid on child exit) skips it.
-proc pid_live_and_ours(pid: Int, start_time_ms: Int) [process, error] -> Result[Bool] {
+proc pid_live_and_ours(pid: Int, start_time_ms: Int) -> Result[Bool] {
   guard pid_alive(pid) else {
     return false
   }
@@ -822,7 +822,7 @@ proc pid_live_and_ours(pid: Int, start_time_ms: Int) [process, error] -> Result[
   pid_start_time(pid)? == start_time_ms
 }
 
-proc read_status(name: Str) [fs, process, env, error] -> Result[SavedStatus] {
+proc read_status(name: Str) -> Result[SavedStatus] {
   let path_value = state_path(name)?
 
   return default_status(name) unless path_value.exists()?
@@ -899,7 +899,7 @@ proc status_line(status: SavedStatus) [error] -> Str {
   line
 }
 
-proc log_path(name: Str) [env, error] -> Result[Path] {
+proc log_path(name: Str) -> Result[Path] {
   fp"{log_root()?.display()}/{name}/current"
 }
 
@@ -911,7 +911,7 @@ proc rotated_log_path(current: Path, index: Int) [error] -> Result[Path] {
 # (current.1 newest). Uses copy-then-truncate so a running child's append fd
 # stays valid; a write landing between the copy and the truncate may be lost,
 # which is the accepted V1 tradeoff for in-process rotation without log reopen.
-proc rotate_log(name: Str, keep: Int) [fs, env, error] {
+proc rotate_log(name: Str, keep: Int) {
   let current = log_path(name)?
   rotated_log_path(current, keep)?.remove(missing_ok: true)
   var index = keep - 1
@@ -930,7 +930,7 @@ proc rotate_log(name: Str, keep: Int) [fs, env, error] {
   current.truncate(0)
 }
 
-proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) [fs, env, error] {
+proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) {
   return when max_size <= 0 or keep <= 0
 
   let current = log_path(name)?
@@ -942,7 +942,7 @@ proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) [fs, env, error] {
   }
 }
 
-proc wait_ready(service: Service) [fs, process, env, time, error] -> Result[Bool] {
+proc wait_ready(service: Service) -> Result[Bool] {
   require_service_file(service.path)
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
@@ -959,7 +959,7 @@ proc wait_ready(service: Service) [fs, process, env, time, error] -> Result[Bool
   false
 }
 
-proc run_start_proc(service: Service) [fs, process, env, error] -> Result[Bool] {
+proc run_start_proc(service: Service) -> Result[Bool] {
   require_service_file(service.path)
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
@@ -971,7 +971,7 @@ proc run_start_proc(service: Service) [fs, process, env, error] -> Result[Bool] 
   false
 }
 
-proc run_stop_proc(service: Service) [fs, process, env, time, error] -> Result[Bool] {
+proc run_stop_proc(service: Service) -> Result[Bool] {
   require_service_file(service.path)
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
@@ -983,7 +983,7 @@ proc run_stop_proc(service: Service) [fs, process, env, time, error] -> Result[B
   false
 }
 
-proc run_reload_proc(service: Service) [fs, process, env, error] -> Result[Bool] {
+proc run_reload_proc(service: Service) -> Result[Bool] {
   require_service_file(service.path)
   let loaded = module.load(service.path)?.require(ServiceFile)?
 
@@ -997,7 +997,7 @@ proc run_reload_proc(service: Service) [fs, process, env, error] -> Result[Bool]
 
 # Reload a running service in place: run its `reload()` hook if it has one,
 # otherwise send SIGHUP to its process group (the usual reload convention).
-proc reload_unit(service: Service, pid: Int) [fs, process, env, error] {
+proc reload_unit(service: Service, pid: Int) {
   if run_reload_proc(service)? {} else if pid > 0 {
     unix.kill_process_group(pid, "HUP")
   }
@@ -1012,7 +1012,7 @@ proc spawn_service(
   service: Service,
   restarts: Int,
   notify: Bool,
-) [fs, process, env, time, error] -> Result[SpawnResult] {
+) -> Result[SpawnResult] {
   let cgroup_path = if service.cpu_max > 0 and env_enabled("XSH_UNIX_DRY_RUN") and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
   } else {
@@ -1098,7 +1098,7 @@ proc spawn_service(
   }
 }
 
-proc start_one_service(name: Str) [fs, process, env, time, error] -> Result[SavedStatus] {
+proc start_one_service(name: Str) -> Result[SavedStatus] {
   let current = read_status(name)?
 
   return current when current.pid > 0 and current.state == "running"
@@ -1134,7 +1134,7 @@ proc start_one_service(name: Str) [fs, process, env, time, error] -> Result[Save
 
 # True when a live scanner owns this run directory. Skipped under
 # XSH_UNIX_DRY_RUN (pids are mocked there), so test-mode start/stop stay direct.
-proc scanner_active() [fs, process, env, error] -> Result[Bool] {
+proc scanner_active() -> Result[Bool] {
   return false when env_enabled("XSH_UNIX_DRY_RUN")
 
   let marker = scanner_marker_path()?
@@ -1153,7 +1153,7 @@ proc request_desired(name: Str, desired: Str) [fs, process, env, error] {
   print f"{name} {desired} queued"
 }
 
-proc start_service(name: Str) [fs, process, env, time, error] {
+proc start_service(name: Str) {
   # When a scanner owns the tree it is the source of truth: post a desired-state
   # request rather than spawning a second, unsupervised copy.
   if scanner_active()? {
@@ -1179,7 +1179,7 @@ proc start_service(name: Str) [fs, process, env, time, error] {
   print status_line(last)
 }
 
-proc running_dependents(name: Str) [fs, process, env, error] -> Result[List[Str]] {
+proc running_dependents(name: Str) -> Result[List[Str]] {
   let services = all_services()?
   var out = []
 
@@ -1196,7 +1196,7 @@ proc running_dependents(name: Str) [fs, process, env, error] -> Result[List[Str]
   out
 }
 
-proc stop_service(name: Str) [fs, process, env, time, error] {
+proc stop_service(name: Str) {
   if scanner_active()? {
     request_desired(name, "down")
     return
@@ -1237,7 +1237,7 @@ proc stop_service(name: Str) [fs, process, env, time, error] {
   print status_line(stopped)
 }
 
-proc restart_service(name: Str) [fs, process, env, time, error] {
+proc restart_service(name: Str) {
   # Under a scanner, restart is a single inbox action so the scanner does the
   # teardown-and-respawn itself; a direct stop+start here would race it and
   # spawn an unsupervised second copy.
@@ -1262,7 +1262,7 @@ proc reload_service(name: Str) [fs, process, env, time, error] {
   print status_line(current)
 }
 
-proc show_status(name: Str) [fs, process, env, error] {
+proc show_status(name: Str) {
   var current = read_status(name)?
 
   if let Ok(loaded) = load_service(name) {
@@ -1283,7 +1283,7 @@ proc show_status(name: Str) [fs, process, env, error] {
   print status_line(current)
 }
 
-proc show_logs(name: Str) [fs, env, error, io] {
+proc show_logs(name: Str) {
   let current = log_path(name)?
 
   if current.exists()? {
@@ -1291,7 +1291,7 @@ proc show_logs(name: Str) [fs, env, error, io] {
   }
 }
 
-proc check_service(...targets: List[Str]) [fs, process, env, error] {
+proc check_service(...targets: List[Str]) {
   let services = if targets.len() == 0 { all_services()? } else { [load_service(targets[0])?] }
   check_service_graph(services)
   let names = [service.name for service in services].join(" ")
@@ -1384,7 +1384,7 @@ pure all_units_stopped(units: List[ServiceUnit]) -> Bool {
 # or — if the ready timeout elapses — promoted to running but not ready, so a
 # silent service does not wedge the scanner. The readiness fd is released either
 # way.
-proc advance_readiness(unit: ServiceUnit, now: Int) [fs, process, env, error] -> Result[ServiceUnit] {
+proc advance_readiness(unit: ServiceUnit, now: Int) -> Result[ServiceUnit] {
   let ready = unit.notify_fd > 0 and unix.notify_ready(unit.notify_fd)?
   let timed_out = now - unit.started_at >= unit.service.ready_timeout_ms
 
@@ -1457,7 +1457,7 @@ proc reconcile_one(
   unit: ServiceUnit,
   units: List[ServiceUnit],
   now: Int,
-) [fs, process, env, time, error] -> Result[ServiceUnit] {
+) -> Result[ServiceUnit] {
   return advance_readiness(unit, now)? when unit.state == "starting"
 
   return unit when unit.desired != "up"
@@ -1495,7 +1495,7 @@ proc reconcile_one(
 
 # Reconcile every unit against a single start-of-pass snapshot, so gating reads
 # consistent dependency states regardless of iteration order.
-proc reconcile_all(units: List[ServiceUnit], now: Int) [fs, process, env, time, error] -> Result[List[ServiceUnit]] {
+proc reconcile_all(units: List[ServiceUnit], now: Int) -> Result[List[ServiceUnit]] {
   [reconcile_one(unit, units, now)? for unit in units]
 }
 
@@ -1522,7 +1522,7 @@ pure finishing_unit(unit: ServiceUnit) -> ServiceUnit {
 # Run a service's finish() cleanup hook after its instance has exited (on stop
 # or crash). While the hook runs the unit is reported as "finishing". A service
 # with no finish() hook is left untouched.
-proc run_finish(unit: ServiceUnit) [fs, process, env, error] {
+proc run_finish(unit: ServiceUnit) {
   require_service_file(unit.service.path)
   let loaded = module.load(unit.service.path)?.require(ServiceFile)?
 
@@ -1536,7 +1536,7 @@ proc mark_unit_dead(
   unit: ServiceUnit,
   child_status: Status,
   now: Int,
-) [fs, process, env, error] -> Result[ServiceUnit] {
+) -> Result[ServiceUnit] {
   # The child is already gone; release any readiness fd it held, then run the
   # finish() cleanup hook before deciding the unit's next state.
   if unit.notify_fd > 0 {
@@ -1594,7 +1594,7 @@ proc mark_children_dead(
   child_pid: Int,
   child_status: Status,
   now: Int,
-) [fs, process, env, error] -> Result[List[ServiceUnit]] {
+) -> Result[List[ServiceUnit]] {
   var out: List[ServiceUnit] = []
 
   for unit in units {
@@ -1611,7 +1611,7 @@ proc mark_children_dead(
 # Tear down a unit's running instance: run its `stop()` hook if it has one,
 # otherwise TERM then KILL the process group. No status write; callers decide
 # the resulting unit state.
-proc kill_unit(unit: ServiceUnit) [fs, process, env, time, error] {
+proc kill_unit(unit: ServiceUnit) {
   if unit.notify_fd > 0 {
     unix.notify_close(unit.notify_fd)
   }
@@ -1631,7 +1631,7 @@ proc kill_unit(unit: ServiceUnit) [fs, process, env, time, error] {
 
 # Stop a unit directly, with no dependency-refusal check (that belongs to the
 # operator-facing `stop` command, not to scanner-driven shutdown).
-proc stop_unit(unit: ServiceUnit) [fs, process, env, time, error] -> Result[ServiceUnit] {
+proc stop_unit(unit: ServiceUnit) -> Result[ServiceUnit] {
   kill_unit(unit)
 
   let stopped: ServiceUnit = ServiceUnit(
@@ -1652,12 +1652,12 @@ proc stop_unit(unit: ServiceUnit) [fs, process, env, time, error] -> Result[Serv
   stopped
 }
 
-proc shutdown_all(units: List[ServiceUnit]) [fs, process, env, time, error] -> Result[List[ServiceUnit]] {
+proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   let reversed = [stop_unit(unit)? for unit in reverse_units(units)]
   reverse_units(reversed)
 }
 
-proc write_scanner_marker() [fs, process, env, error] {
+proc write_scanner_marker() {
   let dir = run_dir()?
   dir.mkdir()
   json.write(scanner_marker_path()?, {pid: process.current_pid()?})
@@ -1666,7 +1666,7 @@ proc write_scanner_marker() [fs, process, env, error] {
 # Apply one desired-state request to a single unit. "down" stops a running unit
 # and parks it; "up" makes it schedulable again (reconcile spawns it on the next
 # pass). A request for a different unit name is a no-op.
-proc apply_one(unit: ServiceUnit, name: Str, desired: Str) [fs, process, env, time, error] -> Result[ServiceUnit] {
+proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit] {
   guard unit.service.name == name else {
     return unit
   }
@@ -1748,7 +1748,7 @@ proc apply_request(
   units: List[ServiceUnit],
   name: Str,
   desired: Str,
-) [fs, process, env, time, error] -> Result[List[ServiceUnit]] {
+) -> Result[List[ServiceUnit]] {
   [apply_one(unit, name, desired)? for unit in units]
 }
 
@@ -1756,7 +1756,7 @@ proc apply_request(
 # "up" or "down". This is the supervisor side of the control plane — operators
 # (and `start`/`stop` when a scanner owns the tree) post desired-state requests
 # rather than signalling a pid, so the scanner stays the source of truth.
-proc drain_inbox(units: List[ServiceUnit]) [fs, process, env, time, error] -> Result[List[ServiceUnit]] {
+proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   let dir = inbox_dir()?
 
   return units unless dir.exists()?
@@ -1834,7 +1834,7 @@ pure next_wait_ms(units: List[ServiceUnit], now: Int) -> Int {
 # Bound the logs of running services: a long-lived instance that never restarts
 # would otherwise grow `current` without limit. Copy-truncates over the cap each
 # pass; the rotate-on-spawn path covers services that crash and restart.
-proc enforce_log_caps(units: List[ServiceUnit]) [fs, env, error] {
+proc enforce_log_caps(units: List[ServiceUnit]) {
   for unit in units {
     if unit.state == "running" and unit.service.log == "append" {
       maybe_rotate_log(unit.service.name, unit.service.log_max_size, unit.service.log_keep)
@@ -1842,7 +1842,7 @@ proc enforce_log_caps(units: List[ServiceUnit]) [fs, env, error] {
   }
 }
 
-proc scan_units(names: List[Str]) [fs, process, env, time, error] {
+proc scan_units(names: List[Str]) {
   unix.pid1_setup(["HUP", "TERM", "INT"], subreaper: true, allow_non_pid1: true)
   var units = [unit_init(load_service(name)?) for name in names]
   var remaining = env_int("XINIT_TEST_MAX_EVENTS", -1)?
@@ -1880,16 +1880,16 @@ proc scan_units(names: List[Str]) [fs, process, env, time, error] {
   }
 }
 
-proc supervise_service(name: Str) [fs, process, env, time, error] {
+proc supervise_service(name: Str) {
   scan_units([name])
 }
 
-proc scan_command(target: Str) [fs, process, env, time, error] {
+proc scan_command(target: Str) {
   let names = match load_service(target) { Ok(_) => plan_service_start(target)?, Err(_) => plan_target_start(target)? }
   scan_units(names)
 }
 
-proc boot_target(target: Str) [fs, process, env, time, error] {
+proc boot_target(target: Str) {
   var last = default_status(target)
 
   for item in plan_target_start(target)? {
@@ -1899,14 +1899,14 @@ proc boot_target(target: Str) [fs, process, env, time, error] {
   print status_line(last)
 }
 
-proc list_services() [fs, process, env, error] {
+proc list_services() {
   for service in all_services()? {
     let status = read_status(service.name)?
     print f"{service.name} {service.kind} targets={service.targets.join(",")} state={status.state} ready={status.ready}"
   }
 }
 
-proc graph_target(target: Str) [fs, process, env, error] {
+proc graph_target(target: Str) {
   let plan = plan_target_start(target)?
 
   for item in plan {
@@ -1916,7 +1916,7 @@ proc graph_target(target: Str) [fs, process, env, error] {
   }
 }
 
-proc graph_service(name: Str) [fs, process, env, error] {
+proc graph_service(name: Str) {
   for item in plan_service_start(name)? {
     let service = load_service(item)?
     let deps = dependency_edges(service).join(",")
@@ -1924,7 +1924,7 @@ proc graph_service(name: Str) [fs, process, env, error] {
   }
 }
 
-proc control(verb: Str, name: Str) [fs, process, env, time, error, io] {
+proc control(verb: Str, name: Str) {
   if verb == "start" or verb == "up" {
     start_service(name)
   } else if verb == "stop" or verb == "down" {

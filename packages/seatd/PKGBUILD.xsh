@@ -80,7 +80,7 @@ export const filetree = [
   },
 ]
 
-proc patch_realtime_dependency() [fs, error] {
+proc patch_realtime_dependency() {
   let meson = p"meson.build"
   let text = fs.read_text(meson)?
 

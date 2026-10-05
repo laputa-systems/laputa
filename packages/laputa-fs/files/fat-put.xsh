@@ -6,15 +6,15 @@ proc ceil_div(value: Int, divisor: Int) [error] -> Int {
   (value + divisor - 1) / divisor
 }
 
-proc le16(value: Int) [error] -> Result[Bytes] {
+proc le16(value: Int) -> Result[Bytes] {
   bytes.pack_le(value, 2)?
 }
 
-proc le32(value: Int) [error] -> Result[Bytes] {
+proc le32(value: Int) -> Result[Bytes] {
   bytes.pack_le(value, 4)?
 }
 
-proc fixed_name(name: Str) [error] -> Result[Bytes] {
+proc fixed_name(name: Str) -> Result[Bytes] {
   let raw = bytes.from_text(name)
 
   return Err(FatPutError.Failed(kind: "name-too-long", message: name)) when raw.len() > 11
@@ -22,7 +22,7 @@ proc fixed_name(name: Str) [error] -> Result[Bytes] {
   bytes.concat([raw, bytes.zero(11 - raw.len())?])
 }
 
-proc dir_entry(name: Str, attr: Int, cluster: Int, size: Int) [error] -> Result[Bytes] {
+proc dir_entry(name: Str, attr: Int, cluster: Int, size: Int) -> Result[Bytes] {
   bytes.concat(
     [
       fixed_name(name)?,
@@ -42,20 +42,20 @@ proc dir_block(
   parent_cluster: Int,
   entries: List[Bytes],
   cluster_size: Int,
-) [error] -> Result[Bytes] {
+) -> Result[Bytes] {
   var parts = [dir_entry(".          ", 16, self_cluster, 0)?, dir_entry("..         ", 16, parent_cluster, 0)?]
   parts += entries
   bytes.concat([bytes.concat(parts), bytes.zero(cluster_size - bytes.concat(parts).len())?])
 }
 
-proc set_fat(image: Path, fat_offset: Int, fat_sectors: Int, cluster: Int, value: Int) [error] {
+proc set_fat(image: Path, fat_offset: Int, fat_sectors: Int, cluster: Int, value: Int) {
   let encoded = le16(value)?
   let first = bytes.write_at(image, fat_offset + cluster * 2, encoded)?
   let second = bytes.write_at(image, fat_offset + fat_sectors * 512 + cluster * 2, encoded)?
   let _ = [first, second]
 }
 
-proc write_cluster(image: Path, data_offset: Int, cluster: Int, data: Bytes, cluster_size: Int) [error] {
+proc write_cluster(image: Path, data_offset: Int, cluster: Int, data: Bytes, cluster_size: Int) {
   let written = bytes.write_at(
     image,
     data_offset + (cluster - 2) * cluster_size,

@@ -151,7 +151,7 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
   }
 }
 
-proc plan_json_dependency(value: DependencyDto) [error] -> Result[types.PlanDependency] {
+proc plan_json_dependency(value: DependencyDto) -> Result[types.PlanDependency] {
   {
     name: value.name,
     kind: types.parse_dependency_kind(value.kind)?,
@@ -169,7 +169,7 @@ proc plan_json_remote(value: RemoteDto) [error] -> Result[types.RemoteRetrieval]
   }
 }
 
-proc plan_json_node(value: NodeDto) [error] -> Result[types.PlanNode] {
+proc plan_json_node(value: NodeDto) -> Result[types.PlanNode] {
   var dependencies: List[types.PlanDependency] = [
     plan_json_dependency(dependency)?
     for dependency in value.dependencies
@@ -199,7 +199,7 @@ proc plan_json_node(value: NodeDto) [error] -> Result[types.PlanNode] {
   }
 }
 
-proc plan_json_from_dto(value: BuildPlanDto) [error] -> Result[types.BuildPlan] {
+proc plan_json_from_dto(value: BuildPlanDto) -> Result[types.BuildPlan] {
   var nodes: List[types.PlanNode] = [plan_json_node(node)? for node in value.nodes]
   {
     format: value.format,

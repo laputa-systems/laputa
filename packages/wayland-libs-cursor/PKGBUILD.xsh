@@ -53,7 +53,7 @@ export const filetree = [
   },
 ]
 
-proc write_embedded_dtd() [fs, error] {
+proc write_embedded_dtd() {
   let dump = p"protocol/wayland.dtd".read_bytes()?.dump("hex-u8")
   var values = []
 
@@ -76,7 +76,7 @@ proc write_embedded_dtd() [fs, error] {
   )
 }
 
-proc patch_python_generator() [fs, error] {
+proc patch_python_generator() {
   write_embedded_dtd()
   let meson_path = p"src/meson.build"
   let text = meson_path.read_text()?
@@ -127,7 +127,7 @@ proc patch_python_generator() [fs, error] {
   )
 }
 
-proc build_wayland(dest: Path) [fs, process, env, error] {
+proc build_wayland(dest: Path) {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?

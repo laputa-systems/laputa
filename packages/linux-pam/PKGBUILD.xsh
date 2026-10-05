@@ -360,7 +360,7 @@ export const filetree = [
   },
 ]
 
-proc patch_modules() [fs, error] {
+proc patch_modules() {
   let root_build = p"meson.build"
   var root_text = root_build.read_text()?
 

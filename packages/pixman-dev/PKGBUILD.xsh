@@ -57,7 +57,7 @@ export const filetree = [
   },
 ]
 
-proc patch_musl_math() [fs, error] {
+proc patch_musl_math() {
   let meson = p"meson.build"
 
   fs.write(

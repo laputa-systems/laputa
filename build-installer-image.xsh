@@ -15,7 +15,7 @@ proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, proce
   )
 }
 
-proc ensure_dev_dirs(rootfs: Path) [fs, error] {
+proc ensure_dev_dirs(rootfs: Path) {
   for sub in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     let dir = fp"{rootfs}/{sub}"
 
@@ -25,7 +25,7 @@ proc ensure_dev_dirs(rootfs: Path) [fs, error] {
   }
 }
 
-proc append_inittab_line(rootfs: Path, line: Str) [fs, error] {
+proc append_inittab_line(rootfs: Path, line: Str) {
   let inittab = fp"{rootfs}/etc/inittab"
 
   return unless fs.exists(inittab)?
@@ -110,12 +110,12 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
 
 # Image overlays change these roots after package composition, so a package
 # generation receipt must not claim to describe the finished image.
-proc drop_generation_receipt(rootfs: Path) [fs, error] {
+proc drop_generation_receipt(rootfs: Path) {
   fs.remove(fp"{rootfs}/var/lib/laputa/generation.json", missing_ok: true)
   fs.remove(fp"{rootfs}/var/lib/laputa/root.json", missing_ok: true)
 }
 
-proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) [fs, env, error] {
+proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) {
   for rootfs in [roots.target, roots.installer, roots.tools] {
     drop_generation_receipt(rootfs)
   }
@@ -126,7 +126,7 @@ proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots
   install_installer_tools(root, roots.installer, arch)
 }
 
-proc prune_runtime_root(rootfs: Path, arch: Str) [fs, error] {
+proc prune_runtime_root(rootfs: Path, arch: Str) {
   fs.remove(fp"{rootfs}/boot/vmlinuz-7.2.9", missing_ok: true)
   fs.remove(fp"{rootfs}/usr/include", missing_ok: true)
   fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)
@@ -154,7 +154,7 @@ const EXT4_BLOCK = 4096
 # Data and mapping blocks for one tree: whole blocks per file plus one
 # indirect block per 1024 data blocks and one for the double-indirect root,
 # and for a directory, its entries at their 264-byte worst case.
-proc tree_blocks(path_value: Path) [fs, error] -> Result[Int] {
+proc tree_blocks(path_value: Path) -> Result[Int] {
   let meta = path_value.metadata()?
 
   if meta.kind != "dir" {
@@ -172,7 +172,7 @@ proc tree_blocks(path_value: Path) [fs, error] -> Result[Int] {
   total
 }
 
-proc installer_root_size_mb(rootfs: Path, override_mb: Str) [fs, error] -> Result[Int] {
+proc installer_root_size_mb(rootfs: Path, override_mb: Str) -> Result[Int] {
   guard override_mb == "" else {
     return override_mb.parse_int()?
   }
@@ -262,7 +262,7 @@ pure sector_count(size: Int, sector_size: Int) -> Int {
   ceil_div(size, sector_size)
 }
 
-proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[Bytes] {
+proc put_be(data: Bytes, offset: Int, value: Int, width: Int) -> Result[Bytes] {
   var parts: List[Int] = []
   var index = width
 
@@ -282,19 +282,19 @@ proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[
   system_image.image_put_bytes(data, offset, bytes.from_ints(parts)?)?
 }
 
-proc put_both_16(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
+proc put_both_16(data: Bytes, offset: Int, value: Int) -> Result[Bytes] {
   var out = system_image.image_put_le(data, offset, value, 2)?
   out = put_be(out, offset + 2, value, 2)?
   out
 }
 
-proc put_both_32(data: Bytes, offset: Int, value: Int) [error] -> Result[Bytes] {
+proc put_both_32(data: Bytes, offset: Int, value: Int) -> Result[Bytes] {
   var out = system_image.image_put_le(data, offset, value, 4)?
   out = put_be(out, offset + 4, value, 4)?
   out
 }
 
-proc fixed_ascii(text: Str, width: Int) [error] -> Result[Bytes] {
+proc fixed_ascii(text: Str, width: Int) -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
   return raw[..width] when raw.len() > width
@@ -302,7 +302,7 @@ proc fixed_ascii(text: Str, width: Int) [error] -> Result[Bytes] {
   bytes.concat([raw, repeated_byte(32, width - raw.len())?])
 }
 
-proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
+proc repeated_byte(value: Int, count: Int) -> Result[Bytes] {
   var values: List[Int] = []
   var remaining = count
 
@@ -314,15 +314,15 @@ proc repeated_byte(value: Int, count: Int) [error] -> Result[Bytes] {
   bytes.from_ints(values)?
 }
 
-proc iso_datetime_7() [error] -> Result[Bytes] {
+proc iso_datetime_7() -> Result[Bytes] {
   bytes.from_ints([126, 1, 1, 0, 0, 0, 0])?
 }
 
-proc iso_datetime_17() [error] -> Result[Bytes] {
+proc iso_datetime_17() -> Result[Bytes] {
   bytes.concat([bytes.from_text("2026010100000000"), bytes.from_ints([0])?])
 }
 
-proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) [error] -> Result[Bytes] {
+proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) -> Result[Bytes] {
   let pad_len = if identifier.len() % 2 == 0 { 1 } else { 0 }
   let length = 33 + identifier.len() + pad_len
   var out = bytes.zero(length)?
@@ -337,15 +337,15 @@ proc iso_dir_record(extent: Int, size: Int, flags: Int, identifier: Bytes) [erro
   out
 }
 
-proc iso_file_record(file: IsoFile) [error] -> Result[Bytes] {
+proc iso_file_record(file: IsoFile) -> Result[Bytes] {
   iso_dir_record(file.extent, file.size, 0, bytes.from_text(file.name))?
 }
 
-proc iso_root_record(root_extent: Int, root_size: Int, self_id: Int) [error] -> Result[Bytes] {
+proc iso_root_record(root_extent: Int, root_size: Int, self_id: Int) -> Result[Bytes] {
   iso_dir_record(root_extent, root_size, 2, bytes.from_ints([self_id])?)?
 }
 
-proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error] -> Result[Bytes] {
+proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) -> Result[Bytes] {
   var records = [iso_root_record(root_extent, root_size, 0)?, iso_root_record(root_extent, root_size, 1)?]
 
   for file in files {
@@ -356,7 +356,7 @@ proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error
   bytes.concat([body, bytes.zero(root_size - body.len())?])
 }
 
-proc iso_path_table(root_extent: Int, big_endian: Bool) [error] -> Result[Bytes] {
+proc iso_path_table(root_extent: Int, big_endian: Bool) -> Result[Bytes] {
   var out = bytes.zero(10)?
   out = system_image.image_put_bytes(out, 0, bytes.from_ints([1, 0])?)?
 
@@ -380,7 +380,7 @@ proc iso_primary_descriptor(
   path_table_size: Int,
   path_l: Int,
   path_m: Int,
-) [error] -> Result[Bytes] {
+) -> Result[Bytes] {
   var out = bytes.zero(2048)?
   out = system_image.image_put_bytes(out, 0, bytes.from_ints([1])?)?
   out = system_image.image_put_bytes(out, 1, bytes.from_text("CD001"))?
@@ -413,7 +413,7 @@ proc iso_primary_descriptor(
   out
 }
 
-proc iso_terminator() [error] -> Result[Bytes] {
+proc iso_terminator() -> Result[Bytes] {
   var out = bytes.zero(2048)?
   out = system_image.image_put_bytes(out, 0, bytes.from_ints([255])?)?
   out = system_image.image_put_bytes(out, 1, bytes.from_text("CD001"))?
@@ -421,7 +421,7 @@ proc iso_terminator() [error] -> Result[Bytes] {
   out
 }
 
-proc iso_files(inputs: List[IsoInput], first_extent: Int) [fs, error] -> Result[List[IsoFile]] {
+proc iso_files(inputs: List[IsoInput], first_extent: Int) -> Result[List[IsoFile]] {
   var extent = first_extent
   var files: List[IsoFile] = []
 
@@ -434,7 +434,7 @@ proc iso_files(inputs: List[IsoInput], first_extent: Int) [fs, error] -> Result[
   files
 }
 
-proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) [fs, error] {
+proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) {
   let path_l = 18
   let path_m = 19
   let root_extent = 20
@@ -502,7 +502,7 @@ proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) [fs, err
   }
 }
 
-proc build_installer_iso(work: Path, iso: Path, kernel: Path, arch: Str) [fs, error] {
+proc build_installer_iso(work: Path, iso: Path, kernel: Path, arch: Str) {
   let iso_arch = if arch == "aarch64" { "AARCH64" } else { "X86_64" }
   let installer_root = fp"{work}/installer-root.ext4"
   write_iso9660(iso, f"LAPUTA_{iso_arch}", [{source: kernel, name: "KERNEL;1"}])
@@ -537,7 +537,7 @@ proc build_filesystems(
   boot_kernel: Path,
   installer_root_mb_override: Str,
   installer_ci: Str,
-) [fs, process, env, error] {
+) {
   let efi_boot = efi_boot_filename(arch)?
   fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer")
   fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT")
@@ -594,7 +594,7 @@ proc build_filesystems(
   )
 }
 
-proc build_host() [fs, net, process, env, time, error, io] {
+proc build_host() {
   let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?
   let arch = host.installer_arch(host.installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64"))?
   let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}")?

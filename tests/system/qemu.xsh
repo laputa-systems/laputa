@@ -30,7 +30,7 @@ pure fixture_profile() -> types.SystemProfile {
   }
 }
 
-proc fixture_qemu(os: Str, arch: Str) [error] -> Result[qemu.QemuConfig] {
+proc fixture_qemu(os: Str, arch: Str) -> Result[qemu.QemuConfig] {
   let target = qemu.qemu_target(os, arch)?
   {qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target}
 }
@@ -43,7 +43,7 @@ proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
   ]
 }
 
-proc assert_profile_devices(argv: List[Str]) [error] {
+proc assert_profile_devices(argv: List[Str]) {
   assert "virtio-net-pci,netdev=net0" in argv, "network"
   assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"
   assert "virtio-keyboard-pci" in argv, "keyboard"
@@ -124,7 +124,7 @@ QEMU_FATAL after success""") {
   }
 }
 
-proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Result[SupervisorFixture] {
+proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
   let bundle = fp"{outputs.builds}/fixture"

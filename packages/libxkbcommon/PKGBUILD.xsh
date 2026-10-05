@@ -107,7 +107,7 @@ export const filetree = [
 # unpacked source tree, using the flags of upstream's yacc_gen:
 #   bison --defines=parser.h -o parser.c -p _xkbcommon_ \
 #     libxkbcommon-xkbcommon-VERSION/src/xkbcomp/parser.y
-proc patch_vendored_parser() [fs, error] {
+proc patch_vendored_parser() {
   fs.install(p"generated/parser.c", p"src/xkbcomp/parser.c", 0o644, parents: true, overwrite: true)
   fs.install(p"generated/parser.h", p"src/xkbcomp/parser.h", 0o644, parents: true, overwrite: true)
   let meson = p"meson.build"
@@ -143,7 +143,7 @@ error XkbcommonError = Patch(message: Str)
 # pkgconf reports xkeyboard-config.pc's path variables under the build root's
 # sysroot, so the legacy root read from xkb_base would name the build root.
 # Without it, meson falls back to prefix/datadir/X11/xkb, the installed path.
-proc patch_legacy_root() [fs, error] {
+proc patch_legacy_root() {
   let meson = p"meson.build"
   let text = meson.read_text()?
   let lookup = """XKB_LEGACY_ROOT = ''

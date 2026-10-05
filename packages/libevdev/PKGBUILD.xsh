@@ -313,12 +313,12 @@ export pure event_names_header(headers: List[Str]) -> Str {
   f"{lines.join("\n")}\n"
 }
 
-proc write_event_names() [fs, error] {
+proc write_event_names() {
   let headers = [p"include/linux/linux/input.h", p"include/linux/linux/input-event-codes.h"]
   fs.write(p"event-names.h", event_names_header([header.read_text()? for header in headers]))
 }
 
-proc patch_python_generator() [fs, error] {
+proc patch_python_generator() {
   write_event_names()
   let meson = p"meson.build"
   var text = meson.read_text()?

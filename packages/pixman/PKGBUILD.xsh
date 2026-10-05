@@ -52,7 +52,7 @@ export const filetree = [
 # Musl provides libm through libc.  Letting Meson discover the staged libm
 # symlink records the executor-local build root as an ELF dependency; link by
 # name so the installed library instead resolves through the target libc.
-proc patch_musl_math() [fs, error] {
+proc patch_musl_math() {
   let meson = p"meson.build"
 
   fs.write(

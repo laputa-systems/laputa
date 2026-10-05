@@ -1,6 +1,6 @@
 ##! Regression coverage for the XSH m4: its package proof and GNU m4 1.4
 ##! compatibility on the constructs bison's and flex's skeletons use.
-proc runner() [fs, process, env, error] -> Result[Path] {
+proc runner() -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
 
   if configured != "" {
@@ -14,7 +14,7 @@ proc runner() [fs, process, env, error] -> Result[Path] {
 
 type M4Run = {ok: Bool, code: Int, stdout: Str, stderr: Str}
 
-proc run_m4(ctx: TestContext, name: Str, input: Str, argv: List[Str] = []) [fs, process, env, error] -> Result[M4Run] {
+proc run_m4(ctx: TestContext, name: Str, input: Str, argv: List[Str] = []) -> Result[M4Run] {
   let root = test.temp_dir(ctx, name:)?
   let source = fp"{root}/input.m4"
   let stdout = fp"{root}/stdout"

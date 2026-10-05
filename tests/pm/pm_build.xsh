@@ -8,7 +8,7 @@ pure fixture(name: Str) -> Path {
 }
 
 ## Builds write a runner and trace beside the recipe, so build a copy instead of the checkout fixture.
-proc staged_fixture(workspace: Path, name: Str) [fs, error] -> Result[Path] {
+proc staged_fixture(workspace: Path, name: Str) -> Result[Path] {
   let pkg_dir = fp"{workspace}/recipes/{name}"
   let _ = fs.copy_tree(fixture(name), pkg_dir, parents: true, overwrite: true)?
   pkg_dir

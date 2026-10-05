@@ -176,12 +176,12 @@ pnp_id_table(const char *key)
 """
 }
 
-proc write_pnp_table(root: Str) [fs, error] {
+proc write_pnp_table(root: Str) {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
   fs.write(p"pnp-id-table.c", pnp_id_table_source(pnp.read_text()?))
 }
 
-proc patch_generators(root: Str) [fs, error] {
+proc patch_generators(root: Str) {
   write_pnp_table(root)
   let meson_path = p"meson.build"
   var text = meson_path.read_text()?

@@ -142,7 +142,7 @@ proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
   kbuild.write_text_if_changed(p"include/generated/vdso-offsets.h", out)
 }
 
-proc build_x86_vdso(cc: Path) [fs, process, env, error] {
+proc build_x86_vdso(cc: Path) {
   let vdso_dir = p"arch/x86/entry/vdso/vdso64"
   fs.mkdir(vdso_dir)
   fs.mkdir(p".xsh-kbuild/host/arch/x86/tools")
@@ -304,7 +304,7 @@ proc build_x86_vdso(cc: Path) [fs, process, env, error] {
 # (page flags come and go with options such as MEMORY_FAILURE and with new
 # releases), so x86 compiles kernel/bounds.c as upstream Kbuild does instead
 # of carrying a hand-copied header.
-proc generate_x86_bounds_header(cc: Path) [fs, process, env, error] {
+proc generate_x86_bounds_header(cc: Path) {
   fs.mkdir(p".xsh-kbuild/generated")
   let asm_out = p".xsh-kbuild/generated/bounds.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
@@ -326,7 +326,7 @@ proc generate_x86_bounds_header(cc: Path) [fs, process, env, error] {
   kbuild.generate_offsets_header(asm_out, p"include/generated/bounds.h", "__LINUX_BOUNDS_H__")
 }
 
-proc generate_x86_asm_offsets_header(cc: Path) [fs, process, env, error] {
+proc generate_x86_asm_offsets_header(cc: Path) {
   fs.mkdir(p".xsh-kbuild")
   fs.mkdir(p".xsh-kbuild/generated")
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
@@ -349,7 +349,7 @@ proc generate_x86_asm_offsets_header(cc: Path) [fs, process, env, error] {
   kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")
 }
 
-proc generate_x86_kvm_asm_offsets_header(cc: Path) [fs, process, env, error] {
+proc generate_x86_kvm_asm_offsets_header(cc: Path) {
   fs.mkdir(p".xsh-kbuild")
   fs.mkdir(p".xsh-kbuild/generated")
   let asm_out = p".xsh-kbuild/generated/kvm-asm-offsets.s"
@@ -376,7 +376,7 @@ proc generate_x86_kvm_asm_offsets_header(cc: Path) [fs, process, env, error] {
 # PARAVIRT and HOTPLUG_CPU fields ahead of it), and inline migrate_disable()
 # writes through it, so x86 generates it as upstream Kbuild does instead of
 # sharing the aarch64-derived files/generated/rq-offsets.h.
-proc generate_x86_rq_offsets_header(cc: Path) [fs, process, env, error] {
+proc generate_x86_rq_offsets_header(cc: Path) {
   fs.mkdir(p".xsh-kbuild/generated")
   let asm_out = p".xsh-kbuild/generated/rq-offsets.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
@@ -398,7 +398,7 @@ proc generate_x86_rq_offsets_header(cc: Path) [fs, process, env, error] {
   kbuild.generate_offsets_header(asm_out, p"include/generated/rq-offsets.h", "__RQ_OFFSETS_H__")
 }
 
-proc write_x86_orc_hash_header() [fs, error] {
+proc write_x86_orc_hash_header() {
   kbuild.write_text_if_changed(
     p"arch/x86/include/generated/asm/orc_hash.h",
     """#define ORC_HASH 0xfe,0x5d,0x32,0xbf,0x58,0x1b,0xd6,0x3b,0x2c,0xa9,0xa5,0xc6,0x5b,0xa5,0xa6,0x25,0xea,0xb3,0xfe,0x24,
@@ -406,7 +406,7 @@ proc write_x86_orc_hash_header() [fs, error] {
   )
 }
 
-proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: Path) [fs, error] -> Result[List[Str]] {
+proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: Path) -> Result[List[Str]] {
   var lines = [f"const char * const {array}[{size}] = {{"]
 
   for raw in input.read_text()?.split("\n") {
@@ -426,7 +426,7 @@ proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: 
   lines.push("};")
 }
 
-proc generate_x86_capflags_source() [fs, error] {
+proc generate_x86_capflags_source() {
   let cpufeature = p"arch/x86/include/asm/cpufeatures.h"
   let vmxfeature = p"arch/x86/include/asm/vmxfeatures.h"
   var lines = ["#ifndef _ASM_X86_CPUFEATURES_H", "#include <asm/cpufeatures.h>", "#endif", ""]
@@ -448,7 +448,7 @@ proc generate_x86_capflags_source() [fs, error] {
   )
 }
 
-proc generate_x86_inat_tables() [fs, error] {
+proc generate_x86_inat_tables() {
   kbuild.copy_text_if_changed(p"inat-tables-x86.c", p"arch/x86/lib/inat-tables.c")
 }
 
@@ -492,7 +492,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   )
 }
 
-proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
+proc build_x86_realmode_payload(cc: Path) {
   let realmode_dir = p"arch/x86/realmode/rm"
   let relocs = p"arch/x86/tools/relocs"
   let ld = PKGBUILD_shared.native_tool("ld.lld")?

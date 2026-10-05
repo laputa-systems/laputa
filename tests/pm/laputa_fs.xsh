@@ -3,14 +3,14 @@ const block_size = 4096
 const inode_size = 256
 const inode_table_block = 4
 
-proc runner() [process, env, error] -> Result[Path] {
+proc runner() -> Result[Path] {
   let configured = e"XSH_HOST" ?? ""
   return fp"{configured}" when configured != ""
 
   process.which("xsh")?
 }
 
-proc inode_offset(inode: Int) [] -> Int {
+proc inode_offset(inode: Int) -> Int {
   inode_table_block * block_size + (inode - 1) * inode_size
 }
 
