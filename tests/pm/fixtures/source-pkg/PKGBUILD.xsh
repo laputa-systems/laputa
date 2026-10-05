@@ -26,7 +26,7 @@ export let upstream_sources = [
 
 export let filetree = [{path: p"usr/share/source-pkg/data.txt", kind: "file"}]
 
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/source-pkg/data.txt"
   fs.mkdir(target.parent)?
   fs.install(p"data.txt", target, 0o644)?

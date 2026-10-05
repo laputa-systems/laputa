@@ -12,7 +12,7 @@ export let upstream_sources = []
 
 export let filetree = [{path: p"usr/share/world-app.txt", kind: "file"}]
 
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/world-app.txt"
   fs.mkdir(target.parent)?
 

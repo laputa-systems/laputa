@@ -12,7 +12,7 @@ export let upstream_sources = []
 
 export let filetree = [{path: p"usr/bin/tool", kind: "file"}]
 
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/bin/tool"
   fs.mkdir(target.parent)?
 

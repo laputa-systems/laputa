@@ -107,7 +107,7 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/share/execute-leaf.txt", kind: "file"}]
 
 ## Builds only after the application payload is available.
-export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   let root = env("LAPUTA_ROOT")?
   let _ = fs.read_text(fp"{root}/usr/share/execute-app.txt")?
   let target = fp"{dest}/usr/share/execute-leaf.txt"
@@ -159,7 +159,7 @@ error ServiceBuildError = Failed(message: Str)
 
 ## Builds only when the runtime-only dependency is absent from the build root
 ## and the environment names the compilers PATH resolves in it.
-export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   let root = env("LAPUTA_ROOT")?
   if fs.exists(fp"{root}/usr/share/execute-dep.txt")? {
     return Err(ServiceBuildError.Failed("execute-dep reached the build root"))

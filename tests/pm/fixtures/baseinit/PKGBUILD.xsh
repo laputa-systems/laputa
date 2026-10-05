@@ -38,7 +38,7 @@ proc write_file(path_value: Path, text: Str) [fs, error] {
   fs.write(path_value, text)?
 }
 
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   write_file(
     fp"{dest}/etc/inittab",
     """::sysinit:/usr/lib/init/rc.boot

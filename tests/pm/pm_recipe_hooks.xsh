@@ -37,11 +37,11 @@ test recipe_hooks_dispatch_each_supported_capability_set [fs, process, env, erro
 export let name = "hook-probe"
 error HookProbe = Reached(message: Str)
 ## Reports that the preparation hook received its typed source path.
-export proc prepare(src: Path) [{effects}] -> Result[Unit] {{
+export proc prepare(src: Path) [{effects}] -> Result[Unit, Error] {{
   return Err(HookProbe.Reached(src.display()))
 }}
 ## Reports that the build hook received its typed destination path.
-export proc build(dest: Path) [{effects}] -> Result[Unit] {{
+export proc build(dest: Path) [{effects}] -> Result[Unit, Error] {{
   return Err(HookProbe.Reached(dest.display()))
 }}
 """)
@@ -78,9 +78,9 @@ test recipe_hooks_preserve_optional_absence_and_required_build_error [fs, proces
 
 test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, process, env, error] { |ctx|
   let incompatible: Map[Str] = {
-    parameter: "export proc build(dest: Str) [fs, error] -> Result[Unit] { return Ok() }",
-    result: "export proc build(dest: Path) [fs, error] -> Result[Str] { return \"entered\" }",
-    capabilities: "export proc build(dest: Path) [fs, process, env, time, error] -> Result[Unit] { return Ok() }",
+    parameter: "export proc build(dest: Str) [fs, error] -> Result[Unit, Error] { return Ok() }",
+    result: "export proc build(dest: Path) [fs, error] -> Result[Str, Error] { return \"entered\" }",
+    capabilities: "export proc build(dest: Path) [fs, process, env, time, error] -> Result[Unit, Error] { return Ok() }",
     export_kind: "export let build = 7",
   }
   for {key: name, value: declaration} in incompatible {
@@ -102,7 +102,7 @@ test recipe_source_preparation_keeps_filesystem_contract [fs, process, env, erro
 ## Names the fixture recipe.
 export let name = "hook-probe"
 ## Writes a marker inside the supplied source path.
-export proc prepare_sources(src: Path) [fs, error] -> Result[Unit] {
+export proc prepare_sources(src: Path) [fs, error] -> Result[Unit, Error] {
   fp"{src}/prepared".write("source prepared")?
 }
 """)

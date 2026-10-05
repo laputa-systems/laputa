@@ -189,7 +189,7 @@ proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) {
     f"""#!{xsh}
 proc main(...argv: List[Str]) [env, error] {{
   if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("{root}/usr/lib") {{
-    abort(3)
+    exit 3
   }}
   print "{output}"
 }}

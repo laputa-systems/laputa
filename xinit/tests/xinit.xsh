@@ -391,12 +391,12 @@ export let service = {
 }
 
 ## The `ready` lifecycle hook.
-export proc ready() [fs, process, env, time, error] -> Result[Bool] {
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {
   return true
 }
 
 ## The `status` lifecycle hook.
-export proc status() [fs, process, env, error] -> Result[Str] {
+export proc status() [fs, process, env, error] -> Result[Str, Error] {
   return "detail=ok"
 }
 """,
@@ -1162,7 +1162,7 @@ export let service = {{
 }}
 
 ## The `reload` lifecycle hook.
-export proc reload() [fs, process, env, error] -> Result[Unit] {{
+export proc reload() [fs, process, env, error] -> Result[Unit, Error] {{
   fs.write(Path({json.encode(touched.display())?}), "reloaded")?
 }}
 """,
@@ -1238,7 +1238,7 @@ export let service = {{
 }}
 
 ## The `finish` lifecycle hook.
-export proc finish() [fs, process, env, error] -> Result[Unit] {{
+export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   fs.write(Path({json.encode(touched.display())?}), "finished")?
 }}
 """,

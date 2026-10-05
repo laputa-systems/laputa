@@ -39,7 +39,7 @@ export let filetree = [
   },
 ]
 
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let _ = fs.copy_tree(p".", dest, parents: true, overwrite: true)?
 
   for keep in fs.walk(dest) |> where .kind == "file" and .name == ".keep" {

@@ -19,7 +19,7 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/share/execute-tool.txt", kind: "file"}]
 
 ## Builds the host tool payload.
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/execute-tool.txt"
   fs.mkdir(target.parent)?
   fs.write(target, "tool\n")?

@@ -19,7 +19,7 @@ export let upstream_sources = []
 export let filetree = [{path: p"usr/share/execute-dep.txt", kind: "file"}]
 
 ## Builds the runtime dependency payload.
-export proc build(dest: Path) [fs, error] -> Result[Unit] {
+export proc build(dest: Path) [fs, error] -> Result[Unit, Error] {
   let target = fp"{dest}/usr/share/execute-dep.txt"
   fs.mkdir(target.parent)?
   fs.write(target, "dependency\n")?
