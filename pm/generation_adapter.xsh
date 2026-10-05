@@ -203,27 +203,26 @@ export proc generation_adapter_copy_manifest_file(
 
   let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(GenerationAdapterMetadataDto)?
   let manifest = generation_adapter_manifest_file(metadata, package_name, relative_path)?
-  let handle = fs.tempdir()?
-  defer handle.close()?
-  let extracted = handle.host_path()?
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
-  let source = fp"{extracted}/{relative_path}"
+  tempdir extracted {
+    archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
+    let source = fp"{extracted}/{relative_path}"
 
-  if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
-    return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
+    if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
+      return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
+    }
+
+    if hash.sha256(source)?.hex() != manifest.sha256 {
+      return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for {relative_path}"))
+    }
+
+    let temporary = fp"{output}.tmp"
+    fs.mkdir(output.parent)
+    fs.remove(temporary, missing_ok: true)
+    defer fs.remove(temporary, missing_ok: true)?
+    fs.copy(source, temporary)
+    fs.fsync(temporary)
+    fs.rename(temporary, output, overwrite: true)
   }
-
-  if hash.sha256(source)?.hex() != manifest.sha256 {
-    return Err(GenerationAdapterError.Failed(f"artifact payload digest does not match metadata for {relative_path}"))
-  }
-
-  let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary)
-  fs.fsync(temporary)
-  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Executes a saved BuildPlan, then composes exactly its declared runtime generation.

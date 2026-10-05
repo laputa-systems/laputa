@@ -192,11 +192,10 @@ export proc build(dest: Path) [fs, error] {
     overwrite: true,
   )
 
-  let early_handle = fs.tempdir()?
-  defer early_handle.close()?
-  let early = early_handle.host_path()?
-  fs.mkdir(fp"{early}/kernel/x86/microcode")
-  fs.write(fp"{early}/kernel/x86/microcode/AuthenticAMD.bin", bytes.concat(containers))
-  fs.mkdir(fp"{dest}/boot")
-  archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)
+  tempdir early {
+    fs.mkdir(fp"{early}/kernel/x86/microcode")
+    fs.write(fp"{early}/kernel/x86/microcode/AuthenticAMD.bin", bytes.concat(containers))
+    fs.mkdir(fp"{dest}/boot")
+    archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)
+  }
 }

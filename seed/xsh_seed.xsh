@@ -279,22 +279,21 @@ proc xsh_seed_core_digest(xsh_root: Path, sources: List[Path]) [fs, error] -> Re
 }
 
 proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path) {
-  let handle = fs.tempdir()?
-  defer handle.close()?
-  let stage = handle.host_path()?
-  var entries = []
+  tempdir stage {
+    var entries = []
 
-  for relative in sources {
-    let installed = xsh_seed_core_install_path(relative)
-    let mode = if relative.display().starts_with("lib/") { 0o644 } else { 0o755 }
-    fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)
-    entries += [installed]
+    for relative in sources {
+      let installed = xsh_seed_core_install_path(relative)
+      let mode = if relative.display().starts_with("lib/") { 0o644 } else { 0o755 }
+      fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)
+      entries += [installed]
+    }
+
+    let temporary = fp"{archive_path}.tmp"
+    fs.remove(temporary, missing_ok: true)
+    archive.tar_create(temporary, stage, entries, "xz", true)
+    fs.rename(temporary, archive_path, overwrite: true)
   }
-
-  let temporary = fp"{archive_path}.tmp"
-  fs.remove(temporary, missing_ok: true)
-  archive.tar_create(temporary, stage, entries, "xz", true)
-  fs.rename(temporary, archive_path, overwrite: true)
 }
 
 # Replace a product only when its bytes changed, so an unchanged rebuild keeps

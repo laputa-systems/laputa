@@ -53,18 +53,17 @@ proc main(root: Path = /rootfs) [fs, error] {
 
   proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")
 
-  let extracted_handle = fs.tempdir()?
-  defer extracted_handle.close()?
-  let extracted = extracted_handle.host_path()?
-  archive.cpio_extract(image, extracted)
-  let early = fp"{extracted}/{early_member}"
-  ensure_sha256(early, early_sha256)
-  proof.ensure(
-    early.read_bytes()? == bytes.concat(concatenated),
-    "amd-ucode",
-    f"{early_member} is not the concatenation of the installed containers",
-  )
-  print "amd-ucode ok"
+  tempdir extracted {
+    archive.cpio_extract(image, extracted)
+    let early = fp"{extracted}/{early_member}"
+    ensure_sha256(early, early_sha256)
+    proof.ensure(
+      early.read_bytes()? == bytes.concat(concatenated),
+      "amd-ucode",
+      f"{early_member} is not the concatenation of the installed containers",
+    )
+    print "amd-ucode ok"
+  }
 }
 
 main(@args)
