@@ -349,7 +349,7 @@ export const filetree = [
 proc patch_python_tools() [fs, env, error] {
   let meson = p"meson.build"
   var text = meson.read_text()?
-  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_root = e"LAPUTA_ROOT" ?? "/"
   let target_arch = pm_util.target_arch()?
   let builtins = f"{target_root}/usr/lib/libclang_rt.builtins-{target_arch}.a"
 
@@ -419,7 +419,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_root = e"LAPUTA_ROOT" ?? "/"
   let target_arch = pm_util.target_arch()?
   let builtins = f"{target_root}/usr/lib/libclang_rt.builtins-{target_arch}.a"
   patch_python_tools()?

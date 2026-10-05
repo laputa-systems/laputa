@@ -6,7 +6,7 @@ use util
 ## XSH_PM_REPO, typically the local mirror (`http://127.0.0.1:3000`) or a
 ## `file://` tree. Empty means offline; there is no default remote.
 export proc repo_url() [env] -> Str {
-  (env.get("XSH_PM_REPO") ?? "").trim()
+  (e"XSH_PM_REPO" ?? "").trim()
 }
 
 # The local mirror and `file://` trees accept writes without credentials.

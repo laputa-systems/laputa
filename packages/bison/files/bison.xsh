@@ -138,7 +138,7 @@ pure unsupported_declaration(decls: Str) -> Str {
 }
 
 proc upstream_disabled() [env] -> Bool {
-  (env.get("XSH_BISON_NO_UPSTREAM") ?? "") == "1"
+  (e"XSH_BISON_NO_UPSTREAM" ?? "") == "1"
 }
 
 proc run_upstream_bison(argv: List[Str], reason: Str) [process, env, error] {

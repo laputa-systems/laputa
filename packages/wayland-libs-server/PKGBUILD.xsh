@@ -148,7 +148,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
 
   let native_scanner = if pm_util.build_arch()? != pm_util.target_arch()? and build_root != "" {
     f"{build_root}/usr/bin/wayland-scanner"
@@ -172,7 +172,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
       let clang = fp"{build_root}/usr/lib/llvm23/bin/clang-23"
 
       env ({
-        PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
+        PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{e"PATH" ?? ""}",
         LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
       }) {
         run $clang "-o" $native_scanner_path "src/scanner.c" "src/wayland-util.c" "-Ibuild" "-Ibuild/src" "-Isrc" f"-I{build_root}/usr/include" f"-L{build_root}/usr/lib" f"-Wl,-rpath,{build_root}/usr/lib" "-lexpat" ?

@@ -12,7 +12,7 @@ pure sources_is_repository_input(source: Str) -> Bool {
 }
 
 proc sources_repository_input_path(source: Str) [fs, env, error] -> Result[Path] {
-  let root = (env.get("XSH_PM_REPOSITORY_ROOT") ?? "").trim()
+  let root = (e"XSH_PM_REPOSITORY_ROOT" ?? "").trim()
   let relative = fp"{source.replace("repository/", "")}".normalize()
 
   if root == "" {
@@ -47,7 +47,7 @@ const sha256_hex = rx"^[0-9a-f]{64}$"
 ## The source cache root for a package repository: LAPUTA_SOURCE_CACHE when set,
 ## otherwise `.cache/sources` under the repository root.
 export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path, Error] {
-  let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
+  let configured = (e"LAPUTA_SOURCE_CACHE" ?? "").trim()
 
   return path.absolute(fp"{configured}")? when configured != ""
 
@@ -57,8 +57,8 @@ export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path, 
 # Builds name their package repository through XSH_PM_REPOSITORY_ROOT, the same
 # root that `repository/` inputs resolve against.
 proc build_source_cache_root() [fs, env, error] -> Result[Path] {
-  let configured = (env.get("LAPUTA_SOURCE_CACHE") ?? "").trim()
-  let repo_root = (env.get("XSH_PM_REPOSITORY_ROOT") ?? "").trim()
+  let configured = (e"LAPUTA_SOURCE_CACHE" ?? "").trim()
+  let repo_root = (e"XSH_PM_REPOSITORY_ROOT" ?? "").trim()
 
   if configured == "" and repo_root == "" {
     return Err(
@@ -142,7 +142,7 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) [fs, net, en
 
   return entry when fs.exists(entry)?
 
-  let mirror = (env.get("LAPUTA_MIRROR") ?? "").trim()
+  let mirror = (e"LAPUTA_MIRROR" ?? "").trim()
 
   if mirror == "" {
     return Err(

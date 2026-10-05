@@ -245,7 +245,7 @@ proc main(...argv: List[Str]) [fs, error] {
 main(@args)?
 """,
   )?
-  let configured = env.get("XSH_HOST") ?? ""
+  let configured = e"XSH_HOST" ?? ""
   let runner = if configured != "" { fp"{configured}" } else { process.which("xsh")? }
   let first = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} ${stage.staged.proof} ?
   let second = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} ${stage.staged.proof} ?

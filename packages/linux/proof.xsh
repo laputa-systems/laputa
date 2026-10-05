@@ -67,7 +67,7 @@ proc main(rootfs = /rootfs) [fs, env, error] {
   let config_path = fp"{rootfs}/usr/share/linux/config-{kernel_release}"
   let os = system.uname()?
   let host_machine = os.machine
-  let proof_arch = env.get("XSH_PM_TARGET_ARCH") ?? env.get("XSH_PM_ARCH") ?? host_machine
+  let proof_arch = e"XSH_PM_TARGET_ARCH" ?? e"XSH_PM_ARCH" ?? host_machine
 
   if proof_arch == "x86_64" or proof_arch == "amd64" {
     ensure_config(config_path, "CONFIG_X86_64", "x86_64 arch check")?

@@ -136,7 +136,7 @@ proc ensure_locked_v8(lockfile: Path) [fs, error] {
 ## Build the `deno` binary with cargo, offline, against the prebuilt V8.
 export proc build(dest: Path) [fs, process, env, error] {
   let cargo = process.which("cargo")?
-  let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+  let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
   let bin = fp"{build_root}/usr/bin"
   let cc = fp"{bin}/cc"
   let arch = pm_util.target_arch()?
@@ -186,7 +186,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs = if cpu.count() < 16 { cpu.count() } else { 16 }
 
   env ({
-    PATH: f"{bin}:{env.get("PATH") ?? ""}",
+    PATH: f"{bin}:{e"PATH" ?? ""}",
     # Build scripts link the root's libgcc_s.so for unwinding. Without this
     # the build host's loader finds the image's libgcc_s.so, a linker script.
     LD_LIBRARY_PATH: pm_env.build_ld_library_path_env(build_root),

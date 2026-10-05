@@ -23,7 +23,7 @@ pure elf_machine_name(arch: Str) -> Str {
 }
 
 proc build_root_path() [env, error] -> Result[Path] {
-  let build_root_value = (env.get("XSH_PM_BUILD_ROOT") ?? "").trim()
+  let build_root_value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
   ensure(build_root_value != "", "proof-musl", "XSH_PM_BUILD_ROOT is required for native-cross proof")?
   fp"{build_root_value}"
 }
@@ -57,7 +57,7 @@ proc compile_hello(
 
   env ({
     LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
-    PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{env.get("PATH") ?? ""}",
+    PATH: f"{build_root}/usr/lib/llvm-toolchain/bin:{build_root}/usr/bin:{e"PATH" ?? ""}",
   }) {
     run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello ?
   }?

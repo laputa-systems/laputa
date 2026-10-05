@@ -17,7 +17,7 @@ pure elf_machine_name(arch: Str) -> Str {
 }
 
 proc build_root_path() [env, error] -> Result[Path] {
-  let build_root_value = (env.get("XSH_PM_BUILD_ROOT") ?? "").trim()
+  let build_root_value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
   ensure(build_root_value != "", "proof-llvm-toolchain", "XSH_PM_BUILD_ROOT is required for native-cross proof")?
   fp"{build_root_value}"
 }

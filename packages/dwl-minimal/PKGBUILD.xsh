@@ -257,8 +257,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let pc = pm_env.pkg_config_context()?
   let pkg_config = pc.pkg_config
-  let root = env.get("LAPUTA_ROOT") ?? "/"
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let root = e"LAPUTA_ROOT" ?? "/"
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
   let cross_build = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if cross_build {

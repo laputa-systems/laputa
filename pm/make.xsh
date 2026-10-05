@@ -295,7 +295,7 @@ pure makeflags_jobs(flags: Str) -> Result[Int] {
 
 ## Exported PM declaration `jobs`.
 export proc jobs() [env, error] -> Result[Int, Error] {
-  let value = env.get("MAKEFLAGS") ?? ""
+  let value = e"MAKEFLAGS" ?? ""
 
   return cpu.count() when value == ""
 
@@ -529,7 +529,7 @@ proc cancel_running_uncompleted(running: List[RunningTask], completed_indices: M
 }
 
 proc make_progress(message: Str) [env] {
-  if (env.get("XSH_MAKE_PROGRESS") ?? "") == "1" or (env.get("XSH_LINUX_KBUILD_PROGRESS") ?? "") == "1" {
+  if (e"XSH_MAKE_PROGRESS" ?? "") == "1" or (e"XSH_LINUX_KBUILD_PROGRESS" ?? "") == "1" {
     print $message
   }
 }

@@ -215,7 +215,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let root = env.get("LAPUTA_ROOT") ?? "/"
+  let root = e"LAPUTA_ROOT" ?? "/"
   patch_generators(root)?
 
   env ({

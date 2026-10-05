@@ -290,7 +290,7 @@ export proc host_arch() [env, error] -> Result[Str, Error] {
 
 ## Exported PM declaration `build_arch`.
 export proc build_arch() [env, error] -> Result[Str, Error] {
-  let override = (env.get("XSH_PM_BUILD_ARCH") ?? "").trim()
+  let override = (e"XSH_PM_BUILD_ARCH" ?? "").trim()
 
   return normalize_arch(override) when override != ""
 
@@ -299,11 +299,11 @@ export proc build_arch() [env, error] -> Result[Str, Error] {
 
 ## Exported PM declaration `target_arch`.
 export proc target_arch() [env, error] -> Result[Str, Error] {
-  let target_override = (env.get("XSH_PM_TARGET_ARCH") ?? "").trim()
+  let target_override = (e"XSH_PM_TARGET_ARCH" ?? "").trim()
 
   return normalize_arch(target_override) when target_override != ""
 
-  let legacy_override = (env.get("XSH_PM_ARCH") ?? "").trim()
+  let legacy_override = (e"XSH_PM_ARCH" ?? "").trim()
 
   return normalize_arch(legacy_override) when legacy_override != ""
 

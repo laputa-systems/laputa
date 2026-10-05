@@ -106,12 +106,12 @@ export pure build_ld_library_path(root: Path, current = "") -> Str {
 
 ## Exported PM declaration `target_root`.
 export proc target_root() [env] -> Path {
-  fp"{env.get("LAPUTA_ROOT") ?? ""}"
+  fp"{e"LAPUTA_ROOT" ?? ""}"
 }
 
 ## Exported PM declaration `build_root`.
 export proc build_root() [env] -> Path {
-  let value = (env.get("XSH_PM_BUILD_ROOT") ?? "").trim()
+  let value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
 
   return fp"{value}" when value != ""
 
@@ -120,12 +120,12 @@ export proc build_root() [env] -> Path {
 
 ## Exported PM declaration `build_path_env`.
 export proc build_path_env(root: Path) [env] -> Str {
-  build_path(root, env.get("PATH") ?? "")
+  build_path(root, e"PATH" ?? "")
 }
 
 ## Exported PM declaration `build_ld_library_path_env`.
 export proc build_ld_library_path_env(root: Path) [env] -> Str {
-  build_ld_library_path(root, env.get("LD_LIBRARY_PATH") ?? "")
+  build_ld_library_path(root, e"LD_LIBRARY_PATH" ?? "")
 }
 
 ## Exported PM declaration `pkg_config_context`.

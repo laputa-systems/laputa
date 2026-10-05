@@ -9,7 +9,7 @@ use pm.util
 const sha256_of_empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 proc runner() [fs, process, env, error] -> Result[Path] {
-  let configured = (env.get("XSH_HOST") ?? "").trim()
+  let configured = (e"XSH_HOST" ?? "").trim()
 
   return path.absolute(fp"{configured}")? when configured != ""
 

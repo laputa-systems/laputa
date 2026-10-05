@@ -183,7 +183,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # find zlib headers and libs. Matches the YSH PKGBUILD's $kr variable.
   var kr = ""
 
-  if let Ok(v) = env.Str.LAPUTA_ROOT {
+  if let Ok(v) = e"LAPUTA_ROOT" {
     if v != "/" {
       kr = v
     }

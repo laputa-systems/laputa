@@ -82,7 +82,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   var host_ld_library_path = ""
 
   if cross_build {
-    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
     bootstrap_cc = fp"{build_root}/usr/bin/cc"
     host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }

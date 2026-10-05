@@ -4,7 +4,7 @@ use pm.make as make
 type TaskOutput = {arguments: List[Str], environment: Str}
 
 proc task_runner() [process, env, error] -> Result[Path] {
-  let configured = env.get("XSH_HOST") ?? ""
+  let configured = e"XSH_HOST" ?? ""
   return fp"{configured}" when configured != ""
   process.which("xsh")?
 }
@@ -124,7 +124,7 @@ if args == ["--cflags", "libone", "libtwo"] {{
 }}
 """)?
   tool.chmod(0o755)?
-  env ({PATH: f"{root}:{env.get("PATH") ?? ""}", XSH_PM_TARGET_ROOT: ""}) {
+  env ({PATH: f"{root}:{e"PATH" ?? ""}", XSH_PM_TARGET_ROOT: ""}) {
     let flags = make.pkg_config_flags(["libone", "libtwo"])?
     assert flags.cflags == ["-I/usr/include/example", "-DEXAMPLE=1"]
     assert flags.libs == ["-L/usr/lib/example", "-lexample"]

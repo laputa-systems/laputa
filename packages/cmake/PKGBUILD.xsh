@@ -116,14 +116,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   var bootstrap_ld_library_path = tool_lib.display()
 
   if cross_build {
-    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
     bootstrap_cc = fp"{build_root}/usr/bin/cc"
     bootstrap_triple = build_triple
     bootstrap_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
 
     bootstrap_task_env = {
       XSH_MAKE_NATIVE_CROSS: "0",
-      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{env.get("PATH") ?? ""}",
+      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{e"PATH" ?? ""}",
       LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     }
   }

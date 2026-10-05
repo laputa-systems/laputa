@@ -287,7 +287,7 @@ pure upstream_flex_source_reason(text: Str) -> Str {
 }
 
 proc upstream_disabled() [env] -> Bool {
-  (env.get("XSH_FLEX_NO_UPSTREAM") ?? "") == "1"
+  (e"XSH_FLEX_NO_UPSTREAM" ?? "") == "1"
 }
 
 proc run_upstream_flex(argv: List[Str], reason: Str) [process, env, error] {

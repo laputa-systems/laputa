@@ -10,7 +10,7 @@ use util
 # /usr/lib/pm on an installed system.
 ## The directory holding this PM's pm.xsh and pm/ tree.
 export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
-  for entry in (env.get("XSH_MODULE_PATH") ?? "/usr/lib/pm").split(":") {
+  for entry in (e"XSH_MODULE_PATH" ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 
     return root when fs.exists(fp"{root}/pm.xsh")? and fs.exists(fp"{root}/pm")?
@@ -68,7 +68,7 @@ main(@args)?
 }
 
 proc xsh_runner() [fs, process, env, error] -> Result[Path] {
-  let host = (env.get("XSH_HOST") ?? "").trim()
+  let host = (e"XSH_HOST" ?? "").trim()
 
   if host != "" {
     let host_path = fp"{host}"
@@ -220,11 +220,11 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
     return
   }
 
-  let makeflags = env.get("MAKEFLAGS") ?? f"-s -j{cpu.count()}"
+  let makeflags = e"MAKEFLAGS" ?? f"-s -j{cpu.count()}"
 
   env ({
     DESTDIR: dest,
-    LAPUTA_ROOT: env.get("LAPUTA_ROOT") ?? "/",
+    LAPUTA_ROOT: e"LAPUTA_ROOT" ?? "/",
     XSH_PM_PREFIX: pm_env.prefix,
     XSH_PM_SYSCONFDIR: pm_env.sysconfdir,
     XSH_PM_LOCALSTATEDIR: pm_env.localstatedir,

@@ -302,7 +302,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
   let jobs_flag = f"-j{make.jobs()?}"
-  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_root = e"LAPUTA_ROOT" ?? "/"
 
   var cmake_args = [
     "-S",

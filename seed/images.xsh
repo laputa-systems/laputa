@@ -25,7 +25,7 @@ const package_tools_contract_epoch = "laputa-package-tools-2"
 
 ## The Docker client: `DOCKER` when set, else `docker` on PATH.
 export proc docker_program() [process, env, error] -> Result[Path, Error] {
-  let configured = (env.get("DOCKER") ?? "").trim()
+  let configured = (e"DOCKER" ?? "").trim()
   return fp"{configured}" unless configured == ""
 
   process.which("docker")?

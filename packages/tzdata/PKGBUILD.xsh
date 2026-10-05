@@ -120,12 +120,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   # zic runs here, so a cross build compiles it with the build machine's
   # compiler; its output does not depend on the target.
   if build_arch != pm_util.target_arch()? {
-    let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
+    let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
     build_cc = fp"{build_root}/usr/bin/cc"
 
     build_task_env = {
       XSH_MAKE_NATIVE_CROSS: "0",
-      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{env.get("PATH") ?? ""}",
+      PATH: f"{build_root}/usr/bin:{build_root}/usr/lib/llvm-toolchain/bin:{e"PATH" ?? ""}",
       LD_LIBRARY_PATH: f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib",
     }
   }

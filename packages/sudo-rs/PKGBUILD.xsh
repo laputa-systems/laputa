@@ -197,8 +197,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cargo = process.which("cargo")?
   let cc = process.which("cc")?
   let target_arch = pm_util.target_arch()?
-  let build_root = fp"{env.get("XSH_PM_BUILD_ROOT") ?? ""}"
-  let target_root_value = (env.get("LAPUTA_ROOT") ?? env.get("XSH_PM_ROOT") ?? "").trim()
+  let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
+  let target_root_value = (e"LAPUTA_ROOT" ?? e"XSH_PM_ROOT" ?? "").trim()
   let target_root = if target_root_value != "" { fp"{target_root_value}" } else { cc.parent.parent }
   var libdir = fp"{target_root}/usr/lib"
 
@@ -235,7 +235,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let aarch64_linker = if triple == "aarch64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
   let x86_64_linker = if triple == "x86_64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
   mark_vendored_crates(p"Cargo.lock", p"vendor")?
-  let current_path = env.get("PATH") ?? ""
+  let current_path = e"PATH" ?? ""
   let cargo_path = f"{host_cc.parent}:{current_path}"
 
   env ({

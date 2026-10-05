@@ -67,8 +67,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     return Err(GnuStubsError.Failed("gnu-stubs requires a native aarch64 or x86_64 build"))
   }
 
-  let laputa_root = fp"{env.get("LAPUTA_ROOT") ?? ""}"
-  let bootstrap_llvm = env.get("XSH_PM_BOOTSTRAP_LLVM_ROOT") ?? ""
+  let laputa_root = fp"{e"LAPUTA_ROOT" ?? ""}"
+  let bootstrap_llvm = e"XSH_PM_BOOTSTRAP_LLVM_ROOT" ?? ""
   let llvm_root = if bootstrap_llvm == "" { fp"{laputa_root}/usr/lib/llvm23" } else { fp"{bootstrap_llvm}" }
   let clang = fp"{llvm_root}/bin/clang"
   let lld = fp"{llvm_root}/bin/ld.lld"
@@ -135,7 +135,7 @@ __gttf2
   fs.mkdir(builtins_dir)?
 
   env ({
-    LD_LIBRARY_PATH: f"{llvm_root}/lib:{env.get("LD_LIBRARY_PATH") ?? ""}",
+    LD_LIBRARY_PATH: f"{llvm_root}/lib:{e"LD_LIBRARY_PATH" ?? ""}",
   }) {
     run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o" ?
     run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o" ?

@@ -158,7 +158,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DPNG_EXECUTABLES=OFF",
   ]
 
-  let target_root = env.get("LAPUTA_ROOT") ?? "/"
+  let target_root = e"LAPUTA_ROOT" ?? "/"
 
   if target_root != "" and target_root != "/" {
     cmake_args = cmake_args.push(f"-DZLIB_ROOT={target_root}/usr")

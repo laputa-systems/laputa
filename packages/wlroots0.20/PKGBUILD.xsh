@@ -708,7 +708,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let build_root = env.get("XSH_PM_BUILD_ROOT") ?? ""
+  let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
   let native_scanner = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
 
   let native_tools_ld = if native_scanner {
@@ -717,7 +717,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     pc.ld_library_path
   }
 
-  let root = env.get("LAPUTA_ROOT") ?? "/"
+  let root = e"LAPUTA_ROOT" ?? "/"
   patch_build(root)?
 
   env ({
