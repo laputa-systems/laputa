@@ -8,8 +8,8 @@ export proc ci_target_installed(sys_block: Path, disks: List[Path], target_partu
         let partition_marker = fp"{block}/{entry.name}/partition"
         let uevent = fp"{block}/{entry.name}/uevent"
 
-        if fs.exists(partition_marker)? and fs.exists(uevent)? {
-          return true when f"PARTUUID={target_partuuid}" in fs.read_text(uevent)?
+        if partition_marker.exists()? and uevent.exists()? {
+          return true when f"PARTUUID={target_partuuid}" in uevent.read_text()?
         }
       }
     }

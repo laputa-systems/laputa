@@ -3,8 +3,7 @@
 error GuestProofError = Failed(phase: Str, message: Str)
 
 proc guest_console(message: Str) [fs, error] {
-  fs.write(
-    /dev/console,
+  p"/dev/console".write(
     f"""{message}
 """,
   )
@@ -17,7 +16,7 @@ proc guest_fail(phase: Str, message: Str) {
 
 proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) {
   var elapsed = 0
-  while ! fs.exists(path_value)? {
+  while ! path_value.exists()? {
     if elapsed >= seconds {
       guest_fail(phase, f"missing {path_value}")
     }
@@ -50,7 +49,7 @@ proc main() [fs, process, time, error] {
     guest_wait_for(device, "input-devices", 20)
   }
 
-  fs.remove(/run/seatd.sock, missing_ok: true)
+  p"/run/seatd.sock".remove(missing_ok: true)
 
   # The serial-only QEMU proof has no virtual terminal.  An unbound seat is
   # immediately active while still mediating the virtio DRM and input devices.
@@ -61,15 +60,14 @@ proc main() [fs, process, time, error] {
   )?
   let _ = _seatd
   guest_wait_for(/run/seatd.sock, "seatd", 20)
-  if ! fs.exists(/run/user/0)? {
-    fs.mkdir(/run/user/0)
+  if ! p"/run/user/0".exists()? {
+    p"/run/user/0".mkdir()
   }
 
-  fs.chmod(/run/user/0, 0o700)
-  fs.remove(/run/laputa-foot-input.txt, missing_ok: true)
-  fs.remove(/run/laputa-foot-read-ready, missing_ok: true)
-  fs.write(
-    /run/laputa-foot-read.xsh,
+  p"/run/user/0".chmod(0o700)
+  p"/run/laputa-foot-input.txt".remove(missing_ok: true)
+  p"/run/laputa-foot-read-ready".remove(missing_ok: true)
+  p"/run/laputa-foot-read.xsh".write(
     """#!/bin/xsh
 fs.write(p"/run/laputa-foot-read-ready", "ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
@@ -97,7 +95,7 @@ fs.write(p"/run/laputa-foot-input.txt", input)?
   guest_wait_for(/run/laputa-foot-read-ready, "foot", 30)
   guest_console("LAPUTA_DWL_FOOT_PROOF_READY")
   guest_wait_for(/run/laputa-foot-input.txt, "input", 90)
-  let input = fs.read_text(/run/laputa-foot-input.txt)?.trim()
+  let input = p"/run/laputa-foot-input.txt".read_text()?.trim()
   if input != "laputa" {
     guest_fail("input", f"expected laputa, got {input}")
   }

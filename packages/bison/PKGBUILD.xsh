@@ -213,7 +213,7 @@ proc fail_on_m4_status() {
     complain (NULL, fatal, _("%s subprocess failed"), "m4");
 """
 
-  fs.write(output_c, text.replace(wait_call, checked_wait))
+  output_c.write(text.replace(wait_call, checked_wait))
 }
 
 proc install_data_tree(src: Path, dest: Path) {
@@ -503,26 +503,22 @@ export proc build(dest: Path) [fs, process, env, error] {
   let pt = """#pragma GCC system_header
 #include_next """
 
-  fs.write(
-    p"lib/alloca.h",
+  p"lib/alloca.h".write(
     f"""{pt}<alloca.h>
 """,
   )
 
-  fs.write(
-    p"lib/dirent.h",
+  p"lib/dirent.h".write(
     f"""{pt}<dirent.h>
 """,
   )
 
-  fs.write(
-    p"lib/errno.h",
+  p"lib/errno.h".write(
     f"""{pt}<errno.h>
 """,
   )
 
-  fs.write(
-    p"lib/fcntl.h",
+  p"lib/fcntl.h".write(
     f"""{pt}<fcntl.h>
 #ifndef O_BINARY
 # define O_BINARY 0
@@ -533,87 +529,73 @@ export proc build(dest: Path) [fs, process, env, error] {
 """,
   )
 
-  fs.write(
-    p"lib/float.h",
+  p"lib/float.h".write(
     f"""{pt}<float.h>
 """,
   )
 
-  fs.write(
-    p"lib/getopt.h",
+  p"lib/getopt.h".write(
     f"""{pt}<getopt.h>
 """,
   )
 
-  fs.write(
-    p"lib/iconv.h",
+  p"lib/iconv.h".write(
     f"""{pt}<iconv.h>
 """,
   )
 
-  fs.write(
-    p"lib/inttypes.h",
+  p"lib/inttypes.h".write(
     f"""{pt}<inttypes.h>
 """,
   )
 
-  fs.write(
-    p"lib/limits.h",
+  p"lib/limits.h".write(
     f"""{pt}<limits.h>
 """,
   )
 
-  fs.write(
-    p"lib/locale.h",
+  p"lib/locale.h".write(
     f"""{pt}<locale.h>
 #include "setlocale_null.h"
 """,
   )
 
-  fs.write(
-    p"lib/math.h",
+  p"lib/math.h".write(
     f"""{pt}<math.h>
 """,
   )
 
-  fs.write(
-    p"lib/sched.h",
+  p"lib/sched.h".write(
     f"""{pt}<sched.h>
 """,
   )
 
-  fs.write(
-    p"lib/signal.h",
+  p"lib/signal.h".write(
     f"""{pt}<signal.h>
 """,
   )
 
-  fs.write(
-    p"lib/spawn.h",
+  p"lib/spawn.h".write(
     f"""{pt}<spawn.h>
 """,
   )
 
-  fs.write(
-    p"lib/stdbool.h",
+  p"lib/stdbool.h".write(
     f"""{pt}<stdbool.h>
 """,
   )
 
-  fs.write(
-    p"lib/stddef.h",
+  p"lib/stddef.h".write(
     f"""{pt}<stddef.h>
 """,
   )
 
-  fs.write(
-    p"lib/stdint.h",
+  p"lib/stdint.h".write(
     f"""{pt}<stdint.h>
 """,
   )
 
-  fs.write(
-    p"lib/stdio.h",
+  p"lib/stdio.h".write(
     f"""{pt}<stdio.h>
 #include "arg-nonnull.h"
 #ifndef _GL_ATTRIBUTE_SPEC_PRINTF_STANDARD
@@ -635,95 +617,80 @@ export proc build(dest: Path) [fs, process, env, error] {
 """,
   )
 
-  fs.write(
-    p"lib/stdlib.h",
+  p"lib/stdlib.h".write(
     f"""{pt}<stdlib.h>
 """,
   )
 
-  fs.write(
-    p"lib/string.h",
+  p"lib/string.h".write(
     f"""{pt}<string.h>
 """,
   )
 
-  fs.write(
-    p"lib/strings.h",
+  p"lib/strings.h".write(
     f"""{pt}<strings.h>
 """,
   )
 
-  fs.write(
-    p"lib/termios.h",
+  p"lib/termios.h".write(
     f"""{pt}<termios.h>
 """,
   )
 
-  fs.write(
-    p"lib/time.h",
+  p"lib/time.h".write(
     f"""{pt}<time.h>
 """,
   )
 
-  fs.write(
-    p"lib/unistd.h",
+  p"lib/unistd.h".write(
     f"""{pt}<unistd.h>
 """,
   )
 
-  fs.write(
-    p"lib/wchar.h",
+  p"lib/wchar.h".write(
     f"""{pt}<wchar.h>
 """,
   )
 
-  fs.write(
-    p"lib/wctype.h",
+  p"lib/wctype.h".write(
     f"""{pt}<wctype.h>
 """,
   )
 
   # sys/ headers live in a subdirectory
-  fs.mkdir(p"lib/sys")
+  p"lib/sys".mkdir()
 
-  fs.write(
-    p"lib/sys/ioctl.h",
+  p"lib/sys/ioctl.h".write(
     f"""{pt}<sys/ioctl.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/resource.h",
+  p"lib/sys/resource.h".write(
     f"""{pt}<sys/resource.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/stat.h",
+  p"lib/sys/stat.h".write(
     f"""{pt}<sys/stat.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/time.h",
+  p"lib/sys/time.h".write(
     f"""{pt}<sys/time.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/times.h",
+  p"lib/sys/times.h".write(
     f"""{pt}<sys/times.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/types.h",
+  p"lib/sys/types.h".write(
     f"""{pt}<sys/types.h>
 """,
   )
 
-  fs.write(
-    p"lib/sys/wait.h",
+  p"lib/sys/wait.h".write(
     f"""{pt}<sys/wait.h>
 """,
   )
@@ -732,12 +699,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   # stdalign/getopt-cdefs: gnulib portability headers, complete as shipped.
   # unitypes/unistr/uniwidth: bundled libunistring API, no substitution needed.
   # textstyle: already a complete no-libtextstyle stub per its header comment.
-  fs.write(p"lib/stdalign.h", fs.read_text(p"lib/stdalign.in.h")?)
-  fs.write(p"lib/getopt-cdefs.h", fs.read_text(p"lib/getopt-cdefs.in.h")?)
-  fs.write(p"lib/unitypes.h", fs.read_text(p"lib/unitypes.in.h")?)
-  fs.write(p"lib/unistr.h", fs.read_text(p"lib/unistr.in.h")?)
-  fs.write(p"lib/uniwidth.h", fs.read_text(p"lib/uniwidth.in.h")?)
-  fs.write(p"lib/textstyle.h", fs.read_text(p"lib/textstyle.in.h")?)
+  p"lib/stdalign.h".write(p"lib/stdalign.in.h".read_text()?)
+  p"lib/getopt-cdefs.h".write(p"lib/getopt-cdefs.in.h".read_text()?)
+  p"lib/unitypes.h".write(p"lib/unitypes.in.h".read_text()?)
+  p"lib/unistr.h".write(p"lib/unistr.in.h".read_text()?)
+  p"lib/uniwidth.h".write(p"lib/uniwidth.in.h".read_text()?)
+  p"lib/textstyle.h".write(p"lib/textstyle.in.h".read_text()?)
   var scratch_lines = []
 
   for line in p"lib/malloc/scratch_buffer.h".lines()? {
@@ -749,15 +716,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.write(
-    p"lib/malloc/scratch_buffer.gl.h",
+  p"lib/malloc/scratch_buffer.gl.h".write(
     f"""/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 {scratch_lines.join("\n")}
 """,
   )
 
-  fs.write(
-    p"lib/xsh-gnulib-shims.h",
+  p"lib/xsh-gnulib-shims.h".write(
     """#include <errno.h>
 #include <spawn.h>
 #include <stddef.h>
@@ -776,8 +741,7 @@ posix_spawn_file_actions_addchdir (posix_spawn_file_actions_t *actions, const ch
 """,
   )
 
-  fs.write(
-    p"lib/xsh-getprogname.c",
+  p"lib/xsh-getprogname.c".write(
     """const char *
 getprogname (void)
 {
@@ -786,8 +750,7 @@ getprogname (void)
 """,
   )
 
-  fs.write(
-    p"lib/configmake.h",
+  p"lib/configmake.h".write(
     """#define PREFIX "/usr"
 #define EXEC_PREFIX "/usr"
 #define BINDIR "/usr/bin"
@@ -900,8 +863,7 @@ getprogname (void)
   fs.install(bison.output, fp"{dest}/usr/bin/bison", 0o755, parents: true, overwrite: true)
 
   # POSIX yacc compatibility wrapper
-  fs.write(
-    fp"{dest}/usr/bin/yacc",
+  fp"{dest}/usr/bin/yacc".write(
     """#!/bin/xsh
 proc main(...argv: List[Str]) [process, error] {
   unix.exec(process.command_argv("bison", ["bison", "-y"].extend(argv)))?

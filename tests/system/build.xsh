@@ -14,8 +14,8 @@ test test_profile_outputs_have_one_exact_generation_and_image_layout [error] {
 }
 
 test test_profile_build_crosses_into_pm_with_process_argv_not_a_request_dto [fs, error] {
-  let build_source = fs.read_text(p"system/build.xsh")?
-  let container_source = fs.read_text(p"system/container_build.xsh")?
+  let build_source = p"system/build.xsh".read_text()?
+  let container_source = p"system/container_build.xsh".read_text()?
 
   assert ! ("ProfileBuildRequestDto" in build_source)
   assert ! (".build-request.json" in build_source)

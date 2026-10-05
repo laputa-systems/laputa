@@ -60,8 +60,7 @@ export const filetree = [
 proc patch_musl_math() {
   let meson = p"meson.build"
 
-  fs.write(
-    meson,
+  meson.write(
     meson.read_text()?.replace(
       "dep_m = cc.find_library('m', required : false)",
       "dep_m = declare_dependency(link_args : ['-lm'])",
@@ -101,7 +100,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libpixman-1.so.") {
-      fs.remove(entry.path, missing_ok: true)
+      entry.path.remove(missing_ok: true)
     }
   }
 }

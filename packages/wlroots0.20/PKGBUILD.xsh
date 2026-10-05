@@ -552,13 +552,13 @@ export const filetree = [
 error WlrootsError = Generate(message: Str) | Patch(message: Str)
 
 proc replace_required(file: Path, old: Str, new: Str) {
-  let text = fs.read_text(file)?
+  let text = file.read_text()?
 
   if old not in text {
     return Err(WlrootsError.Patch(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  fs.write(file, text.replace(old, new))
+  file.write(text.replace(old, new))
 }
 
 # Port of render/gles2/shaders/embed.sh: the shader source as a
@@ -577,7 +577,7 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) {
   }
 
   lines += ["\t0x00,", "};", ""]
-  fs.write(dest, lines.join("\n"))
+  dest.write(lines.join("\n"))
 }
 
 proc write_shader_headers() {
@@ -620,7 +620,7 @@ const char *get_pnp_manufacturer(const char code[static 3]) {{
 
 proc write_pnpids(root: Str) {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  fs.write(p"backend/drm/pnpids.c", pnpids_source(pnp.read_text()?)?)
+  p"backend/drm/pnpids.c".write(pnpids_source(pnp.read_text()?)?)
 }
 
 proc patch_build(root: Str) {
@@ -696,11 +696,11 @@ rt = declare_dependency()""",
 }
 
 proc prune_xwayland_headers(root: Path) {
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h", missing_ok: true)
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h", missing_ok: true)
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h", missing_ok: true)
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h", missing_ok: true)
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland", missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h".remove(missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h".remove(missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h".remove(missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h".remove(missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland".remove(missing_ok: true)
 }
 
 ## Package recipe export.
@@ -736,7 +736,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
-      fs.write(ninja, ninja_text)
+      ninja.write(ninja_text)
     }
 
     run $muon "-C" "build" samu $jobs_flag ?

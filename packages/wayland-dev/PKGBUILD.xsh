@@ -147,8 +147,7 @@ proc write_embedded_dtd() {
     }
   }
 
-  fs.write(
-    p"src/wayland.dtd.h",
+  p"src/wayland.dtd.h".write(
     f"""static const char wayland_dtd[] = {{{{
 	{values.join(" ")}
 }}}};
@@ -178,11 +177,10 @@ proc patch_python_generator(native_scanner: Str) {
 """,
   )
 
-  fs.write(meson_path, patched)
+  meson_path.write(patched)
   let root_meson = p"meson.build"
 
-  fs.write(
-    root_meson,
+  root_meson.write(
     root_meson.read_text()?.replace(
   """	rt_dep = []
 	if not cc.has_function('clock_gettime', prefix: '#include <time.h>')
@@ -198,8 +196,7 @@ proc patch_python_generator(native_scanner: Str) {
 ),
   )
 
-  fs.write(
-    meson_path,
+  meson_path.write(
     meson_path.read_text()?.replace(
       "\tmathlib_dep = cc.find_library('m', required: false)",
       "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
@@ -207,8 +204,7 @@ proc patch_python_generator(native_scanner: Str) {
   )
 
   if native_scanner != "" {
-    fs.write(
-      meson_path,
+    meson_path.write(
       meson_path.read_text()?.replace(
   """if meson.is_cross_build() or not get_option('scanner')
 scanner_dep = dependency('wayland-scanner', native: true, version: meson.project_version())
@@ -268,7 +264,7 @@ export proc build(dest: Path) [fs, process, env, error] {
         f" -- {scanner_text} ",
       )
 
-      fs.write(ninja, ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
+      ninja.write(ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -282,7 +278,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") {
-      fs.remove(entry.path, missing_ok: true)
+      entry.path.remove(missing_ok: true)
     }
   }
 }

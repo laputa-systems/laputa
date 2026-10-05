@@ -571,28 +571,28 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
   let destination = fp"{output}/{entry.path}"
 
   if entry.kind == types.file_kind_tree() {
-    if fs.exists(destination)? {
+    if destination.exists()? {
       root_verify_entry_at(output, entry)
       return
     }
 
-    fs.mkdir(destination)
-    fs.chmod(destination, entry.mode)
+    destination.mkdir()
+    destination.chmod(entry.mode)
     root_verify_entry_at(output, entry)
     return
   }
 
-  if fs.exists(destination)? {
+  if destination.exists()? {
     return Err(
       types.PmError.PackageConflict(f"root path {entry.path} already exists while applying {entry.package_name}"),
     )
   }
 
-  fs.mkdir(destination.parent)
+  destination.parent.mkdir()
 
   if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
-    fs.copy(source, destination)
-    fs.chmod(destination, entry.mode)
+    source.copy(destination)
+    destination.chmod(entry.mode)
   } else if entry.kind == types.file_kind_symlink() {
     fs.symlink(fp"{entry.target}", destination)
   }
@@ -798,14 +798,14 @@ export proc compose_artifacts(
     return Err(types.PmError.PackageContract("root plan does not match verified artifacts"))
   }
 
-  if fs.exists(output)? {
+  if output.exists()? {
     return Err(types.PmError.PackageConflict(f"immutable root {output} already exists"))
   }
 
   let temporary = fp"{output}.tmp"
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.mkdir(temporary)
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
+  temporary.mkdir()
   # preflight above verified these receipts and payloads.
   let verified = root_checked_artifacts(artifacts)?
   var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
@@ -817,11 +817,11 @@ export proc compose_artifacts(
   }
 
   let receipt = root_receipt_for_plan(plan)?
-  fs.mkdir(root_receipt_path(temporary).parent)
-  fs.write(root_receipt_path(temporary), json.encode(root_receipt_dto(receipt))? + "\n")
+  root_receipt_path(temporary).parent.mkdir()
+  root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
   verify(temporary, receipt)
-  fs.mkdir(output.parent)
-  fs.rename(temporary, output)
+  output.parent.mkdir()
+  temporary.rename(output)
   verify(output, receipt)
   receipt
 }

@@ -186,7 +186,7 @@ proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] 
 
 proc xsh_seed_require_checkout(xsh_root: Path) {
   for required in [fp"{xsh_root}/Cargo.lock", fp"{xsh_root}/Dockerfile.test", fp"{xsh_root}/core"] {
-    guard fs.exists(required)? else {
+    guard required.exists()? else {
       return Err(SeedError.Missing(f"XSH_ROOT is not an XSH checkout: {required} is missing"))
     }
   }
@@ -215,14 +215,14 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
     )
   }
 
-  fs.mkdir(xsh_seed_cargo_registry(laputa_root))
+  xsh_seed_cargo_registry(laputa_root).mkdir()
   xsh_seed_run(
     docker,
     xsh_seed_cargo_fetch_argv(docker, laputa_root, xsh_root, value),
     laputa_root,
     "fetching XSH crates",
   )
-  fs.write_atomic(xsh_seed_registry_stamp(laputa_root), hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())
+  xsh_seed_registry_stamp(laputa_root).write_atomic(hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())
 }
 
 proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
@@ -233,7 +233,7 @@ proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
   let stamp = xsh_seed_registry_stamp(laputa_root)
   let lock = hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex()
 
-  if ! fs.exists(stamp)? or fs.read_text(stamp)?.trim() != lock {
+  if ! stamp.exists()? or stamp.read_text()?.trim() != lock {
     return Err(SeedError.Missing(f"the cached crate registry does not match {xsh_root}/Cargo.lock; run `make fetch`"))
   }
 }
@@ -290,24 +290,24 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
     }
 
     let temporary = fp"{archive_path}.tmp"
-    fs.remove(temporary, missing_ok: true)
+    temporary.remove(missing_ok: true)
     archive.tar_create(temporary, stage, entries, "xz", true)
-    fs.rename(temporary, archive_path, overwrite: true)
+    temporary.rename(archive_path, overwrite: true)
   }
 }
 
 # Replace a product only when its bytes changed, so an unchanged rebuild keeps
 # the seed directory, and with it the `xsh` package key, byte-identical.
 proc xsh_seed_publish_binary(source: Path, dest: Path) {
-  guard fs.exists(source)? else {
+  guard source.exists()? else {
     return Err(SeedError.Missing(f"cargo did not produce {source}"))
   }
 
-  return when fs.exists(dest)? and hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
+  return when dest.exists()? and hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
 
   let temporary = fp"{dest}.tmp"
   fs.install(source, temporary, 0o755, parents: true, overwrite: true)
-  fs.rename(temporary, dest, overwrite: true)
+  temporary.rename(dest, overwrite: true)
 }
 
 proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) -> Result[Str] {
@@ -316,7 +316,7 @@ proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) -> Result[Str] {
 }
 
 proc xsh_seed_previous_core_digest(manifest: Path) -> Result[Str] {
-  return "" unless fs.exists(manifest)?
+  return "" unless manifest.exists()?
 
   let value = json.read(manifest)?.require(Record)?
   let digest: Str = value.get("core_sources_sha256")?.require()?
@@ -337,7 +337,7 @@ export proc xsh_seed_build(
 
   xsh_seed_require_checkout(xsh_root)
   xsh_seed_require_fetched(docker, laputa_root, xsh_root)
-  fs.mkdir(xsh_seed_cargo_target(laputa_root))
+  xsh_seed_cargo_target(laputa_root).mkdir()
   xsh_seed_run(
     docker,
     xsh_seed_cargo_build_argv(docker, laputa_root, xsh_root, value, jobs)?,
@@ -347,7 +347,7 @@ export proc xsh_seed_build(
 
   let out = xsh_seed_dir(laputa_root, value.arch)
   let manifest = xsh_seed_manifest_path(laputa_root, value.arch)
-  fs.mkdir(out)
+  out.mkdir()
 
   for product in xsh_seed_binaries {
     xsh_seed_publish_binary(
@@ -362,14 +362,14 @@ export proc xsh_seed_build(
 
   let core_tree = fp"{out}/core"
 
-  if ! fs.exists(core_archive)? or xsh_seed_previous_core_digest(manifest)? != core_digest {
+  if ! core_archive.exists()? or xsh_seed_previous_core_digest(manifest)? != core_digest {
     xsh_seed_write_core(xsh_root, sources, core_archive)
-    fs.remove(core_tree, missing_ok: true)
+    core_tree.remove(missing_ok: true)
   }
 
   # The extracted tree is what containers mount at /usr/lib/xsh/core, so the
   # mounted applets are exactly the packaged ones.
-  if ! fs.exists(core_tree)? {
+  if ! core_tree.exists()? {
     archive.tar_extract(core_archive, out, 0, "xz", true)
   }
 
@@ -390,8 +390,8 @@ export proc xsh_seed_build(
   }
   let text = json.encode(record, pretty: true)? + "\n"
 
-  if ! fs.exists(manifest)? or fs.read_text(manifest)? != text {
-    fs.write_atomic(manifest, text)
+  if ! manifest.exists()? or manifest.read_text()? != text {
+    manifest.write_atomic(text)
   }
 }
 
@@ -400,7 +400,7 @@ export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result
   let out = xsh_seed_dir(laputa_root, arch)
   let manifest = xsh_seed_manifest_path(laputa_root, arch)
 
-  if ! fs.exists(manifest)? {
+  if ! manifest.exists()? {
     return Err(SeedError.Missing(f"the {arch} XSH seed is missing at {out}; run `make seed`"))
   }
 
@@ -415,12 +415,12 @@ export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result
     let expected: Str = files.get(name)?.require()?
     let file = fp"{out}/{name}"
 
-    if ! fs.exists(file)? or hash.sha256(file)?.hex() != expected {
+    if ! file.exists()? or hash.sha256(file)?.hex() != expected {
       return Err(SeedError.Failed(f"{file} does not match {manifest}; run `make seed`"))
     }
   }
 
-  if ! fs.exists(fp"{out}/core")? {
+  if ! fp"{out}/core".exists()? {
     return Err(SeedError.Missing(f"the extracted core tree {out}/core is missing; run `make seed`"))
   }
 

@@ -36,7 +36,7 @@ export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str], Err
 export proc load_manifest(db: Path) [fs, error] -> Result[List[Path], Error] {
   var manifest = []
 
-  if fs.exists(fp"{db}/manifest.json")? {
+  if fp"{db}/manifest.json".exists()? {
     let stored: List[Str] = json.read(fp"{db}/manifest.json")?.require()?
 
     for rel_text in stored {
@@ -53,7 +53,7 @@ export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Res
 
   for rel_path in manifest {
     if util.is_etc_file(rel_path) {
-      let meta = fs.metadata(fp"{dest}/{rel_path}")?
+      let meta = fp"{dest}/{rel_path}".metadata()?
 
       if meta.kind == "file" {
         let sha256 = hash.sha256(fp"{dest}/{rel_path}")?.hex()
@@ -97,7 +97,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   for rel_path in manifest {
     let key = rel_path.display()
     let path_value = fp"{dest}/{rel_path}"
-    let actual_kind = fs.metadata(path_value)?.kind
+    let actual_kind = path_value.metadata()?.kind
     if ! (key in declared) {
       var covered_by_tree = false
 
@@ -312,7 +312,7 @@ export proc write_package_metadata(
   item: types.BuiltPackage,
   executor: types.ExecutorProvenance,
 ) [fs, error] {
-  fs.mkdir(path_value.parent)
+  path_value.parent.mkdir()
   let manifest = collect_manifest_text(item.manifest)?
 
   let metadata: PackageMetadataDto = PackageMetadataDto(
@@ -362,7 +362,7 @@ export proc write_package_db(
   etcsums: List[types.EtcSum],
 ) [fs, error] {
   let db = util.package_db_path(root, pkg.name)
-  fs.mkdir(db)
+  db.mkdir()
   let manifest_text = collect_manifest_text(manifest)?
   json.write(fp"{db}/manifest.json", manifest_text)
   json.write(fp"{db}/etcsums.json", etcsums)

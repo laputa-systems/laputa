@@ -101,8 +101,7 @@ export const filetree = [
 # HAVE_MMX is configure's x86 probe for the dmix mixing assembly; aarch64
 # fails that probe, so the define follows the target.
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"include/config.h",
+  p"include/config.h".write(
     f"""#ifndef LAPUTA_ALSA_LIB_CONFIG_H
 #define LAPUTA_ALSA_LIB_CONFIG_H
 
@@ -277,10 +276,9 @@ proc install_headers(dest: Path) {
 
 # utils/alsa.pc.in and utils/alsa-topology.pc.in as configure fills them.
 proc install_pkg_config(dest: Path) {
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/alsa.pc",
+  fp"{dest}/usr/lib/pkgconfig/alsa.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib
@@ -296,8 +294,7 @@ Cflags: -I${{includedir}}
 """,
   )
 
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/alsa-topology.pc",
+  fp"{dest}/usr/lib/pkgconfig/alsa-topology.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

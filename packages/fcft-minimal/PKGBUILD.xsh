@@ -104,8 +104,7 @@ export const filetree = [
 ]
 
 proc write_version_header() [fs, error] {
-  fs.write(
-    p"version.h",
+  p"version.h".write(
     f"""#define FCFT_VERSION "{ver}"
 """,
   )
@@ -149,7 +148,7 @@ version = files('version.h')
 """,
   )
 
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 ## Exported declaration `build`.

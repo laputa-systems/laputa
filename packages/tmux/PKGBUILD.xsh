@@ -85,8 +85,7 @@ export const upstream_sources = [
 export const filetree = [{path: p"usr/bin/tmux", kind: "binary"}]
 
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     """#ifndef CONFIG_H
 #define CONFIG_H
 
@@ -219,7 +218,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
 
   for patch_file in [p"tmux-no-ncurses.patch", p"tmux-copy-mode-scrolling.patch"] {
-    let _ = patch.apply(p".", fs.read_text(patch_file)?, 1)?
+    let _ = patch.apply(p".", patch_file.read_text()?, 1)?
   }
 
   write_config_h()

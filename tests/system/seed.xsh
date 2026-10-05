@@ -48,11 +48,11 @@ test test_seed_core_layout_matches_xsh_release_packaging [error] {
 proc write_seed(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "seed-root")?
   let seed = xsh_seed.xsh_seed_dir(root, "aarch64")
-  fs.mkdir(fp"{seed}/core")
+  fp"{seed}/core".mkdir()
   var files: Map[Str] = {}
 
   for name in ["xsh", "xshi", "xsht", "core.tar.xz"] {
-    fs.write(fp"{seed}/{name}", f"{name} bytes\n")
+    fp"{seed}/{name}".write(f"{name} bytes\n")
     files[name] = hash.sha256(fp"{seed}/{name}")?.hex()
   }
 
@@ -76,7 +76,7 @@ test test_seed_require_rejects_a_missing_seed [fs, error] { |ctx|
 
 test test_seed_require_rejects_a_product_that_differs_from_its_manifest [fs, error] { |ctx|
   let root = write_seed(ctx)?
-  fs.write(fp"{xsh_seed.xsh_seed_dir(root, "aarch64")}/xshi", "a different build\n")
+  fp"{xsh_seed.xsh_seed_dir(root, "aarch64")}/xshi".write("a different build\n")
 
   match xsh_seed.xsh_seed_require(root, "aarch64") {
     Ok(_) => test.fail("a mismatched seed product was accepted")
@@ -100,14 +100,14 @@ test test_seed_mounts_binaries_and_core_from_one_directory [error] {
 
 proc image_fixture(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "images")?
-  fs.mkdir(fp"{root}/seed")
-  fs.mkdir(fp"{root}/pm")
-  fs.mkdir(fp"{root}/packages/llvm-toolchain")
-  fs.write(fp"{root}/seed/Dockerfile.host-tools", "FROM alpine\n")
-  fs.write(fp"{root}/Dockerfile.package-tools", "FROM base\n")
-  fs.write(fp"{root}/bootstrap-llvm-seed.xsh", "seed helper\n")
-  fs.write(fp"{root}/packages/llvm-toolchain/PKGBUILD.xsh", "llvm recipe\n")
-  fs.write(fp"{root}/pm/cli.xsh", "pm module\n")
+  fp"{root}/seed".mkdir()
+  fp"{root}/pm".mkdir()
+  fp"{root}/packages/llvm-toolchain".mkdir()
+  fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\n")
+  fp"{root}/Dockerfile.package-tools".write("FROM base\n")
+  fp"{root}/bootstrap-llvm-seed.xsh".write("seed helper\n")
+  fp"{root}/packages/llvm-toolchain/PKGBUILD.xsh".write("llvm recipe\n")
+  fp"{root}/pm/cli.xsh".write("pm module\n")
   root
 }
 
@@ -121,22 +121,22 @@ test test_image_tags_are_content_keys_over_their_own_inputs [fs, error] { |ctx|
   assert images.package_tools_tag(root, value)? == tools
 
   # XSH and PM run in containers from mounts; editing them rebuilds no image.
-  fs.write(fp"{root}/pm/cli.xsh", "changed pm module\n")
+  fp"{root}/pm/cli.xsh".write("changed pm module\n")
   assert images.package_tools_tag(root, value)? == tools
   assert images.host_tools_tag(root, value)? == host
 
-  fs.write(fp"{root}/packages/llvm-toolchain/PKGBUILD.xsh", "changed llvm recipe\n")
+  fp"{root}/packages/llvm-toolchain/PKGBUILD.xsh".write("changed llvm recipe\n")
   assert images.package_tools_tag(root, value)? != tools
   assert images.host_tools_tag(root, value)? == host
 
-  fs.write(fp"{root}/seed/Dockerfile.host-tools", "FROM alpine\nRUN true\n")
+  fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\nRUN true\n")
   assert images.host_tools_tag(root, value)? != host
 }
 
 test test_package_tools_requires_its_dockerfile [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "images-missing")?
-  fs.mkdir(fp"{root}/seed")
-  fs.write(fp"{root}/seed/Dockerfile.host-tools", "FROM alpine\n")
+  fp"{root}/seed".mkdir()
+  fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\n")
 
   match images.package_tools_tag(root, xsh_seed.xsh_seed_arch("aarch64")?) {
     Ok(_) => test.fail("a missing Dockerfile.package-tools was accepted")
@@ -163,12 +163,12 @@ test test_package_tools_build_is_offline_and_native [error] {
 }
 
 test test_image_dockerfiles_take_only_local_inputs [fs, error] {
-  let host = fs.read_text(p"seed/Dockerfile.host-tools")?
+  let host = p"seed/Dockerfile.host-tools".read_text()?
   assert "FROM alpine:3.21@sha256:" in host
   assert "e2fsprogs" in host
   assert "util-linux" in host
 
-  let tools = fs.read_text(p"Dockerfile.package-tools")?
+  let tools = p"Dockerfile.package-tools".read_text()?
   assert r"FROM ${HOST_TOOLS_IMAGE}" in tools
   assert "bootstrap-llvm-seed.xsh" in tools
   assert "/src/laputa" in tools
@@ -184,10 +184,10 @@ test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "xsh-package-key")?
   fs.symlink(fp"{fs.cwd()?}/packages", fp"{root}/packages")
   let seed = xsh_seed.xsh_seed_dir(root, "aarch64")
-  fs.mkdir(fp"{seed}/core")
+  fp"{seed}/core".mkdir()
 
   for name in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json", "core/ls"] {
-    fs.write(fp"{seed}/{name}", f"first {name}\n")
+    fp"{seed}/{name}".write(f"first {name}\n")
   }
 
   let target = pm_types.parse_target("aarch64")?
@@ -195,7 +195,7 @@ test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
   let first = pm_fingerprint.package_build_input(root, pkg, target)?
   assert pm_fingerprint.package_build_input(root, pkg, target)? == first
 
-  fs.write(fp"{seed}/xshi", "rebuilt xshi\n")
+  fp"{seed}/xshi".write("rebuilt xshi\n")
   assert pm_fingerprint.package_build_input(root, pkg, target)? != first
 }
 

@@ -239,7 +239,7 @@ proc read_receipt(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt]
   let value = receipt_from_dto(raw.require()?, dir)?
   validate_receipt(value, expected_key)
 
-  if ! fs.exists(payload_path(dir))? or ! fs.exists(metadata_path(dir))? or ! fs.exists(proof_path(dir))? {
+  if ! payload_path(dir).exists()? or ! metadata_path(dir).exists()? or ! proof_path(dir).exists()? {
     return Err(types.PmError.PackageContract(f"artifact {expected_key} is incomplete"))
   }
 
@@ -290,7 +290,7 @@ proc receipt_for(
   let metadata = metadata_path(dir)
   let proof = proof_path(dir)
 
-  if ! fs.exists(payload)? or ! fs.exists(metadata)? or ! fs.exists(proof)? {
+  if ! payload.exists()? or ! metadata.exists()? or ! proof.exists()? {
     return Err(types.PmError.PackageContract(f"staged artifact for {node.package_id} is incomplete"))
   }
 
@@ -314,13 +314,13 @@ proc receipt_for(
 }
 
 proc write_receipt(dir: Path, value: types.ArtifactReceipt) {
-  fs.write(receipt_path(dir), json.encode(receipt_dto(value))? + "\n")
+  receipt_path(dir).write(json.encode(receipt_dto(value))? + "\n")
 }
 
 proc copy_staged(dir: Path, staged: types.StagedArtifact) {
-  fs.copy(staged.payload, payload_path(dir))
-  fs.copy(staged.metadata, metadata_path(dir))
-  fs.copy(staged.proof, proof_path(dir))
+  staged.payload.copy(payload_path(dir))
+  staged.metadata.copy(metadata_path(dir))
+  staged.proof.copy(proof_path(dir))
 }
 
 proc commit_locked(
@@ -333,7 +333,7 @@ proc commit_locked(
   let key = node.artifact_key
   let final_dir = artifact_path(root, key)
 
-  if fs.exists(final_dir)? {
+  if final_dir.exists()? {
     let existing = read_receipt(final_dir, key)?
     if existing.target != target {
       return Err(
@@ -345,9 +345,9 @@ proc commit_locked(
   }
 
   let temporary = temporary_path(root, key)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.mkdir(temporary)
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
+  temporary.mkdir()
   copy_staged(temporary, staged)
   # The staged payload digest was computed when the payload was produced or
   # downloaded; hashing the copy again would only re-read the same bytes.
@@ -355,8 +355,8 @@ proc commit_locked(
 
   # artifact.json is intentionally the final temporary write: a directory with it is complete.
   write_receipt(temporary, value)
-  fs.mkdir(final_dir.parent)
-  fs.rename(temporary, final_dir)
+  final_dir.parent.mkdir()
+  temporary.rename(final_dir)
   read_receipt(final_dir, key)
 }
 
@@ -374,7 +374,7 @@ proc commit_staged(
   let key = node.artifact_key
   require_key(key)
   let lock_file = lock_path(root, key)
-  fs.mkdir(lock_file.parent)
+  lock_file.parent.mkdir()
   let lock = fs.lock(lock_file)?
   defer fs.unlock(lock)?
   commit_locked(target, root, node, staged, origin)?
@@ -395,7 +395,7 @@ proc fetch_remote_object(
   let actual = hash.sha256(cache_path)?.hex()
 
   if actual != expected_sha256 {
-    fs.remove(cache_path, missing_ok: true)
+    cache_path.remove(missing_ok: true)
     return Err(types.PmError.RemoteFetch(f"remote {label} SHA-256 mismatch: expected {expected_sha256}, got {actual}"))
   }
 }
@@ -429,14 +429,13 @@ proc remote_staged_artifact_for(
   let payload = fp"{cache_dir}/payload.tar.gz"
   let metadata = fp"{cache_dir}/metadata.json"
   let proof = fp"{cache_dir}/proof.json"
-  fs.mkdir(cache_dir)
+  cache_dir.mkdir()
   fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")
   fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
   let executor_sha256 = remote_executor_sha256(metadata, node)?
   # fetch_remote_object verified the payload against this digest.
   let payload_sha256 = retrieval.tarball_sha256
-  fs.write_atomic(
-    proof,
+  proof.write_atomic(
     json.encode({
       format: "laputa-package-proof-1",
       origin: "remote",
@@ -475,7 +474,7 @@ export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactRec
   require_key(key)
   let final_dir = artifact_path(root, key)
 
-  if ! fs.exists(final_dir)? {
+  if ! final_dir.exists()? {
     return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
@@ -517,11 +516,11 @@ export proc import_remote(
   let key = node.artifact_key
   require_key(key)
   let lock_file = lock_path(root, key)
-  fs.mkdir(lock_file.parent)
+  lock_file.parent.mkdir()
   let lock = fs.lock(lock_file)?
   defer fs.unlock(lock)?
 
-  if fs.exists(artifact_path(root, key))? {
+  if artifact_path(root, key).exists()? {
     let existing = lookup(root, key)?
     if existing.target != target {
       return Err(
@@ -541,7 +540,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
   require_key(key)
   let final_dir = artifact_path(root, key)
 
-  if ! fs.exists(final_dir)? {
+  if ! final_dir.exists()? {
     return Err(types.PmError.PackageTarball(f"artifact {key} is missing"))
   }
 
@@ -553,7 +552,7 @@ export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.Ar
 export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactReceipt], Error] {
   let objects = object_root(root)
 
-  return [] unless fs.exists(objects)?
+  return [] unless objects.exists()?
 
   var receipts: List[types.ArtifactReceipt] = []
 
@@ -587,7 +586,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
   var remaining = 0
   let objects = object_root(root)
 
-  if fs.exists(objects)? {
+  if objects.exists()? {
     for entry in fs.children(objects)? |> sort-by .name {
       if kept.get(entry.name) ?? false {
         remaining += 1
@@ -595,18 +594,18 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
       }
 
       # fs.remove deletes a directory tree without following symlinks.
-      fs.remove(entry.path)
-      fs.remove(fp"{store_layout(root)}/proofs/{entry.name}", missing_ok: true)
-      fs.remove(lock_path(root, entry.name), missing_ok: true)
+      entry.path.remove()
+      fp"{store_layout(root)}/proofs/{entry.name}".remove(missing_ok: true)
+      lock_path(root, entry.name).remove(missing_ok: true)
       removed += 1
     }
   }
 
   let temporary = fp"{store_layout(root)}/tmp"
 
-  if fs.exists(temporary)? {
+  if temporary.exists()? {
     for entry in fs.children(temporary)? {
-      fs.remove(entry.path)
+      entry.path.remove()
     }
   }
 

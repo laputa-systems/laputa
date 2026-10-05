@@ -169,12 +169,12 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-mesa"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
   let source = fp"{tmp}/proof-mesa.c"
   let binary = fp"{tmp}/proof-mesa"
-  fs.write(source, program_source)
+  source.write(program_source)
   run $cc $source f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lEGL" "-lGLESv2" "-lgbm" "-o" $binary ?
 
   env ({

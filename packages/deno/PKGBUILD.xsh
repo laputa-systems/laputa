@@ -155,7 +155,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"deno-distribution-features.patch",
     p"deno-musl-glibc-extensions.patch",
   ] {
-    let _ = patch.apply(p".", fs.read_text(patch_file)?, 1)?
+    let _ = patch.apply(p".", patch_file.read_text()?, 1)?
   }
 
   let rusty_v8 = fp"{src}/rusty-v8/librusty_v8_simdutf_release_{triple}.a.gz"

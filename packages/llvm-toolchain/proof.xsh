@@ -25,19 +25,19 @@ proc build_root_path() -> Result[Path] {
 proc proof_readelf_path(root: Path) -> Result[Path] {
   let target_readelf = fp"{root}/usr/bin/readelf"
 
-  return target_readelf when fs.exists(target_readelf)?
+  return target_readelf when target_readelf.exists()?
 
   let build_root = build_root_path()?
   fp"{build_root}/usr/bin/readelf"
 }
 
 proc ensure_file(path_value: Path, label: Str) {
-  ensure(fs.exists(path_value)?, "proof-llvm-toolchain", f"missing {label}: {path_value}")
+  ensure(path_value.exists()?, "proof-llvm-toolchain", f"missing {label}: {path_value}")
 }
 
 proc ensure_executable(path_value: Path, label: Str) {
   ensure_file(path_value, label)
-  let mode = fs.metadata(path_value)?.mode % 4096
+  let mode = path_value.metadata()?.mode % 4096
 
   ensure(
     mode in [0o555, 0o755, 0o775, 0o777],
@@ -48,7 +48,7 @@ proc ensure_executable(path_value: Path, label: Str) {
 
 proc ensure_xsh_wrapper(path_value: Path, label: Str) {
   ensure_file(path_value, label)
-  let text = fs.read_text(path_value)?
+  let text = path_value.read_text()?
   ensure(text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", f"{label} is not an XSH wrapper")
   ensure(! ("libgcc" in text), "proof-llvm-toolchain", f"{label} mentions libgcc")
   ensure(! ("libstdc++" in text), "proof-llvm-toolchain", f"{label} mentions libstdc++")
@@ -123,8 +123,7 @@ proc prove_default_compile(root: Path, arch: Str) [fs, process, env, error] {
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-default" {
 
-    fs.write(
-      fp"{tmp}/default-target.c",
+    fp"{tmp}/default-target.c".write(
       """int laputa_default_target(void) {
   return 9;
 }
@@ -143,8 +142,7 @@ proc prove_native_link(root: Path) [fs, process, env, error] {
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native" {
 
-    fs.write(
-      fp"{tmp}/hello.c",
+    fp"{tmp}/hello.c".write(
       """int main(void) {
   return 0;
 }
@@ -166,8 +164,7 @@ proc prove_native_cxx_link(root: Path) [fs, process, env, error] {
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-native-cxx" {
 
-    fs.write(
-      fp"{tmp}/hello.cc",
+    fp"{tmp}/hello.cc".write(
       """#include <string>
 
 int main(void) {
@@ -192,8 +189,7 @@ proc prove_x86_64_v3(root: Path) {
   let objdump = process.which("llvm-objdump")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-v3" {
 
-    fs.write(
-      fp"{tmp}/v3-toy.c",
+    fp"{tmp}/v3-toy.c".write(
       """#include <immintrin.h>
 
 __attribute__((noinline))
@@ -220,8 +216,7 @@ proc prove_explicit_aarch64_target(root: Path) {
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-aarch64" {
 
-    fs.write(
-      fp"{tmp}/aarch64-target-toy.c",
+    fp"{tmp}/aarch64-target-toy.c".write(
       """int laputa_aarch64_target_toy(void) {
   return 42;
 }
@@ -242,15 +237,14 @@ proc prove_target_tools(root: Path, arch: Str) {
   let clang = fp"{root}/usr/lib/llvm23/bin/clang"
   let clang_header = run.text $readelf "-h" $clang ?
   ensure(machine in clang_header, "proof-llvm-toolchain", f"clang is not {arch}")
-  let cc_text = fs.read_text(cc)?
+  let cc_text = cc.read_text()?
   ensure(cc_text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", "cc wrapper is not an XSH script")
   let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-wrapper"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
 
-  fs.write(
-    fp"{tmp}/wrapper-target.c",
+  fp"{tmp}/wrapper-target.c".write(
     """int laputa_wrapper_target(void) {
   return 7;
 }
@@ -266,7 +260,7 @@ proc prove_target_tools(root: Path, arch: Str) {
 proc main(root: Path = /rootfs) [fs, process, env, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"
 
-  if ! fs.exists(db)? {
+  if ! db.exists()? {
     return Err(ProofError.Failed(kind: "proof-llvm-toolchain", message: f"missing package metadata: {db}"))
   }
 

@@ -216,9 +216,9 @@ proc plan_json_from_dto(value: BuildPlanDto) -> Result[types.BuildPlan] {
 ## Atomically writes a validated BuildPlan through its JSON DTO, never through internal tag unions.
 export proc write_plan(path_value: Path, value: types.BuildPlan) [fs, error] {
   build_plan.validate(value)
-  fs.mkdir(path_value.parent)
+  path_value.parent.mkdir()
   let dto = plan_json_write_dto(value)
-  fs.write_atomic(path_value, json.encode(dto)? + "\n")
+  path_value.write_atomic(json.encode(dto)? + "\n")
 }
 
 ## Compatibility spelling for the durable BuildPlan write contract.

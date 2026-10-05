@@ -77,8 +77,7 @@ export const filetree = [
 ]
 
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     """#ifndef DROPBEAR_CONFIG_H
 #define DROPBEAR_CONFIG_H
 
@@ -200,16 +199,15 @@ export proc build(dest: Path) [fs, process, env, error] {
 #define DROPBEAR_SVR_REMOTESTREAMFWD 0
 """
 
-  fs.write(p"localoptions.h", local_opts)
+  p"localoptions.h".write(local_opts)
 
   # sub-makes (libtomcrypt) don't get -I flags, so copy to src/ too
-  fs.write(p"src/localoptions.h", local_opts)
+  p"src/localoptions.h".write(local_opts)
   let ldflags = f"-L{kr}/usr/lib"
   write_config_h()
   let default_options_guard = ifndef_wrapped_defines(p"src/default_options.h")?
 
-  fs.write(
-    p"default_options_guard.h",
+  p"default_options_guard.h".write(
     f"""/*
 Generated from src/default_options.h
 Local customisation goes in localoptions.h
@@ -482,6 +480,6 @@ Local customisation goes in localoptions.h
   fs.install(p"dropbearconvert", fp"{dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)
 
   # Runtime configuration and xinit service module.
-  fs.mkdir(fp"{dest}/etc/dropbear")
+  fp"{dest}/etc/dropbear".mkdir()
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)
 }

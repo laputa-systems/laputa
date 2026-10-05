@@ -132,7 +132,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     return Err(error.failure("CMakeLists.txt no longer creates libpng.so after the build"))?
   }
 
-  fs.write(p"CMakeLists.txt", cmake_lists.replace(post_build_symlink, ""))
+  p"CMakeLists.txt".write(cmake_lists.replace(post_build_symlink, ""))
 
   # CMake sees the executor architecture rather than the aarch64 compiler
   # target, so PNG_ARM_NEON is not an effective cache option here.  Set the
@@ -176,6 +176,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   fs.symlink(p"libpng16.so", fp"{dest}/usr/lib/libpng.so")
-  fs.remove(fp"{dest}/usr/bin", missing_ok: true)
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/bin".remove(missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 }

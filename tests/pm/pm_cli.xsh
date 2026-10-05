@@ -27,8 +27,8 @@ proc module_root() [fs, error] -> Result[Path] {
 proc copied_repository(ctx: TestContext, name: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"{root}/pm")
-  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)
+  fp"{root}/pm".mkdir()
+  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -46,7 +46,7 @@ proc published_generation_receipt(ctx: TestContext) -> Result[Path] {
     false,
   )?
   let overlay = test.temp_dir(ctx, name: "root-inspect-overlay")?
-  fs.mkdir(fp"{overlay}/overlay")
+  fp"{overlay}/overlay".mkdir()
   let generation_value = generation.plan(build_value, ["app"], generation.overlay_digest(fp"{overlay}/overlay")?)?
   let receipt = test.temp_path(ctx, name: "published-generation.json")
   json.write(
@@ -133,8 +133,8 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   let stage = test.temp_dir(ctx, name: "store-extract-stage")?
   let contents = fp"{stage}/contents"
   let kernel = fp"{contents}/boot/vmlinuz"
-  fs.mkdir(kernel.parent)
-  fs.write(kernel, "kernel payload\n")
+  kernel.parent.mkdir()
+  kernel.write("kernel payload\n")
   let payload = fp"{stage}/payload.tar.gz"
   archive.tar_create(payload, contents, [p"."], compression: "gz")
   let metadata = fp"{stage}/metadata.json"
@@ -157,7 +157,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
     },
   )
   let proof = fp"{stage}/proof.json"
-  fs.write(proof, "proof\n")
+  proof.write("proof\n")
   let store_root = test.temp_dir(ctx, name: "store-extract-store")?
   let _ = store.commit(
     types.target_aarch64(),
@@ -190,7 +190,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   )?
   assert output.read_text()? == "kernel payload\n"
 
-  fs.write(output, "previous output\n")
+  output.write("previous output\n")
   let error_output = test.temp_path(ctx, name: "store-extract-error.txt")
   let missing = pm_status(
     [
@@ -325,8 +325,8 @@ test test_repo_plan_does_not_infer_path_arguments [fs, process, env, error] { |c
   let root = copied_repository(ctx, "repo-no-inference")?
   let err = test.temp_path(ctx, name: "repo-no-inference.err")
   let package_like = fp"{root}/looks-like-package"
-  fs.mkdir(package_like)
-  fs.write(fp"{package_like}/PKGBUILD.xsh", "not a command argument\n")
+  package_like.mkdir()
+  fp"{package_like}/PKGBUILD.xsh".write("not a command argument\n")
 
   let status = pm_status(
     [
@@ -407,7 +407,7 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   let output = fp"{root}/out/plan.json"
   let _ = pm_output(["repo", "plan", "--repo", root.display(), "--root", "app", "--output", output.display()])?
   let value = plan_json.read(output)?
-  fs.write(output, output.read_text()?.replace(value.plan_sha256, "corrupt-plan-digest"))
+  output.write(output.read_text()?.replace(value.plan_sha256, "corrupt-plan-digest"))
   let err = test.temp_path(ctx, name: "repo-corrupt.err")
   let status = pm_status(["repo", "show", output.display()], err)?
 
@@ -421,7 +421,7 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
 test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, error] { |ctx|
   let repository = copied_repository(ctx, "plan-executor-repository")?
   let pm_copy = test.temp_dir(ctx, name: "plan-executor-pm")?
-  fs.copy(p"pm.xsh", fp"{pm_copy}/pm.xsh")
+  p"pm.xsh".copy(fp"{pm_copy}/pm.xsh")
   let _ = fs.copy_tree(p"pm", fp"{pm_copy}/pm", parents: true, overwrite: true)?
   let runners = test.temp_dir(ctx, name: "plan-executor-runners")?
   let _ = fs.copy_tree(fixture("fingerprint-executor/runners"), runners, parents: true, overwrite: true)?
@@ -437,10 +437,10 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
     plans += [plan_json.read(output)?]
 
     for name in ["xsh", "xshi", "xsht"] {
-      fs.write(fp"{runners}/{name}", f"rebuilt {name} runner\n")
+      fp"{runners}/{name}".write(f"rebuilt {name} runner\n")
     }
 
-    fs.write(cli_module, cli_module.read_text()? + "\n# A PM revision that must not change any artifact key.\n")
+    cli_module.write(cli_module.read_text()? + "\n# A PM revision that must not change any artifact key.\n")
   }
 
   assert plans[1] == plans[0]

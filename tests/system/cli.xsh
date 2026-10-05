@@ -55,7 +55,7 @@ test test_laputa_cli_rejects_ambiguous_or_invalid_arguments [error] {
 }
 
 test test_laputa_test_and_boot_dispatch_through_the_current_build_path [fs, error] {
-  let source = fs.read_text(p"system/cli.xsh")?
+  let source = p"system/cli.xsh".read_text()?
   assert """LaputaTest => {
       let outputs = build.build_profile""" in source
   assert """LaputaBoot => {

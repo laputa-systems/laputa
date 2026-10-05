@@ -35,13 +35,13 @@ pure metadata_rows(entries: List[EntrySpec]) -> List[Record] {
 
 proc write_payload_entry(root: Path, entry: EntrySpec) {
   let output = fp"{root}/{entry.path}"
-  fs.mkdir(output.parent)
+  output.parent.mkdir()
 
   if entry.kind == types.File or entry.kind == types.Binary {
-    fs.write(output, entry.content, mode: entry.mode)
+    output.write(entry.content, mode: entry.mode)
   } else if entry.kind == types.Tree {
-    fs.mkdir(output)
-    fs.chmod(output, entry.mode)
+    output.mkdir()
+    output.chmod(entry.mode)
   } else if entry.kind == types.Symlink {
     fs.symlink(fp"{entry.target}", output)
   }
@@ -59,20 +59,19 @@ proc stage_artifact(
   let payload = fp"{stage}/payload.tar.gz"
   let metadata = fp"{stage}/metadata.json"
   let proof = fp"{stage}/proof.json"
-  fs.mkdir(contents)
+  contents.mkdir()
 
   for entry in entries {
     write_payload_entry(contents, entry)
   }
 
   if kind == types.Meta {
-    fs.write(payload, "metapackages have no root payload")
+    payload.write("metapackages have no root payload")
   } else {
     archive.tar_create(payload, contents, [p"."], compression: "gz")
   }
 
-  fs.write(
-    metadata,
+  metadata.write(
     json.encode({
       name,
       ver: "1.0.0",
@@ -81,7 +80,7 @@ proc stage_artifact(
       files: metadata_rows(entries),
     })? + "\n",
   )
-  fs.write(proof, f"proof {name}\n")
+  proof.write(f"proof {name}\n")
   let key = digest(f"artifact {name} {dependencies.len()}")
   {
     node: {
@@ -115,8 +114,7 @@ proc rehashed(staged: types.StagedArtifact) [fs, error] -> Result[types.StagedAr
 }
 
 proc write_legacy_sidecar_metadata(staged: types.StagedArtifact, name: Str, entries: List[EntrySpec]) {
-  fs.write(
-    staged.metadata,
+  staged.metadata.write(
     json.encode({
       arch: "aarch64",
       name,
@@ -146,8 +144,8 @@ proc rewrite_legacy_database_payload(
   }
 
   let database = fp"{contents}/var/lib/xsh-pm/packages/{name}"
-  fs.mkdir(database)
-  fs.write(fp"{database}/manifest.json", json.encode([entry.path for entry in entries])?)
+  database.mkdir()
+  fp"{database}/manifest.json".write(json.encode([entry.path for entry in entries])?)
   let etcsums = [
     {path: entry.path, sha256: digest(entry.content)}
     for entry in entries
@@ -155,9 +153,8 @@ proc rewrite_legacy_database_payload(
       "etc/",
     )
   ]
-  fs.write(fp"{database}/etcsums.json", json.encode(etcsums)?)
-  fs.write(
-    fp"{database}/metadata.json",
+  fp"{database}/etcsums.json".write(json.encode(etcsums)?)
+  fp"{database}/metadata.json".write(
     json.encode({
       name,
       ver: "1.0.0",
@@ -173,7 +170,7 @@ proc rewrite_legacy_database_payload(
   )
 
   if unexpected {
-    fs.write(fp"{database}/unexpected.json", "not a known legacy package database record")
+    fp"{database}/unexpected.json".write("not a known legacy package database record")
   }
 
   archive.tar_create(staged.payload, contents, [p"."], compression: "gz", overwrite: true)
@@ -266,7 +263,7 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   assert plan.entries.len() == 4
   let output = fp"{test.temp_dir(ctx, name: "root-legacy-metadata-output")?}/root"
   let composed = root.compose_artifacts(output, plan, [receipt])?
-  assert fs.exists(fp"{output}/var/lib/xsh-pm/packages/legacy/metadata.json")?
+  assert fp"{output}/var/lib/xsh-pm/packages/legacy/metadata.json".exists()?
   root.verify(output, composed)
 
   let unexpected = stage_artifact(ctx, "legacy-extra", types.Payload, entries)?
@@ -285,8 +282,7 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   )
 
   let invalid = stage_artifact(ctx, "invalid-kind", types.Payload, entries)?
-  fs.write(
-    invalid.staged.metadata,
+  invalid.staged.metadata.write(
     json.encode({
       name: "invalid-kind",
       ver: "1.0.0",
@@ -318,9 +314,9 @@ test test_root_preserves_file_mode_symlink_and_empty_directory [fs, error] { |ct
   let plan = root.preflight(types.target_aarch64(), [receipt])?
   let output = fp"{test.temp_dir(ctx, name: "root-single-output")?}/root"
   let composed = root.compose_artifacts(output, plan, [receipt])?
-  assert fs.metadata(fp"{output}/usr/bin/tool")?.mode % 512 == 0o755
+  assert fp"{output}/usr/bin/tool".metadata()?.mode % 512 == 0o755
   assert fp"{output}/bin/tool".readlink()?.display() == "../usr/bin/tool"
-  let empty_metadata = fs.metadata(fp"{output}/usr/share/empty")?
+  let empty_metadata = fp"{output}/usr/share/empty".metadata()?
   assert empty_metadata.kind == "dir"
   assert empty_metadata.mode % 512 == 0o700
   root.verify(output, composed)
@@ -335,7 +331,7 @@ test test_root_rejects_cyclic_payload_link_that_differs_from_receipt [fs, error]
     [payload_symlink("usr/lib/link", "expected-target")],
   )?
   let payload_root = test.temp_dir(ctx, name: "root-symlink-loop-payload")?
-  fs.mkdir(fp"{payload_root}/usr/lib")
+  fp"{payload_root}/usr/lib".mkdir()
   fs.symlink(p"link", fp"{payload_root}/usr/lib/link")
   archive.tar_create(prepared.staged.payload, payload_root, [p"."], compression: "gz", overwrite: true)
   let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, rehashed(prepared.staged)?)?
@@ -407,7 +403,7 @@ test test_root_rejects_collisions_and_same_owner_duplicate_entries_before_mutati
     Err(problem) => assert "owned by both" in problem.message
   }
 
-  assert fs.exists(collision_output)? == false
+  assert collision_output.exists()? == false
 
   let linked_left = commit_artifact(
     ctx,
@@ -446,8 +442,7 @@ test test_root_rejects_collisions_and_same_owner_duplicate_entries_before_mutati
   )
 
   let duplicate = stage_artifact(ctx, "duplicate", types.Payload, [payload_file("usr/bin/duplicate", "one")])?
-  fs.write(
-    duplicate.staged.metadata,
+  duplicate.staged.metadata.write(
     json.encode({
       name: "duplicate",
       ver: "1.0.0",
@@ -507,8 +502,7 @@ test test_root_rejects_file_ownership_across_parent_and_child_paths [fs, error] 
 test test_root_rejects_traversal_and_corrupt_payloads [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-invalid-store")?
   let traversal = stage_artifact(ctx, "traversal", types.Payload, [payload_file("usr/bin/safe", "safe")])?
-  fs.write(
-    traversal.staged.metadata,
+  traversal.staged.metadata.write(
     json.encode({
       name: "traversal",
       ver: "1.0.0",
@@ -521,8 +515,7 @@ test test_root_rejects_traversal_and_corrupt_payloads [fs, error] { |ctx|
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [traversal_receipt]), "must stay relative")
 
   let invalid_link = stage_artifact(ctx, "invalid-link", types.Payload, [payload_file("usr/bin/unused", "unused")])?
-  fs.write(
-    invalid_link.staged.metadata,
+  invalid_link.staged.metadata.write(
     json.encode({
       name: "invalid-link",
       ver: "1.0.0",
@@ -535,7 +528,7 @@ test test_root_rejects_traversal_and_corrupt_payloads [fs, error] { |ctx|
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [invalid_link_receipt]), "escapes the root")
 
   let receipt = commit_artifact(ctx, store_root, "corrupt", types.Payload, [payload_file("usr/bin/corrupt", "clean")])?
-  fs.write(fp"{receipt.artifact_dir}/payload.tar.gz", "corrupt payload")
+  fp"{receipt.artifact_dir}/payload.tar.gz".write("corrupt payload")
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [receipt]), "payload SHA-256 does not match receipt")
 }
 
@@ -548,8 +541,8 @@ test test_root_identifies_the_missing_payload_inventory_entry [fs, error] { |ctx
     [payload_file("usr/bin/present", "present"), payload_tree("usr/share")],
   )?
   let archive_root = test.temp_dir(ctx, name: "root-missing-entry-archive")?
-  fs.mkdir(fp"{archive_root}/usr/bin")
-  fs.write(fp"{archive_root}/usr/bin/present", "present")
+  fp"{archive_root}/usr/bin".mkdir()
+  fp"{archive_root}/usr/bin/present".write("present")
   archive.tar_create(staged.staged.payload, archive_root, [p"."], compression: "gz", overwrite: true)
   let receipt = store.commit(types.target_aarch64(), store_root, staged.node, rehashed(staged.staged)?)?
 
@@ -586,9 +579,9 @@ test test_root_runtime_closure_ignores_build_only_dependency [fs, error] { |ctx|
   let plan = root.preflight(types.target_aarch64(), [app, runtime])?
   let output = fp"{test.temp_dir(ctx, name: "root-runtime-output")?}/root"
   let _ = root.compose_artifacts(output, plan, [app, runtime])?
-  assert fs.exists(fp"{output}/usr/bin/app")?
-  assert fs.exists(fp"{output}/usr/lib/runtime")?
-  assert fs.exists(fp"{output}/usr/bin/compiler")? == false
+  assert fp"{output}/usr/bin/app".exists()?
+  assert fp"{output}/usr/lib/runtime".exists()?
+  assert fp"{output}/usr/bin/compiler".exists()? == false
 }
 
 test test_root_failed_composition_leaves_completed_output_untouched [fs, error] { |ctx|
@@ -602,8 +595,8 @@ test test_root_failed_composition_leaves_completed_output_untouched [fs, error] 
   )?
   let plan = root.preflight(types.target_aarch64(), [artifact])?
   let output = fp"{test.temp_dir(ctx, name: "root-immutable-output")?}/root"
-  fs.mkdir(output)
-  fs.write(fp"{output}/marker", "previous root")
+  output.mkdir()
+  fp"{output}/marker".write("previous root")
 
   match root.compose_artifacts(output, plan, [artifact]) {
     Ok(_) => test.fail("completed root was overwritten")

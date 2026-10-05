@@ -20,29 +20,28 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
 proc authorize_root_key(rootfs: Path, public_key: Str) {
   let ssh_dir = fp"{rootfs}/root/.ssh"
   let auth_keys = fp"{ssh_dir}/authorized_keys"
-  fs.mkdir(ssh_dir)
+  ssh_dir.mkdir()
   var existing = ""
 
-  if fs.exists(auth_keys)? {
-    existing = fs.read_text(auth_keys)?
+  if auth_keys.exists()? {
+    existing = auth_keys.read_text()?
   }
 
-  fs.write(
-    auth_keys,
+  auth_keys.write(
     f"""{existing}{public_key}
 """,
   )
 
-  fs.chmod(ssh_dir, 0o700)
-  fs.chmod(auth_keys, 0o600)
+  ssh_dir.chmod(0o700)
+  auth_keys.chmod(0o600)
 }
 
 proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) {
   let device_path = fp"{rootfs}/dev/{name}"
 
-  return when fs.exists(device_path)?
+  return when device_path.exists()?
 
-  fs.mkdir(device_path.parent)
+  device_path.parent.mkdir()
   let mknod = process.which("mknod")?
   run $mknod "-m" "666" $device_path "c" $major $minor ?
 }
@@ -195,25 +194,25 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let chroot = process.which("chroot")?
   let timeout_bin = process.which("timeout")?
   let tmp = /tmp/dropbear-proof-xinit
-  fs.mkdir(tmp)
-  ensure(fs.exists(fp"{rootfs}/bin/xsh")?, "xinit-control", "rootfs is missing /bin/xsh for service scripts")
-  ensure(fs.exists(fp"{rootfs}/usr/bin/xinit")?, "xinit-control", "rootfs is missing /usr/bin/xinit")
+  tmp.mkdir()
+  ensure(fp"{rootfs}/bin/xsh".exists()?, "xinit-control", "rootfs is missing /bin/xsh for service scripts")
+  ensure(fp"{rootfs}/usr/bin/xinit".exists()?, "xinit-control", "rootfs is missing /usr/bin/xinit")
   ensure_device(rootfs, "null", "1", "3")
   ensure_device(rootfs, "random", "1", "8")
   ensure_device(rootfs, "urandom", "1", "9")
-  fs.mkdir(fp"{rootfs}/tmp")
-  fs.chmod(fp"{rootfs}/tmp", 0o1777)
-  fs.mkdir(log_dir)
-  fs.remove(fp"{log_dir}/current", missing_ok: true)
+  fp"{rootfs}/tmp".mkdir()
+  fp"{rootfs}/tmp".chmod(0o1777)
+  log_dir.mkdir()
+  fp"{log_dir}/current".remove(missing_ok: true)
   let host_key = fp"{rootfs}/tmp/dropbear_host_ed25519"
   let rsa_host_key = fp"{rootfs}/tmp/dropbear_host_rsa"
   let client_key = fp"{tmp}/dropbear_client_ed25519"
-  fs.remove(host_key, missing_ok: true)
-  fs.remove(rsa_host_key, missing_ok: true)
+  host_key.remove(missing_ok: true)
+  rsa_host_key.remove(missing_ok: true)
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $host_key ?
   run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_host_key ?
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
-  fs.chmod(client_key, 0o600)
+  client_key.chmod(0o600)
   let public_key_text = run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?
   let public_key = public_key_line(public_key_text)?
   authorize_root_key(rootfs, public_key)

@@ -2528,10 +2528,10 @@ proc write_entry(term: Term, outdir: Path) {
   }
 
   let leaf = fp"{outdir}/{primary.byte_slice(0, 1)}"
-  fs.mkdir(leaf)
+  leaf.mkdir()
   let file = fp"{leaf}/{primary}"
-  fs.remove(file, missing_ok: true)
-  fs.write(file, object)
+  file.remove(missing_ok: true)
+  file.write(object)
 
   if names.len() < 3 {
     return
@@ -2553,9 +2553,9 @@ proc write_entry(term: Term, outdir: Path) {
     }
 
     let alias_leaf = fp"{outdir}/{alias.byte_slice(0, 1)}"
-    fs.mkdir(alias_leaf)
+    alias_leaf.mkdir()
     let link = fp"{alias_leaf}/{alias}"
-    fs.remove(link, missing_ok: true)
+    link.remove(missing_ok: true)
     file.hardlink(link)
   }
 }
@@ -2581,7 +2581,7 @@ proc compile(source: Path, outdir: Path, wanted: List[Str]) {
   let tokens = scan(text, table)
   let entries = parse_entries(tokens, table)?
   let terms = resolve(entries, table)?
-  fs.mkdir(outdir)
+  outdir.mkdir()
   for term in terms {
     if selected(term.names, wanted) {
       write_entry(term, outdir)

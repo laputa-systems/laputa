@@ -144,8 +144,8 @@ proc write_x86_vdso_offsets(nm: Path) [fs, process, env, error] {
 
 proc build_x86_vdso(cc: Path) {
   let vdso_dir = p"arch/x86/entry/vdso/vdso64"
-  fs.mkdir(vdso_dir)
-  fs.mkdir(p".xsh-kbuild/host/arch/x86/tools")
+  vdso_dir.mkdir()
+  p".xsh-kbuild/host/arch/x86/tools".mkdir()
   let vdso2c = p".xsh-kbuild/host/arch/x86/tools/vdso2c"
   PKGBUILD_shared.emit_kbuild_progress("xsh-kbuild-x86-vdso build-host-vdso2c")
 
@@ -305,7 +305,7 @@ proc build_x86_vdso(cc: Path) {
 # releases), so x86 compiles kernel/bounds.c as upstream Kbuild does instead
 # of carrying a hand-copied header.
 proc generate_x86_bounds_header(cc: Path) {
-  fs.mkdir(p".xsh-kbuild/generated")
+  p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/bounds.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
   let with_flags = base.extend(x86_kbuild_cflags())
@@ -327,8 +327,8 @@ proc generate_x86_bounds_header(cc: Path) {
 }
 
 proc generate_x86_asm_offsets_header(cc: Path) {
-  fs.mkdir(p".xsh-kbuild")
-  fs.mkdir(p".xsh-kbuild/generated")
+  p".xsh-kbuild".mkdir()
+  p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
   let with_flags = base.extend(x86_kbuild_cflags())
@@ -350,8 +350,8 @@ proc generate_x86_asm_offsets_header(cc: Path) {
 }
 
 proc generate_x86_kvm_asm_offsets_header(cc: Path) {
-  fs.mkdir(p".xsh-kbuild")
-  fs.mkdir(p".xsh-kbuild/generated")
+  p".xsh-kbuild".mkdir()
+  p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/kvm-asm-offsets.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
   let with_flags = base.extend(x86_kbuild_cflags())
@@ -377,7 +377,7 @@ proc generate_x86_kvm_asm_offsets_header(cc: Path) {
 # writes through it, so x86 generates it as upstream Kbuild does instead of
 # sharing the aarch64-derived files/generated/rq-offsets.h.
 proc generate_x86_rq_offsets_header(cc: Path) {
-  fs.mkdir(p".xsh-kbuild/generated")
+  p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/rq-offsets.s"
   let base = [cc.display(), "-target", "x86_64-linux-gnu", "-Wno-unused-command-line-argument", "-S"]
   let with_flags = base.extend(x86_kbuild_cflags())
@@ -498,7 +498,7 @@ proc build_x86_realmode_payload(cc: Path) {
   let ld = PKGBUILD_shared.native_tool("ld.lld")?
   let objcopy = PKGBUILD_shared.native_tool("llvm-objcopy")?
   let nm = PKGBUILD_shared.native_tool("llvm-nm")?
-  fs.mkdir(realmode_dir)
+  realmode_dir.mkdir()
 
   PKGBUILD_shared.run_native_command(
     [
@@ -686,7 +686,7 @@ proc build_x86_realmode_payload(cc: Path) {
     return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-relocs", message: "relocs --realmode failed"))
   }
 
-  fs.write(p"arch/x86/realmode/rm/realmode.relocs", relocs_out.stdout)
+  p"arch/x86/realmode/rm/realmode.relocs".write(relocs_out.stdout)
 
   PKGBUILD_shared.run_native_command(
     [objcopy.display(), "-O", "binary", "arch/x86/realmode/rm/realmode.elf", "arch/x86/realmode/rm/realmode.bin"],

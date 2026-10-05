@@ -21,8 +21,8 @@ pure test_generation_sha256(value: Str) -> Str {
 proc copied_generation_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("graph-catalog/packages"), fp"{root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"{root}/pm")
-  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)
+  fp"{root}/pm".mkdir()
+  p"pm/proof.xsh".copy(fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -64,8 +64,8 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
     let metadata = fp"{stage}/metadata.json"
     let proof = fp"{stage}/proof.json"
     let path_value = fp"{contents}/usr/share/{node.name}"
-    fs.mkdir(path_value.parent)
-    fs.write(path_value, f"payload {node.name}\n")
+    path_value.parent.mkdir()
+    path_value.write(f"payload {node.name}\n")
     archive.tar_create(payload, contents, [p"."], compression: "gz")
     json.write(
       metadata,
@@ -86,7 +86,7 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
         ],
       },
     )
-    fs.write(proof, f"proof {node.name}\n")
+    proof.write(f"proof {node.name}\n")
     let _ = store.commit(
       value.target,
       store_root,
@@ -105,8 +105,8 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
   let metadata = fp"{stage}/metadata.json"
   let proof = fp"{stage}/proof.json"
   let init_directory = fp"{contents}/usr/lib/init/rc.d"
-  fs.mkdir(init_directory)
-  fs.chmod(init_directory, 0o755)
+  init_directory.mkdir()
+  init_directory.chmod(0o755)
   archive.tar_create(payload, contents, [p"."], compression: "gz")
   json.write(
     metadata,
@@ -127,7 +127,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
       ],
     },
   )
-  fs.write(proof, "proof baselayout\n")
+  proof.write("proof baselayout\n")
   let _ = store.commit(
     value.target,
     store_root,
@@ -138,7 +138,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
 
 proc empty_overlay(ctx: TestContext, name: Str) -> Result[Path] {
   let overlay = test.temp_dir(ctx, name:)?
-  fs.mkdir(fp"{overlay}/overlay")
+  fp"{overlay}/overlay".mkdir()
   fp"{overlay}/overlay"
 }
 
@@ -163,8 +163,8 @@ test test_generation_runtime_closure_excludes_build_toolchain [fs, env, error] {
   assert [artifact.package_name for artifact in receipt.artifacts] == ["app", "runtime-lib"]
   assert fp"{output}/usr/share/app".read_text()? == "payload app\n"
   assert fp"{output}/usr/share/runtime-lib".read_text()? == "payload runtime-lib\n"
-  assert fs.exists(fp"{output}/usr/share/host-tool")? == false
-  assert fs.exists(fp"{output}/usr/share/target-sdk")? == false
+  assert fp"{output}/usr/share/host-tool".exists()? == false
+  assert fp"{output}/usr/share/target-sdk".exists()? == false
   generation.verify_generation(output, receipt)
 }
 
@@ -245,19 +245,19 @@ test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutati
   let missing_store = test.temp_dir(ctx, name: "generation-missing-store")?
   let missing_output = fp"{test.temp_dir(ctx, name: "generation-missing-output")?}/root"
   expect_generation_error(ctx, generation.compose(value, missing_store, missing_output, overlay), "is missing")
-  assert fs.exists(missing_output)? == false
+  assert missing_output.exists()? == false
 
   let corrupt_store = test.temp_dir(ctx, name: "generation-corrupt-store")?
   stage_generation_artifacts(ctx, build_value, corrupt_store)
   let app = value.artifacts[0]
-  fs.write(fp"{store.artifact_path(corrupt_store, app.artifact_key)}/payload.tar.gz", "corrupt payload")
+  fp"{store.artifact_path(corrupt_store, app.artifact_key)}/payload.tar.gz".write("corrupt payload")
   let corrupt_output = fp"{test.temp_dir(ctx, name: "generation-corrupt-output")?}/root"
   expect_generation_error(
     ctx,
     generation.compose(value, corrupt_store, corrupt_output, overlay),
     "payload SHA-256 does not match receipt",
   )
-  assert fs.exists(corrupt_output)? == false
+  assert corrupt_output.exists()? == false
 }
 
 test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env, error] { |ctx|
@@ -265,8 +265,8 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
   let store_root = test.temp_dir(ctx, name: "generation-overlay-store")?
   stage_generation_artifacts(ctx, build_value, store_root)
   let overlay = empty_overlay(ctx, "generation-overlay-root")?
-  fs.mkdir(fp"{overlay}/etc")
-  fs.write(fp"{overlay}/etc/profile", "profile configuration\n")
+  fp"{overlay}/etc".mkdir()
+  fp"{overlay}/etc/profile".write("profile configuration\n")
   json.write(
     fp"{overlay}/overlay.json",
     {format: "laputa-generation-overlay-1", profile: "qemu-dwl-foot", replacements: []},
@@ -277,11 +277,11 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
   let receipt = generation.compose(value, store_root, output, overlay)?
   assert receipt.profile.name == "qemu-dwl-foot"
   assert fp"{output}/etc/profile".read_text()? == "profile configuration\n"
-  assert fs.exists(fp"{output}/overlay.json")? == false
+  assert fp"{output}/overlay.json".exists()? == false
 
   let conflict_overlay = empty_overlay(ctx, "generation-conflict-overlay")?
-  fs.mkdir(fp"{conflict_overlay}/usr/share")
-  fs.write(fp"{conflict_overlay}/usr/share/app", "replaced app\n")
+  fp"{conflict_overlay}/usr/share".mkdir()
+  fp"{conflict_overlay}/usr/share/app".write("replaced app\n")
   let conflict = generation.plan(build_value, ["app"], generation.overlay_digest(conflict_overlay)?)?
   let conflict_output = fp"{test.temp_dir(ctx, name: "generation-conflict-output")?}/root"
   expect_generation_error(
@@ -289,7 +289,7 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
     generation.compose(conflict, store_root, conflict_output, conflict_overlay),
     "conflicts with package app",
   )
-  assert fs.exists(conflict_output)? == false
+  assert conflict_output.exists()? == false
 
   json.write(
     fp"{conflict_overlay}/overlay.json",
@@ -316,9 +316,9 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
   # profile's overlay digest remains explicit receipt provenance.
   let overlay = empty_overlay(ctx, "generation-baselayout-overlay")?
   let hook_directory = fp"{overlay}/usr/lib/init/rc.d"
-  fs.mkdir(hook_directory)
-  fs.chmod(hook_directory, 0o755)
-  fs.write(fp"{hook_directory}/laputa-test.boot", "profile hook\n")
+  hook_directory.mkdir()
+  hook_directory.chmod(0o755)
+  fp"{hook_directory}/laputa-test.boot".write("profile hook\n")
   let profile = generation.overlay_profile(overlay)?
   let value = generation.plan_profile(build_value, ["baselayout"], profile)?
   let output = fp"{test.temp_dir(ctx, name: "generation-baselayout-output")?}/root"
@@ -328,8 +328,8 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
   generation.verify_generation(output, receipt)
 
   let file_conflict = empty_overlay(ctx, "generation-baselayout-file-conflict")?
-  fs.mkdir(fp"{file_conflict}/usr/lib/init")
-  fs.write(fp"{file_conflict}/usr/lib/init/rc.d", "not a directory\n")
+  fp"{file_conflict}/usr/lib/init".mkdir()
+  fp"{file_conflict}/usr/lib/init/rc.d".write("not a directory\n")
   let file_plan = generation.plan(build_value, ["baselayout"], generation.overlay_digest(file_conflict)?)?
   let file_output = fp"{test.temp_dir(ctx, name: "generation-baselayout-file-output")?}/root"
   expect_generation_error(
@@ -337,12 +337,12 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
     generation.compose(file_plan, store_root, file_output, file_conflict),
     "incompatible directory type or mode metadata",
   )
-  assert fs.exists(file_output)? == false
+  assert file_output.exists()? == false
 
   let mode_conflict = empty_overlay(ctx, "generation-baselayout-mode-conflict")?
   let mode_directory = fp"{mode_conflict}/usr/lib/init/rc.d"
-  fs.mkdir(mode_directory)
-  fs.chmod(mode_directory, 0o700)
+  mode_directory.mkdir()
+  mode_directory.chmod(0o700)
   let mode_plan = generation.plan(build_value, ["baselayout"], generation.overlay_digest(mode_conflict)?)?
   let mode_output = fp"{test.temp_dir(ctx, name: "generation-baselayout-mode-output")?}/root"
   expect_generation_error(
@@ -350,7 +350,7 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
     generation.compose(mode_plan, store_root, mode_output, mode_conflict),
     "incompatible directory type or mode metadata",
   )
-  assert fs.exists(mode_output)? == false
+  assert mode_output.exists()? == false
 }
 
 # Artifact keys exclude the executor, so a package can be rebuilt under the
@@ -361,7 +361,7 @@ test test_generation_follows_artifact_keys_not_releases [fs, env, error] { |ctx|
   # A separate checkout: one process loads each recipe path once.
   let repo_root = copied_generation_repository(ctx, "generation-key-rebuilt")?
   let recipe = fp"{repo_root}/packages/runtime-lib/PKGBUILD.xsh"
-  fs.write(recipe, fs.read_text(recipe)? + "# A rebuild input without a rel bump.\n")
+  recipe.write(recipe.read_text()? + "# A rebuild input without a rel bump.\n")
   let rebuilt = plan.resolve(
     catalog.load(repo_root)?,
     generation_empty_remote(),

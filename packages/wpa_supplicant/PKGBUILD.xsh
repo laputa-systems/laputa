@@ -111,7 +111,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let src = fs.cwd()?
   let objs = fp"{dest}/../objs"
 
-  fs.mkdir(objs)
+  objs.mkdir()
   fs.install(p"config", fp"{src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
@@ -305,7 +305,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     overwrite: true,
   )
 
-  fs.mkdir(fp"{dest}/etc/wpa_supplicant")
+  fp"{dest}/etc/wpa_supplicant".mkdir()
 
   fs.install(
     p"wpa_supplicant.conf",

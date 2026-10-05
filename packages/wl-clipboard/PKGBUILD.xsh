@@ -53,8 +53,8 @@ export const upstream_sources = [
 export const filetree = [{path: p"usr/bin/wl-copy", kind: "binary"}, {path: p"usr/bin/wl-paste", kind: "binary"}]
 
 proc patch_optional_installs() {
-  fs.write(p"data/meson.build", "")
-  fs.write(p"completions/meson.build", "")
+  p"data/meson.build".write("")
+  p"completions/meson.build".write("")
 }
 
 ## Package recipe export.
@@ -89,7 +89,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
-      fs.write(ninja, ninja_text)
+      ninja.write(ninja_text)
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -101,5 +101,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 }

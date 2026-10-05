@@ -89,7 +89,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   let args = parse_seed_args(argv)?
   let laputa_root = fs.cwd()?
 
-  if ! fs.exists(fp"{laputa_root}/pm.xsh")? or ! fs.exists(fp"{laputa_root}/packages")? {
+  if ! fp"{laputa_root}/pm.xsh".exists()? or ! fp"{laputa_root}/packages".exists()? {
     return Err(xsh_seed.SeedError.Usage(f"run seed.xsh from the Laputa checkout root, not {laputa_root}"))
   }
 

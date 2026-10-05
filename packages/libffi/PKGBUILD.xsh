@@ -99,8 +99,7 @@ proc write_generated_headers(target: LibffiTarget) {
     ""
   }
 
-  fs.write(
-    p"fficonfig.h",
+  p"fficonfig.h".write(
     f"""#ifndef FFICONFIG_H
 #define FFICONFIG_H
 
@@ -168,7 +167,7 @@ proc write_generated_headers(target: LibffiTarget) {
     .replace("@FFI_VERSION_NUMBER@", f"{ffi_version_number()?}")
     .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", "0")
 
-  fs.write(p"include/ffi.h", ffi_h)
+  p"include/ffi.h".write(ffi_h)
   fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)
 }
 
@@ -231,10 +230,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   # ffitarget.h; the other headers there are private to the build.
   fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)
   fs.install(p"include/ffitarget.h", fp"{dest}/usr/include/ffitarget.h", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/libffi.pc",
+  fp"{dest}/usr/lib/pkgconfig/libffi.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

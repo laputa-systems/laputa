@@ -91,16 +91,14 @@ const table_files = [
 # The Makefile's `version.h` and `tzdir.h` rules, with the release version
 # and the default TZDIR and TZDEFAULT.
 proc write_zic_headers() {
-  fs.write(
-    p"tzcode/version.h",
+  p"tzcode/version.h".write(
     f"""static char const PKGVERSION[]="(tzcode) ";
 static char const TZVERSION[]="{ver}";
 static char const REPORT_BUGS_TO[]="tz@iana.org";
 """,
   )
 
-  fs.write(
-    p"tzcode/tzdir.h",
+  p"tzcode/tzdir.h".write(
     """#ifndef TZDEFAULT
 # define TZDEFAULT "/etc/localtime" /* default zone */
 #endif
@@ -131,7 +129,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   write_zic_headers()
-  fs.mkdir(p"obj")
+  p"obj".mkdir()
 
   let zic = make.c_program({
     cc: build_cc,
@@ -151,7 +149,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks([{...task, env: build_task_env} for task in zic.tasks], make.jobs()?)
 
   let zoneinfo = fp"{dest}/usr/share/zoneinfo"
-  fs.mkdir(zoneinfo, parents: true)
+  zoneinfo.mkdir(parents: true)
   let zic_bin = zic.output
   let sources = zic_sources
   run $zic_bin "-b" "slim" "-d" $zoneinfo @sources ?

@@ -92,8 +92,7 @@ obj/synproxy.c obj/ct_timeout.c obj/secmark.c obj/ct_expect.c obj/connlimit.c
 # only include/utils.h includes config.h, and it consults
 # HAVE_VISIBILITY_HIDDEN to mark the exported symbols.
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     """#ifndef LIBNFTNL_CONFIG_H
 #define LIBNFTNL_CONFIG_H
 #define HAVE_VISIBILITY_HIDDEN 1
@@ -153,11 +152,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     )
   }
 
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
   # libnftnl.pc.in with configure's /usr prefix substituted.
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/libnftnl.pc",
+  fp"{dest}/usr/lib/pkgconfig/libnftnl.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

@@ -315,7 +315,7 @@ export pure event_names_header(headers: List[Str]) -> Str {
 
 proc write_event_names() {
   let headers = [p"include/linux/linux/input.h", p"include/linux/linux/input-event-codes.h"]
-  fs.write(p"event-names.h", event_names_header([header.read_text()? for header in headers]))
+  p"event-names.h".write(event_names_header([header.read_text()? for header in headers]))
 }
 
 proc patch_python_generator() {
@@ -348,7 +348,7 @@ dep_lm = declare_dependency(link_args: ['-lm'])""",
 dep_rt = declare_dependency()""",
   )
 
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 ## Exported declaration `build`.
@@ -375,5 +375,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 }

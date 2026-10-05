@@ -162,8 +162,7 @@ const regular_defs = [
 # string, the IPv6 header size libxt_TCPMSS.c bounds its MSS with, and the
 # xtables lock path.
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     f"""#ifndef IPTABLES_CONFIG_H
 #define IPTABLES_CONFIG_H
 #define HAVE_LINUX_BPF_H 1
@@ -179,8 +178,7 @@ proc write_config_h() [fs, error] {
 # include/xtables-version.h.in with configure's libxtables_vmajor:
 # libxtables_vcurrent 19 minus libxtables_vage 7.
 proc write_xtables_version_h() [fs, error] {
-  fs.write(
-    p"include/xtables-version.h",
+  p"include/xtables-version.h".write(
     """#define XTABLES_VERSION "libxtables.so.12"
 #define XTABLES_VERSION_CODE 12
 """,
@@ -218,7 +216,7 @@ proc write_initext(file: Path, function_name: Str, hooks: List[Str]) [fs, error]
   }
 
   body += "}\n"
-  fs.write(file, body)
+  file.write(body)
 }
 
 ## Exported declaration `build`.

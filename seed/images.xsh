@@ -54,13 +54,13 @@ pure short_key(key: Str) -> Str {
 }
 
 proc require_file(file: Path) {
-  if ! fs.exists(file)? or ! file.is_file()? {
+  if ! file.exists()? or ! file.is_file()? {
     return Err(SeedImageError.Missing(f"image input is missing: {file}"))
   }
 }
 
 proc tree_digest(root: Path) -> Result[Str] {
-  guard fs.exists(root)? else {
+  guard root.exists()? else {
     return Err(SeedImageError.Missing(f"image input is missing: {root}"))
   }
 
@@ -175,17 +175,17 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   let tag = host_tools_tag(laputa_root, value)?
   let saved = host_tools_saved_image(laputa_root, value)?
 
-  return when fs.exists(saved)?
+  return when saved.exists()?
 
   if ! image_exists(docker, tag, laputa_root)? {
     docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")
   }
 
-  fs.mkdir(saved.parent)
+  saved.parent.mkdir()
   let temporary = fp"{saved}.tmp"
-  fs.remove(temporary, missing_ok: true)
+  temporary.remove(missing_ok: true)
   docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
-  fs.rename(temporary, saved, overwrite: true)
+  temporary.rename(saved, overwrite: true)
 }
 
 ## Make the host-tools base available offline: present, or loaded from `.cache/images/`.
@@ -199,7 +199,7 @@ export proc ensure_host_tools(
   return tag when image_exists(docker, tag, laputa_root)?
 
   let saved = host_tools_saved_image(laputa_root, value)?
-  if ! fs.exists(saved)? {
+  if ! saved.exists()? {
     return Err(SeedImageError.Missing(f"{tag} is neither loaded nor saved at {saved}; run `make fetch`"))
   }
 
@@ -219,17 +219,17 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) -> Result[Path] {
   let source = llvm_seed_source(laputa_root, arch)?
   let digest = llvm_seed_sha256(laputa_root, arch)?
 
-  if ! fs.exists(source)? {
+  if ! source.exists()? {
     return Err(SeedImageError.Missing(f"the {arch} LLVM seed {source} is not fetched; run `make fetch`"))
   }
 
   let context = fp"{laputa_root}/.out/package-tools/{arch}/sources"
   let staged = fp"{context}/sha256/{digest}"
 
-  if ! fs.exists(staged)? {
-    fs.remove(context, missing_ok: true)
-    fs.mkdir(staged.parent)
-    fs.copy(source, staged)
+  if ! staged.exists()? {
+    context.remove(missing_ok: true)
+    staged.parent.mkdir()
+    source.copy(staged)
   }
 
   context

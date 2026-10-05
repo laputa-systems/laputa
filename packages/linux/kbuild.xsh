@@ -387,7 +387,7 @@ export proc write_text_if_changed(path_value: Path, data: Str) [fs, error] {
 
   return when path_value.exists()? and path_value.read_text()? == data
 
-  fs.write(path_value, data)
+  path_value.write(data)
 }
 
 ## Exported declaration `copy_text_if_changed`.
@@ -487,8 +487,8 @@ export proc write_config_headers(config_path: Path, root: Path, release: Str, ar
     auto_conf += [config_auto_line(name, value)]
   }
 
-  fs.mkdir(fp"{root}/include/generated")
-  fs.mkdir(fp"{root}/include/config")
+  fp"{root}/include/generated".mkdir()
+  fp"{root}/include/config".mkdir()
 
   write_text_if_changed(
     fp"{root}/include/generated/autoconf.h",
@@ -521,7 +521,7 @@ proc version_header(release: Str) -> Result[Str] {
 
 ## Exported declaration `write_build_headers`.
 export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [fs, error] {
-  fs.mkdir(fp"{root}/include/generated/uapi/linux")
+  fp"{root}/include/generated/uapi/linux".mkdir()
   let uts_machine = if arch == "x86" { "x86_64" } else { "aarch64" }
 
   write_text_if_changed(
@@ -593,11 +593,11 @@ proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, g
   var wanted = generic
 
   for header in kbuild_header_list(fp"{root}/{mandatory_kbuild}", "mandatory-y")? {
-    continue when fs.exists(fp"{root}/{arch_dir}/{header}")?
+    continue when fp"{root}/{arch_dir}/{header}".exists()?
     wanted += [header]
   }
 
-  fs.mkdir(fp"{root}/{generated_dir}")
+  fp"{root}/{generated_dir}".mkdir()
 
   for header in wanted {
     continue when header in generated
@@ -643,7 +643,7 @@ export proc generate_arm64_kernel_hwcaps(root: Path) [fs, error] {
   }
 
   lines += ["", "#endif /* __ASM_KERNEL_HWCAPS_H */"]
-  fs.mkdir(fp"{root}/arch/arm64/include/generated/asm")
+  fp"{root}/arch/arm64/include/generated/asm".mkdir()
 
   write_text_if_changed(
     fp"{root}/arch/arm64/include/generated/asm/kernel-hwcap.h",
@@ -676,7 +676,7 @@ export proc generate_arm64_cpucap_defs(root: Path) [fs, error] {
   lines += [f"#define ARM64_NCAPS {cap}"]
   lines += [""]
   lines += ["#endif /* __ASM_CPUCAP_DEFS_H */"]
-  fs.mkdir(fp"{root}/arch/arm64/include/generated/asm")
+  fp"{root}/arch/arm64/include/generated/asm".mkdir()
 
   write_text_if_changed(
     fp"{root}/arch/arm64/include/generated/asm/cpucap-defs.h",
@@ -2010,8 +2010,7 @@ proc emit_discover_progress(root: Path, options: DiscoverOptions, state: Discove
     if count == 1 or count % options.progress_every == 0 {
       let message = f"xsh-kbuild-discover {count} visited {state.plan.dirs.len()} dirs {state.plan.objects.len()} objects current={path_key(rel)}"
 
-      fs.write(
-        fp"{root}/.xsh-kbuild-progress",
+      fp"{root}/.xsh-kbuild-progress".write(
         f"""{message}
 """,
       )
@@ -2023,8 +2022,7 @@ proc emit_discover_progress(root: Path, options: DiscoverOptions, state: Discove
 
 proc emit_stage_progress(root: Path, options: DiscoverOptions, message: Str) {
   if options.progress {
-    fs.write(
-      fp"{root}/.xsh-kbuild-progress",
+    fp"{root}/.xsh-kbuild-progress".write(
       f"""{message}
 """,
     )
@@ -2049,8 +2047,7 @@ proc emit_merge_progress(root: Path, options: DiscoverOptions, state: DiscoverSt
 
 proc emit_line_progress(root: Path, options: DiscoverOptions, rel: Path, line_no: Int, line: Str) {
   if options.progress and options.progress_every == 1 {
-    fs.write(
-      fp"{root}/.xsh-kbuild-progress",
+    fp"{root}/.xsh-kbuild-progress".write(
       f"""xsh-kbuild-line current={path_key(rel)} line={line_no} text={line}
 """,
     )
@@ -2059,8 +2056,7 @@ proc emit_line_progress(root: Path, options: DiscoverOptions, rel: Path, line_no
 
 proc emit_batch_progress(root: Path, options: DiscoverOptions, pending: List[Path]) {
   if options.progress {
-    fs.write(
-      fp"{root}/.xsh-kbuild-progress",
+    fp"{root}/.xsh-kbuild-progress".write(
       f"""xsh-kbuild-batch count={pending.len()} sample={path_strings(pending |> take(16)).join(",")}
 """,
     )
@@ -2517,8 +2513,8 @@ proc discover_records_process_pool(
   let prefix = f"/tmp/xsh-kbuild-pool-{time.now()}"
   let state_path = fp"{prefix}-state.json"
   let lock_path = fp"{prefix}-lock"
-  defer fs.remove(state_path, missing_ok: true)?
-  defer fs.remove(lock_path, missing_ok: true)?
+  defer state_path.remove(missing_ok: true)?
+  defer lock_path.remove(missing_ok: true)?
 
   json.write(
     state_path,
@@ -2531,7 +2527,7 @@ proc discover_records_process_pool(
   # Loop-body defers run per iteration; remove worker outputs after the merge instead.
   defer {
     for output_path in output_paths {
-      fs.remove(output_path, missing_ok: true)
+      output_path.remove(missing_ok: true)
     }
   }
 
@@ -4811,7 +4807,7 @@ proc append_x86_relocs(relocs: Path, input: Path, out: Path) {
     return Err(ScriptError.Failed(kind: "linux-x86-relocs", message: f"relocs --abs-relocs failed for {input}"))?
   }
 
-  fs.write(out, bytes.concat([p"arch/x86/boot/compressed/vmlinux.bin".read_bytes()?, reloc_data.stdout]))
+  out.write(bytes.concat([p"arch/x86/boot/compressed/vmlinux.bin".read_bytes()?, reloc_data.stdout]))
 }
 
 proc write_x86_voffset_header(nm: Path, input: Path) {
@@ -5019,8 +5015,8 @@ proc build_x86_compressed_kernel(
   let ld = process.which("ld.lld")?
   let relocs = p"arch/x86/tools/relocs"
   let compressed = p"arch/x86/boot/compressed"
-  fs.mkdir(compressed)
-  fs.mkdir(p".xsh-kbuild/host/arch/x86/boot/compressed")
+  compressed.mkdir()
+  p".xsh-kbuild/host/arch/x86/boot/compressed".mkdir()
   let kernel_bin = fp"{compressed}/vmlinux.bin"
   let kernel_all = fp"{compressed}/vmlinux.bin.all"
   let kernel_gz = fp"{compressed}/vmlinux.bin.gz"
@@ -5169,7 +5165,7 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) {
   let ld = process.which("ld.lld")?
   let objcopy = process.which("llvm-objcopy")?
   let boot = p"arch/x86/boot"
-  fs.mkdir(p".xsh-kbuild/host/arch/x86/boot")
+  p".xsh-kbuild/host/arch/x86/boot".mkdir()
   let mkcpustr = p".xsh-kbuild/host/arch/x86/boot/mkcpustr"
   run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-include" "include/generated/autoconf.h" "-D__EXPORTED_HEADERS__" "-o" $mkcpustr "arch/x86/boot/mkcpustr.c" ?
   write_text_if_changed(fp"{boot}/cpustr.h", run.text $mkcpustr?)
@@ -5338,7 +5334,7 @@ proc write_x86_bzimage(setup: Path, payload: Path, image: Path) {
   let payload_data = payload.read_bytes()?
   let remainder = setup_data.len() % 4096
   let padding_len = if remainder == 0 { 0 } else { 4096 - remainder }
-  fs.write(image, bytes.concat([setup_data, bytes.zero(padding_len)?, payload_data]))
+  image.write(bytes.concat([setup_data, bytes.zero(padding_len)?, payload_data]))
 }
 
 ## Exported declaration `build_scratch_x86_final`.
@@ -5366,11 +5362,11 @@ export proc build_scratch_x86_final(
   write_ubsan_stubs(p".")
   let lds = p"arch/x86/kernel/vmlinux.lds"
   generate_vmlinux_lds_x86(cc, lds)
-  fs.remove(vmlinux_a, missing_ok: true)
-  fs.remove(unstripped, missing_ok: true)
-  fs.remove(vmlinux, missing_ok: true)
-  fs.mkdir(fp"arch/x86/boot")
-  fs.remove(image, missing_ok: true)
+  vmlinux_a.remove(missing_ok: true)
+  unstripped.remove(missing_ok: true)
+  vmlinux.remove(missing_ok: true)
+  fp"arch/x86/boot".mkdir()
+  image.remove(missing_ok: true)
   var tasks: List[make.MakeTask] = []
 
   let export_task = compile_kbuild_task(
@@ -5751,10 +5747,10 @@ export proc build_scratch_arm64_final(
   write_ubsan_stubs(p".")
   let lds = p"arch/arm64/kernel/vmlinux.lds"
   generate_vmlinux_lds(cc, lds)
-  fs.remove(vmlinux_a, missing_ok: true)
-  fs.remove(unstripped, missing_ok: true)
-  fs.remove(vmlinux, missing_ok: true)
-  fs.remove(image, missing_ok: true)
+  vmlinux_a.remove(missing_ok: true)
+  unstripped.remove(missing_ok: true)
+  vmlinux.remove(missing_ok: true)
+  image.remove(missing_ok: true)
   var tasks: List[make.MakeTask] = []
 
   let export_task = compile_kbuild_task(
@@ -5884,11 +5880,11 @@ export proc relink_existing_arm64_argv(
   let efi_lib = p"drivers/firmware/efi/libstub/lib.a"
   let kbuild_ldflags = ["-EL", "-maarch64elf", "-z", "norelro", "-z", "noexecstack"]
   let ldflags_vmlinux = arm64_vmlinux_ldflags(load_config(p".config")?)
-  fs.remove(vmlinux_a, missing_ok: true)
-  fs.remove(vmlinux_o, missing_ok: true)
-  fs.remove(unstripped, missing_ok: true)
-  fs.remove(vmlinux, missing_ok: true)
-  fs.remove(image, missing_ok: true)
+  vmlinux_a.remove(missing_ok: true)
+  vmlinux_o.remove(missing_ok: true)
+  unstripped.remove(missing_ok: true)
+  vmlinux.remove(missing_ok: true)
+  image.remove(missing_ok: true)
 
   let archive_task = vmlinux_archive_argv_task(
     ar_argv,
@@ -6770,17 +6766,17 @@ proc archive_analysis_process_pool(
   let prefix = f"/tmp/xsh-kbuild-archive-analysis-{time.now()}"
   let context_path = fp"{prefix}-context.json"
   json.write(context_path, archive_analysis_plan_context(plan))
-  defer fs.remove(context_path, missing_ok: true)?
+  defer context_path.remove(missing_ok: true)?
   let flags_path = fp"{prefix}-flags.json"
   json.write(flags_path, ArchiveAnalysisFlags(flags: flag_entries))
-  defer fs.remove(flags_path, missing_ok: true)?
+  defer flags_path.remove(missing_ok: true)?
   var handles = []
   var output_paths: List[Path] = []
   var input_paths: List[Path] = []
   # Loop-body defers run per iteration, before workers read their inputs.
   defer {
     for temp_path in [@input_paths, @output_paths] {
-      fs.remove(temp_path, missing_ok: true)
+      temp_path.remove(missing_ok: true)
     }
   }
 

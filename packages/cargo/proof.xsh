@@ -8,7 +8,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let target_arch = pm_util.target_arch()?
   let rust_triple = if target_arch == "aarch64" { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
 
-  if ! fs.exists(fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib")? {
+  if ! fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib".exists()? {
     return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"missing rust std for {rust_triple}"))
   }
 
@@ -20,7 +20,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{target_arch}.so.1"
   let gcc_s = fp"{rootfs}/usr/lib/libgcc_s.so.1"
 
-  if ! fs.exists(gcc_s)? {
+  if ! gcc_s.exists()? {
     print "cargo ok: (runtime test skipped — libgcc_s.so.1 not in root)"
     return
   }
@@ -28,22 +28,20 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   var cargo = ""
   var rustc = ""
   let tmp = fp"{rootfs}/var/tmp/proof-cargo"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
 
-  fs.mkdir(fp"{tmp}/src")
-  fs.mkdir(fp"{tmp}/cargo-home")
-  fs.write(
-    fp"{tmp}/Cargo.toml",
+  fp"{tmp}/src".mkdir()
+  fp"{tmp}/cargo-home".mkdir()
+  fp"{tmp}/Cargo.toml".write(
     """[package]
 name = "cargo-proof-hello"
 version = "0.1.0"
 edition = "2024"
 """,
   )
-  fs.write(
-    fp"{tmp}/src/main.rs",
+  fp"{tmp}/src/main.rs".write(
     """fn main() {
     println!("hello cargo");
 }
@@ -51,8 +49,7 @@ edition = "2024"
   )
 
   let rustc_wrapper = fp"{tmp}/rustc-wrapper"
-  fs.write(
-    rustc_wrapper,
+  rustc_wrapper.write(
     f"""#!/bin/xsh
 proc main(...args: List[Str]) [process, error] {{
   run fp"{dynlinker}" fp"{rootfs}/usr/bin/rustc" @args ?
@@ -63,8 +60,7 @@ main(@args)?
 
   let linker_wrapper = fp"{tmp}/linker-wrapper"
   let linker = fp"{rootfs}/usr/lib/llvm23/bin/ld.lld"
-  fs.write(
-    linker_wrapper,
+  linker_wrapper.write(
     f"""#!/bin/xsh
 proc main(...args: List[Str]) [process, error] {{
   var linker_args: List[Str] = []

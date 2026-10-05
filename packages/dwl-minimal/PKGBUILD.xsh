@@ -58,7 +58,7 @@ export const filetree = [{path: p"usr/bin/dwl", kind: "binary"}]
 proc sysroot_path(root: Str, raw: Str) -> Result[Path] {
   let path_value = fp"{raw.trim()}"
 
-  return path_value when fs.exists(path_value)?
+  return path_value when path_value.exists()?
 
   return fp"{root}{raw.trim()}" when root != "" and root != "/" and raw.starts_with("/")
 
@@ -192,7 +192,7 @@ run(char *startup_cmd)
     "the -v option",
   )?
 
-  fs.write(source, text)
+  source.write(text)
 }
 
 ## Remove bindings whose launcher is intentionally absent from the minimal
@@ -247,7 +247,7 @@ static const char *termcmd[] = { "/usr/bin/foot", NULL };
 
   config = config_without_unavailable_menu(config)
 
-  fs.write(p"config.h", config)
+  p"config.h".write(config)
 }
 
 ## Exported declaration `build`.

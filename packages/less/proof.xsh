@@ -15,15 +15,15 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let less = fp"{rootfs}/usr/bin/less"
   let tmp = fp"{rootfs}/var/tmp/proof-less"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
   let ver = proof.package_version(rootfs, "less")?
   let version = run.text $dynlinker $less "--version" ?
   proof.ensure(version.starts_with(f"less {ver} "), "proof-less", f"less --version reported {version.lines()[0]}")
 
   let text = fp"{tmp}/lines.txt"
-  fs.write(text, [f"line {i}" for i in range(1, 101)].join("\n") + "\n")
+  text.write([f"line {i}" for i in range(1, 101)].join("\n") + "\n")
 
   # Without a tty less copies its input, like cat.
   let copied = run.text $dynlinker $less $text ?

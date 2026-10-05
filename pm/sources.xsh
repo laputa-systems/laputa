@@ -111,17 +111,17 @@ export enum SourceFetchOutcome { Cached, Fetched(Int), Unavailable(Str), Mismatc
 export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net, error] -> Result[SourceFetchOutcome, Error] {
   let entry = source_cache_entry(root, sha256)
   let partial_dir = fp"{root}/partial"
-  fs.mkdir(entry.parent)
-  fs.mkdir(partial_dir)
+  entry.parent.mkdir()
+  partial_dir.mkdir()
   # Packages built in parallel can share one source, so one writer fills an entry.
   let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
   defer fs.unlock(lock)?
 
-  return Cached when fs.exists(entry)?
+  return Cached when entry.exists()?
 
   let partial = fp"{partial_dir}/{sha256}"
-  fs.remove(partial, missing_ok: true)
-  defer fs.remove(partial, missing_ok: true)?
+  partial.remove(missing_ok: true)
+  defer partial.remove(missing_ok: true)?
   let failure = util.download_file(url, partial)?
 
   return Unavailable(failure) when failure != ""
@@ -130,8 +130,8 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
 
   return Mismatch(f"{url}: expected sha256 {sha256}, got {actual}") when actual != sha256
 
-  let size = fs.metadata(partial)?.size
-  fs.rename(partial, entry)
+  let size = partial.metadata()?.size
+  partial.rename(entry)
   Fetched(size)
 }
 
@@ -140,7 +140,7 @@ proc resolve_url_source(package_name: Str, url: Str, checksum: Str) -> Result[Pa
   let root = build_source_cache_root()?
   let entry = source_cache_entry(root, sha256)
 
-  return entry when fs.exists(entry)?
+  return entry when entry.exists()?
 
   let mirror = (e"LAPUTA_MIRROR" ?? "").trim()
 
@@ -203,11 +203,11 @@ export proc resolve_source(
     local = fp"{pkg.dir}/{source_path}".normalize()
   }
 
-  if ! fs.exists(local)? {
+  if ! local.exists()? {
     return Err(types.PmError.SourceNotFound(f"{pkg.name} source not found: {source}"))
   }
 
-  let metadata = fs.metadata(local)?
+  let metadata = local.metadata()?
   {path: local, kind: metadata.kind, name: local.name}
 }
 
@@ -323,8 +323,8 @@ proc resolve_locked_crates(
 # map skips per-file verification of the already sha256-verified archive, so
 # a recipe may patch a vendored crate.
 proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) {
-  fs.remove(dest, missing_ok: true)
-  fs.mkdir(dest)
+  dest.remove(missing_ok: true)
+  dest.mkdir()
 
   for entry in crates {
     let dir = fp"{dest}/{entry.item.name}-{entry.item.version}"
@@ -398,7 +398,7 @@ proc stage_resolved_source(
   }
 
   if source_kind == types.source_directory() or resolved.kind == "dir" {
-    fs.mkdir(dest)
+    dest.mkdir()
     let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
     # Directory sources are checkout trees (recipe files or repository inputs).
     util.normalize_checkout_tree(dest)
@@ -408,27 +408,27 @@ proc stage_resolved_source(
   if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(
     name,
   )) {
-    fs.remove(dest, missing_ok: true)
+    dest.remove(missing_ok: true)
     dest.parent.mkdir()
     archive.tar_extract(source_path, dest, tar_source_strip_components(source_path)?, "auto", true)
     return
   }
 
   if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(name)) {
-    fs.remove(dest, missing_ok: true)
+    dest.remove(missing_ok: true)
     dest.parent.mkdir()
     archive.zip_extract(source_path, dest, overwrite: true)
     return
   }
 
   if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(name)) {
-    fs.remove(dest, missing_ok: true)
+    dest.remove(missing_ok: true)
     dest.parent.mkdir()
     archive.cpio_extract(source_path, dest, overwrite: true)
     return
   }
 
-  fs.mkdir(dest)
+  dest.mkdir()
   fs.install(source_path, fp"{dest}/{name}", 0o644, parents: true, overwrite: true)
 }
 
@@ -464,7 +464,7 @@ export proc prune_git_dirs(src: Path) [fs, error] {
   let git_dirs = fs.walk(src, gitignore: false) |> where .kind == "dir" and .name == ".git"
 
   for entry in git_dirs {
-    fs.remove(entry.path, missing_ok: true)
+    entry.path.remove(missing_ok: true)
   }
 }
 
@@ -492,7 +492,7 @@ export proc prepare_package_source_tree(pkg: types.Package, src: Path) [fs, net,
 # digest they produce, so the next build finds them.
 proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[Str] {
   let partial_dir = fp"{cache_root}/partial"
-  fs.mkdir(partial_dir)
+  partial_dir.mkdir()
   let scratch = fs.tempdir()?
   defer scratch.close()?
   let download = fp"{scratch.host_path()?}/download"
@@ -505,11 +505,11 @@ proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[St
   let digest = hash.sha256(download)?.hex()
   let entry = source_cache_entry(cache_root, digest)
 
-  if ! fs.exists(entry)? {
+  if ! entry.exists()? {
     let partial = fp"{partial_dir}/{digest}.checksum"
-    fs.mkdir(entry.parent)
-    fs.copy(download, partial, overwrite: true)
-    fs.rename(partial, entry, overwrite: true)
+    entry.parent.mkdir()
+    download.copy(partial, overwrite: true)
+    partial.rename(entry, overwrite: true)
   }
 
   digest
@@ -568,7 +568,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
 
   let arch = field_parts[1]
   let pkgbuild = fp"{pkg.dir}/PKGBUILD.xsh"
-  let body = fs.read_text(pkgbuild)?
+  let body = pkgbuild.read_text()?
   let lines = body.split("\n")
   let has_arch_specific = f"arch: \"{arch}\"" in body
   var output = []
@@ -613,7 +613,7 @@ export proc write_checksum_field(pkg: types.Package, field: Str, values: List[St
     return Err(types.PmError.ChecksumField(f"{pkgbuild} has no complete {arch} checksum field"))
   }
 
-  fs.write_atomic(pkgbuild, output.join("\n"))
+  pkgbuild.write_atomic(output.join("\n"))
 }
 
 ## One pinned upstream download: every package and URL that names the same content.
@@ -675,7 +675,7 @@ export proc cargo_crate_fetch_items(
       if util.is_url_source(expanded) {
         lockfile = source_cache_entry(root, pinned_url_sha256(pkg.name, expanded, checksum)?)
 
-        guard fs.exists(lockfile)? else {
+        guard lockfile.exists()? else {
           return Err(types.PmError.SourceNotFound(f"{pkg.name} lockfile {expanded} is not in the source cache {root}"))
         }
       } else {
@@ -696,7 +696,7 @@ export proc cargo_crate_fetch_items(
 # A dead host or a transient failure gets a few spaced retries. A checksum
 # mismatch or a missing `file://` path is deterministic, so neither is retried.
 proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchOutcome] {
-  return Cached when fs.exists(source_cache_entry(root, item.sha256))?
+  return Cached when source_cache_entry(root, item.sha256).exists()?
 
   var unavailable: List[Str] = []
   var mismatched: List[Str] = []
@@ -742,7 +742,7 @@ pure source_fetch_label(item: SourceFetchItem) -> Str {
 ## flight, verifies each sha256, and reports every dead URL and checksum
 ## mismatch together before failing.
 export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, time, error] {
-  fs.mkdir(fp"{root}/sha256")
+  fp"{root}/sha256".mkdir()
 
   # par-map workers do not forward stdout, so progress goes to flushed stderr.
   let results = items |> par-map(jobs: 4) { |item|

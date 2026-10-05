@@ -74,7 +74,7 @@ pure native_kbuild_includes() -> List[Str] {
 
 proc write_native_asm_offsets(cc: Path) {
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
-  fs.mkdir(asm_out.parent)
+  asm_out.parent.mkdir()
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv += ["-S", "-o", asm_out.display(), "arch/arm64/kernel/asm-offsets.c"]
@@ -84,7 +84,7 @@ proc write_native_asm_offsets(cc: Path) {
 
 proc write_native_hyp_constants(cc: Path) {
   let asm_out = p".xsh-kbuild/generated/hyp-constants.s"
-  fs.mkdir(asm_out.parent)
+  asm_out.parent.mkdir()
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv += ["-I./arch/arm64/kvm/hyp/include"]
@@ -397,7 +397,7 @@ pure display_paths(paths: List[Path]) -> List[Str] {
 
 proc build_native_nvhe_helper(cc: Path) -> Result[Path] {
   let out = p".xsh-kbuild/host/arch/arm64/kvm/hyp/nvhe/gen-hyprel"
-  fs.mkdir(out.parent)
+  out.parent.mkdir()
 
   PKGBUILD_shared.run_native_command(
     [cc.display(), "-O2", "-I./include", "-o", out.display(), "arch/arm64/kvm/hyp/nvhe/gen-hyprel.c"],
@@ -407,7 +407,7 @@ proc build_native_nvhe_helper(cc: Path) -> Result[Path] {
 }
 
 proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) {
-  fs.mkdir(out.parent)
+  out.parent.mkdir()
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
 

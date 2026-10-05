@@ -98,7 +98,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       let listed = run.status $chroot $root $musl_interpreter --list $report.path > /dev/null 2> $loader_err
 
       if ! listed.ok {
-        failures += [f"{report.path}: {fs.read_text(loader_err)?.trim()}"]
+        failures += [f"{report.path}: {loader_err.read_text()?.trim()}"]
       }
     }
   }
@@ -115,14 +115,13 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       failures,
     },
   )
-  fs.write(fp"{output}/files.txt", (files |> sort).join("\n") + "\n")
-  fs.copy(fp"{root}/var/lib/laputa/generation.json", fp"{output}/generation.json", overwrite: true)
+  fp"{output}/files.txt".write((files |> sort).join("\n") + "\n")
+  fp"{root}/var/lib/laputa/generation.json".copy(fp"{output}/generation.json", overwrite: true)
 
   # The root's own xsh must run a script from inside it. The probe lands after
   # the receipt was copied; the throwaway root is never used again.
-  fs.mkdir(fp"{root}/tmp")
-  fs.write(
-    fp"{root}/tmp/world-root-probe.xsh",
+  fp"{root}/tmp".mkdir()
+  fp"{root}/tmp/world-root-probe.xsh".write(
     "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n",
   )
   let greeting = run.text $chroot $root /bin/xsh /tmp/world-root-probe.xsh ?

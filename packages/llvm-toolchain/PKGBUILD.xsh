@@ -479,20 +479,20 @@ main(@args)?
 
 proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) {
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
-  fs.mkdir(path_value.parent())
-  fs.remove(path_value, missing_ok: true)
-  fs.write(path_value, xsh_wrapper_source(real, clang, cxx), mode: 0o755)
+  path_value.parent().mkdir()
+  path_value.remove(missing_ok: true)
+  path_value.write(xsh_wrapper_source(real, clang, cxx), mode: 0o755)
 }
 
 proc require_file(path_value: Path, label: Str) {
-  guard fs.exists(path_value)? else {
+  guard path_value.exists()? else {
     fail f"missing {label}: {path_value}"
   }
 }
 
 proc require_executable(path_value: Path, label: Str) {
   require_file(path_value, label)
-  let meta = fs.metadata(path_value)?
+  let meta = path_value.metadata()?
 
   if meta.mode % 0o1000 == 0 {
     fail f"{label} is not executable: {path_value}"
@@ -502,7 +502,7 @@ proc require_executable(path_value: Path, label: Str) {
 proc install_tool_alias(bin: Path, tool_name: Str, target: Str) {
   let link = fp"{bin}/{tool_name}"
 
-  return when fs.exists(link)?
+  return when link.exists()?
 
   require_file(fp"{bin}/{target}", target)
   fs.symlink(fp"{target}", link)
@@ -513,11 +513,11 @@ proc install_prebuilt_tree(dest: Path) {
   let source = p"llvm-prebuilt"
   let target = fp"{dest}/usr/lib/llvm23"
 
-  if ! fs.exists(source)? {
+  if ! source.exists()? {
     fail "missing staged LLVM prebuilt tree"
   }
 
-  fs.remove(target, missing_ok: true)
+  target.remove(missing_ok: true)
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
   let bin = fp"{target}/bin"
   install_tool_alias(bin, "clang-23", "clang")

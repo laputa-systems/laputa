@@ -5,7 +5,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.package_metadata(rootfs, "samurai")
   proof.target_elf(rootfs, p"usr/bin/samu", "samurai")
 
-  if ! fs.exists(fp"{rootfs}/usr/bin/ninja")? {
+  if ! fp"{rootfs}/usr/bin/ninja".exists()? {
     return Err(proof.ProofError.Failed(kind: "proof-samurai", message: "missing ninja symlink"))?
   }
 
@@ -18,14 +18,13 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let samu = fp"{rootfs}/usr/bin/samu"
   let tmp = fp"{rootfs}/var/tmp/proof-samurai"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # A dry run parses the manifest and orders the graph without spawning the
   # rule commands, so the proof needs no shell.
-  fs.write(
-    fp"{tmp}/build.ninja",
+  fp"{tmp}/build.ninja".write(
     """ninja_required_version = 1.9
 rule cc
   command = cc -c $in -o $out
@@ -37,8 +36,8 @@ build prog: link a.o b.o
 default prog
 """,
   )
-  fs.write(fp"{tmp}/a.c", "")
-  fs.write(fp"{tmp}/b.c", "")
+  fp"{tmp}/a.c".write("")
+  fp"{tmp}/b.c".write("")
 
   let version = run.text $dynlinker $samu "--version" ?
   proof.ensure(version.trim().starts_with("1."), "proof-samurai", f"unexpected samu --version: {version.trim()}")

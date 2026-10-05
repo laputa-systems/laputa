@@ -95,8 +95,8 @@ proc image_size(image: Path) -> Result[Int] {
 
   let sectors_path = fp"/sys/class/block/{image.name}/size"
 
-  if fs.exists(sectors_path)? {
-    return fs.read_text(sectors_path)?.trim().parse_int()? * 512
+  if sectors_path.exists()? {
+    return sectors_path.read_text()?.trim().parse_int()? * 512
   }
 
   size

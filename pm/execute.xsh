@@ -114,7 +114,7 @@ proc execute_receipt_closure(
 proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) {
   let root_plan = pm_root.trusted_preflight(target, artifacts)?
   let payload_keys = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
-  fs.mkdir(root)
+  root.mkdir()
 
   for receipt in artifacts {
     if receipt.key in payload_keys {
@@ -148,7 +148,7 @@ proc execute_stage_local(
   let _ = fs.copy_tree(pkg.dir, recipe_dir, parents: true, overwrite: true)?
   util.normalize_checkout_tree(recipe_dir)
   let isolated_pkg = {...pkg, dir: recipe_dir}
-  fs.mkdir(source)
+  source.mkdir()
   # Package recipes may explicitly name repository-owned inputs (for example
   # laputa-pm's PM entrypoint/tree). Resolve those against the plan repository
   # while the recipe itself remains isolated under `work/recipe`.
@@ -192,20 +192,20 @@ proc execute_stage_local(
 proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload_sha256: Str, proof: Path) {
   pm_proof.verify_artifact_receipt(proof, node, payload_sha256)
   let cached = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
-  fs.mkdir(cached.parent)
+  cached.parent.mkdir()
   let lock = fs.lock(fp"{cached.parent}/{node.proof_key}.lock")?
   defer fs.unlock(lock)?
 
-  if fs.exists(cached)? {
+  if cached.exists()? {
     pm_proof.verify_artifact_receipt(cached, node, payload_sha256)
     return
   }
 
   let temporary = fp"{cached}.tmp"
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(proof, temporary, overwrite: true)
-  fs.rename(temporary, cached)
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
+  proof.copy(temporary, overwrite: true)
+  temporary.rename(cached)
 }
 
 # Runs the package proof against `payload` in a fresh root holding its runtime
@@ -262,7 +262,7 @@ proc execute_build_local(
   if pkg.kind == types.package_meta() {
     # Selectors have no build sandbox; their declared dependencies are ordered
     # by the BuildPlan and proved independently before this node executes.
-    fs.mkdir(build_root)
+    build_root.mkdir()
   } else {
     let dependencies = execute_receipt_closure(context, store.receipt_dependency_keys(node))?
     execute_compose_root(context.plan.target, build_root, dependencies)
@@ -295,7 +295,7 @@ proc execute_existing_local(
 
   let cached = store.reproof_receipt_path(context.store_root, node.artifact_key, node.proof_key)
 
-  if fs.exists(cached)? {
+  if cached.exists()? {
     pm_proof.verify_artifact_receipt(cached, node, receipt.payload_sha256)
     return receipt
   }
@@ -332,7 +332,7 @@ proc execute_node(
   context: ExecuteContext,
   node: types.PlanNode,
 ) -> Result[types.ArtifactReceipt] {
-  if fs.exists(store.artifact_path(context.store_root, node.artifact_key))? {
+  if store.artifact_path(context.store_root, node.artifact_key).exists()? {
     return execute_existing_local(context, node)
   }
 
@@ -359,7 +359,7 @@ type FinishedNode = {name: Str, seconds: Int, log: Path}
 # The last lines of a failed node's log: the cause, without the rest of a
 # build that can run to tens of thousands of lines.
 proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
-  return "" unless fs.exists(log)?
+  return "" unless log.exists()?
 
   let lines = log.read_lines()?
   let first = if lines.len() > count { lines.len() - count } else { 0 }
@@ -369,7 +369,7 @@ proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
 # The `error:` lines of a failed node's log, which name the cause above the
 # runtime traceback; the plain tail when there are none.
 proc execute_log_errors(log: Path) -> Result[Str] {
-  return "" unless fs.exists(log)?
+  return "" unless log.exists()?
 
   let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
 
@@ -413,7 +413,7 @@ proc execute_scheduled(
   var running: List[RunningNode] = []
   var finished: List[FinishedNode] = []
   var failure = ""
-  fs.mkdir(logs)
+  logs.mkdir()
 
   while pending.len() > 0 or running.len() > 0 {
     var waiting: List[types.PlanNode] = []
@@ -428,7 +428,7 @@ proc execute_scheduled(
 
       # Stored artifacts and exact remote imports cost no build; they run here,
       # so the scheduler's slots go to real builds.
-      let stored = fs.exists(store.artifact_path(context.store_root, node.artifact_key))?
+      let stored = store.artifact_path(context.store_root, node.artifact_key).exists()?
 
       if stored or ! types.plan_action_is_build(node.action) {
         let receipt = execute_node({...context, published: done}, node)?
@@ -438,7 +438,7 @@ proc execute_scheduled(
       }
 
       let log = fp"{logs}/{node.name}.log"
-      fs.write(log, "")
+      log.write("")
       print f"repo build start {node.name}"
       let command = process.command_argv(
         xsh,
@@ -552,7 +552,7 @@ export proc build_plan_node(
 # when some node will actually build.
 proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) -> Result[Bool] {
   for node in plan_value.nodes {
-    if types.plan_action_is_build(node.action) and ! fs.exists(store.artifact_path(store_root, node.artifact_key))? {
+    if types.plan_action_is_build(node.action) and ! store.artifact_path(store_root, node.artifact_key).exists()? {
       return true
     }
   }

@@ -14,7 +14,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
   proof.ensure("/usr/share/X11/xkb" in strings, "proof-libxkbcommon", "libxkbcommon has another XKB config root")
   proof.ensure(
-    fs.exists(fp"{root}/usr/share/X11/xkb/rules/evdev")?,
+    fp"{root}/usr/share/X11/xkb/rules/evdev".exists()?,
     "proof-libxkbcommon",
     "the XKB config root has no evdev rules",
   )

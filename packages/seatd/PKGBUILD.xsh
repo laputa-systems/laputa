@@ -82,10 +82,9 @@ export const filetree = [
 
 proc patch_realtime_dependency() {
   let meson = p"meson.build"
-  let text = fs.read_text(meson)?
+  let text = meson.read_text()?
 
-  fs.write(
-    meson,
+  meson.write(
     text.replace(
   """# needed for cross-compilation
 realtime = meson.get_compiler('c').find_library('rt')
@@ -120,6 +119,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/bin/seatd-launch", missing_ok: true)
+  fp"{dest}/usr/bin/seatd-launch".remove(missing_ok: true)
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)
 }

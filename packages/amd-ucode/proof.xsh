@@ -18,7 +18,7 @@ const early_sha256 = "49995102b0a6eac9c25e601d148f0a46176ae3a85fe644b13a66dcbcc4
 const early_member = "kernel/x86/microcode/AuthenticAMD.bin"
 
 proc ensure_sha256(file: Path, expected: Str) {
-  proof.ensure(fs.exists(file)?, "amd-ucode", f"missing {file}")
+  proof.ensure(file.exists()?, "amd-ucode", f"missing {file}")
   let actual = hash.sha256(file)?.hex()
   proof.ensure(actual == expected, "amd-ucode", f"{file} has sha256 {actual}, expected {expected}")
 }
@@ -41,7 +41,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   # The early loader scans the initrd for an uncompressed newc ("070701")
   # archive, so the image must start with that header, not a compressor's.
   let image = fp"{root}/boot/amd-ucode.img"
-  proof.ensure(fs.exists(image)?, "amd-ucode", "missing boot/amd-ucode.img")
+  proof.ensure(image.exists()?, "amd-ucode", "missing boot/amd-ucode.img")
   let magic = bytes.read_at(image, 0, 6)?
   proof.ensure(magic == bytes.from_text("070701"), "amd-ucode", "amd-ucode.img is not an uncompressed newc cpio")
 

@@ -64,7 +64,7 @@ proc write_report(logs: Path, arch: Str, timed: List[Timed]) [fs, error] {
     lines += [f"| `{entry.name}` | {entry.seconds} | {if entry.ok { "ok" } else { "FAILED" }} |"]
   }
 
-  fs.write(fp"{logs}/report.md", lines.join("\n") + "\n")
+  fp"{logs}/report.md".write(lines.join("\n") + "\n")
 }
 
 proc main(arch: Str) [fs, process, env, time, error] {
@@ -79,7 +79,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
 
   var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
   let logs = fp"{root}/.out/verify"
-  fs.mkdir(logs)
+  logs.mkdir()
   var mirror: ProcessHandle? = null
 
   for step in steps(arch) {

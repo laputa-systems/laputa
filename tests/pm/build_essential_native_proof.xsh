@@ -24,8 +24,8 @@ proc runner() -> Result[Path] {
 
 proc proof_root(ctx: TestContext, target: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "build-essential-native-proof")?
-  fs.mkdir(fp"{root}/usr/bin")
-  fs.mkdir(fp"{root}/boot")
+  fp"{root}/usr/bin".mkdir()
+  fp"{root}/boot".mkdir()
 
   for tool in [
     "cc",
@@ -38,19 +38,17 @@ proc proof_root(ctx: TestContext, target: Str) -> Result[Path] {
     "bison",
     "muon",
   ] {
-    fs.write(
-      fp"{root}/usr/bin/{tool}",
+    fp"{root}/usr/bin/{tool}".write(
       """typed proof fixture
 """,
     )
   }
 
-  fs.write(
-    fp"{root}/boot/vmlinuz",
+  fp"{root}/boot/vmlinuz".write(
     """typed proof kernel fixture
 """,
   )
-  fs.mkdir(fp"{root}/var/lib/laputa")
+  fp"{root}/var/lib/laputa".mkdir()
   write_root_receipt(root, target, runtime_packages())
   root
 }
@@ -96,7 +94,7 @@ test test_build_essential_native_proof_uses_typed_root_receipt_without_legacy_db
     let target = f"{arch}-linux-musl"
     let root = proof_root(ctx, target)?
     let stderr = fp"{root}/proof.stderr"
-    assert fs.exists(fp"{root}/var/lib/xsh-pm/packages")? == false
+    assert fp"{root}/var/lib/xsh-pm/packages".exists()? == false
     assert run_build_essential_proof(xsh, arch, root, stderr)?.ok
 
     write_root_receipt(root, target, [package for package in runtime_packages() if package != "linux"])

@@ -38,5 +38,5 @@ export let filetree = []
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(dest)
+  dest.mkdir()
 }

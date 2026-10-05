@@ -70,8 +70,7 @@ export const filetree = [
 ]
 
 proc write_config() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     f"""#ifndef MTDEV_CONFIG_H
 #define MTDEV_CONFIG_H
 
@@ -129,10 +128,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so.1")
   fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so")
   make.install_header_tree(p"include", fp"{dest}/usr/include")
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/mtdev.pc",
+  fp"{dest}/usr/lib/pkgconfig/mtdev.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

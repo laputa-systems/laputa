@@ -77,9 +77,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let os = system.uname()?
   let loader = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let tmp = fp"{rootfs}/var/tmp/proof-iptables"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
   let lock = fp"{tmp}/xtables.lock"
 
   for command in ["iptables", "ip6tables", "iptables-save", "ip6tables-save", "iptables-restore", "ip6tables-restore"] {
@@ -89,7 +89,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let unprivileged = fp"{tmp}/without-net-caps"
-  fs.write(fp"{tmp}/without-net-caps.c", unprivileged_program)
+  fp"{tmp}/without-net-caps.c".write(unprivileged_program)
   run $cc fp"{tmp}/without-net-caps.c" "-o" $unprivileged ?
 
   for case in rule_cases {

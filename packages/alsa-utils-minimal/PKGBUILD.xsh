@@ -101,8 +101,7 @@ export const filetree = [
 # built tools read. ENABLE_NLS stays undefined, so gettext.h maps every
 # message to itself. The release tarball ships include/version.h.
 proc write_aconfig_h() [fs, error] {
-  fs.write(
-    p"include/aconfig.h",
+  p"include/aconfig.h".write(
     f"""#ifndef LAPUTA_ALSA_UTILS_ACONFIG_H
 #define LAPUTA_ALSA_UTILS_ACONFIG_H
 
@@ -223,7 +222,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(fp"alsactl/init/{init}", fp"{dest}/usr/share/alsa/init/{init}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.mkdir(fp"{dest}/var/lib/alsa")
+  fp"{dest}/var/lib/alsa".mkdir()
 
   for page in [p"aplay/aplay.1", p"amixer/amixer.1", p"alsactl/alsactl.1", p"speaker-test/speaker-test.1"] {
     fs.install(page, fp"{dest}/usr/share/man/man1/{page.name}", 0o644, parents: true, overwrite: true)

@@ -119,7 +119,7 @@ proc verified_seed(arch: Str) -> Result[Path] {
   let seed = p"seed"
   let manifest_path = fp"{seed}/manifest.json"
 
-  if ! fs.exists(manifest_path)? {
+  if ! manifest_path.exists()? {
     fail f"the {arch} XSH seed has no manifest; run `make seed ARCH={arch}`"
   }
 
@@ -149,11 +149,11 @@ export proc build(dest: Path) [fs, env, error] {
   }
 
   let shell = fp"{dest}/usr/bin/sh"
-  fs.remove(shell, missing_ok: true)
+  shell.remove(missing_ok: true)
   fs.symlink(p"xshi", shell)
 
   let core = fp"{dest}/usr/lib/xsh/core"
-  fs.mkdir(core.parent)
+  core.parent.mkdir()
   archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
 
   for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {

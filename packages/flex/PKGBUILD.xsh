@@ -140,7 +140,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # -Isrc: finds both config.h (generated above) and flexdef.h.
   let includes = ["-Isrc"]
-  fs.mkdir(p"obj")
+  p"obj".mkdir()
 
   # Compile the flex binary sources from src/.
   # libmain.c and libyywrap.c are part of libfl (scanner support library),

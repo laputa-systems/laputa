@@ -22,10 +22,10 @@ proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
 
   for arch in ["aarch64", "x86_64"] {
     let seed = fp"{root}/.out/seed/{arch}"
-    fs.mkdir(seed)
+    seed.mkdir()
 
     for product in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json"] {
-      fs.write(fp"{seed}/{product}", f"fixture {arch} {product}\n")
+      fp"{seed}/{product}".write(f"fixture {arch} {product}\n")
     }
   }
 
@@ -33,7 +33,7 @@ proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
 }
 
 proc rebuild_seed(root: Path, arch: Str) [fs, error] {
-  fs.write(fp"{root}/.out/seed/{arch}/xsh", f"rebuilt {arch} xsh\n")
+  fp"{root}/.out/seed/{arch}/xsh".write(f"rebuilt {arch} xsh\n")
 }
 
 proc plan_for(

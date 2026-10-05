@@ -462,13 +462,13 @@ export const filetree = [
 ]
 
 proc replace_required(file: Path, old: Str, new: Str) {
-  let text = fs.read_text(file)?
+  let text = file.read_text()?
 
   if old not in text {
     return Err(error.failure(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  fs.write(file, text.replace(old, new))
+  file.write(text.replace(old, new))
 }
 
 # Upstream's makealias.py emits hidden internal aliases for the public
@@ -476,7 +476,7 @@ proc replace_required(file: Path, old: Str, new: Str) {
 # PLT calls between its own functions.
 proc write_empty_alias_headers() {
   for header in [p"fcalias.h", p"fcaliastail.h", p"fcftalias.h", p"fcftaliastail.h"] {
-    fs.write(header, "")
+    header.write("")
   }
 }
 
@@ -687,13 +687,13 @@ test_const_name_c = custom_target('test_const_name.c',
   )
 
   let genericfamily_meson = p"fc-genericfamily/meson.build"
-  let genericfamily_text = fs.read_text(genericfamily_meson)?
+  let genericfamily_text = genericfamily_meson.read_text()?
 
   if "command: [gperf, '--pic', '-m', '100', '@INPUT@', '--output-file', '@OUTPUT@']," not in genericfamily_text {
     return Err(error.failure(f"{genericfamily_meson} no longer runs gperf on the generated families"))?
   }
 
-  fs.write(genericfamily_meson, "fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")
+  genericfamily_meson.write("fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")
   let conf_meson = p"conf.d/meson.build"
 
   replace_required(
@@ -748,7 +748,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   for bin in ["fc-cat", "fc-conflist", "fc-genconf", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
-    fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)
+    fp"{dest}/usr/bin/{bin}".remove(missing_ok: true)
   }
 
   # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
@@ -757,6 +757,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.symlink(fp"../../../usr/share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")
   }
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
-  fs.remove(fp"{dest}/usr/share/gettext", missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
+  fp"{dest}/usr/share/gettext".remove(missing_ok: true)
 }

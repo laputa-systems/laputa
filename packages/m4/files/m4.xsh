@@ -89,17 +89,17 @@ proc read_input_file(filepath: Str) -> Result[Str] {
   # explicitly so m4 reads the requested file, never its cwd.
   let input = fp"{filepath}"
 
-  if ! fs.exists(input)? {
+  if ! input.exists()? {
     return Err(ScriptError.Failed(kind: "m4-input", message: f"cannot open `{filepath}': No such file or directory"))
   }
 
-  let metadata = fs.metadata(input)?
+  let metadata = input.metadata()?
 
   if metadata.kind != "file" {
     return Err(ScriptError.Failed(kind: "m4-input", message: f"cannot read non-file input: {filepath}"))
   }
 
-  fs.read_text(input)
+  input.read_text()
 }
 
 # ── byte classes and scanning ────────────────────────────────────────────────
@@ -1807,7 +1807,7 @@ pure numeric_key_order(keys: List[Str]) -> List[Int] {
 proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
   let direct = fp"{name}"
 
-  if fs.exists(direct)? and direct.is_file()? {
+  if direct.exists()? and direct.is_file()? {
     return name
   }
 
@@ -1815,7 +1815,7 @@ proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
     for dir in include_paths {
       let candidate = fp"{dir}/{name}"
 
-      if fs.exists(candidate)? and candidate.is_file()? {
+      if candidate.exists()? and candidate.is_file()? {
         return f"{dir}/{name}"
       }
     }
@@ -2714,7 +2714,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
                 io.write_stdout(heredoc.body)
               } else {
                 let target = fp"{heredoc.target}"
-                let before = if fs.exists(target)? { target.read_text()? } else { "" }
+                let before = if target.exists()? { target.read_text()? } else { "" }
                 target.write(f"{before}{heredoc.body}")
               }
 
@@ -2770,7 +2770,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
               let suffix = format_radix(process.current_pid()? * 1000 + temp_counter, 36, xs)
               let candidate = f"{stem}{suffix.byte_slice(suffix.byte_len() - xs, xs)}"
 
-              if ! fs.exists(fp"{candidate}")? {
+              if ! fp"{candidate}".exists()? {
                 fp"{candidate}".write("")
                 made = candidate
               }

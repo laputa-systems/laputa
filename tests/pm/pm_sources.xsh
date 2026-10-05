@@ -58,8 +58,8 @@ proc demo_tarball(
   text: Str = "hello from the cache\n",
 ) -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
-  fs.mkdir(fp"{tree}/demo-1.0")
-  fs.write(fp"{tree}/demo-1.0/hello.txt", text)
+  fp"{tree}/demo-1.0".mkdir()
+  fp"{tree}/demo-1.0/hello.txt".write(text)
   let tarball = test.temp_path(ctx, name: f"{name}.tar.gz")
   archive.tar_create(tarball, tree, [p"demo-1.0"])
   {path: tarball, sha256: hash.sha256(tarball)?.hex()}
@@ -80,23 +80,23 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
   let tarball = demo_tarball(ctx, "cache-hit")?
   let cache = test.temp_dir(ctx, name: "cache-hit-cache")?
   let entry = sources.source_cache_entry(cache, tarball.sha256)
-  fs.mkdir(entry.parent)
-  fs.copy(tarball.path, entry)
+  entry.parent.mkdir()
+  tarball.path.copy(entry)
   let src = test.temp_dir(ctx, name: "cache-hit-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
   }
 
-  assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
+  assert fp"{src}/hello.txt".read_text()? == "hello from the cache\n"
 }
 
 test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error] { |ctx|
   let tarball = demo_tarball(ctx, "mirror-fill")?
   let mirror = test.temp_dir(ctx, name: "mirror-fill-mirror")?
   let served = fp"{mirror}/sources/sha256/{tarball.sha256}"
-  fs.mkdir(served.parent)
-  fs.copy(tarball.path, served)
+  served.parent.mkdir()
+  tarball.path.copy(served)
   let cache = test.temp_dir(ctx, name: "mirror-fill-cache")?
   let src = test.temp_dir(ctx, name: "mirror-fill-src")?
 
@@ -106,7 +106,7 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
     sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
   }
 
-  assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
+  assert fp"{src}/hello.txt".read_text()? == "hello from the cache\n"
   assert hash.sha256(sources.source_cache_entry(cache, tarball.sha256))?.hex() == tarball.sha256
 }
 
@@ -144,8 +144,8 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
   let tarball = demo_tarball(ctx, "mirror-mismatch")?
   let mirror = test.temp_dir(ctx, name: "mirror-mismatch-mirror")?
   let served = fp"{mirror}/sources/sha256/{sha256_of_empty}"
-  fs.mkdir(served.parent)
-  fs.copy(tarball.path, served)
+  served.parent.mkdir()
+  tarball.path.copy(served)
   let cache = test.temp_dir(ctx, name: "mirror-mismatch-cache")?
   let src = test.temp_dir(ctx, name: "mirror-mismatch-src")?
 
@@ -165,9 +165,9 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
   let impostor = demo_tarball(ctx, "corrupt-impostor", "other bytes\n")?
   let cache = test.temp_dir(ctx, name: "corrupt-entry-cache")?
   let entry = sources.source_cache_entry(cache, pinned.sha256)
-  fs.mkdir(entry.parent)
+  entry.parent.mkdir()
   # A well-formed archive with other bytes: only checksum verification can reject it.
-  fs.copy(impostor.path, entry)
+  impostor.path.copy(entry)
   let src = test.temp_dir(ctx, name: "corrupt-entry-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
@@ -220,9 +220,8 @@ test test_local_repositories_are_loopback_or_file_trees [error] {
 proc fetch_repository(ctx: TestContext, sources_text: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "fetch-repository")?
   let recipe = fp"{root}/packages/fetchdemo/PKGBUILD.xsh"
-  fs.mkdir(recipe.parent)
-  fs.write(
-    recipe,
+  recipe.parent.mkdir()
+  recipe.write(
     f"""##! Fetch fixture metapackage.
 ## Package name.
 export let name = "fetchdemo"
@@ -251,8 +250,8 @@ pure fetch_source_record(url: Str, sha256: Str) -> Str {
 
 test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, process, env, error] { |ctx|
   let upstream = test.temp_dir(ctx, name: "fetch-upstream")?
-  fs.write(fp"{upstream}/good-1.0.txt", "good bytes\n")
-  fs.write(fp"{upstream}/changed.txt", "bytes that changed upstream\n")
+  fp"{upstream}/good-1.0.txt".write("good bytes\n")
+  fp"{upstream}/changed.txt".write("bytes that changed upstream\n")
   let good_sha256 = hash.sha256(fp"{upstream}/good-1.0.txt")?.hex()
   let repository = fetch_repository(
     ctx,
@@ -277,7 +276,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
   assert "0 cached" in first.stdout
   assert "1 fetched" in first.stdout
   assert "2 failed" in first.stdout
-  assert fs.read_text(sources.source_cache_entry(cache, good_sha256))? == "good bytes\n"
+  assert sources.source_cache_entry(cache, good_sha256).read_text()? == "good bytes\n"
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
 
   let second = run.capture --text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo $repository fetchdemo ?
@@ -287,7 +286,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
 
 test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env, error] { |ctx|
   let upstream = test.temp_dir(ctx, name: "checksum-upstream")?
-  fs.write(fp"{upstream}/new-1.0.txt", "new upstream bytes\n")
+  fp"{upstream}/new-1.0.txt".write("new upstream bytes\n")
   let new_sha256 = hash.sha256(fp"{upstream}/new-1.0.txt")?.hex()
   # The recorded pin is stale; `repo checksum` reports what upstream serves now.
   let repository = fetch_repository(ctx, fetch_source_record(f"file://{upstream}/new-VERSION.txt", sha256_of_empty))?
@@ -304,7 +303,7 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
   }
 
   assert output.trim() == f"fetchdemo {new_sha256}"
-  assert fs.read_text(sources.source_cache_entry(cache, new_sha256))? == "new upstream bytes\n"
+  assert sources.source_cache_entry(cache, new_sha256).read_text()? == "new upstream bytes\n"
   # The download is staged in a private temporary directory, never the caller's cwd.
   assert (fs.children(cwd)? |> count()) == 0
 }
@@ -353,9 +352,9 @@ type DemoCrate = {item: sources.LockedCrate, path: Path}
 # A `.crate` archive: one `NAME-VERSION/` directory, as crates.io packs it.
 proc demo_crate(ctx: TestContext, name: Str, version: Str) -> Result[DemoCrate] {
   let tree = test.temp_dir(ctx, name: f"{name}-crate-tree")?
-  fs.mkdir(fp"{tree}/{name}-{version}/src")
-  fs.write(fp"{tree}/{name}-{version}/Cargo.toml", f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")
-  fs.write(fp"{tree}/{name}-{version}/src/lib.rs", "")
+  fp"{tree}/{name}-{version}/src".mkdir()
+  fp"{tree}/{name}-{version}/Cargo.toml".write(f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")
+  fp"{tree}/{name}-{version}/src/lib.rs".write("")
   let tarball = test.temp_path(ctx, name: f"{name}-{version}.tar.gz")
   archive.tar_create(tarball, tree, [fp"{name}-{version}"])
   {item: {name, version, checksum: hash.sha256(tarball)?.hex()}, path: tarball}
@@ -364,8 +363,8 @@ proc demo_crate(ctx: TestContext, name: Str, version: Str) -> Result[DemoCrate] 
 proc cache_file(cache: Path, file: Path) -> Result[Str] {
   let sha256 = hash.sha256(file)?.hex()
   let entry = sources.source_cache_entry(cache, sha256)
-  fs.mkdir(entry.parent)
-  fs.copy(file, entry, overwrite: true)
+  entry.parent.mkdir()
+  file.copy(entry, overwrite: true)
   sha256
 }
 
@@ -397,7 +396,7 @@ test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
     {name: "zstd-sys", version: "2.0.15+zstd.1.5.7", checksum: "2222222222222222222222222222222222222222222222222222222222222222"},
   ]
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  fs.write(lockfile, crate_set_lock(crates))
+  lockfile.write(crate_set_lock(crates))
 
   test.eq(sources.cargo_lock_crates(lockfile)?, crates)
   assert sources.crate_download_url(crates[1]) == "https://static.crates.io/crates/zstd-sys/zstd-sys-2.0.15+zstd.1.5.7.crate"
@@ -405,8 +404,7 @@ test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
 
 test test_cargo_lock_rejects_crates_without_a_content_address [fs, error] { |ctx|
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  fs.write(
-    lockfile,
+  lockfile.write(
     """version = 4
 
 [[package]]
@@ -421,8 +419,7 @@ source = "git+https://example.invalid/forked?rev=abc#abc"
     Err(problem) => assert "forked 0.1.0 comes from git+https://example.invalid/forked" in problem.message
   }
 
-  fs.write(
-    lockfile,
+  lockfile.write(
     """[[package]]
 name = "old"
 version = "0.1.0"
@@ -440,7 +437,7 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let cache = test.temp_dir(ctx, name: "crate-set-cache")?
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  fs.write(lockfile, crate_set_lock([crate_file.item]))
+  lockfile.write(crate_set_lock([crate_file.item]))
   let lock_sha256 = cache_file(cache, lockfile)?
   let src = test.temp_dir(ctx, name: "crate-set-src")?
   let pkg = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
@@ -459,15 +456,15 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   }
 
   let vendored = fp"{src}/vendor/demo_crate-0.1.0"
-  assert "name = \"demo_crate\"" in fs.read_text(fp"{vendored}/Cargo.toml")?
-  let marker = fs.read_text(fp"{vendored}/.cargo-checksum.json")?
+  assert "name = \"demo_crate\"" in fp"{vendored}/Cargo.toml".read_text()?
+  let marker = fp"{vendored}/.cargo-checksum.json".read_text()?
   assert json.decode(marker)? == json.decode(f"""{{"files": {{}}, "package": "{crate_file.item.checksum}"}}""")?
 }
 
 test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, env, error] { |ctx|
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let upstream = test.temp_dir(ctx, name: "crate-set-upstream")?
-  fs.write(fp"{upstream}/Cargo.lock", crate_set_lock([crate_file.item]))
+  fp"{upstream}/Cargo.lock".write(crate_set_lock([crate_file.item]))
   let lock_sha256 = hash.sha256(fp"{upstream}/Cargo.lock")?.hex()
   let repository = fetch_repository(
     ctx,

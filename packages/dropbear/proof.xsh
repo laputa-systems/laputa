@@ -21,7 +21,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let dropbearkey = fp"{rootfs}/usr/bin/dropbearkey"
   let tmp = /tmp/dropbear-proof
-  fs.mkdir(tmp)
+  tmp.mkdir()
 
   # RSA: exercises libtommath (big-integer arithmetic) + libtomcrypt (RSA ops).
   let rsa_key = fp"{tmp}/host_rsa"
@@ -101,8 +101,8 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let me = user.current()?
   let client_key = fp"{tmp}/client_ed25519"
   let stranger_key = fp"{tmp}/stranger_ed25519"
-  fs.remove(client_key, missing_ok: true)
-  fs.remove(stranger_key, missing_ok: true)
+  client_key.remove(missing_ok: true)
+  stranger_key.remove(missing_ok: true)
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key ?
   let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?)?
@@ -112,13 +112,13 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   # writable, which rules out /tmp; a private directory under the home passes.
   let pid = process.current_pid()?
   let auth_dir = fp"{me.home}/.laputa-proof-dropbear-{pid}"
-  fs.remove(auth_dir, missing_ok: true)
-  fs.mkdir(auth_dir)
-  defer fs.remove(auth_dir, missing_ok: true)?
-  fs.chmod(auth_dir, 0o700)
-  fs.write(fp"{auth_dir}/authorized_keys", f"{client_public}\n", mode: 0o600)
+  auth_dir.remove(missing_ok: true)
+  auth_dir.mkdir()
+  defer auth_dir.remove(missing_ok: true)?
+  auth_dir.chmod(0o700)
+  fp"{auth_dir}/authorized_keys".write(f"{client_public}\n", mode: 0o600)
   let client_home = fp"{tmp}/client-home"
-  fs.mkdir(client_home)
+  client_home.mkdir()
   let log_path = fp"{tmp}/dropbear.log"
   let port = 22000 + pid % 20000
   let listen = f"127.0.0.1:{port}"

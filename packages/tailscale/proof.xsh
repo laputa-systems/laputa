@@ -4,13 +4,13 @@ use pm.util as pm_util
 error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure_executable(path_value: Path, label: Str) {
-  guard fs.executable(path_value)? else {
+  guard path_value.executable()? else {
     return Err(ProofError.Failed(kind: "proof-tailscale", message: f"missing executable {label}: {path_value}"))
   }
 }
 
 proc ensure_file(path_value: Path, label: Str) {
-  guard fs.exists(path_value)? else {
+  guard path_value.exists()? else {
     return Err(ProofError.Failed(kind: "proof-tailscale", message: f"missing {label}: {path_value}"))
   }
 }

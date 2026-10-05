@@ -667,7 +667,7 @@ export const filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/usr/share/alsa")
+  fp"{dest}/usr/share/alsa".mkdir()
   let _ = fs.copy_tree(p"ucm2", fp"{dest}/usr/share/alsa/ucm2", parents: true, overwrite: true)?
 
   # The release keeps ucm2/conf.virt.d, which alsa-lib's card scan requires,

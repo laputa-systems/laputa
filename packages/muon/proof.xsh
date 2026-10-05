@@ -6,7 +6,7 @@ error ScriptError = Failed(kind: Str, message: Str)
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let muon = fp"{rootfs}/usr/bin/muon"
 
-  if ! fs.exists(muon)? {
+  if ! muon.exists()? {
     return Err(ScriptError.Failed(kind: "proof-muon", message: f"missing muon: {muon}"))?
   }
 

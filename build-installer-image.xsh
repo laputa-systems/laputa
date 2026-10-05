@@ -17,8 +17,8 @@ proc ensure_dev_dirs(rootfs: Path) {
   for sub in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     let dir = fp"{rootfs}/{sub}"
 
-    if ! fs.exists(dir)? {
-      fs.mkdir(dir)
+    if ! dir.exists()? {
+      dir.mkdir()
     }
   }
 }
@@ -26,9 +26,9 @@ proc ensure_dev_dirs(rootfs: Path) {
 proc append_inittab_line(rootfs: Path, line: Str) {
   let inittab = fp"{rootfs}/etc/inittab"
 
-  return unless fs.exists(inittab)?
+  return unless inittab.exists()?
 
-  var text = fs.read_text(inittab)?
+  var text = inittab.read_text()?
 
   return when line in text
 
@@ -37,8 +37,7 @@ proc append_inittab_line(rootfs: Path, line: Str) {
 """
   }
 
-  fs.write_atomic(
-    inittab,
+  inittab.write_atomic(
     f"""{text}{line}
 """,
   )
@@ -109,8 +108,8 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
 # Image overlays change these roots after package composition, so a package
 # generation receipt must not claim to describe the finished image.
 proc drop_generation_receipt(rootfs: Path) {
-  fs.remove(fp"{rootfs}/var/lib/laputa/generation.json", missing_ok: true)
-  fs.remove(fp"{rootfs}/var/lib/laputa/root.json", missing_ok: true)
+  fp"{rootfs}/var/lib/laputa/generation.json".remove(missing_ok: true)
+  fp"{rootfs}/var/lib/laputa/root.json".remove(missing_ok: true)
 }
 
 proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) {
@@ -125,18 +124,18 @@ proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots
 }
 
 proc prune_runtime_root(rootfs: Path, arch: Str) {
-  fs.remove(fp"{rootfs}/boot/vmlinuz-7.2.9", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/include", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libcrypt.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libdl.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libm.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libpthread.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/librt.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libssp_nonshared.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libutil.a", missing_ok: true)
-  fs.remove(fp"{rootfs}/usr/lib/libxnet.a", missing_ok: true)
+  fp"{rootfs}/boot/vmlinuz-7.2.9".remove(missing_ok: true)
+  fp"{rootfs}/usr/include".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libc.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libcrypt.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libdl.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libm.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libpthread.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/librt.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libssp_nonshared.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libutil.a".remove(missing_ok: true)
+  fp"{rootfs}/usr/lib/libxnet.a".remove(missing_ok: true)
 }
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
@@ -448,9 +447,9 @@ proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) {
     volume_sectors = file.extent + sector_count(file.size, 2048)
   }
 
-  fs.mkdir(image.parent())
-  fs.remove(image, missing_ok: true)
-  fs.write(image, "")
+  image.parent().mkdir()
+  image.remove(missing_ok: true)
+  image.write("")
   image.truncate(volume_sectors * 2048)
   let lead_in = bytes.zero_at(image, 0, 16 * 2048)?
 
@@ -537,13 +536,12 @@ proc build_filesystems(
   installer_ci: Str,
 ) {
   let efi_boot = efi_boot_filename(arch)?
-  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer")
-  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT")
-  fs.mkdir(fp"{work}/rootfs-installer/etc/laputa-installer")
-  fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/target-esp-mb", target_esp_mb)
+  fp"{work}/rootfs-installer/usr/share/laputa-installer".mkdir()
+  fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT".mkdir()
+  fp"{work}/rootfs-installer/etc/laputa-installer".mkdir()
+  fp"{work}/rootfs-installer/etc/laputa-installer/target-esp-mb".write(target_esp_mb)
 
-  fs.copy(
-    boot_kernel,
+  boot_kernel.copy(
     fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT/{efi_boot}",
     overwrite: true,
   )
@@ -556,21 +554,20 @@ proc build_filesystems(
     overwrite: true,
   )
 
-  fs.copy(
-    fp"{work}/target-root.tar.gz",
+  fp"{work}/target-root.tar.gz".copy(
     fp"{work}/rootfs-installer/usr/share/laputa-installer/target-root.tar.gz",
     overwrite: true,
   )
 
   if installer_ci == "1" {
-    fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/ci", "")
+    fp"{work}/rootfs-installer/etc/laputa-installer/ci".write("")
   } else {
-    fs.remove(fp"{work}/rootfs-installer/etc/laputa-installer/ci", missing_ok: true)
+    fp"{work}/rootfs-installer/etc/laputa-installer/ci".remove(missing_ok: true)
   }
 
   let installer_root = fp"{work}/installer-root.ext4"
   let installer_root_mb = installer_root_size_mb(fp"{work}/rootfs-installer", installer_root_mb_override)?
-  fs.write(installer_root, "")
+  installer_root.write("")
   installer_root.truncate(installer_root_mb * 1024 * 1024)
 
   run_xsh_tool(
@@ -613,7 +610,7 @@ proc build_host() {
     installer: fp"{work}/rootfs-installer",
     tools: fp"{work}/rootfs-tools",
   )
-  fs.mkdir(work)
+  work.mkdir()
 
   for path_value in [
     fp"{work}/packages",
@@ -628,7 +625,7 @@ proc build_host() {
     fp"{work}/target-esp.vfat",
     fp"{work}/linux-kernel",
   ] {
-    fs.remove(path_value, missing_ok: true)
+    path_value.remove(missing_ok: true)
   }
 
   package_roots_host.prepare(
@@ -650,12 +647,12 @@ proc build_host() {
 
     let key_path = fp"{qemu_authorized_key}"
 
-    if ! fs.exists(key_path)? {
+    if ! key_path.exists()? {
       fail f"missing {key_path}"
     }
 
-    fs.mkdir(fp"{work}/rootfs-target/etc/laputa-installer")
-    fs.copy(key_path, fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)
+    fp"{work}/rootfs-target/etc/laputa-installer".mkdir()
+    key_path.copy(fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)
   }
 
   prune_runtime_root(roots.target, arch)
@@ -663,11 +660,11 @@ proc build_host() {
   let packaged_kernel = fp"{work}/rootfs-target/boot/vmlinuz"
   let boot_kernel = if kernel_source_raw == "" { packaged_kernel } else { fp"{kernel_source_raw}" }
 
-  if ! fs.exists(boot_kernel)? {
+  if ! boot_kernel.exists()? {
     fail f"missing installer kernel source {boot_kernel}"
   }
 
-  fs.copy(boot_kernel, kernel, overwrite: true)
+  boot_kernel.copy(kernel, overwrite: true)
   build_filesystems(root, work, xsh, arch, target_esp_mb, boot_kernel, installer_root_mb, installer_ci)
   build_installer_iso(work, iso, kernel, arch)
 

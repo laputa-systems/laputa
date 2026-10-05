@@ -4,8 +4,8 @@
 
 proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   let tmp = fp"{dest.parent}/.{dest.name}.tmp"
-  fs.mkdir(dest.parent)
-  fs.remove(tmp, missing_ok: true)
+  dest.parent.mkdir()
+  tmp.remove(missing_ok: true)
   defer tmp.remove(missing_ok: true)?
 
   let _ = net.download(
@@ -18,7 +18,7 @@ proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
     fail "downloaded CA bundle does not contain a PEM certificate"
   }
 
-  fs.rename(tmp, dest, overwrite: true)
+  tmp.rename(dest, overwrite: true)
   print f"update-certdata: updated {dest}"
 }
 

@@ -178,7 +178,7 @@ pnp_id_table(const char *key)
 
 proc write_pnp_table(root: Str) {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  fs.write(p"pnp-id-table.c", pnp_id_table_source(pnp.read_text()?))
+  p"pnp-id-table.c".write(pnp_id_table_source(pnp.read_text()?))
 }
 
 proc patch_generators(root: Str) {
@@ -207,7 +207,7 @@ subdir('test')
   )
 
   text = text.replace("math = cc.find_library('m', required: false)", "math = declare_dependency(link_args: ['-lm'])")
-  fs.write(meson_path, text)
+  meson_path.write(text)
 }
 
 ## Exported declaration `build`.

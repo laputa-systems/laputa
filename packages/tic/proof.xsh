@@ -20,12 +20,12 @@ const expected_base64 = "HgIyAAUADgBoAScAbGFwdXRhLXByb29mfGxhcHV0YS10aWN8TGFwdXR
 proc main(root: Path = /rootfs) [fs, process, error] {
   proof.package_metadata(root, "tic")
   let tic = fp"{root}/usr/bin/tic"
-  proof.ensure(fs.executable(tic)?, "proof-tic", f"missing executable {tic}")
+  proof.ensure(tic.executable()?, "proof-tic", f"missing executable {tic}")
 
   let tmp = fp"{root}/var/tmp/proof-tic"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, parents: true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(parents: true)
+  defer tmp.remove(missing_ok: true)?
   let input = fp"{tmp}/proof.src"
   input.write(source + "\n")
   let out = fp"{tmp}/terminfo"
@@ -36,7 +36,7 @@ proc main(root: Path = /rootfs) [fs, process, error] {
   let expected = expected_base64.base64_decode()?
   proof.ensure(compiled == expected, "proof-tic", "laputa-proof differs from ncurses tic's output")
   proof.ensure(fp"{out}/l/laputa-tic".read_bytes()? == expected, "proof-tic", "the laputa-tic alias differs")
-  proof.ensure(! fs.exists(fp"{out}/l/laputa+base")?, "proof-tic", "-e wrote an unselected entry")
+  proof.ensure(! fp"{out}/l/laputa+base".exists()?, "proof-tic", "-e wrote an unselected entry")
   print f"tic ok: {compiled.len()}-byte 32-bit entry with extended capabilities matches ncurses tic"
 }
 

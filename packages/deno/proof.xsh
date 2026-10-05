@@ -15,21 +15,19 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let deno = fp"{rootfs}/usr/bin/deno"
   let tmp = fp"{rootfs}/var/tmp/proof-deno"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
 
   # A relative import and a type annotation: `deno run` strips the types and
   # resolves the module graph, `deno check` runs the TypeScript checker.
-  fs.write(
-    fp"{tmp}/sum.ts",
+  fp"{tmp}/sum.ts".write(
     """export function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 """,
   )
-  fs.write(
-    fp"{tmp}/main.ts",
+  fp"{tmp}/main.ts".write(
     r"""import { sum } from "./sum.ts";
 
 const total: number = sum([40, 1, 1]);
@@ -37,8 +35,7 @@ console.log(`total=${total}`);
 """,
   )
   # The checker must reject a mistyped program, or a passing check proves nothing.
-  fs.write(
-    fp"{tmp}/mistyped.ts",
+  fp"{tmp}/mistyped.ts".write(
     """import { sum } from "./sum.ts";
 
 const total: string = sum([1, 2]);

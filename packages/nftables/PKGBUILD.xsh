@@ -113,8 +113,7 @@ const build_stamp = "1788280583"
 # visibility, and the --version strings. _GNU_SOURCE is what
 # AC_USE_SYSTEM_EXTENSIONS enables on Linux.
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     f"""#ifndef NFTABLES_CONFIG_H
 #define NFTABLES_CONFIG_H
 #define HAVE_DECL_GETPROTOBYNAME_R 0
@@ -138,7 +137,7 @@ proc write_config_h() [fs, error] {
 proc write_nftversion_h() {
   let version_template = p"nftversion.h.in".read_text()?
   let body = version_template.replace("@BUILD_STAMP@", build_stamp).replace("@NFT_VERSION@", ver.replace(".", ",")).replace("@STABLE_RELEASE@", "0")
-  fs.write(p"nftversion.h", body)
+  p"nftversion.h".write(body)
 }
 
 ## Package recipe export.
@@ -231,11 +230,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     overwrite: true,
   )
 
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
   # libnftables.pc.in with configure's /usr prefix substituted.
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/libnftables.pc",
+  fp"{dest}/usr/lib/pkgconfig/libnftables.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

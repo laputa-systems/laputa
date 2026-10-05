@@ -14,9 +14,8 @@ test test_bison_parses_linux_kconfig_argv_and_rejects_missing_grammar [fs, proce
   let modules = path.absolute(p".")?
   let xsh = generator_runner()?
   let bison = fp"{modules}/packages/bison/files/bison.xsh"
-  fs.mkdir(grammar.parent)
-  fs.write(
-    grammar,
+  grammar.parent.mkdir()
+  grammar.write(
     "%token WORD\n%start input\n%%\ninput: WORD ;\n%%\n",
   )
 
@@ -79,8 +78,8 @@ test test_flex_parses_linux_kconfig_argv_and_rejects_missing_input [fs, process,
   let modules = path.absolute(p".")?
   let xsh = generator_runner()?
   let flex = fp"{modules}/packages/flex/files/flex.xsh"
-  fs.mkdir(lexer.parent)
-  fs.write(lexer, "WORD [a-z]+\n%%\n{WORD} return 1;\n%%\n")
+  lexer.parent.mkdir()
+  lexer.write("WORD [a-z]+\n%%\n{WORD} return 1;\n%%\n")
 
   let success = process.run(
     process.command_argv(

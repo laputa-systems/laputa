@@ -17,7 +17,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   }
 
   for component in [p"keycodes/evdev", p"symbols/us", p"symbols/pc", p"types/complete", p"compat/complete"] {
-    proof.ensure(fs.exists(fp"{xkb}/{component}")?, "proof-xkeyboard-config", f"missing XKB component {component}")
+    proof.ensure(fp"{xkb}/{component}".exists()?, "proof-xkeyboard-config", f"missing XKB component {component}")
   }
 
   print "xkeyboard-config ok"

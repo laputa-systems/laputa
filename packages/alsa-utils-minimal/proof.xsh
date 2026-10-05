@@ -45,7 +45,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     proof.target_elf(root, fp"usr/bin/{name}", "alsa-utils-minimal")
   }
 
-  proof.ensure(fs.exists(fp"{root}/usr/share/alsa/init/00main")?, kind, "missing alsactl init database")
+  proof.ensure(fp"{root}/usr/share/alsa/init/00main".exists()?, kind, "missing alsactl init database")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"alsa-utils-minimal ok: cross-built {pm_util.target_arch()?}"
@@ -54,7 +54,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   # The no-card failures below are the behavior of a machine without sound
   # hardware; a build container that passed /dev/snd through would change them.
-  proof.ensure(! fs.exists(p"/dev/snd")?, kind, "the proof host exposes /dev/snd; the no-card checks need a host without sound devices")
+  proof.ensure(! p"/dev/snd".exists()?, kind, "the proof host exposes /dev/snd; the no-card checks need a host without sound devices")
 
   let aplay = expect_ok(root, "aplay", ["--version"])?
   proof.ensure(aplay.stdout.trim() == "aplay: version 1.2.16 by Jaroslav Kysela <perex@perex.cz>", kind, f"unexpected aplay version: {aplay.stdout.trim()}")
@@ -66,14 +66,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(alsaucm.stdout.trim().ends_with(": version 1.2.16"), kind, f"unexpected alsaucm version: {alsaucm.stdout.trim()}")
 
   let tmp = fp"{root}/var/tmp/proof-alsa-utils-minimal"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # Playback of a WAVE file through the null PCM parses the header and
   # configures the stream from it.
   let wav = fp"{tmp}/square.wav"
-  fs.write(wav, square_wav)
+  wav.write(square_wav)
   let played = expect_ok(root, "aplay", ["-D", "null", wav.display()])?
   let playing = f"Playing WAVE '{wav}' : Signed 16 bit Little Endian, Rate 8000 Hz, Mono"
   proof.ensure(played.stderr.trim() == playing, kind, f"unexpected aplay report: {played.stderr.trim()}")

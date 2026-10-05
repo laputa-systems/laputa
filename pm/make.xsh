@@ -239,7 +239,7 @@ export proc discover_sources(
 ## Exported PM declaration `install_header_tree`.
 export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Path] = []) [fs, error] {
   let source_root = path.absolute(src_dir)?
-  fs.mkdir(dest_dir)
+  dest_dir.mkdir()
 
   for entry in fs.walk(source_root, gitignore: false)? {
     let rel = entry.path.relative_to(source_root)
@@ -247,7 +247,7 @@ export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Pat
     let target = fp"{dest_dir}/{rel}"
 
     if entry.kind == "dir" {
-      fs.mkdir(target)
+      target.mkdir()
     } else {
       fs.install(entry.path, target, 0o644, parents: true, overwrite: true)
     }
@@ -480,7 +480,7 @@ proc spawn_task(task: MakeTask) [fs, process, env, error] -> Result[RunningTask]
   prepare_task_dirs(task)
 
   for output in task.outputs {
-    fs.remove(output, missing_ok: true)
+    output.remove(missing_ok: true)
   }
 
   let task_argv = effective_task_argv(task.argv, task.env)?

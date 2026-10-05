@@ -1149,7 +1149,7 @@ proc scanner_active() -> Result[Bool] {
 proc request_desired(name: Str, desired: Str) [fs, process, env, error] {
   let dir = inbox_dir()?
   dir.mkdir()
-  fs.write_atomic(fp"{dir}/{name}", desired)
+  fp"{dir}/{name}".write_atomic(desired)
   print f"{name} {desired} queued"
 }
 
@@ -1772,7 +1772,7 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       out = apply_request(out, entry.name, desired)?
     }
 
-    fs.remove(entry.path)
+    entry.path.remove()
   }
 
   out

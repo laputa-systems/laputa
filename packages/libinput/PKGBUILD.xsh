@@ -411,7 +411,7 @@ endif
     "",
   )
 
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 ## Exported declaration `build`.
@@ -435,7 +435,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if target_root != "" and target_root != "/" {
       let ninja = p"build/build.ninja"
-      fs.write(ninja, ninja.read_text()?.replace(" -Wl,--end-group", f" -Wl,--end-group {builtins}"))
+      ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", f" -Wl,--end-group {builtins}"))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -447,5 +447,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 }

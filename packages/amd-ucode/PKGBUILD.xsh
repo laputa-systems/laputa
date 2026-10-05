@@ -193,9 +193,9 @@ export proc build(dest: Path) [fs, error] {
   )
 
   tempdir early {
-    fs.mkdir(fp"{early}/kernel/x86/microcode")
-    fs.write(fp"{early}/kernel/x86/microcode/AuthenticAMD.bin", bytes.concat(containers))
-    fs.mkdir(fp"{dest}/boot")
+    fp"{early}/kernel/x86/microcode".mkdir()
+    fp"{early}/kernel/x86/microcode/AuthenticAMD.bin".write(bytes.concat(containers))
+    fp"{dest}/boot".mkdir()
     archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)
   }
 }

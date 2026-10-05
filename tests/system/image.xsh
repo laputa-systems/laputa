@@ -19,18 +19,18 @@ test test_gpt_disk_is_written_atomically_with_expected_root_partition [fs, error
   let root = test.temp_dir(ctx, name: "image")?
   let rootfs = fp"{root}/rootfs.ext4"
   let disk = fp"{root}/disk.img"
-  fs.write(rootfs, bytes.zero(4096)?)
-  fs.write(disk, "old")
+  rootfs.write(bytes.zero(4096)?)
+  disk.write("old")
   image.write_disk(rootfs, disk)
   image.verify_disk(disk, 4096)
-  assert fs.metadata(disk)?.size > 4096
+  assert disk.metadata()?.size > 4096
   assert image.image_root_partuuid() == "33333333-3333-3333-3333-333333333333"
 }
 
 test test_kernel_manifest_path_is_relative_existing_and_nonempty [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "kernel-source")?
-  fs.mkdir(fp"{root}/boot")
-  fs.write(fp"{root}/boot/vmlinuz", "kernel")
+  fp"{root}/boot".mkdir()
+  fp"{root}/boot/vmlinuz".write("kernel")
   assert image.image_kernel_source(root, p"boot/vmlinuz")? == fp"{root}/boot/vmlinuz"
 
   for path_value in [p"boot/missing", /boot/vmlinuz, ../boot/vmlinuz] {
@@ -47,18 +47,18 @@ test test_gpt_partuuid_matches_the_qemu_kernel_command_line [error] {
 
 test test_generation_size_counts_payload_and_incomplete_disk_preserves_final [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "generation-size")?
-  fs.mkdir(fp"{root}/usr")
-  fs.write(fp"{root}/usr/payload", "payload")
+  fp"{root}/usr".mkdir()
+  fp"{root}/usr/payload".write("payload")
   assert image.image_generation_used_bytes(root)? == 7
 
   let rootfs = fp"{root}/invalid.ext4"
   let disk = fp"{root}/disk.img"
-  fs.write(rootfs, "not-sector-aligned")
-  fs.write(disk, "previous-final")
+  rootfs.write("not-sector-aligned")
+  disk.write("previous-final")
   match image.write_disk(rootfs, disk) {
     Ok(_) => assert false
     Err(_) => {}
   }
 
-  assert fs.read_text(disk)? == "previous-final"
+  assert disk.read_text()? == "previous-final"
 }

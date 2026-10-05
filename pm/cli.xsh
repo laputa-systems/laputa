@@ -189,7 +189,7 @@ proc current_pm_repo_root() -> Result[Path] {
   var dir = fs.cwd()?
 
   while true {
-    return dir when fs.exists(fp"{dir}/pm.xsh")? and fs.exists(fp"{dir}/packages")?
+    return dir when fp"{dir}/pm.xsh".exists()? and fp"{dir}/packages".exists()?
 
     let parent = dir.parent
 

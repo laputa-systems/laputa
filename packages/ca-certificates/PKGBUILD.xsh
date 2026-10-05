@@ -69,7 +69,7 @@ export const filetree = [
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
   fs.install(p"cacert.pem", fp"{dest}/etc/ssl/certs/ca-certificates.crt", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/etc/ssl")
+  fp"{dest}/etc/ssl".mkdir()
   fs.symlink(p"certs/ca-certificates.crt", fp"{dest}/etc/ssl/cert.pem")
   fs.install(p"update-certdata.xsh", fp"{dest}/usr/bin/update-certdata", 0o755, parents: true, overwrite: true)
 }

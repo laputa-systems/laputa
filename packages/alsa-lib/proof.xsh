@@ -109,7 +109,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let share = fp"{root}/usr/share/alsa"
 
   for conf in [p"alsa.conf", p"pcm/default.conf", p"pcm/dmix.conf", p"ctl/default.conf", p"cards/HDA-Intel.conf", p"cards/aliases.conf"] {
-    proof.ensure(fs.exists(fp"{share}/{conf}")?, "proof-alsa-lib", f"missing /usr/share/alsa/{conf}")
+    proof.ensure(fp"{share}/{conf}".exists()?, "proof-alsa-lib", f"missing /usr/share/alsa/{conf}")
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -119,10 +119,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-alsa-lib"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-alsa-lib.c", program)
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
+  fp"{tmp}/proof-alsa-lib.c".write(program)
   let binary = fp"{tmp}/proof-alsa-lib"
   run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary ?
 

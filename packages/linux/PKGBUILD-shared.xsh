@@ -174,9 +174,9 @@ export proc emit_kbuild_progress(message: Str) [fs, env, error] {
 }
 
 proc remove_archive_plan_cache() {
-  fs.remove(p".xsh-kbuild-archive-plan.json", missing_ok: true)
-  fs.remove(p".xsh-kbuild-archive-plan.json.summary", missing_ok: true)
-  fs.remove(p".xsh-kbuild-archive-plan.fingerprint", missing_ok: true)
+  p".xsh-kbuild-archive-plan.json".remove(missing_ok: true)
+  p".xsh-kbuild-archive-plan.json.summary".remove(missing_ok: true)
+  p".xsh-kbuild-archive-plan.fingerprint".remove(missing_ok: true)
 }
 
 proc archive_plan_cache_fingerprint(
@@ -484,7 +484,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
 """,
   )
 
-  fs.mkdir(stable_cache_dir)
+  stable_cache_dir.mkdir()
   kbuild.write_discovered_plan(plan, stable_plan_path)
 
   kbuild.write_text_if_changed(
@@ -607,7 +607,7 @@ export proc native_tool(name: Str) [fs, process, env, error] -> Result[Path, Err
   if build_root != "" {
     let tool = fp"{build_root}/usr/bin/{name}"
 
-    return tool when fs.exists(tool)?
+    return tool when tool.exists()?
   }
 
   process.which(name)?
@@ -641,7 +641,7 @@ export proc write_default_builtin_initramfs(cc: Path) [fs, process, env, error] 
   # The XSH native Kbuild path does not run usr/Makefile, so we must explicitly
   # generate the same usr/initramfs_inc_data payload here. Writing an empty file
   # regresses direct block-root boot with "Failed to create /dev/root".
-  fs.mkdir(p".xsh-kbuild/host")
+  p".xsh-kbuild/host".mkdir()
   let gen = p".xsh-kbuild/host/gen_init_cpio"
   run_native_command([cc.display(), "-O2", "-o", gen.display(), "usr/gen_init_cpio.c"])
   let output = run.capture --bytes $gen "usr/default_cpio_list" ?
@@ -650,5 +650,5 @@ export proc write_default_builtin_initramfs(cc: Path) [fs, process, env, error] 
     return Err(kbuild.ScriptError.Failed(kind: "linux-initramfs-default-cpio", message: "gen_init_cpio failed"))
   }
 
-  fs.write(p"usr/initramfs_inc_data", output.stdout)
+  p"usr/initramfs_inc_data".write(output.stdout)
 }

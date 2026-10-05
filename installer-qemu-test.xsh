@@ -14,13 +14,13 @@ proc command_path(name: Str) -> Result[Path] {
 }
 
 proc ensure_dir(path_value: Path) {
-  return when fs.exists(path_value)?
+  return when path_value.exists()?
 
   path_value.mkdir()
 }
 
 proc ensure_file(path_value: Path, kind: Str) {
-  return when fs.exists(path_value)?
+  return when path_value.exists()?
 
   return Err(InstallerQemuTestError.Failed(kind:, message: f"missing {path_value}"))
 }
@@ -41,7 +41,7 @@ proc terminate_if_live(pid: Int) {
 }
 
 proc dump_tail(tail: Path, log: Path, lines: Int) {
-  guard fs.exists(log)? else {
+  guard log.exists()? else {
     return
   }
 
@@ -53,11 +53,11 @@ proc dump_tail(tail: Path, log: Path, lines: Int) {
 }
 
 proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
-  guard fs.exists(log)? else {
+  guard log.exists()? else {
     return false
   }
 
-  let body = fs.read_text(log)?.replace("\r", "")
+  let body = log.read_text()?.replace("\r", "")
 
   for line in body.lines() {
     return true when line.trim() == marker
@@ -67,11 +67,11 @@ proc has_line_marker(log: Path, marker: Str) -> Result[Bool] {
 }
 
 proc has_panic(log: Path) -> Result[Bool] {
-  guard fs.exists(log)? else {
+  guard log.exists()? else {
     return false
   }
 
-  let body = fs.read_text(log)?
+  let body = log.read_text()?
   "Kernel panic" in body or "not syncing" in body or "Attempted to kill init" in body
 }
 
@@ -381,7 +381,7 @@ proc clean_build_state(work: Path) {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    fs.remove(fp"{work}/{name}", missing_ok: true)
+    fp"{work}/{name}".remove(missing_ok: true)
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -395,10 +395,10 @@ proc clean_build_state(work: Path) {
   ] {
     let out = fp"{work}/{name}"
 
-    if fs.exists(out)? {
+    if out.exists()? {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
-          fs.remove(entry.path)
+          entry.path.remove()
         }
       }
     }
@@ -413,7 +413,7 @@ proc kernel_source_env(root: Path, arch: Str) -> Result[Str] {
   let local_name = if arch == "x86_64" { "local-linux-x86_64.bzImage" } else { "local-linux-aarch64.Image" }
   let local_kernel = fp"{root}/target/laputa-installer/{local_name}"
 
-  return local_kernel.display() when fs.exists(local_kernel)?
+  return local_kernel.display() when local_kernel.exists()?
 
   ""
 }
@@ -501,9 +501,9 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   let timeout_seconds = env_int("LAPUTA_INSTALLER_QEMU_TIMEOUT", 180)?
   ensure_dir(work)
   clean_build_state(work)
-  fs.remove(ssh_key, missing_ok: true)
-  fs.remove(fp"{ssh_key}.pub", missing_ok: true)
-  fs.remove(ssh_known_hosts, missing_ok: true)
+  ssh_key.remove(missing_ok: true)
+  fp"{ssh_key}.pub".remove(missing_ok: true)
+  ssh_known_hosts.remove(missing_ok: true)
 
   host.installer_run_argv(
     ssh_keygen,
@@ -525,10 +525,10 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   build_installer(root, arch, work, installer_iso, installer_kernel, fp"{ssh_key}.pub", xsh)
   ensure_file(installer_iso, "installer-iso")
   ensure_file(installer_kernel, "installer-kernel")
-  fs.remove(target_image, missing_ok: true)
-  fs.remove(installer_log, missing_ok: true)
-  fs.remove(target_log, missing_ok: true)
-  fs.write(target_image, "")
+  target_image.remove(missing_ok: true)
+  installer_log.remove(missing_ok: true)
+  target_log.remove(missing_ok: true)
+  target_image.write("")
   target_image.truncate(128 * 1024 * 1024)
 
   let installer = spawn process.command_argv(

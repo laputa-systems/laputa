@@ -347,7 +347,7 @@ export proc install_tree(source: Path, target: Path) [fs, error] {
 
   for entry in fs.files(source)? |> where .ext == "h" {
     let out = fp"{target}/{entry.path.relative_to(source_root)}"
-    fs.mkdir(out.parent)
-    fs.write(out, install_text(entry.path.read_text()?)?, mode: 0o644)
+    out.parent.mkdir()
+    out.write(install_text(entry.path.read_text()?)?, mode: 0o644)
   }
 }

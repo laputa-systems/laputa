@@ -41,15 +41,15 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
   let docker = fp"{env_value("DOCKER", "docker")}"
   let output_root = fp"{laputa_root}/target/laputa/{profile_name}"
 
-  if ! fs.exists(docker)? {
+  if ! docker.exists()? {
     let _ = process.which(docker.display())?
   }
 
   let seed_arch = xsh_seed.xsh_seed_arch(arch)?
   let seed = xsh_seed.xsh_seed_require(laputa_root, arch)?
   let artifact_root = artifact_store_root(laputa_root, arch)
-  fs.mkdir(artifact_root)
-  fs.mkdir(world.world_kbuild_cache(laputa_root))
+  artifact_root.mkdir()
+  world.world_kbuild_cache(laputa_root).mkdir()
 
   let image = images.ensure_package_tools(docker, laputa_root, seed_arch)?
   DockerConfig(
@@ -149,7 +149,7 @@ export pure docker_profile_build_argv(profile: types.SystemProfile, jobs: Int) -
 
 ## Return the structured host command that executes an exact Docker invocation.
 export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] -> Result[Command, Error] {
-  fs.mkdir(value.output_root)
+  value.output_root.mkdir()
   process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root)
 }
 
@@ -180,9 +180,9 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
 export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
   verify_image_architecture(value)
   let temporary = fp"{log}.tmp"
-  fs.mkdir(log.parent)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
+  log.parent.mkdir()
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
   let status = process.run(
     process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
   )?
@@ -192,7 +192,7 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   }
 
   fs.fsync(temporary)
-  fs.rename(temporary, log, overwrite: true)
+  temporary.rename(log, overwrite: true)
 }
 
 ## Run the sole profile PM-plan adapter through the checked native runner.

@@ -135,7 +135,7 @@ yacc = 'vendored parser'
   )
 
   text = text.replace("'yacc': yacc.full_path() + ' ' + yacc.version(),", "'yacc': yacc,")
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 # pkgconf reports xkeyboard-config.pc's path variables under the build root's
@@ -161,7 +161,7 @@ endforeach
     return Err(error.failure("meson.build no longer reads the legacy XKB root from pkg-config"))?
   }
 
-  fs.write(meson, text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))
+  meson.write(text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))
 }
 
 ## Exported declaration `build`.
@@ -190,5 +190,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/share/bash-completion", missing_ok: true)
+  fp"{dest}/usr/share/bash-completion".remove(missing_ok: true)
 }

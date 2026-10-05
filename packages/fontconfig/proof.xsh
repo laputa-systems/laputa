@@ -15,7 +15,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let conf_d = fp"{root}/etc/fonts/conf.d"
 
   for entry in fs.children(conf_d)? |> where .name.ends_with(".conf") {
-    proof.ensure(fs.exists(entry.path)?, "proof-fontconfig", f"conf.d/{entry.name} does not resolve in the root")
+    proof.ensure(entry.path.exists()?, "proof-fontconfig", f"conf.d/{entry.name} does not resolve in the root")
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -26,7 +26,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let os = system.uname()?
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let home = fp"{root}/tmp/fontconfig-proof"
-  fs.mkdir(home)
+  home.mkdir()
 
   # Loading the whole configuration parses every linked conf.d file and the
   # generated language rules; fontconfig reports any problem on stderr.

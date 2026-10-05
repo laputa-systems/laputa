@@ -3,7 +3,7 @@ use pm.proof
 
 proc ensure_sha256(root: Path, rel: Path, expected: Str) {
   let file = fp"{root}/{rel}"
-  proof.ensure(fs.exists(file)?, "wireless-regdb", f"missing {rel}")
+  proof.ensure(file.exists()?, "wireless-regdb", f"missing {rel}")
   let actual = hash.sha256(file)?.hex()
   proof.ensure(actual == expected, "wireless-regdb", f"{rel} has sha256 {actual}, expected {expected}")
 }
@@ -20,7 +20,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   proof.ensure(magic == bytes.from_text("RGDB"), "wireless-regdb", "regulatory.db lacks the RGDB magic")
 
   proof.ensure(
-    fs.exists(fp"{root}/usr/share/licenses/wireless-regdb/LICENSE")?,
+    fp"{root}/usr/share/licenses/wireless-regdb/LICENSE".exists()?,
     "wireless-regdb",
     "missing license",
   )

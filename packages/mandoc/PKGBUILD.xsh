@@ -199,7 +199,7 @@ pure c_sources(stems: Str) -> List[Path] {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  fs.write(p"config.h", config_h)
+  p"config.h".write(config_h)
   let cflags = ["-O2", "-Wno-unused-parameter"]
 
   let libmandoc = make.c_static_library({

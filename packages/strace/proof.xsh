@@ -20,9 +20,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let loader = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let strace = fp"{root}/usr/bin/strace"
   let tmp = fp"{root}/var/tmp/proof-strace"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, parents: true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(parents: true)
+  defer tmp.remove(missing_ok: true)?
 
   let version = run.text $loader $strace "-V" ?
   let banner = version.lines().get(0) ?? ""

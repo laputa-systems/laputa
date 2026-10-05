@@ -1476,7 +1476,7 @@ proc parse_options(argv: List[Str]) -> Result[YaccOptions] {
 
 proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let opt = parse_options(argv)?
-  let source = fs.read_text(fp"{opt.input}")?
+  let source = fp"{opt.input}".read_text()?
   let parts = source.split("%%")
 
   if parts.len() < 2 {
@@ -1492,11 +1492,11 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
 
   if unsupported != "" {
     if upstream_disabled() {
-      fs.write(fp"{opt.output}", generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)
+      fp"{opt.output}".write(generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)
 
       if opt.defines {
         let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-        fs.write(fp"{header}", generate_linux_header(decls, tokens)?)
+        fp"{header}".write(generate_linux_header(decls, tokens)?)
       }
 
       return
@@ -1510,15 +1510,15 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let start = parse_start_symbol(decls, rules[0].lhs)
   let code = generate_c(tokens, rules, start, prologue, epilogue)?
   let out = fp"{opt.output}"
-  fs.write(out, code)
+  out.write(code)
 
   if opt.defines {
     let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-    fs.write(fp"{header}", generate_header(tokens)?)
+    fp"{header}".write(generate_header(tokens)?)
   }
 
   if opt.verbose {
-    fs.write(fp"{opt.prefix}.output", generate_verbose_report(rules, start)?)
+    fp"{opt.prefix}.output".write(generate_verbose_report(rules, start)?)
   }
 }
 

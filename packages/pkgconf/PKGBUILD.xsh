@@ -179,8 +179,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   # -I. finds <libpkgconf/config.h>; each program's CPPFLAGS add -Ilibpkgconf,
   # -Icli, and its own directory.
   let includes = ["-I.", "-Ilibpkgconf", "-Icli"]
-  fs.mkdir(p"obj")
-  fs.write(p"obj/libpkgconf.map", libpkgconf_version_script)
+  p"obj".mkdir()
+  p"obj/libpkgconf.map".write(libpkgconf_version_script)
 
   # Step 2: libpkgconf, shared and static. Sources from Makefile.am's
   # libpkgconf_la_SOURCES; -version-info 8:0:0 makes libpkgconf.so.8.0.0.

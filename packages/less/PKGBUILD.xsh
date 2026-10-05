@@ -66,7 +66,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Laputa ships no curses library: the patch adds a checked-in defines.h in
   # place of configure's and gives screen.c built-in xterm-compatible
   # capabilities (LESS_TERMCAP_* still overrides each one).
-  let _ = patch.apply(p".", fs.read_text(p"less-builtin-terminal.patch")?, 1)?
+  let _ = patch.apply(p".", p"less-builtin-terminal.patch".read_text()?, 1)?
 
   let cflags = ["-O2"]
   let defs = ["-DBINDIR=\"/usr/bin\"", "-DLIBEXECDIR=\"/usr/libexec\"", "-DSYSDIR=\"/etc\"", "-DSECURE_COMPILE=0"]

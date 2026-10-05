@@ -24,7 +24,7 @@ pure package_input_path(rel: Path) -> Bool {
 
 proc tree_entry_line(root: Path, path_value: Path, prefix: Str) -> Result[Str] {
   let rel = path_value.strip_prefix(root)?
-  let metadata = fs.metadata(path_value)?
+  let metadata = path_value.metadata()?
   let label = canonical_field(rel.display())
   let mode = util.checkout_mode(metadata.kind, metadata.mode)
 
@@ -136,7 +136,7 @@ proc repository_input_lines(
     let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
     let input = fp"{repo_root}/{relative}"
 
-    if ! fs.exists(input)? {
+    if ! input.exists()? {
       return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
     }
 
@@ -209,7 +209,7 @@ export proc package_build_input(repo_root: Path, pkg: types.Package, target: typ
 proc pm_proof_module(pm_root: Path) -> Result[Str] {
   let proof = fp"{pm_root}/pm/proof.xsh"
 
-  if ! fs.exists(proof)? {
+  if ! proof.exists()? {
     return Err(types.PmError.PackageContract(f"{proof} is missing"))
   }
 
@@ -219,7 +219,7 @@ proc pm_proof_module(pm_root: Path) -> Result[Str] {
 ## Hashes proof-only inputs independently from build inputs so an unchanged artifact can be re-proved.
 export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str, Error] {
   let proof = fp"{pkg.dir}/proof.xsh"
-  let proof_sha256 = if fs.exists(proof)? { hash.sha256(proof)?.hex() } else { "missing" }
+  let proof_sha256 = if proof.exists()? { hash.sha256(proof)?.hex() } else { "missing" }
   digest_lines(
     [
       "format\tlaputa-package-proof-input-1",
@@ -235,7 +235,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
   let entrypoint = fp"{pm_root}/pm.xsh"
   let modules = fp"{pm_root}/pm"
 
-  if ! fs.exists(entrypoint)? or ! fs.exists(modules)? {
+  if ! entrypoint.exists()? or ! modules.exists()? {
     return Err(types.PmError.PackageContract(f"{pm_root} is not a PM source root"))
   }
 
@@ -254,7 +254,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
 
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
 export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
-  guard fs.exists(core_root)? else {
+  guard core_root.exists()? else {
     return Err(types.PmError.PackageContract(f"{core_root} is missing"))
   }
 

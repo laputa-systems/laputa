@@ -5,7 +5,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "mdevd")
   proof.target_elf(root, p"usr/bin/mdevd", "mdevd")
   proof.target_elf(root, p"usr/bin/mdevd-coldplug", "mdevd")
-  proof.ensure(fs.exists(fp"{root}/usr/lib/xinit/services/mdevd.xsh")?, "proof-mdevd", "missing mdevd service module")
+  proof.ensure(fp"{root}/usr/lib/xinit/services/mdevd.xsh".exists()?, "proof-mdevd", "missing mdevd service module")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "mdevd ok: cross-built"
@@ -16,9 +16,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let mdevd = fp"{root}/usr/bin/mdevd"
   let tmp = fp"{root}/var/tmp/proof-mdevd"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(fp"{tmp}/dev", true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  fp"{tmp}/dev".mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # `-N` opens the uevent netlink socket, parses the configuration in both
   # passes, and exits: 0 for a valid file, 2 for a syntax error. That
@@ -26,15 +26,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let good = fp"{tmp}/good.conf"
   let bad = fp"{tmp}/bad.conf"
 
-  fs.write(
-    good,
+  good.write(
     """null root:root 0666
 SUBSYSTEM=input;event[0-9]+ root:input 0660 =input/
 $MODALIAS=.* root:root 0660 @modprobe -q "$MODALIAS"
 """,
   )
 
-  fs.write(bad, "null root:root 0666 =\n")
+  bad.write("null root:root 0666 =\n")
   run $dynlinker $mdevd "-N" "-f" $good "-d" fp"{tmp}/dev" ?
   let rejected = run.status $dynlinker $mdevd "-N" "-f" $bad "-d" fp"{tmp}/dev" 2> /dev/null
   proof.ensure(rejected.exited() and rejected.exit_code()? == 2, "proof-mdevd", "mdevd -N accepted a configuration with a syntax error")

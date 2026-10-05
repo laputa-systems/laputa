@@ -48,8 +48,8 @@ export proc net_put_file(url: Str, source: Path, token: Str) [net, error] {
 export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: Path) [fs, net, error] {
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, rel)?
-    fs.mkdir(dest.parent)
-    fs.copy(source, dest, overwrite: true)
+    dest.parent.mkdir()
+    source.copy(dest, overwrite: true)
     return
   }
 
@@ -83,8 +83,8 @@ export proc upload_immutable_repo_file(
     # objects its failed attempt already uploaded; identical bytes are done.
     if response.status == 409 or response.status == 412 {
       let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
-      fs.mkdir(existing.parent)
-      defer fs.remove(existing, missing_ok: true)?
+      existing.parent.mkdir()
+      defer existing.remove(missing_ok: true)?
       let failure = try_fetch_repo_file(repo, rel, existing)?
 
       if failure == "" and hash.sha256(existing)?.hex() == hash.sha256(source)?.hex() {
@@ -99,7 +99,7 @@ export proc upload_immutable_repo_file(
 
   let dest = util.repo_file_path(repo, rel)?
 
-  if fs.exists(dest)? {
+  if dest.exists()? {
     if hash.sha256(dest)?.hex() == hash.sha256(source)?.hex() {
       return false
     }
@@ -108,17 +108,17 @@ export proc upload_immutable_repo_file(
   }
 
   let temporary = fp"{dest.parent}/.{dest.name}.tmp"
-  fs.mkdir(dest.parent)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary, overwrite: true)
-  fs.rename(temporary, dest)
+  dest.parent.mkdir()
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
+  source.copy(temporary, overwrite: true)
+  temporary.rename(dest)
   true
 }
 
 ## Exported PM declaration `load_remote_index_from`.
 export proc load_remote_index_from(index_path: Path) [fs, error] -> Result[List[types.RemotePackage], Error] {
-  if fs.exists(index_path)? {
+  if index_path.exists()? {
     let rows: List[Record] = json.read(index_path)?.require(List[Record])?
     return decode_remote_index(rows)
   }
@@ -155,8 +155,8 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
   let body = response.body.utf8()?
   let rows: List[Record] = json.decode(body)?.require(List[Record])?
   let items = decode_remote_index(rows)?
-  fs.mkdir(out)
-  fs.write_atomic(util.remote_index_cache_path(out), body)
+  out.mkdir()
+  util.remote_index_cache_path(out).write_atomic(body)
   items
 }
 
@@ -232,7 +232,7 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
 
 ## Exported PM declaration `write_remote_index_cache`.
 export proc write_remote_index_cache(out: Path, index: List[types.RemotePackage]) [fs, error] {
-  fs.mkdir(out)
+  out.mkdir()
   json.write(util.remote_index_cache_path(out), index)
 }
 
@@ -249,11 +249,11 @@ export proc write_remote_index_to_repo(
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, p"index.json")?
     let temporary = fp"{dest.parent}/.{dest.name}.tmp"
-    fs.mkdir(dest.parent)
-    fs.remove(temporary, missing_ok: true)
-    defer fs.remove(temporary, missing_ok: true)?
-    fs.copy(util.remote_index_cache_path(out), temporary, overwrite: true)
-    fs.rename(temporary, dest, overwrite: true)
+    dest.parent.mkdir()
+    temporary.remove(missing_ok: true)
+    defer temporary.remove(missing_ok: true)?
+    util.remote_index_cache_path(out).copy(temporary, overwrite: true)
+    temporary.rename(dest, overwrite: true)
     return
   }
 

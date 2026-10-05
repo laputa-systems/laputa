@@ -58,8 +58,8 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) {
   wanted += kbuild_list(fp"{arch_uapi}/Kbuild", "generic-y")?
 
   for header in wanted {
-    continue when fs.exists(fp"{arch_uapi}/{header}")?
-    fs.write(fp"{generated}/{header}", f"""#include <asm-generic/{header}>
+    continue when fp"{arch_uapi}/{header}".exists()?
+    fp"{generated}/{header}".write(f"""#include <asm-generic/{header}>
 """)
   }
 }
@@ -79,7 +79,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) {
   }
 
   lines += ["", "#ifdef __KERNEL__", f"#define __NR_syscalls {last + 1}", "#endif", "", f"#endif /* {header_guard} */"]
-  fs.write(fp"{generated}/{header.name}", f"""{lines.join("\n")}
+  fp"{generated}/{header.name}".write(f"""{lines.join("\n")}
 """)
 }
 
@@ -91,8 +91,7 @@ proc generate_version_header(version: Str, out: Path) {
     return Err(uapi.UapiError.Failed(kind: "linux-headers-version", message: f"kernel version {version} is not MAJOR.MINOR.SUB"))
   }
 
-  fs.write(
-    out,
+  out.write(
     f"""#define LINUX_VERSION_CODE {parts[0] * 65536 + parts[1] * 256 + parts[2]}
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
 #define LINUX_VERSION_MAJOR {parts[0]}
@@ -109,8 +108,8 @@ proc main(dest: Path) [fs, env, error] {
   let srcarch = kernel_srcarch(pm_util.target_arch()?)?
   let generated_linux = p"include/generated/uapi/linux"
   let generated_asm = fp"arch/{srcarch}/include/generated/uapi/asm"
-  fs.mkdir(generated_linux)
-  fs.mkdir(generated_asm)
+  generated_linux.mkdir()
+  generated_asm.mkdir()
   generate_version_header(e"XSH_PM_VERSION" ?? "", fp"{generated_linux}/version.h")
   generate_asm_wrappers(srcarch, generated_asm)
 
@@ -131,8 +130,8 @@ proc main(dest: Path) [fs, env, error] {
   # include/uapi/Kbuild's no-export-headers: these linux/ headers only make
   # sense on an arch that provides the asm/ header of the same name.
   for header in ["a.out.h", "kvm.h", "kvm_para.h"] {
-    if ! fs.exists(fp"arch/{srcarch}/include/uapi/asm/{header}")? and ! fs.exists(fp"{generated_asm}/{header}")? {
-      fs.remove(fp"{include}/linux/{header}", missing_ok: true)
+    if ! fp"arch/{srcarch}/include/uapi/asm/{header}".exists()? and ! fp"{generated_asm}/{header}".exists()? {
+      fp"{include}/linux/{header}".remove(missing_ok: true)
     }
   }
 }

@@ -379,8 +379,7 @@ test test_ready_and_status_hooks [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   service_dir.mkdir()
 
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -493,8 +492,7 @@ test test_append_log_rotates_over_size_cap [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   service_dir.mkdir()
 
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -732,8 +730,7 @@ test test_supervise_defers_restart_with_backoff [fs, process, error] { |ctx|
   # not yet relaunched, and only one spawn has happened so far. This is the
   # non-blocking backoff the scanner model gives us (delay_ms: 0 relaunches
   # immediately, exercised by the idempotent-restart test).
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -780,8 +777,7 @@ test test_scan_respawns_one_unit_independently [fs, process, error] { |ctx|
   # pids increment per call, so the bring-up gives logger=1000, worker=1001.
   # Killing worker (pid 1001) must respawn only worker (-> 1002) while logger
   # stays untouched, demonstrating independent per-unit supervision.
-  fs.write(
-    fp"{service_dir}/logger.xsh",
+  fp"{service_dir}/logger.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -795,8 +791,7 @@ export let service = {
 """,
   )
 
-  fs.write(
-    fp"{service_dir}/worker.xsh",
+  fp"{service_dir}/worker.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -846,8 +841,7 @@ test test_scan_gates_start_on_dependency_readiness [fs, process, error] { |ctx|
   service_dir.mkdir()
 
   # logger uses notify readiness and never signals, so it stays "starting".
-  fs.write(
-    fp"{service_dir}/logger.xsh",
+  fp"{service_dir}/logger.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -863,8 +857,7 @@ export let service = {
   )
 
   # app needs logger, so it must not start until logger is ready.
-  fs.write(
-    fp"{service_dir}/app.xsh",
+  fp"{service_dir}/app.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -915,8 +908,7 @@ test test_scan_honors_inbox_down_request [fs, process, error] { |ctx|
   service_dir.mkdir()
   fp"{run_dir}/inbox".mkdir()
 
-  fs.write(
-    fp"{service_dir}/logger.xsh",
+  fp"{service_dir}/logger.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -929,8 +921,7 @@ export let service = {
 """,
   )
 
-  fs.write(
-    fp"{service_dir}/app.xsh",
+  fp"{service_dir}/app.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -984,8 +975,7 @@ test test_scan_notify_readiness_reaches_running [fs, process, error] { |ctx|
   let unix_log = fp"{root}/unix.jsonl"
   service_dir.mkdir()
 
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1033,8 +1023,7 @@ test test_scan_notify_readiness_times_out [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   service_dir.mkdir()
 
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1080,8 +1069,7 @@ test test_start_tolerates_optional_uses_failure [fs, process, error] { |ctx|
   service_dir.mkdir()
 
   # A oneshot whose command fails: it cannot start.
-  fs.write(
-    fp"{service_dir}/flaky.xsh",
+  fp"{service_dir}/flaky.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1095,8 +1083,7 @@ export let service = {
 
   # app only *uses* flaky (optional), so flaky's start failure must be tolerated
   # and app still comes up.
-  fs.write(
-    fp"{service_dir}/app.xsh",
+  fp"{service_dir}/app.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1126,8 +1113,7 @@ export let service = {
 """
 
   # needy *needs* flaky, so the same failure must abort its start.
-  fs.write(
-    fp"{service_dir}/needy.xsh",
+  fp"{service_dir}/needy.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1164,8 +1150,7 @@ test test_reload_runs_hook_then_falls_back_to_sighup [fs, process, error] { |ctx
   run_dir.mkdir()
 
   # A service exporting reload(): the hook runs and SIGHUP is not sent.
-  fs.write(
-    fp"{service_dir}/hooked.xsh",
+  fp"{service_dir}/hooked.xsh".write(
     f"""##! Service fixture.
 
 ## The service declaration.
@@ -1203,8 +1188,7 @@ export proc reload() [fs, process, env, error] -> Result[Unit] {{
   # A service without reload(): the saved process group is sent SIGHUP.
   let plain_log = fp"{root}/plain.jsonl"
 
-  fs.write(
-    fp"{service_dir}/plain.xsh",
+  fp"{service_dir}/plain.xsh".write(
     """##! Service fixture.
 
 ## The service declaration.
@@ -1242,8 +1226,7 @@ test test_finish_hook_runs_after_exit [fs, process, error] { |ctx|
 
   # A service that exits and won't restart, with a finish() cleanup hook. When
   # its child dies the scanner runs finish() before parking it.
-  fs.write(
-    fp"{service_dir}/demo.xsh",
+  fp"{service_dir}/demo.xsh".write(
     f"""##! Service fixture.
 
 ## The service declaration.

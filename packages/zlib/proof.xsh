@@ -13,8 +13,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let cc = process.which("cc")?
   tempdir tmp at fp"{root}/var/tmp/proof-zlib" {
 
-    fs.write(
-      fp"{tmp}/proof-zlib.c",
+    fp"{tmp}/proof-zlib.c".write(
       """#include <string.h>
 #include <zlib.h>
 
@@ -49,8 +48,8 @@ int main(void) {
       proof.target_elf(root, p"usr/lib/libz.so", "zlib")
     }
 
-    check(fs.exists(fp"{root}/usr/include/zlib.h")?, "zlib", "missing zlib.h")
-    check(fs.exists(fp"{root}/usr/lib/libz.so")?, "zlib", "missing libz.so")
+    check(fp"{root}/usr/include/zlib.h".exists()?, "zlib", "missing zlib.h")
+    check(fp"{root}/usr/lib/libz.so".exists()?, "zlib", "missing libz.so")
     print "zlib ok"
   }
 }

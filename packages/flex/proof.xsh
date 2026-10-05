@@ -59,10 +59,10 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
 
 proc prove_scanner(rootfs: Path, flex: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-flex"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/words.l", lexer)
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
+  fp"{tmp}/words.l".write(lexer)
   let stderr = fp"{tmp}/flex.stderr"
 
   # flex runs m4 as a filter; name the root's m4 so the proof cannot pass on
@@ -82,7 +82,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"
 
-    if ! fs.exists(file)? {
+    if ! file.exists()? {
       return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex did not write {output.name}"))?
     }
 
@@ -96,7 +96,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   let scanner = fp"{tmp}/words"
   compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)
   let input = fp"{tmp}/input.txt"
-  fs.write(input, scanner_input)
+  input.write(scanner_input)
   let out = run.text $scanner < $input ?
 
   if out != scanner_expected {
@@ -108,11 +108,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let flex = fp"{rootfs}/usr/bin/flex"
   let lex = fp"{rootfs}/usr/bin/lex"
 
-  if ! fs.exists(flex)? {
+  if ! flex.exists()? {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing flex: {flex}"))?
   }
 
-  if ! fs.exists(lex)? {
+  if ! lex.exists()? {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing lex symlink: {lex}"))?
   }
 

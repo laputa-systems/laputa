@@ -72,7 +72,7 @@ proc build_cc() -> Result[Path] {
   if root != "" {
     let cc = fp"{root}/usr/bin/cc"
 
-    if ! fs.exists(cc)? {
+    if ! cc.exists()? {
       return Err(kbuild.ScriptError.Failed(kind: "linux-build-cc", message: f"missing build-root compiler: {cc}"))?
     }
 

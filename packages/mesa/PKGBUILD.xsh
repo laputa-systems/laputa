@@ -261,14 +261,13 @@ proc patch_file(file: Path, replacements: List[TextReplacement]) {
     text = replace_once(text, file.display(), replacement.old, replacement.new)?
   }
 
-  fs.write(file, text)
+  file.write(text)
 }
 
 proc write_vendored_generator() {
   let script = fp"{vendored_generator}"
 
-  fs.write(
-    script,
+  script.write(
     """#!/bin/xsh
 error VendoredOutputError = Missing(command: Str)
 
@@ -506,13 +505,13 @@ proc stage_vendored_outputs() {
 
   split = split_edge(split, block)?
   let kept = [line for line in split.kept if ! (line.starts_with("default ") and line.byte_slice(8) in split.vendored)]
-  fs.write(ninja, kept.join("\n"))
+  ninja.write(kept.join("\n"))
   var unvendored: List[Str] = []
 
   for output in split.vendored {
     let vendored = fp"generated/{output}"
 
-    if fs.exists(vendored)? {
+    if vendored.exists()? {
       fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)
     } else {
       unvendored += [output]
@@ -543,8 +542,7 @@ includedir=\${prefix}/include
 libdir=\${prefix}/lib
 """
 
-  fs.write(
-    fp"{dir}/egl.pc",
+  fp"{dir}/egl.pc".write(
     f"""{header}
 Name: egl
 Description: Mesa EGL Library
@@ -556,8 +554,7 @@ Cflags: -I\${{includedir}}
 """,
   )
 
-  fs.write(
-    fp"{dir}/gbm.pc",
+  fp"{dir}/gbm.pc".write(
     f"""{header}
 gbmbackendspath=/usr/lib/gbm
 
@@ -569,8 +566,7 @@ Cflags: -I\${{includedir}}
 """,
   )
 
-  fs.write(
-    fp"{dir}/glesv2.pc",
+  fp"{dir}/glesv2.pc".write(
     f"""{header}
 Name: glesv2
 Description: Mesa OpenGL ES 2.0 library

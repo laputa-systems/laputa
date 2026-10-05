@@ -338,8 +338,8 @@ proc generation_plan_from_dto(value: GenerationPlanDto) -> Result[types.Generati
 ## Atomically writes the validated runtime-only generation plan as a durable JSON value.
 export proc write_generation_plan(path_value: Path, value: types.GenerationPlan) [fs, error] {
   generation_validate_plan(value)
-  fs.mkdir(path_value.parent)
-  fs.write_atomic(path_value, json.encode(generation_plan_dto(value))? + "\n")
+  path_value.parent.mkdir()
+  path_value.write_atomic(json.encode(generation_plan_dto(value))? + "\n")
 }
 
 ## Reads a saved generation plan and verifies its canonical content identity.
@@ -354,7 +354,7 @@ export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.G
 export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.GenerationProfile, Error] {
   let config = generation_overlay_config_path(overlay_root)
 
-  if ! fs.exists(config)? {
+  if ! config.exists()? {
     return {name: "default", overlay_sha256: overlay_digest(overlay_root)?, replacements: []}
   }
 
@@ -375,7 +375,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
 
 ## Computes the canonical content identity of a profile overlay, including its explicit `overlay.json` policy metadata.
 export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error] {
-  guard fs.exists(overlay_root)? else {
+  guard overlay_root.exists()? else {
     return generation_empty_overlay_sha256()
   }
 
@@ -394,7 +394,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
       return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
     }
 
-    let metadata = fs.metadata(entry.path)?
+    let metadata = entry.path.metadata()?
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
@@ -414,7 +414,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
 }
 
 proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOverlayEntry]] {
-  if ! fs.exists(overlay_root)? or ! overlay_root.is_dir()? {
+  if ! overlay_root.exists()? or ! overlay_root.is_dir()? {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
@@ -429,7 +429,7 @@ proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOve
       return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
     }
 
-    let metadata = fs.metadata(entry.path)?
+    let metadata = entry.path.metadata()?
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
@@ -576,27 +576,27 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
     let destination = fp"{output_root}/{entry.path}"
 
     if entry.kind == "dir" {
-      if fs.exists(destination)? {
+      if destination.exists()? {
         guard destination.is_dir()? else {
           return Err(
             types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
           )
         }
       } else {
-        fs.mkdir(destination)
+        destination.mkdir()
       }
 
-      fs.chmod(destination, entry.mode)
+      destination.chmod(entry.mode)
     } else {
-      fs.mkdir(destination.parent)
+      destination.parent.mkdir()
 
-      if fs.exists(destination)? {
-        fs.remove(destination)
+      if destination.exists()? {
+        destination.remove()
       }
 
       if entry.kind == "file" {
-        fs.copy(entry.source, destination)
-        fs.chmod(destination, entry.mode)
+        entry.source.copy(destination)
+        destination.chmod(entry.mode)
       } else if entry.kind == "symlink" {
         fs.symlink(fp"{entry.target}", destination)
       } else {
@@ -722,27 +722,27 @@ export proc compose(
   let entries = generation_overlay_entries(overlay_root)?
   generation_preflight_overlay(entries, root_plan, value.profile)
 
-  if fs.exists(output_root)? {
+  if output_root.exists()? {
     return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 
   let temporary = fp"{output_root}.tmp"
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
   let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
   generation_apply_overlay(temporary, entries)
   let receipt = generation_receipt_for(value, root_receipt)?
   let receipt_path = generation_receipt_path(temporary)
-  fs.mkdir(receipt_path.parent)
-  fs.write(receipt_path, json.encode(generation_receipt_dto(receipt))? + "\n")
+  receipt_path.parent.mkdir()
+  receipt_path.write(json.encode(generation_receipt_dto(receipt))? + "\n")
   let stored = read_generation_receipt(temporary)?
 
   if stored != receipt {
     return Err(types.PmError.PackageContract("generation receipt changed while composing"))
   }
 
-  fs.mkdir(output_root.parent)
-  fs.rename(temporary, output_root)
+  output_root.parent.mkdir()
+  temporary.rename(output_root)
   let final_receipt = read_generation_receipt(output_root)?
 
   if final_receipt != receipt {

@@ -108,7 +108,7 @@ export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env
   let python = process.which("python3")?
   let qmp_helper = fp"{laputa_root}/boot/qmp-proof.py"
 
-  if ! fs.exists(qmp_helper)? {
+  if ! qmp_helper.exists()? {
     return Err(types.LaputaError.Profile(f"missing QMP helper {qmp_helper}"))
   }
 
@@ -215,15 +215,15 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
 ## Combine QEMU's serial console and stderr log before scanning proof markers:
 ## fatal QEMU diagnostics can be emitted on stderr rather than serial.
 export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Result[Str, Error] {
-  let console = if fs.exists(console_log)? { fs.read_text(console_log)? } else { "" }
-  let qemu = if fs.exists(qemu_log)? { fs.read_text(qemu_log)? } else { "" }
+  let console = if console_log.exists()? { console_log.read_text()? } else { "" }
+  let qemu = if qemu_log.exists()? { qemu_log.read_text()? } else { "" }
   f"""{console}
 {qemu}"""
 }
 
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
 export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool, Error] {
-  fs.exists(path_value)? and path_value.is_file()? and fs.metadata(path_value)?.size > 0
+  path_value.exists()? and path_value.is_file()? and path_value.metadata()?.size > 0
 }
 
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
@@ -236,14 +236,14 @@ export proc run_test(
   profile: types.SystemProfile,
   outputs: build.ProfileOutputs,
 ) [fs, process, time, error] {
-  if ! fs.exists(outputs.kernel)? or ! fs.exists(outputs.disk)? {
+  if ! outputs.kernel.exists()? or ! outputs.disk.exists()? {
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
 
-  fs.remove(outputs.console_log, missing_ok: true)
-  fs.remove(outputs.qemu_log, missing_ok: true)
-  fs.remove(outputs.qmp_socket, missing_ok: true)
-  fs.remove(outputs.screenshot, missing_ok: true)
+  outputs.console_log.remove(missing_ok: true)
+  outputs.qemu_log.remove(missing_ok: true)
+  outputs.qmp_socket.remove(missing_ok: true)
+  outputs.screenshot.remove(missing_ok: true)
   let command = process.command_argv(
     value.qemu,
     qemu_command_argv(value, profile, outputs, types.Test),
@@ -267,7 +267,7 @@ export proc run_test(
 
     # READY is printed by the guest only after dwl has launched foot's reader.
     # This keeps exactly one deterministic `laputa` plus EOF QMP injection.
-    if ! injected and fs.exists(outputs.qmp_socket)? and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
+    if ! injected and outputs.qmp_socket.exists()? and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
       qemu_qmp_retry(value, "ready", outputs.qmp_socket)
       qemu_qmp(value, "input", outputs.qmp_socket)
       injected = true
@@ -319,7 +319,7 @@ export proc run_test(
 
 ## Run the profile's normal interactive session and return its real QEMU exit status.
 export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, error] {
-  if ! fs.exists(outputs.kernel)? or ! fs.exists(outputs.disk)? {
+  if ! outputs.kernel.exists()? or ! outputs.disk.exists()? {
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
 

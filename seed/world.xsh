@@ -209,9 +209,9 @@ proc world_run(
   inner: List[Str],
   label: Str,
 ) {
-  fs.mkdir(output)
-  fs.mkdir(store)
-  fs.mkdir(world_kbuild_cache(container.laputa_root))
+  output.mkdir()
+  store.mkdir()
+  world_kbuild_cache(container.laputa_root).mkdir()
   let argv = world_container_argv(
     container.docker,
     container.laputa_root,
@@ -318,13 +318,13 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
   let laputa_root = container.laputa_root
   let root_dir = world_root_dir(laputa_root, args.arch)
 
-  if fs.exists(root_dir)? {
+  if root_dir.exists()? {
     return Err(xsh_seed.SeedError.Failed(f"{root_dir} already exists; `make root` removes it first"))
   }
 
   let plan = fp"{root_dir}/plan.json"
   let store = fp"{root_dir}/store"
-  fs.mkdir(store)
+  store.mkdir()
   var selection: List[Str] = []
 
   for name in args.packages {
@@ -360,7 +360,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
 
 ## Run one parsed command from the Laputa checkout root.
 export proc world_command(laputa_root: Path, args: WorldArgs) [fs, net, process, env, time, error] {
-  if ! fs.exists(fp"{laputa_root}/pm.xsh")? or ! fs.exists(fp"{laputa_root}/packages")? {
+  if ! fp"{laputa_root}/pm.xsh".exists()? or ! fp"{laputa_root}/packages".exists()? {
     return Err(xsh_seed.SeedError.Usage(f"run world_cli.xsh from the Laputa checkout root, not {laputa_root}"))
   }
 

@@ -342,15 +342,15 @@ export proc build(dest: Path) [fs, env, error] {
   var rustc_src = p"rustc/rustc"
   var rust_std_src = fp"rust-std/rust-std-{arch}-unknown-linux-musl"
 
-  if ! fs.exists(cargo_src)? {
+  if ! cargo_src.exists()? {
     cargo_src = fp"cargo/cargo-{ver}-{arch}-unknown-linux-musl/cargo"
   }
 
-  if ! fs.exists(rustc_src)? {
+  if ! rustc_src.exists()? {
     rustc_src = fp"rustc/rustc-{ver}-{arch}-unknown-linux-musl/rustc"
   }
 
-  if ! fs.exists(rust_std_src)? {
+  if ! rust_std_src.exists()? {
     rust_std_src = fp"rust-std/rust-std-{ver}-{arch}-unknown-linux-musl/rust-std-{arch}-unknown-linux-musl"
   }
 

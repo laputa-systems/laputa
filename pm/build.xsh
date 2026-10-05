@@ -13,10 +13,10 @@ export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
   for entry in (e"XSH_MODULE_PATH" ?? "/usr/lib/pm").split(":") {
     let root = fp"{entry}"
 
-    return root when fs.exists(fp"{root}/pm.xsh")? and fs.exists(fp"{root}/pm")?
+    return root when fp"{root}/pm.xsh".exists()? and fp"{root}/pm".exists()?
   }
 
-  return path.absolute(p".")? when fs.exists(p"pm.xsh")? and fs.exists(p"pm")?
+  return path.absolute(p".")? when p"pm.xsh".exists()? and p"pm".exists()?
 
   /usr/lib/pm
 }
@@ -73,10 +73,10 @@ proc xsh_runner() -> Result[Path] {
   if host != "" {
     let host_path = fp"{host}"
 
-    return host_path when fs.exists(host_path)?
+    return host_path when host_path.exists()?
   }
 
-  return /bin/xsh when fs.exists(/bin/xsh)?
+  return /bin/xsh when p"/bin/xsh".exists()?
 
   process.which("xsh")?
 }
@@ -86,7 +86,7 @@ proc regular_xsh_source(xsh: Path) -> Result[Path] {
   var depth = 0
 
   while depth < 16 {
-    let metadata = fs.metadata(source)?
+    let metadata = source.metadata()?
 
     return source when metadata.kind != "symlink"
 
@@ -102,7 +102,7 @@ proc direct_xsh_source(xsh: Path, name: Str) -> Result[Path] {
   return regular_xsh_source(xsh) when name == "xsh"
 
   let sibling = fp"{xsh.parent}/{name}"
-  if ! fs.exists(sibling)? {
+  if ! sibling.exists()? {
     return Err(types.PmError.PackageContract(f"missing direct XSH release binary {sibling}"))
   }
 
@@ -111,12 +111,12 @@ proc direct_xsh_source(xsh: Path, name: Str) -> Result[Path] {
 
 proc seed_xsh_runners(root: Path, xsh: Path) {
   let bin = fp"{root}/bin"
-  fs.mkdir(bin)
+  bin.mkdir()
 
   for name in ["xsh", "xshi", "xsht"] {
     let source = direct_xsh_source(xsh, name)?
     let dest = fp"{bin}/{name}"
-    fs.remove(dest, missing_ok: true)
+    dest.remove(missing_ok: true)
     fs.install(source, dest, 0o755, parents: true, overwrite: true)
   }
 }
@@ -127,51 +127,51 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   let xsh = xsh_runner()?
   seed_xsh_runners(root, xsh)
 
-  if fs.exists(/usr/lib/xsh)? {
+  if p"/usr/lib/xsh".exists()? {
     let _ = fs.copy_tree(/usr/lib/xsh, fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
   }
 
   let pm_root = pm_source_root()?
   fs.install(fp"{pm_root}/pm.xsh", fp"{root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)
-  fs.remove(fp"{root}/usr/lib/pm/pm", missing_ok: true)
+  fp"{root}/usr/lib/pm/pm".remove(missing_ok: true)
   let _ = fs.copy_tree(fp"{pm_root}/pm", fp"{root}/usr/lib/pm/pm", parents: true, overwrite: true)?
 
   for sh in [fp"{root}/usr/bin/sh", fp"{root}/bin/sh"] {
-    fs.mkdir(sh.parent)
-    fs.remove(sh, missing_ok: true)
-    fs.write(sh, seeded_shell_script(), mode: 0o755)
+    sh.parent.mkdir()
+    sh.remove(missing_ok: true)
+    sh.write(seeded_shell_script(), mode: 0o755)
   }
 
   for tmp in [fp"{root}/tmp", fp"{root}/var/tmp"] {
-    fs.mkdir(tmp)
-    fs.chmod(tmp, 0o1777)
+    tmp.mkdir()
+    tmp.chmod(0o1777)
   }
 
-  fs.mkdir(fp"{root}/proc")
+  fp"{root}/proc".mkdir()
 
   for name in ["cpuinfo", "meminfo"] {
     let source = fp"/proc/{name}"
     let dest = fp"{root}/proc/{name}"
 
-    match fs.metadata(source) {
-      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)
+    match source.metadata() {
+      Ok(metadata) if metadata.kind == "file" => source.copy(dest, overwrite: true)
       else => {
-        if ! fs.exists(dest)? {
-          fs.write(dest, "")
+        if ! dest.exists()? {
+          dest.write("")
         }
       }
     }
   }
 
-  fs.mkdir(fp"{root}/etc")
+  fp"{root}/etc".mkdir()
 
   for name in ["resolv.conf", "hosts", "nsswitch.conf"] {
     let source = fp"/etc/{name}"
     let dest = fp"{root}/etc/{name}"
 
-    match fs.metadata(source) {
-      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)
-      Ok(metadata) if metadata.kind == "symlink" => fs.write(dest, source.read_text()?)
+    match source.metadata() {
+      Ok(metadata) if metadata.kind == "file" => source.copy(dest, overwrite: true)
+      Ok(metadata) if metadata.kind == "symlink" => dest.write(source.read_text()?)
       else => {}
     }
   }
@@ -188,7 +188,7 @@ export proc executor_provenance() [fs, process, env, error] -> Result[types.Exec
     xshi_sha256: hash.sha256(direct_xsh_source(xsh, "xshi")?)?.hex(),
     xsht_sha256: hash.sha256(direct_xsh_source(xsh, "xsht")?)?.hex(),
     pm_sha256: fingerprint.pm_tree(pm_source_root()?)?,
-    core_sha256: if fs.exists(core)? { fingerprint.core_tree(core)? } else { null },
+    core_sha256: if core.exists()? { fingerprint.core_tree(core)? } else { null },
   }
 }
 
@@ -196,9 +196,9 @@ proc xsht_runner() -> Result[Path] {
   let xsh = xsh_runner()?
   let sibling = fp"{xsh.parent}/xsht"
 
-  return sibling when fs.exists(sibling)?
+  return sibling when sibling.exists()?
 
-  return /bin/xsht when fs.exists(/bin/xsht)?
+  return /bin/xsht when p"/bin/xsht".exists()?
 
   process.which("xsht")?
 }
@@ -212,10 +212,10 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
   # still requires a staged byte object, but it must not contain the legacy
   # package database that payload builds append before archiving.
   if pkg.kind == types.package_meta() {
-    fs.remove(dest, missing_ok: true)
-    fs.mkdir(dest)
-    fs.mkdir(tarball.parent)
-    fs.write(tarball, "laputa metapackage payload marker\n")
+    dest.remove(missing_ok: true)
+    dest.mkdir()
+    tarball.parent.mkdir()
+    tarball.write("laputa metapackage payload marker\n")
     return
   }
 
@@ -260,7 +260,7 @@ proc main(pkg_dir: Path, src: Path, dest: Path) [fs, process, env, error] {
 main(@args)?
 """
 
-    fs.write(runner, runner_text)
+    runner.write(runner_text)
     let trace_path = fp"{pkg_dir.parent}/run-package-build.trace"
     let xsht = xsht_runner()?
     let status = process.run(
@@ -301,6 +301,6 @@ main(@args)?
   # child such as `usr/share/man` while leaving an otherwise undeclared empty
   # parent; that parent must be present in both the receipt and the archive.
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
-  fs.mkdir(tarball.parent)
+  tarball.parent.mkdir()
   archive.tar_create(tarball, dest, archive_paths, compression: "gz", overwrite: true)
 }

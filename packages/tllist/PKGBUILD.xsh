@@ -49,10 +49,9 @@ export const filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
   fs.install(p"tllist.h", fp"{dest}/usr/include/tllist.h", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/tllist.pc",
+  fp"{dest}/usr/lib/pkgconfig/tllist.pc".write(
     f"""prefix=/usr
 includedir=${{prefix}}/include
 

@@ -13,14 +13,13 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-expat"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # wayland-scanner and fontconfig parse their XML through expat: the proof
   # parses a well-formed document with namespaces and rejects a malformed one.
-  fs.write(
-    fp"{tmp}/proof-expat.c",
+  fp"{tmp}/proof-expat.c".write(
     """#include <string.h>
 #include <expat.h>
 

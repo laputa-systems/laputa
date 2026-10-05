@@ -67,8 +67,7 @@ proc write_embedded_dtd() {
     }
   }
 
-  fs.write(
-    p"src/wayland.dtd.h",
+  p"src/wayland.dtd.h".write(
     f"""static const char wayland_dtd[] = {{{{
 	{values.join(" ")}
 }}}};
@@ -98,11 +97,10 @@ proc patch_python_generator() {
 """,
   )
 
-  fs.write(meson_path, patched)
+  meson_path.write(patched)
   let root_meson = p"meson.build"
 
-  fs.write(
-    root_meson,
+  root_meson.write(
     root_meson.read_text()?.replace(
   """	rt_dep = []
 	if not cc.has_function('clock_gettime', prefix: '#include <time.h>')
@@ -118,8 +116,7 @@ proc patch_python_generator() {
 ),
   )
 
-  fs.write(
-    meson_path,
+  meson_path.write(
     meson_path.read_text()?.replace(
       "\tmathlib_dep = cc.find_library('m', required: false)",
       "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
@@ -157,7 +154,7 @@ proc build_wayland(dest: Path) {
 
       let ninja = p"build/build.ninja"
       let scanner_text = native_scanner_path.display()
-      fs.write(ninja, ninja.read_text()?.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
+      ninja.write(ninja.read_text()?.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -176,12 +173,12 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") and ! entry.name.starts_with("libwayland-cursor.so") {
-      fs.remove(entry.path, missing_ok: true)
+      entry.path.remove(missing_ok: true)
     }
   }
 
-  fs.remove(fp"{dest}/usr/bin", missing_ok: true)
-  fs.remove(fp"{dest}/usr/include", missing_ok: true)
-  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)
-  fs.remove(fp"{dest}/usr/share", missing_ok: true)
+  fp"{dest}/usr/bin".remove(missing_ok: true)
+  fp"{dest}/usr/include".remove(missing_ok: true)
+  fp"{dest}/usr/lib/pkgconfig".remove(missing_ok: true)
+  fp"{dest}/usr/share".remove(missing_ok: true)
 }

@@ -8,7 +8,7 @@
 # All other lines (comments, '/* #undef */' commented forms, blank) pass through.
 ## Exported PM declaration `config_h`.
 export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, error] -> Result[Unit, Error] {
-  let content = fs.read_text(in_path)?
+  let content = in_path.read_text()?
   let lines = content.split("\n")
   var out_lines = []
 
@@ -27,8 +27,8 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
     }
   }
 
-  fs.mkdir(out_path.parent)
-  fs.write(out_path, out_lines.join("\n"))
+  out_path.parent.mkdir()
+  out_path.write(out_lines.join("\n"))
 }
 
 # Substitutes @VAR@ placeholders in an autoconf .in file and writes the result.
@@ -36,7 +36,7 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
 # Unknown @VAR@ tokens are left as-is.
 ## Exported PM declaration `substitute`.
 export proc substitute(in_path: Path, out_path: Path, vars: List[List[Str]]) [fs, error] -> Result[Unit, Error] {
-  var content = fs.read_text(in_path)?
+  var content = in_path.read_text()?
 
   for pair in vars {
     let key = pair[0]
@@ -44,6 +44,6 @@ export proc substitute(in_path: Path, out_path: Path, vars: List[List[Str]]) [fs
     content = content.replace(f"@{key}@", value)
   }
 
-  fs.mkdir(out_path.parent)
-  fs.write(out_path, content)
+  out_path.parent.mkdir()
+  out_path.write(content)
 }

@@ -53,8 +53,7 @@ export const filetree = [
 ]
 
 proc write_udev_stub() [fs, error] {
-  fs.write(
-    p"laputa-udev.c",
+  p"laputa-udev.c".write(
     f"""#include <stdio.h>
 #include <string.h>
 
@@ -115,8 +114,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(udev.output, fp"{dest}/usr/bin/udevadm", 0o755, parents: true, overwrite: true)
   fs.install(udev.output, fp"{dest}/usr/bin/udevd", 0o755, parents: true, overwrite: true)
   fs.install(udev.output, fp"{dest}/usr/lib/udev/systemd-udevd", 0o755, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/run")
-  fs.mkdir(fp"{dest}/run/udev")
-  fs.mkdir(fp"{dest}/usr/lib/udev")
-  fs.mkdir(fp"{dest}/usr/lib/udev/rules.d")
+  fp"{dest}/run".mkdir()
+  fp"{dest}/run/udev".mkdir()
+  fp"{dest}/usr/lib/udev".mkdir()
+  fp"{dest}/usr/lib/udev/rules.d".mkdir()
 }

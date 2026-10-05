@@ -118,31 +118,30 @@ export const filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
   let base = fp"{dest}/usr/share/xkeyboard-config-2"
-  fs.mkdir(base)
+  base.mkdir()
 
   for dir in [p"compat", p"geometry", p"keycodes", p"symbols", p"types"] {
     let _ = fs.copy_tree(dir, fp"{base}/{dir.name}", parents: true, overwrite: true)?
   }
 
   # Upstream installs neither its symbols build file nor the custom types stub.
-  fs.remove(fp"{base}/symbols/meson.build", missing_ok: false)
-  fs.remove(fp"{base}/types/custom", missing_ok: false)
-  fs.mkdir(fp"{base}/rules")
+  fp"{base}/symbols/meson.build".remove(missing_ok: false)
+  fp"{base}/types/custom".remove(missing_ok: false)
+  fp"{base}/rules".mkdir()
 
   for ruleset in ["base", "evdev"] {
     fs.install(fp"generated/{ruleset}", fp"{base}/rules/{ruleset}", 0o644, parents: true, overwrite: true)
     fs.install(p"rules/base.xml", fp"{base}/rules/{ruleset}.xml", 0o644, parents: true, overwrite: true)
     fs.install(p"rules/base.extras.xml", fp"{base}/rules/{ruleset}.extras.xml", 0o644, parents: true, overwrite: true)
-    fs.write(fp"{base}/rules/{ruleset}.lst", "")
+    fp"{base}/rules/{ruleset}.lst".write("")
   }
 
   fs.install(p"rules/xkb.dtd", fp"{base}/rules/xkb.dtd", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/usr/share/X11")
+  fp"{dest}/usr/share/X11".mkdir()
   fs.symlink(../xkeyboard-config-2, fp"{dest}/usr/share/X11/xkb")
-  fs.mkdir(fp"{dest}/usr/share/pkgconfig")
+  fp"{dest}/usr/share/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/share/pkgconfig/xkeyboard-config-2.pc",
+  fp"{dest}/usr/share/pkgconfig/xkeyboard-config-2.pc".write(
     f"""prefix=/usr
 datadir=\${{prefix}}/share
 xkb_root=\${{datadir}}/xkeyboard-config-2

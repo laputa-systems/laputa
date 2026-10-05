@@ -72,13 +72,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let cc = cross_cc(default_cc, build_arch, arch)?
   let readelf = process.which("readelf")?
   let tmp = fp"{rootfs}/var/tmp/proof-musl"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
   let hello_src = fp"{tmp}/hello.c"
 
-  fs.write(
-    hello_src,
+  hello_src.write(
     """#define _GNU_SOURCE
 #include <sched.h>
 #include <stdio.h>
@@ -90,7 +89,7 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
   )
 
   # bits/syscall.h carries both name sets, as musl's own build installs it.
-  let syscalls = fs.read_text(fp"{rootfs}/usr/include/bits/syscall.h")?
+  let syscalls = fp"{rootfs}/usr/include/bits/syscall.h".read_text()?
   ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")
 
   let hello = fp"{tmp}/hello"

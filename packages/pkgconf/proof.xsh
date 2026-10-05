@@ -87,7 +87,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/pkgconf", "pkgconf")
   proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")
 
-  if ! fs.exists(fp"{rootfs}/usr/bin/pkg-config")? {
+  if ! fp"{rootfs}/usr/bin/pkg-config".exists()? {
     return Err(proof.ProofError.Failed(kind: "proof-pkgconf", message: "missing pkg-config symlink"))?
   }
 
@@ -106,15 +106,15 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let pkg_config = fp"{rootfs}/usr/bin/pkg-config"
   let ver = proof.package_version(rootfs, "pkgconf")?
   let tmp = fp"{rootfs}/var/tmp/proof-pkgconf"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(fp"{tmp}/sysroot/usr/lib/pkgconfig", true)
-  fs.mkdir(fp"{tmp}/sysroot/usr/share/pkgconfig", true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  fp"{tmp}/sysroot/usr/lib/pkgconfig".mkdir(true)
+  fp"{tmp}/sysroot/usr/share/pkgconfig".mkdir(true)
+  defer tmp.remove(missing_ok: true)?
   let sysroot = fp"{tmp}/sysroot".display()
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc", base_pc)
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc", priv_pc)
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-app.pc", app_pc)
-  fs.write(fp"{sysroot}/usr/share/pkgconfig/laputa-data.pc", data_pc)
+  fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc".write(base_pc)
+  fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc".write(priv_pc)
+  fp"{sysroot}/usr/lib/pkgconfig/laputa-app.pc".write(app_pc)
+  fp"{sysroot}/usr/share/pkgconfig/laputa-data.pc".write(data_pc)
   let libdir = f"{sysroot}/usr/lib/pkgconfig:{sysroot}/usr/share/pkgconfig"
   let s = sysroot
 

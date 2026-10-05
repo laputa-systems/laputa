@@ -25,7 +25,7 @@ test test_build_prepared_metapackage_has_no_payload_or_package_database [fs, pro
 
   test.eq(built.manifest, [])
   test.eq(built.metadata_files, [])
-  assert fs.exists(fp"{dest}/var/lib/xsh-pm/packages/recipe-valid-meta")? == false
+  assert fp"{dest}/var/lib/xsh-pm/packages/recipe-valid-meta".exists()? == false
   assert payload.read_text()? == "laputa metapackage payload marker\n"
 }
 

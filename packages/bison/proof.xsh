@@ -262,9 +262,9 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
 
 proc prove_grammars(rootfs: Path, bison: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-bison"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
   let stderr = fp"{tmp}/bison.stderr"
 
   # Name the root's m4 and skeletons so the proof cannot pass on another m4
@@ -274,7 +274,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
     BISON_PKGDATADIR: fp"{rootfs}/usr/share/bison".display(),
   }) {
     for grammar in grammars {
-      fs.write(fp"{tmp}/{grammar.file}", grammar_text(grammar.file))
+      fp"{tmp}/{grammar.file}".write(grammar_text(grammar.file))
 
       cd $tmp {
         let status = process.run(process.command_argv(bison, [bison.display()].extend(grammar.argv), stderr:))?
@@ -290,7 +290,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   for output in gnu_outputs {
     let file = fp"{tmp}/{output.name}"
 
-    if ! fs.exists(file)? {
+    if ! file.exists()? {
       return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison did not write {output.name}"))?
     }
 

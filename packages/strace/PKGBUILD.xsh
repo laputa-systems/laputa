@@ -191,7 +191,7 @@ proc write_sys_func_h(sources: List[Path]) {
     }
   }
 
-  fs.write(p"src/sys_func.h", [f"{decl}\n" for decl in sorted_unique(decls)].join(""))
+  p"src/sys_func.h".write([f"{decl}\n" for decl in sorted_unique(decls)].join(""))
 }
 
 # `sen.h`: generate_sen.sh, the SEN() names of every syscall table entry that
@@ -211,7 +211,7 @@ proc write_sen_h() {
   }
 
   let body = [f"SEN_{sen},\n" for sen in sorted_unique(names)].join("")
-  fs.write(p"src/sen.h", "enum {\nSEN_printargs = 0,\n" + body + "};\n")
+  p"src/sen.h".write("enum {\nSEN_printargs = 0,\n" + body + "};\n")
 }
 
 # `scno.h` (scno.am): scno.head, then an `__NR_` fallback for every named
@@ -228,7 +228,7 @@ proc write_scno_h(syscallent_i: Path) {
     }
   }
 
-  fs.write(p"src/scno.h", out)
+  p"src/scno.h".write(out)
 }
 
 # printers.h, native_printer_decls.h, and native_printer_defs.h: the
@@ -253,9 +253,9 @@ proc write_printer_headers(mpers_sources: List[Str], preprocessed: List[Path]) {
 
   printers = printers + "} struct_printers;\nextern const struct_printers *printers;\n"
   printers = printers + "#define MPERS_PRINTER_NAME(printer_name) printers->printer_name\n"
-  fs.write(p"src/printers.h", printers)
-  fs.write(p"src/native_printer_decls.h", decls)
-  fs.write(p"src/native_printer_defs.h", defs)
+  p"src/printers.h".write(printers)
+  p"src/native_printer_decls.h".write(decls)
+  p"src/native_printer_defs.h".write(defs)
 }
 
 # ioctl_redefs<N>.h: `sort ioctlent<N>.h | comm -23 - <(sort ioctlent0.h)`
@@ -273,7 +273,7 @@ proc write_ioctl_redefs(personality: Str) {
     }
   }
 
-  fs.write(fp"src/ioctl_redefs{personality}.h", out)
+  fp"src/ioctl_redefs{personality}.h".write(out)
 }
 
 # A preprocessor-only task (`$(CPP) -P`) with no depfile.
@@ -333,7 +333,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let mpers_line = [line for line in p"src/mpers.am".read_lines()? if line.starts_with("mpers_source_files = ")]
   let mpers_sources = mpers_line[0].split(" = ")[1].words()
-  fs.mkdir(p"obj/cpp", parents: true)
+  p"obj/cpp".mkdir(parents: true)
 
   # Each preprocessed input is target code: the syscall table (with config.h
   # forced in), the mpers sources in bootstrap mode, and the target's <linux/ioctl.h>
@@ -357,7 +357,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   write_printer_headers(mpers_sources, mpers_i)
 
   let iocdef = [f"#define {line.split("DEFINE HOST")[1]}\n" for line in iocdef_i.read_lines()? if line.starts_with("DEFINE HOST")]
-  fs.write(p"src/ioctl_iocdef.h", iocdef.join(""))
+  p"src/ioctl_iocdef.h".write(iocdef.join(""))
 
   # One ioctl table per personality the architecture ships ioctls_inc<N>.h
   # for (x86_64: native, i386, x32; aarch64: native, arm). ioctlsort runs on
@@ -373,7 +373,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let all = fp"src/ioctls_all{personality}.h"
     let inc = fp"src/linux/{arch}/ioctls_inc{personality}.h".read_text()?
     let arch_ioctls = fp"src/linux/{arch}/ioctls_arch{personality}.h".read_text()?
-    fs.write(all, inc + arch_ioctls)
+    all.write(inc + arch_ioctls)
 
     let ioctlsort = make.c_program({
       cc: build_cc,
@@ -401,7 +401,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for personality in personalities {
     let ioctlsort = fp"obj/ioctlsort{personality}"
-    fs.write(fp"src/ioctlent{personality}.h", run.text $ioctlsort ?)
+    fp"src/ioctlent{personality}.h".write(run.text $ioctlsort ?)
   }
 
   for personality in personalities {

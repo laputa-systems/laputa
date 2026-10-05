@@ -14,7 +14,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     p"etc/pam.d/su",
     p"etc/pam.d/su-l",
   ] {
-    proof.ensure(fs.exists(fp"{rootfs}/{rel}")?, "proof-linux-pam", f"missing {rel}")
+    proof.ensure(fp"{rootfs}/{rel}".exists()?, "proof-linux-pam", f"missing {rel}")
   }
 
   proof.target_elf(rootfs, p"usr/lib/libpam.so.0", "linux-pam")
@@ -26,17 +26,16 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{rootfs}/var/tmp/proof-linux-pam"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(fp"{tmp}/pam.d", true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  fp"{tmp}/pam.d".mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # Two services in a private config directory: libpam must parse each stack,
   # dlopen the named module from the payload, and return that module's verdict.
-  fs.write(fp"{tmp}/pam.d/proof-permit", f"auth required {rootfs}/usr/lib/security/pam_permit.so\n")
-  fs.write(fp"{tmp}/pam.d/proof-deny", f"auth required {rootfs}/usr/lib/security/pam_deny.so\n")
+  fp"{tmp}/pam.d/proof-permit".write(f"auth required {rootfs}/usr/lib/security/pam_permit.so\n")
+  fp"{tmp}/pam.d/proof-deny".write(f"auth required {rootfs}/usr/lib/security/pam_deny.so\n")
 
-  fs.write(
-    fp"{tmp}/proof-pam.c",
+  fp"{tmp}/proof-pam.c".write(
     """#include <stdio.h>
 #include <security/pam_appl.h>
 

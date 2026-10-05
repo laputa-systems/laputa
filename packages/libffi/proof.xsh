@@ -14,15 +14,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let ver = proof.package_version(root, "libffi")?
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libffi"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # wayland marshals every request through ffi_call and dispatches events
   # through closures, which use the static trampolines on Linux; the proof
   # makes one call of each kind, including a struct return by value.
-  fs.write(
-    fp"{tmp}/proof-libffi.c",
+  fp"{tmp}/proof-libffi.c".write(
     """#include <string.h>
 #include <ffi.h>
 

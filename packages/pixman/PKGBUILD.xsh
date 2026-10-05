@@ -55,8 +55,7 @@ export const filetree = [
 proc patch_musl_math() {
   let meson = p"meson.build"
 
-  fs.write(
-    meson,
+  meson.write(
     meson.read_text()?.replace(
       "dep_m = cc.find_library('m', required : false)",
       "dep_m = declare_dependency(link_args : ['-lm'])",
@@ -84,7 +83,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "muon" "-C" "build" install ?
   }
 
-  fs.remove(fp"{dest}/usr/include", missing_ok: true)
-  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)
-  fs.remove(fp"{dest}/usr/lib/libpixman-1.so", missing_ok: true)
+  fp"{dest}/usr/include".remove(missing_ok: true)
+  fp"{dest}/usr/lib/pkgconfig".remove(missing_ok: true)
+  fp"{dest}/usr/lib/libpixman-1.so".remove(missing_ok: true)
 }

@@ -56,7 +56,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let zoneinfo = fp"{root}/usr/share/zoneinfo"
 
   for table in tables {
-    proof.ensure(fs.exists(fp"{zoneinfo}/{table}")?, "tzdata-tables", f"missing {table}")
+    proof.ensure(fp"{zoneinfo}/{table}".exists()?, "tzdata-tables", f"missing {table}")
   }
 
   let zone1970 = fp"{zoneinfo}/zone1970.tab".read_text()?
@@ -77,10 +77,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-tzdata"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-tzdata.c", program)
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
+  fp"{tmp}/proof-tzdata.c".write(program)
   let binary = fp"{tmp}/proof-tzdata"
   run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary ?
 

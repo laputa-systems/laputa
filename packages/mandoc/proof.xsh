@@ -104,17 +104,17 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let libdir = fp"{root}/usr/lib".display()
   let bin = fp"{root}/usr/bin"
   let tmp = fp"{root}/var/tmp/proof-mandoc"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
 
   let manpath = fp"{tmp}/man"
   let mdoc_file = fp"{manpath}/man1/laputa-hello.1"
   let man_file = fp"{manpath}/man7/laputa-island.7"
-  fs.mkdir(fp"{manpath}/man1", parents: true)
-  fs.mkdir(fp"{manpath}/man7")
-  fs.write(mdoc_file, mdoc_page)
-  fs.write(man_file, man_page)
+  fp"{manpath}/man1".mkdir(parents: true)
+  fp"{manpath}/man7".mkdir()
+  mdoc_file.write(mdoc_page)
+  man_file.write(man_page)
 
   env ({LD_LIBRARY_PATH: libdir}) {
     let mdoc_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $mdoc_file ?, "")
@@ -125,7 +125,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     # makewhatis indexes the tree into mandoc.db; apropos and whatis then
     # answer from that database, and man finds the page by section and name.
     run $loader fp"{bin}/makewhatis" $manpath ?
-    proof.ensure(fs.exists(fp"{manpath}/mandoc.db")?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
+    proof.ensure(fp"{manpath}/mandoc.db".exists()?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
     let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island" ?
     let found_expected = "laputa-hello(1) - greet the floating island\nlaputa-island(7) - overview of the flying island\n"
     proof.ensure(found == found_expected, "mandoc-apropos", f"unexpected apropos output:\n{found}")
@@ -140,8 +140,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     proof.ensure("laputa-hello\ngreet\nthe\nfloating\nisland\n" in words, "mandoc-demandoc", f"unexpected demandoc words:\n{words}")
   }
 
-  fs.write(fp"{tmp}/top.man", ".SH INCLUDED\n.so part.man\n.SH AFTER\n")
-  fs.write(fp"{tmp}/part.man", "from the part\n")
+  fp"{tmp}/top.man".write(".SH INCLUDED\n.so part.man\n.SH AFTER\n")
+  fp"{tmp}/part.man".write("from the part\n")
 
   cd $tmp {
     let inlined = run.text $loader fp"{bin}/soelim" "top.man" ?

@@ -98,7 +98,7 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 
   let source = fp"{profiles_root}/{name}.xsh"
 
-  if ! fs.exists(source)? {
+  if ! source.exists()? {
     return Err(types.LaputaError.Profile(f"unknown profile {name}"))
   }
 

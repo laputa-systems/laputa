@@ -2,11 +2,11 @@
 error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure_file(path_value: Path, label: Str) {
-  guard fs.exists(path_value)? else {
+  guard path_value.exists()? else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing {label}: {path_value}"))?
   }
 
-  let meta = fs.metadata(path_value)?
+  let meta = path_value.metadata()?
 
   if meta.size <= 0 {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"empty {label}: {path_value}"))?
@@ -28,7 +28,7 @@ proc ensure_config(config_path: Path, key: Str, label: Str) {
 }
 
 proc ensure_x86_bzimage(image_path: Path) {
-  let meta = fs.metadata(image_path)?
+  let meta = image_path.metadata()?
 
   if meta.size < 518 {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"x86_64 boot image is too small: {image_path}"))?

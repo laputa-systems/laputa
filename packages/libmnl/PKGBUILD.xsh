@@ -66,8 +66,7 @@ export const filetree = [
 # src/internal.h includes config.h, and it consults HAVE_VISIBILITY_HIDDEN to
 # mark the exported symbols. The header checks and PACKAGE_* strings are unused.
 proc write_config_h() [fs, error] {
-  fs.write(
-    p"config.h",
+  p"config.h".write(
     """#ifndef LIBMNL_CONFIG_H
 #define LIBMNL_CONFIG_H
 #define HAVE_VISIBILITY_HIDDEN 1
@@ -117,11 +116,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so")
   # include/libmnl/Makefile.am pkginclude_HEADERS; include/linux/ is noinst.
   fs.install(p"include/libmnl/libmnl.h", fp"{dest}/usr/include/libmnl/libmnl.h", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
+  fp"{dest}/usr/lib/pkgconfig".mkdir()
 
   # libmnl.pc.in with configure's /usr prefix substituted.
-  fs.write(
-    fp"{dest}/usr/lib/pkgconfig/libmnl.pc",
+  fp"{dest}/usr/lib/pkgconfig/libmnl.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib

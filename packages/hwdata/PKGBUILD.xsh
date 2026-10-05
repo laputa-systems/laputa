@@ -52,13 +52,12 @@ export const filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/usr/share/hwdata")
+  fp"{dest}/usr/share/hwdata".mkdir()
   fs.install(p"pnp.ids", fp"{dest}/usr/share/hwdata/pnp.ids", 0o644, parents: true, overwrite: true)
   fs.install(p"pci.ids", fp"{dest}/usr/share/hwdata/pci.ids", 0o644, parents: true, overwrite: true)
-  fs.mkdir(fp"{dest}/usr/share/pkgconfig")
+  fp"{dest}/usr/share/pkgconfig".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/share/pkgconfig/hwdata.pc",
+  fp"{dest}/usr/share/pkgconfig/hwdata.pc".write(
     """prefix=/usr
 datadir=\${prefix}/share
 pkgdatadir=\${datadir}/hwdata

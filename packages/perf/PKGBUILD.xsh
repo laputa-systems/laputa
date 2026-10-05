@@ -650,7 +650,7 @@ proc write_perf_version_file() {
   }
 
   let release = f"{fields["VERSION"]}.{fields["PATCHLEVEL"]}.{fields["SUBLEVEL"]}{fields["EXTRAVERSION"]}"
-  fs.write(fp"{out}/PERF-VERSION-FILE", f"#define PERF_VERSION \"{release}\"\n")
+  fp"{out}/PERF-VERSION-FILE".write(f"#define PERF_VERSION \"{release}\"\n")
 }
 
 proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[Str]) -> List[make.MakeTask] {

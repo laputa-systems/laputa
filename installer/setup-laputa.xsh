@@ -66,7 +66,7 @@ pure prefix_to_netmask(prefix_len: Int) -> Str {
 # system's login runs on: the PL011 UART on aarch64 virt, the 16550 UART on
 # x86_64 pc. The kernel's /dev/console may be tty0 instead.
 proc serial_console_name() -> Result[Str] {
-  return "ttyAMA0" when fs.exists(/dev/ttyAMA0)?
+  return "ttyAMA0" when p"/dev/ttyAMA0".exists()?
 
   "ttyS0"
 }
@@ -74,8 +74,8 @@ proc serial_console_name() -> Result[Str] {
 proc write_text(text: Str) {
   let serial = fp"/dev/{serial_console_name()?}"
 
-  if fs.exists(serial)? {
-    fs.write(serial, text)
+  if serial.exists()? {
+    serial.write(text)
   } else {
     io.write_stdout(text)
   }
@@ -91,7 +91,7 @@ proc usage() {
 }
 
 proc require_file(path_value: Path) {
-  guard fs.exists(path_value)? else {
+  guard path_value.exists()? else {
     return Err(InstallerError.Failed(kind: "missing-file", message: path_value.display()))
   }
 }
@@ -110,7 +110,7 @@ proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
 
 proc write_file(path_value: Path, body: Str) {
   path_value.parent.mkdir()
-  fs.write(path_value, body)
+  path_value.write(body)
 }
 
 proc normalize_target_ownership(root: Path) {
@@ -132,8 +132,8 @@ proc normalize_target_ownership(root: Path) {
     fp"{root}/usr/bin/sudo",
     fp"{root}/usr/bin/unix_chkpwd",
   ] {
-    if fs.exists(path_value)? {
-      fs.chmod(path_value, 0o4755)
+    if path_value.exists()? {
+      path_value.chmod(0o4755)
     }
   }
 }
@@ -141,19 +141,18 @@ proc normalize_target_ownership(root: Path) {
 proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
   let public_key_path = fp"{root}/etc/laputa-installer/qemu-smoke-authorized-key.pub"
 
-  return false unless fs.exists(public_key_path)?
+  return false unless public_key_path.exists()?
 
-  let public_key = fs.read_text(public_key_path)?.trim()
+  let public_key = public_key_path.read_text()?.trim()
 
   return false when public_key == ""
 
   let ssh_dir = fp"{root}/home/pazu/.ssh"
   let authorized_keys = fp"{ssh_dir}/authorized_keys"
-  fs.mkdir(fp"{root}/etc/dropbear")
-  fs.mkdir(ssh_dir)
+  fp"{root}/etc/dropbear".mkdir()
+  ssh_dir.mkdir()
 
-  fs.write(
-    authorized_keys,
+  authorized_keys.write(
     f"""{public_key}
 """,
   )
@@ -164,8 +163,8 @@ proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
   fs.chgrp(ssh_dir, group.by_gid(1000)?)
   fs.chown(authorized_keys, user.by_uid(1000)?)
   fs.chgrp(authorized_keys, group.by_gid(1000)?)
-  fs.chmod(ssh_dir, 0o700)
-  fs.chmod(authorized_keys, 0o600)
+  ssh_dir.chmod(0o700)
+  authorized_keys.chmod(0o600)
   true
 }
 
@@ -197,9 +196,7 @@ proc print_disks(disks: List[Path]) {
 
 proc disk_has_partitions(disk: Path) -> Result[Bool] {
   for entry in fs.children(fp"/sys/block/{disk.name}")? {
-    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fs.exists(
-      fp"/sys/block/{disk.name}/{entry.name}/partition",
-    )? {
+    if entry.kind == "dir" and entry.name.starts_with(disk.name) and fp"/sys/block/{disk.name}/{entry.name}/partition".exists()? {
       return true
     }
   }
@@ -231,7 +228,7 @@ proc wait_for(path_value: Path) {
   var tries = 50
 
   while tries > 0 {
-    return when fs.exists(path_value)?
+    return when path_value.exists()?
 
     time.sleep(100ms)
     tries -= 1
@@ -407,7 +404,7 @@ main()?
 """,
     )
 
-    fs.chmod(fp"{root}/usr/local/bin/laputa-ci-idle", 0o755)
+    fp"{root}/usr/local/bin/laputa-ci-idle".chmod(0o755)
   } else {
     write_file(
       fp"{root}/etc/inittab",
@@ -422,7 +419,7 @@ tty1::respawn:/usr/bin/login -f pazu
   }
 
   fp"{root}/home/pazu".mkdir()
-  fs.chmod(fp"{root}/home/pazu", 0o755)
+  fp"{root}/home/pazu".chmod(0o755)
   let qemu_smoke_ssh = if ci { configure_qemu_smoke_ssh(root)? } else { false }
 
   if ci {
@@ -457,14 +454,14 @@ tty1::respawn:/usr/bin/login -f pazu
 proc configured_ci_esp_bytes() -> Result[Int] {
   let path_value = /etc/laputa-installer/target-esp-mb
 
-  return 16 * 1024 * 1024 unless fs.exists(path_value)?
+  return 16 * 1024 * 1024 unless path_value.exists()?
 
-  let mb = fs.read_text(path_value)?.trim().parse_int()?
+  let mb = path_value.read_text()?.trim().parse_int()?
   mb * 1024 * 1024
 }
 
 proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
-  let total_sectors = fs.read_text(fp"/sys/block/{disk.name}/size")?.trim().parse_int()?
+  let total_sectors = fp"/sys/block/{disk.name}/size".read_text()?.trim().parse_int()?
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128 * 1024 * 1024 }
   let swap_bytes = if ci { 8 * 1024 * 1024 } else { linux.meminfo()?.total * 2 }
   let esp_sectors = align_up(ceil_div(esp_bytes, 512), 2048)
@@ -526,14 +523,14 @@ proc install_to_disk(disk: Path, ci: Bool) {
   )
 
   linux.mkswap(parts.swap)
-  fs.mkdir(/mnt/target)
+  p"/mnt/target".mkdir()
   linux.mount(parts.root.display(), /mnt/target, fstype: "ext4")
   archive.tar_extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, 0, "auto", true)
   normalize_target_ownership(/mnt/target)
-  fs.mkdir(/mnt/target/boot)
+  p"/mnt/target/boot".mkdir()
   linux.mount(parts.esp.display(), /mnt/target/boot, fstype: "vfat")
 
-  if fs.exists(/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI)? {
+  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI".exists()? {
     fs.install(
       /usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI,
       /mnt/target/boot/EFI/BOOT/BOOTAA64.EFI,
@@ -543,7 +540,7 @@ proc install_to_disk(disk: Path, ci: Bool) {
     )
   }
 
-  if fs.exists(/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI)? {
+  if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI".exists()? {
     fs.install(
       /usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI,
       /mnt/target/boot/EFI/BOOT/BOOTX64.EFI,

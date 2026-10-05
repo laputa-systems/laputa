@@ -342,6 +342,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.remove(fp"{dest}/usr/share/aclocal", missing_ok: true)
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/share/aclocal".remove(missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 }

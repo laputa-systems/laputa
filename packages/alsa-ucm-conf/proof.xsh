@@ -27,7 +27,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   for entry in fs.walk(ucm, gitignore: false)? {
     if entry.kind == "symlink" {
       links += 1
-      proof.ensure(fs.exists(entry.path)?, "proof-alsa-ucm-conf", f"dangling UCM link {entry.path.relative_to(ucm)}")
+      proof.ensure(entry.path.exists()?, "proof-alsa-ucm-conf", f"dangling UCM link {entry.path.relative_to(ucm)}")
     } else if entry.kind == "file" {
       files += 1
     }

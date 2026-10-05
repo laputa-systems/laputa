@@ -65,10 +65,9 @@ export const filetree = [
 export proc build(dest: Path) [fs, error] {
   fs.install(p"pm.xsh", fp"{dest}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)
   let _ = fs.copy_tree(p"pm", fp"{dest}/usr/lib/pm/pm", parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/bin")
+  fp"{dest}/usr/bin".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/bin/pm",
+  fp"{dest}/usr/bin/pm".write(
     """#!/bin/xsh
 error WrapperError = Failed(message: Str)
 

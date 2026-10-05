@@ -35,15 +35,14 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   # of proof roots), and the proof is about tmux, not the shell it hosts.
   let shell = process.which("xshi")?
   let tmp = /tmp/tmux-proof
-  fs.mkdir(tmp)
+  tmp.mkdir()
   let label = "laputa-proof"
   let config = fp"{tmp}/tmux.conf"
-  fs.mkdir(fp"{tmp}/home")
-  check(fs.exists(dynlinker)?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")
-  check(fs.exists(tmux)?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")
+  fp"{tmp}/home".mkdir()
+  check(dynlinker.exists()?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")
+  check(tmux.exists()?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")
 
-  fs.write(
-    config,
+  config.write(
     """set -g default-terminal "tmux-256color"
 set -ga terminal-features "tmux-256color:Sync"
 set -as terminal-features ",screen*:256:clipboard:ccolour:cstyle:focus:title"

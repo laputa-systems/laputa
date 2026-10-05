@@ -96,12 +96,12 @@ export proc parser_generator(name: Str) [env, error] -> Result[ParserGen, Error]
 ## Exported declaration `remove_outputs`.
 export proc remove_outputs(spec: ParserGen) [fs, error] {
   for out in spec.outputs {
-    fs.remove(out, missing_ok: true)
+    out.remove(missing_ok: true)
   }
 
   match spec.name {
-    "bison-kconfig" => fs.remove(p"scripts/kconfig/.parser.tab.h.cmd", missing_ok: true)
-    "bison-dtc" => fs.remove(p"scripts/dtc/.dtc-parser.tab.h.cmd", missing_ok: true)
+    "bison-kconfig" => p"scripts/kconfig/.parser.tab.h.cmd".remove(missing_ok: true)
+    "bison-dtc" => p"scripts/dtc/.dtc-parser.tab.h.cmd".remove(missing_ok: true)
     else => {}
   }
 }

@@ -144,7 +144,7 @@ proc compiler_rt_builtins(arch: Str) -> Result[List[Path]] {
   ]
 
   for candidate in candidates {
-    return [candidate] when fs.exists(candidate)?
+    return [candidate] when candidate.exists()?
   }
 
   []
@@ -158,7 +158,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Generate include/bits/alltypes.h and include/bits/syscall.h.
   # bits/ does not exist in the source tree — create it first.
-  fs.mkdir(p"include/bits")
+  p"include/bits".mkdir()
 
   # Replicates tools/mkalltypes.sed.
   # Input: arch/ARCH/bits/alltypes.h.in then include/alltypes.h.in (concatenated).
@@ -168,8 +168,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   #                     #endif
   # STRUCT name body; and UNION name body; get equivalent struct/union wrappers.
   # All other lines (#define, #if, #endif, blank, etc.) pass through unchanged.
-  let arch_at = fs.read_text(fp"arch/{arch}/bits/alltypes.h.in")?
-  let generic_at = fs.read_text(p"include/alltypes.h.in")?
+  let arch_at = fp"arch/{arch}/bits/alltypes.h.in".read_text()?
+  let generic_at = p"include/alltypes.h.in".read_text()?
   var at_lines = []
 
   for line in [arch_at, generic_at].join("\n").split("\n") {
@@ -202,20 +202,19 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.write(p"include/bits/alltypes.h", at_lines.join("\n"))
+  p"include/bits/alltypes.h".write(at_lines.join("\n"))
 
   # Generate include/bits/syscall.h as musl's Makefile does: the __NR_* header
   # as is, then a SYS_* copy of each __NR_ line (`sed -n s/__NR_/SYS_/p`).
   # Programs use both names.
-  let syscall_in = fs.read_text(fp"arch/{arch}/bits/syscall.h.in")?
+  let syscall_in = fp"arch/{arch}/bits/syscall.h.in".read_text()?
   let sys_names = [line.replace("__NR_", "SYS_") for line in syscall_in.lines() if "__NR_" in line]
   let base = if syscall_in.ends_with("\n") { syscall_in } else { syscall_in + "\n" }
-  fs.write(p"include/bits/syscall.h", base + sys_names.join("\n") + "\n")
+  p"include/bits/syscall.h".write(base + sys_names.join("\n") + "\n")
 
   # Generate src/internal/version.h (included by src/internal/version.c).
   # configure normally produces this from tools/version.sh + VERSION file.
-  fs.write(
-    p"src/internal/version.h",
+  p"src/internal/version.h".write(
     f"""#define VERSION "{ver}"
 """,
   )
@@ -265,7 +264,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   for subsys in fs.children(p"src")? |> where .kind == "dir" {
     let arch_subdir = fp"{subsys.path}/{arch}"
 
-    if fs.exists(arch_subdir)? {
+    if arch_subdir.exists()? {
       for e in fs.children(arch_subdir)? |> where .kind == "file" {
         if e.ext == "c" {
           replaced += [f"{subsys.name}/{e.name.replace(".c", "")}"]
@@ -294,7 +293,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     libc_srcs += [e.path]
   }
 
-  fs.mkdir(p"obj")
+  p"obj".mkdir()
 
   # Compile all src/ sources → LOBJS (PIC; go into both libc.a and libc.so).
   var tasks = []
@@ -320,7 +319,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Hardcoded list — ldso/ contains exactly these two files in every musl release.
   var ldso_objs = []
   var ldso_deps = []
-  fs.mkdir(p"obj/ldso")
+  p"obj/ldso".mkdir()
   let ldso_sources = [fp"ldso/{src_name}.c" for src_name in ["dlstart", "dynlink"]]
   let ldso_compile = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", ldso_sources, p"obj/ldso")
   tasks += ldso_compile.tasks
@@ -418,7 +417,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let packaged_builtin = fp"llvm-toolchain-target/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a"
 
-  if fs.exists(packaged_builtin)? {
+  if packaged_builtin.exists()? {
     fs.install(packaged_builtin, fp"{dest}/usr/lib/{packaged_builtin.name()}", 0o644, parents: true, overwrite: true)
   }
 
@@ -470,11 +469,10 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   if ldso != "" {
     fs.symlink(p"libc.so", fp"{dest}/usr/lib/{ldso}")
-    fs.mkdir(fp"{dest}/usr/bin")
-    fs.remove(fp"{dest}/usr/bin/ldd", missing_ok: true)
+    fp"{dest}/usr/bin".mkdir()
+    fp"{dest}/usr/bin/ldd".remove(missing_ok: true)
 
-    fs.write(
-      fp"{dest}/usr/bin/ldd",
+    fp"{dest}/usr/bin/ldd".write(
       f"""#!/bin/xsh
 proc main(...argv: List[Str]) [process, error] {{{{
   unix.exec(process.command_argv("/usr/lib/{ldso}", ["/usr/lib/{ldso}", "--list"].extend(argv)))?

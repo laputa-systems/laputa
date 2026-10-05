@@ -167,7 +167,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   let xsh = process.which("xsh")?
   fs.install(xsh, fp"{root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)
   fs.install(xsh, fp"{root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)
-  fs.mkdir(fp"{root}/usr/lib/rustlib/{target_arch}-unknown-linux-musl/lib")
+  fp"{root}/usr/lib/rustlib/{target_arch}-unknown-linux-musl/lib".mkdir()
   let stderr_path = test.temp_path(ctx, name: "cargo-proof-stderr")
   let status = process.run(
     process.command_argv(
@@ -178,15 +178,14 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
       stderr: stderr_path,
     ),
   )?
-  test.ok(status.ok, fs.read_text(stderr_path)?)
+  test.ok(status.ok, stderr_path.read_text()?)
 }
 
 # A stand-in executable that prints `output` only when run against the proof
 # root's libraries, and aborts otherwise.
 proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) {
   let bin = fp"{root}/usr/bin/{name}"
-  fs.write(
-    bin,
+  bin.write(
     f"""#!{xsh}
 proc main(...argv: List[Str]) [env, error] {{
   if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("{root}/usr/lib") {{
@@ -204,16 +203,16 @@ type WpaProofRun = {ok: Bool, stderr: Str}
 proc run_wpa_proof(ctx: TestContext, name: Str, psk: Str) [fs, process, env, error] -> Result[WpaProofRun] {
   let root = test.temp_dir(ctx, name:)?
   let xsh = process.which("xsh")?
-  fs.mkdir(fp"{root}/usr/bin")
-  fs.mkdir(fp"{root}/usr/lib/xinit/services")
-  fs.mkdir(fp"{root}/etc/wpa_supplicant")
-  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")
+  fp"{root}/usr/bin".mkdir()
+  fp"{root}/usr/lib/xinit/services".mkdir()
+  fp"{root}/etc/wpa_supplicant".mkdir()
+  fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant".mkdir()
   write_wpa_tool(xsh, root, "wpa_supplicant", "wpa_supplicant v2.12")
   write_wpa_tool(xsh, root, "wpa_passphrase", f"psk={psk}")
-  fs.write(fp"{root}/usr/bin/wpa_cli", "")
-  fs.write(fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")
-  fs.write(fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf", "")
-  fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")
+  fp"{root}/usr/bin/wpa_cli".write("")
+  fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh".write("")
+  fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf".write("")
+  fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json".write("{}")
   let stderr_path = test.temp_path(ctx, name: f"{name}-stderr")
   let status = process.run(
     process.command_argv(
@@ -224,7 +223,7 @@ proc run_wpa_proof(ctx: TestContext, name: Str, psk: Str) [fs, process, env, err
       stderr: stderr_path,
     ),
   )?
-  {ok: status.ok, stderr: fs.read_text(stderr_path)?}
+  {ok: status.ok, stderr: stderr_path.read_text()?}
 }
 
 test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, error] { |ctx|
@@ -244,8 +243,7 @@ test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, err
 proc write_runtime_only_recipe(ctx: TestContext, name: Str, dependencies: Str) -> Result[Path] {
   let dir = test.temp_dir(ctx, name:)?
   let documented = dependencies.replace("export let ", "## Fixture export.\nexport let ")
-  fs.write(
-    fp"{dir}/PKGBUILD.xsh",
+  fp"{dir}/PKGBUILD.xsh".write(
     f"""##! Runtime-only dependency fixture recipe.
 ## Fixture export.
 export let name = "runtime-only-probe"
@@ -322,9 +320,8 @@ test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
 # appended exports, such as an `architectures` list.
 proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) -> Result[Path] {
   let dir = fp"{repo}/packages/{name}"
-  fs.mkdir(dir)
-  fs.write(
-    fp"{dir}/PKGBUILD.xsh",
+  dir.mkdir()
+  fp"{dir}/PKGBUILD.xsh".write(
     f"""##! Package architecture fixture recipe.
 ## Fixture export.
 export let name = "{name}"

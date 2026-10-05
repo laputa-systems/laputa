@@ -219,15 +219,15 @@ export const filetree = [
 ## Exported declaration `prepare_sources`.
 export proc prepare_sources(src: Path) [fs, error] {
   let trace = fp"{src}/va/va_trace.c"
-  fs.write(trace, trace.read_text()?.replace("syscall(__NR_gettid)", "syscall(SYS_gettid)"))
+  trace.write(trace.read_text()?.replace("syscall(__NR_gettid)", "syscall(SYS_gettid)"))
 }
 
 proc prune_install(dest: Path) {
-  fs.remove(fp"{dest}/usr/share/doc", missing_ok: true)
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fp"{dest}/usr/share/doc".remove(missing_ok: true)
+  fp"{dest}/usr/share/man".remove(missing_ok: true)
 
   for static_lib in [p"usr/lib/libva.a", p"usr/lib/libva-drm.a", p"usr/lib/libva-wayland.a"] {
-    fs.remove(fp"{dest}/{static_lib}", missing_ok: true)
+    fp"{dest}/{static_lib}".remove(missing_ok: true)
   }
 }
 
@@ -257,7 +257,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     if native_scanner {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
-      fs.write(ninja, ninja.read_text()?.replace("../../../../root/usr/bin/wayland-scanner", scanner_text))
+      ninja.write(ninja.read_text()?.replace("../../../../root/usr/bin/wayland-scanner", scanner_text))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?

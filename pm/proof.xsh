@@ -26,7 +26,7 @@ export proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 ## Exported PM declaration `package_metadata`.
 export proc package_metadata(root: Path, name: Str) [fs, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
-  ensure(fs.exists(db)?, f"proof-{name}", f"missing package metadata: {db}")
+  ensure(db.exists()?, f"proof-{name}", f"missing package metadata: {db}")
 }
 
 ## The installed package's recipe `ver`, so a proof can check that the
@@ -40,12 +40,12 @@ proc package_dependency_map(root: Path) -> Result[Map[List[Str]]] {
   var package_deps: Map[List[Str]] = {}
   let packages_db = fp"{root}/var/lib/xsh-pm/packages"
 
-  return package_deps unless fs.exists(packages_db)?
+  return package_deps unless packages_db.exists()?
 
   for entry in fs.children(packages_db) |> where .kind == "dir" {
     let metadata_path = fp"{entry.path}/metadata.json"
 
-    if fs.exists(metadata_path)? {
+    if metadata_path.exists()? {
       let metadata = json.read(metadata_path)?.require(Record)?
       var deps: List[Str] = []
 
@@ -106,9 +106,9 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
   let host_readelf = /usr/bin/readelf
   let host_llvm_readelf = /usr/bin/llvm-readelf
 
-  return host_readelf when fs.exists(host_readelf)?
+  return host_readelf when host_readelf.exists()?
 
-  return host_llvm_readelf when fs.exists(host_llvm_readelf)?
+  return host_llvm_readelf when host_llvm_readelf.exists()?
 
   if let Ok(tool) = process.which("readelf") {
     return tool
@@ -120,7 +120,7 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
 ## Exported PM declaration `target_elf`.
 export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, error] {
   let path_value = fp"{root}/{rel}"
-  ensure(fs.exists(path_value)?, f"proof-{name}", f"missing ELF: {path_value}")
+  ensure(path_value.exists()?, f"proof-{name}", f"missing ELF: {path_value}")
   let readelf = readelf_tool()?
   let header = run.text $readelf "-h" $path_value ?
   let arch = pm_util.target_arch()?
@@ -133,10 +133,10 @@ proc proof_xsh_runner() -> Result[Path] {
   if configured != "" {
     let selected = fp"{configured}"
 
-    return selected when fs.exists(selected)?
+    return selected when selected.exists()?
   }
 
-  return /bin/xsh when fs.exists(/bin/xsh)?
+  return /bin/xsh when p"/bin/xsh".exists()?
 
   process.which("xsh")?
 }
@@ -146,7 +146,7 @@ proc proof_xsh_runner() -> Result[Path] {
 export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env, error] -> Result[Unit, Error] {
   let script = fp"{pkg.dir}/proof.xsh"
 
-  if ! fs.exists(script)? {
+  if ! script.exists()? {
     return Err(types.PmError.PackageContract(f"{pkg.name} is missing proof.xsh"))
   }
 
@@ -190,9 +190,8 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 ## Writes the deterministic proof receipt that binds a proof input to one exact payload artifact.
 ## `payload_sha256` is the payload digest the caller already holds (staged or Store receipt).
 export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, payload_sha256: Str) [fs, error] {
-  fs.mkdir(path_value.parent)
-  fs.write(
-    path_value,
+  path_value.parent.mkdir()
+  path_value.write(
     json.encode({
       format: "laputa-package-proof-3",
       package_id: node.package_id,
@@ -317,7 +316,7 @@ export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path, Erro
   let cc = process.which("cc")?
   let source = fp"{dir}/ptydrive.c"
   let binary = fp"{dir}/ptydrive"
-  fs.write(source, pty_driver_source)
+  source.write(pty_driver_source)
   run $cc "-O2" $source "-o" $binary ?
   binary
 }

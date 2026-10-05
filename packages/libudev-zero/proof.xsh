@@ -13,15 +13,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libudev-zero"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # libinput and wlroots find input and DRM devices by enumerating sysfs and
   # reading each device's uevent; /sys/class/mem/null exists in every
   # container and guest, so the proof enumerates the mem subsystem.
-  fs.write(
-    fp"{tmp}/proof-libudev.c",
+  fp"{tmp}/proof-libudev.c".write(
     """#include <string.h>
 #include <libudev.h>
 

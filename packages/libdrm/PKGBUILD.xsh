@@ -199,7 +199,7 @@ proc write_format_modifier_table() {
   }
 
   body += ["};"]
-  fs.write(p"generated_static_table_fourcc.h", body.join("\n"))
+  p"generated_static_table_fourcc.h".write(body.join("\n"))
 }
 
 proc patch_python_generator() {
@@ -219,7 +219,7 @@ format_mod_static_table = custom_target(
 """,
   )
 
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 ## Exported declaration `build`.

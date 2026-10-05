@@ -62,11 +62,11 @@ export proc prepare(
     return Err(InstallerPackageHostError.Failed("the installer needs LAPUTA_REPO_URL, the local mirror (`make mirror`)"))
   }
 
-  if fs.exists(packages)? {
+  if packages.exists()? {
     return Err(InstallerPackageHostError.Failed(f"{packages} already exists; the installer build removes it first"))
   }
 
-  fs.mkdir(packages)
+  packages.mkdir()
   let plan = fp"{packages}/build-plan.json"
   let store = fp"{packages}/store"
   # Every root the installer composes comes from one plan, so the three roots

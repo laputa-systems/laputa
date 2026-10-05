@@ -12,15 +12,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libevent"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp, true)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir(true)
+  defer tmp.remove(missing_ok: true)?
 
   # tmux drives its whole client and server through an event_base, a pipe
   # read event, and timers. Both events here are one-shot, so dispatch returns
   # once each has fired.
-  fs.write(
-    fp"{tmp}/proof-libevent.c",
+  fp"{tmp}/proof-libevent.c".write(
     """#include <string.h>
 #include <unistd.h>
 #include <event2/buffer.h>

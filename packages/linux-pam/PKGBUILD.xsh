@@ -380,7 +380,7 @@ endif
 """,
   )
 
-  fs.write(root_build, root_text)
+  root_build.write(root_text)
   let modules_build = p"modules/meson.build"
 
   let modules_text = modules_build.read_text()?.replace(
@@ -389,7 +389,7 @@ endif
     "",
   )
 
-  fs.write(modules_build, modules_text)
+  modules_build.write(modules_text)
 }
 
 ## Package recipe export.
@@ -432,20 +432,18 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $muon "-C" "build" install ?
   }
 
-  fs.remove(fp"{dest}/etc/environment", missing_ok: true)
-  fs.chmod(fp"{dest}/usr/bin/unix_chkpwd", 0o4755)
-  fs.mkdir(fp"{dest}/etc/pam.d")
+  fp"{dest}/etc/environment".remove(missing_ok: true)
+  fp"{dest}/usr/bin/unix_chkpwd".chmod(0o4755)
+  fp"{dest}/etc/pam.d".mkdir()
 
-  fs.write(
-    fp"{dest}/etc/pam.d/sudo",
+  fp"{dest}/etc/pam.d/sudo".write(
     """auth required /usr/lib/security/pam_unix.so
 account required /usr/lib/security/pam_permit.so
 session required /usr/lib/security/pam_permit.so
 """,
   )
 
-  fs.write(
-    fp"{dest}/etc/pam.d/su",
+  fp"{dest}/etc/pam.d/su".write(
     """auth sufficient /usr/lib/security/pam_rootok.so
 auth required /usr/lib/security/pam_unix.so
 account required /usr/lib/security/pam_permit.so
@@ -453,8 +451,7 @@ session required /usr/lib/security/pam_permit.so
 """,
   )
 
-  fs.write(
-    fp"{dest}/etc/pam.d/su-l",
+  fp"{dest}/etc/pam.d/su-l".write(
     """auth sufficient /usr/lib/security/pam_rootok.so
 auth required /usr/lib/security/pam_unix.so
 account required /usr/lib/security/pam_permit.so

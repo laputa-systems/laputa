@@ -48,7 +48,7 @@ export pure rootfs_size_bytes(used_bytes: Int) -> Int {
 
 ## Sum regular-file payload bytes in a verified immutable generation before allocating its ext4 image.
 export proc image_generation_used_bytes(root: Path) [fs, error] -> Result[Int, Error] {
-  if ! fs.exists(root)? or ! root.is_dir()? {
+  if ! root.exists()? or ! root.is_dir()? {
     return Err(ImageError.Failed(f"generation root is missing or not a directory: {root}"))
   }
 
@@ -71,7 +71,7 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
   }
 
   let source = fp"{root}/{relative}"
-  if ! fs.exists(source)? or ! source.is_file()? or fs.metadata(source)?.size <= 0 {
+  if ! source.exists()? or ! source.is_file()? or source.metadata()?.size <= 0 {
     return Err(ImageError.Failed(f"kernel manifest path is missing or empty: {relative}"))
   }
 
@@ -80,9 +80,9 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
 
 ## Atomically copy one manifest-verified kernel to its profile-owned host output path.
 export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
-  fs.mkdir(output.parent)
+  output.parent.mkdir()
   atomically replace output as temporary {
-    fs.copy(source, temporary)
+    source.copy(temporary)
 
     if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
       return Err(ImageError.Failed(f"kernel copy does not match {source}"))
@@ -96,10 +96,10 @@ export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
 export proc image_write_rootfs(generation_root: Path, formatter: Path, output: Path) [fs, process, error] {
   let target_size = image_generation_used_bytes(generation_root)? |> rootfs_size_bytes(_)
   let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)
-  fs.remove(temporary, missing_ok: true)
-  defer fs.remove(temporary, missing_ok: true)?
-  fs.write(temporary, b"")
+  output.parent.mkdir()
+  temporary.remove(missing_ok: true)
+  defer temporary.remove(missing_ok: true)?
+  temporary.write(b"")
   temporary.truncate(target_size)
 
   let xsh = /bin/xsh
@@ -124,12 +124,12 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
     ),
   )?
 
-  if ! status.ok or fs.metadata(temporary)?.size != target_size {
+  if ! status.ok or temporary.metadata()?.size != target_size {
     return Err(ImageError.Failed(f"native ext4 formatter failed for {output}"))
   }
 
   fs.fsync(temporary)
-  fs.rename(temporary, output, overwrite: true)
+  temporary.rename(output, overwrite: true)
 }
 
 ## Replace an exact byte range inside an immutable byte value.
@@ -227,7 +227,7 @@ export proc root_partition_guid() [error] -> Result[Bytes, Error] {
 
 ## Verify the GPT signatures, root GUID, and partition bounds before publication.
 export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
-  let metadata = fs.metadata(image)?
+  let metadata = image.metadata()?
   if metadata.size <= rootfs_bytes {
     return Err(ImageError.Failed(f"disk image is too small: {image}"))
   }
@@ -257,7 +257,7 @@ export proc verify_disk(image: Path, rootfs_bytes: Int) [fs, error] {
 
 ## Write and fully verify a GPT disk in a sibling temporary path before atomic publication.
 export proc write_disk(rootfs: Path, image: Path) [fs, error] {
-  let rootfs_bytes = fs.metadata(rootfs)?.size
+  let rootfs_bytes = rootfs.metadata()?.size
   if rootfs_bytes <= 0 or rootfs_bytes % sector_size != 0 {
     return Err(ImageError.Failed(f"rootfs must be nonempty and sector aligned: {rootfs}"))
   }
@@ -276,10 +276,10 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
 
   let backup_entries_lba = total_sectors - entry_sectors - 1
   let tmp = fp"{image}.tmp"
-  fs.mkdir(image.parent)
-  fs.remove(tmp, missing_ok: true)
-  defer fs.remove(tmp, missing_ok: true)?
-  fs.write(tmp, b"")
+  image.parent.mkdir()
+  tmp.remove(missing_ok: true)
+  defer tmp.remove(missing_ok: true)?
+  tmp.write(b"")
   tmp.truncate(total_sectors * sector_size)
   let entries = bytes.concat(
     [
@@ -327,6 +327,6 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   )?
   fs.fsync(tmp)
   verify_disk(tmp, rootfs_bytes)
-  fs.rename(tmp, image, overwrite: true)
+  tmp.rename(image, overwrite: true)
   verify_disk(image, rootfs_bytes)
 }

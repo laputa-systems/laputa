@@ -275,7 +275,7 @@ proc patch_cmake() {
     "",
   )
 
-  fs.write(path_value, text)
+  path_value.write(text)
 }
 
 proc create_unversioned_links() {

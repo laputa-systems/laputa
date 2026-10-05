@@ -74,7 +74,7 @@ proc repo_verified_proof_path(
 
   let reproved = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
 
-  if ! fs.exists(reproved)? {
+  if ! reproved.exists()? {
     return Err(
       types.PmError.PackageTarball(
         f"{node.package_id} is missing proof {node.proof_key}; execute the BuildPlan before publication",
@@ -114,9 +114,8 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
 proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, output: Path) -> Result[Path] {
   let raw = json.read(value.metadata)?.require(RepoArtifactMetadataDto)?
   let metadata = fp"{output}/{value.node.artifact_key}.json"
-  fs.mkdir(metadata.parent)
-  fs.write_atomic(
-    metadata,
+  metadata.parent.mkdir()
+  metadata.write_atomic(
     json.encode({
       ...raw,
       arch,
@@ -165,7 +164,7 @@ proc repo_publication_entry(
       if dependency.kind == types.dependency_build_target()
     ],
     sha256: if value.kind == types.package_meta() { "" } else { hash.sha256(value.payload)?.hex() },
-    size: if value.kind == types.package_meta() { 0 } else { fs.metadata(value.payload)?.size },
+    size: if value.kind == types.package_meta() { 0 } else { value.payload.metadata()?.size },
     tarball: if value.kind == types.package_meta() { "" } else { payload_rel.display() },
     metadata: metadata_rel.display(),
     metadata_sha256,
@@ -253,7 +252,7 @@ export proc publish(
     )
   }
 
-  fs.mkdir(work)
+  work.mkdir()
   var stages: List[RepoPublishStage] = []
 
   for publication in repo_snapshot.packages {

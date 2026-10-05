@@ -74,15 +74,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cwd = fs.cwd()?
   let src = cwd
   let objs = p"objs"
-  fs.mkdir(objs)
+  objs.mkdir()
 
   # Generate include/netlink/version.h from version.h.in
-  fs.mkdir(fp"{src}/include/netlink")
+  fp"{src}/include/netlink".mkdir()
   let version_h = fp"{src}/include/netlink/version.h"
   let version_in = fp"{src}/include/netlink/version.h.in"
 
-  if ! fs.exists(version_h)? and fs.exists(version_in)? {
-    let tmpl = fs.read_text(version_in)?
+  if ! version_h.exists()? and version_in.exists()? {
+    let tmpl = version_in.read_text()?
     let parts = ver.split(".")
     let major = parts[0]
     let minor = if parts.len() > 1 { parts[1] } else { "0" }
@@ -92,7 +92,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       .replace("@MINOR_VERSION@", minor)
       .replace("@MICRO_VERSION@", micro)
 
-    fs.write(version_h, body)
+    version_h.write(body)
   }
 
   # include/config.h as configure writes it for musl: the keys are exactly
@@ -101,7 +101,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # live in libc.
   let config_h = fp"{src}/include/config.h"
 
-  if ! fs.exists(config_h)? {
+  if ! config_h.exists()? {
     let cfg_body = f"""#ifndef LIBNL_CONFIG_H
 #define LIBNL_CONFIG_H
 #define HAVE_DECL_GETPROTOBYNAME_R 0
@@ -132,16 +132,16 @@ export proc build(dest: Path) [fs, process, env, error] {
 #endif
 """
 
-    fs.write(config_h, cfg_body)
+    config_h.write(cfg_body)
   }
 
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
 
   # Pre-create install directories.
-  fs.mkdir(fp"{dest}/usr")
-  fs.mkdir(fp"{dest}/usr/lib")
-  fs.mkdir(fp"{dest}/usr/include")
+  fp"{dest}/usr".mkdir()
+  fp"{dest}/usr/lib".mkdir()
+  fp"{dest}/usr/include".mkdir()
   # Upstream compiles every library as gnu11 with the sysconfdir and pkglibdir
   # defines from Makefile.am's defines_cppflags.
   var cflags = ["-std=gnu11", "-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
@@ -230,7 +230,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # Install public headers at /usr/include/netlink/
   let usr_include = fp"{dest}/usr/include"
-  fs.mkdir(usr_include)
+  usr_include.mkdir()
   let headers_src = fp"{src}/include/netlink"
   let headers_dest = fp"{dest}/usr/include/netlink"
   make.install_header_tree(headers_src, headers_dest, [p"version.h.in"])

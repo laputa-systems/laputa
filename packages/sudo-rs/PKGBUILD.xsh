@@ -125,8 +125,8 @@ pure rust_triple(arch: Str) -> Str {
 }
 
 proc stage_rustlib(source: Path, dest: Path) {
-  fs.remove(dest, missing_ok: true)
-  fs.mkdir(dest)
+  dest.remove(missing_ok: true)
+  dest.mkdir()
 
   for entry in fs.walk(source, gitignore: false)? |> sort-by .path {
     continue when entry.path == source
@@ -134,13 +134,13 @@ proc stage_rustlib(source: Path, dest: Path) {
     let out = fp"{dest}/{relative}"
 
     if entry.kind == "dir" {
-      fs.mkdir(out)
+      out.mkdir()
     } else if entry.kind == "file" {
       let mode = if entry.path.executable()? { 0o755 } else { 0o644 }
       fs.install(entry.path, out, mode, parents: true, overwrite: true)
     } else if entry.kind == "symlink" {
-      fs.mkdir(out.parent)
-      fs.remove(out, missing_ok: true)
+      out.parent.mkdir()
+      out.remove(missing_ok: true)
       fs.symlink(entry.path.readlink()?, out)
     }
   }
@@ -184,7 +184,7 @@ proc mark_vendored_crates(lockfile: Path, vendor: Path) {
   for item in locked_registry_crates(lockfile)? {
     let dir = fp"{vendor}/{item.name}-{item.version}"
 
-    if ! fs.exists(fp"{dir}/Cargo.toml")? {
+    if ! fp"{dir}/Cargo.toml".exists()? {
       return Err(SudoRsBuildError.MissingVendoredCrate(f"{item.name}-{item.version}"))
     }
 
@@ -202,20 +202,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   let target_root = if target_root_value != "" { fp"{target_root_value}" } else { cc.parent.parent }
   var libdir = fp"{target_root}/usr/lib"
 
-  if ! fs.exists(libdir)? {
+  if ! libdir.exists()? {
     libdir = fp"{cc.parent.parent}/lib"
   }
 
   let build_arch = pm_util.build_arch()?
   let triple = rust_triple(target_arch)
   let host_triple = rust_triple(build_arch)
-  let host_cc = if fs.exists(fp"{build_root}/usr/bin/cc")? { fp"{build_root}/usr/bin/cc" } else { cc }
+  let host_cc = if fp"{build_root}/usr/bin/cc".exists()? { fp"{build_root}/usr/bin/cc" } else { cc }
   let host_libdir = fp"{build_root}/usr/lib"
   let target_rustlib = fp"rust-std/rust-std-{triple}/lib/rustlib/{triple}"
   let staged_rustlib = fp"{target_root}/usr/lib/rustlib/{triple}"
 
-  if ! fs.exists(fp"{staged_rustlib}/lib")? {
-    guard fs.exists(target_rustlib)? else {
+  if ! fp"{staged_rustlib}/lib".exists()? {
+    guard target_rustlib.exists()? else {
       return Err(SudoRsBuildError.MissingRustStd(target_rustlib.display()))
     }
 

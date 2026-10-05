@@ -86,11 +86,10 @@ export proc build(dest: Path) [fs, error] {
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/tailscaled.xsh", 0o644, parents: true, overwrite: true)
 
   # Persistent state survives reboots on the root filesystem.
-  fs.mkdir(fp"{dest}/var/lib/tailscale")
-  fs.mkdir(fp"{dest}/usr/lib/sysctl.d")
+  fp"{dest}/var/lib/tailscale".mkdir()
+  fp"{dest}/usr/lib/sysctl.d".mkdir()
 
-  fs.write(
-    fp"{dest}/usr/lib/sysctl.d/50-tailscale-ipv6.conf",
+  fp"{dest}/usr/lib/sysctl.d/50-tailscale-ipv6.conf".write(
     """net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 """,

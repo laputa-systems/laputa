@@ -45,7 +45,7 @@ proc main() [fs, process, env, error] {
 
   let kernel_source = if kernel_source_raw != "" {
     kernel_source_raw
-  } else if fs.exists(local_kernel)? {
+  } else if local_kernel.exists()? {
     local_kernel.display()
   } else {
     ""
@@ -76,8 +76,8 @@ proc main() [fs, process, env, error] {
   let installer_iso_meta = installer_iso.metadata()?
   let installer_kernel_meta = installer_kernel.metadata()?
   let _ = {installer_iso_meta, installer_kernel_meta}
-  fs.remove(target_image, missing_ok: true)
-  fs.write(target_image, "")
+  target_image.remove(missing_ok: true)
+  target_image.write("")
   target_image.truncate(target_size)
   print "manual target disk:" $target_image
   print "inside the installer, run: setup-laputa"

@@ -116,7 +116,7 @@ proc write_cap_names_list() {
     }
   }
 
-  fs.write(p"libcap/cap_names.list.h", out)
+  p"libcap/cap_names.list.h".write(out)
 }
 
 ## Package recipe export.
@@ -160,7 +160,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks([{...task, env: build_task_env} for task in makenames.tasks], make.jobs()?)
   let makenames_bin = makenames.output
-  fs.write(p"libcap/cap_names.h", run.text $makenames_bin ?)
+  p"libcap/cap_names.h".write(run.text $makenames_bin ?)
 
   let lib_cflags = ["-O2", "-D_LIBPSX_PTHREAD_LINKAGE"]
   let objects = make.compile_lo_tasks(cc, triple, lib_cflags, [], cppflags, p".", libcap_sources, p"obj/libcap")
@@ -235,7 +235,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks([@objects.tasks, magic, link, @capsh.tasks, @prog_tasks], make.jobs()?)
 
   let bindir = fp"{dest}/usr/bin"
-  fs.mkdir(bindir, parents: true)
+  bindir.mkdir(parents: true)
 
   for prog in ["getcap", "getpcaps", "setcap", "capsh"] {
     fs.install(fp"obj/{prog}-bin", fp"{bindir}/{prog}", 0o755, overwrite: true)
@@ -257,6 +257,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     .replace("@VERSION@", ver)
     .replace("@deps@", "")
 
-  fs.mkdir(fp"{libdir}/pkgconfig")
-  fs.write(fp"{libdir}/pkgconfig/libcap.pc", pc)
+  fp"{libdir}/pkgconfig".mkdir()
+  fp"{libdir}/pkgconfig/libcap.pc".write(pc)
 }

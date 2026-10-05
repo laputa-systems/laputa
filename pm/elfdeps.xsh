@@ -95,7 +95,7 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
   var providers: Map[Str] = {}
   let packages_db = util.packages_db_path(root)
 
-  return providers unless fs.exists(packages_db)?
+  return providers unless packages_db.exists()?
 
   let entries = fs.children(packages_db)
     |> where .kind == "dir"

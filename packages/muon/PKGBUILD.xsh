@@ -47,7 +47,7 @@ export const filetree = [{path: p"usr/bin/muon", kind: "binary"}]
 # was asked for.
 proc patch_system_library_links() {
   let compiler = p"src/functions/compiler.c"
-  let text = fs.read_text(compiler)?
+  let text = compiler.read_text()?
   let lookup = """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
 			return (struct find_library_result){ found, find_library_found_location_system_dirs };
 		}
@@ -57,8 +57,7 @@ proc patch_system_library_links() {
     return Err(error.failure(f"{compiler} no longer resolves libraries in the system directories"))?
   }
 
-  fs.write(
-    compiler,
+  compiler.write(
     text.replace(
       lookup,
       """		if ((found = find_library_check_dirs(wk, libname, comp->libdirs, ext_order, ext_order_len))) {
@@ -86,7 +85,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   patch_system_library_links()
-  fs.mkdir(p"build")
+  p"build".mkdir()
 
   if cross_build {
     env ({
@@ -137,7 +136,7 @@ export proc build(dest: Path) [fs, process, env, error] {
  command = {bootstrap_cc}""",
       )
 
-      fs.write(build_ninja, patched_ninja)
+      build_ninja.write(patched_ninja)
       run "build/muon-bootstrap" "-C" "build" "samu" ?
     }
   } else {

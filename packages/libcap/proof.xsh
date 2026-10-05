@@ -87,12 +87,12 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let libdir = fp"{root}/usr/lib".display()
   let bin = fp"{root}/usr/bin"
   let tmp = fp"{root}/var/tmp/proof-libcap"
-  fs.remove(tmp, missing_ok: true)
-  fs.mkdir(tmp)
-  defer fs.remove(tmp, missing_ok: true)?
+  tmp.remove(missing_ok: true)
+  tmp.mkdir()
+  defer tmp.remove(missing_ok: true)?
 
   let cc = process.which("cc")?
-  fs.write(fp"{tmp}/proof-libcap.c", program)
+  fp"{tmp}/proof-libcap.c".write(program)
   let binary = fp"{tmp}/proof-libcap"
   run $cc fp"{tmp}/proof-libcap.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lcap" "-o" $binary ?
   var checks = ["text round-trip"]

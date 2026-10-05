@@ -123,8 +123,7 @@ export const upstream_sources = [
 export const filetree = [{path: p"etc/xdg/foot/foot.ini", kind: "file"}, {path: p"usr/bin/foot", kind: "binary"}]
 
 proc write_version_header() [fs, error] {
-  fs.write(
-    p"version.h",
+  p"version.h".write(
     f"""#define FOOT_VERSION "{ver}"
 #define FOOT_MAJOR 1
 #define FOOT_MINOR 28
@@ -235,15 +234,14 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   text = text.replace("subdir('completions')", "")
   text = text.replace("subdir('icons')", "")
   text = text.replace("subdir('utils')", "")
-  fs.write(meson, text)
+  meson.write(text)
 }
 
 proc write_minimal_config(dest: Path) {
-  fs.mkdir(fp"{dest}/etc/xdg")
-  fs.mkdir(fp"{dest}/etc/xdg/foot")
+  fp"{dest}/etc/xdg".mkdir()
+  fp"{dest}/etc/xdg/foot".mkdir()
 
-  fs.write(
-    fp"{dest}/etc/xdg/foot/foot.ini",
+  fp"{dest}/etc/xdg/foot/foot.ini".write(
     """font=Hack:size=11
 term=xterm-256color
 """,
@@ -282,7 +280,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
-      fs.write(ninja, ninja_text)
+      ninja.write(ninja_text)
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -295,5 +293,5 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   write_minimal_config(dest)
-  fs.remove(fp"{dest}/usr/share", missing_ok: true)
+  fp"{dest}/usr/share".remove(missing_ok: true)
 }
