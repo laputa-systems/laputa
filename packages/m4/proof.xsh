@@ -107,77 +107,75 @@ proc expect_text(label: Str, actual: Str, expected: Str) {
 }
 
 proc main(rootfs = /rootfs) [fs, process, error] {
-  let tmp = fp"{rootfs}/var/tmp/proof-m4"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  let m4 = fp"{rootfs}/usr/bin/m4"
+  tempdir tmp at fp"{rootfs}/var/tmp/proof-m4" {
+    let m4 = fp"{rootfs}/usr/bin/m4"
 
-  return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()
+    return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()
 
-  fp"{tmp}/test.m4".write(
-    """define(GREETING, hello from m4)GREETING
+    fp"{tmp}/test.m4".write(
+      """define(GREETING, hello from m4)GREETING
 """,
-  )
+    )
 
-  # Construct the generated operand from text.  Interpolated `fp` literals
-  # resolve as the current directory in the published runner and would pass
-  # `proof-m4` itself instead of this file.
-  let input = fp"{tmp}/test.m4"
-  let out = run.text $m4 $input
-  let trimmed = out.trim()
+    # Construct the generated operand from text.  Interpolated `fp` literals
+    # resolve as the current directory in the published runner and would pass
+    # `proof-m4` itself instead of this file.
+    let input = fp"{tmp}/test.m4"
+    let out = run.text $m4 $input
+    let trimmed = out.trim()
 
-  if trimmed != "hello from m4" {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: f"unexpected output: {trimmed}"))?
+    if trimmed != "hello from m4" {
+      return Err(ScriptError.Failed(kind: "proof-m4", message: f"unexpected output: {trimmed}"))?
+    }
+
+    # The include directory is reached only through -I, never the cwd.
+    let include_dir = fp"{tmp}/include"
+    include_dir.mkdir()
+    fp"{include_dir}/proof-inc.m4".write(semantics_include)
+    let semantics = fp"{tmp}/semantics.m4"
+    semantics.write(semantics_input)
+    let semantics_out = run.text $m4 "-I" $include_dir $semantics
+    expect_text("semantics", semantics_out, semantics_expected)
+
+    let prefixed = fp"{tmp}/prefixed.m4"
+    prefixed.write(prefixed_input)
+    let prefixed_out = run.text $m4 "-P" < $prefixed
+    expect_text("prefixed", prefixed_out, prefixed_expected)
+
+    # An unterminated macro call is a fatal error with a nonzero status, never
+    # truncated output with success.
+    let unterminated = fp"{tmp}/unterminated.m4"
+    unterminated.write("define(`x', `y')x(\n")
+    let unterminated_stderr = fp"{tmp}/unterminated.stderr"
+    let unterminated_status = process.run(
+      process.command_argv(m4, [m4, unterminated], stderr: unterminated_stderr),
+    )?
+
+    if unterminated_status.ok {
+      return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted an unterminated argument list"))?
+    }
+
+    if "end of file in argument list" not in unterminated_stderr.read_text()? {
+      return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected an unterminated call without its diagnostic"))?
+    }
+
+    # Positional operands must remain literal file inputs. A directory must not
+    # be silently resolved as the proof cwd by the published XSH runner.
+    let directory_stderr = fp"{tmp}/directory-input.stderr"
+    let directory_input = process.run(
+      process.command_argv(m4, [m4, tmp], stderr: directory_stderr),
+    )?
+
+    if directory_input.ok {
+      return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted a directory input"))?
+    }
+
+    if "cannot read non-file input" not in directory_stderr.read_text()? {
+      return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected a directory without its input diagnostic"))?
+    }
+
+    print "m4 ok: "${trimmed}
   }
-
-  # The include directory is reached only through -I, never the cwd.
-  let include_dir = fp"{tmp}/include"
-  include_dir.mkdir()
-  fp"{include_dir}/proof-inc.m4".write(semantics_include)
-  let semantics = fp"{tmp}/semantics.m4"
-  semantics.write(semantics_input)
-  let semantics_out = run.text $m4 "-I" $include_dir $semantics
-  expect_text("semantics", semantics_out, semantics_expected)
-
-  let prefixed = fp"{tmp}/prefixed.m4"
-  prefixed.write(prefixed_input)
-  let prefixed_out = run.text $m4 "-P" < $prefixed
-  expect_text("prefixed", prefixed_out, prefixed_expected)
-
-  # An unterminated macro call is a fatal error with a nonzero status, never
-  # truncated output with success.
-  let unterminated = fp"{tmp}/unterminated.m4"
-  unterminated.write("define(`x', `y')x(\n")
-  let unterminated_stderr = fp"{tmp}/unterminated.stderr"
-  let unterminated_status = process.run(
-    process.command_argv(m4, [m4, unterminated], stderr: unterminated_stderr),
-  )?
-
-  if unterminated_status.ok {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted an unterminated argument list"))?
-  }
-
-  if "end of file in argument list" not in unterminated_stderr.read_text()? {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected an unterminated call without its diagnostic"))?
-  }
-
-  # Positional operands must remain literal file inputs. A directory must not
-  # be silently resolved as the proof cwd by the published XSH runner.
-  let directory_stderr = fp"{tmp}/directory-input.stderr"
-  let directory_input = process.run(
-    process.command_argv(m4, [m4, tmp], stderr: directory_stderr),
-  )?
-
-  if directory_input.ok {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted a directory input"))?
-  }
-
-  if "cannot read non-file input" not in directory_stderr.read_text()? {
-    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected a directory without its input diagnostic"))?
-  }
-
-  print "m4 ok: "${trimmed}
 }
 
 main(@args)

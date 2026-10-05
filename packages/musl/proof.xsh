@@ -71,14 +71,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let default_cc = process.which("cc")?
   let cc = cross_cc(default_cc, build_arch, arch)?
   let readelf = process.which("readelf")?
-  let tmp = fp"{rootfs}/var/tmp/proof-musl"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  let hello_src = fp"{tmp}/hello.c"
+  tempdir tmp at fp"{rootfs}/var/tmp/proof-musl" {
+    let hello_src = fp"{tmp}/hello.c"
 
-  hello_src.write(
-    """#define _GNU_SOURCE
+    hello_src.write(
+      """#define _GNU_SOURCE
 #include <sched.h>
 #include <stdio.h>
 /* Linking takes clone's address, so a libc that lost the public clone()
@@ -86,29 +83,30 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 int (*volatile clone_entry)(int (*)(void *), void *, int, void *, ...) = clone;
 int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
 """,
-  )
+    )
 
-  # bits/syscall.h carries both name sets, as musl's own build installs it.
-  let syscalls = fp"{rootfs}/usr/include/bits/syscall.h".read_text()?
-  ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")
+    # bits/syscall.h carries both name sets, as musl's own build installs it.
+    let syscalls = fp"{rootfs}/usr/include/bits/syscall.h".read_text()?
+    ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")
 
-  let hello = fp"{tmp}/hello"
-  let dynlinker = fp"{rootfs}/usr/lib/{ldso}"
-  compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)
-  let header = run.text $readelf "-h" $hello
-  ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")
+    let hello = fp"{tmp}/hello"
+    let dynlinker = fp"{rootfs}/usr/lib/{ldso}"
+    compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)
+    let header = run.text $readelf "-h" $hello
+    ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")
 
-  if build_arch == arch {
-    let out = run.text $dynlinker $hello
-    let trimmed = out.trim()
+    if build_arch == arch {
+      let out = run.text $dynlinker $hello
+      let trimmed = out.trim()
 
-    if trimmed != "hello musl" {
-      return Err(ScriptError.Failed(kind: "proof-musl", message: f"unexpected output: {trimmed}"))?
+      if trimmed != "hello musl" {
+        return Err(ScriptError.Failed(kind: "proof-musl", message: f"unexpected output: {trimmed}"))?
+      }
+
+      print "musl ok: "${trimmed}
+    } else {
+      print "musl ok: cross-built "${arch}
     }
-
-    print "musl ok: "${trimmed}
-  } else {
-    print "musl ok: cross-built "${arch}
   }
 }
 

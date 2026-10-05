@@ -261,48 +261,46 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
 }
 
 proc prove_grammars(rootfs: Path, bison: Path) {
-  let tmp = fp"{rootfs}/var/tmp/proof-bison"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  let stderr = fp"{tmp}/bison.stderr"
+  tempdir tmp at fp"{rootfs}/var/tmp/proof-bison" {
+    let stderr = fp"{tmp}/bison.stderr"
 
-  # Name the root's m4 and skeletons so the proof cannot pass on another m4
-  # or data directory the runner happens to provide.
-  env ({
-    M4: fp"{rootfs}/usr/bin/m4".display(),
-    BISON_PKGDATADIR: fp"{rootfs}/usr/share/bison".display(),
-  }) {
-    for grammar in grammars {
-      fp"{tmp}/{grammar.file}".write(grammar_text(grammar.file))
+    # Name the root's m4 and skeletons so the proof cannot pass on another m4
+    # or data directory the runner happens to provide.
+    env ({
+      M4: fp"{rootfs}/usr/bin/m4".display(),
+      BISON_PKGDATADIR: fp"{rootfs}/usr/share/bison".display(),
+    }) {
+      for grammar in grammars {
+        fp"{tmp}/{grammar.file}".write(grammar_text(grammar.file))
 
-      cd $tmp {
-        let status = process.run(process.command_argv(bison, [bison.display()].extend(grammar.argv), stderr:))?
-        let diagnostics = stderr.read_text()?
+        cd $tmp {
+          let status = process.run(process.command_argv(bison, [bison.display()].extend(grammar.argv), stderr:))?
+          let diagnostics = stderr.read_text()?
 
-        if ! status.ok or diagnostics != "" {
-          return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison {grammar.file}: {diagnostics}"))?
+          if ! status.ok or diagnostics != "" {
+            return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison {grammar.file}: {diagnostics}"))?
+          }
         }
       }
     }
-  }
 
-  for output in gnu_outputs {
-    let file = fp"{tmp}/{output.name}"
+    for output in gnu_outputs {
+      let file = fp"{tmp}/{output.name}"
 
-    if ! file.exists() {
-      return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison did not write {output.name}"))?
+      if ! file.exists() {
+        return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison did not write {output.name}"))?
+      }
+
+      let digest = hash.sha256(file)?.hex()
+
+      if digest != output.sha256 {
+        return Err(ScriptError.Failed(kind: "proof-bison", message: f"{output.name} differs from GNU bison 3.8.2 output: sha256 {digest}"))?
+      }
     }
 
-    let digest = hash.sha256(file)?.hex()
-
-    if digest != output.sha256 {
-      return Err(ScriptError.Failed(kind: "proof-bison", message: f"{output.name} differs from GNU bison 3.8.2 output: sha256 {digest}"))?
-    }
+    run_parser(rootfs, tmp, "calc.c", calc_expected)
+    run_parser(rootfs, tmp, "glr.c", glr_expected)
   }
-
-  run_parser(rootfs, tmp, "calc.c", calc_expected)
-  run_parser(rootfs, tmp, "glr.c", glr_expected)
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {

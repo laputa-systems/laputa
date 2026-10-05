@@ -58,49 +58,47 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
 }
 
 proc prove_scanner(rootfs: Path, flex: Path) {
-  let tmp = fp"{rootfs}/var/tmp/proof-flex"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  fp"{tmp}/words.l".write(lexer)
-  let stderr = fp"{tmp}/flex.stderr"
+  tempdir tmp at fp"{rootfs}/var/tmp/proof-flex" {
+    fp"{tmp}/words.l".write(lexer)
+    let stderr = fp"{tmp}/flex.stderr"
 
-  # flex runs m4 as a filter; name the root's m4 so the proof cannot pass on
-  # another m4 the runner happens to provide.
-  env ({M4: fp"{rootfs}/usr/bin/m4".display()}) {
-    cd $tmp {
-      let status = process.run(
-        process.command_argv(flex, [flex, "--header-file=words.h", "-o", "words.c", "words.l"], stderr:),
-      )?
+    # flex runs m4 as a filter; name the root's m4 so the proof cannot pass on
+    # another m4 the runner happens to provide.
+    env ({M4: fp"{rootfs}/usr/bin/m4".display()}) {
+      cd $tmp {
+        let status = process.run(
+          process.command_argv(flex, [flex, "--header-file=words.h", "-o", "words.c", "words.l"], stderr:),
+        )?
 
-      if ! status.ok {
-        return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex failed: {stderr.read_text()?}"))?
+        if ! status.ok {
+          return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex failed: {stderr.read_text()?}"))?
+        }
       }
     }
-  }
 
-  for output in gnu_outputs {
-    let file = fp"{tmp}/{output.name}"
+    for output in gnu_outputs {
+      let file = fp"{tmp}/{output.name}"
 
-    if ! file.exists() {
-      return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex did not write {output.name}"))?
+      if ! file.exists() {
+        return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex did not write {output.name}"))?
+      }
+
+      let digest = hash.sha256(file)?.hex()
+
+      if digest != output.sha256 {
+        return Err(ScriptError.Failed(kind: "proof-flex", message: f"{output.name} differs from GNU flex 2.6.4 output: sha256 {digest}"))?
+      }
     }
 
-    let digest = hash.sha256(file)?.hex()
+    let scanner = fp"{tmp}/words"
+    compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)
+    let input = fp"{tmp}/input.txt"
+    input.write(scanner_input)
+    let out = run.text $scanner < $input
 
-    if digest != output.sha256 {
-      return Err(ScriptError.Failed(kind: "proof-flex", message: f"{output.name} differs from GNU flex 2.6.4 output: sha256 {digest}"))?
+    if out != scanner_expected {
+      return Err(ScriptError.Failed(kind: "proof-flex", message: f"scanner output:\n{out}"))?
     }
-  }
-
-  let scanner = fp"{tmp}/words"
-  compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)
-  let input = fp"{tmp}/input.txt"
-  input.write(scanner_input)
-  let out = run.text $scanner < $input
-
-  if out != scanner_expected {
-    return Err(ScriptError.Failed(kind: "proof-flex", message: f"scanner output:\n{out}"))?
   }
 }
 
