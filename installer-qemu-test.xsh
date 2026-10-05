@@ -45,7 +45,7 @@ proc dump_tail(tail: Path, log: Path, lines: Int) {
     return
   }
 
-  if let Ok(out) = run.text $tail "-n" $lines $log {
+  if let Ok(out) = try run.text $tail "-n" $lines $log {
     if out != "" {
       print $out
     }

@@ -70,7 +70,7 @@ pure dbclient_command(timeout_bin: Path, loader: Path, dbclient: Path, client_ke
 proc dropbear_auth_logged(rootfs: Path, chroot: Path) -> Bool {
   var logged = false
 
-  if let Ok(body) = run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
+  if let Ok(body) = try run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
     logged = "Pubkey auth succeeded" in body
   }
 
@@ -92,12 +92,12 @@ proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries
   var status = ""
   var logs = ""
 
-  match run.text $chroot $rootfs "/usr/bin/xinit" status dropbear {
+  match try run.text $chroot $rootfs "/usr/bin/xinit" status dropbear {
     Ok(body) => status = body.trim()
     Err(err) => status = f"status failed: {err.message}"
   }
 
-  match run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
+  match try run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear {
     Ok(body) => logs = body.trim()
     Err(err) => logs = f"logs failed: {err.message}"
   }
@@ -147,7 +147,7 @@ proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) -> Result[Str] 
   var remaining = tries
 
   while remaining > 0 {
-    let result = run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear
+    let result = try run.text $chroot $rootfs "/usr/bin/xinit" logs dropbear
 
     if let Ok(body) = result {
       guard body.trim() == "" else {
