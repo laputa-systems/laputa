@@ -511,7 +511,7 @@ proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
     let trimmed = item.trim()
 
     if trimmed != "" {
-      outputs = outputs.push(fp"{trimmed}")
+      outputs += [fp"{trimmed}"]
     }
   }
 

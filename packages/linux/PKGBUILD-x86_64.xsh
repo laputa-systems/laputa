@@ -420,7 +420,7 @@ proc x86_capflag_array(array: Str, size: Str, prefix: Str, postfix: Str, input: 
     let name = fields[0]
     let value = quote_parts[1]
     let index = if postfix == "" { f"{prefix}{name}" } else { f"{prefix}{name} - {postfix}" }
-    lines = lines.push(f"\t[{index}] = \"{value}\",")
+    lines += [f"\t[{index}] = \"{value}\","]
   }
 
   lines.push("};")
@@ -430,16 +430,16 @@ proc generate_x86_capflags_source() [fs, error] {
   let cpufeature = p"arch/x86/include/asm/cpufeatures.h"
   let vmxfeature = p"arch/x86/include/asm/vmxfeatures.h"
   var lines = ["#ifndef _ASM_X86_CPUFEATURES_H", "#include <asm/cpufeatures.h>", "#endif", ""]
-  lines = lines.extend(x86_capflag_array("x86_cap_flags", "NCAPINTS*32", "X86_FEATURE_", "", cpufeature)?)
+  lines += x86_capflag_array("x86_cap_flags", "NCAPINTS*32", "X86_FEATURE_", "", cpufeature)?
   lines += [""]
-  lines = lines.extend(x86_capflag_array("x86_bug_flags", "NBUGINTS*32", "X86_BUG_", "NCAPINTS*32", cpufeature)?)
+  lines += x86_capflag_array("x86_bug_flags", "NBUGINTS*32", "X86_BUG_", "NCAPINTS*32", cpufeature)?
   lines += [""]
-  lines = lines.push("#ifdef CONFIG_X86_VMX_FEATURE_NAMES")
-  lines = lines.push("#ifndef _ASM_X86_VMXFEATURES_H")
-  lines = lines.push("#include <asm/vmxfeatures.h>")
-  lines = lines.push("#endif")
-  lines = lines.extend(x86_capflag_array("x86_vmx_flags", "NVMXINTS*32", "VMX_FEATURE_", "", vmxfeature)?)
-  lines = lines.push("#endif /* CONFIG_X86_VMX_FEATURE_NAMES */")
+  lines += ["#ifdef CONFIG_X86_VMX_FEATURE_NAMES"]
+  lines += ["#ifndef _ASM_X86_VMXFEATURES_H"]
+  lines += ["#include <asm/vmxfeatures.h>"]
+  lines += ["#endif"]
+  lines += x86_capflag_array("x86_vmx_flags", "NVMXINTS*32", "VMX_FEATURE_", "", vmxfeature)?
+  lines += ["#endif /* CONFIG_X86_VMX_FEATURE_NAMES */"]
 
   kbuild.write_text_if_changed(
     p"arch/x86/kernel/cpu/capflags.c",
@@ -466,7 +466,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
     let caps = symbol_re.captures(raw)
 
     if let [_, _, name, ..] = caps {
-      lines = lines.push(f"pa_{name} = {name};")
+      lines += [f"pa_{name} = {name};"]
     }
   }
 
@@ -521,8 +521,7 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
   let acpi_sleep = "CONFIG_ACPI_SLEEP=y" in config_text
 
   if acpi_sleep {
-    realmode_objects = realmode_objects.extend(
-      [
+    realmode_objects += [
         "wakeup_asm.o",
         "wakemain.o",
         "video-mode.o",
@@ -532,8 +531,7 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
         "video-vga.o",
         "video-vesa.o",
         "video-bios.o",
-      ],
-    )
+      ]
   }
 
   let realmode_cflags = [

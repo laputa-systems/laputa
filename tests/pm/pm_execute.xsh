@@ -206,7 +206,7 @@ proc exact_remote_snapshot(
     fs.copy(fp"{receipt.artifact_dir}/payload.tar.gz", tarball, overwrite: true)?
     let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     fs.write(metadata, json.encode({...raw, executor_sha256})? + "\n")?
-    packages = packages.push({
+    packages += [{
       name: node.name,
       ver: node.ver,
       rel: node.rel,
@@ -222,7 +222,7 @@ proc exact_remote_snapshot(
       executor_sha256,
       proof_key: node.proof_key,
       proof_sha256: node.proof_sha256,
-    })
+    }]
   }
 
   {target: value.target, index_sha256: "execute-remote-snapshot", packages}
@@ -600,7 +600,7 @@ main(@args)?
       {XSH_MODULE_PATH: modules.display()},
     )?
     assert outcome.success
-    runs = runs.push(sha256_calls_by_module(trace)?)
+    runs += [sha256_calls_by_module(trace)?]
   }
 
   let fresh = runs[0]

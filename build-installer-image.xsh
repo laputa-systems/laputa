@@ -279,7 +279,7 @@ proc put_be(data: Bytes, offset: Int, value: Int, width: Int) [error] -> Result[
       shift -= 1
     }
 
-    parts = parts.push(value / divisor % 256)
+    parts += [value / divisor % 256]
   }
 
   system_image.image_put_bytes(data, offset, bytes.from_ints(parts)?)?
@@ -352,7 +352,7 @@ proc iso_root_dir(root_extent: Int, root_size: Int, files: List[IsoFile]) [error
   var records = [iso_root_record(root_extent, root_size, 0)?, iso_root_record(root_extent, root_size, 1)?]
 
   for file in files {
-    records = records.push(iso_file_record(file)?)
+    records += [iso_file_record(file)?]
   }
 
   let body = bytes.concat(records)
@@ -430,7 +430,7 @@ proc iso_files(inputs: List[IsoInput], first_extent: Int) [fs, error] -> Result[
 
   for input in inputs {
     let size = input.source.metadata()?.size
-    files = files.push({source: input.source, name: input.name, extent: extent, size: size})
+    files += [{source: input.source, name: input.name, extent: extent, size: size}]
     extent += sector_count(size, 2048)
   }
 

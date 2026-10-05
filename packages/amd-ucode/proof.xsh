@@ -48,7 +48,7 @@ proc main(root: Path = /rootfs) [fs, error] {
   var members: List[Str] = []
 
   for entry in archive.cpio_list(image)? {
-    members = members.push(entry.path.display())
+    members += [entry.path.display()]
   }
 
   proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")?

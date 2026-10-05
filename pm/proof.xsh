@@ -72,9 +72,7 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
     let path_value = fp"{root}/{rel_path}"
 
     if path_value.exists()? {
-      failures = failures.extend(
-        elfdeps.installed_file_elf_dependency_failures(name, allowed, rel_path, path_value, providers)?,
-      )
+      failures += elfdeps.installed_file_elf_dependency_failures(name, allowed, rel_path, path_value, providers)?
     }
   }
 

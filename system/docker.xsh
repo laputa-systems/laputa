@@ -97,7 +97,7 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
   ]
 
   if value.repo_url != "" {
-    argv = argv.extend(["--env", f"XSH_PM_REPO={value.repo_url}"])
+    argv += ["--env", f"XSH_PM_REPO={value.repo_url}"]
   }
 
   argv.push(value.image).extend(world.world_owned_argv(value.owner, inner_argv))
@@ -114,7 +114,7 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile, arch: Str) -> List
     argv += ["--root", package_name]
   }
 
-  argv = argv.extend(["--root", profile.kernel_package, "--target", f"{arch}-linux-musl", "--output", "/output/build-plan.json"])
+  argv += ["--root", profile.kernel_package, "--target", f"{arch}-linux-musl", "--output", "/output/build-plan.json"]
   argv
 }
 

@@ -187,7 +187,7 @@ proc qemu_process_live(pid: Int) [process, error] -> Result[Bool] {
 proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") [process, error] {
   var argv = [value.python.display(), value.qmp_helper.display(), mode, socket.display()]
   if screenshot.display() != "" {
-    argv = argv.push(screenshot.display())
+    argv += [screenshot.display()]
   }
 
   let status = process.run(process.command_argv(value.python, argv))?

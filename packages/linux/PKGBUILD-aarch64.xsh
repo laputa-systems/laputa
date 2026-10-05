@@ -77,7 +77,7 @@ proc write_native_asm_offsets(cc: Path) [fs, process, env, error] {
   fs.mkdir(asm_out.parent)?
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
-  argv = argv.extend(["-S", "-o", asm_out.display(), "arch/arm64/kernel/asm-offsets.c"])
+  argv += ["-S", "-o", asm_out.display(), "arch/arm64/kernel/asm-offsets.c"]
   PKGBUILD_shared.run_native_command(argv)?
   kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")?
 }
@@ -88,7 +88,7 @@ proc write_native_hyp_constants(cc: Path) [fs, process, env, error] {
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv += ["-I./arch/arm64/kvm/hyp/include"]
-  argv = argv.extend(["-S", "-o", asm_out.display(), "arch/arm64/kvm/hyp/hyp-constants.c"])
+  argv += ["-S", "-o", asm_out.display(), "arch/arm64/kvm/hyp/hyp-constants.c"]
   PKGBUILD_shared.run_native_command(argv)?
   kbuild.generate_offsets_header(asm_out, p"arch/arm64/kvm/hyp_constants.h", "__HYP_CONSTANTS_H__")?
 }
@@ -411,8 +411,7 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
 
-  argv = argv.extend(
-    [
+  argv += [
       "-D__ASSEMBLY__",
       "-DLINKER_SCRIPT",
       "-E",
@@ -422,8 +421,7 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env
       "arch/arm64/kvm/hyp/nvhe/hyp.lds.S",
       "-o",
       out.display(),
-    ],
-  )
+    ]
 
   PKGBUILD_shared.run_native_command(argv)?
 }
@@ -443,7 +441,7 @@ proc nvhe_ld_task(
   var argv = [ld.display(), "-r"]
 
   if linker_script.display() != "" {
-    argv = argv.extend(["-T", linker_script.display()])
+    argv += ["-T", linker_script.display()]
   }
 
   argv = [@argv, "-o", out.display(), @display_paths(inputs)]
@@ -497,8 +495,7 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   var object_outputs: List[Path] = []
 
   for item in native_nvhe_objects() {
-    object_tasks = object_tasks.push(
-      kbuild.compile_kbuild_task(
+    object_tasks += [kbuild.compile_kbuild_task(
         cc,
         "aarch64-linux-gnu",
         native_nvhe_cflags(),
@@ -506,10 +503,9 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
         native_nvhe_includes(),
         item.source,
         item.out,
-      ),
-    )
+      )]
 
-    object_outputs = object_outputs.push(item.out)
+    object_outputs += [item.out]
   }
 
   let tmp = fp"{nvhe_dir}/kvm_nvhe.tmp.o"
@@ -517,13 +513,12 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   let reloc_o = fp"{nvhe_dir}/hyp-reloc.o"
   let rel = fp"{nvhe_dir}/kvm_nvhe.rel.o"
   let out = fp"{nvhe_dir}/kvm_nvhe.o"
-  object_tasks = object_tasks.push(nvhe_ld_task(ld, tmp, object_outputs, display_paths(object_outputs), linker_script))
+  object_tasks += [nvhe_ld_task(ld, tmp, object_outputs, display_paths(object_outputs), linker_script)]
   make.run_tasks(object_tasks, jobs_count)?
   write_native_nvhe_hyprel(gen, tmp, reloc_asm)?
   var final_tasks: List[make.MakeTask] = []
 
-  final_tasks = final_tasks.push(
-    kbuild.compile_kbuild_task(
+  final_tasks += [kbuild.compile_kbuild_task(
       cc,
       "aarch64-linux-gnu",
       native_nvhe_cflags(),
@@ -531,11 +526,10 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
       native_nvhe_includes(),
       reloc_asm,
       reloc_o,
-    ),
-  )
+    )]
 
-  final_tasks = final_tasks.push(nvhe_ld_task(ld, rel, [tmp, reloc_o], [reloc_o.display()]))
-  final_tasks = final_tasks.push(nvhe_objcopy_task(objcopy, rel, out, [rel.display()]))
+  final_tasks += [nvhe_ld_task(ld, rel, [tmp, reloc_o], [reloc_o.display()])]
+  final_tasks += [nvhe_objcopy_task(objcopy, rel, out, [rel.display()])]
   make.run_tasks(final_tasks, jobs_count)?
 }
 
@@ -612,7 +606,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   ]
 
   for item in native_nvhe_objects() {
-    materialized_outputs = materialized_outputs.push(fp"{item.out.display().replace(".xsh-kbuild/obj/", "")}")
+    materialized_outputs += [fp"{item.out.display().replace(".xsh-kbuild/obj/", "")}"]
   }
 
   PKGBUILD_shared.write_materialized_outputs(materialized_outputs)?

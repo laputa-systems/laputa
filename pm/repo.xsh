@@ -98,14 +98,14 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
     repo_verify_node_receipt(value, node, receipt)?
     let kind = repo_package_kind(receipt, node)?
     let proof = repo_verified_proof_path(store_root, node, receipt)?
-    packages = packages.push({
+    packages += [{
       node,
       receipt,
       payload: fp"{receipt.artifact_dir}/payload.tar.gz",
       metadata: fp"{receipt.artifact_dir}/metadata.json",
       proof,
       kind,
-    })
+    }]
   }
 
   {format: "laputa-repo-snapshot-1", target: value.target, plan_sha256: value.plan_sha256, packages}
@@ -270,7 +270,7 @@ export proc publish(
     }
 
     let metadata = repo_metadata_for_publication(publication, arch, fp"{work}/metadata")?
-    stages = stages.push({publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata})
+    stages += [{publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata}]
   }
 
   # This is the sole remote-index read. It rejects rows behind the remote

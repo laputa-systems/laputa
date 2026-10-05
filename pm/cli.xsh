@@ -177,7 +177,7 @@ pure tail_after(argv: List[Str], start: Int) -> List[Str] {
   var index = start
 
   while index < argv.len() {
-    result = result.push(argv[index])
+    result += [argv[index]]
     index += 1
   }
 
@@ -594,7 +594,7 @@ proc remote_snapshot_for_plan(
 
   for entry in index {
     continue unless entry.arch == types.pm_target_arch(target)
-    packages = packages.push(remote.plan_artifact_from_package_at_repo(entry, repo_url, cache_root)?)
+    packages += [remote.plan_artifact_from_package_at_repo(entry, repo_url, cache_root)?]
   }
 
   {target, index_sha256, packages}
@@ -616,7 +616,7 @@ proc selected_packages(repo_root: Path, names: List[Str]) [fs, env, error] -> Re
     }
 
     let listed: types.Package = by_name.get(name)?
-    selected = selected.push(recipe.load_package(fp"{repo_root}/{listed.dir}")?)
+    selected += [recipe.load_package(fp"{repo_root}/{listed.dir}")?]
     seen[name] = true
   }
 
@@ -736,14 +736,14 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
           return Err(types.PmError.MissingDependency(f"package {name} is not in {args.repo}"))
         }
 
-        selected = selected.push(by_name.get(name)?)
+        selected += [by_name.get(name)?]
       }
     }
 
     for item in sources.source_fetch_items(selected, types.pm_target_arch(target))? {
       if item.sha256 not in seen {
         items += [item]
-        seen = seen.push(item.sha256)
+        seen += [item.sha256]
       }
     }
 
@@ -760,7 +760,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
     for item in sources.cargo_crate_fetch_items(cache_root, selection.packages, selection.arch)? {
       if item.sha256 not in seen {
         crate_items += [item]
-        seen = seen.push(item.sha256)
+        seen += [item.sha256]
       }
     }
   }
