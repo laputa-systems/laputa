@@ -1,8 +1,6 @@
 #!/bin/xsh
 use installer.host
 
-error InstallerReportError = Failed(message: Str)
-
 proc arch_envs(arch: Str, root: Path, work: Path, iso: Path, kernel: Path, xsh: Path) -> Record {
   {
     LAPUTA_INSTALLER_ARCH: arch,
@@ -39,7 +37,7 @@ proc build_installer(raw_arch: Str) {
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
   guard argv.len() == 1 else {
-    return Err(InstallerReportError.Failed("usage: build-installer-common.xsh ARCH"))
+    fail "usage: build-installer-common.xsh ARCH"
   }
 
   build_installer(argv[0])

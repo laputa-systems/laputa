@@ -2,8 +2,6 @@
 use pm.make
 use pm.util as pm_util
 
-error MuslError = Failed(message: Str)
-
 ## Package name.
 export const name = "musl"
 

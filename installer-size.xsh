@@ -1,8 +1,6 @@
 #!/bin/xsh
 use installer.host
 
-error InstallerSizeError = Failed(message: Str)
-
 type PackageSize = {name: Str, size: Int}
 
 pure kib(value: Int) -> Int {
@@ -90,7 +88,7 @@ proc print_report(arch: Str, work: Path, iso: Path, kernel: Path) {
 
 proc main(...argv: List[Str]) [fs, env, error] {
   if argv.len() > 4 {
-    return Err(InstallerSizeError.Failed("usage: installer-size.xsh ARCH [WORK [ISO [KERNEL]]]"))
+    fail "usage: installer-size.xsh ARCH [WORK [ISO [KERNEL]]]"
   }
 
   let raw_arch = if argv.len() >= 1 { argv[0] } else { host.installer_env_value("LAPUTA_INSTALLER_ARCH", "aarch64") }

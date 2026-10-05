@@ -203,11 +203,9 @@ export pure config_without_unavailable_menu(config: Str) -> Str {
   lines.join("\n")
 }
 
-error DwlError = Patch(message: Str)
-
 pure replace_required(text: Str, old: Str, new: Str, what: Str) -> Result[Str] {
   if old not in text {
-    return Err(DwlError.Patch(f"dwl's sources no longer hold {what}"))
+    fail f"dwl's sources no longer hold {what}"
   }
 
   text.replace(old, new)

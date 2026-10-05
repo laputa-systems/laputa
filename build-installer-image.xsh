@@ -4,8 +4,6 @@ use installer.package_roots_host
 use installer.rootfs_size
 use system.image as system_image
 
-error InstallerBuildError = Failed(message: Str)
-
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
   host.installer_run_argv(
     xsh,
@@ -105,7 +103,7 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
 
   return "BOOTX64.EFI" when arch == "x86_64"
 
-  Err(InstallerBuildError.Failed(f"unsupported installer EFI arch {arch}"))
+  Err(error.failure(f"unsupported installer EFI arch {arch}"))
 }
 
 # Image overlays change these roots after package composition, so a package
@@ -647,15 +645,13 @@ proc build_host() {
 
   if qemu_smoke == "1" {
     if qemu_authorized_key == "" {
-      return Err(
-        InstallerBuildError.Failed("LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY is required when smoke mode is enabled"),
-      )
+      fail "LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY is required when smoke mode is enabled"
     }
 
     let key_path = fp"{qemu_authorized_key}"
 
     if ! fs.exists(key_path)? {
-      return Err(InstallerBuildError.Failed(f"missing {key_path}"))
+      fail f"missing {key_path}"
     }
 
     fs.mkdir(fp"{work}/rootfs-target/etc/laputa-installer")
@@ -668,7 +664,7 @@ proc build_host() {
   let boot_kernel = if kernel_source_raw == "" { packaged_kernel } else { fp"{kernel_source_raw}" }
 
   if ! fs.exists(boot_kernel)? {
-    return Err(InstallerBuildError.Failed(f"missing installer kernel source {boot_kernel}"))
+    fail f"missing installer kernel source {boot_kernel}"
   }
 
   fs.copy(boot_kernel, kernel, overwrite: true)
@@ -681,7 +677,7 @@ proc build_host() {
 
 proc main(...argv: List[Str]) [fs, net, process, env, time, error, io] {
   if argv.len() > 0 {
-    return Err(InstallerBuildError.Failed("build-installer-image.xsh does not accept subcommands"))
+    fail "build-installer-image.xsh does not accept subcommands"
   }
 
   build_host()

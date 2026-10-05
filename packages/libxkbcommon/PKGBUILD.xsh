@@ -138,8 +138,6 @@ yacc = 'vendored parser'
   fs.write(meson, text)
 }
 
-error XkbcommonError = Patch(message: Str)
-
 # pkgconf reports xkeyboard-config.pc's path variables under the build root's
 # sysroot, so the legacy root read from xkb_base would name the build root.
 # Without it, meson falls back to prefix/datadir/X11/xkb, the installed path.
@@ -160,7 +158,7 @@ endforeach
 """
 
   if lookup not in text {
-    return Err(XkbcommonError.Patch("meson.build no longer reads the legacy XKB root from pkg-config"))?
+    return Err(error.failure("meson.build no longer reads the legacy XKB root from pkg-config"))?
   }
 
   fs.write(meson, text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))

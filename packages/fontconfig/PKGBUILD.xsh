@@ -461,13 +461,11 @@ export const filetree = [
   },
 ]
 
-error FontconfigError = Patch(message: Str)
-
 proc replace_required(file: Path, old: Str, new: Str) {
   let text = fs.read_text(file)?
 
   if old not in text {
-    return Err(FontconfigError.Patch(f"{file} no longer holds the block the recipe replaces"))?
+    return Err(error.failure(f"{file} no longer holds the block the recipe replaces"))?
   }
 
   fs.write(file, text.replace(old, new))
@@ -692,7 +690,7 @@ test_const_name_c = custom_target('test_const_name.c',
   let genericfamily_text = fs.read_text(genericfamily_meson)?
 
   if "command: [gperf, '--pic', '-m', '100', '@INPUT@', '--output-file', '@OUTPUT@']," not in genericfamily_text {
-    return Err(FontconfigError.Patch(f"{genericfamily_meson} no longer runs gperf on the generated families"))?
+    return Err(error.failure(f"{genericfamily_meson} no longer runs gperf on the generated families"))?
   }
 
   fs.write(genericfamily_meson, "fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")

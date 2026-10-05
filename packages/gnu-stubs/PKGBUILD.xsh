@@ -1,8 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.util as pm_util
 
-error GnuStubsError = Failed(message: Str)
-
 ## Exported declaration `name`.
 export const name = "gnu-stubs"
 
@@ -64,7 +62,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let target_arch = pm_util.target_arch()?
 
   if build_arch != target_arch or (target_arch != "aarch64" and target_arch != "x86_64") {
-    return Err(GnuStubsError.Failed("gnu-stubs requires a native aarch64 or x86_64 build"))
+    fail "gnu-stubs requires a native aarch64 or x86_64 build"
   }
 
   let laputa_root = fp"{e"LAPUTA_ROOT" ?? ""}"
@@ -78,7 +76,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let builtins = fp"{llvm_root}/lib/clang/23/lib/linux/libclang_rt.builtins-{target_arch}.a"
 
   if ! fs.exists(clang)? or ! fs.exists(lld)? or ! fs.exists(llvm_ar)? or ! fs.exists(llvm_objcopy)? {
-    return Err(GnuStubsError.Failed(f"gnu-stubs bootstrap LLVM tools are missing from {llvm_root}"))
+    fail f"gnu-stubs bootstrap LLVM tools are missing from {llvm_root}"
   }
 
   # Rust's musl target hardcodes -lgcc_s, and the prebuilt cargo binary

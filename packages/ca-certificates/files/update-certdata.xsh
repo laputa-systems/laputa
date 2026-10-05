@@ -1,7 +1,6 @@
 #!/bin/xsh
 ##! XSH module `update-certdata` package and build operations.
 # Update CA certificate bundle from curl.se (Mozilla-derived).
-error UpdateCertdataError = Failed(message: Str)
 
 proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   let tmp = fp"{dest.parent}/.{dest.name}.tmp"
@@ -16,7 +15,7 @@ proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   let body = tmp.read_text()?
 
   if "-----BEGIN CERTIFICATE-----" not in body {
-    return Err(UpdateCertdataError.Failed("downloaded CA bundle does not contain a PEM certificate"))
+    fail "downloaded CA bundle does not contain a PEM certificate"
   }
 
   fs.rename(tmp, dest, overwrite: true)

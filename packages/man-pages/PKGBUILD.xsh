@@ -90,8 +90,6 @@ const rendered_pages = [
   },
 ]
 
-error ManPagesError = Rendering(message: Str)
-
 # The terminal formatter marks bold and underline by overstriking each
 # character with a backspace; dropping the struck-over character leaves text.
 const overstrike = rx".\x08"
@@ -106,11 +104,11 @@ proc check_rendering(mandir: Path) [fs, process, env, error] {
     let label = args.join(" ")
 
     guard lines.len() > 3 and lines[0] == page.header and page.name_line in lines else {
-      return Err(ManPagesError.Rendering(f"man {label} rendered unexpectedly:\n{out}"))
+      fail f"man {label} rendered unexpectedly:\n{out}"
     }
 
     guard f"Linux man-pages {ver}" in lines[lines.len() - 1] else {
-      return Err(ManPagesError.Rendering(f"man {label} footer lacks the release version: {lines[lines.len() - 1]}"))
+      fail f"man {label} footer lacks the release version: {lines[lines.len() - 1]}"
     }
   }
 }

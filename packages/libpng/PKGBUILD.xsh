@@ -113,8 +113,6 @@ export const filetree = [
   },
 ]
 
-error LibpngError = Patch(message: Str)
-
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
@@ -131,7 +129,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 """
 
   if post_build_symlink not in cmake_lists {
-    return Err(LibpngError.Patch("CMakeLists.txt no longer creates libpng.so after the build"))?
+    return Err(error.failure("CMakeLists.txt no longer creates libpng.so after the build"))?
   }
 
   fs.write(p"CMakeLists.txt", cmake_lists.replace(post_build_symlink, ""))

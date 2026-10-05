@@ -39,8 +39,6 @@ export const upstream_sources = [
 ## Package recipe export.
 export const filetree = [{path: p"usr/bin/muon", kind: "binary"}]
 
-error MuonError = Patch(message: Str)
-
 # muon links a library that find_library() finds in the compiler's own search
 # directories by its path, where Meson passes `-l<name>`. Musl's libm, librt,
 # libdl, and libpthread are symlinks to libc.so, which has no SONAME, so a
@@ -56,7 +54,7 @@ proc patch_system_library_links() {
 """
 
   if lookup not in text {
-    return Err(MuonError.Patch(f"{compiler} no longer resolves libraries in the system directories"))?
+    return Err(error.failure(f"{compiler} no longer resolves libraries in the system directories"))?
   }
 
   fs.write(

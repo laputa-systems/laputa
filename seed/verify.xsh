@@ -6,8 +6,6 @@
 # and the table in .out/verify/report.md. `make clean` deletes .out/, so the
 # logs are written only after it.
 
-error VerifyError = Failed(message: Str)
-
 type Step = {name: Str, argv: List[Str]}
 
 type Timed = {name: Str, seconds: Int, ok: Bool}
@@ -77,7 +75,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
   # `clean` removes .out/, so its output goes to the console only.
   let started = time.now()
   let cleaned = process.run(process.command_argv(make, ["make", "clean"], root))?
-  return Err(VerifyError.Failed("make clean failed")) unless cleaned.ok
+  fail "make clean failed" unless cleaned.ok
 
   var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
   let logs = fp"{root}/.out/verify"
@@ -94,7 +92,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
 
       while ! mirror_ready(curl)? {
         if waited >= 600 {
-          return Err(VerifyError.Failed("the mirror did not start; see .out/verify/mirror.log"))
+          fail "the mirror did not start; see .out/verify/mirror.log"
         }
 
         time.sleep(1s)
@@ -109,7 +107,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
     if ! result.ok {
       stop_mirror(mirror)
 
-      return Err(VerifyError.Failed(f"{step.name} failed; see .out/verify/{step.name}.log"))
+      fail f"{step.name} failed; see .out/verify/{step.name}.log"
     }
 
     if step.name == "installer-qemu-test" {

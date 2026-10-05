@@ -9,8 +9,6 @@
 #
 # usage: container_entry.xsh UID GID DIR... -- COMMAND ARG...
 
-error ContainerEntryError = Usage(message: Str)
-
 proc give_tree(root: Path, uid: Int, gid: Int) {
   return unless fs.exists(root)?
 
@@ -37,7 +35,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   }
 
   guard separator >= 2 and separator + 1 < argv.len() else {
-    return Err(ContainerEntryError.Usage("usage: container_entry.xsh UID GID DIR... -- COMMAND ARG..."))
+    fail "usage: container_entry.xsh UID GID DIR... -- COMMAND ARG..."
   }
 
   let uid = argv[0].parse_int()?

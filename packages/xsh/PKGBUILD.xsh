@@ -44,8 +44,6 @@ export const upstream_sources = [
 ## Package recipe export.
 export const nostrip = true
 
-error XshPackageError = Source(message: Str)
-
 ## Package recipe export.
 ## Core applets live under one tree so a new XSH applet needs no recipe edit
 ## for its script; its `usr/bin` symlink must still be declared here.
@@ -122,7 +120,7 @@ proc verified_seed(arch: Str) -> Result[Path] {
   let manifest_path = fp"{seed}/manifest.json"
 
   if ! fs.exists(manifest_path)? {
-    return Err(XshPackageError.Source(f"the {arch} XSH seed has no manifest; run `make seed ARCH={arch}`"))
+    fail f"the {arch} XSH seed has no manifest; run `make seed ARCH={arch}`"
   }
 
   let manifest = json.read(manifest_path)?.require(Record)?
@@ -133,7 +131,7 @@ proc verified_seed(arch: Str) -> Result[Path] {
     let actual = hash.sha256(fp"{seed}/{product}")?.hex()
 
     if actual != expected {
-      return Err(XshPackageError.Source(f"seed {product} has sha256 {actual}, its manifest records {expected}"))
+      fail f"seed {product} has sha256 {actual}, its manifest records {expected}"
     }
   }
 

@@ -1,8 +1,6 @@
 ##! LLVM toolchain package definition and build operations.
 use pm.util as pm_util
 
-error LlvmToolchainError = Failed(message: Str)
-
 ## Package name.
 export const name = "llvm-toolchain"
 
@@ -488,7 +486,7 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
 
 proc require_file(path_value: Path, label: Str) {
   guard fs.exists(path_value)? else {
-    return Err(LlvmToolchainError.Failed(f"missing {label}: {path_value}"))
+    fail f"missing {label}: {path_value}"
   }
 }
 
@@ -497,7 +495,7 @@ proc require_executable(path_value: Path, label: Str) {
   let meta = fs.metadata(path_value)?
 
   if meta.mode % 0o1000 == 0 {
-    return Err(LlvmToolchainError.Failed(f"{label} is not executable: {path_value}"))
+    fail f"{label} is not executable: {path_value}"
   }
 }
 
@@ -516,7 +514,7 @@ proc install_prebuilt_tree(dest: Path) {
   let target = fp"{dest}/usr/lib/llvm23"
 
   if ! fs.exists(source)? {
-    return Err(LlvmToolchainError.Failed("missing staged LLVM prebuilt tree"))
+    fail "missing staged LLVM prebuilt tree"
   }
 
   fs.remove(target, missing_ok: true)
