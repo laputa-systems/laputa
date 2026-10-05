@@ -107,7 +107,7 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
     for rel_path in manifest {
       let path_value = fp"{root}/{rel_path}"
       continue unless path_value.exists()?
-      continue unless fs.metadata(path_value)?.kind == "file"
+      continue unless path_value.is_file()?
 
       if let Ok(info) = elf.inspect(path_value) {
         if info.soname != "" {
@@ -134,7 +134,7 @@ export proc installed_file_elf_dependency_failures(
   path_value: Path,
   providers: Map[Str],
 ) [fs, error] -> Result[List[ElfDependencyFailure], Error] {
-  return [] when fs.metadata(path_value)?.kind == "symlink"
+  return [] when path_value.is_symlink()?
 
   if let Ok(info) = elf.inspect(path_value) {
     var failures = missing_elf_runtime_dependencies_with_allowed(

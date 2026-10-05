@@ -88,7 +88,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     if entry.kind == types.file_kind_tree() {
-      guard fs.metadata(fp"{dest}/{entry.path}")?.kind == "dir" else {
+      guard fp"{dest}/{entry.path}".is_dir()? else {
         return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
       }
     }

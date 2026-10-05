@@ -1,12 +1,12 @@
 #!/bin/xsh
 for hook in g"/usr/lib/init/rc.d/*.pre.shutdown" {
-  if hook.metadata()?.kind == "file" {
+  if hook.is_file()? {
     run hook ?
   }
 }
 
 for hook in g"/etc/rc.d/*.pre.shutdown" {
-  if hook.metadata()?.kind == "file" {
+  if hook.is_file()? {
     run hook ?
   }
 }
@@ -17,13 +17,13 @@ let remount_root_result = linux.mount("", /, fstype: "", options: ["remount", "r
 fs.sync()
 
 for hook in g"/usr/lib/init/rc.d/*.post.shutdown" {
-  if hook.metadata()?.kind == "file" {
+  if hook.is_file()? {
     run hook ?
   }
 }
 
 for hook in g"/etc/rc.d/*.post.shutdown" {
-  if hook.metadata()?.kind == "file" {
+  if hook.is_file()? {
     run hook ?
   }
 }

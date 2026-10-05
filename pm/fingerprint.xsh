@@ -140,7 +140,7 @@ proc repository_input_lines(
       return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
     }
 
-    if fs.metadata(input)?.kind == "dir" {
+    if input.is_dir()? {
       for entry in fs.walk(input) |> sort-by .path {
         let rel = entry.path.strip_prefix(repo_root)?
 

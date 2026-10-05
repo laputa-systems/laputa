@@ -207,7 +207,7 @@ export proc generation_adapter_copy_manifest_file(
     archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
     let source = fp"{extracted}/{relative_path}"
 
-    if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
+    if ! fs.exists(source)? or ! source.is_file()? {
       return Err(GenerationAdapterError.Failed(f"artifact payload does not contain {relative_path}"))
     }
 

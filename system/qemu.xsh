@@ -223,7 +223,7 @@ export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Resu
 
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
 export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool, Error] {
-  fs.exists(path_value)? and fs.metadata(path_value)?.kind == "file" and fs.metadata(path_value)?.size > 0
+  fs.exists(path_value)? and path_value.is_file()? and fs.metadata(path_value)?.size > 0
 }
 
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {

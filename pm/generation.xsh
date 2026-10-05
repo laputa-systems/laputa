@@ -358,7 +358,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
     return {name: "default", overlay_sha256: overlay_digest(overlay_root)?, replacements: []}
   }
 
-  if fs.metadata(config)?.kind != "file" {
+  if ! config.is_file()? {
     return Err(types.PmError.PackageContract("generation overlay.json must be a file"))
   }
 
@@ -379,7 +379,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
     return generation_empty_overlay_sha256()
   }
 
-  if fs.metadata(overlay_root)?.kind != "dir" {
+  if ! overlay_root.is_dir()? {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
@@ -414,7 +414,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
 }
 
 proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOverlayEntry]] {
-  if ! fs.exists(overlay_root)? or fs.metadata(overlay_root)?.kind != "dir" {
+  if ! fs.exists(overlay_root)? or ! overlay_root.is_dir()? {
     return Err(types.PmError.PackageContract(f"generation overlay {overlay_root} must be a directory"))
   }
 
@@ -577,7 +577,7 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
 
     if entry.kind == "dir" {
       if fs.exists(destination)? {
-        guard fs.metadata(destination)?.kind == "dir" else {
+        guard destination.is_dir()? else {
           return Err(
             types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
           )

@@ -10,18 +10,18 @@ pure bundle_key_is_valid(value: Str) -> Bool {
 }
 
 proc bundle_verify_file(source: Path, output: Path) {
-  if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
+  if ! fs.exists(source)? or ! source.is_file()? or fs.metadata(source)?.size <= 0 {
     return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: {source}"))
   }
 
-  if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or hash.sha256(source)?.hex() != hash.sha256(output)?.hex() {
+  if ! fs.exists(output)? or ! output.is_file()? or hash.sha256(source)?.hex() != hash.sha256(output)?.hex() {
     return Err(ContainerOutputError.Failed(f"bundle output does not match {source}"))
   }
 }
 
 ## Copy one fully produced regular file to its durable host-output destination without exposing a partial final.
 export proc publish_final_file(source: Path, output: Path) [fs, error] {
-  if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" or fs.metadata(source)?.size <= 0 {
+  if ! fs.exists(source)? or ! source.is_file()? or fs.metadata(source)?.size <= 0 {
     return Err(ContainerOutputError.Failed(f"final publication source is missing or empty: {source}"))
   }
 
@@ -56,7 +56,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
     }
 
     names[item.name] = true
-    if ! fs.exists(item.source)? or fs.metadata(item.source)?.kind != "file" or fs.metadata(item.source)?.size <= 0 {
+    if ! fs.exists(item.source)? or ! item.source.is_file()? or fs.metadata(item.source)?.size <= 0 {
       return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: {item.source}"))
     }
   }
@@ -66,7 +66,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
   let temporary = fp"{builds}/.{key}.tmp"
   fs.mkdir(builds)
   if fs.exists(final_dir)? {
-    guard fs.metadata(final_dir)?.kind == "dir" else {
+    guard final_dir.is_dir()? else {
       return Err(ContainerOutputError.Failed(f"completed bundle path is not a directory: {final_dir}"))
     }
 

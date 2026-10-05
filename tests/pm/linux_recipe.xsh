@@ -171,7 +171,7 @@ test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, p
   recipe.call_build(pkg, source, dest)
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
-    assert fs.metadata(fp"{dest}/{required}")?.kind == "dir"
+    assert fp"{dest}/{required}".is_dir()?
   }
 }
 
@@ -187,7 +187,7 @@ test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, proces
   for hook in ["if-pre-up.d", "if-up.d", "if-down.d", "if-pre-down.d", "if-post-down.d"] {
     let relative = fp"etc/network/{hook}"
     assert {path: relative, kind: types.file_kind_tree()} in pkg.filetree
-    assert fs.metadata(fp"{dest}/{relative}")?.kind == "dir"
+    assert fp"{dest}/{relative}".is_dir()?
     for entry in fs.children(fp"{dest}/{relative}")? {
       test.fail(f"network hook directory contains {entry.name}")
     }
@@ -218,7 +218,7 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
       test.fail(f"baselayout archive is missing {required}")
     }
 
-    assert fs.metadata(fp"{extracted}/{required}")?.kind == "dir"
+    assert fp"{extracted}/{required}".is_dir()?
   }
 }
 

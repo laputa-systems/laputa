@@ -54,7 +54,7 @@ pure short_key(key: Str) -> Str {
 }
 
 proc require_file(file: Path) {
-  if ! fs.exists(file)? or fs.metadata(file)?.kind != "file" {
+  if ! fs.exists(file)? or ! file.is_file()? {
     return Err(SeedImageError.Missing(f"image input is missing: {file}"))
   }
 }

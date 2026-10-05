@@ -7,9 +7,9 @@ proc main(root: Path = /rootfs) [fs, error] {
   proof.ensure(fs.exists(fp"{root}/etc/network/interfaces")?, "laputa-net", "missing /etc/network/interfaces")
   # ifup/ifdown belong to the runtime-only `xsh` dependency, which a package
   # proof root does not hold; generations install it beside this payload.
-  proof.ensure(fs.metadata(fp"{root}/etc/network/if-pre-down.d")?.kind == "dir", "laputa-net", "missing if-pre-down.d")
+  proof.ensure(fp"{root}/etc/network/if-pre-down.d".is_dir()?, "laputa-net", "missing if-pre-down.d")
   proof.ensure(
-    fs.metadata(fp"{root}/etc/network/if-post-down.d")?.kind == "dir",
+    fp"{root}/etc/network/if-post-down.d".is_dir()?,
     "laputa-net",
     "missing if-post-down.d",
   )

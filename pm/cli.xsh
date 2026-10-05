@@ -784,7 +784,7 @@ proc command_root_inspect(args: RootInspectArgs) {
   # Image builders retain the receipt JSON after atomically publishing their final
   # image and removing container-local generation staging. Accept that durable
   # boundary as well as an intact generation root.
-  let receipt = if fs.metadata(args.input)?.kind == "file" {
+  let receipt = if args.input.is_file()? {
     generation.read_generation_receipt_file(args.input)?
   } else {
     generation.read_generation_receipt(args.input)?

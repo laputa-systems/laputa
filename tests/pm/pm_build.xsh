@@ -41,5 +41,5 @@ test test_build_prepared_archives_every_empty_directory_recorded_in_metadata [fs
 
   assert "usr/share" in [entry.path for entry in built.metadata_files]
   archive.tar_extract(payload, extracted)
-  assert fs.metadata(fp"{extracted}/usr/share")?.kind == "dir"
+  assert fp"{extracted}/usr/share".is_dir()?
 }

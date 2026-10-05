@@ -84,7 +84,7 @@ export proc build_profile(
   let result = plan_system_profile(value, profile)?
   docker.docker_profile_build(value, profile, jobs, result.build_log)
 
-  if ! fs.exists(result.current)? or fs.metadata(result.current)?.kind != "symlink" {
+  if ! fs.exists(result.current)? or ! result.current.is_symlink()? {
     return Err(types.LaputaError.Docker(f"profile build did not atomically select {result.current}"))
   }
 

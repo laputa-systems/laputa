@@ -1807,7 +1807,7 @@ pure numeric_key_order(keys: List[Str]) -> List[Int] {
 proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
   let direct = fp"{name}"
 
-  if fs.exists(direct)? and fs.metadata(direct)?.kind == "file" {
+  if fs.exists(direct)? and direct.is_file()? {
     return name
   }
 
@@ -1815,7 +1815,7 @@ proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
     for dir in include_paths {
       let candidate = fp"{dir}/{name}"
 
-      if fs.exists(candidate)? and fs.metadata(candidate)?.kind == "file" {
+      if fs.exists(candidate)? and candidate.is_file()? {
         return f"{dir}/{name}"
       }
     }

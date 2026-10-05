@@ -18,7 +18,7 @@ proc main(root: Path = /rootfs) [fs, error] {
 
   # The UCM card scan reads conf.virt.d for virtual cards and fails when the
   # directory is missing; the release keeps it with only a hidden marker file.
-  proof.ensure(fs.metadata(fp"{ucm}/conf.virt.d")?.kind == "dir", "proof-alsa-ucm-conf", "missing ucm2/conf.virt.d")
+  proof.ensure(fp"{ucm}/conf.virt.d".is_dir()?, "proof-alsa-ucm-conf", "missing ucm2/conf.virt.d")
 
   # Every link in the release resolves to a file inside the installed tree.
   var links = 0
