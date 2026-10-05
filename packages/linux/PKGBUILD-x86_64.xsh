@@ -482,7 +482,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   }
 
   if unique.len() == 0 {
-    return Err(kbuild.ScriptError.Failed("linux-x86-realmode-pasyms", "llvm-nm did not report realmode symbols"))
+    return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-pasyms", message: "llvm-nm did not report realmode symbols"))
   }
 
   kbuild.write_text_if_changed(
@@ -685,7 +685,7 @@ proc build_x86_realmode_payload(cc: Path) [fs, process, env, error] {
   let relocs_out = run.capture --bytes $relocs "--realmode" "arch/x86/realmode/rm/realmode.elf" ?
 
   if ! relocs_out.status.ok {
-    return Err(kbuild.ScriptError.Failed("linux-x86-realmode-relocs", "relocs --realmode failed"))
+    return Err(kbuild.ScriptError.Failed(kind: "linux-x86-realmode-relocs", message: "relocs --realmode failed"))
   }
 
   fs.write(p"arch/x86/realmode/rm/realmode.relocs", relocs_out.stdout)?

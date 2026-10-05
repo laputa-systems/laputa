@@ -74,7 +74,7 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
       )?
 
       if ! status.ok {
-        return Err(ScriptError.Failed("proof-flex", f"flex failed: {stderr.read_text()?}"))?
+        return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex failed: {stderr.read_text()?}"))?
       }
     }?
   }?
@@ -83,13 +83,13 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
     let file = fp"{tmp}/{output.name}"
 
     if ! fs.exists(file)? {
-      return Err(ScriptError.Failed("proof-flex", f"flex did not write {output.name}"))?
+      return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex did not write {output.name}"))?
     }
 
     let digest = hash.sha256(file)?.hex()
 
     if digest != output.sha256 {
-      return Err(ScriptError.Failed("proof-flex", f"{output.name} differs from GNU flex 2.6.4 output: sha256 {digest}"))?
+      return Err(ScriptError.Failed(kind: "proof-flex", message: f"{output.name} differs from GNU flex 2.6.4 output: sha256 {digest}"))?
     }
   }
 
@@ -100,7 +100,7 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
   let out = run.text $scanner < $input ?
 
   if out != scanner_expected {
-    return Err(ScriptError.Failed("proof-flex", f"scanner output:\n{out}"))?
+    return Err(ScriptError.Failed(kind: "proof-flex", message: f"scanner output:\n{out}"))?
   }
 }
 
@@ -109,11 +109,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let lex = fp"{rootfs}/usr/bin/lex"
 
   if ! fs.exists(flex)? {
-    return Err(ScriptError.Failed("proof-flex", f"missing flex: {flex}"))?
+    return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing flex: {flex}"))?
   }
 
   if ! fs.exists(lex)? {
-    return Err(ScriptError.Failed("proof-flex", f"missing lex symlink: {lex}"))?
+    return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing lex symlink: {lex}"))?
   }
 
   proof.target_elf(rootfs, p"usr/bin/flex", "flex")?
@@ -122,7 +122,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     let out = run.text $flex "--version" ?
 
     if "flex 2.6.4" not in out {
-      return Err(ScriptError.Failed("proof-flex", f"flex --version: {out.trim()}"))?
+      return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex --version: {out.trim()}"))?
     }
 
     prove_scanner(rootfs, flex)?

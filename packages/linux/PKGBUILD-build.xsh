@@ -12,7 +12,7 @@ proc package_arch() [env, error] -> Result[Str] {
 
   return arch when arch == "aarch64" or arch == "x86_64"
 
-  Err(kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {arch}"))
+  Err(kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {arch}"))
 }
 
 pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
@@ -21,7 +21,7 @@ pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
   return "x86" when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -33,7 +33,7 @@ pure kernel_config_fragments_for(package_arch_value: Str) -> Result[List[Path]] 
   return [p"files/config/x86_64/base-x86_64.fragment"] when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -43,7 +43,7 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
   return p"arch/x86/boot/bzImage" when package_arch_value == "x86_64"
 
   Err(
-    kbuild.ScriptError.Failed("linux-unsupported-arch", f"unsupported linux package arch {package_arch_value}"),
+    kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {package_arch_value}"),
   )
 }
 
@@ -60,8 +60,8 @@ proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, en
 
   return Err(
     kbuild.ScriptError.Failed(
-      "linux-native-kbuild-unsupported-arch",
-      f"native scratch Kbuild final link is only implemented for arm64 and x86; {srcarch} needs new arch support",
+      kind: "linux-native-kbuild-unsupported-arch",
+      message: f"native scratch Kbuild final link is only implemented for arm64 and x86; {srcarch} needs new arch support",
     ),
   )
 }
@@ -73,7 +73,7 @@ proc build_cc() [fs, process, env, error] -> Result[Path] {
     let cc = fp"{root}/usr/bin/cc"
 
     if ! fs.exists(cc)? {
-      return Err(kbuild.ScriptError.Failed("linux-build-cc", f"missing build-root compiler: {cc}"))?
+      return Err(kbuild.ScriptError.Failed(kind: "linux-build-cc", message: f"missing build-root compiler: {cc}"))?
     }
 
     return cc

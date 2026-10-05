@@ -29,7 +29,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let rsa_out = run.text $dynlinker $dropbearkey "-y" "-f" $rsa_key ?
 
   if "ssh-rsa" not in rsa_out {
-    Err(ScriptError.Failed("dropbear-proof", f"rsa: unexpected output: {rsa_out.trim()}"))?
+    Err(ScriptError.Failed(kind: "dropbear-proof", message: f"rsa: unexpected output: {rsa_out.trim()}"))?
   }
 
   print "dropbear ok: rsa 2048 key generated"
@@ -40,7 +40,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let ed_out = run.text $dynlinker $dropbearkey "-y" "-f" $ed_key ?
 
   if "ssh-ed25519" not in ed_out {
-    Err(ScriptError.Failed("dropbear-proof", f"ed25519: unexpected output: {ed_out.trim()}"))?
+    Err(ScriptError.Failed(kind: "dropbear-proof", message: f"ed25519: unexpected output: {ed_out.trim()}"))?
   }
 
   print "dropbear ok: ed25519 key generated"
@@ -51,7 +51,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let ec_out = run.text $dynlinker $dropbearkey "-y" "-f" $ec_key ?
 
   if "ecdsa-sha2-nistp256" not in ec_out {
-    Err(ScriptError.Failed("dropbear-proof", f"ecdsa: unexpected output: {ec_out.trim()}"))?
+    Err(ScriptError.Failed(kind: "dropbear-proof", message: f"ecdsa: unexpected output: {ec_out.trim()}"))?
   }
 
   print "dropbear ok: ecdsa-256 key generated"
@@ -65,7 +65,7 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
     return trimmed when trimmed.starts_with("ssh-")
   }
 
-  Err(ScriptError.Failed("dropbear-proof", "dropbearkey did not print an SSH public key"))
+  Err(ScriptError.Failed(kind: "dropbear-proof", message: "dropbearkey did not print an SSH public key"))
 }
 
 

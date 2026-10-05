@@ -88,7 +88,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")?
 
   if ! fs.exists(fp"{rootfs}/usr/bin/pkg-config")? {
-    return Err(proof.ProofError.Failed("proof-pkgconf", "missing pkg-config symlink"))?
+    return Err(proof.ProofError.Failed(kind: "proof-pkgconf", message: "missing pkg-config symlink"))?
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {

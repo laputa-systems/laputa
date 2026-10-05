@@ -11,7 +11,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")?
 
   if ! fs.exists(fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake")? {
-    Err(ScriptError.Failed("cmake-proof", "missing CMake module tree"))?
+    Err(ScriptError.Failed(kind: "cmake-proof", message: "missing CMake module tree"))?
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -25,7 +25,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let version = run.text $cmake "--version" ?
 
   if ! version.starts_with(f"cmake version {ver}\n") {
-    Err(ScriptError.Failed("cmake-proof-version", f"cmake --version reported {version.lines()[0]}, expected {ver}"))?
+    Err(ScriptError.Failed(kind: "cmake-proof-version", message: f"cmake --version reported {version.lines()[0]}, expected {ver}"))?
   }
 
   let tmp = fp"{rootfs}/var/tmp/proof-cmake"
@@ -74,14 +74,14 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
     let cmake_status = process.run(cmake_proc)?
 
     if ! cmake_status.ok {
-      Err(ScriptError.Failed("cmake-proof-configure", "cmake configure failed"))?
+      Err(ScriptError.Failed(kind: "cmake-proof-configure", message: "cmake configure failed"))?
     }
 
     let cache = fs.read_text(fp"{tmp}/build/CMakeCache.txt")?
     let marker = fs.read_text(fp"{tmp}/build/proof-output.txt")?
 
     if proof_samu.display() not in cache or marker != "cmake runtime closure\n" {
-      Err(ScriptError.Failed("cmake-proof", "configure did not use the isolated runtime proof inputs"))?
+      Err(ScriptError.Failed(kind: "cmake-proof", message: "configure did not use the isolated runtime proof inputs"))?
     }
 
     print "cmake ok: runtime configure"

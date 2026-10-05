@@ -58,7 +58,7 @@ export proc clean(output_root: Path) [fs, error] {
 export proc plan_system_profile(
   value: docker.DockerConfig,
   profile: types.SystemProfile,
-) [fs, process, error] -> Result[ProfileOutputs] {
+) [fs, process, error] -> Result[ProfileOutputs, Error] {
   let result = outputs(value.output_root)
   docker.docker_plan(value, profile)?
 
@@ -80,7 +80,7 @@ export proc build_profile(
   value: docker.DockerConfig,
   profile: types.SystemProfile,
   jobs: Int,
-) [fs, process, error] -> Result[ProfileOutputs] {
+) [fs, process, error] -> Result[ProfileOutputs, Error] {
   let result = plan_system_profile(value, profile)?
   docker.docker_profile_build(value, profile, jobs, result.build_log)?
 

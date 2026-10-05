@@ -19,7 +19,7 @@ export error ProofError = Failed(kind: Str, message: Str)
 ## Exported PM declaration `ensure`.
 export proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   guard condition else {
-    return Err(ProofError.Failed(kind, message))
+    return Err(ProofError.Failed(kind:, message:))
   }
 }
 
@@ -31,7 +31,7 @@ export proc package_metadata(root: Path, name: Str) [fs, error] {
 
 ## The installed package's recipe `ver`, so a proof can check that the
 ## binary it runs reports the version the recipe pins.
-export proc package_version(root: Path, name: Str) [fs, error] -> Result[Str] {
+export proc package_version(root: Path, name: Str) [fs, error] -> Result[Str, Error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
   json.read(db)?.require(Record)?.get("ver")?.require(Str)
 }
@@ -82,13 +82,13 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
     let first = failures[0]
 
     if first.provider == "" {
-      return Err(ProofError.Failed(f"proof-{name}", f"{first.file} needs {first.soname} by its build-time path"))
+      return Err(ProofError.Failed(kind: f"proof-{name}", message: f"{first.file} needs {first.soname} by its build-time path"))
     }
 
     return Err(
       ProofError.Failed(
-        f"proof-{name}",
-        f"{first.file} needs {first.soname} from {first.provider} without a runtime dependency",
+        kind: f"proof-{name}",
+        message: f"{first.file} needs {first.soname} from {first.provider} without a runtime dependency",
       ),
     )
   }
@@ -104,7 +104,7 @@ export pure elf_machine_name(arch: Str) -> Str {
 }
 
 ## Exported PM declaration `readelf_tool`.
-export proc readelf_tool() [fs, process, env, error] -> Result[Path] {
+export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
   let host_readelf = /usr/bin/readelf
   let host_llvm_readelf = /usr/bin/llvm-readelf
 
@@ -145,7 +145,7 @@ proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
 
 ## Runs one package proof against an already composed mutable proof work root.
 ## Callers must seed the explicit executor substrate before invoking this boundary.
-export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env, error] -> Result[Unit] {
+export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env, error] -> Result[Unit, Error] {
   let script = fp"{pkg.dir}/proof.xsh"
 
   if ! fs.exists(script)? {
@@ -315,7 +315,7 @@ int main(int argc, char **argv) {
 ## Compiles the pseudoterminal driver into `dir` with the proof host's `cc`
 ## and returns its path. The driver runs on the build host, so only native
 ## proofs use it.
-export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path] {
+export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path, Error] {
   let cc = process.which("cc")?
   let source = fp"{dir}/ptydrive.c"
   let binary = fp"{dir}/ptydrive"

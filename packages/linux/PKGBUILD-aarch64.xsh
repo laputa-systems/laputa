@@ -544,8 +544,8 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   guard srcarch == "arm64" else {
     return Err(
       kbuild.ScriptError.Failed(
-        "linux-native-kbuild-unsupported-arch",
-        f"native scratch Kbuild final link is only implemented for arm64; {srcarch} needs x86_64 link/vDSO/generated-header support",
+        kind: "linux-native-kbuild-unsupported-arch",
+        message: f"native scratch Kbuild final link is only implemented for arm64; {srcarch} needs x86_64 link/vDSO/generated-header support",
       ),
     )
   }
@@ -567,8 +567,8 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     PKGBUILD_shared.stop_after("plan")?
     return Err(
       kbuild.ScriptError.Failed(
-        "linux-kbuild-archive-only",
-        f"archive-only loop planned {archive_plan.task_count} tasks",
+        kind: "linux-kbuild-archive-only",
+        message: f"archive-only loop planned {archive_plan.task_count} tasks",
       ),
     )
   }
@@ -667,8 +667,8 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
 
   return Err(
     kbuild.ScriptError.Failed(
-      "linux-native-kbuild-compile-incomplete",
-      f"native scratch Kbuild generated config/syscall headers, discovered {plan.dirs.len()} dirs and {plan.objects.len()} objects, constructed {archive_plan.tasks.len()} object/archive tasks for archive_plan.archives.len() archives, found {archive_plan.generated_objects.len()} generated objects and {archive_plan.missing_sources.len()} objects without direct sources; next step is generated object handling and task execution",
+      kind: "linux-native-kbuild-compile-incomplete",
+      message: f"native scratch Kbuild generated config/syscall headers, discovered {plan.dirs.len()} dirs and {plan.objects.len()} objects, constructed {archive_plan.tasks.len()} object/archive tasks for archive_plan.archives.len() archives, found {archive_plan.generated_objects.len()} generated objects and {archive_plan.missing_sources.len()} objects without direct sources; next step is generated object handling and task execution",
     ),
   )
 }

@@ -6,7 +6,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/samu", "samurai")?
 
   if ! fs.exists(fp"{rootfs}/usr/bin/ninja")? {
-    return Err(proof.ProofError.Failed("proof-samurai", "missing ninja symlink"))?
+    return Err(proof.ProofError.Failed(kind: "proof-samurai", message: "missing ninja symlink"))?
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {

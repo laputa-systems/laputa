@@ -68,7 +68,7 @@ proc main(...argv: List[Str]) [fs, time, error] {
         {...failed_state, active: failed_state.active - 1, done: true, error: "directory scan failed"},
       )?
       fs.unlock(error_lock)?
-      return Err(kbuild.ScriptError.Failed("kbuild-process-pool", "directory scan failed"))
+      return Err(kbuild.ScriptError.Failed(kind: "kbuild-process-pool", message: "directory scan failed"))
     }
   }
 

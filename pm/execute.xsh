@@ -528,7 +528,7 @@ export proc build_plan_node(
   store_root: Path,
   remote_repo: Str,
   key: Str,
-) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt] {
+) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt, Error] {
   build_plan.validate(plan_value)?
   build_plan.require_current_build_epoch(plan_value)?
   let matches = [node for node in plan_value.nodes if node.artifact_key == key]
@@ -571,7 +571,7 @@ export proc build_plan(
   remote_repo: Str,
   jobs: Int,
   logs: Path = p"",
-) [fs, net, process, env, time, error] -> Result[types.BuildResult] {
+) [fs, net, process, env, time, error] -> Result[types.BuildResult, Error] {
   build_plan.validate(plan_value)?
   build_plan.require_current_build_epoch(plan_value)?
 

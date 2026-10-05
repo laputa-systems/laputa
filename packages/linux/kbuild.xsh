@@ -427,7 +427,7 @@ pure config_auto_line(name: Str, value: Str) -> Str {
 }
 
 ## Exported declaration `load_config`.
-export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig] {
+export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig, Error] {
   var enabled: Map[Bool] = {}
   var values: Map[Str] = {}
 
@@ -508,7 +508,7 @@ proc version_header(release: Str) [error] -> Result[Str] {
   let parts = [part.parse_int()? for part in release.split(".")]
 
   guard parts.len() == 3 else {
-    return Err(ScriptError.Failed("kbuild-version", f"kernel release {release} is not MAJOR.MINOR.SUB"))
+    return Err(ScriptError.Failed(kind: "kbuild-version", message: f"kernel release {release} is not MAJOR.MINOR.SUB"))
   }
 
   f"""#define LINUX_VERSION_CODE {parts[0] * 65536 + parts[1] * 256 + parts[2]}
@@ -890,7 +890,7 @@ pure parse_assignment(line: Str) -> Result[ParsedAssignment] {
 
   return parse_assignment_at(line, "=", 1, assignment_index) when assignment_index >= 0
 
-  Err(ScriptError.Failed("kbuild-skip-line", line))
+  Err(ScriptError.Failed(kind: "kbuild-skip-line", message: line))
 }
 
 pure active_obj_lhs(expanded: Str) -> Bool {
@@ -923,13 +923,13 @@ proc eval_make_compare(line: Str, keyword: Str, vars: Map[Str], config: Kconfig,
   let prefix = f"{keyword} ("
 
   if ! line.starts_with(prefix) {
-    return Err(ScriptError.Failed("kbuild-not-conditional", line))
+    return Err(ScriptError.Failed(kind: "kbuild-not-conditional", message: line))
   }
 
   let rest = line.split(prefix).get(1) ?? ""
   let parts = rest.split(",")
 
-  return Err(ScriptError.Failed("kbuild-not-conditional", line)) when parts.len() < 2
+  return Err(ScriptError.Failed(kind: "kbuild-not-conditional", message: line)) when parts.len() < 2
 
   let left = conditional_value(parts[0].trim(), vars, config, srcarch)
   let right = expand_vars(parts |> drop(1).join(",").replace(")", "").trim(), vars, config, srcarch)
@@ -960,7 +960,7 @@ proc eval_conditional(line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) 
     return conditional_value(parts[1], vars, config, srcarch) == "" when parts.len() >= 2
   }
 
-  Err(ScriptError.Failed("kbuild-not-conditional", line))
+  Err(ScriptError.Failed(kind: "kbuild-not-conditional", message: line))
 }
 
 pure active_conditional(stack: List[Bool]) -> Bool {
@@ -1314,13 +1314,13 @@ proc read_compile_flags_cache(path_value: Path, fingerprint: Str) [fs, error] ->
   let format = if "format" in stored { stored.get("format")?.require(Str)? } else { "" }
 
   if format != compile_flags_cache_format() {
-    return Err(ScriptError.Failed("kbuild-compile-flags-cache-stale", "compile flags cache has stale format"))
+    return Err(ScriptError.Failed(kind: "kbuild-compile-flags-cache-stale", message: "compile flags cache has stale format"))
   }
 
   let cache = stored.require(CompileFlagsCache)?
 
   if fingerprint != "" and cache.fingerprint.trim() != fingerprint.trim() {
-    return Err(ScriptError.Failed("kbuild-compile-flags-cache-stale", "compile flags cache fingerprint mismatch"))
+    return Err(ScriptError.Failed(kind: "kbuild-compile-flags-cache-stale", message: "compile flags cache fingerprint mismatch"))
   }
 
   compile_flags_from_cache_entries(cache.flags)?
@@ -1422,7 +1422,7 @@ export proc augment_missing_composites(
   config: Kconfig,
   plan: KbuildPlan,
   srcarch: Str = "arm64",
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   var composites = plan.composites
   var dirs: List[Path] = []
   var missing_by_dir: Map[List[Path]] = {}
@@ -1481,7 +1481,7 @@ export proc prune_inactive_objects(
   config: Kconfig,
   plan: KbuildPlan,
   srcarch: Str = "arm64",
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   var active: Map[Bool] = {}
 
   let dir_objects: List[ActiveDirObjects] = plan.dirs
@@ -1509,7 +1509,7 @@ export proc refresh_plan_dirs(
   plan: KbuildPlan,
   srcarch: Str,
   dirs: List[Path],
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   var next = plan
   let jobs = planner_jobs()
 
@@ -1572,7 +1572,7 @@ export proc refresh_plan_dirs(
 }
 
 ## Exported declaration `refresh_x86_kernel_config_objects`.
-export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan) [fs, error] -> Result[KbuildPlan] {
+export proc refresh_x86_kernel_config_objects(config: Kconfig, plan: KbuildPlan) [fs, error] -> Result[KbuildPlan, Error] {
   var objects: List[Path] = []
   var dirs: List[Path] = []
 
@@ -1851,7 +1851,7 @@ export proc refresh_plan_composite_members(
   plan: KbuildPlan,
   srcarch: Str,
   objects: List[Path],
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   var refreshed: Map[CompositeObject] = {}
   var member_paths: Map[Bool] = {}
 
@@ -1995,7 +1995,7 @@ proc kbuild_file(dir_abs: Path) [fs, error] -> Result[Path] {
 
   return fp"{dir_abs}/Makefile" when has_makefile
 
-  Err(ScriptError.Failed("kbuild-missing", f"missing Kbuild or Makefile in {dir_abs}"))
+  Err(ScriptError.Failed(kind: "kbuild-missing", message: f"missing Kbuild or Makefile in {dir_abs}"))
 }
 
 proc read_kbuild_source(dir_abs: Path) [fs, error] -> Result[KbuildSource] {
@@ -2436,13 +2436,13 @@ export proc scan_record_for_dir(
   config: Kconfig,
   srcarch: Str,
   dir: Path,
-) [fs, error] -> Result[ScanRecord] {
+) [fs, error] -> Result[ScanRecord, Error] {
   let scan = scan_discover_dir(root, dir, config, srcarch, default_discover_options())?
   local_record_record(scan, "")
 }
 
 ## Exported declaration `plan_from_record_values`.
-export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result[KbuildPlan] {
+export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result[KbuildPlan, Error] {
   var scan_by_dir: Map[ScanRecord] = {item.dir: item for item in records}
   var seen: Map[Bool] = {}
   var frontier = [p"."]
@@ -2558,14 +2558,14 @@ proc discover_records_process_pool(
   let statuses = wait handles?
   for status in statuses {
     guard status.exited_with(0) else {
-      return Err(ScriptError.Failed("kbuild-process-pool", "a discovery worker failed"))
+      return Err(ScriptError.Failed(kind: "kbuild-process-pool", message: "a discovery worker failed"))
     }
   }
 
   let state = json.read(state_path)?.require(PoolState)?
 
   if state.error != "" {
-    return Err(ScriptError.Failed("kbuild-process-pool", state.error))
+    return Err(ScriptError.Failed(kind: "kbuild-process-pool", message: state.error))
   }
 
   var records: List[ScanRecord] = []
@@ -2585,7 +2585,7 @@ export proc discover_plan_with_process_pool(
   options: DiscoverOptions,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, time, error] -> Result[KbuildPlan] {
+) [fs, process, time, error] -> Result[KbuildPlan, Error] {
   discover_records_process_pool(root, config, srcarch, options, xsh_bin, worker)?
 }
 
@@ -2730,21 +2730,21 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) [fs, error]
   let cache = local_record_cache_path(root)
 
   if ! cache.exists()? {
-    return Err(ScriptError.Failed("local-record-cache-missing", "local-record cache does not exist"))
+    return Err(ScriptError.Failed(kind: "local-record-cache-missing", message: "local-record cache does not exist"))
   }
 
   let stored = json.read(cache)?.require(Record)?
   let format = stored.get("format")?.require(Str)?
 
   if format != "linux-local-records-v1" {
-    return Err(ScriptError.Failed("local-record-cache-format", "unsupported local-record cache format"))
+    return Err(ScriptError.Failed(kind: "local-record-cache-format", message: "unsupported local-record cache format"))
   }
 
   let cached = stored.require(LocalRecordCache)?
   let expected_key = local_record_cache_key(config, srcarch)?
 
   if cached.key != expected_key {
-    return Err(ScriptError.Failed("local-record-cache-key", "local-record cache key does not match"))
+    return Err(ScriptError.Failed(kind: "local-record-cache-key", message: "local-record cache key does not match"))
   }
 
   var record_map: Map[DirScan] = {}
@@ -2756,7 +2756,7 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) [fs, error]
 
     if hash.sha256(file)?.hex() != item.file_hash {
       return Err(
-        ScriptError.Failed("local-record-cache-stale", f"local-record cache is stale for {path_key(scan.dir)}"),
+        ScriptError.Failed(kind: "local-record-cache-stale", message: f"local-record cache is stale for {path_key(scan.dir)}"),
       )
     }
 
@@ -2838,7 +2838,7 @@ proc merge_local_record_graph_with_options(
 }
 
 ## Exported declaration `discover_plan`.
-export proc discover_plan(root: Path, config: Kconfig, srcarch: Str = "arm64") [fs, error] -> Result[KbuildPlan] {
+export proc discover_plan(root: Path, config: Kconfig, srcarch: Str = "arm64") [fs, error] -> Result[KbuildPlan, Error] {
   discover_plan_with_options(root, config, srcarch, default_discover_options())
 }
 
@@ -2848,7 +2848,7 @@ export proc discover_plan_with_options(
   config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   var scans: Map[DirScan] = {}
   var local_graph: LocalRecordGraph = {records: {}, barriers: {}, plan: empty_plan()}
 
@@ -3027,7 +3027,7 @@ export proc write_discovered_plan(plan: KbuildPlan, out: Path) [fs, error] {
 }
 
 ## Exported declaration `read_discovered_plan`.
-export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildPlan] {
+export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildPlan, Error] {
   let text = path_value.read_text()?
 
   return read_discovered_plan_text(path_value) unless text.trim().starts_with("{")
@@ -3055,7 +3055,7 @@ export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildP
 }
 
 ## Exported declaration `parse_discovered_plan_text`.
-export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan] {
+export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan, Error] {
   var dirs: List[Str] = []
   var objects: List[Str] = []
   var lib_objects: List[Str] = []
@@ -3098,7 +3098,7 @@ export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan] 
 }
 
 ## Exported declaration `read_discovered_plan_text`.
-export proc read_discovered_plan_text(path_value: Path) [fs, error] -> Result[KbuildPlan] {
+export proc read_discovered_plan_text(path_value: Path) [fs, error] -> Result[KbuildPlan, Error] {
   parse_discovered_plan_text(path_value.read_text()?)
 }
 
@@ -3117,7 +3117,7 @@ proc fingerprint_dir_line(root: Path, dir: Path) [fs, error] -> Result[Str] {
 }
 
 ## Exported declaration `plan_fingerprint`.
-export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str] {
+export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str, Error] {
   # The top-level Makefile carries VERSION/PATCHLEVEL/SUBLEVEL, so a plan
   # discovered in another kernel release never matches.
   f"""format linux-kbuild-plan-fingerprint-v10
@@ -3246,7 +3246,7 @@ proc read_archive_plan_record(path_value: Path, stale_message: Str) [fs, error] 
   let format = if "format" in stored { stored.get("format")?.require(Str)? } else { "" }
 
   if format != archive_plan_report_format() {
-    return Err(ScriptError.Failed("kbuild-archive-plan-cache-stale", stale_message))
+    return Err(ScriptError.Failed(kind: "kbuild-archive-plan-cache-stale", message: stale_message))
   }
 
   stored
@@ -3274,20 +3274,20 @@ proc archive_plan_from_summary(
 }
 
 ## Exported declaration `read_archive_plan_report`.
-export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan] {
+export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
   let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
   let tasks = [task_from_record(row)? for row in stored.require(ArchivePlanTasksFile)?.tasks]
   archive_plan_from_summary(stored.require()?, tasks)?
 }
 
 ## Exported declaration `read_archive_plan_summary`.
-export proc read_archive_plan_summary(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan] {
+export proc read_archive_plan_summary(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
   let stored = read_archive_plan_record(path_value, "archive plan summary has stale format")?
   archive_plan_from_summary(stored.require()?, [])?
 }
 
 ## Exported declaration `read_archive_plan_object_outputs`.
-export proc read_archive_plan_object_outputs(path_value: Path) [fs, error] -> Result[List[Path]] {
+export proc read_archive_plan_object_outputs(path_value: Path) [fs, error] -> Result[List[Path], Error] {
   let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
   var outputs: List[Path] = [
     path_from_string(item)?
@@ -3313,7 +3313,7 @@ pure find_task_name_by_output(tasks: List[make.MakeTask], output: Path) -> Resul
     return task.name when task_has_output(task, output)
   }
 
-  Err(ScriptError.Failed("kbuild-task-output-missing", f"no archive-plan task produces {output}"))
+  Err(ScriptError.Failed(kind: "kbuild-task-output-missing", message: f"no archive-plan task produces {output}"))
 }
 
 proc collect_task_closure(task_deps: Map[List[Str]], target: Str, selected: Map[Bool]) [] -> Map[Bool] {
@@ -3337,7 +3337,7 @@ proc archive_task_deps_by_name(tasks: List[make.MakeTask]) [] -> Map[List[Str]] 
 export proc select_archive_tasks_outputs(
   tasks: List[make.MakeTask],
   outputs: List[Path],
-) [error] -> Result[List[make.MakeTask]] {
+) [error] -> Result[List[make.MakeTask], Error] {
   let task_deps = archive_task_deps_by_name(tasks)
   var selected: Map[Bool] = {}
 
@@ -3379,7 +3379,7 @@ export proc write_plan(
   config_path: Path,
   out: Path,
   srcarch: Str = "arm64",
-) [fs, error] -> Result[KbuildPlan] {
+) [fs, error] -> Result[KbuildPlan, Error] {
   let config = load_config(config_path)?
   let plan = discover_plan(root, config, srcarch)?
   write_discovered_plan(plan, out)?
@@ -3397,7 +3397,7 @@ pure composite_for(composites: List[CompositeObject], obj: Path) -> Result[Compo
     return composite when path_key(composite.object) == key
   }
 
-  Err(ScriptError.Failed("kbuild-not-composite", f"{key} is not a composite object"))
+  Err(ScriptError.Failed(kind: "kbuild-not-composite", message: f"{key} is not a composite object"))
 }
 
 proc composite_map(composites: List[CompositeObject]) [] -> Map[CompositeObject] {
@@ -3444,7 +3444,7 @@ proc source_for_object(obj: Path) [fs, error] -> Result[Path] {
     return raw_asm_src when raw_asm_src.exists()?
   }
 
-  Err(ScriptError.Failed("kbuild-missing-source", f"missing source for {obj}"))
+  Err(ScriptError.Failed(kind: "kbuild-missing-source", message: f"missing source for {obj}"))
 }
 
 pure is_asm_source(src: Path) -> Bool {
@@ -3910,7 +3910,7 @@ export proc generate_crc32table_header(root: Path, cc: Path) [fs, process, env, 
   let compile_status = process.run(compile_command)?
 
   if ! compile_status.ok {
-    return Err(ScriptError.Failed("linux-crc32table-compile", f"command failed: {argv.join(" ")}"))
+    return Err(ScriptError.Failed(kind: "linux-crc32table-compile", message: f"command failed: {argv.join(" ")}"))
   }
 
   let output = run.text $gen ?
@@ -3967,7 +3967,7 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
   let compile_status = process.run(compile_command)?
 
   if ! compile_status.ok {
-    return Err(ScriptError.Failed("linux-raid6-mktables-compile", f"command failed: {argv.join(" ")}"))
+    return Err(ScriptError.Failed(kind: "linux-raid6-mktables-compile", message: f"command failed: {argv.join(" ")}"))
   }
 
   let tables = run.text $gen ?
@@ -4109,7 +4109,7 @@ export proc generate_syscall_table(table: Path, out: Path, abis: List[Str] = [])
 
       if abi_enabled(abi, abis) {
         if next_nr > nr {
-          return Err(ScriptError.Failed("kbuild-syscall-order", f"{table} is not sorted at syscall {nr}"))
+          return Err(ScriptError.Failed(kind: "kbuild-syscall-order", message: f"{table} is not sorted at syscall {nr}"))
         }
 
         while next_nr < nr {
@@ -4122,7 +4122,7 @@ export proc generate_syscall_table(table: Path, out: Path, abis: List[Str] = [])
         let noreturn = fields.get(5) ?? ""
 
         if noreturn != "" and noreturn != "noreturn" {
-          return Err(ScriptError.Failed("kbuild-syscall-noreturn", f"invalid noreturn marker '{noreturn}'"))
+          return Err(ScriptError.Failed(kind: "kbuild-syscall-noreturn", message: f"invalid noreturn marker '{noreturn}'"))
         }
 
         lines = lines.push(syscall_line(nr, native, compat, noreturn)?)
@@ -4814,13 +4814,13 @@ proc append_x86_relocs(relocs: Path, input: Path, out: Path) [fs, process, error
   let reloc_data = run.capture --bytes $relocs $input_text ?
 
   if ! reloc_data.status.ok {
-    return Err(ScriptError.Failed("linux-x86-relocs", f"relocs failed for {input}"))?
+    return Err(ScriptError.Failed(kind: "linux-x86-relocs", message: f"relocs failed for {input}"))?
   }
 
   let abs_relocs = run.capture --bytes $relocs "--abs-relocs" $input_text ?
 
   if ! abs_relocs.status.ok {
-    return Err(ScriptError.Failed("linux-x86-relocs", f"relocs --abs-relocs failed for {input}"))?
+    return Err(ScriptError.Failed(kind: "linux-x86-relocs", message: f"relocs --abs-relocs failed for {input}"))?
   }
 
   fs.write(out, bytes.concat([p"arch/x86/boot/compressed/vmlinux.bin".read_bytes()?, reloc_data.stdout]))?
@@ -4841,7 +4841,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) [fs, process, error] {
   }
 
   if lines.len() == 0 {
-    return Err(ScriptError.Failed("linux-x86-voffset", f"no voffset symbols found in {input}"))?
+    return Err(ScriptError.Failed(kind: "linux-x86-voffset", message: f"no voffset symbols found in {input}"))?
   }
 
   write_text_if_changed(
@@ -4866,7 +4866,7 @@ proc write_x86_zoffset_header(nm: Path, input: Path) [fs, process, error] {
   }
 
   if lines.len() == 0 {
-    return Err(ScriptError.Failed("linux-x86-zoffset", f"no zoffset symbols found in {input}"))?
+    return Err(ScriptError.Failed(kind: "linux-x86-zoffset", message: f"no zoffset symbols found in {input}"))?
   }
 
   write_text_if_changed(
@@ -5937,7 +5937,7 @@ export proc build_builtin_archives(
   defs: List[Str],
   includes: List[Str],
   jobs_count: Int,
-) [fs, process, env, time, error] -> Result[List[Path]] {
+) [fs, process, env, time, error] -> Result[List[Path], Error] {
   let archive_plan = plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
   run_builtin_archive_plan(archive_plan, jobs_count)
 }
@@ -5946,7 +5946,7 @@ export proc build_builtin_archives(
 export proc run_builtin_archive_plan(
   archive_plan: BuiltinArchivePlan,
   jobs_count: Int,
-) [fs, process, env, error] -> Result[List[Path]] {
+) [fs, process, env, error] -> Result[List[Path], Error] {
   if archive_plan.missing_sources.len() > 0 {
     print "xsh-kbuild-missing-objects" archive_plan.missing_sources.len() "tolerated"
   }
@@ -5954,8 +5954,8 @@ export proc run_builtin_archive_plan(
   if archive_plan.generated_objects.len() > 0 {
     return Err(
       ScriptError.Failed(
-        "kbuild-generated-objects",
-        f"{archive_plan.generated_objects.len()} generated Kbuild objects need generator tasks",
+        kind: "kbuild-generated-objects",
+        message: f"{archive_plan.generated_objects.len()} generated Kbuild objects need generator tasks",
       ),
     )
   }
@@ -5967,7 +5967,7 @@ export proc run_builtin_archive_plan(
 proc x86_jump_label_helper_source() [fs, error] -> Result[Path] {
   return p"x86-jump-label-patch.c" when p"x86-jump-label-patch.c".exists()?
 
-  Err(ScriptError.Failed("kbuild-x86-jump-label-helper", "missing x86-jump-label-patch.c"))
+  Err(ScriptError.Failed(kind: "kbuild-x86-jump-label-helper", message: "missing x86-jump-label-patch.c"))
 }
 
 proc x86_jump_label_helper() [fs, process, error] -> Result[Path] {
@@ -6006,7 +6006,7 @@ pure parse_jump_label_helper_summary(line: Str) -> JumpLabelPatchResult {
 }
 
 ## Exported declaration `patch_x86_jump_label_outputs`.
-export proc patch_x86_jump_label_outputs(outputs: List[Path]) [fs, process, error] -> Result[JumpLabelPatchResult] {
+export proc patch_x86_jump_label_outputs(outputs: List[Path]) [fs, process, error] -> Result[JumpLabelPatchResult, Error] {
   let helper = x86_jump_label_helper()?
   var argv = [output.display() for output in outputs if output.exists()?]
   archive_plan_progress(f"xsh-kbuild-x86-jump-label-scan start {argv.len()} objects")?
@@ -6071,7 +6071,7 @@ export proc patch_x86_jump_label_archive_plan(
 export proc run_x86_builtin_archive_plan(
   archive_plan: BuiltinArchivePlan,
   jobs_count: Int,
-) [fs, process, env, error] -> Result[List[Path]] {
+) [fs, process, env, error] -> Result[List[Path], Error] {
   let archives = run_builtin_archive_plan(archive_plan, jobs_count)?
   patch_x86_jump_label_archive_plan(archive_plan, jobs_count)?
   archives
@@ -6403,7 +6403,7 @@ export proc analyze_archive_plan_slice(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
+) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let slice_context = archive_analysis_plan_context_slice(context, start, end)?
   let plan = archive_analysis_plan_from_context(slice_context)?
   let config = load_config_if_present(p".config")?
@@ -6740,7 +6740,7 @@ proc archive_analysis_item_from_record(item: Record) [error] -> Result[ArchiveAn
 }
 
 ## Exported declaration `analyze_archive_items`.
-export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
+export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
   analyze_archive_items_impl(typed_items, p".", "", [], [], [], false)?
 }
@@ -6753,7 +6753,7 @@ export proc analyze_archive_items_with_task_specs(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, error] -> Result[List[ArchiveAnalysisResult]] {
+) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
   analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, true)?
 }
 
@@ -6843,7 +6843,7 @@ proc archive_analysis_process_pool(
   let statuses = wait handles?
   for status in statuses {
     guard status.exited_with(0) else {
-      return Err(ScriptError.Failed("kbuild-archive-analysis-pool", "an archive-analysis worker failed"))
+      return Err(ScriptError.Failed(kind: "kbuild-archive-analysis-pool", message: "an archive-analysis worker failed"))
     }
   }
 
@@ -6968,7 +6968,7 @@ proc assemble_builtin_archive_plan(
             deps_by_dir = deps_by_dir.push(owner_key, out.display())
           }
         } else {
-          return Err(ScriptError.Failed("kbuild-archive-analysis", f"unknown archive-analysis task kind {kind}"))
+          return Err(ScriptError.Failed(kind: "kbuild-archive-analysis", message: f"unknown archive-analysis task kind {kind}"))
         }
       }
     } else {
@@ -7177,7 +7177,7 @@ export proc plan_builtin_archives(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, env, time, error] -> Result[BuiltinArchivePlan] {
+) [fs, env, time, error] -> Result[BuiltinArchivePlan, Error] {
   let items = archive_analysis_items_for_plan(plan, triple)?
   let emit_task_specs = (env.get("XSH_LINUX_KBUILD_ARCHIVE_ONLY") ?? "") != "1"
   let results = analyze_archive_items_impl(
@@ -7208,7 +7208,7 @@ export proc plan_builtin_archives_with_analysis_workers(
   analysis_jobs: Int,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, env, time, error] -> Result[BuiltinArchivePlan] {
+) [fs, process, env, time, error] -> Result[BuiltinArchivePlan, Error] {
   guard analysis_jobs > 1 else {
     return plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
   }

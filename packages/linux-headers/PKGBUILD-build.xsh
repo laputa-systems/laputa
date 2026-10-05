@@ -7,7 +7,7 @@ pure kernel_srcarch(arch: Str) -> Result[Str] {
 
   return "x86" when arch == "x86_64"
 
-  Err(uapi.UapiError.Failed("linux-headers-arch", f"unsupported linux-headers arch {arch}"))
+  Err(uapi.UapiError.Failed(kind: "linux-headers-arch", message: f"unsupported linux-headers arch {arch}"))
 }
 
 # One generated asm/unistd header: its syscall table, the ABIs it selects,
@@ -88,7 +88,7 @@ proc generate_version_header(version: Str, out: Path) [fs, error] {
   let parts = [part.parse_int()? for part in version.split(".")]
 
   guard parts.len() == 3 else {
-    return Err(uapi.UapiError.Failed("linux-headers-version", f"kernel version {version} is not MAJOR.MINOR.SUB"))
+    return Err(uapi.UapiError.Failed(kind: "linux-headers-version", message: f"kernel version {version} is not MAJOR.MINOR.SUB"))
   }
 
   fs.write(

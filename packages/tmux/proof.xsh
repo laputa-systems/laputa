@@ -5,7 +5,7 @@ error ScriptError = Failed(kind: Str, message: Str)
 
 proc check(condition: Bool, kind: Str, message: Str) [error] {
   if ! condition {
-    Err(ScriptError.Failed(kind, message))?
+    Err(ScriptError.Failed(kind:, message:))?
   }
 }
 

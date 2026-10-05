@@ -239,7 +239,7 @@ export proc generation_adapter_execute_profile(
   generation_plan_output: Path,
   generation_receipt_output: Path,
   forbidden_packages: List[Str],
-) [fs, net, process, env, time, error] -> Result[GenerationAdapterResult] {
+) [fs, net, process, env, time, error] -> Result[GenerationAdapterResult, Error] {
   let build_plan = pm_plan_json.read(build_plan_path)?
   let execution: types.BuildResult = pm_execute.build_plan(
     build_plan,

@@ -9,7 +9,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let rust_triple = if target_arch == "aarch64" { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
 
   if ! fs.exists(fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib")? {
-    return Err(proof.ProofError.Failed("proof-cargo", f"missing rust std for {rust_triple}"))
+    return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"missing rust std for {rust_triple}"))
   }
 
   if pm_util.build_arch()? != target_arch {
@@ -102,7 +102,7 @@ main(@args)?
   }?
 
   if ! cargo.starts_with("cargo ") {
-    return Err(proof.ProofError.Failed("proof-cargo", f"unexpected cargo version: {cargo.trim()}"))
+    return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"unexpected cargo version: {cargo.trim()}"))
   }
 
   # The package is versioned by the Rust release, which rustc reports; cargo
@@ -110,7 +110,7 @@ main(@args)?
   let ver = proof.package_version(rootfs, "cargo")?
 
   if ! rustc.starts_with(f"rustc {ver} ") {
-    return Err(proof.ProofError.Failed("proof-cargo", f"rustc --version reported {rustc.trim()}, expected {ver}"))
+    return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"rustc --version reported {rustc.trim()}, expected {ver}"))
   }
 
   let hello = fp"{tmp}/target/{rust_triple}/release/cargo-proof-hello"
@@ -118,7 +118,7 @@ main(@args)?
   let trimmed = out.trim()
 
   if trimmed != "hello cargo" {
-    return Err(proof.ProofError.Failed("proof-cargo", f"unexpected hello output: {trimmed}"))
+    return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"unexpected hello output: {trimmed}"))
   }
 
   print "cargo ok: "${trimmed}

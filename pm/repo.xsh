@@ -87,7 +87,7 @@ proc repo_verified_proof_path(
 }
 
 ## Selects every BuildPlan node from verified immutable Store receipts without building or resolving a remote index.
-export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Result[types.RepoSnapshot] {
+export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Result[types.RepoSnapshot, Error] {
   build_plan.validate(value)?
   var packages: List[types.RepoPublication] = []
 

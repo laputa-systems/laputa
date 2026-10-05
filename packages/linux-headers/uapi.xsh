@@ -117,7 +117,7 @@ proc parse_primary(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
     let inner = parse_or(tokens, start + 1)?
 
     if token(tokens, inner.next) != ")" {
-      return Err(UapiError.Failed("uapi-expression", f"unbalanced parentheses in `{tokens.join(" ")}`"))
+      return Err(UapiError.Failed(kind: "uapi-expression", message: f"unbalanced parentheses in `{tokens.join(" ")}`"))
     }
 
     return {cond: inner.cond, next: inner.next + 1}
@@ -148,19 +148,19 @@ proc parse_primary(tokens: List[Str], start: Int) [error] -> Result[Parsed] {
   }
 
   if words.len() == 0 {
-    return Err(UapiError.Failed("uapi-expression", f"empty term in `{tokens.join(" ")}`"))
+    return Err(UapiError.Failed(kind: "uapi-expression", message: f"empty term in `{tokens.join(" ")}`"))
   }
 
   {cond: unknown, next: at}
 }
 
 ## Evaluate an `#if` expression with __KERNEL__ undefined and __EXPORTED_HEADERS__ defined.
-export proc eval_condition(expr: Str) [error] -> Result[Cond] {
+export proc eval_condition(expr: Str) [error] -> Result[Cond, Error] {
   let tokens = tokenize(expr)
   let parsed = parse_or(tokens, 0)?
 
   if parsed.next != tokens.len() {
-    return Err(UapiError.Failed("uapi-expression", f"trailing tokens in `{expr}`"))
+    return Err(UapiError.Failed(kind: "uapi-expression", message: f"trailing tokens in `{expr}`"))
   }
 
   parsed.cond
@@ -218,7 +218,7 @@ pure set_top(frames: List[Frame], frame: Frame) -> List[Frame] {
 # output; any other directive, mixed ones included, passes through byte for
 # byte.
 ## Remove kernel-only conditional blocks as `unifdef -U__KERNEL__ -D__EXPORTED_HEADERS__` does.
-export proc unifdef(lines: List[Str]) [error] -> Result[List[Str]] {
+export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
   var out: List[Str] = []
   var frames: List[Frame] = []
   var index = 0
@@ -268,7 +268,7 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str]] {
     }
 
     if frames.len() == 0 {
-      return Err(UapiError.Failed("uapi-conditional", f"#{current.kind} without #if"))
+      return Err(UapiError.Failed(kind: "uapi-conditional", message: f"#{current.kind} without #if"))
     }
 
     let top = frames[frames.len() - 1]
@@ -325,14 +325,14 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str]] {
   }
 
   if frames.len() > 0 {
-    return Err(UapiError.Failed("uapi-conditional", "#if without #endif"))
+    return Err(UapiError.Failed(kind: "uapi-conditional", message: "#if without #endif"))
   }
 
   out
 }
 
 ## The installed form of one uapi header's text.
-export proc install_text(text: Str) [error] -> Result[Str] {
+export proc install_text(text: Str) [error] -> Result[Str, Error] {
   let lines = [rewrite_line(line) for line in text.lines()]
   let kept = unifdef(lines)?
 

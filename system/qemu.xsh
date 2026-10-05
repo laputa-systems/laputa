@@ -29,7 +29,7 @@ export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: Qe
 # QEMU's default interactive display.
 ## The QEMU target for a host: the guest is the host's architecture, so the
 ## image runs under HVF on macOS and KVM on Linux.
-export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget] {
+export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
   let arm_console = "earlycon=pl011,mmio,0x09000000 keep_bootcon console=ttyAMA0"
 
   if os == "Darwin" and arch == "aarch64" {
@@ -75,7 +75,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget] {
 }
 
 ## The running host's QEMU target.
-export proc host_qemu_target() [env, error] -> Result[QemuTarget] {
+export proc host_qemu_target() [env, error] -> Result[QemuTarget, Error] {
   let os = system.uname()?
   let arch = match os.machine {
     "arm64" | "aarch64" => "aarch64"
@@ -101,7 +101,7 @@ export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode) -> Str {
 }
 
 ## Resolve only the documented host-side QEMU configuration surface.
-export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig] {
+export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig, Error] {
   # QEMU_SYSTEM_AARCH64 or QEMU_SYSTEM_X86_64 names a specific binary.
   let raw_qemu = (env.get(f"QEMU_SYSTEM_{target.arch.upper()}") ?? "").trim()
   let qemu = if raw_qemu == "" { process.which(target.qemu_name)? } else { fp"{raw_qemu}" }
@@ -214,7 +214,7 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
 
 ## Combine QEMU's serial console and stderr log before scanning proof markers:
 ## fatal QEMU diagnostics can be emitted on stderr rather than serial.
-export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Result[Str] {
+export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Result[Str, Error] {
   let console = if fs.exists(console_log)? { fs.read_text(console_log)? } else { "" }
   let qemu = if fs.exists(qemu_log)? { fs.read_text(qemu_log)? } else { "" }
   f"""{console}
@@ -222,7 +222,7 @@ export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Resu
 }
 
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
-export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool] {
+export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool, Error] {
   fs.exists(path_value)? and fs.metadata(path_value)?.kind == "file" and fs.metadata(path_value)?.size > 0
 }
 

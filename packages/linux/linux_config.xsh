@@ -20,15 +20,15 @@ proc resolved_fragment_input(input: Path) [fs, env, error] -> Result[Path] {
 
   Err(
     kbuild.ScriptError.Failed(
-      "linux-config-fragment-missing",
-      f"missing kernel config fragment {input} from staged source or typed recipe directory",
+      kind: "linux-config-fragment-missing",
+      message: f"missing kernel config fragment {input} from staged source or typed recipe directory",
     ),
   )
 }
 
 ## Resolves declared Linux config inputs from verified source staging or the copied typed recipe.
 ## It deliberately never interprets an input relative to the build process cwd.
-export proc resolve_config_fragments(inputs: List[Path]) [fs, env, error] -> Result[List[Path]] {
+export proc resolve_config_fragments(inputs: List[Path]) [fs, env, error] -> Result[List[Path], Error] {
   var fragments = [resolved_fragment_input(input)? for input in inputs]
   fragments
 }
@@ -41,7 +41,7 @@ proc render_fragments(fragments: List[Path]) [fs, error] -> Result[Str] {
   for fragment in fragments {
     guard fragment.exists()? else {
       return Err(
-        kbuild.ScriptError.Failed("linux-config-fragment-missing", f"missing kernel config fragment {fragment}"),
+        kbuild.ScriptError.Failed(kind: "linux-config-fragment-missing", message: f"missing kernel config fragment {fragment}"),
       )
     }
 

@@ -5,13 +5,13 @@ error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure_executable(path_value: Path, label: Str) [fs, error] {
   guard fs.executable(path_value)? else {
-    return Err(ProofError.Failed("proof-tailscale", f"missing executable {label}: {path_value}"))
+    return Err(ProofError.Failed(kind: "proof-tailscale", message: f"missing executable {label}: {path_value}"))
   }
 }
 
 proc ensure_file(path_value: Path, label: Str) [fs, error] {
   guard fs.exists(path_value)? else {
-    return Err(ProofError.Failed("proof-tailscale", f"missing {label}: {path_value}"))
+    return Err(ProofError.Failed(kind: "proof-tailscale", message: f"missing {label}: {path_value}"))
   }
 }
 

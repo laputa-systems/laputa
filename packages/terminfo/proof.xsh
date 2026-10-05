@@ -63,7 +63,7 @@ proc read_compiled(file: Path) [fs, error] -> Result[Compiled] {
   let data = file.read_bytes()?
   let magic = u16(data, 0)
   guard magic == 0o432 or magic == 0o1036 else {
-    return Err(ReadError.Malformed(file, f"bad magic {magic}"))
+    return Err(ReadError.Malformed(file:, message: f"bad magic {magic}"))
   }
 
   let width = if magic == 0o1036 { 4 } else { 2 }

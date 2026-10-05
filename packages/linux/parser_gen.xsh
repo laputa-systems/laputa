@@ -5,7 +5,7 @@ error ParserGenError = Failed(kind: Str, message: Str)
 export type ParserGen = {name: Str, tool: Path, argv: List[Str], outputs: List[Path]}
 
 ## Exported declaration `bison_tool`.
-export proc bison_tool() [env, error] -> Result[Path] {
+export proc bison_tool() [env, error] -> Result[Path, Error] {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
 
   return fp"{root}/usr/lib/pm/repo/bison/files/bison.xsh" when root != ""
@@ -14,7 +14,7 @@ export proc bison_tool() [env, error] -> Result[Path] {
 }
 
 ## Exported declaration `flex_tool`.
-export proc flex_tool() [env, error] -> Result[Path] {
+export proc flex_tool() [env, error] -> Result[Path, Error] {
   let root = env.get("XSH_PM_BUILD_ROOT") ?? env.get("LAPUTA_ROOT") ?? ""
 
   return fp"{root}/usr/lib/pm/repo/flex/files/flex.xsh" when root != ""
@@ -23,7 +23,7 @@ export proc flex_tool() [env, error] -> Result[Path] {
 }
 
 ## Exported declaration `parser_generators`.
-export proc parser_generators() [env, error] -> Result[List[ParserGen]] {
+export proc parser_generators() [env, error] -> Result[List[ParserGen], Error] {
   [
     {
       name: "bison-kconfig",
@@ -85,12 +85,12 @@ export proc parser_generators() [env, error] -> Result[List[ParserGen]] {
 }
 
 ## Exported declaration `parser_generator`.
-export proc parser_generator(name: Str) [env, error] -> Result[ParserGen] {
+export proc parser_generator(name: Str) [env, error] -> Result[ParserGen, Error] {
   for spec in parser_generators()? {
     return spec when spec.name == name
   }
 
-  Err(ParserGenError.Failed("linux-parser-generator", f"unknown parser generator '{name}'"))
+  Err(ParserGenError.Failed(kind: "linux-parser-generator", message: f"unknown parser generator '{name}'"))
 }
 
 ## Exported declaration `remove_outputs`.
@@ -120,15 +120,15 @@ export proc run_generator(spec: ParserGen) [fs, process, error] {
   if ! status.ok {
     return Err(
       ParserGenError.Failed(
-        "linux-parser-generator",
-        f"generator failed for {spec.name}: {spec.tool} {spec.argv.join(" ")}",
+        kind: "linux-parser-generator",
+        message: f"generator failed for {spec.name}: {spec.tool} {spec.argv.join(" ")}",
       ),
     )
   }
 
   for out in spec.outputs {
     guard out.exists()? else {
-      return Err(ParserGenError.Failed("linux-parser-generator", f"{spec.name} did not write {out}"))
+      return Err(ParserGenError.Failed(kind: "linux-parser-generator", message: f"{spec.name} did not write {out}"))
     }
   }
 }

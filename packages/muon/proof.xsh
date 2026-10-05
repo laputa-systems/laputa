@@ -7,7 +7,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let muon = fp"{rootfs}/usr/bin/muon"
 
   if ! fs.exists(muon)? {
-    return Err(ScriptError.Failed("proof-muon", f"missing muon: {muon}"))?
+    return Err(ScriptError.Failed(kind: "proof-muon", message: f"missing muon: {muon}"))?
   }
 
   proof.target_elf(rootfs, p"usr/bin/muon", "muon")?
@@ -17,12 +17,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     let trimmed = out.trim()
 
     if trimmed == "" {
-      return Err(ScriptError.Failed("proof-muon", "muon version produced no output"))?
+      return Err(ScriptError.Failed(kind: "proof-muon", message: "muon version produced no output"))?
     }
 
     # fontconfig 2.18 requires meson 1.11 semantics.
     if "meson compatibility version 1.11" not in trimmed {
-      return Err(ScriptError.Failed("proof-muon", f"muon is not meson 1.11 compatible: {trimmed}"))?
+      return Err(ScriptError.Failed(kind: "proof-muon", message: f"muon is not meson 1.11 compatible: {trimmed}"))?
     }
 
     print "muon ok: "${trimmed}

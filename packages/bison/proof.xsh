@@ -256,7 +256,7 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
   let out = run.text $program ?
 
   if out != expected {
-    return Err(ScriptError.Failed("proof-bison", f"{source} parser output:\n{out}"))?
+    return Err(ScriptError.Failed(kind: "proof-bison", message: f"{source} parser output:\n{out}"))?
   }
 }
 
@@ -281,7 +281,7 @@ proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
         let diagnostics = stderr.read_text()?
 
         if ! status.ok or diagnostics != "" {
-          return Err(ScriptError.Failed("proof-bison", f"bison {grammar.file}: {diagnostics}"))?
+          return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison {grammar.file}: {diagnostics}"))?
         }
       }?
     }
@@ -291,13 +291,13 @@ proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
     let file = fp"{tmp}/{output.name}"
 
     if ! fs.exists(file)? {
-      return Err(ScriptError.Failed("proof-bison", f"bison did not write {output.name}"))?
+      return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison did not write {output.name}"))?
     }
 
     let digest = hash.sha256(file)?.hex()
 
     if digest != output.sha256 {
-      return Err(ScriptError.Failed("proof-bison", f"{output.name} differs from GNU bison 3.8.2 output: sha256 {digest}"))?
+      return Err(ScriptError.Failed(kind: "proof-bison", message: f"{output.name} differs from GNU bison 3.8.2 output: sha256 {digest}"))?
     }
   }
 
@@ -314,7 +314,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     let version = run.text $bison "--version" ?
 
     if "GNU Bison) 3.8.2" not in version {
-      return Err(ScriptError.Failed("proof-bison", f"bison --version: {version.trim()}"))?
+      return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison --version: {version.trim()}"))?
     }
 
     prove_grammars(rootfs, bison)?

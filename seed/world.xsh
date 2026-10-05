@@ -37,7 +37,7 @@ stop lines: pre-cmake (every package whose build closure needs neither cmake nor
 export type WorldArgs = {command: Str, arch: Str, packages: List[Str], stop: Str, jobs: Int, repo: Str}
 
 ## Parse `world_cli.xsh` argv; selection, repository, and root rules fail here, before any Docker run.
-export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs] {
+export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs, Error] {
   if argv.len() == 0 or argv[0] not in ["plan", "build", "publish", "root"] {
     return Err(xsh_seed.SeedError.Usage(world_usage()))
   }
@@ -83,7 +83,7 @@ export proc parse_world_args(argv: List[Str]) [error] -> Result[WorldArgs] {
 }
 
 ## The packages a named stop line excludes, with every package whose build closure needs one.
-export pure world_stop_line(name: Str) -> Result[List[Str]] {
+export pure world_stop_line(name: Str) -> Result[List[Str], Error] {
   match name {
     "pre-cmake" => ["cmake", "linux"]
     _ => Err(xsh_seed.SeedError.Usage(f"unknown stop line {name}; the stop lines are: pre-cmake"))
@@ -91,7 +91,7 @@ export pure world_stop_line(name: Str) -> Result[List[Str]] {
 }
 
 ## The `pm repo plan` selection for explicit packages, a stop line, or (neither) every package.
-export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[Str]] {
+export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[Str], Error] {
   if packages.len() > 0 {
     var argv: List[Str] = []
 
