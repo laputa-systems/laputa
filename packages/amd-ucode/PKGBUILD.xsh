@@ -176,12 +176,12 @@ const microcode_containers = [
 export proc build(dest: Path) [fs, error] {
   let src = fs.cwd()?
   let firmware = fp"{dest}/usr/lib/firmware/amd-ucode"
-  var containers: List[Bytes] = []
-
-  for container in microcode_containers {
-    let staged = fp"{src}/amd-ucode/{container}"
-    fs.install(staged, fp"{firmware}/{container}", 0o644, parents: true, overwrite: true)
-    containers += [staged.read_bytes()?]
+  let containers: List[Bytes] = collect {
+    for container in microcode_containers {
+      let staged = fp"{src}/amd-ucode/{container}"
+      fs.install(staged, fp"{firmware}/{container}", 0o644, parents: true, overwrite: true)
+      yield staged.read_bytes()?
+    }
   }
 
   fs.install(

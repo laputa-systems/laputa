@@ -223,14 +223,14 @@ export proc discover_sources(
   exclude: List[Path] = [],
 ) [fs, error] -> Result[List[Path], Error] {
   let source_root = path.absolute(root)?
-  var sources = []
-
-  for entry in fs.walk(source_root, gitignore: false)? |> sort-by .path {
-    continue unless entry.kind == "file"
-    continue unless entry.ext in extensions
-    let rel = entry.path.relative_to(source_root)
-    continue when path_in_list(rel, exclude)
-    sources += [rel]
+  let sources = collect {
+    for entry in fs.walk(source_root, gitignore: false)? |> sort-by .path {
+      continue unless entry.kind == "file"
+      continue unless entry.ext in extensions
+      let rel = entry.path.relative_to(source_root)
+      continue when path_in_list(rel, exclude)
+      yield rel
+    }
   }
 
   sources
@@ -494,15 +494,16 @@ pure completed_index_key(index: Int) -> Str {
 }
 
 proc remove_running_indices(running: List[RunningTask], completed_indices: Map[Bool]) -> List[RunningTask] {
-  var next = []
   var index = 0
 
-  for row in running {
-    if ! (completed_indices.get(completed_index_key(index)) ?? false) {
-      next += [row]
-    }
+  let next = collect {
+    for row in running {
+      if ! (completed_indices.get(completed_index_key(index)) ?? false) {
+        yield row
+      }
 
-    index += 1
+      index += 1
+    }
   }
 
   next
@@ -674,19 +675,19 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
     }
 
     var completed_indices: Map[Bool] = {}
-    var completed_tasks: List[RunningTask] = []
+    let completed_tasks: List[RunningTask] = collect {
+      for completed in completed_rows {
+        let completed_index = completed.index
+        let row = running[completed_index]
+        completed_indices[completed_index_key(completed_index)] = true
 
-    for completed in completed_rows {
-      let completed_index = completed.index
-      let row = running[completed_index]
-      completed_indices[completed_index_key(completed_index)] = true
+        if ! completed.status.ok {
+          cancel_running_uncompleted(running, completed_indices)
+          return Err(MakeError.CommandFailed(f"make task '{row.task.name}' failed"))
+        }
 
-      if ! completed.status.ok {
-        cancel_running_uncompleted(running, completed_indices)
-        return Err(MakeError.CommandFailed(f"make task '{row.task.name}' failed"))
+        yield row
       }
-
-      completed_tasks += [row]
     }
 
     running = remove_running_indices(running, completed_indices)

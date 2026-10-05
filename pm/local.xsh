@@ -49,15 +49,15 @@ export proc load_manifest(db: Path) [fs, error] -> Result[List[Path], Error] {
 
 ## Exported PM declaration `collect_etcsums`.
 export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Result[List[types.EtcSum], Error] {
-  var sums = []
+  let sums = collect {
+    for rel_path in manifest {
+      if util.is_etc_file(rel_path) {
+        let meta = fp"{dest}/{rel_path}".metadata()?
 
-  for rel_path in manifest {
-    if util.is_etc_file(rel_path) {
-      let meta = fp"{dest}/{rel_path}".metadata()?
-
-      if meta.kind == "file" {
-        let sha256 = hash.sha256(fp"{dest}/{rel_path}")?.hex()
-        sums += [{path: rel_path.display(), sha256}]
+        if meta.kind == "file" {
+          let sha256 = hash.sha256(fp"{dest}/{rel_path}")?.hex()
+          yield {path: rel_path.display(), sha256}
+        }
       }
     }
   }
@@ -68,28 +68,28 @@ export proc collect_etcsums(dest: Path, manifest: List[Path]) [fs, error] -> Res
 ## Exported PM declaration `validate_and_strip_package`.
 export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest: List[Path]) [fs, process, error] {
   var declared: Map[types.FileKind] = {}
-  var binaries = []
+  let binaries = collect {
+    for entry in pkg.filetree {
+      let key = entry.path.display()
 
-  for entry in pkg.filetree {
-    let key = entry.path.display()
+      if key == "" or key.starts_with("/") or key.starts_with("../") or "/../" in key {
+        return Err(types.PmError.PackageContract(f"{pkg.name} declares an invalid filetree path {key}"))
+      }
 
-    if key == "" or key.starts_with("/") or key.starts_with("../") or "/../" in key {
-      return Err(types.PmError.PackageContract(f"{pkg.name} declares an invalid filetree path {key}"))
-    }
+      if key in declared {
+        return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} more than once"))
+      }
 
-    if key in declared {
-      return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} more than once"))
-    }
+      declared[key] = entry.kind
 
-    declared[key] = entry.kind
+      if entry.kind == types.file_kind_binary() {
+        yield entry.path
+      }
 
-    if entry.kind == types.file_kind_binary() {
-      binaries += [entry.path]
-    }
-
-    if entry.kind == types.file_kind_tree() {
-      guard fp"{dest}/{entry.path}".is_dir() else {
-        return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
+      if entry.kind == types.file_kind_tree() {
+        guard fp"{dest}/{entry.path}".is_dir() else {
+          return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
+        }
       }
     }
   }
@@ -253,14 +253,14 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
   }
 
   var unique: Set[Str] = set.empty()
-  var canonical: List[Path] = []
+  let canonical: List[Path] = collect {
+    for entry in entries |> sort-by .display() {
+      let key = entry.display()
 
-  for entry in entries |> sort-by .display() {
-    let key = entry.display()
-
-    if ! (key in unique) {
-      unique = unique.add(key)
-      canonical += [entry]
+      if ! (key in unique) {
+        unique = unique.add(key)
+        yield entry
+      }
     }
   }
 
@@ -386,18 +386,19 @@ export proc write_package_db(
 
 ## Exported PM declaration `load_package_dirs`.
 export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[types.Package], Error] {
-  var packages = []
   var seen: Set[Str] = set.empty()
 
-  for dir in dirs {
-    let pkg = recipe.load_package(dir)?
+  let packages = collect {
+    for dir in dirs {
+      let pkg = recipe.load_package(dir)?
 
-    if pkg.name in seen {
-      return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
+      if pkg.name in seen {
+        return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
+      }
+
+      seen = seen.add(pkg.name)
+      yield pkg
     }
-
-    seen = seen.add(pkg.name)
-    packages += [pkg]
   }
 
   packages

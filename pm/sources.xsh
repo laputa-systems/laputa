@@ -436,20 +436,20 @@ proc stage_resolved_source(
 export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, error] {
   let arch = util.machine_arch()?
   let build = util.build_arch()?
-  var staged = []
+  let staged = collect {
+    for source in pkg.upstream_sources {
+      continue unless source_selected(source, arch)
+      let line = util.parse_source_line(source.source)?
+      let checksum = source_checksum(source, arch)?
+      let resolved = resolve_source(pkg, line, checksum, arch, build)?
+      var crates: List[ResolvedCrate] = []
 
-  for source in pkg.upstream_sources {
-    continue unless source_selected(source, arch)
-    let line = util.parse_source_line(source.source)?
-    let checksum = source_checksum(source, arch)?
-    let resolved = resolve_source(pkg, line, checksum, arch, build)?
-    var crates: List[ResolvedCrate] = []
+      if source.kind == types.source_cargo_vendor() {
+        crates = resolve_locked_crates(pkg, resolved, checksum)?
+      }
 
-    if source.kind == types.source_cargo_vendor() {
-      crates = resolve_locked_crates(pkg, resolved, checksum)?
+      yield {line, resolved, kind: source.kind, checksum, crates}
     }
-
-    staged += [{line, resolved, kind: source.kind, checksum, crates}]
   }
 
   for entry in staged {
@@ -520,25 +520,25 @@ export proc generate_checksums_for(
   arch: Str,
 ) [fs, net, env, error] -> Result[List[Str], Error] {
   let build = util.build_arch()?
-  var generated = []
+  let generated = collect {
+    for source in pkg.upstream_sources {
+      continue unless source_selected(source, arch)
+      let line = util.parse_source_line(source.source)?
+      let stored = source_checksum(source, arch)?
+      let expanded = util.expand_source(line.source, pkg, arch, build)
 
-  for source in pkg.upstream_sources {
-    continue unless source_selected(source, arch)
-    let line = util.parse_source_line(source.source)?
-    let stored = source_checksum(source, arch)?
-    let expanded = util.expand_source(line.source, pkg, arch, build)
-
-    if stored == "SKIP" {
-      generated += ["SKIP"]
-    } else if util.is_url_source(expanded) {
-      generated += [upstream_sha256(cache_root, pkg.name, expanded)?]
-    } else {
-      let resolved = resolve_source(pkg, line, stored, arch, build)?
-
-      if resolved.kind == "dir" {
-        generated += ["SKIP"]
+      if stored == "SKIP" {
+        yield "SKIP"
+      } else if util.is_url_source(expanded) {
+        yield upstream_sha256(cache_root, pkg.name, expanded)?
       } else {
-        generated += [hash.sha256(resolved.path)?.hex()]
+        let resolved = resolve_source(pkg, line, stored, arch, build)?
+
+        if resolved.kind == "dir" {
+          yield "SKIP"
+        } else {
+          yield hash.sha256(resolved.path)?.hex()
+        }
       }
     }
   }
@@ -760,17 +760,17 @@ export proc fetch_sources(root: Path, items: List[SourceFetchItem]) [fs, net, ti
   var cached = 0
   var fetched = 0
   var fetched_bytes = 0
-  var failures: List[Str] = []
-
-  for result in results {
-    match result.outcome {
-      Cached => cached += 1
-      Fetched(size) => {
-        fetched += 1
-        fetched_bytes += size
+  let failures: List[Str] = collect {
+    for result in results {
+      match result.outcome {
+        Cached => cached += 1
+        Fetched(size) => {
+          fetched += 1
+          fetched_bytes += size
+        }
+        Unavailable(detail) => yield f"dead {result.item.packages.join(",")}: {detail}"
+        Mismatch(detail) => yield f"mismatch {result.item.packages.join(",")}: {detail}"
       }
-      Unavailable(detail) => failures += [f"dead {result.item.packages.join(",")}: {detail}"]
-      Mismatch(detail) => failures += [f"mismatch {result.item.packages.join(",")}: {detail}"]
     }
   }
 

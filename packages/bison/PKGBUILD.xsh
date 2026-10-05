@@ -705,14 +705,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   p"lib/unistr.h".write(p"lib/unistr.in.h".read_text()?)
   p"lib/uniwidth.h".write(p"lib/uniwidth.in.h".read_text()?)
   p"lib/textstyle.h".write(p"lib/textstyle.in.h".read_text()?)
-  var scratch_lines = []
-
-  for line in p"lib/malloc/scratch_buffer.h".lines()? {
-    if ! ("libc_hidden_proto" in line) {
-      var generated = line.replace("__always_inline", with: "inline _GL_ATTRIBUTE_ALWAYS_INLINE")
-      generated = generated.replace("__glibc_likely", with: "_GL_LIKELY")
-      generated = generated.replace("__glibc_unlikely", with: "_GL_UNLIKELY")
-      scratch_lines += [generated]
+  let scratch_lines = collect {
+    for line in p"lib/malloc/scratch_buffer.h".lines()? {
+      if ! ("libc_hidden_proto" in line) {
+        var generated = line.replace("__always_inline", with: "inline _GL_ATTRIBUTE_ALWAYS_INLINE")
+        generated = generated.replace("__glibc_likely", with: "_GL_LIKELY")
+        generated = generated.replace("__glibc_unlikely", with: "_GL_UNLIKELY")
+        yield generated
+      }
     }
   }
 
@@ -799,43 +799,44 @@ getprogname (void)
   # -Ilib for gnulib interface headers and generated passthrough headers.
   # -Isrc for bison's own internal headers.
   let includes = ["-I.", "-Ilib", "-Isrc"]
-  var lib_sources = []
   var in_sources = false
 
-  for line in p"lib/gnulib.mk".lines()? {
-    var chunk: Str = line
+  let lib_sources = collect {
+    for line in p"lib/gnulib.mk".lines()? {
+      var chunk: Str = line
 
-    if line.starts_with("lib_libbison_a_SOURCES +=") {
-      chunk = line.replace("lib_libbison_a_SOURCES +=", with: "")
-      in_sources = true
-    }
-
-    if in_sources {
-      let keep_going = chunk.trim().ends_with("\\")
-
-      for word in chunk.replace("\\", with: "").trim().split(" ") |> where . != "" {
-        if word.ends_with(".c") {
-          lib_sources += [fp"{word}"]
-        }
+      if line.starts_with("lib_libbison_a_SOURCES +=") {
+        chunk = line.replace("lib_libbison_a_SOURCES +=", with: "")
+        in_sources = true
       }
 
-      in_sources = keep_going
-    }
-  }
+      if in_sources {
+        let keep_going = chunk.trim().ends_with("\\")
 
-  lib_sources += [p"lib/rawmemchr.c"]
-  lib_sources += [p"lib/error.c"]
-  lib_sources += [p"lib/obstack.c"]
-  lib_sources += [p"lib/obstack_printf.c"]
-  lib_sources += [p"lib/asnprintf.c"]
-  lib_sources += [p"lib/printf-args.c"]
-  lib_sources += [p"lib/printf-parse.c"]
-  lib_sources += [p"lib/vasnprintf.c"]
-  lib_sources += [p"lib/get-errno.c"]
-  lib_sources += [p"lib/setlocale-lock.c"]
-  lib_sources += [p"lib/chdir-long.c"]
-  lib_sources += [p"lib/path-join.c"]
-  lib_sources += [p"lib/xsh-getprogname.c"]
+        for word in chunk.replace("\\", with: "").trim().split(" ") |> where . != "" {
+          if word.ends_with(".c") {
+            yield fp"{word}"
+          }
+        }
+
+        in_sources = keep_going
+      }
+    }
+
+    yield p"lib/rawmemchr.c"
+    yield p"lib/error.c"
+    yield p"lib/obstack.c"
+    yield p"lib/obstack_printf.c"
+    yield p"lib/asnprintf.c"
+    yield p"lib/printf-args.c"
+    yield p"lib/printf-parse.c"
+    yield p"lib/vasnprintf.c"
+    yield p"lib/get-errno.c"
+    yield p"lib/setlocale-lock.c"
+    yield p"lib/chdir-long.c"
+    yield p"lib/path-join.c"
+    yield p"lib/xsh-getprogname.c"
+  }
 
   # Compile bison's src/*.c (scanners and parsers are pre-generated in tarball)
   let src_sources = make.discover_sources(

@@ -3,15 +3,15 @@ use packages.libevdev.PKGBUILD as libevdev_recipe
 
 pure lines_between(text: Str, start: Str, end: Str) -> List[Str] {
   var inside = false
-  var lines = []
-
-  for line in text.split("\n") {
-    if line == start {
-      inside = true
-    } else if inside and line == end {
-      inside = false
-    } else if inside {
-      lines += [line]
+  let lines = collect {
+    for line in text.split("\n") {
+      if line == start {
+        inside = true
+      } else if inside and line == end {
+        inside = false
+      } else if inside {
+        yield line
+      }
     }
   }
 

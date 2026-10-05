@@ -37,12 +37,12 @@ pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
 
 # The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_list(file: Path, variable: Str) -> Result[List[Str]] {
-  var names: List[Str] = []
-
-  for line in file.read_text()?.lines() {
-    let fields = line.fields()
-    continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
-    names += [fields[2]]
+  let names: List[Str] = collect {
+    for line in file.read_text()?.lines() {
+      let fields = line.fields()
+      continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
+      yield fields[2]
+    }
   }
 
   names

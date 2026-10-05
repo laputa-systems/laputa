@@ -265,20 +265,21 @@ export proc upsert_remote_package(
   index: List[types.RemotePackage],
   entry: types.RemotePackage,
 ) [error] -> Result[List[types.RemotePackage], Error] {
-  var updated = []
   var replaced = false
 
-  for existing in index {
-    if existing.arch == entry.arch and existing.name == entry.name {
-      updated += [entry]
-      replaced = true
-    } else {
-      updated += [existing]
+  let updated = collect {
+    for existing in index {
+      if existing.arch == entry.arch and existing.name == entry.name {
+        yield entry
+        replaced = true
+      } else {
+        yield existing
+      }
     }
-  }
 
-  if ! replaced {
-    updated += [entry]
+    if ! replaced {
+      yield entry
+    }
   }
 
   let sorted = updated |> sort-by .name

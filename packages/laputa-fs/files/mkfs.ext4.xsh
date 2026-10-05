@@ -141,12 +141,13 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) -> Result[L
 }
 
 proc assign_inodes(entries: List[ExtEntry]) -> List[ExtEntry] {
-  var out = []
   var index = 0
 
-  for entry in entries |> sort-by .rel {
-    out += [{...entry, inode: 11 + index}]
-    index += 1
+  let out = collect {
+    for entry in entries |> sort-by .rel {
+      yield {...entry, inode: 11 + index}
+      index += 1
+    }
   }
 
   out
@@ -313,21 +314,21 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
   }
 
   var double = 0
-  var indirects = []
+  let indirects = collect {
+    if count > 1036 {
+      let result = allocate_block(current_used, current_next, total_blocks)?
+      current_used = result.used
+      current_next = result.next
+      double = result.block
+      var remaining = count - 1036
 
-  if count > 1036 {
-    let result = allocate_block(current_used, current_next, total_blocks)?
-    current_used = result.used
-    current_next = result.next
-    double = result.block
-    var remaining = count - 1036
-
-    while remaining > 0 {
-      let indirect = allocate_block(current_used, current_next, total_blocks)?
-      current_used = indirect.used
-      current_next = indirect.next
-      indirects += [indirect.block]
-      remaining -= if remaining > 1024 { 1024 } else { remaining }
+      while remaining > 0 {
+        let indirect = allocate_block(current_used, current_next, total_blocks)?
+        current_used = indirect.used
+        current_next = indirect.next
+        yield indirect.block
+        remaining -= if remaining > 1024 { 1024 } else { remaining }
+      }
     }
   }
 
@@ -403,14 +404,15 @@ proc write_indirect_blocks(image: Path, alloc: ExtAlloc) {
   }
 
   if alloc.double != 0 {
-    var double_ptrs = []
     var offset = 1036
 
-    for indirect in alloc.indirects {
-      double_ptrs += [indirect]
-      let end = min_int(offset + 1024, alloc.count)
-      write_block(image, indirect, u32_block(data_blocks_slice(alloc, offset, end - offset))?)
-      offset = end
+    let double_ptrs = collect {
+      for indirect in alloc.indirects {
+        yield indirect
+        let end = min_int(offset + 1024, alloc.count)
+        write_block(image, indirect, u32_block(data_blocks_slice(alloc, offset, end - offset))?)
+        offset = end
+      }
     }
 
     write_block(image, alloc.double, u32_block(double_ptrs)?)
@@ -617,51 +619,53 @@ proc superblock(
 }
 
 proc block_bitmap_bytes(first: Int, group_blocks: Int, allocated_next: Int) -> Result[Bytes] {
-  var out = []
   var byte_index = 0
 
-  while byte_index < BLOCK_SIZE {
-    var value = 0
-    var bit = 0
+  let out = collect {
+    while byte_index < BLOCK_SIZE {
+      var value = 0
+      var bit = 0
 
-    while bit < 8 {
-      let local = byte_index * 8 + bit
+      while bit < 8 {
+        let local = byte_index * 8 + bit
 
-      if local >= group_blocks or local < 4 + INODE_TABLE_BLOCKS or first + local < allocated_next {
-        value += bit_value(bit)
+        if local >= group_blocks or local < 4 + INODE_TABLE_BLOCKS or first + local < allocated_next {
+          value += bit_value(bit)
+        }
+
+        bit += 1
       }
 
-      bit += 1
+      yield value
+      byte_index += 1
     }
-
-    out += [value]
-    byte_index += 1
   }
 
   bytes.from_ints(out)?
 }
 
 proc inode_bitmap_bytes(first_inode: Int, max_inode: Int) -> Result[Bytes] {
-  var out = []
   var byte_index = 0
 
-  while byte_index < BLOCK_SIZE {
-    var value = 0
-    var bit = 0
+  let out = collect {
+    while byte_index < BLOCK_SIZE {
+      var value = 0
+      var bit = 0
 
-    while bit < 8 {
-      let local = byte_index * 8 + bit
-      let inode = first_inode + local
+      while bit < 8 {
+        let local = byte_index * 8 + bit
+        let inode = first_inode + local
 
-      if local >= INODES_PER_GROUP or inode <= 10 or (inode >= 11 and inode <= max_inode) {
-        value += bit_value(bit)
+        if local >= INODES_PER_GROUP or inode <= 10 or (inode >= 11 and inode <= max_inode) {
+          value += bit_value(bit)
+        }
+
+        bit += 1
       }
 
-      bit += 1
+      yield value
+      byte_index += 1
     }
-
-    out += [value]
-    byte_index += 1
   }
 
   bytes.from_ints(out)?
@@ -688,57 +692,58 @@ proc write_headers(
   label: Str,
 ) {
   let max_inode = if entries.is_empty() { 10 } else { entries[-1].inode }
-  var desc_parts = []
   var free_blocks_total = 0
   var group_index = 0
 
-  while group_index < groups {
-    let first = group_index * BLOCKS_PER_GROUP
-    let group_blocks = min_int(BLOCKS_PER_GROUP, total_blocks - first)
-    let block_bitmap = first + 2
-    let inode_bitmap = first + 3
-    let inode_table = first + 4
-    let block_bitmap_data = block_bitmap_bytes(first, group_blocks, allocated_next)?
-    write_block(image, block_bitmap, block_bitmap_data)
-    var used_blocks = 0
-    var local = 0
+  let desc_parts = collect {
+    while group_index < groups {
+      let first = group_index * BLOCKS_PER_GROUP
+      let group_blocks = min_int(BLOCKS_PER_GROUP, total_blocks - first)
+      let block_bitmap = first + 2
+      let inode_bitmap = first + 3
+      let inode_table = first + 4
+      let block_bitmap_data = block_bitmap_bytes(first, group_blocks, allocated_next)?
+      write_block(image, block_bitmap, block_bitmap_data)
+      var used_blocks = 0
+      var local = 0
 
-    while local < group_blocks {
-      if local < 4 + INODE_TABLE_BLOCKS or first + local < allocated_next {
-        used_blocks += 1
+      while local < group_blocks {
+        if local < 4 + INODE_TABLE_BLOCKS or first + local < allocated_next {
+          used_blocks += 1
+        }
+
+        local += 1
       }
 
-      local += 1
-    }
+      let free_blocks = group_blocks - used_blocks
+      free_blocks_total += free_blocks
+      let first_inode = group_index * INODES_PER_GROUP + 1
+      let inode_bitmap_data = inode_bitmap_bytes(first_inode, max_inode)?
+      write_block(image, inode_bitmap, inode_bitmap_data)
+      var used_inodes = 0
+      local = 0
 
-    let free_blocks = group_blocks - used_blocks
-    free_blocks_total += free_blocks
-    let first_inode = group_index * INODES_PER_GROUP + 1
-    let inode_bitmap_data = inode_bitmap_bytes(first_inode, max_inode)?
-    write_block(image, inode_bitmap, inode_bitmap_data)
-    var used_inodes = 0
-    local = 0
+      while local < INODES_PER_GROUP {
+        let inode = first_inode + local
 
-    while local < INODES_PER_GROUP {
-      let inode = first_inode + local
+        if inode <= 10 or (inode >= 11 and inode <= max_inode) {
+          used_inodes += 1
+        }
 
-      if inode <= 10 or (inode >= 11 and inode <= max_inode) {
-        used_inodes += 1
+        local += 1
       }
 
-      local += 1
+      yield group_desc(
+          block_bitmap,
+          inode_bitmap,
+          inode_table,
+          free_blocks,
+          INODES_PER_GROUP - used_inodes,
+          used_dirs_in_group(entries, group_index),
+        )?
+
+      group_index += 1
     }
-
-    desc_parts += [group_desc(
-        block_bitmap,
-        inode_bitmap,
-        inode_table,
-        free_blocks,
-        INODES_PER_GROUP - used_inodes,
-        used_dirs_in_group(entries, group_index),
-      )?]
-
-    group_index += 1
   }
 
   let total_inodes = groups * INODES_PER_GROUP

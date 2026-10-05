@@ -505,13 +505,13 @@ export proc add_extra_objects_from_env(plan: kbuild.KbuildPlan) [env, error] -> 
 }
 
 proc parse_kbuild_only_outputs(raw: Str) [error] -> Result[List[Path]] {
-  var outputs: List[Path] = []
+  let outputs: List[Path] = collect {
+    for item in raw.split(",") {
+      let trimmed = item.trim()
 
-  for item in raw.split(",") {
-    let trimmed = item.trim()
-
-    if trimmed != "" {
-      outputs += [fp"{trimmed}"]
+      if trimmed != "" {
+        yield fp"{trimmed}"
+      }
     }
   }
 

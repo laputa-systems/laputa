@@ -570,12 +570,12 @@ export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [
 
 # The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_header_list(file: Path, variable: Str) -> Result[List[Str]] {
-  var names: List[Str] = []
-
-  for line in file.read_text()?.lines() {
-    let fields = line.fields()
-    continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
-    names += [fields[2]]
+  let names: List[Str] = collect {
+    for line in file.read_text()?.lines() {
+      let fields = line.fields()
+      continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
+      yield fields[2]
+    }
   }
 
   names
@@ -797,13 +797,13 @@ pure expand_vars(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str
 
 proc logical_lines(body: Str) -> List[Str] {
   if ! ("#" in body) and ! ("\\" in body) {
-    var direct: List[Str] = []
+    let direct: List[Str] = collect {
+      for raw in body.split("\n") {
+        let trimmed = raw.trim()
 
-    for raw in body.split("\n") {
-      let trimmed = raw.trim()
-
-      if trimmed != "" {
-        direct += [trimmed]
+        if trimmed != "" {
+          yield trimmed
+        }
       }
     }
 
@@ -980,18 +980,19 @@ pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
 }
 
 proc composite_members(dir: Path, item: Str, vars: Map[Str]) -> List[Path] {
-  var members: List[Path] = []
   let stem = object_stem(item)
 
-  for member in (vars.get(f"{stem}-y") ?? "").fields() {
-    if member.ends_with(".o") {
-      members += [join_rel(dir, member)]
+  let members: List[Path] = collect {
+    for member in (vars.get(f"{stem}-y") ?? "").fields() {
+      if member.ends_with(".o") {
+        yield join_rel(dir, member)
+      }
     }
-  }
 
-  for member in (vars.get(f"{stem}-objs") ?? "").fields() {
-    if member.ends_with(".o") {
-      members += [join_rel(dir, member)]
+    for member in (vars.get(f"{stem}-objs") ?? "").fields() {
+      if member.ends_with(".o") {
+        yield join_rel(dir, member)
+      }
     }
   }
 
@@ -1261,14 +1262,14 @@ pure compile_flags_cache_format() -> Str {
 }
 
 pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlagsEntry] {
-  var entries: List[CompileFlagsEntry] = []
+  let entries: List[CompileFlagsEntry] = collect {
+    for dir_key in flags.keys() {
+      let empty_dir_flags: Map[List[Str]] = {}
+      let dir_flags = flags.get(dir_key) ?? empty_dir_flags
 
-  for dir_key in flags.keys() {
-    let empty_dir_flags: Map[List[Str]] = {}
-    let dir_flags = flags.get(dir_key) ?? empty_dir_flags
-
-    for object_key in dir_flags.keys() {
-      entries += [{dir: dir_key, object: object_key, flags: dir_flags.get(object_key) ?? []}]
+      for object_key in dir_flags.keys() {
+        yield {dir: dir_key, object: object_key, flags: dir_flags.get(object_key) ?? []}
+      }
     }
   }
 
@@ -1454,13 +1455,13 @@ export proc augment_missing_composites(
   let scans: List[CompositeScan] = dirs
     |> par-map(jobs: planner_jobs()) { |dir|
       let vars = vars_for_dir(root, dir, config, srcarch)?
-      var found = []
+      let found = collect {
+        for obj in missing_by_dir.get(path_key(dir)) ?? [] {
+          let members = composite_members(dir, obj.name, vars)
 
-      for obj in missing_by_dir.get(path_key(dir)) ?? [] {
-        let members = composite_members(dir, obj.name, vars)
-
-        if ! members.is_empty() {
-          found += [{object: obj, members: members}]
+          if ! members.is_empty() {
+            yield {object: obj, members: members}
+          }
         }
       }
 
@@ -2381,15 +2382,16 @@ proc scan_discover_dir(
 }
 
 proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) -> List[Path] {
-  var unique: List[Path] = []
   var local_seen = seen
 
-  for path_value in paths {
-    let key = path_key(path_value)
+  let unique: List[Path] = collect {
+    for path_value in paths {
+      let key = path_key(path_value)
 
-    if ! (local_seen.get(key) ?? false) {
-      local_seen[key] = true
-      unique += [path_value]
+      if ! (local_seen.get(key) ?? false) {
+        local_seen[key] = true
+        yield path_value
+      }
     }
   }
 
@@ -2403,11 +2405,11 @@ proc scan_discover_batch_serial(
   srcarch: Str,
   options: DiscoverOptions,
 ) -> Result[List[DirScan]] {
-  var scans: List[DirScan] = []
-
-  for dir in pending {
-    emit_stage_progress(root, options, f"xsh-kbuild-scan {path_key(dir)}")
-    scans += [scan_discover_dir(root, dir, config, srcarch, options)?]
+  let scans: List[DirScan] = collect {
+    for dir in pending {
+      emit_stage_progress(root, options, f"xsh-kbuild-scan {path_key(dir)}")
+      yield scan_discover_dir(root, dir, config, srcarch, options)?
+    }
   }
 
   scans
@@ -2564,10 +2566,11 @@ proc discover_records_process_pool(
     return Err(ScriptError.Failed(kind: "kbuild-process-pool", message: state.error))
   }
 
-  var records: List[ScanRecord] = []
-  for output_path in output_paths {
-    let batch = json.read(output_path)?.require(List[ScanRecord])?
-    records += batch
+  let records: List[ScanRecord] = collect {
+    for output_path in output_paths {
+      let batch = json.read(output_path)?.require(List[ScanRecord])?
+      yield @batch
+    }
   }
 
   plan_from_record_values(records)?
@@ -2905,15 +2908,16 @@ proc paths_from_strings(items: List[Str]) -> Result[List[Path]] {
 }
 
 proc unique_paths(paths: List[Path]) -> List[Path] {
-  var unique: List[Path] = []
   var seen: Map[Bool] = {}
 
-  for path_value in paths {
-    let key = path_key(path_value)
+  let unique: List[Path] = collect {
+    for path_value in paths {
+      let key = path_key(path_value)
 
-    if ! (seen.get(key) ?? false) {
-      seen[key] = true
-      unique += [path_value]
+      if ! (seen.get(key) ?? false) {
+        seen[key] = true
+        yield path_value
+      }
     }
   }
 
@@ -2921,15 +2925,16 @@ proc unique_paths(paths: List[Path]) -> List[Path] {
 }
 
 proc unique_composites(composites: List[CompositeObject]) -> List[CompositeObject] {
-  var unique: List[CompositeObject] = []
   var seen: Map[Bool] = {}
 
-  for composite in composites {
-    let key = path_key(composite.object)
+  let unique: List[CompositeObject] = collect {
+    for composite in composites {
+      let key = path_key(composite.object)
 
-    if ! (seen.get(key) ?? false) {
-      seen[key] = true
-      unique += [composite]
+      if ! (seen.get(key) ?? false) {
+        seen[key] = true
+        yield composite
+      }
     }
   }
 
@@ -3458,25 +3463,26 @@ pure asm_keeps_forced_include(arg: Str) -> Bool {
 }
 
 proc asm_includes(args: List[Str]) -> List[Str] {
-  var filtered: List[Str] = []
   var skip_next = false
 
-  for arg in args {
-    if skip_next {
-      if asm_keeps_forced_include(arg) {
-        filtered += ["-include", arg]
+  let filtered: List[Str] = collect {
+    for arg in args {
+      if skip_next {
+        if asm_keeps_forced_include(arg) {
+          yield @["-include", arg]
+        }
+
+        skip_next = false
+        continue
       }
 
-      skip_next = false
-      continue
-    }
+      if arg == "-include" {
+        skip_next = true
+        continue
+      }
 
-    if arg == "-include" {
-      skip_next = true
-      continue
+      yield arg
     }
-
-    filtered += [arg]
   }
 
   filtered.push("-include").push("./include/generated/asm-offsets.h")
@@ -6014,12 +6020,12 @@ pure has_archive_output(task: make.MakeTask) -> Bool {
 
 pure archive_rerun_tasks(tasks: List[make.MakeTask]) -> List[make.MakeTask] {
   var archive_names = {task.name: true for task in tasks if has_archive_output(task)}
-  var rerun: List[make.MakeTask] = []
-
-  for task in tasks {
-    continue unless has_archive_output(task)
-    var deps = [dep for dep in task.deps if archive_names.get(dep) ?? false]
-    rerun += [{...task, deps}]
+  let rerun: List[make.MakeTask] = collect {
+    for task in tasks {
+      continue unless has_archive_output(task)
+      var deps = [dep for dep in task.deps if archive_names.get(dep) ?? false]
+      yield {...task, deps}
+    }
   }
 
   rerun
@@ -6271,33 +6277,34 @@ proc archive_analysis_slice_items(
     for owner in plan.archive_owners
   }
   let object_count = plan.objects.len()
-  var items: List[ArchiveAnalysisItem] = []
   var index = start
 
-  while index < end {
-    let library = index >= object_count
-    let object_index = if library { index - object_count } else { index }
-    let obj = if library {
-      plan.lib_objects.get(object_index) ?? p"."
-    } else {
-      plan.objects.get(object_index) ?? p"."
-    }
+  let items: List[ArchiveAnalysisItem] = collect {
+    while index < end {
+      let library = index >= object_count
+      let object_index = if library { index - object_count } else { index }
+      let obj = if library {
+        plan.lib_objects.get(object_index) ?? p"."
+      } else {
+        plan.objects.get(object_index) ?? p"."
+      }
 
-    if ! skip_planned_object(config, obj) and path_key(obj) not in composite_members_by_object {
-      items += [archive_analysis_raw_item(
-          obj,
-          archive_owner_key(archive_owner_by_object, obj),
-          library,
-          if library {
-            false
-          } else {
-            is_pi_object(obj)
-          },
-          composites_by_object,
-        )]
-    }
+      if ! skip_planned_object(config, obj) and path_key(obj) not in composite_members_by_object {
+        yield archive_analysis_raw_item(
+            obj,
+            archive_owner_key(archive_owner_by_object, obj),
+            library,
+            if library {
+              false
+            } else {
+              is_pi_object(obj)
+            },
+            composites_by_object,
+          )
+      }
 
-    index += 1
+      index += 1
+    }
   }
 
   items
@@ -6411,31 +6418,31 @@ proc archive_analysis_items(
   archive_plan_timing_done("item-maps", maps_start)
 
   let object_items_start = archive_plan_timing_start("item-objects")
-  var items: List[ArchiveAnalysisItem] = []
+  let items: List[ArchiveAnalysisItem] = collect {
+    for obj in plan.objects {
+      continue when skip_planned_object(config, obj)
+      continue when path_key(obj) in composite_members_by_object
+      yield archive_analysis_record_for_object(
+          obj,
+          archive_owner_key(archive_owner_by_object, obj),
+          false,
+          is_pi_object(obj),
+          composites_by_object,
+          compile_flags_by_dir,
+        )
+    }
 
-  for obj in plan.objects {
-    continue when skip_planned_object(config, obj)
-    continue when path_key(obj) in composite_members_by_object
-    items += [archive_analysis_record_for_object(
-        obj,
-        archive_owner_key(archive_owner_by_object, obj),
-        false,
-        is_pi_object(obj),
-        composites_by_object,
-        compile_flags_by_dir,
-      )]
-  }
-
-  for obj in plan.lib_objects {
-    continue when path_key(obj) in composite_members_by_object
-    items += [archive_analysis_record_for_object(
-        obj,
-        archive_owner_key(archive_owner_by_object, obj),
-        true,
-        false,
-        composites_by_object,
-        compile_flags_by_dir,
-      )]
+    for obj in plan.lib_objects {
+      continue when path_key(obj) in composite_members_by_object
+      yield archive_analysis_record_for_object(
+          obj,
+          archive_owner_key(archive_owner_by_object, obj),
+          true,
+          false,
+          composites_by_object,
+          compile_flags_by_dir,
+        )
+    }
   }
 
   archive_plan_timing_done("item-objects", object_items_start)
@@ -6823,10 +6830,11 @@ proc archive_analysis_process_pool(
     }
   }
 
-  var results: List[ArchiveAnalysisResult] = []
-  for output_path in output_paths {
-    let worker_results = json.read(output_path)?.require(List[ArchiveAnalysisResult])?
-    results += worker_results
+  let results: List[ArchiveAnalysisResult] = collect {
+    for output_path in output_paths {
+      let worker_results = json.read(output_path)?.require(List[ArchiveAnalysisResult])?
+      yield @worker_results
+    }
   }
 
   results
@@ -7082,21 +7090,22 @@ proc assemble_builtin_archive_plan(
 
     var objs = objects_by_dir.get(dir_key) ?? []
     var deps = deps_by_dir.get(dir_key) ?? []
-    var child_archives: List[Path] = []
     var marker_archive = p""
     var marker_dep = ""
     var has_marker_archive = false
 
-    for child in children_by_dir.get(dir_key) ?? [] {
-      if archive_needed.get(path_key(child)) ?? false {
-        let child_archive = dir_archive(child)
+    let child_archives: List[Path] = collect {
+      for child in children_by_dir.get(dir_key) ?? [] {
+        if archive_needed.get(path_key(child)) ?? false {
+          let child_archive = dir_archive(child)
 
-        if dir_key == "arch/arm64/kernel" and path_key(child) == "arch/arm64/kernel/pi" {
-          marker_archive = child_archive
-          marker_dep = child_archive.display()
-          has_marker_archive = true
-        } else {
-          child_archives += [child_archive]
+          if dir_key == "arch/arm64/kernel" and path_key(child) == "arch/arm64/kernel/pi" {
+            marker_archive = child_archive
+            marker_dep = child_archive.display()
+            has_marker_archive = true
+          } else {
+            yield child_archive
+          }
         }
       }
     }

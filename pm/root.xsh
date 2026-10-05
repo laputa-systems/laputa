@@ -394,22 +394,23 @@ proc root_verified_artifacts(
 
 # Checks key and package uniqueness and runtime-closure completeness of receipts as given.
 proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> Result[List[types.ArtifactReceipt]] {
-  var verified: List[types.ArtifactReceipt] = []
   var keys: Set[Str] = set.empty()
   var names: Set[Str] = set.empty()
 
-  for receipt in artifacts {
-    if receipt.key in keys {
-      return Err(types.PmError.PackageContract(f"duplicate artifact key {receipt.key}"))
-    }
+  let verified: List[types.ArtifactReceipt] = collect {
+    for receipt in artifacts {
+      if receipt.key in keys {
+        return Err(types.PmError.PackageContract(f"duplicate artifact key {receipt.key}"))
+      }
 
-    if receipt.package_name in names {
-      return Err(types.PmError.PackageContract(f"duplicate package {receipt.package_name} in root artifacts"))
-    }
+      if receipt.package_name in names {
+        return Err(types.PmError.PackageContract(f"duplicate package {receipt.package_name} in root artifacts"))
+      }
 
-    keys = keys.add(receipt.key)
-    names = names.add(receipt.package_name)
-    verified += [receipt]
+      keys = keys.add(receipt.key)
+      names = names.add(receipt.package_name)
+      yield receipt
+    }
   }
 
   for receipt in verified {

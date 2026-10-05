@@ -173,12 +173,13 @@ pure store_help_text() -> Str {
 }
 
 pure tail_after(argv: List[Str], start: Int) -> List[Str] {
-  var result: List[Str] = []
   var index = start
 
-  while index < argv.len() {
-    result += [argv[index]]
-    index += 1
+  let result: List[Str] = collect {
+    while index < argv.len() {
+      yield argv[index]
+      index += 1
+    }
   }
 
   result

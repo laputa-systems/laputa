@@ -329,33 +329,34 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) {
 }
 
 proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sysdeps: Map[Str]) {
-  var parts = []
-  parts += [gen_types_internal(p"skalibs/src/headers/bits-header".read_text()?, "", "", bits)]
+  let parts = collect {
+    yield gen_types_internal(p"skalibs/src/headers/bits-header".read_text()?, "", "", bits)
 
-  if bits == 64 {
-    parts += [p"skalibs/src/headers/uint64-defs".read_text()?]
+    if bits == 64 {
+      yield p"skalibs/src/headers/uint64-defs".read_text()?
 
-    if (sysdeps.get("uint64t") ?? "") == "no" {
-      if (sysdeps.get("sizeofulong") ?? "") == "8" {
-        parts += [p"skalibs/src/headers/uint64-ulong64".read_text()?]
-      } else {
-        parts += [p"skalibs/src/headers/uint64-noulong64".read_text()?]
+      if (sysdeps.get("uint64t") ?? "") == "no" {
+        if (sysdeps.get("sizeofulong") ?? "") == "8" {
+          yield p"skalibs/src/headers/uint64-ulong64".read_text()?
+        } else {
+          yield p"skalibs/src/headers/uint64-noulong64".read_text()?
+        }
+
+        yield p"skalibs/src/headers/uint64-macros".read_text()?
       }
-
-      parts += [p"skalibs/src/headers/uint64-macros".read_text()?]
+    } else {
+      yield p"skalibs/src/headers/uint64-include".read_text()?
     }
-  } else {
-    parts += [p"skalibs/src/headers/uint64-include".read_text()?]
-  }
 
-  if (sysdeps.get("endianness") ?? "") != "little" {
-    return Err(ScriptError.Failed(kind: "skalibs-gen-bits", message: "unsupported non-little-endian target"))
-  }
+    if (sysdeps.get("endianness") ?? "") != "little" {
+      return Err(ScriptError.Failed(kind: "skalibs-gen-bits", message: "unsupported non-little-endian target"))
+    }
 
-  parts += [fp"skalibs/src/headers/uint{bits}-bswap".read_text()?]
-  parts += [gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits)]
-  parts += [gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt)]
-  parts += [gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits)]
+    yield fp"skalibs/src/headers/uint{bits}-bswap".read_text()?
+    yield gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits)
+    yield gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt)
+    yield gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits)
+  }
   fp"skalibs/src/include/skalibs/uint{bits}.h".write(parts.join(""))
 }
 
@@ -467,13 +468,13 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) -> Result[Path] {
   ]
 
   let includes = ["-Iskalibs/src/include"]
-  var skalibs_sources = []
+  let skalibs_sources = collect {
+    for entry in fs.walk(p"skalibs/src", gitignore: false)? |> where .kind == "file" and .ext == "c" {
+      let src_display = entry.path.display()
 
-  for entry in fs.walk(p"skalibs/src", gitignore: false)? |> where .kind == "file" and .ext == "c" {
-    let src_display = entry.path.display()
-
-    if src_display.starts_with("skalibs/src/lib") or "/skalibs/src/lib" in src_display {
-      skalibs_sources += [entry.path]
+      if src_display.starts_with("skalibs/src/lib") or "/skalibs/src/lib" in src_display {
+        yield entry.path
+      }
     }
   }
 

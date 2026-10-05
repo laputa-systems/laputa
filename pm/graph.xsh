@@ -3,13 +3,14 @@ use policy
 use types
 
 pure graph_sorted_unique_names(names: List[Str]) -> List[Str] {
-  var unique: List[Str] = []
   var seen: Map[Bool] = {}
 
-  for name in names |> sort {
-    if ! (seen.get(name) ?? false) {
-      unique += [name]
-      seen[name] = true
+  let unique: List[Str] = collect {
+    for name in names |> sort {
+      if ! (seen.get(name) ?? false) {
+        yield name
+        seen[name] = true
+      }
     }
   }
 
@@ -103,12 +104,13 @@ pure cycle_from(
     let cycle_index = index_in_path(trail, dependency)
 
     if cycle_index >= 0 {
-      var cycle: List[Str] = []
       var index = cycle_index
 
-      while index < trail.len() {
-        cycle += [trail[index]]
-        index += 1
+      let cycle: List[Str] = collect {
+        while index < trail.len() {
+          yield trail[index]
+          index += 1
+        }
       }
 
       return cycle.push(dependency)
@@ -177,27 +179,28 @@ export proc edges(
 ) [error] -> Result[List[types.DependencyEdge], Error] {
   let local_names = {pkg.name: true for pkg in catalog.packages}
   let remote_names = {name: true for name in catalog.remote_names}
-  var result: List[types.DependencyEdge] = []
   var declared_pairs: Map[Bool] = {}
 
-  for pkg in catalog.packages {
-    for edge in package_edges(pkg, value) {
-      result += [edge]
-      declared_pairs[edge_key(edge.from, edge.to)] = true
-    }
-  }
-
-  for rule in value.bootstrap_seeds {
-    continue unless (! rule.native_only or value.native_build) and (local_names.get(rule.package) ?? false)
-
-    if ! (local_names.get(rule.dependency) ?? false) and ! (remote_names.get(rule.dependency) ?? false) {
-      return Err(types.PmError.MissingDependency(f"{rule.package} bootstrap requires missing {rule.dependency}"))
+  let result: List[types.DependencyEdge] = collect {
+    for pkg in catalog.packages {
+      for edge in package_edges(pkg, value) {
+        yield edge
+        declared_pairs[edge_key(edge.from, edge.to)] = true
+      }
     }
 
-    let key = edge_key(rule.package, rule.dependency)
+    for rule in value.bootstrap_seeds {
+      continue unless (! rule.native_only or value.native_build) and (local_names.get(rule.package) ?? false)
 
-    if ! (declared_pairs.get(key) ?? false) {
-      result += [{from: rule.package, to: rule.dependency, kind: types.dependency_bootstrap()}]
+      if ! (local_names.get(rule.dependency) ?? false) and ! (remote_names.get(rule.dependency) ?? false) {
+        return Err(types.PmError.MissingDependency(f"{rule.package} bootstrap requires missing {rule.dependency}"))
+      }
+
+      let key = edge_key(rule.package, rule.dependency)
+
+      if ! (declared_pairs.get(key) ?? false) {
+        yield {from: rule.package, to: rule.dependency, kind: types.dependency_bootstrap()}
+      }
     }
   }
 
@@ -229,8 +232,6 @@ export proc topological_levels(
   ]
   var unresolved: Map[Int] = {}
   var emitted: Map[Bool] = {}
-  var levels: List[List[Str]] = []
-
   for name in selected_names {
     unresolved[name] = 0
   }
@@ -241,27 +242,29 @@ export proc topological_levels(
 
   var emitted_count = 0
 
-  while emitted_count < selected_names.len() {
-    var ready = [
-      name
-      for name in selected_names
-      if ! (emitted.get(name) ?? false) and (unresolved.get(name) ?? 0) == 0
-    ]
-    if ready.is_empty() {
-      let cycle = find_cycle(selected_names, local_edges)
-      let rendered = if ! cycle.is_empty() { cycle.join(" -> ") } else { selected_names.join(", ") }
-      return Err(types.PmError.DependencyCycle(f"package dependency cycle: {rendered}"))
-    }
+  let levels: List[List[Str]] = collect {
+    while emitted_count < selected_names.len() {
+      var ready = [
+        name
+        for name in selected_names
+        if ! (emitted.get(name) ?? false) and (unresolved.get(name) ?? 0) == 0
+      ]
+      if ready.is_empty() {
+        let cycle = find_cycle(selected_names, local_edges)
+        let rendered = if ! cycle.is_empty() { cycle.join(" -> ") } else { selected_names.join(", ") }
+        return Err(types.PmError.DependencyCycle(f"package dependency cycle: {rendered}"))
+      }
 
-    levels += [ready]
+      yield ready
 
-    for name in ready {
-      emitted[name] = true
-      emitted_count += 1
+      for name in ready {
+        emitted[name] = true
+        emitted_count += 1
 
-      for edge in local_edges {
-        if edge.to == name {
-          unresolved[edge.from] = (unresolved.get(edge.from) ?? 0) - 1
+        for edge in local_edges {
+          if edge.to == name {
+            unresolved[edge.from] = (unresolved.get(edge.from) ?? 0) - 1
+          }
         }
       }
     }
@@ -315,13 +318,13 @@ export proc packages_buildable_without(
   }
 
   let dependency_edges = edges(catalog, value)?
-  var selected: List[Str] = []
+  let selected: List[Str] = collect {
+    for pkg in catalog.packages {
+      let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
 
-  for pkg in catalog.packages {
-    let closure = closure_from_edges(catalog, [pkg.name], build_closure_kinds(), dependency_edges)?
-
-    if [name for name in closure if name in excluded].is_empty() {
-      selected += [pkg.name]
+      if [name for name in closure if name in excluded].is_empty() {
+        yield pkg.name
+      }
     }
   }
 

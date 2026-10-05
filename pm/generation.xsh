@@ -74,13 +74,14 @@ pure generation_canonical_field(value: Str) -> Str {
 }
 
 pure generation_sorted_unique(values: List[Str]) -> List[Str] {
-  var result: List[Str] = []
   var seen: Map[Bool] = {}
 
-  for value in values |> sort {
-    if ! (seen.get(value) ?? false) {
-      result += [value]
-      seen[value] = true
+  let result: List[Str] = collect {
+    for value in values |> sort {
+      if ! (seen.get(value) ?? false) {
+        yield value
+        seen[value] = true
+      }
     }
   }
 

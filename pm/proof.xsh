@@ -66,13 +66,13 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
   let package_deps = package_dependency_map(root)?
   let allowed = elfdeps.runtime_dependency_closure(package_deps.get(name) ?? [], package_deps)
   let manifest = local.load_manifest(fp"{root}/var/lib/xsh-pm/packages/{name}")?
-  var failures = []
+  let failures = collect {
+    for rel_path in manifest {
+      let path_value = fp"{root}/{rel_path}"
 
-  for rel_path in manifest {
-    let path_value = fp"{root}/{rel_path}"
-
-    if path_value.exists() {
-      failures += elfdeps.installed_file_elf_dependency_failures(name, allowed, rel_path, path_value, providers)?
+      if path_value.exists() {
+        yield @elfdeps.installed_file_elf_dependency_failures(name, allowed, rel_path, path_value, providers)?
+      }
     }
   }
 

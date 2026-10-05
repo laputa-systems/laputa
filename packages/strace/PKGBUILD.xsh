@@ -194,14 +194,14 @@ proc write_sys_func_h(sources: List[Path]) {
 # does not mention printargs, sorted and unique.
 proc write_sen_h() {
   let tables = fs.walk(p"src/linux")? |> where .kind == "file" and .name in syscallent_names |> map .path |> sort
-  var names = []
+  let names = collect {
+    for table in tables {
+      for line in table.read_text()?.lines() {
+        continue when "printargs" in line
 
-  for table in tables {
-    for line in table.read_text()?.lines() {
-      continue when "printargs" in line
-
-      if let [_, sen] = sen_pattern.captures(line) {
-        names += [sen]
+        if let [_, sen] = sen_pattern.captures(line) {
+          yield sen
+        }
       }
     }
   }

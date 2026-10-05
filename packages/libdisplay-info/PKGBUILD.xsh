@@ -136,11 +136,11 @@ export pure pnp_id_table_source(pnp_ids: Str) -> Str {
     }
   }
 
-  var cases = []
-
-  for id in names.keys() |> sort {
-    let key = (id.byte_at(0) ?? 0) * 65536 + (id.byte_at(1) ?? 0) * 256 + (id.byte_at(2) ?? 0)
-    cases += [f"    case {key}: return \"{names.get(id) ?? ""}\";"]
+  let cases = collect {
+    for id in names.keys() |> sort {
+      let key = (id.byte_at(0) ?? 0) * 65536 + (id.byte_at(1) ?? 0) * 256 + (id.byte_at(2) ?? 0)
+      yield f"    case {key}: return \"{names.get(id) ?? ""}\";"
+    }
   }
 
   let case_text = cases.join("\n")

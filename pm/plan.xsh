@@ -28,13 +28,14 @@ pure node_is_before(left: types.PlanNode, right: types.PlanNode) -> Bool {
 }
 
 pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
-  var result: List[Str] = []
   var seen: Map[Bool] = {}
 
-  for name in names |> sort {
-    if ! (seen.get(name) ?? false) {
-      result += [name]
-      seen[name] = true
+  let result: List[Str] = collect {
+    for name in names |> sort {
+      if ! (seen.get(name) ?? false) {
+        yield name
+        seen[name] = true
+      }
     }
   }
 
@@ -274,18 +275,18 @@ proc dependency_nodes(
   selected: Map[Bool],
   keys: Map[Str],
 ) -> Result[List[types.PlanDependency]] {
-  var dependencies: List[types.PlanDependency] = []
+  let dependencies: List[types.PlanDependency] = collect {
+    for edge in edges {
+      continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
 
-  for edge in edges {
-    continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
+      if ! (edge.to in keys) {
+        return Err(
+          types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"),
+        )
+      }
 
-    if ! (edge.to in keys) {
-      return Err(
-        types.PmError.PackageContract(f"{name} dependency {edge.to} was not resolved before its build-plan node"),
-      )
+      yield {name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}
     }
-
-    dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
   }
 
   dependencies |> sort-by { |dependency| dependency_key(dependency) }

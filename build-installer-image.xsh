@@ -260,20 +260,21 @@ pure sector_count(size: Int, sector_size: Int) -> Int {
 }
 
 proc put_be(data: Bytes, offset: Int, value: Int, width: Int) -> Result[Bytes] {
-  var parts: List[Int] = []
   var index = width
 
-  while index > 0 {
-    index -= 1
-    var divisor = 1
-    var shift = index
+  let parts: List[Int] = collect {
+    while index > 0 {
+      index -= 1
+      var divisor = 1
+      var shift = index
 
-    while shift > 0 {
-      divisor *= 256
-      shift -= 1
+      while shift > 0 {
+        divisor *= 256
+        shift -= 1
+      }
+
+      yield value / divisor % 256
     }
-
-    parts += [value / divisor % 256]
   }
 
   system_image.image_put_bytes(data, offset, bytes.from_ints(parts)?)?
@@ -300,12 +301,13 @@ proc fixed_ascii(text: Str, width: Int) -> Result[Bytes] {
 }
 
 proc repeated_byte(value: Int, count: Int) -> Result[Bytes] {
-  var values: List[Int] = []
   var remaining = count
 
-  while remaining > 0 {
-    values += [value]
-    remaining -= 1
+  let values: List[Int] = collect {
+    while remaining > 0 {
+      yield value
+      remaining -= 1
+    }
   }
 
   bytes.from_ints(values)?
@@ -420,12 +422,12 @@ proc iso_terminator() -> Result[Bytes] {
 
 proc iso_files(inputs: List[IsoInput], first_extent: Int) -> Result[List[IsoFile]] {
   var extent = first_extent
-  var files: List[IsoFile] = []
-
-  for input in inputs {
-    let size = input.source.metadata()?.size
-    files += [{source: input.source, name: input.name, extent: extent, size: size}]
-    extent += sector_count(size, 2048)
+  let files: List[IsoFile] = collect {
+    for input in inputs {
+      let size = input.source.metadata()?.size
+      yield {source: input.source, name: input.name, extent: extent, size: size}
+      extent += sector_count(size, 2048)
+    }
   }
 
   files

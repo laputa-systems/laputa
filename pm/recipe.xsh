@@ -155,22 +155,23 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
     architecture_seen = architecture_seen.add(architecture)
   }
 
-  var checksums: List[types.SourceChecksum] = []
   var checksum_seen: Set[Str] = set.empty()
 
-  for raw_checksum in raw_checksums {
-    let checksum = decode_source_checksum(name, raw_checksum)?
+  let checksums: List[types.SourceChecksum] = collect {
+    for raw_checksum in raw_checksums {
+      let checksum = decode_source_checksum(name, raw_checksum)?
 
-    if checksum.arch in checksum_seen {
-      return Err(types.PmError.PackageContract(f"{name}: upstream source {source} repeats {checksum.arch} checksum"))
+      if checksum.arch in checksum_seen {
+        return Err(types.PmError.PackageContract(f"{name}: upstream source {source} repeats {checksum.arch} checksum"))
+      }
+
+      if checksum.sha256 == "SKIP" and ! source_is_repository_local(source) {
+        return Err(types.PmError.PackageContract(f"{name}: remote source {source} may not use SKIP"))
+      }
+
+      checksum_seen = checksum_seen.add(checksum.arch)
+      yield checksum
     }
-
-    if checksum.sha256 == "SKIP" and ! source_is_repository_local(source) {
-      return Err(types.PmError.PackageContract(f"{name}: remote source {source} may not use SKIP"))
-    }
-
-    checksum_seen = checksum_seen.add(checksum.arch)
-    checksums += [checksum]
   }
 
   for target_arch in ["aarch64", "x86_64"] {
@@ -219,19 +220,20 @@ proc decode_upstream_sources(name: Str, raw_sources: List[Record]) -> Result[Lis
 }
 
 proc decode_filetree(name: Str, raw_entries: List[Record]) -> Result[List[types.FileTreeEntry]] {
-  var entries: List[types.FileTreeEntry] = []
   var seen: Set[Str] = set.empty()
 
-  for raw_entry in raw_entries {
-    let entry = decode_filetree_entry(name, raw_entry)?
-    let path_text = entry.path.display()
+  let entries: List[types.FileTreeEntry] = collect {
+    for raw_entry in raw_entries {
+      let entry = decode_filetree_entry(name, raw_entry)?
+      let path_text = entry.path.display()
 
-    if path_text in seen {
-      return Err(types.PmError.PackageContract(f"{name}: filetree repeats {path_text}"))
+      if path_text in seen {
+        return Err(types.PmError.PackageContract(f"{name}: filetree repeats {path_text}"))
+      }
+
+      seen = seen.add(path_text)
+      yield entry
     }
-
-    seen = seen.add(path_text)
-    entries += [entry]
   }
 
   entries

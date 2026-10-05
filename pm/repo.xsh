@@ -253,23 +253,23 @@ export proc publish(
   }
 
   work.mkdir()
-  var stages: List[RepoPublishStage] = []
+  let stages: List[RepoPublishStage] = collect {
+    for publication in repo_snapshot.packages {
+      let verified = store.verify_receipt(publication.receipt)?
 
-  for publication in repo_snapshot.packages {
-    let verified = store.verify_receipt(publication.receipt)?
+      if verified != publication.receipt {
+        return Err(
+          types.PmError.PackageContract(f"repository snapshot receipt changed for {publication.node.package_id}"),
+        )
+      }
 
-    if verified != publication.receipt {
-      return Err(
-        types.PmError.PackageContract(f"repository snapshot receipt changed for {publication.node.package_id}"),
-      )
+      if publication.receipt.origin == types.artifact_origin_built() {
+        pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)
+      }
+
+      let metadata = repo_metadata_for_publication(publication, arch, fp"{work}/metadata")?
+      yield {publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata}
     }
-
-    if publication.receipt.origin == types.artifact_origin_built() {
-      pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)
-    }
-
-    let metadata = repo_metadata_for_publication(publication, arch, fp"{work}/metadata")?
-    stages += [{publication, entry: repo_publication_entry(publication, arch, metadata)?, metadata}]
   }
 
   # This is the sole remote-index read. It rejects rows behind the remote

@@ -81,12 +81,12 @@ proc require_key(key: Str) {
 
 pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
   var seen: Set[Str] = set.empty()
-  var result: List[Str] = []
-
-  for key in keys {
-    if ! (key in seen) {
-      seen = seen.add(key)
-      result += [key]
+  let result: List[Str] = collect {
+    for key in keys {
+      if ! (key in seen) {
+        seen = seen.add(key)
+        yield key
+      }
     }
   }
 
@@ -554,14 +554,14 @@ export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactRece
 
   return [] unless objects.exists()
 
-  var receipts: List[types.ArtifactReceipt] = []
+  let receipts: List[types.ArtifactReceipt] = collect {
+    for entry in fs.children(objects)? |> sort-by .name {
+      guard entry.kind == "dir" else {
+        return Err(types.PmError.PackageContract(f"artifact store object {entry.path} is not a directory"))
+      }
 
-  for entry in fs.children(objects)? |> sort-by .name {
-    guard entry.kind == "dir" else {
-      return Err(types.PmError.PackageContract(f"artifact store object {entry.path} is not a directory"))
+      yield verify_artifact(root, entry.name)?
     }
-
-    receipts += [verify_artifact(root, entry.name)?]
   }
 
   receipts

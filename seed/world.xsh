@@ -93,10 +93,10 @@ export pure world_stop_line(name: Str) -> Result[List[Str], Error] {
 ## The `pm repo plan` selection for explicit packages, a stop line, or (neither) every package.
 export pure world_selection_argv(packages: List[Str], stop: Str) -> Result[List[Str], Error] {
   if ! packages.is_empty() {
-    var argv: List[Str] = []
-
-    for name in packages {
-      argv += ["--root", name]
+    let argv: List[Str] = collect {
+      for name in packages {
+        yield @["--root", name]
+      }
     }
 
     return argv
@@ -325,10 +325,10 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
   let plan = fp"{root_dir}/plan.json"
   let store = fp"{root_dir}/store"
   store.mkdir()
-  var selection: List[Str] = []
-
-  for name in args.packages {
-    selection += ["--root", name]
+  let selection: List[Str] = collect {
+    for name in args.packages {
+      yield @["--root", name]
+    }
   }
 
   host_pm(

@@ -4,13 +4,14 @@ use types
 use util
 
 pure sorted_unique_names(names: List[Str]) -> List[Str] {
-  var unique: List[Str] = []
   var seen: Map[Bool] = {}
 
-  for name in names |> sort {
-    if ! (seen.get(name) ?? false) {
-      unique += [name]
-      seen[name] = true
+  let unique: List[Str] = collect {
+    for name in names |> sort {
+      if ! (seen.get(name) ?? false) {
+        yield name
+        seen[name] = true
+      }
     }
   }
 
@@ -88,22 +89,23 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
   }
 
   let arch = types.pm_target_arch(target)
-  var packages: List[types.Package] = []
   var excluded: Set[Str] = set.empty()
 
-  for entry in fs.children(recipe_root)? |> sort-by .name {
-    continue unless entry.kind == "dir"
-    continue unless fp"{entry.path}/PKGBUILD.xsh".exists()
+  let packages: List[types.Package] = collect {
+    for entry in fs.children(recipe_root)? |> sort-by .name {
+      continue unless entry.kind == "dir"
+      continue unless fp"{entry.path}/PKGBUILD.xsh".exists()
 
-    let pkg = recipe.load_package_for_target(entry.path, target)?
+      let pkg = recipe.load_package_for_target(entry.path, target)?
 
-    if arch not in pkg.architectures {
-      excluded = excluded.add(pkg.name)
-      continue
+      if arch not in pkg.architectures {
+        excluded = excluded.add(pkg.name)
+        continue
+      }
+
+      let durable_dir = pkg.dir.relative_to(absolute_root)
+      yield {...pkg, dir: durable_dir}
     }
-
-    let durable_dir = pkg.dir.relative_to(absolute_root)
-    packages += [{...pkg, dir: durable_dir}]
   }
 
   for pkg in packages {

@@ -255,14 +255,14 @@ export pure xsh_seed_core_install_path(relative_source: Path) -> Path {
 
 proc xsh_seed_core_sources(xsh_root: Path) -> Result[List[Path]] {
   let core = fp"{xsh_root}/core"
-  var sources = []
+  let sources = collect {
+    for entry in fs.walk(core, hidden: true)? {
+      if entry.kind == "file" and entry.path.ext() == "xsh" {
+        let relative = entry.path.relative_to(core)
 
-  for entry in fs.walk(core, hidden: true)? {
-    if entry.kind == "file" and entry.path.ext() == "xsh" {
-      let relative = entry.path.relative_to(core)
-
-      if ! relative.display().starts_with("tests/") {
-        sources += [relative]
+        if ! relative.display().starts_with("tests/") {
+          yield relative
+        }
       }
     }
   }
@@ -280,13 +280,13 @@ proc xsh_seed_core_digest(xsh_root: Path, sources: List[Path]) [fs, error] -> Re
 
 proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path) {
   tempdir stage {
-    var entries = []
-
-    for relative in sources {
-      let installed = xsh_seed_core_install_path(relative)
-      let mode = if relative.display().starts_with("lib/") { 0o644 } else { 0o755 }
-      fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)
-      entries += [installed]
+    let entries = collect {
+      for relative in sources {
+        let installed = xsh_seed_core_install_path(relative)
+        let mode = if relative.display().starts_with("lib/") { 0o644 } else { 0o755 }
+        fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)
+        yield installed
+      }
     }
 
     let temporary = fp"{archive_path}.tmp"
@@ -431,10 +431,10 @@ export proc xsh_seed_require(laputa_root: Path, arch: Str) [fs, error] -> Result
 ## Binaries and core applets come from one seed directory, so a container
 ## never pairs one XSH build's interpreter with another build's applets.
 export pure xsh_seed_mount_argv(seed: Path) -> List[Str] {
-  var argv = []
-
-  for product in xsh_seed_binaries {
-    argv += ["--mount", f"type=bind,src={seed}/{product},dst=/bin/{product},readonly"]
+  let argv = collect {
+    for product in xsh_seed_binaries {
+      yield @["--mount", f"type=bind,src={seed}/{product},dst=/bin/{product},readonly"]
+    }
   }
 
   argv.extend(["--mount", f"type=bind,src={seed}/core,dst=/usr/lib/xsh/core,readonly"])

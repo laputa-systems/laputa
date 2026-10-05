@@ -506,15 +506,15 @@ proc stage_vendored_outputs() {
   split = split_edge(split, block)?
   let kept = [line for line in split.kept if ! (line.starts_with("default ") and line.byte_slice(8) in split.vendored)]
   ninja.write(kept.join("\n"))
-  var unvendored: List[Str] = []
+  let unvendored: List[Str] = collect {
+    for output in split.vendored {
+      let vendored = fp"generated/{output}"
 
-  for output in split.vendored {
-    let vendored = fp"generated/{output}"
-
-    if vendored.exists() {
-      fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)
-    } else {
-      unvendored += [output]
+      if vendored.exists() {
+        fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)
+      } else {
+        yield output
+      }
     }
   }
 

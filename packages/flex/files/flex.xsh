@@ -221,34 +221,34 @@ proc split_state_qualifier(pattern: Str) [error] -> Result[StateQualifier] {
 }
 
 proc parse_rules(text: Str, defs: Map[Str]) -> Result[List[LexRule]] {
-  var rules = []
+  let rules = collect {
+    for raw in text.lines() {
+      continue when raw.trim() == "" or raw.starts_with(" ") or raw.starts_with("\t") or raw.trim().starts_with("%")
+      let parsed = split_rule_line(raw)?
+      var pattern = parsed.pattern
+      let action = parsed.action
 
-  for raw in text.lines() {
-    continue when raw.trim() == "" or raw.starts_with(" ") or raw.starts_with("\t") or raw.trim().starts_with("%")
-    let parsed = split_rule_line(raw)?
-    var pattern = parsed.pattern
-    let action = parsed.action
+      if "REJECT" in action {
+        return Err(ToolError.Failed(kind: "unsupported", message: "flex.xsh does not support REJECT"))
+      }
 
-    if "REJECT" in action {
-      return Err(ToolError.Failed(kind: "unsupported", message: "flex.xsh does not support REJECT"))
-    }
+      let qualified = split_state_qualifier(pattern)?
+      pattern = qualified.pattern
+      var bol = false
 
-    let qualified = split_state_qualifier(pattern)?
-    pattern = qualified.pattern
-    var bol = false
+      if pattern.starts_with("^") {
+        bol = true
+        pattern = drop_prefix(pattern, "^")?
+      }
 
-    if pattern.starts_with("^") {
-      bol = true
-      pattern = drop_prefix(pattern, "^")?
-    }
+      pattern = strip_quotes(expand_definitions(pattern, defs)?)?
 
-    pattern = strip_quotes(expand_definitions(pattern, defs)?)?
-
-    if qualified.states.is_empty() {
-      rules += [{pattern, action, bol, state: ""}]
-    } else {
-      for state in qualified.states {
-        rules += [{pattern, action, bol, state}]
+      if qualified.states.is_empty() {
+        yield {pattern, action, bol, state: ""}
+      } else {
+        for state in qualified.states {
+          yield {pattern, action, bol, state}
+        }
       }
     }
   }
@@ -491,36 +491,37 @@ proc generate_exclusive_table(states: List[Str], exclusive: List[Str]) [error] -
 }
 
 proc generate_rule_table(rules: List[LexRule], states: List[Str]) -> Result[Str] {
-  var lines = []
+  let lines = collect {
+    for rule in rules {
+      let bol = if rule.bol { "1" } else { "0" }
 
-  for rule in rules {
-    let bol = if rule.bol { "1" } else { "0" }
+      let state = if rule.state == "" {
+        "-1"
+      } else if rule.state == "*" {
+        "-2"
+      } else {
+        f"{state_id(rule.state, states)?}"
+      }
 
-    let state = if rule.state == "" {
-      "-1"
-    } else if rule.state == "*" {
-      "-2"
-    } else {
-      f"{state_id(rule.state, states)?}"
+      if state == "-1" and rule.state != "" {
+        return Err(ToolError.Failed(kind: "lex", message: f"unknown start condition: {rule.state}"))
+      }
+
+      yield f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},"
     }
-
-    if state == "-1" and rule.state != "" {
-      return Err(ToolError.Failed(kind: "lex", message: f"unknown start condition: {rule.state}"))
-    }
-
-    lines += [f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},"]
   }
 
   lines.join("\n")
 }
 
 proc generate_actions(rules: List[LexRule]) [error] -> Result[Str] {
-  var lines = []
   var i = 0
 
-  for rule in rules {
-    lines += [f"    case {i}: {{ {rule.action} }} break;"]
-    i = i + 1
+  let lines = collect {
+    for rule in rules {
+      yield f"    case {i}: {{ {rule.action} }} break;"
+      i = i + 1
+    }
   }
 
   lines.join("\n")

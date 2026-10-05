@@ -28,9 +28,10 @@ pure tools_roots() -> List[Str] {
 }
 
 pure root_args(flag: Str, names: List[Str]) -> List[Str] {
-  var args: List[Str] = []
-  for name in names {
-    args += [flag, name]
+  let args: List[Str] = collect {
+    for name in names {
+      yield @[flag, name]
+    }
   }
 
   args

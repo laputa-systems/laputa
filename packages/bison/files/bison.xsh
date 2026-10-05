@@ -1123,12 +1123,13 @@ proc rule_lhs_values(rules: List[GrammarRule], names: List[Str]) -> Result[List[
 }
 
 proc rule_rhs_start_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] {
-  var values = []
   var offset = 0
 
-  for rule in rules {
-    values += [f"{offset}"]
-    offset = offset + rule.rhs.len()
+  let values = collect {
+    for rule in rules {
+      yield f"{offset}"
+      offset = offset + rule.rhs.len()
+    }
   }
 
   values
@@ -1139,16 +1140,16 @@ proc rule_rhs_len_values(rules: List[GrammarRule]) [error] -> Result[List[Str]] 
 }
 
 proc rule_rhs_symbol_values(rules: List[GrammarRule], names: List[Str], tokens: Map[Int]) -> Result[List[Str]] {
-  var values = []
+  let values = collect {
+    for rule in rules {
+      for item in rule.rhs {
+        let nt = index_of(names, item)
 
-  for rule in rules {
-    for item in rule.rhs {
-      let nt = index_of(names, item)
-
-      if nt >= 0 {
-        values += [f"{0 - nt - 1}"]
-      } else {
-        values += [token_code_expr(item, tokens)]
+        if nt >= 0 {
+          yield f"{0 - nt - 1}"
+        } else {
+          yield token_code_expr(item, tokens)
+        }
       }
     }
   }

@@ -137,14 +137,14 @@ proc parse_primary(tokens: List[Str], start: Int) -> Result[Parsed] {
   # opaque term such as `__BITS_PER_LONG == 32`.
   var at = start
   var depth = 0
-  var words: List[Str] = []
-
-  while at < tokens.len() {
-    let word = tokens[at]
-    break when depth == 0 and (word == "&&" or word == "||" or word == ")")
-    depth += if word == "(" { 1 } else if word == ")" { -1 } else { 0 }
-    words += [word]
-    at += 1
+  let words: List[Str] = collect {
+    while at < tokens.len() {
+      let word = tokens[at]
+      break when depth == 0 and (word == "&&" or word == "||" or word == ")")
+      depth += if word == "(" { 1 } else if word == ")" { -1 } else { 0 }
+      yield word
+      at += 1
+    }
   }
 
   if words.is_empty() {

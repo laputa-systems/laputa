@@ -135,15 +135,15 @@ export const filetree = [
 
 proc write_embedded_dtd() {
   let dump = p"protocol/wayland.dtd".read_bytes()?.dump("hex-u8")
-  var values = []
+  let values = collect {
+    for line in dump.split("\n") {
+      let words = line.words()
+      var index = 1
 
-  for line in dump.split("\n") {
-    let words = line.words()
-    var index = 1
-
-    while index < words.len() {
-      values += [f"0x{words[index]},"]
-      index += 1
+      while index < words.len() {
+        yield f"0x{words[index]},"
+        index += 1
+      }
     }
   }
 

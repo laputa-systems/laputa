@@ -188,13 +188,13 @@ proc write_xtables_version_h() [fs, error] {
 # extensions/GNUmakefile.in builds every extensions/<prefix><module>.c it finds
 # (a sorted wildcard) except the blacklisted modules.
 proc extension_modules(prefix: Str) -> Result[List[Str]] {
-  var modules = []
-
-  for entry in fs.children(p"extensions")? |> sort-by .name {
-    continue unless entry.kind == "file" and entry.name.starts_with(prefix) and entry.name.ends_with(".c")
-    let extension = entry.name.byte_slice(prefix.byte_len(), entry.name.byte_len() - prefix.byte_len() - 2)
-    continue when extension in blacklisted_extensions
-    modules += [extension]
+  let modules = collect {
+    for entry in fs.children(p"extensions")? |> sort-by .name {
+      continue unless entry.kind == "file" and entry.name.starts_with(prefix) and entry.name.ends_with(".c")
+      let extension = entry.name.byte_slice(prefix.byte_len(), entry.name.byte_len() - prefix.byte_len() - 2)
+      continue when extension in blacklisted_extensions
+      yield extension
+    }
   }
 
   modules

@@ -85,24 +85,24 @@ pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
 # shared code through the module path and outside inputs as `repository/`
 # sources instead.
 proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
-  var lines: List[Str] = []
+  let lines: List[Str] = collect {
+    for entry in fs.walk(pkg.dir) |> sort-by .path {
+      let rel = entry.path.strip_prefix(pkg.dir)?
+      continue when ignored_tree_path(rel)
 
-  for entry in fs.walk(pkg.dir) |> sort-by .path {
-    let rel = entry.path.strip_prefix(pkg.dir)?
-    continue when ignored_tree_path(rel)
+      if entry.kind == "symlink" {
+        let target = entry.path.readlink()?.display()
 
-    if entry.kind == "symlink" {
-      let target = entry.path.readlink()?.display()
-
-      if ! symlink_target_stays_within(rel, target) {
-        return Err(
-          types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
-        )
+        if ! symlink_target_stays_within(rel, target) {
+          return Err(
+            types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
+          )
+        }
       }
-    }
 
-    if package_input_path(rel) {
-      lines += [tree_entry_line(pkg.dir, entry.path, "package-file")?]
+      if package_input_path(rel) {
+        yield tree_entry_line(pkg.dir, entry.path, "package-file")?
+      }
     }
   }
 
@@ -124,32 +124,32 @@ proc repository_input_lines(
   target: types.Target,
 ) -> Result[List[Str]] {
   let arch = types.pm_target_arch(target)
-  var lines: List[Str] = []
+  let lines: List[Str] = collect {
+    for source in pkg.upstream_sources {
+      continue unless arch in source.architectures or "all" in source.architectures
+      let parsed = util.parse_source_line(source.source)?
+      let expanded = util.expand_source(parsed.source, pkg, arch, arch)
 
-  for source in pkg.upstream_sources {
-    continue unless arch in source.architectures or "all" in source.architectures
-    let parsed = util.parse_source_line(source.source)?
-    let expanded = util.expand_source(parsed.source, pkg, arch, arch)
+      continue unless expanded.starts_with("repository/")
+      let relative = fp"{expanded.replace("repository/", with: "")}".normalize()
+      let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
+      let input = fp"{repo_root}/{relative}"
 
-    continue unless expanded.starts_with("repository/")
-    let relative = fp"{expanded.replace("repository/", with: "")}".normalize()
-    let _ = util.ensure_relative_path(relative, f"repository source {expanded}")?
-    let input = fp"{repo_root}/{relative}"
-
-    if ! input.exists() {
-      return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
-    }
-
-    if input.is_dir() {
-      for entry in fs.walk(input) |> sort-by .path {
-        let rel = entry.path.strip_prefix(repo_root)?
-
-        if ! ignored_tree_path(rel) {
-          lines += [tree_entry_line(repo_root, entry.path, "repository-input")?]
-        }
+      if ! input.exists() {
+        return Err(types.PmError.PackageContract(f"{pkg.name}: repository source {expanded} is missing"))
       }
-    } else {
-      lines += [tree_entry_line(repo_root, input, "repository-input")?]
+
+      if input.is_dir() {
+        for entry in fs.walk(input) |> sort-by .path {
+          let rel = entry.path.strip_prefix(repo_root)?
+
+          if ! ignored_tree_path(rel) {
+            yield tree_entry_line(repo_root, entry.path, "repository-input")?
+          }
+        }
+      } else {
+        yield tree_entry_line(repo_root, input, "repository-input")?
+      }
     }
   }
 

@@ -471,13 +471,14 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   }
 
   let sorted = lines |> sort-by .
-  var unique: List[Str] = []
   var previous = ""
 
-  for line in sorted {
-    if line != previous {
-      unique += [line]
-      previous = line
+  let unique: List[Str] = collect {
+    for line in sorted {
+      if line != previous {
+        yield line
+        previous = line
+      }
     }
   }
 

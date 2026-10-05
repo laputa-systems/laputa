@@ -462,17 +462,17 @@ test test_build_plan_json_rejects_dependency_key_mismatch [fs, env, error] { |ct
   plan_json.write_plan(path_value, value)
   let raw = json.read(path_value)?.require(plan_json.BuildPlanDto)?
   let original_nodes = raw.nodes
-  var nodes = []
+  let nodes = collect {
+    for node in original_nodes {
+      let name = node.name
 
-  for node in original_nodes {
-    let name = node.name
-
-    if name == "app" {
-      let dependencies = node.dependencies
-      let dependency = dependencies[0]
-      nodes += [{...node, dependencies: [{...dependency, artifact_key: "tampered"}]}]
-    } else {
-      nodes += [node]
+      if name == "app" {
+        let dependencies = node.dependencies
+        let dependency = dependencies[0]
+        yield {...node, dependencies: [{...dependency, artifact_key: "tampered"}]}
+      } else {
+        yield node
+      }
     }
   }
 

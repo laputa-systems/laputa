@@ -199,17 +199,18 @@ proc parse_inittab_line(line: Str, index: Int) [process, error] -> Result[Initta
 }
 
 proc parse_inittab(path_value: Path) -> Result[List[InittabEntry]] {
-  var entries: List[InittabEntry] = []
   var index = 1
 
-  for line in path_value.read_text()?.lines() {
-    let entry = parse_inittab_line(line, index)?
+  let entries: List[InittabEntry] = collect {
+    for line in path_value.read_text()?.lines() {
+      let entry = parse_inittab_line(line, index)?
 
-    if entry.action != "" {
-      entries += [entry]
+      if entry.action != "" {
+        yield entry
+      }
+
+      index += 1
     }
-
-    index += 1
   }
 
   entries
@@ -234,20 +235,21 @@ pure runtime_get(runtime: List[RuntimeEntry], key: Str) -> RuntimeEntry {
 }
 
 proc runtime_set(runtime: List[RuntimeEntry], value: RuntimeEntry) [error] -> List[RuntimeEntry] {
-  var out: List[RuntimeEntry] = []
   var found = false
 
-  for item in runtime {
-    if item.key == value.key {
-      out += [value]
-      found = true
-    } else {
-      out += [item]
+  let out: List[RuntimeEntry] = collect {
+    for item in runtime {
+      if item.key == value.key {
+        yield value
+        found = true
+      } else {
+        yield item
+      }
     }
-  }
 
-  if ! found {
-    out += [value]
+    if ! found {
+      yield value
+    }
   }
 
   out
@@ -354,14 +356,14 @@ pure should_exit_idle(
 }
 
 proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], fast: Bool) {
-  var groups = []
+  let groups = collect {
+    for entry in entries {
+      if entry_spawns(entry) {
+        let current = runtime_get(runtime, entry.key)
 
-  for entry in entries {
-    if entry_spawns(entry) {
-      let current = runtime_get(runtime, entry.key)
-
-      if current.pid > 0 {
-        groups += [current.pid]
+        if current.pid > 0 {
+          yield current.pid
+        }
       }
     }
   }
@@ -1181,14 +1183,14 @@ proc start_service(name: Str) {
 
 proc running_dependents(name: Str) -> Result[List[Str]] {
   let services = all_services()?
-  var out = []
+  let out = collect {
+    for service in services {
+      if service.name != name and name in required_dependencies(service) {
+        let status = read_status(service.name)?
 
-  for service in services {
-    if service.name != name and name in required_dependencies(service) {
-      let status = read_status(service.name)?
-
-      if status.state == "running" {
-        out += [service.name]
+        if status.state == "running" {
+          yield service.name
+        }
       }
     }
   }
@@ -1359,12 +1361,13 @@ pure unit_saved_status(unit: ServiceUnit) -> SavedStatus {
 }
 
 pure reverse_units(units: List[ServiceUnit]) -> List[ServiceUnit] {
-  var out: List[ServiceUnit] = []
   var i = units.len() - 1
 
-  while i >= 0 {
-    out += [units[i]]
-    i -= 1
+  let out: List[ServiceUnit] = collect {
+    while i >= 0 {
+      yield units[i]
+      i -= 1
+    }
   }
 
   out
@@ -1595,13 +1598,13 @@ proc mark_children_dead(
   child_status: Status,
   now: Int,
 ) -> Result[List[ServiceUnit]] {
-  var out: List[ServiceUnit] = []
-
-  for unit in units {
-    if unit.pid > 0 and unit.pid == child_pid and (unit.state == "running" or unit.state == "starting") {
-      out += [mark_unit_dead(unit, child_status, now)?]
-    } else {
-      out += [unit]
+  let out: List[ServiceUnit] = collect {
+    for unit in units {
+      if unit.pid > 0 and unit.pid == child_pid and (unit.state == "running" or unit.state == "starting") {
+        yield mark_unit_dead(unit, child_status, now)?
+      } else {
+        yield unit
+      }
     }
   }
 

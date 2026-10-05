@@ -25,12 +25,12 @@ proc ensure_sha256(file: Path, expected: Str) {
 
 proc main(root: Path = /rootfs) [fs, error] {
   proof.package_metadata(root, "amd-ucode")
-  var concatenated: List[Bytes] = []
-
-  for container in containers {
-    let file = fp"{root}/usr/lib/firmware/amd-ucode/{container.name}"
-    ensure_sha256(file, container.sha256)
-    concatenated += [file.read_bytes()?]
+  let concatenated: List[Bytes] = collect {
+    for container in containers {
+      let file = fp"{root}/usr/lib/firmware/amd-ucode/{container.name}"
+      ensure_sha256(file, container.sha256)
+      yield file.read_bytes()?
+    }
   }
 
   ensure_sha256(

@@ -325,12 +325,13 @@ pure digit_char(d: Int) -> Str {
 }
 
 pure repeat_text(unit: Str, count: Int) -> Str {
-  var parts: List[Str] = []
   var i = 0
 
-  while i < count {
-    parts += [unit]
-    i += 1
+  let parts: List[Str] = collect {
+    while i < count {
+      yield unit
+      i += 1
+    }
   }
 
   parts.join("")
@@ -346,11 +347,11 @@ pure format_radix(value: Int, radix: Int, width: Int) -> Str {
   } else if magnitude == 0 {
     digits = "0"
   } else {
-    var rev: List[Str] = []
-
-    while magnitude > 0 {
-      rev += [digit_char(magnitude % radix)]
-      magnitude = magnitude / radix
+    let rev: List[Str] = collect {
+      while magnitude > 0 {
+        yield digit_char(magnitude % radix)
+        magnitude = magnitude / radix
+      }
     }
 
     var i = rev.len() - 1
@@ -1144,31 +1145,32 @@ pure gnu_regex_to_rust(pat: Str) -> RegexTranslation {
         j += 1
       }
 
-      var items: List[Str] = []
       var first = true
       var closed = false
 
-      while j < n {
-        let b = pat.byte_at(j) ?? 0
+      let items: List[Str] = collect {
+        while j < n {
+          let b = pat.byte_at(j) ?? 0
 
-        if b == 93 and ! first {
-          closed = true
-          j += 1
-          break
-        }
+          if b == 93 and ! first {
+            closed = true
+            j += 1
+            break
+          }
 
-        let w = utf8_width(b)
-        let item = pat.byte_slice(j, w)
-        j += w
-        first = false
+          let w = utf8_width(b)
+          let item = pat.byte_slice(j, w)
+          j += w
+          first = false
 
-        if (pat.byte_at(j) ?? 0) == 45 and j + 1 < n and (pat.byte_at(j + 1) ?? 0) != 93 {
-          let w2 = utf8_width(pat.byte_at(j + 1) ?? 0)
-          let upper = pat.byte_slice(j + 1, w2)
-          j += 1 + w2
-          items += [f"{regex_literal(item)}-{regex_literal(upper)}"]
-        } else {
-          items += [regex_literal(item)]
+          if (pat.byte_at(j) ?? 0) == 45 and j + 1 < n and (pat.byte_at(j + 1) ?? 0) != 93 {
+            let w2 = utf8_width(pat.byte_at(j + 1) ?? 0)
+            let upper = pat.byte_slice(j + 1, w2)
+            j += 1 + w2
+            yield f"{regex_literal(item)}-{regex_literal(upper)}"
+          } else {
+            yield regex_literal(item)
+          }
         }
       }
 
@@ -1368,55 +1370,56 @@ pure patsubst_text(text: Str, pat: Str, repl: Str) -> Result[BuiltinOutput] {
   let at_offset = regex.compile(f"(?m)\\A(?s:.)(?:{body})")?
   let literal = repl.find("\\") == null
   let n = text.byte_len()
-  var spans: List[Int] = []
+  let spans: List[Int] = collect {
+    for i, m in found {
+      yield @[m.start, m.end]
 
-  for i, m in found {
-    spans += [m.start, m.end]
+      if m.end > m.start and (i + 1 == found.len() or found[i + 1].start != m.end) {
+        let probe = captures_at(text, m.end, m.end, at_start, at_offset)
 
-    if m.end > m.start and (i + 1 == found.len() or found[i + 1].start != m.end) {
-      let probe = captures_at(text, m.end, m.end, at_start, at_offset)
-
-      if ! probe.is_empty() and probe[0] == "" {
-        spans += [m.end, m.end]
+        if ! probe.is_empty() and probe[0] == "" {
+          yield @[m.end, m.end]
+        }
       }
     }
   }
 
-  var out: List[Str] = []
   var notes: List[Str] = []
   var offset = 0
   var k = 0
 
-  while k < spans.len() {
-    let s = spans[k]
-    let e = spans[k + 1]
+  let out: List[Str] = collect {
+    while k < spans.len() {
+      let s = spans[k]
+      let e = spans[k + 1]
 
-    if s > offset {
-      out += [text.byte_slice(offset, s - offset)]
+      if s > offset {
+        yield text.byte_slice(offset, s - offset)
+      }
+
+      if literal {
+        yield repl
+      } else {
+        let caps = captures_at(text, s, e, at_start, at_offset)
+        let sub = substitute_captures(repl, if ! caps.is_empty() { caps } else { [text.byte_slice(s, e - s)] })
+        yield sub.text
+        notes += sub.notes
+      }
+
+      offset = e
+
+      if s == e and offset < n {
+        let w = utf8_width(text.byte_at(offset) ?? 0)
+        yield text.byte_slice(offset, w)
+        offset += w
+      }
+
+      k += 2
     }
 
-    if literal {
-      out += [repl]
-    } else {
-      let caps = captures_at(text, s, e, at_start, at_offset)
-      let sub = substitute_captures(repl, if ! caps.is_empty() { caps } else { [text.byte_slice(s, e - s)] })
-      out += [sub.text]
-      notes += sub.notes
+    if offset < n {
+      yield text.byte_slice(offset, n - offset)
     }
-
-    offset = e
-
-    if s == e and offset < n {
-      let w = utf8_width(text.byte_at(offset) ?? 0)
-      out += [text.byte_slice(offset, w)]
-      offset += w
-    }
-
-    k += 2
-  }
-
-  if offset < n {
-    out += [text.byte_slice(offset, n - offset)]
   }
 
   {text: out.join(""), notes}
@@ -1445,12 +1448,13 @@ pure regexp_text(text: Str, pat: Str, repl: Str, has_repl: Bool) -> Result[Built
 
 # ── macro bodies and builtins ────────────────────────────────────────────────
 pure quote_args(args: List[Str], from: Int, lq: Str, rq: Str, quoted: Bool) -> Str {
-  var out: List[Str] = []
   var i = from
 
-  while i < args.len() {
-    out += [if quoted { f"{lq}{args[i]}{rq}" } else { args[i] }]
-    i += 1
+  let out: List[Str] = collect {
+    while i < args.len() {
+      yield if quoted { f"{lq}{args[i]}{rq}" } else { args[i] }
+      i += 1
+    }
   }
 
   out.join(",")
@@ -1458,52 +1462,53 @@ pure quote_args(args: List[Str], from: Int, lq: Str, rq: Str, quoted: Bool) -> S
 
 # Substitute `$0`..`$N` (multi-digit), `$#`, `$*`, and `$@` in a user macro.
 pure expand_user_body(body: Str, name: Str, args: List[Str], lq: Str, rq: Str) -> Str {
-  var out: List[Str] = []
   let n = body.byte_len()
   var p = 0
 
-  while p < n {
-    let d = body.find("$", p) ?? -1
+  let out: List[Str] = collect {
+    while p < n {
+      let d = body.find("$", p) ?? -1
 
-    if d < 0 {
-      out += [body.byte_slice(p, n - p)]
-      break
-    }
+      if d < 0 {
+        yield body.byte_slice(p, n - p)
+        break
+      }
 
-    if d > p {
-      out += [body.byte_slice(p, d - p)]
-    }
+      if d > p {
+        yield body.byte_slice(p, d - p)
+      }
 
-    let c = body.byte_at(d + 1) ?? -1
+      let c = body.byte_at(d + 1) ?? -1
 
-    if c >= 48 and c <= 57 {
-      var q = d + 1
-      var index = 0
+      if c >= 48 and c <= 57 {
+        var q = d + 1
+        var index = 0
 
-      while q < n and (body.byte_at(q) ?? 0) >= 48 and (body.byte_at(q) ?? 0) <= 57 {
-        if index < 100000000 {
-          index = index * 10 + ((body.byte_at(q) ?? 0) - 48)
+        while q < n and (body.byte_at(q) ?? 0) >= 48 and (body.byte_at(q) ?? 0) <= 57 {
+          if index < 100000000 {
+            index = index * 10 + ((body.byte_at(q) ?? 0) - 48)
+          }
+
+          q += 1
         }
 
-        q += 1
-      }
+        if index == 0 {
+          yield name
+        } else if index <= args.len() {
+          yield args[index - 1]
+        }
 
-      if index == 0 {
-        out += [name]
-      } else if index <= args.len() {
-        out += [args[index - 1]]
+        p = q
+      } else if c == 35 {
+        yield f"{args.len()}"
+        p = d + 2
+      } else if c == 42 or c == 64 {
+        yield quote_args(args, 0, lq, rq, c == 64)
+        p = d + 2
+      } else {
+        yield "$"
+        p = d + 1
       }
-
-      p = q
-    } else if c == 35 {
-      out += [f"{args.len()}"]
-      p = d + 2
-    } else if c == 42 or c == 64 {
-      out += [quote_args(args, 0, lq, rq, c == 64)]
-      p = d + 2
-    } else {
-      out += ["$"]
-      p = d + 1
     }
   }
 
@@ -1989,40 +1994,41 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
     let b = text.byte_at(pos) ?? 0
 
     if b == bc0 and (bcl == 1 or match_at(text, pos, bc)) {
-      var pieces: List[Str] = []
       var start = pos
       var p = pos + bcl
 
-      while true {
-        let close = text.find(ec, p) ?? -1
+      let pieces: List[Str] = collect {
+        while true {
+          let close = text.find(ec, p) ?? -1
 
-        if close >= 0 {
-          pieces += [text.byte_slice(start, close + ec.byte_len() - start)]
-          pos = close + ec.byte_len()
-          break
+          if close >= 0 {
+            yield text.byte_slice(start, close + ec.byte_len() - start)
+            pos = close + ec.byte_len()
+            break
+          }
+
+          yield text.byte_slice(start, tlen - start)
+          pos = tlen
+
+          if nf == 0 {
+            eprint f"m4:{iname}: ERROR: end of file in comment"
+            return 1
+          }
+
+          while pos >= tlen and nf > 0 {
+            nf -= 1
+            text = f_text[nf]
+            pos = f_pos[nf]
+            kind = f_kind[nf]
+            iname = f_name[nf]
+            iline = f_line[nf]
+            tlen = text.byte_len()
+            f_text[nf] = ""
+          }
+
+          start = pos
+          p = pos
         }
-
-        pieces += [text.byte_slice(start, tlen - start)]
-        pos = tlen
-
-        if nf == 0 {
-          eprint f"m4:{iname}: ERROR: end of file in comment"
-          return 1
-        }
-
-        while pos >= tlen and nf > 0 {
-          nf -= 1
-          text = f_text[nf]
-          pos = f_pos[nf]
-          kind = f_kind[nf]
-          iname = f_name[nf]
-          iline = f_line[nf]
-          tlen = text.byte_len()
-          f_text[nf] = ""
-        }
-
-        start = pos
-        p = pos
       }
 
       let comment = pieces.join("")
@@ -2177,44 +2183,45 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         cur.skip = false
       }
     } else if b == lq0 and (lql == 1 or match_at(text, pos, lq)) {
-      var pieces: List[Str] = []
       var start = pos + lql
       var depth = 1
 
-      while true {
-        let scan = scan_quoted(text, start, tlen, lq, rq, depth)
+      let pieces: List[Str] = collect {
+        while true {
+          let scan = scan_quoted(text, start, tlen, lq, rq, depth)
 
-        if scan.depth == 0 {
-          pieces += [text.byte_slice(start, scan.end - rql - start)]
-          pos = scan.end
-          break
-        }
+          if scan.depth == 0 {
+            yield text.byte_slice(start, scan.end - rql - start)
+            pos = scan.end
+            break
+          }
 
-        pieces += [text.byte_slice(start, tlen - start)]
-        depth = scan.depth
-        pos = tlen
-
-        if nf == 0 {
-          eprint f"m4:{iname}: ERROR: end of file in string"
-          return 1
-        }
-
-        while pos >= tlen and nf > 0 {
-          nf -= 1
-          text = f_text[nf]
-          pos = f_pos[nf]
-          kind = f_kind[nf]
-          iname = f_name[nf]
-          iline = f_line[nf]
-          tlen = text.byte_len()
-          f_text[nf] = ""
-        }
-
-        if kind == 2 {
+          yield text.byte_slice(start, tlen - start)
+          depth = scan.depth
           pos = tlen
-        }
 
-        start = pos
+          if nf == 0 {
+            eprint f"m4:{iname}: ERROR: end of file in string"
+            return 1
+          }
+
+          while pos >= tlen and nf > 0 {
+            nf -= 1
+            text = f_text[nf]
+            pos = f_pos[nf]
+            kind = f_kind[nf]
+            iname = f_name[nf]
+            iline = f_line[nf]
+            tlen = text.byte_len()
+            f_text[nf] = ""
+          }
+
+          if kind == 2 {
+            pos = tlen
+          }
+
+          start = pos
+        }
       }
 
       let quoted = if pieces.len() == 1 { pieces[0] } else { pieces.join("") }

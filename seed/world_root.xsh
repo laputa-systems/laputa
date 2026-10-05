@@ -26,13 +26,13 @@ pure elf_interpreter(program_headers: Str) -> Str {
 }
 
 pure elf_needed(dynamic: Str) -> List[Str] {
-  var needed = []
-
-  for line in dynamic.lines() {
-    continue unless "(NEEDED)" in line
-    let start = line.find("[") ?? -1
-    continue unless start >= 0
-    needed += [line.byte_slice(start + 1).replace("]", with: "").trim()]
+  let needed = collect {
+    for line in dynamic.lines() {
+      continue unless "(NEEDED)" in line
+      let start = line.find("[") ?? -1
+      continue unless start >= 0
+      yield line.byte_slice(start + 1).replace("]", with: "").trim()
+    }
   }
 
   needed

@@ -7,12 +7,13 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
 }
 
 proc repeated_byte(value: Int, count: Int) -> Result[Bytes] {
-  var items = []
   var index = 0
 
-  while index < count {
-    items += [value]
-    index += 1
+  let items = collect {
+    while index < count {
+      yield value
+      index += 1
+    }
   }
 
   bytes.from_ints(items)?

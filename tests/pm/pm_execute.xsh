@@ -581,19 +581,19 @@ proc main(plan_path: Path, repo_root: Path, object_store: Path) [fs, net, proces
 main(@args)?
 """
   let modules = path.absolute(p".")?
-  var runs: List[Map[Int]] = []
-
-  for name in ["fresh", "reuse"] {
-    let trace = test.temp_path(ctx, name: f"execute-hash-count-{name}.jsonl")
-    let outcome = test.run_xsht_trace(
-      ctx,
-      source,
-      ["--raw", "--trace-format", "jsonl", "--trace-file", trace.display()],
-      [plan_path.display(), repo_root.display(), object_store.display()],
-      {XSH_MODULE_PATH: modules},
-    )?
-    assert outcome.success
-    runs += [sha256_calls_by_module(trace)?]
+  let runs: List[Map[Int]] = collect {
+    for name in ["fresh", "reuse"] {
+      let trace = test.temp_path(ctx, name: f"execute-hash-count-{name}.jsonl")
+      let outcome = test.run_xsht_trace(
+        ctx,
+        source,
+        ["--raw", "--trace-format", "jsonl", "--trace-file", trace.display()],
+        [plan_path.display(), repo_root.display(), object_store.display()],
+        {XSH_MODULE_PATH: modules},
+      )?
+      assert outcome.success
+      yield sha256_calls_by_module(trace)?
+    }
   }
 
   let fresh = runs[0]

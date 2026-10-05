@@ -1741,20 +1741,21 @@ pure adjust_cancels(start: Ext, other: Ext) -> Ext {
 }
 
 pure merge_names(a: List[Str], b: List[Str]) -> List[Str] {
-  var out: List[Str] = []
   var i = 0
   var j = 0
-  while i < a.len() and j < b.len() {
-    if a[i] < b[j] {
-      out += [a[i]]
-      i += 1
-    } else if a[i] > b[j] {
-      out += [b[j]]
-      j += 1
-    } else {
-      out += [a[i]]
-      i += 1
-      j += 1
+  let out: List[Str] = collect {
+    while i < a.len() and j < b.len() {
+      if a[i] < b[j] {
+        yield a[i]
+        i += 1
+      } else if a[i] > b[j] {
+        yield b[j]
+        j += 1
+      } else {
+        yield a[i]
+        i += 1
+        j += 1
+      }
     }
   }
 
@@ -2162,37 +2163,38 @@ proc finish_entry(entry: Entry, table: CapTable) -> Result[Entry] {
 
 # _nc_parse_entry over the token stream: one Entry per names token.
 proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]] {
-  var entries: List[Entry] = []
   var started = false
   var entry = Entry(empty_term(""), [], 0)
-  for token in tokens {
-    if token.kind == NAMES {
-      if started {
-        entries += [finish_entry(entry, table)?]
+  let entries: List[Entry] = collect {
+    for token in tokens {
+      if token.kind == NAMES {
+        if started {
+          yield finish_entry(entry, table)?
+        }
+
+        guard is_alnum(token.name.byte_at(0) ?? 0) else {
+          return Err(TicError.Source(f"line {token.line}: terminal names must start with letter or digit"))
+        }
+
+        if ! valid_entry_name(first_name(token.name)) {
+          eprint f"tic: line {token.line}: invalid entry name \"{first_name(token.name)}\""
+        }
+
+        started = true
+        entry = Entry(empty_term(token.name), [], token.line)
+        continue
       }
 
-      guard is_alnum(token.name.byte_at(0) ?? 0) else {
-        return Err(TicError.Source(f"line {token.line}: terminal names must start with letter or digit"))
+      guard started else {
+        return Err(TicError.Source(f"line {token.line}: entry does not start with terminal names in column one"))
       }
 
-      if ! valid_entry_name(first_name(token.name)) {
-        eprint f"tic: line {token.line}: invalid entry name \"{first_name(token.name)}\""
-      }
-
-      started = true
-      entry = Entry(empty_term(token.name), [], token.line)
-      continue
+      entry = apply_token(entry, token, table)?
     }
 
-    guard started else {
-      return Err(TicError.Source(f"line {token.line}: entry does not start with terminal names in column one"))
+    if started {
+      yield finish_entry(entry, table)?
     }
-
-    entry = apply_token(entry, token, table)?
-  }
-
-  if started {
-    entries += [finish_entry(entry, table)?]
   }
 
   entries
@@ -2307,19 +2309,20 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
   }
 
   # fixup_acsc: an entry that switches character sets gets the VT100 map.
-  var out: List[Term] = []
   index = 0
-  while index < entries.len() {
-    var term = resolved[index]
-    let has_acsc = table.acsc in term.strs
-    let smacs = text_of(term.strs.get(table.smacs) ?? Absent)
-    let rmacs = text_of(term.strs.get(table.rmacs) ?? Absent)
-    if ! has_acsc and smacs != null and rmacs != null {
-      term = {...term, strs: term.strs.set(table.acsc, Text(bytes.from_text(VT_ACSC)))}
-    }
+  let out: List[Term] = collect {
+    while index < entries.len() {
+      var term = resolved[index]
+      let has_acsc = table.acsc in term.strs
+      let smacs = text_of(term.strs.get(table.smacs) ?? Absent)
+      let rmacs = text_of(term.strs.get(table.rmacs) ?? Absent)
+      if ! has_acsc and smacs != null and rmacs != null {
+        term = {...term, strs: term.strs.set(table.acsc, Text(bytes.from_text(VT_ACSC)))}
+      }
 
-    out += [term]
-    index += 1
+      yield term
+      index += 1
+    }
   }
 
   out
@@ -2327,29 +2330,30 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
 
 # tic's write-time rewrite of `%{n}` into the shorter `%'c'` for printable n.
 proc shorten_constants(text: Bytes) -> Result[Bytes] {
-  var out: List[Int] = []
   var t = 0
   let n = text.len()
   var changed = false
-  while t < n {
-    let ch = text.byte_at(t) ?? 0
-    t += 1
-    out += [ch]
-    if ch == 92 {
-      if t >= n {
-        break
-      }
-
-      out += [text.byte_at(t) ?? 0]
+  let out: List[Int] = collect {
+    while t < n {
+      let ch = text.byte_at(t) ?? 0
       t += 1
-    } else if ch == 37 and (text.byte_at(t) ?? 0) == 123 {
-      let parsed = parse_c_long(text, t + 1)
-      let end = if parsed.end == t + 1 { t + 1 } else { parsed.end }
-      let value = parsed.value
-      if (text.byte_at(end) ?? 0) == 125 and value > 0 and value != 92 and value < 127 and is_print(value) {
-        out += [39, value, 39]
-        t = end + 1
-        changed = true
+      yield ch
+      if ch == 92 {
+        if t >= n {
+          break
+        }
+
+        yield text.byte_at(t) ?? 0
+        t += 1
+      } else if ch == 37 and (text.byte_at(t) ?? 0) == 123 {
+        let parsed = parse_c_long(text, t + 1)
+        let end = if parsed.end == t + 1 { t + 1 } else { parsed.end }
+        let value = parsed.value
+        if (text.byte_at(end) ?? 0) == 125 and value > 0 and value != 92 and value < 127 and is_print(value) {
+          yield @[39, value, 39]
+          t = end + 1
+          changed = true
+        }
       }
     }
   }
@@ -2597,29 +2601,30 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit] {
   var extended = false
   var outdir: Path? = null
   var wanted: List[Str] = []
-  var files: List[Str] = []
   var k = 0
-  while k < argv.len() {
-    let arg = argv[k]
-    k += 1
-    if arg == "-x" {
-      extended = true
-    } else if arg == "-o" or arg == "-e" {
-      guard k < argv.len() else {
-        return Err(TicError.Usage(f"{arg} needs a value; {usage()}"))
-      }
-
-      let value = argv[k]
+  let files: List[Str] = collect {
+    while k < argv.len() {
+      let arg = argv[k]
       k += 1
-      if arg == "-o" {
-        outdir = Path(value)
+      if arg == "-x" {
+        extended = true
+      } else if arg == "-o" or arg == "-e" {
+        guard k < argv.len() else {
+          return Err(TicError.Usage(f"{arg} needs a value; {usage()}"))
+        }
+
+        let value = argv[k]
+        k += 1
+        if arg == "-o" {
+          outdir = Path(value)
+        } else {
+          wanted = wanted + [name.trim() for name in value.split(",") if name.trim() != ""]
+        }
+      } else if arg.starts_with("-") and arg != "-" {
+        return Err(TicError.Usage(f"unsupported option {arg}; {usage()}"))
       } else {
-        wanted = wanted + [name.trim() for name in value.split(",") if name.trim() != ""]
+        yield arg
       }
-    } else if arg.starts_with("-") and arg != "-" {
-      return Err(TicError.Usage(f"unsupported option {arg}; {usage()}"))
-    } else {
-      files += [arg]
     }
   }
 

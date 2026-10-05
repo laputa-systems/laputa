@@ -260,26 +260,26 @@ export proc build(dest: Path) [fs, process, env, error] {
   ]
 
   var tasks = lib.tasks.extend(static_target.tasks)
-  var outputs: List[Path] = []
+  let outputs: List[Path] = collect {
+    for program in programs {
+      let target = make.c_program({
+        cc,
+        triple,
+        cflags,
+        defs,
+        includes: includes.push(program.include),
+        root: p".",
+        sources: program.sources,
+        out_dir: fp"obj/{program.name}-objs",
+        out: fp"obj/{program.name}",
+        libs: [static_target.output],
+        ldflags: [],
+        deps: static_target.deps,
+      })
 
-  for program in programs {
-    let target = make.c_program({
-      cc,
-      triple,
-      cflags,
-      defs,
-      includes: includes.push(program.include),
-      root: p".",
-      sources: program.sources,
-      out_dir: fp"obj/{program.name}-objs",
-      out: fp"obj/{program.name}",
-      libs: [static_target.output],
-      ldflags: [],
-      deps: static_target.deps,
-    })
-
-    tasks += target.tasks
-    outputs += [target.output]
+      tasks += target.tasks
+      yield target.output
+    }
   }
 
   make.run_tasks(tasks, make.jobs()?)
