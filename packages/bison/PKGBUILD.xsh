@@ -908,10 +908,8 @@ proc main(...argv: List[Str]) [process, error] {
 }
 
 main(@args)?
-""",
+""", mode: 0o755,
   )
-
-  fs.chmod(fp"{dest}/usr/bin/yacc", 0o755)
 
   # Install bison's data files to /usr/share/bison/.
   # bison reads skeleton files and m4sugar helpers here at runtime; the path

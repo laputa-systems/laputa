@@ -161,8 +161,7 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   # at this host test runner solely so the behavior can be checked without a
   # target rootfs; the package payload still ships `#!/bin/xsh`.
   let staged = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!{xsh}")
-  fs.write(m4, staged)
-  fs.chmod(m4, 0o755)
+  fs.write(m4, staged, mode: 0o755)
 
   let status = process.run(
     process.command_argv(

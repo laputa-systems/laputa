@@ -195,9 +195,8 @@ proc main(...argv: List[Str]) [env, error] {{
   print "{output}"
 }}
 main(@args)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(bin, 0o755)
 }
 
 type WpaProofRun = {ok: Bool, stderr: Str}

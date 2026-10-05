@@ -483,8 +483,7 @@ proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = fals
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
   fs.mkdir(path_value.parent())
   fs.remove(path_value, missing_ok: true)
-  fs.write(path_value, xsh_wrapper_source(real, clang, cxx))
-  fs.chmod(path_value, 0o755)
+  fs.write(path_value, xsh_wrapper_source(real, clang, cxx), mode: 0o755)
 }
 
 proc require_file(path_value: Path, label: Str) {

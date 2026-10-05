@@ -38,8 +38,7 @@ proc write_payload_entry(root: Path, entry: EntrySpec) {
   fs.mkdir(output.parent)
 
   if entry.kind == types.File or entry.kind == types.Binary {
-    fs.write(output, entry.content)
-    fs.chmod(output, entry.mode)
+    fs.write(output, entry.content, mode: entry.mode)
   } else if entry.kind == types.Tree {
     fs.mkdir(output)
     fs.chmod(output, entry.mode)

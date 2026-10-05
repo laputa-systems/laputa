@@ -75,9 +75,8 @@ fs.write(p"/run/laputa-foot-read-ready", "ready\\n")?
 print "LAPUTA_DWL_FOOT_VISUAL"
 let input = io.stdin_text()?
 fs.write(p"/run/laputa-foot-input.txt", input)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(/run/laputa-foot-read.xsh, 0o755)
   let command = process.command_argv(
     /usr/bin/dwl,
     ["dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/laputa-foot-read.xsh"],

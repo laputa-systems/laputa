@@ -116,8 +116,7 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   fs.mkdir(auth_dir)
   defer fs.remove(auth_dir, missing_ok: true)?
   fs.chmod(auth_dir, 0o700)
-  fs.write(fp"{auth_dir}/authorized_keys", f"{client_public}\n")
-  fs.chmod(fp"{auth_dir}/authorized_keys", 0o600)
+  fs.write(fp"{auth_dir}/authorized_keys", f"{client_public}\n", mode: 0o600)
   let client_home = fp"{tmp}/client-home"
   fs.mkdir(client_home)
   let log_path = fp"{tmp}/dropbear.log"

@@ -14,8 +14,7 @@ test ca_certificate_proof_preserves_empty_dependencies_and_rejects_invalid_metad
   let stderr = fp"{root}/proof.stderr"
   for file in [bundle, helper, metadata] { file.parent.mkdir() }
   bundle.write("-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")
-  helper.write("https://curl.se/ca/cacert.pem")
-  helper.chmod(0o755)
+  helper.write("https://curl.se/ca/cacert.pem", mode: 0o755)
   let xsh = runner()?
   let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
   json.write(metadata, {deps: [], extension: {source: "fixture"}})

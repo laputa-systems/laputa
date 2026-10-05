@@ -47,9 +47,8 @@ proc main(...argv: List[Str]) [] {
 }
 
 main(@args)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(proof_samu, 0o755)
 
   fs.write(
     fp"{tmp}/CMakeLists.txt",

@@ -93,7 +93,6 @@ proc main(...argv: List[Str]) [process, env, error] {
 }
 
 main(@args)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(fp"{dest}/usr/bin/pm", 0o755)
 }

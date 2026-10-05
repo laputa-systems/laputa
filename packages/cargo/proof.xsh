@@ -58,9 +58,8 @@ proc main(...args: List[Str]) [process, error] {{
   run fp"{dynlinker}" fp"{rootfs}/usr/bin/rustc" @args ?
 }}
 main(@args)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(rustc_wrapper, 0o755)
 
   let linker_wrapper = fp"{tmp}/linker-wrapper"
   let linker = fp"{rootfs}/usr/lib/llvm23/bin/ld.lld"
@@ -85,9 +84,8 @@ proc main(...args: List[Str]) [process, error] {{
   run fp"{dynlinker}" fp"{linker}" @linker_args ?
 }}
 main(@args)?
-""",
+""", mode: 0o755,
   )
-  fs.chmod(linker_wrapper, 0o755)
 
   env ({
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),

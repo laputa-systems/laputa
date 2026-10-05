@@ -139,8 +139,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   for sh in [fp"{root}/usr/bin/sh", fp"{root}/bin/sh"] {
     fs.mkdir(sh.parent)
     fs.remove(sh, missing_ok: true)
-    fs.write(sh, seeded_shell_script())
-    fs.chmod(sh, 0o755)
+    fs.write(sh, seeded_shell_script(), mode: 0o755)
   }
 
   for tmp in [fp"{root}/tmp", fp"{root}/var/tmp"] {

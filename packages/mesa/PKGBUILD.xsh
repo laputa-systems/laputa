@@ -277,10 +277,8 @@ proc main(...argv: List[Str]) [error] {
 }
 
 main(@args)?
-""",
+""", mode: 0o755,
   )
-
-  fs.chmod(script, 0o755)
 }
 
 proc patch_build() {

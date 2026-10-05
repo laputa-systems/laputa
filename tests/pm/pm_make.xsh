@@ -122,8 +122,7 @@ if args == ["--cflags", "libone", "libtwo"] {{
 }} else {{
   error.fail("unexpected pkg-config arguments")?
 }}
-""")
-  tool.chmod(0o755)
+""", mode: 0o755)
   env ({PATH: f"{root}:{e"PATH" ?? ""}", XSH_PM_TARGET_ROOT: ""}) {
     let flags = make.pkg_config_flags(["libone", "libtwo"])?
     assert flags.cflags == ["-I/usr/include/example", "-DEXAMPLE=1"]
