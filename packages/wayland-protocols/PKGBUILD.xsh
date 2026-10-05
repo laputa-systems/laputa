@@ -522,9 +522,7 @@ proc prune_x_compat_protocols(root: Path) {
   fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml".remove()
   fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell".remove()
 
-  fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml".remove(
-    missing_ok: true,
-  )
+  fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml".remove()
 
   fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab".remove()
 }
