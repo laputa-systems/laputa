@@ -51,7 +51,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "ecdcb3998c6e77b227b599e9b1774c9eee2ca5382877d735ace3cf7f5ef6fad8",
+        sha256: "afac06f5058f08de228ae43b58b7d5642f7b1becdabde0123563c795eca83af8",
       },
     ],
   },
