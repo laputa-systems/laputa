@@ -230,7 +230,7 @@ srgb_funcs = files('srgb.c', 'srgb.h')
     with: "",
   )
 
-  text = text.replace("install_data('foot.ini', install_dir: join_paths(get_option('sysconfdir'), 'xdg', 'foot'))", "")
+  text = text.replace("install_data('foot.ini', install_dir: join_paths(get_option('sysconfdir'), 'xdg', 'foot'))", with: "")
   text = text.replace("subdir('completions')", with: "")
   text = text.replace("subdir('icons')", with: "")
   text = text.replace("subdir('utils')", with: "")

@@ -141,7 +141,7 @@ proc stage_rustlib(source: Path, dest: Path) {
     } else if entry.kind == "symlink" {
       out.parent.mkdir()
       out.remove()
-      fs.symlink(entry.path.readlink()?, out)
+      out.symlink(to: entry.path.readlink()?)
     }
   }
 }

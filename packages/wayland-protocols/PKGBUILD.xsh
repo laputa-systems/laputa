@@ -519,14 +519,14 @@ export const filetree = [
 proc prune_x_compat_protocols(root: Path) {
   fp"{root}/usr/include/wayland-protocols/xwayland-shell-v1-enum.h".remove(missing_ok: false)
   fp"{root}/usr/include/wayland-protocols/xwayland-keyboard-grab-unstable-v1-enum.h".remove(missing_ok: false)
-  fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml".remove(missing_ok: true)
-  fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell".remove(missing_ok: true)
+  fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml".remove()
+  fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell".remove()
 
   fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml".remove(
     missing_ok: true,
   )
 
-  fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab".remove(missing_ok: true)
+  fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab".remove()
 }
 
 ## Package recipe export.

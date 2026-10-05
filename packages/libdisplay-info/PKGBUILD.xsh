@@ -206,7 +206,7 @@ subdir('test')
     with: "\n",
   )
 
-  text = text.replace("math = cc.find_library('m', required: false)", "math = declare_dependency(link_args: ['-lm'])")
+  text = text.replace("math = cc.find_library('m', required: false)", with: "math = declare_dependency(link_args: ['-lm'])")
   meson_path.write(text)
 }
 

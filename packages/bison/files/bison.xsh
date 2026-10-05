@@ -176,7 +176,7 @@ proc remove_comments(text: Str) [error] -> Result[Str] {
 }
 
 proc parse_rules(text: Str) -> Result[List[GrammarRule]] {
-  let grammar = remove_comments(remove_actions(text)?)?.replace(":", " : ").replace("|", " | ").replace(";", " ; ")
+  let grammar = remove_comments(remove_actions(text)?)?.replace(":", with: " : ").replace("|", with: " | ").replace(";", with: " ; ")
   var rules = []
   var lhs = ""
   var rhs = []

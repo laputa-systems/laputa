@@ -117,9 +117,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   man_file.write(man_page)
 
   env ({LD_LIBRARY_PATH: libdir}) {
-    let mdoc_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $mdoc_file ?, "")
+    let mdoc_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $mdoc_file ?, with: "")
     proof.ensure(mdoc_out == mdoc_text, "mandoc-mdoc", f"unexpected mdoc rendering:\n{mdoc_out}")
-    let man_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $man_file ?, "")
+    let man_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $man_file ?, with: "")
     proof.ensure(man_out == man_text, "mandoc-man", f"unexpected man rendering:\n{man_out}")
 
     # makewhatis indexes the tree into mandoc.db; apropos and whatis then

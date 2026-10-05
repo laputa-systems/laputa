@@ -182,7 +182,7 @@ test test_image_dockerfiles_take_only_local_inputs [fs, error] {
 # though `.out/` is gitignored and the repository source uses `SKIP`.
 test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "xsh-package-key")?
-  fs.symlink(fp"{fs.cwd()?}/packages", fp"{root}/packages")
+  fp"{root}/packages".symlink(to: fp"{fs.cwd()?}/packages")
   let seed = xsh_seed.xsh_seed_dir(root, "aarch64")
   fp"{seed}/core".mkdir()
 
