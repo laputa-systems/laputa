@@ -1,4 +1,4 @@
-use installer.rootfs_size as rootfs_size
+use installer.rootfs_size
 
 test test_installer_root_size_keeps_the_last_ext4_group_metadata {
   # One block group's usable capacity used to produce a 129 MiB image with
