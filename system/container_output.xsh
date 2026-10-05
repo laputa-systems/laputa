@@ -1,6 +1,6 @@
 ##! Atomic publication of final profile artifacts from container-local Linux staging to the host output bind mount.
 ## Publication failures at the local-container to host-output boundary.
-export error ContainerOutputError = Failed(message: Str) : InvalidData
+export error ContainerOutputError = Failed : InvalidData
 
 ## One verified file copied into an atomic system bundle.
 export type BundleFile = {name: Str, source: Path}

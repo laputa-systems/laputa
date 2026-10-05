@@ -4,7 +4,7 @@
 # its own helpers.
 
 ## Installer host failures that are not a child's exit status.
-export error InstallerHostError = Failed(message: Str)
+export error InstallerHostError = Failed
 
 ## Read an environment setting, treating an unset or blank value as absent so
 ## an empty `VAR=` from a Makefile or wrapper falls back to the default.

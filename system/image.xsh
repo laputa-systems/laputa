@@ -3,7 +3,7 @@
 # The native build helper imports PM modules and XSH currently shares union-tag names across
 # user modules; both domains model the supported ARM target with the same tag spelling.
 ## Image-construction failures retained at the narrow image boundary.
-export error ImageError = Failed(message: Str) : InvalidData
+export error ImageError = Failed : InvalidData
 
 # The byte size of one GPT sector.
 const sector_size = 512

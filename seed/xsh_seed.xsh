@@ -13,7 +13,7 @@ export type SeedArch = {arch: Str, triple: Str, docker_platform: Str}
 export type SeedEnvVar = {name: Str, value: Str}
 
 ## Errors raised when the seed inputs, build, or outputs violate their contract.
-export error SeedError = Usage(message: Str) : Usage | Missing(message: Str) : NotFound | Failed(message: Str) : ProcessFailure
+export error SeedError = Usage : Usage | Missing : NotFound | Failed : ProcessFailure
 
 ## The XSH image whose toolchain and musl CRT objects every Linux XSH build links against.
 export const xsh_seed_build_image = "xsh-test"

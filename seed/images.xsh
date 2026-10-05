@@ -18,7 +18,7 @@ use pm.types as pm_types
 use seed.xsh_seed
 
 ## Errors raised when an image input is missing or a Docker step fails.
-export error SeedImageError = Missing(message: Str) : NotFound | Failed(message: Str) : ProcessFailure
+export error SeedImageError = Missing : NotFound | Failed : ProcessFailure
 
 const host_tools_contract_epoch = "laputa-host-tools-1"
 const package_tools_contract_epoch = "laputa-package-tools-2"

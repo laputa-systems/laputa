@@ -19,7 +19,7 @@ export type SystemProfile = {
 }
 
 ## Errors raised when a profile or system command violates its declared contract.
-export error LaputaError = Usage(message: Str) : Usage | Profile(message: Str) : InvalidData | Docker(message: Str) : ProcessFailure | Incomplete(message: Str) : Unsupported
+export error LaputaError = Usage : Usage | Profile : InvalidData | Docker : ProcessFailure | Incomplete : Unsupported
 
 ## Render a QEMU execution mode for diagnostics and persisted command records.
 export pure qemu_mode_text(mode: QemuMode) -> Str {
