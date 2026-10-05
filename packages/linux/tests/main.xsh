@@ -836,7 +836,7 @@ CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
     objects: [p"lib/xor/xor.o"],
     lib_objects: [],
     archive_owners: [],
-    composites: [kbuild.CompositeObject(object: p"lib/xor/xor.o", members: [p"lib/xor/core.o", p"lib/xor/x86/avx.o"])],
+    composites: [kbuild.CompositeObject(p"lib/xor/xor.o", [p"lib/xor/core.o", p"lib/xor/x86/avx.o"])],
     unsupported: [],
   )
 

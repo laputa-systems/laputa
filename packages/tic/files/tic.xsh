@@ -2164,7 +2164,7 @@ proc finish_entry(entry: Entry, table: CapTable) -> Result[Entry] {
 proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]] {
   var entries: List[Entry] = []
   var started = false
-  var entry = Entry(term: empty_term(""), uses: [], line: 0)
+  var entry = Entry(empty_term(""), [], 0)
   for token in tokens {
     if token.kind == NAMES {
       if started {
@@ -2180,7 +2180,7 @@ proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]
       }
 
       started = true
-      entry = Entry(term: empty_term(token.name), uses: [], line: token.line)
+      entry = Entry(empty_term(token.name), [], token.line)
       continue
     }
 

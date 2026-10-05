@@ -6109,7 +6109,7 @@ pure archive_analysis_record_for_object(
   let key = path_key(obj)
 
   if key in composites_by_object {
-    let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
+    let default_composite: CompositeObject = CompositeObject(obj, [])
     let composite = composites_by_object.get(key) ?? default_composite
     return {
       object: key,
@@ -6232,7 +6232,7 @@ pure archive_analysis_raw_item(
   let key = path_key(obj)
 
   if key in composites_by_object {
-    let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
+    let default_composite: CompositeObject = CompositeObject(obj, [])
     let composite = composites_by_object.get(key) ?? default_composite
     return {
       object: key,
@@ -6354,7 +6354,7 @@ proc archive_analysis_flag_entries_for_plan_range(
 
     if path_key(obj) in composites_by_object {
       let object_key = path_key(obj)
-      let default_composite: CompositeObject = CompositeObject(object: obj, members: [])
+      let default_composite: CompositeObject = CompositeObject(obj, [])
       let composite = composites_by_object.get(object_key) ?? default_composite
       for member in composite.members {
         dirs[path_key(object_dir(member))] = true
@@ -6768,7 +6768,7 @@ proc archive_analysis_process_pool(
   json.write(context_path, archive_analysis_plan_context(plan))
   defer context_path.remove(missing_ok: true)?
   let flags_path = fp"{prefix}-flags.json"
-  json.write(flags_path, ArchiveAnalysisFlags(flags: flag_entries))
+  json.write(flags_path, ArchiveAnalysisFlags(flag_entries))
   defer flags_path.remove(missing_ok: true)?
   var handles = []
   var output_paths: List[Path] = []

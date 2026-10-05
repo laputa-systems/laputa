@@ -228,7 +228,7 @@ proc resolve_repo_root(raw: Str) -> Result[Path] {
 }
 
 proc parse_repo_packages(args: List[Str], command: Str) -> Result[RepoPackagesArgs] {
-  var parsed: RepoPackagesOptions = RepoPackagesOptions(repo: "", packages: [])
+  var parsed: RepoPackagesOptions = RepoPackagesOptions("", [])
 
   match cli.parse(
     args,
@@ -267,7 +267,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
 
   match action {
     "check" => {
-      var parsed: RepoCheckOptions = RepoCheckOptions(repo: "")
+      var parsed: RepoCheckOptions = RepoCheckOptions("")
       match cli.parse(args, {repo: {form: "--repo PATH", default: ""}}, "pm repo check") {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
@@ -322,7 +322,7 @@ proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
       })
     }
     "show" => {
-      var parsed: RepoShowOptions = RepoShowOptions(input: p"")
+      var parsed: RepoShowOptions = RepoShowOptions(p"")
       match cli.parse(args, {input: {form: "PLAN", kind: "Path", required: true}}, "pm repo show") {
         Ok(value) => parsed = value
         Err(problem) => return Err(problem)
@@ -477,7 +477,7 @@ proc parse_root_command(argv: List[Str]) [error] -> Result[PmCommand] {
     )
   }
 
-  var parsed: RootInspectOptions = RootInspectOptions(input: p"")
+  var parsed: RootInspectOptions = RootInspectOptions(p"")
   match cli.parse(args, {input: {form: "GENERATION", kind: "Path", required: true}}, "pm root inspect") {
     Ok(value) => parsed = value
     Err(problem) => return Err(problem)
@@ -524,7 +524,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
   }
 
   if argv[1] == "gc" {
-    var collected: StoreGcOptions = StoreGcOptions(store: p"", keep: [])
+    var collected: StoreGcOptions = StoreGcOptions(p"", [])
     match cli.parse(
       tail_after(argv, 2),
       {
@@ -546,7 +546,7 @@ proc parse_store_command(argv: List[Str]) [error] -> Result[PmCommand] {
     return Err(types.PmError.Usage(f"unknown pm store command {argv[1]}"))
   }
 
-  var parsed: StoreVerifyOptions = StoreVerifyOptions(store: p"")
+  var parsed: StoreVerifyOptions = StoreVerifyOptions(p"")
   match cli.parse(
     tail_after(argv, 2),
     {store: {form: "--store STORE", kind: "Path", required: true}},
