@@ -55,3 +55,31 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
   assert block > 0
   assert bytes.read_at(image, block * block_size, 60)? == bytes.from_text(block_target)
 }
+
+test test_ext4_rejects_a_final_group_too_small_for_metadata [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "laputa-fs-short-final-group")?
+  let source = fp"{root}/source"
+  let image = fp"{root}/rootfs.ext4"
+  let stderr = fp"{root}/mkfs.stderr"
+  fs.mkdir(source)?
+  fs.write(image, b"")?
+  image.truncate(129 * 1024 * 1024)?
+
+  let xsh = runner()?
+  let status = process.run(
+    process.command_argv(
+      xsh,
+      [
+        xsh.display(),
+        "packages/laputa-fs/files/mkfs.ext4.xsh",
+        "--",
+        "-d",
+        source.display(),
+        image.display(),
+      ],
+      stderr:,
+    ),
+  )?
+  assert ! status.ok
+  assert "last ext4 block group is too small for its metadata" in fs.read_text(stderr)?
+}

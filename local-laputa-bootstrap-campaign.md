@@ -1,29 +1,32 @@
 # Local Laputa bootstrap campaign
 
-## Summary (Linux amd64 host, 2026-10-04)
+## Summary (Linux amd64 host, final clean run 2026-10-05)
 
-From `make clean` on a Linux amd64 host with only git, make, Docker, KVM and
-QEMU, the whole Laputa world (70 packages for `x86_64-linux-musl`, with no
-exclusions) builds and proves in 4m27s. It then publishes to the local mirror
-and composes a root. The installer image installs and boots under KVM, and
-the canonical `qemu-dwl-foot` proof drives dwl and foot under
-`qemu-system-x86_64` with KVM. All native suites, `make check`, `make
-mirror-test` and XSH's Linux gate pass. A no-change `make build` takes 7 s
-and builds nothing. Timings and every failure fixed are in the run log below.
+`make verify ARCH=x86_64` passed from `make clean` on this Linux amd64 host.
+The full `x86_64-linux-musl` world built and proved all 85 packages in 852 s,
+published all 85 artifacts to the local mirror, and composed the root. The
+installer image installs and boots under KVM, and the canonical
+`qemu-dwl-foot` proof drives dwl and foot under `qemu-system-x86_64` with KVM.
+`make check`, all Laputa native suites and `make mirror-test` passed. The
+final unchanged build took 7 s and built no packages. The run log records each
+step's time.
 
-- **Built:** host tools in 129 s, the seed in 17 s, the world in 267 s,
-  publish in 9 s, root in 15 s. Installer QEMU proof 23 s, profile build plus
-  proof 70 s.
+- **Built:** static host tools in 131 s, the seed in 14 s, the world in 852 s,
+  publish in 13 s, root in 15 s. Installer QEMU proof 26 s; profile build and
+  proof 54 s.
 - **New:** a `linux-headers` package (byte-identical to `make headers_install`
   on both arches), arch-neutral installer and profile CLIs, `make test-linux`,
   `make mirror-test` without host Rust, and a persistent Kbuild plan cache.
 - **Real bugs fixed beyond the build:** musl's missing `clone()`, x86
   `asm/stat.h` and six other clobbered headers, both arches' truncated
   built-in kernel command line, host mode bits leaking into keys and payloads,
-  aarch64 `wchar_t` signedness, an unenforced `forbidden_packages`, and a
-  broken in-world `getent`.
-- **XSH changes** (`../xsh`, local commits): `fs.write_atomic` keeps
-  plain-write modes; host musl builds no longer force rust-lld; a racy net
+  aarch64 `wchar_t` signedness, an unenforced `forbidden_packages`, a broken
+  in-world `getent`, and the installer ext4 final-group sizing bug (D17).
+- **XSH changes** (`../xsh`, local commits at `68dfea86`): target-typed
+  variants and positional record constructors; effect inference for exports,
+  streams, and `main`; item shorthand callbacks and `tempdir` scopes; and
+  atomic, configurable migration-lint fixes. `fs.write_atomic` preserves
+  plain-write modes, host musl builds no longer force rust-lld, and a racy net
   test waits instead of cancelling.
 - **Host change:** `doas apk add qemu-hw-display-virtio-gpu
   qemu-hw-display-virtio-gpu-pci` (Alpine ships QEMU's virtio GPU as separate
@@ -38,10 +41,15 @@ and builds nothing. Timings and every failure fixed are in the run log below.
     blank session.
   - `make installer-qemu-manual` defines `main` without calling it and
     assumes aarch64.
+  - The `alsa-lib` and `alsa-utils-minimal` recipes are still buildable stubs;
+    real ALSA builds and sound-device coverage are separate work.
   - xinit accepts unknown service fields instead of rejecting them.
   - PM's `repo plan` defaults `--target` to aarch64.
   - Removing the `-lgcc_s` name altogether needs a Rust std built with LLVM
     libunwind; `gnu-stubs` already provides that soname from libunwind.
+  - `make lint` is report-only and reports 39 migration warnings in Laputa
+    (27 env-string, 3 item-shorthand, 9 tempdir-scope) plus the existing
+    `lint.shadowing` warning in `pm/graph.xsh`.
 
 Goal: build the whole Laputa world locally from a clean checkout of this
 monorepo and `../xsh`, with:
@@ -264,41 +272,40 @@ fixed in xsh (non-call value stages get `check.ambiguous-grouping` or
 - An incremental seed build once failed to link `xshi` while XSH was being
   committed to concurrently. The rerun passed.
 
-## Linux amd64 run log (2026-10-04)
+## Linux amd64 run log (final clean run, 2026-10-05)
 
 Host: 32 cores, 60 GB, Alpine with rootful Docker 29.5 (`linux/amd64`), KVM.
 The CPU has AVX2, BMI2 and MOVBE.
 
-Final clean run, one step at a time from `make clean` (wall seconds; `.cache/`
-already held the sources):
+Final `make verify ARCH=x86_64` from `make clean` (wall seconds; `.cache/`
+already held the pinned sources):
 
 | Step | Time | Result |
 |---|---|---|
 | `make clean` | <1 | `.out/`, `target/` and the Laputa images removed |
-| `make host-xsh` | 129 | static `xsh`/`xshi`/`xsht` in `.out/host/x86_64` |
-| `make fetch` | 4 | 58 sources cached, 0 fetched |
-| `make seed` | 17 | cargo reused the host-xsh units; then package-tools |
-| `make mirror` | 35 | first run builds the mirror; listening on 127.0.0.1:3000 |
-| `make build ARCH=x86_64` | 267 | 70 packages built and proved |
-| `make publish` | 9 | 70 artifacts |
+| `make host-xsh` | 131 | static `xsh`/`xshi`/`xsht` in `.out/host/x86_64` |
+| `make fetch` | 4 | pinned inputs verified from `.cache/` |
+| `make seed` | 14 | local XSH seed and package-tools image built |
+| `make build ARCH=x86_64` | 852 | all 85 packages built and proved |
+| `make publish` | 13 | 85 artifacts |
 | `make root PKGS="baselayout xsh xinit musl"` | 15 | 324 files, 12 ELF, 0 failures; the root's xsh runs |
-| `make installer-image` | 8 | 137 MB ISO (9.4 MB kernel) |
-| `make installer-qemu-test` | 23 | KVM: install, boot the disk, DHCP, SSH into dropbear |
-| `make profile-build` | 20 | `qemu-dwl-foot` image |
-| `make profile-test` | 50 | KVM: mdevd, seatd, dwl, foot; QMP `laputa` reaches foot; screenshot |
-| `make check` | 34 | clean, extensionless XSH programs included |
-| `make test-pm` | 11 | 196 passed |
-| `make test-system` | 16 | 53 passed |
-| `make test-xinit` | 8 | 22 passed |
-| `make test-linux` | 1 | 24 passed |
-| `make mirror-test` | 41 | 20 passed, in `xsh-test` |
-| `make build ARCH=x86_64` again | 7 | no-op: 0 packages built, 70 reused |
+| `make installer-image` | 10 | 141 MB ISO; 128 MiB ext4 root image fills a whole group |
+| `make installer-qemu-test` | 26 | KVM: install, boot the disk, DHCP, SSH into dropbear |
+| `make profile-build` | 28 | `qemu-dwl-foot` image |
+| `make profile-test` | 26 | KVM: mdevd, seatd, dwl, foot; QMP `laputa` reaches foot; screenshot |
+| `make check` | 38 | clean, extensionless XSH programs included |
+| `make test` | 39 | 223 PM, 55 system, 1 integration, 22 xinit, 25 Linux/header tests passed |
+| `make mirror-test` | 41 | 52 passed, in `xsh-test` |
+| `make build ARCH=x86_64` again | 7 | no-op: 0 packages built, 85 artifacts reused |
 
-XSH (`../xsh`): `cargo dev test linux --ci` passes (836 Rust integration
-tests, 319 unit tests), and so do the native suites for the changed modules.
-The first try at this run failed `make test-linux`: the kbuild tests shared the
-build containers' root-owned plan cache. They have their own directory now, and
-the remaining steps passed on the rerun.
+XSH (`../xsh`, local master at `68dfea86`, three commits ahead of
+`origin/master`): `cargo test --release -j4 -p xsht --no-fail-fast` passed
+(113 unit, 371 integration, 1 profile-parity test); the Linux CI gate passed
+(340 XSH library tests, 839 integration tests, 7 privileged Linux tests, and
+the symbol-plateau check); `xsht test tests/xsh` passed (1,553 passed, 18
+skipped), and docs checks passed (3 tests). The migration lint counts with
+the new rules enabled were 95 in XSH and 39 in Laputa; no corpus autofixes
+were applied.
 
 Failures found and fixed, in order:
 - The `lint` commit had left bison/flex local-source pins and the golden plan
@@ -335,15 +342,20 @@ Failures found and fixed, in order:
   `forbidden_packages` was never enforced.
 - XSH: `.cargo/config.toml` forced rust-lld for the host musl triple, so host
   cargo could not link proc-macros. And a net test raced its own cancel.
+- Installer ext4: the 129 MiB image left only 256 blocks in its last
+  32,768-block group, smaller than laputa-fs's 516-block metadata reservation.
+  Image sizing now pads to the next MiB boundary when needed, and laputa-fs
+  rejects partial groups that cannot hold their metadata. The QEMU smoke
+  image is 131 MiB and its install-and-boot proof passes (D17); the base
+  installer's 128 MiB root image ends on a full group boundary.
 
-## Upgrade and new-package campaign (2026-10-04, wrapped up early)
+## Upgrade and new-package campaign (2026-10-04, completed 2026-10-05)
 
 The goal was every package at its latest stable release (D13), the new
-packages below, and a fresh world build. Work ran in parallel agents in git
-worktrees sharing the artifact store, with heavy builds serialized on
-`.out/heavy.lock`. Everything listed as done is merged on master. At the last
-integration build, master built 82 packages and passed the canonical
-`qemu-dwl-foot` proof (KVM, kernel 7.2.9, real Mesa, wlroots 0.20).
+packages below, and a fresh world build. All lanes are settled in the local
+Laputa and XSH checkouts. The final clean verification built all 85 packages
+and passed the canonical `qemu-dwl-foot` proof (KVM, kernel 7.2.9, real Mesa,
+wlroots 0.20).
 
 **Upgraded:**
 - every package to latest stable, except LLVM (D13) and mdevd (0.1.8.3's
@@ -401,19 +413,14 @@ integration build, master built 82 packages and passed the canonical
 
 ### Handoff: what is open
 
-- **Lanes still running at wrap-up:** XSH terminfo compiler and database,
-  real alsa-lib/alsa-utils builds (the current recipes are stubs that compile
-  nothing), and deno from source. Each is merged below if it landed;
-  otherwise its worktree branch holds the work.
 - **Upstream XSH regression (not ours):** on origin/master, a debug `xsh`
   overflows an 8 MB stack running `dev/main.xsh`, so `cargo dev` segfaults
   (exit 139). Release builds work: `target/release/xsh dev/main.xsh --
   ...` runs the same driver. Repro: `cargo dev --help`. It passes with
   `ulimit -s unlimited`.
-- **Not run on master after the last merges:** `make verify` (the clean-host
-  proof, including the installer QEMU proof). Run it before the next
-  milestone. It deletes `.out/`, so never run it while agents share the store.
 - **aarch64:** nothing was built or booted for aarch64 in either campaign.
+- **Laputa lint report:** `make lint` still reports 39 migration warnings and
+  `lint.shadowing` in `pm/graph.xsh`; the warning counts are recorded above.
 - **Vendored generator outputs that real tools could now replace:**
   - Mesa's 9 parser/lexer files and perf's flex/bison files. bison works now
     but is slow: m4 is XSH-interpreted (glsl_parser.yy takes 97 s).
@@ -436,7 +443,7 @@ integration build, master built 82 packages and passed the canonical
   - The aarch64 kernel has PERF_EVENTS off.
   - libudev-zero needs a `usb.ids` that hwdata doesn't ship.
 
-## Decisions (settled 2026-10-03)
+## Decisions (D1–D17, 2026-10-03 through 2026-10-05)
 
 - **D1. Fetch once, then offline.**
   - `make fetch` is the only networked step: upstream sources, the LLVM
@@ -532,3 +539,10 @@ integration build, master built 82 packages and passed the canonical
   database.
 - **D16. deno builds from source with cargo** (2026-10-04), linking rusty_v8's
   published musl static library, because deno publishes only glibc builds.
+- **D17. Keep a full ext4 metadata reserve in the final block group**
+  (2026-10-05). `laputa-fs` reserves 516 blocks per group for metadata. The
+  installer root image is rounded up to a MiB boundary when its final partial
+  group would be smaller; the formatter rejects any remaining undersized
+  group before writing. This prevents the kernel from rejecting the 129 MiB
+  installer image whose final group held only 256 blocks. The QEMU smoke image
+  is now 131 MiB; the base installer's 128 MiB root ends on a full group.

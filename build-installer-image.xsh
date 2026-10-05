@@ -1,6 +1,7 @@
 #!/bin/xsh
 use installer.host
 use installer.package_roots_host
+use installer.rootfs_size
 use system.image as system_image
 
 error InstallerBuildError = Failed(message: Str)
@@ -149,8 +150,6 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
 # mapped through indirect blocks of 1024 entries. Sizing from apparent bytes
 # plus a fixed slack fails once a root spans more than a group or two.
 const EXT4_BLOCK = 4096
-const EXT4_GROUP_BLOCKS = 32768
-const EXT4_GROUP_RESERVED = 516
 
 # Data and mapping blocks for one tree: whole blocks per file plus one
 # indirect block per 1024 data blocks and one for the double-indirect root,
@@ -178,9 +177,7 @@ proc installer_root_size_mb(rootfs: Path, override_mb: Str) [fs, error] -> Resul
     return override_mb.parse_int()?
   }
 
-  let data = tree_blocks(rootfs)?
-  let groups = ceil_div(data, EXT4_GROUP_BLOCKS - EXT4_GROUP_RESERVED)
-  ceil_div((data + groups * EXT4_GROUP_RESERVED) * EXT4_BLOCK, 1024 * 1024) + 1
+  rootfs_size.image_size_mib(tree_blocks(rootfs)?)
 }
 
 proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) [fs, error] {
