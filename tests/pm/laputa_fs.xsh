@@ -70,12 +70,12 @@ test test_ext4_rejects_a_final_group_too_small_for_metadata [fs, process, env, e
     process.command_argv(
       xsh,
       [
-        xsh.display(),
+        xsh,
         "packages/laputa-fs/files/mkfs.ext4.xsh",
         "--",
         "-d",
-        source.display(),
-        image.display(),
+        source,
+        image,
       ],
       stderr:,
     ),
