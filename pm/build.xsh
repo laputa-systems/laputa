@@ -116,7 +116,7 @@ proc seed_xsh_runners(root: Path, xsh: Path) {
   for name in ["xsh", "xshi", "xsht"] {
     let source = direct_xsh_source(xsh, name)?
     let dest = fp"{bin}/{name}"
-    dest.remove(missing_ok: true)
+    dest.remove()
     fs.install(source, dest, 0o755, parents: true, overwrite: true)
   }
 }
@@ -133,12 +133,12 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
 
   let pm_root = pm_source_root()?
   fs.install(fp"{pm_root}/pm.xsh", fp"{root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)
-  fp"{root}/usr/lib/pm/pm".remove(missing_ok: true)
+  fp"{root}/usr/lib/pm/pm".remove()
   let _ = fs.copy_tree(fp"{pm_root}/pm", fp"{root}/usr/lib/pm/pm", parents: true, overwrite: true)?
 
   for sh in [fp"{root}/usr/bin/sh", fp"{root}/bin/sh"] {
     sh.parent.mkdir()
-    sh.remove(missing_ok: true)
+    sh.remove()
     sh.write(seeded_shell_script(), mode: 0o755)
   }
 
@@ -212,7 +212,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
   # still requires a staged byte object, but it must not contain the legacy
   # package database that payload builds append before archiving.
   if pkg.kind == types.package_meta() {
-    dest.remove(missing_ok: true)
+    dest.remove()
     dest.mkdir()
     tarball.parent.mkdir()
     tarball.write("laputa metapackage payload marker\n")

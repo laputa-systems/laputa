@@ -235,7 +235,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks([@objects.tasks, magic, link, @capsh.tasks, @prog_tasks], make.jobs()?)
 
   let bindir = fp"{dest}/usr/bin"
-  bindir.mkdir(parents: true)
+  bindir.mkdir()
 
   for prog in ["getcap", "getpcaps", "setcap", "capsh"] {
     fs.install(fp"obj/{prog}-bin", fp"{bindir}/{prog}", 0o755, overwrite: true)

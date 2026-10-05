@@ -190,5 +190,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fp"{dest}/usr/share/bash-completion".remove(missing_ok: true)
+  fp"{dest}/usr/share/bash-completion".remove()
 }

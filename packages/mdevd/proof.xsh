@@ -16,9 +16,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let mdevd = fp"{root}/usr/bin/mdevd"
   let tmp = fp"{root}/var/tmp/proof-mdevd"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   fp"{tmp}/dev".mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # `-N` opens the uevent netlink socket, parses the configuration in both
   # passes, and exits: 0 for a valid file, 2 for a syntax error. That

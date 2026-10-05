@@ -2513,8 +2513,8 @@ proc discover_records_process_pool(
   let prefix = f"/tmp/xsh-kbuild-pool-{time.now()}"
   let state_path = fp"{prefix}-state.json"
   let lock_path = fp"{prefix}-lock"
-  defer state_path.remove(missing_ok: true)
-  defer lock_path.remove(missing_ok: true)
+  defer state_path.remove()
+  defer lock_path.remove()
 
   json.write(
     state_path,
@@ -2527,7 +2527,7 @@ proc discover_records_process_pool(
   # Loop-body defers run per iteration; remove worker outputs after the merge instead.
   defer {
     for output_path in output_paths {
-      output_path.remove(missing_ok: true)
+      output_path.remove()
     }
   }
 
@@ -5362,11 +5362,11 @@ export proc build_scratch_x86_final(
   write_ubsan_stubs(p".")
   let lds = p"arch/x86/kernel/vmlinux.lds"
   generate_vmlinux_lds_x86(cc, lds)
-  vmlinux_a.remove(missing_ok: true)
-  unstripped.remove(missing_ok: true)
-  vmlinux.remove(missing_ok: true)
+  vmlinux_a.remove()
+  unstripped.remove()
+  vmlinux.remove()
   fp"arch/x86/boot".mkdir()
-  image.remove(missing_ok: true)
+  image.remove()
   var tasks: List[make.MakeTask] = []
 
   let export_task = compile_kbuild_task(
@@ -5747,10 +5747,10 @@ export proc build_scratch_arm64_final(
   write_ubsan_stubs(p".")
   let lds = p"arch/arm64/kernel/vmlinux.lds"
   generate_vmlinux_lds(cc, lds)
-  vmlinux_a.remove(missing_ok: true)
-  unstripped.remove(missing_ok: true)
-  vmlinux.remove(missing_ok: true)
-  image.remove(missing_ok: true)
+  vmlinux_a.remove()
+  unstripped.remove()
+  vmlinux.remove()
+  image.remove()
   var tasks: List[make.MakeTask] = []
 
   let export_task = compile_kbuild_task(
@@ -5880,11 +5880,11 @@ export proc relink_existing_arm64_argv(
   let efi_lib = p"drivers/firmware/efi/libstub/lib.a"
   let kbuild_ldflags = ["-EL", "-maarch64elf", "-z", "norelro", "-z", "noexecstack"]
   let ldflags_vmlinux = arm64_vmlinux_ldflags(load_config(p".config")?)
-  vmlinux_a.remove(missing_ok: true)
-  vmlinux_o.remove(missing_ok: true)
-  unstripped.remove(missing_ok: true)
-  vmlinux.remove(missing_ok: true)
-  image.remove(missing_ok: true)
+  vmlinux_a.remove()
+  vmlinux_o.remove()
+  unstripped.remove()
+  vmlinux.remove()
+  image.remove()
 
   let archive_task = vmlinux_archive_argv_task(
     ar_argv,
@@ -6766,17 +6766,17 @@ proc archive_analysis_process_pool(
   let prefix = f"/tmp/xsh-kbuild-archive-analysis-{time.now()}"
   let context_path = fp"{prefix}-context.json"
   json.write(context_path, archive_analysis_plan_context(plan))
-  defer context_path.remove(missing_ok: true)
+  defer context_path.remove()
   let flags_path = fp"{prefix}-flags.json"
   json.write(flags_path, ArchiveAnalysisFlags(flag_entries))
-  defer flags_path.remove(missing_ok: true)
+  defer flags_path.remove()
   var handles = []
   var output_paths: List[Path] = []
   var input_paths: List[Path] = []
   # Loop-body defers run per iteration, before workers read their inputs.
   defer {
     for temp_path in [@input_paths, @output_paths] {
-      temp_path.remove(missing_ok: true)
+      temp_path.remove()
     }
   }
 

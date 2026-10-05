@@ -240,10 +240,10 @@ export proc run_test(
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
 
-  outputs.console_log.remove(missing_ok: true)
-  outputs.qemu_log.remove(missing_ok: true)
-  outputs.qmp_socket.remove(missing_ok: true)
-  outputs.screenshot.remove(missing_ok: true)
+  outputs.console_log.remove()
+  outputs.qemu_log.remove()
+  outputs.qmp_socket.remove()
+  outputs.screenshot.remove()
   let command = process.command_argv(
     value.qemu,
     qemu_command_argv(value, profile, outputs, types.Test),

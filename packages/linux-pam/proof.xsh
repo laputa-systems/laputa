@@ -26,9 +26,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{rootfs}/var/tmp/proof-linux-pam"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   fp"{tmp}/pam.d".mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # Two services in a private config directory: libpam must parse each stack,
   # dlopen the named module from the payload, and return that module's verdict.

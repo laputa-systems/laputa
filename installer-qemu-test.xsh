@@ -381,7 +381,7 @@ proc clean_build_state(work: Path) {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    fp"{work}/{name}".remove(missing_ok: true)
+    fp"{work}/{name}".remove()
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -501,9 +501,9 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   let timeout_seconds = env_int("LAPUTA_INSTALLER_QEMU_TIMEOUT", 180)?
   ensure_dir(work)
   clean_build_state(work)
-  ssh_key.remove(missing_ok: true)
-  fp"{ssh_key}.pub".remove(missing_ok: true)
-  ssh_known_hosts.remove(missing_ok: true)
+  ssh_key.remove()
+  fp"{ssh_key}.pub".remove()
+  ssh_known_hosts.remove()
 
   host.installer_run_argv(
     ssh_keygen,
@@ -525,9 +525,9 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   build_installer(root, arch, work, installer_iso, installer_kernel, fp"{ssh_key}.pub", xsh)
   ensure_file(installer_iso, "installer-iso")
   ensure_file(installer_kernel, "installer-kernel")
-  target_image.remove(missing_ok: true)
-  installer_log.remove(missing_ok: true)
-  target_log.remove(missing_ok: true)
+  target_image.remove()
+  installer_log.remove()
+  target_log.remove()
   target_image.write("")
   target_image.truncate(128 * 1024 * 1024)
 

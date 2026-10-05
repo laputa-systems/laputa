@@ -181,8 +181,8 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
   verify_image_architecture(value)
   let temporary = fp"{log}.tmp"
   log.parent.mkdir()
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   let status = process.run(
     process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
   )?

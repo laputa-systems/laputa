@@ -183,7 +183,7 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
 
   saved.parent.mkdir()
   let temporary = fp"{saved}.tmp"
-  temporary.remove(missing_ok: true)
+  temporary.remove()
   docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
   temporary.rename(to: saved, overwrite: true)
 }
@@ -227,7 +227,7 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) -> Result[Path] {
   let staged = fp"{context}/sha256/{digest}"
 
   if ! staged.exists() {
-    context.remove(missing_ok: true)
+    context.remove()
     staged.parent.mkdir()
     source.copy(to: staged)
   }

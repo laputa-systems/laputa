@@ -104,14 +104,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let libdir = fp"{root}/usr/lib".display()
   let bin = fp"{root}/usr/bin"
   let tmp = fp"{root}/var/tmp/proof-mandoc"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   let manpath = fp"{tmp}/man"
   let mdoc_file = fp"{manpath}/man1/laputa-hello.1"
   let man_file = fp"{manpath}/man7/laputa-island.7"
-  fp"{manpath}/man1".mkdir(parents: true)
+  fp"{manpath}/man1".mkdir()
   fp"{manpath}/man7".mkdir()
   mdoc_file.write(mdoc_page)
   man_file.write(man_page)

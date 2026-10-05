@@ -108,8 +108,8 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
 # Image overlays change these roots after package composition, so a package
 # generation receipt must not claim to describe the finished image.
 proc drop_generation_receipt(rootfs: Path) {
-  fp"{rootfs}/var/lib/laputa/generation.json".remove(missing_ok: true)
-  fp"{rootfs}/var/lib/laputa/root.json".remove(missing_ok: true)
+  fp"{rootfs}/var/lib/laputa/generation.json".remove()
+  fp"{rootfs}/var/lib/laputa/root.json".remove()
 }
 
 proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) {
@@ -124,18 +124,18 @@ proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots
 }
 
 proc prune_runtime_root(rootfs: Path, arch: Str) {
-  fp"{rootfs}/boot/vmlinuz-7.2.9".remove(missing_ok: true)
-  fp"{rootfs}/usr/include".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libc.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libcrypt.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libdl.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libm.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libpthread.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/librt.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libssp_nonshared.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libutil.a".remove(missing_ok: true)
-  fp"{rootfs}/usr/lib/libxnet.a".remove(missing_ok: true)
+  fp"{rootfs}/boot/vmlinuz-7.2.9".remove()
+  fp"{rootfs}/usr/include".remove()
+  fp"{rootfs}/usr/lib/libc.a".remove()
+  fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a".remove()
+  fp"{rootfs}/usr/lib/libcrypt.a".remove()
+  fp"{rootfs}/usr/lib/libdl.a".remove()
+  fp"{rootfs}/usr/lib/libm.a".remove()
+  fp"{rootfs}/usr/lib/libpthread.a".remove()
+  fp"{rootfs}/usr/lib/librt.a".remove()
+  fp"{rootfs}/usr/lib/libssp_nonshared.a".remove()
+  fp"{rootfs}/usr/lib/libutil.a".remove()
+  fp"{rootfs}/usr/lib/libxnet.a".remove()
 }
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
@@ -448,7 +448,7 @@ proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) {
   }
 
   image.parent().mkdir()
-  image.remove(missing_ok: true)
+  image.remove()
   image.write("")
   image.truncate(volume_sectors * 2048)
   let lead_in = bytes.zero_at(image, 0, 16 * 2048)?
@@ -562,7 +562,7 @@ proc build_filesystems(
   if installer_ci == "1" {
     fp"{work}/rootfs-installer/etc/laputa-installer/ci".write("")
   } else {
-    fp"{work}/rootfs-installer/etc/laputa-installer/ci".remove(missing_ok: true)
+    fp"{work}/rootfs-installer/etc/laputa-installer/ci".remove()
   }
 
   let installer_root = fp"{work}/installer-root.ext4"
@@ -625,7 +625,7 @@ proc build_host() {
     fp"{work}/target-esp.vfat",
     fp"{work}/linux-kernel",
   ] {
-    path_value.remove(missing_ok: true)
+    path_value.remove()
   }
 
   package_roots_host.prepare(

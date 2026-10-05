@@ -432,7 +432,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $muon "-C" "build" install
   }
 
-  fp"{dest}/etc/environment".remove(missing_ok: true)
+  fp"{dest}/etc/environment".remove()
   fp"{dest}/usr/bin/unix_chkpwd".chmod(0o4755)
   fp"{dest}/etc/pam.d".mkdir()
 

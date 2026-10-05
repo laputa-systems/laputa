@@ -748,7 +748,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   for bin in ["fc-cat", "fc-conflist", "fc-genconf", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
-    fp"{dest}/usr/bin/{bin}".remove(missing_ok: true)
+    fp"{dest}/usr/bin/{bin}".remove()
   }
 
   # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
@@ -757,6 +757,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{dest}/etc/fonts/conf.d/{conf}".symlink(to: fp"../../../usr/share/fontconfig/conf.avail/{conf}")
   }
 
-  fp"{dest}/usr/share/man".remove(missing_ok: true)
-  fp"{dest}/usr/share/gettext".remove(missing_ok: true)
+  fp"{dest}/usr/share/man".remove()
+  fp"{dest}/usr/share/gettext".remove()
 }

@@ -470,7 +470,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   if ldso != "" {
     fp"{dest}/usr/lib/{ldso}".symlink(to: p"libc.so")
     fp"{dest}/usr/bin".mkdir()
-    fp"{dest}/usr/bin/ldd".remove(missing_ok: true)
+    fp"{dest}/usr/bin/ldd".remove()
 
     fp"{dest}/usr/bin/ldd".write(
       f"""#!/bin/xsh

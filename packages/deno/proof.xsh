@@ -15,9 +15,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let deno = fp"{rootfs}/usr/bin/deno"
   let tmp = fp"{rootfs}/var/tmp/proof-deno"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # A relative import and a type annotation: `deno run` strips the types and
   # resolves the module graph, `deno check` runs the TypeScript checker.

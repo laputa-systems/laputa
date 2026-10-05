@@ -118,7 +118,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let mandir = fp"{dest}/usr/share/man"
   # Pages sit exactly one level down, in their section directory.
   for section in fs.children(p"man")? {
-    fp"{mandir}/{section.name}".mkdir(parents: true)
+    fp"{mandir}/{section.name}".mkdir()
 
     for page in fs.children(section.path)? {
       let rel = f"{section.name}/{page.name}"

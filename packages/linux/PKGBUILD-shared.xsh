@@ -174,9 +174,9 @@ export proc emit_kbuild_progress(message: Str) [fs, env, error] {
 }
 
 proc remove_archive_plan_cache() {
-  p".xsh-kbuild-archive-plan.json".remove(missing_ok: true)
-  p".xsh-kbuild-archive-plan.json.summary".remove(missing_ok: true)
-  p".xsh-kbuild-archive-plan.fingerprint".remove(missing_ok: true)
+  p".xsh-kbuild-archive-plan.json".remove()
+  p".xsh-kbuild-archive-plan.json.summary".remove()
+  p".xsh-kbuild-archive-plan.fingerprint".remove()
 }
 
 proc archive_plan_cache_fingerprint(

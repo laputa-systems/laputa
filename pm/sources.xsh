@@ -120,8 +120,8 @@ export proc fill_source_cache_entry(root: Path, sha256: Str, url: Str) [fs, net,
   return Cached when entry.exists()
 
   let partial = fp"{partial_dir}/{sha256}"
-  partial.remove(missing_ok: true)
-  defer partial.remove(missing_ok: true)
+  partial.remove()
+  defer partial.remove()
   let failure = util.download_file(url, partial)?
 
   return Unavailable(failure) when failure != ""
@@ -321,7 +321,7 @@ proc resolve_locked_crates(
 # map skips per-file verification of the already sha256-verified archive, so
 # a recipe may patch a vendored crate.
 proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) {
-  dest.remove(missing_ok: true)
+  dest.remove()
   dest.mkdir()
 
   for entry in crates {
@@ -406,21 +406,21 @@ proc stage_resolved_source(
   if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(
     name,
   )) {
-    dest.remove(missing_ok: true)
+    dest.remove()
     dest.parent.mkdir()
     archive.tar_extract(source_path, dest, tar_source_strip_components(source_path)?, "auto", true)
     return
   }
 
   if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(name)) {
-    dest.remove(missing_ok: true)
+    dest.remove()
     dest.parent.mkdir()
     archive.zip_extract(source_path, dest, overwrite: true)
     return
   }
 
   if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(name)) {
-    dest.remove(missing_ok: true)
+    dest.remove()
     dest.parent.mkdir()
     archive.cpio_extract(source_path, dest, overwrite: true)
     return
@@ -462,7 +462,7 @@ export proc prune_git_dirs(src: Path) [fs, error] {
   let git_dirs = fs.walk(src, gitignore: false) |> where .kind == "dir" and .name == ".git"
 
   for entry in git_dirs {
-    entry.path.remove(missing_ok: true)
+    entry.path.remove()
   }
 }
 

@@ -240,9 +240,9 @@ proc prove_target_tools(root: Path, arch: Str) {
   let cc_text = cc.read_text()?
   ensure(cc_text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", "cc wrapper is not an XSH script")
   let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-wrapper"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   fp"{tmp}/wrapper-target.c".write(
     """int laputa_wrapper_target(void) {

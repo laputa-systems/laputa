@@ -97,8 +97,8 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
   let target_size = image_generation_used_bytes(generation_root)? |> rootfs_size_bytes(_)
   let temporary = fp"{output}.tmp"
   output.parent.mkdir()
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   temporary.write(b"")
   temporary.truncate(target_size)
 
@@ -277,8 +277,8 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   let backup_entries_lba = total_sectors - entry_sectors - 1
   let tmp = fp"{image}.tmp"
   image.parent.mkdir()
-  tmp.remove(missing_ok: true)
-  defer tmp.remove(missing_ok: true)
+  tmp.remove()
+  defer tmp.remove()
   tmp.write(b"")
   tmp.truncate(total_sectors * sector_size)
   let entries = bytes.concat(

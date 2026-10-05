@@ -128,5 +128,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fp"{dest}/usr/lib/libexpat.a".remove(missing_ok: true)
+  fp"{dest}/usr/lib/libexpat.a".remove()
 }

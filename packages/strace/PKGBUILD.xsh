@@ -329,7 +329,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let mpers_line = [line for line in p"src/mpers.am".read_lines()? if line.starts_with("mpers_source_files = ")]
   let mpers_sources = mpers_line[0].split(" = ")[1].words()
-  p"obj/cpp".mkdir(parents: true)
+  p"obj/cpp".mkdir()
 
   # Each preprocessed input is target code: the syscall table (with config.h
   # forced in), the mpers sources in bootstrap mode, and the target's <linux/ioctl.h>

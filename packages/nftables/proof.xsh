@@ -61,9 +61,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let nft = fp"{root}/usr/bin/nft"
   let libdir = fp"{root}/usr/lib".display()
   let tmp = fp"{root}/var/tmp/proof-nftables"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version"
   proof.ensure(version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)", "nftables-version", f"unexpected version: {version.trim()}")

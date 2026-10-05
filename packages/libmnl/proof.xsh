@@ -123,9 +123,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libmnl"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   fp"{tmp}/proof-libmnl.c".write(program)
   let binary = fp"{tmp}/proof-libmnl"
   run $cc fp"{tmp}/proof-libmnl.c" f"-L{root}/usr/lib" "-lmnl" "-o" $binary

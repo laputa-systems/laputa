@@ -83,7 +83,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "muon" "-C" "build" install
   }
 
-  fp"{dest}/usr/include".remove(missing_ok: true)
-  fp"{dest}/usr/lib/pkgconfig".remove(missing_ok: true)
-  fp"{dest}/usr/lib/libpixman-1.so".remove(missing_ok: true)
+  fp"{dest}/usr/include".remove()
+  fp"{dest}/usr/lib/pkgconfig".remove()
+  fp"{dest}/usr/lib/libpixman-1.so".remove()
 }

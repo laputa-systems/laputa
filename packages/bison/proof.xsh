@@ -262,9 +262,9 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
 
 proc prove_grammars(rootfs: Path, bison: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-bison"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let stderr = fp"{tmp}/bison.stderr"
 
   # Name the root's m4 and skeletons so the proof cannot pass on another m4

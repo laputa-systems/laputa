@@ -125,7 +125,7 @@ pure rust_triple(arch: Str) -> Str {
 }
 
 proc stage_rustlib(source: Path, dest: Path) {
-  dest.remove(missing_ok: true)
+  dest.remove()
   dest.mkdir()
 
   for entry in fs.walk(source, gitignore: false)? |> sort-by .path {
@@ -140,7 +140,7 @@ proc stage_rustlib(source: Path, dest: Path) {
       fs.install(entry.path, out, mode, parents: true, overwrite: true)
     } else if entry.kind == "symlink" {
       out.parent.mkdir()
-      out.remove(missing_ok: true)
+      out.remove()
       fs.symlink(entry.path.readlink()?, out)
     }
   }

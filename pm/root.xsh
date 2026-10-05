@@ -803,8 +803,8 @@ export proc compose_artifacts(
   }
 
   let temporary = fp"{output}.tmp"
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   temporary.mkdir()
   # preflight above verified these receipts and payloads.
   let verified = root_checked_artifacts(artifacts)?

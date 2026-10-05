@@ -29,9 +29,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let uv = fp"{root}/usr/bin/uv"
   let uvx = fp"{root}/usr/bin/uvx"
   let tmp = fp"{root}/var/tmp/proof-uv"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   let uv_version = run.text $uv "--version"
   proof.ensure(uv_version.trim() == f"uv 0.12.23 ({arch}-unknown-linux-musl)", "uv-version", f"unexpected uv --version: {uv_version.trim()}")

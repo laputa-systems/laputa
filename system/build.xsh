@@ -51,7 +51,7 @@ export pure outputs(root: Path) -> ProfileOutputs {
 
 ## Remove only generated outputs, preserving the immutable artifact-store volume.
 export proc clean(output_root: Path) [fs, error] {
-  output_root.remove(missing_ok: true)
+  output_root.remove()
 }
 
 ## Generate the profile's exact BuildPlan and its runtime-only GenerationPlan through the native PM container.

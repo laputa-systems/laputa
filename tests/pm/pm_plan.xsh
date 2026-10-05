@@ -137,7 +137,7 @@ test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, erro
 
   for target in [../../pm, /etc, p"files/../../outside.xsh"] {
     let link = fp"{pkg.dir}/escape"
-    link.remove(missing_ok: true)
+    link.remove()
     link.symlink(to: target)
 
     match build_input(pkg) {

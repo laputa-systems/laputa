@@ -15,9 +15,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let less = fp"{rootfs}/usr/bin/less"
   let tmp = fp"{rootfs}/var/tmp/proof-less"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let ver = proof.package_version(rootfs, "less")?
   let version = run.text $dynlinker $less "--version"
   proof.ensure(version.starts_with(f"less {ver} "), "proof-less", f"less --version reported {version.lines()[0]}")

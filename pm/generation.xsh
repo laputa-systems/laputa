@@ -727,8 +727,8 @@ export proc compose(
   }
 
   let temporary = fp"{output_root}.tmp"
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
   generation_apply_overlay(temporary, entries)
   let receipt = generation_receipt_for(value, root_receipt)?

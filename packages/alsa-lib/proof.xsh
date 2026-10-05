@@ -119,9 +119,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-alsa-lib"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   fp"{tmp}/proof-alsa-lib.c".write(program)
   let binary = fp"{tmp}/proof-alsa-lib"
   run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary

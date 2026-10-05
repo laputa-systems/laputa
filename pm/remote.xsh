@@ -84,7 +84,7 @@ export proc upload_immutable_repo_file(
     if response.status == 409 or response.status == 412 {
       let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
       existing.parent.mkdir()
-      defer existing.remove(missing_ok: true)
+      defer existing.remove()
       let failure = try_fetch_repo_file(repo, rel, existing)?
 
       if failure == "" and hash.sha256(existing)?.hex() == hash.sha256(source)?.hex() {
@@ -109,8 +109,8 @@ export proc upload_immutable_repo_file(
 
   let temporary = fp"{dest.parent}/.{dest.name}.tmp"
   dest.parent.mkdir()
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   source.copy(to: temporary, overwrite: true)
   temporary.rename(to: dest)
   true
@@ -250,8 +250,8 @@ export proc write_remote_index_to_repo(
     let dest = util.repo_file_path(repo, p"index.json")?
     let temporary = fp"{dest.parent}/.{dest.name}.tmp"
     dest.parent.mkdir()
-    temporary.remove(missing_ok: true)
-    defer temporary.remove(missing_ok: true)
+    temporary.remove()
+    defer temporary.remove()
     util.remote_index_cache_path(out).copy(to: temporary, overwrite: true)
     temporary.rename(to: dest, overwrite: true)
     return

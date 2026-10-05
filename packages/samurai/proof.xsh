@@ -18,9 +18,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let samu = fp"{rootfs}/usr/bin/samu"
   let tmp = fp"{rootfs}/var/tmp/proof-samurai"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # A dry run parses the manifest and orders the graph without spawning the
   # rule commands, so the proof needs no shell.

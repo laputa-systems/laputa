@@ -77,9 +77,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-tzdata"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   fp"{tmp}/proof-tzdata.c".write(program)
   let binary = fp"{tmp}/proof-tzdata"
   run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary

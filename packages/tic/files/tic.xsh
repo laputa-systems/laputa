@@ -2530,7 +2530,7 @@ proc write_entry(term: Term, outdir: Path) {
   let leaf = fp"{outdir}/{primary.byte_slice(0, 1)}"
   leaf.mkdir()
   let file = fp"{leaf}/{primary}"
-  file.remove(missing_ok: true)
+  file.remove()
   file.write(object)
 
   if names.len() < 3 {
@@ -2555,7 +2555,7 @@ proc write_entry(term: Term, outdir: Path) {
     let alias_leaf = fp"{outdir}/{alias.byte_slice(0, 1)}"
     alias_leaf.mkdir()
     let link = fp"{alias_leaf}/{alias}"
-    link.remove(missing_ok: true)
+    link.remove()
     file.hardlink(at: link)
   }
 }

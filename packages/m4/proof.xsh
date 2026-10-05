@@ -108,9 +108,9 @@ proc expect_text(label: Str, actual: Str, expected: Str) {
 
 proc main(rootfs = /rootfs) [fs, process, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-m4"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let m4 = fp"{rootfs}/usr/bin/m4"
 
   return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless m4.exists()

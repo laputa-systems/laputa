@@ -5,8 +5,8 @@
 proc main(dest = /etc/ssl/certs/ca-certificates.crt) [fs, net, error] {
   let tmp = fp"{dest.parent}/.{dest.name}.tmp"
   dest.parent.mkdir()
-  tmp.remove(missing_ok: true)
-  defer tmp.remove(missing_ok: true)
+  tmp.remove()
+  defer tmp.remove()
 
   let _ = net.download(
     {url: "https://curl.se/ca/cacert.pem", dest: tmp, atomic: true, overwrite: true, fail_status: true},

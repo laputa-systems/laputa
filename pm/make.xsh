@@ -480,7 +480,7 @@ proc spawn_task(task: MakeTask) [fs, process, env, error] -> Result[RunningTask]
   prepare_task_dirs(task)
 
   for output in task.outputs {
-    output.remove(missing_ok: true)
+    output.remove()
   }
 
   let task_argv = effective_task_argv(task.argv, task.env)?

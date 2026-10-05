@@ -173,12 +173,12 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") and ! entry.name.starts_with("libwayland-cursor.so") {
-      entry.path.remove(missing_ok: true)
+      entry.path.remove()
     }
   }
 
-  fp"{dest}/usr/bin".remove(missing_ok: true)
-  fp"{dest}/usr/include".remove(missing_ok: true)
-  fp"{dest}/usr/lib/pkgconfig".remove(missing_ok: true)
-  fp"{dest}/usr/share".remove(missing_ok: true)
+  fp"{dest}/usr/bin".remove()
+  fp"{dest}/usr/include".remove()
+  fp"{dest}/usr/lib/pkgconfig".remove()
+  fp"{dest}/usr/share".remove()
 }

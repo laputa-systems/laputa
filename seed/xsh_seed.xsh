@@ -290,7 +290,7 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
     }
 
     let temporary = fp"{archive_path}.tmp"
-    temporary.remove(missing_ok: true)
+    temporary.remove()
     archive.tar_create(temporary, stage, entries, "xz", true)
     temporary.rename(to: archive_path, overwrite: true)
   }
@@ -364,7 +364,7 @@ export proc xsh_seed_build(
 
   if ! core_archive.exists() or xsh_seed_previous_core_digest(manifest)? != core_digest {
     xsh_seed_write_core(xsh_root, sources, core_archive)
-    core_tree.remove(missing_ok: true)
+    core_tree.remove()
   }
 
   # The extracted tree is what containers mount at /usr/lib/xsh/core, so the

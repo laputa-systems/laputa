@@ -203,12 +203,12 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   fp"{rootfs}/tmp".mkdir()
   fp"{rootfs}/tmp".chmod(0o1777)
   log_dir.mkdir()
-  fp"{log_dir}/current".remove(missing_ok: true)
+  fp"{log_dir}/current".remove()
   let host_key = fp"{rootfs}/tmp/dropbear_host_ed25519"
   let rsa_host_key = fp"{rootfs}/tmp/dropbear_host_rsa"
   let client_key = fp"{tmp}/dropbear_client_ed25519"
-  host_key.remove(missing_ok: true)
-  rsa_host_key.remove(missing_ok: true)
+  host_key.remove()
+  rsa_host_key.remove()
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $host_key
   run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_host_key
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key

@@ -169,9 +169,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-mesa"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let source = fp"{tmp}/proof-mesa.c"
   let binary = fp"{tmp}/proof-mesa"
   source.write(program_source)

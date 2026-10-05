@@ -21,7 +21,7 @@ proc main(repo_root: Path, source_cache: Path, dest: Path) [fs, net, process, en
       sources.prepare_package_source_tree(pkg, src)
     }
     recipe.call_prepare(pkg, src)
-    dest.remove(missing_ok: true)
+    dest.remove()
     dest.mkdir()
     recipe.call_build(pkg, src, dest)
   }

@@ -12,9 +12,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-utf8proc"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # tmux asks utf8proc for display widths, so the proof checks a wide CJK
   # character and a combining mark alongside NFC composition.

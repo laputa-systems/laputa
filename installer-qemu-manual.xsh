@@ -76,7 +76,7 @@ proc main() [fs, process, env, error] {
   let installer_iso_meta = installer_iso.metadata()?
   let installer_kernel_meta = installer_kernel.metadata()?
   let _ = {installer_iso_meta, installer_kernel_meta}
-  target_image.remove(missing_ok: true)
+  target_image.remove()
   target_image.write("")
   target_image.truncate(target_size)
   print "manual target disk:" $target_image

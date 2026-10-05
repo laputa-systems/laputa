@@ -101,8 +101,8 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let me = user.current()?
   let client_key = fp"{tmp}/client_ed25519"
   let stranger_key = fp"{tmp}/stranger_ed25519"
-  client_key.remove(missing_ok: true)
-  stranger_key.remove(missing_ok: true)
+  client_key.remove()
+  stranger_key.remove()
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key
   let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?)?
@@ -112,9 +112,9 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   # writable, which rules out /tmp; a private directory under the home passes.
   let pid = process.current_pid()?
   let auth_dir = fp"{me.home}/.laputa-proof-dropbear-{pid}"
-  auth_dir.remove(missing_ok: true)
+  auth_dir.remove()
   auth_dir.mkdir()
-  defer auth_dir.remove(missing_ok: true)
+  defer auth_dir.remove()
   auth_dir.chmod(0o700)
   fp"{auth_dir}/authorized_keys".write(f"{client_public}\n", mode: 0o600)
   let client_home = fp"{tmp}/client-home"

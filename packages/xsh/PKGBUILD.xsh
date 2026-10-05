@@ -149,7 +149,7 @@ export proc build(dest: Path) [fs, env, error] {
   }
 
   let shell = fp"{dest}/usr/bin/sh"
-  shell.remove(missing_ok: true)
+  shell.remove()
   shell.symlink(to: p"xshi")
 
   let core = fp"{dest}/usr/lib/xsh/core"

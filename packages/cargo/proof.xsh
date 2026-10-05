@@ -28,9 +28,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   var cargo = ""
   var rustc = ""
   let tmp = fp"{rootfs}/var/tmp/proof-cargo"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   fp"{tmp}/src".mkdir()
   fp"{tmp}/cargo-home".mkdir()

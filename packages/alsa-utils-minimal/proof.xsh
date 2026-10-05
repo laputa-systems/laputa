@@ -66,9 +66,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(alsaucm.stdout.trim().ends_with(": version 1.2.16"), kind, f"unexpected alsaucm version: {alsaucm.stdout.trim()}")
 
   let tmp = fp"{root}/var/tmp/proof-alsa-utils-minimal"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   # Playback of a WAVE file through the null PCM parses the header and
   # configures the stream from it.

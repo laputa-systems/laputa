@@ -480,7 +480,7 @@ main(@args)?
 proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) {
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
   path_value.parent().mkdir()
-  path_value.remove(missing_ok: true)
+  path_value.remove()
   path_value.write(xsh_wrapper_source(real, clang, cxx), mode: 0o755)
 }
 
@@ -517,7 +517,7 @@ proc install_prebuilt_tree(dest: Path) {
     fail "missing staged LLVM prebuilt tree"
   }
 
-  target.remove(missing_ok: true)
+  target.remove()
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
   let bin = fp"{target}/bin"
   install_tool_alias(bin, "clang-23", "clang")

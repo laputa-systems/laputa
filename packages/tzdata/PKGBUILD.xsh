@@ -149,7 +149,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks([{...task, env: build_task_env} for task in zic.tasks], make.jobs()?)
 
   let zoneinfo = fp"{dest}/usr/share/zoneinfo"
-  zoneinfo.mkdir(parents: true)
+  zoneinfo.mkdir()
   let zic_bin = zic.output
   let sources = zic_sources
   run $zic_bin "-b" "slim" "-d" $zoneinfo @sources

@@ -696,11 +696,11 @@ rt = declare_dependency()""",
 }
 
 proc prune_xwayland_headers(root: Path) {
-  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h".remove(missing_ok: true)
-  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h".remove(missing_ok: true)
-  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h".remove(missing_ok: true)
-  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h".remove(missing_ok: true)
-  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland".remove(missing_ok: true)
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h".remove()
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h".remove()
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h".remove()
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h".remove()
+  fp"{root}/usr/include/wlroots-0.20/wlr/xwayland".remove()
 }
 
 ## Package recipe export.

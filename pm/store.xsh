@@ -345,8 +345,8 @@ proc commit_locked(
   }
 
   let temporary = temporary_path(root, key)
-  temporary.remove(missing_ok: true)
-  defer temporary.remove(missing_ok: true)
+  temporary.remove()
+  defer temporary.remove()
   temporary.mkdir()
   copy_staged(temporary, staged)
   # The staged payload digest was computed when the payload was produced or
@@ -395,7 +395,7 @@ proc fetch_remote_object(
   let actual = hash.sha256(cache_path)?.hex()
 
   if actual != expected_sha256 {
-    cache_path.remove(missing_ok: true)
+    cache_path.remove()
     return Err(types.PmError.RemoteFetch(f"remote {label} SHA-256 mismatch: expected {expected_sha256}, got {actual}"))
   }
 }
@@ -595,8 +595,8 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
 
       # fs.remove deletes a directory tree without following symlinks.
       entry.path.remove(missing_ok: false)
-      fp"{store_layout(root)}/proofs/{entry.name}".remove(missing_ok: true)
-      lock_path(root, entry.name).remove(missing_ok: true)
+      fp"{store_layout(root)}/proofs/{entry.name}".remove()
+      lock_path(root, entry.name).remove()
       removed += 1
     }
   }

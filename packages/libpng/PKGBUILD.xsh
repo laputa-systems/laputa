@@ -176,6 +176,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   fp"{dest}/usr/lib/libpng.so".symlink(to: p"libpng16.so")
-  fp"{dest}/usr/bin".remove(missing_ok: true)
-  fp"{dest}/usr/share/man".remove(missing_ok: true)
+  fp"{dest}/usr/bin".remove()
+  fp"{dest}/usr/share/man".remove()
 }

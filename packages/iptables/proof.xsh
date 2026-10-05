@@ -77,9 +77,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let os = system.uname()?
   let loader = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let tmp = fp"{rootfs}/var/tmp/proof-iptables"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let lock = fp"{tmp}/xtables.lock"
 
   for command in ["iptables", "ip6tables", "iptables-save", "ip6tables-save", "iptables-restore", "ip6tables-restore"] {

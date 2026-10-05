@@ -131,7 +131,7 @@ proc main(dest: Path) [fs, env, error] {
   # sense on an arch that provides the asm/ header of the same name.
   for header in ["a.out.h", "kvm.h", "kvm_para.h"] {
     if ! fp"arch/{srcarch}/include/uapi/asm/{header}".exists() and ! fp"{generated_asm}/{header}".exists() {
-      fp"{include}/linux/{header}".remove(missing_ok: true)
+      fp"{include}/linux/{header}".remove()
     }
   }
 }

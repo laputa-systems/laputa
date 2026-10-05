@@ -59,9 +59,9 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
 
 proc prove_scanner(rootfs: Path, flex: Path) {
   let tmp = fp"{rootfs}/var/tmp/proof-flex"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   fp"{tmp}/words.l".write(lexer)
   let stderr = fp"{tmp}/flex.stderr"
 

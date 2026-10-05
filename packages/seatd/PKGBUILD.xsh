@@ -119,6 +119,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fp"{dest}/usr/bin/seatd-launch".remove(missing_ok: true)
+  fp"{dest}/usr/bin/seatd-launch".remove()
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)
 }

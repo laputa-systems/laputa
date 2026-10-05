@@ -87,9 +87,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let libdir = fp"{root}/usr/lib".display()
   let bin = fp"{root}/usr/bin"
   let tmp = fp"{root}/var/tmp/proof-libcap"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
 
   let cc = process.which("cc")?
   fp"{tmp}/proof-libcap.c".write(program)

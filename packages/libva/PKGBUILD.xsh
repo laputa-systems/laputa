@@ -223,11 +223,11 @@ export proc prepare_sources(src: Path) [fs, error] {
 }
 
 proc prune_install(dest: Path) {
-  fp"{dest}/usr/share/doc".remove(missing_ok: true)
-  fp"{dest}/usr/share/man".remove(missing_ok: true)
+  fp"{dest}/usr/share/doc".remove()
+  fp"{dest}/usr/share/man".remove()
 
   for static_lib in [p"usr/lib/libva.a", p"usr/lib/libva-drm.a", p"usr/lib/libva-wayland.a"] {
-    fp"{dest}/{static_lib}".remove(missing_ok: true)
+    fp"{dest}/{static_lib}".remove()
   }
 }
 

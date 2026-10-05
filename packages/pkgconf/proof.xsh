@@ -106,10 +106,10 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let pkg_config = fp"{rootfs}/usr/bin/pkg-config"
   let ver = proof.package_version(rootfs, "pkgconf")?
   let tmp = fp"{rootfs}/var/tmp/proof-pkgconf"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   fp"{tmp}/sysroot/usr/lib/pkgconfig".mkdir(true)
   fp"{tmp}/sysroot/usr/share/pkgconfig".mkdir(true)
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   let sysroot = fp"{tmp}/sysroot".display()
   fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc".write(base_pc)
   fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc".write(priv_pc)

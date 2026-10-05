@@ -278,7 +278,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") {
-      entry.path.remove(missing_ok: true)
+      entry.path.remove()
     }
   }
 }

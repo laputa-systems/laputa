@@ -137,9 +137,9 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libnftnl"
-  tmp.remove(missing_ok: true)
+  tmp.remove()
   tmp.mkdir()
-  defer tmp.remove(missing_ok: true)
+  defer tmp.remove()
   fp"{tmp}/proof-libnftnl.c".write(program)
   let binary = fp"{tmp}/proof-libnftnl"
   run $cc fp"{tmp}/proof-libnftnl.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lnftnl" "-o" $binary

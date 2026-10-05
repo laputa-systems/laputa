@@ -293,5 +293,5 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   write_minimal_config(dest)
-  fp"{dest}/usr/share".remove(missing_ok: true)
+  fp"{dest}/usr/share".remove()
 }

@@ -74,8 +74,8 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
       bundle_verify_file(item.source, fp"{final_dir}/{item.name}")
     }
   } else {
-    temporary.remove(missing_ok: true)
-    defer temporary.remove(missing_ok: true)
+    temporary.remove()
+    defer temporary.remove()
     temporary.mkdir()
     for item in files {
       let destination = fp"{temporary}/{item.name}"
@@ -89,8 +89,8 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
 
   let current = fp"{output_root}/current"
   let current_temporary = fp"{output_root}/.current.tmp"
-  current_temporary.remove(missing_ok: true)
-  defer current_temporary.remove(missing_ok: true)
+  current_temporary.remove()
+  defer current_temporary.remove()
   current_temporary.symlink(to: fp"builds/{key}")
   current_temporary.rename(to: current, overwrite: true)
 }
