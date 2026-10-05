@@ -55,6 +55,6 @@ export const filetree = [
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"uv", fp"{dest}/usr/bin/uv", 0o755, parents: true, overwrite: true)?
-  fs.install(p"uvx", fp"{dest}/usr/bin/uvx", 0o755, parents: true, overwrite: true)?
+  fs.install(p"uv", fp"{dest}/usr/bin/uv", 0o755, parents: true, overwrite: true)
+  fs.install(p"uvx", fp"{dest}/usr/bin/uvx", 0o755, parents: true, overwrite: true)
 }

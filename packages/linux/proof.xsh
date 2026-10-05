@@ -61,19 +61,19 @@ proc ensure_x86_bzimage(image_path: Path) [fs, error] {
 const kernel_release = "7.2.9"
 
 proc main(rootfs = /rootfs) [fs, env, error] {
-  ensure_file(fp"{rootfs}/boot/vmlinuz", "kernel image")?
-  ensure_file(fp"{rootfs}/boot/vmlinuz-{kernel_release}", "versioned kernel image")?
-  ensure_file(fp"{rootfs}/usr/share/linux/config-{kernel_release}", "kernel config")?
+  ensure_file(fp"{rootfs}/boot/vmlinuz", "kernel image")
+  ensure_file(fp"{rootfs}/boot/vmlinuz-{kernel_release}", "versioned kernel image")
+  ensure_file(fp"{rootfs}/usr/share/linux/config-{kernel_release}", "kernel config")
   let config_path = fp"{rootfs}/usr/share/linux/config-{kernel_release}"
   let os = system.uname()?
   let host_machine = os.machine
   let proof_arch = e"XSH_PM_TARGET_ARCH" ?? e"XSH_PM_ARCH" ?? host_machine
 
   if proof_arch == "x86_64" or proof_arch == "amd64" {
-    ensure_config(config_path, "CONFIG_X86_64", "x86_64 arch check")?
-    ensure_x86_bzimage(fp"{rootfs}/boot/vmlinuz")?
+    ensure_config(config_path, "CONFIG_X86_64", "x86_64 arch check")
+    ensure_x86_bzimage(fp"{rootfs}/boot/vmlinuz")
   } else if proof_arch == "aarch64" or proof_arch == "arm64" {
-    ensure_config(config_path, "CONFIG_ARM64", "arm64 arch check")?
+    ensure_config(config_path, "CONFIG_ARM64", "arm64 arch check")
   } else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"unsupported proof arch: {proof_arch}"))?
   }
@@ -81,4 +81,4 @@ proc main(rootfs = /rootfs) [fs, env, error] {
   print "linux ok: vmlinuz"
 }
 
-main(@args)?
+main(@args)

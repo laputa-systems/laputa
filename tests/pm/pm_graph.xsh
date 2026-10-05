@@ -43,7 +43,7 @@ pure fixture_package(
 
 proc expect_catalog_rejection(root: Path, expected: Str) [fs, env, error] {
   match catalog.load(root) {
-    Ok(_) => test.fail(f"{expected}: catalog unexpectedly loaded")?
+    Ok(_) => test.fail(f"{expected}: catalog unexpectedly loaded")
     Err(problem) => assert expected in problem.message
   }
 }
@@ -55,7 +55,7 @@ test test_catalog_loads_packages_in_name_order_with_relative_dirs [fs, env, erro
 }
 
 test test_catalog_rejects_missing_dependency [fs, env, error] {
-  expect_catalog_rejection(fixture("graph-missing"), "app depends on missing missing")?
+  expect_catalog_rejection(fixture("graph-missing"), "app depends on missing missing")
 }
 
 test test_catalog_rejects_duplicate_package_name [error] {
@@ -63,7 +63,7 @@ test test_catalog_rejects_duplicate_package_name [error] {
   let second = fixture_package("duplicate", [], [], [])
 
   match catalog.from_packages(p".", [first, second]) {
-    Ok(_) => test.fail("duplicate package catalog unexpectedly loaded")?
+    Ok(_) => test.fail("duplicate package catalog unexpectedly loaded")
     Err(problem) => assert "duplicate package duplicate" in problem.message
   }
 }
@@ -95,7 +95,7 @@ test test_graph_reports_a_useful_cycle_path [fs, env, error] {
   let edges = graph.edges(value, policy.aarch64_docker())?
 
   match graph.topological_levels(catalog.package_names(value), edges) {
-    Ok(_) => test.fail("cycle unexpectedly received levels")?
+    Ok(_) => test.fail("cycle unexpectedly received levels")
     Err(problem) => assert "alpha -> beta -> gamma -> alpha" in problem.message
   }
 }
@@ -168,7 +168,7 @@ test test_catalog_rejects_missing_runtime_only_dependency [error] {
   let service = fixture_package("service", [], [], [], runtime_only_deps: ["absent"])
 
   match catalog.from_packages(p".", [service]) {
-    Ok(_) => test.fail("missing runtime-only dependency unexpectedly loaded")?
+    Ok(_) => test.fail("missing runtime-only dependency unexpectedly loaded")
     Err(problem) => assert "service depends on missing absent" in problem.message
   }
 }
@@ -204,7 +204,7 @@ test test_packages_buildable_without_drops_every_dependent_of_an_excluded_packag
   assert graph.packages_buildable_without(value, ["kernel", "builder"], policy.aarch64_docker())? == ["runner"]
 
   match graph.packages_buildable_without(value, ["absent"], policy.aarch64_docker()) {
-    Ok(_) => test.fail("an unknown excluded package was accepted")?
+    Ok(_) => test.fail("an unknown excluded package was accepted")
     Err(problem) => assert "excluded package absent is not in the catalog" in problem.message
   }
 }

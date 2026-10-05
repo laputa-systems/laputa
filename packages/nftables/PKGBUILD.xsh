@@ -130,7 +130,7 @@ proc write_config_h() [fs, error] {
 #endif
 #endif
 """,
-  )?
+  )
 }
 
 # nftversion.h.in with configure's NFT_VERSION (the version's dotted parts),
@@ -138,7 +138,7 @@ proc write_config_h() [fs, error] {
 proc write_nftversion_h() [fs, error] {
   let version_template = p"nftversion.h.in".read_text()?
   let body = version_template.replace("@BUILD_STAMP@", build_stamp).replace("@NFT_VERSION@", ver.replace(".", ",")).replace("@STABLE_RELEASE@", "0")
-  fs.write(p"nftversion.h", body)?
+  fs.write(p"nftversion.h", body)
 }
 
 ## Package recipe export.
@@ -146,8 +146,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
   let netfilter = make.pkg_config_flags(["libmnl", "libnftnl"])?
-  write_config_h()?
-  write_nftversion_h()?
+  write_config_h()
+  write_nftversion_h()
 
   # Makefile.am AM_CPPFLAGS with BUILD_MINIGMP on and BUILD_DEBUG off.
   let cflags = ["-O2", @warning_flags(), "-fvisibility=hidden"]
@@ -216,12 +216,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   let nft_out = p"obj/nft/nft"
   let link_nft = make.link_executable_task(cc, triple, nft.objects, [library_so], [], nft_out, nft.deps.push(link_library.name))
   let tasks = library.tasks.extend(parser.tasks).extend(minigmp.tasks).push(link_library).extend(nft.tasks).push(link_nft)
-  make.run_tasks(tasks, make.jobs()?)?
+  make.run_tasks(tasks, make.jobs()?)
 
-  fs.install(nft_out, fp"{dest}/usr/bin/nft", 0o755, parents: true, overwrite: true)?
-  fs.install(library_so, fp"{dest}/usr/lib/libnftables.so.1.1.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so.1")?
-  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so")?
+  fs.install(nft_out, fp"{dest}/usr/bin/nft", 0o755, parents: true, overwrite: true)
+  fs.install(library_so, fp"{dest}/usr/lib/libnftables.so.1.1.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so.1")
+  fs.symlink(p"libnftables.so.1.1.0", fp"{dest}/usr/lib/libnftables.so")
 
   fs.install(
     p"include/nftables/libnftables.h",
@@ -229,9 +229,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     0o644,
     parents: true,
     overwrite: true,
-  )?
+  )
 
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   # libnftables.pc.in with configure's /usr prefix substituted.
   fs.write(
@@ -250,5 +250,5 @@ Conflicts:
 Libs: -L${{libdir}} -lnftables
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

@@ -56,7 +56,7 @@ proc stop_mirror(mirror: ProcessHandle?) [process, error] {
   guard let handle = mirror else {
     return
   }
-  handle.cancel(signal: "TERM", kill_after: 5s)?
+  handle.cancel(signal: "TERM", kill_after: 5s)
 }
 
 proc write_report(logs: Path, arch: Str, timed: List[Timed]) [fs, error] {
@@ -66,7 +66,7 @@ proc write_report(logs: Path, arch: Str, timed: List[Timed]) [fs, error] {
     lines += [f"| `{entry.name}` | {entry.seconds} | {if entry.ok { "ok" } else { "FAILED" }} |"]
   }
 
-  fs.write(fp"{logs}/report.md", lines.join("\n") + "\n")?
+  fs.write(fp"{logs}/report.md", lines.join("\n") + "\n")
 }
 
 proc main(arch: Str) [fs, process, env, time, error] {
@@ -81,7 +81,7 @@ proc main(arch: Str) [fs, process, env, time, error] {
 
   var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
   let logs = fp"{root}/.out/verify"
-  fs.mkdir(logs)?
+  fs.mkdir(logs)
   var mirror: ProcessHandle? = null
 
   for step in steps(arch) {
@@ -97,23 +97,23 @@ proc main(arch: Str) [fs, process, env, time, error] {
           return Err(VerifyError.Failed("the mirror did not start; see .out/verify/mirror.log"))
         }
 
-        time.sleep(1s)?
+        time.sleep(1s)
         waited += 1
       }
     }
 
     let result = run_step(root, logs, step)?
     timed += [result]
-    write_report(logs, arch, timed)?
+    write_report(logs, arch, timed)
 
     if ! result.ok {
-      stop_mirror(mirror)?
+      stop_mirror(mirror)
 
       return Err(VerifyError.Failed(f"{step.name} failed; see .out/verify/{step.name}.log"))
     }
 
     if step.name == "installer-qemu-test" {
-      stop_mirror(mirror)?
+      stop_mirror(mirror)
 
       mirror = null
     }
@@ -122,4 +122,4 @@ proc main(arch: Str) [fs, process, env, time, error] {
   print fs.read_text(fp"{logs}/report.md")?
 }
 
-main(@args)?
+main(@args)

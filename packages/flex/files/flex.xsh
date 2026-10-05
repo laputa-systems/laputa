@@ -307,7 +307,7 @@ proc parse_lex_file(source: Str) [error] -> Result[LexProgram] {
     return Err(ToolError.Failed(kind: "lex", message: "input must contain definitions and rules separated by %%"))
   }
 
-  reject_unsupported_options(parts[0])?
+  reject_unsupported_options(parts[0])
   let defs = parse_definitions(parts[0])?
   let states = parse_start_conditions(parts[0])?
   let exclusive = parse_exclusive_start_conditions(parts[0])?
@@ -719,7 +719,7 @@ Options:
   -v, --verbose       print a short generation summary to stderr
   --help              show this help
   --version           show version
-""")?
+""")
 }
 
 proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
@@ -742,11 +742,11 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
     }
 
     if token.kind == "long" and token.name == "help" {
-      usage()?
+      usage()
       exit 0
     } else if token.kind == "long" and token.name == "version" {
       io.write_stdout("""flex.xsh 0.1
-""")?
+""")
       exit 0
     } else if token.name == "t" or token.name == "stdout" {
       to_stdout = true
@@ -775,7 +775,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let opt = parse_options(argv)?
 
   if opt.delegate {
-    run_upstream_flex(argv, opt.delegate_reason)?
+    run_upstream_flex(argv, opt.delegate_reason)
     return
   }
 
@@ -787,15 +787,15 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
       let code = generate_linux_stub(source)?
 
       if opt.to_stdout {
-        io.write_stdout(code)?
+        io.write_stdout(code)
       } else {
-        fs.write(fp"{opt.output}", code)?
+        fs.write(fp"{opt.output}", code)
       }
 
       return
     }
 
-    run_upstream_flex(argv, upstream_reason)?
+    run_upstream_flex(argv, upstream_reason)
     return
   }
 
@@ -807,10 +807,10 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   }
 
   if opt.to_stdout {
-    io.write_stdout(code)?
+    io.write_stdout(code)
   } else {
-    fs.write(fp"{opt.output}", code)?
+    fs.write(fp"{opt.output}", code)
   }
 }
 
-main(args)?
+main(args)

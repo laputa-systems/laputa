@@ -87,7 +87,7 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) [erro
 # a package the build also uses can never be runtime-only. Such a package is a
 # `deps` entry (installed into the build root and needed at runtime).
 proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) [error] {
-  validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)?
+  validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)
   let build_dependencies = [@metadata.deps, @metadata.mkdeps_host, @metadata.mkdeps_target]
 
   for dependency in metadata.runtime_only_deps {
@@ -349,18 +349,18 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   let metadata = decode_metadata(pkgbuild).context("package-load", pkgbuild.display())?
   let {name, ver, rel, mkdeps_target, nostrip, source_mirror, ..} = metadata
 
-  validate_package_name(name)?
+  validate_package_name(name)
 
   if ver == "" {
     return Err(types.PmError.PackageContract(f"{name}: ver must be nonempty"))
   }
 
-  validate_positive_release(name, rel)?
-  validate_package_architectures(name, metadata.architectures)?
-  validate_dependencies(name, "deps", metadata.deps)?
-  validate_dependencies(name, "mkdeps_host", metadata.mkdeps_host)?
-  validate_dependencies(name, "mkdeps_target", mkdeps_target)?
-  validate_runtime_only_dependencies(name, metadata)?
+  validate_positive_release(name, rel)
+  validate_package_architectures(name, metadata.architectures)
+  validate_dependencies(name, "deps", metadata.deps)
+  validate_dependencies(name, "mkdeps_host", metadata.mkdeps_host)
+  validate_dependencies(name, "mkdeps_target", mkdeps_target)
+  validate_runtime_only_dependencies(name, metadata)
 
   if is_production_recipe_directory(dir) and dir.name != name {
     return Err(
@@ -432,22 +432,22 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
   return unless dynamic.get("prepare") is Ok(_)
 
   if let Ok(filesystem_hook) = dynamic.require(hooks.PrepareFilesystem) {
-    filesystem_hook.prepare(src)?
+    filesystem_hook.prepare(src)
     return
   }
 
   if let Ok(environment_hook) = dynamic.require(hooks.PrepareFilesystemEnvironment) {
-    environment_hook.prepare(src)?
+    environment_hook.prepare(src)
     return
   }
 
   if let Ok(process_hook) = dynamic.require(hooks.PrepareProcessesEnvironment) {
-    process_hook.prepare(src)?
+    process_hook.prepare(src)
     return
   }
 
   let prepare_hook = dynamic.require(hooks.PrepareFilesystemProcessesEnvironment)?
-  prepare_hook.prepare(src)?
+  prepare_hook.prepare(src)
 }
 
 ## Invokes the required payload `build` procedure through the dynamic recipe boundary.
@@ -461,22 +461,22 @@ export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, 
   }
 
   if let Ok(filesystem_hook) = dynamic.require(hooks.BuildFilesystem) {
-    cd src { filesystem_hook.build(dest)? } ?
+    cd src { filesystem_hook.build(dest) } ?
     return
   }
 
   if let Ok(environment_hook) = dynamic.require(hooks.BuildFilesystemEnvironment) {
-    cd src { environment_hook.build(dest)? } ?
+    cd src { environment_hook.build(dest) } ?
     return
   }
 
   if let Ok(process_hook) = dynamic.require(hooks.BuildProcessesEnvironment) {
-    cd src { process_hook.build(dest)? } ?
+    cd src { process_hook.build(dest) } ?
     return
   }
 
   let build_hook = dynamic.require(hooks.BuildFilesystemProcessesEnvironment)?
-  cd src { build_hook.build(dest)? } ?
+  cd src { build_hook.build(dest) } ?
 }
 
 ## Invokes the optional dynamic `prepare_sources` procedure for a loaded package.
@@ -485,6 +485,6 @@ export proc call_prepare_sources(pkg: types.Package, src: Path) [fs, process, en
 
   if dynamic.get("prepare_sources") is Ok(_) {
     let sources_hook = dynamic.require(hooks.PrepareSourcesFilesystem)?
-    sources_hook.prepare_sources(src)?
+    sources_hook.prepare_sources(src)
   }
 }

@@ -125,10 +125,10 @@ int main(void) {
 """
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "libnftnl")?
-  proof.ensure(fs.exists(fp"{root}/usr/include/libnftnl/rule.h")?, "libnftnl", "missing libnftnl/rule.h")?
-  proof.ensure(fs.exists(fp"{root}/usr/lib/pkgconfig/libnftnl.pc")?, "libnftnl", "missing libnftnl.pc")?
-  proof.target_elf(root, p"usr/lib/libnftnl.so.11.8.0", "libnftnl")?
+  proof.package_metadata(root, "libnftnl")
+  proof.ensure(fs.exists(fp"{root}/usr/include/libnftnl/rule.h")?, "libnftnl", "missing libnftnl/rule.h")
+  proof.ensure(fs.exists(fp"{root}/usr/lib/pkgconfig/libnftnl.pc")?, "libnftnl", "missing libnftnl.pc")
+  proof.target_elf(root, p"usr/lib/libnftnl.so.11.8.0", "libnftnl")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"libnftnl ok: cross-built {pm_util.target_arch()?}"
@@ -137,16 +137,16 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libnftnl"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-libnftnl.c", program)?
+  fs.write(fp"{tmp}/proof-libnftnl.c", program)
   let binary = fp"{tmp}/proof-libnftnl"
   run $cc fp"{tmp}/proof-libnftnl.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lnftnl" "-o" $binary ?
   let libdir = fp"{root}/usr/lib".display()
   let out = run.text LD_LIBRARY_PATH=$libdir $binary ?
-  proof.ensure(out.trim() == "libnftnl: table chain rule set", "libnftnl", f"unexpected round-trip output: {out.trim()}")?
+  proof.ensure(out.trim() == "libnftnl: table chain rule set", "libnftnl", f"unexpected round-trip output: {out.trim()}")
   print "libnftnl ok: table, base chain, rule, and set round-trip through netlink messages"
 }
 
-main(@args)?
+main(@args)

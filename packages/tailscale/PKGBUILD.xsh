@@ -81,18 +81,18 @@ export const filetree = [
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"tailscale", fp"{dest}/usr/bin/tailscale", 0o755, parents: true, overwrite: true)?
-  fs.install(p"tailscaled", fp"{dest}/usr/bin/tailscaled", 0o755, parents: true, overwrite: true)?
-  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/tailscaled.xsh", 0o644, parents: true, overwrite: true)?
+  fs.install(p"tailscale", fp"{dest}/usr/bin/tailscale", 0o755, parents: true, overwrite: true)
+  fs.install(p"tailscaled", fp"{dest}/usr/bin/tailscaled", 0o755, parents: true, overwrite: true)
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/tailscaled.xsh", 0o644, parents: true, overwrite: true)
 
   # Persistent state survives reboots on the root filesystem.
-  fs.mkdir(fp"{dest}/var/lib/tailscale")?
-  fs.mkdir(fp"{dest}/usr/lib/sysctl.d")?
+  fs.mkdir(fp"{dest}/var/lib/tailscale")
+  fs.mkdir(fp"{dest}/usr/lib/sysctl.d")
 
   fs.write(
     fp"{dest}/usr/lib/sysctl.d/50-tailscale-ipv6.conf",
     """net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 """,
-  )?
+  )
 }

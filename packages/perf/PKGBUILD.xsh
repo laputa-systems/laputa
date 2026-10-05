@@ -650,7 +650,7 @@ proc write_perf_version_file() [fs, error] {
   }
 
   let release = f"{fields["VERSION"]}.{fields["PATCHLEVEL"]}.{fields["SUBLEVEL"]}{fields["EXTRAVERSION"]}"
-  fs.write(fp"{out}/PERF-VERSION-FILE", f"#define PERF_VERSION \"{release}\"\n")?
+  fs.write(fp"{out}/PERF-VERSION-FILE", f"#define PERF_VERSION \"{release}\"\n")
 }
 
 proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[Str]) [] -> List[make.MakeTask] {
@@ -670,7 +670,7 @@ proc compile_units(cc: Path, triple: Str, units: List[PerfUnit], cflags: List[St
 proc install_library_headers() [fs, error] {
   for headers in library_headers() {
     for header in headers.names {
-      fs.install(fp"{headers.src}/{header}", fp"{out}/{headers.dest}/{header}", 0o644, parents: true, overwrite: true)?
+      fs.install(fp"{headers.src}/{header}", fp"{out}/{headers.dest}/{header}", 0o644, parents: true, overwrite: true)
     }
   }
 }
@@ -680,8 +680,8 @@ proc build_perf(cc: Path) [fs, process, env, error] -> Result[Path] {
   let arch = perf_arch(target)?
   let a = arch.srcarch
   let triple = f"{target}-linux-musl"
-  install_library_headers()?
-  write_perf_version_file()?
+  install_library_headers()
+  write_perf_version_file()
 
   let lib_cflags = [
     @extra_warnings,
@@ -789,7 +789,7 @@ proc build_perf(cc: Path) [fs, process, env, error] -> Result[Path] {
     [task.name for task in compiled],
   )
 
-  make.run_tasks(compiled.push(link), make.jobs()?)?
+  make.run_tasks(compiled.push(link), make.jobs()?)
   link.outputs[0]
 }
 
@@ -797,7 +797,7 @@ proc build_perf(cc: Path) [fs, process, env, error] -> Result[Path] {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let perf = build_perf(cc)?
-  fs.install(perf, fp"{dest}/usr/bin/perf", 0o755, parents: true, overwrite: true)?
+  fs.install(perf, fp"{dest}/usr/bin/perf", 0o755, parents: true, overwrite: true)
 
   fs.install(
     p"tools/perf/Documentation/tips.txt",
@@ -805,5 +805,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     0o644,
     parents: true,
     overwrite: true,
-  )?
+  )
 }

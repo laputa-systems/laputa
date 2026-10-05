@@ -99,11 +99,11 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   match args.command {
     "fetch" => {
-      xsh_seed.xsh_seed_fetch(docker, laputa_root, xsh_root, value)?
-      images.fetch_host_tools(docker, laputa_root, value)?
+      xsh_seed.xsh_seed_fetch(docker, laputa_root, xsh_root, value)
+      images.fetch_host_tools(docker, laputa_root, value)
     }
     "build" => {
-      xsh_seed.xsh_seed_build(docker, laputa_root, xsh_root, value, args.jobs)?
+      xsh_seed.xsh_seed_build(docker, laputa_root, xsh_root, value, args.jobs)
       let tag = images.ensure_package_tools(docker, laputa_root, value)?
       print f"seed {xsh_seed.xsh_seed_dir(laputa_root, value.arch)}"
       print f"image {tag}"
@@ -122,4 +122,4 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   }
 }
 
-main(@args)?
+main(@args)

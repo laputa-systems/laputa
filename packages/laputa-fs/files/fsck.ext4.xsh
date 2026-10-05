@@ -69,13 +69,13 @@ proc check_image(image: Path) [error] {
   let inodes_per_group = bytes.unpack_le(super, 4, offset: 40)?
   let magic = bytes.unpack_le(super, 2, offset: 56)?
   let inode_size = bytes.unpack_le(super, 2, offset: 88)?
-  expect_int("bad-magic", magic, 61267)?
-  expect_int("bad-block-size", log_block_size, 2)?
-  expect_int("bad-blocks-per-group", blocks_per_group, BLOCKS_PER_GROUP)?
-  expect_int("bad-inodes-per-group", inodes_per_group, INODES_PER_GROUP)?
-  expect_int("bad-inode-size", inode_size, 256)?
+  expect_int("bad-magic", magic, 61267)
+  expect_int("bad-block-size", log_block_size, 2)
+  expect_int("bad-blocks-per-group", blocks_per_group, BLOCKS_PER_GROUP)
+  expect_int("bad-inodes-per-group", inodes_per_group, INODES_PER_GROUP)
+  expect_int("bad-inode-size", inode_size, 256)
   let groups = ceil_div(total_blocks, BLOCKS_PER_GROUP)
-  expect_int("bad-total-inodes", total_inodes, groups * INODES_PER_GROUP)?
+  expect_int("bad-total-inodes", total_inodes, groups * INODES_PER_GROUP)
   let descs = bytes.read_at(image, BLOCK_SIZE, groups * 32)?
   var counted_free_blocks = 0
   var counted_free_inodes = 0
@@ -90,24 +90,24 @@ proc check_image(image: Path) [error] {
     let inode_table = bytes.unpack_le(desc, 4, offset: 8)?
     let desc_free_blocks = bytes.unpack_le(desc, 2, offset: 12)?
     let desc_free_inodes = bytes.unpack_le(desc, 2, offset: 14)?
-    expect_int("bad-block-bitmap", block_bitmap, first + 2)?
-    expect_int("bad-inode-bitmap", inode_bitmap, first + 3)?
-    expect_int("bad-inode-table", inode_table, first + 4)?
+    expect_int("bad-block-bitmap", block_bitmap, first + 2)
+    expect_int("bad-inode-bitmap", inode_bitmap, first + 3)
+    expect_int("bad-inode-table", inode_table, first + 4)
     let block_map = bytes.read_at(image, block_bitmap * BLOCK_SIZE, BLOCK_SIZE)?
     let inode_map = bytes.read_at(image, inode_bitmap * BLOCK_SIZE, BLOCK_SIZE)?
     let block_used = used_bits(block_map, group_blocks)?
     let inode_used = used_bits(inode_map, INODES_PER_GROUP)?
     let block_free = group_blocks - block_used
     let inode_free = INODES_PER_GROUP - inode_used
-    expect_int("bad-free-blocks", desc_free_blocks, block_free)?
-    expect_int("bad-free-inodes", desc_free_inodes, inode_free)?
+    expect_int("bad-free-blocks", desc_free_blocks, block_free)
+    expect_int("bad-free-inodes", desc_free_inodes, inode_free)
     counted_free_blocks += block_free
     counted_free_inodes += inode_free
     group_index += 1
   }
 
-  expect_int("bad-free-block-total", free_blocks, counted_free_blocks)?
-  expect_int("bad-free-inode-total", free_inodes, counted_free_inodes)?
+  expect_int("bad-free-block-total", free_blocks, counted_free_blocks)
+  expect_int("bad-free-inode-total", free_inodes, counted_free_inodes)
 }
 
 type Ext4FsckOptions = {image: List[Str]}
@@ -130,7 +130,7 @@ proc main(...argv: List[Str]) [error] {
     return Err(Ext4FsckError.Failed(kind: "usage", message: "usage: fsck.ext4 [-n|-p] IMAGE"))
   }
 
-  check_image(fp"{opts.image[0]}")?
+  check_image(fp"{opts.image[0]}")
 }
 
-main(@args)?
+main(@args)

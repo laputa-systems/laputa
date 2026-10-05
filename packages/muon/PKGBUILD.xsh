@@ -71,7 +71,7 @@ proc patch_system_library_links() [fs, error] {
 		}
 """,
     ),
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -87,8 +87,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }
 
-  patch_system_library_links()?
-  fs.mkdir(p"build")?
+  patch_system_library_links()
+  fs.mkdir(p"build")
 
   if cross_build {
     env ({
@@ -139,7 +139,7 @@ export proc build(dest: Path) [fs, process, env, error] {
  command = {bootstrap_cc}""",
       )
 
-      fs.write(build_ninja, patched_ninja)?
+      fs.write(build_ninja, patched_ninja)
       run "build/muon-bootstrap" "-C" "build" "samu" ?
     }?
   } else {
@@ -147,5 +147,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "build/muon-bootstrap" "-C" "build" "samu" ?
   }
 
-  fs.install(p"build/muon", fp"{dest}/usr/bin/muon", 0o755, parents: true, overwrite: true)?
+  fs.install(p"build/muon", fp"{dest}/usr/bin/muon", 0o755, parents: true, overwrite: true)
 }

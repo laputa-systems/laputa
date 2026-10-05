@@ -12,8 +12,8 @@ pure fixture(name: Str) -> Path {
 
 proc expect_contract_rejection(dir: Path, description: Str) [fs, env, error] {
   match recipe.load_package(dir) {
-    Ok(_) => test.fail(f"{description}: recipe unexpectedly loaded")?
-    Err(error) => test.ok(error.message != "", f"{description}: error has a message")?
+    Ok(_) => test.fail(f"{description}: recipe unexpectedly loaded")
+    Err(error) => test.ok(error.message != "", f"{description}: error has a message")
   }
 }
 
@@ -42,7 +42,7 @@ test test_recipe_loads_valid_payload_with_relative_skip_checksum [fs, env, error
 test test_recipe_loads_valid_metapackage [fs, env, error] {
   let pkg = recipe.load_package(fixture("recipe-valid-meta"))?
   assert pkg.kind == types.Meta
-  test.eq(pkg.filetree, [])?
+  test.eq(pkg.filetree, [])
 }
 
 test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, error] {
@@ -53,15 +53,15 @@ test test_recipe_loads_linux_metadata_without_kbuild_dynamic_import [fs, env, er
 }
 
 test test_ca_certificates_local_sources_match_declared_checksums [fs, env, error] {
-  assert_local_source_checksums("ca-certificates")?
+  assert_local_source_checksums("ca-certificates")
 }
 
 test test_bison_local_source_matches_declared_checksum [fs, env, error] {
-  assert_local_source_checksums("bison")?
+  assert_local_source_checksums("bison")
 }
 
 test test_flex_local_source_matches_declared_checksum [fs, env, error] {
-  assert_local_source_checksums("flex")?
+  assert_local_source_checksums("flex")
 }
 
 test test_recipe_selects_target_filetree_variant [fs, env, error] {
@@ -75,73 +75,73 @@ test test_recipe_selects_target_filetree_variant [fs, env, error] {
 }
 
 test test_recipe_rejects_invalid_package_name [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-invalid-name"), "invalid package name")?
+  expect_contract_rejection(fixture("recipe-invalid-name"), "invalid package name")
 }
 
 test test_recipe_rejects_production_directory_name_mismatch [fs, env, error] { |ctx|
   let repo_root = test.temp_dir(ctx, name: "recipe-repo")?
   let dir = fp"{repo_root}/packages/recipe-dir-mismatch"
   let _ = fs.copy_tree(fixture("recipe-dir-mismatch"), dir, parents: true, overwrite: true)?
-  expect_contract_rejection(dir, "production directory/name mismatch")?
+  expect_contract_rejection(dir, "production directory/name mismatch")
 }
 
 test test_recipe_rejects_duplicate_dependency [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-duplicate-dependency"), "duplicate dependency")?
+  expect_contract_rejection(fixture("recipe-duplicate-dependency"), "duplicate dependency")
 }
 
 test test_recipe_rejects_self_dependency [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-self-dependency"), "self dependency")?
+  expect_contract_rejection(fixture("recipe-self-dependency"), "self dependency")
 }
 
 test test_recipe_rejects_invalid_source_kind [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-invalid-source-kind"), "invalid source kind")?
+  expect_contract_rejection(fixture("recipe-invalid-source-kind"), "invalid source kind")
 }
 
 test test_recipe_rejects_cargo_vendor_source_without_a_destination [fs, env, error] {
   match recipe.load_package(fixture("recipe-cargo-vendor-no-dest")) {
-    Ok(_) => test.fail("a crate set staged over the source root was accepted")?
+    Ok(_) => test.fail("a crate set staged over the source root was accepted")
     Err(problem) => assert "needs a `=> DIR` destination" in problem.message
   }
 }
 
 test test_recipe_rejects_invalid_file_kind [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-invalid-file-kind"), "invalid file kind")?
+  expect_contract_rejection(fixture("recipe-invalid-file-kind"), "invalid file kind")
 }
 
 test test_recipe_rejects_remote_skip_checksum [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-remote-skip"), "remote SKIP checksum")?
+  expect_contract_rejection(fixture("recipe-remote-skip"), "remote SKIP checksum")
 }
 
 test test_recipe_rejects_absolute_local_skip_checksum [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-absolute-skip"), "absolute local SKIP checksum")?
+  expect_contract_rejection(fixture("recipe-absolute-skip"), "absolute local SKIP checksum")
 }
 
 test test_recipe_rejects_missing_aarch64_checksum [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-missing-aarch64-checksum"), "missing aarch64 checksum")?
+  expect_contract_rejection(fixture("recipe-missing-aarch64-checksum"), "missing aarch64 checksum")
 }
 
 test test_recipe_rejects_duplicate_filetree_path [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-duplicate-filetree"), "duplicate filetree path")?
+  expect_contract_rejection(fixture("recipe-duplicate-filetree"), "duplicate filetree path")
 }
 
 test test_recipe_rejects_absolute_filetree_path [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-absolute-filetree"), "absolute filetree path")?
+  expect_contract_rejection(fixture("recipe-absolute-filetree"), "absolute filetree path")
 }
 
 test test_recipe_rejects_parent_filetree_traversal [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-parent-filetree"), "parent filetree traversal")?
+  expect_contract_rejection(fixture("recipe-parent-filetree"), "parent filetree traversal")
 }
 
 test test_recipe_rejects_payload_without_build [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-payload-no-build"), "payload without build")?
+  expect_contract_rejection(fixture("recipe-payload-no-build"), "payload without build")
 }
 
 test test_recipe_rejects_payload_without_proof [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-payload-no-proof"), "payload without proof")?
+  expect_contract_rejection(fixture("recipe-payload-no-proof"), "payload without proof")
 }
 
 test test_recipe_rejects_metapackage_with_payload_files [fs, env, error] {
-  expect_contract_rejection(fixture("recipe-meta-payload-files"), "metapackage with payload files")?
+  expect_contract_rejection(fixture("recipe-meta-payload-files"), "metapackage with payload files")
 }
 
 test test_recipe_loads_every_migrated_production_recipe [fs, env, error] {
@@ -165,9 +165,9 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   let build_arch = if target_arch == "aarch64" { "x86_64" } else { "aarch64" }
   let root = test.temp_dir(ctx, name: "cargo-proof-root")?
   let xsh = process.which("xsh")?
-  fs.install(xsh, fp"{root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)?
-  fs.install(xsh, fp"{root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)?
-  fs.mkdir(fp"{root}/usr/lib/rustlib/{target_arch}-unknown-linux-musl/lib")?
+  fs.install(xsh, fp"{root}/usr/bin/cargo", 0o755, parents: true, overwrite: true)
+  fs.install(xsh, fp"{root}/usr/bin/rustc", 0o755, parents: true, overwrite: true)
+  fs.mkdir(fp"{root}/usr/lib/rustlib/{target_arch}-unknown-linux-musl/lib")
   let stderr_path = test.temp_path(ctx, name: "cargo-proof-stderr")
   let status = process.run(
     process.command_argv(
@@ -178,7 +178,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
       stderr: stderr_path,
     ),
   )?
-  test.ok(status.ok, fs.read_text(stderr_path)?)?
+  test.ok(status.ok, fs.read_text(stderr_path)?)
 }
 
 # A stand-in executable that prints `output` only when run against the proof
@@ -196,8 +196,8 @@ proc main(...argv: List[Str]) [env, error] {{
 }}
 main(@args)?
 """,
-  )?
-  fs.chmod(bin, 0o755)?
+  )
+  fs.chmod(bin, 0o755)
 }
 
 type WpaProofRun = {ok: Bool, stderr: Str}
@@ -205,16 +205,16 @@ type WpaProofRun = {ok: Bool, stderr: Str}
 proc run_wpa_proof(ctx: TestContext, name: Str, psk: Str) [fs, process, env, error] -> Result[WpaProofRun] {
   let root = test.temp_dir(ctx, name:)?
   let xsh = process.which("xsh")?
-  fs.mkdir(fp"{root}/usr/bin")?
-  fs.mkdir(fp"{root}/usr/lib/xinit/services")?
-  fs.mkdir(fp"{root}/etc/wpa_supplicant")?
-  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")?
-  write_wpa_tool(xsh, root, "wpa_supplicant", "wpa_supplicant v2.12")?
-  write_wpa_tool(xsh, root, "wpa_passphrase", f"psk={psk}")?
-  fs.write(fp"{root}/usr/bin/wpa_cli", "")?
-  fs.write(fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")?
-  fs.write(fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf", "")?
-  fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")?
+  fs.mkdir(fp"{root}/usr/bin")
+  fs.mkdir(fp"{root}/usr/lib/xinit/services")
+  fs.mkdir(fp"{root}/etc/wpa_supplicant")
+  fs.mkdir(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant")
+  write_wpa_tool(xsh, root, "wpa_supplicant", "wpa_supplicant v2.12")
+  write_wpa_tool(xsh, root, "wpa_passphrase", f"psk={psk}")
+  fs.write(fp"{root}/usr/bin/wpa_cli", "")
+  fs.write(fp"{root}/usr/lib/xinit/services/wpa_supplicant.xsh", "")
+  fs.write(fp"{root}/etc/wpa_supplicant/wpa_supplicant.conf", "")
+  fs.write(fp"{root}/var/lib/xsh-pm/packages/wpa_supplicant/metadata.json", "{}")
   let stderr_path = test.temp_path(ctx, name: f"{name}-stderr")
   let status = process.run(
     process.command_argv(
@@ -235,7 +235,7 @@ test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, err
   }
 
   let good = run_wpa_proof(ctx, "wpa-proof-good", "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e")?
-  test.ok(good.ok, good.stderr)?
+  test.ok(good.ok, good.stderr)
 
   let bad = run_wpa_proof(ctx, "wpa-proof-bad-psk", "00")?
   assert ! bad.ok
@@ -262,7 +262,7 @@ export let upstream_sources = []
 ## Fixture export.
 export let filetree = []
 """,
-  )?
+  )
   dir
 }
 
@@ -281,7 +281,7 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
     "runtime-only-omitted",
     "export let deps = []\nexport let mkdeps_host = []",
   )?
-  test.eq(recipe.load_package(omitted)?.runtime_only_deps, [])?
+  test.eq(recipe.load_package(omitted)?.runtime_only_deps, [])
 
   for overlap in [
     "export let deps = [\"lib\"]\nexport let mkdeps_host = []\nexport let runtime_only_deps = [\"lib\"]",
@@ -291,7 +291,7 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
     let dir = write_runtime_only_recipe(ctx, "runtime-only-overlap", overlap)?
 
     match recipe.load_package(dir) {
-      Ok(_) => test.fail("runtime-only dependency repeating a build dependency unexpectedly loaded")?
+      Ok(_) => test.fail("runtime-only dependency repeating a build dependency unexpectedly loaded")
       Err(problem) => assert "runtime_only_deps entry lib is also a build dependency" in problem.message
     }
   }
@@ -303,7 +303,7 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
   )?
 
   match recipe.load_package(repeated) {
-    Ok(_) => test.fail("repeated runtime-only dependency unexpectedly loaded")?
+    Ok(_) => test.fail("repeated runtime-only dependency unexpectedly loaded")
     Err(problem) => assert "runtime_only_deps contains duplicate dependency service" in problem.message
   }
 }
@@ -323,7 +323,7 @@ test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
 # appended exports, such as an `architectures` list.
 proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) [fs, error] -> Result[Path] {
   let dir = fp"{repo}/packages/{name}"
-  fs.mkdir(dir)?
+  fs.mkdir(dir)
   fs.write(
     fp"{dir}/PKGBUILD.xsh",
     f"""##! Package architecture fixture recipe.
@@ -345,7 +345,7 @@ export let upstream_sources = []
 export let filetree = []
 {extra}
 """,
-  )?
+  )
   dir
 }
 
@@ -370,7 +370,7 @@ test test_recipe_architectures_default_to_every_target_and_reject_invalid_lists 
     )?
 
     match recipe.load_package(dir) {
-      Ok(_) => test.fail(f"architectures {case.list} unexpectedly loaded")?
+      Ok(_) => test.fail(f"architectures {case.list} unexpectedly loaded")
       Err(problem) => assert case.message in problem.message
     }
   }
@@ -388,7 +388,7 @@ test test_catalog_omits_a_package_outside_its_architectures_and_rejects_its_depe
   assert catalog.load_for_target(repo, types.target_x86_64())?.packages.len() == 3
 
   match catalog.load_for_target(repo, types.target_aarch64()) {
-    Ok(_) => test.fail("a dependency on an x86_64-only package unexpectedly loaded for aarch64")?
+    Ok(_) => test.fail("a dependency on an x86_64-only package unexpectedly loaded for aarch64")
     Err(problem) => assert "needs-firmware depends on x86-firmware, which does not exist for aarch64" in problem.message
   }
 }

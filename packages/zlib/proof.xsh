@@ -34,7 +34,7 @@ int main(void) {
   return strcmp((const char *)output, (const char *)input) == 0 ? 0 : 3;
 }
 """,
-    )?
+    )
 
     let binary = fp"{tmp}/proof-zlib"
     run $cc fp"{tmp}/proof-zlib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lz" "-o" $binary ?
@@ -46,13 +46,13 @@ int main(void) {
         run $binary ?
       }?
     } else {
-      proof.target_elf(root, p"usr/lib/libz.so", "zlib")?
+      proof.target_elf(root, p"usr/lib/libz.so", "zlib")
     }
 
-    check(fs.exists(fp"{root}/usr/include/zlib.h")?, "zlib", "missing zlib.h")?
-    check(fs.exists(fp"{root}/usr/lib/libz.so")?, "zlib", "missing libz.so")?
+    check(fs.exists(fp"{root}/usr/include/zlib.h")?, "zlib", "missing zlib.h")
+    check(fs.exists(fp"{root}/usr/lib/libz.so")?, "zlib", "missing libz.so")
     print "zlib ok"
   }
 }
 
-main(@args)?
+main(@args)

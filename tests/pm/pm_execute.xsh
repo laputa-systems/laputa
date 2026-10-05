@@ -21,8 +21,8 @@ pure empty_remote_snapshot() -> types.RemoteSnapshot {
 proc copied_execute_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   let _ = fs.copy_tree(fixture("execute/packages"), fp"{root}/packages", parents: true, overwrite: true)?
-  fs.mkdir(fp"{root}/pm")?
-  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)?
+  fs.mkdir(fp"{root}/pm")
+  fs.copy(p"pm/proof.xsh", fp"{root}/pm/proof.xsh", overwrite: true)
   root
 }
 
@@ -57,7 +57,7 @@ proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
 
 proc write_execute_metapackage(repo_root: Path) [fs, error] {
   let package = fp"{repo_root}/packages/execute-meta"
-  fs.mkdir(package)?
+  fs.mkdir(package)
   fs.write(
     fp"{package}/PKGBUILD.xsh",
     """##! Executor metapackage fixture without a payload proof.
@@ -80,12 +80,12 @@ export let upstream_sources = []
 ## No payload files.
 export let filetree = []
 """,
-  )?
+  )
 }
 
 proc write_execute_leaf(repo_root: Path) [fs, error] {
   let package = fp"{repo_root}/packages/execute-leaf"
-  fs.mkdir(package)?
+  fs.mkdir(package)
   fs.write(
     fp"{package}/PKGBUILD.xsh",
     r"""##! Executor fixture that must not start until execute-app publishes.
@@ -117,7 +117,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
   fs.write(target, "leaf\\n")?
 }
 """,
-  )?
+  )
   fp"{package}/proof.xsh".write(r"""
 error ProofError = MissingPayload
 
@@ -128,14 +128,14 @@ proc main(root: Path = /rootfs) [fs, error] {
 }
 
 main(@args)?
-""")?
+""")
 }
 
 # `execute-service` runtime-only depends on `execute-dep`; its build fails if
 # that dependency's payload reached its build root.
 proc write_execute_service(repo_root: Path) [fs, error] {
   let package = fp"{repo_root}/packages/execute-service"
-  fs.mkdir(package)?
+  fs.mkdir(package)
   fs.write(
     fp"{package}/PKGBUILD.xsh",
     r"""##! Executor fixture with a runtime-only dependency.
@@ -175,7 +175,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit] {
   fs.write(target, "service\n")?
 }
 """,
-  )?
+  )
   fp"{package}/proof.xsh".write(r"""
 error ProofError = Failed(message: Str)
 
@@ -186,7 +186,7 @@ proc main(root: Path = /rootfs) [fs, error] {
 }
 
 main(@args)?
-""")?
+""")
 }
 
 proc exact_remote_snapshot(
@@ -201,11 +201,11 @@ proc exact_remote_snapshot(
     let executor_sha256 = receipt.executor_sha256
     let tarball = fp"{remote_root}/packages/aarch64/{node.name}/{node.package_id}.tar.gz"
     let metadata = fp"{remote_root}/metadata/aarch64/{node.name}/{node.package_id}.json"
-    fs.mkdir(tarball.parent)?
-    fs.mkdir(metadata.parent)?
-    fs.copy(fp"{receipt.artifact_dir}/payload.tar.gz", tarball, overwrite: true)?
+    fs.mkdir(tarball.parent)
+    fs.mkdir(metadata.parent)
+    fs.copy(fp"{receipt.artifact_dir}/payload.tar.gz", tarball, overwrite: true)
     let raw = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
-    fs.write(metadata, json.encode({...raw, executor_sha256})? + "\n")?
+    fs.write(metadata, json.encode({...raw, executor_sha256})? + "\n")
     packages += [{
       name: node.name,
       ver: node.ver,
@@ -265,7 +265,7 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
     pm_sha256: payload_hash,
     core_sha256: null,
   )
-  local.write_package_metadata(metadata, "x86_64", built, executor)?
+  local.write_package_metadata(metadata, "x86_64", built, executor)
   let recorded = json.read(metadata)?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
   assert recorded == executor
   let wire = json.read(metadata)?.require(local.PackageMetadataDto)?
@@ -276,18 +276,18 @@ test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_
   assert wire.files[0].mode == 0o644
   assert wire.manifest == ["usr/share/wire-package"]
 
-  json.write(metadata, {...wire, future_package_metadata: "retained"})?
+  json.write(metadata, {...wire, future_package_metadata: "retained"})
   let extended = json.read(metadata)?.require(local.PackageMetadataDto)?
-  json.write(metadata, {...extended, executor_sha256: payload_hash})?
+  json.write(metadata, {...extended, executor_sha256: payload_hash})
   let forwarded = json.read(metadata)?.require(Record)?
   let extension: Str = forwarded.get("future_package_metadata")?.require()?
   let executor_hash: Str = forwarded.get("executor_sha256")?.require()?
   assert extension == "retained"
   assert executor_hash == payload_hash
 
-  json.write(metadata, {...extended, files: [{...extended.files[0], mode: "invalid"}]})?
+  json.write(metadata, {...extended, files: [{...extended.files[0], mode: "invalid"}]})
   match json.read(metadata)?.require(local.PackageMetadataDto) {
-    Ok(_) => test.fail("metadata schema accepted a string file mode")?
+    Ok(_) => test.fail("metadata schema accepted a string file mode")
     Err(_) => {}
   }
 }
@@ -297,8 +297,8 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
   let value = resolve_execute_plan(repo_root)?
   let object_store = execute_store(ctx, "execute-build-store")?
   let stale = fp"{object_store}/v2/tmp/{node_named(value, "execute-app")?.artifact_key}"
-  fs.mkdir(stale)?
-  fs.write(fp"{stale}/partial", "interrupted build state")?
+  fs.mkdir(stale)
+  fs.write(fp"{stale}/partial", "interrupted build state")
   let first = execute.build_plan(value, repo_root, object_store, "", 2)?
   assert [node.name for node in value.nodes] == ["execute-dep", "execute-tool", "execute-app"]
   assert [receipt.package_name for receipt in first.artifacts] == ["execute-dep", "execute-tool", "execute-app"]
@@ -321,7 +321,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
       "export let filetree = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
       "export let filetree = []\n## Target-specific declared output.\nexport let filetree_x86_64 = [{path: p\"usr/share/execute-dep.txt\", kind: \"file\"}]",
     ),
-  )?
+  )
   let proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(
     proof,
@@ -329,7 +329,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
       "proc main(root: Path = /rootfs) [fs, error] {",
       "proc main(root: Path = /rootfs) [fs, env, error] {\n  if env(\"XSH_PM_TARGET_ARCH\")? != \"x86_64\" {\n    return Err(ProofError.Failed(\"proof ran under the wrong target\"))\n  }",
     ),
-  )?
+  )
   let value = plan.resolve(
     catalog.load_for_target(repo_root, types.target_x86_64())?,
     {target: types.target_x86_64(), index_sha256: "execute-empty-x86-remote", packages: []},
@@ -357,7 +357,7 @@ test test_execute_reproofs_changed_proof_without_rebuilding_payload [fs, net, pr
   let initial_app = node_named(initial, "execute-app")?
   let initial_receipt = receipt_named(built, "execute-app")?
   let proof_path = fp"{repo_root}/packages/execute-app/proof.xsh"
-  fs.write(proof_path, proof_path.read_text()? + "\n# proof revision only\n")?
+  fs.write(proof_path, proof_path.read_text()? + "\n# proof revision only\n")
   let reproved_plan = resolve_execute_plan(repo_root)?
   let reproved_app = node_named(reproved_plan, "execute-app")?
   assert reproved_app.artifact_key == initial_app.artifact_key
@@ -369,7 +369,7 @@ test test_execute_reproofs_changed_proof_without_rebuilding_payload [fs, net, pr
 
 test test_execute_parallel_level_requires_published_dependency_receipts [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-level-barrier-repo")?
-  write_execute_leaf(repo_root)?
+  write_execute_leaf(repo_root)
   let object_store = execute_store(ctx, "execute-level-barrier-store")?
   let app_proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   fs.write(
@@ -382,7 +382,7 @@ proc main(root: Path) [error] {
 
 main(@args)?
 """,
-  )?
+  )
   let value = resolve_execute_plan_for_roots(repo_root, ["execute-leaf"])?
   let app = node_named(value, "execute-app")?
   let leaf = node_named(value, "execute-leaf")?
@@ -394,7 +394,7 @@ main(@args)?
   # proof then fails. A dependent level must never run and replace that cause
   # with an absent-artifact error.
   match execute.build_plan(value, repo_root, object_store, "", 2) {
-    Ok(_) => test.fail("parallel executor advanced past a failed dependency level")?
+    Ok(_) => test.fail("parallel executor advanced past a failed dependency level")
     Err(problem) => assert "package proof for execute-app" in problem.message
   }
 
@@ -410,7 +410,7 @@ test test_execute_rebuilds_changed_recipe_and_dependents [fs, net, process, env,
   let initial_dep = node_named(initial, "execute-dep")?
   let initial_app = node_named(initial, "execute-app")?
   let pkgbuild = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
-  fs.write(pkgbuild, pkgbuild.read_text()?.replace("dependency\\n", "dependency revision two\\n"))?
+  fs.write(pkgbuild, pkgbuild.read_text()?.replace("dependency\\n", "dependency revision two\\n"))
   let changed = resolve_execute_plan(repo_root)?
   let changed_dep = node_named(changed, "execute-dep")?
   let changed_app = node_named(changed, "execute-app")?
@@ -428,7 +428,7 @@ test test_execute_rebuilds_when_package_source_input_changes [fs, net, process, 
   let initial = resolve_execute_plan(repo_root)?
   let _ = execute.build_plan(initial, repo_root, object_store, "", 1)?
   let initial_app = node_named(initial, "execute-app")?
-  fs.write(fp"{repo_root}/packages/execute-app/files/input.txt", "source revision two\n")?
+  fs.write(fp"{repo_root}/packages/execute-app/files/input.txt", "source revision two\n")
   let changed = resolve_execute_plan(repo_root)?
   let changed_app = node_named(changed, "execute-app")?
   assert changed_app.artifact_key == initial_app.artifact_key == false
@@ -438,7 +438,7 @@ test test_execute_rebuilds_when_package_source_input_changes [fs, net, process, 
 
 test test_execute_metapackage_keeps_opaque_marker_and_proves_runtime_dependencies [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-meta-repo")?
-  write_execute_metapackage(repo_root)?
+  write_execute_metapackage(repo_root)
   let value = resolve_execute_plan_for_roots(repo_root, ["execute-meta"])?
   assert [node.name for node in value.nodes] == ["execute-dep", "execute-meta"]
   let object_store = execute_store(ctx, "execute-meta-store")?
@@ -453,7 +453,7 @@ test test_execute_metapackage_keeps_opaque_marker_and_proves_runtime_dependencie
   # still completed the regular proof path first.
   assert fs.read_text(fp"{meta.artifact_dir}/payload.tar.gz")? == "laputa metapackage payload marker\n"
   assert meta_metadata.package_kind == "meta"
-  test.eq(files, [])?
+  test.eq(files, [])
   assert fs.exists(fp"{meta.artifact_dir}/proof.json")?
   assert fs.exists(fp"{dependency.artifact_dir}/proof.json")?
 }
@@ -493,12 +493,12 @@ proc main(root: Path = /rootfs) [error] {
 
 main(@args)?
 """,
-  )?
+  )
   let failed_plan = resolve_execute_plan(repo_root)?
   let failed_app = node_named(failed_plan, "execute-app")?
 
   match execute.build_plan(failed_plan, repo_root, object_store, "", 1) {
-    Ok(_) => test.fail("failed proof unexpectedly published an application artifact")?
+    Ok(_) => test.fail("failed proof unexpectedly published an application artifact")
     Err(problem) => assert "package proof for execute-app" in problem.message
   }
 
@@ -510,7 +510,7 @@ main(@args)?
   let healthy = execute.build_plan(healthy_plan, healthy_repo, healthy_store, "", 1)?
   let healthy_app = node_named(healthy_plan, "execute-app")?
   let final_dir = store.artifact_path(healthy_store, healthy_app.artifact_key)
-  fs.write(fp"{final_dir}/payload.tar.gz", "corrupt final payload")?
+  fs.write(fp"{final_dir}/payload.tar.gz", "corrupt final payload")
 
   # Reuse trusts commit-time hashes and never overwrites a final artifact;
   # explicit Store verification is what detects the corruption.
@@ -519,7 +519,7 @@ main(@args)?
   assert fs.read_text(fp"{final_dir}/payload.tar.gz")? == "corrupt final payload"
 
   match store.verify_artifact(healthy_store, healthy_app.artifact_key) {
-    Ok(_) => test.fail("corrupt final artifact unexpectedly verified")?
+    Ok(_) => test.fail("corrupt final artifact unexpectedly verified")
     Err(problem) => assert "payload SHA-256 does not match receipt" in problem.message
   }
 }
@@ -543,7 +543,7 @@ test test_execute_rejects_plan_from_another_build_epoch [fs, net, process, env, 
   let object_store = execute_store(ctx, "execute-epoch-store")?
 
   match execute.build_plan(value, repo_root, object_store, "", 1) {
-    Ok(_) => test.fail("plan from another BUILD_EPOCH unexpectedly executed")?
+    Ok(_) => test.fail("plan from another BUILD_EPOCH unexpectedly executed")
     Err(problem) => assert f"resolved at BUILD_EPOCH {policy.BUILD_EPOCH + 1}" in problem.message
   }
 
@@ -577,7 +577,7 @@ test test_execute_hashes_each_payload_once_and_reuse_hashes_nothing [fs, process
   let repo_root = copied_execute_repository(ctx, "execute-hash-count-repo")?
   let object_store = execute_store(ctx, "execute-hash-count-store")?
   let plan_path = test.temp_path(ctx, name: "execute-hash-count-plan.json")
-  plan_json.write_plan(plan_path, resolve_execute_plan(repo_root)?)?
+  plan_json.write_plan(plan_path, resolve_execute_plan(repo_root)?)
   let source = r"""use pm.execute
 use pm.plan_json
 
@@ -610,12 +610,12 @@ main(@args)?
   assert (fresh.get("root.xsh") ?? 0) == 0
 
   let reuse = runs[1]
-  test.eq(reuse.keys() |> sort, [])?
+  test.eq(reuse.keys() |> sort, [])
 }
 
 test test_execute_keeps_runtime_only_dependency_out_of_build_root_and_composes_it [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-runtime-only-repo")?
-  write_execute_service(repo_root)?
+  write_execute_service(repo_root)
   let value = resolve_execute_plan_for_roots(repo_root, ["execute-service"])?
   # Both nodes share level 0, and execute-dep builds first: only the missing
   # build-root edge keeps its payload out of execute-service's build root.
@@ -625,18 +625,18 @@ test test_execute_keeps_runtime_only_dependency_out_of_build_root_and_composes_i
   let object_store = execute_store(ctx, "execute-runtime-only-store")?
   let result = execute.build_plan(value, repo_root, object_store, "", 1)?
   let service = receipt_named(result, "execute-service")?
-  test.eq(service.dependency_keys, [])?
-  test.eq(service.runtime_dependency_keys, [])?
+  test.eq(service.dependency_keys, [])
+  test.eq(service.runtime_dependency_keys, [])
 
   let overlay = fp"{test.temp_dir(ctx, name: "execute-runtime-only-overlay")?}/overlay"
-  fs.mkdir(overlay)?
+  fs.mkdir(overlay)
   let generation_plan = generation.plan(value, ["execute-service"], generation.overlay_digest(overlay)?)?
   assert [artifact.package_name for artifact in generation_plan.artifacts] == ["execute-dep", "execute-service"]
   let output = fp"{test.temp_dir(ctx, name: "execute-runtime-only-generation")?}/root"
   let receipt = generation.compose(generation_plan, object_store, output, overlay)?
   assert fp"{output}/usr/share/execute-dep.txt".read_text()? == "dependency\n"
   assert fp"{output}/usr/share/execute-service.txt".read_text()? == "service\n"
-  generation.verify_generation(output, receipt)?
+  generation.verify_generation(output, receipt)
 }
 
 # Parallel builds each write their own log, and a failure names its package
@@ -661,12 +661,12 @@ proc main(root: Path) [error] {
 
 main(@args)?
 """,
-  )?
+  )
   let failing = resolve_execute_plan(repo_root)?
   let failed_logs = test.temp_dir(ctx, name: "execute-failed-logs")?
 
   match execute.build_plan(failing, repo_root, execute_store(ctx, "execute-failed-store")?, "", 2, failed_logs) {
-    Ok(_) => test.fail("a failing proof built")?
+    Ok(_) => test.fail("a failing proof built")
     Err(problem) => {
       assert f"{failed_logs}/execute-app.log" in problem.message, problem.message
       assert "intentional proof failure" in problem.message, problem.message

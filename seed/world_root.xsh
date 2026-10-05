@@ -114,17 +114,17 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       sonames: needed_sonames(elves),
       failures,
     },
-  )?
-  fs.write(fp"{output}/files.txt", (files |> sort).join("\n") + "\n")?
-  fs.copy(fp"{root}/var/lib/laputa/generation.json", fp"{output}/generation.json", overwrite: true)?
+  )
+  fs.write(fp"{output}/files.txt", (files |> sort).join("\n") + "\n")
+  fs.copy(fp"{root}/var/lib/laputa/generation.json", fp"{output}/generation.json", overwrite: true)
 
   # The root's own xsh must run a script from inside it. The probe lands after
   # the receipt was copied; the throwaway root is never used again.
-  fs.mkdir(fp"{root}/tmp")?
+  fs.mkdir(fp"{root}/tmp")
   fs.write(
     fp"{root}/tmp/world-root-probe.xsh",
     "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n",
-  )?
+  )
   let greeting = run.text $chroot $root /bin/xsh /tmp/world-root-probe.xsh ?
   print greeting.trim()
   print f"root files={files.len()} elf={elves.len()} dynamic={dynamic.len()} failures={failures.len()}"
@@ -138,4 +138,4 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   }
 }
 
-main(@args)?
+main(@args)

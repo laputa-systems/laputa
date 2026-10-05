@@ -239,7 +239,7 @@ export proc discover_sources(
 ## Exported PM declaration `install_header_tree`.
 export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Path] = []) [fs, error] {
   let source_root = path.absolute(src_dir)?
-  fs.mkdir(dest_dir)?
+  fs.mkdir(dest_dir)
 
   for entry in fs.walk(source_root, gitignore: false)? {
     let rel = entry.path.relative_to(source_root)
@@ -247,9 +247,9 @@ export proc install_header_tree(src_dir: Path, dest_dir: Path, exclude: List[Pat
     let target = fp"{dest_dir}/{rel}"
 
     if entry.kind == "dir" {
-      fs.mkdir(target)?
+      fs.mkdir(target)
     } else {
-      fs.install(entry.path, target, 0o644, parents: true, overwrite: true)?
+      fs.install(entry.path, target, 0o644, parents: true, overwrite: true)
     }
   }
 }
@@ -469,23 +469,23 @@ proc should_run(task: MakeTask) [fs, env, error] -> Result[Bool] {
 
 proc prepare_task_dirs(task: MakeTask) [fs, error] {
   for output in task.outputs {
-    output.parent.mkdir()?
+    output.parent.mkdir()
   }
 
   if has_path(task.depfile) {
-    task.depfile.parent.mkdir()?
+    task.depfile.parent.mkdir()
   }
 
   if has_path(task.stamp) {
-    task.stamp.parent.mkdir()?
+    task.stamp.parent.mkdir()
   }
 }
 
 proc spawn_task(task: MakeTask) [fs, process, env, error] -> Result[RunningTask] {
-  prepare_task_dirs(task)?
+  prepare_task_dirs(task)
 
   for output in task.outputs {
-    fs.remove(output, missing_ok: true)?
+    fs.remove(output, missing_ok: true)
   }
 
   let task_argv = effective_task_argv(task.argv, task.env)?
@@ -563,7 +563,7 @@ pure should_log_dynamic_progress(tasks_count: Int, event_count: Int, running_cou
 
 ## Exported PM declaration `run_tasks`.
 export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env, error] -> Result[Unit, Error] {
-  check_tasks(tasks, jobs_count)?
+  check_tasks(tasks, jobs_count)
   var task_by_name: Map[MakeTask] = {}
   var dependents: Map[List[Str]] = {}
   var remaining_deps: Map[Int] = {}
@@ -1365,7 +1365,7 @@ export proc compile_lo(
   src: Path,
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([compile_lo_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
+  run_tasks([compile_lo_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
 # Compile a .cxx/.cpp file to a regular .o object using the C++ compiler.
@@ -1379,7 +1379,7 @@ export proc compile_cxx(
   src: Path,
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([compile_cxx_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
+  run_tasks([compile_cxx_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
 # Compile a .c file to a regular .o object (for executables).
@@ -1393,7 +1393,7 @@ export proc compile_c(
   src: Path,
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([compile_c_task(toolchain, triple, cflags, defs, includes, src, out)], 1)?
+  run_tasks([compile_c_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
 # Link a shared library from .lo objects with a given SONAME.
@@ -1406,7 +1406,7 @@ export proc link_shared(
   ldflags: List[Str],
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([link_shared_task(toolchain, triple, objs, soname, ldflags, out)], 1)?
+  run_tasks([link_shared_task(toolchain, triple, objs, soname, ldflags, out)], 1)
 }
 
 # Link a C++ executable using the C++ compiler driver.
@@ -1419,7 +1419,7 @@ export proc link_executable_cxx(
   ldflags: List[Str],
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([link_executable_cxx_task(toolchain, triple, objs, libs, ldflags, out)], 1)?
+  run_tasks([link_executable_cxx_task(toolchain, triple, objs, libs, ldflags, out)], 1)
 }
 
 ## Exported PM declaration `link_executable`.
@@ -1431,11 +1431,11 @@ export proc link_executable(
   ldflags: List[Str],
   out: Path,
 ) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([link_executable_task(toolchain, triple, objs, libs, ldflags, out)], 1)?
+  run_tasks([link_executable_task(toolchain, triple, objs, libs, ldflags, out)], 1)
 }
 
 # Create a static archive from .lo/.o objects.
 ## Exported PM declaration `link_archive`.
 export proc link_archive(toolchain: Path, objs: List[Path], out: Path) [fs, process, env, error] -> Result[Unit, Error] {
-  run_tasks([link_archive_task(toolchain, objs, out)], 1)?
+  run_tasks([link_archive_task(toolchain, objs, out)], 1)
 }

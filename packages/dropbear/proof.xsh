@@ -5,9 +5,9 @@ use pm.util as pm_util
 error ScriptError = Failed(kind: Str, message: Str)
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
-  proof.target_elf(rootfs, p"usr/bin/dropbear", "dropbear")?
-  proof.target_elf(rootfs, p"usr/bin/dropbearkey", "dropbear")?
-  proof.target_elf(rootfs, p"usr/bin/dbclient", "dropbear")?
+  proof.target_elf(rootfs, p"usr/bin/dropbear", "dropbear")
+  proof.target_elf(rootfs, p"usr/bin/dropbearkey", "dropbear")
+  proof.target_elf(rootfs, p"usr/bin/dbclient", "dropbear")
   let build_arch = pm_util.build_arch()?
   let target_arch = pm_util.target_arch()?
 
@@ -21,7 +21,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let dropbearkey = fp"{rootfs}/usr/bin/dropbearkey"
   let tmp = /tmp/dropbear-proof
-  fs.mkdir(tmp)?
+  fs.mkdir(tmp)
 
   # RSA: exercises libtommath (big-integer arithmetic) + libtomcrypt (RSA ops).
   let rsa_key = fp"{tmp}/host_rsa"
@@ -55,7 +55,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   }
 
   print "dropbear ok: ecdsa-256 key generated"
-  ssh_session(dynlinker, rootfs, tmp, ed_key)?
+  ssh_session(dynlinker, rootfs, tmp, ed_key)
 }
 
 proc public_key_line(body: Str) [error] -> Result[Str] {
@@ -101,8 +101,8 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) [fs, 
   let me = user.current()?
   let client_key = fp"{tmp}/client_ed25519"
   let stranger_key = fp"{tmp}/stranger_ed25519"
-  fs.remove(client_key, missing_ok: true)?
-  fs.remove(stranger_key, missing_ok: true)?
+  fs.remove(client_key, missing_ok: true)
+  fs.remove(stranger_key, missing_ok: true)
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $stranger_key ?
   let client_public = public_key_line(run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?)?
@@ -112,14 +112,14 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) [fs, 
   # writable, which rules out /tmp; a private directory under the home passes.
   let pid = process.current_pid()?
   let auth_dir = fp"{me.home}/.laputa-proof-dropbear-{pid}"
-  fs.remove(auth_dir, missing_ok: true)?
-  fs.mkdir(auth_dir)?
+  fs.remove(auth_dir, missing_ok: true)
+  fs.mkdir(auth_dir)
   defer fs.remove(auth_dir, missing_ok: true)?
-  fs.chmod(auth_dir, 0o700)?
-  fs.write(fp"{auth_dir}/authorized_keys", f"{client_public}\n")?
-  fs.chmod(fp"{auth_dir}/authorized_keys", 0o600)?
+  fs.chmod(auth_dir, 0o700)
+  fs.write(fp"{auth_dir}/authorized_keys", f"{client_public}\n")
+  fs.chmod(fp"{auth_dir}/authorized_keys", 0o600)
   let client_home = fp"{tmp}/client-home"
-  fs.mkdir(client_home)?
+  fs.mkdir(client_home)
   let log_path = fp"{tmp}/dropbear.log"
   let port = 22000 + pid % 20000
   let listen = f"127.0.0.1:{port}"
@@ -133,18 +133,18 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) [fs, 
     output = ssh_echo(dynlinker, rootfs, client_home, me.name, client_key, port)?
 
     if output == "" {
-      time.sleep(100ms)?
+      time.sleep(100ms)
       tries -= 1
     }
   }
 
   let stranger = ssh_echo(dynlinker, rootfs, client_home, me.name, stranger_key, port)?
-  process.kill(server.pid, "TERM")?
+  process.kill(server.pid, "TERM")
   let _ = wait server
   let log = log_path.read_text()?
-  proof.ensure(output == "laputa-ssh-ok", "dropbear-ssh", f"authorized client did not run its command: {output}; server log: {log}")?
-  proof.ensure("Pubkey auth succeeded" in log, "dropbear-ssh", f"server did not log public-key auth: {log}")?
-  proof.ensure(stranger == "", "dropbear-ssh", "dropbear accepted a client key missing from authorized_keys")?
+  proof.ensure(output == "laputa-ssh-ok", "dropbear-ssh", f"authorized client did not run its command: {output}; server log: {log}")
+  proof.ensure("Pubkey auth succeeded" in log, "dropbear-ssh", f"server did not log public-key auth: {log}")
+  proof.ensure(stranger == "", "dropbear-ssh", "dropbear accepted a client key missing from authorized_keys")
   print "dropbear ok: ed25519 host key, public-key login runs a command, unknown key refused"
 }
-main(@args)?
+main(@args)

@@ -84,11 +84,11 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(libudev.tasks, make.jobs()?)?
-  fs.install(libudev.output, fp"{dest}/usr/lib/libudev.so.1", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libudev.so.1", fp"{dest}/usr/lib/libudev.so")?
-  fs.install(p"udev.h", fp"{dest}/usr/include/libudev.h", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  make.run_tasks(libudev.tasks, make.jobs()?)
+  fs.install(libudev.output, fp"{dest}/usr/lib/libudev.so.1", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libudev.so.1", fp"{dest}/usr/lib/libudev.so")
+  fs.install(p"udev.h", fp"{dest}/usr/include/libudev.h", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/libudev.pc",
@@ -103,5 +103,5 @@ Version: 251
 Libs: -L\${libdir} -ludev
 Cflags: -I\${includedir}
 """,
-  )?
+  )
 }

@@ -20,7 +20,7 @@ proc run_m4(ctx: TestContext, name: Str, input: Str, argv: List[Str] = []) [fs, 
   let stdout = fp"{root}/stdout"
   let stderr = fp"{root}/stderr"
   let xsh = runner()?
-  fs.write(source, input)?
+  fs.write(source, input)
 
   let status = process.run(
     process.command_argv(
@@ -155,14 +155,14 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   let m4 = fp"{root}/usr/bin/m4"
   let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
-  fs.mkdir(m4.parent)?
+  fs.mkdir(m4.parent)
 
   # The proof invokes the staged runner as an executable.  Its shebang points
   # at this host test runner solely so the behavior can be checked without a
   # target rootfs; the package payload still ships `#!/bin/xsh`.
   let staged = fs.read_text(p"packages/m4/files/m4.xsh")?.replace("#!/bin/xsh", f"#!{xsh}")
-  fs.write(m4, staged)?
-  fs.chmod(m4, 0o755)?
+  fs.write(m4, staged)
+  fs.chmod(m4, 0o755)
 
   let status = process.run(
     process.command_argv(
@@ -172,7 +172,7 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
     ),
   )?
   if ! status.ok {
-    test.fail(stderr.read_text()?)?
+    test.fail(stderr.read_text()?)
   }
 }
 

@@ -104,13 +104,13 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 
   let exports = module.load(source)?.require(SystemProfileModule)?
   let value = exports.profile
-  validate_system_profile(value)?
+  validate_system_profile(value)
   value
 }
 
 ## Compute a canonical digest from all semantic profile fields.
 export proc digest(value: types.SystemProfile) [error] -> Result[Str, Error] {
-  validate_system_profile(value)?
+  validate_system_profile(value)
   let body = f"""laputa-system-profile-1
 name\t{value.name}
 roots\t{value.package_roots.join(",")}

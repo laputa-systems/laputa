@@ -199,11 +199,11 @@ proc write_format_modifier_table() [fs, error] {
   }
 
   body += ["};"]
-  fs.write(p"generated_static_table_fourcc.h", body.join("\n"))?
+  fs.write(p"generated_static_table_fourcc.h", body.join("\n"))
 }
 
 proc patch_python_generator() [fs, error] {
-  write_format_modifier_table()?
+  write_format_modifier_table()
   let meson = p"meson.build"
   var text = meson.read_text()?
 
@@ -219,7 +219,7 @@ format_mod_static_table = custom_target(
 """,
   )
 
-  fs.write(meson, text)?
+  fs.write(meson, text)
 }
 
 ## Exported declaration `build`.
@@ -227,7 +227,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  patch_python_generator()?
+  patch_python_generator()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,

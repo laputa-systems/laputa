@@ -20,7 +20,7 @@ proc main(...argv: List[Str]) [fs, error] {
     input.defs,
     input.includes,
   )?
-  json.write(output_path, results)?
+  json.write(output_path, results)
 }
 
-main(@args)?
+main(@args)

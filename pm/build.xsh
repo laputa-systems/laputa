@@ -111,13 +111,13 @@ proc direct_xsh_source(xsh: Path, name: Str) [fs, error] -> Result[Path] {
 
 proc seed_xsh_runners(root: Path, xsh: Path) [fs, error] {
   let bin = fp"{root}/bin"
-  fs.mkdir(bin)?
+  fs.mkdir(bin)
 
   for name in ["xsh", "xshi", "xsht"] {
     let source = direct_xsh_source(xsh, name)?
     let dest = fp"{bin}/{name}"
-    fs.remove(dest, missing_ok: true)?
-    fs.install(source, dest, 0o755, parents: true, overwrite: true)?
+    fs.remove(dest, missing_ok: true)
+    fs.install(source, dest, 0o755, parents: true, overwrite: true)
   }
 }
 
@@ -125,54 +125,54 @@ proc seed_xsh_runners(root: Path, xsh: Path) [fs, error] {
 ## Completed package roots remain immutable; this function never targets a generation root.
 export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   let xsh = xsh_runner()?
-  seed_xsh_runners(root, xsh)?
+  seed_xsh_runners(root, xsh)
 
   if fs.exists(/usr/lib/xsh)? {
     let _ = fs.copy_tree(/usr/lib/xsh, fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
   }
 
   let pm_root = pm_source_root()?
-  fs.install(fp"{pm_root}/pm.xsh", fp"{root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)?
-  fs.remove(fp"{root}/usr/lib/pm/pm", missing_ok: true)?
+  fs.install(fp"{pm_root}/pm.xsh", fp"{root}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)
+  fs.remove(fp"{root}/usr/lib/pm/pm", missing_ok: true)
   let _ = fs.copy_tree(fp"{pm_root}/pm", fp"{root}/usr/lib/pm/pm", parents: true, overwrite: true)?
 
   for sh in [fp"{root}/usr/bin/sh", fp"{root}/bin/sh"] {
-    fs.mkdir(sh.parent)?
-    fs.remove(sh, missing_ok: true)?
-    fs.write(sh, seeded_shell_script())?
-    fs.chmod(sh, 0o755)?
+    fs.mkdir(sh.parent)
+    fs.remove(sh, missing_ok: true)
+    fs.write(sh, seeded_shell_script())
+    fs.chmod(sh, 0o755)
   }
 
   for tmp in [fp"{root}/tmp", fp"{root}/var/tmp"] {
-    fs.mkdir(tmp)?
-    fs.chmod(tmp, 0o1777)?
+    fs.mkdir(tmp)
+    fs.chmod(tmp, 0o1777)
   }
 
-  fs.mkdir(fp"{root}/proc")?
+  fs.mkdir(fp"{root}/proc")
 
   for name in ["cpuinfo", "meminfo"] {
     let source = fp"/proc/{name}"
     let dest = fp"{root}/proc/{name}"
 
     match fs.metadata(source) {
-      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
+      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)
       else => {
         if ! fs.exists(dest)? {
-          fs.write(dest, "")?
+          fs.write(dest, "")
         }
       }
     }
   }
 
-  fs.mkdir(fp"{root}/etc")?
+  fs.mkdir(fp"{root}/etc")
 
   for name in ["resolv.conf", "hosts", "nsswitch.conf"] {
     let source = fp"/etc/{name}"
     let dest = fp"{root}/etc/{name}"
 
     match fs.metadata(source) {
-      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)?
-      Ok(metadata) if metadata.kind == "symlink" => fs.write(dest, source.read_text()?)?
+      Ok(metadata) if metadata.kind == "file" => fs.copy(source, dest, overwrite: true)
+      Ok(metadata) if metadata.kind == "symlink" => fs.write(dest, source.read_text()?)
       else => {}
     }
   }
@@ -213,10 +213,10 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
   # still requires a staged byte object, but it must not contain the legacy
   # package database that payload builds append before archiving.
   if pkg.kind == types.package_meta() {
-    fs.remove(dest, missing_ok: true)?
-    fs.mkdir(dest)?
-    fs.mkdir(tarball.parent)?
-    fs.write(tarball, "laputa metapackage payload marker\n")?
+    fs.remove(dest, missing_ok: true)
+    fs.mkdir(dest)
+    fs.mkdir(tarball.parent)
+    fs.write(tarball, "laputa metapackage payload marker\n")
     return
   }
 
@@ -261,7 +261,7 @@ proc main(pkg_dir: Path, src: Path, dest: Path) [fs, process, env, error] {
 main(@args)?
 """
 
-    fs.write(runner, runner_text)?
+    fs.write(runner, runner_text)
     let trace_path = fp"{pkg_dir.parent}/run-package-build.trace"
     let xsht = xsht_runner()?
     let status = process.run(
@@ -295,13 +295,13 @@ main(@args)?
     |> map { |entry| entry.path.strip_prefix(dest)? }
     |> sort-by .display()
 
-  local.validate_and_strip_package(pkg, dest, manifest)?
+  local.validate_and_strip_package(pkg, dest, manifest)
   let etcsums = local.collect_etcsums(dest, manifest)?
-  local.write_package_db(dest, pkg, manifest, etcsums)?
+  local.write_package_db(dest, pkg, manifest, etcsums)
   # Metadata and payload share one inventory. A recipe may remove a generated
   # child such as `usr/share/man` while leaving an otherwise undeclared empty
   # parent; that parent must be present in both the receipt and the archive.
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
-  fs.mkdir(tarball.parent)?
-  archive.tar_create(tarball, dest, archive_paths, compression: "gz", overwrite: true)?
+  fs.mkdir(tarball.parent)
+  archive.tar_create(tarball, dest, archive_paths, compression: "gz", overwrite: true)
 }

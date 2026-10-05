@@ -140,7 +140,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Step 2: generate bootstrap headers — replaces cmake's bootstrap shell script.
   # All values are precomputed for Clang + musl on aarch64 and x86_64.
   let bsdir = p"Bootstrap.cmk"
-  fs.mkdir(bsdir)?
+  fs.mkdir(bsdir)
 
   let version_parts = ver.split(".")
 
@@ -151,7 +151,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 #define CMake_VERSION_PATCH {version_parts[2]}
 #define CMake_VERSION "{ver}"
 """,
-  )?
+  )
 
   let src_dir = fs.cwd()?
 
@@ -165,9 +165,9 @@ export proc build(dest: Path) [fs, process, env, error] {
 #define CM_FALLTHROUGH
 #define CMAKE_BOOTSTRAP_NINJA
 """,
-  )?
+  )
 
-  fs.write(fp"{bsdir}/cmSTL.hxx", "")?
+  fs.write(fp"{bsdir}/cmSTL.hxx", "")
 
   # cmThirdParty.h: only #pragma once when using bundled libs (no system libs).
   # cmake's bootstrap only adds #define CMAKE_USE_SYSTEM_* when system libs are found.
@@ -175,7 +175,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{bsdir}/cmThirdParty.h",
     """#pragma once
 """,
-  )?
+  )
 
   # Generate kwsys headers from *.in templates (cmake's bootstrap processes these
   # with sed; we use configure.substitute). All values precomputed for Clang + musl.
@@ -206,7 +206,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     ],
   ]
 
-  fs.mkdir(fp"{bsdir}/cmsys")?
+  fs.mkdir(fp"{bsdir}/cmsys")
 
   for hdr in [
     "Configure.h",
@@ -223,12 +223,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     "System.h",
     "SystemTools.hxx",
   ] {
-    configure.substitute(fp"Source/kwsys/{hdr}.in", fp"{bsdir}/cmsys/{hdr}", kwsys_subs)?
+    configure.substitute(fp"Source/kwsys/{hdr}.in", fp"{bsdir}/cmsys/{hdr}", kwsys_subs)
   }
 
   # Step 3: compile bootstrap cmake from source. No sh, no configure, no make.
   # Source categories from CMAKE_*_SOURCES in cmake's bootstrap script.
-  fs.mkdir(fp"{bsdir}/obj")?
+  fs.mkdir(fp"{bsdir}/obj")
 
   # Pre-combined flag lists (XSH has no list concat, so build them explicitly).
   # Linux system flags + cmake bootstrap flags + includes
@@ -901,7 +901,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     tasks = [{...task, env: bootstrap_task_env} for task in tasks]
   }
 
-  make.run_tasks(tasks, make.jobs()?)?
+  make.run_tasks(tasks, make.jobs()?)
 
   # Step 5: generate InitialCacheFlags.cmake — passed as -C to bootstrap cmake.
   # The bootstrap script generates this to configure install paths and features.
@@ -926,7 +926,7 @@ set (BUILD_MAN_PAGES OFF CACHE BOOL "Build man pages." FORCE)
 set (CMAKE_BUILD_WITH_INSTALL_RPATH ON CACHE BOOL "Use install rpath in the build tree." FORCE)
 set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search path." FORCE)
 """,
-  )?
+  )
 
   # Step 6: run bootstrap cmake with Ninja generator, then build with samu.
   # No Alpine make required — samu is a mkdep and on PATH via /build-env.
@@ -934,7 +934,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
   let jobs = make.jobs()?
   let jobs_flag = f"-j{jobs}"
   let build_dir = p"cmake-build"
-  fs.mkdir(build_dir)?
+  fs.mkdir(build_dir)
 
   env ({
     LD_LIBRARY_PATH: bootstrap_ld_library_path,

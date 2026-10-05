@@ -17,15 +17,15 @@ proc repository_with_seeds(ctx: TestContext, name: Str) [fs, error] -> Result[Pa
   let root = test.temp_dir(ctx, name:)?
 
   for entry in ["packages", "pm", "pm.xsh", "xinit"] {
-    fs.symlink(fp"{checkout}/{entry}", fp"{root}/{entry}")?
+    fs.symlink(fp"{checkout}/{entry}", fp"{root}/{entry}")
   }
 
   for arch in ["aarch64", "x86_64"] {
     let seed = fp"{root}/.out/seed/{arch}"
-    fs.mkdir(seed)?
+    fs.mkdir(seed)
 
     for product in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json"] {
-      fs.write(fp"{seed}/{product}", f"fixture {arch} {product}\n")?
+      fs.write(fp"{seed}/{product}", f"fixture {arch} {product}\n")
     }
   }
 
@@ -33,7 +33,7 @@ proc repository_with_seeds(ctx: TestContext, name: Str) [fs, error] -> Result[Pa
 }
 
 proc rebuild_seed(root: Path, arch: Str) [fs, error] {
-  fs.write(fp"{root}/.out/seed/{arch}/xsh", f"rebuilt {arch} xsh\n")?
+  fs.write(fp"{root}/.out/seed/{arch}/xsh", f"rebuilt {arch} xsh\n")
 }
 
 proc plan_for(
@@ -71,7 +71,7 @@ test test_seed_rebuild_changes_only_the_xsh_key [fs, env, error] { |ctx|
     assert name in [node.name for node in before.nodes]
   }
 
-  rebuild_seed(root, "aarch64")?
+  rebuild_seed(root, "aarch64")
   assert changed_key_names(before, plan_repository(root, types.target_aarch64())?)? == ["xsh"]
 }
 
@@ -80,8 +80,8 @@ test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
   let arm_before = plan_repository(root, types.target_aarch64())?
   let x86_before = plan_repository(root, types.target_x86_64())?
 
-  rebuild_seed(root, "x86_64")?
-  test.eq(changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)?, [])?
+  rebuild_seed(root, "x86_64")
+  test.eq(changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)?, [])
   assert changed_key_names(x86_before, plan_repository(root, types.target_x86_64())?)? == ["xsh"]
 }
 

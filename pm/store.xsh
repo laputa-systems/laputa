@@ -76,7 +76,7 @@ proc require_sha256(value: Str, label: Str) [error] {
 }
 
 proc require_key(key: Str) [error] {
-  require_sha256(key, "artifact key")?
+  require_sha256(key, "artifact key")
 }
 
 pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
@@ -164,8 +164,8 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
     return Err(types.PmError.PackageContract(f"unsupported artifact receipt format {value.format}"))
   }
 
-  require_key(expected_key)?
-  require_key(value.key)?
+  require_key(expected_key)
+  require_key(value.key)
 
   if value.key != expected_key {
     return Err(types.PmError.PackageContract(f"artifact receipt key {value.key} does not match {expected_key}"))
@@ -183,17 +183,17 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
     return Err(types.PmError.PackageContract("artifact receipt package_id is invalid"))
   }
 
-  require_sha256(value.recipe_sha256, "artifact receipt recipe_sha256")?
-  require_sha256(value.executor_sha256, "artifact receipt executor_sha256")?
-  require_sha256(value.payload_sha256, "artifact receipt payload_sha256")?
-  require_sha256(value.metadata_sha256, "artifact receipt metadata_sha256")?
-  require_sha256(value.proof_key, "artifact receipt proof_key")?
-  require_sha256(value.proof_sha256, "artifact receipt proof_sha256")?
+  require_sha256(value.recipe_sha256, "artifact receipt recipe_sha256")
+  require_sha256(value.executor_sha256, "artifact receipt executor_sha256")
+  require_sha256(value.payload_sha256, "artifact receipt payload_sha256")
+  require_sha256(value.metadata_sha256, "artifact receipt metadata_sha256")
+  require_sha256(value.proof_key, "artifact receipt proof_key")
+  require_sha256(value.proof_sha256, "artifact receipt proof_sha256")
 
   var seen: Map[Bool] = {}
 
   for dependency_key in value.dependency_keys {
-    require_sha256(dependency_key, "artifact receipt dependency key")?
+    require_sha256(dependency_key, "artifact receipt dependency key")
 
     if dependency_key in seen {
       return Err(types.PmError.PackageContract(f"artifact receipt repeats dependency key {dependency_key}"))
@@ -205,7 +205,7 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) [error] {
   var seen_runtime: Map[Bool] = {}
 
   for dependency_key in value.runtime_dependency_keys {
-    require_sha256(dependency_key, "artifact receipt runtime dependency key")?
+    require_sha256(dependency_key, "artifact receipt runtime dependency key")
 
     if ! (dependency_key in seen) {
       return Err(
@@ -237,7 +237,7 @@ proc read_receipt(dir: Path, expected_key: Str) [fs, error] -> Result[types.Arti
   }
 
   let value = receipt_from_dto(raw.require()?, dir)?
-  validate_receipt(value, expected_key)?
+  validate_receipt(value, expected_key)
 
   if ! fs.exists(payload_path(dir))? or ! fs.exists(metadata_path(dir))? or ! fs.exists(proof_path(dir))? {
     return Err(types.PmError.PackageContract(f"artifact {expected_key} is incomplete"))
@@ -280,11 +280,11 @@ proc receipt_for(
   executor_sha256: Str,
   origin: types.ArtifactOrigin,
 ) [fs, error] -> Result[types.ArtifactReceipt] {
-  require_key(node.artifact_key)?
-  require_sha256(node.recipe_sha256, "plan node recipe_sha256")?
-  require_sha256(node.proof_key, "plan node proof_key")?
-  require_sha256(executor_sha256, "staged executor_sha256")?
-  require_sha256(payload_sha256, "staged payload_sha256")?
+  require_key(node.artifact_key)
+  require_sha256(node.recipe_sha256, "plan node recipe_sha256")
+  require_sha256(node.proof_key, "plan node proof_key")
+  require_sha256(executor_sha256, "staged executor_sha256")
+  require_sha256(payload_sha256, "staged payload_sha256")
 
   let payload = payload_path(dir)
   let metadata = metadata_path(dir)
@@ -314,13 +314,13 @@ proc receipt_for(
 }
 
 proc write_receipt(dir: Path, value: types.ArtifactReceipt) [fs, error] {
-  fs.write(receipt_path(dir), json.encode(receipt_dto(value))? + "\n")?
+  fs.write(receipt_path(dir), json.encode(receipt_dto(value))? + "\n")
 }
 
 proc copy_staged(dir: Path, staged: types.StagedArtifact) [fs, error] {
-  fs.copy(staged.payload, payload_path(dir))?
-  fs.copy(staged.metadata, metadata_path(dir))?
-  fs.copy(staged.proof, proof_path(dir))?
+  fs.copy(staged.payload, payload_path(dir))
+  fs.copy(staged.metadata, metadata_path(dir))
+  fs.copy(staged.proof, proof_path(dir))
 }
 
 proc commit_locked(
@@ -345,18 +345,18 @@ proc commit_locked(
   }
 
   let temporary = temporary_path(root, key)
-  fs.remove(temporary, missing_ok: true)?
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.mkdir(temporary)?
-  copy_staged(temporary, staged)?
+  fs.mkdir(temporary)
+  copy_staged(temporary, staged)
   # The staged payload digest was computed when the payload was produced or
   # downloaded; hashing the copy again would only re-read the same bytes.
   let value = receipt_for(target, node, temporary, staged.payload_sha256, staged.executor_sha256, origin)?
 
   # artifact.json is intentionally the final temporary write: a directory with it is complete.
-  write_receipt(temporary, value)?
-  fs.mkdir(final_dir.parent)?
-  fs.rename(temporary, final_dir)?
+  write_receipt(temporary, value)
+  fs.mkdir(final_dir.parent)
+  fs.rename(temporary, final_dir)
   read_receipt(final_dir, key)
 }
 
@@ -372,9 +372,9 @@ proc commit_staged(
   }
 
   let key = node.artifact_key
-  require_key(key)?
+  require_key(key)
   let lock_file = lock_path(root, key)
-  fs.mkdir(lock_file.parent)?
+  fs.mkdir(lock_file.parent)
   let lock = fs.lock(lock_file)?
   defer fs.unlock(lock)?
   commit_locked(target, root, node, staged, origin)?
@@ -387,7 +387,7 @@ proc fetch_remote_object(
   expected_sha256: Str,
   label: Str,
 ) [fs, net, error] {
-  require_sha256(expected_sha256, f"remote {label} SHA-256")?
+  require_sha256(expected_sha256, f"remote {label} SHA-256")
   let failure = remote.try_fetch_repo_file(remote_repo, util.ensure_relative_path(rel, f"remote {label}")?, cache_path)?
 
   return Err(types.PmError.RemoteFetch(failure)) when failure != ""
@@ -395,7 +395,7 @@ proc fetch_remote_object(
   let actual = hash.sha256(cache_path)?.hex()
 
   if actual != expected_sha256 {
-    fs.remove(cache_path, missing_ok: true)?
+    fs.remove(cache_path, missing_ok: true)
     return Err(types.PmError.RemoteFetch(f"remote {label} SHA-256 mismatch: expected {expected_sha256}, got {actual}"))
   }
 }
@@ -414,7 +414,7 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) [fs, error] ->
   } else {
     hash.sha256(metadata)?.hex()
   }
-  require_sha256(value, "remote metadata executor_sha256")?
+  require_sha256(value, "remote metadata executor_sha256")
   value
 }
 
@@ -424,14 +424,14 @@ proc remote_staged_artifact_for(
   remote_repo: Str,
   cache: Path,
 ) [fs, net, error] -> Result[types.StagedArtifact] {
-  require_key(node.artifact_key)?
+  require_key(node.artifact_key)
   let cache_dir = fp"{cache}/{node.artifact_key}"
   let payload = fp"{cache_dir}/payload.tar.gz"
   let metadata = fp"{cache_dir}/metadata.json"
   let proof = fp"{cache_dir}/proof.json"
-  fs.mkdir(cache_dir)?
-  fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")?
-  fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")?
+  fs.mkdir(cache_dir)
+  fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")
+  fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
   let executor_sha256 = remote_executor_sha256(metadata, node)?
   # fetch_remote_object verified the payload against this digest.
   let payload_sha256 = retrieval.tarball_sha256
@@ -445,7 +445,7 @@ proc remote_staged_artifact_for(
       proof_input_sha256: node.proof_sha256,
       metadata_sha256: retrieval.metadata_sha256,
     })? + "\n",
-  )?
+  )
   {payload, payload_sha256, metadata, proof, executor_sha256}
 }
 
@@ -472,7 +472,7 @@ export pure artifact_path(root: Path, key: Str) -> Path {
 ## A final directory appears only through `commit`, which recorded those hashes; use
 ## `verify_artifact` where an artifact must be re-checked against its receipt.
 export proc lookup(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt, Error] {
-  require_key(key)?
+  require_key(key)
   let final_dir = artifact_path(root, key)
 
   if ! fs.exists(final_dir)? {
@@ -515,9 +515,9 @@ export proc import_remote(
   }
 
   let key = node.artifact_key
-  require_key(key)?
+  require_key(key)
   let lock_file = lock_path(root, key)
-  fs.mkdir(lock_file.parent)?
+  fs.mkdir(lock_file.parent)
   let lock = fs.lock(lock_file)?
   defer fs.unlock(lock)?
 
@@ -538,7 +538,7 @@ export proc import_remote(
 ## Verifies a completed artifact receipt, its key, and hashes of payload, metadata, and proof objects.
 ## XSH currently lowers exported user-module procedures into one runtime symbol table: keeping this as `verify` would collide with the required `root.verify` when root imports this module. `verify_artifact` is therefore the unambiguous store boundary; no `verify` alias may be added.
 export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt, Error] {
-  require_key(key)?
+  require_key(key)
   let final_dir = artifact_path(root, key)
 
   if ! fs.exists(final_dir)? {
@@ -579,7 +579,7 @@ export type StoreGcResult = {artifacts: Int, kept: Int}
 ## Remove every artifact not in `keep`, with its proofs, lock, and temporary state.
 export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult, Error] {
   for key in keep {
-    require_key(key)?
+    require_key(key)
   }
 
   let kept: Map[Bool] = {key: true for key in keep}
@@ -595,9 +595,9 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
       }
 
       # fs.remove deletes a directory tree without following symlinks.
-      fs.remove(entry.path)?
-      fs.remove(fp"{store_layout(root)}/proofs/{entry.name}", missing_ok: true)?
-      fs.remove(lock_path(root, entry.name), missing_ok: true)?
+      fs.remove(entry.path)
+      fs.remove(fp"{store_layout(root)}/proofs/{entry.name}", missing_ok: true)
+      fs.remove(lock_path(root, entry.name), missing_ok: true)
       removed += 1
     }
   }
@@ -606,7 +606,7 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
 
   if fs.exists(temporary)? {
     for entry in fs.children(temporary)? {
-      fs.remove(entry.path)?
+      fs.remove(entry.path)
     }
   }
 

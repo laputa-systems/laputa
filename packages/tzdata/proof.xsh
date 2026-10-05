@@ -52,22 +52,22 @@ const expected = [
 const tables = ["iso3166.tab", "leap-seconds.list", "leapseconds", "zone.tab", "zone1970.tab", "zonenow.tab"]
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "tzdata")?
+  proof.package_metadata(root, "tzdata")
   let zoneinfo = fp"{root}/usr/share/zoneinfo"
 
   for table in tables {
-    proof.ensure(fs.exists(fp"{zoneinfo}/{table}")?, "tzdata-tables", f"missing {table}")?
+    proof.ensure(fs.exists(fp"{zoneinfo}/{table}")?, "tzdata-tables", f"missing {table}")
   }
 
   let zone1970 = fp"{zoneinfo}/zone1970.tab".read_text()?
-  proof.ensure("\tEurope/Berlin\t" in zone1970, "tzdata-tables", "zone1970.tab lacks Europe/Berlin")?
+  proof.ensure("\tEurope/Berlin\t" in zone1970, "tzdata-tables", "zone1970.tab lacks Europe/Berlin")
 
   let tzif = fs.walk(zoneinfo) |> where .kind == "file" and ! .name.ends_with(".tab") and .name != "leapseconds" and .name != "leap-seconds.list"
-  proof.ensure(tzif.len() == 598, "tzdata-zones", f"expected 598 TZif files, found {tzif.len()}")?
+  proof.ensure(tzif.len() == 598, "tzdata-zones", f"expected 598 TZif files, found {tzif.len()}")
 
   for entry in tzif {
     let magic = entry.path.read_bytes()?.slice(0, 4)
-    proof.ensure(magic == b"TZif", "tzdata-zones", f"{entry.path} is not a TZif file")?
+    proof.ensure(magic == b"TZif", "tzdata-zones", f"{entry.path} is not a TZif file")
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -77,20 +77,20 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-tzdata"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-tzdata.c", program)?
+  fs.write(fp"{tmp}/proof-tzdata.c", program)
   let binary = fp"{tmp}/proof-tzdata"
   run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary ?
 
   for case in expected {
     let tz = fp"{zoneinfo}/{case.zone}".display()
     let out = run.text TZ=$tz $binary ?
-    proof.ensure(out == case.output, "tzdata-localtime", f"{case.zone}: unexpected local time:\n{out}")?
+    proof.ensure(out == case.output, "tzdata-localtime", f"{case.zone}: unexpected local time:\n{out}")
   }
 
   print "tzdata ok: 598 TZif zones, tables, Berlin/New York/Tokyo offsets and DST names"
 }
 
-main(@args)?
+main(@args)

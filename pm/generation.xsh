@@ -132,8 +132,8 @@ proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
 }
 
 proc generation_validate_profile(value: types.GenerationProfile) [error] {
-  generation_require_profile_name(value.name)?
-  generation_require_sha256(value.overlay_sha256, "generation overlay_sha256")?
+  generation_require_profile_name(value.name)
+  generation_require_sha256(value.overlay_sha256, "generation overlay_sha256")
   let replacements = generation_sorted_unique(value.replacements)
 
   if replacements != value.replacements {
@@ -141,7 +141,7 @@ proc generation_validate_profile(value: types.GenerationProfile) [error] {
   }
 
   for replacement in value.replacements {
-    generation_require_overlay_path(replacement, "generation profile replacement")?
+    generation_require_overlay_path(replacement, "generation profile replacement")
 
     if replacement == "overlay.json" or replacement == "var/lib/laputa/generation.json" or replacement == "var/lib/laputa/root.json" {
       return Err(types.PmError.PackageContract(f"generation profile may not replace reserved {replacement}"))
@@ -185,8 +185,8 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
     return Err(types.PmError.PackageContract("generation plan has an unsupported target"))
   }
 
-  generation_require_sha256(value.build_plan_sha256, "generation build_plan_sha256")?
-  generation_validate_profile(value.profile)?
+  generation_require_sha256(value.build_plan_sha256, "generation build_plan_sha256")
+  generation_validate_profile(value.profile)
 
   let canonical_roots = generation_sorted_unique(value.runtime_roots)
 
@@ -203,7 +203,7 @@ proc generation_validate_plan(value: types.GenerationPlan) [error] {
       return Err(types.PmError.PackageContract("generation artifact package identity is incomplete"))
     }
 
-    generation_require_sha256(artifact.artifact_key, f"generation artifact {artifact.package_name} key")?
+    generation_require_sha256(artifact.artifact_key, f"generation artifact {artifact.package_name} key")
 
     if artifact.package_name in names or artifact.artifact_key in keys {
       return Err(types.PmError.PackageContract(f"generation plan repeats artifact {artifact.package_name}"))
@@ -287,8 +287,8 @@ export proc plan_profile(
   runtime_roots: List[Str],
   profile: types.GenerationProfile,
 ) [error] -> Result[types.GenerationPlan, Error] {
-  build_plan.validate(value)?
-  generation_validate_profile(profile)?
+  build_plan.validate(value)
+  generation_validate_profile(profile)
   let roots = generation_sorted_unique(runtime_roots)
 
   if roots.len() == 0 {
@@ -305,7 +305,7 @@ export proc plan_profile(
     generation_sha256: "",
   )
   let planned = {...bare, generation_sha256: generation_digest(bare)?}
-  generation_validate_plan(planned)?
+  generation_validate_plan(planned)
   planned
 }
 
@@ -337,16 +337,16 @@ proc generation_plan_from_dto(value: GenerationPlanDto) [error] -> Result[types.
 
 ## Atomically writes the validated runtime-only generation plan as a durable JSON value.
 export proc write_generation_plan(path_value: Path, value: types.GenerationPlan) [fs, error] {
-  generation_validate_plan(value)?
-  fs.mkdir(path_value.parent)?
-  fs.write_atomic(path_value, json.encode(generation_plan_dto(value))? + "\n")?
+  generation_validate_plan(value)
+  fs.mkdir(path_value.parent)
+  fs.write_atomic(path_value, json.encode(generation_plan_dto(value))? + "\n")
 }
 
 ## Reads a saved generation plan and verifies its canonical content identity.
 export proc read_generation_plan(path_value: Path) [fs, error] -> Result[types.GenerationPlan, Error] {
   let dto = json.read(path_value)?.require(GenerationPlanDto)?
   let value = generation_plan_from_dto(dto)?
-  generation_validate_plan(value)?
+  generation_validate_plan(value)
   value
 }
 
@@ -369,7 +369,7 @@ export proc overlay_profile(overlay_root: Path) [fs, error] -> Result[types.Gene
   }
 
   let profile = {name: dto.profile, overlay_sha256: overlay_digest(overlay_root)?, replacements: dto.replacements}
-  generation_validate_profile(profile)?
+  generation_validate_profile(profile)
   profile
 }
 
@@ -388,7 +388,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
   for entry in fs.walk(overlay_root, gitignore: false, hidden: true) |> sort-by .path {
     let relative = entry.path.strip_prefix(overlay_root)?.display()
     continue when relative == "."
-    generation_require_overlay_path(relative, "generation overlay path")?
+    generation_require_overlay_path(relative, "generation overlay path")
 
     if relative == ".git" or relative.starts_with(".git/") {
       return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
@@ -403,7 +403,7 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
       lines += [f"dir\t{generation_canonical_field(relative)}\t{mode}"]
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
-      generation_validate_symlink_target(relative, target)?
+      generation_validate_symlink_target(relative, target)
       lines += [f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}"]
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
@@ -423,7 +423,7 @@ proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[G
   for entry in fs.walk(overlay_root, gitignore: false, hidden: true) |> sort-by .path {
     let relative = entry.path.strip_prefix(overlay_root)?.display()
     continue when relative == "." or relative == "overlay.json"
-    generation_require_overlay_path(relative, "generation overlay path")?
+    generation_require_overlay_path(relative, "generation overlay path")
 
     if relative == ".git" or relative.starts_with(".git/") {
       return Err(types.PmError.PackageContract("generation overlay may not contain .git"))
@@ -440,7 +440,7 @@ proc generation_overlay_entries(overlay_root: Path) [fs, error] -> Result[List[G
       entries += [{path: relative, source: entry.path, kind: "dir", mode, sha256: "", target: ""}]
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
-      generation_validate_symlink_target(relative, target)?
+      generation_validate_symlink_target(relative, target)
       entries += [{path: relative, source: entry.path, kind: "symlink", mode, sha256: "", target}]
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
@@ -583,22 +583,22 @@ proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlay
           )
         }
       } else {
-        fs.mkdir(destination)?
+        fs.mkdir(destination)
       }
 
-      fs.chmod(destination, entry.mode)?
+      fs.chmod(destination, entry.mode)
     } else {
-      fs.mkdir(destination.parent)?
+      fs.mkdir(destination.parent)
 
       if fs.exists(destination)? {
-        fs.remove(destination)?
+        fs.remove(destination)
       }
 
       if entry.kind == "file" {
-        fs.copy(entry.source, destination)?
-        fs.chmod(destination, entry.mode)?
+        fs.copy(entry.source, destination)
+        fs.chmod(destination, entry.mode)
       } else if entry.kind == "symlink" {
-        fs.symlink(fp"{entry.target}", destination)?
+        fs.symlink(fp"{entry.target}", destination)
       } else {
         return Err(types.PmError.PackageContract(f"generation overlay has invalid entry {entry.path}"))
       }
@@ -657,15 +657,15 @@ proc generation_validate_receipt(value: types.GenerationReceipt) [error] {
     return Err(types.PmError.PackageContract(f"unsupported generation receipt format {value.format}"))
   }
 
-  generation_require_sha256(value.root_sha256, "generation root_sha256")?
-  generation_validate_plan(receipt_plan)?
+  generation_require_sha256(value.root_sha256, "generation root_sha256")
+  generation_validate_plan(receipt_plan)
 }
 
 proc generation_receipt_for(
   value: types.GenerationPlan,
   root_receipt: types.RootReceipt,
 ) [error] -> Result[types.GenerationReceipt] {
-  generation_validate_plan(value)?
+  generation_validate_plan(value)
 
   if root_receipt.target != value.target {
     return Err(types.PmError.PackageContract("generation root receipt target does not match the generation plan"))
@@ -688,7 +688,7 @@ proc generation_receipt_for(
 export proc read_generation_receipt_file(receipt_path: Path) [fs, error] -> Result[types.GenerationReceipt, Error] {
   let dto = json.read(receipt_path)?.require(GenerationReceiptDto)?
   let receipt = generation_receipt_from_dto(dto)?
-  generation_validate_receipt(receipt)?
+  generation_validate_receipt(receipt)
   receipt
 }
 
@@ -704,7 +704,7 @@ export proc compose(
   output_root: Path,
   overlay_root: Path,
 ) [fs, error] -> Result[types.GenerationReceipt, Error] {
-  generation_validate_plan(value)?
+  generation_validate_plan(value)
   let actual_overlay_sha256 = overlay_digest(overlay_root)?
 
   if actual_overlay_sha256 != value.profile.overlay_sha256 {
@@ -720,29 +720,29 @@ export proc compose(
   let artifacts = generation_store_artifacts(value, store_root)?
   let root_plan = pm_root.preflight(value.target, artifacts)?
   let entries = generation_overlay_entries(overlay_root)?
-  generation_preflight_overlay(entries, root_plan, value.profile)?
+  generation_preflight_overlay(entries, root_plan, value.profile)
 
   if fs.exists(output_root)? {
     return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 
   let temporary = fp"{output_root}.tmp"
-  fs.remove(temporary, missing_ok: true)?
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
   let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
-  generation_apply_overlay(temporary, entries)?
+  generation_apply_overlay(temporary, entries)
   let receipt = generation_receipt_for(value, root_receipt)?
   let receipt_path = generation_receipt_path(temporary)
-  fs.mkdir(receipt_path.parent)?
-  fs.write(receipt_path, json.encode(generation_receipt_dto(receipt))? + "\n")?
+  fs.mkdir(receipt_path.parent)
+  fs.write(receipt_path, json.encode(generation_receipt_dto(receipt))? + "\n")
   let stored = read_generation_receipt(temporary)?
 
   if stored != receipt {
     return Err(types.PmError.PackageContract("generation receipt changed while composing"))
   }
 
-  fs.mkdir(output_root.parent)?
-  fs.rename(temporary, output_root)?
+  fs.mkdir(output_root.parent)
+  fs.rename(temporary, output_root)
   let final_receipt = read_generation_receipt(output_root)?
 
   if final_receipt != receipt {
@@ -754,7 +754,7 @@ export proc compose(
 
 ## Verifies that a completed generation still carries its exact immutable receipt.
 export proc verify_generation(output_root: Path, expected: types.GenerationReceipt) [fs, error] {
-  generation_validate_receipt(expected)?
+  generation_validate_receipt(expected)
   let stored = read_generation_receipt(output_root)?
 
   if stored != expected {

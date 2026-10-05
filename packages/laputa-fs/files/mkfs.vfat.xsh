@@ -158,7 +158,7 @@ proc main(...argv: List[Str]) [fs, error] {
     return Err(FatToolError.Failed(kind: "usage", message: "usage: mkfs.vfat [-n LABEL] IMAGE"))
   }
 
-  format_fat16(fp"{opts.image[0]}", opts.label)?
+  format_fat16(fp"{opts.image[0]}", opts.label)
 }
 
-main(@args)?
+main(@args)

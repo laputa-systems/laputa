@@ -558,7 +558,7 @@ proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
     return Err(WlrootsError.Patch(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  fs.write(file, text.replace(old, new))?
+  fs.write(file, text.replace(old, new))
 }
 
 # Port of render/gles2/shaders/embed.sh: the shader source as a
@@ -577,13 +577,13 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) [fs, error] {
   }
 
   lines += ["\t0x00,", "};", ""]
-  fs.write(dest, lines.join("\n"))?
+  fs.write(dest, lines.join("\n"))
 }
 
 proc write_shader_headers() [fs, error] {
   for name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
     let symbol = f"{name.replace(".", "_")}_src"
-    write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)?
+    write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)
   }
 }
 
@@ -620,12 +620,12 @@ const char *get_pnp_manufacturer(const char code[static 3]) {{
 
 proc write_pnpids(root: Str) [fs, error] {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  fs.write(p"backend/drm/pnpids.c", pnpids_source(pnp.read_text()?)?)?
+  fs.write(p"backend/drm/pnpids.c", pnpids_source(pnp.read_text()?)?)
 }
 
 proc patch_build(root: Str) [fs, error] {
-  write_pnpids(root)?
-  write_shader_headers()?
+  write_pnpids(root)
+  write_shader_headers()
 
   replace_required(
     p"meson.build",
@@ -634,7 +634,7 @@ rt = cc.find_library('rt')""",
     """# musl packages libm as a libc symlink and provides realtime interfaces in libc.
 math = declare_dependency(link_args: ['-lm'])
 rt = declare_dependency()""",
-  )?
+  )
 
   replace_required(
     p"backend/drm/meson.build",
@@ -649,14 +649,14 @@ rt = declare_dependency()""",
 """,
     """pnpids_c = files('pnpids.c')
 """,
-  )?
+  )
 
   replace_required(
     p"protocol/meson.build",
     """	'xwayland-shell-v1': wl_protocol_dir / 'staging/xwayland-shell/xwayland-shell-v1.xml',
 """,
     "",
-  )?
+  )
 
   replace_required(
     p"render/gles2/renderer.c",
@@ -672,12 +672,12 @@ rt = declare_dependency()""",
 #include "shaders/tex_rgbx_frag_src.h"
 #include "shaders/tex_external_frag_src.h"
 """,
-  )?
+  )
 
   let shader_meson = p"render/gles2/shaders/meson.build"
 
   replace_required(shader_meson, """embed = find_program('./embed.sh', native: true)
-""", "")?
+""", "")
 
   replace_required(
     shader_meson,
@@ -692,15 +692,15 @@ rt = declare_dependency()""",
 """,
     """	wlr_files += files(output)
 """,
-  )?
+  )
 }
 
 proc prune_xwayland_headers(root: Path) [fs, error] {
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h", missing_ok: true)?
-  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland.h", missing_ok: true)
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/server.h", missing_ok: true)
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/shell.h", missing_ok: true)
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland/xwayland.h", missing_ok: true)
+  fs.remove(fp"{root}/usr/include/wlroots-0.20/wlr/xwayland", missing_ok: true)
 }
 
 ## Package recipe export.
@@ -718,7 +718,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   let root = e"LAPUTA_ROOT" ?? "/"
-  patch_build(root)?
+  patch_build(root)
 
   env ({
     LD_LIBRARY_PATH: native_tools_ld,
@@ -736,7 +736,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
-      fs.write(ninja, ninja_text)?
+      fs.write(ninja, ninja_text)
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -748,5 +748,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  prune_xwayland_headers(dest)?
+  prune_xwayland_headers(dest)
 }

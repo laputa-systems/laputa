@@ -1405,7 +1405,7 @@ Options:
   --debug, --verbose        accepted compatibility aliases
   --help                    show this help
   --version                 show version
-""")?
+""")
 }
 
 proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
@@ -1430,11 +1430,11 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
     }
 
     if token.kind == "long" and token.name == "help" {
-      usage()?
+      usage()
       exit 0
     } else if token.kind == "long" and token.name == "version" {
       io.write_stdout("""bison.xsh 0.1
-""")?
+""")
       exit 0
     } else if token.name == "d" or token.name == "defines" {
       defines = true
@@ -1492,17 +1492,17 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
 
   if unsupported != "" {
     if upstream_disabled() {
-      fs.write(fp"{opt.output}", generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)?
+      fs.write(fp"{opt.output}", generate_linux_stub_c(opt.output, decls, prologue, epilogue)?)
 
       if opt.defines {
         let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-        fs.write(fp"{header}", generate_linux_header(decls, tokens)?)?
+        fs.write(fp"{header}", generate_linux_header(decls, tokens)?)
       }
 
       return
     }
 
-    run_upstream_bison(argv, unsupported)?
+    run_upstream_bison(argv, unsupported)
     return
   }
 
@@ -1510,16 +1510,16 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let start = parse_start_symbol(decls, rules[0].lhs)
   let code = generate_c(tokens, rules, start, prologue, epilogue)?
   let out = fp"{opt.output}"
-  fs.write(out, code)?
+  fs.write(out, code)
 
   if opt.defines {
     let header = if opt.defines_file != "" { opt.defines_file } else { opt.output.replace(".c", ".h") }
-    fs.write(fp"{header}", generate_header(tokens)?)?
+    fs.write(fp"{header}", generate_header(tokens)?)
   }
 
   if opt.verbose {
-    fs.write(fp"{opt.prefix}.output", generate_verbose_report(rules, start)?)?
+    fs.write(fp"{opt.prefix}.output", generate_verbose_report(rules, start)?)
   }
 }
 
-main(args)?
+main(args)

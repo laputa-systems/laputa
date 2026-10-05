@@ -275,14 +275,14 @@ proc patch_cmake() [fs, error] {
     "",
   )
 
-  fs.write(path_value, text)?
+  fs.write(path_value, text)
 }
 
 proc create_unversioned_links() [fs, error] {
   let libdir = p"build/lib"
 
   for library_name in ["event_core", "event_extra", "event_pthreads", "event"] {
-    fs.symlink(fp"lib{library_name}-2.1.so.7.0.2", fp"{libdir}/lib{library_name}.so")?
+    fs.symlink(fp"lib{library_name}-2.1.so.7.0.2", fp"{libdir}/lib{library_name}.so")
   }
 }
 
@@ -294,7 +294,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # The upstream helper's WORKING_DIRECTORY makes CMake emit a shell `cd`,
   # which is not available in the package build environment.
-  patch_cmake()?
+  patch_cmake()
 
   let cmake_args = [
     "-G",
@@ -315,7 +315,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   run $cmake ${cmake_args} ?
   run $samu "-C" "build" $jobs_flag ?
-  create_unversioned_links()?
+  create_unversioned_links()
 
   env ({
     DESTDIR: dest,

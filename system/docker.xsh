@@ -48,8 +48,8 @@ export proc build_config(laputa_root: Path, profile_name: Str, arch: Str) [fs, p
   let seed_arch = xsh_seed.xsh_seed_arch(arch)?
   let seed = xsh_seed.xsh_seed_require(laputa_root, arch)?
   let artifact_root = artifact_store_root(laputa_root, arch)
-  fs.mkdir(artifact_root)?
-  fs.mkdir(world.world_kbuild_cache(laputa_root))?
+  fs.mkdir(artifact_root)
+  fs.mkdir(world.world_kbuild_cache(laputa_root))
 
   let image = images.ensure_package_tools(docker, laputa_root, seed_arch)?
   DockerConfig(
@@ -149,7 +149,7 @@ export pure docker_profile_build_argv(profile: types.SystemProfile, jobs: Int) -
 
 ## Return the structured host command that executes an exact Docker invocation.
 export proc command(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] -> Result[Command, Error] {
-  fs.mkdir(value.output_root)?
+  fs.mkdir(value.output_root)
   process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root)
 }
 
@@ -163,12 +163,12 @@ export proc require_image_architecture(platform: Str, architecture: Str) [error]
 ## Reject Docker images that are not the native execution substrate.
 export proc verify_image_architecture(value: DockerConfig) [process, error] {
   let output = run.text $value.docker image inspect --format "{{.Architecture}}" $value.image ?
-  require_image_architecture(value.platform, output.trim())?
+  require_image_architecture(value.platform, output.trim())
 }
 
 ## Run a profile-owned Docker command only after the runner image proves it is native.
 export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process, error] {
-  verify_image_architecture(value)?
+  verify_image_architecture(value)
   let status = process.run(command(value, inner_argv)?)?
 
   if ! status.ok {
@@ -178,10 +178,10 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
 
 ## Run a profile build while atomically replacing its log only after Docker exits successfully.
 export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
-  verify_image_architecture(value)?
+  verify_image_architecture(value)
   let temporary = fp"{log}.tmp"
-  fs.mkdir(log.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(log.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
   let status = process.run(
     process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
@@ -191,18 +191,18 @@ export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: P
     return Err(types.LaputaError.Docker(f"Docker command failed for {value.image}"))
   }
 
-  fs.fsync(temporary)?
-  fs.rename(temporary, log, overwrite: true)?
+  fs.fsync(temporary)
+  fs.rename(temporary, log, overwrite: true)
 }
 
 ## Run the sole profile PM-plan adapter through the checked native runner.
 export proc docker_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
-  docker_run(value, docker_pm_plan_argv(profile, value.arch))?
+  docker_run(value, docker_pm_plan_argv(profile, value.arch))
 }
 
 ## Project one saved BuildPlan to its typed generation plan through the native runner.
 export proc docker_generation_plan(value: DockerConfig, profile: types.SystemProfile) [fs, process, error] {
-  docker_run(value, docker_generation_plan_argv(profile))?
+  docker_run(value, docker_generation_plan_argv(profile))
 }
 
 ## Build one complete profile image through the native runner and keep its build log transactional.
@@ -216,5 +216,5 @@ export proc docker_profile_build(
     return Err(types.LaputaError.Usage("laputa build jobs must be positive"))
   }
 
-  docker_run_logged(value, docker_profile_build_argv(profile, jobs), log)?
+  docker_run_logged(value, docker_profile_build_argv(profile, jobs), log)
 }

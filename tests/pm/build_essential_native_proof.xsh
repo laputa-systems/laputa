@@ -24,8 +24,8 @@ proc runner() [process, env, error] -> Result[Path] {
 
 proc proof_root(ctx: TestContext, target: Str) [fs, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: "build-essential-native-proof")?
-  fs.mkdir(fp"{root}/usr/bin")?
-  fs.mkdir(fp"{root}/boot")?
+  fs.mkdir(fp"{root}/usr/bin")
+  fs.mkdir(fp"{root}/boot")
 
   for tool in [
     "cc",
@@ -42,16 +42,16 @@ proc proof_root(ctx: TestContext, target: Str) [fs, error] -> Result[Path] {
       fp"{root}/usr/bin/{tool}",
       """typed proof fixture
 """,
-    )?
+    )
   }
 
   fs.write(
     fp"{root}/boot/vmlinuz",
     """typed proof kernel fixture
 """,
-  )?
-  fs.mkdir(fp"{root}/var/lib/laputa")?
-  write_root_receipt(root, target, runtime_packages())?
+  )
+  fs.mkdir(fp"{root}/var/lib/laputa")
+  write_root_receipt(root, target, runtime_packages())
   root
 }
 
@@ -73,7 +73,7 @@ proc write_root_receipt(root: Path, target: Str, packages: List[Str]) [fs, error
       entries: [],
       root_sha256: "typed-root-receipt",
     },
-  )?
+  )
 }
 
 # Proofs run with the build's XSH_PM_TARGET_ARCH, as in package-tools.
@@ -99,7 +99,7 @@ test test_build_essential_native_proof_uses_typed_root_receipt_without_legacy_db
     assert fs.exists(fp"{root}/var/lib/xsh-pm/packages")? == false
     assert run_build_essential_proof(xsh, arch, root, stderr)?.ok
 
-    write_root_receipt(root, target, [package for package in runtime_packages() if package != "linux"])?
+    write_root_receipt(root, target, [package for package in runtime_packages() if package != "linux"])
     let missing = run_build_essential_proof(xsh, arch, root, stderr)?
     assert missing.ok == false
     assert "missing linux artifact in typed root receipt" in stderr.read_text()?

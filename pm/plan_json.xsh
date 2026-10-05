@@ -215,17 +215,17 @@ proc plan_json_from_dto(value: BuildPlanDto) [error] -> Result[types.BuildPlan] 
 
 ## Atomically writes a validated BuildPlan through its JSON DTO, never through internal tag unions.
 export proc write_plan(path_value: Path, value: types.BuildPlan) [fs, error] {
-  build_plan.validate(value)?
-  fs.mkdir(path_value.parent)?
+  build_plan.validate(value)
+  fs.mkdir(path_value.parent)
   let dto = plan_json_write_dto(value)
-  fs.write_atomic(path_value, json.encode(dto)? + "\n")?
+  fs.write_atomic(path_value, json.encode(dto)? + "\n")
 }
 
 ## Compatibility spelling for the durable BuildPlan write contract.
 ## The current native-test indexed backend cannot encode a reachable exported write proc;
 ## callers use write_plan for host-independent behavior coverage until that backend limitation lifts.
 export proc write(path_value: Path, value: types.BuildPlan) [fs, error] {
-  write_plan(path_value, value)?
+  write_plan(path_value, value)
 }
 
 ## Reads a build plan through its JSON DTO and verifies every durable invariant.
@@ -245,12 +245,12 @@ export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan, Error]
 
   let dto = raw.require(BuildPlanDto)?
   let value = plan_json_from_dto(dto)?
-  build_plan.validate(value)?
+  build_plan.validate(value)
   value
 }
 
 ## Re-exports durable BuildPlan verification without colliding with `root.verify`
 ## when XSH imports modules into one runtime symbol table.
 export proc verify_plan(value: types.BuildPlan) [error] {
-  build_plan.validate(value)?
+  build_plan.validate(value)
 }

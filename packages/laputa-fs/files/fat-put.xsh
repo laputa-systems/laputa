@@ -106,16 +106,16 @@ proc main(...argv: List[Str]) [fs, error] {
   let efi_cluster = 2
   let boot_cluster = 3
   let first_file_cluster = 4
-  set_fat(image, fat_offset, fat_sectors, efi_cluster, 65535)?
-  set_fat(image, fat_offset, fat_sectors, boot_cluster, 65535)?
+  set_fat(image, fat_offset, fat_sectors, efi_cluster, 65535)
+  set_fat(image, fat_offset, fat_sectors, boot_cluster, 65535)
   var index = 0
 
   while index < file_clusters {
     let cluster = first_file_cluster + index
     let value = if index + 1 == file_clusters { 65535 } else { cluster + 1 }
-    set_fat(image, fat_offset, fat_sectors, cluster, value)?
+    set_fat(image, fat_offset, fat_sectors, cluster, value)
     let chunk = data.slice(index * cluster_size, cluster_size)
-    write_cluster(image, data_offset, cluster, chunk, cluster_size)?
+    write_cluster(image, data_offset, cluster, chunk, cluster_size)
     index += 1
   }
 
@@ -129,7 +129,7 @@ proc main(...argv: List[Str]) [fs, error] {
     efi_cluster,
     dir_block(efi_cluster, efi_cluster, [dir_entry("BOOT       ", 16, boot_cluster, 0)?], cluster_size)?,
     cluster_size,
-  )?
+  )
 
   write_cluster(
     image,
@@ -137,7 +137,7 @@ proc main(...argv: List[Str]) [fs, error] {
     boot_cluster,
     dir_block(boot_cluster, efi_cluster, [dir_entry(fat_name, 32, first_file_cluster, data.len())?], cluster_size)?,
     cluster_size,
-  )?
+  )
 }
 
-main(@args)?
+main(@args)

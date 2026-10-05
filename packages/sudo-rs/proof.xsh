@@ -4,9 +4,9 @@ use pm.util as pm_util
 error SudoRsProofError = Failed(kind: Str, message: Str)
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.target_elf(rootfs, p"usr/bin/sudo", "sudo-rs")?
-  proof.target_elf(rootfs, p"usr/bin/su", "sudo-rs")?
-  proof.target_elf(rootfs, p"usr/lib/security/pam_unix.so", "sudo-rs")?
+  proof.target_elf(rootfs, p"usr/bin/sudo", "sudo-rs")
+  proof.target_elf(rootfs, p"usr/bin/su", "sudo-rs")
+  proof.target_elf(rootfs, p"usr/lib/security/pam_unix.so", "sudo-rs")
   let readelf = proof.readelf_tool()?
   let pam_unix_so = fp"{rootfs}/usr/lib/security/pam_unix.so"
   let pam_unix = run.text $readelf "-d" $pam_unix_so ?
@@ -77,4 +77,4 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   print "sudo-rs ok"
 }
 
-main(@args)?
+main(@args)

@@ -153,11 +153,11 @@ proc write_embedded_dtd() [fs, error] {
 	{values.join(" ")}
 }}}};
 """,
-  )?
+  )
 }
 
 proc patch_python_generator(native_scanner: Str) [fs, error] {
-  write_embedded_dtd()?
+  write_embedded_dtd()
   let meson_path = p"src/meson.build"
   let text = meson_path.read_text()?
 
@@ -178,7 +178,7 @@ proc patch_python_generator(native_scanner: Str) [fs, error] {
 """,
   )
 
-  fs.write(meson_path, patched)?
+  fs.write(meson_path, patched)
   let root_meson = p"meson.build"
 
   fs.write(
@@ -196,7 +196,7 @@ proc patch_python_generator(native_scanner: Str) [fs, error] {
 	rt_dep = declare_dependency()
 """,
 ),
-  )?
+  )
 
   fs.write(
     meson_path,
@@ -204,7 +204,7 @@ proc patch_python_generator(native_scanner: Str) [fs, error] {
       "\tmathlib_dep = cc.find_library('m', required: false)",
       "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
     ),
-  )?
+  )
 
   if native_scanner != "" {
     fs.write(
@@ -220,7 +220,7 @@ endif
   f"""wayland_scanner_for_build = find_program('{native_scanner}')
 """,
 ),
-    )?
+    )
   }
 }
 
@@ -237,7 +237,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     ""
   }
 
-  patch_python_generator(native_scanner)?
+  patch_python_generator(native_scanner)
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -268,7 +268,7 @@ export proc build(dest: Path) [fs, process, env, error] {
         f" -- {scanner_text} ",
       )
 
-      fs.write(ninja, ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))?
+      fs.write(ninja, ninja_text_build_root.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -282,7 +282,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") {
-      fs.remove(entry.path, missing_ok: true)?
+      fs.remove(entry.path, missing_ok: true)
     }
   }
 }

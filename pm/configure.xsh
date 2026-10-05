@@ -27,8 +27,8 @@ export proc config_h(in_path: Path, out_path: Path, defines: Map[Str]) [fs, erro
     }
   }
 
-  fs.mkdir(out_path.parent)?
-  fs.write(out_path, out_lines.join("\n"))?
+  fs.mkdir(out_path.parent)
+  fs.write(out_path, out_lines.join("\n"))
 }
 
 # Substitutes @VAR@ placeholders in an autoconf .in file and writes the result.
@@ -44,6 +44,6 @@ export proc substitute(in_path: Path, out_path: Path, vars: List[List[Str]]) [fs
     content = content.replace(f"@{key}@", value)
   }
 
-  fs.mkdir(out_path.parent)?
-  fs.write(out_path, content)?
+  fs.mkdir(out_path.parent)
+  fs.write(out_path, content)
 }

@@ -148,20 +148,20 @@ proc read_sysdeps(path_value: Path) [fs, error] -> Result[Map[Str]] {
 
 proc write_skalibs_sysdeps(target: Str) [fs, error] {
   let sysdeps = p"skalibs/sysdeps.cfg"
-  fs.mkdir(sysdeps)?
+  fs.mkdir(sysdeps)
 
   fs.write(
     fp"{sysdeps}/target",
     f"""{target}
 """,
-  )?
+  )
 
-  fs.write(fp"{sysdeps}/pthread.lib", "")?
-  fs.write(fp"{sysdeps}/socket.lib", "")?
-  fs.write(fp"{sysdeps}/spawn.lib", "")?
-  fs.write(fp"{sysdeps}/sysclock.lib", "")?
-  fs.write(fp"{sysdeps}/timer.lib", "")?
-  fs.write(fp"{sysdeps}/util.lib", "")?
+  fs.write(fp"{sysdeps}/pthread.lib", "")
+  fs.write(fp"{sysdeps}/socket.lib", "")
+  fs.write(fp"{sysdeps}/spawn.lib", "")
+  fs.write(fp"{sysdeps}/sysclock.lib", "")
+  fs.write(fp"{sysdeps}/timer.lib", "")
+  fs.write(fp"{sysdeps}/util.lib", "")
 
   fs.write(
     fp"{sysdeps}/sysdeps",
@@ -254,7 +254,7 @@ posixspawnearlyreturn: no
 procselfexe: /proc/self/exe
 selectinfinite: yes
 """,
-  )?
+  )
 }
 
 proc write_skalibs_config() [fs, error] {
@@ -274,7 +274,7 @@ proc write_skalibs_config() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
@@ -328,7 +328,7 @@ proc write_sysdeps_h(target: Str, sysdeps: Map[Str]) [fs, error] {
   }
 
   lines += ["#endif"]
-  fs.write(p"skalibs/src/include/skalibs/sysdeps.h", lines.join("\n"))?
+  fs.write(p"skalibs/src/include/skalibs/sysdeps.h", lines.join("\n"))
 }
 
 proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sysdeps: Map[Str]) [fs, error] {
@@ -359,7 +359,7 @@ proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sy
   parts += [gen_types_internal(p"skalibs/src/headers/bits-lendian".read_text()?, "", "", bits)]
   parts += [gen_bits_template(p"skalibs/src/headers/bits-template".read_text()?, bits, dfmt, ofmt, xfmt, bfmt)]
   parts += [gen_types_internal(p"skalibs/src/headers/bits-footer".read_text()?, "", "", bits)]
-  fs.write(fp"skalibs/src/include/skalibs/uint{bits}.h", parts.join(""))?
+  fs.write(fp"skalibs/src/include/skalibs/uint{bits}.h", parts.join(""))
 }
 
 proc sysdep_bits(sysdeps: Map[Str], type_name: Str) [error] -> Result[Int] {
@@ -406,21 +406,21 @@ proc write_types_h(sysdeps: Map[Str]) [fs, error] {
   }
 
   parts += [p"skalibs/src/headers/types-footer".read_text()?]
-  fs.write(p"skalibs/src/include/skalibs/types.h", parts.join(""))?
+  fs.write(p"skalibs/src/include/skalibs/types.h", parts.join(""))
 }
 
 proc generate_skalibs_headers(target: Str) [fs, error] {
   let sysdeps = read_sysdeps(p"skalibs/sysdeps.cfg/sysdeps")?
-  write_sysdeps_h(target, sysdeps)?
-  write_uint_header(64, "21", "25", "17", "65", sysdeps)?
-  write_uint_header(32, "11", "13", "9", "33", sysdeps)?
-  write_uint_header(16, "6", "7", "5", "17", sysdeps)?
-  write_types_h(sysdeps)?
+  write_sysdeps_h(target, sysdeps)
+  write_uint_header(64, "21", "25", "17", "65", sysdeps)
+  write_uint_header(32, "11", "13", "9", "33", sysdeps)
+  write_uint_header(16, "6", "7", "5", "17", sysdeps)
+  write_types_h(sysdeps)
 
   fs.write(
     p"skalibs/src/include/skalibs/ip46.h",
     f"{p"skalibs/src/headers/ip46-header".read_text()?}{p"skalibs/src/headers/ip46-with".read_text()?}{p"skalibs/src/headers/ip46-footer".read_text()?}",
-  )?
+  )
 }
 
 proc write_mdevd_config() [fs, error] {
@@ -438,13 +438,13 @@ proc write_mdevd_config() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, error] -> Result[Path] {
-  write_skalibs_sysdeps(target)?
-  write_skalibs_config()?
-  generate_skalibs_headers(target)?
+  write_skalibs_sysdeps(target)
+  write_skalibs_config()
+  generate_skalibs_headers(target)
 
   let cflags = [
     "-pipe",
@@ -497,7 +497,7 @@ proc compile_skalibs(cc: Path, triple: Str, target: Str) [fs, process, env, erro
     deps: [],
   })
 
-  make.run_tasks(skarnet.tasks, make.jobs()?)?
+  make.run_tasks(skarnet.tasks, make.jobs()?)
   skarnet_archive
 }
 
@@ -507,7 +507,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
   let target = f"{arch}-alpine-linux-musl"
-  fs.mkdir(p"laputa-headers/linux")?
+  fs.mkdir(p"laputa-headers/linux")
 
   fs.write(
     p"laputa-headers/linux/netlink.h",
@@ -524,7 +524,7 @@ struct sockaddr_nl {
   uint32_t nl_groups;
 };
 """,
-  )?
+  )
 
   let skarnet = compile_skalibs(cc, triple, target)?
 
@@ -551,7 +551,7 @@ struct sockaddr_nl {
   ]
 
   let includes = ["-iquote", "src/include-local", "-Ilaputa-headers", "-Isrc/include", "-Iskalibs/src/include"]
-  write_mdevd_config()?
+  write_mdevd_config()
 
   let multi = make.c_multi_program({
     cc,
@@ -590,10 +590,10 @@ struct sockaddr_nl {
   }],
   })?
 
-  make.run_tasks(multi.tasks, make.jobs()?)?
+  make.run_tasks(multi.tasks, make.jobs()?)
   let mdevd_bin = multi.outputs.get("mdevd")?
   let coldplug_bin = multi.outputs.get("mdevd-coldplug")?
-  fs.install(mdevd_bin, fp"{dest}/usr/bin/mdevd", 0o755, parents: true, overwrite: true)?
-  fs.install(coldplug_bin, fp"{dest}/usr/bin/mdevd-coldplug", 0o755, parents: true, overwrite: true)?
-  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/mdevd.xsh", 0o644, parents: true, overwrite: true)?
+  fs.install(mdevd_bin, fp"{dest}/usr/bin/mdevd", 0o755, parents: true, overwrite: true)
+  fs.install(coldplug_bin, fp"{dest}/usr/bin/mdevd-coldplug", 0o755, parents: true, overwrite: true)
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/mdevd.xsh", 0o644, parents: true, overwrite: true)
 }

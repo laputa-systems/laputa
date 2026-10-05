@@ -159,7 +159,7 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
 
 #endif
 """,
-  )?
+  )
 
   let ffi_h = p"include/ffi.h.in".read_text()?.replace("@VERSION@", ver).replace("@TARGET@", target.target)
     .replace("@HAVE_LONG_DOUBLE@", "1")
@@ -168,8 +168,8 @@ proc write_generated_headers(target: LibffiTarget) [fs, error] {
     .replace("@FFI_VERSION_NUMBER@", f"{ffi_version_number()?}")
     .replace("@FFI_EXEC_TRAMPOLINE_TABLE@", "0")
 
-  fs.write(p"include/ffi.h", ffi_h)?
-  fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)?
+  fs.write(p"include/ffi.h", ffi_h)
+  fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)
 }
 
 # Upstream's Makefile preprocesses libffi.map.in against fficonfig.h and the
@@ -205,8 +205,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     target.sources,
   )
 
-  write_generated_headers(target)?
-  write_version_script(cc, triple, target, defs, includes)?
+  write_generated_headers(target)
+  write_version_script(cc, triple, target, defs, includes)
 
   let libffi = make.c_shared_library({
     cc,
@@ -223,15 +223,15 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(libffi.tasks, make.jobs()?)?
-  fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.5.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so.8")?
-  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so")?
+  make.run_tasks(libffi.tasks, make.jobs()?)
+  fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.5.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so.8")
+  fs.symlink(p"libffi.so.8.5.0", fp"{dest}/usr/lib/libffi.so")
   # include/Makefile.am installs only the generated ffi.h and the target's
   # ffitarget.h; the other headers there are private to the build.
-  fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)?
-  fs.install(p"include/ffitarget.h", fp"{dest}/usr/include/ffitarget.h", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)
+  fs.install(p"include/ffitarget.h", fp"{dest}/usr/include/ffitarget.h", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/libffi.pc",
@@ -246,5 +246,5 @@ Version: {ver}
 Libs: -L${{libdir}} -lffi
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

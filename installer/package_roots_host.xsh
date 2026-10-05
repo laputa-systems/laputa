@@ -40,7 +40,7 @@ proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[S
   world.host_pm(
     repo_url,
     ["root", "compose", plan.display(), "--store", store.display(), @root_args("--runtime-root", roots), "--output", output.display()],
-  )?
+  )
 }
 
 ## Import the installer's package closure for ARCH from the mirror at REPO_URL into PACKAGES, which must not exist yet, then compose ROOTS.
@@ -66,7 +66,7 @@ export proc prepare(
     return Err(InstallerPackageHostError.Failed(f"{packages} already exists; the installer build removes it first"))
   }
 
-  fs.mkdir(packages)?
+  fs.mkdir(packages)
   let plan = fp"{packages}/build-plan.json"
   let store = fp"{packages}/store"
   # Every root the installer composes comes from one plan, so the three roots
@@ -92,11 +92,11 @@ export proc prepare(
       "--output",
       plan.display(),
     ],
-  )?
-  world.require_mirror_plan(plan, repo_url)?
-  world.host_pm(repo_url, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{jobs}"])?
+  )
+  world.require_mirror_plan(plan, repo_url)
+  world.host_pm(repo_url, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{jobs}"])
 
-  compose(repo_url, plan, store, roots.target, target_roots(kernel_package, smoke))?
-  compose(repo_url, plan, store, roots.installer, installer_roots())?
-  compose(repo_url, plan, store, roots.tools, tools_roots())?
+  compose(repo_url, plan, store, roots.target, target_roots(kernel_package, smoke))
+  compose(repo_url, plan, store, roots.installer, installer_roots())
+  compose(repo_url, plan, store, roots.tools, tools_roots())
 }

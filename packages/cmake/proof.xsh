@@ -6,9 +6,9 @@ error ScriptError = Failed(kind: Str, message: Str)
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let cmake = fp"{rootfs}/usr/bin/cmake"
-  proof.target_elf(rootfs, p"usr/bin/cmake", "cmake")?
-  proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")?
-  proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")?
+  proof.target_elf(rootfs, p"usr/bin/cmake", "cmake")
+  proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")
+  proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")
 
   if ! fs.exists(fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake")? {
     Err(ScriptError.Failed(kind: "cmake-proof", message: "missing CMake module tree"))?
@@ -29,8 +29,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   }
 
   let tmp = fp"{rootfs}/var/tmp/proof-cmake"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
 
   # Artifact proofs deliberately compose runtime edges only. `samurai` is a
@@ -48,8 +48,8 @@ proc main(...argv: List[Str]) [] {
 
 main(@args)?
 """,
-  )?
-  fs.chmod(proof_samu, 0o755)?
+  )
+  fs.chmod(proof_samu, 0o755)
 
   fs.write(
     fp"{tmp}/CMakeLists.txt",
@@ -57,9 +57,9 @@ main(@args)?
 project(laputa_cmake_runtime NONE)
 file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
 """,
-  )?
+  )
 
-  fs.mkdir(fp"{tmp}/build")?
+  fs.mkdir(fp"{tmp}/build")
 
   cd fp"{tmp}/build" {
     let cmake_args = [
@@ -88,4 +88,4 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
   } ?
 }
 
-main(@args)?
+main(@args)

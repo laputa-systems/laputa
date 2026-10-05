@@ -24,7 +24,7 @@ pure elf_machine_name(arch: Str) -> Str {
 
 proc build_root_path() [env, error] -> Result[Path] {
   let build_root_value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
-  ensure(build_root_value != "", "proof-musl", "XSH_PM_BUILD_ROOT is required for native-cross proof")?
+  ensure(build_root_value != "", "proof-musl", "XSH_PM_BUILD_ROOT is required for native-cross proof")
   fp"{build_root_value}"
 }
 
@@ -72,8 +72,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let cc = cross_cc(default_cc, build_arch, arch)?
   let readelf = process.which("readelf")?
   let tmp = fp"{rootfs}/var/tmp/proof-musl"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
   let hello_src = fp"{tmp}/hello.c"
 
@@ -87,17 +87,17 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 int (*volatile clone_entry)(int (*)(void *), void *, int, void *, ...) = clone;
 int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
 """,
-  )?
+  )
 
   # bits/syscall.h carries both name sets, as musl's own build installs it.
   let syscalls = fs.read_text(fp"{rootfs}/usr/include/bits/syscall.h")?
-  ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")?
+  ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")
 
   let hello = fp"{tmp}/hello"
   let dynlinker = fp"{rootfs}/usr/lib/{ldso}"
-  compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)?
+  compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)
   let header = run.text $readelf "-h" $hello ?
-  ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")?
+  ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")
 
   if build_arch == arch {
     let out = run.text $dynlinker $hello ?
@@ -113,4 +113,4 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
   }
 }
 
-main(@args)?
+main(@args)

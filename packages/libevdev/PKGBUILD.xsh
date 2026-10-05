@@ -315,11 +315,11 @@ export pure event_names_header(headers: List[Str]) -> Str {
 
 proc write_event_names() [fs, error] {
   let headers = [p"include/linux/linux/input.h", p"include/linux/linux/input-event-codes.h"]
-  fs.write(p"event-names.h", event_names_header([header.read_text()? for header in headers]))?
+  fs.write(p"event-names.h", event_names_header([header.read_text()? for header in headers]))
 }
 
 proc patch_python_generator() [fs, error] {
-  write_event_names()?
+  write_event_names()
   let meson = p"meson.build"
   var text = meson.read_text()?
 
@@ -348,7 +348,7 @@ dep_lm = declare_dependency(link_args: ['-lm'])""",
 dep_rt = declare_dependency()""",
   )
 
-  fs.write(meson, text)?
+  fs.write(meson, text)
 }
 
 ## Exported declaration `build`.
@@ -356,7 +356,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  patch_python_generator()?
+  patch_python_generator()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -375,5 +375,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
 }

@@ -115,7 +115,7 @@ proc root_decode_metadata_entry(value: ArtifactEntryDto) [error] -> Result[types
 }
 
 proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
-  root_require_relative_path(value.path, "artifact metadata path")?
+  root_require_relative_path(value.path, "artifact metadata path")
 
   if value.path == "var/lib/laputa/root.json" {
     return Err(types.PmError.PackageContract("artifact metadata may not own var/lib/laputa/root.json"))
@@ -130,7 +130,7 @@ proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
       return Err(types.PmError.PackageContract(f"file {value.path} must not have a symlink target"))
     }
 
-    root_require_sha256(value.sha256, f"file {value.path} SHA-256")?
+    root_require_sha256(value.sha256, f"file {value.path} SHA-256")
   } else if value.kind == types.file_kind_tree() {
     if value.sha256 != "" or value.target != "" {
       return Err(types.PmError.PackageContract(f"directory {value.path} must not have a hash or target"))
@@ -144,7 +144,7 @@ proc root_validate_metadata_entry(value: types.ArtifactEntry) [error] {
       return Err(types.PmError.PackageContract(f"symlink {value.path} must not have a file hash"))
     }
 
-    root_validate_symlink_target(value.path, value.target)?
+    root_validate_symlink_target(value.path, value.target)
   }
 }
 
@@ -188,7 +188,7 @@ proc root_legacy_package_db_entries(
   let sandbox = fs.tempdir()?
   defer sandbox.close()?
   let extracted = fp"{sandbox.host_path()?}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)?
+  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
   let manifest_file = root_legacy_package_db_file(extracted, receipt, "manifest.json")?
   let etcsums_file = root_legacy_package_db_file(extracted, receipt, "etcsums.json")?
   let metadata_file = root_legacy_package_db_file(extracted, receipt, "metadata.json")?
@@ -256,7 +256,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) [fs, error] -> Resul
 
   for raw_entry in dto.files {
     let entry = root_decode_metadata_entry(raw_entry)?
-    root_validate_metadata_entry(entry)?
+    root_validate_metadata_entry(entry)
 
     if entry.path in seen {
       return Err(types.PmError.PackageContract(f"artifact metadata repeats {entry.path} for {receipt.package_name}"))
@@ -346,7 +346,7 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
   defer sandbox.close()?
   let sandbox_path = sandbox.host_path()?
   let extracted = fp"{sandbox_path}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)?
+  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
   var expected: Map[Bool] = {}
 
   for entry in entries {
@@ -548,11 +548,11 @@ proc root_validate_receipt(value: types.RootReceipt) [error] {
     return Err(types.PmError.PackageContract(f"unsupported root receipt format {value.format}"))
   }
 
-  root_validate_plan(plan)?
+  root_validate_plan(plan)
 }
 
 proc root_receipt_for_plan(value: types.RootPlan) [error] -> Result[types.RootReceipt] {
-  root_validate_plan(value)?
+  root_validate_plan(value)
   {
     format: "laputa-root-1",
     target: value.target,
@@ -572,13 +572,13 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
 
   if entry.kind == types.file_kind_tree() {
     if fs.exists(destination)? {
-      root_verify_entry_at(output, entry)?
+      root_verify_entry_at(output, entry)
       return
     }
 
-    fs.mkdir(destination)?
-    fs.chmod(destination, entry.mode)?
-    root_verify_entry_at(output, entry)?
+    fs.mkdir(destination)
+    fs.chmod(destination, entry.mode)
+    root_verify_entry_at(output, entry)
     return
   }
 
@@ -588,16 +588,16 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
     )
   }
 
-  fs.mkdir(destination.parent)?
+  fs.mkdir(destination.parent)
 
   if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
-    fs.copy(source, destination)?
-    fs.chmod(destination, entry.mode)?
+    fs.copy(source, destination)
+    fs.chmod(destination, entry.mode)
   } else if entry.kind == types.file_kind_symlink() {
-    fs.symlink(fp"{entry.target}", destination)?
+    fs.symlink(fp"{entry.target}", destination)
   }
 
-  root_verify_entry_at(output, entry)?
+  root_verify_entry_at(output, entry)
 }
 
 proc root_materialize_artifact(
@@ -608,17 +608,17 @@ proc root_materialize_artifact(
   let sandbox = fs.tempdir()?
   defer sandbox.close()?
   let extracted = fp"{sandbox.host_path()?}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)?
+  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
 
   for entry in entries {
-    root_materialize_entry(extracted, output, entry)?
+    root_materialize_entry(extracted, output, entry)
   }
 }
 
 proc root_read_receipt(output: Path) [fs, error] -> Result[types.RootReceipt] {
   let dto = json.read(root_receipt_path(output))?.require(RootReceiptDto)?
   let value = root_receipt_from_dto(dto)?
-  root_validate_receipt(value)?
+  root_validate_receipt(value)
   value
 }
 
@@ -750,7 +750,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
     entries: ordered_entries,
     root_sha256: root_digest(target, ordered_artifacts, ordered_entries),
   )
-  root_validate_plan(value)?
+  root_validate_plan(value)
   {plan: value, artifact_entries: artifact_entries_by_key}
 }
 
@@ -766,7 +766,7 @@ export proc preflight(
     if artifact.payload {
       for receipt in verified {
         if receipt.key == artifact.artifact_key {
-          root_verify_payload_entries(receipt, ownership.artifact_entries.get(receipt.key)?)?
+          root_verify_payload_entries(receipt, ownership.artifact_entries.get(receipt.key)?)
         }
       }
     }
@@ -803,32 +803,32 @@ export proc compose_artifacts(
   }
 
   let temporary = fp"{output}.tmp"
-  fs.remove(temporary, missing_ok: true)?
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.mkdir(temporary)?
+  fs.mkdir(temporary)
   # preflight above verified these receipts and payloads.
   let verified = root_checked_artifacts(artifacts)?
   var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
   for artifact in plan.artifacts {
     if artifact.payload {
       let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]
-      root_materialize_artifact(temporary, by_key.get(artifact.artifact_key)?, entries)?
+      root_materialize_artifact(temporary, by_key.get(artifact.artifact_key)?, entries)
     }
   }
 
   let receipt = root_receipt_for_plan(plan)?
-  fs.mkdir(root_receipt_path(temporary).parent)?
-  fs.write(root_receipt_path(temporary), json.encode(root_receipt_dto(receipt))? + "\n")?
-  verify(temporary, receipt)?
-  fs.mkdir(output.parent)?
-  fs.rename(temporary, output)?
-  verify(output, receipt)?
+  fs.mkdir(root_receipt_path(temporary).parent)
+  fs.write(root_receipt_path(temporary), json.encode(root_receipt_dto(receipt))? + "\n")
+  verify(temporary, receipt)
+  fs.mkdir(output.parent)
+  fs.rename(temporary, output)
+  verify(output, receipt)
   receipt
 }
 
 ## Verifies the durable root receipt and every installed payload entry without consulting mutable package state.
 export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
-  root_validate_receipt(receipt)?
+  root_validate_receipt(receipt)
   let stored = root_read_receipt(output)?
 
   if stored != receipt {
@@ -836,6 +836,6 @@ export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
   }
 
   for entry in receipt.entries {
-    root_verify_entry_at(output, entry)?
+    root_verify_entry_at(output, entry)
   }
 }

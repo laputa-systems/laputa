@@ -60,7 +60,7 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) [fs, error] {
   for header in wanted {
     continue when fs.exists(fp"{arch_uapi}/{header}")?
     fs.write(fp"{generated}/{header}", f"""#include <asm-generic/{header}>
-""")?
+""")
   }
 }
 
@@ -80,7 +80,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) [fs, error]
 
   lines += ["", "#ifdef __KERNEL__", f"#define __NR_syscalls {last + 1}", "#endif", "", f"#endif /* {header_guard} */"]
   fs.write(fp"{generated}/{header.name}", f"""{lines.join("\n")}
-""")?
+""")
 }
 
 # linux/version.h for this release, as the top-level Makefile writes it.
@@ -99,7 +99,7 @@ proc generate_version_header(version: Str, out: Path) [fs, error] {
 #define LINUX_VERSION_PATCHLEVEL {parts[1]}
 #define LINUX_VERSION_SUBLEVEL {parts[2]}
 """,
-  )?
+  )
 }
 
 # Like headers_install: every include/uapi directory, the target's arch uapi
@@ -109,32 +109,32 @@ proc main(dest: Path) [fs, env, error] {
   let srcarch = kernel_srcarch(pm_util.target_arch()?)?
   let generated_linux = p"include/generated/uapi/linux"
   let generated_asm = fp"arch/{srcarch}/include/generated/uapi/asm"
-  fs.mkdir(generated_linux)?
-  fs.mkdir(generated_asm)?
-  generate_version_header(e"XSH_PM_VERSION" ?? "", fp"{generated_linux}/version.h")?
-  generate_asm_wrappers(srcarch, generated_asm)?
+  fs.mkdir(generated_linux)
+  fs.mkdir(generated_asm)
+  generate_version_header(e"XSH_PM_VERSION" ?? "", fp"{generated_linux}/version.h")
+  generate_asm_wrappers(srcarch, generated_asm)
 
   for header in syscall_headers(srcarch) {
-    generate_syscall_header(header, generated_asm)?
+    generate_syscall_header(header, generated_asm)
   }
 
   let include = fp"{dest}/usr/include"
 
   for entry in fs.children(p"include/uapi")? |> where .kind == "dir" {
-    uapi.install_tree(entry.path, fp"{include}/{entry.name}")?
+    uapi.install_tree(entry.path, fp"{include}/{entry.name}")
   }
 
-  uapi.install_tree(generated_linux, fp"{include}/linux")?
-  uapi.install_tree(fp"arch/{srcarch}/include/uapi/asm", fp"{include}/asm")?
-  uapi.install_tree(generated_asm, fp"{include}/asm")?
+  uapi.install_tree(generated_linux, fp"{include}/linux")
+  uapi.install_tree(fp"arch/{srcarch}/include/uapi/asm", fp"{include}/asm")
+  uapi.install_tree(generated_asm, fp"{include}/asm")
 
   # include/uapi/Kbuild's no-export-headers: these linux/ headers only make
   # sense on an arch that provides the asm/ header of the same name.
   for header in ["a.out.h", "kvm.h", "kvm_para.h"] {
     if ! fs.exists(fp"arch/{srcarch}/include/uapi/asm/{header}")? and ! fs.exists(fp"{generated_asm}/{header}")? {
-      fs.remove(fp"{include}/linux/{header}", missing_ok: true)?
+      fs.remove(fp"{include}/linux/{header}", missing_ok: true)
     }
   }
 }
 
-main(@args)?
+main(@args)

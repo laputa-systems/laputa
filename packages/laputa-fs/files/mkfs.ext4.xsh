@@ -403,7 +403,7 @@ proc data_blocks_slice(alloc: ExtAlloc, offset: Int, length: Int) [] -> List[Int
 
 proc write_indirect_blocks(image: Path, alloc: ExtAlloc) [error] {
   if alloc.single != 0 {
-    write_block(image, alloc.single, u32_block(data_blocks_slice(alloc, 12, min_int(alloc.count, 1036) - 12))?)?
+    write_block(image, alloc.single, u32_block(data_blocks_slice(alloc, 12, min_int(alloc.count, 1036) - 12))?)
   }
 
   if alloc.double != 0 {
@@ -413,11 +413,11 @@ proc write_indirect_blocks(image: Path, alloc: ExtAlloc) [error] {
     for indirect in alloc.indirects {
       double_ptrs += [indirect]
       let end = min_int(offset + 1024, alloc.count)
-      write_block(image, indirect, u32_block(data_blocks_slice(alloc, offset, end - offset))?)?
+      write_block(image, indirect, u32_block(data_blocks_slice(alloc, offset, end - offset))?)
       offset = end
     }
 
-    write_block(image, alloc.double, u32_block(double_ptrs)?)?
+    write_block(image, alloc.double, u32_block(double_ptrs)?)
   }
 }
 
@@ -438,12 +438,12 @@ proc allocate_bytes(
       image,
       data_block_at(result.alloc, index),
       data.slice(offset: start, length: min_int(data.len() - start, BLOCK_SIZE)),
-    )?
+    )
 
     index += 1
   }
 
-  write_indirect_blocks(image, result.alloc)?
+  write_indirect_blocks(image, result.alloc)
   result
 }
 
@@ -490,7 +490,7 @@ proc allocate_file(
     remaining -= run_len
   }
 
-  write_indirect_blocks(image, result.alloc)?
+  write_indirect_blocks(image, result.alloc)
   result
 }
 
@@ -703,7 +703,7 @@ proc write_headers(
     let inode_bitmap = first + 3
     let inode_table = first + 4
     let block_bitmap_data = block_bitmap_bytes(first, group_blocks, allocated_next)?
-    write_block(image, block_bitmap, block_bitmap_data)?
+    write_block(image, block_bitmap, block_bitmap_data)
     var used_blocks = 0
     var local = 0
 
@@ -719,7 +719,7 @@ proc write_headers(
     free_blocks_total += free_blocks
     let first_inode = group_index * INODES_PER_GROUP + 1
     let inode_bitmap_data = inode_bitmap_bytes(first_inode, max_inode)?
-    write_block(image, inode_bitmap, inode_bitmap_data)?
+    write_block(image, inode_bitmap, inode_bitmap_data)
     var used_inodes = 0
     local = 0
 
@@ -749,13 +749,13 @@ proc write_headers(
   let sb = superblock(total_inodes, total_blocks, free_blocks_total, total_inodes - max_inode, label)?
   let written = bytes.write_at(image, 1024, sb)?
   let _ = written
-  write_block(image, 1, bytes.concat(desc_parts))?
+  write_block(image, 1, bytes.concat(desc_parts))
   group_index = 1
 
   while group_index < groups {
     let first = group_index * BLOCKS_PER_GROUP
-    write_block(image, first, sb)?
-    write_block(image, first + 1, bytes.concat(desc_parts))?
+    write_block(image, first, sb)
+    write_block(image, first + 1, bytes.concat(desc_parts))
     group_index += 1
   }
 }
@@ -814,7 +814,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
   let source_root = source_root.resolve()?
   let collected = collect_entries(source_root, source_root, [])?
   let entries = assign_inodes(collected)
-  zero_image(image, size)?
+  zero_image(image, size)
   let root_data = dir_data(entries, "", 2, 2)?
   var result = allocate_bytes(image, used, next, total_blocks, root_data)?
   used = result.used
@@ -824,7 +824,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
     image,
     2,
     inode_bytes(0o040755, 0, 0, root_data.len(), FIXED_TIME, dir_links(entries, ""), result.alloc, bytes.zero(0)?)?,
-  )?
+  )
 
   for entry in entries {
     if entry.kind == "dir" {
@@ -846,7 +846,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
           result.alloc,
           bytes.zero(0)?,
         )?,
-      )?
+      )
     } else if entry.kind == "file" {
       result = allocate_file(image, used, next, total_blocks, entry.path, entry.size)?
       used = result.used
@@ -865,7 +865,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
           result.alloc,
           bytes.zero(0)?,
         )?,
-      )?
+      )
     } else if entry.kind == "symlink" {
       if entry.target.len() < 60 {
         result = {
@@ -891,11 +891,11 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
         image,
         entry.inode,
         inode_bytes(0o120777, entry.uid, entry.gid, entry.target.len(), entry.mtime, 1, result.alloc, entry.target)?,
-      )?
+      )
     }
   }
 
-  write_headers(image, entries, next, groups, total_blocks, label)?
+  write_headers(image, entries, next, groups, total_blocks, label)
 }
 
 type MkfsExt4Options = {label: Str, source_root: Str, features: Str, image: List[Str]}
@@ -944,11 +944,11 @@ proc main(...argv: List[Str]) [fs, error] {
 
   if source_root == "" {
     let empty_dir = /tmp/mkfs-ext4-empty
-    fs.mkdir(empty_dir)?
+    fs.mkdir(empty_dir)
     source_root = empty_dir
   }
 
-  format_ext_image(fp"{image}", source_root, label)?
+  format_ext_image(fp"{image}", source_root, label)
 }
 
-main(@args)?
+main(@args)

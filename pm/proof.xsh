@@ -26,7 +26,7 @@ export proc ensure(condition: Bool, kind: Str, message: Str) [error] {
 ## Exported PM declaration `package_metadata`.
 export proc package_metadata(root: Path, name: Str) [fs, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/{name}/metadata.json"
-  ensure(fs.exists(db)?, f"proof-{name}", f"missing package metadata: {db}")?
+  ensure(fs.exists(db)?, f"proof-{name}", f"missing package metadata: {db}")
 }
 
 ## The installed package's recipe `ver`, so a proof can check that the
@@ -120,11 +120,11 @@ export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
 ## Exported PM declaration `target_elf`.
 export proc target_elf(root: Path, rel: Path, name: Str) [fs, process, env, error] {
   let path_value = fp"{root}/{rel}"
-  ensure(fs.exists(path_value)?, f"proof-{name}", f"missing ELF: {path_value}")?
+  ensure(fs.exists(path_value)?, f"proof-{name}", f"missing ELF: {path_value}")
   let readelf = readelf_tool()?
   let header = run.text $readelf "-h" $path_value ?
   let arch = pm_util.target_arch()?
-  ensure(elf_machine_name(arch) in header, f"proof-{name}", f"{rel} is not {arch}")?
+  ensure(elf_machine_name(arch) in header, f"proof-{name}", f"{rel} is not {arch}")
 }
 
 proc proof_xsh_runner() [fs, process, env, error] -> Result[Path] {
@@ -150,8 +150,8 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
     return Err(types.PmError.PackageContract(f"{pkg.name} is missing proof.xsh"))
   }
 
-  package_metadata(root, pkg.name)?
-  verify_package_elf_dependencies(root, pkg.name)?
+  package_metadata(root, pkg.name)
+  verify_package_elf_dependencies(root, pkg.name)
   let xsh = proof_xsh_runner()?
 
   # Preserve a nonzero proof Status as data at this boundary. Returning an Err
@@ -190,7 +190,7 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
 ## Writes the deterministic proof receipt that binds a proof input to one exact payload artifact.
 ## `payload_sha256` is the payload digest the caller already holds (staged or Store receipt).
 export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, payload_sha256: Str) [fs, error] {
-  fs.mkdir(path_value.parent)?
+  fs.mkdir(path_value.parent)
   fs.write(
     path_value,
     json.encode({
@@ -201,7 +201,7 @@ export proc write_artifact_receipt(path_value: Path, node: types.PlanNode, paylo
       proof_sha256: node.proof_sha256,
       payload_sha256,
     })? + "\n",
-  )?
+  )
 }
 
 ## Verifies an immutable proof receipt against the exact node and payload digest it attests.
@@ -317,7 +317,7 @@ export proc pty_driver(dir: Path) [fs, process, env, error] -> Result[Path, Erro
   let cc = process.which("cc")?
   let source = fp"{dir}/ptydrive.c"
   let binary = fp"{dir}/ptydrive"
-  fs.write(source, pty_driver_source)?
+  fs.write(source, pty_driver_source)
   run $cc "-O2" $source "-o" $binary ?
   binary
 }

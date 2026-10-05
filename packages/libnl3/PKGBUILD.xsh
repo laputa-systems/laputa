@@ -74,10 +74,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cwd = fs.cwd()?
   let src = cwd
   let objs = p"objs"
-  fs.mkdir(objs)?
+  fs.mkdir(objs)
 
   # Generate include/netlink/version.h from version.h.in
-  fs.mkdir(fp"{src}/include/netlink")?
+  fs.mkdir(fp"{src}/include/netlink")
   let version_h = fp"{src}/include/netlink/version.h"
   let version_in = fp"{src}/include/netlink/version.h.in"
 
@@ -92,7 +92,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       .replace("@MINOR_VERSION@", minor)
       .replace("@MICRO_VERSION@", micro)
 
-    fs.write(version_h, body)?
+    fs.write(version_h, body)
   }
 
   # include/config.h as configure writes it for musl: the keys are exactly
@@ -132,16 +132,16 @@ export proc build(dest: Path) [fs, process, env, error] {
 #endif
 """
 
-    fs.write(config_h, cfg_body)?
+    fs.write(config_h, cfg_body)
   }
 
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
 
   # Pre-create install directories.
-  fs.mkdir(fp"{dest}/usr")?
-  fs.mkdir(fp"{dest}/usr/lib")?
-  fs.mkdir(fp"{dest}/usr/include")?
+  fs.mkdir(fp"{dest}/usr")
+  fs.mkdir(fp"{dest}/usr/lib")
+  fs.mkdir(fp"{dest}/usr/include")
   # Upstream compiles every library as gnu11 with the sysconfdir and pkglibdir
   # defines from Makefile.am's defines_cppflags.
   var cflags = ["-std=gnu11", "-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
@@ -216,7 +216,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(core.tasks.extend(genl.tasks), make.jobs()?)?
+  make.run_tasks(core.tasks.extend(genl.tasks), make.jobs()?)
 
   # Create symlinks
   for lib in [core_so, genl_so] {
@@ -224,14 +224,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     let parts = basename.split(".so.")
     let soname = f"{parts[0]}.so.{parts[1].split(".")[0]}"
     let linker = f"{parts[0]}.so"
-    fs.symlink(fp"{basename}", fp"{dest}/usr/lib/{soname}")?
-    fs.symlink(fp"{soname}", fp"{dest}/usr/lib/{linker}")?
+    fs.symlink(fp"{basename}", fp"{dest}/usr/lib/{soname}")
+    fs.symlink(fp"{soname}", fp"{dest}/usr/lib/{linker}")
   }
 
   # Install public headers at /usr/include/netlink/
   let usr_include = fp"{dest}/usr/include"
-  fs.mkdir(usr_include)?
+  fs.mkdir(usr_include)
   let headers_src = fp"{src}/include/netlink"
   let headers_dest = fp"{dest}/usr/include/netlink"
-  make.install_header_tree(headers_src, headers_dest, [p"version.h.in"])?
+  make.install_header_tree(headers_src, headers_dest, [p"version.h.in"])
 }

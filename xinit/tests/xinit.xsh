@@ -45,7 +45,7 @@ export let service = {{
   restart: {{mode: "{restart_mode}", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000}},
   targets: ["boot"],
 {extra}}}
-""")?
+""")
 }
 
 proc write_named_service(
@@ -67,7 +67,7 @@ export let service = {{
   targets: {json.encode(targets)?},
   dependencies: {{{deps}}},
 {extra}}}
-""")?
+""")
 }
 
 proc assert_failed_with(result: XinitRun, expected: Str) [error] {
@@ -90,16 +90,16 @@ test test_inittab_parsing_and_lifecycle [fs, process, error] { |ctx|
 ::shutdown:/bin/echo "down: ok"
 ttyS0::respawn:/bin/echo "login: ttyS0"
 ttyS1::poweroff:/bin/echo "login: ttyS1"
-""")?
+""")
 
   unsupported.write("""::bogus:/bin/echo nope
-""")?
+""")
 
   shell_syntax.write("""::sysinit:/bin/echo ok && /bin/echo no
-""")?
+""")
 
-  test.unix_fake(ctx, {signal: "TERM"})?
-  test.linux_fake(ctx, {})?
+  test.unix_fake(ctx, {signal: "TERM"})
+  test.linux_fake(ctx, {})
   let output = xinit_text(
     ctx,
     [valid.display()],
@@ -111,19 +111,19 @@ wait: ok
 down: ok
 """
 
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let unsupported_status = run_xinit(
     ctx,
     [unsupported.display()],
     {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"},
   )?
-  assert_failed_with(unsupported_status, "unsupported action 'bogus'")?
+  assert_failed_with(unsupported_status, "unsupported action 'bogus'")
   let shell_status = run_xinit(
     ctx,
     [shell_syntax.display()],
     {XINIT_TEST_ALLOW_NON_PID1: "1", XSH_INIT_TEST_MAX_RESPAWNS: "1", XSH_UNIX_DRY_RUN: "1"},
   )?
-  assert_failed_with(shell_status, "shell syntax")?
+  assert_failed_with(shell_status, "shell syntax")
 }
 
 test test_wait_once_respawn_and_poweroff [fs, process, error] { |ctx|
@@ -136,10 +136,10 @@ test test_wait_once_respawn_and_poweroff [fs, process, error] { |ctx|
 ::wait:/bin/echo wait
 ::once:/usr/bin/once-service
 ::respawn:/usr/bin/respawn-service
-""")?
+""")
 
-  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})?
-  test.linux_fake(ctx, {})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})
+  test.linux_fake(ctx, {})
   let output = xinit_text(
     ctx,
     [inittab.display()],
@@ -163,10 +163,10 @@ wait
 
   poweroff_inittab.write("""::sysinit:/bin/echo boot
 ttyAMA0::poweroff:/bin/xshi --no-config
-""")?
+""")
 
-  test.unix_fake(ctx, {event_kind: "child", pid: 1000})?
-  test.linux_fake(ctx, {log: linux_log})?
+  test.unix_fake(ctx, {event_kind: "child", pid: 1000})
+  test.linux_fake(ctx, {log: linux_log})
   let poweroff_output = xinit_text(
     ctx,
     [poweroff_inittab.display()],
@@ -189,10 +189,10 @@ test test_fast_shutdown_uses_owned_process_groups [fs, process, error] { |ctx|
 ::shutdown:/bin/echo down
 ::respawn:/usr/bin/daemon
 ttyAMA0::poweroff:/bin/xshi --no-config
-""")?
+""")
 
-  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})?
-  test.linux_fake(ctx, {log: linux_log})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001})
+  test.linux_fake(ctx, {log: linux_log})
   let output = xinit_text(
     ctx,
     [inittab.display()],
@@ -219,8 +219,8 @@ test test_service_start_status_stop_and_check [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   let unix_log = fp"{root}/unix.jsonl"
   service_dir.mkdir()
-  write_demo_service(fp"{service_dir}/demo.xsh", "process.command_argv(\"service\", [\"service\"])", "never", false, 0)?
-  test.unix_fake(ctx, {log: unix_log})?
+  write_demo_service(fp"{service_dir}/demo.xsh", "process.command_argv(\"service\", [\"service\"])", "never", false, 0)
+  test.unix_fake(ctx, {log: unix_log})
   let started = xinit_text(
     ctx,
     ["start", "demo"],
@@ -242,13 +242,13 @@ test test_service_start_status_stop_and_check [fs, process, error] { |ctx|
   let log_text = unix_log.read_text()?
   assert "spawn_process_group" in log_text
   assert "log_path" in log_text
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo running pid=1000 ready=true log=append desired=up restarts=0
 """
 
-  test.unix_fake(ctx, {log: unix_log})?
+  test.unix_fake(ctx, {log: unix_log})
   let stopped = xinit_text(
     ctx,
     ["stop", "demo"],
@@ -281,17 +281,17 @@ export let service = {
   name: "bad",
   command: process.command_argv("service", bad([])),
 }
-""")?
+""")
 
   let bad_status = run_xinit(ctx, ["check", bad.display()], {})?
-  assert_failed_with(bad_status, "module-load")?
+  assert_failed_with(bad_status, "module-load")
   assert "failed to check" in bad_status.stderr
   let missing_status = run_xinit(ctx, ["check", missing.display()], {})?
-  assert_failed_with(missing_status, "xinit-service")?
+  assert_failed_with(missing_status, "xinit-service")
   assert "failed to read service file" in missing_status.stderr
   assert missing.display() in missing_status.stderr
   let old_status = run_xinit(ctx, ["validate", "demo"], {})?
-  assert_failed_with(old_status, "xinit-control")?
+  assert_failed_with(old_status, "xinit-control")
   assert "usage: xinit" in old_status.stderr
 }
 
@@ -309,7 +309,7 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
     "process.command_argv(\"logger\", [\"logger\"])",
     ["boot"],
     "",
-  )?
+  )
 
   write_named_service(
     fp"{service_dir}/firewall.xsh",
@@ -317,7 +317,7 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
     "process.command_argv(\"firewall\", [\"firewall\"])",
     ["boot"],
     "before: [\"net\"]",
-  )?
+  )
 
   write_named_service(
     fp"{service_dir}/net.xsh",
@@ -325,7 +325,7 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
     "process.command_argv(\"net\", [\"net\"])",
     ["boot"],
     "need: [\"logger\"], after: [\"firewall\"]",
-  )?
+  )
 
   write_named_service(
     fp"{service_dir}/app.xsh",
@@ -333,14 +333,14 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
     "process.command_argv(\"app\", [\"app\"])",
     ["boot"],
     "need: [\"net\"], uses: [\"logger\"]",
-  )?
+  )
 
   let graph = xinit_text(ctx, ["graph", "app"], {XINIT_SERVICE_DIR: service_dir.display()})?
   assert "logger: deps=" in graph
   assert "firewall: deps=" in graph
   assert "net: deps=logger,firewall" in graph
   assert "app: deps=net,logger" in graph
-  test.unix_fake(ctx, {log: unix_log})?
+  test.unix_fake(ctx, {log: unix_log})
   let boot = xinit_text(
     ctx,
     ["boot"],
@@ -356,7 +356,7 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
   assert fp"{run_dir}/firewall.json".exists()?
   assert fp"{run_dir}/net.json".exists()?
   assert fp"{run_dir}/app.json".exists()?
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let listed = xinit_text(
     ctx,
     ["list"],
@@ -369,7 +369,7 @@ test test_dependency_planning_boot_list_graph_and_stop_refusal [fs, process, err
     ["stop", "net"],
     {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"},
   )?
-  assert_failed_with(stop_net, "running dependents: app")?
+  assert_failed_with(stop_net, "running dependents: app")
 }
 
 test test_ready_and_status_hooks [fs, process, error] { |ctx|
@@ -401,9 +401,9 @@ export proc status() [fs, process, env, error] -> Result[Str] {
   return "detail=ok"
 }
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let started = xinit_text(
     ctx,
     ["start", "demo"],
@@ -441,7 +441,7 @@ test test_append_logs_and_log_none [fs, process, time, error] { |ctx|
     "never",
     false,
     0,
-  )?
+  )
 
   let started = xinit_text(
     ctx,
@@ -449,7 +449,7 @@ test test_append_logs_and_log_none [fs, process, time, error] { |ctx|
     {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display()},
   )?
   assert "demo running" in started
-  time.sleep(100ms)?
+  time.sleep(100ms)
   let log_text = fp"{log_root}/demo/current".read_text()?
   assert "service-out" in log_text
   assert "service-err" in log_text
@@ -466,9 +466,9 @@ test test_append_logs_and_log_none [fs, process, time, error] { |ctx|
     "never",
     true,
     0,
-  )?
+  )
 
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let none_started = xinit_text(
     ctx,
     ["start", "demo"],
@@ -506,13 +506,13 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
   # Pre-fill `current` past the cap; the next start must rotate it to current.1
   # and begin a fresh `current`.
-  fp"{log_root}/demo".mkdir()?
-  fp"{log_root}/demo/current".write("0123456789AB")?
-  test.unix_fake(ctx, {})?
+  fp"{log_root}/demo".mkdir()
+  fp"{log_root}/demo/current".write("0123456789AB")
+  test.unix_fake(ctx, {})
   let _ = xinit_text(
     ctx,
     ["start", "demo"],
@@ -534,9 +534,9 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
 
   fp"{run_dir}/demo.json".write(
     "{\"name\":\"demo\",\"desired\":\"up\",\"state\":\"running\",\"pid\":1000,\"log_pid\":1001,\"restarts\":0}",
-  )?
+  )
 
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo running pid=1000 ready=true log=append desired=up restarts=0
@@ -553,7 +553,7 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
     "never",
     false,
     80,
-  )?
+  )
 
   let cgroup = xinit_text(
     ctx,
@@ -572,7 +572,7 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
   assert "\"cgroup_path\":\"dry-run:/xinit/demo\"" in fp"{cgroup_run_dir}/demo.json".read_text()?
   let blocker = fp"{root}/not-a-dir"
   let failed_run = fp"{root}/failed-run"
-  blocker.write("file")?
+  blocker.write("file")
   let failed = run_xinit(
     ctx,
     ["start", "demo"],
@@ -583,7 +583,7 @@ test test_status_compat_cgroup_and_log_open_failure [fs, process, error] { |ctx|
       XSH_UNIX_DRY_RUN: "1",
     },
   )?
-  assert_failed_with(failed, "xinit-log")?
+  assert_failed_with(failed, "xinit-log")
   assert ! fp"{root}/failed-run/demo.json".exists()?
 }
 
@@ -594,10 +594,10 @@ test test_idempotent_start_and_supervise_restart [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   let unix_log = fp"{root}/unix.jsonl"
   service_dir.mkdir()
-  write_demo_service(fp"{service_dir}/demo.xsh", "process.command_argv(\"service\", [\"service\"])", "never", false, 0)?
+  write_demo_service(fp"{service_dir}/demo.xsh", "process.command_argv(\"service\", [\"service\"])", "never", false, 0)
 
   for _ in [0, 1] {
-    test.unix_fake(ctx, {log: unix_log})?
+    test.unix_fake(ctx, {log: unix_log})
     let output = xinit_text(
       ctx,
       ["start", "demo"],
@@ -626,9 +626,9 @@ test test_idempotent_start_and_supervise_restart [fs, process, error] { |ctx|
     "always",
     false,
     0,
-  )?
+  )
 
-  test.unix_fake(ctx, {log: supervise_unix_log, event_kind: "child", pid: 1000, status_code: 1})?
+  test.unix_fake(ctx, {log: supervise_unix_log, event_kind: "child", pid: 1000, status_code: 1})
   let supervise = xinit_text(
     ctx,
     ["supervise", "demo"],
@@ -641,7 +641,7 @@ test test_idempotent_start_and_supervise_restart [fs, process, error] { |ctx|
     },
   )?
   assert supervise == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: supervise_run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo running pid=1001 ready=true log=append desired=up restarts=1
@@ -662,7 +662,7 @@ test test_status_reconciles_stale_pid [fs, process, error] { |ctx|
 
   fp"{run_dir}/alive.json".write(
     f"{{\"name\":\"alive\",\"desired\":\"up\",\"state\":\"running\",\"pid\":{self_pid},\"restarts\":0}}",
-  )?
+  )
 
   let alive = xinit_text(ctx, ["status", "alive"], {XINIT_RUN_DIR: run_dir.display()})?
 
@@ -674,7 +674,7 @@ test test_status_reconciles_stale_pid [fs, process, error] { |ctx|
   # reporting a phantom and stops `stop` signalling a recycled pid.
   fp"{run_dir}/gone.json".write(
     "{\"name\":\"gone\",\"desired\":\"up\",\"state\":\"running\",\"pid\":2147480000,\"restarts\":2}",
-  )?
+  )
 
   let gone = xinit_text(ctx, ["status", "gone"], {XINIT_RUN_DIR: run_dir.display()})?
 
@@ -700,7 +700,7 @@ test test_status_detects_recycled_pid [fs, process, error] { |ctx|
   # A matching recorded start time means the pid is still our instance: running.
   fp"{run_dir}/ours.json".write(
     f"{{\"name\":\"ours\",\"desired\":\"up\",\"state\":\"running\",\"pid\":{self_pid},\"start_time_ms\":{self_start},\"restarts\":0}}",
-  )?
+  )
 
   let ours = xinit_text(ctx, ["status", "ours"], {XINIT_RUN_DIR: run_dir.display()})?
 
@@ -711,7 +711,7 @@ test test_status_detects_recycled_pid [fs, process, error] { |ctx|
   # different process after ours exited, so the saved state reconciles to dead.
   fp"{run_dir}/recycled.json".write(
     f"{{\"name\":\"recycled\",\"desired\":\"up\",\"state\":\"running\",\"pid\":{self_pid},\"start_time_ms\":1,\"restarts\":0}}",
-  )?
+  )
 
   let recycled = xinit_text(ctx, ["status", "recycled"], {XINIT_RUN_DIR: run_dir.display()})?
 
@@ -744,9 +744,9 @@ export let service = {
   restart: {mode: "always", delay_ms: 30000, max_delay_ms: 30000, stable_after_ms: 100000},
 }
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1000, status_code: 1})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1000, status_code: 1})
   let supervise = xinit_text(
     ctx,
     ["supervise", "demo"],
@@ -759,7 +759,7 @@ export let service = {
     },
   )?
   assert supervise == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo dead pid=0 ready=false log=append desired=up restarts=0
@@ -793,7 +793,7 @@ export let service = {
   restart: {mode: "always", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
   fs.write(
     fp"{service_dir}/worker.xsh",
@@ -808,9 +808,9 @@ export let service = {
   restart: {mode: "always", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001, status_code: 1})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1001, status_code: 1})
   let scan = xinit_text(
     ctx,
     ["scan", "boot"],
@@ -823,7 +823,7 @@ export let service = {
     },
   )?
   assert scan == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert logger_status == """logger running pid=1000 ready=true log=append desired=up restarts=0
@@ -860,7 +860,7 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
   # app needs logger, so it must not start until logger is ready.
   fs.write(
@@ -876,9 +876,9 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {log: unix_log, event_kind: "poll", ready: 0})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll", ready: 0})
   let scan = xinit_text(
     ctx,
     ["scan", "app"],
@@ -891,7 +891,7 @@ export let service = {
     },
   )?
   assert scan == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert logger_status == """logger starting pid=1000 ready=false log=append desired=up restarts=0
@@ -913,7 +913,7 @@ test test_scan_honors_inbox_down_request [fs, process, error] { |ctx|
   let log_root = fp"{root}/logs"
   let unix_log = fp"{root}/unix.jsonl"
   service_dir.mkdir()
-  fp"{run_dir}/inbox".mkdir()?
+  fp"{run_dir}/inbox".mkdir()
 
   fs.write(
     fp"{service_dir}/logger.xsh",
@@ -927,7 +927,7 @@ export let service = {
   restart: {mode: "always", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
   fs.write(
     fp"{service_dir}/app.xsh",
@@ -942,13 +942,13 @@ export let service = {
   restart: {mode: "always", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
   # Pre-post a desired-state "down" request for app. The scanner must drain the
   # inbox before reconciling, so app is parked (never spawned) while logger
   # still comes up — the control plane overriding the default desired state.
-  fp"{run_dir}/inbox/app".write("down")?
-  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})?
+  fp"{run_dir}/inbox/app".write("down")
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
   let scan = xinit_text(
     ctx,
     ["scan", "app"],
@@ -961,7 +961,7 @@ export let service = {
     },
   )?
   assert scan == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert logger_status == """logger running pid=1000 ready=true log=append desired=up restarts=0
@@ -997,12 +997,12 @@ export let service = {
   restart: {mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
   # A notify service is spawned with a readiness pipe (state "starting", not
   # ready); the scanner polls notify_ready and promotes it to running. The unix
   # fake reports the service ready (its `ready` setting defaults to 1).
-  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})?
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
   let scan = xinit_text(
     ctx,
     ["scan", "demo"],
@@ -1015,7 +1015,7 @@ export let service = {
     },
   )?
   assert scan == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo running pid=1000 ready=true log=append desired=up restarts=0
@@ -1047,12 +1047,12 @@ export let service = {
   restart: {mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
 }
 """,
-  )?
+  )
 
   # The service never signals readiness (unix fake `ready: 0`) and the ready
   # timeout is zero, so the scanner promotes it to running but not ready rather
   # than wedging.
-  test.unix_fake(ctx, {event_kind: "poll", ready: 0})?
+  test.unix_fake(ctx, {event_kind: "poll", ready: 0})
   let scan = xinit_text(
     ctx,
     ["scan", "demo"],
@@ -1065,7 +1065,7 @@ export let service = {
     },
   )?
   assert scan == ""
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo running pid=1000 ready=false log=append desired=up restarts=0
@@ -1091,7 +1091,7 @@ export let service = {
   command: process.command_argv("/bin/false", ["false"]),
 }
 """,
-  )?
+  )
 
   # app only *uses* flaky (optional), so flaky's start failure must be tolerated
   # and app still comes up.
@@ -1108,9 +1108,9 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let started = xinit_text(
     ctx,
     ["start", "app"],
@@ -1139,7 +1139,7 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
   let needy_status = run_xinit(
     ctx,
@@ -1151,7 +1151,7 @@ export let service = {
       XSH_UNIX_DRY_RUN: "1",
     },
   )?
-  assert_failed_with(needy_status, "flaky: start failed")?
+  assert_failed_with(needy_status, "flaky: start failed")
 }
 
 test test_reload_runs_hook_then_falls_back_to_sighup [fs, process, error] { |ctx|
@@ -1181,13 +1181,13 @@ export proc reload() [fs, process, env, error] -> Result[Unit] {{
   fs.write(Path({json.encode(touched.display())?}), "reloaded")?
 }}
 """,
-  )?
+  )
 
   fp"{run_dir}/hooked.json".write(
     "{\"name\":\"hooked\",\"desired\":\"up\",\"state\":\"running\",\"pid\":1000,\"restarts\":0}",
-  )?
+  )
 
-  test.unix_fake(ctx, {log: unix_log})?
+  test.unix_fake(ctx, {log: unix_log})
   let hooked = xinit_text(
     ctx,
     ["reload", "hooked"],
@@ -1215,13 +1215,13 @@ export let service = {
   restart: {mode: "never"},
 }
 """,
-  )?
+  )
 
   fp"{run_dir}/plain.json".write(
     "{\"name\":\"plain\",\"desired\":\"up\",\"state\":\"running\",\"pid\":1000,\"restarts\":0}",
-  )?
+  )
 
-  test.unix_fake(ctx, {log: plain_log})?
+  test.unix_fake(ctx, {log: plain_log})
   let _ = xinit_text(
     ctx,
     ["reload", "plain"],
@@ -1259,9 +1259,9 @@ export proc finish() [fs, process, env, error] -> Result[Unit] {{
   fs.write(Path({json.encode(touched.display())?}), "finished")?
 }}
 """,
-  )?
+  )
 
-  test.unix_fake(ctx, {event_kind: "child", pid: 1000, status_code: 1})?
+  test.unix_fake(ctx, {event_kind: "child", pid: 1000, status_code: 1})
   let scan = xinit_text(
     ctx,
     ["scan", "demo"],
@@ -1275,7 +1275,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit] {{
   )?
   assert scan == ""
   assert touched.read_text()? == "finished"
-  test.unix_fake(ctx, {})?
+  test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {XINIT_RUN_DIR: run_dir.display(), XSH_UNIX_DRY_RUN: "1"})?
 
   assert status == """demo down pid=0 ready=false log=append desired=down restarts=0

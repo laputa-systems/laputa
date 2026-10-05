@@ -142,7 +142,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let triple = rust_triple(arch)
   let src = fs.cwd()?
-  ensure_locked_v8(p"Cargo.lock")?
+  ensure_locked_v8(p"Cargo.lock")
 
   # Two patches, applied in XSH (no `patch` binary):
   # deno-distribution-features drops the `upgrade` subcommand (it would
@@ -216,5 +216,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "-p" "deno" "--bin" "deno" ?
   }?
 
-  fs.install(p"target/release/deno", fp"{dest}/usr/bin/deno", 0o755, parents: true, overwrite: true)?
+  fs.install(p"target/release/deno", fp"{dest}/usr/bin/deno", 0o755, parents: true, overwrite: true)
 }

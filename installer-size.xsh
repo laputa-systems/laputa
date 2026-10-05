@@ -77,15 +77,15 @@ proc print_package_sizes(label: Str, rootfs: Path) [fs, error] {
 
 proc print_report(arch: Str, work: Path, iso: Path, kernel: Path) [fs, error] {
   print installer size report: $arch
-  print_path_size("iso", iso)?
-  print_path_size("kernel", kernel)?
-  print_path_size("target rootfs", fp"{work}/rootfs-target")?
-  print_path_size("installer rootfs", fp"{work}/rootfs-installer")?
-  print_path_size("tools rootfs", fp"{work}/rootfs-tools")?
-  print_path_size("target root payload", fp"{work}/target-root.tar.gz")?
-  print_path_size("installer root image", fp"{work}/installer-root.ext4")?
-  print_package_sizes("target rootfs", fp"{work}/rootfs-target")?
-  print_package_sizes("installer rootfs", fp"{work}/rootfs-installer")?
+  print_path_size("iso", iso)
+  print_path_size("kernel", kernel)
+  print_path_size("target rootfs", fp"{work}/rootfs-target")
+  print_path_size("installer rootfs", fp"{work}/rootfs-installer")
+  print_path_size("tools rootfs", fp"{work}/rootfs-tools")
+  print_path_size("target root payload", fp"{work}/target-root.tar.gz")
+  print_path_size("installer root image", fp"{work}/installer-root.ext4")
+  print_package_sizes("target rootfs", fp"{work}/rootfs-target")
+  print_package_sizes("installer rootfs", fp"{work}/rootfs-installer")
 }
 
 proc main(...argv: List[Str]) [fs, env, error] {
@@ -115,7 +115,7 @@ proc main(...argv: List[Str]) [fs, env, error] {
     host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   }
 
-  print_report(arch, work, iso, kernel)?
+  print_report(arch, work, iso, kernel)
 }
 
-main(@args)?
+main(@args)

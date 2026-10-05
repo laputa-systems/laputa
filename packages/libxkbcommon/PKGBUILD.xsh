@@ -108,8 +108,8 @@ export const filetree = [
 #   bison --defines=parser.h -o parser.c -p _xkbcommon_ \
 #     libxkbcommon-xkbcommon-VERSION/src/xkbcomp/parser.y
 proc patch_vendored_parser() [fs, error] {
-  fs.install(p"generated/parser.c", p"src/xkbcomp/parser.c", 0o644, parents: true, overwrite: true)?
-  fs.install(p"generated/parser.h", p"src/xkbcomp/parser.h", 0o644, parents: true, overwrite: true)?
+  fs.install(p"generated/parser.c", p"src/xkbcomp/parser.c", 0o644, parents: true, overwrite: true)
+  fs.install(p"generated/parser.h", p"src/xkbcomp/parser.h", 0o644, parents: true, overwrite: true)
   let meson = p"meson.build"
   var text = meson.read_text()?
 
@@ -135,7 +135,7 @@ yacc = 'vendored parser'
   )
 
   text = text.replace("'yacc': yacc.full_path() + ' ' + yacc.version(),", "'yacc': yacc,")
-  fs.write(meson, text)?
+  fs.write(meson, text)
 }
 
 error XkbcommonError = Patch(message: Str)
@@ -163,15 +163,15 @@ endforeach
     return Err(XkbcommonError.Patch("meson.build no longer reads the legacy XKB root from pkg-config"))?
   }
 
-  fs.write(meson, text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))?
+  fs.write(meson, text.replace(lookup, "XKB_LEGACY_ROOT = ''\n"))
 }
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let pc = pm_env.pkg_config_context()?
-  patch_vendored_parser()?
-  patch_legacy_root()?
+  patch_vendored_parser()
+  patch_legacy_root()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -192,5 +192,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  fs.remove(fp"{dest}/usr/share/bash-completion", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/bash-completion", missing_ok: true)
 }

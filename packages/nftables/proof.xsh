@@ -46,10 +46,10 @@ table inet laputa_proof {
 """
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "nftables")?
-  proof.target_elf(root, p"usr/bin/nft", "nftables")?
-  proof.target_elf(root, p"usr/lib/libnftables.so.1.1.0", "nftables")?
-  proof.ensure(fs.exists(fp"{root}/usr/include/nftables/libnftables.h")?, "nftables", "missing libnftables.h")?
+  proof.package_metadata(root, "nftables")
+  proof.target_elf(root, p"usr/bin/nft", "nftables")
+  proof.target_elf(root, p"usr/lib/libnftables.so.1.1.0", "nftables")
+  proof.ensure(fs.exists(fp"{root}/usr/include/nftables/libnftables.h")?, "nftables", "missing libnftables.h")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"nftables ok: cross-built {pm_util.target_arch()?}"
@@ -61,15 +61,15 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let nft = fp"{root}/usr/bin/nft"
   let libdir = fp"{root}/usr/lib".display()
   let tmp = fp"{root}/var/tmp/proof-nftables"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
 
   let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version" ?
-  proof.ensure(version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)", "nftables-version", f"unexpected version: {version.trim()}")?
+  proof.ensure(version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)", "nftables-version", f"unexpected version: {version.trim()}")
 
   let rules = fp"{tmp}/laputa.nft"
-  fs.write(rules, ruleset)?
+  fs.write(rules, ruleset)
   let checked = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $rules ?
 
   let kernel = if checked.status.ok {
@@ -81,23 +81,23 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
       refused in checked.stderr and checked.stderr.split(": Error: ").len() == 2,
       "nftables-check",
       f"nft --check failed before the kernel boundary: {checked.stderr.trim()}",
-    )?
+    )
 
     "kernel refused the batch without CAP_NET_ADMIN"
   }
 
   let mismatched = fp"{tmp}/mismatched.nft"
-  fs.write(mismatched, mismatched_ruleset)?
+  fs.write(mismatched, mismatched_ruleset)
   let rejected = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $mismatched ?
-  proof.ensure(! rejected.status.ok, "nftables-evaluate", "nft accepted an IPv4 match against an IPv6 set")?
+  proof.ensure(! rejected.status.ok, "nftables-evaluate", "nft accepted an IPv4 match against an IPv6 set")
 
   proof.ensure(
     "datatype mismatch, expected IPv4 address, expression has type IPv6 address" in rejected.stderr,
     "nftables-evaluate",
     f"unexpected evaluation error: {rejected.stderr.trim()}",
-  )?
+  )
 
   print f"nftables ok: --version, ruleset evaluated ({kernel}), type mismatch rejected"
 }
 
-main(@args)?
+main(@args)

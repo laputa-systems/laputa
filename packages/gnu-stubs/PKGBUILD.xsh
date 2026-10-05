@@ -106,7 +106,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let multf3 = fp"{builtins_dir}/multf3.c.o"
   let trunctfdf2 = fp"{builtins_dir}/trunctfdf2.c.o"
   let clear_cache = fp"{builtins_dir}/clear_cache.c.o"
-  fs.write(stub_src, "")?
+  fs.write(stub_src, "")
   fs.write(
     visibility_map,
     """__floatunditf
@@ -121,7 +121,7 @@ __letf2
 __floatsitf
 __gttf2
 """,
-  )?
+  )
   fs.write(
     export_map,
     """{
@@ -129,10 +129,10 @@ __gttf2
     *;
 };
 """,
-  )?
-  fs.mkdir(libdir.parent)?
-  fs.mkdir(libdir)?
-  fs.mkdir(builtins_dir)?
+  )
+  fs.mkdir(libdir.parent)
+  fs.mkdir(libdir)
+  fs.mkdir(builtins_dir)
 
   env ({
     LD_LIBRARY_PATH: f"{llvm_root}/lib:{e"LD_LIBRARY_PATH" ?? ""}",
@@ -154,15 +154,15 @@ __gttf2
     ] {
       let visible = fp"{object}.visible"
       run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible ?
-      fs.rename(visible, object, overwrite: true)?
+      fs.rename(visible, object, overwrite: true)
     }
 
-    fs.remove(stub_src)?
+    fs.remove(stub_src)
     run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf $floatunditf $multf3 $trunctfdf2 $clear_cache ?
   }?
 
-  fs.remove(builtins_dir)?
-  fs.remove(visibility_map)?
-  fs.remove(export_map)?
-  fs.symlink(p"libgcc_s.so", fp"{libdir}/libgcc_s.so.1")?
+  fs.remove(builtins_dir)
+  fs.remove(visibility_map)
+  fs.remove(export_map)
+  fs.symlink(p"libgcc_s.so", fp"{libdir}/libgcc_s.so.1")
 }

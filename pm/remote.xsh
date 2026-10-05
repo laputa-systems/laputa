@@ -48,12 +48,12 @@ export proc net_put_file(url: Str, source: Path, token: Str) [net, error] {
 export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: Path) [fs, net, error] {
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, rel)?
-    fs.mkdir(dest.parent)?
-    fs.copy(source, dest, overwrite: true)?
+    fs.mkdir(dest.parent)
+    fs.copy(source, dest, overwrite: true)
     return
   }
 
-  net_put_file(util.repo_url_for(repo, rel)?, source, token)?
+  net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
 ## Publishes one immutable repository object. A file remote receives a temporary copy and rename;
@@ -83,7 +83,7 @@ export proc upload_immutable_repo_file(
     # objects its failed attempt already uploaded; identical bytes are done.
     if response.status == 409 or response.status == 412 {
       let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
-      fs.mkdir(existing.parent)?
+      fs.mkdir(existing.parent)
       defer fs.remove(existing, missing_ok: true)?
       let failure = try_fetch_repo_file(repo, rel, existing)?
 
@@ -108,11 +108,11 @@ export proc upload_immutable_repo_file(
   }
 
   let temporary = fp"{dest.parent}/.{dest.name}.tmp"
-  fs.mkdir(dest.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(dest.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary, overwrite: true)?
-  fs.rename(temporary, dest)?
+  fs.copy(source, temporary, overwrite: true)
+  fs.rename(temporary, dest)
   true
 }
 
@@ -155,8 +155,8 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) [fs, net, error] -> R
   let body = response.body.utf8()?
   let rows: List[Record] = json.decode(body)?.require(List[Record])?
   let items = decode_remote_index(rows)?
-  fs.mkdir(out)?
-  fs.write_atomic(util.remote_index_cache_path(out), body)?
+  fs.mkdir(out)
+  fs.write_atomic(util.remote_index_cache_path(out), body)
   items
 }
 
@@ -232,8 +232,8 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
 
 ## Exported PM declaration `write_remote_index_cache`.
 export proc write_remote_index_cache(out: Path, index: List[types.RemotePackage]) [fs, error] {
-  fs.mkdir(out)?
-  json.write(util.remote_index_cache_path(out), index)?
+  fs.mkdir(out)
+  json.write(util.remote_index_cache_path(out), index)
 }
 
 ## Exported PM declaration `write_remote_index_to_repo`.
@@ -244,20 +244,20 @@ export proc write_remote_index_to_repo(
   index: List[types.RemotePackage],
   token: Str,
 ) [fs, net, error] {
-  write_remote_index_cache(out, index)?
+  write_remote_index_cache(out, index)
 
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, p"index.json")?
     let temporary = fp"{dest.parent}/.{dest.name}.tmp"
-    fs.mkdir(dest.parent)?
-    fs.remove(temporary, missing_ok: true)?
+    fs.mkdir(dest.parent)
+    fs.remove(temporary, missing_ok: true)
     defer fs.remove(temporary, missing_ok: true)?
-    fs.copy(util.remote_index_cache_path(out), temporary, overwrite: true)?
-    fs.rename(temporary, dest, overwrite: true)?
+    fs.copy(util.remote_index_cache_path(out), temporary, overwrite: true)
+    fs.rename(temporary, dest, overwrite: true)
     return
   }
 
-  upload_repo_file(repo, p"index.json", util.remote_index_cache_path(out), token, work)?
+  upload_repo_file(repo, p"index.json", util.remote_index_cache_path(out), token, work)
 }
 
 ## Exported PM declaration `upsert_remote_package`.

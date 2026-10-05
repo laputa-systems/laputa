@@ -192,7 +192,7 @@ run(char *startup_cmd)
     "the -v option",
   )?
 
-  fs.write(source, text)?
+  fs.write(source, text)
 }
 
 ## Remove bindings whose launcher is intentionally absent from the minimal
@@ -249,7 +249,7 @@ static const char *termcmd[] = { "/usr/bin/foot", NULL };
 
   config = config_without_unavailable_menu(config)
 
-  fs.write(p"config.h", config)?
+  fs.write(p"config.h", config)
 }
 
 ## Exported declaration `build`.
@@ -269,8 +269,8 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let scanner = if cross_build { fp"{build_root}/usr/bin/wayland-scanner" } else { process.which("wayland-scanner")? }
   let packages = ["wayland-server", "xkbcommon", "libinput", "wlroots-0.20"]
-  patch_startup()?
-  write_config()?
+  patch_startup()
+  write_config()
 
   env ({
     LD_LIBRARY_PATH: native_tools_ld,
@@ -279,7 +279,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    generate_protocol_headers(pkg_config, root, scanner)?
+    generate_protocol_headers(pkg_config, root, scanner)
     let pkg_cflags = pkg_config_flags(pkg_config, "--cflags", packages)?
     let pkg_libs = pkg_config_flags(pkg_config, "--libs", packages)?
 
@@ -299,5 +299,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cc "dwl.c" "-o" "dwl" @cflags @pkg_libs "-lm" ?
   }?
 
-  fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)?
+  fs.install(p"dwl", fp"{dest}/usr/bin/dwl", 0o755, parents: true, overwrite: true)
 }

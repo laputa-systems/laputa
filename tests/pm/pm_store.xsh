@@ -76,9 +76,9 @@ proc staged_artifact(
   let payload_path = fp"{root}/payload.tar.gz"
   let metadata_path = fp"{root}/metadata.json"
   let proof_path = fp"{root}/proof.json"
-  fs.write(payload_path, payload)?
-  fs.write(metadata_path, metadata)?
-  fs.write(proof_path, proof)?
+  fs.write(payload_path, payload)
+  fs.write(metadata_path, metadata)
+  fs.write(proof_path, proof)
   {
     root,
     staged: {
@@ -97,7 +97,7 @@ proc store_root(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
 
 proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt], expected: Str) [error] {
   match result {
-    Ok(_) => test.fail(f"{expected}: operation unexpectedly succeeded")?
+    Ok(_) => test.fail(f"{expected}: operation unexpectedly succeeded")
     Err(problem) => assert expected in problem.message
   }
 }
@@ -105,8 +105,8 @@ proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt],
 test test_store_rejects_missing_and_invalid_keys [fs, error] { |ctx|
   let root = store_root(ctx, "store-missing")?
   let key = digest("missing")
-  expect_store_error(ctx, store.lookup(root, key), "is missing")?
-  expect_store_error(ctx, store.lookup(root, "../not-a-key"), "artifact key must be a lowercase SHA-256 digest")?
+  expect_store_error(ctx, store.lookup(root, key), "is missing")
+  expect_store_error(ctx, store.lookup(root, "../not-a-key"), "artifact key must be a lowercase SHA-256 digest")
 }
 
 test test_store_commits_atomically_and_reuses_exact_artifact [fs, error] { |ctx|
@@ -136,7 +136,7 @@ test test_store_receipt_preserves_x86_64_target [fs, error] { |ctx|
   assert types.target_text(store.lookup(root, key)?.target) == "x86_64-linux-musl"
 
   match store.commit(types.target_aarch64(), root, test_node(key), stage.staged) {
-    Ok(_) => test.fail("artifact key was reused across targets")?
+    Ok(_) => test.fail("artifact key was reused across targets")
     Err(problem) => assert "target does not match requested aarch64-linux-musl" in problem.message
   }
 }
@@ -168,16 +168,16 @@ test test_store_receipts_deduplicate_shared_runtime_and_build_host_artifacts [fs
   fs.write(
     fp"{final_dir}/artifact.json",
     json.encode({...raw, dependency_keys: [dependency_key, dependency_key]})? + "\n",
-  )?
-  expect_store_error(ctx, store.verify_artifact(root, key), "repeats dependency key")?
+  )
+  expect_store_error(ctx, store.verify_artifact(root, key), "repeats dependency key")
 }
 
 test test_store_discards_incomplete_temporary_artifacts [fs, error] { |ctx|
   let root = store_root(ctx, "store-temporary")?
   let key = digest("temporary")
   let temporary = fp"{root}/v2/tmp/{key}"
-  fs.mkdir(temporary)?
-  fs.write(fp"{temporary}/payload.tar.gz", "incomplete")?
+  fs.mkdir(temporary)
+  fs.write(fp"{temporary}/payload.tar.gz", "incomplete")
   let receipt = store.commit(
     types.target_aarch64(),
     root,
@@ -198,10 +198,10 @@ test test_store_verify_all_ignores_temporary_state_and_checks_finals [fs, error]
     staged_artifact(ctx, "store-verify-all-stage")?.staged,
   )?
   let temporary = fp"{root}/v2/tmp/{digest("ignored")}"
-  fs.mkdir(temporary)?
-  fs.write(fp"{temporary}/partial", "interrupted")?
+  fs.mkdir(temporary)
+  fs.write(fp"{temporary}/partial", "interrupted")
 
-  test.eq(store.verify_all(root)?, [receipt])?
+  test.eq(store.verify_all(root)?, [receipt])
 }
 
 test test_store_serializes_duplicate_concurrent_commits [fs, process, env, error] { |ctx|
@@ -244,7 +244,7 @@ proc main(...argv: List[Str]) [fs, error] {
 
 main(@args)?
 """,
-  )?
+  )
   let configured = e"XSH_HOST" ?? ""
   let runner = if configured != "" { fp"{configured}" } else { process.which("xsh")? }
   let first = spawn run $runner $script $root $key ${stage.staged.payload} ${stage.staged.metadata} ${stage.staged.proof} ?
@@ -263,13 +263,13 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
   let committed = store.commit(types.target_aarch64(), root, test_node(key), stage.staged)?
 
   # Lookups trust the hashes recorded at commit; explicit verification re-hashes.
-  fs.write(fp"{final_dir}/payload.tar.gz", "corrupted payload")?
+  fs.write(fp"{final_dir}/payload.tar.gz", "corrupted payload")
   assert store.lookup(root, key)? == committed
-  expect_store_error(ctx, store.verify_artifact(root, key), "payload SHA-256 does not match receipt")?
+  expect_store_error(ctx, store.verify_artifact(root, key), "payload SHA-256 does not match receipt")
 
-  fs.write(fp"{final_dir}/payload.tar.gz", "payload")?
-  fs.write(fp"{final_dir}/artifact.json", "not JSON")?
-  expect_store_error(ctx, store.verify_artifact(root, key), "invalid JSON")?
+  fs.write(fp"{final_dir}/payload.tar.gz", "payload")
+  fs.write(fp"{final_dir}/artifact.json", "not JSON")
+  expect_store_error(ctx, store.verify_artifact(root, key), "invalid JSON")
 
   let clean_root = store_root(ctx, "store-key-corrupt")?
   let clean_dir = store.artifact_path(clean_root, key)
@@ -280,8 +280,8 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
     staged_artifact(ctx, "store-key-corrupt-stage")?.staged,
   )?
   let raw = json.read(fp"{clean_dir}/artifact.json")?.require(ReceiptDto)?
-  fs.write(fp"{clean_dir}/artifact.json", json.encode({...raw, key: digest("other key")})? + "\n")?
-  expect_store_error(ctx, store.verify_artifact(clean_root, key), "does not match")?
+  fs.write(fp"{clean_dir}/artifact.json", json.encode({...raw, key: digest("other key")})? + "\n")
+  expect_store_error(ctx, store.verify_artifact(clean_root, key), "does not match")
 }
 
 test test_store_staging_failure_never_publishes_final [fs, error] { |ctx|
@@ -289,7 +289,7 @@ test test_store_staging_failure_never_publishes_final [fs, error] { |ctx|
   let key = digest("staging-failure")
   let stage = staged_artifact(ctx, "store-staging-failure-stage")?
   let broken = {...stage.staged, payload: fp"{stage.root}/missing-payload.tar.gz"}
-  expect_store_error(ctx, store.commit(types.target_aarch64(), root, test_node(key), broken), "No such file")?
+  expect_store_error(ctx, store.commit(types.target_aarch64(), root, test_node(key), broken), "No such file")
   assert fs.exists(store.artifact_path(root, key))? == false
 }
 
@@ -311,10 +311,10 @@ proc remote_fixture(ctx: TestContext, name: Str, payload: Str, metadata: Str) [f
   let root = test.temp_dir(ctx, name:)?
   let tarball = fp"{root}/packages/aarch64/demo/demo-1.0.0-1.tar.gz"
   let metadata_path = fp"{root}/metadata/aarch64/demo/demo-1.0.0-1.json"
-  fs.mkdir(tarball.parent)?
-  fs.mkdir(metadata_path.parent)?
-  fs.write(tarball, payload)?
-  fs.write(metadata_path, metadata)?
+  fs.mkdir(tarball.parent)
+  fs.mkdir(metadata_path.parent)
+  fs.write(tarball, payload)
+  fs.write(metadata_path, metadata)
   root
 }
 
@@ -354,7 +354,7 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
       test.temp_dir(ctx, name: "store-remote-hash-cache")?,
     ),
     "payload SHA-256 mismatch",
-  )?
+  )
   assert fs.exists(store.artifact_path(root, key))? == false
 
   let bad_metadata = json.encode({name: "not-demo", ver: "1.0.0", rel: "1", executor_sha256: digest("remote executor")})?
@@ -370,7 +370,7 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
       test.temp_dir(ctx, name: "store-remote-metadata-cache")?,
     ),
     "remote metadata does not match plan node",
-  )?
+  )
   assert fs.exists(store.artifact_path(root, metadata_key))? == false
 }
 
@@ -387,20 +387,20 @@ test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs
 
   let final_dir = store.artifact_path(root, key)
   let raw = json.read(fp"{final_dir}/artifact.json")?.require(ReceiptDto)?
-  fs.write(fp"{final_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")?
+  fs.write(fp"{final_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")
   expect_store_error(
     ctx,
     store.lookup(root, key),
     f"unsupported receipt format laputa-package-artifact-1; this PM reads {store.receipt_format}",
-  )?
+  )
 
   # Artifacts under an older layout directory are never read or listed.
   let legacy_root = store_root(ctx, "store-legacy-layout")?
   let legacy_dir = fp"{legacy_root}/v1/sha256/{key}"
-  fs.mkdir(legacy_dir)?
-  fs.write(fp"{legacy_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")?
-  expect_store_error(ctx, store.lookup(legacy_root, key), "is missing")?
-  test.eq(store.verify_all(legacy_root)?, [])?
+  fs.mkdir(legacy_dir)
+  fs.write(fp"{legacy_dir}/artifact.json", json.encode({...raw, format: "laputa-package-artifact-1"})? + "\n")
+  expect_store_error(ctx, store.lookup(legacy_root, key), "is missing")
+  test.eq(store.verify_all(legacy_root)?, [])
 }
 
 # Garbage collection keeps exactly the artifacts the kept plans name, with
@@ -413,11 +413,11 @@ test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx
   let _ = store.commit(types.target_aarch64(), root, test_node(dropped), staged_artifact(ctx, "store-gc-dropped")?.staged)?
   let kept_reproof = store.reproof_receipt_path(root, kept, digest("gc-kept-proof"))
   let dropped_reproof = store.reproof_receipt_path(root, dropped, digest("gc-dropped-proof"))
-  fs.mkdir(kept_reproof.parent)?
-  fs.write(kept_reproof, "{}")?
-  fs.mkdir(dropped_reproof.parent)?
-  fs.write(dropped_reproof, "{}")?
-  fs.mkdir(fp"{root}/v2/tmp/{digest("gc-interrupted")}")?
+  fs.mkdir(kept_reproof.parent)
+  fs.write(kept_reproof, "{}")
+  fs.mkdir(dropped_reproof.parent)
+  fs.write(dropped_reproof, "{}")
+  fs.mkdir(fp"{root}/v2/tmp/{digest("gc-interrupted")}")
 
   let removed = store.gc(root, [kept])?
   assert removed.artifacts == 1
@@ -426,5 +426,5 @@ test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx
   assert fs.exists(kept_reproof)?
   assert ! fs.exists(dropped_reproof.parent)?
   assert fs.children(fp"{root}/v2/tmp")?.collect().len() == 0
-  test.eq(store.verify_all(root)?.len(), 1)?
+  test.eq(store.verify_all(root)?.len(), 1)
 }

@@ -116,7 +116,7 @@ proc write_cap_names_list() [fs, error] {
     }
   }
 
-  fs.write(p"libcap/cap_names.list.h", out)?
+  fs.write(p"libcap/cap_names.list.h", out)
 }
 
 ## Package recipe export.
@@ -140,7 +140,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  write_cap_names_list()?
+  write_cap_names_list()
 
   # cap_names.h is printed by _makenames, which tabulates the names above.
   let makenames = make.c_program({
@@ -158,9 +158,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks([{...task, env: build_task_env} for task in makenames.tasks], make.jobs()?)?
+  make.run_tasks([{...task, env: build_task_env} for task in makenames.tasks], make.jobs()?)
   let makenames_bin = makenames.output
-  fs.write(p"libcap/cap_names.h", run.text $makenames_bin ?)?
+  fs.write(p"libcap/cap_names.h", run.text $makenames_bin ?)
 
   let lib_cflags = ["-O2", "-D_LIBPSX_PTHREAD_LINKAGE"]
   let objects = make.compile_lo_tasks(cc, triple, lib_cflags, [], cppflags, p".", libcap_sources, p"obj/libcap")
@@ -232,20 +232,20 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: progs_deps,
   })
 
-  make.run_tasks([@objects.tasks, magic, link, @capsh.tasks, @prog_tasks], make.jobs()?)?
+  make.run_tasks([@objects.tasks, magic, link, @capsh.tasks, @prog_tasks], make.jobs()?)
 
   let bindir = fp"{dest}/usr/bin"
-  fs.mkdir(bindir, parents: true)?
+  fs.mkdir(bindir, parents: true)
 
   for prog in ["getcap", "getpcaps", "setcap", "capsh"] {
-    fs.install(fp"obj/{prog}-bin", fp"{bindir}/{prog}", 0o755, overwrite: true)?
+    fs.install(fp"obj/{prog}-bin", fp"{bindir}/{prog}", 0o755, overwrite: true)
   }
 
   let libdir = fp"{dest}/usr/lib"
-  fs.install(library, fp"{libdir}/libcap.so.2.78", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libcap.so.2.78", fp"{libdir}/libcap.so.2")?
-  fs.symlink(p"libcap.so.2", fp"{libdir}/libcap.so")?
-  fs.install(p"libcap/include/sys/capability.h", fp"{dest}/usr/include/sys/capability.h", 0o644, parents: true, overwrite: true)?
+  fs.install(library, fp"{libdir}/libcap.so.2.78", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libcap.so.2.78", fp"{libdir}/libcap.so.2")
+  fs.symlink(p"libcap.so.2", fp"{libdir}/libcap.so")
+  fs.install(p"libcap/include/sys/capability.h", fp"{dest}/usr/include/sys/capability.h", 0o644, parents: true, overwrite: true)
 
   # libcap.pc.in with the substitutions libcap/Makefile applies; @deps@ is
   # empty because the library links nothing beyond libc.
@@ -257,6 +257,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     .replace("@VERSION@", ver)
     .replace("@deps@", "")
 
-  fs.mkdir(fp"{libdir}/pkgconfig")?
-  fs.write(fp"{libdir}/pkgconfig/libcap.pc", pc)?
+  fs.mkdir(fp"{libdir}/pkgconfig")
+  fs.write(fp"{libdir}/pkgconfig/libcap.pc", pc)
 }

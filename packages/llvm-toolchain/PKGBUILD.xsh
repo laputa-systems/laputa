@@ -481,10 +481,10 @@ main(@args)?
 
 proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) [fs, error] {
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
-  fs.mkdir(path_value.parent())?
-  fs.remove(path_value, missing_ok: true)?
-  fs.write(path_value, xsh_wrapper_source(real, clang, cxx))?
-  fs.chmod(path_value, 0o755)?
+  fs.mkdir(path_value.parent())
+  fs.remove(path_value, missing_ok: true)
+  fs.write(path_value, xsh_wrapper_source(real, clang, cxx))
+  fs.chmod(path_value, 0o755)
 }
 
 proc require_file(path_value: Path, label: Str) [fs, error] {
@@ -494,7 +494,7 @@ proc require_file(path_value: Path, label: Str) [fs, error] {
 }
 
 proc require_executable(path_value: Path, label: Str) [fs, error] {
-  require_file(path_value, label)?
+  require_file(path_value, label)
   let meta = fs.metadata(path_value)?
 
   if meta.mode % 0o1000 == 0 {
@@ -507,8 +507,8 @@ proc install_tool_alias(bin: Path, tool_name: Str, target: Str) [fs, error] {
 
   return when fs.exists(link)?
 
-  require_file(fp"{bin}/{target}", target)?
-  fs.symlink(fp"{target}", link)?
+  require_file(fp"{bin}/{target}", target)
+  fs.symlink(fp"{target}", link)
 }
 
 proc install_prebuilt_tree(dest: Path) [fs, env, error] {
@@ -520,13 +520,13 @@ proc install_prebuilt_tree(dest: Path) [fs, env, error] {
     return Err(LlvmToolchainError.Failed("missing staged LLVM prebuilt tree"))
   }
 
-  fs.remove(target, missing_ok: true)?
+  fs.remove(target, missing_ok: true)
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
   let bin = fp"{target}/bin"
-  install_tool_alias(bin, "clang-23", "clang")?
-  install_tool_alias(bin, "clang++", "clang")?
-  install_tool_alias(bin, "ld.lld", "lld")?
-  install_tool_alias(bin, "llvm-readelf", "llvm-readobj")?
+  install_tool_alias(bin, "clang-23", "clang")
+  install_tool_alias(bin, "clang++", "clang")
+  install_tool_alias(bin, "ld.lld", "lld")
+  install_tool_alias(bin, "llvm-readelf", "llvm-readobj")
 
   for tool in [
     "clang",
@@ -540,36 +540,36 @@ proc install_prebuilt_tree(dest: Path) [fs, env, error] {
     "llvm-readelf",
     "llvm-strip",
   ] {
-    require_executable(fp"{bin}/{tool}", tool)?
+    require_executable(fp"{bin}/{tool}", tool)
   }
 
-  require_file(fp"{target}/lib/clang/23/include/stddef.h", "Clang resource headers")?
-  require_file(fp"{target}/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")?
+  require_file(fp"{target}/lib/clang/23/include/stddef.h", "Clang resource headers")
+  require_file(fp"{target}/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")
 }
 
 ## Install target-specific compiler wrapper links.
 export proc install_wrappers(dest: Path) [fs, error] {
-  write_wrapper(dest, "cc", /usr/lib/llvm23/bin/clang, clang: true)?
-  write_wrapper(dest, "clang", /usr/lib/llvm23/bin/clang, clang: true)?
-  write_wrapper(dest, "c++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)?
-  write_wrapper(dest, "clang++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)?
-  write_wrapper(dest, "ld", /usr/lib/llvm23/bin/ld.lld)?
-  write_wrapper(dest, "ld.lld", /usr/lib/llvm23/bin/ld.lld)?
-  write_wrapper(dest, "ar", /usr/lib/llvm23/bin/llvm-ar)?
-  write_wrapper(dest, "ranlib", /usr/lib/llvm23/bin/llvm-ranlib)?
-  write_wrapper(dest, "nm", /usr/lib/llvm23/bin/llvm-nm)?
-  write_wrapper(dest, "objcopy", /usr/lib/llvm23/bin/llvm-objcopy)?
-  write_wrapper(dest, "objdump", /usr/lib/llvm23/bin/llvm-objdump)?
-  write_wrapper(dest, "readelf", /usr/lib/llvm23/bin/llvm-readelf)?
-  write_wrapper(dest, "strip", /usr/lib/llvm23/bin/llvm-strip)?
+  write_wrapper(dest, "cc", /usr/lib/llvm23/bin/clang, clang: true)
+  write_wrapper(dest, "clang", /usr/lib/llvm23/bin/clang, clang: true)
+  write_wrapper(dest, "c++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)
+  write_wrapper(dest, "clang++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)
+  write_wrapper(dest, "ld", /usr/lib/llvm23/bin/ld.lld)
+  write_wrapper(dest, "ld.lld", /usr/lib/llvm23/bin/ld.lld)
+  write_wrapper(dest, "ar", /usr/lib/llvm23/bin/llvm-ar)
+  write_wrapper(dest, "ranlib", /usr/lib/llvm23/bin/llvm-ranlib)
+  write_wrapper(dest, "nm", /usr/lib/llvm23/bin/llvm-nm)
+  write_wrapper(dest, "objcopy", /usr/lib/llvm23/bin/llvm-objcopy)
+  write_wrapper(dest, "objdump", /usr/lib/llvm23/bin/llvm-objdump)
+  write_wrapper(dest, "readelf", /usr/lib/llvm23/bin/llvm-readelf)
+  write_wrapper(dest, "strip", /usr/lib/llvm23/bin/llvm-strip)
 
   for tool in ["ar", "ranlib", "nm", "objcopy", "objdump", "readelf", "strip"] {
-    write_wrapper(dest, f"llvm-{tool}", fp"/usr/lib/llvm23/bin/llvm-{tool}")?
+    write_wrapper(dest, f"llvm-{tool}", fp"/usr/lib/llvm23/bin/llvm-{tool}")
   }
 }
 
 ## Build and install the LLVM toolchain package.
 export proc build(dest: Path) [fs, process, env, error] {
-  install_prebuilt_tree(dest)?
-  install_wrappers(dest)?
+  install_prebuilt_tree(dest)
+  install_wrappers(dest)
 }

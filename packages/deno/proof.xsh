@@ -3,7 +3,7 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.target_elf(rootfs, p"usr/bin/deno", "deno")?
+  proof.target_elf(rootfs, p"usr/bin/deno", "deno")
   let arch = pm_util.target_arch()?
 
   if pm_util.build_arch()? != arch {
@@ -15,8 +15,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let deno = fp"{rootfs}/usr/bin/deno"
   let tmp = fp"{rootfs}/var/tmp/proof-deno"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
 
   # A relative import and a type annotation: `deno run` strips the types and
@@ -27,7 +27,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   return values.reduce((total, value) => total + value, 0);
 }
 """,
-  )?
+  )
   fs.write(
     fp"{tmp}/main.ts",
     r"""import { sum } from "./sum.ts";
@@ -35,7 +35,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
 const total: number = sum([40, 1, 1]);
 console.log(`total=${total}`);
 """,
-  )?
+  )
   # The checker must reject a mistyped program, or a passing check proves nothing.
   fs.write(
     fp"{tmp}/mistyped.ts",
@@ -44,7 +44,7 @@ console.log(`total=${total}`);
 const total: string = sum([1, 2]);
 console.log(total);
 """,
-  )?
+  )
 
   var version = ""
   var evaluated = ""
@@ -74,13 +74,13 @@ console.log(total);
   }?
 
   let first = version.trim().split("\n")[0]
-  proof.ensure(first.starts_with(f"deno {ver} "), "proof-deno", f"deno --version reported {first}, expected deno {ver}")?
-  proof.ensure(f"{arch}-unknown-linux-musl" in first, "proof-deno", f"deno --version names another target: {first}")?
-  proof.ensure(evaluated.trim() == "2", "proof-deno", f"deno eval printed {evaluated.trim()}, expected 2")?
-  proof.ensure(ran.trim() == "total=42", "proof-deno", f"deno run main.ts printed {ran.trim()}, expected total=42")?
-  proof.ensure("Check main.ts" in checked, "proof-deno", f"deno check main.ts did not type-check: {checked.trim()}")?
-  proof.ensure("TS2322" in mistyped, "proof-deno", f"deno check accepted a mistyped program: {mistyped.trim()}")?
+  proof.ensure(first.starts_with(f"deno {ver} "), "proof-deno", f"deno --version reported {first}, expected deno {ver}")
+  proof.ensure(f"{arch}-unknown-linux-musl" in first, "proof-deno", f"deno --version names another target: {first}")
+  proof.ensure(evaluated.trim() == "2", "proof-deno", f"deno eval printed {evaluated.trim()}, expected 2")
+  proof.ensure(ran.trim() == "total=42", "proof-deno", f"deno run main.ts printed {ran.trim()}, expected total=42")
+  proof.ensure("Check main.ts" in checked, "proof-deno", f"deno check main.ts did not type-check: {checked.trim()}")
+  proof.ensure("TS2322" in mistyped, "proof-deno", f"deno check accepted a mistyped program: {mistyped.trim()}")
   print f"deno ok: {first}"
 }
 
-main(@args)?
+main(@args)

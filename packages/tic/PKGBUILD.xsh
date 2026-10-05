@@ -119,6 +119,6 @@ proc check_caps_table() [fs, error] {
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  check_caps_table()?
-  fs.install(p"tic.xsh", fp"{dest}/usr/bin/tic", 0o755, parents: true, overwrite: true)?
+  check_caps_table()
+  fs.install(p"tic.xsh", fp"{dest}/usr/bin/tic", 0o755, parents: true, overwrite: true)
 }

@@ -254,7 +254,7 @@ export pure is_local_repo_url(url: Str) -> Bool {
 ## follows redirects itself, so release hosts and mirrors that redirect need no
 ## separate probe.
 export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, net, error] -> Result[Str, Error] {
-  fs.mkdir(dest.parent)?
+  fs.mkdir(dest.parent)
 
   if is_file_url(url) {
     let source = file_url_path(url)?
@@ -262,8 +262,8 @@ export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, 
     return f"{url}: missing file" unless fs.exists(source)?
 
     let partial = fp"{dest.parent}/.{dest.name}.partial"
-    fs.copy(source, partial, overwrite: true)?
-    fs.rename(partial, dest, overwrite: true)?
+    fs.copy(source, partial, overwrite: true)
+    fs.rename(partial, dest, overwrite: true)
     return ""
   }
 
@@ -339,6 +339,6 @@ export pure checkout_mode(kind: Str, mode: Int) -> Int {
 export proc normalize_checkout_tree(root: Path) [fs, error] {
   for entry in [{path: root, kind: "dir"}].extend([{path: found.path, kind: found.kind} for found in fs.walk(root, hidden: true)]) {
     continue when entry.kind == "symlink"
-    fs.chmod(entry.path, checkout_mode(entry.kind, fs.metadata(entry.path)?.mode))?
+    fs.chmod(entry.path, checkout_mode(entry.kind, fs.metadata(entry.path)?.mode))
   }
 }

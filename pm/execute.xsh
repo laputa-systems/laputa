@@ -114,11 +114,11 @@ proc execute_receipt_closure(
 proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) [fs, error] {
   let root_plan = pm_root.trusted_preflight(target, artifacts)?
   let payload_keys = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
-  fs.mkdir(root)?
+  fs.mkdir(root)
 
   for receipt in artifacts {
     if receipt.key in payload_keys {
-      archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", root, 0, "auto", true)?
+      archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", root, 0, "auto", true)
     }
   }
 }
@@ -146,9 +146,9 @@ proc execute_stage_local(
   # build_prepared_package creates a traced dynamic runner beside its recipe. Keep that implementation
   # detail inside this node's work tree so execution never writes the checkout or another node's recipe.
   let _ = fs.copy_tree(pkg.dir, recipe_dir, parents: true, overwrite: true)?
-  util.normalize_checkout_tree(recipe_dir)?
+  util.normalize_checkout_tree(recipe_dir)
   let isolated_pkg = {...pkg, dir: recipe_dir}
-  fs.mkdir(source)?
+  fs.mkdir(source)
   # Package recipes may explicitly name repository-owned inputs (for example
   # laputa-pm's PM entrypoint/tree). Resolve those against the plan repository
   # while the recipe itself remains isolated under `work/recipe`.
@@ -156,7 +156,7 @@ proc execute_stage_local(
     XSH_PM_REPOSITORY_ROOT: context.repo_root.display(),
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
-    sources.prepare_package_source_tree(isolated_pkg, source)?
+    sources.prepare_package_source_tree(isolated_pkg, source)
   }?
 
   # Builds are native, so the composed build root is also the target root.
@@ -175,11 +175,11 @@ proc execute_stage_local(
     CXX: "c++",
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
-    pm_build.build_prepared_package(recipe_dir, source, dest, payload)?
+    pm_build.build_prepared_package(recipe_dir, source, dest, payload)
   }?
 
   let built = local.load_built_package_from_dest(isolated_pkg, node.package_id, payload, dest)?
-  local.write_package_metadata(metadata, target_arch, built, executor)?
+  local.write_package_metadata(metadata, target_arch, built, executor)
   {
     payload,
     payload_sha256: hash.sha256(payload)?.hex(),
@@ -190,22 +190,22 @@ proc execute_stage_local(
 }
 
 proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload_sha256: Str, proof: Path) [fs, error] {
-  pm_proof.verify_artifact_receipt(proof, node, payload_sha256)?
+  pm_proof.verify_artifact_receipt(proof, node, payload_sha256)
   let cached = store.reproof_receipt_path(store_root, node.artifact_key, node.proof_key)
-  fs.mkdir(cached.parent)?
+  fs.mkdir(cached.parent)
   let lock = fs.lock(fp"{cached.parent}/{node.proof_key}.lock")?
   defer fs.unlock(lock)?
 
   if fs.exists(cached)? {
-    pm_proof.verify_artifact_receipt(cached, node, payload_sha256)?
+    pm_proof.verify_artifact_receipt(cached, node, payload_sha256)
     return
   }
 
   let temporary = fp"{cached}.tmp"
-  fs.remove(temporary, missing_ok: true)?
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(proof, temporary, overwrite: true)?
-  fs.rename(temporary, cached)?
+  fs.copy(proof, temporary, overwrite: true)
+  fs.rename(temporary, cached)
 }
 
 # Runs the package proof against `payload` in a fresh root holding its runtime
@@ -224,7 +224,7 @@ proc execute_run_proof(
   # a payload archive nor a proof program, but still receive an immutable proof
   # receipt that binds this exact selector node to its opaque Store marker.
   if pkg.kind == types.package_meta() {
-    pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
+    pm_proof.write_artifact_receipt(proof, node, payload_sha256)
     return
   }
 
@@ -239,14 +239,14 @@ proc execute_run_proof(
   # A proof root is a target runtime closure only: no executor substrate, so
   # the proof cannot pass on files the runner happens to provide.
   let proof_root = fp"{root_handle.host_path()?}/proof-root"
-  execute_compose_root(context.plan.target, proof_root, runtime_artifacts)?
-  archive.tar_extract(payload, proof_root, 0, "auto", true)?
+  execute_compose_root(context.plan.target, proof_root, runtime_artifacts)
+  archive.tar_extract(payload, proof_root, 0, "auto", true)
   env ({
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {
-    pm_proof.run_artifact_proof(proof_root, pkg)?
+    pm_proof.run_artifact_proof(proof_root, pkg)
   }?
-  pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
+  pm_proof.write_artifact_receipt(proof, node, payload_sha256)
 }
 
 proc execute_build_local(
@@ -262,14 +262,14 @@ proc execute_build_local(
   if pkg.kind == types.package_meta() {
     # Selectors have no build sandbox; their declared dependencies are ordered
     # by the BuildPlan and proved independently before this node executes.
-    fs.mkdir(build_root)?
+    fs.mkdir(build_root)
   } else {
     let dependencies = execute_receipt_closure(context, store.receipt_dependency_keys(node))?
-    execute_compose_root(context.plan.target, build_root, dependencies)?
+    execute_compose_root(context.plan.target, build_root, dependencies)
     # Only compilation receives the host executor substrate.  A proof root is a
     # target runtime closure; leaking /bin and /usr from the runner both masks
     # missing dependencies and conflicts with baselayout's owned symlinks.
-    pm_build.seed_executor_substrate(build_root)?
+    pm_build.seed_executor_substrate(build_root)
   }
 
   let staged = execute_stage_local(context, node, pkg, build_root, work)?
@@ -282,7 +282,7 @@ proc execute_build_local(
   }
 
   let receipt = store.commit(context.plan.target, context.store_root, node, staged)?
-  execute_require_receipt(context.plan, node, receipt)?
+  execute_require_receipt(context.plan, node, receipt)
   receipt
 }
 
@@ -291,7 +291,7 @@ proc execute_existing_local(
   node: types.PlanNode,
 ) [fs, process, env, error] -> Result[types.ArtifactReceipt] {
   let receipt = store.lookup(context.store_root, node.artifact_key)?
-  execute_require_receipt(context.plan, node, receipt)?
+  execute_require_receipt(context.plan, node, receipt)
 
   # The proof key binds the package, the artifact key, and the proof input.
   return receipt when receipt.proof_key == node.proof_key
@@ -299,7 +299,7 @@ proc execute_existing_local(
   let cached = store.reproof_receipt_path(context.store_root, node.artifact_key, node.proof_key)
 
   if fs.exists(cached)? {
-    pm_proof.verify_artifact_receipt(cached, node, receipt.payload_sha256)?
+    pm_proof.verify_artifact_receipt(cached, node, receipt.payload_sha256)
     return receipt
   }
 
@@ -307,8 +307,8 @@ proc execute_existing_local(
   let root_handle = fs.tempdir()?
   defer root_handle.close()?
   let proof = fp"{root_handle.host_path()?}/proof.json"
-  execute_run_proof(context, node, pkg, fp"{receipt.artifact_dir}/payload.tar.gz", receipt.payload_sha256, proof)?
-  execute_publish_proof_cache(context.store_root, node, receipt.payload_sha256, proof)?
+  execute_run_proof(context, node, pkg, fp"{receipt.artifact_dir}/payload.tar.gz", receipt.payload_sha256, proof)
+  execute_publish_proof_cache(context.store_root, node, receipt.payload_sha256, proof)
   receipt
 }
 
@@ -326,7 +326,7 @@ proc execute_remote_node(
   defer cache_handle.close()?
   let cache = cache_handle.host_path()?
   let receipt = store.import_remote(context.plan.target, context.store_root, node, context.remote_repo, cache)?
-  execute_require_receipt(context.plan, node, receipt)?
+  execute_require_receipt(context.plan, node, receipt)
   receipt
 }
 
@@ -416,7 +416,7 @@ proc execute_scheduled(
   var running: List[RunningNode] = []
   var finished: List[FinishedNode] = []
   var failure = ""
-  fs.mkdir(logs)?
+  fs.mkdir(logs)
 
   while pending.len() > 0 or running.len() > 0 {
     var waiting: List[types.PlanNode] = []
@@ -435,13 +435,13 @@ proc execute_scheduled(
 
       if stored or ! types.plan_action_is_build(node.action) {
         let receipt = execute_node({...context, published: done}, node)?
-        execute_require_receipt(context.plan, node, receipt)?
+        execute_require_receipt(context.plan, node, receipt)
         done[node.artifact_key] = receipt
         continue
       }
 
       let log = fp"{logs}/{node.name}.log"
-      fs.write(log, "")?
+      fs.write(log, "")
       print f"repo build start {node.name}"
       let command = process.command_argv(
         xsh,
@@ -488,7 +488,7 @@ proc execute_scheduled(
 
     if next.status.ok {
       let receipt = store.lookup(context.store_root, entry.node.artifact_key)?
-      execute_require_receipt(context.plan, entry.node, receipt)?
+      execute_require_receipt(context.plan, entry.node, receipt)
       done[entry.node.artifact_key] = receipt
       finished += [{name: entry.node.name, seconds, log: entry.log}]
       print f"repo build done {entry.node.name} {seconds}s"
@@ -506,7 +506,7 @@ proc execute_scheduled(
       # failed, and the store never keeps a partial artifact.
       for other in running {
         print f"repo build cancel {other.node.name}"
-        other.handle.cancel(signal: "TERM", kill_after: 5s)?
+        other.handle.cancel(signal: "TERM", kill_after: 5s)
       }
 
       running = []
@@ -529,8 +529,8 @@ export proc build_plan_node(
   remote_repo: Str,
   key: Str,
 ) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt, Error] {
-  build_plan.validate(plan_value)?
-  build_plan.require_current_build_epoch(plan_value)?
+  build_plan.validate(plan_value)
+  build_plan.require_current_build_epoch(plan_value)
   let matches = [node for node in plan_value.nodes if node.artifact_key == key]
 
   guard matches.len() == 1 else {
@@ -547,7 +547,7 @@ export proc build_plan_node(
     published: {},
   }
   let receipt = execute_node(context, node)?
-  execute_require_receipt(plan_value, node, receipt)?
+  execute_require_receipt(plan_value, node, receipt)
   receipt
 }
 
@@ -572,8 +572,8 @@ export proc build_plan(
   jobs: Int,
   logs: Path = p"",
 ) [fs, net, process, env, time, error] -> Result[types.BuildResult, Error] {
-  build_plan.validate(plan_value)?
-  build_plan.require_current_build_epoch(plan_value)?
+  build_plan.validate(plan_value)
+  build_plan.require_current_build_epoch(plan_value)
 
   return Err(types.PmError.Usage("build jobs must be at least one")) when jobs < 1
 
@@ -591,7 +591,7 @@ export proc build_plan(
     # One job builds in this process, in plan order, with output inline.
     for node in plan_value.nodes {
       let receipt = execute_node({...context, published: done}, node)?
-      execute_require_receipt(plan_value, node, receipt)?
+      execute_require_receipt(plan_value, node, receipt)
       done[node.artifact_key] = receipt
     }
   } else {
@@ -600,7 +600,7 @@ export proc build_plan(
     let scratch = handle.host_path()?
     # Children read the plan from disk; write_plan seals it with its digest.
     let plan_path = fp"{scratch}/plan.json"
-    plan_json.write_plan(plan_path, plan_value)?
+    plan_json.write_plan(plan_path, plan_value)
     let log_dir = if logs == "" { fp"{scratch}/logs" } else { logs }
     done = execute_scheduled(context, plan_path, log_dir, jobs)?
   }

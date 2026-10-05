@@ -10,7 +10,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     return Err(ScriptError.Failed(kind: "proof-muon", message: f"missing muon: {muon}"))?
   }
 
-  proof.target_elf(rootfs, p"usr/bin/muon", "muon")?
+  proof.target_elf(rootfs, p"usr/bin/muon", "muon")
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
     let out = run.text $muon "version" ?
@@ -31,4 +31,4 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   }
 }
 
-main(@args)?
+main(@args)

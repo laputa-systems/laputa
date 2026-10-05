@@ -12,21 +12,21 @@ test ca_certificate_proof_preserves_empty_dependencies_and_rejects_invalid_metad
   let helper = fp"{root}/usr/bin/update-certdata"
   let metadata = fp"{root}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
   let stderr = fp"{root}/proof.stderr"
-  for file in [bundle, helper, metadata] { file.parent.mkdir()? }
-  bundle.write("-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")?
-  helper.write("https://curl.se/ca/cacert.pem")?
-  helper.chmod(0o755)?
+  for file in [bundle, helper, metadata] { file.parent.mkdir() }
+  bundle.write("-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")
+  helper.write("https://curl.se/ca/cacert.pem")
+  helper.chmod(0o755)
   let xsh = runner()?
   let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
-  json.write(metadata, {deps: [], extension: {source: "fixture"}})?
+  json.write(metadata, {deps: [], extension: {source: "fixture"}})
   assert process.run(command)?.ok
-  json.write(metadata, {deps: ["unexpected-runtime"]})?
+  json.write(metadata, {deps: ["unexpected-runtime"]})
   assert ! process.run(command)?.ok
   assert "expected no runtime deps" in stderr.read_text()?
-  json.write(metadata, {deps: "invalid"})?
+  json.write(metadata, {deps: "invalid"})
   assert ! process.run(command)?.ok
   assert "schema" in stderr.read_text()?
-  json.write(metadata, {})?
+  json.write(metadata, {})
   assert ! process.run(command)?.ok
   assert "missing" in stderr.read_text()?
 }

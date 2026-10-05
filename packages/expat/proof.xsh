@@ -3,8 +3,8 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "expat")?
-  proof.target_elf(root, p"usr/lib/libexpat.so.1", "expat")?
+  proof.package_metadata(root, "expat")
+  proof.target_elf(root, p"usr/lib/libexpat.so.1", "expat")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "expat ok: cross-built"
@@ -13,8 +13,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-expat"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp, true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp, true)
   defer fs.remove(tmp, missing_ok: true)?
 
   # wayland-scanner and fontconfig parse their XML through expat: the proof
@@ -56,7 +56,7 @@ int main(void) {
   return v.major == 2 ? 0 : 6;
 }
 """,
-  )?
+  )
 
   let binary = fp"{tmp}/proof-expat"
   run $cc fp"{tmp}/proof-expat.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lexpat" "-o" $binary ?
@@ -70,4 +70,4 @@ int main(void) {
   print "expat ok: namespaced parse, tag mismatch rejected"
 }
 
-main(@args)?
+main(@args)

@@ -81,9 +81,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     },
   )
 
-  make.run_tasks(samu.tasks, make.jobs()?)?
+  make.run_tasks(samu.tasks, make.jobs()?)
 
   # Install binary and ninja symlink.
-  fs.install(samu.output, fp"{dest}/usr/bin/samu", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"samu", fp"{dest}/usr/bin/ninja")?
+  fs.install(samu.output, fp"{dest}/usr/bin/samu", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"samu", fp"{dest}/usr/bin/ninja")
 }

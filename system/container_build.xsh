@@ -81,10 +81,10 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) [fs, er
   }
 
   let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
-  fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)?
+  fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)
   # The overlay is a checkout tree: only git's modes may reach the image, not
   # host bits such as a setgid directory (which new subdirectories inherit).
-  pm_util.normalize_checkout_tree(overlay)?
+  pm_util.normalize_checkout_tree(overlay)
   overlay
 }
 
@@ -114,7 +114,7 @@ proc container_stage_build_plan(work: Path) [fs, error] -> Result[Path] {
     return Err(ContainerBuildError.Failed(f"saved BuildPlan is missing or empty: {source}"))
   }
 
-  fs.copy(source, staged)?
+  fs.copy(source, staged)
 
   if hash.sha256(source)?.hex() != hash.sha256(staged)?.hex() {
     return Err(ContainerBuildError.Failed("container-local BuildPlan staging does not match the saved manifest"))
@@ -156,7 +156,7 @@ proc container_pm_repo_build(build_plan: Path, jobs: Int) [fs, net, process, env
       "--jobs",
       f"{jobs}",
     ],
-  )?
+  )
 }
 
 proc container_generation_plan(
@@ -190,7 +190,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
       "--output",
       output.display(),
     ],
-  )?
+  )
 
   if ! fs.exists(output)? or fs.metadata(output)?.kind != "file" or fs.metadata(output)?.size <= 0 {
     return Err(ContainerBuildError.Failed(f"PM did not extract profile kernel {profile.kernel_path}"))
@@ -198,9 +198,9 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
 }
 
 proc container_build_images(root: Path, rootfs: Path, disk: Path) [fs, process, error] {
-  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, rootfs)?
-  image.write_disk(rootfs, disk)?
-  image.verify_disk(disk, fs.metadata(rootfs)?.size)?
+  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, rootfs)
+  image.write_disk(rootfs, disk)
+  image.verify_disk(disk, fs.metadata(rootfs)?.size)
 }
 
 proc container_system_key(
@@ -243,7 +243,7 @@ proc container_publish_execution(work: Path, profile: types.SystemProfile) [fs, 
       {name: "rootfs.ext4", source: container_work_rootfs(work)},
       {name: "disk.img", source: container_work_disk(work)},
     ],
-  )?
+  )
 }
 
 proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net, process, env, time, error] {
@@ -266,7 +266,7 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
     return Err(ContainerBuildError.Failed(f"{profile.name} generation includes forbidden packages: {forbidden.join(", ")}"))
   }
 
-  container_pm_repo_build(build_plan, jobs)?
+  container_pm_repo_build(build_plan, jobs)
   let root = fp"{work}/generation"
   let _ = pm_generation.compose(saved_generation_plan, container_store_root(), root, overlay)?
   let embedded_manifest = fp"{root}/var/lib/laputa/generation.json"
@@ -274,11 +274,11 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) [fs, net
     return Err(ContainerBuildError.Failed("PM generation compose did not write /var/lib/laputa/generation.json"))
   }
 
-  fs.copy(embedded_manifest, container_work_generation_manifest(work))?
-  container_require_no_forbidden_sonames(root, profile)?
-  container_extract_kernel(build_plan, profile, container_work_kernel(work))?
-  container_build_images(root, container_work_rootfs(work), container_work_disk(work))?
-  container_publish_execution(work, profile)?
+  fs.copy(embedded_manifest, container_work_generation_manifest(work))
+  container_require_no_forbidden_sonames(root, profile)
+  container_extract_kernel(build_plan, profile, container_work_kernel(work))
+  container_build_images(root, container_work_rootfs(work), container_work_disk(work))
+  container_publish_execution(work, profile)
 }
 
 proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
@@ -297,12 +297,12 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error] {
     let overlay = container_prepare_overlay(profile, work)?
     let generation_plan = container_generation_plan(container_build_plan_path(), profile, overlay)?
     let staged = fp"{work}/generation-plan.json"
-    pm_generation.write_generation_plan(staged, generation_plan)?
-    container_output.publish_final_file(staged, container_generation_plan_path())?
+    pm_generation.write_generation_plan(staged, generation_plan)
+    container_output.publish_final_file(staged, container_generation_plan_path())
     return
   }
 
-  container_execute_profile(profile, jobs)?
+  container_execute_profile(profile, jobs)
 }
 
-main(@args)?
+main(@args)

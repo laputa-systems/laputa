@@ -7,11 +7,11 @@ proc guest_console(message: Str) [fs, error] {
     /dev/console,
     f"""{message}
 """,
-  )?
+  )
 }
 
 proc guest_fail(phase: Str, message: Str) [fs, error] {
-  guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED {phase}: {message}")?
+  guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED {phase}: {message}")
   return Err(GuestProofError.Failed(phase:, message:))
 }
 
@@ -19,10 +19,10 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error
   var elapsed = 0
   while ! fs.exists(path_value)? {
     if elapsed >= seconds {
-      guest_fail(phase, f"missing {path_value}")?
+      guest_fail(phase, f"missing {path_value}")
     }
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 }
@@ -30,10 +30,10 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error
 proc guest_run_required(command: Command, phase: Str) [fs, process, error] {
   if let Ok(status) = process.run(command) {
     if ! status.ok {
-      guest_fail(phase, "command exited unsuccessfully")?
+      guest_fail(phase, "command exited unsuccessfully")
     }
   } else {
-    guest_fail(phase, "command could not start")?
+    guest_fail(phase, "command could not start")
   }
 }
 
@@ -44,13 +44,13 @@ proc main() [fs, process, time, error] {
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
   let _ = _mdevd
-  guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")?
+  guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")
 
   for device in [/dev/input/event0, /dev/input/event1] {
-    guest_wait_for(device, "input-devices", 20)?
+    guest_wait_for(device, "input-devices", 20)
   }
 
-  fs.remove(/run/seatd.sock, missing_ok: true)?
+  fs.remove(/run/seatd.sock, missing_ok: true)
 
   # The serial-only QEMU proof has no virtual terminal.  An unbound seat is
   # immediately active while still mediating the virtio DRM and input devices.
@@ -60,14 +60,14 @@ proc main() [fs, process, time, error] {
     env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
   )?
   let _ = _seatd
-  guest_wait_for(/run/seatd.sock, "seatd", 20)?
+  guest_wait_for(/run/seatd.sock, "seatd", 20)
   if ! fs.exists(/run/user/0)? {
-    fs.mkdir(/run/user/0)?
+    fs.mkdir(/run/user/0)
   }
 
-  fs.chmod(/run/user/0, 0o700)?
-  fs.remove(/run/laputa-foot-input.txt, missing_ok: true)?
-  fs.remove(/run/laputa-foot-read-ready, missing_ok: true)?
+  fs.chmod(/run/user/0, 0o700)
+  fs.remove(/run/laputa-foot-input.txt, missing_ok: true)
+  fs.remove(/run/laputa-foot-read-ready, missing_ok: true)
   fs.write(
     /run/laputa-foot-read.xsh,
     """#!/bin/xsh
@@ -76,8 +76,8 @@ print "LAPUTA_DWL_FOOT_VISUAL"
 let input = io.stdin_text()?
 fs.write(p"/run/laputa-foot-input.txt", input)?
 """,
-  )?
-  fs.chmod(/run/laputa-foot-read.xsh, 0o755)?
+  )
+  fs.chmod(/run/laputa-foot-read.xsh, 0o755)
   let command = process.command_argv(
     /usr/bin/dwl,
     ["dwl", "-s", "/usr/bin/foot -- /bin/xsh /run/laputa-foot-read.xsh"],
@@ -95,15 +95,15 @@ fs.write(p"/run/laputa-foot-input.txt", input)?
 
   # This appears only after dwl has started foot and foot has started its
   # stdin reader.  The host sends QMP keyboard input only after this boundary.
-  guest_wait_for(/run/laputa-foot-read-ready, "foot", 30)?
-  guest_console("LAPUTA_DWL_FOOT_PROOF_READY")?
-  guest_wait_for(/run/laputa-foot-input.txt, "input", 90)?
+  guest_wait_for(/run/laputa-foot-read-ready, "foot", 30)
+  guest_console("LAPUTA_DWL_FOOT_PROOF_READY")
+  guest_wait_for(/run/laputa-foot-input.txt, "input", 90)
   let input = fs.read_text(/run/laputa-foot-input.txt)?.trim()
   if input != "laputa" {
-    guest_fail("input", f"expected laputa, got {input}")?
+    guest_fail("input", f"expected laputa, got {input}")
   }
 
-  guest_console("LAPUTA_DWL_FOOT_PROOF_OK")?
+  guest_console("LAPUTA_DWL_FOOT_PROOF_OK")
 }
 
-main()?
+main()

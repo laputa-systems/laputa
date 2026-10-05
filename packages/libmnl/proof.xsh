@@ -111,10 +111,10 @@ int main(void) {
 """
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "libmnl")?
-  proof.ensure(fs.exists(fp"{root}/usr/include/libmnl/libmnl.h")?, "libmnl", "missing libmnl.h")?
-  proof.ensure(fs.exists(fp"{root}/usr/lib/pkgconfig/libmnl.pc")?, "libmnl", "missing libmnl.pc")?
-  proof.target_elf(root, p"usr/lib/libmnl.so.0.2.0", "libmnl")?
+  proof.package_metadata(root, "libmnl")
+  proof.ensure(fs.exists(fp"{root}/usr/include/libmnl/libmnl.h")?, "libmnl", "missing libmnl.h")
+  proof.ensure(fs.exists(fp"{root}/usr/lib/pkgconfig/libmnl.pc")?, "libmnl", "missing libmnl.pc")
+  proof.target_elf(root, p"usr/lib/libmnl.so.0.2.0", "libmnl")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"libmnl ok: cross-built {pm_util.target_arch()?}"
@@ -123,17 +123,17 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libmnl"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-libmnl.c", program)?
+  fs.write(fp"{tmp}/proof-libmnl.c", program)
   let binary = fp"{tmp}/proof-libmnl"
   run $cc fp"{tmp}/proof-libmnl.c" f"-L{root}/usr/lib" "-lmnl" "-o" $binary ?
 
   let libdir = fp"{root}/usr/lib".display()
   let out = run.text LD_LIBRARY_PATH=$libdir $binary ?
-  proof.ensure(out.trim() == "libmnl: lo", "libmnl", f"unexpected link dump output: {out.trim()}")?
+  proof.ensure(out.trim() == "libmnl: lo", "libmnl", f"unexpected link dump output: {out.trim()}")
   print "libmnl ok: RTM_GETLINK dump over NETLINK_ROUTE found lo"
 }
 
-main(@args)?
+main(@args)

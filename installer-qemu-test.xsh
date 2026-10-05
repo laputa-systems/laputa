@@ -16,7 +16,7 @@ proc command_path(name: Str) [process, error] -> Result[Path] {
 proc ensure_dir(path_value: Path) [fs, error] {
   return when fs.exists(path_value)?
 
-  path_value.mkdir()?
+  path_value.mkdir()
 }
 
 proc ensure_file(path_value: Path, kind: Str) [fs, error] {
@@ -90,10 +90,10 @@ proc wait_for_marker(
 
   while process_live(kill, pid, cwd)? {
     if has_line_marker(log, ok)? {
-      time.sleep(2s)?
+      time.sleep(2s)
 
       if has_panic(log)? {
-        dump_tail(tail, log, 120)?
+        dump_tail(tail, log, 120)
         terminate_if_live(pid)
         return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"{ok} was followed by a kernel panic"))
       }
@@ -105,22 +105,22 @@ proc wait_for_marker(
     }
 
     if has_line_marker(log, failed)? or has_panic(log)? {
-      dump_tail(tail, log, 120)?
+      dump_tail(tail, log, 120)
       terminate_if_live(pid)
       return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"failed while waiting for {ok}"))
     }
 
     if elapsed >= timeout_seconds {
-      dump_tail(tail, log, 120)?
+      dump_tail(tail, log, 120)
       terminate_if_live(pid)
       return Err(InstallerQemuTestError.Failed(kind: "qemu-timeout", message: f"timed out waiting for {ok}"))
     }
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 
-  dump_tail(tail, log, 120)?
+  dump_tail(tail, log, 120)
   return Err(InstallerQemuTestError.Failed(kind: "qemu-exit", message: f"qemu exited before {ok}"))
 }
 
@@ -184,15 +184,15 @@ proc wait_for_ssh(
     }
 
     if elapsed >= timeout_seconds {
-      dump_tail(tail, target_log, 160)?
+      dump_tail(tail, target_log, 160)
       return Err(InstallerQemuTestError.Failed(kind: "ssh-timeout", message: "timed out waiting for target ssh"))
     }
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 
-  dump_tail(tail, target_log, 160)?
+  dump_tail(tail, target_log, 160)
   return Err(InstallerQemuTestError.Failed(kind: "qemu-exit", message: "qemu exited before target ssh was ready"))
 }
 
@@ -208,7 +208,7 @@ proc assert_ssh_smoke(
   timeout_seconds: Int,
   cwd: Path,
 ) [fs, process, time, error] {
-  wait_for_ssh(pid, kill, tail, ssh, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)?
+  wait_for_ssh(pid, kill, tail, ssh, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
 
   # xinit status uses signal-0 liveness which gets EPERM across UIDs
   # (SSH user is pazu, dropbear runs as root). Use sudo.
@@ -381,7 +381,7 @@ proc clean_build_state(work: Path) [fs, error] {
     "pm-work-installer-tools",
     "pm-work-tools",
   ] {
-    fs.remove(fp"{work}/{name}", missing_ok: true)?
+    fs.remove(fp"{work}/{name}", missing_ok: true)
   }
 
   # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
@@ -398,7 +398,7 @@ proc clean_build_state(work: Path) [fs, error] {
     if fs.exists(out)? {
       for entry in fs.children(out)? {
         if entry.name != "remote-cache" {
-          fs.remove(entry.path)?
+          fs.remove(entry.path)
         }
       }
     }
@@ -456,7 +456,7 @@ proc build_installer(
     }
   }
 
-  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)?
+  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
@@ -499,11 +499,11 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   let ssh_key = host.installer_env_path("LAPUTA_TARGET_SSH_KEY", fp"{work}/qemu-smoke-ed25519")?
   let ssh_known_hosts = fp"{work}/qemu-smoke-known-hosts"
   let timeout_seconds = env_int("LAPUTA_INSTALLER_QEMU_TIMEOUT", 180)?
-  ensure_dir(work)?
-  clean_build_state(work)?
-  fs.remove(ssh_key, missing_ok: true)?
-  fs.remove(fp"{ssh_key}.pub", missing_ok: true)?
-  fs.remove(ssh_known_hosts, missing_ok: true)?
+  ensure_dir(work)
+  clean_build_state(work)
+  fs.remove(ssh_key, missing_ok: true)
+  fs.remove(fp"{ssh_key}.pub", missing_ok: true)
+  fs.remove(ssh_known_hosts, missing_ok: true)
 
   host.installer_run_argv(
     ssh_keygen,
@@ -520,16 +520,16 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
       ssh_key.display(),
     ],
     root,
-  )?
+  )
 
-  build_installer(root, arch, work, installer_iso, installer_kernel, fp"{ssh_key}.pub", xsh)?
-  ensure_file(installer_iso, "installer-iso")?
-  ensure_file(installer_kernel, "installer-kernel")?
-  fs.remove(target_image, missing_ok: true)?
-  fs.remove(installer_log, missing_ok: true)?
-  fs.remove(target_log, missing_ok: true)?
-  fs.write(target_image, "")?
-  target_image.truncate(128 * 1024 * 1024)?
+  build_installer(root, arch, work, installer_iso, installer_kernel, fp"{ssh_key}.pub", xsh)
+  ensure_file(installer_iso, "installer-iso")
+  ensure_file(installer_kernel, "installer-kernel")
+  fs.remove(target_image, missing_ok: true)
+  fs.remove(installer_log, missing_ok: true)
+  fs.remove(target_log, missing_ok: true)
+  fs.write(target_image, "")
+  target_image.truncate(128 * 1024 * 1024)
 
   let installer = spawn process.command_argv(
     qemu,
@@ -559,9 +559,9 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     false,
     timeout_seconds,
     root,
-  )?
+  )
 
-  time.sleep(3s)?
+  time.sleep(3s)
 
   let target = spawn process.command_argv(
     qemu,
@@ -583,7 +583,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     true,
     timeout_seconds,
     root,
-  )?
+  )
 
   assert_ssh_smoke(
     target.pid,
@@ -596,10 +596,10 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     target_log,
     timeout_seconds,
     root,
-  )?
+  )
 
   terminate_if_live(target.pid)
   print "installer qemu logs:" $installer_log $target_log
 }
 
-main(@args)?
+main(@args)

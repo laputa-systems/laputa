@@ -175,7 +175,7 @@ proc write_config_h() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 # src/Makefile.am libasound_la_SOURCES plus each component's convenience
@@ -259,25 +259,25 @@ proc install_headers(dest: Path) [fs, error] {
   let inc = fp"{dest}/usr/include"
 
   for header in alsa_headers() {
-    fs.install(fp"include/{header}", fp"{inc}/alsa/{header}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"include/{header}", fp"{inc}/alsa/{header}", 0o644, parents: true, overwrite: true)
   }
 
   for header in [@sound_headers(), "type_compat.h"] {
-    fs.install(fp"include/sound/{header}", fp"{inc}/alsa/sound/{header}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"include/sound/{header}", fp"{inc}/alsa/sound/{header}", 0o644, parents: true, overwrite: true)
   }
 
   for header in sound_headers() {
-    fs.install(fp"include/sound/uapi/{header}", fp"{inc}/alsa/sound/uapi/{header}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"include/sound/uapi/{header}", fp"{inc}/alsa/sound/uapi/{header}", 0o644, parents: true, overwrite: true)
   }
 
   # include/Makefile.am's install-data-hook: deprecated forwarding headers.
-  fs.install(p"include/sys.h", fp"{inc}/asoundlib.h", 0o644, parents: true, overwrite: true)?
-  fs.install(p"include/sys.h", fp"{inc}/sys/asoundlib.h", 0o644, parents: true, overwrite: true)?
+  fs.install(p"include/sys.h", fp"{inc}/asoundlib.h", 0o644, parents: true, overwrite: true)
+  fs.install(p"include/sys.h", fp"{inc}/sys/asoundlib.h", 0o644, parents: true, overwrite: true)
 }
 
 # utils/alsa.pc.in and utils/alsa-topology.pc.in as configure fills them.
 proc install_pkg_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/alsa.pc",
@@ -294,7 +294,7 @@ Libs: -L${{libdir}} -lasound
 Libs.private: -lm -lpthread -lrt
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/alsa-topology.pc",
@@ -310,7 +310,7 @@ Requires: alsa >= {ver}
 Libs: -L${{libdir}} -latopology
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }
 
 # src/conf and its cards, ctl, and pcm subdirectories install every .conf
@@ -321,21 +321,21 @@ proc install_config_tree(dest: Path) [fs, error] {
   for entry in fs.walk(conf_root, gitignore: false)? {
     continue unless entry.kind == "file" and entry.ext == "conf"
     let rel = entry.path.relative_to(conf_root)
-    fs.install(entry.path, fp"{dest}/usr/share/alsa/{rel}", 0o644, parents: true, overwrite: true)?
+    fs.install(entry.path, fp"{dest}/usr/share/alsa/{rel}", 0o644, parents: true, overwrite: true)
   }
 }
 
 proc install_library(output: Path, dest: Path, stem: Str) [fs, error] {
-  fs.install(output, fp"{dest}/usr/lib/{stem}.so.2.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so.2")?
-  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so")?
+  fs.install(output, fp"{dest}/usr/lib/{stem}.so.2.0.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so.2")
+  fs.symlink(fp"{stem}.so.2.0.0", fp"{dest}/usr/lib/{stem}.so")
 }
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  write_config_h()?
+  write_config_h()
 
   # src/*/Makefile.am compile every object with -I. -I$(top_srcdir)/include
   # and DEFS=-DHAVE_CONFIG_H; include/alsa is upstream's link back to include,
@@ -371,10 +371,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     [@topology.deps, make.task_deps(libasound.tasks, [libasound.output])[0]],
   )
 
-  make.run_tasks([@libasound.tasks, @topology.tasks, topology_link], make.jobs()?)?
-  install_library(libasound.output, dest, "libasound")?
-  install_library(topology_link.outputs[0], dest, "libatopology")?
-  install_headers(dest)?
-  install_pkg_config(dest)?
-  install_config_tree(dest)?
+  make.run_tasks([@libasound.tasks, @topology.tasks, topology_link], make.jobs()?)
+  install_library(libasound.output, dest, "libasound")
+  install_library(topology_link.outputs[0], dest, "libatopology")
+  install_headers(dest)
+  install_pkg_config(dest)
+  install_config_tree(dest)
 }

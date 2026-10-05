@@ -56,10 +56,10 @@ proc main(root = /rootfs) [fs, env, error] {
     "bison",
     "muon",
   ] {
-    ensure_exists(fp"{root}/usr/bin/{tool}", tool)?
+    ensure_exists(fp"{root}/usr/bin/{tool}", tool)
   }
 
-  ensure_exists(fp"{root}/boot/vmlinuz", "linux kernel image")?
+  ensure_exists(fp"{root}/boot/vmlinuz", "linux kernel image")
 
   # The proof root is composed from verified immutable runtime receipts.  It
   # intentionally does not synthesize legacy package-manager database files.
@@ -77,9 +77,9 @@ proc main(root = /rootfs) [fs, env, error] {
       "linux",
       "muon",
     ],
-  )?
+  )
 
   print "build-essential-native ok"
 }
 
-main(@args)?
+main(@args)

@@ -178,11 +178,11 @@ pnp_id_table(const char *key)
 
 proc write_pnp_table(root: Str) [fs, error] {
   let pnp = fp"{root}/usr/share/hwdata/pnp.ids"
-  fs.write(p"pnp-id-table.c", pnp_id_table_source(pnp.read_text()?))?
+  fs.write(p"pnp-id-table.c", pnp_id_table_source(pnp.read_text()?))
 }
 
 proc patch_generators(root: Str) [fs, error] {
-  write_pnp_table(root)?
+  write_pnp_table(root)
   let meson_path = p"meson.build"
   var text = meson_path.read_text()?
 
@@ -207,7 +207,7 @@ subdir('test')
   )
 
   text = text.replace("math = cc.find_library('m', required: false)", "math = declare_dependency(link_args: ['-lm'])")
-  fs.write(meson_path, text)?
+  fs.write(meson_path, text)
 }
 
 ## Exported declaration `build`.
@@ -216,7 +216,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let root = e"LAPUTA_ROOT" ?? "/"
-  patch_generators(root)?
+  patch_generators(root)
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,

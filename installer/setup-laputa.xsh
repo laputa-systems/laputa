@@ -75,19 +75,19 @@ proc write_text(text: Str) [fs, error, io] {
   let serial = fp"/dev/{serial_console_name()?}"
 
   if fs.exists(serial)? {
-    fs.write(serial, text)?
+    fs.write(serial, text)
   } else {
-    io.write_stdout(text)?
+    io.write_stdout(text)
   }
 }
 
 proc write_stdout_line(line: Str) [fs, error, io] {
   write_text(f"""{line}
-""")?
+""")
 }
 
 proc usage() [fs, error, io] {
-  write_stdout_line("usage: setup-laputa [--auto] [--ci] [--disk DEV]")?
+  write_stdout_line("usage: setup-laputa [--auto] [--ci] [--disk DEV]")
 }
 
 proc require_file(path_value: Path) [fs, error] {
@@ -109,20 +109,20 @@ proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
 }
 
 proc write_file(path_value: Path, body: Str) [fs, error] {
-  path_value.parent.mkdir()?
-  fs.write(path_value, body)?
+  path_value.parent.mkdir()
+  fs.write(path_value, body)
 }
 
 proc normalize_target_ownership(root: Path) [fs, error] {
   let root_user = user.by_uid(0)?
   let root_group = group.by_gid(0)?
-  fs.chown(root, root_user)?
-  fs.chgrp(root, root_group)?
+  fs.chown(root, root_user)
+  fs.chgrp(root, root_group)
 
   for entry in fs.walk(root, gitignore: false)? {
     if entry.kind != "symlink" {
-      fs.chown(entry.path, root_user)?
-      fs.chgrp(entry.path, root_group)?
+      fs.chown(entry.path, root_user)
+      fs.chgrp(entry.path, root_group)
     }
   }
 
@@ -133,7 +133,7 @@ proc normalize_target_ownership(root: Path) [fs, error] {
     fp"{root}/usr/bin/unix_chkpwd",
   ] {
     if fs.exists(path_value)? {
-      fs.chmod(path_value, 0o4755)?
+      fs.chmod(path_value, 0o4755)
     }
   }
 }
@@ -149,23 +149,23 @@ proc configure_qemu_smoke_ssh(root: Path) [fs, error] -> Result[Bool] {
 
   let ssh_dir = fp"{root}/home/pazu/.ssh"
   let authorized_keys = fp"{ssh_dir}/authorized_keys"
-  fs.mkdir(fp"{root}/etc/dropbear")?
-  fs.mkdir(ssh_dir)?
+  fs.mkdir(fp"{root}/etc/dropbear")
+  fs.mkdir(ssh_dir)
 
   fs.write(
     authorized_keys,
     f"""{public_key}
 """,
-  )?
+  )
 
-  fs.chown(fp"{root}/home/pazu", user.by_uid(1000)?)?
-  fs.chgrp(fp"{root}/home/pazu", group.by_gid(1000)?)?
-  fs.chown(ssh_dir, user.by_uid(1000)?)?
-  fs.chgrp(ssh_dir, group.by_gid(1000)?)?
-  fs.chown(authorized_keys, user.by_uid(1000)?)?
-  fs.chgrp(authorized_keys, group.by_gid(1000)?)?
-  fs.chmod(ssh_dir, 0o700)?
-  fs.chmod(authorized_keys, 0o600)?
+  fs.chown(fp"{root}/home/pazu", user.by_uid(1000)?)
+  fs.chgrp(fp"{root}/home/pazu", group.by_gid(1000)?)
+  fs.chown(ssh_dir, user.by_uid(1000)?)
+  fs.chgrp(ssh_dir, group.by_gid(1000)?)
+  fs.chown(authorized_keys, user.by_uid(1000)?)
+  fs.chgrp(authorized_keys, group.by_gid(1000)?)
+  fs.chmod(ssh_dir, 0o700)
+  fs.chmod(authorized_keys, 0o600)
   true
 }
 
@@ -188,10 +188,10 @@ proc list_disks() [process, error] -> Result[List[Path]] {
 }
 
 proc print_disks(disks: List[Path]) [fs, error, io] {
-  write_stdout_line("Available disks:")?
+  write_stdout_line("Available disks:")
 
   for disk in disks {
-    write_stdout_line(f"  {disk}")?
+    write_stdout_line(f"  {disk}")
   }
 }
 
@@ -218,7 +218,7 @@ proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
-  write_text(f"Install to disk [{default_disk}]: ")?
+  write_text(f"Install to disk [{default_disk}]: ")
   let answer = io.stdin_line()?
   let trimmed = answer.trim()
 
@@ -233,7 +233,7 @@ proc wait_for(path_value: Path) [fs, time, error] {
   while tries > 0 {
     return when fs.exists(path_value)?
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries -= 1
   }
 
@@ -314,7 +314,7 @@ proc target_interfaces(network_method: Str) [process, error] -> Result[Str] {
 proc prompt_network_method(ci: Bool) [fs, error, io] -> Result[Str] {
   return "static" when ci
 
-  write_text("Network configuration - [d]hcp or [s]tatic? [dhcp]: ")?
+  write_text("Network configuration - [d]hcp or [s]tatic? [dhcp]: ")
   let answer = io.stdin_line()?.trim().lower()
 
   return "static" when answer == "s" or answer == "static"
@@ -341,7 +341,7 @@ proc write_target_config(
     fp"{root}/etc/hostname",
     """laputa
 """,
-  )?
+  )
 
   write_file(
     fp"{root}/etc/fstab",
@@ -354,7 +354,7 @@ tmpfs /dev/shm tmpfs mode=1777,nosuid,nodev 0 0
 {fstab_esp} /boot vfat rw,noatime 0 2
 {fstab_swap} none swap sw 0 0
 """,
-  )?
+  )
 
   write_file(
     fp"{root}/etc/passwd",
@@ -362,7 +362,7 @@ tmpfs /dev/shm tmpfs mode=1777,nosuid,nodev 0 0
 pazu:x:1000:1000:Pazu:/home/pazu:/bin/xshi
 nobody:x:99:99:Unprivileged User:/dev/null:/bin/false
 """,
-  )?
+  )
 
   write_file(
     fp"{root}/etc/shadow",
@@ -370,7 +370,7 @@ nobody:x:99:99:Unprivileged User:/dev/null:/bin/false
 pazu:*:0:0:99999:7:::
 nobody:*:0:0:99999:7:::
 """,
-  )?
+  )
 
   write_file(
     fp"{root}/etc/group",
@@ -389,9 +389,9 @@ nogroup:x:99:
 users:x:100:
 pazu:x:1000:
 """,
-  )?
+  )
 
-  write_file(fp"{root}/etc/network/interfaces", target_interfaces(network_method)?)?
+  write_file(fp"{root}/etc/network/interfaces", target_interfaces(network_method)?)
 
   if ci {
     write_file(
@@ -405,9 +405,9 @@ while true {
 
 main()?
 """,
-    )?
+    )
 
-    fs.chmod(fp"{root}/usr/local/bin/laputa-ci-idle", 0o755)?
+    fs.chmod(fp"{root}/usr/local/bin/laputa-ci-idle", 0o755)
   } else {
     write_file(
       fp"{root}/etc/inittab",
@@ -418,11 +418,11 @@ tty1::respawn:/usr/bin/login -f pazu
 ::restart:/usr/bin/xinit /etc/inittab
 ::shutdown:/usr/lib/init/rc.shutdown
 """,
-    )?
+    )
   }
 
-  fp"{root}/home/pazu".mkdir()?
-  fs.chmod(fp"{root}/home/pazu", 0o755)?
+  fp"{root}/home/pazu".mkdir()
+  fs.chmod(fp"{root}/home/pazu", 0o755)
   let qemu_smoke_ssh = if ci { configure_qemu_smoke_ssh(root)? } else { false }
 
   if ci {
@@ -440,7 +440,7 @@ tty1::respawn:/usr/bin/login -f pazu
 {dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
 ::shutdown:/usr/lib/init/rc.shutdown
 """,
-    )?
+    )
 
     # laputa-ci-smoke.boot is installed into the installer rootfs by
     # install_installer_tools. Copy it into the target rootfs.
@@ -450,7 +450,7 @@ tty1::respawn:/usr/bin/login -f pazu
       0o755,
       parents: true,
       overwrite: true,
-    )?
+    )
   }
 }
 
@@ -494,21 +494,21 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Dis
 }}""",
   )?.require(Record)?
 
-  linux.write_partition_table(disk, table)?
+  linux.write_partition_table(disk, table)
   DiskParts(esp: partition_path(disk, 1), swap: partition_path(disk, 2), root: partition_path(disk, 3))
 }
 
 proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
-  require_file(/usr/bin/mkfs.ext4)?
-  require_file(/usr/bin/mkfs.vfat)?
-  require_file(/usr/share/laputa-installer/target-root.tar.gz)?
+  require_file(/usr/bin/mkfs.ext4)
+  require_file(/usr/bin/mkfs.vfat)
+  require_file(/usr/share/laputa-installer/target-root.tar.gz)
   let network_method = prompt_network_method(ci)?
-  write_stdout_line(f"Installing Laputa to {disk}")?
+  write_stdout_line(f"Installing Laputa to {disk}")
   let parts = wipe_and_partition(disk, ci)?
-  wait_for(parts.esp)?
-  wait_for(parts.swap)?
-  wait_for(parts.root)?
-  run_argv(/usr/bin/mkfs.vfat, ["mkfs.vfat", "-n", "LAPUTA_ESP", parts.esp.display()])?
+  wait_for(parts.esp)
+  wait_for(parts.swap)
+  wait_for(parts.root)
+  run_argv(/usr/bin/mkfs.vfat, ["mkfs.vfat", "-n", "LAPUTA_ESP", parts.esp.display()])
 
   run_argv(
     /usr/bin/mkfs.ext4,
@@ -523,15 +523,15 @@ proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
       "LAPUTA_ROOT",
       parts.root.display(),
     ],
-  )?
+  )
 
-  linux.mkswap(parts.swap)?
-  fs.mkdir(/mnt/target)?
-  linux.mount(parts.root.display(), /mnt/target, fstype: "ext4")?
-  archive.tar_extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, 0, "auto", true)?
-  normalize_target_ownership(/mnt/target)?
-  fs.mkdir(/mnt/target/boot)?
-  linux.mount(parts.esp.display(), /mnt/target/boot, fstype: "vfat")?
+  linux.mkswap(parts.swap)
+  fs.mkdir(/mnt/target)
+  linux.mount(parts.root.display(), /mnt/target, fstype: "ext4")
+  archive.tar_extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, 0, "auto", true)
+  normalize_target_ownership(/mnt/target)
+  fs.mkdir(/mnt/target/boot)
+  linux.mount(parts.esp.display(), /mnt/target/boot, fstype: "vfat")
 
   if fs.exists(/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI)? {
     fs.install(
@@ -540,7 +540,7 @@ proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
       0o644,
       parents: true,
       overwrite: true,
-    )?
+    )
   }
 
   if fs.exists(/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI)? {
@@ -550,12 +550,12 @@ proc install_to_disk(disk: Path, ci: Bool) [fs, process, time, error, io] {
       0o644,
       parents: true,
       overwrite: true,
-    )?
+    )
   }
 
-  write_target_config(/mnt/target, parts.esp, parts.swap, parts.root, ci, network_method)?
-  linux.umount_all(["vfat", "ext4"])?
-  write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")?
+  write_target_config(/mnt/target, parts.esp, parts.swap, parts.root, ci, network_method)
+  linux.umount_all(["vfat", "ext4"])
+  write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")
 }
 
 proc main(...argv: List[Str]) [fs, process, time, error, io] {
@@ -596,10 +596,10 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
     return Err(InstallerError.Failed(kind: "no-disks", message: "no installable disks found"))
   }
 
-  print_disks(disks)?
+  print_disks(disks)
 
   if ci and disk_text == "" and disk_selection.ci_target_installed(/sys/block, disks, TARGET_ROOT_PARTUUID)? {
-    write_stdout_line("Laputa CI target already installed.")?
+    write_stdout_line("Laputa CI target already installed.")
     return
   }
 
@@ -613,9 +613,9 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
     prompt_disk(disks[0])?
   }
 
-  install_to_disk(disk, ci)?
+  install_to_disk(disk, ci)
 }
 
 env XSH_LINUX_REAL="1" {
-  main(@args)?
+  main(@args)
 } ?

@@ -44,15 +44,15 @@ export proc prepare(src: Path) [{effects}] -> Result[Unit] {{
 export proc build(dest: Path) [{effects}] -> Result[Unit] {{
   return Err(HookProbe.Reached(dest.display()))
 }}
-""")?
+""")
     match recipe.call_prepare(pkg, dir) {
-      Ok(_) => test.fail("preparation hook did not execute")?
+      Ok(_) => test.fail("preparation hook did not execute")
       Err(problem) => assert problem.message == dir.display()
     }
 
     let dest = fp"{dir}/output"
     match recipe.call_build(pkg, dir, dest) {
-      Ok(_) => test.fail("build hook did not execute")?
+      Ok(_) => test.fail("build hook did not execute")
       Err(problem) => assert problem.message == dest.display()
     }
 
@@ -62,18 +62,18 @@ export proc build(dest: Path) [{effects}] -> Result[Unit] {{
 
 test recipe_hooks_preserve_optional_absence_and_required_build_error [fs, process, env, error] { |ctx|
   let dir = test.temp_dir(ctx, name: "absent-hooks")?
-  fp"{dir}/PKGBUILD.xsh".write("##! Recipe without hooks.\n## Exposes its name.\nexport let name = \"no-hooks\"\n")?
+  fp"{dir}/PKGBUILD.xsh".write("##! Recipe without hooks.\n## Exposes its name.\nexport let name = \"no-hooks\"\n")
   let pkg = hook_package(dir)
-  recipe.call_prepare(pkg, dir)?
-  recipe.call_prepare_sources(pkg, dir)?
+  recipe.call_prepare(pkg, dir)
+  recipe.call_prepare_sources(pkg, dir)
   match recipe.call_build(pkg, dir, dir) {
-    Ok(_) => test.fail("payload without a build hook unexpectedly built")?
+    Ok(_) => test.fail("payload without a build hook unexpectedly built")
     Err(problem) => assert problem == types.PmError.PackageContract(
       "hook-probe: payload package lost its build procedure",
     )
   }
 
-  recipe.call_build({...pkg, kind: types.package_meta()}, dir, dir)?
+  recipe.call_build({...pkg, kind: types.package_meta()}, dir, dir)
 }
 
 test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, process, env, error] { |ctx|
@@ -87,11 +87,11 @@ test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, p
     let dir = test.temp_dir(ctx, name:)?
     fp"{dir}/PKGBUILD.xsh".write(
       f"##! Incompatible hook fixture.\n## Names the fixture recipe.\nexport let name = \"hook-probe\"\n## Exposes an incompatible build hook.\n{declaration}\n",
-    )?
+    )
     let pkg = hook_package(dir)
     match recipe.call_build(pkg, dir, dir) {
-      Ok(_) => test.fail(f"{name}: incompatible build hook executed")?
-      Err(problem) => test.error_kind(problem, "schema")?
+      Ok(_) => test.fail(f"{name}: incompatible build hook executed")
+      Err(problem) => test.error_kind(problem, "schema")
     }
   }
 }
@@ -105,7 +105,7 @@ export let name = "hook-probe"
 export proc prepare_sources(src: Path) [fs, error] -> Result[Unit] {
   fp"{src}/prepared".write("source prepared")?
 }
-""")?
-  recipe.call_prepare_sources(hook_package(dir), dir)?
+""")
+  recipe.call_prepare_sources(hook_package(dir), dir)
   assert fp"{dir}/prepared".read_text()? == "source prepared"
 }

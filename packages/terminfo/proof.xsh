@@ -130,55 +130,55 @@ pure string(entry: Compiled, index: Int) -> Bytes? {
 }
 
 proc expect_string(entry: Compiled, index: Int, want: Bytes, what: Str) [error] {
-  proof.ensure(string(entry, index) == want, "proof-terminfo", f"{entry.names}: unexpected {what}")?
+  proof.ensure(string(entry, index) == want, "proof-terminfo", f"{entry.names}: unexpected {what}")
 }
 
 proc main(root: Path = /rootfs) [fs, error] {
-  proof.package_metadata(root, "terminfo")?
+  proof.package_metadata(root, "terminfo")
   let database = fp"{root}/usr/share/terminfo"
   let paths = fs.walk(database)? |> where .kind == "file"
-  proof.ensure(paths.len() > 2800, "proof-terminfo", f"only {paths.len()} compiled names in {database}")?
+  proof.ensure(paths.len() > 2800, "proof-terminfo", f"only {paths.len()} compiled names in {database}")
 
   let xterm = read_compiled(fp"{database}/x/xterm-256color")?
-  proof.ensure(xterm.names.starts_with("xterm-256color|"), "proof-terminfo", "xterm-256color has the wrong names")?
-  proof.ensure(number(xterm, MAX_COLORS) == 256, "proof-terminfo", "xterm-256color does not have 256 colors")?
-  proof.ensure(flag(xterm, AUTO_RIGHT_MARGIN), "proof-terminfo", "xterm-256color lost am")?
-  expect_string(xterm, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")?
-  expect_string(xterm, KEY_UP, b"\x1bOA", "kcuu1")?
-  expect_string(xterm, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")?
+  proof.ensure(xterm.names.starts_with("xterm-256color|"), "proof-terminfo", "xterm-256color has the wrong names")
+  proof.ensure(number(xterm, MAX_COLORS) == 256, "proof-terminfo", "xterm-256color does not have 256 colors")
+  proof.ensure(flag(xterm, AUTO_RIGHT_MARGIN), "proof-terminfo", "xterm-256color lost am")
+  expect_string(xterm, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")
+  expect_string(xterm, KEY_UP, b"\x1bOA", "kcuu1")
+  expect_string(xterm, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")
   # The Linux edit of the xterm+kbs fragment: backspace sends DEL.
-  expect_string(xterm, KEY_BACKSPACE, b"\x7f", "kbs")?
+  expect_string(xterm, KEY_BACKSPACE, b"\x7f", "kbs")
 
   # foot's own description, not ncurses' copy: it declares Tc and Su.
   let foot = read_compiled(fp"{database}/f/foot")?
-  proof.ensure(number(foot, MAX_COLORS) == 256, "proof-terminfo", "foot does not have 256 colors")?
-  expect_string(foot, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")?
-  expect_string(foot, KEY_UP, b"\x1bOA", "kcuu1")?
-  expect_string(foot, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")?
-  proof.ensure((foot.ext_bools.get("Tc") ?? 0) == 1, "proof-terminfo", "foot is not foot's own entry (no Tc)")?
-  proof.ensure("Smulx" in foot.ext_strs and foot.ext_strs["Smulx"] == b"\x1b[4:%p1%dm", "proof-terminfo", "foot lost Smulx")?
+  proof.ensure(number(foot, MAX_COLORS) == 256, "proof-terminfo", "foot does not have 256 colors")
+  expect_string(foot, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")
+  expect_string(foot, KEY_UP, b"\x1bOA", "kcuu1")
+  expect_string(foot, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")
+  proof.ensure((foot.ext_bools.get("Tc") ?? 0) == 1, "proof-terminfo", "foot is not foot's own entry (no Tc)")
+  proof.ensure("Smulx" in foot.ext_strs and foot.ext_strs["Smulx"] == b"\x1b[4:%p1%dm", "proof-terminfo", "foot lost Smulx")
 
   # Direct color needs the 32-bit number format.
   let foot_direct = read_compiled(fp"{database}/f/foot-direct")?
-  proof.ensure(foot_direct.magic == 0o1036, "proof-terminfo", "foot-direct is not in the 32-bit number format")?
-  proof.ensure(number(foot_direct, MAX_COLORS) == 16777216, "proof-terminfo", "foot-direct does not have 2^24 colors")?
-  proof.ensure((foot_direct.ext_bools.get("RGB") ?? 0) == 1, "proof-terminfo", "foot-direct lost RGB")?
+  proof.ensure(foot_direct.magic == 0o1036, "proof-terminfo", "foot-direct is not in the 32-bit number format")
+  proof.ensure(number(foot_direct, MAX_COLORS) == 16777216, "proof-terminfo", "foot-direct does not have 2^24 colors")
+  proof.ensure((foot_direct.ext_bools.get("RGB") ?? 0) == 1, "proof-terminfo", "foot-direct lost RGB")
 
   let console = read_compiled(fp"{database}/l/linux")?
-  proof.ensure(number(console, MAX_COLORS) == 8, "proof-terminfo", "linux does not have 8 colors")?
-  expect_string(console, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")?
-  expect_string(console, KEY_UP, b"\x1b[A", "kcuu1")?
-  proof.ensure(string(console, KEYPAD_XMIT) == null, "proof-terminfo", "linux has an unexpected smkx")?
+  proof.ensure(number(console, MAX_COLORS) == 8, "proof-terminfo", "linux does not have 8 colors")
+  expect_string(console, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")
+  expect_string(console, KEY_UP, b"\x1b[A", "kcuu1")
+  proof.ensure(string(console, KEYPAD_XMIT) == null, "proof-terminfo", "linux has an unexpected smkx")
 
   let dumb = read_compiled(fp"{database}/d/dumb")?
-  proof.ensure(number(dumb, COLUMNS) == 80, "proof-terminfo", "dumb does not have 80 columns")?
-  proof.ensure(string(dumb, CURSOR_ADDRESS) == null, "proof-terminfo", "dumb has cursor addressing")?
+  proof.ensure(number(dumb, COLUMNS) == 80, "proof-terminfo", "dumb does not have 80 columns")
+  proof.ensure(string(dumb, CURSOR_ADDRESS) == null, "proof-terminfo", "dumb has cursor addressing")
 
   # Aliases name the same compiled entry.
   let alias = fp"{database}/v/vt100-am".read_bytes()?
-  proof.ensure(alias == fp"{database}/v/vt100".read_bytes()?, "proof-terminfo", "vt100-am differs from vt100")?
+  proof.ensure(alias == fp"{database}/v/vt100".read_bytes()?, "proof-terminfo", "vt100-am differs from vt100")
 
   print f"terminfo ok: {paths.len()} names; xterm-256color, foot, foot-direct, linux, dumb read back"
 }
 
-main(@args)?
+main(@args)

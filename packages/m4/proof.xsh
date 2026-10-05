@@ -108,8 +108,8 @@ proc expect_text(label: Str, actual: Str, expected: Str) [error] {
 
 proc main(rootfs = /rootfs) [fs, process, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-m4"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
   let m4 = fp"{rootfs}/usr/bin/m4"
 
@@ -119,7 +119,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
     fp"{tmp}/test.m4",
     """define(GREETING, hello from m4)GREETING
 """,
-  )?
+  )
 
   # Construct the generated operand from text.  Interpolated `fp` literals
   # resolve as the current directory in the published runner and would pass
@@ -134,22 +134,22 @@ proc main(rootfs = /rootfs) [fs, process, error] {
 
   # The include directory is reached only through -I, never the cwd.
   let include_dir = fp"{tmp}/include"
-  fs.mkdir(include_dir)?
-  fs.write(fp"{include_dir}/proof-inc.m4", semantics_include)?
+  fs.mkdir(include_dir)
+  fs.write(fp"{include_dir}/proof-inc.m4", semantics_include)
   let semantics = fp"{tmp}/semantics.m4"
-  fs.write(semantics, semantics_input)?
+  fs.write(semantics, semantics_input)
   let semantics_out = run.text $m4 "-I" $include_dir $semantics ?
-  expect_text("semantics", semantics_out, semantics_expected)?
+  expect_text("semantics", semantics_out, semantics_expected)
 
   let prefixed = fp"{tmp}/prefixed.m4"
-  fs.write(prefixed, prefixed_input)?
+  fs.write(prefixed, prefixed_input)
   let prefixed_out = run.text $m4 "-P" < $prefixed ?
-  expect_text("prefixed", prefixed_out, prefixed_expected)?
+  expect_text("prefixed", prefixed_out, prefixed_expected)
 
   # An unterminated macro call is a fatal error with a nonzero status, never
   # truncated output with success.
   let unterminated = fp"{tmp}/unterminated.m4"
-  fs.write(unterminated, "define(`x', `y')x(\n")?
+  fs.write(unterminated, "define(`x', `y')x(\n")
   let unterminated_stderr = fp"{tmp}/unterminated.stderr"
   let unterminated_status = process.run(
     process.command_argv(m4, [m4, unterminated], stderr: unterminated_stderr),
@@ -181,4 +181,4 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   print "m4 ok: "${trimmed}
 }
 
-main(@args)?
+main(@args)

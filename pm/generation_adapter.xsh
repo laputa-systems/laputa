@@ -76,7 +76,7 @@ proc generation_adapter_plan(
   }
 
   let generation = pm_generation.plan_profile(build_plan, runtime_roots, profile)?
-  fs.write_atomic(output, json.encode(generation_adapter_plan_dto(generation))? + "\n")?
+  fs.write_atomic(output, json.encode(generation_adapter_plan_dto(generation))? + "\n")
   generation
 }
 
@@ -87,7 +87,7 @@ proc generation_adapter_publish_receipt(root: Path, expected: types.GenerationRe
     return Err(GenerationAdapterError.Failed("completed generation receipt does not match its plan"))
   }
 
-  fs.write_atomic(output, fs.read_text(fp"{root}/var/lib/laputa/generation.json")?)?
+  fs.write_atomic(output, fs.read_text(fp"{root}/var/lib/laputa/generation.json")?)
 }
 
 proc generation_adapter_ensure_generation(
@@ -107,14 +107,14 @@ proc generation_adapter_ensure_generation(
       )
     }
 
-    pm_generation.verify_generation(root, receipt)?
-    generation_adapter_publish_receipt(root, receipt, receipt_output)?
+    pm_generation.verify_generation(root, receipt)
+    generation_adapter_publish_receipt(root, receipt, receipt_output)
     return receipt
   }
 
   let receipt = pm_generation.compose(value, store_root, root, overlay_root)?
-  pm_generation.verify_generation(root, receipt)?
-  generation_adapter_publish_receipt(root, receipt, receipt_output)?
+  pm_generation.verify_generation(root, receipt)
+  generation_adapter_publish_receipt(root, receipt, receipt_output)
   receipt
 }
 
@@ -206,7 +206,7 @@ export proc generation_adapter_copy_manifest_file(
   let handle = fs.tempdir()?
   defer handle.close()?
   let extracted = handle.host_path()?
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)?
+  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
   let source = fp"{extracted}/{relative_path}"
 
   if ! fs.exists(source)? or fs.metadata(source)?.kind != "file" {
@@ -218,12 +218,12 @@ export proc generation_adapter_copy_manifest_file(
   }
 
   let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(output.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary)?
-  fs.fsync(temporary)?
-  fs.rename(temporary, output, overwrite: true)?
+  fs.copy(source, temporary)
+  fs.fsync(temporary)
+  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Executes a saved BuildPlan, then composes exactly its declared runtime generation.
@@ -248,7 +248,7 @@ export proc generation_adapter_execute_profile(
     pm_remote.repo_url(),
     jobs,
   )?
-  generation_adapter_completed_build(build_plan, execution)?
+  generation_adapter_completed_build(build_plan, execution)
   let generation = generation_adapter_plan(
     build_plan_path,
     runtime_roots,
@@ -263,7 +263,7 @@ export proc generation_adapter_execute_profile(
     overlay_root,
     generation_receipt_output,
   )?
-  generation_adapter_require_no_forbidden_packages(receipt, forbidden_packages)?
+  generation_adapter_require_no_forbidden_packages(receipt, forbidden_packages)
   {generation_root: fp"{output_parent}/{receipt.generation_sha256}"}
 }
 

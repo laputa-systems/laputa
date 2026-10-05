@@ -120,14 +120,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   let mandir = fp"{dest}/usr/share/man"
   # Pages sit exactly one level down, in their section directory.
   for section in fs.children(p"man")? {
-    fs.mkdir(fp"{mandir}/{section.name}", parents: true)?
+    fs.mkdir(fp"{mandir}/{section.name}", parents: true)
 
     for page in fs.children(section.path)? {
       let rel = f"{section.name}/{page.name}"
       continue when rel in excluded_pages
-      fs.write(fp"{mandir}/{rel}", release_page(page.path.read_text()?))?
+      fs.write(fp"{mandir}/{rel}", release_page(page.path.read_text()?))
     }
   }
 
-  check_rendering(mandir)?
+  check_rendering(mandir)
 }

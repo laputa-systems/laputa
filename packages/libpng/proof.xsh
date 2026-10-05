@@ -2,8 +2,8 @@
 use pm.proof
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "libpng")?
-  proof.target_elf(root, p"usr/lib/libpng16.so.16", "libpng")?
+  proof.package_metadata(root, "libpng")
+  proof.target_elf(root, p"usr/lib/libpng16.so.16", "libpng")
 
   # A shared libpng must not defer optional ARM NEON implementations to a
   # nonexistent DSO.  The historical broken artifact passed metadata checks
@@ -21,10 +21,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
       f"UND {symbol}" not in symbols,
       "proof-libpng",
       f"libpng has unresolved optional ARM helper {symbol}",
-    )?
+    )
   }
 
   print "libpng ok"
 }
 
-main(@args)?
+main(@args)

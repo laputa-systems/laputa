@@ -43,5 +43,5 @@ export const filetree = [{path: p"usr/bin/m4", kind: "file"}]
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"m4.xsh", fp"{dest}/usr/bin/m4", 0o755, parents: true, overwrite: true)?
+  fs.install(p"m4.xsh", fp"{dest}/usr/bin/m4", 0o755, parents: true, overwrite: true)
 }

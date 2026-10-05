@@ -68,7 +68,7 @@ proc repo_verified_proof_path(
   }
 
   if receipt.proof_key == node.proof_key {
-    pm_proof.verify_artifact_receipt(primary, node, receipt.payload_sha256)?
+    pm_proof.verify_artifact_receipt(primary, node, receipt.payload_sha256)
     return primary
   }
 
@@ -82,20 +82,20 @@ proc repo_verified_proof_path(
     )
   }
 
-  pm_proof.verify_artifact_receipt(reproved, node, receipt.payload_sha256)?
+  pm_proof.verify_artifact_receipt(reproved, node, receipt.payload_sha256)
   reproved
 }
 
 ## Selects every BuildPlan node from verified immutable Store receipts without building or resolving a remote index.
 export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Result[types.RepoSnapshot, Error] {
-  build_plan.validate(value)?
+  build_plan.validate(value)
   var packages: List[types.RepoPublication] = []
 
   for node in value.nodes {
     # Publication leaves this Store, so re-hash every object instead of
     # trusting commit-time hashes as builds do.
     let receipt = store.verify_artifact(store_root, node.artifact_key)?
-    repo_verify_node_receipt(value, node, receipt)?
+    repo_verify_node_receipt(value, node, receipt)
     let kind = repo_package_kind(receipt, node)?
     let proof = repo_verified_proof_path(store_root, node, receipt)?
     packages += [{
@@ -114,7 +114,7 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
 proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, output: Path) [fs, error] -> Result[Path] {
   let raw = json.read(value.metadata)?.require(RepoArtifactMetadataDto)?
   let metadata = fp"{output}/{value.node.artifact_key}.json"
-  fs.mkdir(metadata.parent)?
+  fs.mkdir(metadata.parent)
   fs.write_atomic(
     metadata,
     json.encode({
@@ -127,7 +127,7 @@ proc repo_metadata_for_publication(value: types.RepoPublication, arch: Str, outp
       proof_key: value.node.proof_key,
       proof_sha256: value.node.proof_sha256,
     })? + "\n",
-  )?
+  )
   metadata
 }
 
@@ -253,7 +253,7 @@ export proc publish(
     )
   }
 
-  fs.mkdir(work)?
+  fs.mkdir(work)
   var stages: List[RepoPublishStage] = []
 
   for publication in repo_snapshot.packages {
@@ -266,7 +266,7 @@ export proc publish(
     }
 
     if publication.receipt.origin == types.artifact_origin_built() {
-      pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)?
+      pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)
     }
 
     let metadata = repo_metadata_for_publication(publication, arch, fp"{work}/metadata")?
@@ -291,14 +291,14 @@ export proc publish(
 
   for stage in pending {
     if ! stage.entry.metapackage {
-      repo_publish_immutable_object(remote_repo, fp"{stage.entry.tarball}", stage.publication.payload, token, work)?
+      repo_publish_immutable_object(remote_repo, fp"{stage.entry.tarball}", stage.publication.payload, token, work)
     }
 
-    repo_publish_immutable_object(remote_repo, fp"{stage.entry.metadata}", stage.metadata, token, work)?
-    repo_publish_immutable_object(remote_repo, fp"{stage.entry.proof}", stage.publication.proof, token, work)?
+    repo_publish_immutable_object(remote_repo, fp"{stage.entry.metadata}", stage.metadata, token, work)
+    repo_publish_immutable_object(remote_repo, fp"{stage.entry.proof}", stage.publication.proof, token, work)
   }
 
   if pending.len() > 0 {
-    remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)?
+    remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)
   }
 }

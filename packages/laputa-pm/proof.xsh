@@ -16,4 +16,4 @@ proc main(root = /rootfs) [fs, error] {
   print "laputa-pm ok"
 }
 
-main(@args)?
+main(@args)

@@ -75,7 +75,7 @@ proc tree_digest(root: Path) [fs, error] -> Result[Str] {
 ## The content key for the host-tools base: its Dockerfile and platform.
 export proc host_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   let dockerfile = host_tools_dockerfile(laputa_root)
-  require_file(dockerfile)?
+  require_file(dockerfile)
   let body = f"""{host_tools_contract_epoch}
 dockerfile\t{hash.sha256(dockerfile)?.hex()}
 platform\t{value.docker_platform}
@@ -115,8 +115,8 @@ export proc llvm_seed_source(laputa_root: Path, arch: Str) [fs, env, error] -> R
 export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
   let dockerfile = package_tools_dockerfile(laputa_root)
   let helper = package_tools_bootstrap_helper(laputa_root)
-  require_file(dockerfile)?
-  require_file(helper)?
+  require_file(dockerfile)
+  require_file(helper)
   let body = f"""{package_tools_contract_epoch}
 dockerfile\t{hash.sha256(dockerfile)?.hex()}
 bootstrap-helper\t{hash.sha256(helper)?.hex()}
@@ -178,14 +178,14 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   return when fs.exists(saved)?
 
   if ! image_exists(docker, tag, laputa_root)? {
-    docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")?
+    docker_step(docker, host_tools_build_argv(docker, laputa_root, value)?, laputa_root, f"building {tag}")
   }
 
-  fs.mkdir(saved.parent)?
+  fs.mkdir(saved.parent)
   let temporary = fp"{saved}.tmp"
-  fs.remove(temporary, missing_ok: true)?
-  docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")?
-  fs.rename(temporary, saved, overwrite: true)?
+  fs.remove(temporary, missing_ok: true)
+  docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
+  fs.rename(temporary, saved, overwrite: true)
 }
 
 ## Make the host-tools base available offline: present, or loaded from `.cache/images/`.
@@ -203,7 +203,7 @@ export proc ensure_host_tools(
     return Err(SeedImageError.Missing(f"{tag} is neither loaded nor saved at {saved}; run `make fetch`"))
   }
 
-  docker_step(docker, [docker.display(), "load", "--input", saved.display()], laputa_root, f"loading {saved}")?
+  docker_step(docker, [docker.display(), "load", "--input", saved.display()], laputa_root, f"loading {saved}")
 
   if ! image_exists(docker, tag, laputa_root)? {
     return Err(SeedImageError.Failed(f"{saved} did not provide {tag}"))
@@ -227,9 +227,9 @@ proc stage_llvm_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[
   let staged = fp"{context}/sha256/{digest}"
 
   if ! fs.exists(staged)? {
-    fs.remove(context, missing_ok: true)?
-    fs.mkdir(staged.parent)?
-    fs.copy(source, staged)?
+    fs.remove(context, missing_ok: true)
+    fs.mkdir(staged.parent)
+    fs.copy(source, staged)
   }
 
   context
@@ -287,6 +287,6 @@ export proc ensure_package_tools(
     package_tools_build_argv(docker, laputa_root, value, host_tag, tag, sources),
     laputa_root,
     f"building {tag}",
-  )?
+  )
   tag
 }

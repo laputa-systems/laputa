@@ -12,7 +12,7 @@ proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, proce
     ["xsh", tool.display(), "--"].extend(argv),
     root,
     {XSH_MODULE_PATH: root.display(), XSH_UNIX_REAL: "1"},
-  )?
+  )
 }
 
 proc ensure_dev_dirs(rootfs: Path) [fs, error] {
@@ -20,7 +20,7 @@ proc ensure_dev_dirs(rootfs: Path) [fs, error] {
     let dir = fp"{rootfs}/{sub}"
 
     if ! fs.exists(dir)? {
-      fs.mkdir(dir)?
+      fs.mkdir(dir)
     }
   }
 }
@@ -43,7 +43,7 @@ proc append_inittab_line(rootfs: Path, line: Str) [fs, error] {
     inittab,
     f"""{text}{line}
 """,
-  )?
+  )
 }
 
 # The serial console QEMU's machine model provides: the PL011 UART on aarch64
@@ -63,7 +63,7 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     0o755,
     parents: true,
     overwrite: true,
-  )?
+  )
 
   fs.install(
     fp"{installer_root}/disk_selection.xsh",
@@ -71,7 +71,7 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     0o644,
     parents: true,
     overwrite: true,
-  )?
+  )
 
   fs.install(
     fp"{installer_root}/laputa-network.boot",
@@ -79,7 +79,7 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     0o755,
     parents: true,
     overwrite: true,
-  )?
+  )
 
   fs.install(
     fp"{installer_root}/laputa-ci-smoke.boot",
@@ -87,7 +87,7 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     0o755,
     parents: true,
     overwrite: true,
-  )?
+  )
 
   fs.install(
     fp"{installer_root}/setup-laputa-autoinstall.boot",
@@ -95,9 +95,9 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     0o755,
     parents: true,
     overwrite: true,
-  )?
+  )
 
-  append_inittab_line(rootfs, f"{serial_console(arch)}::respawn:/bin/xshi")?
+  append_inittab_line(rootfs, f"{serial_console(arch)}::respawn:/bin/xshi")
 }
 
 pure efi_boot_filename(arch: Str) -> Result[Str] {
@@ -111,34 +111,34 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
 # Image overlays change these roots after package composition, so a package
 # generation receipt must not claim to describe the finished image.
 proc drop_generation_receipt(rootfs: Path) [fs, error] {
-  fs.remove(fp"{rootfs}/var/lib/laputa/generation.json", missing_ok: true)?
-  fs.remove(fp"{rootfs}/var/lib/laputa/root.json", missing_ok: true)?
+  fs.remove(fp"{rootfs}/var/lib/laputa/generation.json", missing_ok: true)
+  fs.remove(fp"{rootfs}/var/lib/laputa/root.json", missing_ok: true)
 }
 
 proc overlay_composed_roots(root: Path, roots: package_roots_host.InstallerRoots, arch: Str) [fs, env, error] {
   for rootfs in [roots.target, roots.installer, roots.tools] {
-    drop_generation_receipt(rootfs)?
+    drop_generation_receipt(rootfs)
   }
 
-  ensure_dev_dirs(roots.target)?
-  install_installer_tools(root, roots.target, arch)?
-  ensure_dev_dirs(roots.installer)?
-  install_installer_tools(root, roots.installer, arch)?
+  ensure_dev_dirs(roots.target)
+  install_installer_tools(root, roots.target, arch)
+  ensure_dev_dirs(roots.installer)
+  install_installer_tools(root, roots.installer, arch)
 }
 
 proc prune_runtime_root(rootfs: Path, arch: Str) [fs, error] {
-  fs.remove(fp"{rootfs}/boot/vmlinuz-7.2.9", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/include", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libcrypt.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libdl.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libm.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libpthread.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/librt.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libssp_nonshared.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libutil.a", missing_ok: true)?
-  fs.remove(fp"{rootfs}/usr/lib/libxnet.a", missing_ok: true)?
+  fs.remove(fp"{rootfs}/boot/vmlinuz-7.2.9", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/include", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libc.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libclang_rt.builtins-{arch}.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libcrypt.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libdl.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libm.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libpthread.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/librt.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libssp_nonshared.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libutil.a", missing_ok: true)
+  fs.remove(fp"{rootfs}/usr/lib/libxnet.a", missing_ok: true)
 }
 
 pure ceil_div(value: Int, divisor: Int) -> Int {
@@ -450,10 +450,10 @@ proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) [fs, err
     volume_sectors = file.extent + sector_count(file.size, 2048)
   }
 
-  fs.mkdir(image.parent())?
-  fs.remove(image, missing_ok: true)?
-  fs.write(image, "")?
-  image.truncate(volume_sectors * 2048)?
+  fs.mkdir(image.parent())
+  fs.remove(image, missing_ok: true)
+  fs.write(image, "")
+  image.truncate(volume_sectors * 2048)
   let lead_in = bytes.zero_at(image, 0, 16 * 2048)?
 
   let pvd = bytes.write_at(
@@ -505,14 +505,14 @@ proc write_iso9660(image: Path, volume_id: Str, inputs: List[IsoInput]) [fs, err
 proc build_installer_iso(work: Path, iso: Path, kernel: Path, arch: Str) [fs, error] {
   let iso_arch = if arch == "aarch64" { "AARCH64" } else { "X86_64" }
   let installer_root = fp"{work}/installer-root.ext4"
-  write_iso9660(iso, f"LAPUTA_{iso_arch}", [{source: kernel, name: "KERNEL;1"}])?
+  write_iso9660(iso, f"LAPUTA_{iso_arch}", [{source: kernel, name: "KERNEL;1"}])
   let base_size = iso.metadata()?.size
   let root_size = installer_root.metadata()?.size
   let root_start_lba = ceil_div(base_size, 1024 * 1024) * 2048
   let root_sectors = ceil_div(root_size, 512)
   let root_end_lba = root_start_lba + root_sectors - 1
   let total_sectors = root_end_lba + 4
-  iso.truncate(total_sectors * 512)?
+  iso.truncate(total_sectors * 512)
 
   let copied = bytes.copy_file(
     installer_root,
@@ -525,7 +525,7 @@ proc build_installer_iso(work: Path, iso: Path, kernel: Path, arch: Str) [fs, er
   )?
 
   let _ = copied
-  write_iso_hybrid_gpt(iso, total_sectors, root_start_lba, root_end_lba)?
+  write_iso_hybrid_gpt(iso, total_sectors, root_start_lba, root_end_lba)
 }
 
 proc build_filesystems(
@@ -539,16 +539,16 @@ proc build_filesystems(
   installer_ci: Str,
 ) [fs, process, env, error] {
   let efi_boot = efi_boot_filename(arch)?
-  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer")?
-  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT")?
-  fs.mkdir(fp"{work}/rootfs-installer/etc/laputa-installer")?
-  fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/target-esp-mb", target_esp_mb)?
+  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer")
+  fs.mkdir(fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT")
+  fs.mkdir(fp"{work}/rootfs-installer/etc/laputa-installer")
+  fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/target-esp-mb", target_esp_mb)
 
   fs.copy(
     boot_kernel,
     fp"{work}/rootfs-installer/usr/share/laputa-installer/esp/EFI/BOOT/{efi_boot}",
     overwrite: true,
-  )?
+  )
 
   archive.tar_create(
     fp"{work}/target-root.tar.gz",
@@ -556,24 +556,24 @@ proc build_filesystems(
     [p"."],
     compression: "gz",
     overwrite: true,
-  )?
+  )
 
   fs.copy(
     fp"{work}/target-root.tar.gz",
     fp"{work}/rootfs-installer/usr/share/laputa-installer/target-root.tar.gz",
     overwrite: true,
-  )?
+  )
 
   if installer_ci == "1" {
-    fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/ci", "")?
+    fs.write(fp"{work}/rootfs-installer/etc/laputa-installer/ci", "")
   } else {
-    fs.remove(fp"{work}/rootfs-installer/etc/laputa-installer/ci", missing_ok: true)?
+    fs.remove(fp"{work}/rootfs-installer/etc/laputa-installer/ci", missing_ok: true)
   }
 
   let installer_root = fp"{work}/installer-root.ext4"
   let installer_root_mb = installer_root_size_mb(fp"{work}/rootfs-installer", installer_root_mb_override)?
-  fs.write(installer_root, "")?
-  installer_root.truncate(installer_root_mb * 1024 * 1024)?
+  fs.write(installer_root, "")
+  installer_root.truncate(installer_root_mb * 1024 * 1024)
 
   run_xsh_tool(
     root,
@@ -591,7 +591,7 @@ proc build_filesystems(
       fp"{work}/rootfs-installer".display(),
       installer_root.display(),
     ],
-  )?
+  )
 }
 
 proc build_host() [fs, net, process, env, time, error, io] {
@@ -615,7 +615,7 @@ proc build_host() [fs, net, process, env, time, error, io] {
     installer: fp"{work}/rootfs-installer",
     tools: fp"{work}/rootfs-tools",
   )
-  fs.mkdir(work)?
+  fs.mkdir(work)
 
   for path_value in [
     fp"{work}/packages",
@@ -630,7 +630,7 @@ proc build_host() [fs, net, process, env, time, error, io] {
     fp"{work}/target-esp.vfat",
     fp"{work}/linux-kernel",
   ] {
-    fs.remove(path_value, missing_ok: true)?
+    fs.remove(path_value, missing_ok: true)
   }
 
   package_roots_host.prepare(
@@ -642,8 +642,8 @@ proc build_host() [fs, net, process, env, time, error, io] {
     host.installer_env_value("LAPUTA_INSTALLER_JOBS", "4").parse_int()?,
     fp"{work}/packages",
     roots,
-  )?
-  overlay_composed_roots(root, roots, arch)?
+  )
+  overlay_composed_roots(root, roots, arch)
 
   if qemu_smoke == "1" {
     if qemu_authorized_key == "" {
@@ -658,12 +658,12 @@ proc build_host() [fs, net, process, env, time, error, io] {
       return Err(InstallerBuildError.Failed(f"missing {key_path}"))
     }
 
-    fs.mkdir(fp"{work}/rootfs-target/etc/laputa-installer")?
-    fs.copy(key_path, fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)?
+    fs.mkdir(fp"{work}/rootfs-target/etc/laputa-installer")
+    fs.copy(key_path, fp"{work}/rootfs-target/etc/laputa-installer/qemu-smoke-authorized-key.pub", overwrite: true)
   }
 
-  prune_runtime_root(roots.target, arch)?
-  prune_runtime_root(roots.installer, arch)?
+  prune_runtime_root(roots.target, arch)
+  prune_runtime_root(roots.installer, arch)
   let packaged_kernel = fp"{work}/rootfs-target/boot/vmlinuz"
   let boot_kernel = if kernel_source_raw == "" { packaged_kernel } else { fp"{kernel_source_raw}" }
 
@@ -671,12 +671,12 @@ proc build_host() [fs, net, process, env, time, error, io] {
     return Err(InstallerBuildError.Failed(f"missing installer kernel source {boot_kernel}"))
   }
 
-  fs.copy(boot_kernel, kernel, overwrite: true)?
-  build_filesystems(root, work, xsh, arch, target_esp_mb, boot_kernel, installer_root_mb, installer_ci)?
-  build_installer_iso(work, iso, kernel, arch)?
+  fs.copy(boot_kernel, kernel, overwrite: true)
+  build_filesystems(root, work, xsh, arch, target_esp_mb, boot_kernel, installer_root_mb, installer_ci)
+  build_installer_iso(work, iso, kernel, arch)
 
   io.write_stdout(f"""{iso}
-""")?
+""")
 }
 
 proc main(...argv: List[Str]) [fs, net, process, env, time, error, io] {
@@ -684,7 +684,7 @@ proc main(...argv: List[Str]) [fs, net, process, env, time, error, io] {
     return Err(InstallerBuildError.Failed("build-installer-image.xsh does not accept subcommands"))
   }
 
-  build_host()?
+  build_host()
 }
 
-main(@args)?
+main(@args)

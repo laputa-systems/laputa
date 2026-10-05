@@ -2,8 +2,8 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "utf8proc")?
-  proof.target_elf(root, p"usr/lib/libutf8proc.so.3", "utf8proc")?
+  proof.package_metadata(root, "utf8proc")
+  proof.target_elf(root, p"usr/lib/libutf8proc.so.3", "utf8proc")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "utf8proc ok: cross-built"
@@ -12,8 +12,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-utf8proc"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp, true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp, true)
   defer fs.remove(tmp, missing_ok: true)?
 
   # tmux asks utf8proc for display widths, so the proof checks a wide CJK
@@ -36,7 +36,7 @@ int main(void) {
   return strncmp(utf8proc_version(), "2.", 2) == 0 ? 0 : 3;
 }
 """,
-  )?
+  )
 
   let binary = fp"{tmp}/proof-utf8proc"
   run $cc fp"{tmp}/proof-utf8proc.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lutf8proc" "-o" $binary ?
@@ -50,4 +50,4 @@ int main(void) {
   print "utf8proc ok: NFC, character widths"
 }
 
-main(@args)?
+main(@args)

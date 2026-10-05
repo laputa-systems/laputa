@@ -18,32 +18,32 @@ const early_sha256 = "49995102b0a6eac9c25e601d148f0a46176ae3a85fe644b13a66dcbcc4
 const early_member = "kernel/x86/microcode/AuthenticAMD.bin"
 
 proc ensure_sha256(file: Path, expected: Str) [fs, error] {
-  proof.ensure(fs.exists(file)?, "amd-ucode", f"missing {file}")?
+  proof.ensure(fs.exists(file)?, "amd-ucode", f"missing {file}")
   let actual = hash.sha256(file)?.hex()
-  proof.ensure(actual == expected, "amd-ucode", f"{file} has sha256 {actual}, expected {expected}")?
+  proof.ensure(actual == expected, "amd-ucode", f"{file} has sha256 {actual}, expected {expected}")
 }
 
 proc main(root: Path = /rootfs) [fs, error] {
-  proof.package_metadata(root, "amd-ucode")?
+  proof.package_metadata(root, "amd-ucode")
   var concatenated: List[Bytes] = []
 
   for container in containers {
     let file = fp"{root}/usr/lib/firmware/amd-ucode/{container.name}"
-    ensure_sha256(file, container.sha256)?
+    ensure_sha256(file, container.sha256)
     concatenated += [file.read_bytes()?]
   }
 
   ensure_sha256(
     fp"{root}/usr/share/licenses/amd-ucode/LICENSE.amd-ucode",
     "2103bd999f77522c5ab5fd35df0579ed00e2a6b885f6f8ebd444e97ffa482991",
-  )?
+  )
 
   # The early loader scans the initrd for an uncompressed newc ("070701")
   # archive, so the image must start with that header, not a compressor's.
   let image = fp"{root}/boot/amd-ucode.img"
-  proof.ensure(fs.exists(image)?, "amd-ucode", "missing boot/amd-ucode.img")?
+  proof.ensure(fs.exists(image)?, "amd-ucode", "missing boot/amd-ucode.img")
   let magic = bytes.read_at(image, 0, 6)?
-  proof.ensure(magic == bytes.from_text("070701"), "amd-ucode", "amd-ucode.img is not an uncompressed newc cpio")?
+  proof.ensure(magic == bytes.from_text("070701"), "amd-ucode", "amd-ucode.img is not an uncompressed newc cpio")
 
   var members: List[Str] = []
 
@@ -51,20 +51,20 @@ proc main(root: Path = /rootfs) [fs, error] {
     members += [entry.path.display()]
   }
 
-  proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")?
+  proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")
 
   let extracted_handle = fs.tempdir()?
   defer extracted_handle.close()?
   let extracted = extracted_handle.host_path()?
-  archive.cpio_extract(image, extracted)?
+  archive.cpio_extract(image, extracted)
   let early = fp"{extracted}/{early_member}"
-  ensure_sha256(early, early_sha256)?
+  ensure_sha256(early, early_sha256)
   proof.ensure(
     early.read_bytes()? == bytes.concat(concatenated),
     "amd-ucode",
     f"{early_member} is not the concatenation of the installed containers",
-  )?
+  )
   print "amd-ucode ok"
 }
 
-main(@args)?
+main(@args)

@@ -2,8 +2,8 @@
 use pm.proof
 
 proc main(root: Path = /rootfs) [fs, error] {
-  proof.package_metadata(root, "fcft-minimal")?
+  proof.package_metadata(root, "fcft-minimal")
   print "fcft-minimal ok"
 }
 
-main(@args)?
+main(@args)

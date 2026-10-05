@@ -97,7 +97,7 @@ proc write_zic_headers() [fs, error] {
 static char const TZVERSION[]="{ver}";
 static char const REPORT_BUGS_TO[]="tz@iana.org";
 """,
-  )?
+  )
 
   fs.write(
     p"tzcode/tzdir.h",
@@ -108,7 +108,7 @@ static char const REPORT_BUGS_TO[]="tz@iana.org";
 # define TZDIR "/usr/share/zoneinfo" /* TZif directory */
 #endif
 """,
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -130,8 +130,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  write_zic_headers()?
-  fs.mkdir(p"obj")?
+  write_zic_headers()
+  fs.mkdir(p"obj")
 
   let zic = make.c_program({
     cc: build_cc,
@@ -148,15 +148,15 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks([{...task, env: build_task_env} for task in zic.tasks], make.jobs()?)?
+  make.run_tasks([{...task, env: build_task_env} for task in zic.tasks], make.jobs()?)
 
   let zoneinfo = fp"{dest}/usr/share/zoneinfo"
-  fs.mkdir(zoneinfo, parents: true)?
+  fs.mkdir(zoneinfo, parents: true)
   let zic_bin = zic.output
   let sources = zic_sources
   run $zic_bin "-b" "slim" "-d" $zoneinfo @sources ?
 
   for table in table_files {
-    fs.install(fp"{table}", fp"{zoneinfo}/{table}", 0o644, overwrite: true)?
+    fs.install(fp"{table}", fp"{zoneinfo}/{table}", 0o644, overwrite: true)
   }
 }

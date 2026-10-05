@@ -470,7 +470,7 @@ proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
     return Err(FontconfigError.Patch(f"{file} no longer holds the block the recipe replaces"))?
   }
 
-  fs.write(file, text.replace(old, new))?
+  fs.write(file, text.replace(old, new))
 }
 
 # Upstream's makealias.py emits hidden internal aliases for the public
@@ -478,7 +478,7 @@ proc replace_required(file: Path, old: Str, new: Str) [fs, error] {
 # PLT calls between its own functions.
 proc write_empty_alias_headers() [fs, error] {
   for header in [p"fcalias.h", p"fcaliastail.h", p"fcftalias.h", p"fcftaliastail.h"] {
-    fs.write(header, "")?
+    fs.write(header, "")
   }
 }
 
@@ -506,23 +506,23 @@ proc write_empty_alias_headers() [fs, error] {
 # fcconst.h, fcgenericfamily.h, and fcobjshash.h go beside the sources in src/
 # that include them, where upstream relies on generated-header include paths.
 proc patch_generated_build_inputs() [fs, error] {
-  fs.install(p"generated/fccase.h", p"fc-case/fccase.h", 0o644, overwrite: true)?
-  fs.install(p"generated/fclang.h", p"fc-lang/fclang.h", 0o644, overwrite: true)?
-  fs.install(p"generated/fcconst.h", p"src/fcconst.h", 0o644, overwrite: true)?
-  fs.install(p"generated/fcgenericfamily.h", p"src/fcgenericfamily.h", 0o644, overwrite: true)?
-  fs.install(p"generated/fcobjshash.h", p"src/fcobjshash.h", 0o644, overwrite: true)?
-  fs.install(p"generated/35-lang-normalize.conf", p"conf.d/35-lang-normalize.conf", 0o644, overwrite: true)?
-  write_empty_alias_headers()?
+  fs.install(p"generated/fccase.h", p"fc-case/fccase.h", 0o644, overwrite: true)
+  fs.install(p"generated/fclang.h", p"fc-lang/fclang.h", 0o644, overwrite: true)
+  fs.install(p"generated/fcconst.h", p"src/fcconst.h", 0o644, overwrite: true)
+  fs.install(p"generated/fcgenericfamily.h", p"src/fcgenericfamily.h", 0o644, overwrite: true)
+  fs.install(p"generated/fcobjshash.h", p"src/fcobjshash.h", 0o644, overwrite: true)
+  fs.install(p"generated/35-lang-normalize.conf", p"conf.d/35-lang-normalize.conf", 0o644, overwrite: true)
+  write_empty_alias_headers()
   let meson = p"meson.build"
 
   replace_required(meson, """    'rust_std=2021',
-""", "")?
+""", "")
 
   replace_required(
     meson,
     "math_dep = cc.find_library('m', required: false)",
     "math_dep = declare_dependency(link_args: ['-lm'])",
-  )?
+  )
 
   replace_required(
     meson,
@@ -558,9 +558,9 @@ foreach check : check_alignofs
   conf.set(conf_name, (type == 'void *' or type == 'double') ? 8 : cc.alignment(type))
 endforeach
 """,
-  )?
+  )
 
-  replace_required(meson, "python3 = import('python').find_installation()\n", "")?
+  replace_required(meson, "python3 = import('python').find_installation()\n", "")
 
   # gperf 3.1 and later type lengths as size_t, as the vendored output does.
   replace_required(
@@ -596,7 +596,7 @@ endif
 """,
     """gperf_len_type = 'size_t'
 """,
-  )?
+  )
 
   replace_required(
     meson,
@@ -615,7 +615,7 @@ ft_alias_headers = custom_target('ft_alias_headers',
     """alias_headers = files('fcalias.h', 'fcaliastail.h')
 ft_alias_headers = files('fcftalias.h', 'fcftaliastail.h')
 """,
-  )?
+  )
 
   replace_required(
     p"src/meson.build",
@@ -636,7 +636,7 @@ fcobjshash_h = custom_target(
 """,
     """fcobjshash_h = files('fcobjshash.h')
 """,
-  )?
+  )
 
   replace_required(
     p"fc-case/meson.build",
@@ -647,7 +647,7 @@ fcobjshash_h = custom_target(
 """,
     """fccase_h = files('fccase.h')
 """,
-  )?
+  )
 
   replace_required(
     p"fc-lang/meson.build",
@@ -670,7 +670,7 @@ fcobjshash_h = custom_target(
 """,
     """fclang_h = files('fclang.h')
 """,
-  )?
+  )
 
   # The fc-const target also writes a test-only source; tests are disabled.
   replace_required(
@@ -686,7 +686,7 @@ test_const_name_c = custom_target('test_const_name.c',
 """,
     """fcconst_h = files('../src/fcconst.h')
 """,
-  )?
+  )
 
   let genericfamily_meson = p"fc-genericfamily/meson.build"
   let genericfamily_text = fs.read_text(genericfamily_meson)?
@@ -695,7 +695,7 @@ test_const_name_c = custom_target('test_const_name.c',
     return Err(FontconfigError.Patch(f"{genericfamily_meson} no longer runs gperf on the generated families"))?
   }
 
-  fs.write(genericfamily_meson, "fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")?
+  fs.write(genericfamily_meson, "fcgenericfamily_h = files('../src/fcgenericfamily.h')\n")
   let conf_meson = p"conf.d/meson.build"
 
   replace_required(
@@ -711,7 +711,7 @@ test_const_name_c = custom_target('test_const_name.c',
              install_dir: fc_templatedir,
              install_tag: 'runtime')
 """,
-  )?
+  )
 
   # The recipe links conf_links itself after install.
   replace_required(
@@ -722,7 +722,7 @@ test_const_name_c = custom_target('test_const_name.c',
                          install_tag: 'runtime')
 """,
     "",
-  )?
+  )
 }
 
 ## Exported declaration `build`.
@@ -730,7 +730,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
-  patch_generated_build_inputs()?
+  patch_generated_build_inputs()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -750,15 +750,15 @@ export proc build(dest: Path) [fs, process, env, error] {
   }?
 
   for bin in ["fc-cat", "fc-conflist", "fc-genconf", "fc-list", "fc-pattern", "fc-query", "fc-scan", "fc-validate"] {
-    fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)?
+    fs.remove(fp"{dest}/usr/bin/{bin}", missing_ok: true)
   }
 
   # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
   # makes them, so they resolve in any root the package is installed into.
   for conf in conf_links {
-    fs.symlink(fp"../../../usr/share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")?
+    fs.symlink(fp"../../../usr/share/fontconfig/conf.avail/{conf}", fp"{dest}/etc/fonts/conf.d/{conf}")
   }
 
-  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/share/gettext", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/share/man", missing_ok: true)
+  fs.remove(fp"{dest}/usr/share/gettext", missing_ok: true)
 }

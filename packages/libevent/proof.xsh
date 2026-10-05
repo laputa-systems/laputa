@@ -2,8 +2,8 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "libevent")?
-  proof.target_elf(root, p"usr/lib/libevent_core-2.1.so.7", "libevent")?
+  proof.package_metadata(root, "libevent")
+  proof.target_elf(root, p"usr/lib/libevent_core-2.1.so.7", "libevent")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "libevent ok: cross-built"
@@ -12,8 +12,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libevent"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp, true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp, true)
   defer fs.remove(tmp, missing_ok: true)?
 
   # tmux drives its whole client and server through an event_base, a pipe
@@ -63,7 +63,7 @@ int main(void) {
   return strncmp(event_get_version(), "2.1.", 4) == 0 ? 0 : 7;
 }
 """,
-  )?
+  )
 
   let binary = fp"{tmp}/proof-libevent"
   run $cc fp"{tmp}/proof-libevent.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-levent_core" "-o" $binary ?
@@ -77,4 +77,4 @@ int main(void) {
   print "libevent ok: event loop, pipe read, timer, evbuffer"
 }
 
-main(@args)?
+main(@args)

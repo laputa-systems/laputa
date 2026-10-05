@@ -147,18 +147,18 @@ export proc build(dest: Path) [fs, env, error] {
   let seed = verified_seed(pm_util.target_arch()?)?
 
   for product in ["xsh", "xshi", "xsht"] {
-    fs.install(fp"{seed}/{product}", fp"{dest}/usr/bin/{product}", 0o755, parents: true, overwrite: true)?
+    fs.install(fp"{seed}/{product}", fp"{dest}/usr/bin/{product}", 0o755, parents: true, overwrite: true)
   }
 
   let shell = fp"{dest}/usr/bin/sh"
-  fs.remove(shell, missing_ok: true)?
-  fs.symlink(p"xshi", shell)?
+  fs.remove(shell, missing_ok: true)
+  fs.symlink(p"xshi", shell)
 
   let core = fp"{dest}/usr/lib/xsh/core"
-  fs.mkdir(core.parent)?
-  archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)?
+  fs.mkdir(core.parent)
+  archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
 
   for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {
-    fs.symlink(fp"../lib/xsh/core/{entry.name}", fp"{dest}/usr/bin/{entry.name}")?
+    fs.symlink(fp"../lib/xsh/core/{entry.name}", fp"{dest}/usr/bin/{entry.name}")
   }
 }

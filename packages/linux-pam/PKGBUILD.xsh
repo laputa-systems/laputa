@@ -380,7 +380,7 @@ endif
 """,
   )
 
-  fs.write(root_build, root_text)?
+  fs.write(root_build, root_text)
   let modules_build = p"modules/meson.build"
 
   let modules_text = modules_build.read_text()?.replace(
@@ -389,14 +389,14 @@ endif
     "",
   )
 
-  fs.write(modules_build, modules_text)?
+  fs.write(modules_build, modules_text)
 }
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
-  patch_modules()?
+  patch_modules()
 
   let setup_args = [
     "setup",
@@ -432,9 +432,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $muon "-C" "build" install ?
   }?
 
-  fs.remove(fp"{dest}/etc/environment", missing_ok: true)?
-  fs.chmod(fp"{dest}/usr/bin/unix_chkpwd", 0o4755)?
-  fs.mkdir(fp"{dest}/etc/pam.d")?
+  fs.remove(fp"{dest}/etc/environment", missing_ok: true)
+  fs.chmod(fp"{dest}/usr/bin/unix_chkpwd", 0o4755)
+  fs.mkdir(fp"{dest}/etc/pam.d")
 
   fs.write(
     fp"{dest}/etc/pam.d/sudo",
@@ -442,7 +442,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 account required /usr/lib/security/pam_permit.so
 session required /usr/lib/security/pam_permit.so
 """,
-  )?
+  )
 
   fs.write(
     fp"{dest}/etc/pam.d/su",
@@ -451,7 +451,7 @@ auth required /usr/lib/security/pam_unix.so
 account required /usr/lib/security/pam_permit.so
 session required /usr/lib/security/pam_permit.so
 """,
-  )?
+  )
 
   fs.write(
     fp"{dest}/etc/pam.d/su-l",
@@ -460,5 +460,5 @@ auth required /usr/lib/security/pam_unix.so
 account required /usr/lib/security/pam_permit.so
 session required /usr/lib/security/pam_permit.so
 """,
-  )?
+  )
 }

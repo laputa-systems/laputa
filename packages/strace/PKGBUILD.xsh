@@ -191,7 +191,7 @@ proc write_sys_func_h(sources: List[Path]) [fs, error] {
     }
   }
 
-  fs.write(p"src/sys_func.h", [f"{decl}\n" for decl in sorted_unique(decls)].join(""))?
+  fs.write(p"src/sys_func.h", [f"{decl}\n" for decl in sorted_unique(decls)].join(""))
 }
 
 # `sen.h`: generate_sen.sh, the SEN() names of every syscall table entry that
@@ -211,7 +211,7 @@ proc write_sen_h() [fs, error] {
   }
 
   let body = [f"SEN_{sen},\n" for sen in sorted_unique(names)].join("")
-  fs.write(p"src/sen.h", "enum {\nSEN_printargs = 0,\n" + body + "};\n")?
+  fs.write(p"src/sen.h", "enum {\nSEN_printargs = 0,\n" + body + "};\n")
 }
 
 # `scno.h` (scno.am): scno.head, then an `__NR_` fallback for every named
@@ -228,7 +228,7 @@ proc write_scno_h(syscallent_i: Path) [fs, error] {
     }
   }
 
-  fs.write(p"src/scno.h", out)?
+  fs.write(p"src/scno.h", out)
 }
 
 # printers.h, native_printer_decls.h, and native_printer_defs.h: the
@@ -253,9 +253,9 @@ proc write_printer_headers(mpers_sources: List[Str], preprocessed: List[Path]) [
 
   printers = printers + "} struct_printers;\nextern const struct_printers *printers;\n"
   printers = printers + "#define MPERS_PRINTER_NAME(printer_name) printers->printer_name\n"
-  fs.write(p"src/printers.h", printers)?
-  fs.write(p"src/native_printer_decls.h", decls)?
-  fs.write(p"src/native_printer_defs.h", defs)?
+  fs.write(p"src/printers.h", printers)
+  fs.write(p"src/native_printer_decls.h", decls)
+  fs.write(p"src/native_printer_defs.h", defs)
 }
 
 # ioctl_redefs<N>.h: `sort ioctlent<N>.h | comm -23 - <(sort ioctlent0.h)`
@@ -273,7 +273,7 @@ proc write_ioctl_redefs(personality: Str) [fs, error] {
     }
   }
 
-  fs.write(fp"src/ioctl_redefs{personality}.h", out)?
+  fs.write(fp"src/ioctl_redefs{personality}.h", out)
 }
 
 # A preprocessor-only task (`$(CPP) -P`) with no depfile.
@@ -320,20 +320,20 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  fs.install(p"config.h", p"src/config.h", 0o644, overwrite: true)?
+  fs.install(p"config.h", p"src/config.h", 0o644, overwrite: true)
 
   # configure's workaround for musl, whose <signal.h> conflicts with the
   # kernel's <linux/signal.h>: shadow the latter with the libc header.
-  fs.install(p"src/linux/generic/signal.h.in", p"src/linux/generic/linux/signal.h", 0o644, parents: true, overwrite: true)?
+  fs.install(p"src/linux/generic/signal.h.in", p"src/linux/generic/linux/signal.h", 0o644, parents: true, overwrite: true)
 
   let library_sources = [fp"src/{src}" for src in libstrace_sources.words()]
   let sources = [p"src/strace.c", @library_sources]
-  write_sys_func_h([src for src in sources if src != p"src/bpf_attr_check.c"])?
-  write_sen_h()?
+  write_sys_func_h([src for src in sources if src != p"src/bpf_attr_check.c"])
+  write_sen_h()
 
   let mpers_line = [line for line in p"src/mpers.am".read_lines()? if line.starts_with("mpers_source_files = ")]
   let mpers_sources = mpers_line[0].split(" = ")[1].words()
-  fs.mkdir(p"obj/cpp", parents: true)?
+  fs.mkdir(p"obj/cpp", parents: true)
 
   # Each preprocessed input is target code: the syscall table (with config.h
   # forced in), the mpers sources in bootstrap mode, and the target's <linux/ioctl.h>
@@ -352,12 +352,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     mpers_i += [out]
   }
 
-  make.run_tasks(cpp_tasks, make.jobs()?)?
-  write_scno_h(syscallent_i)?
-  write_printer_headers(mpers_sources, mpers_i)?
+  make.run_tasks(cpp_tasks, make.jobs()?)
+  write_scno_h(syscallent_i)
+  write_printer_headers(mpers_sources, mpers_i)
 
   let iocdef = [f"#define {line.split("DEFINE HOST")[1]}\n" for line in iocdef_i.read_lines()? if line.starts_with("DEFINE HOST")]
-  fs.write(p"src/ioctl_iocdef.h", iocdef.join(""))?
+  fs.write(p"src/ioctl_iocdef.h", iocdef.join(""))
 
   # One ioctl table per personality the architecture ships ioctls_inc<N>.h
   # for (x86_64: native, i386, x32; aarch64: native, arm). ioctlsort runs on
@@ -373,7 +373,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let all = fp"src/ioctls_all{personality}.h"
     let inc = fp"src/linux/{arch}/ioctls_inc{personality}.h".read_text()?
     let arch_ioctls = fp"src/linux/{arch}/ioctls_arch{personality}.h".read_text()?
-    fs.write(all, inc + arch_ioctls)?
+    fs.write(all, inc + arch_ioctls)
 
     let ioctlsort = make.c_program({
       cc: build_cc,
@@ -397,16 +397,16 @@ export proc build(dest: Path) [fs, process, env, error] {
     ioctlsort_tasks = [{...task, env: build_task_env} for task in ioctlsort_tasks]
   }
 
-  make.run_tasks(ioctlsort_tasks, make.jobs()?)?
+  make.run_tasks(ioctlsort_tasks, make.jobs()?)
 
   for personality in personalities {
     let ioctlsort = fp"obj/ioctlsort{personality}"
-    fs.write(fp"src/ioctlent{personality}.h", run.text $ioctlsort ?)?
+    fs.write(fp"src/ioctlent{personality}.h", run.text $ioctlsort ?)
   }
 
   for personality in personalities {
     if personality != "0" {
-      write_ioctl_redefs(personality)?
+      write_ioctl_redefs(personality)
     }
   }
 
@@ -416,6 +416,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let libstrace = make.link_archive_task(cc, library.objects, p"obj/libstrace.a", library.deps)
   let main = make.compile_c_tasks(cc, triple, cflags, [], cppflags, p".", [p"src/strace.c"], p"obj/strace")
   let link = make.link_executable_task(cc, triple, main.objects, [p"obj/libstrace.a"], [], p"obj/strace/strace", [@main.deps, libstrace.name])
-  make.run_tasks([@library.tasks, libstrace, @main.tasks, link], make.jobs()?)?
-  fs.install(link.outputs[0], fp"{dest}/usr/bin/strace", 0o755, parents: true, overwrite: true)?
+  make.run_tasks([@library.tasks, libstrace, @main.tasks, link], make.jobs()?)
+  fs.install(link.outputs[0], fp"{dest}/usr/bin/strace", 0o755, parents: true, overwrite: true)
 }

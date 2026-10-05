@@ -89,27 +89,27 @@ proof PLUG PREPARED RUNNING SETUP 4800
 version 1.2.16.1"""
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "alsa-lib")?
+  proof.package_metadata(root, "alsa-lib")
 
   for lib in ["libasound", "libatopology"] {
     let so = fp"usr/lib/{lib}.so.2.0.0"
-    proof.target_elf(root, so, "alsa-lib")?
+    proof.target_elf(root, so, "alsa-lib")
     let readelf = proof.readelf_tool()?
     let dynamic = run.text $readelf "-d" fp"{root}/{so}" ?
-    proof.ensure(f"[{lib}.so.2]" in dynamic, "proof-alsa-lib", f"{lib} has no {lib}.so.2 SONAME")?
+    proof.ensure(f"[{lib}.so.2]" in dynamic, "proof-alsa-lib", f"{lib} has no {lib}.so.2 SONAME")
   }
 
   # pkg-config expands ${name} references, so consumers get real paths.
   let pc = fp"{root}/usr/lib/pkgconfig/alsa.pc".read_text()?
-  proof.ensure(r"exec_prefix=${prefix}" in pc, "proof-alsa-lib", "alsa.pc does not derive exec_prefix from prefix")?
-  proof.ensure(r"Cflags: -I${includedir}" in pc, "proof-alsa-lib", "alsa.pc does not reference includedir")?
-  proof.ensure(r"Libs: -L${libdir} -lasound" in pc, "proof-alsa-lib", "alsa.pc does not reference libdir")?
+  proof.ensure(r"exec_prefix=${prefix}" in pc, "proof-alsa-lib", "alsa.pc does not derive exec_prefix from prefix")
+  proof.ensure(r"Cflags: -I${includedir}" in pc, "proof-alsa-lib", "alsa.pc does not reference includedir")
+  proof.ensure(r"Libs: -L${libdir} -lasound" in pc, "proof-alsa-lib", "alsa.pc does not reference libdir")
 
   # The configuration tree libasound reads from ALSA_CONFIG_DIR.
   let share = fp"{root}/usr/share/alsa"
 
   for conf in [p"alsa.conf", p"pcm/default.conf", p"pcm/dmix.conf", p"ctl/default.conf", p"cards/HDA-Intel.conf", p"cards/aliases.conf"] {
-    proof.ensure(fs.exists(fp"{share}/{conf}")?, "proof-alsa-lib", f"missing /usr/share/alsa/{conf}")?
+    proof.ensure(fs.exists(fp"{share}/{conf}")?, "proof-alsa-lib", f"missing /usr/share/alsa/{conf}")
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -119,10 +119,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-alsa-lib"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp, true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp, true)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/proof-alsa-lib.c", program)?
+  fs.write(fp"{tmp}/proof-alsa-lib.c", program)
   let binary = fp"{tmp}/proof-alsa-lib"
   run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary ?
 
@@ -135,8 +135,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     run.text $binary ?
   }?
 
-  proof.ensure(out.trim() == expected, "proof-alsa-lib", f"unexpected software PCM run:\n{out.trim()}")?
+  proof.ensure(out.trim() == expected, "proof-alsa-lib", f"unexpected software PCM run:\n{out.trim()}")
   print "alsa-lib ok: snd_config_load parsed, null and plug->null PCMs ran PREPARED -> RUNNING -> SETUP"
 }
 
-main(@args)?
+main(@args)

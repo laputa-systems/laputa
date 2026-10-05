@@ -81,28 +81,28 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
 ## Atomically copy one manifest-verified kernel to its profile-owned host output path.
 export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
   let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(output.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary)?
+  fs.copy(source, temporary)
 
   if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
     return Err(ImageError.Failed(f"kernel copy does not match {source}"))
   }
 
-  fs.fsync(temporary)?
-  fs.rename(temporary, output, overwrite: true)?
+  fs.fsync(temporary)
+  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.
 export proc image_write_rootfs(generation_root: Path, formatter: Path, output: Path) [fs, process, error] {
   let target_size = image_generation_used_bytes(generation_root)? |> rootfs_size_bytes(_)
   let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(output.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.write(temporary, b"")?
-  temporary.truncate(target_size)?
+  fs.write(temporary, b"")
+  temporary.truncate(target_size)
 
   let xsh = /bin/xsh
   let status = process.run(
@@ -130,8 +130,8 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
     return Err(ImageError.Failed(f"native ext4 formatter failed for {output}"))
   }
 
-  fs.fsync(temporary)?
-  fs.rename(temporary, output, overwrite: true)?
+  fs.fsync(temporary)
+  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Replace an exact byte range inside an immutable byte value.
@@ -278,11 +278,11 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
 
   let backup_entries_lba = total_sectors - entry_sectors - 1
   let tmp = fp"{image}.tmp"
-  fs.mkdir(image.parent)?
-  fs.remove(tmp, missing_ok: true)?
+  fs.mkdir(image.parent)
+  fs.remove(tmp, missing_ok: true)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(tmp, b"")?
-  tmp.truncate(total_sectors * sector_size)?
+  fs.write(tmp, b"")
+  tmp.truncate(total_sectors * sector_size)
   let entries = bytes.concat(
     [
       image_gpt_entry(image_linux_partition_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
@@ -327,8 +327,8 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
     create: false,
     truncate: false,
   )?
-  fs.fsync(tmp)?
-  verify_disk(tmp, rootfs_bytes)?
-  fs.rename(tmp, image, overwrite: true)?
-  verify_disk(image, rootfs_bytes)?
+  fs.fsync(tmp)
+  verify_disk(tmp, rootfs_bytes)
+  fs.rename(tmp, image, overwrite: true)
+  verify_disk(image, rootfs_bytes)
 }

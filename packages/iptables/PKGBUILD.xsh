@@ -173,7 +173,7 @@ proc write_config_h() [fs, error] {
 #define XT_LOCK_NAME "/run/xtables.lock"
 #endif
 """,
-  )?
+  )
 }
 
 # include/xtables-version.h.in with configure's libxtables_vmajor:
@@ -184,7 +184,7 @@ proc write_xtables_version_h() [fs, error] {
     """#define XTABLES_VERSION "libxtables.so.12"
 #define XTABLES_VERSION_CODE 12
 """,
-  )?
+  )
 }
 
 # extensions/GNUmakefile.in builds every extensions/<prefix><module>.c it finds
@@ -218,15 +218,15 @@ proc write_initext(file: Path, function_name: Str, hooks: List[Str]) [fs, error]
   }
 
   body += "}\n"
-  fs.write(file, body)?
+  fs.write(file, body)
 }
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  write_config_h()?
-  write_xtables_version_h()?
+  write_config_h()
+  write_xtables_version_h()
   var tasks = []
   var objects = []
 
@@ -268,7 +268,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let modules = extension_modules(ext_archive.prefix)?
     let hooks = [f"{ext_archive.prefix}{extension}_init" for extension in modules]
     let initext = fp"extensions/{ext_archive.initext}.c"
-    write_initext(initext, ext_archive.function_name, hooks)?
+    write_initext(initext, ext_archive.function_name, hooks)
 
     let init_task = make.compile_c_task(
       cc,
@@ -332,11 +332,11 @@ export proc build(dest: Path) [fs, process, env, error] {
   # references every extension object, so linking the objects directly is the
   # same program.
   let link = make.link_executable_task(cc, triple, objects, [], ["-lm"], multi_out, [task.name for task in tasks])
-  make.run_tasks(tasks.push(link), make.jobs()?)?
+  make.run_tasks(tasks.push(link), make.jobs()?)
 
-  fs.install(multi_out, fp"{dest}/usr/bin/xtables-legacy-multi", 0o755, parents: true, overwrite: true)?
+  fs.install(multi_out, fp"{dest}/usr/bin/xtables-legacy-multi", 0o755, parents: true, overwrite: true)
 
   for command in command_links {
-    fs.symlink(p"xtables-legacy-multi", fp"{dest}/usr/bin/{command}")?
+    fs.symlink(p"xtables-legacy-multi", fp"{dest}/usr/bin/{command}")
   }
 }

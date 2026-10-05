@@ -17,19 +17,19 @@ proc main(...argv: List[Str]) [fs, time, error] {
     let {pending, active, ..} = state
 
     if state.done or state.error != "" {
-      fs.unlock(lock)?
+      fs.unlock(lock)
       break
     }
 
     if pending.len() == 0 {
       if active == 0 {
-        json.write(state_path, {...state, done: true})?
-        fs.unlock(lock)?
+        json.write(state_path, {...state, done: true})
+        fs.unlock(lock)
         break
       }
 
-      fs.unlock(lock)?
-      time.sleep(1ms)?
+      fs.unlock(lock)
+      time.sleep(1ms)
       continue
     }
 
@@ -37,8 +37,8 @@ proc main(...argv: List[Str]) [fs, time, error] {
     json.write(
       state_path,
       {...state, pending: pending |> drop(1), active: active + 1},
-    )?
-    fs.unlock(lock)?
+    )
+    fs.unlock(lock)
 
     let scan_result = kbuild.scan_record_for_dir(root, config, srcarch, fp"{dir}")
     if let Ok(scan) = scan_result {
@@ -58,21 +58,21 @@ proc main(...argv: List[Str]) [fs, time, error] {
       json.write(
         state_path,
         {...committed, pending: new_pending, active: committed.active - 1, seen: seen},
-      )?
-      fs.unlock(commit_lock)?
+      )
+      fs.unlock(commit_lock)
     } else {
       let error_lock = fs.lock(lock_path)?
       let failed_state = json.read(state_path)?.require(kbuild.PoolState)?
       json.write(
         state_path,
         {...failed_state, active: failed_state.active - 1, done: true, error: "directory scan failed"},
-      )?
-      fs.unlock(error_lock)?
+      )
+      fs.unlock(error_lock)
       return Err(kbuild.ScriptError.Failed(kind: "kbuild-process-pool", message: "directory scan failed"))
     }
   }
 
-  json.write(output_path, records)?
+  json.write(output_path, records)
 }
 
-main(@args)?
+main(@args)

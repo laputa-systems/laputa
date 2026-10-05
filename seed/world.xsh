@@ -209,9 +209,9 @@ proc world_run(
   inner: List[Str],
   label: Str,
 ) [fs, process, error] {
-  fs.mkdir(output)?
-  fs.mkdir(store)?
-  fs.mkdir(world_kbuild_cache(container.laputa_root))?
+  fs.mkdir(output)
+  fs.mkdir(store)
+  fs.mkdir(world_kbuild_cache(container.laputa_root))
   let argv = world_container_argv(
     container.docker,
     container.laputa_root,
@@ -260,24 +260,24 @@ proc world_plan(container: WorldContainer, args: WorldArgs) [fs, process, error]
       ],
     ),
     "repo plan",
-  )?
+  )
 }
 
 proc world_build(container: WorldContainer, args: WorldArgs) [fs, process, error] {
-  world_plan(container, args)?
+  world_plan(container, args)
   world_run(
     container,
     world_dir(container.laputa_root, args.arch),
     world_store(container.laputa_root, args.arch),
     pm_argv(["repo", "build", "/output/plan.json", "--store", "/artifacts", "--jobs", f"{args.jobs}", "--logs", "/output/logs"]),
     "repo build",
-  )?
+  )
 }
 
 ## Run PM in this host process against the loopback mirror.
 export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo}) {
-    pm_cli.run_pm_cli(args)?
+    pm_cli.run_pm_cli(args)
   }?
 }
 
@@ -285,12 +285,12 @@ export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, er
 # bump, say) under tuples the checkout no longer declares, so publish first
 # builds the current checkout's plan; an unchanged build is a no-op.
 proc world_publish(container: WorldContainer, args: WorldArgs) [fs, net, process, env, time, error] {
-  world_build(container, args)?
+  world_build(container, args)
   let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
   host_pm(
     args.repo,
     ["repo", "publish", plan.display(), "--store", world_store(container.laputa_root, args.arch).display()],
-  )?
+  )
 }
 
 ## The `make root` tree: the mirror plan, the store imported from the mirror, and the composed receipt.
@@ -324,7 +324,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
 
   let plan = fp"{root_dir}/plan.json"
   let store = fp"{root_dir}/store"
-  fs.mkdir(store)?
+  fs.mkdir(store)
   var selection: List[Str] = []
 
   for name in args.packages {
@@ -344,9 +344,9 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
       "--output",
       plan.display(),
     ],
-  )?
-  require_mirror_plan(plan, args.repo)?
-  host_pm(args.repo, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{args.jobs}"])?
+  )
+  require_mirror_plan(plan, args.repo)
+  host_pm(args.repo, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{args.jobs}"])
   world_run(
     container,
     root_dir,
@@ -355,7 +355,7 @@ proc world_root(container: WorldContainer, args: WorldArgs) [fs, net, process, e
       args.packages,
     ),
     "root compose",
-  )?
+  )
 }
 
 ## Run one parsed command from the Laputa checkout root.
@@ -367,9 +367,9 @@ export proc world_command(laputa_root: Path, args: WorldArgs) [fs, net, process,
   let value = xsh_seed.xsh_seed_arch(args.arch)?
 
   match args.command {
-    "plan" => world_plan(world_container(laputa_root, value)?, args)?
-    "build" => world_build(world_container(laputa_root, value)?, args)?
-    "publish" => world_publish(world_container(laputa_root, value)?, args)?
-    else => world_root(world_container(laputa_root, value)?, args)?
+    "plan" => world_plan(world_container(laputa_root, value)?, args)
+    "build" => world_build(world_container(laputa_root, value)?, args)
+    "publish" => world_publish(world_container(laputa_root, value)?, args)
+    else => world_root(world_container(laputa_root, value)?, args)
   }
 }

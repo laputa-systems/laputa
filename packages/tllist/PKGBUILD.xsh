@@ -48,8 +48,8 @@ export const filetree = [
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"tllist.h", fp"{dest}/usr/include/tllist.h", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.install(p"tllist.h", fp"{dest}/usr/include/tllist.h", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/tllist.pc",
@@ -61,5 +61,5 @@ Description: Typed linked list C header-only library
 Version: {ver}
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

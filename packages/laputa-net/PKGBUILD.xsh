@@ -86,11 +86,11 @@ export const filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/net.xsh", 0o644, parents: true, overwrite: true)?
-  fs.install(p"interfaces", fp"{dest}/etc/network/interfaces", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/etc/network/if-pre-up.d")?
-  fs.mkdir(fp"{dest}/etc/network/if-up.d")?
-  fs.mkdir(fp"{dest}/etc/network/if-down.d")?
-  fs.mkdir(fp"{dest}/etc/network/if-pre-down.d")?
-  fs.mkdir(fp"{dest}/etc/network/if-post-down.d")?
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/net.xsh", 0o644, parents: true, overwrite: true)
+  fs.install(p"interfaces", fp"{dest}/etc/network/interfaces", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/etc/network/if-pre-up.d")
+  fs.mkdir(fp"{dest}/etc/network/if-up.d")
+  fs.mkdir(fp"{dest}/etc/network/if-down.d")
+  fs.mkdir(fp"{dest}/etc/network/if-pre-down.d")
+  fs.mkdir(fp"{dest}/etc/network/if-post-down.d")
 }

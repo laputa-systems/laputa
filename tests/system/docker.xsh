@@ -54,12 +54,12 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
 }
 
 test test_docker_rejects_a_runner_image_of_another_architecture [error] {
-  docker.require_image_architecture("linux/arm64", "arm64")?
-  docker.require_image_architecture("linux/amd64", "amd64")?
+  docker.require_image_architecture("linux/arm64", "arm64")
+  docker.require_image_architecture("linux/amd64", "amd64")
 
   for mismatch in [["linux/arm64", "amd64"], ["linux/amd64", "arm64"]] {
     match docker.require_image_architecture(mismatch[0], mismatch[1]) {
-      Ok(_) => test.fail(f"{mismatch[1]} image accepted for {mismatch[0]}")?
+      Ok(_) => test.fail(f"{mismatch[1]} image accepted for {mismatch[0]}")
       Err(_) => {}
     }
   }

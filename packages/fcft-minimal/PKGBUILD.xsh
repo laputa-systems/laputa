@@ -108,13 +108,13 @@ proc write_version_header() [fs, error] {
     p"version.h",
     f"""#define FCFT_VERSION "{ver}"
 """,
-  )?
+  )
 }
 
 proc patch_generated_inputs() [fs, error] {
-  fs.install(p"generated/emoji-data.h", p"emoji-data.h", 0o644, overwrite: true)?
-  fs.install(p"generated/unicode-compose-table.h", p"unicode-compose-table.h", 0o644, overwrite: true)?
-  write_version_header()?
+  fs.install(p"generated/emoji-data.h", p"emoji-data.h", 0o644, overwrite: true)
+  fs.install(p"generated/unicode-compose-table.h", p"unicode-compose-table.h", 0o644, overwrite: true)
+  write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
   text = text.replace("math = cc.find_library('m')", "math = declare_dependency(link_args: ['-lm'])")
@@ -149,7 +149,7 @@ version = files('version.h')
 """,
   )
 
-  fs.write(meson, text)?
+  fs.write(meson, text)
 }
 
 ## Exported declaration `build`.
@@ -157,7 +157,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{make.jobs()?}"
   let pc = pm_env.pkg_config_context()?
-  patch_generated_inputs()?
+  patch_generated_inputs()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,

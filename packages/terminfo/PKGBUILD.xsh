@@ -83,8 +83,8 @@ proc foot_terminfo_source(text: Str) [error] -> Result[Str] {
 export proc build(dest: Path) [fs, process, env, error] {
   let tic = process.which("tic")?
   let database = fp"{dest}/usr/share/terminfo"
-  p"terminfo.src".write(linux_terminfo_source(p"ncurses/misc/terminfo.src".read_text()?)?)?
-  p"foot.info".write(foot_terminfo_source(p"foot/foot.info".read_text()?)?)?
+  p"terminfo.src".write(linux_terminfo_source(p"ncurses/misc/terminfo.src".read_text()?)?)
+  p"foot.info".write(foot_terminfo_source(p"foot/foot.info".read_text()?)?)
 
   run $tic -x -o $database terminfo.src
   # foot's own descriptions replace ncurses' copies of `foot` and

@@ -130,7 +130,7 @@ proc write_config_h() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 proc build_tmux(cc: Path) [fs, process, env, error] -> Result[Path] {
@@ -210,7 +210,7 @@ compat/utf8proc.c
     deps: [],
   })
 
-  make.run_tasks(tmux.tasks, make.jobs()?)?
+  make.run_tasks(tmux.tasks, make.jobs()?)
   tmux.output
 }
 
@@ -222,7 +222,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     let _ = patch.apply(p".", fs.read_text(patch_file)?, 1)?
   }
 
-  write_config_h()?
+  write_config_h()
   let tmux = build_tmux(cc)?
-  fs.install(tmux, fp"{dest}/usr/bin/tmux", 0o755, parents: true, overwrite: true)?
+  fs.install(tmux, fp"{dest}/usr/bin/tmux", 0o755, parents: true, overwrite: true)
 }

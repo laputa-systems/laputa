@@ -58,16 +58,16 @@ proc demo_tarball(
   text: Str = "hello from the cache\n",
 ) [fs, error] -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
-  fs.mkdir(fp"{tree}/demo-1.0")?
-  fs.write(fp"{tree}/demo-1.0/hello.txt", text)?
+  fs.mkdir(fp"{tree}/demo-1.0")
+  fs.write(fp"{tree}/demo-1.0/hello.txt", text)
   let tarball = test.temp_path(ctx, name: f"{name}.tar.gz")
-  archive.tar_create(tarball, tree, [p"demo-1.0"])?
+  archive.tar_create(tarball, tree, [p"demo-1.0"])
   {path: tarball, sha256: hash.sha256(tarball)?.hex()}
 }
 
 proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) [fs, net, env, error] {
   match sources.stage_package_sources(pkg, src) {
-    Ok(_) => test.fail("staging unexpectedly succeeded")?
+    Ok(_) => test.fail("staging unexpectedly succeeded")
     Err(problem) => {
       for text in expected {
         assert text in problem.message
@@ -80,12 +80,12 @@ test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, erro
   let tarball = demo_tarball(ctx, "cache-hit")?
   let cache = test.temp_dir(ctx, name: "cache-hit-cache")?
   let entry = sources.source_cache_entry(cache, tarball.sha256)
-  fs.mkdir(entry.parent)?
-  fs.copy(tarball.path, entry)?
+  fs.mkdir(entry.parent)
+  fs.copy(tarball.path, entry)
   let src = test.temp_dir(ctx, name: "cache-hit-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
-    sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
+    sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
   }?
 
   assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
@@ -95,15 +95,15 @@ test test_url_source_fills_the_cache_from_the_local_mirror [fs, net, env, error]
   let tarball = demo_tarball(ctx, "mirror-fill")?
   let mirror = test.temp_dir(ctx, name: "mirror-fill-mirror")?
   let served = fp"{mirror}/sources/sha256/{tarball.sha256}"
-  fs.mkdir(served.parent)?
-  fs.copy(tarball.path, served)?
+  fs.mkdir(served.parent)
+  fs.copy(tarball.path, served)
   let cache = test.temp_dir(ctx, name: "mirror-fill-cache")?
   let src = test.temp_dir(ctx, name: "mirror-fill-src")?
 
   # The mirror serves the cache layout by sha256; a `file://` mirror exercises
   # the same resolution order and verification as the HTTP one.
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: f"file://{mirror}/", XSH_PM_TARGET_ARCH: "aarch64"}) {
-    sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)?
+    sources.stage_package_sources(url_package("https://upstream.invalid/demo-1.0.tar.gz", tarball.sha256), src)
   }?
 
   assert fs.read_text(fp"{src}/hello.txt")? == "hello from the cache\n"
@@ -119,7 +119,7 @@ test test_missing_url_source_without_a_mirror_says_to_run_make_fetch [fs, net, e
       url_package("https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty),
       src,
       ["https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty, "is not in the source cache", "make fetch"],
-    )?
+    )
   }?
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
@@ -134,7 +134,7 @@ test test_unreachable_http_mirror_is_asked_by_content_address [fs, net, env, err
       url_package("https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty),
       src,
       [f"http://127.0.0.1:9/sources/sha256/{sha256_of_empty}", "make fetch"],
-    )?
+    )
   }?
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
@@ -144,8 +144,8 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
   let tarball = demo_tarball(ctx, "mirror-mismatch")?
   let mirror = test.temp_dir(ctx, name: "mirror-mismatch-mirror")?
   let served = fp"{mirror}/sources/sha256/{sha256_of_empty}"
-  fs.mkdir(served.parent)?
-  fs.copy(tarball.path, served)?
+  fs.mkdir(served.parent)
+  fs.copy(tarball.path, served)
   let cache = test.temp_dir(ctx, name: "mirror-mismatch-cache")?
   let src = test.temp_dir(ctx, name: "mirror-mismatch-src")?
 
@@ -154,7 +154,7 @@ test test_mirror_bytes_with_the_wrong_sha256_never_enter_the_cache [fs, net, env
       url_package("https://upstream.invalid/demo-1.0.tar.gz", sha256_of_empty),
       src,
       [f"expected sha256 {sha256_of_empty}, got {tarball.sha256}"],
-    )?
+    )
   }?
 
   assert sources.source_cache_entry(cache, sha256_of_empty).exists()? == false
@@ -165,9 +165,9 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
   let impostor = demo_tarball(ctx, "corrupt-impostor", "other bytes\n")?
   let cache = test.temp_dir(ctx, name: "corrupt-entry-cache")?
   let entry = sources.source_cache_entry(cache, pinned.sha256)
-  fs.mkdir(entry.parent)?
+  fs.mkdir(entry.parent)
   # A well-formed archive with other bytes: only checksum verification can reject it.
-  fs.copy(impostor.path, entry)?
+  fs.copy(impostor.path, entry)
   let src = test.temp_dir(ctx, name: "corrupt-entry-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
@@ -175,7 +175,7 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
       url_package("https://upstream.invalid/demo-1.0.tar.gz", pinned.sha256),
       src,
       [f"expected {pinned.sha256}"],
-    )?
+    )
   }?
 
   assert (fs.children(src)? |> count()) == 0
@@ -183,12 +183,12 @@ test test_corrupt_cache_entry_fails_checksum_verification [fs, net, env, error] 
 
 test test_url_sources_must_pin_a_sha256 [error] {
   match sources.pinned_url_sha256("demo", "https://upstream.invalid/demo.tar.gz", "SKIP") {
-    Ok(_) => test.fail("SKIP unexpectedly pinned a URL source")?
+    Ok(_) => test.fail("SKIP unexpectedly pinned a URL source")
     Err(problem) => assert "SKIP is only for repository-local sources" in problem.message
   }
 
   match sources.pinned_url_sha256("demo", "https://upstream.invalid/demo.tar.gz", "ABC") {
-    Ok(_) => test.fail("a malformed sha256 unexpectedly pinned a URL source")?
+    Ok(_) => test.fail("a malformed sha256 unexpectedly pinned a URL source")
     Err(problem) => assert "malformed sha256" in problem.message
   }
 
@@ -205,7 +205,7 @@ test test_source_placeholders_expand_only_as_whole_words [error] {
   assert util.expand_source("PATCHES/SEARCH/ARCHIVE/PACKAGES", pkg, "aarch64", "aarch64") == "PATCHES/SEARCH/ARCHIVE/PACKAGES"
   assert util.expand_source("PATCH-PACKAGE", pkg, "aarch64", "aarch64") == "4-tailscale"
   # Substituted values are not rescanned for placeholders.
-  test.eq(util.expand_source("VERSION", {...pkg, ver: "ARCH"}, "aarch64", "aarch64"), "ARCH")?
+  test.eq(util.expand_source("VERSION", {...pkg, ver: "ARCH"}, "aarch64", "aarch64"), "ARCH")
 }
 
 test test_local_repositories_are_loopback_or_file_trees [error] {
@@ -220,7 +220,7 @@ test test_local_repositories_are_loopback_or_file_trees [error] {
 proc fetch_repository(ctx: TestContext, sources_text: Str) [fs, error] -> Result[Path] {
   let root = test.temp_dir(ctx, name: "fetch-repository")?
   let recipe = fp"{root}/packages/fetchdemo/PKGBUILD.xsh"
-  fs.mkdir(recipe.parent)?
+  fs.mkdir(recipe.parent)
   fs.write(
     recipe,
     f"""##! Fetch fixture metapackage.
@@ -241,7 +241,7 @@ export let upstream_sources = [{sources_text}]
 ## No payload.
 export let filetree = []
 """,
-  )?
+  )
   root
 }
 
@@ -251,8 +251,8 @@ pure fetch_source_record(url: Str, sha256: Str) -> Str {
 
 test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, process, env, error] { |ctx|
   let upstream = test.temp_dir(ctx, name: "fetch-upstream")?
-  fs.write(fp"{upstream}/good-1.0.txt", "good bytes\n")?
-  fs.write(fp"{upstream}/changed.txt", "bytes that changed upstream\n")?
+  fs.write(fp"{upstream}/good-1.0.txt", "good bytes\n")
+  fs.write(fp"{upstream}/changed.txt", "bytes that changed upstream\n")
   let good_sha256 = hash.sha256(fp"{upstream}/good-1.0.txt")?.hex()
   let repository = fetch_repository(
     ctx,
@@ -287,7 +287,7 @@ test test_sources_fetch_caches_pins_and_reports_dead_and_mismatched_urls [fs, pr
 
 test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env, error] { |ctx|
   let upstream = test.temp_dir(ctx, name: "checksum-upstream")?
-  fs.write(fp"{upstream}/new-1.0.txt", "new upstream bytes\n")?
+  fs.write(fp"{upstream}/new-1.0.txt", "new upstream bytes\n")
   let new_sha256 = hash.sha256(fp"{upstream}/new-1.0.txt")?.hex()
   # The recorded pin is stale; `repo checksum` reports what upstream serves now.
   let repository = fetch_repository(ctx, fetch_source_record(f"file://{upstream}/new-VERSION.txt", sha256_of_empty))?
@@ -353,19 +353,19 @@ type DemoCrate = {item: sources.LockedCrate, path: Path}
 # A `.crate` archive: one `NAME-VERSION/` directory, as crates.io packs it.
 proc demo_crate(ctx: TestContext, name: Str, version: Str) [fs, error] -> Result[DemoCrate] {
   let tree = test.temp_dir(ctx, name: f"{name}-crate-tree")?
-  fs.mkdir(fp"{tree}/{name}-{version}/src")?
-  fs.write(fp"{tree}/{name}-{version}/Cargo.toml", f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")?
-  fs.write(fp"{tree}/{name}-{version}/src/lib.rs", "")?
+  fs.mkdir(fp"{tree}/{name}-{version}/src")
+  fs.write(fp"{tree}/{name}-{version}/Cargo.toml", f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")
+  fs.write(fp"{tree}/{name}-{version}/src/lib.rs", "")
   let tarball = test.temp_path(ctx, name: f"{name}-{version}.tar.gz")
-  archive.tar_create(tarball, tree, [fp"{name}-{version}"])?
+  archive.tar_create(tarball, tree, [fp"{name}-{version}"])
   {item: {name, version, checksum: hash.sha256(tarball)?.hex()}, path: tarball}
 }
 
 proc cache_file(cache: Path, file: Path) [fs, error] -> Result[Str] {
   let sha256 = hash.sha256(file)?.hex()
   let entry = sources.source_cache_entry(cache, sha256)
-  fs.mkdir(entry.parent)?
-  fs.copy(file, entry, overwrite: true)?
+  fs.mkdir(entry.parent)
+  fs.copy(file, entry, overwrite: true)
   sha256
 }
 
@@ -397,9 +397,9 @@ test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
     {name: "zstd-sys", version: "2.0.15+zstd.1.5.7", checksum: "2222222222222222222222222222222222222222222222222222222222222222"},
   ]
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  fs.write(lockfile, crate_set_lock(crates))?
+  fs.write(lockfile, crate_set_lock(crates))
 
-  test.eq(sources.cargo_lock_crates(lockfile)?, crates)?
+  test.eq(sources.cargo_lock_crates(lockfile)?, crates)
   assert sources.crate_download_url(crates[1]) == "https://static.crates.io/crates/zstd-sys/zstd-sys-2.0.15+zstd.1.5.7.crate"
 }
 
@@ -414,10 +414,10 @@ name = "forked"
 version = "0.1.0"
 source = "git+https://example.invalid/forked?rev=abc#abc"
 """,
-  )?
+  )
 
   match sources.cargo_lock_crates(lockfile) {
-    Ok(_) => test.fail("a git dependency was accepted as a vendored crate")?
+    Ok(_) => test.fail("a git dependency was accepted as a vendored crate")
     Err(problem) => assert "forked 0.1.0 comes from git+https://example.invalid/forked" in problem.message
   }
 
@@ -428,10 +428,10 @@ name = "old"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 """,
-  )?
+  )
 
   match sources.cargo_lock_crates(lockfile) {
-    Ok(_) => test.fail("a crate without a checksum was accepted")?
+    Ok(_) => test.fail("a crate without a checksum was accepted")
     Err(problem) => assert "old 0.1.0 has no sha256 checksum" in problem.message
   }
 }
@@ -440,7 +440,7 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let cache = test.temp_dir(ctx, name: "crate-set-cache")?
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  fs.write(lockfile, crate_set_lock([crate_file.item]))?
+  fs.write(lockfile, crate_set_lock([crate_file.item]))
   let lock_sha256 = cache_file(cache, lockfile)?
   let src = test.temp_dir(ctx, name: "crate-set-src")?
   let pkg = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
@@ -448,14 +448,14 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   # Every crate resolves before anything is extracted: an uncached crate
   # fails the whole source and names the fix.
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
-    expect_stage_error(pkg, src, [sources.crate_download_url(crate_file.item), "make fetch"])?
+    expect_stage_error(pkg, src, [sources.crate_download_url(crate_file.item), "make fetch"])
   }?
 
   assert (fs.children(src)? |> count()) == 0
   assert cache_file(cache, crate_file.path)? == crate_file.item.checksum
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
-    sources.stage_package_sources(pkg, src)?
+    sources.stage_package_sources(pkg, src)
   }?
 
   let vendored = fp"{src}/vendor/demo_crate-0.1.0"
@@ -467,7 +467,7 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
 test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, env, error] { |ctx|
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let upstream = test.temp_dir(ctx, name: "crate-set-upstream")?
-  fs.write(fp"{upstream}/Cargo.lock", crate_set_lock([crate_file.item]))?
+  fs.write(fp"{upstream}/Cargo.lock", crate_set_lock([crate_file.item]))
   let lock_sha256 = hash.sha256(fp"{upstream}/Cargo.lock")?.hex()
   let repository = fetch_repository(
     ctx,

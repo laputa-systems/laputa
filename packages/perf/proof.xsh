@@ -15,7 +15,7 @@ proc recorded_version(rootfs: Path) [fs, error] -> Result[Str] {
 
 proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
   let version = (run.text $loader $perf "--version" ?).trim()
-  proof.ensure(version == f"perf version {ver}", "perf-version", f"perf --version printed '{version}'")?
+  proof.ensure(version == f"perf version {ver}", "perf-version", f"perf --version printed '{version}'")
 
   # The minimal feature set links only musl: every optional library is off.
   let options = run.text $loader $perf "version" "--build-options" ?
@@ -25,13 +25,13 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
       regex.compile(f"(?m)^ *{feature}: \\[ OFF \\]")?.matches(options),
       "perf-build-options",
       f"perf reports {feature} enabled or missing: {options.trim()}",
-    )?
+    )
   }
 
   let software = run.text $loader $perf "list" "sw" ?
 
   for event in ["task-clock", "cpu-clock", "context-switches", "page-faults"] {
-    proof.ensure(event in software, "perf-list", f"perf list sw lacks {event}")?
+    proof.ensure(event in software, "perf-list", f"perf list sw lacks {event}")
   }
 
   # These built-in tests run the pregenerated expression, PMU, and
@@ -42,7 +42,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
     let result = run.capture --text $loader $perf "test" $suite ?
     let report = f"{result.stdout}{result.stderr}"
     let passed = result.status.ok and passed_suite.matches(report) and no_failures.matches(report)
-    proof.ensure(passed, "perf-test", f"perf test '{suite}' did not pass: {report.trim()}")?
+    proof.ensure(passed, "perf-test", f"perf test '{suite}' did not pass: {report.trim()}")
   }
 
   # A counted run needs perf_event_open. Docker's default seccomp profile
@@ -55,7 +55,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
       counted_task_clock.matches(stat.stderr),
       "perf-stat",
       f"perf stat did not count task-clock: {stat.stderr.trim()}",
-    )?
+    )
 
     print f"perf ok: {version}, parser tests, task-clock counted"
     return
@@ -65,13 +65,13 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) [process, error] {
     "No permission to enable task-clock" in stat.stderr,
     "perf-stat",
     f"perf stat failed for a reason other than a denied perf_event_open: {stat.stderr.trim()}",
-  )?
+  )
 
   print f"perf ok: {version}, parser tests; perf_event_open denied here, task-clock not counted"
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.target_elf(rootfs, p"usr/bin/perf", "perf")?
+  proof.target_elf(rootfs, p"usr/bin/perf", "perf")
   let target_arch = pm_util.target_arch()?
 
   if pm_util.build_arch()? != target_arch {
@@ -86,8 +86,8 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let ver = recorded_version(rootfs)?
 
   env ({LD_LIBRARY_PATH: fp"{rootfs}/usr/lib"}) {
-    prove_perf(loader, fp"{rootfs}/usr/bin/perf", ver)?
+    prove_perf(loader, fp"{rootfs}/usr/bin/perf", ver)
   }?
 }
 
-main(@args)?
+main(@args)

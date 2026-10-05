@@ -96,7 +96,7 @@ proc write_config() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -107,7 +107,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cflags = ["-O2", "-Wall"]
   let defs = ["-DHAVE_CONFIG_H"]
   let includes = ["-Iinclude", "-Isrc", "-I."]
-  write_config()?
+  write_config()
 
   let libmtdev = make.c_shared_library({
     cc,
@@ -124,12 +124,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(libmtdev.tasks, make.jobs()?)?
-  fs.install(libmtdev.output, fp"{dest}/usr/lib/libmtdev.so.1.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so.1")?
-  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so")?
-  make.install_header_tree(p"include", fp"{dest}/usr/include")?
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  make.run_tasks(libmtdev.tasks, make.jobs()?)
+  fs.install(libmtdev.output, fp"{dest}/usr/lib/libmtdev.so.1.0.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so.1")
+  fs.symlink(p"libmtdev.so.1.0.0", fp"{dest}/usr/lib/libmtdev.so")
+  make.install_header_tree(p"include", fp"{dest}/usr/include")
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/lib/pkgconfig/mtdev.pc",
@@ -144,5 +144,5 @@ Version: {ver}
 Libs: -L${{libdir}} -lmtdev
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

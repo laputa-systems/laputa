@@ -1927,7 +1927,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         eprint f"m4:{where}: ERROR: end of file in argument list"
 
         if div == 0 {
-          io.write_stdout(sink.join(""))?
+          io.write_stdout(sink.join(""))
         }
 
         return 1
@@ -2048,7 +2048,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         sink += [comment]
 
         if div == 0 and sink.len() >= 4096 {
-          io.write_stdout(sink.join(""))?
+          io.write_stdout(sink.join(""))
           sink = []
         }
       }
@@ -2106,7 +2106,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           sink += [word]
 
           if div == 0 and sink.len() >= 4096 {
-            io.write_stdout(sink.join(""))?
+            io.write_stdout(sink.join(""))
             sink = []
           }
         }
@@ -2173,7 +2173,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           sink += [word]
 
           if div == 0 and sink.len() >= 4096 {
-            io.write_stdout(sink.join(""))?
+            io.write_stdout(sink.join(""))
             sink = []
           }
         }
@@ -2240,7 +2240,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         sink += [quoted]
 
         if div == 0 and sink.len() >= 4096 {
-          io.write_stdout(sink.join(""))?
+          io.write_stdout(sink.join(""))
           sink = []
         }
       }
@@ -2312,7 +2312,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
         sink += [text.byte_slice(pos, end - pos)]
 
         if div == 0 and sink.len() >= 4096 {
-          io.write_stdout(sink.join(""))?
+          io.write_stdout(sink.join(""))
           sink = []
         }
       }
@@ -2364,7 +2364,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
             eprint f"m4:{where}: {failure.message}"
 
             if div == 0 {
-              io.write_stdout(sink.join(""))?
+              io.write_stdout(sink.join(""))
             }
 
             return 1
@@ -2519,7 +2519,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 
           if target != div {
             if div == 0 {
-              io.write_stdout(sink.join(""))?
+              io.write_stdout(sink.join(""))
             } else if div > 0 and sink.len() > 0 {
               diversions[f"{div}"] = f"{diversions.get(f"{div}") ?? ""}{sink.join("")}"
             }
@@ -2673,7 +2673,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           }
 
           if div == 0 {
-            io.write_stdout(sink.join(""))?
+            io.write_stdout(sink.join(""))
           }
 
           return code
@@ -2709,17 +2709,17 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
             let heredoc = cat_heredoc(cmd)
 
             if div == 0 {
-              io.write_stdout(sink.join(""))?
+              io.write_stdout(sink.join(""))
               sink = []
             }
 
             if heredoc != null and bi == "syscmd" {
               if heredoc.target == "" {
-                io.write_stdout(heredoc.body)?
+                io.write_stdout(heredoc.body)
               } else {
                 let target = fp"{heredoc.target}"
                 let before = if fs.exists(target)? { target.read_text()? } else { "" }
-                target.write(f"{before}{heredoc.body}")?
+                target.write(f"{before}{heredoc.body}")
               }
 
               sysval = 0
@@ -2775,7 +2775,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
               let candidate = f"{stem}{suffix.byte_slice(suffix.byte_len() - xs, xs)}"
 
               if ! fs.exists(fp"{candidate}")? {
-                fp"{candidate}".write("")?
+                fp"{candidate}".write("")
                 made = candidate
               }
             }
@@ -2923,14 +2923,14 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
 
   # End of input: diversions are emitted in numeric order.
   if div == 0 {
-    io.write_stdout(sink.join(""))?
+    io.write_stdout(sink.join(""))
   } else if div > 0 and sink.len() > 0 {
     diversions[f"{div}"] = f"{diversions.get(f"{div}") ?? ""}{sink.join("")}"
   }
 
   for k in numeric_key_order(diversions.keys()) {
     if k > 0 {
-      io.write_stdout(diversions[f"{k}"])?
+      io.write_stdout(diversions[f"{k}"])
     }
   }
 
@@ -2961,12 +2961,12 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
     }
 
     if a == "--version" {
-      io.write_stdout("m4 (GNU M4 compatible, XSH) 1.4.20\n")?
+      io.write_stdout("m4 (GNU M4 compatible, XSH) 1.4.20\n")
       return null
     }
 
     if a == "--help" or a == "-h" {
-      io.write_stdout("usage: m4 [-P] [-I DIR] [-D NAME[=VALUE]] [-U NAME] [FILE]...\n")?
+      io.write_stdout("usage: m4 [-P] [-I DIR] [-D NAME[=VALUE]] [-U NAME] [FILE]...\n")
       return null
     }
 
@@ -3060,4 +3060,4 @@ proc main(margs: List[Str] = []) [fs, process, env, error, io] {
   }
 }
 
-main(args)?
+main(args)

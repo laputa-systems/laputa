@@ -194,7 +194,7 @@ proc xsh_seed_require_checkout(xsh_root: Path) [fs, error] {
 
 ## Fetch the seed's networked inputs: the `xsh-test` image and the crate registry for XSH_ROOT's Cargo.lock.
 export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, value: SeedArch) [fs, process, error] {
-  xsh_seed_require_checkout(xsh_root)?
+  xsh_seed_require_checkout(xsh_root)
 
   if ! xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root)? {
     xsh_seed_run(
@@ -212,17 +212,17 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
       ],
       laputa_root,
       f"building {xsh_seed_build_image} from {xsh_root}/Dockerfile.test",
-    )?
+    )
   }
 
-  fs.mkdir(xsh_seed_cargo_registry(laputa_root))?
+  fs.mkdir(xsh_seed_cargo_registry(laputa_root))
   xsh_seed_run(
     docker,
     xsh_seed_cargo_fetch_argv(docker, laputa_root, xsh_root, value),
     laputa_root,
     "fetching XSH crates",
-  )?
-  fs.write_atomic(xsh_seed_registry_stamp(laputa_root), hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())?
+  )
+  fs.write_atomic(xsh_seed_registry_stamp(laputa_root), hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())
 }
 
 proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) [fs, process, error] {
@@ -287,14 +287,14 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
   for relative in sources {
     let installed = xsh_seed_core_install_path(relative)
     let mode = if relative.display().starts_with("lib/") { 0o644 } else { 0o755 }
-    fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)?
+    fs.install(fp"{xsh_root}/core/{relative}", fp"{stage}/{installed}", mode, parents: true, overwrite: true)
     entries += [installed]
   }
 
   let temporary = fp"{archive_path}.tmp"
-  fs.remove(temporary, missing_ok: true)?
-  archive.tar_create(temporary, stage, entries, "xz", true)?
-  fs.rename(temporary, archive_path, overwrite: true)?
+  fs.remove(temporary, missing_ok: true)
+  archive.tar_create(temporary, stage, entries, "xz", true)
+  fs.rename(temporary, archive_path, overwrite: true)
 }
 
 # Replace a product only when its bytes changed, so an unchanged rebuild keeps
@@ -307,8 +307,8 @@ proc xsh_seed_publish_binary(source: Path, dest: Path) [fs, error] {
   return when fs.exists(dest)? and hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
 
   let temporary = fp"{dest}.tmp"
-  fs.install(source, temporary, 0o755, parents: true, overwrite: true)?
-  fs.rename(temporary, dest, overwrite: true)?
+  fs.install(source, temporary, 0o755, parents: true, overwrite: true)
+  fs.rename(temporary, dest, overwrite: true)
 }
 
 proc xsh_seed_git_text(xsh_root: Path, argv: List[Str]) [process, error] -> Result[Str] {
@@ -336,25 +336,25 @@ export proc xsh_seed_build(
     return Err(SeedError.Usage("seed build jobs must be positive"))
   }
 
-  xsh_seed_require_checkout(xsh_root)?
-  xsh_seed_require_fetched(docker, laputa_root, xsh_root)?
-  fs.mkdir(xsh_seed_cargo_target(laputa_root))?
+  xsh_seed_require_checkout(xsh_root)
+  xsh_seed_require_fetched(docker, laputa_root, xsh_root)
+  fs.mkdir(xsh_seed_cargo_target(laputa_root))
   xsh_seed_run(
     docker,
     xsh_seed_cargo_build_argv(docker, laputa_root, xsh_root, value, jobs)?,
     laputa_root,
     f"building the {value.arch} XSH seed",
-  )?
+  )
 
   let out = xsh_seed_dir(laputa_root, value.arch)
   let manifest = xsh_seed_manifest_path(laputa_root, value.arch)
-  fs.mkdir(out)?
+  fs.mkdir(out)
 
   for product in xsh_seed_binaries {
     xsh_seed_publish_binary(
       fp"{xsh_seed_cargo_target(laputa_root)}/{value.triple}/release/{product}",
       fp"{out}/{product}",
-    )?
+    )
   }
 
   let core_archive = fp"{out}/core.tar.xz"
@@ -364,14 +364,14 @@ export proc xsh_seed_build(
   let core_tree = fp"{out}/core"
 
   if ! fs.exists(core_archive)? or xsh_seed_previous_core_digest(manifest)? != core_digest {
-    xsh_seed_write_core(xsh_root, sources, core_archive)?
-    fs.remove(core_tree, missing_ok: true)?
+    xsh_seed_write_core(xsh_root, sources, core_archive)
+    fs.remove(core_tree, missing_ok: true)
   }
 
   # The extracted tree is what containers mount at /usr/lib/xsh/core, so the
   # mounted applets are exactly the packaged ones.
   if ! fs.exists(core_tree)? {
-    archive.tar_extract(core_archive, out, 0, "xz", true)?
+    archive.tar_extract(core_archive, out, 0, "xz", true)
   }
 
   var files: Map[Str] = {product: hash.sha256(fp"{out}/{product}")?.hex() for product in xsh_seed_binaries}
@@ -392,7 +392,7 @@ export proc xsh_seed_build(
   let text = json.encode(record, pretty: true)? + "\n"
 
   if ! fs.exists(manifest)? or fs.read_text(manifest)? != text {
-    fs.write_atomic(manifest, text)?
+    fs.write_atomic(manifest, text)
   }
 }
 

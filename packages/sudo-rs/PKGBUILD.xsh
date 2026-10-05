@@ -125,8 +125,8 @@ pure rust_triple(arch: Str) -> Str {
 }
 
 proc stage_rustlib(source: Path, dest: Path) [fs, error] {
-  fs.remove(dest, missing_ok: true)?
-  fs.mkdir(dest)?
+  fs.remove(dest, missing_ok: true)
+  fs.mkdir(dest)
 
   for entry in fs.walk(source, gitignore: false)? |> sort-by .path {
     continue when entry.path == source
@@ -134,14 +134,14 @@ proc stage_rustlib(source: Path, dest: Path) [fs, error] {
     let out = fp"{dest}/{relative}"
 
     if entry.kind == "dir" {
-      fs.mkdir(out)?
+      fs.mkdir(out)
     } else if entry.kind == "file" {
       let mode = if entry.path.executable()? { 0o755 } else { 0o644 }
-      fs.install(entry.path, out, mode, parents: true, overwrite: true)?
+      fs.install(entry.path, out, mode, parents: true, overwrite: true)
     } else if entry.kind == "symlink" {
-      fs.mkdir(out.parent)?
-      fs.remove(out, missing_ok: true)?
-      fs.symlink(entry.path.readlink()?, out)?
+      fs.mkdir(out.parent)
+      fs.remove(out, missing_ok: true)
+      fs.symlink(entry.path.readlink()?, out)
     }
   }
 }
@@ -188,7 +188,7 @@ proc mark_vendored_crates(lockfile: Path, vendor: Path) [fs, error] {
       return Err(SudoRsBuildError.MissingVendoredCrate(f"{item.name}-{item.version}"))
     }
 
-    json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: item.checksum})?
+    json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: item.checksum})
   }
 }
 
@@ -219,7 +219,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       return Err(SudoRsBuildError.MissingRustStd(target_rustlib.display()))
     }
 
-    stage_rustlib(target_rustlib, staged_rustlib)?
+    stage_rustlib(target_rustlib, staged_rustlib)
   }
 
   let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
@@ -234,7 +234,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let aarch64_linker = if triple == "aarch64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
   let x86_64_linker = if triple == "x86_64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
-  mark_vendored_crates(p"Cargo.lock", p"vendor")?
+  mark_vendored_crates(p"Cargo.lock", p"vendor")
   let current_path = e"PATH" ?? ""
   let cargo_path = f"{host_cc.parent}:{current_path}"
 
@@ -251,7 +251,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "sudo" "--bin" "su" ?
   }?
 
-  fs.install(fp"target/{triple}/release/sudo", fp"{dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)?
-  fs.install(fp"target/{triple}/release/su", fp"{dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)?
-  fs.symlink(p"sudo", fp"{dest}/usr/bin/sudoedit")?
+  fs.install(fp"target/{triple}/release/sudo", fp"{dest}/usr/bin/sudo", 0o4755, parents: true, overwrite: true)
+  fs.install(fp"target/{triple}/release/su", fp"{dest}/usr/bin/su", 0o4755, parents: true, overwrite: true)
+  fs.symlink(p"sudo", fp"{dest}/usr/bin/sudoedit")
 }

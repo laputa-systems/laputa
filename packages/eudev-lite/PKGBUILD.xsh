@@ -86,7 +86,7 @@ int main(int argc, char **argv)
     return 1;
 }}}}
 """,
-  )?
+  )
 }
 
 ## Exported declaration `build`.
@@ -94,7 +94,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let os = system.uname()?
   let triple = f"{os.machine}-linux-musl"
-  write_udev_stub()?
+  write_udev_stub()
 
   let udev = make.c_program({
     cc,
@@ -111,12 +111,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(udev.tasks, make.jobs()?)?
-  fs.install(udev.output, fp"{dest}/usr/bin/udevadm", 0o755, parents: true, overwrite: true)?
-  fs.install(udev.output, fp"{dest}/usr/bin/udevd", 0o755, parents: true, overwrite: true)?
-  fs.install(udev.output, fp"{dest}/usr/lib/udev/systemd-udevd", 0o755, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/run")?
-  fs.mkdir(fp"{dest}/run/udev")?
-  fs.mkdir(fp"{dest}/usr/lib/udev")?
-  fs.mkdir(fp"{dest}/usr/lib/udev/rules.d")?
+  make.run_tasks(udev.tasks, make.jobs()?)
+  fs.install(udev.output, fp"{dest}/usr/bin/udevadm", 0o755, parents: true, overwrite: true)
+  fs.install(udev.output, fp"{dest}/usr/bin/udevd", 0o755, parents: true, overwrite: true)
+  fs.install(udev.output, fp"{dest}/usr/lib/udev/systemd-udevd", 0o755, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/run")
+  fs.mkdir(fp"{dest}/run/udev")
+  fs.mkdir(fp"{dest}/usr/lib/udev")
+  fs.mkdir(fp"{dest}/usr/lib/udev/rules.d")
 }

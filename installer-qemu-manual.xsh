@@ -72,13 +72,13 @@ proc main() [fs, process, env, error] {
     }
   }
 
-  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)?
+  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)
   let installer_iso_meta = installer_iso.metadata()?
   let installer_kernel_meta = installer_kernel.metadata()?
   let _ = {installer_iso_meta, installer_kernel_meta}
-  fs.remove(target_image, missing_ok: true)?
-  fs.write(target_image, "")?
-  target_image.truncate(target_size)?
+  fs.remove(target_image, missing_ok: true)
+  fs.write(target_image, "")
+  target_image.truncate(target_size)
   print "manual target disk:" $target_image
   print "inside the installer, run: setup-laputa"
   print "CI-sized disk run: setup-laputa --ci"
@@ -116,5 +116,5 @@ proc main() [fs, process, env, error] {
       "none",
     ],
     root,
-  )?
+  )
 }

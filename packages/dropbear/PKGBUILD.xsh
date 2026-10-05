@@ -150,7 +150,7 @@ proc write_config_h() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 proc ifndef_wrapped_defines(source: Path) [fs, error] -> Result[Str] {
@@ -200,12 +200,12 @@ export proc build(dest: Path) [fs, process, env, error] {
 #define DROPBEAR_SVR_REMOTESTREAMFWD 0
 """
 
-  fs.write(p"localoptions.h", local_opts)?
+  fs.write(p"localoptions.h", local_opts)
 
   # sub-makes (libtomcrypt) don't get -I flags, so copy to src/ too
-  fs.write(p"src/localoptions.h", local_opts)?
+  fs.write(p"src/localoptions.h", local_opts)
   let ldflags = f"-L{kr}/usr/lib"
-  write_config_h()?
+  write_config_h()
   let default_options_guard = ifndef_wrapped_defines(p"src/default_options.h")?
 
   fs.write(
@@ -217,7 +217,7 @@ Local customisation goes in localoptions.h
 
 {default_options_guard}
 """,
-  )?
+  )
 
   let common_stems = [
     "dbutil",
@@ -475,13 +475,13 @@ Local customisation goes in localoptions.h
   }],
   })?
 
-  make.run_tasks(ltc.tasks.extend(ltm.tasks).extend(multi.tasks), make.jobs()?)?
-  fs.install(p"dropbear", fp"{dest}/usr/bin/dropbear", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dbclient", fp"{dest}/usr/bin/dbclient", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dropbearkey", fp"{dest}/usr/bin/dropbearkey", 0o755, parents: true, overwrite: true)?
-  fs.install(p"dropbearconvert", fp"{dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)?
+  make.run_tasks(ltc.tasks.extend(ltm.tasks).extend(multi.tasks), make.jobs()?)
+  fs.install(p"dropbear", fp"{dest}/usr/bin/dropbear", 0o755, parents: true, overwrite: true)
+  fs.install(p"dbclient", fp"{dest}/usr/bin/dbclient", 0o755, parents: true, overwrite: true)
+  fs.install(p"dropbearkey", fp"{dest}/usr/bin/dropbearkey", 0o755, parents: true, overwrite: true)
+  fs.install(p"dropbearconvert", fp"{dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)
 
   # Runtime configuration and xinit service module.
-  fs.mkdir(fp"{dest}/etc/dropbear")?
-  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)?
+  fs.mkdir(fp"{dest}/etc/dropbear")
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)
 }

@@ -128,7 +128,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(less.tasks, make.jobs()?)?
-  fs.install(less.output, fp"{dest}/usr/bin/less", 0o755, parents: true, overwrite: true)?
-  fs.install(p"less-osc8-open.sh", fp"{dest}/usr/libexec/less-osc8-open", 0o755, parents: true, overwrite: true)?
+  make.run_tasks(less.tasks, make.jobs()?)
+  fs.install(less.output, fp"{dest}/usr/bin/less", 0o755, parents: true, overwrite: true)
+  fs.install(p"less-osc8-open.sh", fp"{dest}/usr/libexec/less-osc8-open", 0o755, parents: true, overwrite: true)
 }

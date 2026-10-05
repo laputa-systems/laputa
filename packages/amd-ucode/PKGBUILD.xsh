@@ -180,7 +180,7 @@ export proc build(dest: Path) [fs, error] {
 
   for container in microcode_containers {
     let staged = fp"{src}/amd-ucode/{container}"
-    fs.install(staged, fp"{firmware}/{container}", 0o644, parents: true, overwrite: true)?
+    fs.install(staged, fp"{firmware}/{container}", 0o644, parents: true, overwrite: true)
     containers += [staged.read_bytes()?]
   }
 
@@ -190,13 +190,13 @@ export proc build(dest: Path) [fs, error] {
     0o644,
     parents: true,
     overwrite: true,
-  )?
+  )
 
   let early_handle = fs.tempdir()?
   defer early_handle.close()?
   let early = early_handle.host_path()?
-  fs.mkdir(fp"{early}/kernel/x86/microcode")?
-  fs.write(fp"{early}/kernel/x86/microcode/AuthenticAMD.bin", bytes.concat(containers))?
-  fs.mkdir(fp"{dest}/boot")?
-  archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)?
+  fs.mkdir(fp"{early}/kernel/x86/microcode")
+  fs.write(fp"{early}/kernel/x86/microcode/AuthenticAMD.bin", bytes.concat(containers))
+  fs.mkdir(fp"{dest}/boot")
+  archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)
 }

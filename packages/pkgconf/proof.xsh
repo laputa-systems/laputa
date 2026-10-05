@@ -66,7 +66,7 @@ proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: L
 
 proc expect(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str], want: Str) [process, env, error] {
   let got = query(pkg_config, dynlinker, libdir, sysroot, args)?
-  proof.ensure(got == want, "proof-pkgconf", f"pkg-config {args.join(" ")} (sysroot {sysroot}) gave `{got}`, want `{want}`")?
+  proof.ensure(got == want, "proof-pkgconf", f"pkg-config {args.join(" ")} (sysroot {sysroot}) gave `{got}`, want `{want}`")
 }
 
 proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[Str], ok: Bool) [process, env, error] {
@@ -79,13 +79,13 @@ proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[St
     status_ok = (run.status $dynlinker $pkg_config @args 2> /dev/null).ok
   }?
 
-  proof.ensure(status_ok == ok, "proof-pkgconf", f"pkg-config {args.join(" ")} exit status ok={status_ok}, want ok={ok}")?
+  proof.ensure(status_ok == ok, "proof-pkgconf", f"pkg-config {args.join(" ")} exit status ok={status_ok}, want ok={ok}")
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(rootfs, "pkgconf")?
-  proof.target_elf(rootfs, p"usr/bin/pkgconf", "pkgconf")?
-  proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")?
+  proof.package_metadata(rootfs, "pkgconf")
+  proof.target_elf(rootfs, p"usr/bin/pkgconf", "pkgconf")
+  proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")
 
   if ! fs.exists(fp"{rootfs}/usr/bin/pkg-config")? {
     return Err(proof.ProofError.Failed(kind: "proof-pkgconf", message: "missing pkg-config symlink"))?
@@ -106,20 +106,20 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   let pkg_config = fp"{rootfs}/usr/bin/pkg-config"
   let ver = proof.package_version(rootfs, "pkgconf")?
   let tmp = fp"{rootfs}/var/tmp/proof-pkgconf"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(fp"{tmp}/sysroot/usr/lib/pkgconfig", true)?
-  fs.mkdir(fp"{tmp}/sysroot/usr/share/pkgconfig", true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(fp"{tmp}/sysroot/usr/lib/pkgconfig", true)
+  fs.mkdir(fp"{tmp}/sysroot/usr/share/pkgconfig", true)
   defer fs.remove(tmp, missing_ok: true)?
   let sysroot = fp"{tmp}/sysroot".display()
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc", base_pc)?
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc", priv_pc)?
-  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-app.pc", app_pc)?
-  fs.write(fp"{sysroot}/usr/share/pkgconfig/laputa-data.pc", data_pc)?
+  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-base.pc", base_pc)
+  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-priv.pc", priv_pc)
+  fs.write(fp"{sysroot}/usr/lib/pkgconfig/laputa-app.pc", app_pc)
+  fs.write(fp"{sysroot}/usr/share/pkgconfig/laputa-data.pc", data_pc)
   let libdir = f"{sysroot}/usr/lib/pkgconfig:{sysroot}/usr/share/pkgconfig"
   let s = sysroot
 
-  expect(pkg_config, dynlinker, libdir, "", ["--version"], ver)?
-  expect(pkg_config, dynlinker, libdir, s, ["--modversion", "laputa-app"], "2.0.0")?
+  expect(pkg_config, dynlinker, libdir, "", ["--version"], ver)
+  expect(pkg_config, dynlinker, libdir, s, ["--modversion", "laputa-app"], "2.0.0")
 
   expect(
     pkg_config,
@@ -128,9 +128,9 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     s,
     ["--cflags", "laputa-app"],
     f"-I{s}/usr/include/app -I{s}/usr/include -I{s}/usr/include/base -DLAPUTA_BASE=1 -I{s}/usr/include/priv",
-  )?
+  )
 
-  expect(pkg_config, dynlinker, libdir, s, ["--libs", "laputa-app"], f"-L{s}/usr/lib -lapp -lbase")?
+  expect(pkg_config, dynlinker, libdir, s, ["--libs", "laputa-app"], f"-L{s}/usr/lib -lapp -lbase")
 
   expect(
     pkg_config,
@@ -139,12 +139,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     s,
     ["--static", "--libs", "laputa-app"],
     f"-L{s}/usr/lib -lapp -lbase -lm -L{s}/usr/lib/priv -lpriv -lpthread",
-  )?
+  )
 
-  expect(pkg_config, dynlinker, libdir, s, ["--libs", "laputa-base", "laputa-priv"], f"-L{s}/usr/lib -lbase -L{s}/usr/lib/priv -lpriv")?
-  expect(pkg_config, dynlinker, libdir, s, ["--variable=pkgdatadir", "laputa-data"], f"{s}/usr/share/laputa-data")?
-  expect(pkg_config, dynlinker, libdir, s, ["--print-requires", "laputa-app"], "laputa-base >= 1.2")?
-  expect(pkg_config, dynlinker, libdir, s, ["--print-requires-private", "laputa-app"], "laputa-priv")?
+  expect(pkg_config, dynlinker, libdir, s, ["--libs", "laputa-base", "laputa-priv"], f"-L{s}/usr/lib -lbase -L{s}/usr/lib/priv -lpriv")
+  expect(pkg_config, dynlinker, libdir, s, ["--variable=pkgdatadir", "laputa-data"], f"{s}/usr/share/laputa-data")
+  expect(pkg_config, dynlinker, libdir, s, ["--print-requires", "laputa-app"], "laputa-base >= 1.2")
+  expect(pkg_config, dynlinker, libdir, s, ["--print-requires-private", "laputa-app"], "laputa-priv")
 
   # An installed system: /usr/include and /usr/lib are the compiler's own
   # search directories, so they are filtered out.
@@ -155,24 +155,24 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     "",
     ["--cflags", "--libs", "laputa-app"],
     "-I/usr/include/app -I/usr/include/base -DLAPUTA_BASE=1 -I/usr/include/priv -lapp -lbase",
-  )?
+  )
 
-  expect_status(pkg_config, dynlinker, libdir, ["--exists", "laputa-base >= 1.2"], true)?
-  expect_status(pkg_config, dynlinker, libdir, ["--exists", "laputa-base >= 1.3"], false)?
-  expect_status(pkg_config, dynlinker, libdir, ["--cflags", "laputa-missing"], false)?
+  expect_status(pkg_config, dynlinker, libdir, ["--exists", "laputa-base >= 1.2"], true)
+  expect_status(pkg_config, dynlinker, libdir, ["--exists", "laputa-base >= 1.3"], false)
+  expect_status(pkg_config, dynlinker, libdir, ["--cflags", "laputa-missing"], false)
 
   # The shared library loads and exports only the public pkgconf_ API.
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "--dyn-syms" "-W" fp"{rootfs}/usr/lib/libpkgconf.so.8" ?
-  proof.ensure(" pkgconf_compare_version" in symbols, "proof-pkgconf", "libpkgconf does not export pkgconf_compare_version")?
+  proof.ensure(" pkgconf_compare_version" in symbols, "proof-pkgconf", "libpkgconf does not export pkgconf_compare_version")
 
   for line in symbols.lines() {
     let words = line.words()
     continue when words.len() < 8 or words[4] != "GLOBAL" or words[6] == "UND"
-    proof.ensure(words[7].starts_with("pkgconf_"), "proof-pkgconf", f"libpkgconf exports a non-API symbol: {words[7]}")?
+    proof.ensure(words[7].starts_with("pkgconf_"), "proof-pkgconf", f"libpkgconf exports a non-API symbol: {words[7]}")
   }
 
   print f"pkgconf ok: {ver} cflags, libs, static, sysroot, system filtering, constraints, exports"
 }
 
-main(@args)?
+main(@args)

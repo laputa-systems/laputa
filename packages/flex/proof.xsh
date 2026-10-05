@@ -59,10 +59,10 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) [process, 
 
 proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-flex"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
-  fs.write(fp"{tmp}/words.l", lexer)?
+  fs.write(fp"{tmp}/words.l", lexer)
   let stderr = fp"{tmp}/flex.stderr"
 
   # flex runs m4 as a filter; name the root's m4 so the proof cannot pass on
@@ -94,9 +94,9 @@ proc prove_scanner(rootfs: Path, flex: Path) [fs, process, env, error] {
   }
 
   let scanner = fp"{tmp}/words"
-  compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)?
+  compile_root_c_program(rootfs, fp"{tmp}/words.c", scanner)
   let input = fp"{tmp}/input.txt"
-  fs.write(input, scanner_input)?
+  fs.write(input, scanner_input)
   let out = run.text $scanner < $input ?
 
   if out != scanner_expected {
@@ -116,7 +116,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     return Err(ScriptError.Failed(kind: "proof-flex", message: f"missing lex symlink: {lex}"))?
   }
 
-  proof.target_elf(rootfs, p"usr/bin/flex", "flex")?
+  proof.target_elf(rootfs, p"usr/bin/flex", "flex")
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
     let out = run.text $flex "--version" ?
@@ -125,11 +125,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
       return Err(ScriptError.Failed(kind: "proof-flex", message: f"flex --version: {out.trim()}"))?
     }
 
-    prove_scanner(rootfs, flex)?
+    prove_scanner(rootfs, flex)
     print "flex ok: generated scanner matches GNU flex 2.6.4 and runs"
   } else {
     print "flex ok: cross-built "${pm_util.target_arch()?}
   }
 }
 
-main(@args)?
+main(@args)

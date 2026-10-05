@@ -131,7 +131,7 @@ proc write_version_header() [fs, error] {
 #define FOOT_PATCH 0
 #define FOOT_EXTRA ""
 """,
-  )?
+  )
 }
 
 # files/generated/ replaces upstream's Python generator targets. Regenerate
@@ -143,11 +143,11 @@ proc write_version_header() [fs, error] {
 #     unicode/emoji-variation-sequences.txt emoji-variation-sequences.h
 #   python3 scripts/srgb.py srgb.c srgb.h
 proc patch_generated_inputs() [fs, error] {
-  fs.install(p"generated/emoji-variation-sequences.h", p"emoji-variation-sequences.h", 0o644, overwrite: true)?
-  fs.install(p"generated/foot-terminfo.h", p"foot-terminfo.h", 0o644, overwrite: true)?
-  fs.install(p"generated/srgb.c", p"srgb.c", 0o644, overwrite: true)?
-  fs.install(p"generated/srgb.h", p"srgb.h", 0o644, overwrite: true)?
-  write_version_header()?
+  fs.install(p"generated/emoji-variation-sequences.h", p"emoji-variation-sequences.h", 0o644, overwrite: true)
+  fs.install(p"generated/foot-terminfo.h", p"foot-terminfo.h", 0o644, overwrite: true)
+  fs.install(p"generated/srgb.c", p"srgb.c", 0o644, overwrite: true)
+  fs.install(p"generated/srgb.h", p"srgb.h", 0o644, overwrite: true)
+  write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
   text = text.replace("math = cc.find_library('m')", "math = declare_dependency(link_args: ['-lm'])")
@@ -235,19 +235,19 @@ srgb_funcs = files('srgb.c', 'srgb.h')
   text = text.replace("subdir('completions')", "")
   text = text.replace("subdir('icons')", "")
   text = text.replace("subdir('utils')", "")
-  fs.write(meson, text)?
+  fs.write(meson, text)
 }
 
 proc write_minimal_config(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/etc/xdg")?
-  fs.mkdir(fp"{dest}/etc/xdg/foot")?
+  fs.mkdir(fp"{dest}/etc/xdg")
+  fs.mkdir(fp"{dest}/etc/xdg/foot")
 
   fs.write(
     fp"{dest}/etc/xdg/foot/foot.ini",
     """font=Hack:size=11
 term=xterm-256color
 """,
-  )?
+  )
 }
 
 ## Exported declaration `build`.
@@ -264,7 +264,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     pc.ld_library_path
   }
 
-  patch_generated_inputs()?
+  patch_generated_inputs()
 
   env ({
     LD_LIBRARY_PATH: native_tools_ld,
@@ -282,7 +282,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", scanner_text)
-      fs.write(ninja, ninja_text)?
+      fs.write(ninja, ninja_text)
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -294,6 +294,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  write_minimal_config(dest)?
-  fs.remove(fp"{dest}/usr/share", missing_ok: true)?
+  write_minimal_config(dest)
+  fs.remove(fp"{dest}/usr/share", missing_ok: true)
 }

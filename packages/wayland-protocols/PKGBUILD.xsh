@@ -517,17 +517,17 @@ export const filetree = [
 ]
 
 proc prune_x_compat_protocols(root: Path) [fs, error] {
-  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-shell-v1-enum.h", missing_ok: false)?
-  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-keyboard-grab-unstable-v1-enum.h", missing_ok: false)?
-  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)?
-  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell", missing_ok: true)?
+  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-shell-v1-enum.h", missing_ok: false)
+  fs.remove(fp"{root}/usr/include/wayland-protocols/xwayland-keyboard-grab-unstable-v1-enum.h", missing_ok: false)
+  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml", missing_ok: true)
+  fs.remove(fp"{root}/usr/share/wayland-protocols/staging/xwayland-shell", missing_ok: true)
 
   fs.remove(
     fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml",
     missing_ok: true,
-  )?
+  )
 
-  fs.remove(fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab", missing_ok: true)?
+  fs.remove(fp"{root}/usr/share/wayland-protocols/unstable/xwayland-keyboard-grab", missing_ok: true)
 }
 
 ## Package recipe export.
@@ -552,5 +552,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  prune_x_compat_protocols(dest)?
+  prune_x_compat_protocols(dest)
 }

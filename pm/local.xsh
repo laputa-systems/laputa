@@ -312,7 +312,7 @@ export proc write_package_metadata(
   item: types.BuiltPackage,
   executor: types.ExecutorProvenance,
 ) [fs, error] {
-  fs.mkdir(path_value.parent)?
+  fs.mkdir(path_value.parent)
   let manifest = collect_manifest_text(item.manifest)?
 
   let metadata: PackageMetadataDto = PackageMetadataDto(
@@ -342,7 +342,7 @@ export proc write_package_metadata(
       for entry in item.metadata_files
     ],
   )
-  json.write(path_value, {...metadata, executor})?
+  json.write(path_value, {...metadata, executor})
 }
 
 ## Exported PM declaration `dir_empty`.
@@ -362,10 +362,10 @@ export proc write_package_db(
   etcsums: List[types.EtcSum],
 ) [fs, error] {
   let db = util.package_db_path(root, pkg.name)
-  fs.mkdir(db)?
+  fs.mkdir(db)
   let manifest_text = collect_manifest_text(manifest)?
-  json.write(fp"{db}/manifest.json", manifest_text)?
-  json.write(fp"{db}/etcsums.json", etcsums)?
+  json.write(fp"{db}/manifest.json", manifest_text)
+  json.write(fp"{db}/etcsums.json", etcsums)
 
   json.write(
     fp"{db}/metadata.json",
@@ -381,7 +381,7 @@ export proc write_package_db(
       nostrip: pkg.nostrip,
       dir: pkg.dir.display(),
     },
-  )?
+  )
 }
 
 ## Exported PM declaration `load_package_dirs`.
@@ -456,7 +456,7 @@ export proc update_package_checksums(cache_root: Path, pkg: types.Package) [fs, 
   let updates = sources.collect_checksum_updates(cache_root, pkg)?
 
   for update in updates {
-    sources.write_checksum_field(pkg, update.field, update.values)?
+    sources.write_checksum_field(pkg, update.field, update.values)
     print ${pkg.name} ${update.field} updated
   }
 }

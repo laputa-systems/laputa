@@ -133,7 +133,7 @@ int main(void)
 # The gallium library is named for the Mesa version.
 proc gallium_library(root: Path) [fs, error] -> Result[Path] {
   let found = [entry.path for entry in fs.children(fp"{root}/usr/lib") if entry.name.starts_with("libgallium-") and entry.name.ends_with(".so")]
-  proof.ensure(found.len() == 1, "proof-mesa", f"expected one libgallium, found {found.len()}")?
+  proof.ensure(found.len() == 1, "proof-mesa", f"expected one libgallium, found {found.len()}")
   found[0].relative_to(root)
 }
 
@@ -142,7 +142,7 @@ proc gallium_library(root: Path) [fs, error] -> Result[Path] {
 proc check_runtime_needs(root: Path, rels: List[Path]) [fs, error] {
   for rel in rels {
     for needed in elf.inspect(fp"{root}/{rel}")?.needed {
-      proof.ensure(! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"), "proof-mesa", f"{rel} links {needed}")?
+      proof.ensure(! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"), "proof-mesa", f"{rel} links {needed}")
     }
   }
 }
@@ -157,10 +157,10 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   ]
 
   for rel in libraries {
-    proof.target_elf(root, rel, "mesa")?
+    proof.target_elf(root, rel, "mesa")
   }
 
-  check_runtime_needs(root, libraries)?
+  check_runtime_needs(root, libraries)
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "mesa ok: cross-built "${pm_util.target_arch()?}
@@ -169,12 +169,12 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-mesa"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
   let source = fp"{tmp}/proof-mesa.c"
   let binary = fp"{tmp}/proof-mesa"
-  fs.write(source, program_source)?
+  fs.write(source, program_source)
   run $cc $source f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lEGL" "-lGLESv2" "-lgbm" "-o" $binary ?
 
   env ({
@@ -182,11 +182,11 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
     GBM_BACKENDS_PATH: fp"{root}/usr/lib/gbm".display(),
   }) {
     let out = run.text $binary ?
-    proof.ensure("GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected renderer: {out}")?
-    proof.ensure("OpenGL ES 3.1 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")?
-    proof.ensure("rendered" in out, "proof-mesa", f"render check failed: {out}")?
+    proof.ensure("GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected renderer: {out}")
+    proof.ensure("OpenGL ES 3.1 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")
+    proof.ensure("rendered" in out, "proof-mesa", f"render check failed: {out}")
     print f"mesa ok: {out.trim().split("\n").join("; ")}"
   }?
 }
 
-main(@args)?
+main(@args)

@@ -213,15 +213,15 @@ proc fail_on_m4_status() [fs, error] {
     complain (NULL, fatal, _("%s subprocess failed"), "m4");
 """
 
-  fs.write(output_c, text.replace(wait_call, checked_wait))?
+  fs.write(output_c, text.replace(wait_call, checked_wait))
 }
 
 proc install_data_tree(src: Path, dest: Path) [fs, error] {
   for e in fs.children(src)? {
     if e.kind == "dir" {
-      install_data_tree(e.path, fp"{dest}/{e.name}")?
+      install_data_tree(e.path, fp"{dest}/{e.name}")
     } else if e.kind == "file" {
-      fs.install(e.path, fp"{dest}/{e.name}", 0o644, parents: true, overwrite: true)?
+      fs.install(e.path, fp"{dest}/{e.name}", 0o644, parents: true, overwrite: true)
     }
   }
 }
@@ -229,7 +229,7 @@ proc install_data_tree(src: Path, dest: Path) [fs, error] {
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
-  fail_on_m4_status()?
+  fail_on_m4_status()
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
   let abi = target.lp64_musl_abi(arch)
@@ -495,7 +495,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["REPLACE_STRERROR_0"] = "0"
   defines["REPLACE_VASNPRINTF"] = "0"
   defines["REPLACE_VFPRINTF_POSIX"] = "0"
-  configure.config_h(p"lib/config.in.h", p"config.h", defines)?
+  configure.config_h(p"lib/config.in.h", p"config.h", defines)
 
   # Generate gnulib POSIX header passthroughs.
   # On musl, all POSIX headers are complete. Each wrapper just redirects to
@@ -507,19 +507,19 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"lib/alloca.h",
     f"""{pt}<alloca.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/dirent.h",
     f"""{pt}<dirent.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/errno.h",
     f"""{pt}<errno.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/fcntl.h",
@@ -531,86 +531,86 @@ export proc build(dest: Path) [fs, process, env, error] {
 # define O_TEXT 0
 #endif
 """,
-  )?
+  )
 
   fs.write(
     p"lib/float.h",
     f"""{pt}<float.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/getopt.h",
     f"""{pt}<getopt.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/iconv.h",
     f"""{pt}<iconv.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/inttypes.h",
     f"""{pt}<inttypes.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/limits.h",
     f"""{pt}<limits.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/locale.h",
     f"""{pt}<locale.h>
 #include "setlocale_null.h"
 """,
-  )?
+  )
 
   fs.write(
     p"lib/math.h",
     f"""{pt}<math.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sched.h",
     f"""{pt}<sched.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/signal.h",
     f"""{pt}<signal.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/spawn.h",
     f"""{pt}<spawn.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/stdbool.h",
     f"""{pt}<stdbool.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/stddef.h",
     f"""{pt}<stddef.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/stdint.h",
     f"""{pt}<stdint.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/stdio.h",
@@ -633,111 +633,111 @@ export proc build(dest: Path) [fs, process, env, error] {
 # define _GL_ATTRIBUTE_FORMAT_PRINTF_SYSTEM(formatstring_parameter, first_argument) _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_SYSTEM, formatstring_parameter, first_argument))
 #endif
 """,
-  )?
+  )
 
   fs.write(
     p"lib/stdlib.h",
     f"""{pt}<stdlib.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/string.h",
     f"""{pt}<string.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/strings.h",
     f"""{pt}<strings.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/termios.h",
     f"""{pt}<termios.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/time.h",
     f"""{pt}<time.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/unistd.h",
     f"""{pt}<unistd.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/wchar.h",
     f"""{pt}<wchar.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/wctype.h",
     f"""{pt}<wctype.h>
 """,
-  )?
+  )
 
   # sys/ headers live in a subdirectory
-  fs.mkdir(p"lib/sys")?
+  fs.mkdir(p"lib/sys")
 
   fs.write(
     p"lib/sys/ioctl.h",
     f"""{pt}<sys/ioctl.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/resource.h",
     f"""{pt}<sys/resource.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/stat.h",
     f"""{pt}<sys/stat.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/time.h",
     f"""{pt}<sys/time.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/times.h",
     f"""{pt}<sys/times.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/types.h",
     f"""{pt}<sys/types.h>
 """,
-  )?
+  )
 
   fs.write(
     p"lib/sys/wait.h",
     f"""{pt}<sys/wait.h>
 """,
-  )?
+  )
 
   # Files with zero @VAR@ placeholders — copy .in.h directly as the header.
   # stdalign/getopt-cdefs: gnulib portability headers, complete as shipped.
   # unitypes/unistr/uniwidth: bundled libunistring API, no substitution needed.
   # textstyle: already a complete no-libtextstyle stub per its header comment.
-  fs.write(p"lib/stdalign.h", fs.read_text(p"lib/stdalign.in.h")?)?
-  fs.write(p"lib/getopt-cdefs.h", fs.read_text(p"lib/getopt-cdefs.in.h")?)?
-  fs.write(p"lib/unitypes.h", fs.read_text(p"lib/unitypes.in.h")?)?
-  fs.write(p"lib/unistr.h", fs.read_text(p"lib/unistr.in.h")?)?
-  fs.write(p"lib/uniwidth.h", fs.read_text(p"lib/uniwidth.in.h")?)?
-  fs.write(p"lib/textstyle.h", fs.read_text(p"lib/textstyle.in.h")?)?
+  fs.write(p"lib/stdalign.h", fs.read_text(p"lib/stdalign.in.h")?)
+  fs.write(p"lib/getopt-cdefs.h", fs.read_text(p"lib/getopt-cdefs.in.h")?)
+  fs.write(p"lib/unitypes.h", fs.read_text(p"lib/unitypes.in.h")?)
+  fs.write(p"lib/unistr.h", fs.read_text(p"lib/unistr.in.h")?)
+  fs.write(p"lib/uniwidth.h", fs.read_text(p"lib/uniwidth.in.h")?)
+  fs.write(p"lib/textstyle.h", fs.read_text(p"lib/textstyle.in.h")?)
   var scratch_lines = []
 
   for line in p"lib/malloc/scratch_buffer.h".lines()? {
@@ -754,7 +754,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     f"""/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 {scratch_lines.join("\n")}
 """,
-  )?
+  )
 
   fs.write(
     p"lib/xsh-gnulib-shims.h",
@@ -774,7 +774,7 @@ posix_spawn_file_actions_addchdir (posix_spawn_file_actions_t *actions, const ch
   return ENOSYS;
 }
 """,
-  )?
+  )
 
   fs.write(
     p"lib/xsh-getprogname.c",
@@ -784,7 +784,7 @@ getprogname (void)
   return "bison";
 }
 """,
-  )?
+  )
 
   fs.write(
     p"lib/configmake.h",
@@ -817,7 +817,7 @@ getprogname (void)
 #define PKGLIBDIR "/usr/lib/bison"
 #define PKGLIBEXECDIR "/usr/libexec/bison"
 """,
-  )?
+  )
 
   let cflags = ["-g", "-O2", "-Wno-error=implicit-function-declaration"]
 
@@ -896,8 +896,8 @@ getprogname (void)
     deps: [],
   })
 
-  make.run_tasks(bison.tasks, make.jobs()?)?
-  fs.install(bison.output, fp"{dest}/usr/bin/bison", 0o755, parents: true, overwrite: true)?
+  make.run_tasks(bison.tasks, make.jobs()?)
+  fs.install(bison.output, fp"{dest}/usr/bin/bison", 0o755, parents: true, overwrite: true)
 
   # POSIX yacc compatibility wrapper
   fs.write(
@@ -909,13 +909,13 @@ proc main(...argv: List[Str]) [process, error] {
 
 main(@args)?
 """,
-  )?
+  )
 
-  fs.chmod(fp"{dest}/usr/bin/yacc", 0o755)?
+  fs.chmod(fp"{dest}/usr/bin/yacc", 0o755)
 
   # Install bison's data files to /usr/share/bison/.
   # bison reads skeleton files and m4sugar helpers here at runtime; the path
   # is compiled in via -DPKGDATADIR above.
-  install_data_tree(p"data", fp"{dest}/usr/share/bison")?
-  fs.install(p"bison.xsh", fp"{dest}/usr/lib/pm/repo/bison/files/bison.xsh", 0o755, parents: true, overwrite: true)?
+  install_data_tree(p"data", fp"{dest}/usr/share/bison")
+  fs.install(p"bison.xsh", fp"{dest}/usr/lib/pm/repo/bison/files/bison.xsh", 0o755, parents: true, overwrite: true)
 }

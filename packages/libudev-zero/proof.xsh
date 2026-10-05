@@ -3,8 +3,8 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(root, "libudev-zero")?
-  proof.target_elf(root, p"usr/lib/libudev.so.1", "libudev-zero")?
+  proof.package_metadata(root, "libudev-zero")
+  proof.target_elf(root, p"usr/lib/libudev.so.1", "libudev-zero")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "libudev-zero ok: cross-built"
@@ -13,8 +13,8 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
 
   let cc = process.which("cc")?
   let tmp = fp"{root}/var/tmp/proof-libudev-zero"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp, true)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp, true)
   defer fs.remove(tmp, missing_ok: true)?
 
   # libinput and wlroots find input and DRM devices by enumerating sysfs and
@@ -46,7 +46,7 @@ int main(void) {
   return found ? 0 : 4;
 }
 """,
-  )?
+  )
 
   let binary = fp"{tmp}/proof-libudev"
   run $cc fp"{tmp}/proof-libudev.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-ludev" "-o" $binary ?
@@ -60,4 +60,4 @@ int main(void) {
   print "libudev-zero ok: enumerated /dev/null through the mem subsystem"
 }
 
-main(@args)?
+main(@args)

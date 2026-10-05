@@ -73,11 +73,11 @@ proc write_embedded_dtd() [fs, error] {
 	{values.join(" ")}
 }}}};
 """,
-  )?
+  )
 }
 
 proc patch_python_generator() [fs, error] {
-  write_embedded_dtd()?
+  write_embedded_dtd()
   let meson_path = p"src/meson.build"
   let text = meson_path.read_text()?
 
@@ -98,7 +98,7 @@ proc patch_python_generator() [fs, error] {
 """,
   )
 
-  fs.write(meson_path, patched)?
+  fs.write(meson_path, patched)
   let root_meson = p"meson.build"
 
   fs.write(
@@ -116,7 +116,7 @@ proc patch_python_generator() [fs, error] {
 	rt_dep = declare_dependency()
 """,
 ),
-  )?
+  )
 
   fs.write(
     meson_path,
@@ -124,7 +124,7 @@ proc patch_python_generator() [fs, error] {
       "\tmathlib_dep = cc.find_library('m', required: false)",
       "\tmathlib_dep = declare_dependency(link_args: ['-lm'])",
     ),
-  )?
+  )
 }
 
 proc build_wayland(dest: Path) [fs, process, env, error] {
@@ -133,7 +133,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
   let pc = pm_env.pkg_config_context()?
   let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
   let native_scanner = pm_util.build_arch()? != pm_util.target_arch()? and build_root != ""
-  patch_python_generator()?
+  patch_python_generator()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -157,7 +157,7 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
 
       let ninja = p"build/build.ninja"
       let scanner_text = native_scanner_path.display()
-      fs.write(ninja, ninja.read_text()?.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))?
+      fs.write(ninja, ninja.read_text()?.replace(" -- src/wayland-scanner ", f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag ?
@@ -172,16 +172,16 @@ proc build_wayland(dest: Path) [fs, process, env, error] {
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  build_wayland(dest)?
+  build_wayland(dest)
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libwayland-") and ! entry.name.starts_with("libwayland-cursor.so") {
-      fs.remove(entry.path, missing_ok: true)?
+      fs.remove(entry.path, missing_ok: true)
     }
   }
 
-  fs.remove(fp"{dest}/usr/bin", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/include", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/share", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/bin", missing_ok: true)
+  fs.remove(fp"{dest}/usr/include", missing_ok: true)
+  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)
+  fs.remove(fp"{dest}/usr/share", missing_ok: true)
 }

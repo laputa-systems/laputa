@@ -57,7 +57,7 @@ export const filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
   let firmware = fp"{dest}/usr/lib/firmware"
-  fs.install(p"regulatory.db", fp"{firmware}/regulatory.db", 0o644, parents: true, overwrite: true)?
-  fs.install(p"regulatory.db.p7s", fp"{firmware}/regulatory.db.p7s", 0o644, parents: true, overwrite: true)?
-  fs.install(p"LICENSE", fp"{dest}/usr/share/licenses/wireless-regdb/LICENSE", 0o644, parents: true, overwrite: true)?
+  fs.install(p"regulatory.db", fp"{firmware}/regulatory.db", 0o644, parents: true, overwrite: true)
+  fs.install(p"regulatory.db.p7s", fp"{firmware}/regulatory.db.p7s", 0o644, parents: true, overwrite: true)
+  fs.install(p"LICENSE", fp"{dest}/usr/share/licenses/wireless-regdb/LICENSE", 0o644, parents: true, overwrite: true)
 }

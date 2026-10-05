@@ -11,15 +11,15 @@ type ArchiveCompileTaskReport = {source: Str, flags: List[Str]}
 type ArchiveAnalysisResult = {object: Str, tasks: List[ArchiveCompileTaskReport]}
 
 proc write_fixture(root: Path) [fs, error] {
-  fs.mkdir(fp"{root}/init/lib")?
-  fs.mkdir(fp"{root}/block")?
-  fs.mkdir(fp"{root}/net")?
-  fs.mkdir(fp"{root}/fs")?
-  fs.mkdir(fp"{root}/fs/proc")?
-  fs.mkdir(fp"{root}/fs/devpts")?
-  fs.mkdir(fp"{root}/fs/ramfs")?
-  fs.mkdir(fp"{root}/mm")?
-  fs.mkdir(fp"{root}/arch/arm64/kernel")?
+  fs.mkdir(fp"{root}/init/lib")
+  fs.mkdir(fp"{root}/block")
+  fs.mkdir(fp"{root}/net")
+  fs.mkdir(fp"{root}/fs")
+  fs.mkdir(fp"{root}/fs/proc")
+  fs.mkdir(fp"{root}/fs/devpts")
+  fs.mkdir(fp"{root}/fs/ramfs")
+  fs.mkdir(fp"{root}/mm")
+  fs.mkdir(fp"{root}/arch/arm64/kernel")
 
   fs.write(
     fp"{root}/.config",
@@ -31,7 +31,7 @@ CONFIG_MMU=y
 CONFIG_UNIX98_PTYS=y
 # CONFIG_UNUSED is not set
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/Kbuild",
@@ -54,51 +54,51 @@ ifeq ($(CONFIG_UNUSED),y)
 obj-y += skipped.o
 endif
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/Makefile",
     """obj-y += wrong-precedence.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/init/Kbuild",
     """obj-y += main.o \\
   lib/
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/init/lib/Makefile",
     """obj-y += helper.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/block/Kbuild",
     """obj-y := blk-core.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/net/Kbuild",
     """obj-$(CONFIG_INET) += ipv4.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/Kbuild",
     """obj-y += proc/ devpts/ ramfs/
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/devpts/Kbuild",
     """obj-$(CONFIG_UNIX98_PTYS) += devpts.o
 devpts-$(CONFIG_UNIX98_PTYS) := inode.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/proc/Makefile",
@@ -107,7 +107,7 @@ proc-y := nommu.o task_nommu.o
 proc-$(CONFIG_MMU) := task_mmu.o
 proc-y += inode.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/ramfs/Kbuild",
@@ -116,7 +116,7 @@ file-mmu-y := file-nommu.o
 file-mmu-$(CONFIG_MMU) := file-mmu.o
 ramfs-objs += inode.o $(file-mmu-y)
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/mm/Kbuild",
@@ -124,13 +124,13 @@ ramfs-objs += inode.o $(file-mmu-y)
 mmu-y := nommu.o
 mmu-$(CONFIG_MMU) := highmem.o memory.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/arch/arm64/kernel/Kbuild",
     """obj-y += head.o
 """,
-  )?
+  )
 }
 
 pure contains_path(paths: List[Path], target: Str) -> Bool {
@@ -153,7 +153,7 @@ pure composite_has_member(plan: kbuild.KbuildPlan, object: Str, member: Str) -> 
 
 test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild")?
-  write_fixture(root)?
+  write_fixture(root)
   let config = kbuild.load_config(fp"{root}/.config")?
   let plan = kbuild.discover_plan(root, config, "arm64")?
   assert contains_path(plan.dirs, ".")
@@ -196,7 +196,7 @@ test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild-local-records")?
   let default_out = test.temp_path(ctx, name: "linux-kbuild-default-plan")
   let local_out = test.temp_path(ctx, name: "linux-kbuild-local-plan")
-  write_fixture(root)?
+  write_fixture(root)
   let config = kbuild.load_config(fp"{root}/.config")?
   let default_plan = kbuild.discover_plan(root, config, "arm64")?
   let local_plan = kbuild.discover_plan_with_options(
@@ -212,14 +212,14 @@ test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
       build_plan: true,
     },
   )?
-  kbuild.write_discovered_plan(default_plan, default_out)?
-  kbuild.write_discovered_plan(local_plan, local_out)?
+  kbuild.write_discovered_plan(default_plan, default_out)
+  kbuild.write_discovered_plan(local_plan, local_out)
   assert default_out.read_text()? == local_out.read_text()?
 }
 
 test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild-local-cache")?
-  write_fixture(root)?
+  write_fixture(root)
   let config = kbuild.load_config(fp"{root}/.config")?
   let options = {
     progress: false,
@@ -239,7 +239,7 @@ test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
     root_kbuild,
     f"""{original}obj-y += cached.o
 """,
-  )?
+  )
   let third = kbuild.discover_plan_with_options(root, config, "arm64", options)?
   assert contains_path(third.objects, "cached.o")
 }
@@ -247,7 +247,7 @@ test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
 test test_kbuild_writes_text_plan [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild-text")?
   let out = test.temp_path(ctx, name: "plan.json")
-  write_fixture(root)?
+  write_fixture(root)
   let plan = kbuild.write_plan(root, fp"{root}/.config", out, "arm64")?
   let stored = out.read_text()?
   assert "obj\tinit/main.o" in stored
@@ -258,109 +258,109 @@ test test_kbuild_writes_text_plan [fs, error] { |ctx|
 
 test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-tasks")?
-  write_fixture(root)?
+  write_fixture(root)
 
   fs.write(
     fp"{root}/core.c",
     """int core(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/libhelper.c",
     """int libhelper(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/hyperv.c",
     """int hyperv(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/conditional.c",
     """int conditional(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/combo-a.c",
     """int combo_a(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/combo-b.c",
     """int combo_b(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/init/main.c",
     """int init_main(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/init/lib/helper.S",
     """.text
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/proc/task_mmu.c",
     """int task_mmu(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/proc/inode.c",
     """int proc_inode(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/devpts/inode.c",
     """int devpts_inode(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/ramfs/inode.c",
     """int ramfs_inode(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/fs/ramfs/file-mmu.c",
     """int ramfs_file_mmu(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/mm/mm.c",
     """int mm(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/block/blk-core.c",
     """int blk_core(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/net/ipv4.c",
     """int ipv4(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/arch/arm64/kernel/head.S",
     """.text
 """,
-  )?
+  )
 
   let config = kbuild.load_config(fp"{root}/.config")?
   let plan = kbuild.discover_plan(root, config, "arm64")?
@@ -394,7 +394,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
     assert contains_path(archive_plan.archives, ".xsh-kbuild/init/built-in.a")
     assert contains_path(archive_plan.archives, ".xsh-kbuild/init/lib/built-in.a")
     let report = fp"{root}/archive-plan.json"
-    kbuild.write_archive_plan_report(archive_plan, report)?
+    kbuild.write_archive_plan_report(archive_plan, report)
     let stored = json.read(report)?.require(ArchivePlanReport)?
     let {task_count, tasks, ..} = stored
     assert task_count == archive_plan.tasks.len()
@@ -429,32 +429,32 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
 
 test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-pi-relacheck")?
-  fs.mkdir(fp"{root}/arch/arm64/kernel/pi")?
-  fs.write(fp"{root}/.config", "")?
+  fs.mkdir(fp"{root}/arch/arm64/kernel/pi")
+  fs.write(fp"{root}/.config", "")
 
   fs.write(
     fp"{root}/Kbuild",
     """obj-y += arch/arm64/kernel/pi/
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/arch/arm64/kernel/pi/Makefile",
     """obj-y += idreg-override.pi.o
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/arch/arm64/kernel/pi/idreg-override.c",
     """int idreg_override;
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/arch/arm64/kernel/pi/relacheck.c",
     """int main(int argc, char **argv) { return argc < 3; }
 """,
-  )?
+  )
 
   cd root {
     let config = kbuild.load_config(p".config")?
@@ -556,9 +556,9 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
         },
       ],
     },
-  )?
+  )
 
-  kbuild.run_archive_plan_output(plan, second, 1)?
+  kbuild.run_archive_plan_output(plan, second, 1)
   assert first.read_text()? == "first"
   assert second.read_text()? == "firstsecond"
 }
@@ -570,7 +570,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
     fp"{root}/present.c",
     """int present(void) { return 0; }
 """,
-  )?
+  )
 
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
@@ -601,12 +601,12 @@ test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
     fp"{root}/first.c",
     """int first(void) { return 0; }
 """,
-  )?
+  )
   fs.write(
     fp"{root}/second.c",
     """int second(void) { return 0; }
 """,
-  )?
+  )
 
   cd root {
     let results = kbuild.analyze_archive_items(
@@ -652,18 +652,18 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
   let root = test.temp_dir(ctx, name: "linux-archive-analysis-pool")?
   let worker = path.absolute(p"packages/linux/kbuild-archive-analysis-worker.xsh")?
   let xsh_bin = process.which("xsh")?
-  fs.write(fp"{root}/.config", "")?
-  fs.write(fp"{root}/Kbuild", "")?
+  fs.write(fp"{root}/.config", "")
+  fs.write(fp"{root}/Kbuild", "")
   fs.write(
     fp"{root}/first.c",
     """int first(void) { return 0; }
 """,
-  )?
+  )
   fs.write(
     fp"{root}/second.c",
     """int second(void) { return 0; }
 """,
-  )?
+  )
 
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
@@ -743,14 +743,14 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
 
 test test_kbuild_adds_x86_kvm_local_include [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-x86-kvm-include")?
-  fs.mkdir(fp"{root}/arch/x86/kvm/mmu")?
+  fs.mkdir(fp"{root}/arch/x86/kvm/mmu")
 
   fs.write(
     fp"{root}/arch/x86/kvm/mmu/mmu.c",
     """#include "irq.h"
 int mmu(void) { return 0; }
 """,
-  )?
+  )
 
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
@@ -789,34 +789,34 @@ int mmu(void) { return 0; }
 
 test test_kbuild_applies_object_and_subdir_cflags [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-cflags")?
-  fs.mkdir(fp"{root}/sound/hda/common")?
-  fs.mkdir(fp"{root}/sound/hda/controllers")?
-  fs.write(fp"{root}/.config", "")?
+  fs.mkdir(fp"{root}/sound/hda/common")
+  fs.mkdir(fp"{root}/sound/hda/controllers")
+  fs.write(fp"{root}/.config", "")
 
   fs.write(
     fp"{root}/sound/hda/common/Makefile",
     """CFLAGS_controller.o := -I$(src)
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/sound/hda/controllers/Makefile",
     """subdir-ccflags-y += -I$(src)/../common
 CFLAGS_intel.o := -I$(src)
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/sound/hda/common/controller.c",
     """int controller(void) { return 0; }
 """,
-  )?
+  )
 
   fs.write(
     fp"{root}/sound/hda/controllers/intel.c",
     """int intel(void) { return 0; }
 """,
-  )?
+  )
 
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [
@@ -862,8 +862,8 @@ CFLAGS_intel.o := -I$(src)
 # its CFLAGS_<member> entry.
 test test_kbuild_applies_composite_makefile_cflags_to_subdir_members [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-composite-cflags")?
-  fs.mkdir(fp"{root}/lib/xor/x86")?
-  fs.write(fp"{root}/.config", "")?
+  fs.mkdir(fp"{root}/lib/xor/x86")
+  fs.write(fp"{root}/.config", "")
 
   fs.write(
     fp"{root}/lib/xor/Makefile",
@@ -872,10 +872,10 @@ obj-y += xor.o
 xor-y += core.o x86/avx.o
 CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
 """,
-  )?
+  )
 
-  fs.write(fp"{root}/lib/xor/core.c", "int core(void) { return 0; }\n")?
-  fs.write(fp"{root}/lib/xor/x86/avx.c", "int avx(void) { return 0; }\n")?
+  fs.write(fp"{root}/lib/xor/core.c", "int core(void) { return 0; }\n")
+  fs.write(fp"{root}/lib/xor/x86/avx.c", "int avx(void) { return 0; }\n")
 
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [p"lib/xor"],
@@ -912,9 +912,9 @@ test test_kbuild_generates_config_headers [fs, error] { |ctx|
 CONFIG_NUMBER=12
 CONFIG_TEXT="value"
 """,
-  )?
+  )
 
-  kbuild.write_config_headers(config, root, "7.0.5", "arm64")?
+  kbuild.write_config_headers(config, root, "7.0.5", "arm64")
   let autoconf = fp"{root}/include/generated/autoconf.h".read_text()?
   let auto_conf = fp"{root}/include/config/auto.conf".read_text()?
   assert "#define CONFIG_ALPHA 1" in autoconf
@@ -937,9 +937,9 @@ test test_kbuild_generates_syscall_table [fs, error] { |ctx|
 3 64 exit sys_exit - noreturn
 4 32 skip32 sys_skip32
 """,
-  )?
+  )
 
-  kbuild.generate_syscall_table(table, out, ["common", "64"])?
+  kbuild.generate_syscall_table(table, out, ["common", "64"])
 
   assert out.read_text()? == """__SYSCALL(0, sys_read)
 __SYSCALL(1, sys_ni_syscall)
@@ -947,7 +947,7 @@ __SYSCALL_WITH_COMPAT(2, sys_open, compat_sys_open)
 __SYSCALL_NORETURN(3, sys_exit)
 """
 
-  kbuild.generate_syscall_numbers(table, numbers, "_ASM_UNISTD_H", "__NR_syscalls", "", ["common", "64"])?
+  kbuild.generate_syscall_numbers(table, numbers, "_ASM_UNISTD_H", "__NR_syscalls", "", ["common", "64"])
   let observed_output_1 = numbers.read_text()?
   assert "#define __NR_read 0" in observed_output_1
   let observed_output_2 = numbers.read_text()?
@@ -967,9 +967,9 @@ test test_kbuild_generates_offsets_header [fs, error] { |ctx|
 .ascii "->"
 .ascii "->BAR 16 sizeof(struct demo)"
 """,
-  )?
+  )
 
-  kbuild.generate_offsets_header(asm_path, out, "__ASM_OFFSETS_H__")?
+  kbuild.generate_offsets_header(asm_path, out, "__ASM_OFFSETS_H__")
 
   assert out.read_text()? == """#ifndef __ASM_OFFSETS_H__
 #define __ASM_OFFSETS_H__
@@ -991,10 +991,10 @@ test test_kbuild_config_keeps_string_values_that_contain_equals_signs [fs, error
   let root = test.temp_dir(ctx, name: "linux-config-strings")?
   fs.write(fp"{root}/.config", """CONFIG_CMDLINE_BOOL=y
 CONFIG_CMDLINE="root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0"
-""")?
+""")
   let config = kbuild.load_config(fp"{root}/.config")?
-  test.eq(config.values.get("CMDLINE") ?? "", "root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0")?
-  kbuild.write_config_headers(fp"{root}/.config", root, "7.0.5", "x86")?
+  test.eq(config.values.get("CMDLINE") ?? "", "root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0")
+  kbuild.write_config_headers(fp"{root}/.config", root, "7.0.5", "x86")
   assert "#define CONFIG_CMDLINE \"root=PARTLABEL=LAPUTA_ROOT rw console=ttyS0\"" in fs.read_text(fp"{root}/include/generated/autoconf.h")?
 }
 
@@ -1007,7 +1007,7 @@ test test_kbuild_x86_vmlinux_archive_leaves_out_efi_stub [error] {
   test.eq(
     kbuild.vmlinux_x86_archive_inputs(inputs),
     [p".xsh-kbuild/obj/lib/cmdline.o", p".xsh-kbuild/obj/drivers/firmware/efi/efi.o"],
-  )?
+  )
 }
 
 test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
@@ -1027,7 +1027,7 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let vmlinux = fp"{root}/vmlinux"
   let image = fp"{root}/arch/arm64/boot/Image"
   let archive_task = kbuild.vmlinux_archive_task(ar, [built_in, arch_lib], vmlinux_a)
-  test.eq(archive_task.argv, ["/usr/bin/ar", "cDPrST", vmlinux_a.display(), built_in.display(), arch_lib.display()])?
+  test.eq(archive_task.argv, ["/usr/bin/ar", "cDPrST", vmlinux_a.display(), built_in.display(), arch_lib.display()])
   let reloc = kbuild.vmlinux_o_task(ld, ["-EL", "-maarch64elf"], vmlinux_a, [efi_lib], vmlinux_o)
   assert "--whole-archive" in reloc.argv
   assert "--start-group" in reloc.argv
@@ -1050,10 +1050,10 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let stripped = kbuild.vmlinux_strip_task(objcopy, unstripped, vmlinux)
   assert "--remove-section=.modinfo" in stripped.argv
   let image_task = kbuild.image_task(objcopy, vmlinux, image)
-  test.eq(image_task.argv.get(1)?, "-O")?
-  test.eq(image_task.argv.get(2)?, "binary")?
+  test.eq(image_task.argv.get(1)?, "-O")
+  test.eq(image_task.argv.get(2)?, "binary")
   let llvm_image_task = kbuild.image_argv_task(["llvm-objcopy"], vmlinux, image)
-  test.eq(llvm_image_task.argv.get(0)?, "llvm-objcopy")?
+  test.eq(llvm_image_task.argv.get(0)?, "llvm-objcopy")
   let nonrel_config: kbuild.Kconfig = kbuild.Kconfig(enabled: map.empty(), values: {["RELR"]: "y"})
   let nonrel_flags = kbuild.arm64_vmlinux_ldflags(nonrel_config)
   assert "-shared" in nonrel_flags == false

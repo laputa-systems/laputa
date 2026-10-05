@@ -24,4 +24,4 @@ proc main(rootfs: Path = /rootfs) [fs, error] {
   print "gnu-stubs ok"
 }
 
-main(@args)?
+main(@args)

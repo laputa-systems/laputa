@@ -586,7 +586,7 @@ proc remote_snapshot_for_plan(
       index = remote.upsert_remote_package(index, entry)?
     }
 
-    remote.write_remote_index_cache(cache_root, index)?
+    remote.write_remote_index_cache(cache_root, index)
   }
 
   let index_sha256 = if cache.exists()? { hash.sha256(cache)?.hex() } else { bytes.from_text("[]\n").sha256().hex() }
@@ -661,7 +661,7 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
 
   # The durable DTO and atomic write are kept behind `write_plan` while the release
   # native-test runner cannot encode a direct reachable call to `plan_json.write`.
-  pm_plan_json.write_plan(args.output, value)?
+  pm_plan_json.write_plan(args.output, value)
   print (pm_plan.render(value, false)?)
 }
 
@@ -699,7 +699,7 @@ proc command_repo_publish(args: RepoPublishArgs) [fs, net, env, time, error] {
   let work_handle = fs.tempdir()?
   defer work_handle.close()?
   let token = (e"LAPUTA_TOKEN" ?? "").trim()
-  repo.publish(snapshot, repo_url, token, work_handle.host_path()?)?
+  repo.publish(snapshot, repo_url, token, work_handle.host_path()?)
   print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
 }
 
@@ -708,9 +708,9 @@ proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, proc
 
   for pkg in selected_packages(args.repo, args.packages)? {
     if update {
-      local.update_package_checksums(cache_root, pkg)?
+      local.update_package_checksums(cache_root, pkg)
     } else {
-      local.print_package_checksums(cache_root, pkg)?
+      local.print_package_checksums(cache_root, pkg)
     }
   }
 }
@@ -750,7 +750,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
     selections += [{packages: selected, arch: types.pm_target_arch(target)}]
   }
 
-  sources.fetch_sources(cache_root, items)?
+  sources.fetch_sources(cache_root, items)
 
   # A `cargo-vendor` source's crate set is named by its lockfile, which the
   # first pass has just cached.
@@ -766,7 +766,7 @@ proc command_sources_fetch(args: SourcesFetchArgs) [fs, net, env, time, error] {
   }
 
   if crate_items.len() > 0 {
-    sources.fetch_sources(cache_root, crate_items)?
+    sources.fetch_sources(cache_root, crate_items)
   }
 }
 
@@ -819,32 +819,32 @@ proc command_store_extract(args: StoreExtractArgs) [fs, error] {
     args.package,
     args.path,
     args.output,
-  )?
+  )
   print f"store extract {args.package} {args.path}"
 }
 
 proc handle(command: PmCommand) [fs, net, process, env, time, error] {
   match command {
     Help(text) => print $text
-    RepoCheck(args) => command_repo_check(args)?
-    RepoPlan(args) => command_repo_plan(args)?
-    RepoShow(args) => command_repo_show(args)?
-    RepoBuild(args) => command_repo_build(args)?
-    RepoBuildNode(args) => command_repo_build_node(args)?
-    RepoPublish(args) => command_repo_publish(args)?
-    RepoChecksum(args) => command_repo_checksums(args, false)?
-    RepoUpdateChecksums(args) => command_repo_checksums(args, true)?
-    SourcesFetch(args) => command_sources_fetch(args)?
-    RootCompose(args) => command_root_compose(args)?
-    RootInspect(args) => command_root_inspect(args)?
-    StoreVerify(args) => command_store_verify(args)?
-    StoreGc(args) => command_store_gc(args)?
-    StoreExtract(args) => command_store_extract(args)?
+    RepoCheck(args) => command_repo_check(args)
+    RepoPlan(args) => command_repo_plan(args)
+    RepoShow(args) => command_repo_show(args)
+    RepoBuild(args) => command_repo_build(args)
+    RepoBuildNode(args) => command_repo_build_node(args)
+    RepoPublish(args) => command_repo_publish(args)
+    RepoChecksum(args) => command_repo_checksums(args, false)
+    RepoUpdateChecksums(args) => command_repo_checksums(args, true)
+    SourcesFetch(args) => command_sources_fetch(args)
+    RootCompose(args) => command_root_compose(args)
+    RootInspect(args) => command_root_inspect(args)
+    StoreVerify(args) => command_store_verify(args)
+    StoreGc(args) => command_store_gc(args)
+    StoreExtract(args) => command_store_extract(args)
   }
 }
 
 ## Parses only the final explicit PM command surface; there are no extension or legacy fallbacks.
 export proc run_pm_cli(argv: List[Str]) [fs, net, process, env, time, error] {
   let args = if argv.len() > 0 and argv[0] == "--" { tail_after(argv, 1) } else { argv }
-  handle(parse_command(args)?)?
+  handle(parse_command(args)?)
 }

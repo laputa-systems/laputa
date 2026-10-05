@@ -26,17 +26,17 @@ export proc publish_final_file(source: Path, output: Path) [fs, error] {
   }
 
   let temporary = fp"{output}.tmp"
-  fs.mkdir(output.parent)?
-  fs.remove(temporary, missing_ok: true)?
+  fs.mkdir(output.parent)
+  fs.remove(temporary, missing_ok: true)
   defer fs.remove(temporary, missing_ok: true)?
-  fs.copy(source, temporary)?
+  fs.copy(source, temporary)
 
   if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
     return Err(ContainerOutputError.Failed(f"final publication copy does not match {source}"))
   }
 
-  fs.fsync(temporary)?
-  fs.rename(temporary, output, overwrite: true)?
+  fs.fsync(temporary)
+  fs.rename(temporary, output, overwrite: true)
 }
 
 ## Publishes a complete immutable system bundle before atomically selecting it
@@ -66,33 +66,33 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
   let builds = fp"{output_root}/builds"
   let final_dir = fp"{builds}/{key}"
   let temporary = fp"{builds}/.{key}.tmp"
-  fs.mkdir(builds)?
+  fs.mkdir(builds)
   if fs.exists(final_dir)? {
     guard fs.metadata(final_dir)?.kind == "dir" else {
       return Err(ContainerOutputError.Failed(f"completed bundle path is not a directory: {final_dir}"))
     }
 
     for item in files {
-      bundle_verify_file(item.source, fp"{final_dir}/{item.name}")?
+      bundle_verify_file(item.source, fp"{final_dir}/{item.name}")
     }
   } else {
-    fs.remove(temporary, missing_ok: true)?
+    fs.remove(temporary, missing_ok: true)
     defer fs.remove(temporary, missing_ok: true)?
-    fs.mkdir(temporary)?
+    fs.mkdir(temporary)
     for item in files {
       let destination = fp"{temporary}/{item.name}"
-      fs.copy(item.source, destination)?
-      bundle_verify_file(item.source, destination)?
-      fs.fsync(destination)?
+      fs.copy(item.source, destination)
+      bundle_verify_file(item.source, destination)
+      fs.fsync(destination)
     }
 
-    fs.rename(temporary, final_dir)?
+    fs.rename(temporary, final_dir)
   }
 
   let current = fp"{output_root}/current"
   let current_temporary = fp"{output_root}/.current.tmp"
-  fs.remove(current_temporary, missing_ok: true)?
+  fs.remove(current_temporary, missing_ok: true)
   defer fs.remove(current_temporary, missing_ok: true)?
-  fs.symlink(fp"builds/{key}", current_temporary)?
-  fs.rename(current_temporary, current, overwrite: true)?
+  fs.symlink(fp"builds/{key}", current_temporary)
+  fs.rename(current_temporary, current, overwrite: true)
 }

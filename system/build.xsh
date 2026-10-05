@@ -51,7 +51,7 @@ export pure outputs(root: Path) -> ProfileOutputs {
 
 ## Remove only generated outputs, preserving the immutable artifact-store volume.
 export proc clean(output_root: Path) [fs, error] {
-  fs.remove(output_root, missing_ok: true)?
+  fs.remove(output_root, missing_ok: true)
 }
 
 ## Generate the profile's exact BuildPlan and its runtime-only GenerationPlan through the native PM container.
@@ -60,13 +60,13 @@ export proc plan_system_profile(
   profile: types.SystemProfile,
 ) [fs, process, error] -> Result[ProfileOutputs, Error] {
   let result = outputs(value.output_root)
-  docker.docker_plan(value, profile)?
+  docker.docker_plan(value, profile)
 
   if ! fs.exists(result.build_plan)? {
     return Err(types.LaputaError.Docker(f"PM plan command did not write {result.build_plan}"))
   }
 
-  docker.docker_generation_plan(value, profile)?
+  docker.docker_generation_plan(value, profile)
 
   if ! fs.exists(result.generation_plan)? {
     return Err(types.LaputaError.Docker(f"PM generation plan command did not write {result.generation_plan}"))
@@ -82,7 +82,7 @@ export proc build_profile(
   jobs: Int,
 ) [fs, process, error] -> Result[ProfileOutputs, Error] {
   let result = plan_system_profile(value, profile)?
-  docker.docker_profile_build(value, profile, jobs, result.build_log)?
+  docker.docker_profile_build(value, profile, jobs, result.build_log)
 
   if ! fs.exists(result.current)? or fs.metadata(result.current)?.kind != "symlink" {
     return Err(types.LaputaError.Docker(f"profile build did not atomically select {result.current}"))
@@ -94,6 +94,6 @@ export proc build_profile(
     }
   }
 
-  image.verify_disk(result.disk, fs.metadata(result.rootfs)?.size)?
+  image.verify_disk(result.disk, fs.metadata(result.rootfs)?.size)
   result
 }

@@ -342,15 +342,15 @@ export proc resolve(
   roots: List[Str],
   all: Bool,
 ) [fs, error] -> Result[types.BuildPlan, Error] {
-  require_supported_target(policy.target, "build policy")?
-  require_supported_target(policy.build_target, "build policy")?
-  require_supported_target(snapshot.target, "remote snapshot")?
+  require_supported_target(policy.target, "build policy")
+  require_supported_target(policy.build_target, "build policy")
+  require_supported_target(snapshot.target, "remote snapshot")
 
   if snapshot.target != policy.target {
     return Err(types.PmError.PackageContract("remote snapshot target does not match build policy"))
   }
 
-  require_build_epoch(policy.build_epoch, "build policy")?
+  require_build_epoch(policy.build_epoch, "build policy")
   let canonical_roots = plan_sorted_unique_names(roots)
   let selected_roots = if all { catalog.package_names(value) } else { canonical_roots }
 
@@ -592,7 +592,7 @@ proc validate_node(
     if retrieval == null {
       return Err(types.PmError.PackageContract(f"build plan node {node.name} reuses remote without retrieval data"))
     } else {
-      validate_retrieval(retrieval, value.target)?
+      validate_retrieval(retrieval, value.target)
       let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
 
       if node.artifact_key != expected_local and node.artifact_key != expected_legacy {
@@ -642,8 +642,8 @@ proc validate_structure(value: types.BuildPlan) [error] {
     return Err(types.PmError.PackageContract(f"unsupported build plan format {value.format}"))
   }
 
-  require_supported_target(value.target, "build plan")?
-  require_build_epoch(value.build_epoch, "build plan")?
+  require_supported_target(value.target, "build plan")
+  require_build_epoch(value.build_epoch, "build plan")
 
   let canonical_roots = plan_sorted_unique_names(value.roots)
 
@@ -681,7 +681,7 @@ proc validate_structure(value: types.BuildPlan) [error] {
       }
     }
 
-    validate_node(value, node, seen, levels, artifact_keys)?
+    validate_node(value, node, seen, levels, artifact_keys)
     seen[node.name] = true
     previous = node
   }
@@ -726,13 +726,13 @@ proc fingerprint_unchecked(value: types.BuildPlan) [error] -> Result[Str] {
 
 ## Computes the plan's canonical line-oriented fingerprint without its own digest field.
 export proc fingerprint(value: types.BuildPlan) [error] -> Result[Str, Error] {
-  validate_structure(value)?
+  validate_structure(value)
   fingerprint_unchecked(value)?
 }
 
 ## Verifies every durable BuildPlan invariant, including the stored plan digest.
 export proc validate(value: types.BuildPlan) [error] {
-  validate_structure(value)?
+  validate_structure(value)
   let expected = fingerprint_unchecked(value)?
 
   if value.plan_sha256 != expected {
@@ -750,7 +750,7 @@ pure color(text: Str, code: Str, colors: Bool) -> Str {
 
 ## Renders a concise deterministic human view of a verified plan.
 export proc render(value: types.BuildPlan, colors: Bool) [error] -> Result[Str, Error] {
-  validate(value)?
+  validate(value)
   var lines = [
     f"plan {value.plan_sha256}",
     f"target {types.target_text(value.target)}",

@@ -66,7 +66,7 @@ proc patch_musl_math() [fs, error] {
       "dep_m = cc.find_library('m', required : false)",
       "dep_m = declare_dependency(link_args : ['-lm'])",
     ),
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -75,7 +75,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let arch = pm_util.target_arch()?
-  patch_musl_math()?
+  patch_musl_math()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -101,7 +101,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   for entry in fs.children(fp"{dest}/usr/lib")? {
     if entry.name.starts_with("libpixman-1.so.") {
-      fs.remove(entry.path, missing_ok: true)?
+      fs.remove(entry.path, missing_ok: true)
     }
   }
 }

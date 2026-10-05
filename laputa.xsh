@@ -3,7 +3,7 @@
 use system.cli as laputa_cli
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
-  laputa_cli.dispatch(argv)?
+  laputa_cli.dispatch(argv)
 }
 
-main(@args)?
+main(@args)

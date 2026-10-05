@@ -20,7 +20,7 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
 proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
   let ssh_dir = fp"{rootfs}/root/.ssh"
   let auth_keys = fp"{ssh_dir}/authorized_keys"
-  fs.mkdir(ssh_dir)?
+  fs.mkdir(ssh_dir)
   var existing = ""
 
   if fs.exists(auth_keys)? {
@@ -31,10 +31,10 @@ proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
     auth_keys,
     f"""{existing}{public_key}
 """,
-  )?
+  )
 
-  fs.chmod(ssh_dir, 0o700)?
-  fs.chmod(auth_keys, 0o600)?
+  fs.chmod(ssh_dir, 0o700)
+  fs.chmod(auth_keys, 0o600)
 }
 
 proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) [fs, process, error] {
@@ -42,7 +42,7 @@ proc ensure_device(rootfs: Path, name: Str, major: Str, minor: Str) [fs, process
 
   return when fs.exists(device_path)?
 
-  fs.mkdir(device_path.parent)?
+  fs.mkdir(device_path.parent)
   let mknod = process.which("mknod")?
   run $mknod "-m" "666" $device_path "c" $major $minor ?
 }
@@ -86,7 +86,7 @@ proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries
 
     return when status.ok or dropbear_auth_logged(rootfs, chroot)
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     remaining -= 1
   }
 
@@ -156,7 +156,7 @@ proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time,
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     remaining -= 1
   }
 
@@ -195,63 +195,63 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let chroot = process.which("chroot")?
   let timeout_bin = process.which("timeout")?
   let tmp = /tmp/dropbear-proof-xinit
-  fs.mkdir(tmp)?
-  ensure(fs.exists(fp"{rootfs}/bin/xsh")?, "xinit-control", "rootfs is missing /bin/xsh for service scripts")?
-  ensure(fs.exists(fp"{rootfs}/usr/bin/xinit")?, "xinit-control", "rootfs is missing /usr/bin/xinit")?
-  ensure_device(rootfs, "null", "1", "3")?
-  ensure_device(rootfs, "random", "1", "8")?
-  ensure_device(rootfs, "urandom", "1", "9")?
-  fs.mkdir(fp"{rootfs}/tmp")?
-  fs.chmod(fp"{rootfs}/tmp", 0o1777)?
-  fs.mkdir(log_dir)?
-  fs.remove(fp"{log_dir}/current", missing_ok: true)?
+  fs.mkdir(tmp)
+  ensure(fs.exists(fp"{rootfs}/bin/xsh")?, "xinit-control", "rootfs is missing /bin/xsh for service scripts")
+  ensure(fs.exists(fp"{rootfs}/usr/bin/xinit")?, "xinit-control", "rootfs is missing /usr/bin/xinit")
+  ensure_device(rootfs, "null", "1", "3")
+  ensure_device(rootfs, "random", "1", "8")
+  ensure_device(rootfs, "urandom", "1", "9")
+  fs.mkdir(fp"{rootfs}/tmp")
+  fs.chmod(fp"{rootfs}/tmp", 0o1777)
+  fs.mkdir(log_dir)
+  fs.remove(fp"{log_dir}/current", missing_ok: true)
   let host_key = fp"{rootfs}/tmp/dropbear_host_ed25519"
   let rsa_host_key = fp"{rootfs}/tmp/dropbear_host_rsa"
   let client_key = fp"{tmp}/dropbear_client_ed25519"
-  fs.remove(host_key, missing_ok: true)?
-  fs.remove(rsa_host_key, missing_ok: true)?
+  fs.remove(host_key, missing_ok: true)
+  fs.remove(rsa_host_key, missing_ok: true)
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $host_key ?
   run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_host_key ?
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $client_key ?
-  fs.chmod(client_key, 0o600)?
+  fs.chmod(client_key, 0o600)
   let public_key_text = run.text $dynlinker $dropbearkey "-y" "-f" $client_key ?
   let public_key = public_key_line(public_key_text)?
-  authorize_root_key(rootfs, public_key)?
+  authorize_root_key(rootfs, public_key)
   print_direct_dropbear_probe(rootfs, chroot, port + 1, "default-keys", [])
   print_direct_dropbear_probe(rootfs, chroot, port + 2, "ed25519", ["-r", "/tmp/dropbear_host_ed25519"])
   print_direct_dropbear_probe(rootfs, chroot, port + 3, "rsa", ["-r", "/tmp/dropbear_host_rsa"])
-  xinit_start(rootfs, chroot, port, /tmp/dropbear_host_ed25519)?
+  xinit_start(rootfs, chroot, port, /tmp/dropbear_host_ed25519)
   let running = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear ?
 
   ensure(
     "pid=0" not in running and "log=append" in running,
     "dropbear-start",
     f"xinit status did not report append logging for a running service: {running}",
-  )?
+  )
 
   let check = dbclient_command(timeout_bin, dynlinker, dbclient, client_key, port)
-  wait_for_ssh(check, rootfs, chroot, port, 50)?
+  wait_for_ssh(check, rootfs, chroot, port, 50)
   let log_text = wait_for_xinit_logs(rootfs, chroot, 50)?
 
   ensure(
     "Pubkey auth succeeded" in log_text,
     "dropbear-log",
     f"xinit log did not capture successful Dropbear auth: {log_text}",
-  )?
+  )
 
   print "xinit dropbear logs ok"
   run $chroot $rootfs "/usr/bin/xinit" stop dropbear ?
   let stopped_status = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear ?
-  ensure("pid=0" in stopped_status, "dropbear-stop", "xinit status still reported a service pid after stop")?
+  ensure("pid=0" in stopped_status, "dropbear-stop", "xinit status still reported a service pid after stop")
   let listeners = process.port(port)? |> map .argv
 
   ensure(
     listeners.len() == 0,
     "dropbear-stop",
     f"dropbear still had listeners after stop: {live_dropbear_diagnostics(port)?}",
-  )?
+  )
 
   print "xinit dropbear ok"
 }
 
-main(@args)?
+main(@args)

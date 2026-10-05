@@ -52,10 +52,10 @@ export const filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
-  fs.mkdir(fp"{dest}/usr/share/hwdata")?
-  fs.install(p"pnp.ids", fp"{dest}/usr/share/hwdata/pnp.ids", 0o644, parents: true, overwrite: true)?
-  fs.install(p"pci.ids", fp"{dest}/usr/share/hwdata/pci.ids", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/share/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/share/hwdata")
+  fs.install(p"pnp.ids", fp"{dest}/usr/share/hwdata/pnp.ids", 0o644, parents: true, overwrite: true)
+  fs.install(p"pci.ids", fp"{dest}/usr/share/hwdata/pci.ids", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/usr/share/pkgconfig")
 
   fs.write(
     fp"{dest}/usr/share/pkgconfig/hwdata.pc",
@@ -66,5 +66,5 @@ pkgdatadir=\${datadir}/hwdata
 Name: hwdata
 Description: Hardware identification data
 """ + f"Version: {ver}\n",
-  )?
+  )
 }

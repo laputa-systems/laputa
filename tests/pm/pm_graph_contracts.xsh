@@ -19,7 +19,7 @@ test graph_cycle_retains_package_error_and_deterministic_path [error] {
     {from: "alpha", to: "beta", kind: types.dependency_build_target()},
   ]
   match graph.topological_levels(["beta", "alpha"], edges) {
-    Ok(_) => test.fail("dependency cycle unexpectedly received levels")?
+    Ok(_) => test.fail("dependency cycle unexpectedly received levels")
     Err(problem) => assert problem == types.PmError.DependencyCycle("package dependency cycle: alpha -> beta -> alpha")
   }
 }

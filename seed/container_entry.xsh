@@ -17,12 +17,12 @@ proc give_tree(root: Path, uid: Int, gid: Int) [fs, error] {
   # The ids need not exist in the image's /etc/passwd or /etc/group.
   let owner = {uid, gid, name: "", home: /, shell: ""}
   let owning_group = {gid, members: [], name: ""}
-  fs.chown(root, owner, false)?
-  fs.chgrp(root, owning_group, false)?
+  fs.chown(root, owner, false)
+  fs.chgrp(root, owning_group, false)
 
   for entry in fs.walk(root, hidden: true) {
-    fs.chown(entry.path, owner, false)?
-    fs.chgrp(entry.path, owning_group, false)?
+    fs.chown(entry.path, owner, false)
+    fs.chgrp(entry.path, owning_group, false)
   }
 }
 
@@ -47,7 +47,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   let status = run.status @command ?
 
   for dir in dirs {
-    give_tree(dir, uid, gid)?
+    give_tree(dir, uid, gid)
   }
 
   if ! status.ok {
@@ -55,4 +55,4 @@ proc main(...argv: List[Str]) [fs, process, error] {
   }
 }
 
-main(@args)?
+main(@args)

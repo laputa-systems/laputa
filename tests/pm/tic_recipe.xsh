@@ -84,14 +84,14 @@ test test_ncurses_sample_matches_ncurses_tic [fs, process, env, error] { |ctx|
   let out = fp"{test.temp_dir(ctx, name: "tic-ncurses")?}/terminfo"
   let status = compile(out, ncurses_sample, p"tests/pm/fixtures/tic/ncurses-sample.src")?
   assert status.ok
-  assert_same_tree(p"tests/pm/fixtures/tic/expected-ncurses", out)?
+  assert_same_tree(p"tests/pm/fixtures/tic/expected-ncurses", out)
 }
 
 test test_foot_entries_match_ncurses_tic [fs, process, env, error] { |ctx|
   let out = fp"{test.temp_dir(ctx, name: "tic-foot")?}/terminfo"
   let status = compile(out, ["foot", "foot-direct"], p"tests/pm/fixtures/tic/foot.info")?
   assert status.ok
-  assert_same_tree(p"tests/pm/fixtures/tic/expected-foot", out)?
+  assert_same_tree(p"tests/pm/fixtures/tic/expected-foot", out)
 }
 
 # tic would look an unknown use= target up in whatever database the host has;
@@ -99,7 +99,7 @@ test test_foot_entries_match_ncurses_tic [fs, process, env, error] { |ctx|
 test test_unresolved_use_fails [fs, process, env, error] { |ctx|
   let dir = test.temp_dir(ctx, name: "tic-unresolved")?
   let source = fp"{dir}/missing.src"
-  source.write("needs-base|entry with a missing use target,\n\tam, use=no-such-entry,\n")?
+  source.write("needs-base|entry with a missing use target,\n\tam, use=no-such-entry,\n")
   let status = compile(fp"{dir}/terminfo", ["needs-base"], source)?
   assert ! status.ok
   assert ! fp"{dir}/terminfo/n/needs-base".exists()?

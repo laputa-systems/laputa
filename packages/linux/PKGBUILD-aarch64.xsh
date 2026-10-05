@@ -74,23 +74,23 @@ pure native_kbuild_includes() -> List[Str] {
 
 proc write_native_asm_offsets(cc: Path) [fs, process, env, error] {
   let asm_out = p".xsh-kbuild/generated/asm-offsets.s"
-  fs.mkdir(asm_out.parent)?
+  fs.mkdir(asm_out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv += ["-S", "-o", asm_out.display(), "arch/arm64/kernel/asm-offsets.c"]
-  PKGBUILD_shared.run_native_command(argv)?
-  kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")?
+  PKGBUILD_shared.run_native_command(argv)
+  kbuild.generate_offsets_header(asm_out, p"include/generated/asm-offsets.h", "__ASM_OFFSETS_H__")
 }
 
 proc write_native_hyp_constants(cc: Path) [fs, process, env, error] {
   let asm_out = p".xsh-kbuild/generated/hyp-constants.s"
-  fs.mkdir(asm_out.parent)?
+  fs.mkdir(asm_out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_kbuild_cflags(), @native_kbuild_includes()]
   argv += ["-I./arch/arm64/kvm/hyp/include"]
   argv += ["-S", "-o", asm_out.display(), "arch/arm64/kvm/hyp/hyp-constants.c"]
-  PKGBUILD_shared.run_native_command(argv)?
-  kbuild.generate_offsets_header(asm_out, p"arch/arm64/kvm/hyp_constants.h", "__HYP_CONSTANTS_H__")?
+  PKGBUILD_shared.run_native_command(argv)
+  kbuild.generate_offsets_header(asm_out, p"arch/arm64/kvm/hyp_constants.h", "__HYP_CONSTANTS_H__")
 }
 
 pure native_vdso_cflags() -> List[Str] {
@@ -123,7 +123,7 @@ proc write_native_vdso_offsets(nm: Path) [fs, process, env, error] {
     }
   }
 
-  kbuild.write_text_if_changed(p"include/generated/vdso-offsets.h", out)?
+  kbuild.write_text_if_changed(p"include/generated/vdso-offsets.h", out)
 }
 
 proc build_native_vdso(cc: Path) [fs, process, env, error] {
@@ -142,7 +142,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
         "arch/arm64/kernel/vdso/vdso.lds",
       ],
     ),
-  )?
+  )
 
   for asm in [
     {
@@ -162,7 +162,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
       base.extend(
         ["-D__ASSEMBLY__", "-c", f"arch/arm64/kernel/vdso/{asm.source}", "-o", f"arch/arm64/kernel/vdso/{asm.object}"],
       ),
-    )?
+    )
   }
 
   let c_base = base.extend(["-O2", "-mcmodel=tiny", "-fasynchronous-unwind-tables"])
@@ -178,7 +178,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
         "arch/arm64/kernel/vdso/vgettimeofday.o",
       ],
     ),
-  )?
+  )
 
   PKGBUILD_shared.run_native_command(
     c_base.extend(
@@ -191,7 +191,7 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
         "arch/arm64/kernel/vdso/vgetrandom.o",
       ],
     ),
-  )?
+  )
 
   let ld = PKGBUILD_shared.native_tool("ld.lld")?
 
@@ -213,15 +213,15 @@ proc build_native_vdso(cc: Path) [fs, process, env, error] {
       "-o",
       "arch/arm64/kernel/vdso/vdso.so.dbg",
     ],
-  )?
+  )
 
   let objcopy = PKGBUILD_shared.native_tool("llvm-objcopy")?
 
   PKGBUILD_shared.run_native_command(
     [objcopy.display(), "-S", "arch/arm64/kernel/vdso/vdso.so.dbg", "arch/arm64/kernel/vdso/vdso.so"],
-  )?
+  )
 
-  write_native_vdso_offsets(PKGBUILD_shared.native_tool("llvm-nm")?)?
+  write_native_vdso_offsets(PKGBUILD_shared.native_tool("llvm-nm")?)
 }
 
 pure native_nvhe_cflags() -> List[Str] {
@@ -397,17 +397,17 @@ pure display_paths(paths: List[Path]) -> List[Str] {
 
 proc build_native_nvhe_helper(cc: Path) [fs, process, env, error] -> Result[Path] {
   let out = p".xsh-kbuild/host/arch/arm64/kvm/hyp/nvhe/gen-hyprel"
-  fs.mkdir(out.parent)?
+  fs.mkdir(out.parent)
 
   PKGBUILD_shared.run_native_command(
     [cc.display(), "-O2", "-I./include", "-o", out.display(), "arch/arm64/kvm/hyp/nvhe/gen-hyprel.c"],
-  )?
+  )
 
   out
 }
 
 proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env, error] {
-  fs.mkdir(out.parent)?
+  fs.mkdir(out.parent)
   var argv = [cc.display(), "-target", "aarch64-linux-gnu", "-Wno-unused-command-line-argument"]
   argv = [@argv, @native_nvhe_cflags(), @native_nvhe_includes()]
 
@@ -423,12 +423,12 @@ proc preprocess_native_nvhe_linker_script(cc: Path, out: Path) [fs, process, env
       out.display(),
     ]
 
-  PKGBUILD_shared.run_native_command(argv)?
+  PKGBUILD_shared.run_native_command(argv)
 }
 
 proc write_native_nvhe_hyprel(gen: Path, input: Path, out: Path) [fs, process, error] {
   let reloc = run.text $gen $input ?
-  kbuild.write_text_if_changed(out, reloc)?
+  kbuild.write_text_if_changed(out, reloc)
 }
 
 proc nvhe_ld_task(
@@ -488,7 +488,7 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   let gen = build_native_nvhe_helper(cc)?
   let nvhe_dir = p".xsh-kbuild/obj/arch/arm64/kvm/hyp/nvhe"
   let linker_script = fp"{nvhe_dir}/hyp.lds"
-  preprocess_native_nvhe_linker_script(cc, linker_script)?
+  preprocess_native_nvhe_linker_script(cc, linker_script)
   let ld = PKGBUILD_shared.native_tool("ld.lld")?
   let objcopy = PKGBUILD_shared.native_tool("llvm-objcopy")?
   var object_tasks: List[make.MakeTask] = []
@@ -514,8 +514,8 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   let rel = fp"{nvhe_dir}/kvm_nvhe.rel.o"
   let out = fp"{nvhe_dir}/kvm_nvhe.o"
   object_tasks += [nvhe_ld_task(ld, tmp, object_outputs, display_paths(object_outputs), linker_script)]
-  make.run_tasks(object_tasks, jobs_count)?
-  write_native_nvhe_hyprel(gen, tmp, reloc_asm)?
+  make.run_tasks(object_tasks, jobs_count)
+  write_native_nvhe_hyprel(gen, tmp, reloc_asm)
   var final_tasks: List[make.MakeTask] = []
 
   final_tasks += [kbuild.compile_kbuild_task(
@@ -530,7 +530,7 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
 
   final_tasks += [nvhe_ld_task(ld, rel, [tmp, reloc_o], [reloc_o.display()])]
   final_tasks += [nvhe_objcopy_task(objcopy, rel, out, [rel.display()])]
-  make.run_tasks(final_tasks, jobs_count)?
+  make.run_tasks(final_tasks, jobs_count)
 }
 
 ## Exported declaration `build_scratch`.
@@ -558,7 +558,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     )?
     PKGBUILD_shared.timing_done("archive-plan", archive_plan_start)
     PKGBUILD_shared.timing_done("plan", plan_start)
-    PKGBUILD_shared.stop_after("plan")?
+    PKGBUILD_shared.stop_after("plan")
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-kbuild-archive-only",
@@ -568,34 +568,34 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   }
 
   let prepare_start = PKGBUILD_shared.timing_start("prepare")
-  kbuild.write_config_headers(p".config", p".", ver, srcarch)?
-  kbuild.write_build_headers(p".", ver)?
-  kbuild.copy_text_if_changed(p"timeconst.h", p"include/generated/timeconst.h")?
-  kbuild.copy_text_if_changed(p"bounds.h", p"include/generated/bounds.h")?
-  kbuild.write_asm_generic_wrappers(p".", srcarch)?
-  kbuild.generate_arm64_cpucap_defs(p".")?
-  kbuild.generate_arm64_kernel_hwcaps(p".")?
-  kbuild.copy_text_if_changed(p"sysreg-defs.h", p"arch/arm64/include/generated/asm/sysreg-defs.h")?
-  kbuild.generate_arm64_syscall_tables(p".")?
-  write_native_asm_offsets(cc)?
-  kbuild.copy_text_if_changed(p"rq-offsets.h", p"include/generated/rq-offsets.h")?
-  write_native_hyp_constants(cc)?
-  kbuild.copy_text_if_changed(p"sha256-core.S", p"lib/crypto/arm64/sha256-core.S")?
-  kbuild.copy_text_if_changed(p"sha512-core.S", p"lib/crypto/arm64/sha512-core.S")?
-  kbuild.generate_empty_root_dtb_asm(p".")?
-  kbuild.generate_crc32table_header(p".", cc)?
-  PKGBUILD_shared.write_default_builtin_initramfs(cc)?
-  build_native_vdso(cc)?
+  kbuild.write_config_headers(p".config", p".", ver, srcarch)
+  kbuild.write_build_headers(p".", ver)
+  kbuild.copy_text_if_changed(p"timeconst.h", p"include/generated/timeconst.h")
+  kbuild.copy_text_if_changed(p"bounds.h", p"include/generated/bounds.h")
+  kbuild.write_asm_generic_wrappers(p".", srcarch)
+  kbuild.generate_arm64_cpucap_defs(p".")
+  kbuild.generate_arm64_kernel_hwcaps(p".")
+  kbuild.copy_text_if_changed(p"sysreg-defs.h", p"arch/arm64/include/generated/asm/sysreg-defs.h")
+  kbuild.generate_arm64_syscall_tables(p".")
+  write_native_asm_offsets(cc)
+  kbuild.copy_text_if_changed(p"rq-offsets.h", p"include/generated/rq-offsets.h")
+  write_native_hyp_constants(cc)
+  kbuild.copy_text_if_changed(p"sha256-core.S", p"lib/crypto/arm64/sha256-core.S")
+  kbuild.copy_text_if_changed(p"sha512-core.S", p"lib/crypto/arm64/sha512-core.S")
+  kbuild.generate_empty_root_dtb_asm(p".")
+  kbuild.generate_crc32table_header(p".", cc)
+  PKGBUILD_shared.write_default_builtin_initramfs(cc)
+  build_native_vdso(cc)
   PKGBUILD_shared.timing_done("prepare", prepare_start)
-  PKGBUILD_shared.stop_after("prepare")?
+  PKGBUILD_shared.stop_after("prepare")
   let discover_start = PKGBUILD_shared.timing_start("discover")
   let plan = PKGBUILD_shared.cached_package_plan(srcarch)?
   PKGBUILD_shared.timing_done("discover", discover_start)
-  PKGBUILD_shared.stop_after("discover")?
+  PKGBUILD_shared.stop_after("discover")
   let plan_start = PKGBUILD_shared.timing_start("plan")
   let nvhe_jobs_count = PKGBUILD_shared.build_jobs()?
   let nvhe_start = PKGBUILD_shared.timing_start("nvhe")
-  build_native_nvhe(cc, nvhe_jobs_count)?
+  build_native_nvhe(cc, nvhe_jobs_count)
   var materialized_outputs = [
     p"arch/arm64/kernel/vdso/note.o",
     p"arch/arm64/kernel/vdso/sigreturn.o",
@@ -609,7 +609,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     materialized_outputs += [fp"{item.out.display().replace(".xsh-kbuild/obj/", "")}"]
   }
 
-  PKGBUILD_shared.write_materialized_outputs(materialized_outputs)?
+  PKGBUILD_shared.write_materialized_outputs(materialized_outputs)
   PKGBUILD_shared.timing_done("nvhe", nvhe_start)
 
   let archive_plan_start = PKGBUILD_shared.timing_start("archive-plan")
@@ -626,11 +626,11 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   let only = e"XSH_LINUX_KBUILD_ONLY" ?? ""
 
   if only != "" {
-    PKGBUILD_shared.run_targeted_kbuild_outputs(archive_plan, only)?
+    PKGBUILD_shared.run_targeted_kbuild_outputs(archive_plan, only)
   }
 
   PKGBUILD_shared.timing_done("plan", plan_start)
-  PKGBUILD_shared.stop_after("plan")?
+  PKGBUILD_shared.stop_after("plan")
 
   if archive_plan.generated_objects.len() == 0 and archive_plan.missing_sources.len() == 0 {
     let jobs_count = PKGBUILD_shared.build_jobs()?
@@ -648,11 +648,11 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
     }
 
     PKGBUILD_shared.timing_done("compile", compile_start)
-    PKGBUILD_shared.stop_after("compile")?
+    PKGBUILD_shared.stop_after("compile")
     let link_start = PKGBUILD_shared.timing_start("link")
-    kbuild.build_scratch_arm64_final(cc, native_kbuild_cflags(), [], native_kbuild_includes(), jobs_count)?
+    kbuild.build_scratch_arm64_final(cc, native_kbuild_cflags(), [], native_kbuild_includes(), jobs_count)
     PKGBUILD_shared.timing_done("link", link_start)
-    PKGBUILD_shared.stop_after("link")?
+    PKGBUILD_shared.stop_after("link")
     print "linux-native-kbuild-complete" archives.len() "archives" "linked" "arch/arm64/boot/Image"
     return
   }

@@ -199,7 +199,7 @@ pure c_sources(stems: Str) -> List[Path] {
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  fs.write(p"config.h", config_h)?
+  fs.write(p"config.h", config_h)
   let cflags = ["-O2", "-Wno-unused-parameter"]
 
   let libmandoc = make.c_static_library({
@@ -262,22 +262,22 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks([@libmandoc.tasks, @mandoc.tasks, @demandoc.tasks, @soelim.tasks], make.jobs()?)?
+  make.run_tasks([@libmandoc.tasks, @mandoc.tasks, @demandoc.tasks, @soelim.tasks], make.jobs()?)
 
   let bindir = fp"{dest}/usr/bin"
-  fs.install(mandoc.output, fp"{bindir}/mandoc", 0o755, parents: true, overwrite: true)?
-  fs.install(demandoc.output, fp"{bindir}/demandoc", 0o755, overwrite: true)?
-  fs.install(soelim.output, fp"{bindir}/soelim", 0o755, overwrite: true)?
+  fs.install(mandoc.output, fp"{bindir}/mandoc", 0o755, parents: true, overwrite: true)
+  fs.install(demandoc.output, fp"{bindir}/demandoc", 0o755, overwrite: true)
+  fs.install(soelim.output, fp"{bindir}/soelim", 0o755, overwrite: true)
 
   for link in mandoc_links {
-    fs.symlink(p"mandoc", fp"{bindir}/{link}")?
+    fs.symlink(p"mandoc", fp"{bindir}/{link}")
   }
 
   let mandir = fp"{dest}/usr/share/man"
 
   for manual in manuals {
-    fs.install(fp"{manual[0]}", fp"{mandir}/{manual[1]}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"{manual[0]}", fp"{mandir}/{manual[1]}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"apropos.1", fp"{mandir}/man1/whatis.1")?
+  fs.symlink(p"apropos.1", fp"{mandir}/man1/whatis.1")
 }

@@ -22,11 +22,11 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
   let block_target = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   assert fast_target.byte_len() == 59
   assert block_target.byte_len() == 60
-  fs.mkdir(source)?
-  fs.symlink(fp"{fast_target}", fp"{source}/fast")?
-  fs.symlink(fp"{block_target}", fp"{source}/block")?
-  fs.write(image, b"")?
-  image.truncate(8 * 1024 * 1024)?
+  fs.mkdir(source)
+  fs.symlink(fp"{fast_target}", fp"{source}/fast")
+  fs.symlink(fp"{block_target}", fp"{source}/block")
+  fs.write(image, b"")
+  image.truncate(8 * 1024 * 1024)
 
   let xsh = runner()?
   let status = process.run(
@@ -61,9 +61,9 @@ test test_ext4_rejects_a_final_group_too_small_for_metadata [fs, process, env, e
   let source = fp"{root}/source"
   let image = fp"{root}/rootfs.ext4"
   let stderr = fp"{root}/mkfs.stderr"
-  fs.mkdir(source)?
-  fs.write(image, b"")?
-  image.truncate(129 * 1024 * 1024)?
+  fs.mkdir(source)
+  fs.write(image, b"")
+  image.truncate(129 * 1024 * 1024)
 
   let xsh = runner()?
   let status = process.run(

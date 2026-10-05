@@ -141,7 +141,7 @@ proc write_aconfig_h() [fs, error] {
 
 #endif
 """,
-  )?
+  )
 }
 
 # The minimal set is playback and capture (aplay, with arecord as its other
@@ -182,7 +182,7 @@ boot_params.c daemon.c monitor.c clean.c info.c export.c
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  write_aconfig_h()?
+  write_aconfig_h()
 
   # Upstream links -lasound -lrt -lm -lpthread; musl's libc holds the last
   # three.
@@ -209,25 +209,25 @@ export proc build(dest: Path) [fs, process, env, error] {
     outputs[tool.name] = target.output
   }
 
-  make.run_tasks(tasks, make.jobs()?)?
+  make.run_tasks(tasks, make.jobs()?)
 
   for tool in alsa_tools() {
-    fs.install(outputs[tool.name], fp"{dest}/usr/bin/{tool.name}", 0o755, parents: true, overwrite: true)?
+    fs.install(outputs[tool.name], fp"{dest}/usr/bin/{tool.name}", 0o755, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"aplay", fp"{dest}/usr/bin/arecord")?
+  fs.symlink(p"aplay", fp"{dest}/usr/bin/arecord")
 
   # alsactl init reads its card database from DATADIR/init; `alsactl store`
   # writes SYS_ASOUNDRC, whose directory it does not create.
   for init in "00main ca0106 default hda help info test".words() {
-    fs.install(fp"alsactl/init/{init}", fp"{dest}/usr/share/alsa/init/{init}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"alsactl/init/{init}", fp"{dest}/usr/share/alsa/init/{init}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.mkdir(fp"{dest}/var/lib/alsa")?
+  fs.mkdir(fp"{dest}/var/lib/alsa")
 
   for page in [p"aplay/aplay.1", p"amixer/amixer.1", p"alsactl/alsactl.1", p"speaker-test/speaker-test.1"] {
-    fs.install(page, fp"{dest}/usr/share/man/man1/{page.name}", 0o644, parents: true, overwrite: true)?
+    fs.install(page, fp"{dest}/usr/share/man/man1/{page.name}", 0o644, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"aplay.1", fp"{dest}/usr/share/man/man1/arecord.1")?
+  fs.symlink(p"aplay.1", fp"{dest}/usr/share/man/man1/arecord.1")
 }

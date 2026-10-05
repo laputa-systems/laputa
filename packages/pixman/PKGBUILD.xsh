@@ -61,14 +61,14 @@ proc patch_musl_math() [fs, error] {
       "dep_m = cc.find_library('m', required : false)",
       "dep_m = declare_dependency(link_args : ['-lm'])",
     ),
-  )?
+  )
 }
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let jobs_flag = f"-j{cpu.count()}"
   let arch = pm_util.target_arch()?
-  patch_musl_math()?
+  patch_musl_math()
 
   if arch == "x86_64" {
     run "muon" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dlibpng=disabled" "-Dgtk=disabled" "-Dtests=disabled" "-Ddemos=disabled" "build" ?
@@ -84,7 +84,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     run "muon" "-C" "build" install ?
   }?
 
-  fs.remove(fp"{dest}/usr/include", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)?
-  fs.remove(fp"{dest}/usr/lib/libpixman-1.so", missing_ok: true)?
+  fs.remove(fp"{dest}/usr/include", missing_ok: true)
+  fs.remove(fp"{dest}/usr/lib/pkgconfig", missing_ok: true)
+  fs.remove(fp"{dest}/usr/lib/libpixman-1.so", missing_ok: true)
 }

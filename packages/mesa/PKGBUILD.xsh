@@ -261,7 +261,7 @@ proc patch_file(file: Path, replacements: List[TextReplacement]) [fs, error] {
     text = replace_once(text, file.display(), replacement.old, replacement.new)?
   }
 
-  fs.write(file, text)?
+  fs.write(file, text)
 }
 
 proc write_vendored_generator() [fs, error] {
@@ -278,13 +278,13 @@ proc main(...argv: List[Str]) [error] {
 
 main(@args)?
 """,
-  )?
+  )
 
-  fs.chmod(script, 0o755)?
+  fs.chmod(script, 0o755)
 }
 
 proc patch_build() [fs, error] {
-  write_vendored_generator()?
+  write_vendored_generator()
 
   patch_file(
     p"meson.build",
@@ -401,7 +401,7 @@ prog_python = prog_vendored
         new: "",
       },
     ],
-  )?
+  )
 
   patch_file(
     p"src/loader/meson.build",
@@ -452,7 +452,7 @@ prog_python = prog_vendored
 """,
       },
     ],
-  )?
+  )
 }
 
 type NinjaSplit = {kept: List[Str], vendored: List[Str]}
@@ -508,14 +508,14 @@ proc stage_vendored_outputs() [fs, error] {
 
   split = split_edge(split, block)?
   let kept = [line for line in split.kept if ! (line.starts_with("default ") and line.byte_slice(8) in split.vendored)]
-  fs.write(ninja, kept.join("\n"))?
+  fs.write(ninja, kept.join("\n"))
   var unvendored: List[Str] = []
 
   for output in split.vendored {
     let vendored = fp"generated/{output}"
 
     if fs.exists(vendored)? {
-      fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)?
+      fs.install(vendored, fp"build/{output}", 0o644, parents: true, overwrite: true)
     } else {
       unvendored += [output]
     }
@@ -556,7 +556,7 @@ Libs: -L\${{libdir}} -lEGL
 Libs.private: -lpthread -pthread -lm
 Cflags: -I\${{includedir}}
 """,
-  )?
+  )
 
   fs.write(
     fp"{dir}/gbm.pc",
@@ -569,7 +569,7 @@ Version: {ver}
 Libs: -L\${{libdir}} -lgbm
 Cflags: -I\${{includedir}}
 """,
-  )?
+  )
 
   fs.write(
     fp"{dir}/glesv2.pc",
@@ -581,7 +581,7 @@ Libs: -L\${{libdir}} -lGLESv2
 Libs.private: -lpthread -pthread -lm
 Cflags: -I\${{includedir}}
 """,
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -590,7 +590,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let setup_args = pm_meson.setup_args(mesa_options)
-  patch_build()?
+  patch_build()
 
   env ({
     LD_LIBRARY_PATH: pc.ld_library_path,
@@ -600,7 +600,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
     run $muon @setup_args ?
-    stage_vendored_outputs()?
+    stage_vendored_outputs()
     run $muon "-C" "build" samu $jobs_flag ?
 
     env ({
@@ -610,5 +610,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }?
   }?
 
-  write_pkg_config(dest)?
+  write_pkg_config(dest)
 }

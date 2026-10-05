@@ -99,7 +99,7 @@ proc write_config_h() [fs, error] {
 #define HAVE_VISIBILITY_HIDDEN 1
 #endif
 """,
-  )?
+  )
 }
 
 ## Package recipe export.
@@ -107,7 +107,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
   let mnl = make.pkg_config_flags(["libmnl"])?
-  write_config_h()?
+  write_config_h()
 
   # Flags from configure.ac (regular_CPPFLAGS, regular_CFLAGS, and the
   # -fvisibility=hidden that CHECK_GCC_FVISIBILITY adds) and Make_global.am.
@@ -138,10 +138,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(libnftnl.tasks, make.jobs()?)?
-  fs.install(libnftnl.output, fp"{dest}/usr/lib/libnftnl.so.11.8.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so.11")?
-  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so")?
+  make.run_tasks(libnftnl.tasks, make.jobs()?)
+  fs.install(libnftnl.output, fp"{dest}/usr/lib/libnftnl.so.11.8.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so.11")
+  fs.symlink(p"libnftnl.so.11.8.0", fp"{dest}/usr/lib/libnftnl.so")
 
   for header in public_headers() {
     fs.install(
@@ -150,10 +150,10 @@ export proc build(dest: Path) [fs, process, env, error] {
       0o644,
       parents: true,
       overwrite: true,
-    )?
+    )
   }
 
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   # libnftnl.pc.in with configure's /usr prefix substituted.
   fs.write(
@@ -173,5 +173,5 @@ Conflicts:
 Libs: -L${{libdir}} -lnftnl
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

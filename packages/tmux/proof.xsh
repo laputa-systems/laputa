@@ -13,7 +13,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   let os = system.uname()?
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let tmux = fp"{rootfs}/usr/bin/tmux"
-  proof.target_elf(rootfs, p"usr/bin/tmux", "tmux")?
+  proof.target_elf(rootfs, p"usr/bin/tmux", "tmux")
   let build_arch = pm_util.build_arch()?
   let target_arch = pm_util.target_arch()?
 
@@ -35,12 +35,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
   # of proof roots), and the proof is about tmux, not the shell it hosts.
   let shell = process.which("xshi")?
   let tmp = /tmp/tmux-proof
-  fs.mkdir(tmp)?
+  fs.mkdir(tmp)
   let label = "laputa-proof"
   let config = fp"{tmp}/tmux.conf"
-  fs.mkdir(fp"{tmp}/home")?
-  check(fs.exists(dynlinker)?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")?
-  check(fs.exists(tmux)?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")?
+  fs.mkdir(fp"{tmp}/home")
+  check(fs.exists(dynlinker)?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")
+  check(fs.exists(tmux)?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")
 
   fs.write(
     config,
@@ -51,7 +51,7 @@ set -g set-clipboard external
 set -sg escape-time 0
 set -g focus-events on
 """,
-  )?
+  )
 
   env ({
     HOME: fp"{tmp}/home",
@@ -62,46 +62,46 @@ set -g focus-events on
     TMUX_TMPDIR: tmp,
   }) {
     run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell "--no-config" ?
-    time.sleep(500ms)?
+    time.sleep(500ms)
     let sessions = run.text $dynlinker $tmux "-L" $label "list-sessions" ?
-    check("proof:" in sessions, "tmux-session", f"tmux did not report proof session: {sessions.trim()}")?
+    check("proof:" in sessions, "tmux-session", f"tmux did not report proof session: {sessions.trim()}")
     let default_terminal = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "default-terminal" ?
-    check(default_terminal.trim() == "tmux-256color", "tmux-config", f"default-terminal was {default_terminal.trim()}")?
+    check(default_terminal.trim() == "tmux-256color", "tmux-config", f"default-terminal was {default_terminal.trim()}")
     let terminal_features = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "terminal-features" ?
 
     check(
       "tmux-256color:Sync" in terminal_features,
       "tmux-config",
       f"missing Sync terminal feature: {terminal_features.trim()}",
-    )?
+    )
 
     check(
       "screen*:256:clipboard:ccolour:cstyle:focus:title" in terminal_features,
       "tmux-config",
       f"missing screen terminal features: {terminal_features.trim()}",
-    )?
+    )
 
     let set_clipboard = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "set-clipboard" ?
-    check(set_clipboard.trim() == "external", "tmux-config", f"set-clipboard was {set_clipboard.trim()}")?
+    check(set_clipboard.trim() == "external", "tmux-config", f"set-clipboard was {set_clipboard.trim()}")
     let escape_time = run.text $dynlinker $tmux "-L" $label "show-options" "-sgqv" "escape-time" ?
-    check(escape_time.trim() == "0", "tmux-config", f"escape-time was {escape_time.trim()}")?
+    check(escape_time.trim() == "0", "tmux-config", f"escape-time was {escape_time.trim()}")
     let focus_events = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "focus-events" ?
-    check(focus_events.trim() == "on", "tmux-config", f"focus-events was {focus_events.trim()}")?
+    check(focus_events.trim() == "on", "tmux-config", f"focus-events was {focus_events.trim()}")
     run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-alpha\"" "C-m" ?
     run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" "ok\"" "C-m" ?
-    time.sleep(1000ms)?
+    time.sleep(1000ms)
     let pane = run.text $dynlinker $tmux "-L" $label "capture-pane" "-pt" "proof:0.0" ?
-    check("tmux-proof-alpha" in pane, "tmux-pane", f"tmux pane did not capture alpha output: {pane.trim()}")?
-    check("tmux-proof-edit:ok" in pane, "tmux-pane", f"tmux pane did not capture edited command output: {pane.trim()}")?
+    check("tmux-proof-alpha" in pane, "tmux-pane", f"tmux pane did not capture alpha output: {pane.trim()}")
+    check("tmux-proof-edit:ok" in pane, "tmux-pane", f"tmux pane did not capture edited command output: {pane.trim()}")
     run $dynlinker $tmux "-L" $label "new-window" "-d" "-n" "check" $shell "--no-config" ?
     let windows = run.text $dynlinker $tmux "-L" $label "list-windows" ?
-    check("check" in windows, "tmux-window", f"tmux did not report created window: {windows.trim()}")?
+    check("check" in windows, "tmux-window", f"tmux did not report created window: {windows.trim()}")
     run $dynlinker $tmux "-L" $label "kill-server" ?
     let dead = run.status $dynlinker $tmux "-L" $label "has-session" "-t" "proof" 2> /dev/null
-    check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")?
+    check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")
   }?
 
-  outer_terminals(rootfs, dynlinker, tmux, shell, tmp, config)?
+  outer_terminals(rootfs, dynlinker, tmux, shell, tmp, config)
   print "tmux ok: config, pty capture, window creation, clean stop, attach under xterm-256color, foot, linux, tmux-256color"
 }
 
@@ -127,20 +127,20 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
       TMUX_TMPDIR: tmp,
     }) {
       let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
-      check(status.ok, "tmux-attach", f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}")?
+      check(status.ok, "tmux-attach", f"client under TERM={term} did not draw its pane and exit cleanly: {out.read_text()?}")
     }?
 
     let screen = out.read_text()?
 
-    check("[exited]" in screen, "tmux-attach", f"client under TERM={term} did not report its session exiting: {screen}")?
+    check("[exited]" in screen, "tmux-attach", f"client under TERM={term} did not report its session exiting: {screen}")
 
     # linux has no alternate screen and resets the cursor with its own
     # cnorm; the others switch to the alternate screen.
     if term == "linux" {
-      check("\x1b[?1049h" not in screen, "tmux-attach", "client used an alternate screen the linux console lacks")?
-      check("\x1b[?25h\x1b[?0c" in screen, "tmux-attach", "client did not use the linux console's cnorm")?
+      check("\x1b[?1049h" not in screen, "tmux-attach", "client used an alternate screen the linux console lacks")
+      check("\x1b[?25h\x1b[?0c" in screen, "tmux-attach", "client did not use the linux console's cnorm")
     } else {
-      check("\x1b[?1049h" in screen, "tmux-attach", f"client under TERM={term} did not enter the alternate screen")?
+      check("\x1b[?1049h" in screen, "tmux-attach", f"client under TERM={term} did not enter the alternate screen")
     }
   }
 
@@ -152,11 +152,11 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
     TMUX_TMPDIR: tmp,
   }) {
     let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
-    check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")?
+    check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")
   }?
 
   let refused = fp"{tmp}/unknown.out".read_text()?
-  check("missing or unsuitable terminal: laputa-unknown-terminal" in refused, "tmux-attach", f"unknown terminal not reported: {refused}")?
+  check("missing or unsuitable terminal: laputa-unknown-terminal" in refused, "tmux-attach", f"unknown terminal not reported: {refused}")
 }
 
-main(@args)?
+main(@args)

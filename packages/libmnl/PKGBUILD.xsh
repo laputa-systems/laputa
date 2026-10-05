@@ -73,14 +73,14 @@ proc write_config_h() [fs, error] {
 #define HAVE_VISIBILITY_HIDDEN 1
 #endif
 """,
-  )?
+  )
 }
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
-  write_config_h()?
+  write_config_h()
 
   # Flags from configure.ac (regular_CPPFLAGS, regular_CFLAGS, and the
   # -fvisibility=hidden that CHECK_GCC_FVISIBILITY adds) and Make_global.am.
@@ -111,13 +111,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(libmnl.tasks, make.jobs()?)?
-  fs.install(libmnl.output, fp"{dest}/usr/lib/libmnl.so.0.2.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so.0")?
-  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so")?
+  make.run_tasks(libmnl.tasks, make.jobs()?)
+  fs.install(libmnl.output, fp"{dest}/usr/lib/libmnl.so.0.2.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so.0")
+  fs.symlink(p"libmnl.so.0.2.0", fp"{dest}/usr/lib/libmnl.so")
   # include/libmnl/Makefile.am pkginclude_HEADERS; include/linux/ is noinst.
-  fs.install(p"include/libmnl/libmnl.h", fp"{dest}/usr/include/libmnl/libmnl.h", 0o644, parents: true, overwrite: true)?
-  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")?
+  fs.install(p"include/libmnl/libmnl.h", fp"{dest}/usr/include/libmnl/libmnl.h", 0o644, parents: true, overwrite: true)
+  fs.mkdir(fp"{dest}/usr/lib/pkgconfig")
 
   # libmnl.pc.in with configure's /usr prefix substituted.
   fs.write(
@@ -136,5 +136,5 @@ Conflicts:
 Libs: -L${{libdir}} -lmnl
 Cflags: -I${{includedir}}
 """,
-  )?
+  )
 }

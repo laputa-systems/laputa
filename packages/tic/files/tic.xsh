@@ -1175,7 +1175,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
       loop {
         c = chars.byte_at(i) ?? -1
         if c < 0 {
-          source_error(f"line {line}: premature end of file in names")?
+          source_error(f"line {line}: premature end of file in names")
         }
 
         col = (cols.byte_at(i) ?? 49) - 48
@@ -1256,7 +1256,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
       }
 
       if syntax != 1 {
-        source_error(f"line {line}: termcap-syntax entries are not supported")?
+        source_error(f"line {line}: termcap-syntax entries are not supported")
       }
 
       # Drop trailing blanks and commas.
@@ -1298,7 +1298,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
 
     if c == 44 or c == 58 {
       if c != separator {
-        source_error(f"line {line}: separator inconsistent with syntax")?
+        source_error(f"line {line}: separator inconsistent with syntax")
       }
 
       token = {...token, kind: BOOLEAN}
@@ -1361,14 +1361,14 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
         }
 
         if out.len() >= MAX_ENTRY_SIZE - 2 {
-          source_error(f"line {line}: string value of {name} is too long")?
+          source_error(f"line {line}: string value of {name} is too long")
         }
 
         var ignored = false
         if c == 94 and last_ch != 37 {
           c = chars.byte_at(i) ?? -1
           if c < 0 {
-            source_error(f"line {line}: premature end of file in {name}")?
+            source_error(f"line {line}: premature end of file in {name}")
           }
 
           col = (cols.byte_at(i) ?? 49) - 48
@@ -1390,7 +1390,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
         } else if c == 92 {
           c = chars.byte_at(i) ?? -1
           if c < 0 {
-            source_error(f"line {line}: premature end of file in {name}")?
+            source_error(f"line {line}: premature end of file in {name}")
           }
 
           col = (cols.byte_at(i) ?? 49) - 48
@@ -1405,7 +1405,7 @@ stream scan(source: Str, table: CapTable) [error] -> Stream[Token] {
             while k < 2 {
               c = chars.byte_at(i) ?? -1
               if c < 0 {
-                source_error(f"line {line}: premature end of file in {name}")?
+                source_error(f"line {line}: premature end of file in {name}")
               }
 
               col = (cols.byte_at(i) ?? 49) - 48
@@ -2528,10 +2528,10 @@ proc write_entry(term: Term, outdir: Path) [fs, error] {
   }
 
   let leaf = fp"{outdir}/{primary.byte_slice(0, 1)}"
-  fs.mkdir(leaf)?
+  fs.mkdir(leaf)
   let file = fp"{leaf}/{primary}"
-  fs.remove(file, missing_ok: true)?
-  fs.write(file, object)?
+  fs.remove(file, missing_ok: true)
+  fs.write(file, object)
 
   if names.len() < 3 {
     return
@@ -2553,10 +2553,10 @@ proc write_entry(term: Term, outdir: Path) [fs, error] {
     }
 
     let alias_leaf = fp"{outdir}/{alias.byte_slice(0, 1)}"
-    fs.mkdir(alias_leaf)?
+    fs.mkdir(alias_leaf)
     let link = fp"{alias_leaf}/{alias}"
-    fs.remove(link, missing_ok: true)?
-    file.hardlink(link)?
+    fs.remove(link, missing_ok: true)
+    file.hardlink(link)
   }
 }
 
@@ -2581,10 +2581,10 @@ proc compile(source: Path, outdir: Path, wanted: List[Str]) [fs, error] {
   let tokens = scan(text, table)
   let entries = parse_entries(tokens, table)?
   let terms = resolve(entries, table)?
-  fs.mkdir(outdir)?
+  fs.mkdir(outdir)
   for term in terms {
     if selected(term.names, wanted) {
-      write_entry(term, outdir)?
+      write_entry(term, outdir)
     }
   }
 }
@@ -2635,5 +2635,5 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit] {
     return Err(TicError.Usage(f"an output directory (-o) is required; {usage()}"))
   }
 
-  compile(Path(files[0]), outdir, wanted)?
+  compile(Path(files[0]), outdir, wanted)
 }

@@ -111,8 +111,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   let src = fs.cwd()?
   let objs = fp"{dest}/../objs"
 
-  fs.mkdir(objs)?
-  fs.install(p"config", fp"{src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)?
+  fs.mkdir(objs)
+  fs.install(p"config", fp"{src}/wpa_supplicant/.config", 0o644, parents: true, overwrite: true)
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
 
@@ -286,16 +286,16 @@ export proc build(dest: Path) [fs, process, env, error] {
   }],
   })?
 
-  make.run_tasks(shared.tasks.extend(multi.tasks), make.jobs()?)?
+  make.run_tasks(shared.tasks.extend(multi.tasks), make.jobs()?)
   let wpa_supplicant_out = multi.outputs.get("wpa_supplicant")?
   let wpa_cli_out = multi.outputs.get("wpa_cli")?
   let passphrase_out = multi.outputs.get("wpa_passphrase")?
 
   # Install under /usr/bin: baselayout symlinks /usr/sbin -> bin so
   # installing to /usr/sbin would fail proof extraction with "symlink escape".
-  fs.install(wpa_supplicant_out, fp"{dest}/usr/bin/wpa_supplicant", 0o755, parents: true, overwrite: true)?
-  fs.install(wpa_cli_out, fp"{dest}/usr/bin/wpa_cli", 0o755, parents: true, overwrite: true)?
-  fs.install(passphrase_out, fp"{dest}/usr/bin/wpa_passphrase", 0o755, parents: true, overwrite: true)?
+  fs.install(wpa_supplicant_out, fp"{dest}/usr/bin/wpa_supplicant", 0o755, parents: true, overwrite: true)
+  fs.install(wpa_cli_out, fp"{dest}/usr/bin/wpa_cli", 0o755, parents: true, overwrite: true)
+  fs.install(passphrase_out, fp"{dest}/usr/bin/wpa_passphrase", 0o755, parents: true, overwrite: true)
 
   fs.install(
     p"service.xsh",
@@ -303,9 +303,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     0o644,
     parents: true,
     overwrite: true,
-  )?
+  )
 
-  fs.mkdir(fp"{dest}/etc/wpa_supplicant")?
+  fs.mkdir(fp"{dest}/etc/wpa_supplicant")
 
   fs.install(
     p"wpa_supplicant.conf",
@@ -313,5 +313,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     0o600,
     parents: true,
     overwrite: true,
-  )?
+  )
 }

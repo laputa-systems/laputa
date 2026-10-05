@@ -134,13 +134,13 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   # YYTEXT_POINTER: flex generates char *yytext (not char yytext[]).
   defines["YYTEXT_POINTER"] = "1"
-  configure.config_h(p"src/config.h.in", p"src/config.h", defines)?
+  configure.config_h(p"src/config.h.in", p"src/config.h", defines)
   let cflags = ["-g", "-O2"]
   let defs = ["-DHAVE_CONFIG_H"]
 
   # -Isrc: finds both config.h (generated above) and flexdef.h.
   let includes = ["-Isrc"]
-  fs.mkdir(p"obj")?
+  fs.mkdir(p"obj")
 
   # Compile the flex binary sources from src/.
   # libmain.c and libyywrap.c are part of libfl (scanner support library),
@@ -165,10 +165,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  make.run_tasks(flex.tasks, make.jobs()?)?
-  fs.install(flex.output, fp"{dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)?
+  make.run_tasks(flex.tasks, make.jobs()?)
+  fs.install(flex.output, fp"{dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)
 
   # POSIX requires a 'lex' command; flex is the canonical implementation.
-  fs.symlink(p"flex", fp"{dest}/usr/bin/lex")?
-  fs.install(p"flex.xsh", fp"{dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)?
+  fs.symlink(p"flex", fp"{dest}/usr/bin/lex")
+  fs.install(p"flex.xsh", fp"{dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)
 }

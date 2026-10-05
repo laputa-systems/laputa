@@ -155,7 +155,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["PACKAGE_VERSION"] = f"\"{ver}\""
   defines["STDC_HEADERS"] = "1"
   defines["VERSION"] = f"\"{ver}\""
-  configure.config_h(p"libpkgconf/config.h.in", p"libpkgconf/config.h", defines)?
+  configure.config_h(p"libpkgconf/config.h.in", p"libpkgconf/config.h", defines)
 
   # configure's CFLAGS and CPPFLAGS.
   let cflags = ["-g", "-O2", "-Wall", "-Wextra", "-Wformat=2", "-std=c99"]
@@ -179,8 +179,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   # -I. finds <libpkgconf/config.h>; each program's CPPFLAGS add -Ilibpkgconf,
   # -Icli, and its own directory.
   let includes = ["-I.", "-Ilibpkgconf", "-Icli"]
-  fs.mkdir(p"obj")?
-  fs.write(p"obj/libpkgconf.map", libpkgconf_version_script)?
+  fs.mkdir(p"obj")
+  fs.write(p"obj/libpkgconf.map", libpkgconf_version_script)
 
   # Step 2: libpkgconf, shared and static. Sources from Makefile.am's
   # libpkgconf_la_SOURCES; -version-info 8:0:0 makes libpkgconf.so.8.0.0.
@@ -282,24 +282,24 @@ export proc build(dest: Path) [fs, process, env, error] {
     outputs += [target.output]
   }
 
-  make.run_tasks(tasks, make.jobs()?)?
+  make.run_tasks(tasks, make.jobs()?)
 
   # Step 4: install into dest.
-  fs.install(lib.output, fp"{dest}/usr/lib/libpkgconf.so.8.0.0", 0o755, parents: true, overwrite: true)?
-  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so.8")?
-  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so")?
-  fs.install(static_target.output, fp"{dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)?
+  fs.install(lib.output, fp"{dest}/usr/lib/libpkgconf.so.8.0.0", 0o755, parents: true, overwrite: true)
+  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so.8")
+  fs.symlink(p"libpkgconf.so.8.0.0", fp"{dest}/usr/lib/libpkgconf.so")
+  fs.install(static_target.output, fp"{dest}/usr/lib/libpkgconf.a", 0o644, parents: true, overwrite: true)
 
   for output in outputs {
-    fs.install(output, fp"{dest}/usr/bin/{output.name}", 0o755, parents: true, overwrite: true)?
+    fs.install(output, fp"{dest}/usr/bin/{output.name}", 0o755, parents: true, overwrite: true)
   }
 
-  fs.symlink(p"pkgconf", fp"{dest}/usr/bin/pkg-config")?
+  fs.symlink(p"pkgconf", fp"{dest}/usr/bin/pkg-config")
 
   # Makefile.am's nobase_pkginclude_HEADERS; config.h and the Windows
   # dirent shim stay private to the build.
   for hdr in ["bsdstubs.h", "iter.h", "libpkgconf.h", "stdinc.h", "libpkgconf-api.h"] {
-    fs.install(fp"libpkgconf/{hdr}", fp"{dest}/usr/include/pkgconf/libpkgconf/{hdr}", 0o644, parents: true, overwrite: true)?
+    fs.install(fp"libpkgconf/{hdr}", fp"{dest}/usr/include/pkgconf/libpkgconf/{hdr}", 0o644, parents: true, overwrite: true)
   }
 
   # libpkgconf.pc names its license file, which dist_doc_DATA installs.
@@ -314,7 +314,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ["datadir", "/usr/share"],
       ["PACKAGE_VERSION", ver],
     ],
-  )?
+  )
 
-  fs.install(p"COPYING", fp"{dest}/usr/share/doc/pkgconf/COPYING", 0o644, parents: true, overwrite: true)?
+  fs.install(p"COPYING", fp"{dest}/usr/share/doc/pkgconf/COPYING", 0o644, parents: true, overwrite: true)
 }

@@ -64,7 +64,7 @@ test test_qemu_command_on_macos_is_aarch64_under_hvf [error] {
     assert "virtio-blk-device,drive=root" in argv, "root device"
     assert argv |> any "console=ttyAMA0" in ., "pl011 console"
     assert ! (argv |> any "x86_64" in .), "no other architecture"
-    assert_profile_devices(argv)?
+    assert_profile_devices(argv)
   }
 
   assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test), "test proof flag"
@@ -85,7 +85,7 @@ test test_qemu_command_on_linux_x86_64_is_q35_under_kvm [error] {
     assert "virtio-blk-pci,drive=root" in argv, "root device"
     assert argv |> any "console=ttyS0" in ., "16550 console"
     assert ! (argv |> any "ttyAMA0" in .), "no PL011 console"
-    assert_profile_devices(argv)?
+    assert_profile_devices(argv)
   }
 
   assert "none" in pair[0], "headless test"
@@ -99,7 +99,7 @@ test test_qemu_target_runs_on_linux_aarch64_under_kvm_and_rejects_other_hosts [e
 
   for host in [["Darwin", "x86_64"], ["FreeBSD", "x86_64"]] {
     match qemu.qemu_target(host[0], host[1]) {
-      Ok(_) => test.fail(f"{host[0]} {host[1]} unexpectedly has a QEMU target")?
+      Ok(_) => test.fail(f"{host[0]} {host[1]} unexpectedly has a QEMU target")
       Err(_) => {}
     }
   }
@@ -128,8 +128,8 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
   let bundle = fp"{outputs.builds}/fixture"
-  fs.mkdir(bundle)?
-  fs.symlink(p"builds/fixture", outputs.current)?
+  fs.mkdir(bundle)
+  fs.symlink(p"builds/fixture", outputs.current)
   let fake_qemu = fp"{root}/fake-qemu.sh"
   let fake_qmp = fp"{root}/fake-qmp.sh"
   let attempt_one = fp"{root}/qmp-attempt-one"
@@ -138,8 +138,8 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
   let input_record = fp"{root}/input-record"
   let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '{outputs.qemu_log}'" } else { "" }
 
-  fs.write(outputs.kernel, "kernel")?
-  fs.write(outputs.disk, "disk")?
+  fs.write(outputs.kernel, "kernel")
+  fs.write(outputs.disk, "disk")
 
   # This fake QEMU ignores TERM, proving managed cancellation escalates to KILL.
   fs.write(
@@ -151,7 +151,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
       "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'",
       "while :; do sleep 1; done",
     ].join("\n") + "\n",
-  )?
+  )
 
   # The failed first call makes the side-effect-free QMP readiness check retry.
   # The third call is the one proof input; the fourth writes screenshot evidence.
@@ -166,9 +166,9 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
       final_log,
       "exit 0",
     ].join("\n") + "\n",
-  )?
-  fs.chmod(fake_qemu, 0o755)?
-  fs.chmod(fake_qmp, 0o755)?
+  )
+  fs.chmod(fake_qemu, 0o755)
+  fs.chmod(fake_qmp, 0o755)
   {
     config: {
       qemu: fake_qemu,
@@ -187,7 +187,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) [fs, error] -> Re
 test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-screenshot")?
   let screenshot = fp"{root}/screenshot.ppm"
-  fs.write(screenshot, "")?
+  fs.write(screenshot, "")
   assert ! qemu.screenshot_is_valid(screenshot)?
   fs.write(
     screenshot,
@@ -195,13 +195,13 @@ test test_screenshot_evidence_must_be_nonempty [fs, error] { |ctx|
 1 1
 255
 X""",
-  )?
+  )
   assert qemu.screenshot_is_valid(screenshot)?
 }
 
 test test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
-  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
+  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)
   assert fs.exists(fixture.qmp_attempt_one)?
   assert fs.exists(fixture.qmp_attempt_two)?
   assert fs.exists(fixture.qmp_attempt_three)?
@@ -213,7 +213,7 @@ test test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown [fs, p
 test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, true)?
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
-    Ok(_) => test.fail("supervisor accepted QEMU fatal marker written with screenshot")?
+    Ok(_) => test.fail("supervisor accepted QEMU fatal marker written with screenshot")
     Err(_) => {}
   }
 
@@ -254,10 +254,10 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
 # per-test limit.
 test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
-  fs.write(fixture.config.qemu, "#!/bin/sh\necho 'qemu: device model missing' >&2\nexit 1\n")?
+  fs.write(fixture.config.qemu, "#!/bin/sh\necho 'qemu: device model missing' >&2\nexit 1\n")
 
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
-    Ok(_) => test.fail("supervisor accepted a QEMU that exited at startup")?
+    Ok(_) => test.fail("supervisor accepted a QEMU that exited at startup")
     Err(problem) => assert "QEMU exited before qemu-dwl-foot proof" in problem.message, problem.message
   }
 }

@@ -96,12 +96,12 @@ export proc parser_generator(name: Str) [env, error] -> Result[ParserGen, Error]
 ## Exported declaration `remove_outputs`.
 export proc remove_outputs(spec: ParserGen) [fs, error] {
   for out in spec.outputs {
-    fs.remove(out, missing_ok: true)?
+    fs.remove(out, missing_ok: true)
   }
 
   match spec.name {
-    "bison-kconfig" => fs.remove(p"scripts/kconfig/.parser.tab.h.cmd", missing_ok: true)?
-    "bison-dtc" => fs.remove(p"scripts/dtc/.dtc-parser.tab.h.cmd", missing_ok: true)?
+    "bison-kconfig" => fs.remove(p"scripts/kconfig/.parser.tab.h.cmd", missing_ok: true)
+    "bison-dtc" => fs.remove(p"scripts/dtc/.dtc-parser.tab.h.cmd", missing_ok: true)
     else => {}
   }
 }
@@ -138,31 +138,31 @@ export proc generate_parser(name: Str, clean = true) [fs, process, env, error] {
   let spec = parser_generator(name)?
 
   if clean {
-    remove_outputs(spec)?
+    remove_outputs(spec)
   }
 
-  run_generator(spec)?
+  run_generator(spec)
 }
 
 ## Exported declaration `generate_kconfig_parsers`.
 export proc generate_kconfig_parsers(clean = true) [fs, process, env, error] {
-  generate_parser("bison-kconfig", clean)?
-  generate_parser("flex-kconfig", clean)?
+  generate_parser("bison-kconfig", clean)
+  generate_parser("flex-kconfig", clean)
 }
 
 ## Exported declaration `generate_dtc_parsers`.
 export proc generate_dtc_parsers(clean = true) [fs, process, env, error] {
-  generate_parser("bison-dtc", clean)?
-  generate_parser("flex-dtc", clean)?
+  generate_parser("bison-dtc", clean)
+  generate_parser("flex-dtc", clean)
 }
 
 ## Exported declaration `generate_linux_parsers`.
 export proc generate_linux_parsers(clean = true) [fs, process, env, error] {
   for spec in parser_generators()? {
     if clean {
-      remove_outputs(spec)?
+      remove_outputs(spec)
     }
 
-    run_generator(spec)?
+    run_generator(spec)
   }
 }

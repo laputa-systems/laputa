@@ -27,14 +27,14 @@ proc build_installer(raw_arch: Str) [fs, process, env, error] {
   let kernel = host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
   let xsh = host.installer_env_path("XSH_HOST", process.which("xsh")?)?
   let envs = arch_envs(arch, root, work, iso, kernel, xsh)
-  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, envs)?
+  host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, envs)
 
   host.installer_run_argv(
     xsh,
     ["xsh", fp"{root}/installer-size.xsh".display(), "--", arch, work.display(), iso.display(), kernel.display()],
     root,
     {LAPUTA_ROOT: root.display()},
-  )?
+  )
 }
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
@@ -42,7 +42,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
     return Err(InstallerReportError.Failed("usage: build-installer-common.xsh ARCH"))
   }
 
-  build_installer(argv[0])?
+  build_installer(argv[0])
 }
 
-main(@args)?
+main(@args)

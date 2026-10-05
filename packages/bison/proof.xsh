@@ -252,7 +252,7 @@ proc compile_root_c_program(rootfs: Path, source: Path, output: Path) [process, 
 
 proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, process, env, error] {
   let program = fp"{tmp}/{source}.bin"
-  compile_root_c_program(rootfs, fp"{tmp}/{source}", program)?
+  compile_root_c_program(rootfs, fp"{tmp}/{source}", program)
   let out = run.text $program ?
 
   if out != expected {
@@ -262,8 +262,8 @@ proc run_parser(rootfs: Path, tmp: Path, source: Str, expected: Str) [fs, proces
 
 proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
   let tmp = fp"{rootfs}/var/tmp/proof-bison"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
   let stderr = fp"{tmp}/bison.stderr"
 
@@ -274,7 +274,7 @@ proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
     BISON_PKGDATADIR: fp"{rootfs}/usr/share/bison".display(),
   }) {
     for grammar in grammars {
-      fs.write(fp"{tmp}/{grammar.file}", grammar_text(grammar.file))?
+      fs.write(fp"{tmp}/{grammar.file}", grammar_text(grammar.file))
 
       cd $tmp {
         let status = process.run(process.command_argv(bison, [bison.display()].extend(grammar.argv), stderr:))?
@@ -301,13 +301,13 @@ proc prove_grammars(rootfs: Path, bison: Path) [fs, process, env, error] {
     }
   }
 
-  run_parser(rootfs, tmp, "calc.c", calc_expected)?
-  run_parser(rootfs, tmp, "glr.c", glr_expected)?
+  run_parser(rootfs, tmp, "calc.c", calc_expected)
+  run_parser(rootfs, tmp, "glr.c", glr_expected)
 }
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.package_metadata(rootfs, "bison")?
-  proof.target_elf(rootfs, p"usr/bin/bison", "bison")?
+  proof.package_metadata(rootfs, "bison")
+  proof.target_elf(rootfs, p"usr/bin/bison", "bison")
   let bison = fp"{rootfs}/usr/bin/bison"
 
   if pm_util.build_arch()? == pm_util.target_arch()? {
@@ -317,11 +317,11 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
       return Err(ScriptError.Failed(kind: "proof-bison", message: f"bison --version: {version.trim()}"))?
     }
 
-    prove_grammars(rootfs, bison)?
+    prove_grammars(rootfs, bison)
     print "bison ok: yacc.c, glr.c, and lalr1.cc output matches GNU bison 3.8.2; parsers run"
   } else {
     print "bison ok: cross-built "${pm_util.target_arch()?}
   }
 }
 
-main(@args)?
+main(@args)

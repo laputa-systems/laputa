@@ -3,8 +3,8 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
-  proof.target_elf(rootfs, p"usr/bin/cargo", "cargo")?
-  proof.target_elf(rootfs, p"usr/bin/rustc", "rustc")?
+  proof.target_elf(rootfs, p"usr/bin/cargo", "cargo")
+  proof.target_elf(rootfs, p"usr/bin/rustc", "rustc")
   let target_arch = pm_util.target_arch()?
   let rust_triple = if target_arch == "aarch64" { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
 
@@ -28,12 +28,12 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   var cargo = ""
   var rustc = ""
   let tmp = fp"{rootfs}/var/tmp/proof-cargo"
-  fs.remove(tmp, missing_ok: true)?
-  fs.mkdir(tmp)?
+  fs.remove(tmp, missing_ok: true)
+  fs.mkdir(tmp)
   defer fs.remove(tmp, missing_ok: true)?
 
-  fs.mkdir(fp"{tmp}/src")?
-  fs.mkdir(fp"{tmp}/cargo-home")?
+  fs.mkdir(fp"{tmp}/src")
+  fs.mkdir(fp"{tmp}/cargo-home")
   fs.write(
     fp"{tmp}/Cargo.toml",
     """[package]
@@ -41,14 +41,14 @@ name = "cargo-proof-hello"
 version = "0.1.0"
 edition = "2024"
 """,
-  )?
+  )
   fs.write(
     fp"{tmp}/src/main.rs",
     """fn main() {
     println!("hello cargo");
 }
 """,
-  )?
+  )
 
   let rustc_wrapper = fp"{tmp}/rustc-wrapper"
   fs.write(
@@ -59,8 +59,8 @@ proc main(...args: List[Str]) [process, error] {{
 }}
 main(@args)?
 """,
-  )?
-  fs.chmod(rustc_wrapper, 0o755)?
+  )
+  fs.chmod(rustc_wrapper, 0o755)
 
   let linker_wrapper = fp"{tmp}/linker-wrapper"
   let linker = fp"{rootfs}/usr/lib/llvm23/bin/ld.lld"
@@ -86,8 +86,8 @@ proc main(...args: List[Str]) [process, error] {{
 }}
 main(@args)?
 """,
-  )?
-  fs.chmod(linker_wrapper, 0o755)?
+  )
+  fs.chmod(linker_wrapper, 0o755)
 
   env ({
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib".display(),
@@ -124,4 +124,4 @@ main(@args)?
   print "cargo ok: "${trimmed}
 }
 
-main(@args)?
+main(@args)

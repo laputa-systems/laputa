@@ -49,12 +49,12 @@ pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
 
 proc build_native_scratch(cc: Path, srcarch: Str, version: Str) [fs, process, env, time, error] {
   if srcarch == "arm64" {
-    PKGBUILD_aarch64.build_scratch(cc, srcarch, version)?
+    PKGBUILD_aarch64.build_scratch(cc, srcarch, version)
     return
   }
 
   if srcarch == "x86" {
-    PKGBUILD_x86_64.build_x86_64_scratch(cc, srcarch, version)?
+    PKGBUILD_x86_64.build_x86_64_scratch(cc, srcarch, version)
     return
   }
 
@@ -90,21 +90,21 @@ proc main(dest: Path) [fs, process, env, time, error] {
   let srcarch = linux_srcarch(arch)?
   let config_start = PKGBUILD_shared.timing_start("config")
   let config_fragments = linux_config.resolve_config_fragments(kernel_config_fragments_for(arch)?)?
-  linux_config.write_resolved_config(p".", srcarch, config_fragments, p".config")?
+  linux_config.write_resolved_config(p".", srcarch, config_fragments, p".config")
   PKGBUILD_shared.timing_done("config", config_start)
   let parser_start = PKGBUILD_shared.timing_start("parser")
-  parser_gen.generate_linux_parsers()?
+  parser_gen.generate_linux_parsers()
   PKGBUILD_shared.timing_done("parser", parser_start)
   let kbuild_start = PKGBUILD_shared.timing_start("kbuild")
-  build_native_scratch(cc, srcarch, version)?
+  build_native_scratch(cc, srcarch, version)
   PKGBUILD_shared.timing_done("kbuild", kbuild_start)
   let install_start = PKGBUILD_shared.timing_start("install")
   let image = kernel_image_for(arch)?
-  fs.install(image, fp"{dest}/boot/vmlinuz-{version}", 0o644, parents: true, overwrite: true)?
-  fs.install(image, fp"{dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)?
-  fs.install(p".config", fp"{dest}/usr/share/linux/config-{version}", 0o644, parents: true, overwrite: true)?
+  fs.install(image, fp"{dest}/boot/vmlinuz-{version}", 0o644, parents: true, overwrite: true)
+  fs.install(image, fp"{dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)
+  fs.install(p".config", fp"{dest}/usr/share/linux/config-{version}", 0o644, parents: true, overwrite: true)
   PKGBUILD_shared.timing_done("install", install_start)
   PKGBUILD_shared.timing_done("package-total", package_start)
 }
 
-main(@args)?
+main(@args)

@@ -169,7 +169,7 @@ export pure qemu_command_argv(
 # seconds, then escalates that group to KILL and reaps it.  Do not replace this
 # with a background shell watcher: it would lose the explicit cleanup boundary.
 proc qemu_stop(launched: ProcessHandle) [process, error] {
-  launched.cancel(signal: "TERM", kill_after: 5s)?
+  launched.cancel(signal: "TERM", kill_after: 5s)
 }
 
 # Returns whether the spawned QEMU group leader is still running, without a
@@ -203,7 +203,7 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
     match qemu_qmp(value, mode, socket, screenshot) {
       Ok(_) => return
       Err(_) => {
-        time.sleep(250ms)?
+        time.sleep(250ms)
         attempt += 1
       }
     }
@@ -240,10 +240,10 @@ export proc run_test(
     return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
   }
 
-  fs.remove(outputs.console_log, missing_ok: true)?
-  fs.remove(outputs.qemu_log, missing_ok: true)?
-  fs.remove(outputs.qmp_socket, missing_ok: true)?
-  fs.remove(outputs.screenshot, missing_ok: true)?
+  fs.remove(outputs.console_log, missing_ok: true)
+  fs.remove(outputs.qemu_log, missing_ok: true)
+  fs.remove(outputs.qmp_socket, missing_ok: true)
+  fs.remove(outputs.screenshot, missing_ok: true)
   let command = process.command_argv(
     value.qemu,
     qemu_command_argv(value, profile, outputs, types.Test),
@@ -259,7 +259,7 @@ export proc run_test(
     let log_text = qemu_log_text(outputs.console_log, outputs.qemu_log)?
     let failed = proof.failure_marker(log_text)
     if failed != "" {
-      qemu_stop(launched)?
+      qemu_stop(launched)
       return Err(
         types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
@@ -268,20 +268,20 @@ export proc run_test(
     # READY is printed by the guest only after dwl has launched foot's reader.
     # This keeps exactly one deterministic `laputa` plus EOF QMP injection.
     if ! injected and fs.exists(outputs.qmp_socket)? and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
-      qemu_qmp_retry(value, "ready", outputs.qmp_socket)?
-      qemu_qmp(value, "input", outputs.qmp_socket)?
+      qemu_qmp_retry(value, "ready", outputs.qmp_socket)
+      qemu_qmp(value, "input", outputs.qmp_socket)
       injected = true
     }
 
     if proof.succeeded(log_text) {
       if ! screenshot_taken {
-        qemu_qmp_retry(value, "screenshot", outputs.qmp_socket, outputs.screenshot)?
+        qemu_qmp_retry(value, "screenshot", outputs.qmp_socket, outputs.screenshot)
         screenshot_taken = true
       }
 
-      qemu_stop(launched)?
+      qemu_stop(launched)
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-      proof.verify_console(final_log)?
+      proof.verify_console(final_log)
       if ! screenshot_is_valid(outputs.screenshot)? {
         return Err(
           types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
@@ -293,13 +293,13 @@ export proc run_test(
     }
 
     if elapsed >= 180 {
-      qemu_stop(launched)?
+      qemu_stop(launched)
       return Err(
         types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 
