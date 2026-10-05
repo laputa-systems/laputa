@@ -42,6 +42,6 @@ export pure lp64_musl_abi(arch: Str) -> MuslAbi {
 }
 
 ## Exported PM declaration `musl_abi`.
-export proc musl_abi() [env, error] -> Result[MuslAbi] {
+export proc musl_abi() [env, error] -> Result[MuslAbi, Error] {
   lp64_musl_abi(pm_util.target_arch()?)
 }

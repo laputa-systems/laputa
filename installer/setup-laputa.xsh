@@ -92,7 +92,7 @@ proc usage() [fs, error, io] {
 
 proc require_file(path_value: Path) [fs, error] {
   guard fs.exists(path_value)? else {
-    return Err(InstallerError.Failed("missing-file", path_value.display()))
+    return Err(InstallerError.Failed(kind: "missing-file", message: path_value.display()))
   }
 }
 
@@ -105,7 +105,7 @@ proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
     abort(status.exit_code()?)
   }
 
-  return Err(InstallerError.Failed("command-signaled", argv[0]))
+  return Err(InstallerError.Failed(kind: "command-signaled", message: argv[0]))
 }
 
 proc write_file(path_value: Path, body: Str) [fs, error] {
@@ -214,7 +214,7 @@ proc ci_default_disk(disks: List[Path]) [fs, error] -> Result[Path] {
     }
   }
 
-  Err(InstallerError.Failed("no-blank-disk", "no blank CI install disk found"))
+  Err(InstallerError.Failed(kind: "no-blank-disk", message: "no blank CI install disk found"))
 }
 
 proc prompt_disk(default_disk: Path) [fs, process, error, io] -> Result[Path] {
@@ -237,7 +237,7 @@ proc wait_for(path_value: Path) [fs, time, error] {
     tries -= 1
   }
 
-  return Err(InstallerError.Failed("device-timeout", path_value.display()))
+  return Err(InstallerError.Failed(kind: "device-timeout", message: path_value.display()))
 }
 
 proc installer_network_interfaces() [process, error] -> Result[InstallerNetwork] {
@@ -479,7 +479,7 @@ proc wipe_and_partition(disk: Path, ci: Bool) [fs, process, error] -> Result[Dis
   let root_end = root_start + root_sectors - 1
 
   if root_sectors <= 0 or root_end <= root_start {
-    return Err(InstallerError.Failed("disk-too-small", f"{disk} is too small for Laputa"))
+    return Err(InstallerError.Failed(kind: "disk-too-small", message: f"{disk} is too small for Laputa"))
   }
 
   let table = json.decode(
@@ -579,12 +579,12 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
       index += 1
 
       if index >= argv.len() {
-        return Err(InstallerError.Failed("usage", "--disk requires a device"))
+        return Err(InstallerError.Failed(kind: "usage", message: "--disk requires a device"))
       }
 
       disk_text = argv[index]
     } else {
-      return Err(InstallerError.Failed("usage", f"unknown argument {arg}"))
+      return Err(InstallerError.Failed(kind: "usage", message: f"unknown argument {arg}"))
     }
 
     index += 1
@@ -593,7 +593,7 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
   let disks = list_disks()?
 
   if disks.len() == 0 {
-    return Err(InstallerError.Failed("no-disks", "no installable disks found"))
+    return Err(InstallerError.Failed(kind: "no-disks", message: "no installable disks found"))
   }
 
   print_disks(disks)?

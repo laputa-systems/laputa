@@ -112,7 +112,7 @@ proc check_caps_table() [fs, error] {
       let have = embedded.split("\n")
       let differing = [k for k in range(want.len()) if k >= have.len() or want[k] != have[k]]
       let row = if differing.len() > 0 { want[differing[0]] } else { have[want.len()] }
-      return Err(CapsTableError.Mismatch(block, row))
+      return Err(CapsTableError.Mismatch(block:, row:))
     }
   }
 }

@@ -12,7 +12,7 @@ proc guest_console(message: Str) [fs, error] {
 
 proc guest_fail(phase: Str, message: Str) [fs, error] {
   guest_console(f"LAPUTA_DWL_FOOT_PROOF_FAILED {phase}: {message}")?
-  return Err(GuestProofError.Failed(phase, message))
+  return Err(GuestProofError.Failed(phase:, message:))
 }
 
 proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error] {

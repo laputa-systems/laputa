@@ -181,7 +181,7 @@ proc dir_file_type(kind: Str) [error] -> Result[Int] {
 
   return 7 when kind == "symlink"
 
-  Err(Ext4ToolError.Failed("bad-dir-kind", kind))
+  Err(Ext4ToolError.Failed(kind: "bad-dir-kind", message: kind))
 }
 
 proc dirent(item: DirItem, rec_len: Int) [error] -> Result[Bytes] {
@@ -268,7 +268,7 @@ proc allocate_block(used: Map[Bool], next: Int, total_blocks: Int) [error] -> Re
     cursor += 1
   }
 
-  Err(Ext4ToolError.Failed("full", "image is full"))
+  Err(Ext4ToolError.Failed(kind: "full", message: "image is full"))
 }
 
 proc next_data_block(cursor: Int) [] -> Int {
@@ -304,7 +304,7 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
   current_next = skip_data_blocks(current_next, count)
 
   if current_next > total_blocks {
-    return Err(Ext4ToolError.Failed("full", "image is full"))
+    return Err(Ext4ToolError.Failed(kind: "full", message: "image is full"))
   }
 
   var single = 0
@@ -791,11 +791,11 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
   let size = image_size(image)?
 
   if size < 8 * 1024 * 1024 {
-    return Err(Ext4ToolError.Failed("too-small", "ext image must be at least 8MiB"))
+    return Err(Ext4ToolError.Failed(kind: "too-small", message: "ext image must be at least 8MiB"))
   }
 
   if size % BLOCK_SIZE != 0 {
-    return Err(Ext4ToolError.Failed("bad-size", "ext image size must be a multiple of 4096 bytes"))
+    return Err(Ext4ToolError.Failed(kind: "bad-size", message: "ext image size must be a multiple of 4096 bytes"))
   }
 
   let total_blocks = size / BLOCK_SIZE
@@ -922,11 +922,11 @@ proc main(...argv: List[Str]) [fs, error] {
   )?
 
   if opts.image.len() != 1 {
-    return Err(Ext4ToolError.Failed("usage", "usage: mkfs.ext4 [-L LABEL] [-d ROOT] IMAGE"))
+    return Err(Ext4ToolError.Failed(kind: "usage", message: "usage: mkfs.ext4 [-L LABEL] [-d ROOT] IMAGE"))
   }
 
   if opts.features != "" and opts.features != "^64bit,^metadata_csum" and opts.features != "^metadata_csum,^64bit" {
-    return Err(Ext4ToolError.Failed("unsupported-feature", opts.features))
+    return Err(Ext4ToolError.Failed(kind: "unsupported-feature", message: opts.features))
   }
 
   let image = opts.image[0]

@@ -4,7 +4,7 @@ error ScriptError = Failed(kind: Str, message: Str)
 
 proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   if ! condition {
-    Err(ScriptError.Failed(kind, message))?
+    Err(ScriptError.Failed(kind:, message:))?
   }
 }
 
@@ -104,7 +104,7 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
     let trimmed = out.trim()
 
     if trimmed != "hello musl" {
-      return Err(ScriptError.Failed("proof-musl", f"unexpected output: {trimmed}"))?
+      return Err(ScriptError.Failed(kind: "proof-musl", message: f"unexpected output: {trimmed}"))?
     }
 
     print "musl ok: "${trimmed}

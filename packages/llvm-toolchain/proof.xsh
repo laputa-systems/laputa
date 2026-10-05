@@ -4,7 +4,7 @@ error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   if ! condition {
-    Err(ProofError.Failed(kind, message))?
+    Err(ProofError.Failed(kind:, message:))?
   }
 }
 
@@ -277,7 +277,7 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"
 
   if ! fs.exists(db)? {
-    return Err(ProofError.Failed("proof-llvm-toolchain", f"missing package metadata: {db}"))
+    return Err(ProofError.Failed(kind: "proof-llvm-toolchain", message: f"missing package metadata: {db}"))
   }
 
   let target_arch = pm_util.target_arch()?

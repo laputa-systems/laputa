@@ -102,7 +102,7 @@ later
 
 proc expect_text(label: Str, actual: Str, expected: Str) [error] {
   if actual != expected {
-    return Err(ScriptError.Failed("proof-m4", f"{label}: output differs from GNU m4\n--- expected\n{expected}--- actual\n{actual}"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: f"{label}: output differs from GNU m4\n--- expected\n{expected}--- actual\n{actual}"))?
   }
 }
 
@@ -113,7 +113,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   defer fs.remove(tmp, missing_ok: true)?
   let m4 = fp"{rootfs}/usr/bin/m4"
 
-  return Err(ScriptError.Failed("proof-m4", f"missing m4: {m4}"))? unless fs.exists(m4)?
+  return Err(ScriptError.Failed(kind: "proof-m4", message: f"missing m4: {m4}"))? unless fs.exists(m4)?
 
   fs.write(
     fp"{tmp}/test.m4",
@@ -129,7 +129,7 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   let trimmed = out.trim()
 
   if trimmed != "hello from m4" {
-    return Err(ScriptError.Failed("proof-m4", f"unexpected output: {trimmed}"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: f"unexpected output: {trimmed}"))?
   }
 
   # The include directory is reached only through -I, never the cwd.
@@ -156,11 +156,11 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   )?
 
   if unterminated_status.ok {
-    return Err(ScriptError.Failed("proof-m4", "m4 accepted an unterminated argument list"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted an unterminated argument list"))?
   }
 
   if "end of file in argument list" not in unterminated_stderr.read_text()? {
-    return Err(ScriptError.Failed("proof-m4", "m4 rejected an unterminated call without its diagnostic"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected an unterminated call without its diagnostic"))?
   }
 
   # Positional operands must remain literal file inputs. A directory must not
@@ -171,11 +171,11 @@ proc main(rootfs = /rootfs) [fs, process, error] {
   )?
 
   if directory_input.ok {
-    return Err(ScriptError.Failed("proof-m4", "m4 accepted a directory input"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 accepted a directory input"))?
   }
 
   if "cannot read non-file input" not in directory_stderr.read_text()? {
-    return Err(ScriptError.Failed("proof-m4", "m4 rejected a directory without its input diagnostic"))?
+    return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected a directory without its input diagnostic"))?
   }
 
   print "m4 ok: "${trimmed}

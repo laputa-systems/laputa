@@ -9,7 +9,7 @@ type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], ent
 
 proc ensure_exists(path_value: Path, label: Str) [fs, error] {
   guard fs.exists(path_value)? else {
-    return Err(ProofError.Failed("proof-build-essential-native", f"missing {label}: {path_value}"))
+    return Err(ProofError.Failed(kind: "proof-build-essential-native", message: f"missing {label}: {path_value}"))
   }
 }
 
@@ -20,7 +20,7 @@ proc ensure_runtime_artifacts(root: Path, packages: List[Str]) [fs, env, error] 
 
   if receipt.format != "laputa-root-1" or receipt.target != f"{pm_util.target_arch()?}-linux-musl" {
     return Err(
-      ProofError.Failed("proof-build-essential-native", f"invalid typed root receipt: {path_value}"),
+      ProofError.Failed(kind: "proof-build-essential-native", message: f"invalid typed root receipt: {path_value}"),
     )
   }
 
@@ -36,8 +36,8 @@ proc ensure_runtime_artifacts(root: Path, packages: List[Str]) [fs, env, error] 
     if ! found {
       return Err(
         ProofError.Failed(
-          "proof-build-essential-native",
-          f"missing {package} artifact in typed root receipt: {path_value}",
+          kind: "proof-build-essential-native",
+          message: f"missing {package} artifact in typed root receipt: {path_value}",
         ),
       )
     }

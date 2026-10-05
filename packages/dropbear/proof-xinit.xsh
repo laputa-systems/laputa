@@ -3,7 +3,7 @@ error ScriptError = Failed(kind: Str, message: Str)
 
 proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   if ! condition {
-    Err(ScriptError.Failed(kind, message))?
+    Err(ScriptError.Failed(kind:, message:))?
   }
 }
 
@@ -14,7 +14,7 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
     return trimmed when trimmed.starts_with("ssh-")
   }
 
-  Err(ScriptError.Failed("dropbear-public-key", "dropbearkey did not print an SSH public key"))
+  Err(ScriptError.Failed(kind: "dropbear-public-key", message: "dropbearkey did not print an SSH public key"))
 }
 
 proc authorize_root_key(rootfs: Path, public_key: Str) [fs, error] {
@@ -105,8 +105,8 @@ proc wait_for_ssh(command: Command, rootfs: Path, chroot: Path, port: Int, tries
 
   return Err(
     ScriptError.Failed(
-      "dropbear-connect",
-      f"dbclient could not connect before timeout; status={status}; logs={logs}; live={live_dropbear_diagnostics(port)?}",
+      kind: "dropbear-connect",
+      message: f"dbclient could not connect before timeout; status={status}; logs={logs}; live={live_dropbear_diagnostics(port)?}",
     ),
   )
 }
@@ -160,7 +160,7 @@ proc wait_for_xinit_logs(rootfs: Path, chroot: Path, tries: Int) [process, time,
     remaining -= 1
   }
 
-  Err(ScriptError.Failed("dropbear-log", "xinit did not write dropbear log content"))
+  Err(ScriptError.Failed(kind: "dropbear-log", message: "xinit did not write dropbear log content"))
 }
 
 proc xinit_start(rootfs: Path, chroot: Path, port: Int, host_key: Path) [process, env, error] {

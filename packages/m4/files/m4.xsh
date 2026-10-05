@@ -90,13 +90,13 @@ proc read_input_file(filepath: Str) [fs, error] -> Result[Str] {
   let input = fp"{filepath}"
 
   if ! fs.exists(input)? {
-    return Err(ScriptError.Failed("m4-input", f"cannot open `{filepath}': No such file or directory"))
+    return Err(ScriptError.Failed(kind: "m4-input", message: f"cannot open `{filepath}': No such file or directory"))
   }
 
   let metadata = fs.metadata(input)?
 
   if metadata.kind != "file" {
-    return Err(ScriptError.Failed("m4-input", f"cannot read non-file input: {filepath}"))
+    return Err(ScriptError.Failed(kind: "m4-input", message: f"cannot read non-file input: {filepath}"))
   }
 
   fs.read_text(input)
@@ -1024,7 +1024,7 @@ pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
       let sign = if value < 0 { "-" } else if signed and plus { "+" } else if signed and space { " " } else { "" }
       out += [pad_field(f"{sign}{digits}", width, left, zero and precision < 0)]
     } else if conv == 101 or conv == 69 or conv == 102 or conv == 70 or conv == 103 or conv == 71 or conv == 97 or conv == 65 {
-      return Err(ScriptError.Failed("m4-format", f"format: floating-point conversion `{spec}' is not supported"))
+      return Err(ScriptError.Failed(kind: "m4-format", message: f"format: floating-point conversion `{spec}' is not supported"))
     } else {
       notes += [f"Warning: unrecognized specifier in `{fmt}'"]
       return {text: out.join(""), notes}
@@ -1314,7 +1314,7 @@ pure compile_gnu_regex(pat: Str) -> Result[RegexTranslation] {
   let tr = gnu_regex_to_rust(pat)
 
   if tr.error.starts_with("unsupported: ") {
-    return Err(ScriptError.Failed("m4-regex", tr.error.byte_slice(13, tr.error.byte_len() - 13)))
+    return Err(ScriptError.Failed(kind: "m4-regex", message: tr.error.byte_slice(13, tr.error.byte_len() - 13)))
   }
 
   tr
@@ -1759,7 +1759,7 @@ pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[Builti
     return {text: f"{result}", notes: notes.extend(argc_notes(name, argc, 2, 2))}
   }
 
-  Err(ScriptError.Failed("m4-internal", f"no argument-only builtin named {name}"))
+  Err(ScriptError.Failed(kind: "m4-internal", message: f"no argument-only builtin named {name}"))
 }
 
 pure is_argument_builtin(name: Str) -> Bool {
@@ -2835,7 +2835,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
           let _ = bi
         }
         _ => {
-          return Err(ScriptError.Failed("m4-internal", f"unhandled builtin {bi}"))
+          return Err(ScriptError.Failed(kind: "m4-internal", message: f"unhandled builtin {bi}"))
         }
       }
 
@@ -3006,12 +3006,12 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[Options?] {
         has_value = true
       }
     } else {
-      return Err(ScriptError.Failed("m4-usage", f"unrecognized option '{a}'"))
+      return Err(ScriptError.Failed(kind: "m4-usage", message: f"unrecognized option '{a}'"))
     }
 
     if ! has_value {
       if i >= argv.len() {
-        return Err(ScriptError.Failed("m4-usage", f"option '{a}' requires an argument"))
+        return Err(ScriptError.Failed(kind: "m4-usage", message: f"option '{a}' requires an argument"))
       }
 
       value = argv[i]

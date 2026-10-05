@@ -22,7 +22,7 @@ proc ensure_dir(path_value: Path) [fs, error] {
 proc ensure_file(path_value: Path, kind: Str) [fs, error] {
   return when fs.exists(path_value)?
 
-  return Err(InstallerQemuTestError.Failed(kind, f"missing {path_value}"))
+  return Err(InstallerQemuTestError.Failed(kind:, message: f"missing {path_value}"))
 }
 
 proc process_live(kill: Path, pid: Int, cwd: Path) [process, error] -> Result[Bool] {
@@ -95,7 +95,7 @@ proc wait_for_marker(
       if has_panic(log)? {
         dump_tail(tail, log, 120)?
         terminate_if_live(pid)
-        return Err(InstallerQemuTestError.Failed("qemu", f"{ok} was followed by a kernel panic"))
+        return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"{ok} was followed by a kernel panic"))
       }
 
       return when keep_running
@@ -107,13 +107,13 @@ proc wait_for_marker(
     if has_line_marker(log, failed)? or has_panic(log)? {
       dump_tail(tail, log, 120)?
       terminate_if_live(pid)
-      return Err(InstallerQemuTestError.Failed("qemu", f"failed while waiting for {ok}"))
+      return Err(InstallerQemuTestError.Failed(kind: "qemu", message: f"failed while waiting for {ok}"))
     }
 
     if elapsed >= timeout_seconds {
       dump_tail(tail, log, 120)?
       terminate_if_live(pid)
-      return Err(InstallerQemuTestError.Failed("qemu-timeout", f"timed out waiting for {ok}"))
+      return Err(InstallerQemuTestError.Failed(kind: "qemu-timeout", message: f"timed out waiting for {ok}"))
     }
 
     time.sleep(1s)?
@@ -121,7 +121,7 @@ proc wait_for_marker(
   }
 
   dump_tail(tail, log, 120)?
-  return Err(InstallerQemuTestError.Failed("qemu-exit", f"qemu exited before {ok}"))
+  return Err(InstallerQemuTestError.Failed(kind: "qemu-exit", message: f"qemu exited before {ok}"))
 }
 
 pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) -> List[Str] {
@@ -185,7 +185,7 @@ proc wait_for_ssh(
 
     if elapsed >= timeout_seconds {
       dump_tail(tail, target_log, 160)?
-      return Err(InstallerQemuTestError.Failed("ssh-timeout", "timed out waiting for target ssh"))
+      return Err(InstallerQemuTestError.Failed(kind: "ssh-timeout", message: "timed out waiting for target ssh"))
     }
 
     time.sleep(1s)?
@@ -193,7 +193,7 @@ proc wait_for_ssh(
   }
 
   dump_tail(tail, target_log, 160)?
-  return Err(InstallerQemuTestError.Failed("qemu-exit", "qemu exited before target ssh was ready"))
+  return Err(InstallerQemuTestError.Failed(kind: "qemu-exit", message: "qemu exited before target ssh was ready"))
 }
 
 proc assert_ssh_smoke(
@@ -216,14 +216,14 @@ proc assert_ssh_smoke(
 
   if ! ("dropbear running" in status) {
     print $status
-    return Err(InstallerQemuTestError.Failed("ssh-dropbear", "dropbear status assertion failed"))
+    return Err(InstallerQemuTestError.Failed(kind: "ssh-dropbear", message: "dropbear status assertion failed"))
   }
 
   let result = ssh_guest(ssh, ssh_key, port, known_hosts, "run /bin/xshi --help ?")?
 
   if ! ("xshi 0.0.1" in result) {
     print $result
-    return Err(InstallerQemuTestError.Failed("ssh-xshi", "xshi help assertion failed"))
+    return Err(InstallerQemuTestError.Failed(kind: "ssh-xshi", message: "xshi help assertion failed"))
   }
 }
 
@@ -461,7 +461,7 @@ proc build_installer(
 
 proc main(...argv: List[Str]) [fs, process, env, time, error] {
   if argv.len() > 0 {
-    return Err(InstallerQemuTestError.Failed("argv", "installer-qemu-test.xsh does not accept arguments"))
+    return Err(InstallerQemuTestError.Failed(kind: "argv", message: "installer-qemu-test.xsh does not accept arguments"))
   }
 
   let root = host.installer_env_path("LAPUTA_ROOT", fs.cwd()?)?

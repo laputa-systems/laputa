@@ -39,12 +39,12 @@ type LogPolicy = {mode: Str}
 
 type ServiceFile = module {
   export let service: Record
-  export optional proc start() [fs, process, env, error] -> Result[Unit]
-  export optional proc stop() [fs, process, env, time, error] -> Result[Unit]
-  export optional proc reload() [fs, process, env, error] -> Result[Unit]
-  export optional proc finish() [fs, process, env, error] -> Result[Unit]
-  export optional proc ready() [fs, process, env, time, error] -> Result[Bool]
-  export optional proc status() [fs, process, env, error] -> Result[Str]
+  export optional proc start() [fs, process, env, error] -> Result[Unit, Error]
+  export optional proc stop() [fs, process, env, time, error] -> Result[Unit, Error]
+  export optional proc reload() [fs, process, env, error] -> Result[Unit, Error]
+  export optional proc finish() [fs, process, env, error] -> Result[Unit, Error]
+  export optional proc ready() [fs, process, env, time, error] -> Result[Bool, Error]
+  export optional proc status() [fs, process, env, error] -> Result[Str, Error]
 }
 
 # Result of reaping one inittab child: the updated runtime table plus the
@@ -166,33 +166,33 @@ proc parse_inittab_line(line: Str, index: Int) [process, error] -> Result[Initta
   let fields = trimmed.split(":")
 
   if fields.len() < 2 {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: missing runlevels"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing runlevels"))
   }
 
   if fields.len() < 3 {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: missing action"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing action"))
   }
 
   if fields.len() < 4 {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: missing command"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing command"))
   }
 
   let action = fields[2].trim()
 
   if ! (action == "sysinit" or action == "wait" or action == "once" or action == "restart" or action == "shutdown" or action == "respawn" or action == "poweroff") {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: unsupported action '{action}'"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: unsupported action '{action}'"))
   }
 
   let command = fields |> drop(3).join(":").trim()
 
   if command == "" {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: missing command"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing command"))
   }
 
   let argv = process.argv_words(command)?
 
   if argv.len() == 0 or argv[0] == "" {
-    return Err(XinitError.Failed("init-inittab", f"line {index}: missing command"))
+    return Err(XinitError.Failed(kind: "init-inittab", message: f"line {index}: missing command"))
   }
 
   {key: f"{index}:{fields[0].trim()}", id: fields[0].trim(), action, command, argv}
@@ -220,7 +220,7 @@ proc run_phase(entries: List[InittabEntry], action: Str) [process, error] {
     if entry.action == action {
       let status = process.run(command_from_argv(entry.argv))?
 
-      return Err(XinitError.Failed("init-entry-failed", entry.command)) unless status.ok
+      return Err(XinitError.Failed(kind: "init-entry-failed", message: entry.command)) unless status.ok
     }
   }
 }
@@ -474,8 +474,8 @@ proc require_service_file(path_value: Path) [fs, error] {
   guard path_value.exists()? else {
     return Err(
       XinitError.Failed(
-        "xinit-service",
-        f"failed to read service file '{path_value}': No such file or directory",
+        kind: "xinit-service",
+        message: f"failed to read service file '{path_value}': No such file or directory",
       ),
     )
   }
@@ -606,8 +606,8 @@ proc load_service(target: Str) [fs, process, env, error] -> Result[Service] {
 
   Err(
     XinitError.Failed(
-      "xinit-service",
-      f"service file '{path_value}' defines '{service.name}', not '{target}'",
+      kind: "xinit-service",
+      message: f"service file '{path_value}' defines '{service.name}', not '{target}'",
     ),
   )
 }
@@ -639,7 +639,7 @@ pure find_loaded_service(services: List[Service], name: Str) -> Result[Service] 
     return service when service.name == name
   }
 
-  Err(XinitError.Failed("xinit-service", f"unknown service '{name}'"))
+  Err(XinitError.Failed(kind: "xinit-service", message: f"unknown service '{name}'"))
 }
 
 pure required_dependencies(service: Service) -> List[Str] {
@@ -657,7 +657,7 @@ proc check_service_graph(services: List[Service]) [error] {
   for service in services {
     for dep in dependency_edges(service).extend(service.before) {
       if dep not in names and dep not in facilities {
-        return Err(XinitError.Failed("xinit-deps", f"{service.name}: unknown dependency '{dep}'"))
+        return Err(XinitError.Failed(kind: "xinit-deps", message: f"{service.name}: unknown dependency '{dep}'"))
       }
     }
   }
@@ -673,7 +673,7 @@ pure visit_plan(
   return {done, out} when name in done
 
   if name in stack {
-    return Err(XinitError.Failed("xinit-deps", f"dependency cycle: {stack.push(name).join(" -> ")}"))
+    return Err(XinitError.Failed(kind: "xinit-deps", message: f"dependency cycle: {stack.push(name).join(" -> ")}"))
   }
 
   let service = find_loaded_service(services, name)?
@@ -1024,7 +1024,7 @@ proc spawn_service(
       let status = process.run(service.command)?
 
       if ! status.ok {
-        return Err(XinitError.Failed("xinit-service", f"{service.name}: start failed"))
+        return Err(XinitError.Failed(kind: "xinit-service", message: f"{service.name}: start failed"))
       }
     }
 
@@ -1072,7 +1072,7 @@ proc spawn_service(
 
   match path_value.parent.mkdir() {
     Ok(_) => {}
-    Err(err) => return Err(XinitError.Failed("xinit-log", err.message))
+    Err(err) => return Err(XinitError.Failed(kind: "xinit-log", message: err.message))
   }
 
   # Rotate before opening so a service that has accumulated a large log across
@@ -1205,7 +1205,7 @@ proc stop_service(name: Str) [fs, process, env, time, error] {
   let dependents = running_dependents(name)?
 
   if dependents.len() > 0 {
-    return Err(XinitError.Failed("xinit-deps", f"{name}: running dependents: {dependents.join(", ")}"))
+    return Err(XinitError.Failed(kind: "xinit-deps", message: f"{name}: running dependents: {dependents.join(", ")}"))
   }
 
   let current = read_status(name)?
@@ -1941,7 +1941,7 @@ proc control(verb: Str, name: Str) [fs, process, env, time, error, io] {
     supervise_service(name)?
   } else {
     return Err(
-      XinitError.Failed("xinit-control", "usage: xinit <start|stop|restart|reload|status|logs|supervise> SERVICE"),
+      XinitError.Failed(kind: "xinit-control", message: "usage: xinit <start|stop|restart|reload|status|logs|supervise> SERVICE"),
     )
   }
 }
@@ -2016,37 +2016,37 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
 
   if parsed.command == "pid1" {
     if parsed.args.len() > 0 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit"))
     }
 
     run_pid1(fp"{env_value("XSH_INIT_INITTAB", "/etc/inittab")}")?
   } else if parsed.command == "help" {
     if parsed.args.len() > 0 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit help"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit help"))
     }
 
     io.write_stdout(usage_text())?
   } else if parsed.command == "boot" {
     if parsed.args.len() > 1 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit boot [TARGET]"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit boot [TARGET]"))
     }
 
     boot_target(parsed.args.get(0) ?? "boot")?
   } else if parsed.command == "scan" {
     if parsed.args.len() > 1 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit scan [SERVICE|TARGET]"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit scan [SERVICE|TARGET]"))
     }
 
     scan_command(parsed.args.get(0) ?? "boot")?
   } else if parsed.command == "list" {
     if parsed.args.len() > 0 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit list"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit list"))
     }
 
     list_services()?
   } else if parsed.command == "graph" {
     if parsed.args.len() > 1 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit graph [SERVICE|TARGET]"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit graph [SERVICE|TARGET]"))
     }
 
     let target = parsed.args.get(0) ?? "boot"
@@ -2056,13 +2056,13 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
     }
   } else if parsed.command == "start" or parsed.command == "stop" or parsed.command == "restart" or parsed.command == "reload" or parsed.command == "status" or parsed.command == "logs" or parsed.command == "supervise" {
     if parsed.args.len() > 0 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit <action> SERVICE"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
     control(parsed.action, parsed.get("service")?.require()?)?
   } else if parsed.command == "check" {
     if parsed.args.len() > 1 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit check [SERVICE|PATH]"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit check [SERVICE|PATH]"))
     }
 
     if parsed.args.len() == 0 {
@@ -2072,7 +2072,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
     }
   } else {
     if parsed.args.len() > 0 {
-      return Err(XinitError.Failed("xinit-control", "usage: xinit INITTAB"))
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit INITTAB"))
     }
 
     run_pid1(parsed.get("inittab")?.require()?)?

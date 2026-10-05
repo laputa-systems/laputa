@@ -352,7 +352,7 @@ proc write_uint_header(bits: Int, dfmt: Str, ofmt: Str, xfmt: Str, bfmt: Str, sy
   }
 
   if (sysdeps.get("endianness") ?? "") != "little" {
-    return Err(ScriptError.Failed("skalibs-gen-bits", "unsupported non-little-endian target"))
+    return Err(ScriptError.Failed(kind: "skalibs-gen-bits", message: "unsupported non-little-endian target"))
   }
 
   parts = parts.push(fp"skalibs/src/headers/uint{bits}-bswap".read_text()?)

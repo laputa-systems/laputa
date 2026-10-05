@@ -970,7 +970,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
           print (fs.read_text(err_log)?)
         }
 
-        Err(ScriptError.Failed("cmake-configure-failed", "bootstrap cmake configure failed"))?
+        Err(ScriptError.Failed(kind: "cmake-configure-failed", message: "bootstrap cmake configure failed"))?
       }
 
       run $samu $jobs_flag ?

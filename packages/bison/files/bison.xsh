@@ -142,12 +142,12 @@ proc upstream_disabled() [env] -> Bool {
 }
 
 proc run_upstream_bison(argv: List[Str], reason: Str) [process, env, error] {
-  return Err(ToolError.Failed("unsupported", reason)) when upstream_disabled()
+  return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("bison") {
     run $bin @argv ?
   } else {
-    return Err(ToolError.Failed("unsupported", reason))
+    return Err(ToolError.Failed(kind: "unsupported", message: reason))
   }
 }
 
@@ -203,7 +203,7 @@ proc parse_rules(text: Str) [error] -> Result[List[GrammarRule]] {
     }
   }
 
-  return Err(ToolError.Failed("yacc", "no grammar rules found")) when rules.len() == 0
+  return Err(ToolError.Failed(kind: "yacc", message: "no grammar rules found")) when rules.len() == 0
 
   rules
 }
@@ -1193,7 +1193,7 @@ proc generate_c(
   let tables = generate_rule_tables(rules, names, tokens)?
   let start_id = index_of(names, start)
 
-  return Err(ToolError.Failed("yacc", f"unknown start symbol: {start}")) when start_id < 0
+  return Err(ToolError.Failed(kind: "yacc", message: f"unknown start symbol: {start}")) when start_id < 0
 
   f"""#include <stdio.h>
 #include <stdlib.h>
@@ -1458,11 +1458,11 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[YaccOptions] {
     } else if token.name == "v" or token.name == "verbose" {
       verbose = true
     } else {
-      return Err(ToolError.Failed("usage", f"unsupported option: {token.name}"))
+      return Err(ToolError.Failed(kind: "usage", message: f"unsupported option: {token.name}"))
     }
   }
 
-  return Err(ToolError.Failed("usage", "missing grammar file")) when input == ""
+  return Err(ToolError.Failed(kind: "usage", message: "missing grammar file")) when input == ""
 
   {
     input,
@@ -1480,7 +1480,7 @@ proc main(argv: List[Str] = []) [fs, process, env, error, io] {
   let parts = source.split("%%")
 
   if parts.len() < 2 {
-    return Err(ToolError.Failed("yacc", "input must contain declarations and rules separated by %%"))
+    return Err(ToolError.Failed(kind: "yacc", message: "input must contain declarations and rules separated by %%"))
   }
 
   let decls = parts[0]

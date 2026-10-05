@@ -248,7 +248,7 @@ type TextReplacement = {old: Str, new: Str}
 
 proc replace_once(text: Str, file: Str, old: Str, new: Str) [error] -> Result[Str] {
   if old not in text {
-    return Err(MesaBuildError.Failed("mesa-patch", f"{file} no longer contains the text this recipe replaces:\n{old}"))
+    return Err(MesaBuildError.Failed(kind: "mesa-patch", message: f"{file} no longer contains the text this recipe replaces:\n{old}"))
   }
 
   text.replace(old, new)
@@ -461,7 +461,7 @@ proc edge_outputs(build_line: Str) [error] -> Result[List[Str]] {
   let head = build_line.byte_slice(6).split(": ")[0]
 
   if "$" in head or "|" in head {
-    return Err(MesaBuildError.Failed("mesa-ninja", f"unexpected escaped or implicit outputs: {build_line}"))
+    return Err(MesaBuildError.Failed(kind: "mesa-ninja", message: f"unexpected escaped or implicit outputs: {build_line}"))
   }
 
   head.split(" ")
@@ -527,7 +527,7 @@ proc stage_vendored_outputs() [fs, error] {
     let output = entry.path.strip_prefix(generated)?.display()
 
     if output not in split.vendored {
-      return Err(MesaBuildError.Failed("mesa-generated", f"vendored {output} has no generator edge in this configuration"))
+      return Err(MesaBuildError.Failed(kind: "mesa-generated", message: f"vendored {output} has no generator edge in this configuration"))
     }
   }
 

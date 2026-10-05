@@ -106,11 +106,11 @@ proc format_fat16(image: Path, label: Str) [fs, error] {
   let size = image_size(image)?
 
   if size < 2 * 1024 * 1024 {
-    return Err(FatToolError.Failed("too-small", "FAT16 image must be at least 2MiB"))
+    return Err(FatToolError.Failed(kind: "too-small", message: "FAT16 image must be at least 2MiB"))
   }
 
   if size % 512 != 0 {
-    return Err(FatToolError.Failed("bad-size", "FAT image size must be a multiple of 512 bytes"))
+    return Err(FatToolError.Failed(kind: "bad-size", message: "FAT image size must be a multiple of 512 bytes"))
   }
 
   let sectors = total_sectors(size)
@@ -121,7 +121,7 @@ proc format_fat16(image: Path, label: Str) [fs, error] {
   let clusters = data_sectors / spc
 
   if clusters < 4085 or clusters >= 65525 {
-    return Err(FatToolError.Failed("unsupported-size", "native mkfs.vfat currently supports FAT16-sized images"))
+    return Err(FatToolError.Failed(kind: "unsupported-size", message: "native mkfs.vfat currently supports FAT16-sized images"))
   }
 
   let cleared = bytes.zero_at(image, 0, size)?
@@ -155,7 +155,7 @@ proc main(...argv: List[Str]) [fs, error] {
   )?
 
   if opts.image.len() != 1 {
-    return Err(FatToolError.Failed("usage", "usage: mkfs.vfat [-n LABEL] IMAGE"))
+    return Err(FatToolError.Failed(kind: "usage", message: "usage: mkfs.vfat [-n LABEL] IMAGE"))
   }
 
   format_fat16(fp"{opts.image[0]}", opts.label)?

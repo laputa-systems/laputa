@@ -17,7 +17,7 @@ proc le32(value: Int) [error] -> Result[Bytes] {
 proc fixed_name(name: Str) [error] -> Result[Bytes] {
   let raw = bytes.from_text(name)
 
-  return Err(FatPutError.Failed("name-too-long", name)) when raw.len() > 11
+  return Err(FatPutError.Failed(kind: "name-too-long", message: name)) when raw.len() > 11
 
   bytes.concat([raw, bytes.zero(11 - raw.len())?])
 }
@@ -70,7 +70,7 @@ pure fallback_fat_name(path_value: Str) -> Result[Str] {
 
   return "BOOTX64 EFI" when path_value == "EFI/BOOT/BOOTX64.EFI"
 
-  Err(FatPutError.Failed("unsupported-path", path_value))
+  Err(FatPutError.Failed(kind: "unsupported-path", message: path_value))
 }
 
 type FatPutOptions = {operands: List[Str]}
@@ -78,7 +78,7 @@ type FatPutOptions = {operands: List[Str]}
 proc main(...argv: List[Str]) [fs, error] {
   let opts: FatPutOptions = cli.applet(argv, {operands: {form: "...ARG"}})?
   if opts.operands.len() != 3 {
-    return Err(FatPutError.Failed("usage", "usage: fat-put IMAGE SOURCE EFI/BOOT/{BOOTAA64.EFI,BOOTX64.EFI}"))
+    return Err(FatPutError.Failed(kind: "usage", message: "usage: fat-put IMAGE SOURCE EFI/BOOT/{BOOTAA64.EFI,BOOTX64.EFI}"))
   }
 
   let fat_name = fallback_fat_name(opts.operands[2])?
@@ -94,7 +94,7 @@ proc main(...argv: List[Str]) [fs, error] {
   let fat_sectors = bytes.unpack_le(boot, 2, offset: 22)?
 
   if bytes_per_sector != 512 or fats != 2 {
-    return Err(FatPutError.Failed("unsupported-fat", "only 512-byte-sector FAT16 with two FATs is supported"))
+    return Err(FatPutError.Failed(kind: "unsupported-fat", message: "only 512-byte-sector FAT16 with two FATs is supported"))
   }
 
   let cluster_size = sectors_per_cluster * 512

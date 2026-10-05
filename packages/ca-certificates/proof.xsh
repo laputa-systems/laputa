@@ -3,7 +3,7 @@ error ProofError = Failed(kind: Str, message: Str)
 
 proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   guard condition else {
-    return Err(ProofError.Failed(kind, message))
+    return Err(ProofError.Failed(kind:, message:))
   }
 }
 

@@ -206,7 +206,7 @@ proc fail_on_m4_status() [fs, error] {
 """
 
   if wait_call not in text {
-    return Err(BisonBuildError.Failed("bison-patch", "src/output.c no longer waits for m4 as this recipe expects"))
+    return Err(BisonBuildError.Failed(kind: "bison-patch", message: "src/output.c no longer waits for m4 as this recipe expects"))
   }
 
   let checked_wait = """  if (wait_subprocess (pid, "m4", false, false, true, true, NULL) != 0)

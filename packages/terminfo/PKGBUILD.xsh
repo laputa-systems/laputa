@@ -63,7 +63,7 @@ error TerminfoSourceError = Unexpected(file: Str, message: Str)
 proc linux_terminfo_source(text: Str) [error] -> Result[Str] {
   let fragment = "xterm+kbs|fragment for backspace key,\n\tkbs=^H,\n"
   guard fragment in text else {
-    return Err(TerminfoSourceError.Unexpected("terminfo.src", "the xterm+kbs fragment no longer reads kbs=^H"))
+    return Err(TerminfoSourceError.Unexpected(file: "terminfo.src", message: "the xterm+kbs fragment no longer reads kbs=^H"))
   }
 
   text.replace(fragment, "xterm+kbs|fragment for backspace key,\n\tkbs=^?,\n")
@@ -73,7 +73,7 @@ proc linux_terminfo_source(text: Str) [error] -> Result[Str] {
 # compiling it; Laputa keeps foot's default name.
 proc foot_terminfo_source(text: Str) [error] -> Result[Str] {
   guard "@default_terminfo@|foot terminal emulator," in text else {
-    return Err(TerminfoSourceError.Unexpected("foot.info", "the foot entry is no longer named @default_terminfo@"))
+    return Err(TerminfoSourceError.Unexpected(file: "foot.info", message: "the foot entry is no longer named @default_terminfo@"))
   }
 
   text.replace("@default_terminfo@", "foot")

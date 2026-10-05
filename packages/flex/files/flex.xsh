@@ -202,7 +202,7 @@ proc split_rule_line(raw: Str) [error] -> Result[PatternAction] {
     }
   }
 
-  Err(ToolError.Failed("lex", f"missing action for rule: {raw}"))
+  Err(ToolError.Failed(kind: "lex", message: f"missing action for rule: {raw}"))
 }
 
 proc split_state_qualifier(pattern: Str) [error] -> Result[StateQualifier] {
@@ -230,7 +230,7 @@ proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
     let action = parsed.action
 
     if "REJECT" in action {
-      return Err(ToolError.Failed("unsupported", "flex.xsh does not support REJECT"))
+      return Err(ToolError.Failed(kind: "unsupported", message: "flex.xsh does not support REJECT"))
     }
 
     let qualified = split_state_qualifier(pattern)?
@@ -253,7 +253,7 @@ proc parse_rules(text: Str, defs: Map[Str]) [error] -> Result[List[LexRule]] {
     }
   }
 
-  return Err(ToolError.Failed("lex", "no rules found")) when rules.len() == 0
+  return Err(ToolError.Failed(kind: "lex", message: "no rules found")) when rules.len() == 0
 
   rules
 }
@@ -263,7 +263,7 @@ proc reject_unsupported_options(text: Str) [error] {
     let line = raw.trim()
 
     if line.starts_with("%option") and "reject" in line {
-      return Err(ToolError.Failed("unsupported", "flex.xsh does not support REJECT"))
+      return Err(ToolError.Failed(kind: "unsupported", message: "flex.xsh does not support REJECT"))
     }
   }
 }
@@ -291,12 +291,12 @@ proc upstream_disabled() [env] -> Bool {
 }
 
 proc run_upstream_flex(argv: List[Str], reason: Str) [process, env, error] {
-  return Err(ToolError.Failed("unsupported", reason)) when upstream_disabled()
+  return Err(ToolError.Failed(kind: "unsupported", message: reason)) when upstream_disabled()
 
   if let Ok(bin) = process.which("flex") {
     run $bin @argv ?
   } else {
-    return Err(ToolError.Failed("unsupported", reason))
+    return Err(ToolError.Failed(kind: "unsupported", message: reason))
   }
 }
 
@@ -304,7 +304,7 @@ proc parse_lex_file(source: Str) [error] -> Result[LexProgram] {
   let parts = source.split("%%")
 
   if parts.len() < 2 {
-    return Err(ToolError.Failed("lex", "input must contain definitions and rules separated by %%"))
+    return Err(ToolError.Failed(kind: "lex", message: "input must contain definitions and rules separated by %%"))
   }
 
   reject_unsupported_options(parts[0])?
@@ -355,7 +355,7 @@ proc generate_linux_stub(source: Str) [error] -> Result[Str] {
   let parts = source.split("%%")
 
   if parts.len() < 2 {
-    return Err(ToolError.Failed("lex", "input must contain definitions and rules separated by %%"))
+    return Err(ToolError.Failed(kind: "lex", message: "input must contain definitions and rules separated by %%"))
   }
 
   let prologue = extract_c_block(parts[0])?
@@ -505,7 +505,7 @@ proc generate_rule_table(rules: List[LexRule], states: List[Str]) [error] -> Res
     }
 
     if state == "-1" and rule.state != "" {
-      return Err(ToolError.Failed("lex", f"unknown start condition: {rule.state}"))
+      return Err(ToolError.Failed(kind: "lex", message: f"unknown start condition: {rule.state}"))
     }
 
     lines = lines.push(f"  {{\"^({c_quote(rule.pattern)})\", {bol}, {state}}},")
@@ -757,7 +757,7 @@ proc parse_options(argv: List[Str]) [error, io] -> Result[LexOptions] {
     } else if token.name == "o" or token.name == "outfile" {
       output = token.value
     } else {
-      return Err(ToolError.Failed("usage", f"unsupported option: {token.name}"))
+      return Err(ToolError.Failed(kind: "usage", message: f"unsupported option: {token.name}"))
     }
   }
 

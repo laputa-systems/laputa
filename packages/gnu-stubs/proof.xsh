@@ -11,14 +11,14 @@ proc main(rootfs: Path = /rootfs) [fs, error] {
     fp"{rootfs}/usr/lib/libgcc_s.so.1",
   ] {
     guard fs.exists(path_value)? else {
-      return Err(ProofError.Failed("proof-gnu-stubs", f"missing {path_value.strip_prefix(rootfs)?.display()}"))
+      return Err(ProofError.Failed(kind: "proof-gnu-stubs", message: f"missing {path_value.strip_prefix(rootfs)?.display()}"))
     }
   }
 
   let link = fp"{rootfs}/usr/lib/libgcc_s.so.1".readlink()?
 
   if link.display() != "libgcc_s.so" {
-    return Err(ProofError.Failed("proof-gnu-stubs", f"libgcc_s.so.1 symlink points to {link}"))
+    return Err(ProofError.Failed(kind: "proof-gnu-stubs", message: f"libgcc_s.so.1 symlink points to {link}"))
   }
 
   print "gnu-stubs ok"
