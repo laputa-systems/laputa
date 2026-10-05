@@ -111,43 +111,41 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   # user's home (or /) is owned by the user or root and not group or world
   # writable, which rules out /tmp; a private directory under the home passes.
   let pid = process.current_pid()?
-  let auth_dir = fp"{me.home}/.laputa-proof-dropbear-{pid}"
-  auth_dir.remove()
-  auth_dir.mkdir()
-  defer auth_dir.remove()
-  auth_dir.chmod(0o700)
-  fp"{auth_dir}/authorized_keys".write(f"{client_public}\n", mode: 0o600)
-  let client_home = fp"{tmp}/client-home"
-  client_home.mkdir()
-  let log_path = fp"{tmp}/dropbear.log"
-  let port = 22000 + pid % 20000
-  let listen = f"127.0.0.1:{port}"
-  let server = spawn run $dynlinker $dropbear "-F" "-E" "-s" "-r" $host_key "-D" $auth_dir "-p" $listen > /dev/null \
-    2> $log_path ?
+  tempdir auth_dir at fp"{me.home}/.laputa-proof-dropbear-{pid}" {
+    auth_dir.chmod(0o700)
+    fp"{auth_dir}/authorized_keys".write(f"{client_public}\n", mode: 0o600)
+    let client_home = fp"{tmp}/client-home"
+    client_home.mkdir()
+    let log_path = fp"{tmp}/dropbear.log"
+    let port = 22000 + pid % 20000
+    let listen = f"127.0.0.1:{port}"
+    let server = spawn run $dynlinker $dropbear "-F" "-E" "-s" "-r" $host_key "-D" $auth_dir "-p" $listen > /dev/null \
+      2> $log_path ?
 
-  var output = ""
-  var tries = 50
+    var output = ""
+    var tries = 50
 
-  # Retry while the server comes up.
-  while tries > 0 and output == "" {
-    output = ssh_echo(dynlinker, rootfs, client_home, me.name, client_key, port)?
+    # Retry while the server comes up.
+    while tries > 0 and output == "" {
+      output = ssh_echo(dynlinker, rootfs, client_home, me.name, client_key, port)?
 
-    if output == "" {
-      time.sleep(100ms)
-      tries -= 1
+      if output == "" {
+        time.sleep(100ms)
+        tries -= 1
+      }
     }
-  }
 
-  let stranger = ssh_echo(dynlinker, rootfs, client_home, me.name, stranger_key, port)?
-  process.kill(server.pid, "TERM")
-  let _ = wait server
-  let log = log_path.read_text()?
-  proof.ensure(
-    output == "laputa-ssh-ok",
-    "dropbear-ssh",
-    f"authorized client did not run its command: {output}; server log: {log}",
-  )
-  proof.ensure("Pubkey auth succeeded" in log, "dropbear-ssh", f"server did not log public-key auth: {log}")
-  proof.ensure(stranger == "", "dropbear-ssh", "dropbear accepted a client key missing from authorized_keys")
-  print "dropbear ok: ed25519 host key, public-key login runs a command, unknown key refused"
+    let stranger = ssh_echo(dynlinker, rootfs, client_home, me.name, stranger_key, port)?
+    process.kill(server.pid, "TERM")
+    let _ = wait server
+    let log = log_path.read_text()?
+    proof.ensure(
+      output == "laputa-ssh-ok",
+      "dropbear-ssh",
+      f"authorized client did not run its command: {output}; server log: {log}",
+    )
+    proof.ensure("Pubkey auth succeeded" in log, "dropbear-ssh", f"server did not log public-key auth: {log}")
+    proof.ensure(stranger == "", "dropbear-ssh", "dropbear accepted a client key missing from authorized_keys")
+    print "dropbear ok: ed25519 host key, public-key login runs a command, unknown key refused"
+  }
 }

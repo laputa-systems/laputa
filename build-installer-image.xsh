@@ -4,6 +4,12 @@ use installer.package_roots_host
 use installer.rootfs_size
 use system.image as system_image
 
+# laputa-fs's mkfs.ext4 layout: 4 KiB blocks in 32768-block groups, each of
+# which reserves its first 516 blocks (headers and the inode table), and files
+# mapped through indirect blocks of 1024 entries. Sizing from apparent bytes
+# plus a fixed slack fails once a root spans more than a group or two.
+const EXT4_BLOCK = 4096
+
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
   host.installer_run_argv(
     xsh,
@@ -141,12 +147,6 @@ proc prune_runtime_root(rootfs: Path, arch: Str) {
 pure ceil_div(value: Int, divisor: Int) -> Int {
   (value + divisor - 1) / divisor
 }
-
-# laputa-fs's mkfs.ext4 layout: 4 KiB blocks in 32768-block groups, each of
-# which reserves its first 516 blocks (headers and the inode table), and files
-# mapped through indirect blocks of 1024 entries. Sizing from apparent bytes
-# plus a fixed slack fails once a root spans more than a group or two.
-const EXT4_BLOCK = 4096
 
 # Data and mapping blocks for one tree: whole blocks per file plus one
 # indirect block per 1024 data blocks and one for the double-indirect root,
@@ -507,7 +507,7 @@ proc build_installer_iso(work: Path, iso: Path, kernel: Path, arch: Str) {
   write_iso9660(iso, f"LAPUTA_{iso_arch}", [{source: kernel, name: "KERNEL;1"}])
   let base_size = iso.metadata()?.size
   let root_size = installer_root.metadata()?.size
-  let root_start_lba = ceil_div(base_size, 1024 * 1024) * 2048
+  let root_start_lba = ceil_div(base_size, 1MiB) * 2048
   let root_sectors = ceil_div(root_size, 512)
   let root_end_lba = root_start_lba + root_sectors - 1
   let total_sectors = root_end_lba + 4

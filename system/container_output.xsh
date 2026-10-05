@@ -88,9 +88,7 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
   }
 
   let current = fp"{output_root}/current"
-  let current_temporary = fp"{output_root}/.current.tmp"
-  current_temporary.remove()
-  defer current_temporary.remove()
-  current_temporary.symlink(to: fp"builds/{key}")
-  current_temporary.rename(to: current, overwrite: true)
+  atomically replace current as current_temporary {
+    current_temporary.symlink(to: fp"builds/{key}")
+  }
 }

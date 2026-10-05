@@ -1,7 +1,7 @@
 ##! Contract coverage for the minimal dwl keyboard configuration.
 use packages.dwl-minimal.PKGBUILD as dwl_recipe
 
-test test_dwl_minimal_removes_the_unavailable_menu_binding [fs, error] { |ctx|
+test test_dwl_minimal_removes_the_unavailable_menu_binding [fs, error] { |_|
   let upstream = """static const char *termcmd[] = { \"foot\", NULL };
 static const char *menucmd[] = { \"wmenu-run\", NULL };
 static const Key keys[] = {

@@ -539,10 +539,7 @@ test test_runtime_only_dependency_is_planned_but_neither_ordered_nor_keyed [fs, 
   ]
   let service = node_named(initial, "service")?
   assert service.level == 0
-  test.eq(
-    service.dependencies,
-    [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}],
-  )
+  assert service.dependencies == [{name: "app", kind: types.RuntimeOnly, artifact_key: node_named(initial, "app")?.artifact_key}]
 
   let path_value = fp"{test.temp_dir(ctx, name: "plan-runtime-only-json")?}/plan.json"
   plan_json.write_plan(path_value, initial)

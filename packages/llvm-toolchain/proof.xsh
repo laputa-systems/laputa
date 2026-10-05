@@ -234,22 +234,20 @@ proc prove_target_tools(root: Path, arch: Str) {
   ensure(machine in clang_header, "proof-llvm-toolchain", f"clang is not {arch}")
   let cc_text = cc.read_text()?
   ensure(cc_text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", "cc wrapper is not an XSH script")
-  let tmp = fp"{root}/var/tmp/proof-llvm-toolchain-wrapper"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-wrapper" {
 
-  fp"{tmp}/wrapper-target.c".write(
-    """int laputa_wrapper_target(void) {
+    fp"{tmp}/wrapper-target.c".write(
+      """int laputa_wrapper_target(void) {
   return 7;
 }
 """,
-  )
+    )
 
-  let object = fp"{tmp}/wrapper-target.o"
-  run $cc "-target" f"{arch}-linux-musl" "-O2" "-c" fp"{tmp}/wrapper-target.c" "-o" $object
-  let object_header = run.text $readelf "-h" $object
-  ensure(machine in object_header, "proof-llvm-toolchain", f"cc wrapper did not produce a {arch} object")
+    let object = fp"{tmp}/wrapper-target.o"
+    run $cc "-target" f"{arch}-linux-musl" "-O2" "-c" fp"{tmp}/wrapper-target.c" "-o" $object
+    let object_header = run.text $readelf "-h" $object
+    ensure(machine in object_header, "proof-llvm-toolchain", f"cc wrapper did not produce a {arch} object")
+  }
 }
 
 proc main(root: Path = /rootfs) [fs, process, env, error] {

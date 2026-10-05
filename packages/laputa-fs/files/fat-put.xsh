@@ -113,7 +113,7 @@ proc main(...argv: List[Str]) [fs, error] {
     let cluster = first_file_cluster + index
     let value = if index + 1 == file_clusters { 65535 } else { cluster + 1 }
     set_fat(image, fat_offset, fat_sectors, cluster, value)
-    let chunk = data.slice(index * cluster_size, cluster_size)
+    let chunk = data[index * cluster_size..(index + 1) * cluster_size]
     write_cluster(image, data_offset, cluster, chunk, cluster_size)
     index += 1
   }

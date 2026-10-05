@@ -289,6 +289,73 @@ type PerfArch = {srcarch: Str, defs: List[Str], sources: List[Str]}
 # Makefile's install_headers does; perf includes them from there.
 type HeaderSet = {src: Str, dest: Str, names: List[Str]}
 
+# perf objects whose source is outside tools/perf, generated, or renamed.
+const perf_moved_units: List[PerfUnit] = [
+  {obj: "pmu-events/pmu-events.o", src: "tools/perf/pmu-events/empty-pmu-events.c"},
+  {obj: "util/argv_split.o", src: "tools/lib/argv_split.c"},
+  {obj: "util/bitmap.o", src: "tools/lib/bitmap.c"},
+  {obj: "util/ctype.o", src: "tools/lib/ctype.c"},
+  {obj: "util/find_bit.o", src: "tools/lib/find_bit.c"},
+  {obj: "util/hweight.o", src: "tools/lib/hweight.c"},
+  {obj: "util/libstring.o", src: "tools/lib/string.c"},
+  {obj: "util/list_sort.o", src: "tools/lib/list_sort.c"},
+  {obj: "util/rbtree.o", src: "tools/lib/rbtree.c"},
+  {obj: "util/vsprintf.o", src: "tools/lib/vsprintf.c"},
+  {obj: "util/intel-pt-decoder/inat.o", src: "tools/arch/x86/lib/inat.c"},
+  {obj: "util/intel-pt-decoder/insn.o", src: "tools/arch/x86/lib/insn.c"},
+  {obj: "util/expr-bison.o", src: "build/util/expr-bison.c"},
+  {obj: "util/expr-flex.o", src: "build/util/expr-flex.c"},
+  {obj: "util/parse-events-bison.o", src: "build/util/parse-events-bison.c"},
+  {obj: "util/parse-events-flex.o", src: "build/util/parse-events-flex.c"},
+  {obj: "util/pmu-bison.o", src: "build/util/pmu-bison.c"},
+  {obj: "util/pmu-flex.o", src: "build/util/pmu-flex.c"},
+]
+
+const extra_warnings = [
+  "-Wbad-function-cast",
+  "-Wdeclaration-after-statement",
+  "-Wformat-security",
+  "-Wformat-y2k",
+  "-Winit-self",
+  "-Wmissing-declarations",
+  "-Wmissing-prototypes",
+  "-Wnested-externs",
+  "-Wno-system-headers",
+  "-Wold-style-definition",
+  "-Wpacked",
+  "-Wredundant-decls",
+  "-Wstrict-prototypes",
+  "-Wswitch-default",
+  "-Wswitch-enum",
+  "-Wundef",
+  "-Wwrite-strings",
+  "-Wformat",
+  "-Wno-type-limits",
+  "-Wshadow",
+]
+
+# The upstream feature probes' results against musl; none depends on the
+# architecture.
+const musl_feature_defs = [
+  "-DHAVE_PTHREAD_BARRIER",
+  "-DHAVE_EVENTFD_SUPPORT",
+  "-DHAVE_GETTID",
+  "-DHAVE_SCHED_GETCPU_SUPPORT",
+  "-DHAVE_SETNS_SUPPORT",
+]
+
+const bison_cflags = ["-DYYLTYPE_IS_TRIVIAL=0", "-DYYENABLE_NLS=0", "-Wno-unused-but-set-variable", "-Wno-switch-enum"]
+
+const flex_cflags = [
+  "-Wno-redundant-decls",
+  "-Wno-switch-default",
+  "-Wno-unused-function",
+  "-Wno-misleading-indentation",
+  "-Wno-unused-but-set-variable",
+]
+
+const workload_cflags = ["-g", "-O0", "-fno-inline"]
+
 # The object lists below transcribe a host run of the upstream build
 # (`make -C tools/perf V=1 prefix=/usr`, ARCH=x86_64 and ARCH=arm64) with
 # NO_LIBELF NO_LIBTRACEEVENT NO_JEVENTS NO_LIBPYTHON NO_SLANG NO_LIBNUMA
@@ -397,28 +464,6 @@ util/util.c util/values.c util/vdso.c
 """.words()
 }
 
-# perf objects whose source is outside tools/perf, generated, or renamed.
-const perf_moved_units: List[PerfUnit] = [
-  {obj: "pmu-events/pmu-events.o", src: "tools/perf/pmu-events/empty-pmu-events.c"},
-  {obj: "util/argv_split.o", src: "tools/lib/argv_split.c"},
-  {obj: "util/bitmap.o", src: "tools/lib/bitmap.c"},
-  {obj: "util/ctype.o", src: "tools/lib/ctype.c"},
-  {obj: "util/find_bit.o", src: "tools/lib/find_bit.c"},
-  {obj: "util/hweight.o", src: "tools/lib/hweight.c"},
-  {obj: "util/libstring.o", src: "tools/lib/string.c"},
-  {obj: "util/list_sort.o", src: "tools/lib/list_sort.c"},
-  {obj: "util/rbtree.o", src: "tools/lib/rbtree.c"},
-  {obj: "util/vsprintf.o", src: "tools/lib/vsprintf.c"},
-  {obj: "util/intel-pt-decoder/inat.o", src: "tools/arch/x86/lib/inat.c"},
-  {obj: "util/intel-pt-decoder/insn.o", src: "tools/arch/x86/lib/insn.c"},
-  {obj: "util/expr-bison.o", src: "build/util/expr-bison.c"},
-  {obj: "util/expr-flex.o", src: "build/util/expr-flex.c"},
-  {obj: "util/parse-events-bison.o", src: "build/util/parse-events-bison.c"},
-  {obj: "util/parse-events-flex.o", src: "build/util/parse-events-flex.c"},
-  {obj: "util/pmu-bison.o", src: "build/util/pmu-bison.c"},
-  {obj: "util/pmu-flex.o", src: "build/util/pmu-flex.c"},
-]
-
 # The aarch64 list comes from an ARCH=arm64 cross run against musl and kernel
 # headers for arm64; nothing built from it has run on aarch64 yet.
 proc perf_arch(target: Str) [error] -> Result[PerfArch] {
@@ -498,39 +543,6 @@ pure tree_units(obj_prefix: Str, src_dir: Str, sources: List[Str]) -> List[PerfU
   [{obj: fp"{obj_prefix}{source}".with_ext("o").display(), src: f"{src_dir}/{source}"} for source in sources]
 }
 
-const extra_warnings = [
-  "-Wbad-function-cast",
-  "-Wdeclaration-after-statement",
-  "-Wformat-security",
-  "-Wformat-y2k",
-  "-Winit-self",
-  "-Wmissing-declarations",
-  "-Wmissing-prototypes",
-  "-Wnested-externs",
-  "-Wno-system-headers",
-  "-Wold-style-definition",
-  "-Wpacked",
-  "-Wredundant-decls",
-  "-Wstrict-prototypes",
-  "-Wswitch-default",
-  "-Wswitch-enum",
-  "-Wundef",
-  "-Wwrite-strings",
-  "-Wformat",
-  "-Wno-type-limits",
-  "-Wshadow",
-]
-
-# The upstream feature probes' results against musl; none depends on the
-# architecture.
-const musl_feature_defs = [
-  "-DHAVE_PTHREAD_BARRIER",
-  "-DHAVE_EVENTFD_SUPPORT",
-  "-DHAVE_GETTID",
-  "-DHAVE_SCHED_GETCPU_SUPPORT",
-  "-DHAVE_SETNS_SUPPORT",
-]
-
 # perf's CFLAGS between the compiler and BUILD_STR, in upstream order. perf
 # drops -Wnested-externs from the shared warning set.
 pure perf_cflags(arch: PerfArch) -> List[Str] {
@@ -577,18 +589,6 @@ pure perf_cflags(arch: PerfArch) -> List[Str] {
     f"-I{out}/",
   ]
 }
-
-const bison_cflags = ["-DYYLTYPE_IS_TRIVIAL=0", "-DYYENABLE_NLS=0", "-Wno-unused-but-set-variable", "-Wno-switch-enum"]
-
-const flex_cflags = [
-  "-Wno-redundant-decls",
-  "-Wno-switch-default",
-  "-Wno-unused-function",
-  "-Wno-misleading-indentation",
-  "-Wno-unused-but-set-variable",
-]
-
-const workload_cflags = ["-g", "-O0", "-fno-inline"]
 
 # Per-object CFLAGS from the Build files, appended after the shared flags.
 # DOCDIR is upstream's fallback tips location for running perf from its source
@@ -641,7 +641,7 @@ pure unit_cflags(obj: Str) -> List[Str] {
 proc write_perf_version_file() {
   var fields: Map[Str] = {}
 
-  for line in p"Makefile".read_text()?.lines() {
+  for line in p"Makefile".lines()? {
     let parts = line.split("=")
     continue unless parts.len() == 2
     let key = parts[0].trim()

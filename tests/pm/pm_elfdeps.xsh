@@ -1,7 +1,7 @@
 ##! ELF runtime-dependency checks applied to package proofs.
 use pm.elfdeps
 
-test test_elfdeps_rejects_a_needed_build_time_path [error] { |ctx|
+test test_elfdeps_rejects_a_needed_build_time_path [error] { |_|
   let failures = elfdeps.missing_elf_runtime_dependencies(
     "libva",
     ["musl"],
@@ -15,7 +15,7 @@ test test_elfdeps_rejects_a_needed_build_time_path [error] { |ctx|
   assert failures[0].provider == ""
 }
 
-test test_elfdeps_accepts_names_its_dependencies_provide [error] { |ctx|
+test test_elfdeps_accepts_names_its_dependencies_provide [error] { |_|
   let failures = elfdeps.missing_elf_runtime_dependencies(
     "libinput",
     ["musl", "libevdev"],

@@ -202,7 +202,7 @@ proc parse_inittab(path_value: Path) -> Result[List[InittabEntry]] {
   var index = 1
 
   let entries: List[InittabEntry] = collect {
-    for line in path_value.read_text()?.lines() {
+    for line in path_value.lines()? {
       let entry = parse_inittab_line(line, index)?
 
       yield entry when entry.action != ""

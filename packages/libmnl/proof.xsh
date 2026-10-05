@@ -122,16 +122,14 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   }
 
   let cc = process.which("cc")?
-  let tmp = fp"{root}/var/tmp/proof-libmnl"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  fp"{tmp}/proof-libmnl.c".write(program)
-  let binary = fp"{tmp}/proof-libmnl"
-  run $cc fp"{tmp}/proof-libmnl.c" f"-L{root}/usr/lib" "-lmnl" "-o" $binary
+  tempdir tmp at fp"{root}/var/tmp/proof-libmnl" {
+    fp"{tmp}/proof-libmnl.c".write(program)
+    let binary = fp"{tmp}/proof-libmnl"
+    run $cc fp"{tmp}/proof-libmnl.c" f"-L{root}/usr/lib" "-lmnl" "-o" $binary
 
-  let libdir = fp"{root}/usr/lib".display()
-  let out = run.text LD_LIBRARY_PATH=$libdir $binary
-  proof.ensure(out.trim() == "libmnl: lo", "libmnl", f"unexpected link dump output: {out.trim()}")
-  print "libmnl ok: RTM_GETLINK dump over NETLINK_ROUTE found lo"
+    let libdir = fp"{root}/usr/lib".display()
+    let out = run.text LD_LIBRARY_PATH=$libdir $binary
+    proof.ensure(out.trim() == "libmnl: lo", "libmnl", f"unexpected link dump output: {out.trim()}")
+    print "libmnl ok: RTM_GETLINK dump over NETLINK_ROUTE found lo"
+  }
 }

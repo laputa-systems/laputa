@@ -18,7 +18,7 @@ pure lines_between(text: Str, start: Str, end: Str) -> List[Str] {
   lines
 }
 
-test test_event_name_lookups_are_sorted_by_name [error] { |ctx|
+test test_event_name_lookups_are_sorted_by_name [error] { |_|
   let header = libevdev_recipe.event_names_header(
     [
   """#define EV_SYN 0x00
@@ -42,7 +42,7 @@ test test_event_name_lookups_are_sorted_by_name [error] { |ctx|
   ]
 }
 
-test test_event_names_keep_the_last_name_per_code [error] { |ctx|
+test test_event_names_keep_the_last_name_per_code [error] { |_|
   let header = libevdev_recipe.event_names_header(
     [
   """#define EV_SND 0x12

@@ -581,9 +581,9 @@ proc write_shader_header(src: Path, dest: Path, symbol: Str) {
 }
 
 proc write_shader_headers() {
-  for name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
-    let symbol = f"{name.replace(".", with: "_")}_src"
-    write_shader_header(fp"render/gles2/shaders/{name}", fp"render/gles2/shaders/{symbol}.h", symbol)
+  for shader_name in ["common.vert", "quad.frag", "tex_rgba.frag", "tex_rgbx.frag", "tex_external.frag"] {
+    let symbol = f"{shader_name.replace(".", with: "_")}_src"
+    write_shader_header(fp"render/gles2/shaders/{shader_name}", fp"render/gles2/shaders/{symbol}.h", symbol)
   }
 }
 

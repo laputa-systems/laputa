@@ -142,19 +142,19 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[Supervi
   outputs.disk.write("disk")
 
   # This fake QEMU ignores TERM, proving managed cancellation escalates to KILL.
-  fake_qemu.write(
+  fake_qemu.write_lines(
     [
       "#!/bin/sh",
       "trap '' TERM",
       f"printf qmp > '{outputs.qmp_socket}'",
       "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'",
       "while :; do sleep 1; done",
-    ].join("\n") + "\n",
+    ],
   )
 
   # The failed first call makes the side-effect-free QMP readiness check retry.
   # The third call is the one proof input; the fourth writes screenshot evidence.
-  fake_qmp.write(
+  fake_qmp.write_lines(
     [
       "#!/bin/sh",
       f"if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
@@ -163,7 +163,7 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[Supervi
       f"printf 'P6\\n1 1\\n255\\nX' > '{outputs.screenshot}'",
       final_log,
       "exit 0",
-    ].join("\n") + "\n",
+    ],
   )
   fake_qemu.chmod(0o755)
   fake_qmp.chmod(0o755)

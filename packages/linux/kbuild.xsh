@@ -571,7 +571,7 @@ export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [
 # The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_header_list(file: Path, variable: Str) -> Result[List[Str]] {
   let names: List[Str] = collect {
-    for line in file.read_text()?.lines() {
+    for line in file.lines()? {
       let fields = line.fields()
       continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
       yield fields[2]
@@ -640,7 +640,7 @@ export proc generate_arm64_kernel_hwcaps(root: Path) [fs, error] {
     "",
   ]
 
-  for line in fp"{root}/arch/arm64/include/uapi/asm/hwcap.h".read_text()?.lines() {
+  for line in fp"{root}/arch/arm64/include/uapi/asm/hwcap.h".lines()? {
     continue unless define_re.matches(line)
 
     if let [_, index, name, ..] = name_re.captures(line) {
@@ -2836,7 +2836,7 @@ export proc discover_plan_with_options(
   options: DiscoverOptions,
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var scans: Map[DirScan] = {}
-  var local_graph: LocalRecordGraph = {records: {}, barriers: {}, plan: empty_plan()}
+  var local_graph = LocalRecordGraph(records: {}, barriers: {}, plan: empty_plan())
 
   if options.local_records {
     if options.local_record_cache {
@@ -4263,26 +4263,23 @@ export proc generate_offsets_header(asm_path: Path, out: Path, header_guard: Str
   for raw in asm_path.read_text()?.split("\n") {
     let line = raw.trim()
 
-    match regex_captures(line, "\\.ascii\\s+\"->([^\"]*)\"") {
-      Ok(caps) => {
-        if caps.len() >= 2 {
-          let body = caps[1].trim()
+    if let Ok(caps) = regex_captures(line, "\\.ascii\\s+\"->([^\"]*)\"") {
+      if caps.len() >= 2 {
+        let body = caps[1].trim()
 
-          if body == "" {
-            lines += [""]
-          } else {
-            let parts = body.fields()
-            let name = parts.get(0) ?? ""
-            let value = (parts.get(1) ?? "").replace("$", with: "")
-            let comment = parts |> drop(2)
+        if body == "" {
+          lines += [""]
+        } else {
+          let parts = body.fields()
+          let name = parts.get(0) ?? ""
+          let value = (parts.get(1) ?? "").replace("$", with: "")
+          let comment = parts |> drop(2)
 
-            if name != "" and value != "" {
-              lines += [f"#define {name} {value} /* {comment.join(" ")} */"]
-            }
+          if name != "" and value != "" {
+            lines += [f"#define {name} {value} /* {comment.join(" ")} */"]
           }
         }
       }
-      Err(_) => {}
     }
   }
 

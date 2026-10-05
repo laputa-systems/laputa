@@ -66,7 +66,7 @@ proc write_report(logs: Path, arch: Str, timed: List[Timed]) [fs, error] {
     lines += [f"| `{entry.name}` | {entry.seconds} | {if entry.ok { "ok" } else { "FAILED" }} |"]
   }
 
-  fp"{logs}/report.md".write(lines.join("\n") + "\n")
+  fp"{logs}/report.md".write_lines(lines)
 }
 
 proc main(arch: Str) [fs, process, env, time, error] {

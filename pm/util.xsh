@@ -1,6 +1,11 @@
 ##! PM util operations and shared package-manager policy.
 use types
 
+# Placeholders are whole uppercase words in a source string. Matching words
+# rather than substrings keeps names such as PATCH, PACKAGE, or SEARCH from
+# being rewritten through the ARCH or other placeholders they contain.
+const source_placeholder_word = rx"[A-Z]+"
+
 ## Exported PM declaration `package_id`.
 export pure package_id(name: Str, ver: Str, rel: Str) -> Str {
   f"{name}-{ver}-{rel}"
@@ -171,11 +176,6 @@ export pure goarch_for(arch: Str) -> Str {
 
   arch
 }
-
-# Placeholders are whole uppercase words in a source string. Matching words
-# rather than substrings keeps names such as PATCH, PACKAGE, or SEARCH from
-# being rewritten through the ARCH or other placeholders they contain.
-const source_placeholder_word = rx"[A-Z]+"
 
 ## Substitutes each whole-word placeholder in `source` from `values` in one pass.
 ## A placeholder is a run of uppercase ASCII letters, or two such runs joined by

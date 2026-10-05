@@ -38,64 +38,6 @@ export type BuildPlanDto = {
   plan_sha256: Str,
 }
 
-pure plan_json_dependency_dto(value: types.PlanDependency) -> DependencyDto {
-  {
-    name: value.name,
-    kind: types.dependency_kind_text(value.kind),
-    artifact_key: value.artifact_key,
-  }
-}
-
-pure plan_json_remote_dto(value: types.RemoteRetrieval) -> RemoteDto {
-  {
-    arch: value.arch,
-    tarball: value.tarball,
-    tarball_sha256: value.tarball_sha256,
-    metadata: value.metadata,
-    metadata_sha256: value.metadata_sha256,
-  }
-}
-
-pure plan_json_node_dto(value: types.PlanNode) -> NodeDto {
-  var remote: RemoteDto? = null
-
-  let retrieval = value.remote
-
-  if retrieval != null {
-    remote = plan_json_remote_dto(retrieval)
-  }
-
-  {
-    name: value.name,
-    ver: value.ver,
-    rel: value.rel,
-    package_id: value.package_id,
-    recipe_dir: value.recipe_dir.display(),
-    recipe_sha256: value.recipe_sha256,
-    proof_sha256: value.proof_sha256,
-    artifact_key: value.artifact_key,
-    proof_key: value.proof_key,
-    action: types.plan_action_text(value.action),
-    reason: types.plan_action_reason(value.action),
-    level: value.level,
-    dependencies: [plan_json_dependency_dto(dependency) for dependency in value.dependencies],
-    remote,
-  }
-}
-
-pure plan_json_dto(value: types.BuildPlan) -> BuildPlanDto {
-  {
-    format: value.format,
-    target: types.target_text(value.target),
-    roots: value.roots,
-    repository_digest: value.repository_digest,
-    remote_index_sha256: value.remote_index_sha256,
-    build_epoch: value.build_epoch,
-    nodes: [plan_json_node_dto(node) for node in value.nodes],
-    plan_sha256: value.plan_sha256,
-  }
-}
-
 pure plan_json_write_dto(value: types.BuildPlan) -> Record {
   var nodes: List[Record] = []
 

@@ -22,7 +22,7 @@ proc repeated_byte(value: Int, count: Int) -> Result[Bytes] {
 proc fixed_text(text: Str, width: Int) -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
-  return raw.slice(offset: 0, length: width) when raw.len() >= width
+  return raw[..width] when raw.len() >= width
 
   bytes.concat([raw, repeated_byte(32, width - raw.len())?])
 }

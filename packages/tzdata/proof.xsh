@@ -77,19 +77,17 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   }
 
   let cc = process.which("cc")?
-  let tmp = fp"{root}/var/tmp/proof-tzdata"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
-  fp"{tmp}/proof-tzdata.c".write(program)
-  let binary = fp"{tmp}/proof-tzdata"
-  run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary
+  tempdir tmp at fp"{root}/var/tmp/proof-tzdata" {
+    fp"{tmp}/proof-tzdata.c".write(program)
+    let binary = fp"{tmp}/proof-tzdata"
+    run $cc "--sysroot=/" "-O2" fp"{tmp}/proof-tzdata.c" "-o" $binary
 
-  for case in expected {
-    let tz = fp"{zoneinfo}/{case.zone}".display()
-    let out = run.text TZ=$tz $binary
-    proof.ensure(out == case.output, "tzdata-localtime", f"{case.zone}: unexpected local time:\n{out}")
+    for case in expected {
+      let tz = fp"{zoneinfo}/{case.zone}".display()
+      let out = run.text TZ=$tz $binary
+      proof.ensure(out == case.output, "tzdata-localtime", f"{case.zone}: unexpected local time:\n{out}")
+    }
+
+    print "tzdata ok: 598 TZif zones, tables, Berlin/New York/Tokyo offsets and DST names"
   }
-
-  print "tzdata ok: 598 TZif zones, tables, Berlin/New York/Tokyo offsets and DST names"
 }

@@ -188,7 +188,7 @@ proc commit_artifact(
   store.commit(types.target_aarch64(), store_root, prepared.node, prepared.staged)?
 }
 
-proc expect_root_error(ctx: TestContext, result: Result[types.RootPlan], expected: Str) {
+proc expect_root_error(_: TestContext, result: Result[types.RootPlan], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: root preflight unexpectedly succeeded")
     Err(problem) => assert expected in problem.message
@@ -197,17 +197,17 @@ proc expect_root_error(ctx: TestContext, result: Result[types.RootPlan], expecte
 
 test test_root_composes_empty_and_metapackage_roots [fs, error] { |ctx|
   let empty = root.preflight(types.target_aarch64(), [])?
-  test.eq(empty.artifacts, [])
+  assert empty.artifacts == []
   let empty_output = fp"{test.temp_dir(ctx, name: "root-empty-output")?}/root"
   let empty_receipt = root.compose_artifacts(empty_output, empty, [])?
-  test.eq(empty_receipt.entries, [])
+  assert empty_receipt.entries == []
   root.verify(empty_output, empty_receipt)
 
   let store_root = test.temp_dir(ctx, name: "root-meta-store")?
   let meta = commit_artifact(ctx, store_root, "meta", types.Meta, [])?
   let meta_plan = root.preflight(types.target_aarch64(), [meta])?
   assert meta_plan.artifacts[0].payload == false
-  test.eq(meta_plan.entries, [])
+  assert meta_plan.entries == []
   let output = fp"{test.temp_dir(ctx, name: "root-meta-output")?}/root"
   test.eq(root.compose_artifacts(output, meta_plan, [meta])?.artifacts[0].package_name, "meta")
 }

@@ -180,8 +180,8 @@ pure c_lookup_lines(defs: List[EventDef], attr: Str, max_codes: Map[Int]) -> Lis
   var names = class_defs(defs, attr)
 
   if attr == "btn" {
-    for name in ["BTN_A", "BTN_B", "BTN_X", "BTN_Y"] {
-      names += [{attr, value: 0, name}]
+    for button_name in ["BTN_A", "BTN_B", "BTN_X", "BTN_Y"] {
+      names += [{attr, value: 0, name: button_name}]
     }
   }
 

@@ -449,7 +449,7 @@ test test_execute_metapackage_keeps_opaque_marker_and_proves_runtime_dependencie
   # still completed the regular proof path first.
   assert fp"{meta.artifact_dir}/payload.tar.gz".read_text()? == "laputa metapackage payload marker\n"
   assert meta_metadata.package_kind == "meta"
-  test.eq(files, [])
+  assert files == []
   assert fp"{meta.artifact_dir}/proof.json".exists()?
   assert fp"{dependency.artifact_dir}/proof.json".exists()?
 }
@@ -620,8 +620,8 @@ test test_execute_keeps_runtime_only_dependency_out_of_build_root_and_composes_i
   let object_store = execute_store(ctx, "execute-runtime-only-store")?
   let result = execute.build_plan(value, repo_root, object_store, "", 1)?
   let service = receipt_named(result, "execute-service")?
-  test.eq(service.dependency_keys, [])
-  test.eq(service.runtime_dependency_keys, [])
+  assert service.dependency_keys == []
+  assert service.runtime_dependency_keys == []
 
   let overlay = fp"{test.temp_dir(ctx, name: "execute-runtime-only-overlay")?}/overlay"
   overlay.mkdir()

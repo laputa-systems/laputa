@@ -39,7 +39,7 @@ export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
 ## Calculate a graphical rootfs size from used bytes, rounded to MiB with a 256-MiB floor.
 export pure rootfs_size_bytes(used_bytes: Int) -> Int {
   let raw = used_bytes + used_bytes / 4 + 64MiB
-  let mib = 1024 * 1024
+  let mib = 1MiB
   let rounded = (raw + mib - 1) / mib * mib
   return 256 * mib when rounded < 256 * mib
 
@@ -95,41 +95,39 @@ export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
 ## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.
 export proc image_write_rootfs(generation_root: Path, formatter: Path, output: Path) [fs, process, error] {
   let target_size = image_generation_used_bytes(generation_root)? |> rootfs_size_bytes(_)
-  let temporary = fp"{output}.tmp"
   output.parent.mkdir()
-  temporary.remove()
-  defer temporary.remove()
-  temporary.write(b"")
-  temporary.truncate(target_size)
+  atomically replace output as temporary {
+    temporary.write(b"")
+    temporary.truncate(target_size)
 
-  let xsh = /bin/xsh
-  let status = process.run(
-    process.command_argv(
-      xsh,
-      [
-        "xsh",
-        formatter,
-        "--",
-        "-q",
-        "-O",
-        "^64bit,^metadata_csum",
-        "-E",
-        "no_copy_xattrs",
-        "-L",
-        "LAPUTA_ROOT",
-        "-d",
-        generation_root,
-        temporary,
-      ],
-    ),
-  )?
+    let xsh = /bin/xsh
+    let status = process.run(
+      process.command_argv(
+        xsh,
+        [
+          "xsh",
+          formatter,
+          "--",
+          "-q",
+          "-O",
+          "^64bit,^metadata_csum",
+          "-E",
+          "no_copy_xattrs",
+          "-L",
+          "LAPUTA_ROOT",
+          "-d",
+          generation_root,
+          temporary,
+        ],
+      ),
+    )?
 
-  if ! status.ok or temporary.metadata()?.size != target_size {
-    return Err(ImageError.Failed(f"native ext4 formatter failed for {output}"))
+    if ! status.ok or temporary.metadata()?.size != target_size {
+      return Err(ImageError.Failed(f"native ext4 formatter failed for {output}"))
+    }
+
+    fs.fsync(temporary)
   }
-
-  fs.fsync(temporary)
-  temporary.rename(to: output, overwrite: true)
 }
 
 ## Replace an exact byte range inside an immutable byte value.
@@ -281,58 +279,56 @@ export proc write_disk(rootfs: Path, image: Path) [fs, error] {
   }
 
   let backup_entries_lba = total_sectors - entry_sectors - 1
-  let tmp = fp"{image}.tmp"
   image.parent.mkdir()
-  tmp.remove()
-  defer tmp.remove()
-  tmp.write(b"")
-  tmp.truncate(total_sectors * sector_size)
-  let entries = bytes.concat(
-    [
-      image_gpt_entry(image_linux_partition_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
-      bytes.zero(entry_count * entry_size - entry_size)?,
-    ],
-  )
-  let entries_crc = hash.crc32(entries)
-  let disk_guid = bytes.zero(16)?
-  let primary_header = image_gpt_header(
-    1,
-    total_sectors - 1,
-    first_usable,
-    last_usable,
-    disk_guid,
-    2,
-    entry_count,
-    entry_size,
-    entries_crc,
-  )?
-  let backup_header = image_gpt_header(
-    total_sectors - 1,
-    1,
-    first_usable,
-    last_usable,
-    disk_guid,
-    backup_entries_lba,
-    entry_count,
-    entry_size,
-    entries_crc,
-  )?
-  let _ = bytes.write_at(tmp, 0, protective_mbr(total_sectors)?)?
-  let _ = bytes.write_at(tmp, sector_size, primary_header)?
-  let _ = bytes.write_at(tmp, 2 * sector_size, entries)?
-  let _ = bytes.write_at(tmp, backup_entries_lba * sector_size, entries)?
-  let _ = bytes.write_at(tmp, (total_sectors - 1) * sector_size, backup_header)?
-  let _ = bytes.copy_file(
-    rootfs,
-    tmp,
-    source_offset: 0,
-    dest_offset: root_start_lba * sector_size,
-    length: rootfs_bytes,
-    create: false,
-    truncate: false,
-  )?
-  fs.fsync(tmp)
-  verify_disk(tmp, rootfs_bytes)
-  tmp.rename(to: image, overwrite: true)
+  atomically replace image as tmp {
+    tmp.write(b"")
+    tmp.truncate(total_sectors * sector_size)
+    let entries = bytes.concat(
+      [
+        image_gpt_entry(image_linux_partition_type_guid()?, root_partition_guid()?, root_start_lba, root_end, "LAPUTA_ROOT")?,
+        bytes.zero(entry_count * entry_size - entry_size)?,
+      ],
+    )
+    let entries_crc = hash.crc32(entries)
+    let disk_guid = bytes.zero(16)?
+    let primary_header = image_gpt_header(
+      1,
+      total_sectors - 1,
+      first_usable,
+      last_usable,
+      disk_guid,
+      2,
+      entry_count,
+      entry_size,
+      entries_crc,
+    )?
+    let backup_header = image_gpt_header(
+      total_sectors - 1,
+      1,
+      first_usable,
+      last_usable,
+      disk_guid,
+      backup_entries_lba,
+      entry_count,
+      entry_size,
+      entries_crc,
+    )?
+    let _ = bytes.write_at(tmp, 0, protective_mbr(total_sectors)?)?
+    let _ = bytes.write_at(tmp, sector_size, primary_header)?
+    let _ = bytes.write_at(tmp, 2 * sector_size, entries)?
+    let _ = bytes.write_at(tmp, backup_entries_lba * sector_size, entries)?
+    let _ = bytes.write_at(tmp, (total_sectors - 1) * sector_size, backup_header)?
+    let _ = bytes.copy_file(
+      rootfs,
+      tmp,
+      source_offset: 0,
+      dest_offset: root_start_lba * sector_size,
+      length: rootfs_bytes,
+      create: false,
+      truncate: false,
+    )?
+    fs.fsync(tmp)
+    verify_disk(tmp, rootfs_bytes)
+  }
   verify_disk(image, rootfs_bytes)
 }

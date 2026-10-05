@@ -183,20 +183,18 @@ export proc docker_run(value: DockerConfig, inner_argv: List[Str]) [fs, process,
 ## Run a profile build while atomically replacing its log only after Docker exits successfully.
 export proc docker_run_logged(value: DockerConfig, inner_argv: List[Str], log: Path) [fs, process, error] {
   verify_image_architecture(value)
-  let temporary = fp"{log}.tmp"
   log.parent.mkdir()
-  temporary.remove()
-  defer temporary.remove()
-  let status = process.run(
-    process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
-  )?
+  atomically replace log as temporary {
+    let status = process.run(
+      process.command_argv(value.docker, docker_command_argv(value, inner_argv), value.laputa_root, stdout: temporary),
+    )?
 
-  if ! status.ok {
-    return Err(types.LaputaError.Docker(f"Docker command failed for {value.image}"))
+    if ! status.ok {
+      return Err(types.LaputaError.Docker(f"Docker command failed for {value.image}"))
+    }
+
+    fs.fsync(temporary)
   }
-
-  fs.fsync(temporary)
-  temporary.rename(to: log, overwrite: true)
 }
 
 ## Run the sole profile PM-plan adapter through the checked native runner.

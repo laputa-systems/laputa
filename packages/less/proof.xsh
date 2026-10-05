@@ -23,7 +23,7 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
   proof.ensure(version.starts_with(f"less {ver} "), "proof-less", f"less --version reported {version.lines()[0]}")
 
   let text = fp"{tmp}/lines.txt"
-  text.write([f"line {i}" for i in range(1, 101)].join("\n") + "\n")
+  text.write_lines([f"line {i}" for i in range(1, 101)])
 
   # Without a tty less copies its input, like cat.
   let copied = run.text $dynlinker $less $text

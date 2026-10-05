@@ -22,18 +22,17 @@ proc main() [fs, process, time, error] {
   }
 
   # 2. Configure DHCP on eth0.
-  fs.write(
-    /etc/network/interfaces,
+  p"/etc/network/interfaces".write(
     """auto lo
 iface lo inet loopback
 
 auto eth0
 iface eth0 inet dhcp
 """,
-  )?
+  )
 
   # 3. Bring up networking via DHCP.
-  run /usr/bin/ifup "-a" ?
+  run /usr/bin/ifup "-a"
 
   # 4. Wait for a DHCP lease on a non-lo interface (timeout ~15 s).
   var elapsed = 0
@@ -52,11 +51,9 @@ iface eth0 inet dhcp
       }
     }
 
-    if got_lease {
-      break
-    }
+    break when got_lease
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 
@@ -84,4 +81,4 @@ iface eth0 inet dhcp
   print "LAPUTA_TARGET_CI_OK"
 }
 
-main()?
+main()

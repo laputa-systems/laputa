@@ -82,7 +82,7 @@ proc check_image(image: Path) {
   var group_index = 0
 
   while group_index < groups {
-    let desc = descs.slice(offset: group_index * 32, length: 32)
+    let desc = descs[group_index * 32..(group_index + 1) * 32]
     let first = group_index * BLOCKS_PER_GROUP
     let group_blocks = min_int(BLOCKS_PER_GROUP, total_blocks - first)
     let block_bitmap = bytes.unpack_le(desc, 4, offset: 0)?

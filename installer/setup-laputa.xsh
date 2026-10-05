@@ -447,7 +447,7 @@ tty1::respawn:/usr/bin/login -f pazu
 proc configured_ci_esp_bytes() -> Result[Int] {
   let path_value = /etc/laputa-installer/target-esp-mb
 
-  return 16 * 1024 * 1024 unless path_value.exists()
+  return 16MiB unless path_value.exists()
 
   let mb = path_value.read_text()?.trim() as Int
   mb * 1024 * 1024
@@ -455,8 +455,8 @@ proc configured_ci_esp_bytes() -> Result[Int] {
 
 proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
   let total_sectors = fp"/sys/block/{disk.name}/size".read_text()?.trim() as Int
-  let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128 * 1024 * 1024 }
-  let swap_bytes = if ci { 8 * 1024 * 1024 } else { linux.meminfo()?.total * 2 }
+  let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128MiB }
+  let swap_bytes = if ci { 8MiB } else { linux.meminfo()?.total * 2 }
   let esp_sectors = align_up(ceil_div(esp_bytes, 512), 2048)
   let swap_sectors = align_up(ceil_div(swap_bytes, 512), 2048)
   let first = 2048

@@ -107,54 +107,52 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let loader = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let libdir = fp"{root}/usr/lib".display()
   let bin = fp"{root}/usr/bin"
-  let tmp = fp"{root}/var/tmp/proof-mandoc"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
+  tempdir tmp at fp"{root}/var/tmp/proof-mandoc" {
 
-  let manpath = fp"{tmp}/man"
-  let mdoc_file = fp"{manpath}/man1/laputa-hello.1"
-  let man_file = fp"{manpath}/man7/laputa-island.7"
-  fp"{manpath}/man1".mkdir()
-  fp"{manpath}/man7".mkdir()
-  mdoc_file.write(mdoc_page)
-  man_file.write(man_page)
+    let manpath = fp"{tmp}/man"
+    let mdoc_file = fp"{manpath}/man1/laputa-hello.1"
+    let man_file = fp"{manpath}/man7/laputa-island.7"
+    fp"{manpath}/man1".mkdir()
+    fp"{manpath}/man7".mkdir()
+    mdoc_file.write(mdoc_page)
+    man_file.write(man_page)
 
-  env ({LD_LIBRARY_PATH: libdir}) {
-    let mdoc_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $mdoc_file ?, with: "")
-    proof.ensure(mdoc_out == mdoc_text, "mandoc-mdoc", f"unexpected mdoc rendering:\n{mdoc_out}")
-    let man_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $man_file ?, with: "")
-    proof.ensure(man_out == man_text, "mandoc-man", f"unexpected man rendering:\n{man_out}")
+    env ({LD_LIBRARY_PATH: libdir}) {
+      let mdoc_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $mdoc_file ?, with: "")
+      proof.ensure(mdoc_out == mdoc_text, "mandoc-mdoc", f"unexpected mdoc rendering:\n{mdoc_out}")
+      let man_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $man_file ?, with: "")
+      proof.ensure(man_out == man_text, "mandoc-man", f"unexpected man rendering:\n{man_out}")
 
-    # makewhatis indexes the tree into mandoc.db; apropos and whatis then
-    # answer from that database, and man finds the page by section and name.
-    run $loader fp"{bin}/makewhatis" $manpath
-    proof.ensure(fp"{manpath}/mandoc.db".exists()?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
-    let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island"
-    let found_expected = "laputa-hello(1) - greet the floating island\nlaputa-island(7) - overview of the flying island\n"
-    proof.ensure(found == found_expected, "mandoc-apropos", f"unexpected apropos output:\n{found}")
-    let by_name = run.text $loader fp"{bin}/apropos" "-M" $manpath "Nm=laputa-hello"
-    proof.ensure(by_name == "laputa-hello(1) - greet the floating island\n", "mandoc-apropos", f"unexpected apropos Nm= output:\n{by_name}")
-    let what = run.text $loader fp"{bin}/whatis" "-M" $manpath "laputa-island"
-    proof.ensure(what == "laputa-island(7) - overview of the flying island\n", "mandoc-whatis", f"unexpected whatis output:\n{what}")
-    let shown = overstrike.replace(run.text $loader fp"{bin}/man" "-M" $manpath "-T" "ascii" "-O" "width=60" "7" "laputa-island" ?, with: "")
-    proof.ensure(shown == man_text, "mandoc-man-lookup", f"unexpected man 7 laputa-island output:\n{shown}")
+      # makewhatis indexes the tree into mandoc.db; apropos and whatis then
+      # answer from that database, and man finds the page by section and name.
+      run $loader fp"{bin}/makewhatis" $manpath
+      proof.ensure(fp"{manpath}/mandoc.db".exists()?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
+      let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island"
+      let found_expected = "laputa-hello(1) - greet the floating island\nlaputa-island(7) - overview of the flying island\n"
+      proof.ensure(found == found_expected, "mandoc-apropos", f"unexpected apropos output:\n{found}")
+      let by_name = run.text $loader fp"{bin}/apropos" "-M" $manpath "Nm=laputa-hello"
+      proof.ensure(by_name == "laputa-hello(1) - greet the floating island\n", "mandoc-apropos", f"unexpected apropos Nm= output:\n{by_name}")
+      let what = run.text $loader fp"{bin}/whatis" "-M" $manpath "laputa-island"
+      proof.ensure(what == "laputa-island(7) - overview of the flying island\n", "mandoc-whatis", f"unexpected whatis output:\n{what}")
+      let shown = overstrike.replace(run.text $loader fp"{bin}/man" "-M" $manpath "-T" "ascii" "-O" "width=60" "7" "laputa-island" ?, with: "")
+      proof.ensure(shown == man_text, "mandoc-man-lookup", f"unexpected man 7 laputa-island output:\n{shown}")
 
-    let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file
-    proof.ensure("laputa-hello\ngreet\nthe\nfloating\nisland\n" in words, "mandoc-demandoc", f"unexpected demandoc words:\n{words}")
+      let words = run.text $loader fp"{bin}/demandoc" "-w" $mdoc_file
+      proof.ensure("laputa-hello\ngreet\nthe\nfloating\nisland\n" in words, "mandoc-demandoc", f"unexpected demandoc words:\n{words}")
+    }
+
+    fp"{tmp}/top.man".write(".SH INCLUDED\n.so part.man\n.SH AFTER\n")
+    fp"{tmp}/part.man".write("from the part\n")
+
+    cd $tmp {
+      let inlined = run.text $loader fp"{bin}/soelim" "top.man"
+      proof.ensure(
+        inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n",
+        "mandoc-soelim",
+        f"unexpected soelim output:\n{inlined}",
+      )
+    }
+
+    print "mandoc ok: mdoc and man rendered, makewhatis/apropos/whatis/man lookup, demandoc, soelim"
   }
-
-  fp"{tmp}/top.man".write(".SH INCLUDED\n.so part.man\n.SH AFTER\n")
-  fp"{tmp}/part.man".write("from the part\n")
-
-  cd $tmp {
-    let inlined = run.text $loader fp"{bin}/soelim" "top.man"
-    proof.ensure(
-      inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n",
-      "mandoc-soelim",
-      f"unexpected soelim output:\n{inlined}",
-    )
-  }
-
-  print "mandoc ok: mdoc and man rendered, makewhatis/apropos/whatis/man lookup, demandoc, soelim"
 }

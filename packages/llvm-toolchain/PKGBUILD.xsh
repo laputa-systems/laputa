@@ -212,7 +212,7 @@ proc sysroot_arg(argv: List[Str]) [env, error] -> Result[Path] {
     }
 
     if arg.starts_with("--sysroot=") {
-      return Path(arg.replace("--sysroot=", ""))
+      return Path(arg.replace("--sysroot=", with: ""))
     }
 
     index += 1
@@ -323,7 +323,7 @@ proc target_arch(argv: List[Str]) [env, error] -> Result[Str] {
     }
 
     if arg.starts_with("--target=") {
-      let arch = arch_from_triple(arg.replace("--target=", ""))
+      let arch = arch_from_triple(arg.replace("--target=", with: ""))
 
       if arch != "" {
         return arch

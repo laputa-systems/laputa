@@ -31,6 +31,8 @@ export XSHT="$XSH_BIN_DIR/xsht"
 
 ```bash
 make check         # xsht check over the tree, plus shebang-only XSH scripts
+make lint          # production PM, system, installer, and xinit modules
+$XSHT lint         # the full configured tree, including recipes and tests
 make test-pm
 make test-system   # tests/system, then tests/integration
 make test-xinit
@@ -81,6 +83,21 @@ commit and dirty flag. The `laputa-package-tools` image adds only the LLVM seed
 from the source cache. Containers mount the seed at `/bin/{xsh,xshi,xsht}` and
 `/usr/lib/xsh/core`, so an XSH or PM change rebuilds no image. Image tags are
 content keys over each image's own inputs (`seed/images.xsh`).
+
+The `xsh` package installs core applets under `/usr/lib/xsh/core` and
+exposes each command through an explicitly declared `/usr/bin` symlink,
+including the core text, identity, terminal, and process utilities. `su`
+stays outside that command surface. When the seed gains or removes an
+applet, update the recipe's `filetree` to match; undeclared installed
+commands fail package validation.
+
+`capsh -- SCRIPT ARGS...` runs `/usr/bin/xsh` with the script path and
+arguments passed directly. The default executable no longer accepts
+interactive shell commands or `-c`; use `--shell=/path/to/program -- ARGS...`
+to launch another executable. The capability proof checks that a dropped
+bounding-set capability stays absent after executing capsh again. The tmux
+proof runs explicit XSH pane scripts and checks terminal input editing,
+output capture, window lifecycle, and attachment across terminal types.
 
 ## Local bootstrap
 
@@ -181,6 +198,9 @@ requirements, and the proof contract.
 `make installer-image` and `make installer-qemu-test` take `ARCH` and import
 their package roots from the local mirror, so `make mirror` must be running
 and `make publish` done. See [INSTALLER.md](../INSTALLER.md).
+
+Installer host validation failures use XSH's standard `validation` error
+kind; child failures retain the child's exit code.
 
 ## Verify the artifact store
 

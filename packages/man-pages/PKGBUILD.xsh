@@ -50,19 +50,6 @@ export const filetree = [
 # package provides; mandoc installs the real man(7) there instead.
 const excluded_pages = ["man7/man.7"]
 
-# Upstream's build-man rule rewrites the release placeholders of every page
-# with a .TH or .Dd header, line by line:
-#   sed '/^\.TH /s/(unreleased)/$(DISTVERSION)/' | sed '/^\.Os /s/(unreleased)/$(DISTVERSION)/'
-# The `(date)` and `$Mdocdate$` substitutions take the date from git; the
-# release tarball already carries every page's date, so they never apply.
-pure release_page(text: Str) -> Str {
-  return text unless "(unreleased)" in text
-
-  [if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", with: ver) } else { line } for line in text.split(
-    "\n",
-  )].join("\n")
-}
-
 # Renders pages with mandoc's man(1) from this build's tree, and checks each
 # header and NAME line. fprintf(3) is a `.so` page, so it also proves the
 # links resolve to their target page as installed.
@@ -105,6 +92,19 @@ const rendered_pages = [
 # character with a backspace; dropping the struck-over character leaves text.
 const overstrike = rx".\x08"
 
+# Upstream's build-man rule rewrites the release placeholders of every page
+# with a .TH or .Dd header, line by line:
+#   sed '/^\.TH /s/(unreleased)/$(DISTVERSION)/' | sed '/^\.Os /s/(unreleased)/$(DISTVERSION)/'
+# The `(date)` and `$Mdocdate$` substitutions take the date from git; the
+# release tarball already carries every page's date, so they never apply.
+pure release_page(text: Str) -> Str {
+  return text unless "(unreleased)" in text
+
+  [if line.starts_with(".TH ") or line.starts_with(".Os ") { line.replace("(unreleased)", with: ver) } else { line } for line in text.split(
+    "\n",
+  )].join("\n")
+}
+
 proc check_rendering(mandir: Path) [fs, process, env, error] {
   let man = process.which("man")?
 
@@ -132,9 +132,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{mandir}/{section.name}".mkdir()
 
     for page in fs.children(section.path)? {
-      let rel = f"{section.name}/{page.name}"
-      continue when rel in excluded_pages
-      fp"{mandir}/{rel}".write(release_page(page.path.read_text()?))
+      let page_path = f"{section.name}/{page.name}"
+      continue when page_path in excluded_pages
+      fp"{mandir}/{page_path}".write(release_page(page.path.read_text()?))
     }
   }
 

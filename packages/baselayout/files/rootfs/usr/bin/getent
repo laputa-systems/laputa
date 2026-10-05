@@ -1,29 +1,21 @@
 #!/bin/xsh
 pure entry_matches(database: Str, line: Str, key: Str) -> Bool {
-  if key == "" {
-    return true
-  }
+  return true when key == ""
 
   let fields = line.split(":")
 
-  if (fields.get(0) ?? "") == key {
-    return true
-  }
+  return true when (fields.get(0) ?? "") == key
 
-  if database == "passwd" and (fields.get(2) ?? "") == key {
-    return true
-  }
+  return true when database == "passwd" and (fields.get(2) ?? "") == key
 
-  if database == "group" and (fields.get(2) ?? "") == key {
-    return true
-  }
+  return true when database == "group" and (fields.get(2) ?? "") == key
 
-  return false
+  false
 }
 
-proc main(database: Str = "", key: Str = "") [fs, error] {
+proc main(database = "", key = "") [fs, error] {
   if database == "" {
-    abort(2)
+    exit 2
   }
 
   var path_value: Path = /etc/passwd
@@ -33,12 +25,12 @@ proc main(database: Str = "", key: Str = "") [fs, error] {
   } else if database == "group" {
     path_value = /etc/group
   } else {
-    abort(2)
+    exit 2
   }
 
   var found = false
 
-  for raw in fs.read_text(path_value)?.lines() {
+  for raw in path_value.read_lines()? {
     let line = raw.trim()
     continue when line == "" or line.starts_with("#")
 
@@ -49,6 +41,6 @@ proc main(database: Str = "", key: Str = "") [fs, error] {
   }
 
   if ! found {
-    abort(2)
+    exit 2
   }
 }

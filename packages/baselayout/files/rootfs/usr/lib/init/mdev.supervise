@@ -1,4 +1,4 @@
 #!/bin/xsh
-if fs.exists(/usr/bin/mdevd)? {
-  run /usr/bin/xinit supervise mdevd ?
+if p"/usr/bin/mdevd".exists() {
+  run /usr/bin/xinit supervise mdevd
 }

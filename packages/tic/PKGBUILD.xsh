@@ -60,15 +60,15 @@ export const filetree = [{path: p"usr/bin/tic", kind: "file"}]
 
 error CapsTableError = Missing(block: Str) | Mismatch(block: Str, row: Str)
 
-# The text of the raw-string constant `name` in tic.xsh.
-proc embedded_block(script: Str, name: Str) [error] -> Result[Str] {
-  let opening = f"const {name} = r\"\"\"\n"
+# The text of the requested raw-string constant in tic.xsh.
+proc embedded_block(script: Str, block_name: Str) [error] -> Result[Str] {
+  let opening = f"const {block_name} = r\"\"\"\n"
   let start = script.find(opening)
-  return Err(CapsTableError.Missing(name)) when start == null
+  return Err(CapsTableError.Missing(block_name)) when start == null
 
   let body = start + opening.byte_len()
   let end = script.find("\n\"\"\"", body)
-  return Err(CapsTableError.Missing(name)) when end == null
+  return Err(CapsTableError.Missing(block_name)) when end == null
 
   script.byte_slice(body, end - body)
 }

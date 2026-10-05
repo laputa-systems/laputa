@@ -9,7 +9,7 @@ use util
 ## The durable on-disk and in-memory build-plan format.
 ## Format 2 artifact keys hash `BUILD_EPOCH` and no executor identity.
 ## Format 3 adds `runtime-only` dependencies, which order no build and are no key input.
-export let format: Str = "laputa-build-plan-3"
+export const format = "laputa-build-plan-3"
 
 pure plan_canonical_field(value: Str) -> Str {
   value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
@@ -76,7 +76,7 @@ proc artifact_key_for(
     f"recipe\t{plan_canonical_field(recipe_sha256)}",
   ]
 
-  for dependency in dependencies |> sort-by { |dependency| dependency_key(dependency) } {
+  for dependency in (dependencies |> sort-by(dependency_key)) {
     continue unless graph.edge_orders_builds(dependency.kind)
     lines += [
       f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
@@ -123,13 +123,10 @@ proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) -> Resu
 
 # Hashes each recipe once; resolution reuses these digests for its nodes.
 proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) -> Result[Map[Str]] {
-  var inputs: Map[Str] = {}
-
-  for pkg in value.packages {
-    inputs[pkg.name] = pm_fingerprint.package_build_input(value.root, absolute_recipe_package(value, pkg)?, target)?
+  {
+    pkg.name: pm_fingerprint.package_build_input(value.root, absolute_recipe_package(value, pkg)?, target)?
+    for pkg in value.packages
   }
-
-  inputs
 }
 
 proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) -> Result[Str] {
@@ -147,7 +144,7 @@ proc find_remote(snapshot: types.RemoteSnapshot, name: Str) [error] -> Result[ty
 
   for candidate in snapshot.packages {
     if candidate.name == name {
-      if selected != null {
+      guard selected == null else {
         return Err(types.PmError.PackageContract(f"remote snapshot has duplicate package {name}"))
       }
 
@@ -159,13 +156,9 @@ proc find_remote(snapshot: types.RemoteSnapshot, name: Str) [error] -> Result[ty
 }
 
 pure plan_compare_lex(left: Str, right: Str) -> Int {
-  if left == right {
-    return 0
-  }
+  return 0 when left == right
 
-  if [left, right] |> sort[0] == left {
-    return -1
-  }
+  return -1 when [left, right] |> sort[0] == left
 
   1
 }
@@ -257,9 +250,7 @@ pure remote_is_exact(
   artifact_key: Str,
   proof_key: Str,
 ) -> Bool {
-  if remote.artifact_key == "" {
-    return false
-  }
+  return false when remote.artifact_key == ""
 
   remote.artifact_key == artifact_key
     and remote.recipe_sha256 == recipe_sha256
@@ -289,7 +280,7 @@ proc dependency_nodes(
     }
   }
 
-  dependencies |> sort-by { |dependency| dependency_key(dependency) }
+  dependencies |> sort-by(dependency_key)
 }
 
 # Adds each node's runtime-only dependencies once every key is resolved: they
@@ -310,7 +301,7 @@ proc with_runtime_only_dependencies(
       dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
     }
 
-    result += [{...node, dependencies: dependencies |> sort-by { |dependency| dependency_key(dependency) }}]
+    result += [{...node, dependencies: dependencies |> sort-by(dependency_key)}]
   }
 
   result
@@ -322,7 +313,7 @@ proc built_dependency_names(
   selected: Map[Bool],
   actions: Map[types.PlanAction],
 ) -> Result[List[Str]] {
-  var changed: List[Str] = [
+  var changed = [
     edge.to
     for edge in edges
     if edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
@@ -356,11 +347,11 @@ export proc resolve(
   }
 
   let selected_names = graph.build_closure(value, selected_roots, policy)?
-  let selected: Map[Bool] = {name: true for name in selected_names}
+  let selected = {name: true for name in selected_names}
   let packages = catalog.package_map(value)
 
   for name in selected_names {
-    if ! (name in packages) {
+    guard name in packages else {
       return Err(types.PmError.MissingDependency(f"build plan needs a local recipe for {name}"))
     }
   }
@@ -376,7 +367,7 @@ export proc resolve(
 
   for names in levels {
     for name in names {
-      let pkg: types.Package = packages.get(name)?.require(types.Package)?
+      let pkg = packages.get(name)?
       let source_pkg = absolute_recipe_package(value, pkg)?
       let recipe_dir = durable_recipe_dir(value, pkg)?
       let package_id = util.package_id(pkg.name, pkg.ver, pkg.rel)
@@ -461,7 +452,7 @@ export proc resolve(
   }
 
   let bare = {
-    format,
+    format: format,
     target: policy.target,
     roots: selected_roots,
     repository_digest,
@@ -475,7 +466,7 @@ export proc resolve(
 }
 
 proc require_build_epoch(value: Int, label: Str) [error] {
-  if value < 1 {
+  guard value >= 1 else {
     return Err(types.PmError.PackageContract(f"{label} build epoch must be positive"))
   }
 }
@@ -483,7 +474,7 @@ proc require_build_epoch(value: Int, label: Str) [error] {
 ## Rejects a plan resolved under a different `BUILD_EPOCH` than this PM's.
 ## Its artifact keys belong to another epoch, so executing it would mix epochs in one Store.
 export proc require_current_build_epoch(value: types.BuildPlan) [error] {
-  if value.build_epoch != build_policy.BUILD_EPOCH {
+  guard value.build_epoch == build_policy.BUILD_EPOCH else {
     return Err(
       types.PmError.PackageContract(
         f"build plan was resolved at BUILD_EPOCH {value.build_epoch}, but this PM is at BUILD_EPOCH {build_policy.BUILD_EPOCH}; re-run repo plan",
@@ -493,7 +484,7 @@ export proc require_current_build_epoch(value: types.BuildPlan) [error] {
 }
 
 proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) {
-  if value.arch != types.pm_target_arch(target) {
+  guard value.arch == types.pm_target_arch(target) else {
     return Err(
       types.PmError.PackageContract(f"remote artifact architecture {value.arch} does not match {types.target_text(target)}"),
     )
@@ -538,7 +529,7 @@ proc validate_node(
     }
 
     if prior_dependency != null {
-      if dependency_key(dependency) < dependency_key(prior_dependency) {
+      guard dependency_key(dependency) >= dependency_key(prior_dependency) else {
         return Err(types.PmError.PackageContract(f"build plan node {node.name} dependencies are not ordered"))
       }
     }
@@ -574,7 +565,7 @@ proc validate_node(
   )?
 
   if types.plan_action_is_build(node.action) {
-    if node.remote != null {
+    guard node.remote == null else {
       return Err(
         types.PmError.PackageContract(f"build plan node {node.name} builds locally but has remote retrieval data"),
       )
@@ -611,9 +602,7 @@ export proc node_uses_legacy_remote_identity(
   value: types.BuildPlan,
   node: types.PlanNode,
 ) [error] -> Result[Bool, Error] {
-  if types.plan_action_is_build(node.action) {
-    return false
-  }
+  return false when types.plan_action_is_build(node.action)
 
   let retrieval = node.remote
 
@@ -628,9 +617,7 @@ export proc node_uses_legacy_remote_identity(
       node.dependencies,
     )?
 
-    if node.artifact_key == expected_local {
-      return false
-    }
+    return false when node.artifact_key == expected_local
 
     let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
     return node.artifact_key == expected_legacy
@@ -638,7 +625,7 @@ export proc node_uses_legacy_remote_identity(
 }
 
 proc validate_structure(value: types.BuildPlan) {
-  if value.format != format {
+  guard value.format == format else {
     return Err(types.PmError.PackageContract(f"unsupported build plan format {value.format}"))
   }
 
@@ -666,7 +653,7 @@ proc validate_structure(value: types.BuildPlan) {
   }
 
   for root in value.roots {
-    if ! (root in names) {
+    guard root in names else {
       return Err(types.PmError.PackageContract(f"build plan root {root} is not a node"))
     }
   }
@@ -741,9 +728,7 @@ export proc validate(value: types.BuildPlan) [error] {
 }
 
 pure color(text: Str, code: Str, colors: Bool) -> Str {
-  if colors {
-    return f"[{code}m{text}[0m"
-  }
+  return f"[{code}m{text}[0m" when colors
 
   text
 }

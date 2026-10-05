@@ -115,7 +115,7 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       failures,
     },
   )
-  fp"{output}/files.txt".write((files |> sort).join("\n") + "\n")
+  fp"{output}/files.txt".write_lines(if files.is_empty() { [""] } else { files |> sort })
   fp"{root}/var/lib/laputa/generation.json".copy(to: fp"{output}/generation.json", overwrite: true)
 
   # The root's own xsh must run a script from inside it. The probe lands after

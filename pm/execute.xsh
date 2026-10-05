@@ -347,12 +347,12 @@ proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
   lines[first..].join("\n")
 }
 
-# The `error:` lines of a failed node's log, which name the cause above the
+# The `err:` lines of a failed node's log, which name the cause above the
 # runtime traceback; the plain tail when there are none.
 proc execute_log_errors(log: Path) -> Result[Str] {
   return "" unless log.exists()
 
-  let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("error:")]
+  let errors = [line.trim() for line in log.read_lines()? if line.trim().starts_with("err:")]
 
   return execute_log_tail(log, 12)? when errors.is_empty()
 

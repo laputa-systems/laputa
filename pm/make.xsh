@@ -820,7 +820,7 @@ export proc compile_lo_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let depfile = depfile_path(out)
-  var argv: List[Any] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC"]
+  var argv: List[Union[Str, Path]] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC"]
   argv = [@argv, @cflags, @defs, @includes]
   argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
@@ -833,7 +833,7 @@ export proc compile_lo_task(
       src,
     ],
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: depfile,
@@ -875,7 +875,7 @@ export proc compile_asm_lo_task(
   out: Path,
   deps: List[Str] = [],
 ) [] -> MakeTask {
-  var argv: List[Any] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC", "-Wa,--noexecstack"]
+  var argv: List[Union[Str, Path]] = [toolchain, "-target", triple, "-c", "-fPIC", "-DPIC", "-Wa,--noexecstack"]
   argv = [@argv, @includes, src, "-o", out]
 
   {
@@ -887,7 +887,7 @@ export proc compile_asm_lo_task(
       src,
     ],
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: p"",
@@ -931,7 +931,7 @@ export proc compile_cxx_task(
 ) [] -> MakeTask {
   let _ = toolchain
   let depfile = depfile_path(out)
-  var argv: List[Any] = ["c++", "-target", triple, "-c"]
+  var argv: List[Union[Str, Path]] = ["c++", "-target", triple, "-c"]
   argv = [@argv, @cflags, @defs, @includes]
   argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
@@ -944,7 +944,7 @@ export proc compile_cxx_task(
       src,
     ],
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: depfile,
@@ -989,7 +989,7 @@ export proc compile_c_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let depfile = depfile_path(out)
-  var argv: List[Any] = [toolchain, "-target", triple, "-c"]
+  var argv: List[Union[Str, Path]] = [toolchain, "-target", triple, "-c"]
   argv = [@argv, @cflags, @defs, @includes]
   argv += [src, "-o", out, "-MMD", "-MP", "-MF", depfile]
 
@@ -1002,7 +1002,7 @@ export proc compile_c_task(
       src,
     ],
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: depfile,
@@ -1257,7 +1257,7 @@ export proc link_shared_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let _ = toolchain
-  var argv: List[Any] = ["cc", "-target", triple, "-shared", f"-Wl,-soname,{soname}"]
+  var argv: List[Union[Str, Path]] = ["cc", "-target", triple, "-shared", f"-Wl,-soname,{soname}"]
   argv = [@argv, @ldflags, @objs, "-o", out]
 
   {
@@ -1267,7 +1267,7 @@ export proc link_shared_task(
     ],
     inputs: objs,
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: p"",
@@ -1286,7 +1286,7 @@ export proc link_executable_cxx_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let _ = toolchain
-  var argv: List[Any] = ["c++", "-target", triple]
+  var argv: List[Union[Str, Path]] = ["c++", "-target", triple]
   argv = [@argv, @objs, @libs, @ldflags, "-o", out]
 
   {
@@ -1296,7 +1296,7 @@ export proc link_executable_cxx_task(
     ],
     inputs: objs.extend(libs),
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: p"",
@@ -1317,7 +1317,7 @@ export proc link_executable_task(
   deps: List[Str] = [],
 ) [] -> MakeTask {
   let _ = toolchain
-  var argv: List[Any] = ["cc", "-target", triple]
+  var argv: List[Union[Str, Path]] = ["cc", "-target", triple]
   argv = [@argv, @objs, @libs, @ldflags, "-o", out]
 
   {
@@ -1327,7 +1327,7 @@ export proc link_executable_task(
     ],
     inputs: objs.extend(libs),
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: p"",
@@ -1338,7 +1338,7 @@ export proc link_executable_task(
 ## Exported PM declaration `link_archive_task`.
 export proc link_archive_task(toolchain: Path, objs: List[Path], out: Path, deps: List[Str] = []) [] -> MakeTask {
   let _ = toolchain
-  var argv: List[Any] = ["ar", "rcs", out]
+  var argv: List[Union[Str, Path]] = ["ar", "rcs", out]
   argv = [@argv, @objs]
 
   {
@@ -1348,7 +1348,7 @@ export proc link_archive_task(toolchain: Path, objs: List[Path], out: Path, deps
     ],
     inputs: objs,
     deps: deps,
-    argv: argv,
+    argv: [@argv],
     cwd: p".",
     env: {},
     depfile: p"",

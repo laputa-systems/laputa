@@ -134,7 +134,7 @@ proc stage_plan_artifacts(
   }
 }
 
-proc expect_snapshot_error(ctx: TestContext, value: types.BuildPlan, store_root: Path, expected: Str) {
+proc expect_snapshot_error(_: TestContext, value: types.BuildPlan, store_root: Path, expected: Str) {
   match repo.snapshot(value, store_root) {
     Ok(_) => test.fail(f"{expected}: snapshot unexpectedly succeeded")
     Err(problem) => assert expected in problem.message
@@ -270,7 +270,7 @@ export let filetree = []
       assert entry.deps == ["runtime-lib"]
       assert entry.runtime_only_deps == ["app"]
     } else {
-      test.eq(entry.runtime_only_deps, [])
+      assert entry.runtime_only_deps == []
     }
   }
 }
@@ -483,7 +483,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     metapackage: false,
   })?
   # Index rows written before runtime-only dependencies existed declare none.
-  test.eq(modern.runtime_only_deps, [])
+  assert modern.runtime_only_deps == []
   let modern_plan = remote.plan_artifact_from_package(modern)?
   assert modern_plan.artifact_key == "artifact"
   assert modern_plan.retrieval.metadata_sha256 == "metadata"
@@ -610,6 +610,6 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
 
   for upload in uploads {
     let headers = upload.args.get("headers")?.require(List[NetHeader])?
-    test.eq([header.name for header in headers if header.name == "Authorization"], [])
+    assert [header.name for header in headers if header.name == "Authorization"] == []
   }
 }

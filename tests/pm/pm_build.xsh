@@ -23,8 +23,8 @@ test test_build_prepared_metapackage_has_no_payload_or_package_database [fs, pro
   let pkg = recipe.load_package(pkg_dir)?
   let built = local.load_built_package_from_dest(pkg, "recipe-valid-meta-1.0.0-1", payload, dest)?
 
-  test.eq(built.manifest, [])
-  test.eq(built.metadata_files, [])
+  assert built.manifest == []
+  assert built.metadata_files == []
   assert fp"{dest}/var/lib/xsh-pm/packages/recipe-valid-meta".exists()? == false
   assert payload.read_text()? == "laputa metapackage payload marker\n"
 }

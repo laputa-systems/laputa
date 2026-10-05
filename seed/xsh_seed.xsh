@@ -287,10 +287,9 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
       }
     }
 
-    let temporary = fp"{archive_path}.tmp"
-    temporary.remove()
-    archive.tar_create(temporary, stage, entries, "xz", true)
-    temporary.rename(to: archive_path, overwrite: true)
+    atomically replace archive_path as temporary {
+      archive.tar_create(temporary, stage, entries, "xz", true)
+    }
   }
 }
 

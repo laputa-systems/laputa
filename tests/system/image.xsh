@@ -5,8 +5,8 @@ use system.types
 
 test test_rootfs_size_has_expected_margin_rounding_and_floor [error] {
   assert image.rootfs_size_bytes(0) == 256MiB
-  assert image.rootfs_size_bytes(256 * 1024 * 1024) == 384MiB
-  assert image.rootfs_size_bytes(257 * 1024 * 1024) == 386MiB
+  assert image.rootfs_size_bytes(256MiB) == 384MiB
+  assert image.rootfs_size_bytes(257MiB) == 386MiB
 }
 
 test test_protective_mbr_has_signature_and_protective_partition [error] {

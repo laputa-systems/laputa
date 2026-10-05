@@ -240,12 +240,10 @@ export proc write_remote_index_to_repo(
 
   if util.is_file_url(repo) {
     let dest = util.repo_file_path(repo, p"index.json")?
-    let temporary = fp"{dest.parent}/.{dest.name}.tmp"
     dest.parent.mkdir()
-    temporary.remove()
-    defer temporary.remove()
-    util.remote_index_cache_path(out).copy(to: temporary, overwrite: true)
-    temporary.rename(to: dest, overwrite: true)
+    atomically replace dest as temporary {
+      util.remote_index_cache_path(out).copy(to: temporary, overwrite: true)
+    }
     return
   }
 

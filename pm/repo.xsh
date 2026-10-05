@@ -58,10 +58,8 @@ proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) -> 
 proc repo_verified_proof_path(store_root: Path, node: types.PlanNode, receipt: types.ArtifactReceipt) -> Result[Path] {
   let primary = fp"{receipt.artifact_dir}/proof.json"
 
-  if receipt.origin == types.artifact_origin_remote() {
-    # import_remote hashes and verifies its opaque remote proof object through the Store receipt.
-    return primary
-  }
+  # import_remote hashes and verifies its opaque remote proof object through the Store receipt.
+  return primary when receipt.origin == types.artifact_origin_remote()
 
   if receipt.proof_key == node.proof_key {
     pm_proof.verify_artifact_receipt(primary, node, receipt.payload_sha256)

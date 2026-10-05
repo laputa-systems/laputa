@@ -3,9 +3,6 @@
 # installed alone into the image and resolves no checkout modules, so it keeps
 # its own helpers.
 
-## Installer host failures that are not a child's exit status.
-export error InstallerHostError = Failed
-
 ## Read an environment setting, treating an unset or blank value as absent so
 ## an empty `VAR=` from a Makefile or wrapper falls back to the default.
 export proc installer_env_value(name: Str, fallback: Str) [env] -> Str {
@@ -27,7 +24,7 @@ export pure installer_arch(arch: Str) -> Result[Str, Error] {
 
   return "x86_64" when arch == "amd64" or arch == "x86_64"
 
-  Err(InstallerHostError.Failed(f"unsupported installer arch {arch}"))
+  fail f"unsupported installer arch {arch}"
 }
 
 ## Run one step of the installer pipeline. A failing child aborts this script
@@ -42,5 +39,5 @@ export proc installer_run_argv(target: Path, argv: List[Str], cwd: Path, envs: R
     exit status.exit_code()?
   }
 
-  return Err(InstallerHostError.Failed(f"{argv[0]} was signaled"))
+  fail f"{argv[0]} was signaled"
 }

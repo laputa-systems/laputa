@@ -30,14 +30,23 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
     Err(_) => {}
   }
 
-  # The session shell is the runner's static xshi. tmux's runtime closure
-  # holds no shell (xsh, which owns /usr/bin/sh, is runtime-only and stays out
-  # of proof roots), and the proof is about tmux, not the shell it hosts.
-  let shell = process.which("xshi")?
+  # Execute the proof's pane program directly with the host XSH runner.
+  # The package's runtime proof exercises tmux's terminal transport without
+  # requiring an interactive command interpreter in the composed root.
+  let runner = process.which("xsh")?
   let tmp = /tmp/tmux-proof
   tmp.mkdir()
   let label = "laputa-proof"
   let config = fp"{tmp}/tmux.conf"
+  let pane_program = fp"{tmp}/pane.xsh"
+  pane_program.write(
+    """while true {
+  let line = io.stdin_line()?
+  print f"tmux-proof-{line}"
+  io.flush_stdout()?
+}
+""",
+  )
   fp"{tmp}/home".mkdir()
   check(dynlinker.exists()?, "tmux-proof", f"missing rootfs musl loader: {dynlinker}")
   check(tmux.exists()?, "tmux-proof", f"missing rootfs tmux binary: {tmux}")
@@ -55,13 +64,11 @@ set -g focus-events on
   env ({
     HOME: fp"{tmp}/home",
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib",
-    PS1: "laputa$ ",
-    SHELL: shell,
+    SHELL: runner,
     TERM: "tmux-256color",
     TMUX_TMPDIR: tmp,
   }) {
-    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $shell \
-      "--no-config"
+    run $dynlinker $tmux "-L" $label "-f" $config "new-session" "-d" "-s" "proof" "-x" "80" "-y" "24" $runner $pane_program
     time.sleep(500ms)
     let sessions = run.text $dynlinker $tmux "-L" $label "list-sessions"
     check("proof:" in sessions, "tmux-session", f"tmux did not report proof session: {sessions.trim()}")
@@ -87,14 +94,14 @@ set -g focus-events on
     check(escape_time.trim() == "0", "tmux-config", f"escape-time was {escape_time.trim()}")
     let focus_events = run.text $dynlinker $tmux "-L" $label "show-options" "-gqv" "focus-events"
     check(focus_events.trim() == "on", "tmux-config", f"focus-events was {focus_events.trim()}")
-    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-alpha\"" "C-m"
-    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "print \"tmux-proof-edit:ba" "BSpace" "BSpace" \
-      "ok\"" "C-m"
+    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "alpha" "C-m"
+    run $dynlinker $tmux "-L" $label "send-keys" "-t" "proof:0.0" "edit:ba" "BSpace" "BSpace" \
+      "ok" "C-m"
     time.sleep(1000ms)
     let pane = run.text $dynlinker $tmux "-L" $label "capture-pane" "-pt" "proof:0.0"
     check("tmux-proof-alpha" in pane, "tmux-pane", f"tmux pane did not capture alpha output: {pane.trim()}")
-    check("tmux-proof-edit:ok" in pane, "tmux-pane", f"tmux pane did not capture edited command output: {pane.trim()}")
-    run $dynlinker $tmux "-L" $label "new-window" "-d" "-n" "check" $shell "--no-config"
+    check("tmux-proof-edit:ok" in pane, "tmux-pane", f"tmux pane did not capture edited input output: {pane.trim()}")
+    run $dynlinker $tmux "-L" $label "new-window" "-d" "-n" "check" $runner $pane_program
     let windows = run.text $dynlinker $tmux "-L" $label "list-windows"
     check("check" in windows, "tmux-window", f"tmux did not report created window: {windows.trim()}")
     run $dynlinker $tmux "-L" $label "kill-server"
@@ -102,7 +109,7 @@ set -g focus-events on
     check(! dead.ok, "tmux-stop", "tmux server still reported the proof session after kill-server")
   }
 
-  outer_terminals(rootfs, dynlinker, tmux, shell, tmp, config)
+  outer_terminals(rootfs, dynlinker, tmux, runner, tmp, config)
   print "tmux ok: config, pty capture, window creation, clean stop, attach under xterm-256color, foot, linux, tmux-256color"
 }
 
@@ -111,11 +118,12 @@ set -g focus-events on
 # capabilities without a terminfo database: tmux carries built-in entries
 # compiled from ncurses' terminfo.src. Each attach runs one pane command on a
 # real pty, and the client must draw it with that terminal's own sequences.
-proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp: Path, config: Path) {
+proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, runner: Path, tmp: Path, config: Path) {
   let driver = proof.pty_driver(tmp)?
   # The marker is assembled at run time so that only the pane's output, never
   # the command text, can match it.
-  let pane = "let state = \"ok\"\nprint f\"tmux-attached-{state}\"\ntime.sleep(1s)?"
+  let pane_program = fp"{tmp}/attached-pane.xsh"
+  pane_program.write("let state = \"ok\"\nprint f\"tmux-attached-{state}\"\ntime.sleep(1s)?")
 
   for term in ["xterm-256color", "foot", "linux", "tmux-256color"] {
     let label = f"laputa-proof-{term}"
@@ -128,7 +136,7 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
       TMUX_TMPDIR: tmp,
     }) {
       let status = run.status --timeout=60s $driver "24" "80" "30000" "tmux-attached-ok" "" "--" $dynlinker $tmux "-L" \
-        $label "-f" $config "new-session" $shell "--no-config" "-c" $pane > $out
+        $label "-f" $config "new-session" $runner $pane_program > $out
       check(
         status.ok,
         "tmux-attach",
@@ -158,7 +166,7 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, shell: Path, tmp
     TMUX_TMPDIR: tmp,
   }) {
     let status = run.status $driver "24" "80" "10000" "--" $dynlinker $tmux "-L" "laputa-proof-unknown" "-f" $config \
-      "new-session" $shell "--no-config" "-c" "time.sleep(1s)?" > fp"{tmp}/unknown.out"
+      "new-session" $runner $pane_program > fp"{tmp}/unknown.out"
     check(! status.ok, "tmux-attach", "tmux attached to an unknown terminal")
   }
 

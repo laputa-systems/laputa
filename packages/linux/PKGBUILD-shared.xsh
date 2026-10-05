@@ -377,7 +377,7 @@ export proc cached_archive_plan(
 # symbols would silently miss every other config change.
 ## Exported declaration `cached_package_plan`.
 export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] -> Result[kbuild.KbuildPlan, Error] {
-  let config = kbuild.load_config(p".config")?
+  let _ = kbuild.load_config(p".config")?
   let explicit_inline = e"XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE" ?? ""
   let explicit_text = e"XSH_LINUX_KBUILD_USE_PLAN_TEXT" ?? ""
   let explicit = e"XSH_LINUX_KBUILD_USE_PLAN" ?? ""

@@ -60,46 +60,44 @@ proc main(root: Path = /rootfs) [fs, process, env, error] {
   let loader = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let nft = fp"{root}/usr/bin/nft"
   let libdir = fp"{root}/usr/lib".display()
-  let tmp = fp"{root}/var/tmp/proof-nftables"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
+  tempdir tmp at fp"{root}/var/tmp/proof-nftables" {
 
-  let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version"
-  proof.ensure(
-    version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)",
-    "nftables-version",
-    f"unexpected version: {version.trim()}",
-  )
-
-  let rules = fp"{tmp}/laputa.nft"
-  rules.write(ruleset)
-  let checked = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $rules
-
-  let kernel = if checked.status.ok {
-    "accepted by the kernel"
-  } else {
-    let refused = f"{rules}:1:1-14: Error: Could not process rule: Operation not permitted"
-
+    let version = run.text LD_LIBRARY_PATH=$libdir $loader $nft "--version"
     proof.ensure(
-      refused in checked.stderr and checked.stderr.split(": Error: ").len() == 2,
-      "nftables-check",
-      f"nft --check failed before the kernel boundary: {checked.stderr.trim()}",
+      version.trim() == "nftables v1.1.7 (Commodore Bullmoose #8)",
+      "nftables-version",
+      f"unexpected version: {version.trim()}",
     )
 
-    "kernel refused the batch without CAP_NET_ADMIN"
+    let rules = fp"{tmp}/laputa.nft"
+    rules.write(ruleset)
+    let checked = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $rules
+
+    let kernel = if checked.status.ok {
+      "accepted by the kernel"
+    } else {
+      let refused = f"{rules}:1:1-14: Error: Could not process rule: Operation not permitted"
+
+      proof.ensure(
+        refused in checked.stderr and checked.stderr.split(": Error: ").len() == 2,
+        "nftables-check",
+        f"nft --check failed before the kernel boundary: {checked.stderr.trim()}",
+      )
+
+      "kernel refused the batch without CAP_NET_ADMIN"
+    }
+
+    let mismatched = fp"{tmp}/mismatched.nft"
+    mismatched.write(mismatched_ruleset)
+    let rejected = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $mismatched
+    proof.ensure(! rejected.status.ok, "nftables-evaluate", "nft accepted an IPv4 match against an IPv6 set")
+
+    proof.ensure(
+      "datatype mismatch, expected IPv4 address, expression has type IPv6 address" in rejected.stderr,
+      "nftables-evaluate",
+      f"unexpected evaluation error: {rejected.stderr.trim()}",
+    )
+
+    print f"nftables ok: --version, ruleset evaluated ({kernel}), type mismatch rejected"
   }
-
-  let mismatched = fp"{tmp}/mismatched.nft"
-  mismatched.write(mismatched_ruleset)
-  let rejected = run.capture --text LD_LIBRARY_PATH=$libdir $loader $nft "--check" "-f" $mismatched
-  proof.ensure(! rejected.status.ok, "nftables-evaluate", "nft accepted an IPv4 match against an IPv6 set")
-
-  proof.ensure(
-    "datatype mismatch, expected IPv4 address, expression has type IPv6 address" in rejected.stderr,
-    "nftables-evaluate",
-    f"unexpected evaluation error: {rejected.stderr.trim()}",
-  )
-
-  print f"nftables ok: --version, ruleset evaluated ({kernel}), type mismatch rejected"
 }

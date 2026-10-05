@@ -15,7 +15,7 @@ export pure image_size_mib(data_blocks: Int) -> Int {
   let groups = ceil_div(data_blocks, ext4_blocks_per_group - ext4_group_metadata_blocks)
   let needed_mib = ceil_div(
     (data_blocks + groups * ext4_group_metadata_blocks) * ext4_block_size,
-    1024 * 1024,
+    1MiB,
   ) + 1
   let last_group_blocks = needed_mib * blocks_per_mib % ext4_blocks_per_group
 

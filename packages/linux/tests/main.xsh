@@ -978,7 +978,11 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let vmlinux = fp"{root}/vmlinux"
   let image = fp"{root}/arch/arm64/boot/Image"
   let archive_task = kbuild.vmlinux_archive_task(ar, [built_in, arch_lib], vmlinux_a)
-  test.eq(archive_task.argv, ["/usr/bin/ar", "cDPrST", vmlinux_a.display(), built_in.display(), arch_lib.display()])
+  let expected_archive_argv = ["/usr/bin/ar", "cDPrST", vmlinux_a.display(), built_in.display(), arch_lib.display()]
+  assert archive_task.argv.len() == expected_archive_argv.len()
+  for index in range(expected_archive_argv.len()) {
+    assert archive_task.argv[index] == expected_archive_argv[index]
+  }
   let reloc = kbuild.vmlinux_o_task(ld, ["-EL", "-maarch64elf"], vmlinux_a, [efi_lib], vmlinux_o)
   assert "--whole-archive" in reloc.argv
   assert "--start-group" in reloc.argv
@@ -1001,10 +1005,10 @@ test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let stripped = kbuild.vmlinux_strip_task(objcopy, unstripped, vmlinux)
   assert "--remove-section=.modinfo" in stripped.argv
   let image_task = kbuild.image_task(objcopy, vmlinux, image)
-  test.eq(image_task.argv.get(1)?, "-O")
-  test.eq(image_task.argv.get(2)?, "binary")
+  assert image_task.argv.get(1)? == "-O"
+  assert image_task.argv.get(2)? == "binary"
   let llvm_image_task = kbuild.image_argv_task(["llvm-objcopy"], vmlinux, image)
-  test.eq(llvm_image_task.argv.get(0)?, "llvm-objcopy")
+  assert llvm_image_task.argv.get(0)? == "llvm-objcopy"
   let nonrel_config: kbuild.Kconfig = kbuild.Kconfig(enabled: map.empty(), values: {["RELR"]: "y"})
   let nonrel_flags = kbuild.arm64_vmlinux_ldflags(nonrel_config)
   assert "-shared" in nonrel_flags == false

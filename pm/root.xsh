@@ -656,11 +656,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
         package_name: receipt.package_name,
         package_id: receipt.package_id,
         artifact_key: receipt.key,
-        path: entry.path,
-        kind: entry.kind,
-        mode: entry.mode,
-        sha256: entry.sha256,
-        target: entry.target,
+        ...entry,
       )
 
       var coalesced = false

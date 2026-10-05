@@ -73,9 +73,9 @@ proc bit_value(bit: Int) -> Int {
 proc put(data: Bytes, offset: Int, replacement: Bytes) [error] -> Result[Bytes] {
   bytes.concat(
     [
-      data.slice(offset: 0, length: offset),
+      data[..offset],
       replacement,
-      data.slice(offset: offset + replacement.len(), length: data.len() - offset - replacement.len()),
+      data[offset + replacement.len()..],
     ],
   )
 }
@@ -87,7 +87,7 @@ proc put_le(data: Bytes, offset: Int, value: Int, width: Int) -> Result[Bytes] {
 proc fixed_text(text: Str, width: Int) -> Result[Bytes] {
   let raw = bytes.from_text(text)
 
-  return raw.slice(offset: 0, length: width) when raw.len() >= width
+  return raw[..width] when raw.len() >= width
 
   bytes.concat([raw, bytes.zero(width - raw.len())?])
 }
@@ -354,7 +354,7 @@ proc allocate_blocks(used: Map[Bool], next: Int, total_blocks: Int, count: Int) 
 
 proc write_block(image: Path, block: Int, data: Bytes) {
   let payload = if data.len() < BLOCK_SIZE { bytes.concat([data, bytes.zero(BLOCK_SIZE - data.len())?]) } else { data }
-  let written = bytes.write_at(image, block * BLOCK_SIZE, payload.slice(offset: 0, length: BLOCK_SIZE))?
+  let written = bytes.write_at(image, block * BLOCK_SIZE, payload[..BLOCK_SIZE])?
   let _ = written
 }
 
@@ -431,7 +431,7 @@ proc allocate_bytes(image: Path, used: Map[Bool], next: Int, total_blocks: Int, 
     write_block(
       image,
       data_block_at(result.alloc, index),
-      data.slice(offset: start, length: min_int(data.len() - start, BLOCK_SIZE)),
+      data[start..start + BLOCK_SIZE],
     )
 
     index += 1
@@ -752,7 +752,7 @@ proc write_headers(
 }
 
 proc zero_image(image: Path, size: Int) {
-  let chunk = 1024 * 1024
+  let chunk: Int = 1MiB
   var offset = 0
 
   while offset < size {

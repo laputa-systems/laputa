@@ -77,7 +77,7 @@ test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
   let x86_before = plan_repository(root, types.target_x86_64())?
 
   rebuild_seed(root, "x86_64")
-  test.eq(changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)?, [])
+  assert changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)? == []
   assert changed_key_names(x86_before, plan_repository(root, types.target_x86_64())?)? == ["xsh"]
 }
 

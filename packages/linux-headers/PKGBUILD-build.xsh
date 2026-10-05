@@ -44,7 +44,7 @@ pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
 # The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_list(file: Path, variable: Str) -> Result[List[Str]] {
   let names: List[Str] = collect {
-    for line in file.read_text()?.lines() {
+    for line in file.lines()? {
       let fields = line.fields()
       continue unless fields.len() == 3 and fields[0] == variable and fields[1] == "+="
       yield fields[2]
@@ -76,7 +76,7 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) {
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
   var last = -1
 
-  for raw in header.table.read_text()?.lines() {
+  for raw in header.table.lines()? {
     let fields = raw.split("#")[0].fields()
     continue when fields.len() < 3 or fields[1] not in header.abis
     last = fields[0] as Int

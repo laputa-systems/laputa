@@ -142,7 +142,7 @@ proc empty_overlay(ctx: TestContext, name: Str) -> Result[Path] {
   fp"{overlay}/overlay"
 }
 
-proc expect_generation_error(ctx: TestContext, result: Result[types.GenerationReceipt], expected: Str) {
+proc expect_generation_error(_: TestContext, result: Result[types.GenerationReceipt], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: generation unexpectedly succeeded")
     Err(problem) => assert expected in problem.message

@@ -182,10 +182,9 @@ export proc fetch_host_tools(docker: Path, laputa_root: Path, value: xsh_seed.Se
   }
 
   saved.parent.mkdir()
-  let temporary = fp"{saved}.tmp"
-  temporary.remove()
-  docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
-  temporary.rename(to: saved, overwrite: true)
+  atomically replace saved as temporary {
+    docker_step(docker, [docker.display(), "save", "--output", temporary.display(), tag], laputa_root, f"saving {tag}")
+  }
 }
 
 ## Make the host-tools base available offline: present, or loaded from `.cache/images/`.

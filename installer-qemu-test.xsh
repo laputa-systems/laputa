@@ -525,7 +525,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   installer_log.remove()
   target_log.remove()
   target_image.write("")
-  target_image.truncate(128 * 1024 * 1024)
+  target_image.truncate(128MiB)
 
   let installer = spawn process.command_argv(
     qemu,

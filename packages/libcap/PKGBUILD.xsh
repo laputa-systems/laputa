@@ -110,7 +110,7 @@ const capability_define = rx"^#define\s+(CAP_[^\s]+)\s+([0-9]+)\s*$"
 proc write_cap_names_list() {
   var out = ""
 
-  for line in p"libcap/include/uapi/linux/capability.h".read_text()?.lines() {
+  for line in p"libcap/include/uapi/linux/capability.h".lines()? {
     if let [_, cap, value] = capability_define.captures(line) {
       out = out + "{\"" + cap.lower() + "\"," + value + "},\n"
     }
@@ -215,13 +215,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     prog_tasks = [@prog_tasks, @program.tasks]
   }
 
-  # capsh execs its SHELL for `--` and `==`; Laputa's interactive shell is
-  # xshi, not upstream's /bin/bash default.
+  # capsh passes arguments after `--` directly to this executable. The
+  # default runner accepts an XSH script path; `--shell` can select another
+  # executable without introducing shell command parsing.
   let capsh = make.c_program({
     cc,
     triple,
     cflags: ["-O2"],
-    defs: ["-DSHELL=\"/bin/xshi\""],
+    defs: ["-DSHELL=\"/usr/bin/xsh\""],
     includes: cppflags,
     root: p".",
     sources: [p"progs/capsh.c", p"progs/capshdoc.c"],

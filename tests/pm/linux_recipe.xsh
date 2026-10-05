@@ -90,7 +90,7 @@ test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, p
   sources.stage_package_sources({...original, upstream_sources: local_sources}, source)
 
   for name in required {
-    test.ok(fp"{source}/{name}".exists()?, f"missing staged {name}")
+    assert fp"{source}/{name}".exists()?, f"missing staged {name}"
   }
 }
 
@@ -150,7 +150,7 @@ test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process,
   assert fp"{source}/usr/lib/init/rc.boot".metadata()?.mode % 4096 == 0o755
 }
 
-test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |ctx|
+test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |_|
   let pkg = recipe.load_package(p"packages/baselayout")?
   let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.file_kind_tree()]
 
@@ -259,7 +259,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
   }
 }
 
-test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |ctx|
+test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |_|
   let pkg = recipe.load_package(p"packages/wlroots0.20")?
   assert "seatd" in pkg.deps
 }

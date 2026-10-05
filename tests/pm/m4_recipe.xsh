@@ -1,5 +1,21 @@
 ##! Regression coverage for the XSH m4: its package proof and GNU m4 1.4
 ##! compatibility on the constructs bison's and flex's skeletons use.
+const cat_heredoc = r"""changequote([, ])dnl
+before
+syscmd([cat <<'_m4eof'
+@complain(in order@)
+_m4eof
+])dnl
+sysval
+after
+"""
+
+const cat_heredoc_output = r"""before
+@complain(in order@)
+0
+after
+"""
+
 proc runner() -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
 
@@ -137,22 +153,6 @@ x
 second wrapped
 first wrapped
 two
-"""
-
-const cat_heredoc = r"""changequote([, ])dnl
-before
-syscmd([cat <<'_m4eof'
-@complain(in order@)
-_m4eof
-])dnl
-sysval
-after
-"""
-
-const cat_heredoc_output = r"""before
-@complain(in order@)
-0
-after
 """
 
 test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, process, env, error] { |ctx|

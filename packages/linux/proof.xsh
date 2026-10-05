@@ -1,6 +1,9 @@
 ##! XSH module `proof` package and build operations.
 error ProofError = Failed(kind: Str, message: Str)
 
+# The release the recipe installs its versioned image and config under.
+const kernel_release = "7.2.9"
+
 proc ensure_file(path_value: Path, label: Str) {
   guard path_value.exists() else {
     return Err(ProofError.Failed(kind: "proof-linux", message: f"missing {label}: {path_value}"))?
@@ -47,7 +50,7 @@ proc ensure_x86_bzimage(image_path: Path) {
     )?
   }
 
-  if image.slice(offset: 514, length: 4) != hdrs {
+  if image[514..518] != hdrs {
     return Err(
       ProofError.Failed(
         kind: "proof-linux",
@@ -56,9 +59,6 @@ proc ensure_x86_bzimage(image_path: Path) {
     )?
   }
 }
-
-# The release the recipe installs its versioned image and config under.
-const kernel_release = "7.2.9"
 
 proc main(rootfs = /rootfs) [fs, env, error] {
   ensure_file(fp"{rootfs}/boot/vmlinuz", "kernel image")

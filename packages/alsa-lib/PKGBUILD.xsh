@@ -323,8 +323,8 @@ proc install_config_tree(dest: Path) {
 
   for entry in fs.walk(conf_root, gitignore: false)? {
     continue unless entry.kind == "file" and entry.ext == "conf"
-    let rel = entry.path.relative_to(conf_root)
-    fs.install(entry.path, fp"{dest}/usr/share/alsa/{rel}", 0o644, parents: true, overwrite: true)
+    let config_path = entry.path.relative_to(conf_root)
+    fs.install(entry.path, fp"{dest}/usr/share/alsa/{config_path}", 0o644, parents: true, overwrite: true)
   }
 }
 

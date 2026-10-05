@@ -95,7 +95,7 @@ proc store_root(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
   test.temp_dir(ctx, name:)
 }
 
-proc expect_store_error(ctx: TestContext, result: Result[types.ArtifactReceipt], expected: Str) {
+proc expect_store_error(_: TestContext, result: Result[types.ArtifactReceipt], expected: Str) {
   match result {
     Ok(_) => test.fail(f"{expected}: operation unexpectedly succeeded")
     Err(problem) => assert expected in problem.message

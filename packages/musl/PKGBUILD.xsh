@@ -355,7 +355,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-Wl,-e,_dlstart",
   ]
 
-  var so_argv: List[Any] = [cc, "-target", triple]
+  var so_argv: List[Union[Str, Path]] = [cc, "-target", triple]
   so_argv = [@so_argv, @so_ldflags]
 
   for obj in all_so_objs {
@@ -372,7 +372,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       ],
       inputs: all_so_objs,
       deps: all_so_deps,
-      argv: so_argv,
+      argv: [@so_argv],
       cwd: p".",
       env: {},
       depfile: p"",

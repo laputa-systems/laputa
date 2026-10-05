@@ -13,7 +13,7 @@ pure fixture(name: Str) -> Path {
 proc expect_contract_rejection(dir: Path, description: Str) {
   match recipe.load_package(dir) {
     Ok(_) => test.fail(f"{description}: recipe unexpectedly loaded")
-    Err(error) => test.ok(error.message != "", f"{description}: error has a message")
+    Err(error) => assert error.message != "", f"{description}: error has a message"
   }
 }
 
@@ -178,7 +178,9 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
       stderr: stderr_path,
     ),
   )?
-  test.ok(status.ok, stderr_path.read_text()?)
+  let succeeded = status.ok
+  let stderr = stderr_path.read_text()?
+  assert succeeded, stderr
 }
 
 # A stand-in executable that prints `output` only when run against the proof
@@ -234,7 +236,7 @@ test test_wpa_proof_runs_binaries_with_composed_libraries [fs, process, env, err
   }
 
   let good = run_wpa_proof(ctx, "wpa-proof-good", "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e")?
-  test.ok(good.ok, good.stderr)
+  assert good.ok, good.stderr
 
   let bad = run_wpa_proof(ctx, "wpa-proof-bad-psk", "00")?
   assert ! bad.ok
@@ -279,7 +281,7 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
     "runtime-only-omitted",
     "export let deps = []\nexport let mkdeps_host = []",
   )?
-  test.eq(recipe.load_package(omitted)?.runtime_only_deps, [])
+  assert recipe.load_package(omitted)?.runtime_only_deps == []
 
   for overlap in [
     "export let deps = [\"lib\"]\nexport let mkdeps_host = []\nexport let runtime_only_deps = [\"lib\"]",

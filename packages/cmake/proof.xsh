@@ -33,60 +33,58 @@ proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
     )?
   }
 
-  let tmp = fp"{rootfs}/var/tmp/proof-cmake"
-  tmp.remove()
-  tmp.mkdir()
-  defer tmp.remove()
+  tempdir tmp at fp"{rootfs}/var/tmp/proof-cmake" {
 
-  # Artifact proofs deliberately compose runtime edges only. `samurai` is a
-  # build-host tool, so use this explicit proof-local generator instead of
-  # resolving a build dependency through the proof root. It gives CMake the
-  # generator capability required for a configure-only package smoke test;
-  # `llvm-toolchain` proves compiler execution independently.
-  let proof_samu = fp"{tmp}/proof-samu"
-  proof_samu.write(
-    """#!/bin/xsh
+    # Artifact proofs deliberately compose runtime edges only. `samurai` is a
+    # build-host tool, so use this explicit proof-local generator instead of
+    # resolving a build dependency through the proof root. It gives CMake the
+    # generator capability required for a configure-only package smoke test;
+    # `llvm-toolchain` proves compiler execution independently.
+    let proof_samu = fp"{tmp}/proof-samu"
+    proof_samu.write(
+      """#!/bin/xsh
 proc main(...argv: List[Str]) [] {
   print "1.12.0"
 }
 
 main(@args)?
 """,
-    mode: 0o755,
-  )
+      mode: 0o755,
+    )
 
-  fp"{tmp}/CMakeLists.txt".write(
-    r"""cmake_minimum_required(VERSION 3.13)
+    fp"{tmp}/CMakeLists.txt".write(
+      r"""cmake_minimum_required(VERSION 3.13)
 project(laputa_cmake_runtime NONE)
 file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
 """,
-  )
+    )
 
-  fp"{tmp}/build".mkdir()
+    fp"{tmp}/build".mkdir()
 
-  cd fp"{tmp}/build" {
-    let cmake_args = [
-      cmake.display(),
-      "..",
-      "-G",
-      "Ninja",
-      f"-DCMAKE_MAKE_PROGRAM={proof_samu}",
-    ]
+    cd fp"{tmp}/build" {
+      let cmake_args = [
+        cmake.display(),
+        "..",
+        "-G",
+        "Ninja",
+        f"-DCMAKE_MAKE_PROGRAM={proof_samu}",
+      ]
 
-    let cmake_proc = process.command_argv(cmake_args[0], cmake_args)
-    let cmake_status = process.run(cmake_proc)?
+      let cmake_proc = process.command_argv(cmake_args[0], cmake_args)
+      let cmake_status = process.run(cmake_proc)?
 
-    if ! cmake_status.ok {
-      Err(ScriptError.Failed(kind: "cmake-proof-configure", message: "cmake configure failed"))?
+      if ! cmake_status.ok {
+        Err(ScriptError.Failed(kind: "cmake-proof-configure", message: "cmake configure failed"))?
+      }
+
+      let cache = fp"{tmp}/build/CMakeCache.txt".read_text()?
+      let marker = fp"{tmp}/build/proof-output.txt".read_text()?
+
+      if proof_samu.display() not in cache or marker != "cmake runtime closure\n" {
+        Err(ScriptError.Failed(kind: "cmake-proof", message: "configure did not use the isolated runtime proof inputs"))?
+      }
+
+      print "cmake ok: runtime configure"
     }
-
-    let cache = fp"{tmp}/build/CMakeCache.txt".read_text()?
-    let marker = fp"{tmp}/build/proof-output.txt".read_text()?
-
-    if proof_samu.display() not in cache or marker != "cmake runtime closure\n" {
-      Err(ScriptError.Failed(kind: "cmake-proof", message: "configure did not use the isolated runtime proof inputs"))?
-    }
-
-    print "cmake ok: runtime configure"
   }
 }

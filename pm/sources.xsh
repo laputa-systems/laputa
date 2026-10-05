@@ -3,6 +3,29 @@ use recipe
 use types
 use util
 
+# URL sources are content-addressed: `make fetch` (`pm sources fetch`) is the
+# only step that contacts upstream hosts. Builds resolve a pinned URL source from
+# the cache, then from the local mirror named by LAPUTA_MIRROR, and otherwise
+# fail. The source string and checksum stay the recipe's identity, so where the
+# bytes come from never changes a fingerprint.
+const sha256_hex = rx"^[0-9a-f]{64}$"
+
+# A `cargo-vendor` source names a Cargo.lock. Its crates.io records are a
+# content-addressed crate set: each `checksum` is the sha256 crates.io serves
+# that `.crate` under, so `make fetch` caches every crate like any pinned URL
+# and a build stages them offline as a cargo directory source. Cargo.lock
+# names crates.io by its git index or, with the sparse protocol, its HTTP
+# index; both serve the same archives.
+const crates_io_lock_sources = [
+  "registry+https://github.com/rust-lang/crates.io-index",
+  "sparse+https://index.crates.io/",
+]
+
+# Crate names and versions become vendor directory names, so neither may
+# carry a path separator.
+const crate_name_pattern = rx"^[A-Za-z0-9_-]+$"
+const crate_version_pattern = rx"^[0-9A-Za-z.+-]+$"
+
 # `repository/` names a declared package-repository input rather than a path
 # relative to an isolated recipe copy. The executor supplies its exact
 # repository root, so recipes can stage repository-owned source trees without
@@ -36,13 +59,6 @@ export proc source_checksum(source: types.UpstreamSource, arch: Str) [error] -> 
 
   Err(types.PmError.SourceChecksum(f"no checksum for {source.source} on {arch}"))
 }
-
-# URL sources are content-addressed: `make fetch` (`pm sources fetch`) is the
-# only step that contacts upstream hosts. Builds resolve a pinned URL source from
-# the cache, then from the local mirror named by LAPUTA_MIRROR, and otherwise
-# fail. The source string and checksum stay the recipe's identity, so where the
-# bytes come from never changes a fingerprint.
-const sha256_hex = rx"^[0-9a-f]{64}$"
 
 ## The source cache root for a package repository: LAPUTA_SOURCE_CACHE when set,
 ## otherwise `.cache/sources` under the repository root.
@@ -214,22 +230,6 @@ export proc resolve_source(
   let metadata = local.metadata()?
   {path: local, kind: metadata.kind, name: local.name}
 }
-
-# A `cargo-vendor` source names a Cargo.lock. Its crates.io records are a
-# content-addressed crate set: each `checksum` is the sha256 crates.io serves
-# that `.crate` under, so `make fetch` caches every crate like any pinned URL
-# and a build stages them offline as a cargo directory source. Cargo.lock
-# names crates.io by its git index or, with the sparse protocol, its HTTP
-# index; both serve the same archives.
-const crates_io_lock_sources = [
-  "registry+https://github.com/rust-lang/crates.io-index",
-  "sparse+https://index.crates.io/",
-]
-
-# Crate names and versions become vendor directory names, so neither may
-# carry a path separator.
-const crate_name_pattern = rx"^[A-Za-z0-9_-]+$"
-const crate_version_pattern = rx"^[0-9A-Za-z.+-]+$"
 
 ## One crates.io package a Cargo.lock pins, and the sha256 of its `.crate`.
 export type LockedCrate = {name: Str, version: Str, checksum: Str}

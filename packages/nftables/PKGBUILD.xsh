@@ -65,6 +65,18 @@ export const filetree = [
   },
 ]
 
+# Makefile.am src_libparser_la_SOURCES. The release tarball ships the Bison
+# parser (src/parser_bison.c and .h, Bison 3.8.2) and the Flex scanner
+# (src/scanner.c) newer than their .y and .l sources, so configure takes the
+# prebuilt path and neither generator runs.
+const parser_sources = ["src/parser_bison.c", "src/scanner.c"]
+
+# configure substitutes BUILD_STAMP from SOURCE_DATE_EPOCH or the build time,
+# and nft stamps it into the tables it creates to warn when a table came from
+# a newer build of the same version. The newest file mtime in the 1.1.7 release
+# tarball (src/scanner.c) keeps the payload reproducible; update it with `ver`.
+const build_stamp = "1788280583"
+
 # Makefile.am src_libnftables_la_SOURCES with BUILD_JSON and BUILD_PROFILING
 # off; src/xt.c is always listed and compiles to stubs without libxtables.
 pure library_sources() -> List[Str] {
@@ -81,12 +93,6 @@ src/tcpopt.c src/tunnel.c src/utils.c src/xfrm.c src/xt.c
 """.words()
 }
 
-# Makefile.am src_libparser_la_SOURCES. The release tarball ships the Bison
-# parser (src/parser_bison.c and .h, Bison 3.8.2) and the Flex scanner
-# (src/scanner.c) newer than their .y and .l sources, so configure takes the
-# prebuilt path and neither generator runs.
-const parser_sources = ["src/parser_bison.c", "src/scanner.c"]
-
 # Makefile.am AM_CFLAGS.
 pure warning_flags() -> List[Str] {
   """
@@ -97,12 +103,6 @@ pure warning_flags() -> List[Str] {
 -Wwrite-strings
 """.words()
 }
-
-# configure substitutes BUILD_STAMP from SOURCE_DATE_EPOCH or the build time,
-# and nft stamps it into the tables it creates to warn when a table came from
-# a newer build of the same version. The newest file mtime in the 1.1.7 release
-# tarball (src/scanner.c) keeps the payload reproducible; update it with `ver`.
-const build_stamp = "1788280583"
 
 # Captured from upstream `./configure --prefix=/usr --sysconfdir=/etc
 # --with-mini-gmp --without-cli --without-json --disable-man-doc

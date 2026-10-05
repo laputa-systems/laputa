@@ -86,7 +86,7 @@ proc pm_status(args: List[Str], err: Path) -> Result[Status] {
   return run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO="" $xsh pm.xsh -- @args 2> $err
 }
 
-test test_repo_help_is_explicit [fs, process, env, error] { |ctx|
+test test_repo_help_is_explicit [fs, process, env, error] { |_|
   let top = pm_output(["--help"])?
   let repository = pm_output(["repo", "--help"])?
   let plan = pm_output(["repo", "plan", "--help"])?
