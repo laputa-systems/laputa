@@ -252,14 +252,14 @@ export proc collect_archive_paths(root: Path, filetree: List[types.FileTreeEntry
     }
   }
 
-  var unique: Map[Bool] = {}
+  var unique: Set[Str] = set.empty()
   var canonical: List[Path] = []
 
   for entry in entries |> sort-by .display() {
     let key = entry.display()
 
     if ! (key in unique) {
-      unique[key] = true
+      unique = unique.add(key)
       canonical += [entry]
     }
   }
@@ -387,7 +387,7 @@ export proc write_package_db(
 ## Exported PM declaration `load_package_dirs`.
 export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[types.Package], Error] {
   var packages = []
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for dir in dirs {
     let pkg = recipe.load_package(dir)?
@@ -396,7 +396,7 @@ export proc load_package_dirs(dirs: List[Path]) [fs, env, error] -> Result[List[
       return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
     }
 
-    seen[pkg.name] = true
+    seen = seen.add(pkg.name)
     packages += [pkg]
   }
 

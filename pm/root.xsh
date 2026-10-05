@@ -252,7 +252,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
   }
 
   var entries: List[types.ArtifactEntry] = []
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for raw_entry in dto.files {
     let entry = root_decode_metadata_entry(raw_entry)?
@@ -262,7 +262,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
       return Err(types.PmError.PackageContract(f"artifact metadata repeats {entry.path} for {receipt.package_name}"))
     }
 
-    seen[entry.path] = true
+    seen = seen.add(entry.path)
     entries += [entry]
   }
 
@@ -276,7 +276,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
         )
       }
 
-      seen[entry.path] = true
+      seen = seen.add(entry.path)
       entries += [entry]
     }
   }
@@ -347,10 +347,10 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
   let sandbox_path = sandbox.host_path()?
   let extracted = fp"{sandbox_path}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
-  var expected: Map[Bool] = {}
+  var expected: Set[Str] = set.empty()
 
   for entry in entries {
-    expected[entry.path] = true
+    expected = expected.add(entry.path)
     # Keep the immutable receipt owner and exact metadata path at this
     # archive boundary.  A raw filesystem error otherwise loses the artifact
     # that supplied the malformed inventory, especially when this runs inside
@@ -395,8 +395,8 @@ proc root_verified_artifacts(
 # Checks key and package uniqueness and runtime-closure completeness of receipts as given.
 proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> Result[List[types.ArtifactReceipt]] {
   var verified: List[types.ArtifactReceipt] = []
-  var keys: Map[Bool] = {}
-  var names: Map[Bool] = {}
+  var keys: Set[Str] = set.empty()
+  var names: Set[Str] = set.empty()
 
   for receipt in artifacts {
     if receipt.key in keys {
@@ -407,8 +407,8 @@ proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> R
       return Err(types.PmError.PackageContract(f"duplicate package {receipt.package_name} in root artifacts"))
     }
 
-    keys[receipt.key] = true
-    names[receipt.package_name] = true
+    keys = keys.add(receipt.key)
+    names = names.add(receipt.package_name)
     verified += [receipt]
   }
 

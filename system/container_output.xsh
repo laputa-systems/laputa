@@ -49,13 +49,13 @@ export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile])
     return Err(ContainerOutputError.Failed("system bundle must contain files"))
   }
 
-  var names: Map[Bool] = {}
+  var names: Set[Str] = set.empty()
   for item in files {
     if item.name == "" or "/" in item.name or item.name in names {
       return Err(ContainerOutputError.Failed(f"invalid system bundle file name {item.name}"))
     }
 
-    names[item.name] = true
+    names = names.add(item.name)
     if ! item.source.exists() or ! item.source.is_file() or item.source.metadata()?.size <= 0 {
       return Err(ContainerOutputError.Failed(f"bundle source is missing or empty: {item.source}"))
     }

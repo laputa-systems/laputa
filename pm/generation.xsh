@@ -194,8 +194,8 @@ proc generation_validate_plan(value: types.GenerationPlan) {
     return Err(types.PmError.PackageContract("generation runtime roots must be non-empty, sorted, and unique"))
   }
 
-  var names: Map[Bool] = {}
-  var keys: Map[Bool] = {}
+  var names: Set[Str] = set.empty()
+  var keys: Set[Str] = set.empty()
   var prior_name = ""
 
   for artifact in value.artifacts {
@@ -213,8 +213,8 @@ proc generation_validate_plan(value: types.GenerationPlan) {
       return Err(types.PmError.PackageContract("generation artifacts are not in canonical order"))
     }
 
-    names[artifact.package_name] = true
-    keys[artifact.artifact_key] = true
+    names = names.add(artifact.package_name)
+    keys = keys.add(artifact.artifact_key)
     prior_name = artifact.package_name
   }
 
@@ -481,7 +481,7 @@ proc generation_preflight_overlay(
   root_plan: types.RootPlan,
   profile: types.GenerationProfile,
 ) [error] {
-  var used_replacements: Map[Bool] = {}
+  var used_replacements: Set[Str] = set.empty()
 
   for entry in entries {
     if entry.path == "var/lib/laputa/root.json" or entry.path == "var/lib/laputa/generation.json" {
@@ -514,7 +514,7 @@ proc generation_preflight_overlay(
           )
         }
 
-        used_replacements[entry.path] = true
+        used_replacements = used_replacements.add(entry.path)
       } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.file_kind_tree() {
         return Err(
           types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"),
@@ -541,7 +541,7 @@ proc generation_store_artifacts(
   store_root: Path,
 ) -> Result[List[types.ArtifactReceipt]] {
   var receipts: List[types.ArtifactReceipt] = []
-  var keys: Map[Bool] = {}
+  var keys: Set[Str] = set.empty()
 
   for artifact in value.artifacts {
     let receipt = artifact_store.lookup(store_root, artifact.artifact_key)?
@@ -552,7 +552,7 @@ proc generation_store_artifacts(
       )
     }
 
-    keys[receipt.key] = true
+    keys = keys.add(receipt.key)
     receipts += [receipt]
   }
 

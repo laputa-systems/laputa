@@ -28,14 +28,14 @@ proc make_catalog(
 ) [error] -> Result[types.PackageCatalog] {
   let sorted_packages = packages |> sort-by .name
   let available_remote_names = sorted_unique_names(remote_names)
-  var local_names: Map[Bool] = {}
+  var local_names: Set[Str] = set.empty()
   var available_names: Map[Bool] = {name: true for name in available_remote_names}
   for pkg in sorted_packages {
     if pkg.name in local_names {
       return Err(types.PmError.PackageContract(f"duplicate package {pkg.name}"))
     }
 
-    local_names[pkg.name] = true
+    local_names = local_names.add(pkg.name)
     available_names[pkg.name] = true
   }
 
@@ -89,7 +89,7 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
 
   let arch = types.pm_target_arch(target)
   var packages: List[types.Package] = []
-  var excluded: Map[Bool] = {}
+  var excluded: Set[Str] = set.empty()
 
   for entry in fs.children(recipe_root)? |> sort-by .name {
     continue unless entry.kind == "dir"
@@ -98,7 +98,7 @@ export proc load_for_target(root: Path, target: types.Target) [fs, env, error] -
     let pkg = recipe.load_package_for_target(entry.path, target)?
 
     if arch not in pkg.architectures {
-      excluded[pkg.name] = true
+      excluded = excluded.add(pkg.name)
       continue
     }
 

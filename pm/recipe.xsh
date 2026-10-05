@@ -52,7 +52,7 @@ proc validate_package_architectures(name: Str, architectures: List[Str]) {
     return package_contract_error(name, "architectures must name at least one target architecture")
   }
 
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for architecture in architectures {
     if architecture != "aarch64" and architecture != "x86_64" {
@@ -63,12 +63,12 @@ proc validate_package_architectures(name: Str, architectures: List[Str]) {
       return package_contract_error(name, f"architectures repeats {architecture}")
     }
 
-    seen[architecture] = true
+    seen = seen.add(architecture)
   }
 }
 
 proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) {
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for dependency in dependencies {
     if dependency in seen {
@@ -79,7 +79,7 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) {
       return package_contract_error(name, f"{label} may not depend on itself")
     }
 
-    seen[dependency] = true
+    seen = seen.add(dependency)
   }
 }
 
@@ -137,7 +137,7 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
     return Err(types.PmError.PackageContract(f"{name}: cargo-vendor source {source} needs a `=> DIR` destination"))
   }
 
-  var architecture_seen: Map[Bool] = {}
+  var architecture_seen: Set[Str] = set.empty()
 
   for architecture in architectures {
     if architecture in architecture_seen {
@@ -152,11 +152,11 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
       )
     }
 
-    architecture_seen[architecture] = true
+    architecture_seen = architecture_seen.add(architecture)
   }
 
   var checksums: List[types.SourceChecksum] = []
-  var checksum_seen: Map[Bool] = {}
+  var checksum_seen: Set[Str] = set.empty()
 
   for raw_checksum in raw_checksums {
     let checksum = decode_source_checksum(name, raw_checksum)?
@@ -169,7 +169,7 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
       return Err(types.PmError.PackageContract(f"{name}: remote source {source} may not use SKIP"))
     }
 
-    checksum_seen[checksum.arch] = true
+    checksum_seen = checksum_seen.add(checksum.arch)
     checksums += [checksum]
   }
 
@@ -220,7 +220,7 @@ proc decode_upstream_sources(name: Str, raw_sources: List[Record]) -> Result[Lis
 
 proc decode_filetree(name: Str, raw_entries: List[Record]) -> Result[List[types.FileTreeEntry]] {
   var entries: List[types.FileTreeEntry] = []
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for raw_entry in raw_entries {
     let entry = decode_filetree_entry(name, raw_entry)?
@@ -230,7 +230,7 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) -> Result[List[types.
       return Err(types.PmError.PackageContract(f"{name}: filetree repeats {path_text}"))
     }
 
-    seen[path_text] = true
+    seen = seen.add(path_text)
     entries += [entry]
   }
 

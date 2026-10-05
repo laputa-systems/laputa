@@ -80,12 +80,12 @@ proc require_key(key: Str) {
 }
 
 pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
   var result: List[Str] = []
 
   for key in keys {
     if ! (key in seen) {
-      seen[key] = true
+      seen = seen.add(key)
       result += [key]
     }
   }
@@ -190,7 +190,7 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) {
   require_sha256(value.proof_key, "artifact receipt proof_key")
   require_sha256(value.proof_sha256, "artifact receipt proof_sha256")
 
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for dependency_key in value.dependency_keys {
     require_sha256(dependency_key, "artifact receipt dependency key")
@@ -199,10 +199,10 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) {
       return Err(types.PmError.PackageContract(f"artifact receipt repeats dependency key {dependency_key}"))
     }
 
-    seen[dependency_key] = true
+    seen = seen.add(dependency_key)
   }
 
-  var seen_runtime: Map[Bool] = {}
+  var seen_runtime: Set[Str] = set.empty()
 
   for dependency_key in value.runtime_dependency_keys {
     require_sha256(dependency_key, "artifact receipt runtime dependency key")
@@ -217,7 +217,7 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) {
       return Err(types.PmError.PackageContract(f"artifact receipt repeats runtime dependency key {dependency_key}"))
     }
 
-    seen_runtime[dependency_key] = true
+    seen_runtime = seen_runtime.add(dependency_key)
   }
 }
 

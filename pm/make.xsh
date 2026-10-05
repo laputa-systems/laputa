@@ -564,7 +564,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
   var remaining_deps: Map[Int] = {}
   var ready = []
   var ready_index = 0
-  var done: Map[Bool] = {}
+  var done: Set[Str] = set.empty()
   var scheduled: Map[Bool] = {}
   var running: List[RunningTask] = []
   var pending_stamps: List[RunningTask] = []
@@ -620,7 +620,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
             )
           }
         } else {
-          done[task.name] = true
+          done = done.add(task.name)
           done_count += 1
           skip_count += 1
 
@@ -693,7 +693,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
 
     for row in completed_tasks {
       pending_stamps += [row]
-      done[row.task.name] = true
+      done = done.add(row.task.name)
       done_count += 1
 
       for dependent in dependents.get(row.task.name) ?? no_dependents {
@@ -734,7 +734,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
               )
             }
           } else {
-            done[task.name] = true
+            done = done.add(task.name)
             done_count += 1
             skip_count += 1
 

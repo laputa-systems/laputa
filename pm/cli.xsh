@@ -602,7 +602,7 @@ proc selected_packages(repo_root: Path, names: List[Str]) -> Result[List[types.P
   let value = catalog.load(repo_root)?
   let by_name = catalog.package_map(value)
   var selected: List[types.Package] = []
-  var seen: Map[Bool] = {}
+  var seen: Set[Str] = set.empty()
 
   for name in names {
     if name in seen {
@@ -615,7 +615,7 @@ proc selected_packages(repo_root: Path, names: List[Str]) -> Result[List[types.P
 
     let listed: types.Package = by_name.get(name)?
     selected += [recipe.load_package(fp"{repo_root}/{listed.dir}")?]
-    seen[name] = true
+    seen = seen.add(name)
   }
 
   selected
