@@ -276,10 +276,7 @@ proc execute_build_local(
   # Keep the proof outcome as Result data through this build-node boundary.
   # The published runner otherwise propagates a failing Unit proc directly out
   # of a par-map worker before its node-status marker can be written.
-  match execute_run_proof(context, node, pkg, staged.payload, staged.payload_sha256, staged.proof) {
-    Ok(_) => {}
-    Err(problem) => return Err(problem)
-  }
+  execute_run_proof(context, node, pkg, staged.payload, staged.payload_sha256, staged.proof)?
 
   let receipt = store.commit(context.plan.target, context.store_root, node, staged)?
   execute_require_receipt(context.plan, node, receipt)
