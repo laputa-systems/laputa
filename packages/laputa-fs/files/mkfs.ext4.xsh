@@ -803,8 +803,8 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) [fs, error] {
   if last_group_blocks > 0 and last_group_blocks < 4 + INODE_TABLE_BLOCKS {
     return Err(
       Ext4ToolError.Failed(
-        "bad-size",
-        "last ext4 block group is too small for its metadata",
+        kind: "bad-size",
+        message: "last ext4 block group is too small for its metadata",
       ),
     )
   }
