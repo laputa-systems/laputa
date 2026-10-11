@@ -26,7 +26,7 @@ make asterinas-build
 `asterinas-fetch` fetches the pinned Asterinas and XSH source plus the declared
 build inputs. `asterinas-build` builds or reuses the Asterinas PVH kernel and
 the Laputa generation, then publishes a content-addressed bundle. XSH is built
-from commit `76bc2de87d96040244248f3ca0ba478801ec4969`; changes in the sibling
+from commit `58d321d92963401c3d0113a03e809ca6349c6f16`; changes in the sibling
 XSH working tree do not affect this pinned build.
 
 The kernel, verified immutable bundles, runtime disk copies, Firecracker
@@ -56,12 +56,22 @@ verified bundle image. The serial log and result metadata remain under
 `test-console.log` and `boot-console.log` files.
 
 Run one native XSH test module from the locked XSH snapshot inside the guest
-with `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. The module, test tree, and required
-specification file are staged through a PM generation overlay; their identities
-are included in the immutable bundle manifest. The selected module runs under
-the packaged `xsht`, and the host requires its guest success marker. To test a
-different XSH source revision, update the XSH commit pin in
-`infra/asterinas/inputs.lock` first.
+with `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. A module under `core/tests`,
+`dev/tests`, or `showcase/tests` can be selected the same way. Use
+`XSH_TEST=core/tests/test-awk.xsh::test_awk_matrix_arrays_and_functions` to
+run one exact test. Use `XSH_TEST=all` to run the full
+native suite configured by the pinned `xsht-config.ini`, including `core/tests`,
+`dev/tests`, `tests`, and `showcase/tests`. The test source tree is staged from
+the locked Git archive through a PM generation overlay; its digest is included
+in the immutable bundle manifest. Guest test runs use 4 GiB of memory; the
+base viability proof uses 1 GiB. The selected tests run under the packaged
+`xsht`, and the host requires their guest success marker. To test a different
+XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
+first.
+
+The full `XSH_TEST=all` run currently has painfully long wall time in the
+2-vCPU Asterinas guest. The suite and its guest execution need substantial
+runtime improvements; use module or exact-test selections for focused checks.
 
 Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
 which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing

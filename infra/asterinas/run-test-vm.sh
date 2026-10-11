@@ -2,7 +2,7 @@
 set -euo pipefail
 
 [[ $# == 6 ]] || {
-    printf 'usage: run-test-vm.sh FIRECRACKER CONFIG CONSOLE_LOG FIRECRACKER_LOG SELECTED_MODULE MAX_POLLS\n' >&2
+    printf 'usage: run-test-vm.sh FIRECRACKER CONFIG CONSOLE_LOG FIRECRACKER_LOG XSH_TEST_SELECTION MAX_POLLS\n' >&2
     exit 2
 }
 
@@ -10,7 +10,7 @@ firecracker_bin="$1"
 firecracker_config="$2"
 console_log="$3"
 firecracker_log="$4"
-selected_module="$5"
+test_selection="$5"
 max_polls="$6"
 firecracker_pid=""
 
@@ -91,9 +91,9 @@ for ((attempt = 0; attempt < max_polls; attempt++)); do
 done
 [[ "$complete" == true ]] || fail 'timed out waiting for the Laputa guest completion marker'
 
-if [[ -n "$selected_module" ]]; then
-    grep -Fq "LAPUTA_ASTERINAS_XSH_TEST_START $selected_module" "$console_log" || \
-        fail "guest did not start the selected XSH test module: $selected_module"
+if [[ -n "$test_selection" ]]; then
+    grep -Fq "LAPUTA_ASTERINAS_XSH_TEST_START $test_selection" "$console_log" || \
+        fail "guest did not start the requested XSH test selection: $test_selection"
     grep -Fq LAPUTA_ASTERINAS_XSH_TEST_OK "$console_log" || \
         fail 'guest did not report the selected XSH test module passing'
 fi

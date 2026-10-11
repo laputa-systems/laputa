@@ -233,7 +233,7 @@ The lock currently selects Asterinas commit
 `0.18.1-20260926` at digest
 `sha256:e4a5a5742247a287af70d1d5b59f5fa93fe8ab46dcc9081a5e3d0a8066faab56`,
 Firecracker `v1.17.0`, and XSH commit
-`76bc2de87d96040244248f3ca0ba478801ec4969`. Update these pins deliberately.
+`58d321d92963401c3d0113a03e809ca6349c6f16`. Update these pins deliberately.
 
 The build uses the Asterinas source and XSH source archives in managed caches,
 so it does not move or edit the developer's XSH branch. The runtime root is
@@ -662,16 +662,19 @@ Design the incremental build dependencies so that:
 - Unchanged generations reuse valid images.
 - Test logs are never mistaken for reusable build artifacts.
 
-Expose a narrow way to run one existing XSH test module from the locked source
-snapshot inside the Asterinas guest:
+Run either one existing XSH test module or the full native XSH suite from the
+locked source snapshot inside the Asterinas guest:
 
 ```sh
 make asterinas-test XSH_TEST=tests/xsh/stdlib/fs.xsh
+make asterinas-test XSH_TEST=core/tests/test-awk.xsh::test_awk_matrix_arrays_and_functions
+make asterinas-test XSH_TEST=all
 ```
 
-Use the packaged `xsht` native test runner and stage the test tree through a
-PM generation overlay whose digest participates in the system key. The
-`fs.xsh` suite exercises kernel-enforced rooted filesystem operations and
+Use the packaged `xsht` native test runner and stage the pinned source archive
+through a PM generation overlay whose digest participates in the system key.
+The `all` selection runs every native test root in `xsht-config.ini`.
+The `fs.xsh` suite exercises kernel-enforced rooted filesystem operations and
 should run against Laputa's Asterinas fork.
 
 Do not require the developer to manually copy files into a mounted disk image.

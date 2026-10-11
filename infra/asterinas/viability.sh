@@ -14,6 +14,12 @@ if [[ -n "$requested_xsh_test" && ( "$action" != test || "$mode" != viability ) 
     printf 'asterinas-%s: XSH_TEST is supported only with the automated viability test\n' "$action" >&2
     exit 2
 fi
+# Native suite runs create many short-lived processes; 1 GiB exhausted kernel
+# task allocations before the configured XSH tests finished.
+guest_memory_mib=1024
+if [[ -n "$requested_xsh_test" ]]; then
+    guest_memory_mib=4096
+fi
 unset XSH_BIN_DIR XSH_HOST
 source "$repo_root/infra/asterinas/inputs.lock"
 output_dir="$repo_root/.out/asterinas-firecracker"
@@ -67,7 +73,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-for tool in awk cat cc chmod cp dirname docker find git grep head make mkdir mv ps readlink realpath rm sed sha256sum sleep sort stat tail tr uname; do
+for tool in awk cat cc chmod cp dirname docker find git grep head make mkdir mv ps readlink realpath rm sed sha256sum sleep sort stat tail tar tr uname; do
     command -v "$tool" >/dev/null 2>&1 || fail "required host command is missing: $tool"
 done
 mkdir -p "$output_dir/logs"
@@ -89,7 +95,7 @@ readarray -t xsh_snapshot <<< "$xsh_snapshot_output"
 xsh_root="${xsh_snapshot[0]}"
 xsh_build_inputs_hash="${xsh_snapshot[1]}"
 actual_xsh_commit="$XSH_COMMIT"
-xsh_test_path=""
+xsh_test_selection=""
 xsh_test_sha256=""
 if [[ -n "$requested_xsh_test" ]]; then
     xsh_test_stage_output="$(bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
@@ -100,7 +106,7 @@ if [[ -n "$requested_xsh_test" ]]; then
        "${xsh_test_stage[1]}" == "$requested_xsh_test" && \
        "${xsh_test_stage[2]}" =~ ^[0-9a-f]{64}$ ]] || fail 'XSH test staging helper returned invalid provenance'
     profile_overlay_path="/src/laputa/.out/asterinas-firecracker/xsh-test-overlay"
-    xsh_test_path="${xsh_test_stage[1]}"
+    xsh_test_selection="${xsh_test_stage[1]}"
     xsh_test_sha256="${xsh_test_stage[2]}"
     profile_proof_source="$repo_root/guest/asterinas/viability/overlay/usr/lib/asterinas/boot-proof.xsh"
     profile_proof_source_path="guest/asterinas/viability/overlay/usr/lib/asterinas/boot-proof.xsh"
@@ -134,7 +140,9 @@ run_make() {
 
 run_make fetch-seed
 "$host_xsh" "$repo_root/pm.xsh" -- sources fetch --repo "$repo_root" --target x86_64-linux-musl llvm-toolchain
-if [[ "$mode" == shell ]]; then
+use_asterinas_xshi_seed=false
+if [[ "$mode" == shell || -n "$requested_xsh_test" ]]; then
+    use_asterinas_xshi_seed=true
     restore_standard_seed=true
     run_make seed-asterinas-shell
 else
@@ -148,7 +156,7 @@ plan_path="$repo_root/.out/world/x86_64/plan.json"
 "$host_xsh" "$repo_root/infra/asterinas/fetch-plan-sources.xsh" -- "$plan_path"
 run_make build "PKGS=$package_selection"
 
-if [[ "$mode" == shell ]]; then
+if [[ "$use_asterinas_xshi_seed" == true ]]; then
     run_make seed
     restore_standard_seed=false
 fi
@@ -218,7 +226,7 @@ kernel_hash="$(sha256sum "$output_dir/asterinas.elf" | awk '{print $1}')"
 root_hash="$(sha256sum "$root_image" | awk '{print $1}')"
 initramfs_hash="$(sha256sum "$initramfs" | awk '{print $1}')"
 proof_source_hash="$(sha256sum "$profile_proof_source" | awk '{print $1}')"
-bundle_key="$(printf '%s\n' "$mode" "$generation" "$actual_xsh_commit" "$xsh_build_inputs_hash" "$ASTERINAS_COMMIT" "$asterinas_source_snapshot_hash" "$asterinas_source_state" "$toolchain_channel" "$kernel_build_config" "$dev_image_id" "$ASTERINAS_DEV_IMAGE_DIGEST" "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version" "$FIRECRACKER_VERSION" "$FIRECRACKER_BINARY_SHA256" "$package_tools_image" "$kernel_hash" "$root_hash" "$initramfs_hash" "$proof_source_hash" "$xsh_test_path" "$xsh_test_sha256" 'writable-runtime-root-v1' | sha256sum | awk '{print $1}')"
+bundle_key="$(printf '%s\n' "$mode" "$generation" "$actual_xsh_commit" "$xsh_build_inputs_hash" "$ASTERINAS_COMMIT" "$asterinas_source_snapshot_hash" "$asterinas_source_state" "$toolchain_channel" "$kernel_build_config" "$dev_image_id" "$ASTERINAS_DEV_IMAGE_DIGEST" "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version" "$FIRECRACKER_VERSION" "$FIRECRACKER_BINARY_SHA256" "$package_tools_image" "$kernel_hash" "$root_hash" "$initramfs_hash" "$proof_source_hash" "$xsh_test_selection" "$xsh_test_sha256" "$guest_memory_mib" 'writable-runtime-root-v1' | sha256sum | awk '{print $1}')"
 bundle_dir="$output_dir/builds/$bundle_key"
 runtime_root="$output_dir/runtime/$bundle_key/laputa-root.ext2"
 mkdir -p "$output_dir/builds"
@@ -247,13 +255,15 @@ else
         --arg firecracker_sha "$FIRECRACKER_BINARY_SHA256" \
         --arg kernel_sha "$kernel_hash" --arg root_sha "$root_hash" --arg initramfs_sha "$initramfs_hash" \
         --arg proof_source "$profile_proof_source_path" --arg proof_sha "$proof_source_hash" \
-        --arg xsh_test_path "$xsh_test_path" --arg xsh_test_sha "$xsh_test_sha256" \
-        '{schema_version:1,build_key:$key,profile:$profile,pm_generation:$generation,xsh:{commit:$xsh_commit,build_inputs_sha256:$xsh_inputs},asterinas:{commit:$asterinas_commit,source_snapshot_sha256:$asterinas_source_sha,source_state:$asterinas_source_state,kernel_build_config:$kernel_build_config},toolchain:{dev_image:$dev_image,image_id:$dev_image_id,digest:$dev_image_digest,rust_channel:$toolchain_channel,cargo:$cargo_version,rustc:$rustc_version,gcc:$gcc_version},firecracker:{version:$firecracker,binary_sha256:$firecracker_sha},package_tools_image:$package_tools,guest_tests:{profile_proof:{path:$proof_source,sha256:$proof_sha},xsh_module:(if $xsh_test_path == "" then null else {path:$xsh_test_path,sha256:$xsh_test_sha} end)},artifacts:{kernel:{path:"kernel.elf",sha256:$kernel_sha},rootfs:{path:"laputa-root.ext2",format:"ext2",sha256:$root_sha},initramfs:{path:"laputa-initramfs.cpio.gz",format:"newc+gzip",sha256:$initramfs_sha}}}' \
+        --argjson guest_memory_mib "$guest_memory_mib" \
+        --arg xsh_test_selection "$xsh_test_selection" --arg xsh_test_sha "$xsh_test_sha256" \
+        '{schema_version:1,build_key:$key,profile:$profile,pm_generation:$generation,machine:{vcpu_count:2,memory_mib:$guest_memory_mib},xsh:{commit:$xsh_commit,build_inputs_sha256:$xsh_inputs},asterinas:{commit:$asterinas_commit,source_snapshot_sha256:$asterinas_source_sha,source_state:$asterinas_source_state,kernel_build_config:$kernel_build_config},toolchain:{dev_image:$dev_image,image_id:$dev_image_id,digest:$dev_image_digest,rust_channel:$toolchain_channel,cargo:$cargo_version,rustc:$rustc_version,gcc:$gcc_version},firecracker:{version:$firecracker,binary_sha256:$firecracker_sha},package_tools_image:$package_tools,guest_tests:{profile_proof:{path:$proof_source,sha256:$proof_sha},xsh_selection:(if $xsh_test_selection == "" then null else {selection:$xsh_test_selection,source_sha256:$xsh_test_sha} end)},artifacts:{kernel:{path:"kernel.elf",sha256:$kernel_sha},rootfs:{path:"laputa-root.ext2",format:"ext2",sha256:$root_sha},initramfs:{path:"laputa-initramfs.cpio.gz",format:"newc+gzip",sha256:$initramfs_sha}}}' \
         > "$bundle_stage/manifest.json"
     docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/jq "$dev_image_id" \
         -n --arg kernel "$bundle_dir/kernel.elf" --arg initramfs "$bundle_dir/laputa-initramfs.cpio.gz" \
         --arg root "$runtime_root" \
-        '{"boot-source":{"kernel_image_path":$kernel,"initrd_path":$initramfs,"boot_args":"console=ttyS0 earlycon loglevel=error i8042.exist rdinit=/init"},"drives":[{"drive_id":"laputa-root","path_on_host":$root,"is_root_device":true,"is_read_only":false}],"machine-config":{"vcpu_count":2,"mem_size_mib":1024}}' \
+        --argjson guest_memory_mib "$guest_memory_mib" \
+        '{"boot-source":{"kernel_image_path":$kernel,"initrd_path":$initramfs,"boot_args":"console=ttyS0 earlycon loglevel=error i8042.exist rdinit=/init"},"drives":[{"drive_id":"laputa-root","path_on_host":$root,"is_root_device":true,"is_read_only":false}],"machine-config":{"vcpu_count":2,"mem_size_mib":$guest_memory_mib}}' \
         > "$bundle_stage/firecracker.json"
     (cd "$bundle_stage" && sha256sum kernel.elf laputa-root.ext2 laputa-initramfs.cpio.gz pm-plan.json generation.json inputs.lock package-tools-image manifest.json firecracker.json > SHA256SUMS)
     chmod -R a-w "$bundle_stage"
@@ -329,12 +339,14 @@ if [[ "$mode" == shell ]]; then
 fi
 
 completion_checks=300
-if [[ -n "$xsh_test_path" ]]; then
+if [[ "$xsh_test_selection" == all ]]; then
+    completion_checks=15000
+elif [[ -n "$xsh_test_selection" ]]; then
     completion_checks=1500
 fi
 "$repo_root/infra/asterinas/run-test-vm.sh" \
     "$firecracker_bin" "$firecracker_config" "$console_log" "$firecracker_log" \
-    "$xsh_test_path" "$completion_checks"
+    "$xsh_test_selection" "$completion_checks"
 "$host_xsh" "$repo_root/infra/asterinas/check-guest-output.xsh" -- "$console_log" || \
     fail 'guest completion is missing a required proof marker'
 
@@ -345,7 +357,7 @@ root_hash="$(sha256sum "$root_image" | awk '{print $1}')"
 firecracker_version="$(cat "$output_dir/firecracker.version")"
 asterinas_commit="$(cat "$output_dir/setup.txt" | sed -n 's/^Asterinas commit: //p')"
 guest_proofs='LAPUTA_ASTERINAS_EXT2_MOUNT_OK, LAPUTA_ASTERINAS_SWITCH_ROOT_START, LAPUTA_ASTERINAS_BOOT_SETUP_OK, LAPUTA_ASTERINAS_XINIT_PID1_OK, LAPUTA_ASTERINAS_ROOTFS_OK, LAPUTA_ASTERINAS_LOOPBACK_OK, LAPUTA_ASTERINAS_XSH_OK, LAPUTA_ASTERINAS_TEST_OK'
-if [[ -n "$xsh_test_path" ]]; then
+if [[ -n "$xsh_test_selection" ]]; then
     guest_proofs+=', LAPUTA_ASTERINAS_XSH_TEST_OK'
 fi
 cat > "$output_dir/viability-result.txt" <<RESULT
@@ -361,8 +373,9 @@ Toolchain image: asterinas/dev:$dev_version ($dev_image_id)
 Toolchain: $toolchain_cargo_version; $toolchain_rustc_version; $toolchain_gcc_version
 Kernel SHA-256: $kernel_hash
 Ext2 root SHA-256: $root_hash
+Guest memory: $guest_memory_mib MiB
 Guest proofs: $guest_proofs
-Selected XSH test module: ${xsh_test_path:-none}
+XSH test selection: ${xsh_test_selection:-none}
 Selected XSH test SHA-256: ${xsh_test_sha256:-none}
 VM completion: Firecracker stopped by the host after all guest proof markers
 Guest serial log: $console_log

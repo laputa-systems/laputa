@@ -122,9 +122,19 @@ assert_preflight_rejects_host Linux aarch64 'Firecracker requires x86_64, found 
 
 xsh_root="$scratch/xsh-snapshot"
 xsh_output="$scratch/xsh-output"
-mkdir -p "$xsh_root/tests/xsh/stdlib" "$xsh_root/docs"
+mkdir -p "$xsh_root/tests/xsh/stdlib" "$xsh_root/docs" \
+    "$xsh_root/core/tests" "$xsh_root/dev/tests" "$xsh_root/showcase/tests"
 printf 'test selected_module { assert true }\n' > "$xsh_root/tests/xsh/stdlib/fs.xsh"
 printf 'XSH specification fixture\n' > "$xsh_root/docs/SPEC.md"
+printf 'module_path = .\ntest_roots = core/tests\n  dev/tests\n  tests\n  showcase/tests\n' > "$xsh_root/xsht-config.ini"
+printf 'test core_suite_fixture { assert true }\n' > "$xsh_root/core/tests/test-core.xsh"
+printf 'test dev_suite_fixture { assert true }\n' > "$xsh_root/dev/tests/test-dev.xsh"
+printf 'test showcase_suite_fixture { assert true }\n' > "$xsh_root/showcase/tests/test-showcase.xsh"
+git -C "$xsh_root" init -q
+git -C "$xsh_root" config user.email asterinas-test@example.invalid
+git -C "$xsh_root" config user.name Asterinas
+git -C "$xsh_root" add tests docs core dev showcase xsht-config.ini
+git -C "$xsh_root" commit -qm initial
 readarray -t staged_xsh_test < <(
     bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
         "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
@@ -132,26 +142,40 @@ readarray -t staged_xsh_test < <(
 [[ ${#staged_xsh_test[@]} == 3 ]]
 [[ "${staged_xsh_test[0]}" == "$xsh_output/xsh-test-overlay" ]]
 [[ "${staged_xsh_test[1]}" == tests/xsh/stdlib/fs.xsh ]]
-[[ "${staged_xsh_test[2]}" == "$(sha256_file "$xsh_root/tests/xsh/stdlib/fs.xsh")" ]]
+initial_test_sha256="$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')"
+[[ "${staged_xsh_test[2]}" == "$initial_test_sha256" ]]
 [[ -f "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/tests/xsh/stdlib/fs.xsh" ]]
 [[ -f "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/docs/SPEC.md" ]]
 [[ ! -e "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/.git" ]]
 grep -Fq 'profile": "asterinas-viability-xsh-test"' "$xsh_output/xsh-test-overlay/overlay.json"
-[[ "$(cat "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.path")" == tests/xsh/stdlib/fs.xsh ]]
-initial_test_sha256="${staged_xsh_test[2]}"
+[[ "$(cat "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == tests/xsh/stdlib/fs.xsh ]]
 printf 'test selected_module { assert 42 == 42 }\n' > "$xsh_root/tests/xsh/stdlib/fs.xsh"
+git -C "$xsh_root" add tests/xsh/stdlib/fs.xsh
+git -C "$xsh_root" commit -qm 'change selected XSH test'
 readarray -t changed_xsh_test < <(
     bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
         "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
 )
-[[ ${changed_xsh_test[2]} == "$(sha256_file "$xsh_root/tests/xsh/stdlib/fs.xsh")" ]]
+[[ ${changed_xsh_test[2]} == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
 [[ ${changed_xsh_test[2]} != "$initial_test_sha256" ]]
 cmp "$xsh_root/tests/xsh/stdlib/fs.xsh" \
     "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/tests/xsh/stdlib/fs.xsh"
+readarray -t staged_core_test < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+        "$xsh_root" core/tests/test-core.xsh "$xsh_output"
+)
+[[ "${staged_core_test[1]}" == core/tests/test-core.xsh ]]
+[[ -f "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/core/tests/test-core.xsh" ]]
+readarray -t staged_exact_xsh_test < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+        "$xsh_root" core/tests/test-core.xsh::core_suite_fixture "$xsh_output"
+)
+[[ "${staged_exact_xsh_test[1]}" == core/tests/test-core.xsh::core_suite_fixture ]]
+[[ "$(cat "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == core/tests/test-core.xsh::core_suite_fixture ]]
 
 ln -s "$scratch/outside-test.xsh" "$xsh_root/tests/xsh/stdlib/escape.xsh"
 printf 'outside\n' > "$scratch/outside-test.xsh"
-before_invalid_stage="$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.path")"
+before_invalid_stage="$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")"
 assert_xsh_test_rejected() {
     local module="$1"
     local log="$scratch/xsh-stage-rejected.log"
@@ -161,11 +185,38 @@ assert_xsh_test_rejected() {
         exit 1
     fi
     [[ -s "$log" ]]
-    [[ "$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.path")" == "$before_invalid_stage" ]]
+    [[ "$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == "$before_invalid_stage" ]]
 }
 assert_xsh_test_rejected ../tests/xsh/stdlib/fs.xsh
+assert_xsh_test_rejected core/tests/../../tests/xsh/stdlib/fs.xsh
 assert_xsh_test_rejected tests/xsh/stdlib/escape.xsh
 assert_xsh_test_rejected tests/xsh/stdlib/missing.xsh
+
+readarray -t staged_full_xsh_suite < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+        "$xsh_root" all "$xsh_output"
+)
+[[ ${#staged_full_xsh_suite[@]} == 3 ]]
+[[ "${staged_full_xsh_suite[1]}" == all ]]
+[[ "${staged_full_xsh_suite[2]}" == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
+full_suite_source="$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source"
+[[ -f "$full_suite_source/xsht-config.ini" ]]
+[[ -f "$full_suite_source/core/tests/test-core.xsh" ]]
+[[ -f "$full_suite_source/dev/tests/test-dev.xsh" ]]
+[[ -f "$full_suite_source/tests/xsh/stdlib/fs.xsh" ]]
+[[ -f "$full_suite_source/showcase/tests/test-showcase.xsh" ]]
+[[ ! -e "$full_suite_source/.git" ]]
+[[ ! -e "$full_suite_source/.envrc" ]]
+initial_full_suite_sha256="${staged_full_xsh_suite[2]}"
+printf 'test dev_suite_fixture { assert 42 == 42 }\n' > "$xsh_root/dev/tests/test-dev.xsh"
+git -C "$xsh_root" add dev/tests/test-dev.xsh
+git -C "$xsh_root" commit -qm 'change full XSH suite input'
+readarray -t changed_full_xsh_suite < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+        "$xsh_root" all "$xsh_output"
+)
+[[ "${changed_full_xsh_suite[2]}" == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
+[[ "${changed_full_xsh_suite[2]}" != "$initial_full_suite_sha256" ]]
 
 vm_test_root="$scratch/vm-fixture"
 fake_firecracker="$vm_test_root/firecracker"
@@ -189,6 +240,20 @@ case "$FAKE_FIRECRACKER_MODE" in
                 LAPUTA_ASTERINAS_XSH_TEST_OK
         fi
         printf '%s\n' LAPUTA_ASTERINAS_TEST_OK
+        exec /bin/sleep 30
+        ;;
+    full-success)
+        printf '%s\n' \
+            'LAPUTA_ASTERINAS_XSH_TEST_START all' \
+            LAPUTA_ASTERINAS_XSH_TEST_OK \
+            LAPUTA_ASTERINAS_TEST_OK
+        exec /bin/sleep 30
+        ;;
+    exact-success)
+        printf '%s\n' \
+            'LAPUTA_ASTERINAS_XSH_TEST_START core/tests/test-core.xsh::core_suite_fixture' \
+            LAPUTA_ASTERINAS_XSH_TEST_OK \
+            LAPUTA_ASTERINAS_TEST_OK
         exec /bin/sleep 30
         ;;
     failed)
@@ -246,7 +311,10 @@ assert_vm_case() {
 
 assert_vm_case base '' 2 0
 assert_vm_case success tests/xsh/stdlib/numeric.xsh 2 0
+assert_vm_case full-success all 2 0
+assert_vm_case exact-success core/tests/test-core.xsh::core_suite_fixture 2 0
 assert_vm_case base tests/xsh/stdlib/numeric.xsh 2 1
+assert_vm_case base all 2 1
 assert_vm_case failed '' 2 1
 assert_vm_case panic '' 2 1
 assert_vm_case early '' 2 1

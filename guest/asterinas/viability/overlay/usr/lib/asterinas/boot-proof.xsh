@@ -158,17 +158,23 @@ proc main() [fs, process, env, time, error] {
     "the ext2 root did not preserve an XSH write",
   )?
 
-  let selected_test_path = p"/usr/lib/asterinas/xsh-test.path"
+  let test_selection_path = p"/usr/lib/asterinas/xsh-test.selection"
 
-  if selected_test_path.exists()? {
+  if test_selection_path.exists()? {
     let source_root = p"/usr/lib/asterinas/xsh-source"
     # XSH's filesystem test checks the repository root marker and specification file.
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir(parents: true)
-    let test_module = selected_test_path.read_text()?.trim()
-    eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_module}"
+    let test_selection = test_selection_path.read_text()?.trim()
+    eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
     let test_run = cd (source_root) {
-      run.capture --text XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_module
+      if test_selection == "all" {
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture
+      } else if "::" in test_selection {
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection
+      } else {
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection
+      }
     }?
     eprint --flush $test_run.stdout
     eprint --flush $test_run.stderr
@@ -177,7 +183,7 @@ proc main() [fs, process, env, time, error] {
         and "test result: ok." in test_run.stdout
         and ! ("test result: ok. 0 passed; 0 failed; 0 skipped" in test_run.stdout),
       "xsh-test",
-      f"selected XSH test module failed or discovered no tests: {test_module}",
+      f"XSH test selection failed or discovered no tests: {test_selection}",
     )?
     eprint --flush "LAPUTA_ASTERINAS_XSH_TEST_OK"
   }

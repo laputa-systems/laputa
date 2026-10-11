@@ -20,7 +20,7 @@ export const guest_success_markers = [
   "LAPUTA_ASTERINAS_TEST_OK",
 ]
 
-## Add the selected module marker when the host staged an XSH test.
+## Add the XSH test marker when the host staged a module or native suite.
 export pure guest_required_success_markers(has_selected_xsh_test: Bool) -> List[Str] {
   if has_selected_xsh_test {
     guest_success_markers + ["LAPUTA_ASTERINAS_XSH_TEST_OK"]
@@ -31,6 +31,6 @@ export pure guest_required_success_markers(has_selected_xsh_test: Bool) -> List[
 
 ## Return every required marker that is absent from the captured serial log.
 export pure guest_missing_success_markers(output: Str) -> List[Str] {
-  let has_selected_xsh_test = "LAPUTA_ASTERINAS_XSH_TEST_START " in output
-  [marker for marker in guest_required_success_markers(has_selected_xsh_test) if !(marker in output)]
+  let has_xsh_tests = "LAPUTA_ASTERINAS_XSH_TEST_START " in output
+  [marker for marker in guest_required_success_markers(has_xsh_tests) if !(marker in output)]
 }
