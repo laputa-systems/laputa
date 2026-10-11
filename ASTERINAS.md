@@ -134,6 +134,16 @@ Linux x86-64 host
                                     +-- development tests
 ```
 
+## Preliminary host and kernel setup
+
+The implementation pins Asterinas, its development image, Firecracker, and XSH
+in `infra/asterinas/inputs.lock`. `make asterinas-setup` builds that kernel
+with the pinned development image and boots a small smoke initramfs on host KVM
+until the guest prints a serial marker. This only checks the kernel and VMM
+path; `make asterinas-test` verifies the Laputa userspace. Repeated builds reuse
+the kernel when its source, toolchain image, build flags, and initramfs inputs
+match.
+
 Docker is acceptable as a **host-side build tool**, as it already is throughout Laputa.
 
 There must be no Docker dependency inside the guest.
@@ -212,54 +222,32 @@ Relevant upstream references:
 
 Asterinas has native Firecracker support through its x86-64 PVH boot protocol.
 
-The documented kernel build is:
+`infra/asterinas/setup.sh` invokes `cargo osdk build` in the selected official
+development container with the externally generated smoke initramfs, direct
+VMM boot, x86-64 target, and `pvh_boot` feature. It checks the resulting PVH
+ELF and records its SHA-256. The Laputa target builds its own separate
+initramfs; neither path invokes Nix or consumes a Nix-produced filesystem.
 
-```sh
-make kernel BOOT_PROTOCOL=pvh
-```
+The lock currently selects Asterinas commit
+`af0b77c8f11db24ba59b8d2cf29a189281b8e270`, dev image
+`0.18.1-20260926` at digest
+`sha256:e4a5a5742247a287af70d1d5b59f5fa93fe8ab46dcc9081a5e3d0a8066faab56`,
+Firecracker `v1.17.0`, and XSH commit
+`76bc2de87d96040244248f3ca0ba478801ec4969`. Update these pins deliberately.
 
-Its documented kernel artifact is:
+The build uses the Asterinas source and XSH source archives in managed caches,
+so it does not move or edit the developer's XSH branch. The runtime root is
+composed by PM from `baselayout`, `xsh`, `laputa-pm`, and `xinit`; the root
+image is a raw ext2 filesystem. The guest initramfs uses a small freestanding
+static syscall bootstrap because the XSH process runtime starts a preparation
+thread and Asterinas waits for sibling threads during `execve`; ordinary init
+policy stays in the packaged XSH `xinit` and boot hooks.
 
-```text
-target/osdk/asterinas/asterinas-osdk-bin.elf
-```
+The setup validates source/toolchain compatibility, builds into managed output,
+records the source, image, build configuration, and kernel hash, and reuses the
+kernel when its inputs are unchanged. Update the pins in the lock deliberately.
 
-However, upstream's default Makefile also invokes a Nix-based initramfs builder.
-
-**Do not accidentally introduce Nix as a dependency by copying the upstream Makefile workflow.**
-
-Instead, investigate the supported direct `cargo osdk build` invocation that builds the PVH kernel using an externally supplied initramfs.
-
-Determine the correct, currently supported OSDK options from source or `cargo osdk build --help`, including:
-
-- Direct VM boot.
-- PVH boot support.
-- External initramfs.
-- Correct architecture.
-- Relevant kernel configuration.
-- ELF output format.
-- Required vDSO inputs.
-
-Do not assume option spelling without checking.
-
-The official Asterinas development container is an acceptable build environment. Its documentation currently references `asterinas/dev:0.18.1-20260926`; verify the appropriate image for the selected source revision.
-
-If the development image contains Nix tools, that does not authorize using them. The Laputa integration must not invoke Nix, consume Nix-built rootfs artifacts, or require Nix on the host.
-
-Implement a reproducible source/toolchain selection:
-
-1. Pin Asterinas to an immutable Git commit.
-2. Pin the development-toolchain image by digest if using Docker.
-3. Validate source and toolchain compatibility.
-4. Build the kernel into a managed output directory.
-5. Verify the resulting ELF.
-6. Record the source commit, toolchain identity, configuration, and kernel SHA-256.
-7. Reuse the kernel when inputs are unchanged.
-8. Rebuild when its real inputs change.
-
-The initial run may resolve and record a verified upstream revision. Subsequent builds must not silently advance the pin.
-
-Use the existing Laputa caching conventions where applicable.
+Use Laputa's existing cache conventions where applicable.
 
 Do not vendor the entire Asterinas repository into Git. Keep downloaded source and compilation artifacts in explicitly managed, gitignored cache/output directories.
 
@@ -488,6 +476,7 @@ Use bounded shutdown escalation and ensure child processes are reaped.
 Implement these targets:
 
 ```sh
+make asterinas-setup
 make asterinas-preflight
 make asterinas-fetch
 make asterinas-build
@@ -530,7 +519,8 @@ Do not remove the shared package artifact store or unrelated Linux/QEMU generati
 
 Match existing Makefile conventions for variables, diagnostics, and cleanup.
 
-Support `XSH_ROOT`, `ARCH`, and ordinary existing Laputa configuration mechanisms as appropriate.
+The Asterinas backend pins XSH independently of the developer's `XSH_ROOT`
+working tree. Existing non-Asterinas Make targets continue to use `XSH_ROOT`.
 
 Do not add an unnecessarily broad new set of configuration options.
 
@@ -786,9 +776,11 @@ target/laputa/asterinas-firecracker/
 │       ├── firecracker.json
 │       └── manifest.json
 ├── current -> builds/<system-key>
-├── console.log
-├── firecracker.log
-└── test-result.json
+├── test-console.log
+├── test-firecracker.log
+├── boot-console.log
+├── boot-firecracker.log
+└── viability-result.txt
 ```
 
 Adjust names to fit existing conventions, but preserve the principles.

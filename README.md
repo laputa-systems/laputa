@@ -7,10 +7,10 @@ upstream sources on one machine: it fetches every input once, then builds
 offline in Docker and publishes to a mirror on the loopback interface. It never
 contacts a remote Laputa mirror.
 
-Laputa and XSH are developed together. XSH lives in its own checkout at
-`../xsh` (`XSH_ROOT`), and every Laputa seed is built from that checkout.
-Changes to XSH that make Laputa simpler are welcome. Make them there, then run
-`make seed` to bring them into the build.
+Laputa and XSH are developed together. Ordinary Laputa seeds use the XSH
+checkout at `../xsh` (`XSH_ROOT`). The Asterinas backend uses the separate XSH
+commit recorded in `infra/asterinas/inputs.lock`, so it stays reproducible
+while the development checkout moves.
 
 ## Layout
 
@@ -22,6 +22,7 @@ Changes to XSH that make Laputa simpler are welcome. Make them there, then run
 | `mirror/` | the package mirror server (a host tool, not a package) |
 | `xinit/` | `xinit.xsh`, the PID 1 and service manager |
 | `system/`, `laputa.xsh`, `profiles/`, `guest/`, `boot/` | the `qemu-dwl-foot` profile CLI and its QEMU proof |
+| `infra/asterinas/`, `guest/asterinas/` | pinned Asterinas/Firecracker builds, Laputa guest proof, and serial shell |
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | the installer image and its QEMU harness |
 | `tests/` | native XSH test suites |
 | `docs/` | [development](docs/DEVELOPMENT.md), [architecture](docs/CORE-INFRASTRUCTURE.md), [PM](docs/PM.md), [QEMU proof](docs/QEMU.md), [pm.make](docs/MAKE.md) |
@@ -91,6 +92,22 @@ and does not need the mirror. Both run natively for the host's architecture
 (`ARCH` for the installer). [INSTALLER.md](INSTALLER.md) and
 [docs/QEMU.md](docs/QEMU.md) describe them.
 
+On x86-64 Linux with KVM, Docker, a C compiler, and the host `find` and `sort`
+tools, the Asterinas proof builds a locked PVH kernel and a PM-composed Laputa
+ext2 root, then boots them together in Firecracker:
+
+```sh
+make asterinas-preflight
+make asterinas-fetch
+make asterinas-build
+make asterinas-test
+make asterinas-boot   # interactive xshi; type laputa-exit to stop
+```
+
+The Asterinas source, toolchain, Firecracker, and XSH pins are in
+`infra/asterinas/inputs.lock`. See [development](docs/DEVELOPMENT.md) for the
+boot path, result artifacts, and backend-specific cleanup.
+
 `make check` and `make test` run the static checks and the native test suites;
 see [development](docs/DEVELOPMENT.md).
 
@@ -100,12 +117,14 @@ see [development](docs/DEVELOPMENT.md).
 |---|---|---|
 | `.cache/sources/sha256/` | fetched upstream sources, by digest | `make distclean` |
 | `.cache/cargo/`, `.cache/images/` | XSH and mirror crates, the saved host-tools base image | `make distclean` |
+| `.cache/asterinas/` | pinned Asterinas and XSH source caches | `make asterinas-clean` |
 | `.out/host/<arch>/` | host `xsh`/`xshi`/`xsht` and `laputa-mirror` (Linux) | `make clean` |
 | `.out/xsh-target/`, `.out/mirror-target/` | incremental cargo targets for the seed and host tools | `make clean` |
 | `.out/seed/<arch>/` | the XSH seed and its manifest | `make clean` |
 | `.out/artifacts/<arch>/` | the PM artifact store, which is the build cache | `make clean` |
 | `.out/world/<arch>/` | the last plan and the `make root` tree | `make clean` |
 | `.out/cache/linux-kbuild/` | the kernel recipe's Kbuild plan cache | `make clean` |
+| `.out/asterinas-firecracker/` | immutable Asterinas + Laputa bundles, writable run disks, and logs | `make asterinas-clean` |
 | `.out/mirror/` | local mirror data | `make clean` |
 | `target/` | profile (`target/laputa/`) and installer outputs | `make clean` |
 

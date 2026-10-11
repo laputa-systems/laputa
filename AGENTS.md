@@ -16,6 +16,7 @@ read `../xsh/AGENTS.md` before editing there or before writing `.xsh` here.
 | `packages/<name>/` | recipes (`PKGBUILD.xsh`), package proofs, package files |
 | `system/`, `laputa.xsh` | typed `qemu-dwl-foot` profile CLI: Docker adapter, image construction, QEMU proof |
 | `profiles/`, `guest/`, `boot/` | profile data, guest proof payload, QMP helper |
+| `infra/asterinas/`, `guest/asterinas/` | pinned Asterinas/Firecracker backend, Laputa guest proof, and serial shell |
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 and x86_64 installer image and its QEMU harness (separate from the profile CLI) |
 | `xinit/` | `xinit.xsh`, Laputa's pure-XSH PID 1 and service manager, with tests and docs |
 | `mirror/` | Rust package mirror server, a host tool (not a Laputa package) |
@@ -41,6 +42,7 @@ sets it.
 | `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
 | `make fetch [ARCH=x86_64]` | fetches pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base for offline builds |
 | `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
+| `make seed-asterinas-shell [ARCH=…]` | offline: the seed with xshi's Laputa Asterinas integration feature, used only while building the interactive guest |
 | `make build [PKGS="a b" \| STOP=pre-cmake]`, `make plan` | PM plan and build in package-tools with `--network none` into `.out/artifacts/<arch>` (the build cache); `STOP=pre-cmake` is `repo plan --all --without cmake --without linux` |
 | `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground; on Linux built by `make host-mirror` in `xsh-test`, elsewhere run through cargo); publish builds the selection, then uploads it from the host |
 | `make root PKGS="…"` | import PKGS from the mirror on the host, compose the root offline in a container, check its ELF files load and its xsh runs |
@@ -54,6 +56,11 @@ sets it.
 | `make profile-{plan,build,test,boot,clean}` | the typed profile CLI on the host: builds in native Docker for the host arch, boots QEMU with HVF (macOS) or KVM (Linux) |
 | `make installer-image`, `make installer-qemu-test [ARCH=…]` | installer ISO and its QEMU install-and-boot proof; roots come from the local mirror, so `make mirror` and `make publish` come first |
 | `make installer-qemu-manual` | interactive installer boot in QEMU |
+| `make asterinas-preflight`, `make asterinas-fetch`, `make asterinas-build` | checks host capabilities, fetches locked source/tool inputs, and builds an immutable Asterinas + Laputa bundle |
+| `make asterinas-test` | boots the PM-built ext2 root under Asterinas/Firecracker and checks xinit, XSH, and guest filesystem/process behavior |
+| `make asterinas-boot` | boots the PM-built Laputa root and connects an interactive xshi session to Firecracker's serial console |
+| `make asterinas-clean` | removes only the Asterinas backend cache and output; preserves shared PM artifacts |
+| `make asterinas-setup` | builds the pinned Asterinas PVH kernel and boots a small KVM smoke guest |
 | `make store-gc` | remove store artifacts that neither the last world plan nor a profile plan names (between builds only) |
 | `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |
 | `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images), through a container on Linux because rootful Docker leaves root-owned files; `make distclean` also removes `.cache/` |
@@ -99,6 +106,8 @@ build, and QEMU last. Use `cargo -j 4` and run one test suite at a time.
   build-depends on `linux-headers` (installed from the pinned kernel tarball
   without a compiler), never on `linux`, which ships only the kernel image and
   config. A kernel config change then rebuilds only the kernel.
+- `packages/xsh` exposes only the core applets declared in its `filetree`; add
+  command links only when Laputa needs them, and keep `su` outside `/usr/bin`.
 - Keep PM tests behavior-oriented; add them when behavior changes or a bug
   needs a regression test, not to raise coverage.
 

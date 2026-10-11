@@ -1,0 +1,8 @@
+#!/bin/xsh --
+error AsterinasShellExitError = Failed(message: Str)
+
+proc main() [error] {
+  print "LAPUTA_ASTERINAS_SHELL_EXIT"
+}
+
+main()?

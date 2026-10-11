@@ -86,9 +86,11 @@ endif
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-smoke \
+.PHONY: check lint test test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
+	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
+	asterinas-test asterinas-boot asterinas-clean asterinas-viability asterinas-shell \
 	profile-plan profile-build profile-test profile-boot profile-clean \
 	test-pm-native test-pm-docker xsh-native update-checksums \
 	installer-image installer-qemu-test \
@@ -115,6 +117,7 @@ test-pm: need-xsh
 test-system: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/system
 	$(HOST_XSH_ENV) $(XSHT) test tests/integration
+	bash tests/system/asterinas_host.sh
 
 test-xinit: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
@@ -245,6 +248,11 @@ host-mirror:
 seed: need-xsh
 	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS)
 
+# Offline: build the ordinary seed plus xshi's Laputa Asterinas integration
+# feature. Only the Asterinas shell proof consumes this variant.
+seed-asterinas-shell: need-xsh
+	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS) --asterinas-shell
+
 # Offline proof that the seed runs in package-tools with --network none.
 seed-smoke: need-xsh
 	$(SEED) smoke $(SEED_ARGS)
@@ -318,6 +326,43 @@ profile-boot:
 
 profile-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
+
+# Install Firecracker locally, build the pinned Asterinas PVH kernel, and boot
+# a small serial smoke initramfs under KVM.
+asterinas-setup:
+	bash infra/asterinas/setup.sh
+
+# Check the supported host and pinned input identities without changing files.
+asterinas-preflight:
+	bash infra/asterinas/preflight.sh
+
+# Fetch pinned Asterinas, toolchain, Firecracker, XSH, seed, and package inputs.
+asterinas-fetch:
+	bash infra/asterinas/fetch.sh
+
+# Build a PM runtime generation, ext2 root, initramfs, and immutable VM bundle.
+asterinas-build:
+	bash infra/asterinas/viability.sh build
+
+# Boot the Laputa bundle under Asterinas in Firecracker and run guest checks.
+asterinas-test:
+	bash infra/asterinas/viability.sh test
+
+# Boot the interactive Laputa xshi profile in Firecracker.
+asterinas-boot:
+	bash infra/asterinas/viability.sh boot
+
+# Remove only Asterinas source and VM outputs; shared PM artifacts remain reusable.
+asterinas-clean:
+	bash infra/asterinas/clean.sh
+
+# Legacy alias for asterinas-test.
+asterinas-viability:
+	bash infra/asterinas/viability.sh test
+
+# Legacy alias for asterinas-boot.
+asterinas-shell:
+	bash infra/asterinas/viability.sh boot
 
 # Host-native PM suite on Linux against the checked-out debug XSH.
 test-pm-native: xsh-native

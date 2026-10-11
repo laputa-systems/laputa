@@ -1,0 +1,3 @@
+::sysinit:/usr/bin/xsh /usr/lib/asterinas/boot-setup.xsh
+::sysinit:/usr/lib/asterinas/shell-ready.xsh
+ttyS0::respawn:/usr/bin/xshi --no-config

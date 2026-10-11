@@ -1,0 +1,7 @@
+{
+  "format": "laputa-generation-overlay-1",
+  "profile": "asterinas-shell",
+  "replacements": [
+    "etc/inittab"
+  ]
+}

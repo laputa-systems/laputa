@@ -10,14 +10,69 @@ every container runs on the host's native Docker platform (`linux/arm64` or
 `linux/amd64`). There is no cross-architecture build. The only supported
 system profile is `qemu-dwl-foot`.
 
+## Asterinas and Firecracker bootstrap
+
+The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
+versions recorded in `infra/asterinas/inputs.lock`. On x86-64 Linux with KVM
+and Docker, plus a C compiler and the host `find` and `sort` tools, start with:
+
+```bash
+make asterinas-preflight
+make asterinas-fetch
+make asterinas-build
+```
+
+`asterinas-preflight` only checks host capabilities and input declarations.
+`asterinas-fetch` fetches the pinned Asterinas and XSH source plus the declared
+build inputs. `asterinas-build` builds or reuses the Asterinas PVH kernel and
+the Laputa generation, then publishes a content-addressed bundle. XSH is built
+from commit `76bc2de87d96040244248f3ca0ba478801ec4969`; changes in the sibling
+XSH working tree do not affect this pinned build.
+
+The kernel, verified immutable bundles, runtime disk copies, Firecracker
+configuration, build and boot logs live under `.out/asterinas-firecracker/`.
+Fetched Asterinas and XSH repositories remain under `.cache/asterinas/`.
+`asterinas-clean` removes only these backend outputs and caches; it preserves
+the shared PM artifact store. The ordinary `asterinas-setup` target also
+offers a small kernel/VMM smoke boot.
+
+Run the automated guest proof with:
+
+```bash
+make asterinas-test
+```
+
+The target uses PM to plan, build, and compose `baselayout`, `xsh`, `laputa-pm`,
+and `xinit` into an immutable generation, creates and checks an ext2 image, and
+boots that image as a Firecracker virtio block device. A small static initramfs
+bootstrap mounts the device and pseudo-filesystems, chroots to the generated
+root, and execs packaged `/init`; packaged xinit then runs as PID 1. Guest
+checks exercise XSH, core commands, PM metadata, process behavior, and ext2
+filesystem operations. Firecracker receives a writable per-run copy of the
+verified bundle image. The serial log and result metadata remain under
+`.out/asterinas-firecracker/`; test and interactive boot have separate
+`test-console.log` and `boot-console.log` files.
+
+For an interactive session, run:
+
+```bash
+make asterinas-shell
+```
+
+`asterinas-boot` starts an interactive shell using the pinned XSH commit. Type
+`laputa-exit` in the guest to stop Firecracker; Ctrl-C interrupts xshi. The
+`asterinas-shell` target remains an alias for this interactive boot.
+
 ## XSH tools
 
 XSH is a separate checkout at `XSH_ROOT` (default `../xsh`). The Makefile
 takes host tools from `$XSH_ROOT/target/release/` when that build exists, and
 on Linux otherwise from the static binaries `make host-xsh` writes to
-`.out/host/<arch>/`. Override the directory with `XSH_BIN_DIR`. Every make
-target sets `XSH_MODULE_PATH` to the checkout, which PM needs at runtime to
-load recipes and spawn runners. Set it yourself when you run XSH directly:
+`.out/host/<arch>/`. Override the directory with `XSH_BIN_DIR`. The ordinary
+Make targets use this checkout; the Asterinas targets build from the locked
+XSH commit in their managed source snapshot. Make targets set
+`XSH_MODULE_PATH` to this Laputa checkout, which PM needs to load recipes and
+spawn runners. Set it yourself when you run XSH directly:
 
 ```bash
 export XSH_MODULE_PATH="$PWD"     # from the checkout root
@@ -73,6 +128,7 @@ packages), saved to `.cache/images/`. Then, offline:
 
 ```bash
 make seed        # static musl xsh/xshi/xsht + core.tar.xz under .out/seed/<arch>/, then the image
+make seed-asterinas-shell # opt-in xshi build used by make asterinas-shell
 make seed-smoke  # the seed runs, plans, and passes a PM subset in the image with --network none
 ```
 
@@ -84,12 +140,11 @@ from the source cache. Containers mount the seed at `/bin/{xsh,xshi,xsht}` and
 `/usr/lib/xsh/core`, so an XSH or PM change rebuilds no image. Image tags are
 content keys over each image's own inputs (`seed/images.xsh`).
 
-The `xsh` package installs core applets under `/usr/lib/xsh/core` and
-exposes each command through an explicitly declared `/usr/bin` symlink,
-including the core text, identity, terminal, and process utilities. `su`
-stays outside that command surface. When the seed gains or removes an
-applet, update the recipe's `filetree` to match; undeclared installed
-commands fail package validation.
+The `xsh` package installs the seed's core tree under `/usr/lib/xsh/core`,
+then exposes only the commands declared in `packages/xsh/PKGBUILD.xsh` through
+`/usr/bin` symlinks. `su` stays outside that command surface. Add a symlink to
+the recipe only when Laputa needs to expose that applet; this also avoids
+collisions with commands owned by other packages.
 
 `capsh -- SCRIPT ARGS...` runs `/usr/bin/xsh` with the script path and
 arguments passed directly. The default executable no longer accepts

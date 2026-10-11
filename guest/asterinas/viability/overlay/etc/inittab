@@ -1,0 +1,2 @@
+::sysinit:/usr/bin/xsh /usr/lib/asterinas/boot-setup.xsh
+::sysinit:/usr/bin/xsh /usr/lib/asterinas/boot-proof.xsh
