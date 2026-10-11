@@ -97,6 +97,31 @@ proc main() [fs, process, env, time, error] {
     "ext2",
     "the ext2 root did not preserve an XSH write",
   )?
+
+  let selected_test_path = p"/usr/lib/asterinas/xsh-test.path"
+
+  if selected_test_path.exists()? {
+    let source_root = p"/usr/lib/asterinas/xsh-source"
+    # XSH's filesystem test checks the repository root marker and specification file.
+    let git_marker = fp"{source_root}/.git"
+    git_marker.mkdir(parents: true)
+    let test_module = selected_test_path.read_text()?.trim()
+    eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_module}"
+    let test_run = cd (source_root) {
+      run.capture --text XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_module
+    }?
+    eprint --flush $test_run.stdout
+    eprint --flush $test_run.stderr
+    require(
+      test_run.status.exited_with(0)
+        and "test result: ok." in test_run.stdout
+        and ! ("test result: ok. 0 passed; 0 failed; 0 skipped" in test_run.stdout),
+      "xsh-test",
+      f"selected XSH test module failed or discovered no tests: {test_module}",
+    )?
+    eprint --flush "LAPUTA_ASTERINAS_XSH_TEST_OK"
+  }
+
   eprint --flush "LAPUTA_ASTERINAS_XSH_OK"
   eprint --flush "LAPUTA_ASTERINAS_TEST_OK"
 }

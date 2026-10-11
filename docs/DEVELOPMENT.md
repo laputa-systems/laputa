@@ -53,15 +53,28 @@ verified bundle image. The serial log and result metadata remain under
 `.out/asterinas-firecracker/`; test and interactive boot have separate
 `test-console.log` and `boot-console.log` files.
 
+Run one native XSH test module from the locked XSH snapshot inside the guest
+with `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. The module, test tree, and required
+specification file are staged through a PM generation overlay; their identities
+are included in the immutable bundle manifest. The selected module runs under
+the packaged `xsht`, and the host requires its guest success marker. To test a
+different XSH source revision, update the XSH commit pin in
+`infra/asterinas/inputs.lock` first.
+
+The pinned Asterinas commit does not implement Linux `openat2`. The XSH rooted
+filesystem API uses that syscall, so selecting `tests/xsh/stdlib/fs.xsh`
+currently fails with `ENOSYS`; the test runner reports the failure without
+skipping it. The `numeric.xsh` example exercises the selected-module workflow
+without depending on that unsupported syscall.
+
 For an interactive session, run:
 
 ```bash
-make asterinas-shell
+make asterinas-boot
 ```
 
-`asterinas-boot` starts an interactive shell using the pinned XSH commit. Type
-`laputa-exit` in the guest to stop Firecracker; Ctrl-C interrupts xshi. The
-`asterinas-shell` target remains an alias for this interactive boot.
+The shell uses the pinned XSH commit. Type `laputa-exit` in the guest to stop
+Firecracker; Ctrl-C interrupts xshi. `asterinas-shell` remains a legacy alias.
 
 ## XSH tools
 

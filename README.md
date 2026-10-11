@@ -101,6 +101,7 @@ make asterinas-preflight
 make asterinas-fetch
 make asterinas-build
 make asterinas-test
+make asterinas-test XSH_TEST=tests/xsh/stdlib/numeric.xsh  # optional pinned XSH test module
 make asterinas-boot   # interactive xshi; type laputa-exit to stop
 ```
 

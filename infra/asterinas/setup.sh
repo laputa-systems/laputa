@@ -20,14 +20,15 @@ initramfs_root="$cache_dir/initramfs/root"
 firecracker_bin="$output_dir/bin/firecracker"
 firecracker_pid=""
 scratch_dir=""
+logs_initialized=false
 
 fail() {
     printf 'asterinas-setup: %s\n' "$*" >&2
-    if [[ -s "$output_dir/smoke-console.log" ]]; then
+    if [[ "$logs_initialized" == true && -s "$output_dir/smoke-console.log" ]]; then
         printf '\n--- Firecracker guest console ---\n' >&2
         tail -n 60 "$output_dir/smoke-console.log" >&2 || true
     fi
-    if [[ -s "$output_dir/smoke-firecracker.log" ]]; then
+    if [[ "$logs_initialized" == true && -s "$output_dir/smoke-firecracker.log" ]]; then
         printf '\n--- Firecracker diagnostics ---\n' >&2
         tail -n 60 "$output_dir/smoke-firecracker.log" >&2 || true
     fi
@@ -77,14 +78,15 @@ if [[ "$mode" == setup ]]; then
     [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] || fail '/dev/kvm must exist and be readable and writable by this user'
 fi
 
-for tool in awk cat chmod cp curl docker find git grep mkdir mktemp mv ps readelf rm sha256sum sleep sort tail tar tee tr uname; do
+for tool in awk cat chmod cp curl docker find git grep head mkdir mktemp mv ps readelf rm sha256sum sleep sort tail tar tee tr uname; do
     need_tool "$tool"
 done
 
-docker info >/dev/null 2>&1 || fail 'Docker is unavailable to this user'
 mkdir -p "$cache_dir" "$output_dir/bin" "$output_dir/logs"
 : > "$output_dir/smoke-console.log"
 : > "$output_dir/smoke-firecracker.log"
+logs_initialized=true
+docker info >/dev/null 2>&1 || fail 'Docker is unavailable to this user'
 scratch_dir="$(mktemp -d "$cache_dir/setup.XXXXXX")"
 
 [[ "$ASTERINAS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'Asterinas commit pin must be a full Git commit id'
@@ -126,8 +128,10 @@ dev_image_id="$(docker image inspect --format '{{.Id}}' "$dev_image")"
 dev_image_digest="$(docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}' "$dev_image")"
 [[ "$dev_image_digest" == "asterinas/dev@$ASTERINAS_DEV_IMAGE_DIGEST" ]] || \
     fail "Asterinas dev image digest mismatch: expected asterinas/dev@$ASTERINAS_DEV_IMAGE_DIGEST, found $dev_image_digest"
-docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cargo --version
-docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gcc --version
+toolchain_cargo_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cargo --version)"
+toolchain_rustc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" rustc --version)"
+toolchain_gcc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gcc --version | head -n 1)"
+printf '%s\n%s\n%s\n' "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version"
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cpio --version
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gzip --version
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" jq --version
@@ -280,13 +284,14 @@ if [[ ! -f "$output_initramfs" || "$(sha256sum "$output_initramfs" | awk '{print
     mv -f "$output_initramfs.tmp" "$output_initramfs"
 fi
 
+kernel_build_config='target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev'
 kernel_key="$(printf '%s\n' \
     "$asterinas_commit" \
     "$dev_version" \
     "$dev_image_id" \
     "$dev_image_digest" \
     "$initramfs_hash" \
-    'target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev' | sha256sum | awk '{print $1}')"
+    "$kernel_build_config" | sha256sum | awk '{print $1}')"
 kernel_source="$source_dir/target/osdk/asterinas/asterinas-osdk-bin.elf"
 kernel_output="$output_dir/asterinas.elf"
 kernel_sha_file="$output_dir/kernel.sha256"
@@ -345,6 +350,10 @@ kernel_hash="$(sha256sum "$kernel_output" | awk '{print $1}')"
 
 printf 'Asterinas commit: %s\n' "$asterinas_commit" > "$output_dir/setup.txt"
 printf 'Asterinas dev image: %s (%s)\n' "$dev_version" "$dev_image_digest" >> "$output_dir/setup.txt"
+printf 'Kernel build config: %s\n' "$kernel_build_config" >> "$output_dir/setup.txt"
+printf 'Cargo: %s\n' "$toolchain_cargo_version" >> "$output_dir/setup.txt"
+printf 'Rustc: %s\n' "$toolchain_rustc_version" >> "$output_dir/setup.txt"
+printf 'GCC: %s\n' "$toolchain_gcc_version" >> "$output_dir/setup.txt"
 printf 'Firecracker: %s\n' "$firecracker_version" >> "$output_dir/setup.txt"
 printf 'Kernel SHA-256: %s\n' "$kernel_hash" >> "$output_dir/setup.txt"
 if [[ "$mode" == build ]]; then
@@ -388,6 +397,10 @@ done
 stop_firecracker
 printf 'Asterinas commit: %s\n' "$asterinas_commit" > "$output_dir/setup.txt"
 printf 'Asterinas dev image: %s (%s)\n' "$dev_version" "$dev_image_digest" >> "$output_dir/setup.txt"
+printf 'Kernel build config: %s\n' "$kernel_build_config" >> "$output_dir/setup.txt"
+printf 'Cargo: %s\n' "$toolchain_cargo_version" >> "$output_dir/setup.txt"
+printf 'Rustc: %s\n' "$toolchain_rustc_version" >> "$output_dir/setup.txt"
+printf 'GCC: %s\n' "$toolchain_gcc_version" >> "$output_dir/setup.txt"
 printf 'Firecracker: %s\n' "$firecracker_version" >> "$output_dir/setup.txt"
 printf 'Kernel SHA-256: %s\n' "$kernel_hash" >> "$output_dir/setup.txt"
 printf 'Guest proof: ASTERINAS_PVH_BOOT_OK observed on ttyS0\n' >> "$output_dir/setup.txt"

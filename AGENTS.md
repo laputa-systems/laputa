@@ -57,7 +57,7 @@ sets it.
 | `make installer-image`, `make installer-qemu-test [ARCH=…]` | installer ISO and its QEMU install-and-boot proof; roots come from the local mirror, so `make mirror` and `make publish` come first |
 | `make installer-qemu-manual` | interactive installer boot in QEMU |
 | `make asterinas-preflight`, `make asterinas-fetch`, `make asterinas-build` | checks host capabilities, fetches locked source/tool inputs, and builds an immutable Asterinas + Laputa bundle |
-| `make asterinas-test` | boots the PM-built ext2 root under Asterinas/Firecracker and checks xinit, XSH, and guest filesystem/process behavior |
+| `make asterinas-test [XSH_TEST=tests/xsh/<module>.xsh]` | boots the PM-built ext2 root under Asterinas/Firecracker and checks xinit, XSH, and guest filesystem/process behavior; optionally runs one pinned XSH test module |
 | `make asterinas-boot` | boots the PM-built Laputa root and connects an interactive xshi session to Firecracker's serial console |
 | `make asterinas-clean` | removes only the Asterinas backend cache and output; preserves shared PM artifacts |
 | `make asterinas-setup` | builds the pinned Asterinas PVH kernel and boots a small KVM smoke guest |

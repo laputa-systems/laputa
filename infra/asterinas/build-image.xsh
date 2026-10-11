@@ -7,10 +7,10 @@ const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit"]
 
 error AsterinasImageError = Failed(message: Str)
 
-proc main(arch: Str, profile_name: Str, package_tools_image: Str) [fs, process, error] {
+proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, process, error] {
   let plan_path = fp"/src/laputa/.out/world/{arch}/plan.json"
   let store = p"/artifacts"
-  let profile_overlay = fp"/src/laputa/guest/asterinas/{profile_name}/overlay"
+  let profile_overlay = fp"{profile_overlay_path}"
   let overlay_handle = fs.tempdir()?
   defer overlay_handle.close()
   let overlay = fp"{overlay_handle.host_path()?}/overlay"

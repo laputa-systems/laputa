@@ -641,9 +641,10 @@ Preserve diagnostics even when tests fail.
 
 ## Phase 10 — Establish a useful XSH development workflow
 
-The primary purpose of this environment is ongoing XSH development.
-
-A developer should be able to edit XSH locally and rerun the Asterinas test without rebuilding unrelated components.
+The primary purpose of this environment is ongoing XSH development. The
+Asterinas workflow uses the XSH commit in `infra/asterinas/inputs.lock`; a
+different XSH revision must be committed and selected there before its seed or
+runtime package is rebuilt.
 
 Design the incremental build dependencies so that:
 
@@ -656,19 +657,19 @@ Design the incremental build dependencies so that:
 - Unchanged generations reuse valid images.
 - Test logs are never mistaken for reusable build artifacts.
 
-Consider exposing a narrow, documented way to run a selected existing XSH test module inside the Asterinas guest.
-
-For example:
+Expose a narrow way to run one existing XSH test module from the locked source
+snapshot inside the Asterinas guest:
 
 ```sh
 make asterinas-test XSH_TEST=tests/xsh/stdlib/fs.xsh
 ```
 
-If the current XSH native test runner supports this naturally, integrate it.
-
-If not, implement the simplest useful equivalent without building a generic remote execution service.
-
-Ideally the test can be staged into the guest through an existing immutable overlay or dedicated test initramfs.
+Use the packaged `xsht` native test runner and stage the test tree through a
+PM generation overlay whose digest participates in the system key. The
+`fs.xsh` suite currently exposes a known Asterinas gap: its rooted-filesystem
+tests call Linux `openat2`, which the pinned kernel does not implement. Preserve
+the `ENOSYS` failure; use `tests/xsh/stdlib/numeric.xsh` to verify the selected
+module workflow until Asterinas provides kernel-enforced rooted opens.
 
 Do not require the developer to manually copy files into a mounted disk image.
 
@@ -713,6 +714,11 @@ Distinguish:
 4. An actual Asterinas Linux-ABI compatibility gap.
 
 Fix issues in Laputa or XSH where appropriate.
+
+With the current lock, Asterinas returns `ENOSYS` for `openat2`. XSH's rooted
+filesystem API depends on this syscall, so selecting `tests/xsh/stdlib/fs.xsh`
+in the guest exposes that specific incompatibility. The test runner must keep
+reporting the failure rather than skipping rooted-filesystem tests.
 
 If an Asterinas defect is straightforward to fix locally and is necessary for completing this task, a narrowly scoped pinned kernel patch may be acceptable. Preserve its source, rationale, and test evidence.
 
@@ -798,6 +804,10 @@ The manifest should identify:
 - Initramfs SHA-256.
 - Rootfs SHA-256.
 - Guest test payload identity where applicable.
+
+The manifest records the selected test module path and source hash, the
+profile proof source hash, the Asterinas kernel build configuration, and the
+toolchain image identity and compiler versions.
 
 Rebuilds should not reuse artifacts when their semantic inputs changed.
 

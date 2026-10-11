@@ -5,7 +5,7 @@ use seed.xsh_seed
 
 error AsterinasImageBuildError = Failed(message: Str)
 
-proc main(arch: Str, profile: Str = "viability") [fs, env, process, error] {
+proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let laputa_root = fs.cwd()?
   let value = xsh_seed.xsh_seed_arch(arch)?
   let docker = images.docker_program()?
@@ -19,7 +19,7 @@ proc main(arch: Str, profile: Str = "viability") [fs, env, process, error] {
   let _ = world.world_kbuild_cache(laputa_root).mkdir(parents: true)?
   let id = unix.id()?
   let owner: world.WorldOwner = {uid: id.uid, gid: id.gid}
-  let inner = ["/bin/xsh", "/src/laputa/infra/asterinas/build-image.xsh", "--", arch, profile, tag]
+  let inner = ["/bin/xsh", "/src/laputa/infra/asterinas/build-image.xsh", "--", arch, tag, profile_overlay_path]
   let argv = world.world_container_argv(
     docker,
     laputa_root,

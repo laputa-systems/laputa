@@ -6,6 +6,16 @@ test test_guest_protocol_requires_every_boot_and_xsh_marker {
   assert guest_protocol.guest_missing_success_markers(output) == []
 }
 
+test test_guest_protocol_requires_the_selected_xsh_test_marker {
+  let base_output = guest_protocol.guest_success_markers.join("\n")
+  let start = "LAPUTA_ASTERINAS_XSH_TEST_START tests/xsh/stdlib/fs.xsh"
+  assert guest_protocol.guest_missing_success_markers(f"{base_output}\n{start}") == [
+    "LAPUTA_ASTERINAS_XSH_TEST_OK",
+  ]
+  let selected_output = f"{base_output}\n{start}\nLAPUTA_ASTERINAS_XSH_TEST_OK"
+  assert guest_protocol.guest_missing_success_markers(selected_output) == []
+}
+
 test test_guest_protocol_reports_each_missing_marker_in_protocol_order {
   var output = ""
   for marker in guest_protocol.guest_success_markers {
