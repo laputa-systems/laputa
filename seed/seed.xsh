@@ -8,24 +8,31 @@ pure seed_usage() -> Str {
 
   fetch   networked: the xsh-test image, XSH's crates, and the saved host-tools base
   build   offline: the XSH seed under .out/seed/ARCH and the package-tools image
+          --asterinas-shell opts into xshi's Laputa Asterinas integration feature
   smoke   offline: run the package-tools image with the seed and prove it works;
           SUITE replaces the default PM test subset
 """
 }
 
-type SeedArgs = {command: Str, arch: Str, xsh_root: Str, jobs: Int, suites: List[Str]}
+type SeedArgs = {command: Str, arch: Str, xsh_root: Str, jobs: Int, suites: List[Str], asterinas_shell: Bool}
 
 proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
   if argv.is_empty() or argv[0] not in ["fetch", "build", "smoke"] {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }
 
-  var parsed: SeedArgs = SeedArgs(command: argv[0], arch: "", xsh_root: "", jobs: 4, suites: [])
+  var parsed: SeedArgs = SeedArgs(command: argv[0], arch: "", xsh_root: "", jobs: 4, suites: [], asterinas_shell: false)
   var index = 1
 
   while index < argv.len() {
     guard argv[index].starts_with("--") else {
       parsed = {...parsed, suites: parsed.suites.push(argv[index])}
+      index += 1
+      continue
+    }
+
+    if argv[index] == "--asterinas-shell" {
+      parsed = {...parsed, asterinas_shell: true}
       index += 1
       continue
     }
@@ -45,7 +52,7 @@ proc parse_seed_args(argv: List[Str]) -> Result[SeedArgs] {
     index += 2
   }
 
-  if parsed.arch == "" or parsed.xsh_root == "" or (parsed.command != "smoke" and ! parsed.suites.is_empty()) {
+  if parsed.arch == "" or parsed.xsh_root == "" or (parsed.command != "smoke" and ! parsed.suites.is_empty()) or (parsed.asterinas_shell and parsed.command != "build") {
     return Err(xsh_seed.SeedError.Usage(seed_usage()))
   }
 
@@ -103,7 +110,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
       images.fetch_host_tools(docker, laputa_root, value)
     }
     "build" => {
-      xsh_seed.xsh_seed_build(docker, laputa_root, xsh_root, value, args.jobs)
+      xsh_seed.xsh_seed_build(docker, laputa_root, xsh_root, value, args.jobs, args.asterinas_shell)
       let tag = images.ensure_package_tools(docker, laputa_root, value)?
       print f"seed {xsh_seed.xsh_seed_dir(laputa_root, value.arch)}"
       print f"image {tag}"

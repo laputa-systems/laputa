@@ -11,7 +11,7 @@ export const package_kind = "payload"
 export const ver = "0.0.0"
 
 ## Package recipe export.
-export const rel = "16"
+export const rel = "17"
 
 ## Package recipe export.
 export let deps = []
@@ -45,8 +45,8 @@ export const upstream_sources = [
 export const nostrip = true
 
 ## Package recipe export.
-## Core applets live under one tree so a new XSH applet needs no recipe edit
-## for its script; its `usr/bin` symlink must still be declared here.
+## Core applets live under one tree, but only declared command links are
+## exposed under /usr/bin; the full seed applet set is not Laputa's CLI.
 export const filetree = [
   {path: p"usr/bin/arch", kind: "symlink"},
   {path: p"usr/bin/basename", kind: "symlink"},
@@ -185,8 +185,10 @@ export proc build(dest: Path) [fs, env, error] {
   let core = fp"{dest}/usr/lib/xsh/core"
   core.parent.mkdir()
   archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
+  let command_links = [item.path.display() for item in filetree if item.kind == "symlink"]
 
   for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {
+    continue unless fp"usr/bin/{entry.name}".display() in command_links
     fp"{dest}/usr/bin/{entry.name}".symlink(to: fp"../lib/xsh/core/{entry.name}")
   }
 }

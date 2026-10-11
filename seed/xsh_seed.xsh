@@ -23,6 +23,13 @@ const xsh_seed_manifest_format = "laputa-xsh-seed-1"
 # XSH's distribution feature set: release binaries carry the network and tool
 # modules and xsht's native test runner, but not the xsh crate's own tests.
 const xsh_seed_features = "xsh/net xsh/tools xsht/native-tests"
+const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
+
+# Select XSH features for the ordinary seed or Laputa's Asterinas shell.
+pure xsh_seed_features_for(asterinas_shell: Bool) -> Str {
+  return f"{xsh_seed_features} {xsh_seed_asterinas_shell_feature}" when asterinas_shell
+  xsh_seed_features
+}
 
 ## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
 export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
@@ -86,6 +93,7 @@ export pure xsh_seed_cargo_build_argv(
   xsh_root: Path,
   value: SeedArch,
   jobs: Int,
+  asterinas_shell: Bool,
 ) -> Result[List[Str], Error] {
   let rustflags = xsh_seed_rustflags_env(value)?
   [
@@ -137,7 +145,7 @@ export pure xsh_seed_cargo_build_argv(
     "xsht",
     "--no-default-features",
     "--features",
-    xsh_seed_features,
+    xsh_seed_features_for(asterinas_shell),
     "--bin",
     "xsh",
     "--bin",
@@ -327,6 +335,7 @@ export proc xsh_seed_build(
   xsh_root: Path,
   value: SeedArch,
   jobs: Int,
+  asterinas_shell: Bool,
 ) [fs, process, error] {
   guard jobs >= 1 else {
     return Err(SeedError.Usage("seed build jobs must be positive"))
@@ -337,7 +346,7 @@ export proc xsh_seed_build(
   xsh_seed_cargo_target(laputa_root).mkdir()
   xsh_seed_run(
     docker,
-    xsh_seed_cargo_build_argv(docker, laputa_root, xsh_root, value, jobs)?,
+    xsh_seed_cargo_build_argv(docker, laputa_root, xsh_root, value, jobs, asterinas_shell)?,
     laputa_root,
     f"building the {value.arch} XSH seed",
   )
@@ -379,7 +388,7 @@ export proc xsh_seed_build(
     arch: value.arch,
     triple: value.triple,
     cargo_profile: "release, lto=false, incremental",
-    features: xsh_seed_features,
+    features: xsh_seed_features_for(asterinas_shell),
     xsh_commit: xsh_seed_git_text(xsh_root, ["rev-parse", "HEAD"])?,
     xsh_dirty: dirty,
     core_sources_sha256: core_digest,

@@ -22,7 +22,7 @@ test test_seed_arch_names_each_tool_target [error] {
 
 test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
-  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", /work/laputa, /work/xsh, value, 4)?
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", /work/laputa, /work/xsh, value, 4, false)?
   assert xsh_seed.xsh_seed_build_image in argv
   assert "--network" in argv and "none" in argv
   assert "--locked" in argv and "--offline" in argv and "--release" in argv
@@ -37,6 +37,13 @@ test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
   assert rustflags.len() == 1
   assert "+crt-static" in rustflags[0]
   assert "__isoc23_sscanf=sscanf" in rustflags[0]
+  assert ! ("xshi/laputa-asterinas" in argv.join(" "))
+}
+
+test test_xshi_asterinas_feature_is_opt_in [error] {
+  let value = xsh_seed.xsh_seed_arch("x86_64")?
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", /work/laputa, /work/xsh, value, 4, true)?
+  assert "xshi/laputa-asterinas" in argv.join(" ")
 }
 
 test test_seed_core_layout_matches_xsh_release_packaging [error] {
@@ -298,6 +305,7 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
       /work/xsh,
       xsh_seed.xsh_seed_arch(arch)?,
       4,
+      false,
     )?
     let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words())
     assert made.cargo == seed.cargo
