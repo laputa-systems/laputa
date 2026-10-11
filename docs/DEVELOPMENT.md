@@ -61,11 +61,13 @@ the packaged `xsht`, and the host requires its guest success marker. To test a
 different XSH source revision, update the XSH commit pin in
 `infra/asterinas/inputs.lock` first.
 
-The pinned Asterinas commit does not implement Linux `openat2`. The XSH rooted
-filesystem API uses that syscall, so selecting `tests/xsh/stdlib/fs.xsh`
-currently fails with `ENOSYS`; the test runner reports the failure without
-skipping it. The `numeric.xsh` example exercises the selected-module workflow
-without depending on that unsupported syscall.
+Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
+which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing
+syscalls required by Laputa, XSH, or a selected guest test belong in that fork
+with kernel regression coverage; do not work around them in userspace or skip
+the exposing test. For a fingerprinted build of uncommitted local kernel edits,
+run `ASTERINAS_LOCAL=1 make asterinas-test`. Commit a kernel change and update
+the lock and submodule gitlink together before using the clean pinned workflow.
 
 For an interactive session, run:
 

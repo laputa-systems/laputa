@@ -15,7 +15,10 @@ input_lock="$repo_root/infra/asterinas/inputs.lock"
 source "$input_lock"
 cache_dir="$repo_root/.cache/asterinas"
 output_dir="$repo_root/.out/asterinas-firecracker"
-source_dir="$cache_dir/source"
+source_dir="$repo_root/asterinas"
+target_dir="$cache_dir/target"
+cargo_home="$cache_dir/cargo"
+osdk_output_dir="$cache_dir/osdk-output"
 initramfs_root="$cache_dir/initramfs/root"
 firecracker_bin="$output_dir/bin/firecracker"
 firecracker_pid=""
@@ -71,6 +74,16 @@ need_tool() {
     command -v "$1" >/dev/null 2>&1 || fail "required host command is missing: $1"
 }
 
+asterinas_source_hash() {
+    git -C "$source_dir" ls-files --cached --others --exclude-standard -z | \
+        docker run --rm --interactive --pull never --platform linux/amd64 --network none \
+            --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
+            --entrypoint /usr/bin/tar "$dev_image_id" \
+            --create --file=- --directory=/src/asterinas --null --files-from=- \
+            --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner | \
+        sha256sum | awk '{print $1}'
+}
+
 [[ "$(uname -s)" == Linux ]] || fail 'Firecracker setup requires a Linux host'
 host_arch="$(uname -m)"
 [[ "$host_arch" == x86_64 ]] || fail "Firecracker setup requires x86_64, found $host_arch"
@@ -94,27 +107,30 @@ scratch_dir="$(mktemp -d "$cache_dir/setup.XXXXXX")"
 [[ "$ASTERINAS_DEV_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'Asterinas dev image pin must be a SHA-256 digest'
 [[ "$FIRECRACKER_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'invalid pinned Firecracker version'
 [[ "$FIRECRACKER_BINARY_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail 'Firecracker binary pin must be a SHA-256 digest'
-
-if [[ ! -e "$source_dir" ]]; then
-    mkdir -p "$source_dir"
-    git -C "$source_dir" init
-    git -C "$source_dir" remote add origin "$ASTERINAS_REPOSITORY"
-fi
 git -C "$source_dir" rev-parse --git-dir >/dev/null 2>&1 || \
-    fail "managed Asterinas source path is not a Git checkout: $source_dir"
-[[ -z "$(git -C "$source_dir" status --porcelain --untracked-files=no)" ]] || \
-    fail "Asterinas source checkout has local tracked changes: $source_dir"
+    fail "Asterinas submodule is not initialized: $source_dir; run make asterinas-fetch"
 source_remote="$(git -C "$source_dir" remote get-url origin)"
 [[ "$source_remote" == "$ASTERINAS_REPOSITORY" || \
-   "$source_remote" == git@github.com:asterinas/asterinas.git ]] || \
-    fail "Asterinas source remote differs from the pin: $source_remote"
-if ! git -C "$source_dir" cat-file -e "$ASTERINAS_COMMIT^{commit}" 2>/dev/null; then
-    git -C "$source_dir" fetch --depth=1 origin "$ASTERINAS_COMMIT"
-fi
+   "$source_remote" == git@github.com:joshuarli/asterinas.git ]] || \
+    fail "Asterinas submodule origin differs from the fork pin: $source_remote"
 asterinas_commit="$ASTERINAS_COMMIT"
-git -C "$source_dir" checkout --detach "$asterinas_commit"
-[[ "$asterinas_commit" =~ ^[0-9a-f]{40}$ ]] || fail 'upstream did not resolve to a full commit id'
+[[ "$asterinas_commit" =~ ^[0-9a-f]{40}$ ]] || fail 'Asterinas commit pin must be a full Git commit id'
 [[ "$(git -C "$source_dir" rev-parse HEAD)" == "$ASTERINAS_COMMIT" ]] || fail 'checked-out Asterinas source does not match its pin'
+submodule_commit="$(git -C "$repo_root" ls-files --stage -- asterinas | awk '$4 == "asterinas" { print $2 }')"
+[[ "$submodule_commit" == "$ASTERINAS_COMMIT" ]] || \
+    fail 'Asterinas gitlink differs from inputs.lock; update inputs.lock and the gitlink together'
+source_changes="$(git -C "$source_dir" status --porcelain --untracked-files=normal)"
+if [[ -n "$source_changes" && "${ASTERINAS_LOCAL:-0}" != 1 ]]; then
+    fail 'Asterinas source has local changes; use ASTERINAS_LOCAL=1 for a fingerprinted developer build'
+fi
+[[ "${ASTERINAS_LOCAL:-0}" == 0 || "${ASTERINAS_LOCAL:-0}" == 1 ]] || \
+    fail 'ASTERINAS_LOCAL must be 0 or 1'
+source_state=clean
+if [[ -n "$source_changes" ]]; then
+    source_state=working-tree
+fi
+toolchain_channel="$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$source_dir/rust-toolchain.toml")"
+[[ -n "$toolchain_channel" ]] || fail 'Asterinas Rust toolchain pin is missing'
 
 dev_version="$ASTERINAS_DEV_IMAGE_VERSION"
 [[ "$(cat "$source_dir/DOCKER_IMAGE_VERSION")" == "$dev_version" ]] || \
@@ -128,6 +144,13 @@ dev_image_id="$(docker image inspect --format '{{.Id}}' "$dev_image")"
 dev_image_digest="$(docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}' "$dev_image")"
 [[ "$dev_image_digest" == "asterinas/dev@$ASTERINAS_DEV_IMAGE_DIGEST" ]] || \
     fail "Asterinas dev image digest mismatch: expected asterinas/dev@$ASTERINAS_DEV_IMAGE_DIGEST, found $dev_image_digest"
+toolchain_sysroot="$(docker run --rm --platform linux/amd64 --network none \
+    --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
+    --entrypoint /usr/bin/env "$dev_image_id" rustc --print sysroot)"
+sysroot_manifest="$toolchain_sysroot/lib/rustlib/src/rust/library/sysroot/Cargo.toml"
+sysroot_lock="$toolchain_sysroot/lib/rustlib/src/rust/library/Cargo.lock"
+source_snapshot_hash="$(asterinas_source_hash)"
+[[ "$source_snapshot_hash" =~ ^[0-9a-f]{64}$ ]] || fail 'could not fingerprint Asterinas source'
 toolchain_cargo_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cargo --version)"
 toolchain_rustc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" rustc --version)"
 toolchain_gcc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gcc --version | head -n 1)"
@@ -136,6 +159,50 @@ docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env 
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gzip --version
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" jq --version
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/test "$dev_image_id" -d /root/linux_vdso
+
+sysroot_lock_hash="$(docker run --rm --platform linux/amd64 --network none \
+    --entrypoint /usr/bin/sha256sum "$dev_image_id" "$sysroot_lock" | awk '{print $1}')"
+cargo_lock_hash="$(printf '%s\n%s\n%s\n%s\n' \
+    "$(sha256sum "$source_dir/Cargo.lock" "$source_dir/osdk/Cargo.lock" | sha256sum | awk '{print $1}')" \
+    "$sysroot_lock_hash" "$toolchain_channel" "$dev_image_digest" | sha256sum | awk '{print $1}')"
+cargo_lock_stamp="$cache_dir/cargo.lock.sha256"
+mkdir -p "$cargo_home" "$target_dir" "$osdk_output_dir"
+if [[ "$mode" == fetch || "$mode" == setup ]]; then
+    docker run --rm --platform linux/amd64 \
+        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
+        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --workdir /src/asterinas \
+        --env CARGO_HOME=/work/asterinas/cargo \
+        --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
+        --entrypoint /usr/bin/env "$dev_image_id" cargo fetch --locked
+    docker run --rm --platform linux/amd64 \
+        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
+        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --workdir /src/asterinas \
+        --env CARGO_HOME=/work/asterinas/cargo \
+        --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
+        --entrypoint /usr/bin/env "$dev_image_id" \
+        cargo fetch --locked --manifest-path osdk/Cargo.toml
+    docker run --rm --platform linux/amd64 \
+        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --env CARGO_HOME=/work/asterinas/cargo \
+        --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
+        --entrypoint /usr/bin/env "$dev_image_id" \
+        cargo fetch --locked --manifest-path "$sysroot_manifest"
+    docker run --rm --platform linux/amd64 --network none \
+        --mount "type=bind,src=$repo_root,dst=/src/laputa,readonly" \
+        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
+        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --workdir /src/laputa \
+        --env CARGO_HOME=/work/asterinas/cargo \
+        --entrypoint /usr/bin/env "$dev_image_id" \
+        bash infra/asterinas/seed-cargo-git-tags.sh \
+        /src/asterinas/Cargo.lock /src/asterinas/osdk/Cargo.lock
+    printf '%s\n' "$cargo_lock_hash" > "$cargo_lock_stamp.tmp"
+    mv -f "$cargo_lock_stamp.tmp" "$cargo_lock_stamp"
+elif [[ "$(cat "$cargo_lock_stamp" 2>/dev/null || true)" != "$cargo_lock_hash" ]]; then
+    fail 'Asterinas Cargo inputs are not fetched for this lockfile; run make asterinas-fetch'
+fi
 
 firecracker_version="$FIRECRACKER_VERSION"
 
@@ -187,7 +254,7 @@ else
 fi
 
 if [[ "$mode" == fetch ]]; then
-    printf 'Fetched pinned Asterinas source, dev image, and Firecracker %s.\n' "$firecracker_version"
+    printf 'Fetched pinned Asterinas Cargo inputs, dev image, and Firecracker %s.\n' "$firecracker_version"
     exit 0
 fi
 
@@ -284,15 +351,18 @@ if [[ ! -f "$output_initramfs" || "$(sha256sum "$output_initramfs" | awk '{print
     mv -f "$output_initramfs.tmp" "$output_initramfs"
 fi
 
-kernel_build_config='target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev'
+kernel_build_config='target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev source_mount=/src/asterinas'
 kernel_key="$(printf '%s\n' \
     "$asterinas_commit" \
+    "$source_snapshot_hash" \
+    "$source_state" \
     "$dev_version" \
     "$dev_image_id" \
     "$dev_image_digest" \
+    "$toolchain_channel" \
     "$initramfs_hash" \
     "$kernel_build_config" | sha256sum | awk '{print $1}')"
-kernel_source="$source_dir/target/osdk/asterinas/asterinas-osdk-bin.elf"
+kernel_source="$osdk_output_dir/asterinas/asterinas-osdk-bin.elf"
 kernel_output="$output_dir/asterinas.elf"
 kernel_sha_file="$output_dir/kernel.sha256"
 kernel_key_file="$output_dir/kernel.key"
@@ -304,27 +374,42 @@ if [[ "$(cat "$kernel_key_file" 2>/dev/null || true)" == "$kernel_key" && \
       -f "$kernel_output" && "$cached_kernel_hash" == "$(cat "$kernel_sha_file" 2>/dev/null || true)" ]]; then
     printf 'Asterinas PVH kernel for %s is unchanged.\n' "$asterinas_commit"
 else
-    osdk_key="$(printf '%s\n%s\n' "$asterinas_commit" "$dev_image_id" | sha256sum | awk '{print $1}')"
+    osdk_key="$(printf '%s\n%s\n%s\n%s\n' \
+        "$asterinas_commit" "$source_snapshot_hash" "$dev_image_id" "$toolchain_channel" | \
+        sha256sum | awk '{print $1}')"
     osdk_install="$cache_dir/osdk/$osdk_key"
     if [[ ! -x "$osdk_install/bin/cargo-osdk" ]]; then
         mkdir -p "$osdk_install"
-        docker run --rm --platform linux/amd64 \
+        docker run --rm --platform linux/amd64 --network none \
+            --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
             --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
-            --workdir /work/asterinas/source \
+            --workdir /src/asterinas \
+            --env CARGO_HOME=/work/asterinas/cargo \
+            --env CARGO_TARGET_DIR=/work/asterinas/target \
+            --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
             --env OSDK_LOCAL_DEV=1 \
             --env "OSDK_INSTALL_ROOT=/work/asterinas/osdk/$osdk_key" \
             --entrypoint /usr/bin/env "$dev_image_id" \
-            cargo install --locked --force cargo-osdk --path osdk --root "/work/asterinas/osdk/$osdk_key"
+            cargo install --locked --offline --force cargo-osdk --path osdk --root "/work/asterinas/osdk/$osdk_key"
         [[ -x "$osdk_install/bin/cargo-osdk" ]] || fail 'OSDK install did not produce cargo-osdk'
     fi
     docker run --rm --platform linux/amd64 \
+        --network none \
+        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
         --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
-        --workdir /work/asterinas/source/kernel \
+        --workdir /src/asterinas/kernel \
+        --env CARGO_HOME=/work/asterinas/cargo \
+        --env CARGO_TARGET_DIR=/work/asterinas/target \
+        --env CARGO_NET_OFFLINE=true \
+        --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
         --env VDSO_LIBRARY_DIR=/root/linux_vdso \
         --entrypoint "/work/asterinas/osdk/$osdk_key/bin/cargo-osdk" "$dev_image_id" \
-        build --initramfs=/work/asterinas/smoke-initramfs.cpio.gz \
+        osdk build --initramfs=/work/asterinas/smoke-initramfs.cpio.gz \
         --boot-method=vmm-direct --target-arch=x86_64 --features pvh_boot \
+        --output=/work/asterinas/osdk-output \
         2>&1 | tee "$output_dir/kernel-build.log"
+    [[ "$(asterinas_source_hash)" == "$source_snapshot_hash" ]] || \
+        fail 'Asterinas source changed during the kernel build; rerun with a stable working tree'
     [[ -f "$kernel_source" ]] || fail "Asterinas OSDK did not produce the expected ELF: $kernel_source"
     readelf -h "$kernel_source" | grep -Eq 'Class:[[:space:]]+ELF64' || \
         fail 'Asterinas kernel is not an ELF64 image'
@@ -349,6 +434,9 @@ readelf -n "$kernel_output" | grep -Fq 'Unknown note type: (0x00000012)' || \
 kernel_hash="$(sha256sum "$kernel_output" | awk '{print $1}')"
 
 printf 'Asterinas commit: %s\n' "$asterinas_commit" > "$output_dir/setup.txt"
+printf 'Asterinas source snapshot SHA-256: %s\n' "$source_snapshot_hash" >> "$output_dir/setup.txt"
+printf 'Asterinas source state: %s\n' "$source_state" >> "$output_dir/setup.txt"
+printf 'Rust toolchain channel: %s\n' "$toolchain_channel" >> "$output_dir/setup.txt"
 printf 'Asterinas dev image: %s (%s)\n' "$dev_version" "$dev_image_digest" >> "$output_dir/setup.txt"
 printf 'Kernel build config: %s\n' "$kernel_build_config" >> "$output_dir/setup.txt"
 printf 'Cargo: %s\n' "$toolchain_cargo_version" >> "$output_dir/setup.txt"
@@ -396,6 +484,9 @@ done
 [[ "$booted" == true ]] || fail 'timed out waiting for the Asterinas PVH guest init marker'
 stop_firecracker
 printf 'Asterinas commit: %s\n' "$asterinas_commit" > "$output_dir/setup.txt"
+printf 'Asterinas source snapshot SHA-256: %s\n' "$source_snapshot_hash" >> "$output_dir/setup.txt"
+printf 'Asterinas source state: %s\n' "$source_state" >> "$output_dir/setup.txt"
+printf 'Rust toolchain channel: %s\n' "$toolchain_channel" >> "$output_dir/setup.txt"
 printf 'Asterinas dev image: %s (%s)\n' "$dev_version" "$dev_image_digest" >> "$output_dir/setup.txt"
 printf 'Kernel build config: %s\n' "$kernel_build_config" >> "$output_dir/setup.txt"
 printf 'Cargo: %s\n' "$toolchain_cargo_version" >> "$output_dir/setup.txt"

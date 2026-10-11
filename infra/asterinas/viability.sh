@@ -157,13 +157,19 @@ fi
 root_image="$output_dir/laputa-root.ext2"
 [[ -f "$root_image" ]] || fail 'PM image builder did not produce the ext2 root'
 
-dev_version="$(cat "$repo_root/.cache/asterinas/source/DOCKER_IMAGE_VERSION")"
+dev_version="$(cat "$repo_root/asterinas/DOCKER_IMAGE_VERSION")"
 dev_image_id="$(docker image inspect --format '{{.Id}}' "asterinas/dev:$dev_version")"
 kernel_build_config="$(sed -n 's/^Kernel build config: //p' "$output_dir/setup.txt")"
+asterinas_source_snapshot_hash="$(sed -n 's/^Asterinas source snapshot SHA-256: //p' "$output_dir/setup.txt")"
+asterinas_source_state="$(sed -n 's/^Asterinas source state: //p' "$output_dir/setup.txt")"
+toolchain_channel="$(sed -n 's/^Rust toolchain channel: //p' "$output_dir/setup.txt")"
 toolchain_cargo_version="$(sed -n 's/^Cargo: //p' "$output_dir/setup.txt")"
 toolchain_rustc_version="$(sed -n 's/^Rustc: //p' "$output_dir/setup.txt")"
 toolchain_gcc_version="$(sed -n 's/^GCC: //p' "$output_dir/setup.txt")"
-[[ -n "$kernel_build_config" && -n "$toolchain_cargo_version" && -n "$toolchain_rustc_version" && -n "$toolchain_gcc_version" ]] || \
+[[ "$asterinas_source_snapshot_hash" =~ ^[0-9a-f]{64}$ && \
+   ( "$asterinas_source_state" == clean || "$asterinas_source_state" == working-tree ) && \
+   -n "$toolchain_channel" && -n "$kernel_build_config" && \
+   -n "$toolchain_cargo_version" && -n "$toolchain_rustc_version" && -n "$toolchain_gcc_version" ]] || \
     fail 'Asterinas setup did not record its build configuration and toolchain versions'
 initramfs_root="$output_dir/initramfs-root"
 initramfs="$output_dir/laputa-initramfs.cpio.gz"
@@ -212,7 +218,7 @@ kernel_hash="$(sha256sum "$output_dir/asterinas.elf" | awk '{print $1}')"
 root_hash="$(sha256sum "$root_image" | awk '{print $1}')"
 initramfs_hash="$(sha256sum "$initramfs" | awk '{print $1}')"
 proof_source_hash="$(sha256sum "$profile_proof_source" | awk '{print $1}')"
-bundle_key="$(printf '%s\n' "$mode" "$generation" "$actual_xsh_commit" "$xsh_build_inputs_hash" "$ASTERINAS_COMMIT" "$kernel_build_config" "$dev_image_id" "$ASTERINAS_DEV_IMAGE_DIGEST" "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version" "$FIRECRACKER_VERSION" "$FIRECRACKER_BINARY_SHA256" "$package_tools_image" "$kernel_hash" "$root_hash" "$initramfs_hash" "$proof_source_hash" "$xsh_test_path" "$xsh_test_sha256" 'writable-runtime-root-v1' | sha256sum | awk '{print $1}')"
+bundle_key="$(printf '%s\n' "$mode" "$generation" "$actual_xsh_commit" "$xsh_build_inputs_hash" "$ASTERINAS_COMMIT" "$asterinas_source_snapshot_hash" "$asterinas_source_state" "$toolchain_channel" "$kernel_build_config" "$dev_image_id" "$ASTERINAS_DEV_IMAGE_DIGEST" "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version" "$FIRECRACKER_VERSION" "$FIRECRACKER_BINARY_SHA256" "$package_tools_image" "$kernel_hash" "$root_hash" "$initramfs_hash" "$proof_source_hash" "$xsh_test_path" "$xsh_test_sha256" 'writable-runtime-root-v1' | sha256sum | awk '{print $1}')"
 bundle_dir="$output_dir/builds/$bundle_key"
 runtime_root="$output_dir/runtime/$bundle_key/laputa-root.ext2"
 mkdir -p "$output_dir/builds"
@@ -232,7 +238,9 @@ else
     docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/jq "$dev_image_id" \
         -n --arg key "$bundle_key" --arg profile "$mode" --arg generation "$generation" \
         --arg xsh_commit "$actual_xsh_commit" --arg xsh_inputs "$xsh_build_inputs_hash" \
-        --arg asterinas_commit "$ASTERINAS_COMMIT" --arg dev_image_digest "$ASTERINAS_DEV_IMAGE_DIGEST" \
+        --arg asterinas_commit "$ASTERINAS_COMMIT" --arg asterinas_source_sha "$asterinas_source_snapshot_hash" \
+        --arg asterinas_source_state "$asterinas_source_state" --arg dev_image_digest "$ASTERINAS_DEV_IMAGE_DIGEST" \
+        --arg toolchain_channel "$toolchain_channel" \
         --arg kernel_build_config "$kernel_build_config" --arg dev_image "asterinas/dev:$dev_version" --arg dev_image_id "$dev_image_id" \
         --arg cargo_version "$toolchain_cargo_version" --arg rustc_version "$toolchain_rustc_version" --arg gcc_version "$toolchain_gcc_version" \
         --arg firecracker "$FIRECRACKER_VERSION" --arg package_tools "$package_tools_image" \
@@ -240,7 +248,7 @@ else
         --arg kernel_sha "$kernel_hash" --arg root_sha "$root_hash" --arg initramfs_sha "$initramfs_hash" \
         --arg proof_source "$profile_proof_source_path" --arg proof_sha "$proof_source_hash" \
         --arg xsh_test_path "$xsh_test_path" --arg xsh_test_sha "$xsh_test_sha256" \
-        '{schema_version:1,build_key:$key,profile:$profile,pm_generation:$generation,xsh:{commit:$xsh_commit,build_inputs_sha256:$xsh_inputs},asterinas:{commit:$asterinas_commit,kernel_build_config:$kernel_build_config},toolchain:{dev_image:$dev_image,image_id:$dev_image_id,digest:$dev_image_digest,cargo:$cargo_version,rustc:$rustc_version,gcc:$gcc_version},firecracker:{version:$firecracker,binary_sha256:$firecracker_sha},package_tools_image:$package_tools,guest_tests:{profile_proof:{path:$proof_source,sha256:$proof_sha},xsh_module:(if $xsh_test_path == "" then null else {path:$xsh_test_path,sha256:$xsh_test_sha} end)},artifacts:{kernel:{path:"kernel.elf",sha256:$kernel_sha},rootfs:{path:"laputa-root.ext2",format:"ext2",sha256:$root_sha},initramfs:{path:"laputa-initramfs.cpio.gz",format:"newc+gzip",sha256:$initramfs_sha}}}' \
+        '{schema_version:1,build_key:$key,profile:$profile,pm_generation:$generation,xsh:{commit:$xsh_commit,build_inputs_sha256:$xsh_inputs},asterinas:{commit:$asterinas_commit,source_snapshot_sha256:$asterinas_source_sha,source_state:$asterinas_source_state,kernel_build_config:$kernel_build_config},toolchain:{dev_image:$dev_image,image_id:$dev_image_id,digest:$dev_image_digest,rust_channel:$toolchain_channel,cargo:$cargo_version,rustc:$rustc_version,gcc:$gcc_version},firecracker:{version:$firecracker,binary_sha256:$firecracker_sha},package_tools_image:$package_tools,guest_tests:{profile_proof:{path:$proof_source,sha256:$proof_sha},xsh_module:(if $xsh_test_path == "" then null else {path:$xsh_test_path,sha256:$xsh_test_sha} end)},artifacts:{kernel:{path:"kernel.elf",sha256:$kernel_sha},rootfs:{path:"laputa-root.ext2",format:"ext2",sha256:$root_sha},initramfs:{path:"laputa-initramfs.cpio.gz",format:"newc+gzip",sha256:$initramfs_sha}}}' \
         > "$bundle_stage/manifest.json"
     docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/jq "$dev_image_id" \
         -n --arg kernel "$bundle_dir/kernel.elf" --arg initramfs "$bundle_dir/laputa-initramfs.cpio.gz" \

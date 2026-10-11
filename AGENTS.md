@@ -79,6 +79,9 @@ build, and QEMU last. Use `cargo -j 4` and run one test suite at a time.
 - Do not run pre-commit hooks or CI workflows. Never push.
 - Keep changes scoped; prefer existing patterns; preserve comments that explain
   why. Add no dependency without a clear need.
+- Implement Asterinas syscalls required by Laputa, XSH, or selected guest tests
+  in the pinned `asterinas/` fork with kernel regression coverage; do not hide
+  missing kernel behavior with userspace workarounds or skipped tests.
 - Use typed module imports, structured process argv, explicit effects, and `?`
   at error boundaries. Public exports share a global runtime symbol table, so
   use domain-qualified names where modules could collide.

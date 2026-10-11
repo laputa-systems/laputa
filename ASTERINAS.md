@@ -644,7 +644,10 @@ Preserve diagnostics even when tests fail.
 The primary purpose of this environment is ongoing XSH development. The
 Asterinas workflow uses the XSH commit in `infra/asterinas/inputs.lock`; a
 different XSH revision must be committed and selected there before its seed or
-runtime package is rebuilt.
+runtime package is rebuilt. Laputa also pins its Asterinas compatibility fork
+as the `asterinas/` submodule. Developers can edit that checkout and run the
+local integration proof with `ASTERINAS_LOCAL=1`; the source snapshot is
+fingerprinted into the kernel build key.
 
 Design the incremental build dependencies so that:
 
@@ -666,10 +669,8 @@ make asterinas-test XSH_TEST=tests/xsh/stdlib/fs.xsh
 
 Use the packaged `xsht` native test runner and stage the test tree through a
 PM generation overlay whose digest participates in the system key. The
-`fs.xsh` suite currently exposes a known Asterinas gap: its rooted-filesystem
-tests call Linux `openat2`, which the pinned kernel does not implement. Preserve
-the `ENOSYS` failure; use `tests/xsh/stdlib/numeric.xsh` to verify the selected
-module workflow until Asterinas provides kernel-enforced rooted opens.
+`fs.xsh` suite exercises kernel-enforced rooted filesystem operations and
+should run against Laputa's Asterinas fork.
 
 Do not require the developer to manually copy files into a mounted disk image.
 
@@ -713,20 +714,31 @@ Distinguish:
 3. An invalid assumption in the integration.
 4. An actual Asterinas Linux-ABI compatibility gap.
 
-Fix issues in Laputa or XSH where appropriate.
+Fix Laputa defects in Laputa and XSH defects in XSH. When a syscall required by
+Laputa, XSH, or a selected guest test is missing or incomplete in Asterinas,
+implement its Linux ABI behavior in the pinned `asterinas/` fork and add
+kernel-side regression coverage. Keep the fork focused on compatibility needed
+by Laputa, and include the source revision and tests in the normal local build
+and guest verification workflow.
 
-With the current lock, Asterinas returns `ENOSYS` for `openat2`. XSH's rooted
-filesystem API depends on this syscall, so selecting `tests/xsh/stdlib/fs.xsh`
-in the guest exposes that specific incompatibility. The test runner must keep
-reporting the failure rather than skipping rooted-filesystem tests.
+The rooted filesystem APIs in XSH require `openat2(2)`. The pinned fork now
+implements syscall 437 for x86-64 and the generic syscall table, validates the
+`open_how` ABI, and enforces the supported `RESOLVE_*` constraints during path
+lookup. Its regression source is under
+`asterinas/test/initramfs/src/regression/fs/openat2/`; the Laputa guest proof
+also runs `tests/xsh/stdlib/fs_root_children.xsh` against the built kernel.
 
-If an Asterinas defect is straightforward to fix locally and is necessary for completing this task, a narrowly scoped pinned kernel patch may be acceptable. Preserve its source, rationale, and test evidence.
+The broader `tests/xsh/stdlib/fs.xsh` module currently stops at
+`test_fs_root_and_children_preserve_non_utf8_name`: the pinned VFS converts
+pathname bytes through UTF-8 `String` values, so invalid bytes alias the
+replacement character. This is separate from `openat2`, and means the full
+`fs.xsh` gate remains unsatisfied until Asterinas path handling preserves raw
+Linux pathname bytes end to end. Keep the test enabled while fixing that gap.
 
-Do not maintain a sprawling downstream Asterinas fork.
-
-Do not fake unsupported kernel behavior in XSH merely to achieve green tests.
-
-If a particular optional API is genuinely unsupported, document the precise scope and maintain a narrowly defined compatibility expectation. Do not broadly suppress errors or treat required acceptance tests as optional.
+Do not replace missing kernel behavior with a userspace emulation, weaken a
+security guarantee, or skip the test that exposed the gap. Optional interfaces
+outside Laputa's runtime and selected tests may remain unsupported when their
+scope and observed errno are documented precisely.
 
 The final boot and basic XSH proof must pass without such waivers.
 

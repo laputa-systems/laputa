@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+git -C "$repo_root" submodule update --init --recursive -- asterinas
 unset XSH_BIN_DIR XSH_HOST
 xsh_snapshot_output="$(bash "$repo_root/infra/asterinas/prepare-xsh.sh")"
 readarray -t xsh_snapshot <<< "$xsh_snapshot_output"

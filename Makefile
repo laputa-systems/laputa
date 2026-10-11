@@ -12,6 +12,8 @@
 
 XSH_ROOT ?= ../xsh
 XSH_ROOT_ABS := $(abspath $(XSH_ROOT))
+ASTERINAS_LOCAL ?= 0
+export ASTERINAS_LOCAL
 
 # The machine running make. Docker images and host tools follow it, and ARCH
 # (the seed and package target) defaults to it: aarch64 on Apple Silicon and
