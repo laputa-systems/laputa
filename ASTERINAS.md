@@ -229,7 +229,7 @@ ELF and records its SHA-256. The Laputa target builds its own separate
 initramfs; neither path invokes Nix or consumes a Nix-produced filesystem.
 
 The lock currently selects Asterinas commit
-`af0b77c8f11db24ba59b8d2cf29a189281b8e270`, dev image
+`81b2faa0883cc05e7b8a93dd053aa00a1f6eddea`, dev image
 `0.18.1-20260926` at digest
 `sha256:e4a5a5742247a287af70d1d5b59f5fa93fe8ab46dcc9081a5e3d0a8066faab56`,
 Firecracker `v1.17.0`, and XSH commit
@@ -728,12 +728,19 @@ lookup. Its regression source is under
 `asterinas/test/initramfs/src/regression/fs/openat2/`; the Laputa guest proof
 also runs `tests/xsh/stdlib/fs_root_children.xsh` against the built kernel.
 
-The broader `tests/xsh/stdlib/fs.xsh` module currently stops at
-`test_fs_root_and_children_preserve_non_utf8_name`: the pinned VFS converts
-pathname bytes through UTF-8 `String` values, so invalid bytes alias the
-replacement character. This is separate from `openat2`, and means the full
-`fs.xsh` gate remains unsatisfied until Asterinas path handling preserves raw
-Linux pathname bytes end to end. Keep the test enabled while fixing that gap.
+The pinned VFS now carries raw pathname bytes through path resolution, dentry
+cache keys, ext2 and ramfs directory operations, symlink targets, metadata
+syscalls, `getdents64`, and inotify event names. The ext2 openat2 regression
+creates, reads, enumerates, and unlinks a filename containing `0xff`. The
+complete `tests/xsh/stdlib/fs.xsh` module passes in the Laputa guest; its two
+permission tests skip because the guest runs as root, which the tests report
+explicitly.
+
+Filesystems that use the default `Inode` byte-name adapters accept UTF-8 names
+and return `EILSEQ` for invalid bytes; ext2 and ramfs implement byte names
+directly. The `mount(2)` source field remains a UTF-8 string and returns
+`EILSEQ` for an invalid source because filesystem creation and mount metadata
+currently represent it as `str`.
 
 Do not replace missing kernel behavior with a userspace emulation, weaken a
 security guarantee, or skip the test that exposed the gap. Optional interfaces
@@ -856,7 +863,7 @@ Include:
 - Kernel compatibility limitations.
 - How to update Asterinas deliberately.
 - Troubleshooting boot failures.
-- How to clean only Asterinas outputs.
+- How to clear rebuildable checkout state for a cold campaign rebuild.
 
 Keep documentation factual and tied to verified implementation.
 

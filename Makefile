@@ -160,7 +160,7 @@ clean: mirror-clean
 	docker volume rm --force $(LEGACY_LAPUTA_VOLUMES)
 
 distclean: clean
-	rm -rf .cache
+	$(REMOVE_DERIVED) .cache
 
 # Every target that runs host XSH names this first, so a fresh Linux host
 # learns to run `make host-xsh` instead of failing on a missing binary.
@@ -354,7 +354,7 @@ asterinas-test:
 asterinas-boot:
 	bash infra/asterinas/viability.sh boot
 
-# Remove only Asterinas source and VM outputs; shared PM artifacts remain reusable.
+# Remove all checkout build outputs and fetched caches for a cold rebuild.
 asterinas-clean:
 	bash infra/asterinas/clean.sh
 

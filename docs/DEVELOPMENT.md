@@ -32,9 +32,11 @@ XSH working tree do not affect this pinned build.
 The kernel, verified immutable bundles, runtime disk copies, Firecracker
 configuration, build and boot logs live under `.out/asterinas-firecracker/`.
 Fetched Asterinas and XSH repositories remain under `.cache/asterinas/`.
-`asterinas-clean` removes only these backend outputs and caches; it preserves
-the shared PM artifact store. The ordinary `asterinas-setup` target also
-offers a small kernel/VMM smoke boot.
+`asterinas-clean` runs `make distclean`, removing the checkout's outputs,
+shared PM artifact store, fetched caches, and the pinned build-tool images so
+the campaign can be rebuilt from pinned inputs. It keeps the tracked source
+checkouts. The ordinary `asterinas-setup` target also offers a small
+kernel/VMM smoke boot.
 
 Run the automated guest proof with:
 

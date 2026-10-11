@@ -295,7 +295,10 @@ if [[ "$(cat "$compiled_init_key_file" 2>/dev/null || true)" != "$initramfs_key"
         --entrypoint /usr/bin/env "$dev_image_id" \
         gcc -nostdlib -static -no-pie -Wl,-e,_start -Wl,--build-id=none \
         -o /work/asterinas/initramfs/root/init.tmp /work/asterinas/smoke-init.S
-    chmod 755 "$initramfs_root/init.tmp"
+    docker run --rm --platform linux/amd64 --network none \
+        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --entrypoint /usr/bin/chmod "$dev_image_id" \
+        755 /work/asterinas/initramfs/root/init.tmp
     mv -f "$initramfs_root/init.tmp" "$initramfs_root/init"
     readelf -h "$initramfs_root/init" | grep -Eq 'Machine:[[:space:]]+Advanced Micro Devices X86-64' || \
         fail 'smoke init is not an x86_64 executable'

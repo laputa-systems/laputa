@@ -23,6 +23,7 @@ export PATH="$xsh_bin_dir:$PATH"
 export LAPUTA_SOURCE_CACHE="${SOURCE_CACHE:-$repo_root/.cache/sources}"
 
 make -C "$repo_root" "${make_args[@]}" fetch-seed
+make -C "$repo_root" "${make_args[@]}" seed
 "$XSH_HOST" "$repo_root/pm.xsh" -- sources fetch --repo "$repo_root" --target x86_64-linux-musl llvm-toolchain
 make -C "$repo_root" "${make_args[@]}" plan 'PKGS=baselayout xsh laputa-pm xinit'
 "$XSH_HOST" "$repo_root/infra/asterinas/fetch-plan-sources.xsh" -- "$repo_root/.out/world/x86_64/plan.json"

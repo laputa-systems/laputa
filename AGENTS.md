@@ -59,7 +59,7 @@ sets it.
 | `make asterinas-preflight`, `make asterinas-fetch`, `make asterinas-build` | checks host capabilities, fetches locked source/tool inputs, and builds an immutable Asterinas + Laputa bundle |
 | `make asterinas-test [XSH_TEST=tests/xsh/<module>.xsh]` | boots the PM-built ext2 root under Asterinas/Firecracker and checks xinit, XSH, and guest filesystem/process behavior; optionally runs one pinned XSH test module |
 | `make asterinas-boot` | boots the PM-built Laputa root and connects an interactive xshi session to Firecracker's serial console |
-| `make asterinas-clean` | removes only the Asterinas backend cache and output; preserves shared PM artifacts |
+| `make asterinas-clean` | removes all checkout build outputs, fetched caches, and pinned builder images for a cold Asterinas rebuild |
 | `make asterinas-setup` | builds the pinned Asterinas PVH kernel and boots a small KVM smoke guest |
 | `make store-gc` | remove store artifacts that neither the last world plan nor a profile plan names (between builds only) |
 | `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |

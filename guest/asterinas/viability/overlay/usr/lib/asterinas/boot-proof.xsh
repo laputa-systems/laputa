@@ -91,6 +91,32 @@ proc main() [fs, process, env, time, error] {
   renamed.remove()?
   test_dir.remove()?
 
+  let raw_tmp_dir = fp"/tmp/asterinas-raw-path-{process.current_pid()?}"
+  raw_tmp_dir.mkdir()
+  let raw_tmp_root = fs.open_root(raw_tmp_dir)?
+  require(raw_tmp_dir.exists()?, "tmpfs-path", "new tmpfs directory is missing")?
+  require(
+    raw_tmp_root.children(p".")?.children.len() == 0,
+    "tmpfs-path",
+    "new tmpfs directory was not visible through rooted enumeration",
+  )?
+  let raw_name = b"raw\xfffile" as Path
+  raw_tmp_root.write(raw_name, b"ok")
+  require(raw_tmp_dir.exists()?, "tmpfs-path", "rooted create removed its parent path")?
+  require(
+    raw_tmp_root.children(p".")?.children == [raw_name],
+    "tmpfs-path",
+    "rooted directory enumeration lost the raw pathname bytes",
+  )?
+  let raw_tmp_entries = fs.children(raw_tmp_dir)?.collect()
+  require(
+    raw_tmp_entries.len() == 1
+      and raw_tmp_entries[0].path.relative_to(raw_tmp_dir) == raw_name,
+    "tmpfs-path",
+    "pathname lookup did not find the rooted create through its parent path",
+  )?
+  raw_tmp_root.close()
+
   p"/var/lib/laputa/asterinas-ext2-write".write("Laputa XSH wrote to ext2\n")
   require(
     p"/var/lib/laputa/asterinas-ext2-write".read_text()? == "Laputa XSH wrote to ext2\n",
