@@ -54,6 +54,40 @@ proc main() [fs, process, env, time, error] {
   let pipeline = run.text /usr/bin/printf "laputa\n" | run /usr/bin/tr a-z A-Z
   require(pipeline.trim() == "LAPUTA", "pipeline", "the XSH pipeline produced the wrong output")?
 
+  # A TCP echo over 127.0.0.1 exercises the guest network stack without host networking.
+  let socket_abi = linux.net_constants()
+  let server = linux.socket(socket_abi.AF_INET, socket_abi.SOCK_STREAM)?
+  defer unix.close_fd(server)
+  linux.bind(server, {family: "inet", address: "127.0.0.1", port: 0})?
+  linux.listen(server, 1)?
+  let local = linux.getsockname(server)?
+  let client = linux.socket(socket_abi.AF_INET, socket_abi.SOCK_STREAM)?
+  defer unix.close_fd(client)
+  linux.connect(client, local)?
+  let accepted = linux.accept(server)?
+  defer unix.close_fd(accepted.fd)
+  let request = bytes.from_text("laputa-loopback")
+  require(
+    unix.write_fd(client, request)? == request.len(),
+    "loopback",
+    "the XSH client could not write its TCP request",
+  )?
+  require(
+    unix.poll_fd(accepted.fd, ["readable"], 1000)? == ["readable"],
+    "loopback",
+    "the XSH server did not become readable",
+  )?
+  let received = unix.read_fd(accepted.fd, 64)?
+  require(received == request, "loopback", "the TCP request payload changed")?
+  require(
+    linux.sendto(accepted.fd, received)? == request.len(),
+    "loopback",
+    "the XSH server could not send its TCP response",
+  )?
+  let response = linux.recvfrom(client, 64)?
+  require(response.data == request, "loopback", "the TCP response payload changed")?
+  eprint --flush "LAPUTA_ASTERINAS_LOOPBACK_OK"
+
   let failed_child = run.status /usr/bin/false
   require(failed_child.exited_with(1), "process-status", "the child exit status was not preserved")?
 

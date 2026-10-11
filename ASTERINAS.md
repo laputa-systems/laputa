@@ -594,7 +594,8 @@ An interactive `asterinas-boot` must provide a usable serial-console shell and n
 
 ### Networking
 
-Basic loopback socket behavior should be tested when supported.
+The guest proof performs a TCP echo over `127.0.0.1`, requiring no host network
+setup.
 
 Full host/guest networking may require TAP configuration. Avoid making privileged host networking a prerequisite for the initial core proof.
 
@@ -608,6 +609,7 @@ For example, emit the following over the guest serial console:
 
 ```text
 LAPUTA_ASTERINAS_BOOT_OK
+LAPUTA_ASTERINAS_LOOPBACK_OK
 LAPUTA_ASTERINAS_XSH_OK
 LAPUTA_ASTERINAS_TEST_OK
 ```

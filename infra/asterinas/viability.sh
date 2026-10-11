@@ -344,7 +344,7 @@ kernel_hash="$(sha256sum "$bundle_dir/kernel.elf" | awk '{print $1}')"
 root_hash="$(sha256sum "$root_image" | awk '{print $1}')"
 firecracker_version="$(cat "$output_dir/firecracker.version")"
 asterinas_commit="$(cat "$output_dir/setup.txt" | sed -n 's/^Asterinas commit: //p')"
-guest_proofs='LAPUTA_ASTERINAS_EXT2_MOUNT_OK, LAPUTA_ASTERINAS_SWITCH_ROOT_START, LAPUTA_ASTERINAS_BOOT_SETUP_OK, LAPUTA_ASTERINAS_XINIT_PID1_OK, LAPUTA_ASTERINAS_ROOTFS_OK, LAPUTA_ASTERINAS_XSH_OK, LAPUTA_ASTERINAS_TEST_OK'
+guest_proofs='LAPUTA_ASTERINAS_EXT2_MOUNT_OK, LAPUTA_ASTERINAS_SWITCH_ROOT_START, LAPUTA_ASTERINAS_BOOT_SETUP_OK, LAPUTA_ASTERINAS_XINIT_PID1_OK, LAPUTA_ASTERINAS_ROOTFS_OK, LAPUTA_ASTERINAS_LOOPBACK_OK, LAPUTA_ASTERINAS_XSH_OK, LAPUTA_ASTERINAS_TEST_OK'
 if [[ -n "$xsh_test_path" ]]; then
     guest_proofs+=', LAPUTA_ASTERINAS_XSH_TEST_OK'
 fi

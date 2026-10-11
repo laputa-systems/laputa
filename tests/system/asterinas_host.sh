@@ -181,6 +181,7 @@ case "$FAKE_FIRECRACKER_MODE" in
             LAPUTA_ASTERINAS_BOOT_SETUP_OK \
             LAPUTA_ASTERINAS_XINIT_PID1_OK \
             LAPUTA_ASTERINAS_ROOTFS_OK \
+            LAPUTA_ASTERINAS_LOOPBACK_OK \
             LAPUTA_ASTERINAS_XSH_OK
         if [[ "$FAKE_FIRECRACKER_MODE" == success ]]; then
             printf '%s\n' \
