@@ -127,7 +127,7 @@ proc main() [fs, process, env, time, net, error] {
   let raw_tmp_root = fs.open_root(raw_tmp_dir)?
   require(raw_tmp_dir.exists()?, "tmpfs-path", "new tmpfs directory is missing")
   require(
-    raw_tmp_root.children(p".")?.children.len() == 0,
+    raw_tmp_root.children(p".")?.children.is_empty(),
     "tmpfs-path",
     "new tmpfs directory was not visible through rooted enumeration",
   )
