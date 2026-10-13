@@ -471,7 +471,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
   let first = fp"{root}/first.txt"
   let second = fp"{root}/second.txt"
   let plan = fp"{root}/archive-plan.json"
-  let no_strings: List[Str] = []
+  let no_strings = []
 
   json.write(
     plan,

@@ -680,7 +680,7 @@ type FetchSelection = {packages: List[types.Package], arch: Str}
 proc command_sources_fetch(args: SourcesFetchArgs) {
   let cache_root = sources.source_cache_root(args.repo)?
   var items: List[sources.SourceFetchItem] = []
-  var seen: List[Str] = []
+  var seen = []
   var selections: List[FetchSelection] = []
 
   for target in args.targets {
@@ -757,7 +757,7 @@ proc command_root_inspect(args: RootInspectArgs) {
 # Every artifact a kept plan names stays, whatever its action: a plan that
 # reuses a remote artifact still runs from the imported copy.
 proc command_store_gc(args: StoreGcArgs) {
-  var keep: List[Str] = []
+  var keep = []
 
   for plan_file in args.keep {
     keep += [node.artifact_key for node in pm_plan_json.read(fp"{plan_file}")?.nodes]

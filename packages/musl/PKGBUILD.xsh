@@ -247,7 +247,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # An override replaces only the generic file at its own path, as the
   # Makefile's REPLACED_OBJS (`/$(ARCH)/` removed) does: src/thread/x86_64/clone.s
   # replaces src/thread/clone.c (__clone), never src/linux/clone.c (clone()).
-  var replaced: List[Str] = []
+  var replaced = []
   var arch_c_files = []
   var arch_s_files = []
 
@@ -387,7 +387,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # PIE:     Scrt1, rcrt1 (compile_lo adds -fPIC/-DPIC for PIE executables).
   let crt_cflags = cflags.push("-DCRT")
   var crt_tasks = []
-  var crt_outs: List[Path] = []
+  var crt_outs = []
 
   for src_name in ["crt1", "crti", "crtn"] {
     let src = fp"crt/{src_name}.c"

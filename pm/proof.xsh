@@ -47,7 +47,7 @@ proc package_dependency_map(root: Path) -> Result[Map[List[Str]]] {
 
     if metadata_path.exists() {
       let metadata = json.read(metadata_path)?.require(Record)?
-      var deps: List[Str] = []
+      var deps = []
 
       if "deps" in metadata {
         deps = metadata.get("deps")?.require(List[Str])?

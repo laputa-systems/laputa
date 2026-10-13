@@ -64,7 +64,7 @@ export pure is_bootstrap_dependency(value: types.BuildPolicy, package: Str, depe
 
 ## Returns the policy-defined bootstrap dependencies for one package in declaration order.
 export pure bootstrap_dependencies(value: types.BuildPolicy, package: Str) -> List[Str] {
-  var dependencies: List[Str] = []
+  var dependencies = []
 
   for rule in value.bootstrap_seeds {
     if rule.package == package and (! rule.native_only or value.native_build) and rule.dependency not in dependencies {

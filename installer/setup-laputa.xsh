@@ -169,8 +169,8 @@ proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
 }
 
 proc list_disks() -> Result[List[Path]] {
-  var blank: List[Path] = []
-  var partitioned: List[Path] = []
+  var blank = []
+  var partitioned = []
   let devices = linux.block_devices()?
 
   for device in devices {

@@ -175,7 +175,7 @@ export proc decode_remote_index(rows: List[Record]) [error] -> Result[List[types
 ## Exported PM declaration `decode_remote_package`.
 export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePackage, Error] {
   var arch = "aarch64"
-  let empty_dependencies: List[Str] = []
+  let empty_dependencies = []
   let mkdeps_host = if "mkdeps_host" in row {
     row.get("mkdeps_host")?.require(List[Str])?
   } else {

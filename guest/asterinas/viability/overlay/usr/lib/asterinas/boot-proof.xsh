@@ -113,7 +113,7 @@ proc main() [fs, process, env, time, net, error] {
   let renamed = fp"{test_dir}/renamed.txt"
   let link = fp"{test_dir}/alias.txt"
   link.symlink(to: p"renamed.txt")?
-  var names: List[Str] = []
+  var names = []
   for entry in fs.children(test_dir)? {
     names += [entry.name]
   }

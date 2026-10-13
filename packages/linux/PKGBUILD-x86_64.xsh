@@ -460,7 +460,7 @@ proc write_x86_realmode_pasyms(nm: Path, objects: List[Str]) [fs, process, env, 
   let symbol_re = rx"^([0-9a-fA-F]+) [ABCDGRSTVW] (.+)$"
   let paths = realmode_object_paths(objects)
   let symbols = run.text $nm @paths
-  var lines: List[Str] = []
+  var lines = []
 
   for raw in symbols.lines() {
     let caps = symbol_re.captures(raw)
@@ -765,7 +765,7 @@ export proc build_x86_64_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process,
   PKGBUILD_shared.require_complete_x86_archive_plan(archive_plan)
   PKGBUILD_shared.stop_after("plan")
   let jobs_count = PKGBUILD_shared.build_jobs()?
-  var archives: List[Path] = []
+  var archives = []
   let archive_report = p".xsh-kbuild-archive-plan.json"
   let root_archive = p".xsh-kbuild/built-in.a"
   let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"

@@ -360,7 +360,7 @@ pure join_root(root: Path, rel: Path) -> Path {
 }
 
 pure normalize_rel_path(path_value: Path) -> Path {
-  var parts: List[Str] = []
+  var parts = []
 
   for part in path_value.display().split("/") {
     continue when part == "" or part == "."
@@ -814,7 +814,7 @@ proc logical_lines(body: Str) -> List[Str] {
     return direct
   }
 
-  var lines: List[Str] = []
+  var lines = []
   var current = ""
 
   for raw in body.split("\n") {
@@ -994,7 +994,7 @@ proc composite_members(dir: Path, item: Str, vars: Map[Str]) -> List[Path] {
 }
 
 stream active_objects_for_dir(dir: Path, vars: Map[Str]) -> Stream[Path] {
-  var objects: List[Path] = []
+  var objects = []
   var words = (vars.get("obj-y") ?? "").fields()
   words += (vars.get("lib-y") ?? "").fields()
 
@@ -1131,7 +1131,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
   vars["src"] = local_dir
   vars["obj"] = local_dir
   var flags: Map[List[Str]] = {}
-  var subdir_flags: List[Str] = []
+  var subdir_flags = []
   var active_stack = [true]
   var lines = logical_lines(file.read_text()?)
   var line_index = 0
@@ -1413,7 +1413,7 @@ export proc augment_missing_composites(
   srcarch: Str = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var composites = plan.composites
-  var dirs: List[Path] = []
+  var dirs = []
   var missing_by_dir: Map[List[Path]] = {}
 
   for obj in plan_objects(plan) {
@@ -1520,7 +1520,7 @@ export proc refresh_plan_dirs(
     )
 
     let vars = vars_for_dir(root, dir, config, srcarch)?
-    var objects: List[Path] = []
+    var objects = []
     var composites = []
 
     for obj in active_objects_for_dir(dir, vars) {
@@ -1563,7 +1563,7 @@ export proc refresh_x86_kernel_config_objects(
   config: Kconfig,
   plan: KbuildPlan,
 ) [fs, error] -> Result[KbuildPlan, Error] {
-  var dirs: List[Path] = []
+  var dirs = []
 
   if config_value(config, "UTS_NS") == "y" or config_value(config, "USER_NS") == "y" or config_value(config, "PID_NS") == "y" or config_value(
     config,
@@ -1948,8 +1948,8 @@ proc apply_words(
   build_plan: Bool = true,
 ) -> ItemResult {
   var current = plan
-  var dirs: List[Path] = []
-  var entries: List[Path] = []
+  var dirs = []
+  var entries = []
 
   if ! build_plan {
     for item in words {
@@ -2078,10 +2078,10 @@ proc scan_simple_kbuild(
   var plan = add_dir(empty_plan(), rel)
   let vars = kbuild_vars_for_dir(rel, srcarch)
   var mutable_vars = vars
-  var child_dirs: List[Path] = []
-  var entries: List[Path] = []
-  var object_rhs: List[Str] = []
-  var lib_rhs: List[Str] = []
+  var child_dirs = []
+  var entries = []
+  var object_rhs = []
+  var lib_rhs = []
   var line_no = 0
 
   for line in lines {
@@ -2155,10 +2155,10 @@ proc scan_flat_kbuild(
 ) -> Result[DirScan] {
   var plan = add_dir(empty_plan(), rel)
   var vars = kbuild_vars_for_dir(rel, srcarch)
-  var child_dirs: List[Path] = []
-  var entries: List[Path] = []
-  var object_rhs: List[Str] = []
-  var lib_rhs: List[Str] = []
+  var child_dirs = []
+  var entries = []
+  var object_rhs = []
+  var lib_rhs = []
   var line_no = 0
 
   for line in lines {
@@ -2261,10 +2261,10 @@ proc scan_discover_dir(
 
   var plan = add_dir(empty_plan(), rel)
   var vars = kbuild_vars_for_dir(rel, srcarch)
-  var child_dirs: List[Path] = []
-  var entries: List[Path] = []
-  var object_rhs: List[Str] = []
-  var lib_rhs: List[Str] = []
+  var child_dirs = []
+  var entries = []
+  var object_rhs = []
+  var lib_rhs = []
   var active_stack = [true]
   var line_no = 0
   var line_index = 0
@@ -2432,12 +2432,12 @@ export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result
   var scan_by_dir: Map[ScanRecord] = {item.dir: item for item in records}
   var seen: Map[Bool] = {}
   var frontier = [p"."]
-  var plan_dirs: List[Path] = []
-  var planned_objects: List[Path] = []
-  var plan_lib_objects: List[Path] = []
+  var plan_dirs = []
+  var planned_objects = []
+  var plan_lib_objects = []
   var plan_archive_owners: List[ArchiveOwnerRecord] = []
   var plan_composites: List[CompositeRecord] = []
-  var plan_unsupported: List[Str] = []
+  var plan_unsupported = []
 
   while ! frontier.is_empty() {
     let pending = unique_unseen_paths(frontier, seen)
@@ -2513,7 +2513,7 @@ proc discover_records_process_pool(
 
   let worker_count = if options.jobs < 1 { 1 } else if options.jobs > 16 { 16 } else { options.jobs }
   var handles = []
-  var output_paths: List[Path] = []
+  var output_paths = []
   # Loop-body defers run per iteration; remove worker outputs after the merge instead.
   defer {
     for output_path in output_paths {
@@ -3044,12 +3044,12 @@ export proc read_discovered_plan(path_value: Path) [fs, error] -> Result[KbuildP
 
 ## Exported declaration `parse_discovered_plan_text`.
 export proc parse_discovered_plan_text(text: Str) [error] -> Result[KbuildPlan, Error] {
-  var dirs: List[Str] = []
-  var objects: List[Str] = []
-  var lib_objects: List[Str] = []
+  var dirs = []
+  var objects = []
+  var lib_objects = []
   var archive_owners: List[ArchiveOwner] = []
   var composites: List[CompositeObject] = []
-  var unsupported: List[Str] = []
+  var unsupported = []
 
   for raw in text.split("\n") {
     let line = raw.trim()
@@ -3143,7 +3143,7 @@ export pure archive_plan_summary_path(report_path: Path) -> Path {
 
 pure duplicate_task_outputs(tasks: List[make.MakeTask]) -> List[Path] {
   var outputs: Map[Bool] = {}
-  var duplicates: List[Path] = []
+  var duplicates = []
 
   for task in tasks {
     for output in task.outputs {
@@ -3903,7 +3903,7 @@ export proc generate_raid6_sources(root: Path, cc: Path) [fs, process, env, erro
   let int_uc = fp"{root}/lib/raid/raid6/int.uc".read_text()?
 
   for n in [1, 2, 4, 8] {
-    var lines: List[Str] = []
+    var lines = []
 
     for line in int_uc.split("\n") {
       let reps = if "$$" in line { n } else { 1 }
@@ -3974,8 +3974,8 @@ proc insert_archive_before(
   dep: Str,
   marker: Path,
 ) -> ArchiveInputs {
-  var out_objs: List[Path] = []
-  var out_deps: List[Str] = []
+  var out_objs = []
+  var out_deps = []
   var inserted = false
   var index = 0
   let marker_key = path_key(marker)
@@ -4077,7 +4077,7 @@ pure syscall_line(nr: Int, native: Str, compat: Str, noreturn: Str) -> Result[St
 
 ## Exported declaration `generate_syscall_table`.
 export proc generate_syscall_table(table: Path, out: Path, abis: List[Str] = []) [fs, error] {
-  var lines: List[Str] = []
+  var lines = []
   var next_nr = 0
 
   for raw in table.read_text()?.split("\n") {
@@ -4813,7 +4813,7 @@ proc write_x86_voffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [ABbCDGRSTtVW] (_text|__start_rodata|_sinittext|__inittext_end|__bss_start|_end)$"
 
   let symbols = run.text $nm $input
-  var lines: List[Str] = []
+  var lines = []
 
   for raw in symbols.lines() {
     let caps = symbol_re.captures(raw)
@@ -4838,7 +4838,7 @@ proc write_x86_zoffset_header(nm: Path, input: Path) {
   let symbol_re = rx"^([0-9a-fA-F]+) [a-zA-Z] (startup_32|efi.._stub_entry|efi(32)?_pe_entry|input_data|kernel_info|_end|_ehead|_text|_e?data|_e?sbat|z_.*)$"
 
   let symbols = run.text $nm $input
-  var lines: List[Str] = []
+  var lines = []
 
   for raw in symbols.lines() {
     let caps = symbol_re.captures(raw)
@@ -5029,7 +5029,7 @@ proc build_x86_compressed_kernel(cc: Path, unstripped: Path, vmlinux: Path, efi_
   let base_cflags = x86_compressed_cflags()
   let includes = x86_compressed_includes()
   var tasks: List[make.MakeTask] = []
-  var objects: List[Path] = []
+  var objects = []
 
   for item in [
     {
@@ -5166,7 +5166,7 @@ proc build_x86_setup_image(cc: Path, jobs_count: Int) {
   let base_cflags = x86_setup_cflags()
   let includes = x86_setup_includes()
   var tasks: List[make.MakeTask] = []
-  var objects: List[Path] = []
+  var objects = []
 
   for item in [
     {
@@ -5386,8 +5386,8 @@ export proc build_scratch_x86_final(
   )
 
   tasks += [version_task]
-  var stub_objs: List[Path] = []
-  var stub_deps: List[Str] = []
+  var stub_objs = []
+  var stub_deps = []
 
   for stem in efi_libstub_stems_x86() {
     let obj = fp"drivers/firmware/efi/libstub/{stem}.o"
@@ -5413,8 +5413,8 @@ export proc build_scratch_x86_final(
 
   let efi_archive = efi_libstub_archive_task(ar_argv, stub_objs, efi_lib, stub_deps)
   tasks += [efi_archive]
-  var support_objs: List[Path] = []
-  var support_deps: List[Str] = []
+  var support_objs = []
+  var support_deps = []
 
   for obj in final_support_lib_sources() {
     let src = source_for_object(obj)?
@@ -5765,8 +5765,8 @@ export proc build_scratch_arm64_final(
   )
 
   tasks += [version_task]
-  var stub_objs: List[Path] = []
-  var stub_deps: List[Str] = []
+  var stub_objs = []
+  var stub_deps = []
 
   for stem in efi_libstub_stems() {
     let obj = fp"drivers/firmware/efi/libstub/{stem}.o"
@@ -5792,8 +5792,8 @@ export proc build_scratch_arm64_final(
 
   let efi_archive = efi_libstub_archive_task(ar_argv, stub_objs, efi_lib, stub_deps)
   tasks += [efi_archive]
-  var support_objs: List[Path] = []
-  var support_deps: List[Str] = []
+  var support_objs = []
+  var support_deps = []
 
   for obj in final_support_lib_sources() {
     let src = source_for_object(obj)?
@@ -6550,14 +6550,14 @@ proc analyze_archive_items_impl(
   for item in items {
     let {object: object_key, owner: owner_key, library, pi, composite: composite_key, flags, ..} = item
     let obj = fp"{object_key}"
-    var task_specs: List[Record] = []
+    var task_specs = []
     var task_count = 0
-    var archive_outputs: List[Path] = []
-    var archive_deps: List[Str] = []
+    var archive_outputs = []
+    var archive_deps = []
     var has_pi = false
-    var link_inputs: List[Path] = []
-    var generated_objects: List[Path] = []
-    var missing_sources: List[Path] = []
+    var link_inputs = []
+    var generated_objects = []
+    var missing_sources = []
 
     if composite_key != "" {
       let {member_objects, member_flags, ..} = item
@@ -6768,8 +6768,8 @@ proc archive_analysis_process_pool(
   json.write(flags_path, ArchiveAnalysisFlags(flag_entries))
   defer flags_path.remove()
   var handles = []
-  var output_paths: List[Path] = []
-  var input_paths: List[Path] = []
+  var output_paths = []
+  var input_paths = []
   # Loop-body defers run per iteration, before workers read their inputs.
   defer {
     for temp_path in [@input_paths, @output_paths] {
@@ -6859,15 +6859,15 @@ proc assemble_builtin_archive_plan(
   let materialize_tasks = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let result_merge_start = archive_plan_timing_start("merge-results")
   var tasks: List[make.MakeTask] = []
-  var deferred_task_specs: List[Record] = []
+  var deferred_task_specs = []
   var task_count = 0
   var objects_by_dir: Map[List[Path]] = {}
   var deps_by_dir: Map[List[Str]] = {}
   var lib_objects_by_dir: Map[List[Path]] = {}
   var lib_deps_by_dir: Map[List[Str]] = {}
-  var missing_sources: List[Path] = []
-  var generated_objects: List[Path] = []
-  var link_inputs: List[Path] = []
+  var missing_sources = []
+  var generated_objects = []
+  var link_inputs = []
   var link_input_seen: Map[Bool] = {}
   var pi_relacheck_added = false
 
@@ -7005,7 +7005,7 @@ proc assemble_builtin_archive_plan(
   )
   archive_plan_timing_done("merge-results", result_merge_start)
   let barrier_merge_start = archive_plan_timing_start("merge-barriers")
-  var archives: List[Path] = []
+  var archives = []
   let children_start = archive_plan_timing_start("merge-children")
   var children_by_dir: Map[List[Path]] = {}
   var parent_by_dir: Map[Str] = {}

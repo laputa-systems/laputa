@@ -492,7 +492,7 @@ proc build_native_nvhe(cc: Path, jobs_count: Int) [fs, process, env, time, error
   let ld = PKGBUILD_shared.native_tool("ld.lld")?
   let objcopy = PKGBUILD_shared.native_tool("llvm-objcopy")?
   var object_tasks: List[make.MakeTask] = []
-  var object_outputs: List[Path] = []
+  var object_outputs = []
 
   for item in native_nvhe_objects() {
     object_tasks += [
@@ -638,7 +638,7 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
 
   if archive_plan.generated_objects.is_empty() and archive_plan.missing_sources.is_empty() {
     let jobs_count = PKGBUILD_shared.build_jobs()?
-    var archives: List[Path] = []
+    var archives = []
     let archive_report = p".xsh-kbuild-archive-plan.json"
     let root_archive = p".xsh-kbuild/built-in.a"
     let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"

@@ -657,7 +657,7 @@ pure with_fetch_item(
   url: Str,
   package_name: Str,
 ) -> Map[SourceFetchItem] {
-  let empty: List[Str] = []
+  let empty = []
   let existing = by_sha256.get(sha256) ?? {sha256, urls: empty, packages: empty}
   var updated = by_sha256
   updated[sha256] = {
@@ -716,8 +716,8 @@ export proc cargo_crate_fetch_items(
 proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchOutcome] {
   return Cached when source_cache_entry(root, item.sha256).exists()
 
-  var unavailable: List[Str] = []
-  var mismatched: List[Str] = []
+  var unavailable = []
+  var mismatched = []
 
   for url in item.urls {
     var last_failure = ""

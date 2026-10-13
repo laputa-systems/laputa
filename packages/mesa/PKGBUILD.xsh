@@ -490,7 +490,7 @@ proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
 proc stage_vendored_outputs() {
   let ninja = p"build/build.ninja"
   var split: NinjaSplit = NinjaSplit(kept: [], vendored: [])
-  var block: List[Str] = []
+  var block = []
 
   for line in ninja.read_text()?.split("\n") {
     if ! block.is_empty() and line.starts_with(" ") {

@@ -1196,7 +1196,7 @@ export proc c_multi_program(spec: CMultiProgram) [] -> Result[CMultiTarget, Erro
   }
 
   for target in spec.targets {
-    var objects: List[Path] = []
+    var objects = []
     var target_deps: List[Str] = target.deps
     var needs_cxx_link = true in [source_is_cxx(src) for src in target.sources]
 

@@ -83,7 +83,7 @@ export proc prepare(
   let store = fp"{packages}/store"
   # Every root the installer composes comes from one plan, so the three roots
   # agree on each shared package.
-  var plan_roots: List[Str] = []
+  var plan_roots = []
 
   for name in [@target_roots(kernel_package, smoke), @installer_roots(), @tools_roots()] {
     if name not in plan_roots {
