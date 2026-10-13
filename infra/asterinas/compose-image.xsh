@@ -18,7 +18,7 @@ proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let _ = store.mkdir()?
   let _ = world.world_kbuild_cache(laputa_root).mkdir()?
   let id = unix.id()?
-  let owner: world.WorldOwner = {uid: id.uid, gid: id.gid}
+  let owner: world.WorldOwner = world.WorldOwner(uid: id.uid, gid: id.gid)
   let inner = ["/bin/xsh", "/src/laputa/infra/asterinas/build-image.xsh", "--", arch, tag, profile_overlay_path]
   let argv = world.world_container_argv(
     docker,
