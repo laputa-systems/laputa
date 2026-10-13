@@ -70,7 +70,7 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   docker_tool(docker_image, "gzip", ["-d", "-c"], root, output_tmp, unpacked)
   docker_tool(docker_image, "cpio", ["--list", "--quiet"], root, unpacked, listing)
 
-  let names = listing.read_text()?.lines()
+  let names = listing.read_lines()?
   if ! (names |> any . == "init" or . == "./init") {
     output_tmp.remove()
     return Err(InitramfsPackError.Failed("packed initramfs does not contain /init"))
