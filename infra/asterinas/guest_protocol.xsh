@@ -23,7 +23,7 @@ export const guest_success_markers = [
 ## Add the XSH test marker when the host staged a module or native suite.
 export pure guest_required_success_markers(has_selected_xsh_test: Bool) -> List[Str] {
   if has_selected_xsh_test {
-    guest_success_markers + ["LAPUTA_ASTERINAS_XSH_TEST_OK"]
+    [@guest_success_markers, "LAPUTA_ASTERINAS_XSH_TEST_OK"]
   } else {
     guest_success_markers
   }
