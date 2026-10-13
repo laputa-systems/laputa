@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "foot-minimal")
   proof.target_elf(root, p"usr/bin/foot", "foot-minimal")
 

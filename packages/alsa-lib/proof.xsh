@@ -88,7 +88,7 @@ null NULL PREPARED RUNNING SETUP 4800
 proof PLUG PREPARED RUNNING SETUP 4800
 version 1.2.16.1"""
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "alsa-lib")
 
   for lib in ["libasound", "libatopology"] {

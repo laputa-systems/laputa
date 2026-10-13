@@ -9,7 +9,7 @@ proc check(condition: Bool, kind: Str, message: Str) {
   }
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
+proc main(rootfs = /rootfs) [fs, process, env, time, error] {
   let os = system.uname()?
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let tmux = fp"{rootfs}/usr/bin/tmux"

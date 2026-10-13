@@ -155,7 +155,7 @@ proc check_runtime_needs(root: Path, rels: List[Path]) {
   }
 }
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   let libraries = [
     p"usr/lib/libEGL.so.1.0.0",
     p"usr/lib/libGLESv2.so.2.0.0",

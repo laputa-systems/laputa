@@ -27,7 +27,7 @@ const sections = [
 # The tarball's 3132 pages, less man7/man.7.
 const page_count = 3131
 
-proc main(root: Path = /rootfs) [fs, error] {
+proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "man-pages")
   let mandir = fp"{root}/usr/share/man"
   let installed = fs.children(mandir)? |> map .name |> sort

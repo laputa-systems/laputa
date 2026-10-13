@@ -45,7 +45,7 @@ table inet laputa_proof {
 }
 """
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "nftables")
   proof.target_elf(root, p"usr/bin/nft", "nftables")
   proof.target_elf(root, p"usr/lib/libnftables.so.1.1.0", "nftables")

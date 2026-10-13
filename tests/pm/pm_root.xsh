@@ -11,11 +11,11 @@ pure digest(value: Str) -> Str {
   bytes.from_text(value).sha256().hex()
 }
 
-pure payload_file(rel: Str, content: Str, mode: Int = 0o644) -> EntrySpec {
+pure payload_file(rel: Str, content: Str, mode = 0o644) -> EntrySpec {
   {path: rel, kind: types.File, content, mode, target: ""}
 }
 
-pure payload_tree(rel: Str, mode: Int = 0o755) -> EntrySpec {
+pure payload_tree(rel: Str, mode = 0o755) -> EntrySpec {
   {path: rel, kind: types.Tree, content: "", mode, target: ""}
 }
 
@@ -135,7 +135,7 @@ proc rewrite_legacy_database_payload(
   staged: types.StagedArtifact,
   name: Str,
   entries: List[EntrySpec],
-  unexpected: Bool = false,
+  unexpected = false,
 ) {
   let contents = test.temp_dir(ctx, name: f"root-legacy-payload-{name}")?
 

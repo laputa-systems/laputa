@@ -1,7 +1,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.package_metadata(rootfs, "samurai")
   proof.target_elf(rootfs, p"usr/bin/samu", "samurai")
 

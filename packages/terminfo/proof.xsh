@@ -133,7 +133,7 @@ proc expect_string(entry: Compiled, index: Int, want: Bytes, what: Str) {
   proof.ensure(string(entry, index) == want, "proof-terminfo", f"{entry.names}: unexpected {what}")
 }
 
-proc main(root: Path = /rootfs) [fs, error] {
+proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "terminfo")
   let database = fp"{root}/usr/share/terminfo"
   let paths = fs.walk(database)? |> where .kind == "file"

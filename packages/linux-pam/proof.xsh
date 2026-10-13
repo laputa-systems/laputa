@@ -1,7 +1,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
 
   for rel in [

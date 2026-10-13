@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "wlroots0.20")
   let lib = p"usr/lib/libwlroots-0.20.so"
   proof.target_elf(root, lib, "wlroots0.20")

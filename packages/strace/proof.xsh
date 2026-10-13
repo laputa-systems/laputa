@@ -7,7 +7,7 @@ use pm.util as pm_util
 # program writes its version banner to stdout (musl's stdio flushes with
 # writev). `-s 256` keeps the root's long paths from being truncated. Tracing a child it forked needs only
 # ptrace on that child, which Docker's default seccomp profile allows.
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "strace")
   proof.target_elf(root, p"usr/bin/strace", "strace")
 

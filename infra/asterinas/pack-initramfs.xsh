@@ -3,7 +3,7 @@ use hash
 
 error InitramfsPackError = Failed(message: Str)
 
-proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin: Path = p"", stdout: Path = p"") [process, error] {
+proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") [process, error] {
   let command = if stdin != "" and stdout != "" {
     process.command_argv(executable, argv, cwd, stdin: stdin, stdout: stdout)
   } else if stdin != "" {

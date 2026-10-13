@@ -4,7 +4,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   let cmake = fp"{rootfs}/usr/bin/cmake"
   proof.target_elf(rootfs, p"usr/bin/cmake", "cmake")
   proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")

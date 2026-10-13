@@ -250,7 +250,7 @@ proc prove_target_tools(root: Path, arch: Str) {
   }
 }
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"
 
   if ! db.exists() {

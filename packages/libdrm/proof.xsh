@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libdrm")
   let lib = p"usr/lib/libdrm.so.2.134.0"
   proof.target_elf(root, lib, "libdrm")

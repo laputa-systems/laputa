@@ -3,7 +3,7 @@ use pm.util as pm_util
 
 error ProofError = Failed(kind: Str, message: Str)
 
-proc main(rootfs: Path = /rootfs) [fs, error] {
+proc main(rootfs = /rootfs) [fs, error] {
   for path_value in [
     fp"{rootfs}/usr/lib/crtbeginS.o",
     fp"{rootfs}/usr/lib/crtendS.o",

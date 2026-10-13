@@ -4,7 +4,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, time, error] {
+proc main(rootfs = /rootfs) [fs, process, env, time, error] {
   proof.target_elf(rootfs, p"usr/bin/dropbear", "dropbear")
   proof.target_elf(rootfs, p"usr/bin/dropbearkey", "dropbear")
   proof.target_elf(rootfs, p"usr/bin/dbclient", "dropbear")

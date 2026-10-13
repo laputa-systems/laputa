@@ -70,7 +70,7 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) {
   print f"perf ok: {version}, parser tests; perf_event_open denied here, task-clock not counted"
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/perf", "perf")
   let target_arch = pm_util.target_arch()?
 

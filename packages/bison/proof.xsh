@@ -303,7 +303,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   }
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.package_metadata(rootfs, "bison")
   proof.target_elf(rootfs, p"usr/bin/bison", "bison")
   let bison = fp"{rootfs}/usr/bin/bison"

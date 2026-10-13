@@ -3,7 +3,7 @@ use pm.util as pm_util
 
 error SudoRsProofError = Failed(kind: Str, message: Str)
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/sudo", "sudo-rs")
   proof.target_elf(rootfs, p"usr/bin/su", "sudo-rs")
   proof.target_elf(rootfs, p"usr/lib/security/pam_unix.so", "sudo-rs")

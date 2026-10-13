@@ -8,7 +8,7 @@ proc require(condition: Bool, message: Str) {
   }
 }
 
-proc main(root: Path = /rootfs) [fs, env, error] {
+proc main(root = /rootfs) [fs, env, error] {
   proof.package_metadata(root, "linux-headers")
   let include = fp"{root}/usr/include"
 

@@ -55,7 +55,7 @@ pure url_package(url: Str, sha256: Str) -> types.Package {
 type DemoTarball = {path: Path, sha256: Str}
 
 # A one-file source tarball and its sha256.
-proc demo_tarball(ctx: TestContext, name: Str, text: Str = "hello from the cache\n") -> Result[DemoTarball] {
+proc demo_tarball(ctx: TestContext, name: Str, text = "hello from the cache\n") -> Result[DemoTarball] {
   let tree = test.temp_dir(ctx, name: f"{name}-tree")?
   fp"{tree}/demo-1.0".mkdir()
   fp"{tree}/demo-1.0/hello.txt".write(text)

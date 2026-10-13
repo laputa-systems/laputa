@@ -46,7 +46,7 @@ pure test_node(key: Str) -> types.PlanNode {
 pure node_with_shared_runtime_and_build_host_dependency(
   key: Str,
   dependency_key: Str,
-  build_host_first: Bool = false,
+  build_host_first = false,
 ) -> types.PlanNode {
   let runtime: types.PlanDependency = types.PlanDependency(
     name: "llvm-toolchain",
@@ -68,9 +68,9 @@ pure node_with_shared_runtime_and_build_host_dependency(
 proc staged_artifact(
   ctx: TestContext,
   name: Str,
-  payload: Str = "payload",
-  metadata: Str = "metadata",
-  proof: Str = "proof",
+  payload = "payload",
+  metadata = "metadata",
+  proof = "proof",
 ) -> Result[TestStage] {
   let root = test.temp_dir(ctx, name:)?
   let payload_path = fp"{root}/payload.tar.gz"

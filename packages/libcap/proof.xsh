@@ -69,7 +69,7 @@ pure current_caps(print_out: Str) -> Str {
 # capabilities). The checks that change capability state run when the proof
 # holds them and otherwise must fail with the kernel's refusal, so a
 # restricted container still proves the programs reach the kernel.
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libcap")
   proof.target_elf(root, p"usr/lib/libcap.so.2.78", "libcap")
 

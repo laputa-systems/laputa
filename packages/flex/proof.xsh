@@ -103,7 +103,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   }
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   let flex = fp"{rootfs}/usr/bin/flex"
   let lex = fp"{rootfs}/usr/bin/lex"
 

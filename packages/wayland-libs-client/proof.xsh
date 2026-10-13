@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "wayland-libs-client")
   proof.target_elf(root, p"usr/lib/libwayland-client.so.0.26.0", "wayland-libs-client")
   let readelf = proof.readelf_tool()?

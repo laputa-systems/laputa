@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/deno", "deno")
   let arch = pm_util.target_arch()?
 

@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libxkbcommon")
   let lib = p"usr/lib/libxkbcommon.so.0.13.2"
   proof.target_elf(root, lib, "libxkbcommon")

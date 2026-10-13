@@ -15,7 +15,7 @@ proc ensure_file(path_value: Path, label: Str) {
   }
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   ensure_executable(fp"{rootfs}/usr/bin/tailscale", "tailscale")
   ensure_executable(fp"{rootfs}/usr/bin/tailscaled", "tailscaled")
   # iptables and xinit are runtime-only dependencies: generations install

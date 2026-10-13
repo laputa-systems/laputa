@@ -1,7 +1,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libevent")
   proof.target_elf(root, p"usr/lib/libevent_core-2.1.so.7", "libevent")
 

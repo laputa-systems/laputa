@@ -8,7 +8,7 @@ proc ensure_sha256(root: Path, rel: Path, expected: Str) {
   proof.ensure(actual == expected, "wireless-regdb", f"{rel} has sha256 {actual}, expected {expected}")
 }
 
-proc main(root: Path = /rootfs) [fs, error] {
+proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "wireless-regdb")
 
   # The 2026.09.03 release's regulatory.db and its signature, byte for byte.

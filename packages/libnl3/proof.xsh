@@ -11,7 +11,7 @@ pure exports_symbol(syms: Str, symbol: Str) -> Bool {
   false
 }
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libnl3")
   proof.ensure(fp"{root}/usr/include/netlink/netlink.h".exists()?, "libnl3", "missing netlink.h")
   proof.ensure(fp"{root}/usr/include/netlink/genl/genl.h".exists()?, "libnl3", "missing genl.h")

@@ -66,7 +66,7 @@ proc compile_hello(
   }?
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let build_arch = pm_util.build_arch()?
   let triple = f"{arch}-linux-musl"

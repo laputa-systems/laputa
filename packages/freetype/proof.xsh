@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "freetype")
   let lib = p"usr/lib/libfreetype.so.6.20.6"
   proof.target_elf(root, lib, "freetype")

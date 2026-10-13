@@ -82,9 +82,9 @@ proc stage_plan_artifacts(
   ctx: TestContext,
   value: types.BuildPlan,
   store_root: Path,
-  valid_proofs: Bool = true,
-  include_package_kind: Bool = true,
-  package_kind: Str = "payload",
+  valid_proofs = true,
+  include_package_kind = true,
+  package_kind = "payload",
   target: types.Target = types.target_aarch64(),
 ) {
   let executor_sha256 = publish_executor_sha256()

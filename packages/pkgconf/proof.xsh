@@ -90,7 +90,7 @@ proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[St
   )
 }
 
-proc main(rootfs: Path = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.package_metadata(rootfs, "pkgconf")
   proof.target_elf(rootfs, p"usr/bin/pkgconf", "pkgconf")
   proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")

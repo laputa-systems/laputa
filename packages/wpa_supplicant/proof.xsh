@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "wpa_supplicant")
   proof.ensure(fp"{root}/usr/bin/wpa_supplicant".exists()?, "wpa_supplicant", "missing wpa_supplicant binary")
   proof.ensure(fp"{root}/usr/bin/wpa_cli".exists()?, "wpa_supplicant", "missing wpa_cli binary")

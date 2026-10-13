@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libinput")
   let lib = p"usr/lib/libinput.so.10.13.0"
   proof.target_elf(root, lib, "libinput")

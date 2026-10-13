@@ -15,7 +15,7 @@ requires-python = ">=3.13"
 dependencies = []
 """
 
-proc main(root: Path = /rootfs) [fs, process, env, error] {
+proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "uv")
   proof.target_elf(root, p"usr/bin/uv", "uv")
   proof.target_elf(root, p"usr/bin/uvx", "uv")
