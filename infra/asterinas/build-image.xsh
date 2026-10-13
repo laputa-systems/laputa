@@ -1,7 +1,7 @@
 ##! Compose a PM generation and build the ext2 root used by Asterinas.
+use hash
 use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
-use hash
 
 const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit"]
 
