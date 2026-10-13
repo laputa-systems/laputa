@@ -25,14 +25,14 @@ const xsh_seed_manifest_format = "laputa-xsh-seed-1"
 const xsh_seed_features = "xsh/net xsh/tools xsht/native-tests"
 const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
 
+## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
+export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
+
 # Select XSH features for the ordinary seed or Laputa's Asterinas shell.
 pure xsh_seed_features_for(asterinas_shell: Bool) -> Str {
   return f"{xsh_seed_features} {xsh_seed_asterinas_shell_feature}" when asterinas_shell
   xsh_seed_features
 }
-
-## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
-export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
 
 ## Resolve a seed architecture name.
 export pure xsh_seed_arch(arch: Str) -> Result[SeedArch, Error] {
