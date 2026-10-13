@@ -1,5 +1,5 @@
 ##! Reject a captured guest log unless every boot and XSH proof marker is present.
-use infra.asterinas.guest_protocol as guest_protocol
+use infra.asterinas.guest_protocol
 
 error GuestOutputCheckError = Failed
 

@@ -1,5 +1,5 @@
 ##! The host must accept only a complete initramfs-to-XSH guest proof.
-use infra.asterinas.guest_protocol as guest_protocol
+use infra.asterinas.guest_protocol
 
 test test_guest_protocol_requires_every_boot_and_xsh_marker {
   let output = guest_protocol.guest_success_markers.join("\n")
