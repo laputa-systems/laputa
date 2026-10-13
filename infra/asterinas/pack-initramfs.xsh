@@ -5,11 +5,11 @@ error InitramfsPackError = Failed(message: Str)
 
 proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") [process, error] {
   let command = if stdin != "" and stdout != "" {
-    process.command_argv(executable, argv, cwd, stdin: stdin, stdout: stdout)
+    process.command_argv(executable, argv, cwd, stdin:, stdout:)
   } else if stdin != "" {
-    process.command_argv(executable, argv, cwd, stdin: stdin)
+    process.command_argv(executable, argv, cwd, stdin:)
   } else if stdout != "" {
-    process.command_argv(executable, argv, cwd, stdout: stdout)
+    process.command_argv(executable, argv, cwd, stdout:)
   } else {
     process.command_argv(executable, argv, cwd)
   }
@@ -27,7 +27,7 @@ proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdi
   }
 
   argv += ["--entrypoint", f"/usr/bin/{tool}", docker_image, @args]
-  run_checked("docker", argv, root, stdin: stdin, stdout: stdout)
+  run_checked("docker", argv, root, stdin:, stdout:)
 }
 
 proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
