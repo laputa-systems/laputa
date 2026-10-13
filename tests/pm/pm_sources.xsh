@@ -289,7 +289,7 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
   fp"{upstream}/new-1.0.txt".write("new upstream bytes\n")
   let new_sha256 = hash.sha256(fp"{upstream}/new-1.0.txt")?.hex()
   # The recorded pin is stale; `repo checksum` reports what upstream serves now.
-  let repository = fetch_repository(ctx, fetch_source_record(f"file://{upstream}/new-VERSION.txt", sha256_of_empty))?
+  let repository = fetch_source_record(f"file://{upstream}/new-VERSION.txt", sha256_of_empty) |> fetch_repository(ctx, _)?
   let cache = test.temp_dir(ctx, name: "checksum-cache")?
   let xsh = runner()?
   let modules = path.absolute(p".")?

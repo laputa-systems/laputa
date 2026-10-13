@@ -76,7 +76,7 @@ proc pkg_config_variable(pkg_config: Path, package: Str, variable: Str) -> Resul
 }
 
 proc generate_protocol_headers(pkg_config: Path, root: Str, scanner: Path) {
-  let protocols = sysroot_path(root, pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")?)?
+  let protocols = pkg_config_variable(pkg_config, "wayland-protocols", "pkgdatadir")? |> sysroot_path(root, _)?
   run $scanner "enum-header" fp"{protocols}/staging/cursor-shape/cursor-shape-v1.xml" "cursor-shape-v1-protocol.h"
   run $scanner "enum-header" fp"{protocols}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml" \
     "ext-image-copy-capture-v1-protocol.h"

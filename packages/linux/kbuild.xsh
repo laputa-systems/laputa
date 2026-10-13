@@ -343,7 +343,7 @@ proc merge_plan(base: KbuildPlan, addition: KbuildPlan) -> KbuildPlan {
 
 pure archive_owner_key(owners: Map[Str], obj: Path) -> Path {
   let object_key = path_key(obj)
-  let default_owner = path_key(object_dir(obj))
+  let default_owner = object_dir(obj) |> path_key(_)
   fp"{owners.get(object_key) ?? default_owner}"
 }
 
@@ -1039,7 +1039,7 @@ pure plan_objects(plan: KbuildPlan) -> List[Path] {
 }
 
 proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[Map[Str]] {
-  let file = kbuild_file(join_root(root, dir))?
+  let file = join_root(root, dir) |> kbuild_file(_)?
   var vars = kbuild_vars_for_dir(dir, srcarch)
   var active_stack = [true]
   var lines = logical_lines(file.read_text()?)
@@ -1082,8 +1082,7 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Resul
     }
 
     if let Ok(assign) = parse_assignment(line) {
-      let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-      let lhs = active_var_lhs(expanded_lhs)
+      let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
 
       if lhs != "" {
         if path_key(dir) == "arch/x86/boot/startup" and lhs == "obj-y" and assign.rhs.starts_with(
@@ -1191,7 +1190,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
       let object_name = object_cflags_lhs(expanded_lhs)
 
       if object_name != "" {
-        let key = path_key(join_rel(dir, object_name))
+        let key = join_rel(dir, object_name) |> path_key(_)
         let current = flags.get(key) ?? []
 
         if assign.op == "+=" {
@@ -2701,7 +2700,7 @@ proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: Loc
 
   for dir_key in graph.records.keys() {
     let scan = graph.records.get(dir_key)?
-    let file = kbuild_file(join_root(root, scan.dir))?
+    let file = join_root(root, scan.dir) |> kbuild_file(_)?
     records += [local_record_record(scan, hash.sha256(file)?.hex())]
   }
 
@@ -2734,7 +2733,7 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[L
 
   for item in cached.records {
     let scan = local_record_from_record(item)?
-    let file = kbuild_file(join_root(root, scan.dir))?
+    let file = join_root(root, scan.dir) |> kbuild_file(_)?
 
     if hash.sha256(file)?.hex() != item.file_hash {
       return Err(
@@ -3697,13 +3696,13 @@ proc compile_kbuild_task_for_module(
   mod_out: Path,
   deps: List[Str] = [],
 ) -> make.MakeTask {
-  let compile_cflags = object_compile_cflags(pi_compile_cflags(cflags, out), out)
+  let compile_cflags = pi_compile_cflags(cflags, out) |> object_compile_cflags(_, out)
 
-  let object_includes = arch_local_compile_includes(
-    trace_compile_includes(
+  let object_includes = trace_compile_includes(
       version_compile_includes(libfdt_compile_includes(pi_compile_includes(includes, out), out), out),
       src,
-    ),
+    ) |> arch_local_compile_includes(
+    _,
     src,
     triple,
   )
@@ -4044,7 +4043,7 @@ pure pi_base_name(obj: Path) -> Str {
 }
 
 pure pi_base_object(obj: Path) -> Path {
-  join_rel(object_dir(obj), f"{pi_base_name(obj)}.o")
+  object_dir(obj) |> join_rel(_, f"{pi_base_name(obj)}.o")
 }
 
 pure pi_source(obj: Path) -> Path {
@@ -4052,7 +4051,7 @@ pure pi_source(obj: Path) -> Path {
 
   return fp"lib/{base.replace("lib-", with: "")}.c" when base.starts_with("lib-")
 
-  join_rel(object_dir(obj), f"{base}.c")
+  object_dir(obj) |> join_rel(_, f"{base}.c")
 }
 
 pure abi_enabled(abi: Str, abis: List[Str]) -> Bool {
@@ -6496,15 +6495,15 @@ proc archive_compile_task_spec(
   emit_task_specs: Bool,
 ) [error] -> Result[Record] {
   if emit_task_specs {
-    let compile_cflags = object_compile_cflags(
-      pi_compile_cflags(archive_object_cflags_from_extra(cflags, extra_flags, object), out),
+    let compile_cflags = pi_compile_cflags(archive_object_cflags_from_extra(cflags, extra_flags, object), out) |> object_compile_cflags(
+      _,
       out,
     )
-    let object_includes = arch_local_compile_includes(
-      trace_compile_includes(
+    let object_includes = trace_compile_includes(
         version_compile_includes(libfdt_compile_includes(pi_compile_includes(includes, out), out), out),
         source,
-      ),
+      ) |> arch_local_compile_includes(
+      _,
       source,
       triple,
     )
@@ -6601,7 +6600,7 @@ proc analyze_archive_items_impl(
       let source = pi_source(obj)
 
       if source.exists() {
-        let base_out = obj_out_path(pi_base_object(obj))
+        let base_out = pi_base_object(obj) |> obj_out_path(_)
         let out = obj_out_path(obj)
         let base_task_spec = archive_compile_task_spec(
           pi_base_object(obj),

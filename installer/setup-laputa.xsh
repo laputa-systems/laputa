@@ -457,8 +457,8 @@ proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
   let total_sectors = fp"/sys/block/{disk.name}/size".read_text()?.trim() as Int
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128MiB }
   let swap_bytes = if ci { 8MiB } else { linux.meminfo()?.total * 2 }
-  let esp_sectors = align_up(ceil_div(esp_bytes, 512), 2048)
-  let swap_sectors = align_up(ceil_div(swap_bytes, 512), 2048)
+  let esp_sectors = ceil_div(esp_bytes, 512) |> align_up(_, 2048)
+  let swap_sectors = ceil_div(swap_bytes, 512) |> align_up(_, 2048)
   let first = 2048
   let esp_start = first
   let esp_end = esp_start + esp_sectors - 1
