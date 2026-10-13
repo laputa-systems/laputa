@@ -23,7 +23,7 @@ proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdi
   ]
 
   if tool == "cpio" {
-    argv += ["--mount", f"type=bind,src={root.display()},dst=/rootfs,readonly", "--workdir", "/rootfs"]
+    argv += ["--mount", f"type=bind,src={root},dst=/rootfs,readonly", "--workdir", "/rootfs"]
   }
 
   argv += ["--entrypoint", f"/usr/bin/{tool}", docker_image, @args]
@@ -32,7 +32,7 @@ proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdi
 
 proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   if ! root.exists() or ! root.is_dir() {
-    return Err(InitramfsPackError.Failed(f"initramfs root is not a directory: {root.display()}"))
+    return Err(InitramfsPackError.Failed(f"initramfs root is not a directory: {root}"))
   }
 
   let scratch = fs.tempdir()?
@@ -41,7 +41,7 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   let cpio_archive = fp"{scratch.host_path()?}/initramfs.cpio"
   let unpacked = fp"{scratch.host_path()?}/initramfs.unpacked.cpio"
   let listing = fp"{scratch.host_path()?}/initramfs.list"
-  let output_tmp = fp"{output.display()}.tmp"
+  let output_tmp = fp"{output}.tmp"
   defer output_tmp.remove()
 
   run_checked(
