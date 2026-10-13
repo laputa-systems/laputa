@@ -1,7 +1,7 @@
 # Supervision Model
 
 This describes how xinit keeps services running and why it is shaped this way.
-`INIT.md` is the user-facing contract (commands, service fields, defaults);
+[INIT.md](INIT.md) is the user-facing contract (commands, service fields, defaults);
 this is the design behind the scanner, its state, and its control plane.
 
 ## The idea borrowed from s6
@@ -86,7 +86,8 @@ not act on the process. They post a desired-state request (`up`, `down`,
 `restart`, `reload`) to `${XINIT_RUN_DIR}/inbox/SERVICE`, and the scanner
 drains the inbox on its next pass. Without a live scanner, `start` and `stop`
 act directly. That one-shot `start` path records the child's kernel start
-time, and every status read checks the saved pid against the kernel: a pid
+time when available, and every status read probes liveness with signal 0 and
+compares any recorded start time against the kernel: a pid
 that is gone, or alive with a different start time (recycled), reconciles to
 `dead`. The scanner does not need that check, because it clears a unit's pid
 the instant its child exits.

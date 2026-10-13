@@ -30,7 +30,8 @@ export pure command_text(command: LaputaCommand) -> Str {
 
 ## Render concise help for the final public Laputa command surface.
 export pure usage() -> Str {
-  """usage: laputa <plan|build|test|boot|clean> qemu-dwl-foot [--jobs N]
+  """usage: laputa <plan|build|test|boot|clean> qemu-dwl-foot
+       laputa <build|test|boot> qemu-dwl-foot [--jobs N]
 
 Build and test the one supported reference system natively for this host:
 aarch64 under HVF on macOS, aarch64 or x86_64 under KVM on Linux.

@@ -28,6 +28,8 @@ xinit graph [SERVICE|TARGET]
 xinit check [SERVICE|PATH]
 ```
 
+`up` aliases `start`; `down` aliases `stop`.
+
 With no argument, `xinit` reads `XSH_INIT_INITTAB` or `/etc/inittab`. PID 1
 mode requires `getpid() == 1`; tests may set `XINIT_TEST_ALLOW_NON_PID1=1`.
 
@@ -84,15 +86,15 @@ x86_64.
 
 ## Minimal Hooks
 
-- `docs/minimal-rc.boot.xsh`
-- `docs/minimal-rc.shutdown.xsh`
+- [Boot hook](minimal-rc.boot.xsh)
+- [Shutdown hook](minimal-rc.shutdown.xsh)
 
 ## Services
 
 Service files live under `/usr/lib/xinit/services` by default. A file named
 `demo.xsh` is loaded by `xinit start demo` or `xinit supervise demo`.
 
-Each file exports one `service` record. See `docs/demo-service.xsh` for a
+Each file exports one `service` record. See [demo-service.xsh](demo-service.xsh) for a
 minimal service module, and `packages/*/service.xsh` in the Laputa checkout
 for the installed ones.
 
@@ -141,7 +143,7 @@ down (in reverse dependency order) on `SIGTERM` or `SIGINT`. `supervise` holds a
 single service; `scan` holds a whole dependency tree (a `TARGET`'s services, or
 a `SERVICE` plus its dependencies) in one process, each unit backed off
 independently. The scanner is the source of truth for the services it owns and
-writes their status JSON. See `docs/SUPERVISION.md` for the model.
+writes their status JSON. See [supervision](SUPERVISION.md) for the model.
 
 Restart backoff is exponential. After a crash the scanner waits `delay_ms`
 before relaunching and doubles that delay on each successive crash, capped at
@@ -222,19 +224,12 @@ When a service cgroup is created, the resolved `cgroup_path` is included in the
 status JSON. `stop` sends `TERM`, then `KILL`, to the saved process group when
 no custom `stop()` exists.
 
-Saved status is reconciled against the kernel on every read. A state recorded as
-`running` with a tracked pid is only trusted when that pid is still alive
-(probed with signal 0) and, when `start` recorded the child's kernel start time,
-still has that same start time. A process that crashed without cleanup, or whose
-pid was recycled into an unrelated process, reconciles to state `dead` with the
-pid cleared. This stops `status` reporting a phantom, stops `stop` signalling an
-unrelated recycled pid, and lets `start` relaunch a service whose saved state
-went stale. The start-time check is what closes the recycle window the liveness
-probe alone leaves open; it is recorded only by the one-shot `start` path (the
-scanner clears a service's pid the instant its child exits, so it has no stale
-window). A tracked pid of `0` (a completed `oneshot`/`scripted` service) is left
-as `running`. Reconciliation is skipped under `XSH_UNIX_DRY_RUN`, where pids are
-mocked.
+Saved status is reconciled against the kernel on every read. A vanished or
+recycled tracked pid becomes `dead` with the pid cleared. Completed
+`oneshot`/`scripted` services with pid 0 remain `running`. Reconciliation is
+skipped under `XSH_UNIX_DRY_RUN`, where pids are mocked. The
+[supervision model](SUPERVISION.md#control-plane) explains the liveness and
+start-time checks.
 
 A service module may export a `finish()` hook; xinit runs it after the service's
 instance exits — on a clean stop and on a crash — for cleanup that must follow

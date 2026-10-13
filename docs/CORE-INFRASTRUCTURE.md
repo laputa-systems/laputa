@@ -5,6 +5,23 @@ and proves its own architecture natively: Docker runs on the host's platform,
 and QEMU boots the result with hardware acceleration (HVF on Apple Silicon
 macOS, KVM on Linux).
 
+## Layout
+
+| Path | Owns |
+|---|---|
+| `pm.xsh`, `pm/` | package manager CLI and modules |
+| `packages/<name>/` | recipes (`PKGBUILD.xsh`), package proofs, package files |
+| `system/`, `laputa.xsh` | typed `qemu-dwl-foot` profile CLI: Docker adapter, image construction, QEMU proof |
+| `profiles/`, `guest/`, `boot/` | profile data, guest proof payload, QMP helper |
+| `infra/asterinas/`, `guest/asterinas/` | pinned Asterinas/Firecracker backend, Laputa guest proof, and serial shell |
+| `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 and x86_64 installer image and its QEMU harness (separate from the profile CLI) |
+| `xinit/` | `xinit.xsh`, Laputa's pure-XSH PID 1 and service manager, with tests and docs |
+| `mirror/` | Rust package mirror server, a host tool (not a Laputa package) |
+| `seed/`, `Dockerfile.package-tools`, `bootstrap-llvm-seed.xsh` | local XSH seed build, the content-keyed host-tools and package-tools images, and the package world on the seed (`seed/world.xsh`) |
+| `tests/pm/`, `tests/system/`, `tests/integration/` | native XSH tests; `*/fixtures/` are staged inputs, not tests |
+| `docs/` | development, architecture, PM, VM workflows, testing, and deployment |
+| `.out/`, `.cache/` | derived state and fetched inputs (gitignored; `docs/DEVELOPMENT.md` maps them) |
+
 ## Ownership
 
 - `pm.xsh`, `pm/`, and `packages/` own recipes, the typed `PackageCatalog`,
@@ -16,7 +33,7 @@ macOS, KVM on Linux).
   `qemu-dwl-foot`: the native Docker adapter, image construction, and the QEMU
   proof. `system/qemu.xsh` picks the QEMU target for the host.
 - The installer (`installer/`, `build-installer-*.xsh`, `installer-*.xsh`)
-  composes its roots from the local mirror; see `INSTALLER.md`.
+  composes its roots from the local mirror; see [installer](INSTALLER.md).
 
 The boundary between PM and its consumers is narrow:
 
@@ -70,3 +87,21 @@ publishes all of them as one immutable `builds/<system-key>/` directory.
 disk from the same current system. The acceptance proof boots QEMU with
 hardware acceleration, drives the real dwl and foot session through QMP, and
 requires the guest success marker plus a screenshot; see [QEMU proof](QEMU.md).
+
+## Implementation constraints
+
+Use typed module imports, structured process argv, explicit effects, and `?`
+at error boundaries. Public exports share a global runtime symbol table; use
+domain-qualified names where modules could collide.
+
+`pm.xsh` forwards argv to `pm/cli.xsh`; `pm/recipe.xsh` is the sole dynamic
+recipe boundary. Plans, fingerprints, store, root composition, generations, and
+publication each retain one owning module.
+
+Use the typed system CLI rather than handwritten closures or mutable world
+roots. The Docker adapter mounts the checkout read-only at `/src/laputa`, the
+seed at `/bin/{xsh,xshi,xsht}` and `/usr/lib/xsh/core`, the artifact store at
+`/artifacts`, and the Kbuild cache from `.out/cache/linux-kbuild`. Stage builds
+on the container filesystem and copy only complete, atomic outputs to host
+mounts. `system/qemu.xsh` owns machine, accelerator, console, block transport,
+and display; profiles hold system intent.

@@ -47,8 +47,9 @@ supply the installer's package roots or image policy.
 
 ## Entry Points
 
-Both targets take `ARCH` (the host's by default) and `MIRROR_URL` (the
-loopback mirror by default).
+Image creation and the automated proof take `ARCH` (the host's by default)
+and `MIRROR_URL` (the loopback mirror by default). The manual harness is
+aarch64-only and uses `LAPUTA_REPO_URL`, defaulting to the loopback mirror.
 
 - `make installer-image`
   builds the CI/autoinstall ISO at
@@ -67,9 +68,13 @@ loopback mirror by default).
   `LAPUTA_INSTALLER_KERNEL_SOURCE`; otherwise the image builder uses the
   kernel installed from the selected kernel package.
 - `make installer-qemu-manual`
-  builds a non-CI image and starts interactive QEMU with stdio serial and no
+  is an aarch64-only harness, regardless of `ARCH`. It builds a non-CI image
+  under `target/laputa-installer/` and starts interactive QEMU with stdio serial and no
   monitor, so `^C` interrupts QEMU. Inside the guest, run `setup-laputa`; for a
-  CI-sized target disk, run `setup-laputa --ci`.
+  CI-sized target disk, run `setup-laputa --ci`. Invoke it with
+  `XSH_MODULE_PATH="$PWD" make installer-qemu-manual` from the checkout root,
+  with host XSH on `PATH`.
+  It requires the aarch64 packages to be published to the running mirror.
 
 ## Components
 
@@ -114,14 +119,6 @@ XSH byte APIs. Its ISO9660 view exposes the selected kernel, and
 its GPT view exposes the installer ext4 root partition with the same
 deterministic `PARTUUID` used by the QEMU harness.
 `LAPUTA_INSTALLER_JOBS` controls the PM import concurrency (default 4).
-
-## Kernel Size
-
-The kernel is present three times in an installer: as the ISO-visible
-direct-boot kernel, as the EFI fallback kernel in the installer payload, and
-as the target root's `/boot/vmlinuz`. The x86_64 kernel is monolithic for
-direct root boot and builds in broad driver families such as DRM/i915 and
-media tuners; its gzip-compressed bzImage is about 9.5M.
 
 ## Install Flow
 
@@ -173,20 +170,3 @@ uses 2x detected memory for swap and fails if the target disk is too small.
 - `mkfs.ext4` normalizes ownership to root and mtimes to a fixed timestamp so
   native image builds are reproducible across host filesystems.
 
-## Known Follow-ups
-
-- Find the clean standalone EFI media boot path, likely with a tiny EFI loader,
-  a real bootloader, or a kernel config choice that supplies a usable default
-  command line.
-- Grow `laputa-fs` from image-builder profile support into real filesystem
-  tools: ext4 journal creation, journal replay, safe fsck repairs, richer FAT
-  variants, and a reference harness that cross-checks native outputs against
-  established tools for the supported Laputa profiles.
-- Add target disk confirmation and stronger destructive-operation guardrails for
-  non-CI use.
-- Make static networking preserve DHCP details more accurately, including DNS.
-- Continue auditing runtime dependencies across the repo. The first pass fixed
-  concrete ELF misses in `cmake`, `wayland-dev`, and `sudo-rs`; broader cleanup
-  should avoid treating optional plugin/dlopen edges as hard dependencies.
-- Decide whether a tiny `efibootmgr` path is still needed. The current UEFI
-  fallback path does not require writing NVRAM boot entries.

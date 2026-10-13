@@ -4,24 +4,18 @@
 `xinit` package installs `xinit.xsh` as `/usr/bin/xinit` with `/init` linking
 to it.
 
-It lives in the Laputa monorepo and runs on the XSH tools the root `Makefile`
-selects (see the root `README.md`). From the monorepo root:
-
-```sh
-make test-xinit
-```
-
 ## Commands
 
 ```sh
-xsh xinit/xinit.xsh -- [INITTAB]
-xsh xinit/xinit.xsh -- boot [TARGET]
-xsh xinit/xinit.xsh -- scan [SERVICE|TARGET]
-xsh xinit/xinit.xsh -- <start|stop|restart|reload|status|logs|supervise> SERVICE
-xsh xinit/xinit.xsh -- list
-xsh xinit/xinit.xsh -- graph [SERVICE|TARGET]
-xsh xinit/xinit.xsh -- check [SERVICE|PATH]
+xinit [INITTAB]
+xinit boot [TARGET]
+xinit scan [SERVICE|TARGET]
+xinit <start|up|stop|down|restart|reload|status|logs|supervise> SERVICE
+xinit list
+xinit graph [SERVICE|TARGET]
+xinit check [SERVICE|PATH]
 ```
 
-See `docs/INIT.md` for the full contract and `docs/SUPERVISION.md` for the
-supervision model.
+See the [init contract](docs/INIT.md) for configuration and
+[supervision model](docs/SUPERVISION.md) for scanner design.
+Developer checks are covered in [testing](../docs/TESTING.md).

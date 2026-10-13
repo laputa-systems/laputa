@@ -203,13 +203,7 @@ The native Docker adapter passes `XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23`
 for `gnu-stubs`: its LLVM edge is a bootstrap seed, so the recipe must use the
 preseeded compiler while the replacement LLVM package is built.
 
-`pm/make.xsh::check_tasks` and `run_tasks` accept `List[MakeTask]`, preserving
-the task schema from compiler helpers through scheduling and spawned process
-handles. `pkg_config_flags` preserves `PkgConfigFlags` string lists through
-compiler and linker flag assembly. `MakeTask.argv` retains the existing heterogeneous argument boundary:
-paths and strings are passed as individual process arguments rather than shell
-source. Completed-task stamps are published only after the entire graph succeeds;
-a failed command cancels unfinished peers.
+[Make task graphs](MAKE.md) covers the typed build helpers and scheduler.
 
 ## Identity, store, and snapshots
 
@@ -329,11 +323,11 @@ package construction itself uses typed XSH process and filesystem boundaries.
 
 ## Verification
 
-PM behavior is covered by the focused modules under `tests/pm/`, one per
-owning module (`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`,
+PM behavior is covered by focused modules under `tests/pm/`, including
+`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`,
 `pm_graph_contracts.xsh`, `pm_make.xsh`, `pm_plan.xsh`, `pm_store.xsh`,
 `pm_root.xsh`, `pm_build.xsh`, `pm_execute.xsh`, `pm_publish.xsh`,
-`pm_sources.xsh`, `pm_generation.xsh`, `pm_elfdeps.xsh`, `pm_cli.xsh`), plus
+`pm_sources.xsh`, `pm_generation.xsh`, `pm_elfdeps.xsh`, and `pm_cli.xsh`, plus
 `repository_keys.xsh` for `repository/` source keys and recipe-specific
 modules (`linux_recipe.xsh`, `m4_recipe.xsh`, `dwl_recipe.xsh`, ...).
 `tests/pm/fixtures/` holds staged inputs, not tests.
@@ -364,3 +358,14 @@ offline. There is no published runner pin: the seed is always the current
 `XSH_ROOT` checkout. The kernel recipe's Kbuild tests and linux-headers'
 `headers_install` tests live beside those recipes and run with
 `make test-linux`.
+
+## Recipe authoring
+
+Package construction must not depend on `/bin/sh`, `/usr/bin/sh`, or `SHELL`,
+including generated Ninja rules. Use XSH `cd` blocks, structured `run` argv,
+direct tool entrypoints, or `#!/bin/xsh` wrappers. Inputs under
+`files/generated/` or package-local `files/*.c` replace heavyweight generators;
+document their regeneration path beside them.
+
+The `xsh` recipe exposes only the core applets declared in its `filetree`. Add
+command links only when Laputa needs them, and keep `su` outside `/usr/bin`.

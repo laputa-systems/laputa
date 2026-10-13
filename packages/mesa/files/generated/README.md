@@ -23,12 +23,18 @@ pkg-config sysroot holding Laputa's `libdrm`, `wayland-dev`,
 (the configure step needs their `.pc` files; nothing is compiled):
 
 ```sh
-python3 -m venv /tmp/mesa-venv
-/tmp/mesa-venv/bin/pip install meson mako pyyaml packaging
-tar xf mesa-26.2.4.tar.xz && cd mesa-26.2.4
+# From the checkout root, ensure .work/ is ignored in .git/info/exclude.
+mkdir -p .work/tmp
+export TMPDIR="$PWD/.work/tmp"
+MESA_VENV="$TMPDIR/mesa-venv"
+python3 -m venv "$MESA_VENV"
+"$MESA_VENV/bin/pip" install meson mako pyyaml packaging
+MESA_SOURCE=/path/to/mesa-26.2.4.tar.xz
+tar xf "$MESA_SOURCE" -C "$TMPDIR"
+cd "$TMPDIR/mesa-26.2.4"
 PKG_CONFIG_SYSROOT_DIR=$SYSROOT \
 PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig \
-PATH=/tmp/mesa-venv/bin:$PATH \
+PATH="$MESA_VENV/bin:$PATH" \
   meson setup build <every option in mesa_options>
 ninja -C build $(cat /path/to/packages/mesa/files/generated/OUTPUTS)
 ```

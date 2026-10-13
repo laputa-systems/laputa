@@ -78,8 +78,7 @@ type SpawnResult = {status: SavedStatus, notify_fd: Int}
 # -> running -> dead -> running, or -> stopped); `next_ms`/`current_delay`/
 # `started_at` drive non-blocking restart backoff (a future-dated `next_ms` gate
 # replaces the blocking sleep the single-service supervisor used to do).
-# `notify_fd` holds the readiness pipe while a unit is `starting`. See
-# docs/SUPERVISION.md.
+# `notify_fd` holds the readiness pipe while a unit is `starting`.
 type ServiceUnit = {
   service: Service,
   desired: Str,

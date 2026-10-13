@@ -1,7 +1,7 @@
 //! Pure-Rust WebAuthn relying-party implementation.
 //! Supports passkeys (discoverable credentials) with P-256/ES256 only.
-//! Accepts any attestation format but does not verify attestation statements;
-//! only the credential data from authData is extracted and used.
+//! Accepts none and structurally valid packed attestation without verifying
+//! attestation signatures or certificates; other formats are rejected.
 
 use base64ct::{Base64UrlUnpadded, Encoding};
 use graviola::hashing::{Hash, Sha256};

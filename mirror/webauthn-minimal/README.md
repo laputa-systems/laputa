@@ -1,60 +1,32 @@
 # WebAuthn-Minimal
 
-`webauthn-minimal` is a lightweight, pure-Rust implementation of a WebAuthn Relying Party (RP). It is designed for simplicity and ease of integration, focusing on modern passkey support using the P-256/ES256 algorithm.
+`webauthn-minimal` is the mirror's pure Rust WebAuthn relying-party library.
+It supports P-256/ES256 credentials, with passkey and hardware-key registration
+modes. It accepts `none` and structurally valid `packed` attestation; it does
+not verify attestation signatures or certificates, and rejects other formats.
 
-## Features
+## Use the API
 
-- **Passkey Support**: Fully supports discoverable credentials (passkeys).
-- **P-256 / ES256 Only**: Focused implementation of the most widely used algorithm for modern authenticators.
-- **Flexible Signature Encoding**: Supports both DER-encoded and raw (concatenated R+S) signatures for maximum compatibility with various hardware and platform authenticators.
-- **Lightweight Attestation**: 
-    - Explicitly supports the `none` attestation format (standard for passkeys).
-    - Provides basic structure validation for the `packed` attestation format.
-- **AAGUID Tracking**: Extracts and returns the Authenticator Attestation GUID (AAGUID) during registration.
-- **Type Safety**: Uses strongly typed request and response structures for registration and authentication ceremonies.
+Construct `RelyingParty::new(rp_id, rp_origin, rp_name)` with the expected RP ID
+and exact browser origin.
 
-## Architecture
+1. Call `start_registration(user_id, username, mode)` with
+   `RegistrationMode::Passkey` or `RegistrationMode::HardwareKey`. Send the
+   returned creation options to the browser and retain `RegChallenge`.
+2. Pass the browser's `RegistrationResponse` and that challenge state to
+   `finish_registration`. Persist the returned `StoredCredential`: credential
+   ID, AAGUID, P-256 public key coordinates, and signature counter.
+3. Call `start_authentication(credentials)` with the user's stored credentials.
+   Send the request options to the browser and retain `AuthChallenge`.
+4. Pass the browser's `AuthenticationResponse`, challenge state, and selected
+   credential to `finish_authentication`. Persist the returned updated credential.
 
-The crate centers around the `RelyingParty` struct, which manages the configuration and verification logic.
+The caller owns challenge/session lifetime and credential storage. Challenges
+contain 32 random bytes. Both finish methods check ceremony type, challenge,
+and origin; credential parsing checks RP ID and user presence. Authentication
+verifies the signature over authenticator data and the client-data hash,
+accepting raw R+S or DER signature encoding.
 
-### Core Components
-
-- **`RelyingParty`**: The main entry point. It handles the generation of options for the browser and the verification of the authenticator's responses.
-- **`StoredCredential`**: The data structure used to persist a user's public key, credential ID, AAGUID, and signature counter.
-- **Challenge State (`RegChallenge`, `AuthChallenge`)**: Minimal state objects designed to be stored in a session or database between the "start" and "finish" phases of a ceremony.
-
-### Registration Flow
-
-1. **Start**: `start_registration` generates `PublicKeyCredentialCreationOptions` and a `RegChallenge`.
-2. **Client Interaction**: The server sends these options to the client's browser via the WebAuthn API.
-3. **Finish**: `finish_registration` receives a `RegistrationResponse`. It:
-    - Verifies the `clientDataJSON` (challenge and origin).
-    - Parses the `attestationObject` (CBOR).
-    - Validates the attestation format (skips for `none`, basic check for `packed`).
-    - Parses `authData` to extract the `credId` and P-256 public key.
-    - Returns a `StoredCredential` for persistence.
-
-### Authentication Flow
-
-1. **Start**: `start_authentication` generates `PublicKeyCredentialRequestOptions` and an `AuthChallenge`.
-2. **Client Interaction**: The server sends these options to the browser.
-3. **Finish**: `finish_authentication` receives an `AuthenticationResponse` and the previously `StoredCredential`. It:
-    - Verifies the `clientDataJSON` (challenge and origin).
-    - Parses `authData` to verify the `rpIdHash` and user presence.
-    - Verifies the ES256 signature over `authData || SHA-256(clientDataJSON)`.
-    - Handles both DER and raw signature encodings.
-    - Checks for signature counter regressions (logging a warning if detected).
-    - Returns an updated `StoredCredential` with the new signature counter.
-
-## Design Decisions & Simplifications
-
-- **Algorithm Limitation**: Only ES256 (P-256) is supported. This significantly reduces complexity while remaining compatible with almost all modern passkey authenticators.
-- **Minimal Attestation**: Attestation verification is intentionally minimal. While it allows the server to accept any valid credential, it provides the hooks to implement stricter hardware enforcement (e.g., verifying the AAGUID or the attestation statement).
-- **Statelessness**: The `RelyingParty` does not manage storage. It provides the data needed to be stored and expects the caller to manage the persistence of challenges and credentials.
-- **Constant-Time Comparisons**: Uses constant-time equality checks for challenges to mitigate timing attacks.
-
-## Security Considerations
-
-- **Challenge Management**: Challenges are generated as 32-byte random values.
-- **Origin Validation**: Strict validation of the origin in `clientDataJSON` to prevent phishing.
-- **Counter Tracking**: Monitors the signature counter to detect possible authenticator cloning.
+A non-increasing counter after a positive stored counter logs a warning and
+still succeeds. Authenticators that always return zero are supported; counter
+tracking alone does not establish that a credential was cloned.
