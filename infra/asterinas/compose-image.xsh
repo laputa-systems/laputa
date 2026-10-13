@@ -13,10 +13,10 @@ proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let tag = images.ensure_package_tools(docker, laputa_root, value)?
   let output = fp"{laputa_root}/.out/asterinas-firecracker"
   let store = world.world_store(laputa_root, arch)
-  let _ = output.mkdir(parents: true)?
+  let _ = output.mkdir()?
   fp"{output}/package-tools-image".write(f"{tag}\n")
-  let _ = store.mkdir(parents: true)?
-  let _ = world.world_kbuild_cache(laputa_root).mkdir(parents: true)?
+  let _ = store.mkdir()?
+  let _ = world.world_kbuild_cache(laputa_root).mkdir()?
   let id = unix.id()?
   let owner: world.WorldOwner = {uid: id.uid, gid: id.gid}
   let inner = ["/bin/xsh", "/src/laputa/infra/asterinas/build-image.xsh", "--", arch, tag, profile_overlay_path]

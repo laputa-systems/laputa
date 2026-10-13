@@ -42,7 +42,7 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   let unpacked = fp"{scratch.host_path()?}/initramfs.unpacked.cpio"
   let listing = fp"{scratch.host_path()?}/initramfs.list"
   let output_tmp = fp"{output.display()}.tmp"
-  defer output_tmp.remove(missing_ok: true)
+  defer output_tmp.remove()
 
   run_checked(
     "/usr/bin/find",
@@ -72,7 +72,7 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
 
   let names = listing.read_text()?.lines()
   if ! (names |> any . == "init" or . == "./init") {
-    output_tmp.remove(missing_ok: true)
+    output_tmp.remove()
     return Err(InitramfsPackError.Failed("packed initramfs does not contain /init"))
   }
 

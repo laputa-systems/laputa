@@ -16,7 +16,7 @@ proc main() [fs, process, error] {
   require(p"/proc/1/cmdline".exists()?, "proc", "PID 1 command line is unavailable")
 
   for dir in [/dev/pts, /dev/shm, /run, /tmp] {
-    dir.mkdir(parents: true)
+    dir.mkdir()
   }
 
   linux.mount("run", /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])

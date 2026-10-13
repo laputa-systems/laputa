@@ -164,7 +164,7 @@ proc main() [fs, process, env, time, net, error] {
     let source_root = p"/usr/lib/asterinas/xsh-source"
     # XSH's filesystem test checks the repository root marker and specification file.
     let git_marker = fp"{source_root}/.git"
-    git_marker.mkdir(parents: true)
+    git_marker.mkdir()
     let test_selection = test_selection_path.read_text()?.trim()
     eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
     let test_run = cd (source_root) {

@@ -13,10 +13,10 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   let profile_overlay = fp"{profile_overlay_path}"
   let overlay_handle = fs.tempdir()?
   let overlay = fp"{overlay_handle.host_path()?}/overlay"
-  let _ = fs.copy_tree(profile_overlay, overlay, parents: true)?
+  let _ = fs.copy_tree(profile_overlay, overlay)?
   let common_boot_setup = p"/src/laputa/guest/asterinas/common/boot-setup.xsh"
   let boot_setup = fp"{overlay}/usr/lib/asterinas/boot-setup.xsh"
-  boot_setup.parent.mkdir(parents: true)
+  boot_setup.parent.mkdir()
   common_boot_setup.copy(to: boot_setup)
   boot_setup.chmod(0o755)
   let build_plan = pm_plan_json.read(plan_path)?
@@ -55,9 +55,9 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   } else {
     let stage_handle = fs.tempdir()?
     let rootfs = fp"{stage_handle.host_path()?}/rootfs"
-    let _ = fs.copy_tree(generation_root, rootfs, parents: true)?
+    let _ = fs.copy_tree(generation_root, rootfs)?
     let image_tmp = p"/output/laputa-root.ext2.tmp"
-    let _ = image_tmp.remove(missing_ok: true)?
+    let _ = image_tmp.remove()?
     run chown -R 0:0 $rootfs
     run truncate -s 512M $image_tmp
     run /usr/bin/env SOURCE_DATE_EPOCH=1 /sbin/mke2fs -q -F -t ext2 -L LAPUTA -d $rootfs -U $uuid -E f"hash_seed={uuid},lazy_itable_init=0" $image_tmp
