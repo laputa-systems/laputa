@@ -1,6 +1,7 @@
 ##! Pack an initramfs root deterministically with direct tool invocations.
 use hash
 
+error InitramfsPackError = Failed
 
 proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") {
   let command = if stdin != "" and stdout != "" {
@@ -13,7 +14,7 @@ proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdou
     process.command_argv(executable, argv, cwd)
   }
   let status = process.run(command)?
-  fail f"command failed: {argv.join(" ")}" unless status.ok
+  return Err(InitramfsPackError.Failed(f"command failed: {argv.join(" ")}")) unless status.ok
 }
 
 proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdin: Path, stdout: Path) {
@@ -31,7 +32,7 @@ proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdi
 
 proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   if ! root.exists() or ! root.is_dir() {
-    fail f"initramfs root is not a directory: {root}"
+    return Err(InitramfsPackError.Failed(f"initramfs root is not a directory: {root}"))
   }
 
   let scratch = fs.tempdir()?
@@ -72,7 +73,7 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   let names = listing.read_lines()?
   if ! (names |> any . == "init" or . == "./init") {
     output_tmp.remove()
-    fail "packed initramfs does not contain /init"
+    return Err(InitramfsPackError.Failed("packed initramfs does not contain /init"))
   }
 
   output_tmp.rename(to: output, overwrite: true)

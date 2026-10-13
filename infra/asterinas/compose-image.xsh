@@ -3,6 +3,7 @@ use seed.images
 use seed.world
 use seed.xsh_seed
 
+error AsterinasImageBuildError = Failed
 
 proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let laputa_root = fs.cwd()?
@@ -33,6 +34,6 @@ proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let status = process.run(process.command_argv(docker, argv, laputa_root))?
 
   if ! status.ok {
-    fail "Asterinas PM generation and ext2 image build failed"
+    return Err(AsterinasImageBuildError.Failed("Asterinas PM generation and ext2 image build failed"))
   }
 }

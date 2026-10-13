@@ -31,3 +31,12 @@ test test_guest_protocol_reports_each_missing_marker_in_protocol_order {
     "LAPUTA_ASTERINAS_XSH_OK",
   ]
 }
+
+test test_guest_output_failure_keeps_its_nominal_error [process, error] {
+  # The input lock has no guest proof markers, so it exercises the rejection path.
+  let output = run.capture --text "xsh" infra/asterinas/check-guest-output.xsh -- infra/asterinas/inputs.lock
+
+  assert ! output.status.ok, output.stderr
+  assert "GuestOutputCheckError.Failed" in output.stderr, output.stderr
+  assert "guest proof is missing:" in output.stderr, output.stderr
+}
