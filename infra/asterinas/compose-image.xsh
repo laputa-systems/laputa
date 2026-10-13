@@ -3,7 +3,7 @@ use seed.images
 use seed.world
 use seed.xsh_seed
 
-error AsterinasImageBuildError = Failed(message: Str)
+error AsterinasImageBuildError = Failed
 
 proc main(arch: Str, profile_overlay_path: Str) [fs, env, process, error] {
   let laputa_root = fs.cwd()?

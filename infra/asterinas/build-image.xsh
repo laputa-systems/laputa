@@ -5,7 +5,7 @@ use hash
 
 const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit"]
 
-error AsterinasImageError = Failed(message: Str)
+error AsterinasImageError = Failed
 
 proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, process, error] {
   let plan_path = fp"/src/laputa/.out/world/{arch}/plan.json"

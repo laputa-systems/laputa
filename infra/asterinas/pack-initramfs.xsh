@@ -1,7 +1,7 @@
 ##! Pack an initramfs root deterministically with direct tool invocations.
 use hash
 
-error InitramfsPackError = Failed(message: Str)
+error InitramfsPackError = Failed
 
 proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") [process, error] {
   let command = if stdin != "" and stdout != "" {
