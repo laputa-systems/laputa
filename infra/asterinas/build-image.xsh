@@ -5,7 +5,6 @@ use pm.plan_json as pm_plan_json
 
 const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit"]
 
-error AsterinasImageError = Failed
 
 proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, process, error] {
   let plan_path = fp"/src/laputa/.out/world/{arch}/plan.json"
@@ -29,7 +28,7 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
     let receipt = pm_generation.read_generation_receipt(generation_root)?
 
     if receipt.generation_sha256 != generation_plan.generation_sha256 {
-      return Err(AsterinasImageError.Failed("existing Asterinas generation has a different identity"))
+      fail "existing Asterinas generation has a different identity"
     }
   } else {
     let _ = pm_generation.compose(generation_plan, store, generation_root, overlay)?
@@ -48,7 +47,7 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
     let image_sha = hash.sha256(image)?.hex()
 
     if ! image_sha_path.exists() or image_sha_path.read_text()?.trim() != image_sha {
-      return Err(AsterinasImageError.Failed("cached ext2 root image checksum mismatch"))
+      fail "cached ext2 root image checksum mismatch"
     }
 
     run /sbin/e2fsck -fn $image
@@ -75,19 +74,19 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   let feature_ro_compat = bytes.unpack_le(ext2_superblock, 4, 100)?
 
   if ext2_magic != 61267 {
-    return Err(AsterinasImageError.Failed("root image does not contain an ext2 superblock"))
+    fail "root image does not contain an ext2 superblock"
   }
 
   if feature_compat % 8 >= 4 {
-    return Err(AsterinasImageError.Failed("root ext2 image unexpectedly contains a journal"))
+    fail "root ext2 image unexpectedly contains a journal"
   }
 
   if feature_incompat != 2 {
-    return Err(AsterinasImageError.Failed("root ext2 image has an unsupported incompatible feature"))
+    fail "root ext2 image has an unsupported incompatible feature"
   }
 
   if feature_ro_compat >= 8 {
-    return Err(AsterinasImageError.Failed("root ext2 image has an unsupported read-only feature"))
+    fail "root ext2 image has an unsupported read-only feature"
   }
 
   p"/output/generation.path".write(f"{generation_plan.generation_sha256}\n")
