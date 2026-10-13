@@ -12,7 +12,7 @@ pure doubled(value: Int) -> Int {
   value * 2
 }
 
-proc main() [fs, process, env, time, error] {
+proc main() [fs, process, env, time, net, error] {
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_START"
   # xinit reaches this sysinit only after its production PID 1 guard succeeds.
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_OK"
