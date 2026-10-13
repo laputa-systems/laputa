@@ -113,7 +113,10 @@ proc main() [fs, process, env, time, net, error] {
   let renamed = fp"{test_dir}/renamed.txt"
   let link = fp"{test_dir}/alias.txt"
   link.symlink(to: p"renamed.txt")
-  var names = [entry.name for entry in fs.children(test_dir)?]
+  var names = []
+  for entry in fs.children(test_dir)? {
+    names += [entry.name]
+  }
   require("payload.txt" in names and "alias.txt" in names, "directory", "directory traversal missed an entry")
 
   original.rename(to: renamed)
