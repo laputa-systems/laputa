@@ -158,7 +158,6 @@ proc root_legacy_package_db_file(
   name: Str,
 ) -> Result[LegacyPackageDbFile] {
   let root_handle = fs.open_root(extracted)?
-  defer root_handle.close()
   let rel = root_legacy_package_db_path(receipt, name)
 
   match root_handle.readlink(rel) {
@@ -186,7 +185,6 @@ proc root_legacy_package_db_entries(
   payload_entries: List[types.ArtifactEntry],
 ) -> Result[List[types.ArtifactEntry]] {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()
   let extracted = fp"{sandbox.host_path()?}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
   let manifest_file = root_legacy_package_db_file(extracted, receipt, "manifest.json")?
@@ -290,7 +288,6 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
 
 proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
   let root_handle = fs.open_root(root)?
-  defer root_handle.close()
   let rel = fp"{entry.path}"
 
   # Root metadata follows the final path component. Inspect a declared symlink
@@ -343,7 +340,6 @@ pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry)
 
 proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()
   let sandbox_path = sandbox.host_path()?
   let extracted = fp"{sandbox_path}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
@@ -601,7 +597,6 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
 
 proc root_materialize_artifact(output: Path, receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
-  defer sandbox.close()
   let extracted = fp"{sandbox.host_path()?}/payload"
   archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
 

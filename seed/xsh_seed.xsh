@@ -184,7 +184,6 @@ proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
 
 proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] {
   let handle = fs.tempdir()?
-  defer handle.close()
   let quiet = fp"{handle.host_path()?}/inspect"
   let status = process.run(
     process.command_argv(docker, [docker, "image", "inspect", image], cwd, stdout: quiet, stderr: quiet),

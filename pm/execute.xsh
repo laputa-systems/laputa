@@ -228,7 +228,6 @@ proc execute_run_proof(
   ]
   let runtime_artifacts = execute_receipt_closure(context, runtime_keys)?
   let root_handle = fs.tempdir()?
-  defer root_handle.close()
   # A proof root is a target runtime closure only: no executor substrate, so
   # the proof cannot pass on files the runner happens to provide.
   let proof_root = fp"{root_handle.host_path()?}/proof-root"
@@ -245,7 +244,6 @@ proc execute_run_proof(
 proc execute_build_local(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
-  defer root_handle.close()
   let work = root_handle.host_path()?
   let build_root = fp"{work}/build-root"
 
@@ -289,7 +287,6 @@ proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) -> Re
 
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
-  defer root_handle.close()
   let proof = fp"{root_handle.host_path()?}/proof.json"
   execute_run_proof(context, node, pkg, fp"{receipt.artifact_dir}/payload.tar.gz", receipt.payload_sha256, proof)
   execute_publish_proof_cache(context.store_root, node, receipt.payload_sha256, proof)
@@ -304,7 +301,6 @@ proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) -> Resul
   }
 
   let cache_handle = fs.tempdir()?
-  defer cache_handle.close()
   let cache = cache_handle.host_path()?
   let receipt = store.import_remote(context.plan.target, context.store_root, node, context.remote_repo, cache)?
   execute_require_receipt(context.plan, node, receipt)
@@ -578,7 +574,6 @@ export proc build_plan(
     }
   } else {
     let handle = fs.tempdir()?
-    defer handle.close()
     let scratch = handle.host_path()?
     # Children read the plan from disk; write_plan seals it with its digest.
     let plan_path = fp"{scratch}/plan.json"

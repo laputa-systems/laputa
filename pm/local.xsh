@@ -186,7 +186,6 @@ export proc collect_metadata_files(
   manifest: List[Path],
 ) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
   let root_handle = fs.open_root(root)?
-  defer root_handle.close()
 
   let files: List[types.ArtifactEntry] = collect {
     for rel_path in manifest {

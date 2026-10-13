@@ -66,7 +66,6 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   # Every dynamic ELF in a Laputa root must name musl's loader.
   let musl_interpreter = f"/lib/ld-musl-{arch}.so.1"
   let handle = fs.tempdir()?
-  defer handle.close()
   let root = fp"{handle.host_path()?}/root"
   let loader_err = fp"{handle.host_path()?}/loader.err"
   var compose_args = ["root", "compose", plan, "--store", store, "--output", root.display()]

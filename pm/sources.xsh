@@ -503,7 +503,6 @@ proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[St
   let partial_dir = fp"{cache_root}/partial"
   partial_dir.mkdir()
   let scratch = fs.tempdir()?
-  defer scratch.close()
   let download = fp"{scratch.host_path()?}/download"
   let failure = util.download_file(url, download)?
 

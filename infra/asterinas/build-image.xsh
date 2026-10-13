@@ -12,7 +12,6 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   let store = p"/artifacts"
   let profile_overlay = fp"{profile_overlay_path}"
   let overlay_handle = fs.tempdir()?
-  defer overlay_handle.close()
   let overlay = fp"{overlay_handle.host_path()?}/overlay"
   let _ = fs.copy_tree(profile_overlay, overlay, parents: true)?
   let common_boot_setup = p"/src/laputa/guest/asterinas/common/boot-setup.xsh"
@@ -55,7 +54,6 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
     run /sbin/e2fsck -fn $image
   } else {
     let stage_handle = fs.tempdir()?
-    defer stage_handle.close()
     let rootfs = fp"{stage_handle.host_path()?}/rootfs"
     let _ = fs.copy_tree(generation_root, rootfs, parents: true)?
     let image_tmp = p"/output/laputa-root.ext2.tmp"

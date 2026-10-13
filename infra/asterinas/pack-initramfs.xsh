@@ -36,7 +36,6 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
   }
 
   let scratch = fs.tempdir()?
-  defer scratch.close()
   let file_list = fp"{scratch.host_path()?}/files.list"
   let sorted_list = fp"{scratch.host_path()?}/files.sorted"
   let cpio_archive = fp"{scratch.host_path()?}/initramfs.cpio"
