@@ -3,7 +3,7 @@ use hash
 
 error InitramfsPackError = Failed
 
-proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") [process, error] {
+proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdout = p"") {
   let command = if stdin != "" and stdout != "" {
     process.command_argv(executable, argv, cwd, stdin:, stdout:)
   } else if stdin != "" {
@@ -17,7 +17,7 @@ proc run_checked(executable: Str, argv: List[Str], cwd: Path, stdin = p"", stdou
   return Err(InitramfsPackError.Failed(f"command failed: {argv.join(" ")}")) unless status.ok
 }
 
-proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdin: Path, stdout: Path) [process, error] {
+proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdin: Path, stdout: Path) {
   var argv = [
     "docker", "run", "--rm", "--interactive", "--pull", "never", "--platform", "linux/amd64", "--network", "none",
   ]
