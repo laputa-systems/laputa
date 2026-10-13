@@ -31,7 +31,7 @@ proc docker_tool(docker_image: Str, tool: Str, args: List[Str], root: Path, stdi
 }
 
 proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
-  if ! root.exists()? or ! root.is_dir()? {
+  if ! root.exists() or ! root.is_dir() {
     return Err(InitramfsPackError.Failed(f"initramfs root is not a directory: {root.display()}"))
   }
 
@@ -50,14 +50,14 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
     ["/usr/bin/find", ".", "-print0"],
     root,
     stdout: file_list,
-  )?
+  )
   run_checked(
     "/usr/bin/env",
     ["LC_ALL=C", "/usr/bin/sort", "-z"],
     root,
     stdin: file_list,
     stdout: sorted_list,
-  )?
+  )
   docker_tool(
     docker_image,
     "cpio",
@@ -65,18 +65,18 @@ proc main(root: Path, output: Path, docker_image: Str) [fs, process, error] {
     root,
     sorted_list,
     cpio_archive,
-  )?
-  docker_tool(docker_image, "gzip", ["-n", "-9", "-c"], root, cpio_archive, output_tmp)?
-  docker_tool(docker_image, "gzip", ["-t", "-"], root, output_tmp, p"")?
-  docker_tool(docker_image, "gzip", ["-d", "-c"], root, output_tmp, unpacked)?
-  docker_tool(docker_image, "cpio", ["--list", "--quiet"], root, unpacked, listing)?
+  )
+  docker_tool(docker_image, "gzip", ["-n", "-9", "-c"], root, cpio_archive, output_tmp)
+  docker_tool(docker_image, "gzip", ["-t", "-"], root, output_tmp, p"")
+  docker_tool(docker_image, "gzip", ["-d", "-c"], root, output_tmp, unpacked)
+  docker_tool(docker_image, "cpio", ["--list", "--quiet"], root, unpacked, listing)
 
   let names = listing.read_text()?.lines()
   if ! (names |> any . == "init" or . == "./init") {
-    output_tmp.remove(missing_ok: true)?
+    output_tmp.remove(missing_ok: true)
     return Err(InitramfsPackError.Failed("packed initramfs does not contain /init"))
   }
 
-  output_tmp.rename(to: output, overwrite: true)?
+  output_tmp.rename(to: output, overwrite: true)
   print f"Initramfs SHA-256: {hash.sha256(output)?.hex()}"
 }

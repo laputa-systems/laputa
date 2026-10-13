@@ -17,9 +17,9 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   let _ = fs.copy_tree(profile_overlay, overlay, parents: true)?
   let common_boot_setup = p"/src/laputa/guest/asterinas/common/boot-setup.xsh"
   let boot_setup = fp"{overlay}/usr/lib/asterinas/boot-setup.xsh"
-  boot_setup.parent.mkdir(parents: true)?
-  common_boot_setup.copy(to: boot_setup)?
-  boot_setup.chmod(0o755)?
+  boot_setup.parent.mkdir(parents: true)
+  common_boot_setup.copy(to: boot_setup)
+  boot_setup.chmod(0o755)
   let build_plan = pm_plan_json.read(plan_path)?
   let profile = pm_generation.overlay_profile(overlay)?
   let generation_plan = pm_generation.plan_profile(build_plan, runtime_roots, profile)?
@@ -66,8 +66,8 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
     run /sbin/e2fsck -fn $image_tmp
     image_tmp.rename(to: image, overwrite: true)
     let image_sha = hash.sha256(image)?.hex()
-    image_sha_path.write_atomic(f"{image_sha}\n")?
-    image_key_path.write_atomic(image_key)?
+    image_sha_path.write_atomic(f"{image_sha}\n")
+    image_key_path.write_atomic(image_key)
   }
 
   let ext2_superblock = bytes.read_at(image, 1024, 104)?
