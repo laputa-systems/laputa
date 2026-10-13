@@ -2,7 +2,7 @@
 error AsterinasBootSetupError = Failed(phase: Str, message: Str)
 
 proc require(condition: Bool, phase: Str, message: Str) {
-  if ! condition {
+  guard condition else {
     eprint --flush f"LAPUTA_ASTERINAS_TEST_FAILED {phase}: {message}"
     return Err(AsterinasBootSetupError.Failed(phase:, message:))
   }
