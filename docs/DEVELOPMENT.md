@@ -17,6 +17,10 @@ fetch steps. You don't need a Rust toolchain or a pre-built XSH. `make
 host-xsh` builds static XSH binaries and `make mirror` builds the mirror, both
 in XSH's own build image.
 
+The x86_64 compiler wrapper defaults to `-march=x86-64-v3`
+(`packages/llvm-toolchain/PKGBUILD.xsh::default_march`). Native package proofs
+need a CPU that supports that baseline.
+
 On macOS (Apple Silicon), the developer path uses XSH's native release build
 (`cargo build --release -j 4 -p xsh -p xshi -p xsht --bin xsh --bin xshi --bin xsht`
 in `../xsh`) and runs the mirror and `make
@@ -45,7 +49,10 @@ spawn runners. Set it yourself when you run XSH directly:
 export XSH_MODULE_PATH="$PWD"     # from the checkout root
 export XSH_ROOT="$PWD/../xsh"
 XSH_BIN_DIR="$XSH_ROOT/target/release"
-if [ "$(uname -s)" = Linux ]; then
+if [ "$(uname -s)" = Linux ] &&
+   { [ ! -f "$XSH_BIN_DIR/xsh" ] ||
+     [ ! -f "$XSH_BIN_DIR/xshi" ] ||
+     [ ! -f "$XSH_BIN_DIR/xsht" ]; }; then
   XSH_BIN_DIR="$PWD/.out/host/$(uname -m | sed 's/^arm64$/aarch64/; s/^amd64$/x86_64/')"
 fi
 export XSH_HOST="$XSH_BIN_DIR/xsh"
@@ -75,13 +82,9 @@ from the source cache. Containers mount the seed at `/bin/{xsh,xshi,xsht}` and
 `/usr/lib/xsh/core`, so an XSH or PM change rebuilds no image. Image tags are
 content keys over each image's own inputs (`seed/images.xsh`).
 
-`capsh -- SCRIPT ARGS...` runs `/usr/bin/xsh` with the script path and
-arguments passed directly. The default executable no longer accepts
-interactive shell commands or `-c`; use `--shell=/path/to/program -- ARGS...`
-to launch another executable. The capability proof checks that a dropped
-bounding-set capability stays absent after executing capsh again. The tmux
-proof runs explicit XSH pane scripts and checks terminal input editing,
-output capture, window lifecycle, and attachment across terminal types.
+The LLVM seed stays prebuilt. Its pin belongs to
+`packages/llvm-toolchain/PKGBUILD.xsh`. The `xsh` recipe packages the local
+seed rather than compiling another interpreter in the package world.
 
 ## Local bootstrap
 
@@ -137,20 +140,9 @@ default remote; these make targets use the loopback mirror.
   composes the root, runs musl's loader over every dynamic ELF inside it, and
   runs the root's own `xsh`. `inspection.json`, `files.txt` and
   `generation.json` land beside that store.
-- Artifact keys exclude the XSH runners and PM:
-  - A new seed rebuilds only `xsh`.
-  - A PM edit rebuilds only `laputa-pm`, which packages the PM tree.
-  - A recipe `rel` bump rebuilds that package and its build dependents.
-  - A kernel config change rebuilds only `linux`: packages that compile
-    against kernel headers build-depend on `linux-headers`.
-- Published objects are immutable and content-addressed: each is named by
-  its artifact key (and proof key), and the index row is the only mutable
-  pointer. A rebuilt `xsh` or `laputa-pm` keeps its `ver`/`rel`;
-  `make publish` uploads it under new names and replaces only its index row.
-  A row behind the mirror's `ver`/`rel` is refused. Reverting a change and
-  publishing again moves the row back to the earlier, still-published key.
-  `make root` imports the key each row names, which must be the key the
-  checkout plans. See "Publication" in [PM](PM.md).
+
+See [artifact identity](PM.md#identity-store-and-snapshots) for rebuild rules
+and [publication](PM.md#publication) for immutable objects and index updates.
 
 ## Containers and file ownership
 
@@ -229,14 +221,9 @@ docker run --rm --network none --platform "$PLATFORM" \
   /bin/xsh /src/laputa/pm.xsh -- root inspect /profile/current/generation.json
 ```
 
-The generation's direct runtime roots are the profile's `package_roots`
-(`profiles/qemu-dwl-foot.xsh`): `baselayout`, `xsh`, `laputa-pm`, `xinit`,
-`mdevd`, `seatd`, `dwl-minimal`, and `foot-minimal`. Build-only tools such as
-`llvm-toolchain`, `pkgconf`, `cmake`, `muon`, `samurai`, `m4`, `flex`,
-`bison`, `wayland-dev`, `wayland-protocols`, and `pixman-dev` must be absent.
-The profile lists them in `forbidden_packages`, and the build fails before
-building anything if the generation's runtime closure contains one. It also
-fails if any generation file provides or needs a `forbidden_sonames` entry.
+`profiles/qemu-dwl-foot.xsh` owns `package_roots`, `forbidden_packages`, and
+`forbidden_sonames`. The profile build checks the runtime closure against
+these exclusions before execution and checks sonames in the composed files.
 
 ## Derived state
 

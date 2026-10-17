@@ -3,7 +3,6 @@
 Set up the host tools as described in [development](DEVELOPMENT.md#xsh-tools).
 The examples below use its `XSHT` environment variable.
 
-
 ```bash
 make check         # xsht check over the tree, plus shebang-only XSH scripts
 make lint          # production PM, system, installer, and xinit modules
@@ -42,3 +41,7 @@ Use `cargo -j 4` for Rust checks. `make mirror-test` checks the mirror and its
 POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.
 `make verify` is the full host proof from a clean build, with logs and a timing
 table under `.out/verify/`; reserve it for an explicit full verification run.
+
+The bootstrap campaign completed a clean x86_64 world build and both QEMU
+proofs. Its later shared-path changes did not receive a full aarch64 rebuild
+or boot proof. Track that verification gap in [TODO](../TODO.md).

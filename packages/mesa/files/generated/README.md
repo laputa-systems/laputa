@@ -2,9 +2,9 @@
 
 `mesa-26.2.4-generated.tar.xz` holds every build output that Mesa 26.2.4
 produces with Python (Mako/PyYAML), GNU bison, or flex for the configuration
-in `../../PKGBUILD.xsh` (`mesa_options`). Laputa's build world has no Python,
-and its bison and flex cannot process these grammars, so the recipe drops the
-build edges for these outputs and copies them from this archive instead.
+in [the recipe](../../PKGBUILD.xsh) (`mesa_options`). Laputa's build world has
+no Python. The recipe replaces the generator edges with archived outputs.
+Bison and flex outputs remain vendored alongside the Python outputs.
 
 `OUTPUTS` lists the archived paths, relative to the Mesa build directory. The
 archive has one top-level directory, `mesa-26.2.4-generated/`, which PM strips

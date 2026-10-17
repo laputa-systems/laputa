@@ -41,6 +41,7 @@ Host-tool setup, the full target reference, and cleanup are in
 | Layout, ownership, identities, image boundaries | [Core infrastructure](docs/CORE-INFRASTRUCTURE.md) |
 | Recipes, source inputs, plans, store, roots, publication | [Package manager](docs/PM.md) |
 | Typed Makefile-style build graphs | [Make task graphs](docs/MAKE.md) |
+| Open work | [TODO](TODO.md) |
 | Focused tests and wider verification | [Testing](docs/TESTING.md) |
 | Native Docker/QEMU profile and graphical proof | [QEMU](docs/QEMU.md) |
 | Installer images, install policy, QEMU harness | [Installer](docs/INSTALLER.md) |

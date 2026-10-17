@@ -52,21 +52,11 @@ never become runtime content without an explicit runtime edge.
 
 ## Identity and the store
 
-`pm repo plan` resolves one deterministic `BuildPlan`. Its artifact keys
-cover the target, the recipe inputs, `BUILD_EPOCH`, and the exact keys of the
-build dependencies. They deliberately exclude proof scripts, checkout state
-(paths, mtimes, `.git`, and file modes beyond git's 0755/0644 model), the XSH
-runners, the PM tree and core applets, remote-index state, and job counts.
-Bump `BUILD_EPOCH` only when a PM or XSH change can alter a payload without
-any recipe change.
-
-The store is `v2/sha256/<key>/` with `artifact.json`, `payload.tar.gz`,
-`metadata.json`, and `proof.json`. Metadata is the package inventory,
-including file types and Linux modes, plus the executor provenance. A cached
-source is revalidated against its declared checksum before use; where it came
-from is not artifact identity. A changed proof re-proves an unchanged artifact
-and stores the result under `v2/proofs/<key>/`. [PM](PM.md) has the full
-contract.
+`pm repo plan` resolves one deterministic `BuildPlan`. Artifact identity
+separates payload inputs from proof inputs and executor provenance, so a new
+proof can validate an existing payload without rebuilding it. The
+[PM contract](PM.md#identity-store-and-snapshots) owns key inputs, rebuild
+rules, store layout, and publication identity.
 
 ## Images and the seed
 

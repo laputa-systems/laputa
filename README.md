@@ -58,6 +58,9 @@ xinit stop SERVICE
 The [xinit guide](xinit/docs/INIT.md) covers service configuration and output.
 The [mirror guide](mirror/README.md) covers running a package mirror.
 
+`capsh -- SCRIPT ARGS...` runs an XSH script. Use
+`capsh --shell=/path/to/program -- ARGS...` to launch another executable.
+
 ## Help and licensing
 
 Use the linked command guides and `pm --help` for usage. When reporting a

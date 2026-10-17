@@ -41,8 +41,8 @@ it does not remove the package.
 A package that compiles against the kernel's userspace API headers takes
 `linux-headers` as a build dependency, never `linux`. `linux-headers` installs
 those headers from the pinned kernel tarball without a compiler, through an
-XSH port of the kernel's `headers_install`, and its output matches `make
-headers_install` byte for byte. `linux` ships only the kernel image and
+XSH port of the kernel's `headers_install`. The parity tests live in
+`packages/linux-headers/tests/`. `linux` ships only the kernel image and
 config, so a kernel config or Kbuild change rebuilds only the kernel, and no
 runtime root pulls in the kernel through a library.
 
@@ -98,6 +98,7 @@ pm root compose PLAN \
   --output GENERATION
 pm root inspect GENERATION
 pm store verify --store STORE
+pm store gc --store STORE --keep PLAN [--keep PLAN...]
 pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 ```
 
@@ -323,14 +324,8 @@ package construction itself uses typed XSH process and filesystem boundaries.
 
 ## Verification
 
-PM behavior is covered by focused modules under `tests/pm/`, including
-`pm_recipe.xsh`, `pm_recipe_hooks.xsh`, `pm_graph.xsh`,
-`pm_graph_contracts.xsh`, `pm_make.xsh`, `pm_plan.xsh`, `pm_store.xsh`,
-`pm_root.xsh`, `pm_build.xsh`, `pm_execute.xsh`, `pm_publish.xsh`,
-`pm_sources.xsh`, `pm_generation.xsh`, `pm_elfdeps.xsh`, and `pm_cli.xsh`, plus
-`repository_keys.xsh` for `repository/` source keys and recipe-specific
-modules (`linux_recipe.xsh`, `m4_recipe.xsh`, `dwl_recipe.xsh`, ...).
-`tests/pm/fixtures/` holds staged inputs, not tests.
+PM behavior is covered by focused modules under `tests/pm/`. Name the module
+when iterating on a contract. `tests/pm/fixtures/` holds staged inputs.
 
 The isolated `pm_graph_contracts.xsh` module covers nominal plan-action identity,
 dependency-first ordering, selection boundaries, and cycle errors without

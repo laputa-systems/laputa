@@ -9,9 +9,7 @@ supply the installer's package roots or image policy.
 
 ## Current Shape
 
-- The primary tested installer is now a compact hybrid ISO artifact written
-  directly by XSH. The raw GPT installer image path was removed; the ISO is the
-  only installer artifact.
+- The installer is a compact hybrid ISO written directly by XSH.
 - The image contains an ESP with `EFI/BOOT/BOOTAA64.EFI` (aarch64) or
   `EFI/BOOT/BOOTX64.EFI` (x86_64), but the current QEMU
   harness boots the packaged kernel directly with `-kernel` and `-append`.
@@ -28,9 +26,6 @@ supply the installer's package roots or image policy.
 - Direct root boot without a separate initramfs depends on the kernel carrying
   a tiny built-in default cpio payload that seeds `/dev/console`, `/dev/null`,
   and `/dev/root`. This is kernel build input, not a QEMU `-initrd`.
-- The installer test command line boots
-  `root=PARTUUID=55555555-5555-5555-5555-555555555555`. The target smoke boot
-  uses `root=PARTUUID=33333333-3333-3333-3333-333333333333`.
 - There is still no bootloader. The ISO includes an ESP fallback kernel, but
   standalone EFI media boot still needs a way to pass a kernel command line.
   Both kernels carry a built-in command line naming
@@ -113,11 +108,12 @@ It creates sparse image files with native `Path.truncate`, builds a compact
 target-root tarball, copies the EFI fallback
 kernel into the installer payload, autosizes the installer root image from its
 contents unless `LAPUTA_INSTALLER_ROOT_MB` is set, formats the installer root
-through `laputa-fs` (sized from the root's block count in laputa-fs's ext4
-layout), and writes a minimal hybrid ISO/GPT artifact directly with
+through `laputa-fs`, and writes a minimal hybrid ISO/GPT artifact directly with
 XSH byte APIs. Its ISO9660 view exposes the selected kernel, and
 its GPT view exposes the installer ext4 root partition with the same
 deterministic `PARTUUID` used by the QEMU harness.
+`installer/rootfs_size.xsh` accounts for per-group metadata and pads a partial
+final block group so its inode table fits.
 `LAPUTA_INSTALLER_JOBS` controls the PM import concurrency (default 4).
 
 ## Install Flow
@@ -153,8 +149,8 @@ uses 2x detected memory for swap and fails if the target disk is too small.
   ISO media boot needs either a tiny EFI loader that passes LoadOptions, a
   real bootloader, or a kernel config choice that supplies a usable default
   command line without rebuilding for every installer iteration.
-- The installer is proven under QEMU `virt` (aarch64) and `pc` with KVM
-  (x86_64) only.
+- The harness supports QEMU `virt` (aarch64) and `pc` with KVM (x86_64).
+  See [verification limits](TESTING.md) for the aarch64 gap.
 - Networking is brought up with the XSH `ifup` applet when present, with the
   old minimal static IPv4 parser retained only as a fallback. The installed
   system receives the installer's address/netmask/gateway where possible, with
