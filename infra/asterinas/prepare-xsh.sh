@@ -31,7 +31,7 @@ mkdir -p "$stage"
 trap 'if [[ -d "$stage" ]]; then chmod -R u+w "$stage"; rm -rf "$stage"; fi' EXIT
 git --git-dir="$cache_dir" archive --format=tar "$XSH_COMMIT" | tar -xf - -C "$stage"
 git -C "$stage" init --quiet
-git -C "$stage" add --all
+git -C "$stage" add --all --force
 GIT_AUTHOR_NAME='Laputa Asterinas build' GIT_AUTHOR_EMAIL='build@laputa.invalid' \
     GIT_COMMITTER_NAME='Laputa Asterinas build' GIT_COMMITTER_EMAIL='build@laputa.invalid' \
     GIT_AUTHOR_DATE='1970-01-01T00:00:00+0000' GIT_COMMITTER_DATE='1970-01-01T00:00:00+0000' \
