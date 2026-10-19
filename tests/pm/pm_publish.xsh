@@ -1,6 +1,9 @@
 ##! Behavior coverage for verified BuildPlan repository snapshots and immutable file publication.
 use pm.catalog
+use pm.execute as execute
+use pm.local as local
 use pm.plan
+use pm.plan_json
 use pm.policy
 use pm.proof as pm_proof
 use pm.remote
@@ -78,6 +81,33 @@ proc node_named(value: types.BuildPlan, name: Str) [error] -> Result[types.PlanN
   Err(types.PmError.PackageContract(f"missing published node {name}"))
 }
 
+pure remote_decoder_row(metapackage: Bool, tarball: Str, sha256: Str, size: Int) -> Record {
+  {
+    arch: "aarch64",
+    name: "decoder",
+    ver: "1",
+    rel: "1",
+    deps: [],
+    runtime_only_deps: [],
+    mkdeps_host: [],
+    mkdeps_target: [],
+    sha256,
+    size,
+    tarball,
+    metadata: "metadata/aarch64/decoder/decoder-1-1.json",
+    metadata_sha256: "",
+    artifact_key: "",
+    recipe_sha256: "",
+    executor_sha256: "",
+    proof_key: "",
+    proof_sha256: "",
+    proof: "",
+    proof_receipt_sha256: "",
+    source_sha256: "",
+    metapackage,
+  }
+}
+
 proc stage_plan_artifacts(
   ctx: TestContext,
   value: types.BuildPlan,
@@ -86,6 +116,7 @@ proc stage_plan_artifacts(
   include_package_kind = true,
   package_kind = "payload",
   target: types.Target = types.target_aarch64(),
+  dependency_order: List[Str] = [],
 ) {
   let executor_sha256 = publish_executor_sha256()
   let arch = types.pm_target_arch(target)
@@ -95,8 +126,11 @@ proc stage_plan_artifacts(
     let payload = fp"{staged_root}/payload.tar.gz"
     let metadata = fp"{staged_root}/metadata.json"
     let proof = fp"{staged_root}/proof.json"
-    payload.write(f"payload {node.package_id}\n")
+    payload.write(if package_kind == "meta" { "laputa metapackage payload marker\n" } else { f"payload {node.package_id}\n" })
     let payload_sha256 = hash.sha256(payload)?.hex()
+    let runtime_dependencies = [
+      dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()
+    ]
     if include_package_kind {
       json.write(
         metadata,
@@ -106,7 +140,16 @@ proc stage_plan_artifacts(
           additional_metadata: {source: "recipe"},
           ver: node.ver,
           rel: node.rel,
+          deps: if dependency_order.is_empty() or runtime_dependencies.is_empty() { runtime_dependencies } else { dependency_order },
+          runtime_only_deps: [
+            dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+          ],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
           package_kind,
+          filetree: [],
+          manifest: [],
+          metadata_sha256: "",
           files: [],
         },
       )
@@ -119,6 +162,15 @@ proc stage_plan_artifacts(
           additional_metadata: {source: "recipe"},
           ver: node.ver,
           rel: node.rel,
+          deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()],
+          runtime_only_deps: [
+            dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+          ],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
+          filetree: [],
+          manifest: [],
+          metadata_sha256: "",
           files: [],
         },
       )
@@ -272,6 +324,232 @@ export let filetree = []
     } else {
       assert entry.runtime_only_deps == []
     }
+  }
+}
+
+test test_published_metapackage_imports_without_a_payload_object [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_publish_repository(ctx, "publish-meta-import-repo")?
+  let selector = fp"{repo_root}/packages/selector"
+  selector.mkdir()
+  fp"{selector}/PKGBUILD.xsh".write(
+    """##! Published metadata-only selector fixture.
+## Package name.
+export let name = "selector"
+## Explicit package classification.
+export let package_kind = "meta"
+## Package version.
+export let ver = "1"
+## Package release.
+export let rel = "1"
+## Runtime dependencies.
+export let deps = ["target-sdk", "runtime-lib"]
+## Runtime-only dependencies.
+export let runtime_only_deps = []
+## Host build dependencies.
+export let mkdeps_host = []
+## Target build dependencies.
+export let mkdeps_target = []
+## Fixture sources.
+export let upstream_sources = []
+## Metapackages have no payload files.
+export let filetree = []
+""",
+  )
+  let target = types.target_aarch64()
+  let local_plan = plan.resolve(
+    catalog.load_for_target(repo_root, target)?,
+    publish_empty_remote(),
+    policy.aarch64_docker(),
+    ["selector"],
+    false,
+  )?
+  let local_store = test.temp_dir(ctx, name: "publish-meta-import-local-store")?
+  stage_plan_artifacts(
+    ctx,
+    local_plan,
+    local_store,
+    package_kind: "meta",
+    dependency_order: ["target-sdk", "runtime-lib"],
+  )
+  let remote_root = test.temp_dir(ctx, name: "publish-meta-import-remote")?
+  let remote_url = f"file://{remote_root}"
+  repo.publish(
+    repo.snapshot(local_plan, local_store)?,
+    remote_url,
+    "",
+    test.temp_dir(ctx, name: "publish-meta-import-work")?,
+  )
+
+  let index_path = fp"{remote_root}/index.json"
+  let index = remote.load_remote_index_from(index_path)?
+  let selector_row = index_row(index, "selector")?
+  assert selector_row.metapackage
+  assert selector_row.deps == ["runtime-lib", "target-sdk"]
+  assert selector_row.tarball == ""
+  assert selector_row.sha256 == ""
+  assert selector_row.size == 0
+  assert fp"{remote_root}/packages/aarch64/selector/selector-1-1.tar.gz".exists()? == false
+
+  let index_cache = test.temp_dir(ctx, name: "publish-meta-import-index-cache")?
+  let remote_packages: List[types.RemotePlanArtifact] = [
+    remote.plan_artifact_from_package_at_repo(entry, remote_url, index_cache)?
+    for entry in index
+  ]
+  let remote_snapshot: types.RemoteSnapshot = {
+    target,
+    index_sha256: hash.sha256(index_path)?.hex(),
+    packages: remote_packages,
+  }
+  let imported_plan = plan.resolve(
+    catalog.load_for_target(repo_root, target)?,
+    remote_snapshot,
+    policy.aarch64_docker(),
+    ["selector"],
+    false,
+  )?
+  let selector_node = node_named(imported_plan, "selector")?
+  assert types.plan_action_text(selector_node.action) == "reuse-remote"
+  assert [dependency.name for dependency in selector_node.dependencies] == ["runtime-lib", "target-sdk"]
+
+  let serialized_plan = fp"{test.temp_dir(ctx, name: "publish-meta-import-plan")?}/plan.json"
+  plan_json.write_plan(serialized_plan, imported_plan)
+  let round_tripped = plan_json.read(serialized_plan)?
+  let imported_store = test.temp_dir(ctx, name: "publish-meta-import-imported-store")?
+  let result = execute.build_plan(round_tripped, repo_root, imported_store, remote_url, 1)?
+  let selector_receipt = [receipt for receipt in result.artifacts if receipt.package_name == "selector"][0]
+  let marker = fp"{selector_receipt.artifact_dir}/payload.tar.gz"
+  let marker_hash = bytes.from_text("laputa metapackage payload marker\n").sha256().hex()
+  assert marker.read_text()? == "laputa metapackage payload marker\n"
+  assert hash.sha256(marker)?.hex() == marker_hash
+  let metadata = json.read(fp"{selector_receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+  assert metadata.package_kind == "meta"
+  assert metadata.filetree.is_empty()
+  assert metadata.manifest.is_empty()
+  assert metadata.files.is_empty()
+  assert selector_receipt.dependency_keys == [
+    node_named(imported_plan, "runtime-lib")?.artifact_key,
+    node_named(imported_plan, "target-sdk")?.artifact_key,
+  ]
+
+  let selector_artifact = [package for package in remote_packages if package.name == "selector"][0]
+  let remote_metadata = fp"{remote_root}/{selector_row.metadata}"
+  let original_metadata: local.PackageMetadataDto = json.read(remote_metadata)?.require(local.PackageMetadataDto)?
+  let selector_remote_node = {...selector_node, remote: selector_artifact.retrieval}
+  json.write(remote_metadata, {...original_metadata, package_kind: "payload"})
+  let wrong_kind_node = {
+    ...selector_remote_node,
+    remote: {
+      ...selector_artifact.retrieval,
+      metadata_sha256: hash.sha256(remote_metadata)?.hex(),
+    },
+  }
+  let wrong_kind_store = test.temp_dir(ctx, name: "publish-meta-import-wrong-kind-store")?
+
+  match store.import_remote(
+    target,
+    wrong_kind_store,
+    wrong_kind_node,
+    remote_url,
+    test.temp_dir(ctx, name: "publish-meta-import-wrong-kind-cache")?,
+  ) {
+    Ok(_) => test.fail("metadata-only retrieval accepted payload metadata")
+    Err(problem) => assert "declares a payload" in problem.message
+  }
+
+  assert store.artifact_path(wrong_kind_store, selector_node.artifact_key).exists()? == false
+  json.write(remote_metadata, {...original_metadata, filetree: [{path: "bin/invalid", kind: "file"}]})
+  let inventory_node = {
+    ...selector_remote_node,
+    remote: {
+      ...selector_artifact.retrieval,
+      metadata_sha256: hash.sha256(remote_metadata)?.hex(),
+    },
+  }
+  let inventory_store = test.temp_dir(ctx, name: "publish-meta-import-inventory-store")?
+
+  match store.import_remote(
+    target,
+    inventory_store,
+    inventory_node,
+    remote_url,
+    test.temp_dir(ctx, name: "publish-meta-import-inventory-cache")?,
+  ) {
+    Ok(_) => test.fail("metadata-only retrieval accepted a nonempty payload inventory")
+    Err(problem) => assert "declares payload files" in problem.message
+  }
+
+  assert store.artifact_path(inventory_store, selector_node.artifact_key).exists()? == false
+
+  let extra_dependency_metadata = {...original_metadata, deps: ["runtime-lib", "target-sdk", "unexpected"]}
+  json.write(remote_metadata, extra_dependency_metadata)
+  let extra_dependency_node = {
+    ...selector_remote_node,
+    remote: {
+      ...selector_artifact.retrieval,
+      metadata_sha256: hash.sha256(remote_metadata)?.hex(),
+    },
+  }
+
+  match store.import_remote(
+    target,
+    test.temp_dir(ctx, name: "publish-meta-import-extra-dependency-store")?,
+    extra_dependency_node,
+    remote_url,
+    test.temp_dir(ctx, name: "publish-meta-import-extra-dependency-cache")?,
+  ) {
+    Ok(_) => test.fail("metadata-only retrieval accepted an undeclared dependency")
+    Err(problem) => assert "dependencies do not match" in problem.message
+  }
+
+  let duplicate_dependency_metadata = {...original_metadata, deps: ["runtime-lib", "runtime-lib", "target-sdk"]}
+  json.write(remote_metadata, duplicate_dependency_metadata)
+  let duplicate_dependency_node = {
+    ...selector_remote_node,
+    remote: {
+      ...selector_artifact.retrieval,
+      metadata_sha256: hash.sha256(remote_metadata)?.hex(),
+    },
+  }
+
+  match store.import_remote(
+    target,
+    test.temp_dir(ctx, name: "publish-meta-import-duplicate-dependency-store")?,
+    duplicate_dependency_node,
+    remote_url,
+    test.temp_dir(ctx, name: "publish-meta-import-duplicate-dependency-cache")?,
+  ) {
+    Ok(_) => test.fail("metadata-only retrieval accepted a duplicate dependency")
+    Err(problem) => assert "dependencies do not match" in problem.message
+  }
+}
+
+test test_remote_decoder_keeps_payload_states_unambiguous [fs, net, env, error] { |ctx|
+  let empty_meta = remote.decode_remote_package(remote_decoder_row(true, "", "", 0))?
+  let meta_plan = remote.plan_artifact_from_package(empty_meta)?
+  assert types.remote_payload_is_metadata_only(meta_plan.retrieval.payload)
+  assert types.remote_payload_tarball(meta_plan.retrieval.payload) == ""
+  assert types.remote_payload_sha256(meta_plan.retrieval.payload) == ""
+
+  let empty_legacy = remote.decode_remote_package(remote_decoder_row(false, "", "", 0))?
+  let legacy_plan = remote.plan_artifact_from_package(empty_legacy)?
+  assert ! types.remote_payload_is_metadata_only(legacy_plan.retrieval.payload)
+  assert types.remote_payload_tarball(legacy_plan.retrieval.payload) == "packages/aarch64/decoder/decoder-1-1.tar.gz"
+  assert types.remote_payload_sha256(legacy_plan.retrieval.payload) != ""
+
+  let archive_row = remote.decode_remote_package(remote_decoder_row(false, "packages/aarch64/decoder/decoder-1-1.tar.gz", "payload", 7))?
+  let archive_plan = remote.plan_artifact_from_package(archive_row)?
+  assert ! types.remote_payload_is_metadata_only(archive_plan.retrieval.payload)
+  assert types.remote_payload_tarball(archive_plan.retrieval.payload) == archive_row.tarball
+  assert types.remote_payload_sha256(archive_plan.retrieval.payload) == archive_row.sha256
+
+  match remote.decode_remote_package(remote_decoder_row(false, "packages/aarch64/decoder/decoder-1-1.tar.gz", "", 7)) {
+    Ok(_) => test.fail("partial archive coordinates unexpectedly decoded")
+    Err(problem) => assert "declared together" in problem.message
+  }
+
+  match remote.decode_remote_package(remote_decoder_row(true, "packages/aarch64/decoder/decoder-1-1.tar.gz", "payload", 7)) {
+    Ok(_) => test.fail("metapackage archive coordinates unexpectedly decoded")
+    Err(problem) => assert "must not declare an archive payload" in problem.message
   }
 }
 
@@ -506,8 +784,12 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
       action: .ReuseRemote("legacy remote artifact"),
       remote: {
         arch: "aarch64",
-        tarball: payload.relative_to(remote_root).display(),
-        tarball_sha256: hash.sha256(payload)?.hex(),
+        payload: types.RemoteArchive(
+          types.RemoteArchiveCoordinates(
+            tarball: payload.relative_to(remote_root).display(),
+            sha256: hash.sha256(payload)?.hex(),
+          ),
+        ),
         metadata: metadata.relative_to(remote_root).display(),
         metadata_sha256: hash.sha256(metadata)?.hex(),
       },
@@ -593,12 +875,29 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
   let snapshot = repo.snapshot(value, store_root)?
   let work = test.temp_dir(ctx, name: "publish-local-mirror-work")?
   let local_mirror = "http://127.0.0.1:3000"
-  let created = {status: 201, reason: "Created", bytes: 0, headers: [], url: local_mirror}
+  let created = {
+    status: 201,
+    reason: "Created",
+    bytes: 0,
+    headers: [],
+    url: local_mirror,
+    effective_url: local_mirror,
+    redirect_count: 0,
+  }
   test.mock(
     ctx,
     "net.request",
     {url: f"{local_mirror}/index.json"},
-    Ok({status: 404, reason: "Not Found", bytes: 0, headers: [], url: f"{local_mirror}/index.json", body: b""}),
+    Ok({
+      status: 404,
+      reason: "Not Found",
+      bytes: 0,
+      headers: [],
+      url: f"{local_mirror}/index.json",
+      effective_url: f"{local_mirror}/index.json",
+      redirect_count: 0,
+      body: b"",
+    }),
   )
   # Three immutable objects per package, then the index.
   test.mock(ctx, "net.upload", {method: "PUT"}, Ok(created), snapshot.packages.len() * 3 + 1)

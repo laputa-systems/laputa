@@ -174,8 +174,12 @@ proc resolve_plan(
 pure retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
-    tarball_sha256: f"payload-{name}-{ver}-{rel}",
+    payload: types.RemoteArchive(
+      types.RemoteArchiveCoordinates(
+        tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
+        sha256: f"payload-{name}-{ver}-{rel}",
+      ),
+    ),
     metadata: f"metadata/aarch64/{name}/{name}-{ver}-{rel}.json",
     metadata_sha256: f"metadata-{name}-{ver}-{rel}",
   }
@@ -188,8 +192,12 @@ pure plan_test_sha256(value: Str) -> Str {
 pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
-    tarball_sha256: plan_test_sha256(f"legacy payload {name}-{ver}-{rel}"),
+    payload: types.RemoteArchive(
+      types.RemoteArchiveCoordinates(
+        tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
+        sha256: plan_test_sha256(f"legacy payload {name}-{ver}-{rel}"),
+      ),
+    ),
     metadata: f"metadata/aarch64/{name}/{name}-{ver}-{rel}.json",
     metadata_sha256: plan_test_sha256(f"legacy metadata {name}-{ver}-{rel}"),
   }
@@ -441,6 +449,32 @@ test test_build_plan_json_round_trip_and_detects_corruption [fs, env, error] { |
   match plan_json.read(path_value) {
     Ok(_) => test.fail("corrupt plan digest unexpectedly loaded")
     Err(problem) => assert "digest does not match" in problem.message
+  }
+}
+
+test test_build_plan_json_rejects_partial_remote_archive_coordinates [fs, env, error] { |ctx|
+  let packages = plan_catalog(ctx, "plan-json-remote-payload")?
+  let local = resolve_plan(packages, ["app"], empty_remote_snapshot())?
+  let value = resolve_plan(packages, ["app"], exact_remote_snapshot(local)?)?
+  let path_value = fp"{test.temp_dir(ctx, name: "plan-json-remote-payload")?}/plan.json"
+  plan_json.write_plan(path_value, value)
+  let raw = json.read(path_value)?.require(plan_json.BuildPlanDto)?
+  let nodes = collect {
+    for node in raw.nodes {
+      let retrieval = node.remote
+
+      if node.name == "app" and retrieval != null {
+        yield {...node, remote: {...retrieval, tarball_sha256: ""}}
+      } else {
+        yield node
+      }
+    }
+  }
+  path_value.write(json.encode({...raw, nodes})?)
+
+  match plan_json.read(path_value) {
+    Ok(_) => test.fail("partial remote archive coordinates unexpectedly loaded")
+    Err(problem) => assert "archive path and SHA-256 must be declared together" in problem.message
   }
 }
 

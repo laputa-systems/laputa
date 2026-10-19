@@ -26,6 +26,11 @@ export type PackageMetadataDto = {
   files: List[PackageFileEntryDto],
 }
 
+## Return the canonical Store payload used for metadata-only packages.
+export pure metapackage_payload_marker() -> Str {
+  "laputa metapackage payload marker\n"
+}
+
 ## Exported PM declaration `collect_manifest_text`.
 export pure collect_manifest_text(manifest: List[Path]) -> Result[List[Str], Error] {
   let lines = [rel_path.display() for rel_path in manifest]

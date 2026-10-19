@@ -299,8 +299,12 @@ pure remote_node(key: Str, payload: Str, metadata: Str) -> types.PlanNode {
     action: .ReuseRemote("exact remote artifact"),
     remote: {
       arch: "aarch64",
-      tarball: "packages/aarch64/demo/demo-1.0.0-1.tar.gz",
-      tarball_sha256: digest(payload),
+      payload: types.RemoteArchive(
+        types.RemoteArchiveCoordinates(
+          tarball: "packages/aarch64/demo/demo-1.0.0-1.tar.gz",
+          sha256: digest(payload),
+        ),
+      ),
       metadata: "metadata/aarch64/demo/demo-1.0.0-1.json",
       metadata_sha256: digest(metadata),
     },

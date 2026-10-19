@@ -3,6 +3,7 @@
 # in its receipt. Lookups trust a committed directory and do not re-hash it;
 # `verify_artifact`, `verify_receipt`, and `verify_all` re-hash on request.
 use remote
+use local
 use types
 use util
 
@@ -24,6 +25,21 @@ type ArtifactReceiptDto = {
 }
 
 type RemoteMetadataDto = {name: Str, ver: Str, rel: Str}
+
+type RemoteMetapackageMetadataDto = {
+  arch: Str,
+  name: Str,
+  ver: Str,
+  rel: Str,
+  deps: List[Str],
+  runtime_only_deps: List[Str],
+  mkdeps_host: List[Str],
+  mkdeps_target: List[Str],
+  filetree: List[Record],
+  manifest: List[Str],
+  package_kind: Str,
+  files: List[Record],
+}
 
 type ReceiptFormatDto = {format: Str}
 
@@ -412,6 +428,53 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) -> Result[Str]
   value
 }
 
+proc verify_remote_metapackage_metadata(metadata: Path, node: types.PlanNode, arch: Str) {
+  let dto = json.read(metadata)?.require(RemoteMetapackageMetadataDto)?
+  let runtime_dependencies = [
+    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()
+  ] |> sort
+  let runtime_only_dependencies = [
+    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+  ] |> sort
+  let build_host_dependencies = [
+    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()
+  ] |> sort
+  let build_target_dependencies = [
+    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()
+  ] |> sort
+  let metadata_runtime_dependencies = dto.deps |> sort
+  let metadata_runtime_only_dependencies = dto.runtime_only_deps |> sort
+  let metadata_build_host_dependencies = dto.mkdeps_host |> sort
+  let metadata_build_target_dependencies = dto.mkdeps_target |> sort
+
+  if dto.arch != arch or dto.name != node.name or dto.ver != node.ver or dto.rel != node.rel {
+    return Err(types.PmError.PackageContract(f"remote metapackage metadata does not match plan node {node.package_id}"))
+  }
+
+  if types.parse_package_kind(dto.package_kind)? != types.package_meta() {
+    return Err(types.PmError.PackageContract(f"remote metapackage metadata for {node.package_id} declares a payload"))
+  }
+
+  if ! dto.filetree.is_empty() or ! dto.manifest.is_empty() or ! dto.files.is_empty() {
+    return Err(types.PmError.PackageContract(f"remote metapackage metadata for {node.package_id} declares payload files"))
+  }
+
+  if metadata_runtime_dependencies != runtime_dependencies or metadata_runtime_only_dependencies != runtime_only_dependencies or metadata_build_host_dependencies != build_host_dependencies or metadata_build_target_dependencies != build_target_dependencies {
+    return Err(types.PmError.PackageContract(f"remote metapackage metadata dependencies do not match plan node {node.package_id}"))
+  }
+}
+
+proc verify_remote_archive_metadata(metadata: Path, node: types.PlanNode) {
+  let raw = json.read(metadata)?.require(Record)?
+  return when ! ("package_kind" in raw)
+
+  let kind = types.parse_package_kind(raw.get("package_kind")?.require()?)?
+
+  if kind == types.package_meta() {
+    return Err(types.PmError.PackageContract(f"remote archive metadata for {node.package_id} declares a metapackage"))
+  }
+}
+
 proc remote_staged_artifact_for(
   node: types.PlanNode,
   retrieval: types.RemoteRetrieval,
@@ -424,11 +487,23 @@ proc remote_staged_artifact_for(
   let metadata = fp"{cache_dir}/metadata.json"
   let proof = fp"{cache_dir}/proof.json"
   cache_dir.mkdir()
-  fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")
-  fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
-  let executor_sha256 = remote_executor_sha256(metadata, node)?
-  # fetch_remote_object verified the payload against this digest.
-  let payload_sha256 = retrieval.tarball_sha256
+  let imported = if types.remote_payload_is_metadata_only(retrieval.payload) {
+    fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
+    let executor_sha256 = remote_executor_sha256(metadata, node)?
+    verify_remote_metapackage_metadata(metadata, node, retrieval.arch)
+    payload.write_atomic(local.metapackage_payload_marker())
+    {payload_sha256: hash.sha256(payload)?.hex(), executor_sha256}
+  } else {
+    let tarball = types.remote_payload_tarball(retrieval.payload)
+    let sha256 = types.remote_payload_sha256(retrieval.payload)
+    fetch_remote_object(remote_repo, fp"{tarball}", payload, sha256, "payload")
+    fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
+    let executor_sha256 = remote_executor_sha256(metadata, node)?
+    verify_remote_archive_metadata(metadata, node)
+    {payload_sha256: sha256, executor_sha256}
+  }
+  let payload_sha256 = imported.payload_sha256
+  let executor_sha256 = imported.executor_sha256
   proof.write_atomic(
     json.encode({
       format: "laputa-package-proof-1",

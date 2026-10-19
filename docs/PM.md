@@ -6,6 +6,13 @@ publishes verified snapshots, and composes runtime-only root generations.
 Publication validates package identity before adding artifact and proof fields;
 additional recipe metadata survives that augmentation unchanged.
 
+Repository index rows mark metadata-only packages with `metapackage: true` and
+empty `tarball` and `sha256` fields. Remote plans preserve that empty pair as a
+metadata-only retrieval; import verifies the metadata kind and empty payload
+inventory, then stages the same canonical marker used by local builds. Archive
+rows require both payload fields, while the legacy non-metadata empty-pair form
+continues to resolve to its historical archive path.
+
 ## Package Contract
 
 Recipes live at `packages/<package>/PKGBUILD.xsh` and export:
