@@ -39,8 +39,9 @@ $XSHT test --jobs 1 tests/integration/cross_consumer.xsh
 
 Use `cargo -j 4` for Rust checks. `make mirror-test` checks the mirror and its
 POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.
-`make verify` is the full host proof from a clean build, with logs and a timing
-table under `.out/verify/`; reserve it for an explicit full verification run.
+`make verify` runs the full host proof incrementally and records logs and a
+timing table under `.out/verify/`. It preserves existing derived state; run
+`make clean` separately when you intend to remove those outputs.
 
 The bootstrap campaign completed a clean x86_64 world build and both QEMU
 proofs. Its later shared-path changes did not receive a full aarch64 rebuild

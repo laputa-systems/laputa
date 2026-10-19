@@ -135,10 +135,6 @@ test-linux: need-xsh
 	$(HOST_XSH_ENV) XSH_LINUX_KBUILD_PLAN_CACHE_DIR="$(LINUX_KBUILD_TEST_CACHE)" $(XSHT) test packages/linux/tests
 	$(HOST_XSH_ENV) $(XSHT) test packages/linux-headers/tests
 
-# The whole host proof from `make clean`: host tools, fetch, seed, the world,
-# publish, root, the installer image and its QEMU proof, the qemu-dwl-foot
-# proof, check, the native suites, mirror-test, and a no-op rebuild, one step
-# at a time. Logs and the timing table go to .out/verify/.
 verify: need-xsh
 	$(HOST_XSH_ENV) $(XSH) seed/verify.xsh -- $(ARCH)
 

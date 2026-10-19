@@ -277,5 +277,5 @@ targets leave it in place.
 | `make asterinas-clean` | removes all checkout build outputs, fetched caches, and pinned builder images for a cold Asterinas rebuild |
 | `make asterinas-setup` | builds the pinned Asterinas PVH kernel and boots a small KVM smoke guest |
 | `make store-gc` | remove store artifacts that neither the last world plan nor a profile plan names (between builds only) |
-| `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |
+| `make verify` | the full host proof using existing derived state, with logs and a timing table in `.out/verify/` |
 | `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images), through a container on Linux because rootful Docker leaves root-owned files; `make distclean` also removes `.cache/` |

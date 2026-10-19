@@ -1,10 +1,5 @@
 #!/bin/xsh
-##! `make verify`: the whole host proof from `make clean`, one step at a time, with a timing report.
-# Every step is a make target run in order; the first failure stops the run.
-# The mirror runs for the steps that need it and is stopped afterwards, so the
-# run leaves no process behind. Each step's output is in .out/verify/STEP.log
-# and the table in .out/verify/report.md. `make clean` deletes .out/, so the
-# logs are written only after it.
+##! `make verify`: run the full host proof incrementally, one step at a time, with a timing report.
 
 type Step = {name: Str, argv: List[Str]}
 
@@ -50,8 +45,6 @@ proc mirror_ready(curl: Path) [process, error] -> Result[Bool] {
   status.ok
 }
 
-# Cancelling the `make mirror` handle signals its whole process group, the
-# server included.
 proc stop_mirror(mirror: ProcessHandle?) [process, error] {
   guard let handle = mirror else {
     return
@@ -74,20 +67,13 @@ proc main(arch: Str) [fs, process, env, time, error] {
   let make = process.which("make")?
   let curl = process.which("curl")?
 
-  # `clean` removes .out/, so its output goes to the console only.
-  let started = time.now()
-  let cleaned = process.run(process.command_argv(make, ["make", "clean"], root))?
-  fail "make clean failed" unless cleaned.ok
-
-  var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
   let logs = fp"{root}/.out/verify"
-  logs.mkdir()
+  logs.mkdir(parents: true)
+  var timed: List[Timed] = []
   var mirror = null
 
   for step in steps(arch) {
     if step.name == "publish" {
-      # Started after the world build, so its own first-run build does not
-      # overlap the heaviest step.
       let handle = spawn process.command_argv(
         make,
         ["make", "mirror"],

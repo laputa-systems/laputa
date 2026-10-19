@@ -105,6 +105,63 @@ test test_seed_mounts_binaries_and_core_from_one_directory [error] {
   ]
 }
 
+proc verify_runner() -> Result[Path] {
+  let configured = (e"XSH_HOST" ?? "").trim()
+  return fp"{configured}" when configured != ""
+  process.which("xsh")?
+}
+
+test test_verify_preserves_derived_outputs_when_first_step_fails [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "verify-preserves-derived-output")?
+  let docker_bin = fp"{root}/bin"
+  docker_bin.mkdir()
+  fp"{root}/.out/artifacts/aarch64".mkdir()
+  fp"{root}/target/laputa/qemu-dwl-foot".mkdir()
+  fp"{root}/.out/artifacts/aarch64/sentinel".write("artifact bytes\n")
+  fp"{root}/target/laputa/qemu-dwl-foot/sentinel".write("target bytes\n")
+  fp"{root}/.out/sentinel".write("output bytes\n")
+  let docker_log = fp"{root}/docker.log"
+  fp"{docker_bin}/docker".write(
+    "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$DOCKER_LOG\"\n",
+    mode: 0o755,
+  )
+  fp"{root}/Makefile".write(
+    """.PHONY: clean host-xsh mirror-clean
+clean: mirror-clean
+	rm -rf .out target
+	docker image ls --quiet --filter reference=laputa-host-tools
+	docker volume rm --force laputa-artifacts-aarch64-v2
+mirror-clean:
+	@:
+host-xsh:
+	@printf 'host-xsh deliberate failure\\n' >&2; exit 23
+""",
+  )
+  let xsh = verify_runner()?
+  let script = fp"{path.absolute(p".")?}/seed/verify.xsh"
+  let path_value = f"{docker_bin}:{e"PATH" ?? ""}"
+  let status = process.run(
+    process.command_argv(
+      xsh,
+      [xsh, script, "--", "aarch64"],
+      cwd: root,
+      env: {PATH: path_value, DOCKER_LOG: docker_log.display()},
+    ),
+  )?
+
+  assert ! status.ok
+  assert fp"{root}/.out/sentinel".read_text()? == "output bytes\n"
+  assert fp"{root}/.out/artifacts/aarch64/sentinel".read_text()? == "artifact bytes\n"
+  assert fp"{root}/target/laputa/qemu-dwl-foot/sentinel".read_text()? == "target bytes\n"
+  assert ! docker_log.exists()?
+  let report = fp"{root}/.out/verify/report.md".read_text()?
+  assert "| `host-xsh` |" in report and "| FAILED |" in report
+  assert ! ("| `clean` |" in report)
+  assert ! ("| `fetch` |" in report)
+  assert ! fp"{root}/.out/verify/mirror.log".exists()?
+  assert "host-xsh deliberate failure" in fp"{root}/.out/verify/host-xsh.log".read_text()?
+}
+
 proc image_fixture(ctx: TestContext) -> Result[Path] {
   let root = test.temp_dir(ctx, name: "images")?
   fp"{root}/seed".mkdir()
