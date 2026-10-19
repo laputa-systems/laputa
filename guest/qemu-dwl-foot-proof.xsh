@@ -36,7 +36,19 @@ proc guest_run_required(command: Command, phase: Str) {
   }
 }
 
+proc guest_require_xshi() [fs, process, error] {
+  if let Ok(captured) = try run.capture --text /usr/bin/xshi --no-config -c "print \"LAPUTA_XSHI_PROOF_OK\"" {
+    if ! captured.status.ok or captured.stdout != "LAPUTA_XSHI_PROOF_OK\n" or captured.stderr != "" {
+      guest_fail("xshi", "xshi command returned an unexpected result")
+    }
+  } else {
+    guest_fail("xshi", "xshi command could not start")
+  }
+}
+
 proc main() [fs, process, time, error] {
+  guest_require_xshi()
+
   let _mdevd = spawn process.command_argv(
     /usr/bin/mdevd,
     ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-C"],
