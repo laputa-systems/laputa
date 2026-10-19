@@ -236,14 +236,14 @@ else
     tar -xzf "$archive_path" -C "$scratch_dir/firecracker"
     candidate="$(find "$scratch_dir/firecracker" -type f -name "firecracker-${firecracker_version}-x86_64" -print -quit)"
     [[ -n "$candidate" ]] || fail "Firecracker archive did not contain the expected x86_64 executable"
-    "$candidate" --version | grep -Fq "$firecracker_version" || \
-        fail "downloaded Firecracker binary does not report $firecracker_version"
     install_tmp="$firecracker_bin.tmp.$$"
     cp "$candidate" "$install_tmp"
     chmod 755 "$install_tmp"
     binary_hash="$(sha256sum "$install_tmp" | awk '{print $1}')"
     [[ "$binary_hash" == "$FIRECRACKER_BINARY_SHA256" ]] || \
         fail "Firecracker binary checksum mismatch for $firecracker_version: expected $FIRECRACKER_BINARY_SHA256, found $binary_hash"
+    "$install_tmp" --version | grep -Fq "$firecracker_version" || \
+        fail "downloaded Firecracker binary does not report $firecracker_version"
     mv -f "$install_tmp" "$firecracker_bin"
     printf '%s\n' "$firecracker_version" > "$output_dir/firecracker.version.tmp"
     mv -f "$output_dir/firecracker.version.tmp" "$output_dir/firecracker.version"
