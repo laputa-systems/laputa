@@ -14,13 +14,12 @@ export type SignedReleaseInput = {
   now_epoch_seconds: Int,
 }
 
-## Existing build and store inputs plus separate candidate-generation and overlay paths.
+## Existing build and store inputs plus the candidate-generation output path.
 export type TrustGenerationTarget = {
   build_plan: types.BuildPlan,
   runtime_roots: List[Str],
   store_root: Path,
   output_root: Path,
-  overlay_root: Path,
 }
 
 ## Signed trust release validation failed.
@@ -165,32 +164,16 @@ proc release_stage_overlay(overlay_root: Path, value: VerifiedTrustRelease) [fs,
   profile
 }
 
-proc release_require_separate_roots(output_root: Path, overlay_root: Path) [error] {
-  guard output_root != overlay_root else {
-    return Err(release_fail("generation output and trust overlay must be separate paths"))
-  }
-
-  let output_inside_overlay = match output_root.strip_prefix(overlay_root) {
-    Ok(_) => true
-    Err(_) => false
-  }
-  let overlay_inside_output = match overlay_root.strip_prefix(output_root) {
-    Ok(_) => true
-    Err(_) => false
-  }
-  guard ! output_inside_overlay and ! overlay_inside_output else {
-    return Err(release_fail("generation output and trust overlay must not contain one another"))
-  }
-}
-
 ## Composes one signed release as a new immutable generation and leaves prior generations untouched.
 export proc compose_signed_release(input: SignedReleaseInput, target: TrustGenerationTarget) [fs, error] -> Result[types.GenerationReceipt, Error] {
   let verified = release_verify(input)?
   release_require(! target.output_root.exists()?, "immutable generation output already exists")
-  release_require_separate_roots(target.output_root, target.overlay_root)
-  target.overlay_root.mkdir()
-  defer target.overlay_root.remove()
-  let profile = release_stage_overlay(target.overlay_root, verified)?
+  target.output_root.parent.mkdir(parents: true)
+  let overlay_root = fs.temp_sibling(target.output_root)?
+  overlay_root.mkdir(parents: false)
+  defer overlay_root.remove(missing_ok: true)
+  overlay_root.chmod(0o700)
+  let profile = release_stage_overlay(overlay_root, verified)?
   let plan = generation.plan_profile(target.build_plan, target.runtime_roots, profile)?
-  generation.compose(plan, target.store_root, target.output_root, target.overlay_root)
+  generation.compose(plan, target.store_root, target.output_root, overlay_root)
 }

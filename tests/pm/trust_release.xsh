@@ -122,8 +122,6 @@ proc expect_rejected_without_mutation(
   name: Str,
   expected: Str,
 ) {
-  let overlay_parent = test.temp_dir(ctx, name: f"trust-release-overlay-{name}")?
-  let overlay_root = fp"{overlay_parent}/staged"
   match trust_release.compose_signed_release(
     input,
     {
@@ -131,14 +129,12 @@ proc expect_rejected_without_mutation(
       runtime_roots: ["ca-certificates"],
       store_root,
       output_root: old_generation,
-      overlay_root,
     },
   ) {
     Ok(_) => test.fail(f"{name}: invalid signed release was accepted")
     Err(problem) => assert expected in problem.message
   }
   assert fp"{old_generation}/generation-marker".read_text()? == "prior generation\n"
-  assert ! overlay_root.exists()?
 }
 
 test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, error] { |ctx|
@@ -149,8 +145,6 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
   let old_generation = test.temp_dir(ctx, name: "trust-release-old-generation")?
   fp"{old_generation}/generation-marker".write("prior generation\n")
   let output_root = test.temp_path(ctx, name: "trust-release-next-generation")
-  let overlay_parent = test.temp_dir(ctx, name: "trust-release-overlay-valid")?
-  let overlay_root = fp"{overlay_parent}/staged"
 
   let receipt = trust_release.compose_signed_release(
     input,
@@ -159,7 +153,6 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
       runtime_roots: ["ca-certificates"],
       store_root,
       output_root,
-      overlay_root,
     },
   )?
 
@@ -168,10 +161,8 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
   assert fp"{output_root}/etc/laputa/trust-policy".read_bytes()? == input.next_policy
   assert fp"{output_root}/etc/ssl/certs/ca-certificates.crt".read_bytes()? == input.root_bundle
   assert fp"{old_generation}/generation-marker".read_text()? == "prior generation\n"
-  assert ! overlay_root.exists()?
   generation.verify_generation(output_root, receipt)
 
-  let second_overlay = fp"{overlay_parent}/second-staging"
   match trust_release.compose_signed_release(
     input,
     {
@@ -179,14 +170,12 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
       runtime_roots: ["ca-certificates"],
       store_root,
       output_root,
-      overlay_root: second_overlay,
     },
   ) {
     Ok(_) => test.fail("signed release overwrote an immutable generation")
     Err(problem) => assert "already exists" in problem.message
   }
   assert fp"{output_root}/etc/laputa/trust-policy".read_bytes()? == input.next_policy
-  assert ! second_overlay.exists()?
 }
 
 test trust_release_rejects_bad_metadata_and_keeps_the_old_generation [fs, env, error] { |ctx|
@@ -285,12 +274,50 @@ test trust_release_rejects_bad_metadata_and_keeps_the_old_generation [fs, env, e
   )
 }
 
-test trust_release_rejects_generation_and_overlay_path_overlap [fs, env, error] { |ctx|
+test trust_release_preserves_unowned_staging_paths [fs, env, error] { |ctx|
   let input = signed_release_input("valid")?
   let value = trust_build_plan(ctx)?
-  let base = test.temp_dir(ctx, name: "trust-release-overlap")?
+  let store_root = test.temp_dir(ctx, name: "trust-release-staging-store")?
+  stage_trust_artifact(ctx, value, store_root)
+  let base = test.temp_dir(ctx, name: "trust-release-staging-collisions")?
   let output_root = fp"{base}/candidate"
-  let store_root = test.temp_dir(ctx, name: "trust-release-overlap-store")?
+  let prior_overlay = fp"{base}/staged"
+  prior_overlay.mkdir()
+  fp"{prior_overlay}/sentinel".write("prior overlay\n")
+  let overlay_alias = fp"{base}/staged-alias"
+  overlay_alias.symlink(to: prior_overlay)
+  let generation_stage_alias = fp"{output_root}.tmp"
+  generation_stage_alias.symlink(to: prior_overlay)
+  let root_stage_sentinel = fp"{output_root}.tmp.tmp"
+  root_stage_sentinel.mkdir()
+  fp"{root_stage_sentinel}/sentinel".write("prior root stage\n")
+
+  let _ = trust_release.compose_signed_release(
+    input,
+    {
+      build_plan: value,
+      runtime_roots: ["ca-certificates"],
+      store_root,
+      output_root,
+    },
+  )?
+
+  assert fp"{prior_overlay}/sentinel".read_text()? == "prior overlay\n"
+  assert overlay_alias.is_symlink()?
+  assert generation_stage_alias.is_symlink()?
+  assert fp"{root_stage_sentinel}/sentinel".read_text()? == "prior root stage\n"
+}
+
+test trust_release_never_replaces_a_broken_destination_alias [fs, env, error] { |ctx|
+  let input = signed_release_input("valid")?
+  let value = trust_build_plan(ctx)?
+  let store_root = test.temp_dir(ctx, name: "trust-release-alias-store")?
+  stage_trust_artifact(ctx, value, store_root)
+  let base = test.temp_dir(ctx, name: "trust-release-alias-output")?
+  let output_root = fp"{base}/candidate"
+  let missing_target = fp"{base}/not-installed"
+  output_root.symlink(to: missing_target)
+
   match trust_release.compose_signed_release(
     input,
     {
@@ -298,13 +325,15 @@ test trust_release_rejects_generation_and_overlay_path_overlap [fs, env, error] 
       runtime_roots: ["ca-certificates"],
       store_root,
       output_root,
-      overlay_root: fp"{output_root}/staged",
     },
   ) {
-    Ok(_) => test.fail("generation accepted an overlay below its output path")
-    Err(problem) => assert "must not contain one another" in problem.message
+    Ok(_) => test.fail("generation replaced a dangling destination symlink")
+    Err(_) => {}
   }
-  assert ! output_root.exists()?
+
+  assert output_root.is_symlink()?
+  assert output_root.readlink()? == missing_target
+  assert ! missing_target.exists()?
 }
 
 test trust_release_composition_failure_keeps_the_old_generation [fs, env, error] { |ctx|
@@ -313,9 +342,9 @@ test trust_release_composition_failure_keeps_the_old_generation [fs, env, error]
   let store_root = test.temp_dir(ctx, name: "trust-release-missing-store")?
   let old_generation = test.temp_dir(ctx, name: "trust-release-composition-old")?
   fp"{old_generation}/generation-marker".write("prior generation\n")
-  let base = test.temp_dir(ctx, name: "trust-release-composition-failure")?
-  let output_root = fp"{base}/candidate"
-  let overlay_root = fp"{base}/staged"
+  let output_parent = test.temp_dir(ctx, name: "trust-release-composition-failure")?
+  let output_root = fp"{output_parent}/candidate"
+  let entries_before = fs.children(output_parent)? |> count()
 
   match trust_release.compose_signed_release(
     input,
@@ -324,7 +353,6 @@ test trust_release_composition_failure_keeps_the_old_generation [fs, env, error]
       runtime_roots: ["ca-certificates"],
       store_root,
       output_root,
-      overlay_root,
     },
   ) {
     Ok(_) => test.fail("composition unexpectedly succeeded without a Store artifact")
@@ -333,5 +361,78 @@ test trust_release_composition_failure_keeps_the_old_generation [fs, env, error]
 
   assert fp"{old_generation}/generation-marker".read_text()? == "prior generation\n"
   assert ! output_root.exists()?
-  assert ! overlay_root.exists()?
+  assert (fs.children(output_parent)? |> count()) == entries_before
+}
+
+test trust_release_concurrent_composers_publish_one_owned_generation [fs, process, env, error] { |ctx|
+  let repo_root = test.temp_dir(ctx, name: "trust-release-concurrent-repository")?
+  let _ = fs.copy_tree(p"packages/ca-certificates", fp"{repo_root}/packages/ca-certificates", parents: true, overwrite: true)?
+  fp"{repo_root}/pm".mkdir()
+  p"pm/proof.xsh".copy(to: fp"{repo_root}/pm/proof.xsh", overwrite: true)
+  let value = plan.resolve(
+    catalog.load(repo_root)?,
+    {target: types.Aarch64LinuxMusl, index_sha256: "trust-release-index", packages: []},
+    policy.aarch64_docker(),
+    ["ca-certificates"],
+    false,
+  )?
+  let store_root = test.temp_dir(ctx, name: "trust-release-concurrent-store")?
+  stage_trust_artifact(ctx, value, store_root)
+  let base = test.temp_dir(ctx, name: "trust-release-concurrent-output")?
+  let output_root = fp"{base}/candidate"
+  let foreign = fp"{base}/foreign"
+  foreign.mkdir()
+  fp"{foreign}/sentinel".write("foreign data\n")
+  let script = fp"{test.temp_dir(ctx, name: "trust-release-concurrent-script")?}/compose.xsh"
+  script.write(
+    r"""use pm.catalog
+use pm.generation
+use pm.plan
+use pm.policy
+use pm.types
+use trust.release as trust_release
+
+proc main(...argv: List[Str]) [fs, env, error] {
+  let repo_root = fp"{argv[0]}"
+  let store_root = fp"{argv[1]}"
+  let output_root = fp"{argv[2]}"
+  let metadata = p"tests/fixtures/trust-release/valid.metadata".read_bytes()?
+  let signature = p"tests/fixtures/trust-release/valid.signature.base64".read_text()?.trim().base64_decode()?
+  let public_key = p"tests/fixtures/trust-release/test-public-key.base64".read_text()?.trim().base64_decode()?
+  let build_plan = plan.resolve(
+    catalog.load(repo_root)?,
+    {target: types.Aarch64LinuxMusl, index_sha256: "trust-release-index", packages: []},
+    policy.aarch64_docker(),
+    ["ca-certificates"],
+    false,
+  )?
+  let _ = trust_release.compose_signed_release(
+    {
+      metadata,
+      signature,
+      provisioned_public_key: public_key,
+      root_bundle: p"packages/ca-certificates/files/cacert.pem".read_bytes()?,
+      next_policy: p"tests/fixtures/trust-release/policy-v2".read_bytes()?,
+      installed_policy_snapshot: fp"{repo_root}/packages/ca-certificates/files/trust-policy".read_bytes()?,
+      now_epoch_seconds: 1792540800,
+    },
+    {build_plan, runtime_roots: ["ca-certificates"], store_root, output_root},
+  )?
+}
+
+main(@args)?
+""",
+  )
+  let configured = e"XSH_HOST" ?? ""
+  let runner = if configured != "" { fp"{configured}" } else { process.which("xsh")? }
+  let first = spawn run $runner $script ${repo_root} $store_root $output_root ?
+  let second = spawn run $runner $script ${repo_root} $store_root $output_root ?
+  let statuses = wait [first, second]?
+
+  assert statuses[0].ok != statuses[1].ok
+  assert output_root.exists()?
+  assert fp"{foreign}/sentinel".read_text()? == "foreign data\n"
+  assert (fs.children(base)? |> count()) == 2
+  let receipt = generation.read_generation_receipt(output_root)?
+  generation.verify_generation(output_root, receipt)
 }

@@ -730,10 +730,18 @@ export proc compose(
     return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 
-  let temporary = fp"{output_root}.tmp"
-  temporary.remove()
-  defer temporary.remove()
+  output_root.parent.mkdir(parents: true)
+  let temporary = fs.temp_sibling(output_root)?
+  var owns_temporary = false
+  defer {
+    if owns_temporary {
+      temporary.remove(missing_ok: true)
+    }
+  }
   let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
+  owns_temporary = true
+  let publication_mode = temporary.metadata()?.mode % 4096
+  temporary.chmod(0o700)
   generation_apply_overlay(temporary, entries)
   let receipt = generation_receipt_for(value, root_receipt)?
   let receipt_path = generation_receipt_path(temporary)
@@ -745,8 +753,9 @@ export proc compose(
     return Err(types.PmError.PackageContract("generation receipt changed while composing"))
   }
 
-  output_root.parent.mkdir()
-  temporary.rename(to: output_root)
+  temporary.chmod(publication_mode)
+  fs.rename_noreplace(temporary, output_root)
+  owns_temporary = false
   let final_receipt = read_generation_receipt(output_root)?
 
   if final_receipt != receipt {

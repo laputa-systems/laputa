@@ -604,4 +604,21 @@ test test_root_failed_composition_leaves_completed_output_untouched [fs, error] 
   }
 
   assert fp"{output}/marker".read_text()? == "previous root"
+
+  let staged_output = test.temp_path(ctx, name: "root-staging-name-output")
+  let fixed_stage = fp"{staged_output}.tmp"
+  fixed_stage.mkdir()
+  fp"{fixed_stage}/marker".write("unowned stage")
+  let _ = root.compose_artifacts(staged_output, plan, [artifact])?
+  assert fp"{fixed_stage}/marker".read_text()? == "unowned stage"
+
+  let competing_output = test.temp_path(ctx, name: "root-competing-output")
+  let missing_target = test.temp_path(ctx, name: "root-missing-output-target")
+  competing_output.symlink(to: missing_target)
+  match root.compose_artifacts(competing_output, plan, [artifact]) {
+    Ok(_) => test.fail("root composition replaced a dangling destination symlink")
+    Err(_) => {}
+  }
+  assert competing_output.is_symlink()?
+  assert competing_output.readlink()? == missing_target
 }

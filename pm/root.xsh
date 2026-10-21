@@ -790,11 +790,17 @@ export proc compose_artifacts(
     return Err(types.PmError.PackageConflict(f"immutable root {output} already exists"))
   }
 
-  let temporary = fp"{output}.tmp"
-  temporary.remove()
-  defer temporary.remove()
-  temporary.mkdir()
-  # preflight above verified these receipts and payloads.
+  output.parent.mkdir(parents: true)
+  let temporary = fs.temp_sibling(output)?
+  temporary.mkdir(parents: false)
+  var owns_temporary = true
+  defer {
+    if owns_temporary {
+      temporary.remove(missing_ok: true)
+    }
+  }
+  let publication_mode = temporary.metadata()?.mode % 4096
+  temporary.chmod(0o700)
   let verified = root_checked_artifacts(artifacts)?
   var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
   for artifact in plan.artifacts {
@@ -808,9 +814,9 @@ export proc compose_artifacts(
   root_receipt_path(temporary).parent.mkdir()
   root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
   verify(temporary, receipt)
-  output.parent.mkdir()
-  temporary.rename(to: output)
-  verify(output, receipt)
+  temporary.chmod(publication_mode)
+  fs.rename_noreplace(temporary, output)
+  owns_temporary = false
   receipt
 }
 
