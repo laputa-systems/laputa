@@ -6,7 +6,7 @@ export const name = "uv"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.12.23"
+export const ver = "0.13.4"
 
 ## Package recipe export.
 export const rel = "1"
@@ -14,6 +14,8 @@ export const rel = "1"
 ## The upstream release binaries are static-pie musl executables, so the
 ## package needs no libraries at runtime.
 export const deps: List[Str] = []
+
+export const runtime_only_deps = ["ca-certificates"]
 
 ## Package recipe export.
 export const mkdeps_host: List[Str] = []
@@ -31,11 +33,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "b536543cc4d50661986b165c76ee8aa9056e4fa332edcd153ff2e98760f9359b",
+        sha256: "253a17cadcb659ae77a0fe3b9a2f1c14297528d480c421899e61e64d64f24e8f",
       },
       {
         arch: "x86_64",
-        sha256: "1cff8783850e794470aadb73f54b749542a511fc57b0ce6468b64bd3852e0ade",
+        sha256: "28d4385f9f9d1d1c7654d85b3855e0e2615b2f6cc13136a2edff858bbdc16ff1",
       },
     ],
   },
@@ -43,6 +45,10 @@ export const upstream_sources = [
 
 ## Package recipe export.
 export const filetree = [
+  {
+    path: p"etc/uv/uv.toml",
+    kind: "file",
+  },
   {
     path: p"usr/bin/uv",
     kind: "binary",
@@ -57,4 +63,6 @@ export const filetree = [
 export proc build(dest: Path) [fs, error] {
   fs.install(p"uv", fp"{dest}/usr/bin/uv", 0o755, parents: true, overwrite: true)
   fs.install(p"uvx", fp"{dest}/usr/bin/uvx", 0o755, parents: true, overwrite: true)
+  fp"{dest}/etc/uv".mkdir()
+  fp"{dest}/etc/uv/uv.toml".write("system-certs = true\n")
 }

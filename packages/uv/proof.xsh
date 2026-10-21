@@ -18,7 +18,13 @@ dependencies = []
 proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "uv")
   proof.target_elf(root, p"usr/bin/uv", "uv")
-  proof.target_elf(root, p"usr/bin/uvx", "uv")
+  proof.target_elf(root, p"usr/bin/uvx", "uvx")
+  let tls_config = fp"{root}/etc/uv/uv.toml".read_text()?
+  proof.ensure(
+    tls_config == "system-certs = true\n",
+    "uv-system-certs",
+    f"unexpected /etc/uv/uv.toml: {tls_config.trim()}",
+  )
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"uv ok: {pm_util.target_arch()?} binaries"
@@ -32,13 +38,13 @@ proc main(root = /rootfs) [fs, process, env, error] {
 
     let uv_version = run.text $uv "--version"
     proof.ensure(
-      uv_version.trim() == f"uv 0.12.23 ({arch}-unknown-linux-musl)",
+      uv_version.trim() == f"uv 0.13.4 ({arch}-unknown-linux-musl)",
       "uv-version",
       f"unexpected uv --version: {uv_version.trim()}",
     )
     let uvx_version = run.text $uvx "--version"
     proof.ensure(
-      uvx_version.trim() == f"uvx 0.12.23 ({arch}-unknown-linux-musl)",
+      uvx_version.trim() == f"uvx 0.13.4 ({arch}-unknown-linux-musl)",
       "uvx-version",
       f"unexpected uvx --version: {uvx_version.trim()}",
     )

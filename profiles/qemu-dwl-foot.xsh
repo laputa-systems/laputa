@@ -6,6 +6,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
   name: "qemu-dwl-foot",
   package_roots: [
     "baselayout",
+    "ca-certificates",
     "xsh",
     "laputa-pm",
     "xinit",

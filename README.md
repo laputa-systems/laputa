@@ -56,6 +56,7 @@ xinit stop SERVICE
 ```
 
 The [xinit guide](xinit/docs/INIT.md) covers service configuration and output.
+The [certificate-trust guide](docs/CERTIFICATE-TRUST.md) records root updates and TLS consumer coverage.
 The [mirror guide](mirror/README.md) covers running a package mirror.
 
 `capsh -- SCRIPT ARGS...` runs an XSH script. Use

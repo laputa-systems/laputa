@@ -6,7 +6,7 @@ export const name = "tailscale"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.102.4"
+export const ver = "1.104.2"
 
 ## Package recipe export.
 export const rel = "1"
@@ -16,7 +16,7 @@ export let deps = []
 
 ## The build only installs the prebuilt static binaries and the service
 ## module; tailscaled drives iptables and runs under xinit at runtime.
-export const runtime_only_deps = ["iptables", "xinit"]
+export const runtime_only_deps = ["ca-certificates", "iptables", "xinit"]
 
 ## Package recipe export.
 export const mkdeps_host: List[Str] = []
@@ -32,11 +32,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "9dd1e6a592a014bbaea0103167ffe299adeda4ba14e078ce9c2895364f6c4c3f",
+        sha256: "5776aaa901b5ef1916e66be5bb54b9f481cd399c9c28db123a8cab620efa237b",
       },
       {
         arch: "x86_64",
-        sha256: "50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9",
+        sha256: "512f613ed7d04fc7282f7dc5bd76aa105aae28168fbb9357eb749ebcbc29f0ae",
       },
     ],
   },

@@ -15,12 +15,14 @@ export const package_kind = "payload"
 export const ver = "2.9.7"
 
 ## Package release revision.
-export const rel = "1"
+export const rel = "2"
 
 # libffi backs Deno.dlopen (the crate's own libffi build runs autotools);
 # gnu-stubs' libgcc_s provides the unwinder Rust std and V8's libc++abi call.
 ## Runtime package dependencies.
 export const deps = ["musl", "gnu-stubs", "libffi"]
+
+export const runtime_only_deps = ["ca-certificates"]
 
 ## Host-side build dependencies.
 export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers"]
