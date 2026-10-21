@@ -14,7 +14,7 @@ test ca_certificate_proof_checks_pinned_roots_and_rejects_invalid_metadata [fs, 
   let stderr = fp"{root}/proof.stderr"
   for file in [bundle, metadata] { file.parent.mkdir() }
   var valid_bundle = ""
-  for _ in 0..118 { valid_bundle += "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n" }
+  for _ in range(118) { valid_bundle += "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n" }
   bundle.write(valid_bundle)
   let xsh = runner()?
   let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
@@ -24,7 +24,7 @@ test ca_certificate_proof_checks_pinned_roots_and_rejects_invalid_metadata [fs, 
   bundle.write("-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")
   assert ! process.run(command)?.ok
   assert "expected 118 certificates" in stderr.read_text()?
-  bundle.write(valid_bundle.replace("fixture", "MIICTjCCAdOgAgIKPPYHqWhwDtqLhDAKB"))
+  bundle.write(valid_bundle.replace("fixture", with: "MIICTjCCAdOgAgIKPPYHqWhwDtqLhDAKB"))
   assert ! process.run(command)?.ok
   assert "bundle retains the removed emSign G3 root" in stderr.read_text()?
   bundle.write(valid_bundle)
