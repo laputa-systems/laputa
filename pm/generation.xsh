@@ -731,38 +731,33 @@ export proc compose(
   }
 
   output_root.parent.mkdir(parents: true)
-  let temporary = fs.temp_sibling(output_root)?
-  var owns_temporary = false
-  defer {
-    if owns_temporary {
-      temporary.remove(missing_ok: true)
+  let publication_mode = 0o777.clear_bits(fs.umask()?)
+  with staging_root = fs.tempdir_in(output_root.parent)? {
+    let staging_path = staging_root.host_path()?
+    let temporary = fp"{staging_path}/generation"
+    let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
+    temporary.chmod(0o700)
+    generation_apply_overlay(temporary, entries)
+    let receipt = generation_receipt_for(value, root_receipt)?
+    let receipt_path = generation_receipt_path(temporary)
+    receipt_path.parent.mkdir()
+    receipt_path.write(json.encode(generation_receipt_dto(receipt))? + "\n")
+    let stored = read_generation_receipt(temporary)?
+
+    if stored != receipt {
+      return Err(types.PmError.PackageContract("generation receipt changed while composing"))
     }
-  }
-  let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
-  owns_temporary = true
-  let publication_mode = temporary.metadata()?.mode % 4096
-  temporary.chmod(0o700)
-  generation_apply_overlay(temporary, entries)
-  let receipt = generation_receipt_for(value, root_receipt)?
-  let receipt_path = generation_receipt_path(temporary)
-  receipt_path.parent.mkdir()
-  receipt_path.write(json.encode(generation_receipt_dto(receipt))? + "\n")
-  let stored = read_generation_receipt(temporary)?
 
-  if stored != receipt {
-    return Err(types.PmError.PackageContract("generation receipt changed while composing"))
-  }
+    temporary.chmod(publication_mode)
+    fs.rename_noreplace(temporary, output_root)
+    let final_receipt = read_generation_receipt(output_root)?
 
-  temporary.chmod(publication_mode)
-  fs.rename_noreplace(temporary, output_root)
-  owns_temporary = false
-  let final_receipt = read_generation_receipt(output_root)?
+    if final_receipt != receipt {
+      return Err(types.PmError.PackageContract("completed generation receipt does not match"))
+    }
 
-  if final_receipt != receipt {
-    return Err(types.PmError.PackageContract("completed generation receipt does not match"))
-  }
-
-  receipt
+    receipt
+  }?
 }
 
 ## Verifies that a completed generation still carries its exact immutable receipt.

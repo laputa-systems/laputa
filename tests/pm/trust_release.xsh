@@ -61,8 +61,8 @@ proc stage_trust_artifact(ctx: TestContext, value: types.BuildPlan, store_root: 
   let proof = fp"{stage}/proof.json"
   bundle_path.parent.mkdir(parents: true)
   policy_path.parent.mkdir(parents: true)
-  bundle_path.write(bundle.read_bytes()?)
-  policy_path.write(current_policy.read_bytes()?)
+  bundle_path.write(bundle.read_bytes()?, mode: 0o644)
+  policy_path.write(current_policy.read_bytes()?, mode: 0o644)
   cert_link.symlink(to: p"certs/ca-certificates.crt")
   archive.tar_create(payload, contents, [p"."], compression: "gz")
   json.write(
@@ -145,6 +145,7 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
   let old_generation = test.temp_dir(ctx, name: "trust-release-old-generation")?
   fp"{old_generation}/generation-marker".write("prior generation\n")
   let output_root = test.temp_path(ctx, name: "trust-release-next-generation")
+  let expected_mode = 0o777.clear_bits(fs.umask()?)
 
   let receipt = trust_release.compose_signed_release(
     input,
@@ -160,6 +161,7 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
   assert receipt.profile.replacements == ["etc/laputa/trust-policy", "etc/ssl/certs/ca-certificates.crt"]
   assert fp"{output_root}/etc/laputa/trust-policy".read_bytes()? == input.next_policy
   assert fp"{output_root}/etc/ssl/certs/ca-certificates.crt".read_bytes()? == input.root_bundle
+  assert output_root.metadata()?.mode % 4096 == expected_mode
   assert fp"{old_generation}/generation-marker".read_text()? == "prior generation\n"
   generation.verify_generation(output_root, receipt)
 

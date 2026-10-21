@@ -145,7 +145,7 @@ proc rewrite_legacy_database_payload(
 
   let database = fp"{contents}/var/lib/xsh-pm/packages/{name}"
   database.mkdir()
-  fp"{database}/manifest.json".write(json.encode([entry.path for entry in entries])?)
+  fp"{database}/manifest.json".write(json.encode([entry.path for entry in entries])?, mode: 0o644)
   let etcsums = [
     {path: entry.path, sha256: digest(entry.content)}
     for entry in entries
@@ -153,7 +153,7 @@ proc rewrite_legacy_database_payload(
       "etc/",
     )
   ]
-  fp"{database}/etcsums.json".write(json.encode(etcsums)?)
+  fp"{database}/etcsums.json".write(json.encode(etcsums)?, mode: 0o644)
   fp"{database}/metadata.json".write(
     json.encode({
       name,
@@ -167,10 +167,11 @@ proc rewrite_legacy_database_payload(
       dir: f"/var/tmp/pm-build/{name}-1.0.0-1/pkg",
       extract_install: true,
     })?,
+    mode: 0o644,
   )
 
   if unexpected {
-    fp"{database}/unexpected.json".write("not a known legacy package database record")
+    fp"{database}/unexpected.json".write("not a known legacy package database record", mode: 0o644)
   }
 
   archive.tar_create(staged.payload, contents, [p"."], compression: "gz", overwrite: true)
@@ -542,7 +543,7 @@ test test_root_identifies_the_missing_payload_inventory_entry [fs, error] { |ctx
   )?
   let archive_root = test.temp_dir(ctx, name: "root-missing-entry-archive")?
   fp"{archive_root}/usr/bin".mkdir()
-  fp"{archive_root}/usr/bin/present".write("present")
+  fp"{archive_root}/usr/bin/present".write("present", mode: 0o644)
   archive.tar_create(staged.staged.payload, archive_root, [p"."], compression: "gz", overwrite: true)
   let receipt = store.commit(types.target_aarch64(), store_root, staged.node, rehashed(staged.staged)?)?
 
@@ -609,7 +610,9 @@ test test_root_failed_composition_leaves_completed_output_untouched [fs, error] 
   let fixed_stage = fp"{staged_output}.tmp"
   fixed_stage.mkdir()
   fp"{fixed_stage}/marker".write("unowned stage")
+  let expected_mode = 0o777.clear_bits(fs.umask()?)
   let _ = root.compose_artifacts(staged_output, plan, [artifact])?
+  assert staged_output.metadata()?.mode % 4096 == expected_mode
   assert fp"{fixed_stage}/marker".read_text()? == "unowned stage"
 
   let competing_output = test.temp_path(ctx, name: "root-competing-output")

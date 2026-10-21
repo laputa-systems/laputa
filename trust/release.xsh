@@ -169,11 +169,10 @@ export proc compose_signed_release(input: SignedReleaseInput, target: TrustGener
   let verified = release_verify(input)?
   release_require(! target.output_root.exists()?, "immutable generation output already exists")
   target.output_root.parent.mkdir(parents: true)
-  let overlay_root = fs.temp_sibling(target.output_root)?
-  overlay_root.mkdir(parents: false)
-  defer overlay_root.remove(missing_ok: true)
-  overlay_root.chmod(0o700)
-  let profile = release_stage_overlay(overlay_root, verified)?
-  let plan = generation.plan_profile(target.build_plan, target.runtime_roots, profile)?
-  generation.compose(plan, target.store_root, target.output_root, overlay_root)
+  with overlay_root = fs.tempdir_in(target.output_root.parent)? {
+    let overlay_path = overlay_root.host_path()?
+    let profile = release_stage_overlay(overlay_path, verified)?
+    let plan = generation.plan_profile(target.build_plan, target.runtime_roots, profile)?
+    generation.compose(plan, target.store_root, target.output_root, overlay_path)?
+  }?
 }

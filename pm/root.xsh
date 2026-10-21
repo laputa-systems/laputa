@@ -791,33 +791,28 @@ export proc compose_artifacts(
   }
 
   output.parent.mkdir(parents: true)
-  let temporary = fs.temp_sibling(output)?
-  temporary.mkdir(parents: false)
-  var owns_temporary = true
-  defer {
-    if owns_temporary {
-      temporary.remove(missing_ok: true)
+  let publication_mode = 0o777.clear_bits(fs.umask()?)
+  with staging_root = fs.tempdir_in(output.parent)? {
+    let staging_path = staging_root.host_path()?
+    staging_root.mkdir(p"root", mode: 0o700)?
+    let temporary = fp"{staging_path}/root"
+    let verified = root_checked_artifacts(artifacts)?
+    var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
+    for artifact in plan.artifacts {
+      if artifact.payload {
+        let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]
+        root_materialize_artifact(temporary, by_key.get(artifact.artifact_key)?, entries)
+      }
     }
-  }
-  let publication_mode = temporary.metadata()?.mode % 4096
-  temporary.chmod(0o700)
-  let verified = root_checked_artifacts(artifacts)?
-  var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
-  for artifact in plan.artifacts {
-    if artifact.payload {
-      let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]
-      root_materialize_artifact(temporary, by_key.get(artifact.artifact_key)?, entries)
-    }
-  }
 
-  let receipt = root_receipt_for_plan(plan)?
-  root_receipt_path(temporary).parent.mkdir()
-  root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
-  verify(temporary, receipt)
-  temporary.chmod(publication_mode)
-  fs.rename_noreplace(temporary, output)
-  owns_temporary = false
-  receipt
+    let receipt = root_receipt_for_plan(plan)?
+    root_receipt_path(temporary).parent.mkdir()
+    root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
+    verify(temporary, receipt)
+    temporary.chmod(publication_mode)
+    fs.rename_noreplace(temporary, output)
+    receipt
+  }?
 }
 
 ## Verifies the durable root receipt and every installed payload entry without consulting mutable package state.
