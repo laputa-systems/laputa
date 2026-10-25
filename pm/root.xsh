@@ -157,8 +157,8 @@ proc root_legacy_package_db_file(
   receipt: types.ArtifactReceipt,
   name: Str,
 ) -> Result[LegacyPackageDbFile] {
+  let rel: RelPath = root_legacy_package_db_path(receipt, name).require(RelPath)?
   let root_handle = fs.open_root(extracted)?
-  let rel = root_legacy_package_db_path(receipt, name)
 
   match root_handle.readlink(rel) {
     Ok(_) => return Err(types.PmError.PackageContract(f"legacy package database {rel} must be a regular file"))
@@ -287,8 +287,8 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
 }
 
 proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
+  let rel: RelPath = fp"{entry.path}".require(RelPath)?
   let root_handle = fs.open_root(root)?
-  let rel = fp"{entry.path}"
 
   # Root metadata follows the final path component. Inspect a declared symlink
   # first so a contained dangling or cyclic link remains a literal payload

@@ -185,10 +185,15 @@ export proc collect_metadata_files(
   root: Path,
   manifest: List[Path],
 ) [fs, error] -> Result[List[types.ArtifactEntry], Error] {
+  let relative_manifest: List[RelPath] = collect {
+    for manifest_path in manifest {
+      yield manifest_path.require(RelPath)?
+    }
+  }
   let root_handle = fs.open_root(root)?
 
   let files: List[types.ArtifactEntry] = collect {
-    for rel_path in manifest {
+    for rel_path in relative_manifest {
       if let Ok(target) = root_handle.readlink(rel_path) {
         yield {
           path: rel_path.display(),
