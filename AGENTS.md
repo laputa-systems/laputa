@@ -8,7 +8,7 @@ its package manager, recipes, init, installer, system tooling, and mirror.
 The root `Makefile` is the entry point; `ARCH` defaults to the host.
 
 - Bootstrap: `make host-xsh` (Linux), `make fetch`, `make seed`.
-- Packages: `make plan`, `make build [PKGS="a b" | STOP=pre-cmake]`.
+- Packages: `make plan`, `make build [PKGS=… | STOP=pre-cmake]`.
 - Mirror and roots: `make mirror`, `make publish`, `make root PKGS="…"`.
 - Check: `make check`; focused tests: `$XSHT test tests/pm/pm_plan.xsh`.
 - Suites: `make test-pm`, `make test-system`, `make test-xinit`, `make test-linux`.
@@ -46,8 +46,10 @@ Host-tool setup, the full target reference, and cleanup are in
 | Native Docker/QEMU profile and graphical proof | [QEMU](docs/QEMU.md) |
 | Installer images, install policy, QEMU harness | [Installer](docs/INSTALLER.md) |
 | Pinned Asterinas/Firecracker build, test, serial shell | [Asterinas](docs/ASTERINAS.md) |
+| Root bundle, trust policy, signed releases | [Certificate trust](docs/CERTIFICATE-TRUST.md) |
 | Mirror host/Cloudflare operations and rollback | [Mirror deployment](docs/MIRROR-DEPLOYMENT.md) |
 | Mirror invocation, publishing, client settings | [Mirror usage](mirror/README.md) |
+| xinit command line | [xinit](xinit/README.md) |
 | PID 1, inittab, service fields and commands | [xinit contract](xinit/docs/INIT.md) |
 | Scanner, readiness, status, control plane | [xinit supervision](xinit/docs/SUPERVISION.md) |
 | WebAuthn API used by the mirror | [WebAuthn](mirror/webauthn-minimal/README.md) |

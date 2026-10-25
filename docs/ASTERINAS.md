@@ -1,8 +1,9 @@
 # Asterinas and Firecracker
 
 The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
-versions recorded in `infra/asterinas/inputs.lock`. On x86-64 Linux with KVM
-and Docker, plus a C compiler and the host `find` and `sort` tools, start with:
+versions recorded in `infra/asterinas/inputs.lock`. Start on an x86-64 Linux
+host with usable `/dev/kvm`; `infra/asterinas/preflight.sh` lists the required
+host tools:
 
 ```bash
 make asterinas-preflight
@@ -10,20 +11,18 @@ make asterinas-fetch
 make asterinas-build
 ```
 
-`asterinas-preflight` only checks host capabilities and input declarations.
-`asterinas-fetch` fetches the pinned Asterinas and XSH source plus the declared
+`asterinas-preflight` only checks the host and input declarations.
+`asterinas-fetch` fetches the pinned Asterinas and XSH source and the declared
 build inputs. `asterinas-build` builds or reuses the Asterinas PVH kernel and
 the Laputa generation, then publishes a content-addressed bundle. Changes in
 the sibling XSH working tree do not affect this pinned build.
 
-The kernel, verified immutable bundles, runtime disk copies, Firecracker
-configuration, build and boot logs live under `.out/asterinas-firecracker/`.
-Fetched Asterinas and XSH repositories remain under `.cache/asterinas/`.
-`asterinas-clean` runs `make distclean`, removing the checkout's outputs,
-shared PM artifact store, fetched caches, and the pinned build-tool images for
-a cold rebuild from pinned inputs. It keeps the tracked source
-checkouts. The ordinary `asterinas-setup` target also offers a small
-kernel/VMM smoke boot.
+The kernel, verified bundles, runtime disk copies, Firecracker configuration,
+and logs live under `.out/asterinas-firecracker/`; fetched Asterinas and XSH
+repositories under `.cache/asterinas/`. `asterinas-clean` runs `make distclean`
+and removes the pinned `xsh-test` and Asterinas dev images, so the next build
+is cold; tracked source checkouts stay. `asterinas-setup` builds the kernel and
+boots a small kernel/VMM smoke guest.
 
 Run the automated guest proof with:
 
@@ -42,12 +41,13 @@ verified bundle image. The serial log and result metadata remain under
 `.out/asterinas-firecracker/`; test and interactive boot have separate
 `test-console.log` and `boot-console.log` files.
 
-Run one native XSH test module from the locked XSH snapshot inside the guest
-with `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. A module under `core/tests`,
+Run one native XSH test module from the pinned XSH snapshot (paths are relative
+to the XSH repository root) inside the guest with
+`XSH_TEST=tests/xsh/stdlib/numeric.xsh`. A module under `core/tests`,
 `dev/tests`, or `showcase/tests` can be selected the same way. Use
 `XSH_TEST=core/tests/test-awk.xsh::test_awk_matrix_arrays_and_functions` to
 run one exact test. Use `XSH_TEST=all` to run the full
-native suite configured by the pinned `xsht-config.ini`, including `core/tests`,
+native suite in a 2-vCPU guest configured by the pinned `xsht-config.ini`, including `core/tests`,
 `dev/tests`, `tests`, and `showcase/tests`. The test source tree is staged from
 the locked Git archive through a PM generation overlay; its digest is included
 in the immutable bundle manifest. Guest test runs use 4 GiB of memory; the
@@ -55,9 +55,6 @@ base viability proof uses 1 GiB. The selected tests run under the packaged
 `xsht`, and the host requires their guest success marker. To test a different
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
-
-Use module or exact-test selections for focused checks; `XSH_TEST=all` runs
-the entire suite in a 2-vCPU guest.
 
 Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
 which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing
@@ -74,5 +71,6 @@ make asterinas-boot
 ```
 
 The shell uses the pinned XSH commit. Type `laputa-exit` in the guest to stop
-Firecracker; Ctrl-C interrupts xshi. `asterinas-shell` remains a legacy alias.
+Firecracker; Ctrl-C interrupts xshi. `asterinas-shell` and `asterinas-viability` are legacy aliases
+for `asterinas-boot` and `asterinas-test`.
 

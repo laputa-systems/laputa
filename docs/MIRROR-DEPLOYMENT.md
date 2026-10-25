@@ -23,15 +23,15 @@ and upload state stay under `/var/lib/laputa-mirror/`.
 
 ## One-time prerequisites
 
-The deployment host must be an x86_64 Debian or Ubuntu style system with
-systemd 247 or newer, SSH access as root or a user with passwordless sudo, and
-`cloudflared` installed at `/usr/bin/cloudflared`. The deployment checks for
-`cloudflared tunnel run --token-file` support. It does not install host
-packages or configure SSH.
+The deployment host must be x86_64 Linux with systemd 247 or newer, SSH access
+as root or a user with passwordless sudo, and `cloudflared` installed at
+`/usr/bin/cloudflared` with `tunnel run --token-file` support. Preflight checks
+these (`check_remote` in `infra/mirror/deploy.sh`). The deployment does not
+install host packages or configure SSH.
 
 The build machine needs Docker with Buildx, Deno, Node.js, Make, OpenSSH,
-`curl`, `jq`, and the Cloudflare `cf` CLI. `make deploy-mirror` checks these
-and the remote prerequisites before building.
+`curl`, `jq`, and the Cloudflare `cf` CLI. Preflight checks them before
+building.
 
 Authenticate the Cloudflare CLI with `cf auth login`, or provide a scoped
 `CLOUDFLARE_API_TOKEN` in the deployment environment file below. The account
@@ -48,10 +48,7 @@ read-before-write reconciliation, tunnel setup, and legacy tunnel cleanup:
 - The mirror zone: `Zone Read`, `DNS Read`, and `DNS Write`.
 
 Cloudflare's [API token permission reference](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
-lists the current names. The [R2 bucket API](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/),
-[Tunnel API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/cloudflared/methods/create/),
-and [DNS record API](https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/create/)
-describe the operations used by the reconciler.
+lists the current names.
 
 Create an R2 S3 API token with object read/write access to the `laputa-mirror`
 bucket. This is separate from the Cloudflare API token. The deployment needs
@@ -60,18 +57,9 @@ It does not create or rotate R2 access keys.
 
 ## Configure deployment secrets
 
-Create `$HOME/.config/laputa/mirror-deploy.env` with mode `0600`. It is a
-POSIX shell fragment sourced by the deployment script, so quote values using
-ordinary shell syntax. Keep it outside the repository.
-
-```sh
-mkdir -p "$HOME/.config/laputa"
-chmod 700 "$HOME/.config/laputa"
-${EDITOR:-vi} "$HOME/.config/laputa/mirror-deploy.env"
-chmod 600 "$HOME/.config/laputa/mirror-deploy.env"
-```
-
-Example contents:
+Create `$HOME/.config/laputa/mirror-deploy.env` with mode `0600`, outside the
+repository. It is a POSIX shell fragment sourced by the deployment script, so
+quote values using ordinary shell syntax. Example contents:
 
 ```sh
 # Optional when cf is already authenticated with a profile.
@@ -91,16 +79,15 @@ DEPLOY_HOST='ubuntu@oracle'
 # JWT_SUBJECT_PATTERN='repo:josh/*'
 ```
 
-Protect credential files with mode `0600`. The mirror reads one terminal LF
-from each S3 credential file and otherwise preserves its contents. Direct
-`S3_ACCESS_KEY_ID` or `S3_SECRET_ACCESS_KEY` environment values take precedence
-over the corresponding `_FILE` setting.
+Keep credential files at mode `0600`. Direct `S3_ACCESS_KEY_ID` or
+`S3_SECRET_ACCESS_KEY` values take precedence over the corresponding `_FILE`
+setting.
 
-Defaults are `DEPLOY_HOST=ubuntu@oracle`,
-`MIRROR_HOSTNAME=laputa.17166969.xyz`, `MIRROR_R2_BUCKET=laputa-mirror`,
-`MIRROR_CF_TUNNEL=laputa-mirror`, and `MIRROR_LISTEN_ADDR=127.0.0.1:3000`.
-Override them in this file when needed. For a different environment file, set
-`MIRROR_DEPLOY_ENV=/path/to/file`.
+`DEPLOY_HOST`, `MIRROR_HOSTNAME`, `MIRROR_R2_BUCKET`, `MIRROR_CF_TUNNEL`, and
+`MIRROR_LISTEN_ADDR` have defaults and validation in `load_environment` and
+`validate_config` in `infra/mirror/deploy.sh`; override them in this file. For
+a different environment file, set `MIRROR_DEPLOY_ENV=/path/to/file`.
+`MIRROR_LISTEN_ADDR` must bind `127.0.0.1`.
 
 ## Deploy
 
@@ -132,12 +119,9 @@ switches `current` atomically, rolls back the application and managed host
 configuration after a failed local health check, and retains the current,
 previous, and one additional release after a successful deployment.
 
-To deploy to another host, use an SSH host or `user@host` and rely on
-`~/.ssh/config` for connection settings:
-
-```sh
-DEPLOY_HOST='ubuntu@another-host' make deploy-mirror
-```
+To deploy to another host, set `DEPLOY_HOST` to an SSH host or `user@host`;
+connection settings come from `~/.ssh/config`. A `DEPLOY_HOST` in the calling
+environment overrides the env file.
 
 ## Inspect
 

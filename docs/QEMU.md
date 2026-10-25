@@ -6,29 +6,21 @@ a handwritten package list.
 
 ## Host targets
 
-The profile CLI runs natively on the host: it builds the image in Docker for
-the host's architecture and boots it with hardware acceleration. The host
-decides the QEMU target (`system/qemu.xsh`); the profile holds only system
-intent.
-
-| Host | QEMU | Machine | Console | Root disk | Interactive display |
-|---|---|---|---|---|---|
-| macOS aarch64 | `qemu-system-aarch64` | `virt`, HVF | PL011 `ttyAMA0` | `virtio-blk-device` | Cocoa |
-| Linux aarch64 | `qemu-system-aarch64` | `virt`, KVM | PL011 `ttyAMA0` | `virtio-blk-device` | QEMU's default |
-| Linux x86_64 | `qemu-system-x86_64` | `q35`, KVM, `-vga none` | 16550 `ttyS0` | `virtio-blk-pci` | QEMU's default |
-
-On x86_64, `-vga none` removes q35's default VGA adapter so the virtio GPU is
-the only display; otherwise QMP's screendump captures the VGA text console
-instead of the compositor.
+The profile CLI runs natively on the host, builds the image in Docker for the
+host's architecture, and boots it with hardware acceleration: HVF on macOS
+aarch64, KVM on Linux aarch64 and x86_64. `qemu_target` in `system/qemu.xsh`
+owns the machine, console, block device, and display per host; the profile
+holds only system intent. On x86_64 `-vga none` makes the virtio GPU the only
+display, so QMP's screendump captures the compositor and not q35's VGA text
+console.
 
 ## Host requirements
 
 - `qemu-system-<arch>` for the host's architecture on `PATH`, or named by
   `QEMU_SYSTEM_AARCH64` or `QEMU_SYSTEM_X86_64`. On macOS, Homebrew's `qemu`.
 - KVM on Linux: `/dev/kvm` must be usable by your user.
-- QEMU's virtio GPU PCI device. Some distributions package device models
-  separately; on Alpine install `qemu-hw-display-virtio-gpu` and
-  `qemu-hw-display-virtio-gpu-pci`.
+- QEMU's virtio GPU PCI device; on Alpine install
+  `qemu-hw-display-virtio-gpu` and `qemu-hw-display-virtio-gpu-pci`.
 - `python3`, which runs the QMP helper `boot/qmp-proof.py`.
 - `make seed` done for the host arch. The profile build needs no mirror.
 

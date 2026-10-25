@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 21
+Next: 27
 
 Open work from package-manager development and the completed local bootstrap.
 Priorities are assumed from impact. Verification gaps are marked unproven.
@@ -9,8 +9,8 @@ Priorities are assumed from impact. Verification gaps are marked unproven.
 ### LAP-5 · P2 · Reject unknown service fields
 
 - **Area:** Config
-- **Where:** `xinit/xinit.xsh:516`
-- **Problem:** `service_from_record` reads recognized keys without rejecting extra keys, so a misspelled service setting silently takes its default.
+- **Where:** `xinit/xinit.xsh:488`
+- **Problem:** `service_from_record` reads recognized keys without rejecting extra keys, so a misspelled service setting silently takes its default. It also ignores `log` entirely when `logging` is present.
 - **Recommendation:** Validate keys at the top level and in nested sections. Add a failing check for a misspelled setting.
 - **Fix with:** make-invalid-states-unrepresentable
 - **Effort:** S (hours)
@@ -27,7 +27,7 @@ Priorities are assumed from impact. Verification gaps are marked unproven.
 ### LAP-7 · P2 · Capture foot while its proof window is alive
 
 - **Area:** Tests
-- **Where:** `system/qemu.xsh:280`, `guest/qemu-dwl-foot-proof.xsh:70`
+- **Where:** `system/qemu.xsh:263`, `guest/qemu-dwl-foot-proof.xsh:70`
 - **Problem:** The host takes its screenshot after the success marker. The foot reader writes its input and exits before that marker, so screenshot presence does not prove visible terminal content.
 - **Recommendation:** Keep the terminal alive until the host captures and checks its visual marker.
 - **Fix with:** lifecycle-concurrency
@@ -45,7 +45,7 @@ Priorities are assumed from impact. Verification gaps are marked unproven.
 ### LAP-2 · P3 · Use Target instead of recipe architecture strings
 
 - **Area:** Types
-- **Where:** `pm/types.xsh:1`, `pm/target.xsh:1`
+- **Where:** `pm/types.xsh:31`, `pm/target.xsh:1`
 - **Problem:** Recipes compare architecture strings and often treat the other branch as x86_64. Adding a target cannot expose those assumptions through exhaustive matching.
 - **Recommendation:** Match the existing Target enum at recipe architecture boundaries.
 - **Fix with:** make-invalid-states-unrepresentable
@@ -177,11 +177,65 @@ Priorities are assumed from impact. Verification gaps are marked unproven.
 - **Fix with:** root-cause
 - **Effort:** M (days)
 
+### LAP-21 · P3 · Make non-idempotent QMP requests unretryable by type
+
+- **Area:** Types
+- **Where:** `system/qemu.xsh:178`, `system/qemu.xsh:188`
+- **Problem:** `qemu_qmp_retry` must carry only idempotent readiness and screenshot requests, because a retried keyboard injection can duplicate the proof keystrokes. `mode` is a `Str`, so the constraint was held only by a comment, now deleted.
+- **Recommendation:** Give the retried modes their own closed type so keyboard input cannot reach `qemu_qmp_retry`.
+- **Fix with:** make-invalid-states-unrepresentable
+- **Effort:** S (hours)
+
+### LAP-22 · P3 · Confirm xinit test switches leave production behavior unchanged
+
+- **Area:** Architecture
+- **Where:** `xinit/xinit.xsh:374`, `xinit/xinit.xsh:804`, `xinit/xinit.xsh:944`, `xinit/xinit.xsh:1057`
+- **Problem:** `XSH_UNIX_DRY_RUN` skips the status liveness reconcile, selects the cgroup path, and bypasses scanner detection. The inittab respawn delay and launch limit read only from `XSH_INIT_TEST_*` variables. `run_pid1` accepts both `XINIT_TEST_ALLOW_NON_PID1` and `XSH_INIT_TEST_ALLOW_NON_PID1`. The repo invariant says test-only switches must not change production behavior. `XSH_INIT_FAST_SHUTDOWN` and `XSH_INIT_FINAL_CLEANUP` are not named as test switches. Unproven: whether any production run sets them.
+- **Recommendation:** Keep one name for the non-PID1 switch. Move the respawn delay and limit into typed inittab configuration. Show that each remaining switch is inert unless a test sets it.
+- **Fix with:** isolate-effects
+- **Effort:** M (days)
+
+### LAP-23 · P3 · Delete remaining non-contract comments in XSH sources
+
+- **Area:** Navigability
+- **Where:** `pm/execute.xsh:1`, `pm/sources.xsh:1`, `xinit/tests/xinit.xsh:1`, `packages/m4/files/m4.xsh:1`, `packages/tic/files/tic.xsh:1`
+- **Problem:** Tracked `.xsh` files still hold about 2,960 line comments outside doc comments, generated inputs included. `xinit/xinit.xsh` and `system/qemu.xsh` are clean. Comments that explain our own code go stale and get copied.
+- **Recommendation:** Delete each comment per `comment-cleanup`, fix the causes behind any excuse, and move rationale into the doc that owns the topic. Skip generated files and external-quirk comments.
+- **Fix with:** comment-cleanup
+- **Effort:** L (weeks)
+
 ### LAP-20 · P4 · Remove the libgcc_s compatibility name
 
 - **Area:** Dependencies
-- **Where:** `packages/gnu-stubs/PKGBUILD.xsh:75`
+- **Where:** `packages/gnu-stubs/PKGBUILD.xsh:83`
 - **Problem:** gnu-stubs supplies libgcc_s from LLVM libunwind because the prebuilt Rust standard library requests that name.
 - **Recommendation:** Retire the alias only with a Rust standard library built against LLVM libunwind and verified Rust package links.
 - **Fix with:** dead-code-archaeology
 - **Effort:** L (weeks)
+
+### LAP-24 · P4 · Set the module path in the manual installer target
+
+- **Area:** Build
+- **Where:** `Makefile:393`
+- **Problem:** `installer-qemu-manual` passes neither `XSH_MODULE_PATH` nor `LAPUTA_REPO_URL`, so the README tells users to export `XSH_MODULE_PATH` by hand, unlike `installer-image` and `installer-qemu-test`.
+- **Recommendation:** Pass the same variables as the sibling targets, then drop the manual export from `README.md`.
+- **Fix with:** single-source-of-truth
+- **Effort:** S (hours)
+
+### LAP-25 · P4 · Share the installer build environment record
+
+- **Area:** Navigability
+- **Where:** `installer-qemu-test.xsh:426`, `installer-qemu-manual.xsh:52`
+- **Problem:** Both scripts build the same `build_env` record twice, with and without `KERNEL_SOURCE`, and can drift apart.
+- **Recommendation:** Build the record once in the shared installer host module.
+- **Fix with:** deduplicate
+- **Effort:** S (hours)
+
+### LAP-26 · P4 · Document or retire undocumented make targets
+
+- **Area:** Docs
+- **Where:** `Makefile:100`
+- **Problem:** `mirror-demo`, `mirror-frontend`, `fetch-mirror`, `mirror-build-x86_64-musl`, and `deploy-mirror-fresh` appear in no doc, apart from a mention of `deploy-mirror-fresh` in `docs/MIRROR-DEPLOYMENT.md`.
+- **Recommendation:** Describe each target in its owning doc, or delete the unused ones.
+- **Fix with:** dead-code-archaeology
+- **Effort:** S (hours)

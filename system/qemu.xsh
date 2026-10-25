@@ -22,11 +22,6 @@ export type QemuTarget = {
 ## The host executable, QMP helper, and host target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: QemuTarget}
 
-# aarch64 virt has a PL011 UART and virtio-mmio block devices; x86_64 q35 has a
-# 16550 UART and virtio-pci, and a default VGA adapter that `-vga none`
-# removes: the virtio GPU must be the only display, or QEMU's screendump
-# captures the VGA text console instead of the compositor. Linux hosts take
-# QEMU's default interactive display.
 ## The QEMU target for a host: the guest is the host's architecture, so the
 ## image runs under HVF on macOS and KVM on Linux.
 export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
@@ -106,7 +101,6 @@ export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode) -> Str {
 
 ## Resolve only the documented host-side QEMU configuration surface.
 export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig, Error] {
-  # QEMU_SYSTEM_AARCH64 or QEMU_SYSTEM_X86_64 names a specific binary.
   let raw_qemu = (env.get(f"QEMU_SYSTEM_{target.arch.upper()}") ?? "").trim()
   let qemu = if raw_qemu == "" { process.which(target.qemu_name)? } else { fp"{raw_qemu}" }
   let python = process.which("python3")?
@@ -169,16 +163,10 @@ export pure qemu_command_argv(
   ]
 }
 
-# QEMU's managed handle owns the process group; cancel sends TERM, waits five
-# seconds, then escalates that group to KILL and reaps it.  Do not replace this
-# with a background shell watcher: it would lose the explicit cleanup boundary.
 proc qemu_stop(launched: ProcessHandle) [process, error] {
   launched.cancel(signal: "TERM", kill_after: 5s)
 }
 
-# Returns whether the spawned QEMU group leader is still running, without a
-# shell watcher. An exited QEMU stays a zombie (status `Z`) until it is
-# reaped, and signal 0 still reaches a zombie, so the process table decides.
 proc qemu_process_live(pid: Int) -> Result[Bool] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
@@ -187,7 +175,6 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   false
 }
 
-# Invokes the retained focused Python QMP helper with structured arguments.
 proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
   var argv = [value.python.display(), value.qmp_helper.display(), mode, socket.display()]
   if screenshot != "" {
@@ -198,9 +185,6 @@ proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p""
   return Err(types.LaputaError.Docker(f"QMP {mode} helper failed")) unless status.ok
 }
 
-# Retry idempotent QMP readiness or screenshot requests while QEMU publishes
-# its socket.  Keyboard input is deliberately *not* retried: a late transport
-# error could otherwise duplicate the proof keystrokes.
 proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
   var attempt = 0
   while attempt < 20 {
@@ -269,8 +253,6 @@ export proc run_test(
       )
     }
 
-    # READY is printed by the guest only after dwl has launched foot's reader.
-    # This keeps exactly one deterministic `laputa` plus EOF QMP injection.
     if ! injected and outputs.qmp_socket.exists() and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
       qemu_qmp_retry(value, "ready", outputs.qmp_socket)
       qemu_qmp(value, "input", outputs.qmp_socket)

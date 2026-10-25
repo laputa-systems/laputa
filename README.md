@@ -6,8 +6,9 @@ XSH for its package manager, recipes, init system, installer, and system tools.
 ## Get and run it
 
 The current installer workflow uses locally built packages and runs in QEMU.
-Obtain the checkout and prepare its local packages using the
-[bootstrap instructions](docs/DEVELOPMENT.md#local-bootstrap), then, on aarch64 with host XSH on `PATH` and the local mirror running, run:
+Prepare the checkout's local packages with the
+[bootstrap instructions](docs/DEVELOPMENT.md#local-bootstrap). Then, on aarch64
+with host XSH on `PATH` and the local mirror running, run:
 
 ```sh
 XSH_MODULE_PATH="$PWD" make installer-qemu-manual
@@ -21,9 +22,9 @@ autologin, and passwordless wheel sudo.
 The manual harness writes its ISO, matching kernel, and target disk under
 `target/laputa-installer/`. Image creation and the automated installation
 proof (`make installer-qemu-test`) support both architectures and write under
-`target/laputa-installer-<arch>/` and `target/laputa-installer-<arch>-qemu/`. The current harness boots the kernel directly;
-standalone firmware boot of the ISO is not yet supported by this workflow.
-See the [installer guide](docs/INSTALLER.md) for host requirements and boot
+`target/laputa-installer-<arch>/` and `target/laputa-installer-<arch>-qemu/`.
+The harness boots the kernel directly; standalone firmware boot of the ISO is
+not supported. See the [installer guide](docs/INSTALLER.md) for host requirements and boot
 limitations.
 
 For a dwl desktop with the foot terminal, after preparing the seed run:
@@ -43,8 +44,8 @@ x86_64 Linux; see [Asterinas](docs/ASTERINAS.md).
 `pm` works with explicit plans and immutable runtime generations. It has no
 default remote repository. Set `XSH_PM_REPO` to a mirror URL to plan against
 its package index; leave it empty for offline planning. Publishing to an
-authenticated mirror also needs `LAPUTA_TOKEN`. Run `pm --help` for commands
-and see the [PM contract](docs/PM.md#commands) for examples.
+authenticated mirror also needs `LAPUTA_TOKEN`. Run `pm --help` for commands;
+the [PM contract](docs/PM.md#commands) covers their behavior.
 
 `xinit` manages services, for example:
 
@@ -64,9 +65,8 @@ The [mirror guide](mirror/README.md) covers running a package mirror.
 
 ## Help and licensing
 
-Use the linked command guides and `pm --help` for usage. When reporting a
-problem to the maintainers, include the command, host architecture, and relevant
-output.
+Run `pm --help` or see the linked guides. When reporting a problem, include
+the command, host architecture, and relevant output.
 
 This checkout has no repository-wide license file. Package recipes declare
 upstream licenses individually.

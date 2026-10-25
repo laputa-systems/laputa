@@ -1,39 +1,21 @@
 # XSH Init
 
-`xinit` is a pure XSH init and service supervisor script. It is the process
-that should run as PID 1, usually as `/init` or `/usr/bin/xinit`, after
-installation with an `xsh` interpreter shebang. Inittab commands, boot hooks,
-shutdown hooks, and service definition modules are ordinary XSH or executable
-commands.
+`xinit` is a pure XSH init and service supervisor script, installed as
+`/usr/bin/xinit` with `/init` linking to it. Inittab commands, boot and
+shutdown hooks, and service modules are ordinary XSH or executable commands.
+PID 1 mechanics live in `xinit.xsh` and the XSH `unix` and `linux` module
+APIs it calls; `xsh --pid1` is not supported.
 
-`xsh --pid1` is not supported. PID 1 mechanics live in this `xinit.xsh` script
-and the XSH `unix` and `linux` module APIs it calls.
+This is the contract for inittab authors and service authors. The
+[supervision model](SUPERVISION.md) explains the design behind the scanner.
+The command list is in the [README](../README.md); `xinit help` prints it.
 
-## Invocation
+## Paths
 
-```sh
-xinit
-xinit /etc/inittab
-xinit boot [TARGET]
-xinit scan [SERVICE|TARGET]
-xinit start SERVICE
-xinit restart SERVICE
-xinit reload SERVICE
-xinit supervise SERVICE
-xinit status SERVICE
-xinit logs SERVICE
-xinit stop SERVICE
-xinit list
-xinit graph [SERVICE|TARGET]
-xinit check [SERVICE|PATH]
-```
-
-`up` aliases `start`; `down` aliases `stop`.
-
-With no argument, `xinit` reads `XSH_INIT_INITTAB` or `/etc/inittab`. PID 1
-mode requires `getpid() == 1`; tests may set `XINIT_TEST_ALLOW_NON_PID1=1`.
-
-Control commands use these paths by default:
+With no argument, `xinit` runs as PID 1 on the inittab named by
+`XSH_INIT_INITTAB`, default `/etc/inittab`. It refuses to run unless
+`getpid() == 1`. Test-only `XINIT_TEST_*` and `XSH_INIT_TEST_*` switches are
+read in `xinit.xsh`.
 
 - `XINIT_SERVICE_DIR`, default `/usr/lib/xinit/services`.
 - `XINIT_RUN_DIR`, default `/run/xinit`.
@@ -41,37 +23,23 @@ Control commands use these paths by default:
 
 ## Inittab
 
-Each non-empty line is:
-
-```text
-id:runlevels:action:command
-```
-
-`runlevels` is parsed for compatibility but is not used. `command` is split
-with XSH argv parsing, so quotes and escaped spaces work.
-
-Supported actions:
+Each non-empty line is `id:runlevels:action:command`. `runlevels` is parsed
+for compatibility and ignored. `command` is split with XSH argv parsing, so
+quotes and escaped spaces work.
 
 - `sysinit`: run synchronously before services.
 - `wait`: run synchronously after `sysinit`.
 - `once`: start once and do not restart.
-- `respawn`: supervise with launch delay and optional test launch limit.
+- `respawn`: supervise with a flat launch delay.
 - `poweroff`: start once; when it exits, stop owned process groups and power off.
-- `restart`: exec on restart lifecycle.
+- `restart`: exec on the restart lifecycle.
 - `shutdown`: run synchronously during shutdown after owned process groups stop.
 
-Lifecycle signals:
-
-- `SIGHUP`: restart.
-- `SIGUSR1`: halt.
-- `SIGUSR2`: poweroff.
-- `SIGTERM`: reboot.
-- `SIGINT`: poweroff.
-
-Child exits are drained before lifecycle signals are processed. On Linux,
-`xinit` enables child subreaper mode where available.
-
-## Minimal Inittab
+Lifecycle signals: `SIGHUP` restarts, `SIGUSR1` halts, `SIGUSR2` and `SIGINT`
+power off, `SIGTERM` reboots. Child exits are drained before lifecycle signals.
+On Linux `xinit` becomes the child subreaper. Halt, poweroff, and reboot send
+`TERM` then `KILL` (after 2 seconds) to every remaining process before the
+kernel call.
 
 ```text
 ::sysinit:/usr/lib/init/rc.boot
@@ -82,161 +50,116 @@ tty1::respawn:/bin/getty 38400 tty1
 ```
 
 The serial console is `ttyAMA0` on aarch64 `virt` (PL011) and `ttyS0` on
-x86_64.
-
-## Minimal Hooks
-
-- [Boot hook](minimal-rc.boot.xsh)
-- [Shutdown hook](minimal-rc.shutdown.xsh)
+x86_64. Example hooks: [boot](minimal-rc.boot.xsh),
+[shutdown](minimal-rc.shutdown.xsh).
 
 ## Services
 
-Service files live under `/usr/lib/xinit/services` by default. A file named
-`demo.xsh` is loaded by `xinit start demo` or `xinit supervise demo`.
+`xinit start demo` and `xinit supervise demo` load
+`${XINIT_SERVICE_DIR}/demo.xsh`. Each file exports one `service` record; see
+[demo-service.xsh](demo-service.xsh), and `packages/*/service.xsh` for the
+installed ones. `xinit check` validates the files and the dependency graph.
 
-Each file exports one `service` record. See [demo-service.xsh](demo-service.xsh) for a
-minimal service module, and `packages/*/service.xsh` in the Laputa checkout
-for the installed ones.
+The fields read are defined in `service_from_record` in `xinit.xsh`. Other
+fields are not rejected and have no effect.
 
-```xsh
-export let service = {
-  name: "demo",
-  kind: "longrun",
-  command: process.command_argv(/usr/bin/demo, ["demo", "--foreground"]),
-  targets: ["boot"],
-  dependencies: {need: ["net"], uses: ["logger"], after: ["firewall"]},
-  restart: {mode: "on_failure", delay_ms: 1000, max_delay_ms: 30000, stable_after_ms: 10000},
-  logging: "append",
-}
-```
+| Field | Meaning |
+|---|---|
+| `name`, `command` | Service name and spawn command. |
+| `kind` | `longrun` (default), `oneshot`, or `scripted`. |
+| `targets` | Targets selected by `boot [TARGET]`; default target is `boot`. |
+| `dependencies` | `need`, `uses`, `after`, `before`. |
+| `restart` | `mode`: `always`, `on_failure`, `never`; default `on_failure` for `longrun`, `never` otherwise. `delay_ms`, `max_delay_ms`, `stable_after_ms`. |
+| `readiness` | `"notify"` or the default. |
+| `ready_timeout_ms`, `stop_timeout_ms` | Defaults 5000 and 200. |
+| `logging` | `"append"` (default) or `"off"`. |
+| `log` | `{mode, max_size, keep}`; ignored when `logging` is set. |
+| `resources` | `{cpu_max: N}`. |
 
-Service kinds are `longrun`, `oneshot`, and `scripted`. A service module may
-also export lifecycle procs:
+A module may also export lifecycle procs. `start()` and `stop()` replace the
+default spawn and stop, `reload()` replaces the `SIGHUP`, `ready()` gates
+dependents, `status()` appends text to the `status` line, and `finish()` runs after the
+instance exits, on a clean stop or a crash, while the unit reports
+`finishing`. Signatures are in `ServiceFile` in `xinit.xsh`.
 
-```xsh
-export proc start() [fs, process, env, error] -> Result[Unit]
-export proc stop() [fs, process, env, time, error] -> Result[Unit]
-export proc reload() [fs, process, env, error] -> Result[Unit]
-export proc finish() [fs, process, env, error] -> Result[Unit]
-export proc ready() [fs, process, env, time, error] -> Result[Bool]
-export proc status() [fs, process, env, error] -> Result[Str]
-```
+### Dependencies
 
-Dependency fields are:
+- `need`: required; `start SERVICE` starts them first and aborts on failure.
+- `uses`: optional; a start failure is tolerated. Named `uses` because `use`
+  is an XSH keyword.
+- `after`, `before`: ordering only.
 
-- `need`: required dependencies; `start SERVICE` starts them first.
-- `uses`: optional facility-style dependencies; this is named `uses` because
-  `use` is an XSH keyword.
-- `after`: ordering-only dependencies.
-- `before`: inverse ordering-only dependencies.
+The built-in facility names `logger`, `net`, `dns`, and `firewall` need no
+service file. Any other dependency must resolve to a service file; cycles and
+missing dependencies are errors. `boot` starts all services declaring the
+target. `stop` refuses while running services `need` the target, unless a
+scanner owns the run directory.
 
-Built-in facility names are `logger`, `net`, `dns`, and `firewall`.
-Non-facility dependencies must resolve to service files. Cycles and missing
-dependencies are errors.
+### Scanner and control
 
-Restart modes are `always`, `on_failure`, and `never`.
+`supervise SERVICE` and `scan [SERVICE|TARGET]` are one scanner. `supervise`
+holds one unit; `scan` holds a target's services, or a service and its
+dependencies. The scanner owns and reaps its children, writes their status
+JSON, and on `SIGTERM` or `SIGINT` stops them in reverse dependency order.
 
-`supervise SERVICE` and `scan [SERVICE|TARGET]` are the same scanner: a process
-that holds a set of units and reconciles each toward its desired state on every
-wakeup, applying restart/backoff policy on child exits and shutting its units
-down (in reverse dependency order) on `SIGTERM` or `SIGINT`. `supervise` holds a
-single service; `scan` holds a whole dependency tree (a `TARGET`'s services, or
-a `SERVICE` plus its dependencies) in one process, each unit backed off
-independently. The scanner is the source of truth for the services it owns and
-writes their status JSON. See [supervision](SUPERVISION.md) for the model.
+While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
+`start`/`stop`/`restart`/`reload SERVICE` post a request to
+`${XINIT_RUN_DIR}/inbox/SERVICE` instead of acting, and the scanner applies it
+on its next pass. Without a scanner, `start` and `stop` act directly.
 
-Restart backoff is exponential. After a crash the scanner waits `delay_ms`
-before relaunching and doubles that delay on each successive crash, capped at
-`max_delay_ms` (`max_delay_ms: 0` means no cap). A run that stayed up for at
-least `stable_after_ms` is treated as healthy and resets the delay back to
-`delay_ms`, so a long-lived service that finally crashes does not inherit a
-stale long delay. `delay_ms: 0` disables backoff and restarts immediately. The
-delay is a non-blocking `next_ms` gate, not a sleep: backing one unit off never
-blocks reconciling, stopping, or starting another, and a unit awaiting respawn
-reports state `dead`.
+A scanner gates each unit's first start. A `need` dependency must be
+`running`; `uses` and `after` dependencies may also be `stopped`. Dependencies
+outside the scanned set impose no gate. Respawns are not re-gated, and a
+dependency crashing does not stop a running dependent.
 
-Readiness has two forms. By default a longrun is ready as soon as it is spawned
-(or, if it exports `ready()`, when that returns true within `ready_timeout_ms`).
-Setting `readiness: "notify"` opts into an edge-triggered contract: the scanner
-spawns the service with an inherited readiness pipe whose fd number is published
-as the `NOTIFY_FD` environment variable, the service writes any byte to that fd
-when ready, and until then the unit sits in state `starting`. If the service
-does not signal within `ready_timeout_ms`, the scanner promotes it to `running`
-but leaves `ready` false rather than wedging. Readiness is reported by `status`
-and `list`.
+### Restart
 
-The scanner gates each service's first start on its dependencies' readiness: a
-unit is not spawned until its ordering dependencies are up. A `need` dependency
-must reach `running` (its startup, including readiness, has completed); `uses`
-and `after` dependencies may also be `stopped` (settled), since they are
-optional or ordering-only and must not block forever. Dependencies that are not
-part of the scanned set (facilities, or services outside this scan) impose no
-gate. Only the initial start waits — a respawn is not re-gated, and a dependency
-crashing does not stop an already-running dependent.
+After a crash the scanner waits `delay_ms`, doubles the delay on each further
+crash up to `max_delay_ms` (`0` is uncapped), and resets it to `delay_ms` after a
+run of at least `stable_after_ms`. `delay_ms: 0` restarts immediately. A unit
+awaiting respawn reports `dead`.
 
-On stop, the owned process group is sent `TERM`, then `KILL` after
-`stop_timeout_ms` (default 200ms) when no custom `stop()` hook exists.
+### Readiness
 
-`reload SERVICE` refreshes a running service in place: it runs the service's
-`reload()` hook if it exports one, otherwise sends `SIGHUP` to the saved process
-group. It does not restart the service or change its state.
+By default a longrun is ready once spawned, or, if it exports `ready()`, when
+that returns true within `ready_timeout_ms`. With `readiness: "notify"` the
+scanner passes a pipe whose fd number is in `NOTIFY_FD`; the unit is `starting`
+until the service writes any byte to it. On timeout the unit becomes `running`
+with `ready` false. `status` and `list` report readiness.
 
-While a scanner owns a run directory (tracked by a live `scanner.json` marker),
-`start`/`stop`/`restart`/`reload SERVICE` do not act directly — they post a
-desired-state request (`up`/`down`/`restart`/`reload`) to
-`${XINIT_RUN_DIR}/inbox/SERVICE`, which the scanner drains on its next pass and
-applies as the source of truth. Without a live scanner,
-`start`/`stop` keep their standalone behavior.
+### Stop and reload
 
-Log modes are `append` and `off`. Missing `logging` means `append`; `off`
-disables builtin capture. Append logging is owned by `xinit`: service stdout
-and stderr are appended as raw combined bytes to
-`${XINIT_LOG_ROOT}/SERVICE/current`, with `XINIT_LOG_ROOT` defaulting to
-`/var/log`. The service log directory is created as `0755`, and `current` is
-created as `0600`. If append logging cannot create or open the file, service
-start fails.
+Without a `stop()` hook, stop sends `TERM` to the saved process group, then
+`KILL` after `stop_timeout_ms`. `reload` runs `reload()` if exported, otherwise
+sends `SIGHUP` to the saved process group; it does not change state.
 
-Append logs are size-capped. The `log: {mode: "append", max_size, keep}` form
-configures rotation: when `current` reaches `max_size` bytes it is rotated to
-`current.1` (older copies shift to `current.2` … `current.<keep>`, oldest
-dropped). Defaults are `max_size: 1048576` (1 MiB) and `keep: 3`; `max_size: 0`
-disables rotation (unbounded). A service is rotated before each (re)start, and a
-scanner additionally rotates a running service's log mid-run via copy-truncate
-(a write landing between the copy and the truncate may be lost — the accepted
-tradeoff for in-process rotation without log reopen). One-shot `start` outside a
-scanner only rotates at start. Compression, timestamps, and line framing are not
-implemented yet.
+### Logs
 
-Cgroups v2 support `resources: {cpu_max: N}` for service process-tree CPU
-quota. `N` is a percentage of one CPU, matching `run --cpumax`. Linux enforces
-the limit with cgroups v2; macOS accepts it as a no-op. No other cgroup
-policy is supported (`delegate`, `slice`, `cgroup`, `cgroup_path`, or memory,
-pids, and CPU-weight resources). xinit reads only the service fields named
-here and does not reject others, so `xinit check` accepts such fields and
-they have no effect.
+Append logging is owned by `xinit`: stdout and stderr go as raw combined bytes
+to `${XINIT_LOG_ROOT}/SERVICE/current` (directory `0755`, file `0600`). If the
+file cannot be created or opened, start fails. `logging: "off"` disables
+capture and shows as `log=none` in status.
 
-`boot` starts all services that declare the selected target, with `boot` as the
-default target. `start` plans dependencies first, starts them, then starts the
-requested service. If a service exports `ready()`, dependents wait until it
-returns true or the ready timeout expires. If no `ready()` exists, spawned means
-ready. `stop` refuses to stop a service while running dependents require it.
-When a service cgroup is created, the resolved `cgroup_path` is included in the
-status JSON. `stop` sends `TERM`, then `KILL`, to the saved process group when
-no custom `stop()` exists.
+`current` rotates to `current.1` and shifts older copies up to
+`current.<keep>` when it reaches `max_size` bytes; defaults are 1 MiB and 3.
+`max_size: 0` disables rotation. Rotation runs before each start and, under a
+scanner, each pass by copy-truncate, so a write between copy and truncate may
+be lost. There is no compression or timestamping.
 
-Saved status is reconciled against the kernel on every read. A vanished or
-recycled tracked pid becomes `dead` with the pid cleared. Completed
-`oneshot`/`scripted` services with pid 0 remain `running`. Reconciliation is
-skipped under `XSH_UNIX_DRY_RUN`, where pids are mocked. The
-[supervision model](SUPERVISION.md#control-plane) explains the liveness and
-start-time checks.
+### Resources
 
-A service module may export a `finish()` hook; xinit runs it after the service's
-instance exits — on a clean stop and on a crash — for cleanup that must follow
-the process (the unit is reported as `finishing` while it runs).
+`resources: {cpu_max: N}` limits the process tree to N percent of one CPU
+through cgroups v2, matching `run --cpumax`. macOS accepts it as a no-op. No
+other cgroup policy exists.
 
-`status` prints one line:
+### Status
 
 ```text
 demo running pid=1000 ready=true log=append desired=up restarts=0
 ```
+
+`supervisor=PID` and `cgroup=PATH` are appended when set. Saved status is
+reconciled against the kernel on every read: a vanished or recycled pid
+becomes `dead` with the pid cleared, and completed `oneshot`/`scripted`
+services with pid 0 stay `running`. See the
+[control plane](SUPERVISION.md#control-plane) for the liveness check.

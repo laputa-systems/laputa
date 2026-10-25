@@ -23,7 +23,6 @@ pkg-config sysroot holding Laputa's `libdrm`, `wayland-dev`,
 (the configure step needs their `.pc` files; nothing is compiled):
 
 ```sh
-# From the checkout root, ensure .work/ is ignored in .git/info/exclude.
 mkdir -p .work/tmp
 export TMPDIR="$PWD/.work/tmp"
 MESA_VENV="$TMPDIR/mesa-venv"

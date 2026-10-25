@@ -42,6 +42,4 @@ POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.
 `make verify` is the full host proof from a clean build, with logs and a timing
 table under `.out/verify/`; reserve it for an explicit full verification run.
 
-The bootstrap campaign completed a clean x86_64 world build and both QEMU
-proofs. Its later shared-path changes did not receive a full aarch64 rebuild
-or boot proof. Track that verification gap in [TODO](../TODO.md).
+The aarch64 world rebuild and boot proofs are unverified; see [TODO](../TODO.md).

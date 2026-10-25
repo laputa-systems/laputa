@@ -21,15 +21,10 @@ The x86_64 compiler wrapper defaults to `-march=x86-64-v3`
 (`packages/llvm-toolchain/PKGBUILD.xsh::default_march`). Native package proofs
 need a CPU that supports that baseline.
 
-On macOS (Apple Silicon), the developer path uses XSH's native release build
-(`cargo build --release -j 4 -p xsh -p xshi -p xsht --bin xsh --bin xshi --bin xsht`
-in `../xsh`) and runs the mirror and `make
-mirror-test` through `cargo`. Docker must run `linux/arm64` natively (for
-example OrbStack).
-
-On Linux, builds use rootful Docker. Package builds give their outputs back to
-you when they finish, and `make clean` deletes the cargo targets the XSH build
-image leaves root-owned through a container.
+On macOS (Apple Silicon), build XSH's release binaries (`xsh`, `xshi`, `xsht`)
+with `cargo build --release` in `XSH_ROOT`. The mirror and `make mirror-test`
+run through `cargo`. Docker must run `linux/arm64` natively (for example
+OrbStack).
 
 VM host requirements belong to [QEMU](QEMU.md#host-requirements),
 [installer](INSTALLER.md#entry-points), and [Asterinas](ASTERINAS.md).
@@ -98,17 +93,11 @@ make seed            # offline: the XSH seed in .out/seed/<arch>/, then the pack
 make mirror &        # http://127.0.0.1:3000, data in .out/mirror (the first run builds the mirror)
 make build           # offline: every package, in Docker with --network none
 make publish         # the same plan's artifacts into the local mirror
-make root PKGS="baselayout xsh xinit musl"   # import from the mirror, compose a root, check it runs
+make root PKGS=baselayout   # import from the mirror, compose a root, check it runs
 kill %1              # stop the mirror
 ```
 
-`ARCH` defaults to the host's architecture, and the package build runs
-natively in Docker. `make build STOP=pre-cmake` builds only the packages that
-need neither cmake nor linux, and `PKGS="a b"` builds those packages and their
-dependencies. A rebuild with nothing changed reuses every artifact.
-
-Stop the mirror with Ctrl-C if it runs in a separate terminal. PM has no
-default remote; these make targets use the loopback mirror.
+PM has no default remote; these make targets use the loopback mirror.
 
 - `make build` plans and builds in package-tools with `--network none`. The
   checkout, with the source cache, is mounted read-only. The artifact store
@@ -122,7 +111,7 @@ default remote; these make targets use the loopback mirror.
   start and finish. A failure stops the other builds and prints the failing
   package, its log path, and the log's tail. The build ends with its slowest
   packages.
-- `PKGS="a b"` plans those packages' closures. `STOP=pre-cmake` runs
+- `PKGS` (space-separated names) plans those packages' closures. `STOP=pre-cmake` runs
   `repo plan --all --without cmake --without linux`, a fast first signal on a
   new seed or toolchain. With neither, the build covers every package. The
   plan is `.out/world/<arch>/plan.json`.
@@ -181,9 +170,6 @@ requirements, and the proof contract.
 `make installer-image` and `make installer-qemu-test` take `ARCH` and import
 their package roots from the local mirror, so `make mirror` must be running
 and `make publish` done. See [installer](INSTALLER.md).
-
-Installer host validation failures use XSH's standard `validation` error
-kind; child failures retain the child's exit code.
 
 ## Verify the artifact store
 
@@ -251,33 +237,23 @@ targets leave it in place.
 
 ## Make targets
 
+The `Makefile` is the reference; its comments describe each target. The ones
+below carry behavior not stated elsewhere in this guide.
+
 | Command | Does |
 |---|---|
-| `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker (no host XSH or Rust); shares the seed's cargo target |
-| `make check` | `xsht check` over the tree (`xsht-config.ini` owns module path and excludes), plus XSH scripts without a `.xsh` name (boot hooks, `getent`), found by their `#!/bin/xsh` shebang |
+| `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker; shares the seed's cargo target |
+| `make check` | `xsht check` over the tree, plus XSH scripts without a `.xsh` name, found by their `#!/bin/xsh` shebang |
 | `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
-| `make fetch [ARCH=x86_64]` | fetches pinned upstream sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base for offline builds |
-| `make seed [ARCH=…]` | offline: static musl `xsh`/`xshi`/`xsht` and `core.tar.xz` from `XSH_ROOT` into `.out/seed/<arch>/` with a manifest, then the package-tools image |
-| `make seed-asterinas-shell [ARCH=…]` | offline: opt-in xshi integration variant; the pinned backend builds its own seed |
-| `make build [PKGS="a b" \| STOP=pre-cmake]`, `make plan` | PM plan and build in package-tools with `--network none` into `.out/artifacts/<arch>` (the build cache); `STOP=pre-cmake` is `repo plan --all --without cmake --without linux` |
-| `make mirror`, `make publish [PKGS=… \| STOP=…]` | the loopback local mirror (foreground; on Linux built by `make host-mirror` in `xsh-test`, elsewhere run through cargo); publish builds the selection, then uploads it from the host |
-| `make root PKGS="…"` | import PKGS from the mirror on the host, compose the root offline in a container, check its ELF files load and its xsh runs |
-| `make seed-smoke`, `make test-pm-docker` | the seed in package-tools with `--network none`: offline plan plus a PM subset, or the full PM suite |
-| `make test` | the `test-pm`, `test-system`, `test-xinit`, and `test-linux` native suites |
-| `make test-linux` | the kernel recipe's Kbuild tests, each with a test-owned plan cache, and linux-headers' `headers_install` tests |
-| `make test-pm-native` | the PM suite against XSH_ROOT's debug build (`make xsh-native`), with coverage under `target/coverage/` |
+| `make fetch` | pinned sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
+| `make seed-asterinas-shell` | opt-in xshi integration seed; the pinned Asterinas backend builds its own seed |
+| `make seed-smoke` | the seed in package-tools with `--network none`: offline plan plus a PM subset |
+| `make mirror-build` | host `cargo build` for `mirror/`; needs a host Rust toolchain |
 | `make update-checksums` | `pm repo update-checksums` for every recipe (networked) |
-| `make mirror-build` | host `cargo build` for `mirror/`; requires a host Rust toolchain |
-| `make mirror-test` | mirror tests plus fake-command deployment checks; on Linux Cargo runs offline in `xsh-test` |
-| `make preflight-mirror`, `make deploy-mirror` | read-only deployment checks, then build and converge the production mirror over SSH and Cloudflare `cf` |
-| `make profile-{plan,build,test,boot,clean}` | the typed profile CLI on the host: builds in native Docker for the host arch, boots QEMU with HVF (macOS) or KVM (Linux) |
-| `make installer-image`, `make installer-qemu-test [ARCH=…]` | installer ISO and its QEMU install-and-boot proof; roots come from the local mirror, so `make mirror` and `make publish` come first |
-| `make installer-qemu-manual` | aarch64-only interactive installer boot; set `XSH_MODULE_PATH` to the checkout root |
-| `make asterinas-preflight`, `make asterinas-fetch`, `make asterinas-build` | checks host capabilities, fetches locked source/tool inputs, and builds an immutable Asterinas + Laputa bundle |
-| `make asterinas-test [XSH_TEST=tests/xsh/<module>.xsh]` | boots the PM-built ext2 root under Asterinas/Firecracker and checks xinit, XSH, and guest filesystem/process behavior; optionally runs one pinned XSH test module |
-| `make asterinas-boot` | boots the PM-built Laputa root and connects an interactive xshi session to Firecracker's serial console |
-| `make asterinas-clean` | removes all checkout build outputs, fetched caches, and pinned builder images for a cold Asterinas rebuild |
-| `make asterinas-setup` | builds the pinned Asterinas PVH kernel and boots a small KVM smoke guest |
 | `make store-gc` | remove store artifacts that neither the last world plan nor a profile plan names (between builds only) |
 | `make verify` | the whole host proof from `make clean`, one step at a time, with logs and a timing table in `.out/verify/` |
-| `make clean` | remove all derived state (`.out/`, `target/`, mirror frontend outputs, `laputa-*` images), through a container on Linux because rootful Docker leaves root-owned files; `make distclean` also removes `.cache/` |
+| `make clean`, `make distclean` | see [derived state](#derived-state) |
+
+Suites (including `test-pm-docker` and `test-pm-native`) are in [testing](TESTING.md), mirror targets in [mirror usage](../mirror/README.md)
+and [mirror deployment](MIRROR-DEPLOYMENT.md), and `asterinas-*` targets in
+[Asterinas](ASTERINAS.md).

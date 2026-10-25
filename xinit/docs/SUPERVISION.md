@@ -1,8 +1,8 @@
 # Supervision Model
 
 This describes how xinit keeps services running and why it is shaped this way.
-[INIT.md](INIT.md) is the user-facing contract (commands, service fields, defaults);
-this is the design behind the scanner, its state, and its control plane.
+[INIT.md](INIT.md) is the contract (commands, service fields, defaults); this
+is the design behind the scanner, its state, and its control plane.
 
 ## The idea borrowed from s6
 
@@ -52,45 +52,30 @@ pending -> starting -> running -> dead -> running ...
 
 ### Backoff without blocking
 
-Backoff is a per-unit `next_ms` gate checked on each pass, not a sleep. After
-a crash the delay starts at `delay_ms` and doubles per successive crash up to
-`max_delay_ms`; a run that stayed up for `stable_after_ms` resets it. The
-scanner sleeps in `unix.wait_pid1_event(timeout:)` until the soonest gate, and
-wakes early on a signal or a child exit, so an idle tree does not spin and
+Backoff is a per-unit `next_ms` gate checked on each pass, not a sleep. The
+scanner sleeps in `unix.wait_pid1_event(timeout:)` until the soonest gate and
+wakes early on a signal or child exit, so an idle tree does not spin and
 backing one unit off never delays stopping or starting another. Units blocked
-on the dependency gate are left out of that deadline.
+on the dependency gate are left out of that deadline. Units in `starting` poll
+readiness every 100 ms. The restart fields are in
+[INIT.md](INIT.md#restart).
 
-### Dependency gating
+### Dependency gating and readiness
 
-A unit's first start waits until its `need` dependencies are `running` and its
-`uses` and `after` dependencies are running or `stopped` (settled).
-Dependencies outside the scanned set, including the built-in facilities,
-impose no gate. Respawns are not re-gated, and a dependency going down does not
-stop or restart a running dependent.
-
-### Readiness
-
-The default is `ready()` polling: a longrun is ready once spawned, or once its
-exported `ready()` returns true within `ready_timeout_ms`. A
-`readiness: "notify"` service is spawned with an inherited pipe whose write end
-is `NOTIFY_FD`; the unit stays `starting` until the service writes a byte, or
-until `ready_timeout_ms`, when it becomes `running` with `ready` false rather
-than wedging. Stop sends `TERM` to the process group, then `KILL` after the
-service's `stop_timeout_ms`, unless the service exports `stop()`.
+The gate and the readiness contract are in [INIT.md](INIT.md#scanner-and-control).
+A gated unit stays `pending` and its wakeup comes from the dependency's own
+transition, not from a timer.
 
 ## Control plane
 
-While a scanner owns a run directory, marked by a live
-`${XINIT_RUN_DIR}/scanner.json`, `start`, `stop`, `restart`, and `reload` do
-not act on the process. They post a desired-state request (`up`, `down`,
-`restart`, `reload`) to `${XINIT_RUN_DIR}/inbox/SERVICE`, and the scanner
-drains the inbox on its next pass. Without a live scanner, `start` and `stop`
-act directly. That one-shot `start` path records the child's kernel start
-time when available, and every status read probes liveness with signal 0 and
-compares any recorded start time against the kernel: a pid
-that is gone, or alive with a different start time (recycled), reconciles to
-`dead`. The scanner does not need that check, because it clears a unit's pid
-the instant its child exits.
+While a scanner owns a run directory, `start`, `stop`, `restart`, and
+`reload` post requests to its inbox instead of acting on the process
+([INIT.md](INIT.md#scanner-and-control)). Without a scanner, the one-shot
+`start` path records the child's kernel start time when available. Every status
+read probes liveness with signal 0 and compares any recorded start time against
+the kernel: a pid that is gone, or alive with a different start time
+(recycled), reconciles to `dead`. The scanner does not need that check,
+because it clears a unit's pid the instant its child exits.
 
 ## The inittab engine
 

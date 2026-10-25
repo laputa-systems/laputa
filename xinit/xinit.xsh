@@ -28,13 +28,8 @@ type Service = {
   readiness: Str,
 }
 
-# The one key every service record must declare. The remaining service-record
-# keys are optional, so they are validated one at a time by the `field_*`
-# helpers: a schema field cannot express an absent key.
 type ServiceIdentity = {name: Str}
 
-# An explicit `log` section must name its mode; its size and keep keys are
-# optional.
 type LogPolicy = {mode: Str}
 
 type ServiceFile = module {
@@ -47,12 +42,8 @@ type ServiceFile = module {
   export optional proc status() [fs, process, env, error] -> Result[Str, Error]
 }
 
-# Result of reaping one inittab child: the updated runtime table plus the
-# lifecycle event the death triggers ("poweroff" or "").
 type DeadMark = {runtime: List[RuntimeEntry], event: Str}
 
-# Accumulator for the depth-first start-order walk: names already planned and
-# the start order built so far.
 type StartPlan = {done: List[Str], out: List[Str]}
 
 type SavedStatus = {
@@ -68,17 +59,8 @@ type SavedStatus = {
   start_time_ms: Int,
 }
 
-# Result of spawning a service instance: the saved status plus the readiness
-# notification fd (>0 only for a `readiness: "notify"` service spawned under the
-# scanner; -1 otherwise).
 type SpawnResult = {status: SavedStatus, notify_fd: Int}
 
-# A supervised unit: a service plus the runtime state the scanner needs to keep
-# it at its desired state. `state` is the internal lifecycle (pending -> starting
-# -> running -> dead -> running, or -> stopped); `next_ms`/`current_delay`/
-# `started_at` drive non-blocking restart backoff (a future-dated `next_ms` gate
-# replaces the blocking sleep the single-service supervisor used to do).
-# `notify_fd` holds the readiness pipe while a unit is `starting`.
 type ServiceUnit = {
   service: Service,
   desired: Str,
@@ -250,10 +232,6 @@ proc runtime_set(runtime: List[RuntimeEntry], value: RuntimeEntry) [error] -> Li
   out
 }
 
-# The shared (re)spawn timing gate: a tracked process is due when it holds no
-# live pid and its backoff/respawn deadline has elapsed. Both the inittab respawn
-# engine and the service scanner gate on this; each then layers its own policy on
-# top (inittab: per-action launch limits; scanner: desired state + restart mode).
 pure spawn_due(pid: Int, now: Int, next_ms: Int) -> Bool {
   pid <= 0 and now >= next_ms
 }
@@ -476,14 +454,10 @@ proc require_service_file(path_value: Path) {
   }
 }
 
-# Error context for a service-record key that failed validation. The service
-# file path and key name let an operator find the bad declaration.
 pure field_context(source: Path, field: Str) -> Str {
   f"{source}: field `{field}`"
 }
 
-# Optional service-record keys. An absent key yields the fallback; a present
-# key must hold the declared type (a present null is a type error, not absence).
 proc field_str(raw: Record, field: Str, fallback: Str, source: Path) -> Result[Str] {
   return fallback when field not in raw
 
@@ -502,8 +476,6 @@ proc field_str_list(raw: Record, field: Str, source: Path) -> Result[List[Str]] 
   raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, field))?
 }
 
-# A nested optional section (`restart`, `dependencies`, ...); absent reads as an
-# empty record so every key inside it takes its default.
 proc field_record(raw: Record, field: Str, source: Path) -> Result[Record] {
   if field not in raw {
     let empty: Record = {}
@@ -532,9 +504,6 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
   let log = field_record(raw, "log", path_value)?
   var log_mode = "append"
 
-  # Built-in append logs are bounded by default: rotate `current` once it reaches
-  # `max_size` bytes, keeping `keep` rotated files. `max_size: 0` disables
-  # rotation (unbounded, the old behavior).
   var log_max_size = 1048576
   var log_keep = 3
 
@@ -696,9 +665,6 @@ pure visit_plan(
   {done: next_done, out: next_out}
 }
 
-# Names that must start for `name` to be considered up: the root plus its
-# transitive `need` closure. `uses` deps are deliberately excluded — they are
-# optional, so their start failure is tolerated (see start_service).
 pure required_closure(services: List[Service], name: Str, out: List[Str]) -> Result[List[Str]] {
   return out when name in out
 
@@ -772,12 +738,6 @@ pure default_status(name: Str) -> SavedStatus {
   }
 }
 
-# Liveness probe via signal 0. An Ok result means the pid exists and we may
-# signal it, i.e. it is plausibly still our running service. Any error means it
-# is gone (ESRCH) or no longer ours (EPERM, e.g. the pid was recycled into
-# another user's process); in both cases the saved state is stale, so we treat
-# it as not alive. xinit runs as root over its own children, so EPERM does not
-# arise for legitimately-owned services in practice.
 proc pid_alive(pid: Int) -> Bool {
   guard pid > 0 else {
     return false
@@ -789,7 +749,6 @@ proc pid_alive(pid: Int) -> Bool {
   }
 }
 
-# The kernel start time (epoch ms) of a live pid, or 0 if it is not found.
 proc pid_start_time(pid: Int) -> Result[Int] {
   guard pid > 0 else {
     return 0
@@ -802,11 +761,6 @@ proc pid_start_time(pid: Int) -> Result[Int] {
   0
 }
 
-# Whether a tracked pid is still our service instance: alive (signal 0) and, when
-# a baseline start time was recorded, with a matching kernel start time. The
-# start-time check closes the window the bare liveness probe leaves open when a
-# dead service's pid is recycled into an unrelated process. A baseline of 0
-# (e.g. scanner-managed units, which clear the pid on child exit) skips it.
 proc pid_live_and_ours(pid: Int, start_time_ms: Int) -> Result[Bool] {
   guard pid_alive(pid) else {
     return false
@@ -847,12 +801,6 @@ proc read_status(name: Str) -> Result[SavedStatus] {
     start_time_ms:,
   )
 
-  # Trust the kernel, not the pidfile. A saved "running" state whose tracked pid
-  # is no longer alive is stale (the process crashed without cleanup, or the pid
-  # was recycled), so reconcile it to "dead" rather than report a phantom or let
-  # `stop` signal an unrelated process. Skipped under XSH_UNIX_DRY_RUN, where
-  # pids are mocked and `process.kill` would probe the real kernel. A tracked
-  # pid of 0 (completed oneshot/scripted service) is left untouched.
   if status.state == "running" and status.pid > 0 and ! env_enabled("XSH_UNIX_DRY_RUN") and ! pid_live_and_ours(
     status.pid,
     status.start_time_ms,
@@ -902,10 +850,6 @@ proc rotated_log_path(current: Path, index: Int) [error] -> Result[Path] {
   fp"{current}.{index}"
 }
 
-# Rotate a service's `current` log, keeping `keep` numbered copies
-# (current.1 newest). Uses copy-then-truncate so a running child's append fd
-# stays valid; a write landing between the copy and the truncate may be lost,
-# which is the accepted V1 tradeoff for in-process rotation without log reopen.
 proc rotate_log(name: Str, keep: Int) {
   let current = log_path(name)?
   rotated_log_path(current, keep)?.remove(missing_ok: true)
@@ -990,19 +934,12 @@ proc run_reload_proc(service: Service) -> Result[Bool] {
   false
 }
 
-# Reload a running service in place: run its `reload()` hook if it has one,
-# otherwise send SIGHUP to its process group (the usual reload convention).
 proc reload_unit(service: Service, pid: Int) {
   if run_reload_proc(service) {} else if pid > 0 {
     unix.kill_process_group(pid, "HUP")
   }
 }
 
-# Spawn one instance of a service. `notify` is set by the scanner; combined with
-# a `readiness: "notify"` service it spawns with a readiness pipe and reports the
-# child not-yet-ready (the scanner polls the returned `notify_fd`). Otherwise
-# readiness is resolved inline via the `ready()` hook (or spawned == ready), and
-# `notify_fd` is -1.
 proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[SpawnResult] {
   let cgroup_path = if service.cpu_max > 0 and env_enabled("XSH_UNIX_DRY_RUN") and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
@@ -1066,8 +1003,6 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
     Err(err) => return Err(XinitError.Failed(kind: "xinit-log", message: err.message))
   }
 
-  # Rotate before opening so a service that has accumulated a large log across
-  # restarts starts a fresh `current` rather than appending to an oversized one.
   maybe_rotate_log(service.name, service.log_max_size, service.log_keep)
   let child = unix.spawn_process_group_log(service.command, path_value, notify: use_notify)?
   let ready = if use_notify { false } else { wait_ready(service)? }
@@ -1096,14 +1031,9 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
 
   let service = load_service(name)?
 
-  # CLI start is one-shot and unsupervised: no notify pipe (its read end would
-  # die with this process), so readiness resolves inline.
   let spawned = spawn_service(service, current.restarts, false)?
   let base = spawned.status
 
-  # Record the child's kernel start time so a later status read can tell our
-  # instance from an unrelated process that reuses the pid after ours exits.
-  # (The scanner does not need this — it clears the pid on child exit.)
   let start_time_ms = if base.pid > 0 { pid_start_time(base.pid)? } else { 0 }
 
   let status: SavedStatus = SavedStatus(
@@ -1123,8 +1053,6 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
   status
 }
 
-# True when a live scanner owns this run directory. Skipped under
-# XSH_UNIX_DRY_RUN (pids are mocked there), so test-mode start/stop stay direct.
 proc scanner_active() -> Result[Bool] {
   return false when env_enabled("XSH_UNIX_DRY_RUN")
 
@@ -1145,8 +1073,6 @@ proc request_desired(name: Str, desired: Str) [fs, process, env, error] {
 }
 
 proc start_service(name: Str) {
-  # When a scanner owns the tree it is the source of truth: post a desired-state
-  # request rather than spawning a second, unsupervised copy.
   if scanner_active() {
     request_desired(name, "up")
     return
@@ -1156,8 +1082,6 @@ proc start_service(name: Str) {
   var last = default_status(name)
 
   for item in plan_service_start(name)? {
-    # `need` deps (and the service itself) are required: a failure aborts.
-    # `uses`-only deps are optional: tolerate their start failure.
     if item in required {
       last = start_one_service(item)?
     } else {
@@ -1227,9 +1151,6 @@ proc stop_service(name: Str) {
 }
 
 proc restart_service(name: Str) {
-  # Under a scanner, restart is a single inbox action so the scanner does the
-  # teardown-and-respawn itself; a direct stop+start here would race it and
-  # spawn an unsupervised second copy.
   if scanner_active() {
     request_desired(name, "restart")
     return
@@ -1319,14 +1240,10 @@ pure unit_init(service: Service) -> ServiceUnit {
 pure unit_state_label(unit: ServiceUnit) -> Str {
   return "running" when unit.state == "running"
 
-  # Spawned but not yet ready (awaiting its notify byte).
   return "starting" when unit.state == "starting"
 
-  # Running a finish() cleanup hook after the instance exited.
   return "finishing" when unit.state == "finishing"
 
-  # A unit awaiting a backoff respawn is reported as "dead" so callers can tell
-  # it apart from a clean stop; pending and stopped both read as "down".
   return "dead" when unit.state == "dead"
 
   "down"
@@ -1370,10 +1287,6 @@ pure all_units_stopped(units: List[ServiceUnit]) -> Bool {
   true
 }
 
-# Advance a `starting` unit toward `running`: ready once its notify byte arrives,
-# or — if the ready timeout elapses — promoted to running but not ready, so a
-# silent service does not wedge the scanner. The readiness fd is released either
-# way.
 proc advance_readiness(unit: ServiceUnit, now: Int) -> Result[ServiceUnit] {
   let ready = unit.notify_fd > 0 and unix.notify_ready(unit.notify_fd)?
   let timed_out = now - unit.started_at >= unit.service.ready_timeout_ms
@@ -1402,10 +1315,6 @@ proc advance_readiness(unit: ServiceUnit, now: Int) -> Result[ServiceUnit] {
   running
 }
 
-# Reconcile a unit toward its desired state. A `starting` unit advances toward
-# ready; a wanted-up unit that is pending or dead and past its backoff gate is
-# (re)spawned. Running units (and completed oneshots, pid 0 in state "running")
-# return unchanged, so this is cheap to call on every poll.
 pure unit_state_of(units: List[ServiceUnit], name: Str) -> Str {
   for unit in units {
     return unit.state when unit.service.name == name
@@ -1414,12 +1323,6 @@ pure unit_state_of(units: List[ServiceUnit], name: Str) -> Str {
   ""
 }
 
-# Whether a unit's ordering dependencies are satisfied enough for its first
-# start. A `need` dep must be `running` (its startup, including readiness, has
-# completed); `uses`/`after` deps may also be `stopped` (settled — optional or
-# ordering-only, so a failed one does not block forever). Deps that are not
-# scanned units (facilities, or absent) impose no gate. Respawns are not gated;
-# only the initial pending -> running transition waits.
 pure gate_satisfied(units: List[ServiceUnit], service: Service) -> Bool {
   for dep in service.need {
     let state = unit_state_of(units, dep)
@@ -1436,9 +1339,6 @@ pure gate_satisfied(units: List[ServiceUnit], service: Service) -> Bool {
   true
 }
 
-# True for a pending unit that cannot start yet because a dependency is still
-# coming up. Used to gate the initial start and to avoid spinning the scanner
-# while it waits (the dependency's own transitions drive the wakeups).
 pure unit_blocked(units: List[ServiceUnit], unit: ServiceUnit) -> Bool {
   unit.desired == "up" and unit.state == "pending" and ! gate_satisfied(units, unit.service)
 }
@@ -1450,11 +1350,8 @@ proc reconcile_one(unit: ServiceUnit, units: List[ServiceUnit], now: Int) -> Res
 
   return unit when unit.state != "pending" and unit.state != "dead"
 
-  # Dependency-ordered readiness gating: an initial start waits until its
-  # ordering deps are up. Respawns (state "dead") are not gated.
   return unit when unit.state == "pending" and ! gate_satisfied(units, unit.service)
 
-  # Pending/dead units hold pid 0, so this is the shared backoff gate.
   return unit unless spawn_due(unit.pid, now, unit.next_ms)
 
   let restarts = if unit.state == "dead" { unit.restarts + 1 } else { unit.restarts }
@@ -1479,16 +1376,10 @@ proc reconcile_one(unit: ServiceUnit, units: List[ServiceUnit], now: Int) -> Res
   started
 }
 
-# Reconcile every unit against a single start-of-pass snapshot, so gating reads
-# consistent dependency states regardless of iteration order.
 proc reconcile_all(units: List[ServiceUnit], now: Int) -> Result[List[ServiceUnit]] {
   [reconcile_one(unit, units, now)? for unit in units]
 }
 
-# Apply the death of a unit's child: either schedule a backoff respawn (the
-# `next_ms` gate, so reconcile relaunches on a later pass without blocking the
-# scanner) or, when the restart policy declines, mark the unit stopped. Backoff
-# resets to the base delay after an instance stayed up at least stable_after_ms.
 pure finishing_unit(unit: ServiceUnit) -> ServiceUnit {
   {
     service: unit.service,
@@ -1505,9 +1396,6 @@ pure finishing_unit(unit: ServiceUnit) -> ServiceUnit {
   }
 }
 
-# Run a service's finish() cleanup hook after its instance has exited (on stop
-# or crash). While the hook runs the unit is reported as "finishing". A service
-# with no finish() hook is left untouched.
 proc run_finish(unit: ServiceUnit) {
   require_service_file(unit.service.path)
   let loaded = module.load(unit.service.path)?.require(ServiceFile)?
@@ -1519,8 +1407,6 @@ proc run_finish(unit: ServiceUnit) {
 }
 
 proc mark_unit_dead(unit: ServiceUnit, child_status: Status, now: Int) -> Result[ServiceUnit] {
-  # The child is already gone; release any readiness fd it held, then run the
-  # finish() cleanup hook before deciding the unit's next state.
   if unit.notify_fd > 0 {
     unix.notify_close(unit.notify_fd)
   }
@@ -1590,9 +1476,6 @@ proc mark_children_dead(
   out
 }
 
-# Tear down a unit's running instance: run its `stop()` hook if it has one,
-# otherwise TERM then KILL the process group. No status write; callers decide
-# the resulting unit state.
 proc kill_unit(unit: ServiceUnit) {
   if unit.notify_fd > 0 {
     unix.notify_close(unit.notify_fd)
@@ -1607,12 +1490,9 @@ proc kill_unit(unit: ServiceUnit) {
     }
   }
 
-  # Cleanup hook after the instance is down.
   run_finish(unit)
 }
 
-# Stop a unit directly, with no dependency-refusal check (that belongs to the
-# operator-facing `stop` command, not to scanner-driven shutdown).
 proc stop_unit(unit: ServiceUnit) -> Result[ServiceUnit] {
   kill_unit(unit)
 
@@ -1645,9 +1525,6 @@ proc write_scanner_marker() {
   json.write(scanner_marker_path()?, {pid: process.current_pid()?})
 }
 
-# Apply one desired-state request to a single unit. "down" stops a running unit
-# and parks it; "up" makes it schedulable again (reconcile spawns it on the next
-# pass). A request for a different unit name is a no-op.
 proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit] {
   guard unit.service.name == name else {
     return unit
@@ -1673,8 +1550,6 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
     }
   }
 
-  # "reload" refreshes a running unit in place (reload() hook or SIGHUP) without
-  # changing its state.
   if desired == "reload" {
     if unit.state == "running" or unit.state == "starting" {
       reload_unit(unit.service, unit.pid)
@@ -1683,9 +1558,6 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
     return unit
   }
 
-  # "restart" tears down the current instance and re-arms the unit for an
-  # immediate respawn on the next reconcile pass. A desired-state slot cannot
-  # hold a transient, so restart is expressed as its own inbox action.
   if desired == "restart" {
     kill_unit(unit)
 
@@ -1707,8 +1579,6 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
     return restarted
   }
 
-  # "up": an already-active unit (running or starting) is left as-is; an
-  # idle/stopped one is re-armed so reconcile spawns it on the next pass.
   return unit when unit.state == "running" or unit.state == "starting"
 
   {
@@ -1730,10 +1600,6 @@ proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[
   [apply_one(unit, name, desired)? for unit in units]
 }
 
-# Drain the control inbox: each request file is named for a service and holds
-# "up" or "down". This is the supervisor side of the control plane — operators
-# (and `start`/`stop` when a scanner owns the tree) post desired-state requests
-# rather than signalling a pid, so the scanner stays the source of truth.
 proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   let dir = inbox_dir()?
 
@@ -1756,14 +1622,6 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   out
 }
 
-# The unified scanner: hold a set of units and reconcile them toward their
-# desired state on every wakeup. `wait_pid1_event` returns a `poll` event within
-# ~100ms even when idle, so the loop re-checks backoff gates without a dedicated
-# timer. This is the single supervision mechanism behind both `supervise` (one
-# unit) and `scan` (a whole dependency tree).
-# A `starting` unit has no notify_fd event to wait on, so the scanner polls its
-# readiness on this cadence rather than spinning (a zero wait would busy-loop a
-# notify service's whole startup at 100% CPU).
 pure readiness_poll_ms() -> Int {
   100
 }
@@ -1776,17 +1634,10 @@ pure due_ms(unit: ServiceUnit, now: Int) -> Int {
   due
 }
 
-# How long the scanner may block before it must reconcile again: the soonest
-# pending/dead unit's backoff gate, the readiness poll cadence for starting
-# units, else an hour. wait_pid1_event still wakes within ~100ms for signals and
-# children, so the long ceiling only bounds idle sleeps.
 pure next_wait_ms(units: List[ServiceUnit], now: Int) -> Int {
   var soonest = -1
 
   for unit in units {
-    # A pending unit blocked on a dependency is not "due" — its wakeup comes from
-    # the dependency's own transition (a starting poll, a respawn deadline, or a
-    # child exit), so skipping it here keeps the scanner from spinning.
     let candidate = if unit.state == "starting" {
       readiness_poll_ms()
     } else if unit.desired != "up" {
@@ -1809,9 +1660,6 @@ pure next_wait_ms(units: List[ServiceUnit], now: Int) -> Int {
   soonest
 }
 
-# Bound the logs of running services: a long-lived instance that never restarts
-# would otherwise grow `current` without limit. Copy-truncates over the cap each
-# pass; the rotate-on-spawn path covers services that crash and restart.
 proc enforce_log_caps(units: List[ServiceUnit]) {
   for unit in units {
     if unit.state == "running" and unit.service.log == "append" {

@@ -3,8 +3,6 @@
 `pm.xsh` is the typed Laputa package manager. It turns package recipes into a
 deterministic `BuildPlan`, executes only that plan through immutable artifacts,
 publishes verified snapshots, and composes runtime-only root generations.
-Publication validates package identity before adding artifact and proof fields;
-additional recipe metadata survives that augmentation unchanged.
 
 ## Package Contract
 
@@ -28,15 +26,14 @@ dependents'), never order a build, and never enter an artifact key, so
 rebuilding one rebuilds none of its dependents. A package may appear in only
 one of `deps`, `mkdeps_*`, and `runtime_only_deps`; one the build uses belongs
 in `deps`. A build tool's own runtime needs stay `deps` when dependents run it
-at build time (`flex` and `bison` need `m4`), except `xsh`, which the executor substrate
+at build time (`flex` and `bison` need `m4`), except `xsh`, which the executor
 seeds into every build root.
 
 A recipe without `architectures` exists for every target. One that names a
 subset (CPU microcode for one vendor's x86 parts, say) is left out of the
 catalog for any other target, so `--all` never plans it there, a `--root` on
 it finds no recipe, and a package that depends on it fails to load for that
-target. A per-source `architectures` list only selects that source's inputs;
-it does not remove the package.
+target. A per-source `architectures` list only selects that source's inputs.
 
 A package that compiles against the kernel's userspace API headers takes
 `linux-headers` as a build dependency, never `linux`. `linux-headers` installs
@@ -53,25 +50,19 @@ ordinary descendants. ELF outputs must be declared as `binary`.
 
 Recipe loading is quarantined in `pm/recipe.xsh`. The rest of PM receives only
 typed `Package` values; runtime lifecycle hooks are not part of the package
-contract. Immutable root preflight rejects ownership conflicts before any
-generation is written.
+contract.
 
-Recipe hooks take one `Path` and return `Result[Unit]`. `pm/recipe_hooks.xsh`
-validates `build` and optional `prepare` against the existing declared capability
-sets: `[fs, error]`, `[fs, env, error]`, `[process, env, error]`, or
-`[fs, process, env, error]`. Optional `prepare_sources` uses `[fs, error]`.
-Module validation compares declared effects exactly, so the boundary retains
-each recipe's capabilities. A missing optional hook remains a no-op; a present
-hook with incompatible parameters, result, export kind, or capabilities is
-rejected before invocation.
+Recipe hooks (`build`, optional `prepare` and `prepare_sources`) take one `Path`
+and return `Result[Unit]`. `pm/recipe_hooks.xsh` lists the accepted effect sets,
+compared exactly. A missing optional hook is a no-op; a present hook with an
+incompatible signature or effects is rejected before invocation.
 
 `upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`,
-`directory`, or `cargo-vendor` materialization (see "Sources" below). A URL source pins a sha256 per architecture; a
+`directory`, or `cargo-vendor` materialization (see [Sources](#sources)). A URL source pins a sha256 per architecture; a
 `SKIP` checksum is accepted only for a relative repository-local source. Source
-strings may name the whole-word placeholders `VERSION`, `RELEASE`, `MAJOR`,
-`MINOR`, `PATCH`, `IDENT`, `PACKAGE`, `ARCH`, `GOARCH`, and their
-`TARGET_`/`BUILD_` forms (`pm/util.xsh::expand_source`); a word that merely
-contains one, such as `PATCHES`, is left alone. Source preparation is part of
+strings may name whole-word placeholders such as `VERSION` and `ARCH`
+(`pm/util.xsh::expand_source` lists them); a word that merely contains one, such
+as `PATCHES`, is left alone. Source preparation is part of
 the package build identity. A `repository/` source is hashed after the same
 expansion and only for the targets it selects, so `repository/.out/seed/ARCH`
 keys each target's `xsh` by that target's seed alone. A recipe directory may
@@ -80,34 +71,12 @@ module path.
 
 ## Commands
 
-```text
-pm repo check [--repo PATH]
-pm repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) \
-  [--target TARGET] --output PLAN    # TARGET defaults to the host's arch
-pm repo show PLAN
-pm repo build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
-pm repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
-pm repo publish PLAN --store STORE
-pm repo checksum [--repo PATH] PACKAGE...
-pm repo update-checksums [--repo PATH] PACKAGE...
-pm sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
-
-pm root compose PLAN \
-  --store STORE \
-  --runtime-root PACKAGE... \
-  --output GENERATION
-pm root inspect GENERATION
-pm store verify --store STORE
-pm store gc --store STORE --keep PLAN [--keep PLAN...]
-pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
-```
-
-`pm.xsh` declares the typed command tree. The `pm/cli.xsh` module owns domain
-validation and execution; it does not parse argv. Required named options, the
-`-j` alias, repeated package options, and job limits are checked before command
-execution. Missing or malformed arguments exit 2 with usage. Domain selection
-errors retain `PmError.Usage` and exit 3. Empty commands and groups print help
-and exit 0.
+The command list and options are the help text in `pm.xsh` (`pm --help`).
+Targets are `aarch64-linux-musl` and `x86_64-linux-musl`. `pm.xsh` declares the
+typed command tree; `pm/cli.xsh` owns domain validation and execution and does
+not parse argv. Missing or malformed arguments exit 2 with usage. Domain
+selection errors keep `PmError.Usage` and exit 3. Empty commands and groups
+print help and exit 0.
 
 `--without PACKAGE` (with `--all` only) plans every package whose build
 closure contains no excluded package, and records that set as the plan's
@@ -119,17 +88,14 @@ remote. It records the target, typed dependency graph, remote retrieval
 identity, build/proof inputs, `BUILD_EPOCH`, action reasons, and sorted
 artifact keys in an atomically written plan.
 
-Without `--target`, `repo plan` and `sources fetch` target the host's arch; the make targets and the
-profile CLI always pass the target for `ARCH` or the host. `x86_64-linux-musl`
-is planned anywhere and built on a native Linux x86_64 runner, with
-target-specific source checksums, filetrees, remote index entries, and
-artifact keys. On other hosts, `repo build` rejects x86_64 before creating a
-store. Artifact receipts can carry either
-target and reject cross-target reuse of the same key. Root preflight and
-composition preserve an explicit target and reject mixed receipts. Generation
-plans and receipts also preserve x86_64 when supplied with verified x86_64
-artifacts. The executor preserves x86_64 through recipe selection, build
-metadata, proofs, receipts, and root composition.
+Without `--target`, `repo plan` and `sources fetch` use the host's arch; the
+make targets and the profile CLI always pass the target for `ARCH` or the host
+and run PM in package-tools on the host's native Docker platform.
+`x86_64-linux-musl` is planned anywhere and built only on a native Linux x86_64
+runner (`repo build` rejects it elsewhere before creating a store), with
+target-specific source checksums, filetrees, remote index entries, and artifact
+keys. Receipts carry one target and reject cross-target reuse of a key; root
+preflight and composition reject mixed-target receipts.
 
 `repo build` discovers the repository only by walking to a directory containing
 both `pm.xsh` and `packages/`. It executes the saved plan with `pm/execute.xsh`;
@@ -146,19 +112,18 @@ sent none; any other remote needs `LAPUTA_TOKEN` from the process environment.
 PM does not store credentials.
 
 `root compose` selects only typed runtime and runtime-only edges from the saved
-plan and writes an immutable generation receipt. It never installs into a live root. `root
-inspect` and `store verify` are read-only receipt checks.
-`store extract` copies one manifest-declared file from the exact artifact named
-by a saved BuildPlan. `pm/generation_adapter.xsh::generation_adapter_copy_manifest_file`
-checks the Store receipt and payload digest, verifies the file against artifact
-metadata, and publishes the output by atomic rename. `PATH` must be canonical
-and relative. Image builders use it for kernel files that are deliberately
-absent from the runtime generation.
+plan and writes an immutable generation receipt. It never installs into a live
+root. `root inspect` and `store verify` are read-only receipt checks.
+
+`store extract` copies one manifest-declared file from the exact artifact a saved
+BuildPlan names (`pm/generation_adapter.xsh::generation_adapter_copy_manifest_file`
+checks the receipt, payload digest, and artifact metadata, then publishes by
+atomic rename). `PATH` must be canonical and relative. Image builders use it for
+kernel files absent from the runtime generation.
+
 For a profile-owned overlay, `pm/generation.xsh::plan_profile` selects the
-runtime closure and binds the overlay digest into its identity.
-`write_generation_plan` and `read_generation_plan` persist and validate that
-typed plan before `compose` uses it; the saved plan must match the BuildPlan and
-overlay used for execution.
+runtime closure and binds the overlay digest into its identity. The saved
+generation plan must match the BuildPlan and overlay used for execution.
 
 ## Sources
 
@@ -198,18 +163,18 @@ destination may not be the source root.
 `pm/catalog.xsh` is the repository-wide typed catalog boundary. It rejects
 duplicate package names and malformed recipes before resolution.
 `pm/policy.xsh` holds the explicit bootstrap exceptions (the same seed rules
-for both targets), while `pm/graph.xsh` resolves stable runtime, runtime-only, build-host, and
-build-target edges. The graph never adds an implicit package-manager
-dependency. Its sorted topological levels and typed edge kinds are persisted
-in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
+for both targets); `pm/graph.xsh` resolves runtime, runtime-only, build-host, and
+build-target edges and adds no implicit package-manager dependency. Sorted
+topological levels and typed edge kinds are persisted in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
 (roots compose them), but runtime-only and bootstrap edges order no build, so
 a runtime-only edge may close a cycle; plan format 3 records them as
 `runtime-only` node dependencies. A bootstrap edge names a build input a seed
 substitutes, so it selects no package either: planning `musl` does not pull in
 `zlib`, and through it `cmake`.
-The native Docker adapter passes `XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23`
-for `gnu-stubs`: its LLVM edge is a bootstrap seed, so the recipe must use the
-preseeded compiler while the replacement LLVM package is built.
+The Docker adapter (`system/docker.xsh`) passes
+`XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23` for `gnu-stubs`: its LLVM edge is a
+bootstrap seed, so the recipe uses the preseeded compiler while the replacement
+LLVM package is built.
 
 [Make task graphs](MAKE.md) covers the typed build helpers and scheduler.
 
@@ -264,9 +229,8 @@ payload once, directly into the root, after a metadata-only ownership check
 closure only: a runtime-only dependency may not be built yet when its
 dependent is proved, so package proofs never check its files. Recipes see the build root as both
 `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin` first on
-`PATH`, and `CC=cc` and `CXX=c++`, so build tools that pick a compiler by
-scoring every one they find (muon) still take the build root's over a host
-compiler later on `PATH`.
+`PATH`, and `CC=cc` and `CXX=c++`, so tools that score every compiler they find
+(muon) take the build root's.
 
 Before a package's own proof runs, PM checks every ELF file it installs: a
 `DT_NEEDED` name another package in the proof root provides must come from the
@@ -312,54 +276,22 @@ artifact moves the row to content-addressed names.
 
 ## Root composition
 
-`pm/root.xsh` preflights the exact artifact inventories and ownership before it
-mutates a generation root. `pm/generation.xsh` chooses direct runtime roots and
-the runtime closure (runtime and runtime-only edges) only, then writes the deterministic receipt used by Laputa
-to construct a disk image. Build tools do not leak into that closure unless a
-separate typed runtime edge requires them.
-Regular files and directories retain permission bits through `0o7777`,
-including setuid helpers; symlink metadata remains fixed at `0o777`.
-
-## Scope
-
-PM builds aarch64 and x86_64 Linux-musl packages. The make targets and the
-profile CLI run it in package-tools on the host's native Docker platform, and
-PM itself refuses to build x86_64 anywhere but a native Linux x86_64 runner.
-The shell-compatible
-surface is limited to packages whose declared runtime capability requires it;
-package construction itself uses typed XSH process and filesystem boundaries.
+`pm/root.xsh` preflights exact artifact inventories and ownership before it
+mutates a generation root, so ownership conflicts are rejected before any
+generation is written. `pm/generation.xsh` chooses direct runtime roots and the
+runtime closure (runtime and runtime-only edges), then writes the deterministic
+receipt Laputa uses to construct a disk image. Build tools do not enter the
+closure unless a typed runtime edge requires them. Regular files and
+directories keep permission bits through `0o7777`, including setuid helpers;
+symlink metadata stays `0o777`.
 
 ## Verification
 
-PM behavior is covered by focused modules under `tests/pm/`. Name the module
-when iterating on a contract. `tests/pm/fixtures/` holds staged inputs.
-
-The isolated `pm_graph_contracts.xsh` module covers nominal plan-action identity,
-dependency-first ordering, selection boundaries, and cycle errors without
-loading recipes or starting package builds
-(`$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`).
-`pm_recipe_hooks.xsh` likewise exercises checked hook dispatch, absence, rejected
-contracts, and cwd restoration with temporary fixtures. These host checks do not
-validate Linux package execution. `pm_make.xsh`
-uses temporary native child scripts to verify argument and environment preservation,
-dependency order, stamp reuse, failed-peer cancellation, and checked pkg-config
-flag lists without package builds. `ca_certificates_recipe.xsh` checks the proof
-metadata boundary using a temporary bundle and helper; `m4_recipe.xsh` runs
-the m4 proof and checks GNU m4 1.4 output on the constructs bison's and
-flex's skeletons use, plus its loud failures. `parser_generators.xsh`
-checks Bison token definitions, Flex definition expansion, generated output paths,
-and missing-input diagnostics independently of Linux build modules.
-`tic_recipe.xsh` compiles vendored terminfo sources with the XSH `tic` and
-compares every compiled entry byte for byte with ncurses 6.6 `tic -x` output
-vendored beside them in `tests/pm/fixtures/tic/`.
-
-`make test-pm` runs the suite with the host tools. `make test-pm-native` runs
-it against `XSH_ROOT`'s debug build with coverage, and `make test-pm-docker`
-runs it with the local XSH seed (`make seed`) inside the package-tools image,
-offline. There is no published runner pin: the seed is always the current
-`XSH_ROOT` checkout. The kernel recipe's Kbuild tests and linux-headers'
-`headers_install` tests live beside those recipes and run with
-`make test-linux`.
+PM behavior is covered by the modules under `tests/pm/`; `tests/pm/fixtures/`
+holds staged inputs. Run the module for the contract you are changing, for
+example `$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`. Suites and wider
+runs are in [Testing](TESTING.md). The seed is always the current `XSH_ROOT`
+checkout; there is no published runner pin.
 
 ## Recipe authoring
 
