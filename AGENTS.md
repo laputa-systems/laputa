@@ -3,6 +3,11 @@
 Laputa is a Linux distribution built and managed in XSH. This monorepo owns
 its package manager, recipes, init, installer, system tooling, and mirror.
 
+Read the [roadmap](docs/ROADMAP.md) before planning feature or architecture
+work. It owns the broader vision and sequencing; [TODO](TODO.md) owns bounded
+follow-ups. Roadmap items are not blanket implementation authority. Real-hardware
+enablement is out of scope, including hardware-related TODO entries.
+
 ## Commands
 
 The root `Makefile` is the entry point; `ARCH` defaults to the host.
@@ -41,6 +46,7 @@ Host-tool setup, the full target reference, and cleanup are in
 | Layout, ownership, identities, image boundaries | [Core infrastructure](docs/CORE-INFRASTRUCTURE.md) |
 | Recipes, source inputs, plans, store, roots, publication | [Package manager](docs/PM.md) |
 | Typed Makefile-style build graphs | [Make task graphs](docs/MAKE.md) |
+| Vision, scope, priorities, acceptance milestones | [Roadmap](docs/ROADMAP.md) |
 | Open work | [TODO](TODO.md) |
 | Focused tests and wider verification | [Testing](docs/TESTING.md) |
 | Native Docker/QEMU profile and graphical proof | [QEMU](docs/QEMU.md) |
