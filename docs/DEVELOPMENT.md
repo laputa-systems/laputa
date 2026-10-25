@@ -131,6 +131,8 @@ default remote; these make targets use the loopback mirror.
   Every entry is checked against a fingerprint of the kernel source and
   `.config` before use.
 - Containers have no network, so only host processes reach the mirror.
+  Host planning, importing, publishing, and composition call typed PM operations
+  in the same process under a scoped `XSH_PM_REPO` value.
   `make publish` builds the same selection (a no-op when nothing changed),
   then `pm repo publish` uploads that plan's verified artifacts from the
   host.

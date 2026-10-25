@@ -1,6 +1,7 @@
 ##! Behavior coverage for the local XSH seed and the content-keyed Laputa images.
 use pm.fingerprint as pm_fingerprint
 use pm.recipe as pm_recipe
+use pm.plan_json as pm_plan_json
 use pm.types as pm_types
 use seed.images
 use seed.world
@@ -321,4 +322,27 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
       index += 1
     }
   }
+}
+
+test test_world_host_plan_scopes_the_mirror_and_keeps_typed_selection [fs, net, process, env, time, error] { |ctx|
+  let repository = test.temp_dir(ctx, name: "world-host-plan")?
+  let _ = fs.copy_tree(p"tests/pm/fixtures/graph-catalog/packages", fp"{repository}/packages", parents: true, overwrite: true)?
+  fp"{repository}/pm".mkdir()
+  p"pm/proof.xsh".copy(to: fp"{repository}/pm/proof.xsh", overwrite: true)
+  let output = fp"{repository}/plan.json"
+  let outer_repo = f"file://{repository}/missing-mirror"
+
+  env ({XSH_PM_REPO: outer_repo}) {
+    world.host_pm_plan("", repo_root: repository, roots: ["app"], target: "aarch64-linux-musl", output:)
+    let value = pm_plan_json.read(output)?
+    assert value.roots == ["app"]
+    assert value.target == pm_types.target_aarch64()
+    assert e"XSH_PM_REPO"? == outer_repo
+
+    match world.host_pm_plan("", repo_root: repository, roots: [], target: "aarch64-linux-musl", output:) {
+      Ok(_) => test.fail("an empty explicit root selection was accepted")
+      Err(problem) => assert "requires exactly one" in problem.message
+    }
+    assert e"XSH_PM_REPO"? == outer_repo
+  }?
 }

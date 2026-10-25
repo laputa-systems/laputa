@@ -27,30 +27,8 @@ pure tools_roots() -> List[Str] {
   ["xsh", "laputa-fs"]
 }
 
-pure root_args(flag: Str, names: List[Str]) -> List[Str] {
-  let args: List[Str] = collect {
-    for name in names {
-      yield @[flag, name]
-    }
-  }
-
-  args
-}
-
 proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[Str]) {
-  world.host_pm(
-    repo_url,
-    [
-      "root",
-      "compose",
-      plan.display(),
-      "--store",
-      store.display(),
-      @root_args("--runtime-root", roots),
-      "--output",
-      output.display(),
-    ],
-  )
+  world.host_pm_compose(repo_url, input: plan, store:, runtime_roots: roots, output:)
 }
 
 ## Import the installer's package closure for ARCH from the mirror at REPO_URL into PACKAGES, which must not exist yet, then compose ROOTS.
@@ -91,22 +69,15 @@ export proc prepare(
     }
   }
 
-  world.host_pm(
+  world.host_pm_plan(
     repo_url,
-    [
-      "repo",
-      "plan",
-      "--repo",
-      root.display(),
-      @root_args("--root", plan_roots),
-      "--target",
-      f"{arch}-linux-musl",
-      "--output",
-      plan.display(),
-    ],
+    repo_root: root,
+    roots: plan_roots,
+    target: f"{arch}-linux-musl",
+    output: plan,
   )
   world.require_mirror_plan(plan, repo_url)
-  world.host_pm(repo_url, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{jobs}"])
+  world.host_pm_build(repo_url, input: plan, store:, jobs:)
 
   compose(repo_url, plan, store, roots.target, target_roots(kernel_package, smoke))
   compose(repo_url, plan, store, roots.installer, installer_roots())

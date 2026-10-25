@@ -6,14 +6,5 @@ use pm.types as pm_types
 proc main(plan_path: Path) [fs, net, process, env, time, error] {
   let plan = pm_plan_json.read(plan_path)?
   let packages = [node.name for node in plan.nodes]
-  let args = [
-    "sources",
-    "fetch",
-    "--repo",
-    fs.cwd()?.display(),
-    "--target",
-    pm_types.target_text(plan.target),
-  ].extend(packages)
-
-  pm_cli.run_pm_cli(args)
+  pm_cli.pm_cli_sources_fetch(fs.cwd()?.display(), all: false, packages:, target_names: [pm_types.target_text(plan.target)])
 }

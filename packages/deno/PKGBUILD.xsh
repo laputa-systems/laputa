@@ -22,6 +22,7 @@ export const rel = "2"
 ## Runtime package dependencies.
 export const deps = ["musl", "gnu-stubs", "libffi"]
 
+## Dependencies installed only in the runtime closure.
 export const runtime_only_deps = ["ca-certificates"]
 
 ## Host-side build dependencies.

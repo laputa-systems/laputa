@@ -277,10 +277,31 @@ proc world_build(container: WorldContainer, args: WorldArgs) {
   )
 }
 
-## Run PM in this host process against the loopback mirror.
-export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, error] {
-  env ({XSH_PM_REPO: repo}) {
-    pm_cli.run_pm_cli(args)
+## Plan explicit package roots in this host process against the mirror.
+export proc host_pm_plan(repo_url: Str, repo_root: Path, roots: List[Str], target: Str, output: Path) [fs, net, process, env, time, error] {
+  env ({XSH_PM_REPO: repo_url}) {
+    pm_cli.pm_cli_repo_plan({repo: repo_root.display(), all: false, roots, without: [], target, output})
+  }?
+}
+
+## Import or build a saved plan in this host process against the mirror.
+export proc host_pm_build(repo_url: Str, input: Path, store: Path, jobs: Int) [fs, net, process, env, time, error] {
+  env ({XSH_PM_REPO: repo_url}) {
+    pm_cli.pm_cli_repo_build({input, store, jobs, logs: p""})
+  }?
+}
+
+## Publish a saved plan's verified artifacts in this host process.
+export proc host_pm_publish(repo_url: Str, input: Path, store: Path) [fs, net, process, env, time, error] {
+  env ({XSH_PM_REPO: repo_url}) {
+    pm_cli.pm_cli_repo_publish({input, store})
+  }?
+}
+
+## Compose a generation from a saved plan and store in this host process.
+export proc host_pm_compose(repo_url: Str, input: Path, store: Path, runtime_roots: List[Str], output: Path) [fs, net, process, env, time, error] {
+  env ({XSH_PM_REPO: repo_url}) {
+    pm_cli.pm_cli_root_compose({input, store, runtime_roots, output})
   }?
 }
 
@@ -290,10 +311,7 @@ export proc host_pm(repo: Str, args: List[Str]) [fs, net, process, env, time, er
 proc world_publish(container: WorldContainer, args: WorldArgs) {
   world_build(container, args)
   let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
-  host_pm(
-    args.repo,
-    ["repo", "publish", plan.display(), "--store", world_store(container.laputa_root, args.arch).display()],
-  )
+  host_pm_publish(args.repo, input: plan, store: world_store(container.laputa_root, args.arch))
 }
 
 ## The `make root` tree: the mirror plan, the store imported from the mirror, and the composed receipt.
@@ -328,28 +346,15 @@ proc world_root(container: WorldContainer, args: WorldArgs) {
   let plan = fp"{root_dir}/plan.json"
   let store = fp"{root_dir}/store"
   store.mkdir()
-  let selection: List[Str] = collect {
-    for name in args.packages {
-      yield @["--root", name]
-    }
-  }
-
-  host_pm(
+  host_pm_plan(
     args.repo,
-    [
-      "repo",
-      "plan",
-      "--repo",
-      laputa_root.display(),
-      @selection,
-      "--target",
-      pm_target(container.value),
-      "--output",
-      plan.display(),
-    ],
+    repo_root: laputa_root,
+    roots: args.packages,
+    target: pm_target(container.value),
+    output: plan,
   )
   require_mirror_plan(plan, args.repo)
-  host_pm(args.repo, ["repo", "build", plan.display(), "--store", store.display(), "--jobs", f"{args.jobs}"])
+  host_pm_build(args.repo, input: plan, store:, jobs: args.jobs)
   world_run(
     container,
     root_dir,

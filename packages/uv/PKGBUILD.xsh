@@ -15,6 +15,7 @@ export const rel = "1"
 ## package needs no libraries at runtime.
 export const deps: List[Str] = []
 
+## Dependencies installed only in the runtime closure.
 export const runtime_only_deps = ["ca-certificates"]
 
 ## Package recipe export.

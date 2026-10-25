@@ -102,6 +102,13 @@ pm store gc --store STORE --keep PLAN [--keep PLAN...]
 pm store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
 ```
 
+`pm.xsh` declares the typed command tree. The `pm/cli.xsh` module owns domain
+validation and execution; it does not parse argv. Required named options, the
+`-j` alias, repeated package options, and job limits are checked before command
+execution. Missing or malformed arguments exit 2 with usage. Domain selection
+errors retain `PmError.Usage` and exit 3. Empty commands and groups print help
+and exit 0.
+
 `--without PACKAGE` (with `--all` only) plans every package whose build
 closure contains no excluded package, and records that set as the plan's
 roots; `--all --without cmake --without linux` is the `STOP=pre-cmake`

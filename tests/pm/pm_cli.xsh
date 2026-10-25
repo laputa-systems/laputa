@@ -457,3 +457,26 @@ test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, e
 
   assert plans[1] == plans[0]
 }
+
+test test_cli_keeps_parser_and_domain_error_statuses [fs, process, env, error] { |ctx|
+  for {arguments, message, code} in [
+    {arguments: ["repo", "build"], message: "missing required argument PLAN", code: 2},
+    {arguments: ["repo", "build", "plan", "--store", "store", "-j", "0"], message: "option --jobs expects value >= 1", code: 2},
+    {arguments: ["repo", "--unknown"], message: "PmError.Usage: unknown pm repo command --unknown", code: 3},
+    {arguments: ["repo", "plan", "--output", "unused"], message: "PmError.Usage: pm repo plan requires exactly one", code: 3},
+  ] {
+    let err = test.temp_path(ctx, name: f"cli-status-{code}-{arguments.len()}.err")
+    let status = pm_status(arguments, err)?
+    assert status.exited_with(code), err.read_text()?
+    assert message in err.read_text()?
+  }
+}
+
+test test_cli_empty_groups_and_declared_help_remain_successful [fs, process, env, error] { |_|
+  for command_group in ["repo", "root", "store", "sources"] {
+    let text = pm_output([command_group])?
+    assert f"usage: pm {command_group}" in text
+  }
+  assert pm_output(["repo", "plan", "help"])? == pm_output(["repo", "plan", "--help"])?
+  assert pm_output(["--", "repo", "plan", "--help"])? == pm_output(["repo", "plan", "--help"])?
+}

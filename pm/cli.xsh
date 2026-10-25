@@ -16,176 +16,32 @@ use store
 use types
 use util
 
-type RepoCheckArgs = {repo: Path}
+type PmRepoCheckArgs = {repo: Path}
 
-type RepoPlanArgs = {repo: Path, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
+type PmRepoPlanArgs = {repo: Str, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
 
-type RepoShowArgs = {input: Path}
+type PmRepoShowArgs = {input: Path}
 
-type RepoBuildArgs = {input: Path, store: Path, jobs: Int, logs: Path}
+type PmRepoBuildArgs = {input: Path, store: Path, jobs: Int, logs: Path}
 
-type RepoBuildNodeArgs = {input: Path, repo: Path, store: Path, node: Str}
+type PmRepoBuildNodeArgs = {input: Path, repo: Path, store: Path, node: Str}
 
-type RepoPublishArgs = {input: Path, store: Path}
+type PmRepoPublishArgs = {input: Path, store: Path}
 
-type RepoPackagesArgs = {repo: Path, packages: List[Str]}
+type PmRepoPackagesArgs = {repo: Str, packages: List[Str]}
 
-type RootComposeArgs = {input: Path, store: Path, runtime_roots: List[Str], output: Path}
+type PmRootComposeArgs = {input: Path, store: Path, runtime_roots: List[Str], output: Path}
 
-type RootInspectArgs = {input: Path}
+type PmRootInspectArgs = {input: Path}
 
-type StoreVerifyArgs = {store: Path}
+type PmStoreVerifyArgs = {store: Path}
 
-type StoreGcArgs = {store: Path, keep: List[Str]}
+type PmStoreGcArgs = {store: Path, keep: List[Str]}
 
-type StoreExtractArgs = {input: Path, store: Path, package: Str, path: Path, output: Path}
+type PmStoreExtractArgs = {input: Path, store: Path, package: Str, path: Path, output: Path}
 
-type SourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: List[types.Target]}
+type PmSourcesFetchArgs = {repo: Path, all: Bool, packages: List[Str], targets: List[types.Target]}
 
-enum PmCommand {
-    Help(Str),
-    RepoCheck(RepoCheckArgs),
-    RepoPlan(RepoPlanArgs),
-    RepoShow(RepoShowArgs),
-    RepoBuild(RepoBuildArgs),
-    RepoBuildNode(RepoBuildNodeArgs),
-    RepoPublish(RepoPublishArgs),
-    RepoChecksum(RepoPackagesArgs),
-    RepoUpdateChecksums(RepoPackagesArgs),
-    SourcesFetch(SourcesFetchArgs),
-    RootCompose(RootComposeArgs),
-    RootInspect(RootInspectArgs),
-    StoreVerify(StoreVerifyArgs),
-    StoreGc(StoreGcArgs),
-    StoreExtract(StoreExtractArgs),
-}
-
-type RepoCheckOptions = {repo: Str}
-
-type RepoPlanOptions = {repo: Str, all: Bool, roots: List[Str], without: List[Str], target: Str, output: Path}
-
-type RepoShowOptions = {input: Path}
-
-type RepoBuildOptions = {input: Path, store: Path, jobs: Int, logs: Str}
-
-type RepoBuildNodeOptions = {input: Path, repo: Str, store: Path, node: Str}
-
-type RepoPublishOptions = {input: Path, store: Path}
-
-type RepoPackagesOptions = {repo: Str, packages: List[Str]}
-
-type RootComposeOptions = {input: Path, store: Path, runtime_roots: List[Str], output: Path}
-
-type RootInspectOptions = {input: Path}
-
-type StoreVerifyOptions = {store: Path}
-
-type StoreGcOptions = {store: Path, keep: List[Str]}
-
-type StoreExtractOptions = {input: Path, store: Path, package: Str, path: Path, output: Path}
-
-type SourcesFetchOptions = {repo: Str, all: Bool, packages: List[Str], targets: List[Str]}
-
-pure help_text() -> Str {
-  """usage: pm COMMAND [OPTIONS]
-
-repository commands:
-  repo check [--repo PATH]
-  repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
-  repo show PLAN
-  repo build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
-  repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
-  repo publish PLAN --store STORE
-  repo checksum [--repo PATH] PACKAGE...
-  repo update-checksums [--repo PATH] PACKAGE...
-
-source commands:
-  sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
-
-root commands:
-  root compose PLAN --store STORE --runtime-root PACKAGE... --output GENERATION
-  root inspect GENERATION_OR_RECEIPT
-
-store commands:
-  store verify --store STORE
-  store gc --store STORE --keep PLAN...
-  store extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
-
-targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
-"""
-}
-
-pure repo_help_text() -> Str {
-  """usage: pm repo COMMAND [OPTIONS]
-
-  check [--repo PATH]
-  plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
-  show PLAN
-  build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
-  build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
-  publish PLAN --store STORE
-  checksum [--repo PATH] PACKAGE...
-  update-checksums [--repo PATH] PACKAGE...
-
-targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
-"""
-}
-
-pure repo_plan_help_text() -> Str {
-  """usage: pm repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
-
---without PACKAGE drops from --all every package whose build closure needs
-PACKAGE (and PACKAGE itself): `--all --without cmake --without linux` plans
-everything that builds before cmake and linux exist.
-
-targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
-"""
-}
-
-pure sources_help_text() -> Str {
-  """usage: pm sources fetch [--repo PATH] (--all | PACKAGE...) [--target TARGET]...
-
-Downloads every pinned upstream source the selected packages use on each
-target into the content-addressed source cache (LAPUTA_SOURCE_CACHE, default
-REPO/.cache/sources) and verifies its sha256. This is the only PM command that
-contacts upstream hosts; builds read the cache or the local mirror named by
-LAPUTA_MIRROR.
-
-targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
-"""
-}
-
-pure root_help_text() -> Str {
-  """usage: pm root COMMAND [OPTIONS]
-
-  compose PLAN --store STORE --runtime-root PACKAGE... --output GENERATION
-  inspect GENERATION_OR_RECEIPT
-"""
-}
-
-pure store_help_text() -> Str {
-  """usage: pm store COMMAND [OPTIONS]
-
-  verify --store STORE
-  gc --store STORE --keep PLAN...
-  extract PLAN --store STORE --package PACKAGE --path PATH --output FILE
-"""
-}
-
-pure tail_after(argv: List[Str], start: Int) -> List[Str] {
-  var index = start
-
-  let result: List[Str] = collect {
-    while index < argv.len() {
-      yield argv[index]
-      index += 1
-    }
-  }
-
-  result
-}
-
-# Parent discovery is intentionally restricted to a complete package repository.
 proc current_pm_repo_root() -> Result[Path] {
   var dir = fs.cwd()?
 
@@ -222,322 +78,13 @@ proc execution_repo_root() -> Result[Path] {
   root
 }
 
-proc resolve_repo_root(raw: Str) -> Result[Path] {
+## Resolve an explicit repository path or discover the enclosing complete repository.
+export proc pm_cli_resolve_repo_root(raw: Str) -> Result[Path, Error] {
   return repo_default_root()? when raw == ""
 
   path.absolute(fp"{raw}")?
 }
 
-proc parse_repo_packages(args: List[Str], command: Str) -> Result[RepoPackagesArgs] {
-  var parsed: RepoPackagesOptions = RepoPackagesOptions("", [])
-
-  parsed = cli.parse(
-    args,
-    {
-      repo: {form: "--repo PATH", default: ""},
-      packages: {form: "...PACKAGE"},
-    },
-    command,
-  )?
-
-  if parsed.packages.is_empty() {
-    return Err(types.PmError.Usage(f"{command} requires one-or-more PACKAGE arguments"))
-  }
-
-  {repo: resolve_repo_root(parsed.repo)?, packages: parsed.packages}
-}
-
-proc parse_repo_command(argv: List[Str]) -> Result[PmCommand] {
-  if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
-    return Help(repo_help_text())
-  }
-
-  let action = argv[1]
-  let args = tail_after(argv, 2)
-
-  if action not in ["check", "plan", "show", "build", "build-node", "publish", "checksum", "update-checksums"] {
-    return Err(types.PmError.Usage(f"unknown pm repo command {action}"))
-  }
-
-  if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
-    return Help(if action == "plan" { repo_plan_help_text() } else { repo_help_text() })
-  }
-
-  match action {
-    "check" => {
-      var parsed: RepoCheckOptions = RepoCheckOptions("")
-      parsed = cli.parse(args, {repo: {form: "--repo PATH", default: ""}}, "pm repo check")?
-
-      RepoCheck({repo: resolve_repo_root(parsed.repo)?})
-    }
-    "plan" => {
-      var parsed: RepoPlanOptions = RepoPlanOptions(
-        repo: "",
-        all: false,
-        roots: [],
-        without: [],
-        target: "",
-        output: p"",
-      )
-      parsed = cli.parse(
-        args,
-        {
-          repo: {form: "--repo PATH", default: ""},
-          all: {form: "--all", default: false},
-          roots: {form: "--root PACKAGE", repeated: true},
-          without: {form: "--without PACKAGE", repeated: true},
-          target: {form: "--target TARGET", default: ""},
-          output: {form: "--output PLAN", kind: "Path", required: true},
-        },
-        "pm repo plan",
-      )?
-
-      if parsed.all == ! parsed.roots.is_empty() {
-        return Err(types.PmError.Usage("pm repo plan requires exactly one of --all or one-or-more --root"))
-      }
-
-      if ! parsed.without.is_empty() and ! parsed.all {
-        return Err(types.PmError.Usage("pm repo plan --without requires --all"))
-      }
-
-      # A plan targets the host's architecture unless it names one.
-      let target = if parsed.target == "" { f"{util.host_arch()?}-linux-musl" } else { parsed.target }
-      let _ = types.parse_target(target)?
-      parsed = {...parsed, target}
-      RepoPlan({
-        repo: resolve_repo_root(parsed.repo)?,
-        all: parsed.all,
-        roots: parsed.roots,
-        without: parsed.without,
-        target: parsed.target,
-        output: parsed.output,
-      })
-    }
-    "show" => {
-      var parsed: RepoShowOptions = RepoShowOptions(p"")
-      parsed = cli.parse(args, {input: {form: "PLAN", kind: "Path", required: true}}, "pm repo show")?
-
-      RepoShow({input: parsed.input})
-    }
-    "build" => {
-      var parsed: RepoBuildOptions = RepoBuildOptions(input: p"", store: p"", jobs: cpu.count(), logs: "")
-      match cli.parse(
-        args,
-        {
-          input: {form: "PLAN", kind: "Path", required: true},
-          store: {form: "--store STORE", kind: "Path", required: true},
-          jobs: {form: "-j --jobs N", kind: "Int", default: cpu.count(), min: 1},
-          logs: {form: "--logs DIR", default: ""},
-        },
-        "pm repo build",
-      ) {
-        Ok(value) => parsed = value.require(RepoBuildOptions)?
-        Err(problem) => return Err(problem)
-      }
-
-      RepoBuild({input: parsed.input, store: parsed.store, jobs: parsed.jobs, logs: fp"{parsed.logs}"})
-    }
-    "build-node" => {
-      var parsed: RepoBuildNodeOptions = RepoBuildNodeOptions(input: p"", repo: "", store: p"", node: "")
-      parsed = cli.parse(
-        args,
-        {
-          input: {form: "PLAN", kind: "Path", required: true},
-          repo: {form: "--repo PATH", required: true},
-          store: {form: "--store STORE", kind: "Path", required: true},
-          node: {form: "--node ARTIFACT_KEY", required: true},
-        },
-        "pm repo build-node",
-      )?
-
-      RepoBuildNode({input: parsed.input, repo: fp"{parsed.repo}", store: parsed.store, node: parsed.node})
-    }
-    "publish" => {
-      var parsed: RepoPublishOptions = RepoPublishOptions(input: p"", store: p"")
-      parsed = cli.parse(
-        args,
-        {
-          input: {form: "PLAN", kind: "Path", required: true},
-          store: {form: "--store STORE", kind: "Path", required: true},
-        },
-        "pm repo publish",
-      )?
-
-      RepoPublish({input: parsed.input, store: parsed.store})
-    }
-    "checksum" => RepoChecksum(parse_repo_packages(args, "pm repo checksum")?)
-    "update-checksums" => RepoUpdateChecksums(parse_repo_packages(args, "pm repo update-checksums")?)
-    else => Err(types.PmError.Usage(f"unknown pm repo command {action}"))
-  }
-}
-
-proc parse_sources_command(argv: List[Str]) -> Result[PmCommand] {
-  if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
-    return Help(sources_help_text())
-  }
-
-  if argv[1] != "fetch" {
-    return Err(types.PmError.Usage(f"unknown pm sources command {argv[1]}"))
-  }
-
-  let args = tail_after(argv, 2)
-
-  if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
-    return Help(sources_help_text())
-  }
-
-  var parsed: SourcesFetchOptions = SourcesFetchOptions(repo: "", all: false, packages: [], targets: [])
-  parsed = cli.parse(
-    args,
-    {
-      repo: {form: "--repo PATH", default: ""},
-      all: {form: "--all", default: false},
-      targets: {form: "--target TARGET", repeated: true},
-      packages: {form: "...PACKAGE"},
-    },
-    "pm sources fetch",
-  )?
-
-  if parsed.all == ! parsed.packages.is_empty() {
-    return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
-  }
-
-  let names = if parsed.targets.is_empty() { [f"{util.host_arch()?}-linux-musl"] } else { parsed.targets }
-  var targets: List[types.Target] = []
-
-  for name in names {
-    let target = types.parse_target(name)?
-
-    if target not in targets {
-      targets += [target]
-    }
-  }
-
-  SourcesFetch({repo: resolve_repo_root(parsed.repo)?, all: parsed.all, packages: parsed.packages, targets})
-}
-
-proc parse_root_command(argv: List[Str]) -> Result[PmCommand] {
-  if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
-    return Help(root_help_text())
-  }
-
-  let action = argv[1]
-  let args = tail_after(argv, 2)
-
-  if action not in ["compose", "inspect"] {
-    return Err(types.PmError.Usage(f"unknown pm root command {action}"))
-  }
-
-  if args.len() == 1 and args[0] in ["-h", "--help", "help"] {
-    return Help(root_help_text())
-  }
-
-  if action == "compose" {
-    var parsed: RootComposeOptions = RootComposeOptions(input: p"", store: p"", runtime_roots: [], output: p"")
-    parsed = cli.parse(
-      args,
-      {
-        input: {form: "PLAN", kind: "Path", required: true},
-        store: {form: "--store STORE", kind: "Path", required: true},
-        runtime_roots: {form: "--runtime-root PACKAGE", repeated: true},
-        output: {form: "--output GENERATION", kind: "Path", required: true},
-      },
-      "pm root compose",
-    )?
-
-    if parsed.runtime_roots.is_empty() {
-      return Err(types.PmError.Usage("pm root compose requires one-or-more --runtime-root PACKAGE"))
-    }
-
-    return RootCompose(
-      {input: parsed.input, store: parsed.store, runtime_roots: parsed.runtime_roots, output: parsed.output},
-    )
-  }
-
-  var parsed: RootInspectOptions = RootInspectOptions(p"")
-  parsed = cli.parse(args, {input: {form: "GENERATION", kind: "Path", required: true}}, "pm root inspect")?
-
-  RootInspect({input: parsed.input})
-}
-
-proc parse_store_command(argv: List[Str]) -> Result[PmCommand] {
-  if argv.len() == 1 or argv[1] in ["-h", "--help", "help"] {
-    return Help(store_help_text())
-  }
-
-  if argv[1] == "extract" {
-    var extracted: StoreExtractOptions = StoreExtractOptions(
-      input: p"",
-      store: p"",
-      package: "",
-      path: p"",
-      output: p"",
-    )
-    extracted = cli.parse(
-      tail_after(argv, 2),
-      {
-        input: {form: "PLAN", kind: "Path", required: true},
-        store: {form: "--store STORE", kind: "Path", required: true},
-        package: {form: "--package PACKAGE", required: true},
-        path: {form: "--path PATH", kind: "Path", required: true},
-        output: {form: "--output FILE", kind: "Path", required: true},
-      },
-      "pm store extract",
-    )?
-
-    return StoreExtract({
-      input: extracted.input,
-      store: extracted.store,
-      package: extracted.package,
-      path: extracted.path,
-      output: extracted.output,
-    })
-  }
-
-  if argv[1] == "gc" {
-    var collected: StoreGcOptions = StoreGcOptions(p"", [])
-    collected = cli.parse(
-      tail_after(argv, 2),
-      {
-        store: {form: "--store STORE", kind: "Path", required: true},
-        keep: {form: "--keep PLAN", repeated: true},
-      },
-      "pm store gc",
-    )?
-
-    return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when collected.keep.is_empty()
-
-    return StoreGc({store: collected.store, keep: collected.keep})
-  }
-
-  if argv[1] != "verify" {
-    return Err(types.PmError.Usage(f"unknown pm store command {argv[1]}"))
-  }
-
-  var parsed: StoreVerifyOptions = StoreVerifyOptions(p"")
-  parsed = cli.parse(
-    tail_after(argv, 2),
-    {store: {form: "--store STORE", kind: "Path", required: true}},
-    "pm store verify",
-  )?
-
-  StoreVerify({store: parsed.store})
-}
-
-proc parse_command(argv: List[Str]) -> Result[PmCommand] {
-  return Help(help_text()) when argv.is_empty() or argv[0] in ["-h", "--help", "help"]
-
-  match argv[0] {
-    "repo" => parse_repo_command(argv)?
-    "sources" => parse_sources_command(argv)?
-    "root" => parse_root_command(argv)?
-    "store" => parse_store_command(argv)?
-    else => Err(types.PmError.Usage(f"unknown pm command {argv[0]}"))
-  }
-}
-
-# Planning is offline unless XSH_PM_REPO names a package repository; offline
-# plans record the digest of an empty index.
 proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) -> Result[types.RemoteSnapshot] {
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
@@ -583,19 +130,31 @@ proc selected_packages(repo_root: Path, names: List[Str]) -> Result[List[types.P
   selected
 }
 
-proc command_repo_check(args: RepoCheckArgs) {
+## Execute the typed repo check command.
+export proc pm_cli_repo_check(args: PmRepoCheckArgs) {
   let value = catalog.load(args.repo)?
   let edges = graph.edges(value, policy.aarch64_docker())?
   print "repo" "check" value.packages.len() "packages" edges.len() "edges"
 }
 
-proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] {
-  let target = types.parse_target(args.target)?
+## Execute the typed repo plan command.
+export proc pm_cli_repo_plan(args: PmRepoPlanArgs) [fs, net, process, env, time, error] {
+  if args.all == ! args.roots.is_empty() {
+    return Err(types.PmError.Usage("pm repo plan requires exactly one of --all or one-or-more --root"))
+  }
+
+  if ! args.without.is_empty() and ! args.all {
+    return Err(types.PmError.Usage("pm repo plan --without requires --all"))
+  }
+
+  let target_name = if args.target == "" { f"{util.host_arch()?}-linux-musl" } else { args.target }
+  let target = types.parse_target(target_name)?
+  let repo_root = pm_cli_resolve_repo_root(args.repo)?
   let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
 
   let cache_handle = fs.tempdir()?
   let cache_root = cache_handle.host_path()?
-  let catalog_value = catalog.load_for_target(args.repo, target)?
+  let catalog_value = catalog.load_for_target(repo_root, target)?
   var roots = args.roots
   var all = args.all
 
@@ -618,17 +177,17 @@ proc command_repo_plan(args: RepoPlanArgs) [fs, net, process, env, time, error] 
     all,
   )?
 
-  # The durable DTO and atomic write are kept behind `write_plan` while the release
-  # native-test runner cannot encode a direct reachable call to `plan_json.write`.
   pm_plan_json.write_plan(args.output, value)
   print (pm_plan.render(value, false)?)
 }
 
-proc command_repo_show(args: RepoShowArgs) {
+## Execute the typed repo show command.
+export proc pm_cli_repo_show(args: PmRepoShowArgs) {
   print (pm_plan.render(pm_plan_json.read(args.input)?, false)?)
 }
 
-proc command_repo_build(args: RepoBuildArgs) {
+## Execute the typed repo build command.
+export proc pm_cli_repo_build(args: PmRepoBuildArgs) {
   let value = pm_plan_json.read(args.input)?
   if value.target == types.target_x86_64() and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
@@ -638,13 +197,15 @@ proc command_repo_build(args: RepoBuildArgs) {
   print "repo" "build" $result.plan_sha256 result.artifacts.len() "artifacts"
 }
 
-proc command_repo_build_node(args: RepoBuildNodeArgs) {
+## Execute the typed repo build node command.
+export proc pm_cli_repo_build_node(args: PmRepoBuildNodeArgs) {
   let value = pm_plan_json.read(args.input)?
   let receipt = pm_execute.build_plan_node(value, args.repo, args.store, remote.repo_url(), args.node)?
   print "repo" "build-node" $receipt.package_id $receipt.key
 }
 
-proc command_repo_publish(args: RepoPublishArgs) {
+## Execute the typed repo publish command.
+export proc pm_cli_repo_publish(args: PmRepoPublishArgs) {
   let value = pm_plan_json.read(args.input)?
   let snapshot = repo.snapshot(value, args.store)?
   let repo_url = remote.repo_url()
@@ -661,10 +222,16 @@ proc command_repo_publish(args: RepoPublishArgs) {
   print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
 }
 
-proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, process, env, time, error] {
-  let cache_root = sources.source_cache_root(args.repo)?
+proc command_repo_checksums(args: PmRepoPackagesArgs, update: Bool) [fs, net, process, env, time, error] {
+  if args.packages.is_empty() {
+    let command = if update { "pm repo update-checksums" } else { "pm repo checksum" }
+    return Err(types.PmError.Usage(f"{command} requires one-or-more PACKAGE arguments"))
+  }
 
-  for pkg in selected_packages(args.repo, args.packages)? {
+  let repo_root = pm_cli_resolve_repo_root(args.repo)?
+  let cache_root = sources.source_cache_root(repo_root)?
+
+  for pkg in selected_packages(repo_root, args.packages)? {
     if update {
       local.update_package_checksums(cache_root, pkg)
     } else {
@@ -675,7 +242,21 @@ proc command_repo_checksums(args: RepoPackagesArgs, update: Bool) [fs, net, proc
 
 type FetchSelection = {packages: List[types.Package], arch: Str}
 
-proc command_sources_fetch(args: SourcesFetchArgs) {
+## Fetch selected package sources for explicit or host targets.
+export proc pm_cli_sources_fetch(repo: Str, all: Bool, packages: List[Str], target_names: List[Str]) {
+  if all == ! packages.is_empty() {
+    return Err(types.PmError.Usage("pm sources fetch requires exactly one of --all or one-or-more PACKAGE arguments"))
+  }
+
+  let names = if target_names.is_empty() { [f"{util.host_arch()?}-linux-musl"] } else { target_names }
+  var targets: List[types.Target] = []
+
+  for name in names {
+    let target = types.parse_target(name)?
+    if target not in targets { targets += [target] }
+  }
+
+  let args: PmSourcesFetchArgs = {repo: pm_cli_resolve_repo_root(repo)?, all, packages, targets}
   let cache_root = sources.source_cache_root(args.repo)?
   var items: List[sources.SourceFetchItem] = []
   var seen = []
@@ -728,7 +309,12 @@ proc command_sources_fetch(args: SourcesFetchArgs) {
   }
 }
 
-proc command_root_compose(args: RootComposeArgs) {
+## Execute the typed root compose command.
+export proc pm_cli_root_compose(args: PmRootComposeArgs) {
+  if args.runtime_roots.is_empty() {
+    return Err(types.PmError.Usage("pm root compose requires one-or-more --runtime-root PACKAGE"))
+  }
+
   let value = pm_plan_json.read(args.input)?
   let overlay_handle = fs.tempdir()?
   let overlay = overlay_handle.host_path()?
@@ -737,7 +323,8 @@ proc command_root_compose(args: RootComposeArgs) {
   print "root" "compose" $receipt.generation_sha256 $receipt.root_sha256
 }
 
-proc command_root_inspect(args: RootInspectArgs) {
+## Execute the typed root inspect command.
+export proc pm_cli_root_inspect(args: PmRootInspectArgs) {
   # Image builders retain the receipt JSON after atomically publishing their final
   # image and removing container-local generation staging. Accept that durable
   # boundary as well as an intact generation root.
@@ -753,7 +340,10 @@ proc command_root_inspect(args: RootInspectArgs) {
 
 # Every artifact a kept plan names stays, whatever its action: a plan that
 # reuses a remote artifact still runs from the imported copy.
-proc command_store_gc(args: StoreGcArgs) {
+## Execute the typed store gc command.
+export proc pm_cli_store_gc(args: PmStoreGcArgs) {
+  return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when args.keep.is_empty()
+
   var keep = []
 
   for plan_file in args.keep {
@@ -764,12 +354,14 @@ proc command_store_gc(args: StoreGcArgs) {
   print "store" "gc" $result.artifacts "removed" $result.kept "kept"
 }
 
-proc command_store_verify(args: StoreVerifyArgs) {
+## Execute the typed store verify command.
+export proc pm_cli_store_verify(args: PmStoreVerifyArgs) {
   let receipts = store.verify_all(args.store)?
   print "store" "verify" receipts.len() "artifacts"
 }
 
-proc command_store_extract(args: StoreExtractArgs) {
+## Execute the typed store extract command.
+export proc pm_cli_store_extract(args: PmStoreExtractArgs) {
   pm_generation_adapter.generation_adapter_copy_manifest_file(
     args.input,
     args.store,
@@ -780,28 +372,13 @@ proc command_store_extract(args: StoreExtractArgs) {
   print f"store extract {args.package} {args.path}"
 }
 
-proc handle(command: PmCommand) {
-  match command {
-    Help(text) => print $text
-    RepoCheck(args) => command_repo_check(args)
-    RepoPlan(args) => command_repo_plan(args)
-    RepoShow(args) => command_repo_show(args)
-    RepoBuild(args) => command_repo_build(args)
-    RepoBuildNode(args) => command_repo_build_node(args)
-    RepoPublish(args) => command_repo_publish(args)
-    RepoChecksum(args) => command_repo_checksums(args, false)
-    RepoUpdateChecksums(args) => command_repo_checksums(args, true)
-    SourcesFetch(args) => command_sources_fetch(args)
-    RootCompose(args) => command_root_compose(args)
-    RootInspect(args) => command_root_inspect(args)
-    StoreVerify(args) => command_store_verify(args)
-    StoreGc(args) => command_store_gc(args)
-    StoreExtract(args) => command_store_extract(args)
-  }
+
+## Calculate checksums for the selected repository packages.
+export proc pm_cli_repo_checksum(args: PmRepoPackagesArgs) {
+  command_repo_checksums(args, false)
 }
 
-## Parses only the final explicit PM command surface; there are no extension or legacy fallbacks.
-export proc run_pm_cli(argv: List[Str]) [fs, net, process, env, time, error] {
-  let args = if ! argv.is_empty() and argv[0] == "--" { tail_after(argv, 1) } else { argv }
-  handle(parse_command(args)?)
+## Update checksums for the selected repository packages.
+export proc pm_cli_repo_update_checksums(args: PmRepoPackagesArgs) {
+  command_repo_checksums(args, true)
 }
