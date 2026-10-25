@@ -128,6 +128,47 @@ pure contains_path(paths: List[Path], target: Str) -> Bool {
   false
 }
 
+proc test_builtin_archive_plan(
+  cache: Path,
+  plan: kbuild.KbuildPlan,
+  cc: Path,
+  triple: Str,
+  cflags: List[Str],
+  defs: List[Str],
+  includes: List[Str],
+) [fs, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display()}) {
+    return kbuild.plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
+  }
+}
+
+proc test_builtin_archive_plan_with_workers(
+  cache: Path,
+  plan: kbuild.KbuildPlan,
+  cc: Path,
+  triple: Str,
+  cflags: List[Str],
+  defs: List[Str],
+  includes: List[Str],
+  analysis_jobs: Int,
+  xsh_bin: Path,
+  worker: Path,
+) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display()}) {
+    return kbuild.plan_builtin_archives_with_analysis_workers(
+      plan,
+      cc,
+      triple,
+      cflags,
+      defs,
+      includes,
+      analysis_jobs,
+      xsh_bin,
+      worker,
+    )?
+  }
+}
+
 pure composite_has_member(plan: kbuild.KbuildPlan, object: Str, member: Str) -> Bool {
   for composite in plan.composites {
     if composite.object.display() == object {
@@ -244,6 +285,7 @@ test test_kbuild_writes_text_plan [fs, error] { |ctx|
 
 test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-tasks")?
+  let cache = test.temp_dir(ctx, name: "linux-archive-cache")?
   write_fixture(root)
 
   fp"{root}/core.c".write(
@@ -335,7 +377,8 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
   let plan = kbuild.discover_plan(root, config, "arm64")?
 
   cd root {
-    let archive_plan = kbuild.plan_builtin_archives(
+    let archive_plan = test_builtin_archive_plan(
+      cache,
       plan,
       /usr/bin/cc,
       "aarch64-linux-gnu",
@@ -398,6 +441,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
 
 test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-pi-relacheck")?
+  let cache = test.temp_dir(ctx, name: "linux-pi-cache")?
   fp"{root}/arch/arm64/kernel/pi".mkdir()
   fp"{root}/.config".write("")
 
@@ -425,7 +469,8 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
     let config = kbuild.load_config(p".config")?
     let plan = kbuild.discover_plan(p".", config, "arm64")?
 
-    let archive_plan = kbuild.plan_builtin_archives(
+    let archive_plan = test_builtin_archive_plan(
+      cache,
       plan,
       /usr/bin/cc,
       "aarch64-linux-gnu",
@@ -471,7 +516,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
   let first = fp"{root}/first.txt"
   let second = fp"{root}/second.txt"
   let plan = fp"{root}/archive-plan.json"
-  let no_strings = []
+  let no_strings: List[Str] = []
 
   json.write(
     plan,
@@ -530,6 +575,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
 
 test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-missing")?
+  let cache = test.temp_dir(ctx, name: "linux-missing-cache")?
 
   fp"{root}/present.c".write(
     """int present(void) { return 0; }
@@ -551,7 +597,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
   )
 
   cd root {
-    let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
     assert archive_plan.missing_sources.len() == 1
     assert archive_plan.generated_objects.is_empty()
     assert contains_path(archive_plan.missing_sources, "missing.o")
@@ -612,6 +658,7 @@ test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
 
 test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-analysis-pool")?
+  let cache = test.temp_dir(ctx, name: "linux-analysis-cache")?
   let worker = path.absolute(p"packages/linux/kbuild-archive-analysis-worker.xsh")?
   let xsh_bin = process.which("xsh")?
   fp"{root}/.config".write("")
@@ -649,8 +696,9 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
   )
 
   cd root {
-    let serial = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
-    let parallel = kbuild.plan_builtin_archives_with_analysis_workers(
+    let serial = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    let parallel = test_builtin_archive_plan_with_workers(
+      cache,
       plan,
       /usr/bin/cc,
       "aarch64-linux-gnu",
@@ -676,8 +724,9 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
     env ({
       XSH_LINUX_KBUILD_ARCHIVE_ONLY: "1",
     }) {
-      let compact_serial = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
-      let compact_parallel = kbuild.plan_builtin_archives_with_analysis_workers(
+      let compact_serial = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+      let compact_parallel = test_builtin_archive_plan_with_workers(
+        cache,
         plan,
         /usr/bin/cc,
         "aarch64-linux-gnu",
@@ -703,6 +752,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
 
 test test_kbuild_adds_x86_kvm_local_include [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-x86-kvm-include")?
+  let cache = test.temp_dir(ctx, name: "linux-kvm-cache")?
   fp"{root}/arch/x86/kvm/mmu".mkdir()
 
   fp"{root}/arch/x86/kvm/mmu/mmu.c".write(
@@ -732,7 +782,7 @@ int mmu(void) { return 0; }
   )
 
   cd root {
-    let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
     var saw_mmu = false
 
     for task in archive_plan.tasks {
@@ -748,6 +798,7 @@ int mmu(void) { return 0; }
 
 test test_kbuild_applies_object_and_subdir_cflags [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-cflags")?
+  let cache = test.temp_dir(ctx, name: "linux-cflags-cache")?
   fp"{root}/sound/hda/common".mkdir()
   fp"{root}/sound/hda/controllers".mkdir()
   fp"{root}/.config".write("")
@@ -789,7 +840,7 @@ CFLAGS_intel.o := -I$(src)
   )
 
   cd root {
-    let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
     var saw_controller = false
     var saw_intel = false
 
@@ -811,12 +862,9 @@ CFLAGS_intel.o := -I$(src)
   }
 }
 
-# Kbuild compiles a composite's members with the flags of the Makefile that
-# lists them, so a member in a subdirectory without its own Makefile (as
-# lib/raid/xor's x86/ objects are) still gets that Makefile's ccflags-y and
-# its CFLAGS_<member> entry.
 test test_kbuild_applies_composite_makefile_cflags_to_subdir_members [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-composite-cflags")?
+  let cache = test.temp_dir(ctx, name: "linux-composite-cache")?
   fp"{root}/lib/xor/x86".mkdir()
   fp"{root}/.config".write("")
 
@@ -841,7 +889,7 @@ CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
   )
 
   cd root {
-    let archive_plan = kbuild.plan_builtin_archives(plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
     var saw_member = false
 
     for task in archive_plan.tasks {
