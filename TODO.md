@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 36
+Next: 41
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -67,6 +67,7 @@ entire queue as a new campaign.
 - **Problem:** Build paths prepend declared tools to ambient paths and package-tools retains an external host-tools base. These are bootstrap choices, not a demonstrated escape, but offline execution alone does not establish a closed input or authority boundary.
 - **Recommendation:** Select a small C/Rust/XSH-build cohort. Declare executable/library/source/environment inputs, seed exceptions, writable output/scratch roots, inherited descriptors and network policy. Qualify a restricted build path using existing execution infrastructure with OS enforcement, not only an effect annotation, PATH filter or lexical path check. Keep exceptions explicit; no second sandbox/deployment framework.
 - **Acceptance:** Undeclared tools, libraries, environment and reads/writes outside the allowed closure are rejected or unavailable. Poison ambient inputs and verify sentinels; declared builds still pass offline. Record the exact trusted host/seed boundary and unsupported enforcement. LAP-10 compares payloads; reproducible output alone is not isolation proof.
+- **Coordination:** XSH-47 evaluates only the narrow host-enforcement primitive this already-scoped build consumer demonstrates; static effects or `FsRoot` checks are not an OS sandbox.
 - **Fix with:** isolate-effects
 - **Effort:** M (days)
 
@@ -89,6 +90,17 @@ entire queue as a new campaign.
 - **Acceptance:** Malicious archive entries, ancestor/symlink swaps, destination conflicts, interrupted cleanup and full disks cannot alter outside sentinels or remove the prior committed generation. Record atomic-visibility and durability evidence separately; process-kill tests alone do not satisfy power-loss claims.
 - **Coordination:** Roadmap R4/R5; XSH-37 owns reusable host operations, not package policy.
 - **Fix with:** isolate-effects
+- **Effort:** M (days)
+
+### LAP-36 · P2 · Stress xinit and PID 1 ownership under signal races
+
+- **Area:** Service lifecycle tests
+- **Where:** `xinit/xinit.xsh`, `xinit/tests/`, `tests/system/`, `tests/integration/`, `guest/`, `xinit/docs/SUPERVISION.md`
+- **Problem:** xinit supervises and reaps process groups, but bounded randomized interruption at scanner/spawn/readiness/finish/stop boundaries has not been qualified. The existing LAP-34 task reduces one failure to a replay; it does not systematically exercise signal timing.
+- **Recommendation:** Use XSH-43's seed-replayable signal-storm harness with actual disposable guest process groups and the canonical xinit service/PID 1 paths. Inject child exits, failed readiness, SIGTERM/SIGINT to the scanner, the inittab engine's documented lifecycle signals, early pipe closure, and repeated stop/restart requests at controlled points. Keep the existing ownership/scanner model and test-only switches; no new init manager.
+- **Acceptance:** Fixed seeds replay and shrink failures; no duplicate service instance, foreign-PID signal, zombie, unreaped owned group, skipped cleanup or inconsistent scanner state remains after bounded reconciliation. Verify reverse-dependency stop, restart/backoff, PID 1's distinct signal meanings and production/test separation. SIGKILL and disk power loss retain independent limitations; do not send stress signals to the host.
+- **Coordination:** XSH-43 supplies reusable process/stream oracle; XSH-36 owns runtime resource contracts; LAP-34 owns one hermetic service replay and LAP-22 owns test-switch parity.
+- **Fix with:** lifecycle-concurrency
 - **Effort:** M (days)
 
 ### LAP-1 · P3 · Attach package context at the execution boundary
@@ -318,6 +330,28 @@ entire queue as a new campaign.
 - **Fix with:** deduplicate
 - **Effort:** M (days)
 
+### LAP-37 · P3 · Replay a second operational host-observation failure
+
+- **Area:** Deterministic testing
+- **Where:** `packages/laputa-net/`, `tests/system/`, `tests/integration/`, `profiles/`, `docs/ROADMAP.md`
+- **Problem:** LAP-34 targets service lifecycle replay and btop already has a rooted observation bundle; reuse of the same explicit-observation technique for a different policy consumer is unproven.
+- **Recommendation:** Use XSH-45 and LAP-32 to record the minimum link/address/route observations and operation results for one virtual-network reconciliation conflict. Feed the same bounded ordered inputs to pure planning/re-observation code offline. Reuse existing XSH typed records, rooted fixtures and trace/mocks; no general simulation framework, virtual networking stack or new daemon.
+- **Acceptance:** Stable replay yields the same plan/error; missing or reordered events, a stale precondition, truncated messages and denied host operations fail closed with useful diagnostics. A disposable Linux VM corroborates the chosen real boundary; no live-host fallback or assumption of network convergence based on a mock alone.
+- **Coordination:** XSH-45 owns the reusable replay seam; LAP-32 owns virtual-interface policy. Complete LAP-34's first service counterexample independently.
+- **Fix with:** isolate-effects
+- **Effort:** M (days)
+
+### LAP-38 · P3 · Extract one pure, inspectable service-policy decision
+
+- **Area:** Service policy
+- **Where:** `xinit/xinit.xsh`, `xinit/tests/`, `xinit/docs/SUPERVISION.md`, `xinit/docs/INIT.md`
+- **Problem:** xinit's restart/backoff decisions mix observation and time-gating with side-effectful supervision; whether a pure decision function would simplify the current code is unproven. Adding a general policy DSL or configurable callbacks now would expand the boot-critical surface.
+- **Recommendation:** Start with one restart/backoff or admission choice. Supply immutable typed unit state plus explicit elapsed-time observations to an ordinary XSH pure function and return the decision; leave waiting, spawns, signals and state mutation with the scanner. Compare lines and invariants against the existing implementation and keep the simpler form, even if it is just an internal helper. Do not change service-file schema or introduce a user-configurable policy language.
+- **Acceptance:** Table-driven native fixtures exercise stable-after, retry saturation, zero-delay, dependency gating, clock discontinuity and errors. The checker rejects host effects inside pure policy; execution parity and restart/cleanup behavior pass in disposable guests. No duplicate policy owner or hidden wall-clock read; discard the refactor if it adds machinery without reducing branching.
+- **Coordination:** XSH-48 owns the shared language-side policy lesson; LAP-5 owns service-schema strictness and LAP-27 owns elapsed-time semantics.
+- **Fix with:** single-source-of-truth
+- **Effort:** S (hours)
+
 ### LAP-20 · P4 · Remove the libgcc_s compatibility name
 
 - **Area:** Dependencies
@@ -352,4 +386,26 @@ entire queue as a new campaign.
 - **Problem:** `mirror-demo`, `mirror-frontend`, `fetch-mirror`, `mirror-build-x86_64-musl`, and `deploy-mirror-fresh` appear in no doc, apart from a mention of `deploy-mirror-fresh` in `docs/MIRROR-DEPLOYMENT.md`.
 - **Recommendation:** Describe each target in its owning doc, or delete the unused ones.
 - **Fix with:** dead-code-archaeology
+- **Effort:** S (hours)
+
+### LAP-39 · P4 · Measure the complexity delta of one removed glue boundary
+
+- **Area:** Design economy
+- **Where:** `docs/ROADMAP.md`, `docs/DEVELOPMENT.md`, `boot/qmp-proof.py`, `system/qemu.xsh`, `tests/system/`
+- **Problem:** The roadmap already prescribes architectural subtraction, but no selected change measures first-party glue and invariants removed versus new dependencies and host boundaries created. A source-line quota or replacement of mature libraries would be counterproductive.
+- **Recommendation:** Use LAP-35's Python QMP-helper replacement as one bounded case after its behavior proof. Record before/after entry points, argument/JSON round-trips, subprocesses, duplicate error rules, protocol ownership, first-party source, dependencies and verification cost. Relate the result to startup/binary measurements where XSH itself changes. Keep a compact evidence table in the owning docs, not a permanent scoring service or blanket LOC limit.
+- **Acceptance:** A reviewer can trace every retired responsibility to an actual removal and every retained contract to tests; the new XSH QMP client passes the same fragmented-input and lifecycle cases. If replacement increases obligations without a demonstrated gain, retain or redesign it rather than claim simplification from language choice alone.
+- **Coordination:** XSH-49 owns substrate-complexity accounting; LAP-35 owns the actual QMP implementation and evidence.
+- **Fix with:** ultratriage
+- **Effort:** S (hours)
+
+### LAP-40 · P4 · Pilot one trusted external CLI signature in Laputa recipes
+
+- **Area:** Tooling
+- **Where:** `packages/*/PKGBUILD.xsh`, `pm/`, `tests/pm/`, `docs/DEVELOPMENT.md`
+- **Problem:** Native XSH APIs and typed recipe boundaries are checked, but flags of a pinned external executable can be mistyped without a diagnostic. An always-on command-signature registry would add drift and inappropriate implicit authority.
+- **Recommendation:** Only after XSH-46 delivers its opt-in `xsht` checker, select one stable pinned executable invoked by a real recipe. Supply/reuse a reviewed complete flag signature and compare static diagnostics against the package's existing invocation tests. Keep dynamic targets and incomplete signatures conservative; the checker must not execute a tool to discover its options.
+- **Acceptance:** A controlled misspelling is caught without launching any process; correct recipe invocations check and build unchanged. Version mismatches or unverified subcommands produce advisory diagnostics, never false hard errors. Report the actual maintenance/compile-time cost and drop the pilot if not worth it; CLI flags do not establish process effects.
+- **Coordination:** XSH-46 owns the optional tooling feature and signature trust policy.
+- **Fix with:** reference-parity
 - **Effort:** S (hours)
