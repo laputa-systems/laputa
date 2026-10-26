@@ -8,6 +8,46 @@ The next investment is lifecycle correctness, not a larger command catalog.
 Preserve the existing PM, typed profiles, xinit, and XSH boundaries rather than
 introducing a second package manager, service manager, or deployment framework.
 
+## Design filter: make complexity unnecessary
+
+Laputa is the operational proving ground for XSH, not merely a collection of
+Rust replacements. XSH aims to make systems work as immediate as shell scripting
+while keeping behavior explicit and checkable. The useful measure is how many
+independent assumptions and intermediate protocols a workflow no longer needs,
+not how many commands or codecs are present.
+
+Follow [XSH's design principles](https://github.com/laputa-systems/xsh/blob/master/docs/DESIGN.md):
+a small specified language core; a minimal trustworthy systems substrate; an
+expansive userspace built predominantly in XSH. Laputa supplies demanding real
+consumers for those boundaries. Keep service, network, build and activation
+policy in ordinary XSH; improve reusable host operations when a consumer exposes
+a gap. Do not move whole commands into Rust merely to call the result native.
+Established external protocol/storage engines remain appropriate where they
+reduce risk rather than duplicate machinery.
+
+Prefer architectural subtraction without removing useful capability: one owner
+per invariant, typed data/OS observations instead of render-and-reparse paths,
+shared libraries instead of command-specific runtime features, and fewer hidden
+conversions or mandatory intermediate representations. Preserve independent
+verifier and trust-boundary checks; shared definitions do not replace them.
+Every substantial slice
+should identify its consumer, what machinery disappears, the boundary that
+changes, its failure proof and its dependency/runtime cost. This is a design
+filter, not a mandate for another framework or repository-wide rewrite.
+
+Conceptual coherence and expressive coverage do not establish implementation
+economy or operational trust. Checked effects are not OS authority enforcement;
+path validation is not filesystem confinement; atomic publication is not crash
+durability; formal semantics are not native-adapter conformance. Require the
+corresponding host/guest evidence and state its limits. Keep the language core
+and substrate increasingly predictable while userspace grows above them.
+
+The most direct feedback loop is to build XSH inside Laputa, use it to produce a
+successor system, and reduce discovered failures to ordinary regression tests.
+R10 adds that milestone; R1/R2/R4/R5 remain the operational consumers that give
+its abstractions purpose. No new language feature is justified solely by this
+roadmap, and no paused XSH campaign is resumed by it.
+
 ## Authority and scope
 
 This document owns direction, sequencing, and acceptance milestones.
@@ -20,7 +60,9 @@ the owning topic or campaign. Do not duplicate the TODO queue here.
 The planning baseline was reread after the documentation refactor at
 `44572a718e3067e9d03e6646036e67f04c4ac5b2` on 2026-10-25. This review did not
 rerun build or guest proofs. All milestones below remain open unless their
-owning documentation records subsequent verification.
+owning documentation records subsequent verification. The systems-foundation
+follow-up used Laputa `85c175515312` and XSH `9d893e0075d2`; it adds design
+constraints and TODO slices, not new runtime evidence.
 
 **Supported direction:** Linux guests under QEMU on aarch64 and x86_64, plus the
 pinned x86_64 Asterinas/Firecracker backend. Keep the existing graphical VM
@@ -58,9 +100,10 @@ operational capability is complete.
 
 ## Priority and sequence
 
-P0 means required before trusting a long-lived installed VM; P1 completes its
-operational baseline; P2 is optional expansion. Priority is not execution order:
-service ownership and focused test infrastructure unblock several P0 tracks.
+P0 means required before trusting a long-lived installed VM; P1 strengthens the
+operational and self-hosting foundation; P2 is optional expansion. Priority is not
+execution order: service ownership and focused tests unblock several P0 tracks.
+These milestone priorities are not a renumbering of the bounded TODO priorities.
 
 | Track | Priority | Outcome |
 |---|---|---|
@@ -73,12 +116,15 @@ service ownership and focused test infrastructure unblock several P0 tracks.
 | R7 | P1 | Backups, scheduled maintenance, and persistent diagnostics |
 | R8 | P2 | A qualified Linux OCI execution profile, only after the operational baseline |
 | R9 | P2 | Selective integration of Laputa-native tools, not catalog growth for its own sake |
+| R10 | P1, staged independently | Closed build cohort, in-guest XSH rebuild, and successor-system boot |
 
 R1, R2, and R3 can advance in bounded independent slices. Design R4 alongside
 R2's time-bootstrap policy; R5 depends on R3's rescue path and R4's authenticated
 inputs. Basic diagnostic capture and manual backup/restore should arrive early;
 R7's automation is not a reason to delay them. No implementation needs to wait
-for the whole roadmap to be complete.
+for the whole roadmap to be complete. R10 can progress alongside those tracks;
+it is not an entry fee for their bounded fixes, and its local development proof
+is not a substitute for R4/R5 production trust and activation.
 
 ## R1: Make xinit the service lifecycle owner
 
@@ -101,6 +147,12 @@ A named facility without a provider must not masquerade as a satisfied critical
 dependency. Keep local network configuration distinct from Internet reachability;
 do not block rescue/login forever waiting for external services. Longruns must
 remain foreground processes. Do not add blanket dependency restart cascades.
+
+Give service configuration one authoritative typed model, with shape validation,
+semantic checks and execution preconditions kept distinct. LAP-5 owns strict
+normalization, redacted inspection and read-only planning. Reuse XSH's data
+validator for external configuration; executable service modules remain trusted
+code, not inert data. A codec migration must not create a second service schema.
 
 **Acceptance:** a real VM boots the selected graph once; killing a daemon
 exercises backoff and recovery; killing/restarting the scanner has a defined
@@ -131,6 +183,12 @@ split-DNS boundary; do not let independent writers race on `resolv.conf`.
 Keep name resolution separate from optional DNS caching/recursive service work.
 Audit hook execution for the intended XSH/no-ambient-shell contract.
 
+Use the network path as a shared-library consumer: observe actual state, compute
+a typed plan, apply with preconditions, then re-observe. Preserve foreign resources,
+including Tailscale/operator state; detect lost notifications and stale snapshots.
+Partial application requires reconciliation, not a promise of generic rollback.
+LAP-32 owns the first virtual-interface slice with XSH-38's reusable operations.
+
 Evaluate a maintained DHCP client before writing a new one. `dhcproto` is a
 possible Rust protocol building block, not a ready-made lease manager. Select an
 implementation only after reviewing its lifecycle behavior, musl dependency
@@ -155,6 +213,11 @@ status reporting, initial step versus later slew policy, and recovery after VM
 pause or clock jumps. Prove actual guest-clock discipline, not just daemon
 startup or an NTS handshake. Never grant a test access to alter the build host's
 clock; use disposable guests for clock-changing tests.
+
+Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
+separate supervisor deadlines from wall timestamps with explicit units/origins;
+a mechanical `time.now()` to `time.monotonic()` replacement is not sufficient.
+Correcting wall time must not break restart, readiness or shutdown budgets.
 
 Time bootstrap is part of R4: TLS/NTS verification and release expiry cannot
 assume an already trustworthy wall clock. Document initial clock assumptions,
@@ -348,6 +411,34 @@ Defer `zzz` and other physical power/device integration under the scope boundary
 Rust implementations are preferred where they fit, but reliability at storage,
 security, and protocol boundaries outranks avoiding every non-Rust dependency.
 
+## R10: Close the self-hosting loop
+
+The current xsh package imports seed products, and package-tools retains an
+external host-tools base. Treat these as declared bootstrap boundaries, not
+proof of a closed build or an in-world XSH rebuild. Keep the compiler in Rust;
+this is distribution self-hosting, not language self-implementation.
+
+First qualify a small C/Rust/XSH-build cohort with declared tools, libraries,
+sources, environment and writable paths, plus explicit seed exceptions (LAP-28).
+No network or ambient host fallback should silently satisfy a missing input.
+Poison undeclared inputs and test OS-enforced authority separately from output
+reproducibility. LAP-10 owns independent rebuild comparisons; LAP-31 owns the
+semantic executor-invalidation contract. Executor provenance alone cannot stop
+reuse after an interpreter change alters recipe meaning.
+
+Then build and run replacement xsh/xsht inside a Laputa VM and use them to
+rebuild that cohort (LAP-29). Expand only after the bounded loop is useful.
+Finally use the in-guest tools and PM to produce a successor bundle and boot it
+through the existing launcher (LAP-30). Declare remaining bootstrap trust rather
+than claiming complete source bootstrap or a self-hosted world prematurely.
+
+**Acceptance:** one qualified target builds its replacement tools, uses them to
+produce the selected successor closure, boots the matching kernel/root bundle,
+and verifies the actual running receipt and behavior. No undeclared host tool
+supplies a missing capability. Preserve the prior system on failure. Keep local
+proof separate from production R4/R5 admission, state migration and fallback;
+Linux and Asterinas require their own evidence.
+
 ## Delivery gates and evidence
 
 | Gate | Required result |
@@ -356,6 +447,7 @@ security, and protocol boundaries outranks avoiding every non-Rust dependency.
 | G1: Reliable VM | R1-R3 work together with controlled network/time failure, daemon recovery, dirty-disk handling, independent rescue, and enough persistent diagnostics to explain failures. |
 | G2: Maintainable VM | R4-R7 deliver authenticated updates, observable activation/fallback, safe VM defaults, and a successful restore onto a blank virtual disk. |
 | G3: Optional expansion | R8/R9 are admitted only with a concrete workload, bounded runtime cost, and their own proof; they do not hold G1/G2 hostage. |
+| G4: Self-hosted feedback loop | R10 proves a closed cohort, replacement XSH, and successor boot on a named target; it can advance independently of optional expansion and does not waive G1/G2. |
 
 Use focused tests first and the existing [testing](TESTING.md) and
 [development](DEVELOPMENT.md) entry points. Reserve `make verify` for an explicitly
@@ -363,6 +455,15 @@ requested full verification run. No full rebuild is required for roadmap-only
 edits. Add targeted guest fixtures to the existing harness instead of a second
 VM orchestration framework. Fault injection uses disposable guests and disks,
 never host clocks, host disks, or production credentials.
+
+Prefer failures that become small counterexamples: LAP-34 and XSH-40 connect one
+real service lifecycle failure to a hermetic native replay before generalizing.
+Missing observations must not fall through to the host. Process kills do not
+simulate loss/reordering of storage writes; storage crash claims need separate
+fault injection. LAP-35 replaces the QMP helper only through a reusable bounded
+XSH client with parity, not a language-only translation or a new VM framework.
+LAP-33/XSH-37 qualify confined extraction/publication without equating lexical
+path safety with authority. Existing production/test boundaries remain binding.
 
 For every completed slice, record the source revision, target/backend, relevant
 configuration and dependency closure, test commands/results, and remaining
