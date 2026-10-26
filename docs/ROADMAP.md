@@ -65,7 +65,9 @@ follow-up used Laputa `85c175515312` and XSH `9d893e0075d2`; it adds design
 constraints and TODO slices, not new runtime evidence.
 
 **Supported direction:** Linux guests under QEMU on aarch64 and x86_64, plus the
-pinned x86_64 Asterinas/Firecracker backend. Keep the existing graphical VM
+pinned x86_64 Asterinas/Firecracker backend. Linux aarch64 guest qualification
+is deferred pending a macOS aarch64 host via Docker; Linux x86_64 remains the
+active proof target. Keep the existing graphical VM
 reference working while developing the headless operational path. A feature
 proved on Linux is not automatically proved on Asterinas or another architecture.
 Native build hosts are test infrastructure, not a bare-metal Laputa target.
@@ -325,7 +327,8 @@ an unbootable B; inject termination at publication/selection/confirmation
 boundaries; exercise concurrent requests, full disks, and GC. Every recoverable
 case selects a complete admissible bundle with preserved mutable state. Rescue
 still works when neither normal generation boots. Linux and Asterinas results
-are recorded separately.
+are recorded separately; Linux aarch64 is deferred pending a macOS aarch64
+host via Docker.
 
 ## R6: Separate disposable development from long-lived VM policy
 
@@ -437,13 +440,14 @@ produce the selected successor closure, boots the matching kernel/root bundle,
 and verifies the actual running receipt and behavior. No undeclared host tool
 supplies a missing capability. Preserve the prior system on failure. Keep local
 proof separate from production R4/R5 admission, state migration and fallback;
-Linux and Asterinas require their own evidence.
+Linux and Asterinas require their own evidence; Linux aarch64 is deferred
+pending a macOS aarch64 host via Docker.
 
 ## Delivery gates and evidence
 
 | Gate | Required result |
 |---|---|
-| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. Resolve or explicitly report LAP-6's aarch64 verification gap, LAP-7's visual-proof gap, and LAP-21's QMP retry boundary; missing proof is not a pass. |
+| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. LAP-6's aarch64 verification gap is deferred pending a macOS aarch64 host via Docker; resolve or explicitly report LAP-7's visual-proof gap, and LAP-21's QMP retry boundary; missing proof is not a pass. |
 | G1: Reliable VM | R1-R3 work together with controlled network/time failure, daemon recovery, dirty-disk handling, independent rescue, and enough persistent diagnostics to explain failures. |
 | G2: Maintainable VM | R4-R7 deliver authenticated updates, observable activation/fallback, safe VM defaults, and a successful restore onto a blank virtual disk. |
 | G3: Optional expansion | R8/R9 are admitted only with a concrete workload, bounded runtime cost, and their own proof; they do not hold G1/G2 hostage. |
@@ -468,6 +472,7 @@ path safety with authority. Existing production/test boundaries remain binding.
 For every completed slice, record the source revision, target/backend, relevant
 configuration and dependency closure, test commands/results, and remaining
 limits. Linux aarch64, Linux x86_64, and Asterinas x86_64 have separate evidence;
+Linux aarch64 evidence is deferred pending a macOS aarch64 host via Docker;
 a build-only result is not a boot proof. Fix required Asterinas syscalls in the
 pinned fork with regression tests, never hide a failure behind a userspace shim
 or mark a skipped test as passed. A Linux-first delivery may land while the

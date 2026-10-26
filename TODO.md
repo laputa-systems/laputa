@@ -16,7 +16,9 @@ to modify another checkout. Owning topic documents record qualified behavior
 and its remaining limits.
 
 Real-hardware enablement remains out of scope. Existing hardware entries are
-retained but deferred as noted below. VM clocks, virtual networking, disposable
+retained but deferred as noted below. aarch64 qualification is deferred
+pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is
+available in this campaign. VM clocks, virtual networking, disposable
 disks and native build hosts remain in scope. Existing paused campaigns are not resumed. The current Laputa campaign covers
 runnable entries using the supplied fixed XSH snapshot. External XSH repairs
 and real-hardware enablement remain outside that scope.
@@ -27,7 +29,8 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `docs/TESTING.md:45`
 - **Problem:** The completed x86_64 bootstrap changed shared PM, musl, headers, installer, and profile paths without a full aarch64 world rebuild or boot proof. aarch64 parity is unproven.
 - **Recommendation:** Run the clean world build and both installer and profile proofs on a native aarch64 host. Fix failures before claiming parity.
-- **Blocked:** This campaign has an x86_64 host; the required native aarch64 build and guest proof remain unavailable.
+- **Deferred:** aarch64 qualification is deferred pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is available. Retain this finding, but exclude it from active backlog runs until the owner reopens it.
+- **Blocked:** This campaign has an x86_64 host; the required native aarch64 build and guest proof remain unavailable. Unblock with a macOS aarch64 host via Docker.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
@@ -89,7 +92,8 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `packages/linux/files/config/aarch64/base-aarch64.fragment:233`
 - **Problem:** The aarch64 kernel disables PERF_EVENTS while Laputa packages perf, leaving event recording unavailable.
 - **Recommendation:** Enable perf events and check recording on a native aarch64 guest.
-- **Blocked:** Native aarch64 guest qualification is unavailable in this campaign.
+- **Deferred:** aarch64 qualification is deferred pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is available. Retain this finding, but exclude it from active backlog runs until the owner reopens it.
+- **Blocked:** Native aarch64 guest qualification is unavailable in this campaign; unblock with a macOS aarch64 host via Docker.
 - **Fix with:** none
 - **Effort:** S (hours)
 
