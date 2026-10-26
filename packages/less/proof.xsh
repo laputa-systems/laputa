@@ -25,14 +25,9 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   let text = fp"{tmp}/lines.txt"
   text.write_lines([f"line {i}" for i in range(1, 101)])
 
-  # Without a tty less copies its input, like cat.
   let copied = run.text $dynlinker $less $text
   proof.ensure(copied == text.read_text()?, "proof-less", "less did not copy its input to a non-terminal")
 
-  # On a 10-row terminal less pages lines 1-9, then the down-arrow key (sent
-  # in its application-mode form, as less enables keypad mode) scrolls to
-  # line 10, and q quits. less has no terminfo here, so each TERM a Laputa
-  # user meets must work from the built-in capabilities.
   let driver = proof.pty_driver(tmp)?
 
   for term in ["xterm-256color", "foot", "tmux-256color", "linux"] {

@@ -5,7 +5,7 @@ error ProofError = Failed(kind: Str, message: Str)
 
 type RootArtifact = {package_name: Str, package_id: Str, artifact_key: Str, payload: Bool}
 
-type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], entries: List[Any], root_sha256: Str}
+type RootReceipt = {format: Str, target: Str, artifacts: List[RootArtifact], entries: List[Any], generated_entries: List[Any], root_sha256: Str}
 
 proc ensure_exists(path_value: Path, label: Str) {
   guard path_value.exists() else {
@@ -13,12 +13,11 @@ proc ensure_exists(path_value: Path, label: Str) {
   }
 }
 
-# The root must be composed for the target this proof runs for.
 proc ensure_runtime_artifacts(root: Path, packages: List[Str]) {
   let path_value = fp"{root}/var/lib/laputa/root.json"
   let receipt = json.read(path_value)?.require(RootReceipt)?
 
-  if receipt.format != "laputa-root-1" or receipt.target != f"{pm_util.target_arch()?}-linux-musl" {
+  if receipt.format != "laputa-root-2" or receipt.target != f"{pm_util.target_arch()?}-linux-musl" {
     return Err(
       ProofError.Failed(kind: "proof-build-essential-native", message: f"invalid typed root receipt: {path_value}"),
     )
@@ -61,8 +60,6 @@ proc main(root = /rootfs) [fs, env, error] {
 
   ensure_exists(fp"{root}/boot/vmlinuz", "linux kernel image")
 
-  # The proof root is composed from verified immutable runtime receipts.  It
-  # intentionally does not synthesize legacy package-manager database files.
   ensure_runtime_artifacts(
     root,
     [

@@ -1,13 +1,4 @@
 #!/bin/xsh
-# Verified bootstrap LLVM seed assembly before the package artifact graph can run.
-# The typed build policy deliberately models musl -> llvm-toolchain as an external
-# bootstrap edge: the first compiler must exist before a BuildPlan can rebuild musl.
-# This adapter is therefore limited to the prebuilt LLVM seed. It uses the normal
-# typed recipe boundary and source verifier, but does not masquerade as a completed
-# package artifact or root generation.
-#
-# It runs offline inside the package-tools image build: the pinned archive
-# resolves from SOURCE_CACHE (`sha256/<digest>`, filled by `make fetch`).
 use pm.recipe
 use pm.sources
 

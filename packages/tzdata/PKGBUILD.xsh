@@ -20,8 +20,6 @@ export const deps: List[Str] = []
 ## zic is compiled for the build machine and run once; it is not shipped.
 export const mkdeps_host = ["llvm-toolchain"]
 
-# The data tarball stages at the source root and the code tarball beside it,
-# because staging an archive replaces its destination directory.
 ## Package recipe export.
 export const upstream_sources = [
   {
@@ -61,9 +59,6 @@ export const filetree = [
   },
 ]
 
-# Upstream's `posix_only` install compiles these files after its awk scripts
-# fold them into tzdata.zi; zic reads the same rules from the raw files and
-# writes byte-identical TZif output, so the build needs no awk.
 const zic_sources = [
   "africa",
   "antarctica",
@@ -77,8 +72,6 @@ const zic_sources = [
   "backward",
 ]
 
-# Upstream installs these beside the TZif files (its TABDATA, without the
-# generated tzdata.zi); leap-seconds.list is the IERS source of leapseconds.
 const table_files = [
   "iso3166.tab",
   "leap-seconds.list",
@@ -88,8 +81,6 @@ const table_files = [
   "zonenow.tab",
 ]
 
-# The Makefile's `version.h` and `tzdir.h` rules, with the release version
-# and the default TZDIR and TZDEFAULT.
 proc write_zic_headers() {
   p"tzcode/version.h".write(
     f"""static char const PKGVERSION[]="(tzcode) ";
@@ -115,8 +106,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   var build_cc = process.which("cc")?
   var build_task_env: Record = {}
 
-  # zic runs here, so a cross build compiles it with the build machine's
-  # compiler; its output does not depend on the target.
   if build_arch != pm_util.target_arch()? {
     let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
     build_cc = fp"{build_root}/usr/bin/cc"

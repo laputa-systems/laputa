@@ -77,8 +77,6 @@ const parser_sources = ["src/parser_bison.c", "src/scanner.c"]
 # tarball (src/scanner.c) keeps the payload reproducible; update it with `ver`.
 const build_stamp = "1788280583"
 
-# Makefile.am src_libnftables_la_SOURCES with BUILD_JSON and BUILD_PROFILING
-# off; src/xt.c is always listed and compiles to stubs without libxtables.
 pure library_sources() -> List[Str] {
   """
 src/cache.c src/cmd.c src/ct.c src/datatype.c src/dccpopt.c src/erec.c
@@ -93,7 +91,6 @@ src/tcpopt.c src/tunnel.c src/utils.c src/xfrm.c src/xt.c
 """.words()
 }
 
-# Makefile.am AM_CFLAGS.
 pure warning_flags() -> List[Str] {
   """
 -Wall -Waggregate-return -Wbad-function-cast -Wcast-align
@@ -132,8 +129,6 @@ proc write_config_h() [fs, error] {
   )
 }
 
-# nftversion.h.in with configure's NFT_VERSION (the version's dotted parts),
-# STABLE_RELEASE (0 without --with-stable-release), and BUILD_STAMP.
 proc write_nftversion_h() {
   let version_template = p"nftversion.h.in".read_text()?
   let body = version_template.replace("@BUILD_STAMP@", with: build_stamp)
@@ -150,7 +145,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   write_config_h()
   write_nftversion_h()
 
-  # Makefile.am AM_CPPFLAGS with BUILD_MINIGMP on and BUILD_DEBUG off.
   let cflags = ["-O2", @warning_flags(), "-fvisibility=hidden"]
   let defs = ["-DHAVE_CONFIG_H", "-DDEFAULT_INCLUDE_PATH=\"/etc\"", "-DHAVE_MINIGMP"]
   let includes = ["-I.", "-Iinclude"].extend(netfilter.cflags)
@@ -169,7 +163,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"obj/libnftables",
   )
 
-  # Makefile.am src_libparser_la_CFLAGS: generated code needs these relaxed.
   let parser = make.compile_lo_tasks(
     cc,
     triple,
@@ -193,7 +186,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"obj/libparser",
   )
 
-  # Makefile.am src_libminigmp_la_CFLAGS, built in place of libgmp.
   let minigmp = make.compile_lo_tasks(
     cc,
     triple,
@@ -205,9 +197,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"obj/libminigmp",
   )
 
-  # libtool -version-info 2:0:1 names the file libnftables.so.1.1.0. Upstream
-  # links the parser and mini-gmp convenience libraries whole-archive, which
-  # is the same as linking their objects directly.
   let library_so = p"obj/libnftables.so.1.1.0"
 
   let link_library = make.link_shared_task(
@@ -220,7 +209,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     [@library.deps, @parser.deps, @minigmp.deps],
   )
 
-  # Makefile.am src_nft_SOURCES without BUILD_CLI, linked to libnftables.
   let nft = make.compile_c_tasks(cc, triple, cflags, defs, includes, p".", [p"src/main.c"], p"obj/nft")
   let nft_out = p"obj/nft/nft"
   let link_nft = make.link_executable_task(
@@ -254,7 +242,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  # libnftables.pc.in with configure's /usr prefix substituted.
   fp"{dest}/usr/lib/pkgconfig/libnftables.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}

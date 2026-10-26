@@ -6,6 +6,9 @@ use pm.types
 const PM_HELP = """usage: pm COMMAND [OPTIONS]
 
 repository commands:
+  repo lint [--repo PATH]
+  repo outdated PACKAGE --github-release OWNER/REPO [--repo PATH]
+  repo update-filetree PACKAGE --plan PLAN --store STORE [--repo PATH]
   repo check [--repo PATH]
   repo plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   repo show PLAN
@@ -32,6 +35,9 @@ targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 
 const REPO_HELP = """usage: pm repo COMMAND [OPTIONS]
 
+  lint [--repo PATH]
+  outdated PACKAGE --github-release OWNER/REPO [--repo PATH]
+  update-filetree PACKAGE --plan PLAN --store STORE [--repo PATH]
   check [--repo PATH]
   plan [--repo PATH] (--all [--without PACKAGE...] | --root PACKAGE...) [--target TARGET] --output PLAN
   show PLAN
@@ -57,9 +63,9 @@ const SOURCES_HELP = """usage: pm sources fetch [--repo PATH] (--all | PACKAGE..
 
 Downloads every pinned upstream source the selected packages use on each
 target into the content-addressed source cache (LAPUTA_SOURCE_CACHE, default
-REPO/.cache/sources) and verifies its sha256. This is the only PM command that
-contacts upstream hosts; builds read the cache or the local mirror named by
-LAPUTA_MIRROR.
+REPO/.cache/sources) and verifies its sha256. Source fetches, checksum commands,
+and explicit `repo outdated` lookups contact upstream hosts. Builds read the
+cache or the local mirror named by LAPUTA_MIRROR.
 
 targets: aarch64-linux-musl, x86_64-linux-musl (default: the host's)
 """
@@ -277,4 +283,34 @@ cli main store extract(input: Path, store: Path, package: Str, payload_path: Pat
   },
 } {
   pm_cli.pm_cli_store_extract({input, store, package, path: payload_path, output})
+}
+
+cli main repo lint(repo: Str = "") with {
+  name: "pm repo lint",
+  parameters: {repo: {form: "--repo PATH"}},
+} {
+  pm_cli.pm_cli_repo_lint(pm_cli.pm_cli_resolve_repo_root(repo)?)
+}
+
+cli main repo outdated(package: Str, github_release: Str, repo: Str = "") with {
+  name: "pm repo outdated",
+  parameters: {
+    package: {form: "PACKAGE"},
+    github_release: {form: "--github-release REPOSITORY"},
+    repo: {form: "--repo PATH"},
+  },
+} {
+  pm_cli.pm_cli_repo_outdated(repo, package, github_release)
+}
+
+cli main repo update_filetree(package: Str, input: Path, store_root: Path, repo: Str = "") with {
+  name: "pm repo update-filetree",
+  parameters: {
+    package: {form: "PACKAGE"},
+    input: {form: "--plan PLAN"},
+    store_root: {form: "--store STORE"},
+    repo: {form: "--repo PATH"},
+  },
+} {
+  pm_cli.pm_cli_repo_update_filetree(repo, package, input, store_root)
 }

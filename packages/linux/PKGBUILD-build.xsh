@@ -5,55 +5,23 @@ use PKGBUILD-x86_64 as PKGBUILD_x86_64
 use kbuild
 use linux_config
 use parser_gen
-use pm.util as pm_util
+use pm.target as pm_target
+use pm.types
 
-proc package_arch() -> Result[Str] {
-  let arch = pm_util.target_arch()?
-
-  return arch when arch == "aarch64" or arch == "x86_64"
-
-  Err(kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: f"unsupported linux package arch {arch}"))
-}
-
-pure linux_srcarch(package_arch_value: Str) -> Result[Str] {
-  return "arm64" when package_arch_value == "aarch64"
-
-  return "x86" when package_arch_value == "x86_64"
-
-  Err(
-    kbuild.ScriptError.Failed(
-      kind: "linux-unsupported-arch",
-      message: f"unsupported linux package arch {package_arch_value}",
-    ),
-  )
-}
-
-pure kernel_config_fragments_for(package_arch_value: Str) -> Result[List[Path]] {
-  if package_arch_value == "aarch64" {
-    return [p"files/config/aarch64/base-aarch64.fragment"]
+pure kernel_config_fragments_for(target: types.Target) -> Result[List[Path]] {
+  match target {
+    types.Aarch64LinuxMusl => [p"files/config/aarch64/base-aarch64.fragment"]
+    types.X86_64LinuxMusl => [p"files/config/x86_64/base-x86_64.fragment"]
+    types.TargetReserved => Err(kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: "unsupported linux package target"))
   }
-
-  return [p"files/config/x86_64/base-x86_64.fragment"] when package_arch_value == "x86_64"
-
-  Err(
-    kbuild.ScriptError.Failed(
-      kind: "linux-unsupported-arch",
-      message: f"unsupported linux package arch {package_arch_value}",
-    ),
-  )
 }
 
-pure kernel_image_for(package_arch_value: Str) -> Result[Path] {
-  return p"arch/arm64/boot/Image" when package_arch_value == "aarch64"
-
-  return p"arch/x86/boot/bzImage" when package_arch_value == "x86_64"
-
-  Err(
-    kbuild.ScriptError.Failed(
-      kind: "linux-unsupported-arch",
-      message: f"unsupported linux package arch {package_arch_value}",
-    ),
-  )
+pure kernel_image_for(target: types.Target) -> Result[Path] {
+  match target {
+    types.Aarch64LinuxMusl => p"arch/arm64/boot/Image"
+    types.X86_64LinuxMusl => p"arch/x86/boot/bzImage"
+    types.TargetReserved => Err(kbuild.ScriptError.Failed(kind: "linux-unsupported-arch", message: "unsupported linux package target"))
+  }
 }
 
 proc build_native_scratch(cc: Path, srcarch: Str, version: Str) {
@@ -95,10 +63,10 @@ proc main(dest: Path) [fs, process, env, time, error] {
   let version = e"XSH_PM_VERSION" ?? ""
   let package_start = PKGBUILD_shared.timing_start("package-total")
   let cc = build_cc()?
-  let arch = package_arch()?
-  let srcarch = linux_srcarch(arch)?
+  let target = pm_target.recipe_target()?
+  let srcarch = pm_target.kernel_arch(target)?
   let config_start = PKGBUILD_shared.timing_start("config")
-  let config_fragments = linux_config.resolve_config_fragments(kernel_config_fragments_for(arch)?)?
+  let config_fragments = linux_config.resolve_config_fragments(kernel_config_fragments_for(target)?)?
   linux_config.write_resolved_config(p".", srcarch, config_fragments, p".config")
   PKGBUILD_shared.timing_done("config", config_start)
   let parser_start = PKGBUILD_shared.timing_start("parser")
@@ -108,7 +76,7 @@ proc main(dest: Path) [fs, process, env, time, error] {
   build_native_scratch(cc, srcarch, version)
   PKGBUILD_shared.timing_done("kbuild", kbuild_start)
   let install_start = PKGBUILD_shared.timing_start("install")
-  let image = kernel_image_for(arch)?
+  let image = kernel_image_for(target)?
   fs.install(image, fp"{dest}/boot/vmlinuz-{version}", 0o644, parents: true, overwrite: true)
   fs.install(image, fp"{dest}/boot/vmlinuz", 0o644, parents: true, overwrite: true)
   fs.install(p".config", fp"{dest}/usr/share/linux/config-{version}", 0o644, parents: true, overwrite: true)

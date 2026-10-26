@@ -76,7 +76,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let objs = p"objs"
   objs.mkdir()
 
-  # Generate include/netlink/version.h from version.h.in
   fp"{src}/include/netlink".mkdir()
   let version_h = fp"{src}/include/netlink/version.h"
   let version_in = fp"{src}/include/netlink/version.h.in"
@@ -138,12 +137,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let triple = f"{pm_util.target_arch()?}-linux-musl"
 
-  # Pre-create install directories.
   fp"{dest}/usr".mkdir()
   fp"{dest}/usr/lib".mkdir()
   fp"{dest}/usr/include".mkdir()
-  # Upstream compiles every library as gnu11 with the sysconfdir and pkglibdir
-  # defines from Makefile.am's defines_cppflags.
   var cflags = ["-std=gnu11", "-O2", "-fPIC", "-DPIC", "-D_GNU_SOURCE"]
   var defs = ["-D_NL_SYSCONFDIR_LIBNL=\"/etc/libnl\"", "-D_NL_PKGLIBDIR=\"/usr/lib/libnl\""]
 
@@ -160,7 +156,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{src}/third_party/c-list/src".display(),
   ]
 
-  # Core source files for libnl-3.so
   let core_sources = [
     p"lib/mpls.c",
     p"lib/addr.c",
@@ -181,7 +176,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"lib/version.c",
   ]
 
-  # genl source files for libnl-genl-3.so
   let genl_sources = [p"lib/genl/ctrl.c", p"lib/genl/family.c", p"lib/genl/genl.c", p"lib/genl/mngt.c"]
   let core_so = fp"{dest}/usr/lib/libnl-3.so.200.26.0"
   let genl_so = fp"{dest}/usr/lib/libnl-genl-3.so.200.26.0"
@@ -218,7 +212,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(core.tasks.extend(genl.tasks), make.jobs()?)
 
-  # Create symlinks
   for lib in [core_so, genl_so] {
     let basename = lib.name
     let parts = basename.split(".so.")
@@ -228,7 +221,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{dest}/usr/lib/{linker}".symlink(to: fp"{soname}")
   }
 
-  # Install public headers at /usr/include/netlink/
   let usr_include = fp"{dest}/usr/include"
   usr_include.mkdir()
   let headers_src = fp"{src}/include/netlink"

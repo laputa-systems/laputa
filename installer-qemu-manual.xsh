@@ -49,26 +49,15 @@ proc main() [fs, process, env, error] {
     ""
   }
 
-  var build_env: Record = {
-    XSH_HOST: xsh.display(),
-    LAPUTA_ROOT: root.display(),
-    LAPUTA_INSTALLER_CI: "0",
-    LAPUTA_INSTALLER_WORK: work.display(),
-    LAPUTA_INSTALLER_ISO: installer_iso.display(),
-    LAPUTA_INSTALLER_KERNEL: installer_kernel.display(),
-  }
-
-  if kernel_source != "" {
-    build_env = {
-      XSH_HOST: xsh.display(),
-      LAPUTA_ROOT: root.display(),
-      LAPUTA_INSTALLER_CI: "0",
-      LAPUTA_INSTALLER_WORK: work.display(),
-      LAPUTA_INSTALLER_ISO: installer_iso.display(),
-      LAPUTA_INSTALLER_KERNEL: installer_kernel.display(),
-      LAPUTA_INSTALLER_KERNEL_SOURCE: kernel_source,
-    }
-  }
+  let build_env = host.installer_build_environment(
+    purpose: host.installer_manual_build_purpose(),
+    xsh:,
+    root:,
+    work:,
+    installer_iso:,
+    installer_kernel:,
+    kernel_source: if kernel_source == "" { null } else { kernel_source },
+  )
 
   host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-image.xsh".display()], root, build_env)
   let installer_iso_meta = installer_iso.metadata()?

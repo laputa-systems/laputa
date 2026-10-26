@@ -48,7 +48,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "7758819f7e73e41b3624ae1927ba8d89eb84e0e7655b670546477fd8a682b2ac",
+        sha256: "1ce94beb27a0db6822b53d68836b4fcd4f8405c21c1d33b5c0f667eaa798adfb",
       },
     ],
   },
@@ -120,7 +120,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["HAVE__BOOL"] = "1"
   defines["LT_OBJDIR"] = "\".libs/\""
 
-  # M4: path bison uses at runtime to invoke m4 skeleton expansion.
   defines["M4"] = "\"/usr/bin/m4\""
   defines["PACKAGE"] = "\"flex\""
   defines["PACKAGE_BUGREPORT"] = "\"flex-help@lists.sourceforge.net\""
@@ -132,17 +131,14 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["STDC_HEADERS"] = "1"
   defines["VERSION"] = f"\"{ver}\""
 
-  # YYTEXT_POINTER: flex generates char *yytext (not char yytext[]).
   defines["YYTEXT_POINTER"] = "1"
   configure.config_h(p"src/config.h.in", p"src/config.h", defines)
   let cflags = ["-g", "-O2"]
   let defs = ["-DHAVE_CONFIG_H"]
 
-  # -Isrc: finds both config.h (generated above) and flexdef.h.
   let includes = ["-Isrc"]
   p"obj".mkdir()
 
-  # Compile the flex binary sources from src/.
   # libmain.c and libyywrap.c are part of libfl (scanner support library),
   # not the flex binary itself, so exclude them.
   # lib/ contains only two gnulib wrappers (malloc.c, realloc.c).
@@ -168,7 +164,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   make.run_tasks(flex.tasks, make.jobs()?)
   fs.install(flex.output, fp"{dest}/usr/bin/flex", 0o755, parents: true, overwrite: true)
 
-  # POSIX requires a 'lex' command; flex is the canonical implementation.
   fp"{dest}/usr/bin/lex".symlink(to: p"flex")
   fs.install(p"flex.xsh", fp"{dest}/usr/lib/pm/repo/flex/files/flex.xsh", 0o755, parents: true, overwrite: true)
 }

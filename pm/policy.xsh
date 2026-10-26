@@ -6,7 +6,7 @@ use types
 ## the PM code, and the core applets that execute a build; bump this when a
 ## change to those can alter payloads without any recipe change. Bump a
 ## recipe's `rel` instead to rebuild one package and its build dependents.
-export const BUILD_EPOCH = 1
+export const BUILD_EPOCH = 2
 
 ## Returns the aarch64 Docker build policy, including native bootstrap seed rules.
 ## `musl -> llvm-toolchain` breaks the musl/LLVM cycle with the already-seeded compiler.

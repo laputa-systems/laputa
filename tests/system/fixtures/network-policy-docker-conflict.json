@@ -1,0 +1,40 @@
+{
+  "error": "desired address is foreign; ownership cannot be inferred",
+  "input": {
+    "intent": {
+      "address": {
+        "local": "172.17.0.2",
+        "prefix": 16
+      },
+      "gateway": "172.17.0.1",
+      "ifindex": 2,
+      "metric": 0,
+      "name": "eth0"
+    },
+    "observed": {
+      "addresses": [
+        {
+          "local": "172.17.0.2",
+          "prefix": 16
+        }
+      ],
+      "ifindex": 2,
+      "kind": "veth",
+      "name": "eth0",
+      "routes": [
+        {
+          "gateway": "172.17.0.1",
+          "metric": 0
+        }
+      ],
+      "sequence": 1,
+      "up": true
+    },
+    "owned": {
+      "addresses": [],
+      "ifindex": 2,
+      "name": "eth0",
+      "routes": []
+    }
+  }
+}

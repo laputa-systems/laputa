@@ -28,8 +28,6 @@ table inet laputa_proof {
 }
 """
 
-# The same ruleset with an IPv6 set matched against an IPv4 address must fail
-# in nft's own evaluator, which shows the check above was not vacuous.
 const mismatched_ruleset = """flush ruleset
 
 table inet laputa_proof {

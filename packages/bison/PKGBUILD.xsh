@@ -16,8 +16,6 @@ export const ver = "3.8.2"
 ## Exported declaration `rel`.
 export const rel = "13"
 
-# bison runs `/usr/bin/m4` on every grammar, so m4 is a runtime dependency
-# (and in the proof root, which holds `deps` only).
 ## Exported declaration `deps`.
 export const deps = ["musl", "m4"]
 
@@ -51,7 +49,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "c7706d579c0b4468ed3eeae4eb272d1a0b55a774b92072c3978e1867df44cf43",
+        sha256: "1b214c00539258de672a58c81333651a9729d8d272c734f95085c5cdf446e682",
       },
     ],
   },
@@ -231,19 +229,13 @@ proc install_data_tree(src: Path, dest: Path) {
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
-  fail_on_m4_status()
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
-  let abi = target.lp64_musl_abi(arch)
+  let abi = target.lp64_musl_abi(target.recipe_target()?)?
+  fail_on_m4_status()
 
-  # Generate config.h from lib/config.in.h.
-  # lib/config.in.h is the bison/gnulib unified config template (549 #undef
-  # entries, zero @VAR@ substitutions — all values are set explicitly here).
-  # Values are for musl + Clang on x86_64 and aarch64; both
-  # architectures exercise the same configure probes.
   var defines: Map[Str] = {}
 
-  # Package metadata
   defines["PACKAGE"] = "\"bison\""
   defines["PACKAGE_BUGREPORT"] = "\"bug-bison@gnu.org\""
   defines["PACKAGE_COPYRIGHT_YEAR"] = "2021"
@@ -254,12 +246,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["PACKAGE_VERSION"] = f"\"{ver}\""
   defines["VERSION"] = f"\"{ver}\""
 
-  # musl-specific
   defines["MUSL_LIBC"] = "1"
   defines["MALLOC_0_IS_NONNULL"] = "1"
   defines["STDC_HEADERS"] = "1"
 
-  # m4 runtime path and GNU option flag
   defines["M4"] = "\"/usr/bin/m4\""
   defines["M4_GNU_OPTION"] = "\"--gnu\""
   defines["BITSIZEOF_PTRDIFF_T"] = abi.ptrdiff_bits
@@ -275,13 +265,11 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["HAVE_SIGNED_SIG_ATOMIC_T"] = if abi.signed_sig_atomic_t { "1" } else { "0" }
   defines["HAVE_SIGNED_WCHAR_T"] = if abi.signed_wchar_t { "1" } else { "0" }
 
-  # Compiler features (Clang-based)
   defines["HAVE_INLINE"] = "1"
   defines["HAVE___BUILTIN_EXPECT"] = "1"
   defines["HAVE___INLINE"] = "1"
   defines["HAVE_VISIBILITY"] = "1"
 
-  # Standard headers — all present in musl
   defines["HAVE_ALLOCA_H"] = "1"
   defines["HAVE_DIRENT_H"] = "1"
   defines["HAVE_FEATURES_H"] = "1"
@@ -316,7 +304,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["HAVE_WCHAR_H"] = "1"
   defines["HAVE_WCTYPE_H"] = "1"
 
-  # Standard functions — all present in musl
   defines["HAVE_ALLOCA"] = "1"
   defines["HAVE_CANONICALIZE_FILE_NAME"] = "1"
   defines["HAVE_CLOCK_GETTIME"] = "1"
@@ -417,7 +404,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["HAVE_WINT_T"] = "1"
   defines["HAVE__BOOL"] = "1"
 
-  # Declarations present in musl headers
   defines["HAVE_DECL_ALARM"] = "1"
   defines["HAVE_DECL_CLEARERR_UNLOCKED"] = "1"
   defines["HAVE_DECL_DIRFD"] = "1"
@@ -459,26 +445,21 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["HAVE_DECL_VSNPRINTF"] = "1"
   defines["HAVE_DECL_WCWIDTH"] = "1"
 
-  # Struct fields present in musl's stat
   defines["TYPEOF_STRUCT_STAT_ST_ATIM_IS_STRUCT_TIMESPEC"] = "1"
   defines["LSTAT_FOLLOWS_SLASHED_SYMLINK"] = "1"
 
   # iconv: musl uses const char ** for the inbuf argument (same as glibc)
   defines["ICONV_CONST"] = "const"
 
-  # Threads: pthreads are part of musl's libc (no separate libpthread)
   defines["USE_POSIX_THREADS"] = "1"
   defines["USE_POSIX_THREADS_FROM_LIBC"] = "1"
 
-  # Optional deps not available in our sysroot
   defines["HAVE_READLINE"] = "0"
   defines["HAVE_LIBTEXTSTYLE"] = "0"
 
-  # NLS disabled
   defines["ENABLE_NLS"] = "0"
   defines["YYENABLE_NLS"] = "0"
 
-  # gnulib unistring modules used by bison (controls declarations in unistr.h)
   defines["GNULIB_UNISTR_U8_MBTOUCR"] = "1"
   defines["GNULIB_UNISTR_U8_UCTOMB"] = "1"
   defines["GNULIB_DIRNAME"] = "1"
@@ -486,7 +467,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["GNULIB_XALLOC"] = "1"
   defines["GNULIB_XALLOC_DIE"] = "1"
 
-  # Replace flags — musl implementations are all correct, no gnulib overrides
   defines["REPLACE_DIRFD"] = "0"
   defines["REPLACE_FCHDIR"] = "0"
   defines["REPLACE_FPRINTF_POSIX"] = "0"
@@ -499,9 +479,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["REPLACE_VFPRINTF_POSIX"] = "0"
   configure.config_h(p"lib/config.in.h", p"config.h", defines)
 
-  # Generate gnulib POSIX header passthroughs.
-  # On musl, all POSIX headers are complete. Each wrapper just redirects to
-  # the system header via #include_next. The pragma suppresses warnings.
   let pt = """#pragma GCC system_header
 #include_next """
 
@@ -659,7 +636,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 """,
   )
 
-  # sys/ headers live in a subdirectory
   p"lib/sys".mkdir()
 
   p"lib/sys/ioctl.h".write(
@@ -697,10 +673,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 """,
   )
 
-  # Files with zero @VAR@ placeholders — copy .in.h directly as the header.
-  # stdalign/getopt-cdefs: gnulib portability headers, complete as shipped.
-  # unitypes/unistr/uniwidth: bundled libunistring API, no substitution needed.
-  # textstyle: already a complete no-libtextstyle stub per its header comment.
   p"lib/stdalign.h".write(p"lib/stdalign.in.h".read_text()?)
   p"lib/getopt-cdefs.h".write(p"lib/getopt-cdefs.in.h".read_text()?)
   p"lib/unitypes.h".write(p"lib/unitypes.in.h".read_text()?)
@@ -786,7 +758,6 @@ getprogname (void)
 
   let cflags = ["-g", "-O2", "-Wno-error=implicit-function-declaration"]
 
-  # PKGDATADIR: hardcoded path where bison finds skeleton and m4sugar files.
   let defs = [
     "-DHAVE_CONFIG_H",
     "-D_GNU_SOURCE",
@@ -797,9 +768,6 @@ getprogname (void)
     "-DPKGDATADIR=\"/usr/share/bison\"",
   ]
 
-  # -I. first so <config.h> resolves to ./config.h, not lib/config.h.
-  # -Ilib for gnulib interface headers and generated passthrough headers.
-  # -Isrc for bison's own internal headers.
   let includes = ["-I.", "-Ilib", "-Isrc"]
   var in_sources = false
 
@@ -838,7 +806,6 @@ getprogname (void)
     yield p"lib/xsh-getprogname.c"
   }
 
-  # Compile bison's src/*.c (scanners and parsers are pre-generated in tarball)
   let src_sources = make.discover_sources(
     p"src",
     ["c"],
@@ -863,7 +830,6 @@ getprogname (void)
   make.run_tasks(bison.tasks, make.jobs()?)
   fs.install(bison.output, fp"{dest}/usr/bin/bison", 0o755, parents: true, overwrite: true)
 
-  # POSIX yacc compatibility wrapper
   fp"{dest}/usr/bin/yacc".write(
     """#!/bin/xsh
 proc main(...argv: List[Str]) [process, error] {
@@ -875,9 +841,6 @@ main(@args)?
     mode: 0o755,
   )
 
-  # Install bison's data files to /usr/share/bison/.
-  # bison reads skeleton files and m4sugar helpers here at runtime; the path
-  # is compiled in via -DPKGDATADIR above.
   install_data_tree(p"data", fp"{dest}/usr/share/bison")
   fs.install(p"bison.xsh", fp"{dest}/usr/lib/pm/repo/bison/files/bison.xsh", 0o755, parents: true, overwrite: true)
 }

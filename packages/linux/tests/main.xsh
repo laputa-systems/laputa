@@ -1,7 +1,6 @@
 use packages.linux.kbuild
 use pm.make
 
-# Serialized report fields and analysis task fields checked by the native assertions.
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}
 
 type ArchivePlanReport = {task_count: Int, tasks: List[ArchiveTaskReport]}

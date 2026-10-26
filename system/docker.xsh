@@ -72,10 +72,6 @@ export proc build_config(
 
 ## Construct an exact native-platform Docker invocation for an inner PM command.
 export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> List[Str] {
-  # PM modules must resolve from the mounted checkout's source root.
-  # The finished rootfs may contain /usr/lib/pm, but it must never share the
-  # interpreter process used for planning, execution, or generation.
-  # Bootstrap recipes use the container's compiler before its replacement artifact exists.
   var argv = [
     value.docker.display(),
     "run",
@@ -100,7 +96,9 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
     "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23",
   ]
 
-  if value.repo_url != "" {
+  if value.repo_url == "" {
+    argv += ["--network", "none"]
+  } else {
     argv += ["--env", f"XSH_PM_REPO={value.repo_url}"]
   }
 

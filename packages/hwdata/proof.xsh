@@ -5,8 +5,6 @@ proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "hwdata")
   let share = fp"{root}/usr/share/hwdata"
 
-  # libdisplay-info names monitor vendors from pnp.ids, and the QEMU guest's
-  # virtio devices are Red Hat PCI ids.
   let pnp = fp"{share}/pnp.ids".read_text()?
   proof.ensure("\nDEL\tDell Inc.\n" in pnp, "proof-hwdata", "pnp.ids lacks the DEL vendor")
   let pci = fp"{share}/pci.ids".read_text()?

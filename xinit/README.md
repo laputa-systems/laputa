@@ -7,13 +7,15 @@ to it.
 ## Commands
 
 ```sh
-xinit [INITTAB]
+xinit [INITTAB] [--respawn-delay-ms N] [--launch-limit N]
 xinit boot [TARGET]
 xinit scan [SERVICE|TARGET]
 xinit <start|up|stop|down|restart|reload|status|logs|supervise> SERVICE
 xinit list
 xinit graph [SERVICE|TARGET]
 xinit check [SERVICE|PATH]
+xinit inspect SERVICE
+xinit start-plan SERVICE
 ```
 
 See the [init contract](docs/INIT.md) for configuration and

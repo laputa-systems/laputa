@@ -9,7 +9,6 @@ export proc repo_url() [env] -> Str {
   (e"XSH_PM_REPO" ?? "").trim()
 }
 
-# The local mirror and `file://` trees accept writes without credentials.
 pure remote_auth_headers(token: Str) -> List[NetHeader] {
   return [] when token == ""
 
@@ -75,8 +74,6 @@ export proc upload_immutable_repo_file(
 
     return true when response.status >= 200 and response.status < 300
 
-    # Objects are content-addressed, so a retried publication meets the
-    # objects its failed attempt already uploaded; identical bytes are done.
     if response.status == 409 or response.status == 412 {
       let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
       existing.parent.mkdir()
@@ -126,7 +123,6 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
     return load_remote_index_from(util.repo_file_path(repo, p"index.json")?)?
   }
 
-  # The mirror advertises a cache lifetime for index.json; PM needs the current generation.
   let response = net.request({
     method: "GET",
     url: util.repo_url_for(repo, p"index.json")?,
@@ -201,7 +197,6 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
     ver: row.get("ver")?.require()?,
     rel: row.get("rel")?.require()?,
     deps: row.get("deps")?.require()?,
-    # Index rows written before runtime-only dependencies existed declare none.
     runtime_only_deps: if "runtime_only_deps" in row { row.get("runtime_only_deps")?.require()? } else { empty_dependencies },
     mkdeps_host,
     mkdeps_target,
@@ -274,7 +269,6 @@ export proc upsert_remote_package(
   sorted
 }
 
-# Derives the legacy retrieval fingerprint kept for index rows that predate immutable metadata sidecars.
 pure legacy_snapshot_digest(value: types.RemotePackage) -> Str {
   var lines = [
     "format\tlaputa-legacy-remote-entry-1",

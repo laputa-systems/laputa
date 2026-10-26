@@ -1,7 +1,5 @@
 ##! Linux userspace API headers, built from the kernel source without building the kernel.
-# Userland compiles against these headers only, so they are their own
-# package: a kernel config or Kbuild change rebuilds `linux` alone, not every
-# package whose build includes <linux/...> or <asm/...>.
+use packages.upstream_pins as upstream_pins
 ## Package recipe export.
 export const name = "linux-headers"
 
@@ -9,7 +7,7 @@ export const name = "linux-headers"
 export const package_kind = "payload"
 
 ## The kernel release these headers come from; `linux` pins the same tarball.
-export const ver = "7.2.9"
+export const ver = upstream_pins.linux_kernel_version
 
 ## Package recipe export.
 export const rel = "1"
@@ -21,21 +19,7 @@ export const deps: List[Str] = []
 export const mkdeps_host: List[Str] = []
 
 ## Package recipe export.
-export const upstream_sources = [
-  {
-    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba",
-      },
-    ],
-  },
-]
+export let upstream_sources = [upstream_pins.linux_kernel_source]
 
 ## Package recipe export.
 export const filetree = [{path: p"usr/include", kind: "tree"}]

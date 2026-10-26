@@ -1,6 +1,8 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.make
 use pm.util as pm_util
+use pm.types
+use pm.target as pm_target
 
 ## Exported declaration `name`.
 export const name = "libffi"
@@ -37,7 +39,7 @@ export const upstream_sources = [
   },
 ]
 
-type LibffiTarget = {target: Str, dir: Str, sources: List[Str]}
+type LibffiTarget = {target: Str, dir: Str, sources: List[Str], config_defines: Str}
 
 ## Exported declaration `filetree`.
 export const filetree = [
@@ -67,10 +69,13 @@ export const filetree = [
   },
 ]
 
-pure libffi_target(machine: Str) -> LibffiTarget {
-  if machine == "x86_64" {
-    return {
+pure libffi_target(machine: types.Target) -> Result[LibffiTarget, Error] {
+  match machine {
+    types.X86_64LinuxMusl => {
       target: "X86_64",
+      config_defines: """#define HAVE_AS_X86_PCREL 1
+#define HAVE_AS_X86_64_UNWIND_SECTION_TYPE 1
+""",
       dir: "x86",
       sources: [
         "src/x86/ffi64.c",
@@ -79,26 +84,17 @@ pure libffi_target(machine: Str) -> LibffiTarget {
         "src/x86/win64.S",
       ],
     }
+    types.Aarch64LinuxMusl => {target: "AARCH64", dir: "aarch64", config_defines: "", sources: ["src/aarch64/ffi.c", "src/aarch64/sysv.S"]}
+    types.TargetReserved => Err(types.PmError.PackageContract("unsupported libffi target"))
   }
-
-  {target: "AARCH64", dir: "aarch64", sources: ["src/aarch64/ffi.c", "src/aarch64/sysv.S"]}
 }
 
-# configure.ac encodes X.Y.Z as X*10000 + Y*100 + Z.
 proc ffi_version_number() -> Result[Int] {
   let parts = ver.split(".")
   parts[0] as Int * 10000 + parts[1] as Int * 100 + parts[2] as Int
 }
 
 proc write_generated_headers(target: LibffiTarget) {
-  let target_defines = if target.target == "X86_64" {
-    """#define HAVE_AS_X86_PCREL 1
-#define HAVE_AS_X86_64_UNWIND_SECTION_TYPE 1
-"""
-  } else {
-    ""
-  }
-
   p"fficonfig.h".write(
     f"""#ifndef FFICONFIG_H
 #define FFICONFIG_H
@@ -123,7 +119,7 @@ proc write_generated_headers(target: LibffiTarget) {
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_UNISTD_H 1
-{target_defines}#define LIBFFI_GNU_SYMBOL_VERSIONING 1
+{target.config_defines}#define LIBFFI_GNU_SYMBOL_VERSIONING 1
 #define LT_OBJDIR ".libs/"
 #define PACKAGE "libffi"
 #define PACKAGE_BUGREPORT "http://github.com/libffi/libffi/issues"
@@ -171,9 +167,6 @@ proc write_generated_headers(target: LibffiTarget) {
   fs.install(fp"src/{target.dir}/ffitarget.h", p"include/ffitarget.h", 0o644, parents: true, overwrite: true)
 }
 
-# Upstream's Makefile preprocesses libffi.map.in against fficonfig.h and the
-# target's ffitarget.h, which select the closure, Go closure, complex, and
-# int128 symbol nodes the target exports.
 proc write_version_script(cc: Path, triple: Str, target: LibffiTarget, defs: List[Str], includes: List[Str]) {
   let argv = [
     "-target",
@@ -199,7 +192,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
-  let target = libffi_target(arch)
+  let target = libffi_target(pm_target.recipe_target()?)?
   let cflags = ["-O2", "-Wall", "-fexceptions"]
   let defs = ["-DHAVE_CONFIG_H"]
   let includes = ["-I.", "-Iinclude", "-Isrc"]
@@ -230,8 +223,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(libffi.output, fp"{dest}/usr/lib/libffi.so.8.5.0", 0o755, parents: true, overwrite: true)
   fp"{dest}/usr/lib/libffi.so.8".symlink(to: p"libffi.so.8.5.0")
   fp"{dest}/usr/lib/libffi.so".symlink(to: p"libffi.so.8.5.0")
-  # include/Makefile.am installs only the generated ffi.h and the target's
-  # ffitarget.h; the other headers there are private to the build.
   fs.install(p"include/ffi.h", fp"{dest}/usr/include/ffi.h", 0o644, parents: true, overwrite: true)
   fs.install(p"include/ffitarget.h", fp"{dest}/usr/include/ffitarget.h", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/lib/pkgconfig".mkdir()

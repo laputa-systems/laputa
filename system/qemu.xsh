@@ -22,6 +22,10 @@ export type QemuTarget = {
 ## The host executable, QMP helper, and host target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: QemuTarget}
 
+enum QmpOperation { QmpReady, QmpInput, QmpScreenshot(Path) }
+enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
+error QmpFailure = OutcomeIndeterminate(operation: QmpOperation)
+
 ## The QEMU target for a host: the guest is the host's architecture, so the
 ## image runs under HVF on macOS and KVM on Linux.
 export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
@@ -163,6 +167,16 @@ export pure qemu_command_argv(
   ]
 }
 
+## Attach the declared read-only inputs and writable output disk to a self-hosting guest.
+export pure qemu_self_hosting_disks_argv(target: QemuTarget, inputs: Path, output: Path) -> List[Str] {
+  [
+    "-drive", f"if=none,id=inputs,format=raw,file={inputs},readonly=on",
+    "-device", f"{target.block_device},drive=inputs",
+    "-drive", f"if=none,id=output,format=raw,file={output}",
+    "-device", f"{target.block_device},drive=output",
+  ]
+}
+
 proc qemu_stop(launched: ProcessHandle) [process, error] {
   launched.cancel(signal: "TERM", kill_after: 5s)
 }
@@ -175,21 +189,40 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   false
 }
 
-proc qemu_qmp(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
-  var argv = [value.python.display(), value.qmp_helper.display(), mode, socket.display()]
-  if screenshot != "" {
-    argv += [screenshot.display()]
+pure qmp_mode(operation: QmpOperation) -> Str {
+  match operation {
+    QmpReady => "ready"
+    QmpInput => "input"
+    QmpScreenshot(_) => "screenshot"
+  }
+}
+
+pure qmp_retry_operation(operation: QmpRetryOperation) -> QmpOperation {
+  match operation {
+    QmpRetryReady => QmpReady
+    QmpRetryScreenshot(output) => QmpScreenshot(output)
+  }
+}
+
+proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) -> Result[Unit, Error] {
+  var argv = [value.python.display(), value.qmp_helper.display(), qmp_mode(operation), socket.display()]
+  if let QmpScreenshot(output) = operation {
+    argv += [output.display()]
   }
 
   let status = process.run(process.command_argv(value.python, argv))?
-  return Err(types.LaputaError.Docker(f"QMP {mode} helper failed")) unless status.ok
+  return Err(QmpFailure.OutcomeIndeterminate(operation)) when status.exited_with(75)
+  return Err(types.LaputaError.Docker(f"QMP {qmp_mode(operation)} helper failed")) unless status.ok
+  Ok()
 }
 
-proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path = p"") {
+proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path) -> Result[Unit, Error] {
+  let qmp_operation = qmp_retry_operation(operation)
   var attempt = 0
   while attempt < 20 {
-    match qemu_qmp(value, mode, socket, screenshot) {
-      Ok(_) => return
+    match qemu_qmp(value, qmp_operation, socket) {
+      Ok(_) => return Ok()
+      Err(QmpFailure.OutcomeIndeterminate {operation}) => return Err(QmpFailure.OutcomeIndeterminate(operation))
       Err(_) => {
         time.sleep(250ms)
         attempt += 1
@@ -197,7 +230,7 @@ proc qemu_qmp_retry(value: QemuConfig, mode: Str, socket: Path, screenshot: Path
     }
   }
 
-  return Err(types.LaputaError.Docker(f"QMP {mode} helper did not become ready"))
+  return Err(types.LaputaError.Docker(f"QMP {qmp_mode(qmp_operation)} helper did not become ready"))
 }
 
 ## Combine QEMU's serial console and stderr log before scanning proof markers:
@@ -212,6 +245,53 @@ export proc qemu_log_text(console_log: Path, qemu_log: Path) [fs, error] -> Resu
 ## A screenshot is proof evidence only when QMP wrote nonempty image bytes.
 export proc screenshot_is_valid(path_value: Path) [fs, error] -> Result[Bool, Error] {
   path_value.exists()? and path_value.is_file()? and path_value.metadata()?.size > 0
+}
+
+pure ppm_data_offset(image: Bytes) -> Int {
+  return -1 unless image.starts_with(b"P6\n")
+
+  var line_feeds = 0
+  var index = 0
+  while index < image.len() {
+    if (image.byte_at(index) ?? -1) == 10 {
+      line_feeds += 1
+      if line_feeds == 3 {
+        return index + 1 when image.slice(0, index + 1).ends_with(b"255\n")
+        return -1
+      }
+    }
+
+    index += 1
+  }
+
+  -1
+}
+
+pure ppm_has_foot_marker(image: Bytes) -> Bool {
+  let pixel_offset = ppm_data_offset(image)
+  return false when pixel_offset < 0
+
+  var marker_pixels = 0
+  var index = pixel_offset
+  while index + 2 < image.len() {
+    let red = image.byte_at(index) ?? -1
+    let green = image.byte_at(index + 1) ?? -1
+    let blue = image.byte_at(index + 2) ?? -1
+    if red == 255 and green == 0 and blue == 255 {
+      marker_pixels += 1
+      return true when marker_pixels >= 16
+    } else {
+      marker_pixels = 0
+    }
+
+    index += 3
+  }
+
+  false
+}
+
+proc screenshot_has_foot_marker(path_value: Path) [fs, error] -> Result[Bool, Error] {
+  ppm_has_foot_marker(path_value.read_bytes()?)
 }
 
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
@@ -239,6 +319,7 @@ export proc run_test(
     stderr: outputs.qemu_log,
   )
   let launched = spawn command?
+  defer qemu_stop(launched)
   var elapsed = 0
   var injected = false
   var screenshot_taken = false
@@ -247,39 +328,45 @@ export proc run_test(
     let log_text = qemu_log_text(outputs.console_log, outputs.qemu_log)?
     let failed = proof.failure_marker(log_text)
     if failed != "" {
-      qemu_stop(launched)
       return Err(
         types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
     if ! injected and outputs.qmp_socket.exists() and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
-      qemu_qmp_retry(value, "ready", outputs.qmp_socket)
-      qemu_qmp(value, "input", outputs.qmp_socket)
+      qemu_qmp_retry(value, QmpRetryReady, outputs.qmp_socket)
+      qemu_qmp(value, QmpInput, outputs.qmp_socket)
       injected = true
     }
 
     if proof.succeeded(log_text) {
       if ! screenshot_taken {
-        qemu_qmp_retry(value, "screenshot", outputs.qmp_socket, outputs.screenshot)
+        qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket)
+        if ! screenshot_is_valid(outputs.screenshot)? {
+          return Err(
+            types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
+          )
+        }
+        if ! screenshot_has_foot_marker(outputs.screenshot)? {
+          return Err(
+            types.LaputaError.Profile(
+              f"QMP screenshot does not contain the foot visual marker; inspect {qemu_output_locations(outputs)}",
+            ),
+          )
+        }
+
         screenshot_taken = true
       }
 
       qemu_stop(launched)
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
       proof.verify_console(final_log)
-      if ! screenshot_is_valid(outputs.screenshot) {
-        return Err(
-          types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
-        )
-      }
 
       print "laputa test qemu-dwl-foot: ok"
       return
     }
 
     if elapsed >= 180 {
-      qemu_stop(launched)
       return Err(
         types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
       )

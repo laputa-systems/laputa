@@ -1,5 +1,7 @@
 ##! Package recipe metadata and build operations.
-use pm.util as pm_util
+use packages.upstream_pins as upstream_pins
+use pm.target as pm_target
+use pm.types
 
 error SudoRsBuildError = MissingRustStd(path: Str) | MissingVendoredCrate(name: Str)
 
@@ -21,15 +23,8 @@ export const deps = ["linux-pam", "gnu-stubs", "musl"]
 ## Package recipe export.
 export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-pam"]
 
-# The build is offline: every crate sudo-rs's shipped Cargo.lock pins is an
-# upstream source of its own, cached by `make fetch` and staged under vendor/,
-# and cargo reads that directory instead of crates.io. The crate entries are
-# exactly the `[[package]]` records with a `checksum` in the sudo-rs crate's
-# Cargo.lock (crates.io serves each `.crate` with that sha256), so they are what
-# `cargo vendor --locked` would produce. After a version bump, list the new
-# Cargo.lock's records here.
 ## Package recipe export.
-export const upstream_sources = [
+export let upstream_sources = [
   {
     source: p"https://static.crates.io/crates/sudo-rs/sudo-rs-VERSION.crate",
     kind: "auto",
@@ -82,21 +77,12 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
+    source: fp"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
     architectures: [
       "all",
     ],
-    checksums: [
-      {
-        arch: "aarch64",
-        sha256: "ea8fd309578a09c9e12401621a470e6d6b1047f25933207fb8a39d66647d4561",
-      },
-      {
-        arch: "x86_64",
-        sha256: "b106b0aa4565cc3525fd3161c69203a9e39044e6e6b4d618f261c3eeda14ad50",
-      },
-    ],
+    checksums: upstream_pins.rust_std_checksums,
   },
 ]
 
@@ -115,14 +101,6 @@ export const filetree = [
     kind: "symlink",
   },
 ]
-
-pure rust_triple(arch: Str) -> Str {
-  return "aarch64-unknown-linux-musl" when arch == "aarch64" or arch == "arm64"
-
-  return "x86_64-unknown-linux-musl" when arch == "amd64"
-
-  f"{arch}-unknown-linux-musl"
-}
 
 proc stage_rustlib(source: Path, dest: Path) {
   dest.remove()
@@ -148,8 +126,6 @@ proc stage_rustlib(source: Path, dest: Path) {
 
 type LockedCrate = {name: Str, version: Str, checksum: Str}
 
-# Reads the registry packages from Cargo.lock. Its `[[package]]` records are
-# flat `key = "value"` lines, so no TOML parser is needed.
 proc locked_registry_crates(lockfile: Path) -> Result[List[LockedCrate]] {
   var crates: List[LockedCrate] = []
   var current: LockedCrate = LockedCrate(name: "", version: "", checksum: "")
@@ -196,7 +172,7 @@ proc mark_vendored_crates(lockfile: Path, vendor: Path) {
 export proc build(dest: Path) [fs, process, env, error] {
   let cargo = process.which("cargo")?
   let cc = process.which("cc")?
-  let target_arch = pm_util.target_arch()?
+  let target = pm_target.recipe_target()?
   let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
   let target_root_value = (e"LAPUTA_ROOT" ?? e"XSH_PM_ROOT" ?? "").trim()
   let target_root = if target_root_value != "" { fp"{target_root_value}" } else { cc.parent.parent }
@@ -206,9 +182,9 @@ export proc build(dest: Path) [fs, process, env, error] {
     libdir = fp"{cc.parent.parent}/lib"
   }
 
-  let build_arch = pm_util.build_arch()?
-  let triple = rust_triple(target_arch)
-  let host_triple = rust_triple(build_arch)
+  let build_target = pm_target.build_target()?
+  let triple = pm_target.rust_triple(target)?
+  let host_triple = pm_target.rust_triple(build_target)?
   let host_cc = if fp"{build_root}/usr/bin/cc".exists() { fp"{build_root}/usr/bin/cc" } else { cc }
   let host_libdir = fp"{build_root}/usr/lib"
   let target_rustlib = fp"rust-std/rust-std-{triple}/lib/rustlib/{triple}"
@@ -224,16 +200,28 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
   let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={host_cc} -L native={host_libdir} -C link-arg=-Wl,--as-needed"
-  let aarch64_rustflags = if triple == "aarch64-unknown-linux-musl" { target_rustflags } else { host_rustflags }
+  let aarch64_rustflags = match target {
+    types.Aarch64LinuxMusl => target_rustflags
+    types.X86_64LinuxMusl => host_rustflags
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported sudo-rs target")) }
+  }
 
-  let x86_64_rustflags = if host_triple == "x86_64-unknown-linux-musl" and triple != host_triple {
+  let x86_64_rustflags = if build_target == types.target_x86_64() and target != build_target {
     host_rustflags
   } else {
     target_rustflags
   }
 
-  let aarch64_linker = if triple == "aarch64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
-  let x86_64_linker = if triple == "x86_64-unknown-linux-musl" { cc.display() } else { host_cc.display() }
+  let aarch64_linker = match target {
+    types.Aarch64LinuxMusl => cc.display()
+    types.X86_64LinuxMusl => host_cc.display()
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported sudo-rs target")) }
+  }
+  let x86_64_linker = match target {
+    types.Aarch64LinuxMusl => host_cc.display()
+    types.X86_64LinuxMusl => cc.display()
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported sudo-rs target")) }
+  }
   mark_vendored_crates(p"Cargo.lock", p"vendor")
   let current_path = e"PATH" ?? ""
   let cargo_path = f"{host_cc.parent}:{current_path}"

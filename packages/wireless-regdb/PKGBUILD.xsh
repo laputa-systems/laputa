@@ -50,10 +50,6 @@ export const filetree = [
   },
 ]
 
-# cfg80211 requests regulatory.db and its PKCS#7 signature through the kernel
-# firmware loader, which searches /lib/firmware; baselayout makes /lib a
-# symlink to usr/lib, so the files belong under usr/lib/firmware. The database
-# ships prebuilt and signed in the release tarball, so nothing is regenerated.
 ## Package recipe export.
 export proc build(dest: Path) [fs, error] {
   let firmware = fp"{dest}/usr/lib/firmware"

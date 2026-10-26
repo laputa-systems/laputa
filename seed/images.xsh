@@ -1,17 +1,4 @@
 ##! Laputa's two Docker images: the networked host-tools base and the offline package-tools image built on it.
-# Layering keeps the networked, drifting part small and rarely rebuilt:
-#
-# - `laputa-host-tools` is the digest-pinned Alpine base plus its apk
-#   toolchain. Building it is the one networked image step and belongs to
-#   `make fetch`, which also saves it to `.cache/images/` so later runs
-#   `docker load` it offline. apk is unpinned, so the saved tar, not a
-#   rebuild, is what keeps it stable.
-# - `laputa-package-tools` adds the prebuilt LLVM seed from the source cache,
-#   built with `--network none`.
-#
-# Neither image contains XSH, PM, or recipes. Containers mount the seed XSH
-# and the checkout at run time, so an XSH or PM change rebuilds no image.
-# Tags are content keys over each image's own inputs.
 use pm.recipe as pm_recipe
 use pm.sources as pm_sources
 use pm.types as pm_types

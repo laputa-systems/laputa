@@ -251,10 +251,6 @@ export proc collect_archive_paths(
     }
   }
 
-  # `fs.walk` is the general inventory, but an explicitly declared empty
-  # directory is a durable payload member even when the walker did not report
-  # it.  Recording it here keeps receipt metadata exactly aligned with the
-  # archive assembled by `pm.build`.
   for entry in filetree {
     if entry.kind == types.file_kind_tree() {
       let tree = fp"{root}/{entry.path}"
@@ -392,7 +388,6 @@ export proc write_package_db(
       package_kind: types.package_kind_text(pkg.kind),
       filetree: [{path: entry.path.display(), kind: types.file_kind_text(entry.kind)} for entry in pkg.filetree],
       nostrip: pkg.nostrip,
-      dir: pkg.dir.display(),
     },
   )
 }

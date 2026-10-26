@@ -30,6 +30,8 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
     "--root",
     "baselayout",
     "--root",
+    "ca-certificates",
+    "--root",
     "xsh",
     "--root",
     "laputa-pm",
@@ -76,6 +78,7 @@ test test_docker_places_optional_repository_configuration_before_image [error] {
   assert argv[image - 2] == "--env"
   assert argv[image - 1] == "XSH_PM_REPO=https://packages.example.test"
   assert ! (argv |> any "XSH_PM_PUBLIC_REPO" in .)
+  assert ! ("--network" in argv)
 }
 
 test test_native_docker_command_mounts_only_declared_inputs [error] {
@@ -92,6 +95,13 @@ test test_native_docker_command_mounts_only_declared_inputs [error] {
   assert "XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23" in argv
   assert ! (argv |> any "amd64" in .)
   assert ! (argv |> any "x86_64" in .)
+}
+
+test test_local_profile_commands_cannot_use_the_container_network [error] {
+  let argv = docker.docker_command_argv(fixture_config(), ["/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "check"])
+  let network_options = [index for index in range(argv.len()) if argv[index] == "--network"]
+  assert network_options.len() == 1
+  assert argv[network_options[0] + 1] == "none"
 }
 
 test test_container_xsh_and_core_come_from_one_seed [error] {

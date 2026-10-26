@@ -11,6 +11,7 @@ pure hook_package(dir: Path) -> types.Package {
     kind: types.package_payload(),
     deps: [],
     runtime_only_deps: [],
+    proof_deps: [],
     mkdeps_host: [],
     mkdeps_target: [],
     upstream_sources: [],

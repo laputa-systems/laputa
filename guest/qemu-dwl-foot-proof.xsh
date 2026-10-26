@@ -70,9 +70,11 @@ proc main() [fs, process, time, error] {
   p"/run/laputa-foot-read.xsh".write(
     """#!/bin/xsh
 p"/run/laputa-foot-read-ready".write("ready\\n")?
-print "LAPUTA_DWL_FOOT_VISUAL"
+print "\\x1b[48;2;255;0;255m     LAPUTA_DWL_FOOT_VISUAL     \\x1b[0m"
+io.flush_stdout()?
 let input = io.stdin_text()?
 p"/run/laputa-foot-input.txt".write(input)?
+let _ = io.stdin_text()?
 """,
     mode: 0o755,
   )
@@ -91,8 +93,6 @@ p"/run/laputa-foot-input.txt".write(input)?
   let compositor = spawn command?
   let _ = compositor
 
-  # This appears only after dwl has started foot and foot has started its
-  # stdin reader.  The host sends QMP keyboard input only after this boundary.
   guest_wait_for(/run/laputa-foot-read-ready, "foot", 30)
   guest_console("LAPUTA_DWL_FOOT_PROOF_READY")
   guest_wait_for(/run/laputa-foot-input.txt, "input", 90)

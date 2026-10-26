@@ -378,7 +378,6 @@ proc clean_build_state(work: Path) {
     fp"{work}/{name}".remove()
   }
 
-  # pm-out dirs hold remote-cache; keep the cache to avoid re-downloading packages.
   for name in [
     "pm-out-target-base",
     "pm-out-target-runtime",
@@ -423,32 +422,16 @@ proc build_installer(
 ) {
   let kernel_package = host.installer_env_value("LAPUTA_INSTALLER_KERNEL_PACKAGE", "linux")
 
-  var build_env: Record = {
-    XSH_HOST: xsh.display(),
-    LAPUTA_ROOT: root.display(),
-    LAPUTA_INSTALLER_QEMU_SMOKE: "1",
-    LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY: ssh_pubkey.display(),
-    LAPUTA_INSTALLER_WORK: work.display(),
-    LAPUTA_INSTALLER_ISO: installer_iso.display(),
-    LAPUTA_INSTALLER_KERNEL: installer_kernel.display(),
-    LAPUTA_INSTALLER_KERNEL_PACKAGE: kernel_package,
-  }
-
   let kernel_source = kernel_source_env(root, arch)?
-
-  if kernel_source != "" {
-    build_env = {
-      XSH_HOST: xsh.display(),
-      LAPUTA_ROOT: root.display(),
-      LAPUTA_INSTALLER_QEMU_SMOKE: "1",
-      LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY: ssh_pubkey.display(),
-      LAPUTA_INSTALLER_WORK: work.display(),
-      LAPUTA_INSTALLER_ISO: installer_iso.display(),
-      LAPUTA_INSTALLER_KERNEL: installer_kernel.display(),
-      LAPUTA_INSTALLER_KERNEL_PACKAGE: kernel_package,
-      LAPUTA_INSTALLER_KERNEL_SOURCE: kernel_source,
-    }
-  }
+  let build_env = host.installer_build_environment(
+    purpose: host.installer_qemu_smoke_build_purpose(ssh_pubkey, kernel_package),
+    xsh:,
+    root:,
+    work:,
+    installer_iso:,
+    installer_kernel:,
+    kernel_source: if kernel_source == "" { null } else { kernel_source },
+  )
 
   host.installer_run_argv(xsh, ["xsh", fp"{root}/build-installer-common.xsh".display(), "--", arch], root, build_env)
 }

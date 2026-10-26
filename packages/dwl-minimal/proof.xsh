@@ -10,7 +10,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" $dwl
   proof.ensure("[libwlroots-0.20.so]" in dynamic, "proof-dwl-minimal", "dwl does not link wlroots 0.20")
 
-  # The startup command runs through execvp, never a shell.
   let strings = dwl.read_bytes()?.strings()
   proof.ensure("/bin/sh" not in strings, "proof-dwl-minimal", "dwl still names /bin/sh")
 
@@ -19,7 +18,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # `dwl -v` loads every library dwl links, then prints its version.
   let os = system.uname()?
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
 

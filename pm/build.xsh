@@ -6,8 +6,6 @@ use recipe
 use types
 use util
 
-# The PM tree is the monorepo root (pm.xsh beside pm/) in a checkout and
-# /usr/lib/pm on an installed system.
 ## The directory holding this PM's pm.xsh and pm/ tree.
 export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
   for entry in (e"XSH_MODULE_PATH" ?? "/usr/lib/pm").split(":") {
@@ -208,9 +206,6 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
   let packages = local.load_package_dirs([pkg_dir])?
   let pkg = packages[0]
 
-  # A metapackage is a graph selector, never an installable payload.  Store
-  # still requires a staged byte object, but it must not contain the legacy
-  # package database that payload builds append before archiving.
   if pkg.kind == types.package_meta() {
     dest.remove()
     dest.mkdir()
@@ -235,12 +230,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
     XSH_PM_NAME: pkg.name,
     XSH_PM_VERSION: pkg.ver,
     XSH_PM_RELEASE: pkg.rel,
-    # Deferred dynamic builds run from the prepared source tree.  Preserve that
-    # typed staging root so recipe inputs never depend on the process cwd.
     XSH_PM_SOURCE_DIR: src.display(),
-    # Dynamic recipes cannot infer their copied checkout location from the
-    # source-tree working directory.  Keep it explicit for deferred build
-    # programs such as the Linux Kbuild runner.
     XSH_PM_RECIPE_DIR: pkg_dir.display(),
     XSH_PM_QUIET: "1",
     MAKEFLAGS: makeflags,
@@ -297,9 +287,6 @@ main(@args)?
   local.validate_and_strip_package(pkg, dest, manifest)
   let etcsums = local.collect_etcsums(dest, manifest)?
   local.write_package_db(dest, pkg, manifest, etcsums)
-  # Metadata and payload share one inventory. A recipe may remove a generated
-  # child such as `usr/share/man` while leaving an otherwise undeclared empty
-  # parent; that parent must be present in both the receipt and the archive.
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
   tarball.parent.mkdir()
   archive.tar_create(tarball, dest, archive_paths, compression: "gz", overwrite: true)

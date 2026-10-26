@@ -1,7 +1,4 @@
 ##! Immutable package artifacts addressed by semantic SHA-256 keys; finals appear only after a temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
-# Object hashes are computed once, when an artifact is committed, and recorded
-# in its receipt. Lookups trust a committed directory and do not re-hash it;
-# `verify_artifact`, `verify_receipt`, and `verify_all` re-hash on request.
 use remote
 use types
 use util
@@ -30,9 +27,6 @@ type ReceiptFormatDto = {format: Str}
 ## The receipt format this Store writes and reads.
 export const receipt_format = "laputa-package-artifact-2"
 
-# The layout directory is versioned with the artifact-key format. Keys of an
-# older format live under their own directory (`v1/`), which this PM never
-# reads, so old and new artifacts cannot mix.
 pure store_layout(root: Path) -> Path {
   fp"{root}/v2"
 }
@@ -96,15 +90,13 @@ pure store_unique_artifact_keys(keys: List[Str]) -> List[Str] {
 ## Returns canonical artifact identities for every build-input PlanNode dependency edge.
 ## A receipt does not serialize edge kinds: shared Runtime and BuildHost artifacts retain
 ## their first planned occurrence exactly once while PlanNode keeps the complete edge list.
-## Runtime-only edges are absent: they are no artifact-key input, so one artifact (and its
-## receipt) serves every plan whatever runtime-only artifacts that plan pairs with it.
-## Root composition reads them from the plan instead.
+## Runtime-only and proof edges are absent because neither changes payload identity.
 export pure receipt_dependency_keys(node: types.PlanNode) -> List[Str] {
   store_unique_artifact_keys(
     [
       dependency.artifact_key
       for dependency in node.dependencies
-      if dependency.kind != types.dependency_runtime_only()
+      if dependency.kind != types.dependency_runtime_only() and dependency.kind != types.dependency_proof()
     ],
   )
 }
@@ -221,11 +213,8 @@ proc validate_receipt(value: types.ArtifactReceipt, expected_key: Str) {
   }
 }
 
-# Reads and validates a receipt and checks that its objects exist, without hashing them.
 proc read_receipt(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt] {
   let raw = json.read(receipt_path(dir))?
-  # Check the format before the DTO so a receipt from another Store schema
-  # names its format instead of failing on a missing field.
   let format_field = raw.require(ReceiptFormatDto)?.format
 
   if format_field != receipt_format {
@@ -349,11 +338,8 @@ proc commit_locked(
   defer temporary.remove()
   temporary.mkdir()
   copy_staged(temporary, staged)
-  # The staged payload digest was computed when the payload was produced or
-  # downloaded; hashing the copy again would only re-read the same bytes.
   let value = receipt_for(target, node, temporary, staged.payload_sha256, staged.executor_sha256, origin)?
 
-  # artifact.json is intentionally the final temporary write: a directory with it is complete.
   write_receipt(temporary, value)
   final_dir.parent.mkdir()
   temporary.rename(to: final_dir)
@@ -401,7 +387,6 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) -> Result[Str]
     return Err(types.PmError.PackageContract(f"remote metadata does not match plan node {node.package_id}"))
   }
 
-  # Legacy package metadata did not record an executor digest. Its verified metadata digest is a stable fallback.
   let raw = json.read(metadata)?.require(Record)?
   let value: Str = if "executor_sha256" in raw {
     raw.get("executor_sha256")?.require()?
@@ -427,7 +412,6 @@ proc remote_staged_artifact_for(
   fetch_remote_object(remote_repo, fp"{retrieval.tarball}", payload, retrieval.tarball_sha256, "payload")
   fetch_remote_object(remote_repo, fp"{retrieval.metadata}", metadata, retrieval.metadata_sha256, "metadata")
   let executor_sha256 = remote_executor_sha256(metadata, node)?
-  # fetch_remote_object verified the payload against this digest.
   let payload_sha256 = retrieval.tarball_sha256
   proof.write_atomic(
     json.encode({
@@ -560,11 +544,6 @@ export proc verify_all(root: Path) [fs, error] -> Result[List[types.ArtifactRece
 ## What one garbage collection removed.
 export type StoreGcResult = {artifacts: Int, kept: Int}
 
-# The store only grows: every rebuild under a new key adds an artifact, and
-# nothing else ever removes one. A collection keeps exactly the artifacts in
-# `keep` (the keys of the plans still in use), with their re-proof receipts,
-# and removes every other final artifact, its proofs and lock, and any
-# interrupted temporary build. It must not run while a build writes the store.
 ## Remove every artifact not in `keep`, with its proofs, lock, and temporary state.
 export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult, Error] {
   for key in keep {
@@ -583,7 +562,6 @@ export proc gc(root: Path, keep: List[Str]) [fs, error] -> Result[StoreGcResult,
         continue
       }
 
-      # `Path.remove` deletes a directory tree without following symlinks.
       entry.path.remove(missing_ok: false)
       fp"{store_layout(root)}/proofs/{entry.name}".remove()
       lock_path(root, entry.name).remove()

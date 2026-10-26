@@ -1,0 +1,28 @@
+##! Closed Rust payload package.
+## Package name.
+export let name = "cohort-rust"
+## Installable package kind.
+export let package_kind = "payload"
+## Package version.
+export let ver = "1.0.0"
+## Package release.
+export let rel = "1"
+## Runtime dependencies.
+export let deps = []
+## Build host dependencies.
+export let mkdeps_host = []
+## Build target dependencies.
+export let mkdeps_target = []
+## Repository source inputs.
+export let upstream_sources = [{source: p"files", kind: "directory", architectures: ["all"], checksums: [{arch: "all", sha256: "SKIP"}]}]
+## Preserve the compiler outputs.
+export let nostrip = true
+## Installed payload contract.
+export let filetree = [{path: p"usr/bin/cohort-rust", kind: "binary"}]
+
+## Build the declared Rust payload.
+export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
+  let source = env("XSH_PM_SOURCE_DIR")?
+  fp"{dest}/usr/bin".mkdir()?
+  run /bin/kache /seed/rust/bin/rustc fp"{source}/hello.rs" "-C" "linker=/usr/bin/clang" "-C" "link-arg=-fuse-ld=/bin/mold" "-o" fp"{dest}/usr/bin/cohort-rust"
+}

@@ -2,16 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# The program formats two fixed instants, one in northern winter and one in
-# northern summer, through localtime_r and strftime, so each zone must yield
-# its standard and daylight offsets and abbreviations. musl loads an absolute
-# TZ path as a TZif file, which points it at the proof root's zoneinfo rather
-# than the container's.
-#
-# tzdata has no runtime dependencies, so the proof root holds no libc to link
-# against. The program is therefore built with `--sysroot=/` against the
-# proof container's own musl; the libc that reads the zones is musl either
-# way, and only the TZif files under test come from the proof root.
 const program = r"""#include <stdio.h>
 #include <time.h>
 

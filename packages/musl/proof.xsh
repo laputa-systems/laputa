@@ -1,4 +1,5 @@
-use pm.util as pm_util
+use pm.target as pm_target
+use pm.types
 
 error ScriptError = Failed(kind: Str, message: Str)
 
@@ -8,18 +9,12 @@ proc ensure(condition: Bool, kind: Str, message: Str) {
   }
 }
 
-pure musl_ldso_name(arch: Str) -> Str {
-  return "ld-musl-aarch64.so.1" when arch == "aarch64"
-
-  f"ld-musl-{arch}.so.1"
-}
-
-pure elf_machine_name(arch: Str) -> Str {
-  return "AArch64" when arch == "aarch64"
-
-  return "X86-64" when arch == "x86_64"
-
-  arch
+pure elf_machine_name(target: types.Target) -> Result[Str, Error] {
+  match target {
+    types.Aarch64LinuxMusl => "AArch64"
+    types.X86_64LinuxMusl => "X86-64"
+    types.TargetReserved => Err(types.PmError.PackageContract("unsupported ELF target"))
+  }
 }
 
 proc build_root_path() -> Result[Path] {
@@ -66,11 +61,12 @@ proc compile_hello(
   }?
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
-  let arch = pm_util.target_arch()?
-  let build_arch = pm_util.build_arch()?
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
+  let target = pm_target.recipe_target()?
+  let arch = types.pm_target_arch(target)
+  let build_arch = types.pm_target_arch(pm_target.build_target()?)
   let triple = f"{arch}-linux-musl"
-  let ldso = musl_ldso_name(arch)
+  let ldso = f"ld-musl-{arch}.so.1"
   let default_cc = process.which("cc")?
   let cc = cross_cc(default_cc, build_arch, arch)?
   let readelf = process.which("readelf")?
@@ -88,7 +84,6 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
 """,
     )
 
-    # bits/syscall.h carries both name sets, as musl's own build installs it.
     let syscalls = fp"{rootfs}/usr/include/bits/syscall.h".read_text()?
     ensure("#define __NR_openat" in syscalls and "#define SYS_openat" in syscalls, "proof-musl", "bits/syscall.h lacks __NR_* or SYS_* names")
 
@@ -96,7 +91,7 @@ int main(void) { puts(clone_entry ? "hello musl" : "no clone"); return 0; }
     let dynlinker = fp"{rootfs}/usr/lib/{ldso}"
     compile_hello(cc, rootfs, hello_src, hello, triple, dynlinker, build_arch, arch)
     let header = run.text $readelf "-h" $hello
-    ensure(elf_machine_name(arch) in header, "proof-musl", f"hello binary is not {arch}")
+    ensure(elf_machine_name(target)? in header, "proof-musl", f"hello binary is not {arch}")
 
     if build_arch == arch {
       let out = run.text $dynlinker $hello

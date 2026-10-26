@@ -5,9 +5,6 @@ use util
 
 type ArtifactEntryDto = {path: Str, kind: Str, mode: Int, sha256: Str, target: Str}
 
-# Legacy repository metadata supplied the exact payload inventory before it
-# recorded package_kind.  Keep its required inventory typed, then handle that
-# one omitted field at this decoder boundary; new recipe metadata is explicit.
 type ArtifactMetadataDto = {name: Str, ver: Str, rel: Str, files: List[ArtifactEntryDto]}
 
 type LegacyPackageDbMetadataDto = {
@@ -43,13 +40,12 @@ type RootReceiptDto = {
   target: Str,
   artifacts: List[RootArtifactDto],
   entries: List[RootEntryDto],
+  generated_entries: List[ArtifactEntryDto],
   root_sha256: Str,
 }
 
 type DecodedArtifactMetadata = {kind: types.PackageKind, entries: List[types.ArtifactEntry]}
 
-# A root plan plus each artifact's complete entry list, including directories
-# coalesced into an earlier owner, which payload verification still needs.
 type RootOwnership = {plan: types.RootPlan, artifact_entries: Map[List[types.RootEntry]]}
 
 pure root_receipt_path(output: Path) -> Path {
@@ -117,8 +113,8 @@ proc root_decode_metadata_entry(value: ArtifactEntryDto) -> Result[types.Artifac
 proc root_validate_metadata_entry(value: types.ArtifactEntry) {
   root_require_relative_path(value.path, "artifact metadata path")
 
-  if value.path == "var/lib/laputa/root.json" {
-    return Err(types.PmError.PackageContract("artifact metadata may not own var/lib/laputa/root.json"))
+  if value.path == "var/lib/laputa/root.json" or value.path == "usr/share/man/mandoc.db" {
+    return Err(types.PmError.PackageContract(f"artifact metadata may not own generated root path {value.path}"))
   }
 
   if value.mode < 0 or value.mode > 0o7777 {
@@ -286,13 +282,10 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
   {kind, entries: entries |> sort-by .path}
 }
 
-proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
+proc root_verify_entry_at(root: Path, entry: types.ArtifactEntry) {
   let rel: RelPath = fp"{entry.path}".require(RelPath)?
   let root_handle = fs.open_root(root)?
 
-  # Root metadata follows the final path component. Inspect a declared symlink
-  # first so a contained dangling or cyclic link remains a literal payload
-  # entry instead of making receipt verification traverse it.
   if entry.kind == types.file_kind_symlink() {
     let target = root_handle.readlink(rel)?
 
@@ -303,9 +296,6 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
     return
   }
 
-  # Do not let an absent declaration escape as an unlabelled fs-root-stat
-  # error: the caller needs the exact immutable inventory entry to diagnose a
-  # malformed artifact, including from a parallel executor worker.
   if ! root_handle.exists(rel) {
     return Err(types.PmError.PackageContract(f"root entry {entry.path} is absent or unreadable"))
   }
@@ -327,9 +317,6 @@ proc root_verify_entry_at(root: Path, entry: types.RootEntry) {
   }
 }
 
-# Directories are structural paths, not exclusive file ownership. Identical declarations
-# coalesce to the first canonical artifact owner; every artifact is still verified against
-# its own directory metadata before composition. Files and symlinks remain exclusive.
 pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry) -> Bool {
   left.kind == types.file_kind_tree()
     and right.kind == types.file_kind_tree()
@@ -347,10 +334,6 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
 
   for entry in entries {
     expected = expected.add(entry.path)
-    # Keep the immutable receipt owner and exact metadata path at this
-    # archive boundary.  A raw filesystem error otherwise loses the artifact
-    # that supplied the malformed inventory, especially when this runs inside
-    # a parallel executor worker.
     match root_verify_entry_at(extracted, entry) {
       Ok(_) => {}
       Err(problem) => return Err(
@@ -386,7 +369,6 @@ proc root_verified_artifacts(artifacts: List[types.ArtifactReceipt]) -> Result[L
   root_checked_artifacts([artifact_store.verify_receipt(artifact)? for artifact in artifacts])
 }
 
-# Checks key and package uniqueness and runtime-closure completeness of receipts as given.
 proc root_checked_artifacts(artifacts: List[types.ArtifactReceipt]) [error] -> Result[List[types.ArtifactReceipt]] {
   var keys: Set[Str] = set.empty()
   var names: Set[Str] = set.empty()
@@ -511,6 +493,7 @@ pure root_receipt_dto(value: types.RootReceipt) -> RootReceiptDto {
     target: types.target_text(value.target),
     artifacts: [root_artifact_dto(artifact) for artifact in value.artifacts],
     entries: [root_entry_dto(entry) for entry in value.entries],
+    generated_entries: [{path: entry.path, kind: types.file_kind_text(entry.kind), mode: entry.mode, sha256: entry.sha256, target: entry.target} for entry in value.generated_entries],
     root_sha256: value.root_sha256,
   }
 }
@@ -527,7 +510,7 @@ proc root_receipt_from_dto(value: RootReceiptDto) -> Result[types.RootReceipt] {
     entries += [root_entry_from_dto(entry)?]
   }
 
-  {format: value.format, target: types.parse_target(value.target)?, artifacts, entries, root_sha256: value.root_sha256}
+  {format: value.format, target: types.parse_target(value.target)?, artifacts, entries, generated_entries: [root_decode_metadata_entry(entry)? for entry in value.generated_entries], root_sha256: value.root_sha256}
 }
 
 proc root_validate_receipt(value: types.RootReceipt) {
@@ -536,31 +519,48 @@ proc root_validate_receipt(value: types.RootReceipt) {
     target: value.target,
     artifacts: value.artifacts,
     entries: value.entries,
-    root_sha256: value.root_sha256,
+    root_sha256: root_digest(value.target, value.artifacts, value.entries),
   )
 
-  if value.format != "laputa-root-1" {
+  if value.format != "laputa-root-2" {
     return Err(types.PmError.PackageContract(f"unsupported root receipt format {value.format}"))
   }
 
   root_validate_plan(plan)
+  if value.generated_entries.len() > 1 {
+    return Err(types.PmError.PackageContract("root receipt repeats generated manual index"))
+  }
+  for entry in value.generated_entries {
+    if entry.path != "usr/share/man/mandoc.db" or entry.kind != types.file_kind_file() or entry.mode != 0o644 or entry.target != "" {
+      return Err(types.PmError.PackageContract("root receipt has invalid generated manual index metadata"))
+    }
+    root_require_sha256(entry.sha256, "manual index SHA-256")
+  }
+  if value.root_sha256 != root_completed_digest(plan, value.generated_entries) {
+    return Err(types.PmError.PackageContract("root receipt digest does not match generated contents"))
+  }
+}
+
+pure root_completed_digest(plan: types.RootPlan, generated: List[types.ArtifactEntry]) -> Str {
+  if generated.is_empty() {
+    return plan.root_sha256
+  }
+  let lines = [f"generated\t{entry.path}\t{types.file_kind_text(entry.kind)}\t{entry.mode}\t{entry.sha256}\t{entry.target}" for entry in generated]
+  bytes.from_text(plan.root_sha256 + "\n" + lines.join("\n") + "\n").sha256().hex()
 }
 
 proc root_receipt_for_plan(value: types.RootPlan) -> Result[types.RootReceipt] {
   root_validate_plan(value)
   {
-    format: "laputa-root-1",
+    format: "laputa-root-2",
     target: value.target,
     artifacts: value.artifacts,
     entries: value.entries,
+    generated_entries: [],
     root_sha256: value.root_sha256,
   }
 }
 
-# An artifact archive is never extracted over the assembled root.  Preflight
-# has already checked its complete payload inventory; apply only that plan's
-# canonical entries so the archive implementation cannot overwrite a sibling
-# artifact's path after the conflict check has passed.
 proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEntry) {
   let source = fp"{source_root}/{entry.path}"
   let destination = fp"{output}/{entry.path}"
@@ -606,14 +606,16 @@ proc root_materialize_artifact(output: Path, receipt: types.ArtifactReceipt, ent
 }
 
 proc root_read_receipt(output: Path) -> Result[types.RootReceipt] {
-  let dto = json.read(root_receipt_path(output))?.require(RootReceiptDto)?
+  let raw = json.read(root_receipt_path(output))?.require(Record)?
+  if raw.get("format")?.require(Str)? != "laputa-root-2" {
+    return Err(types.PmError.PackageContract("unsupported root receipt format; recompose the root"))
+  }
+  let dto = raw.require(RootReceiptDto)?
   let value = root_receipt_from_dto(dto)?
   root_validate_receipt(value)
   value
 }
 
-# Plans path ownership from artifact metadata. Payload archives are read only
-# for legacy metadata, whose package-database entries live in the payload.
 proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt]) -> Result[RootOwnership] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("root preflight target is unsupported"))
@@ -622,8 +624,6 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
   var artifact_entries_by_key: Map[List[types.RootEntry]] = {}
   var planned_artifacts: List[types.RootArtifact] = []
   var entries: List[types.RootEntry] = []
-  # Exact owners catch duplicate paths; the first owner below each prefix
-  # catches a later file that would replace an existing subtree.
   var owners: Map[types.RootEntry] = {}
   var first_descendants: Map[types.RootEntry] = {}
 
@@ -825,6 +825,87 @@ export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
   }
 
   for entry in receipt.entries {
+    root_verify_entry_at(output, entry)
+  }
+  for entry in receipt.generated_entries {
+    root_verify_entry_at(output, entry)
+  }
+}
+
+## Generates a manual index in an unpublished staging root and records its generated contents.
+export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
+  root_validate_receipt(receipt)
+  if root_read_receipt(output)? != receipt {
+    return Err(types.PmError.PackageContract("manual index root receipt does not match"))
+  }
+  let mandoc = [artifact for artifact in receipt.artifacts if artifact.package_name == "mandoc" and artifact.payload]
+  if mandoc.is_empty() {
+    return receipt
+  }
+  let manpath = fp"{output}/usr/share/man"
+  if ! manpath.exists() {
+    return receipt
+  }
+  var has_pages = false
+  for entry in fs.walk(manpath, gitignore: false, hidden: true) {
+    let relative = entry.path.strip_prefix(manpath)?.display()
+    if relative.starts_with("man") and "/" in relative and entry.kind != "dir" {
+      has_pages = true
+    }
+  }
+  if ! has_pages {
+    return receipt
+  }
+  let loader = fp"{output}/usr/lib/ld-musl-{types.pm_target_arch(receipt.target)}.so.1"
+  let program = fp"{output}/usr/bin/makewhatis"
+  let library_path = fp"{output}/usr/lib"
+  for required in [loader, program, fp"{library_path}/libz.so.1"] {
+    if ! required.exists() or fs.stat(required, follow_symlinks: true)?.kind != "file" {
+      return Err(types.PmError.PackageContract(f"manual index requires selected-root tool or library {required}"))
+    }
+  }
+  var libraries = [program]
+  var checked: Set[Str] = set.empty()
+  while ! libraries.is_empty() {
+    let library = libraries[0]
+    libraries = libraries |> drop(1)
+    continue when library.display() in checked
+    checked = checked.add(library.display())
+    for needed in elf.inspect(library)?.needed {
+      continue when needed == "libc.so" or needed == f"libc.musl-{types.pm_target_arch(receipt.target)}.so.1"
+      if "/" in needed or ! fp"{library_path}/{needed}".exists() or fs.stat(fp"{library_path}/{needed}", follow_symlinks: true)?.kind != "file" {
+        return Err(types.PmError.PackageContract(f"manual index requires selected-root library {needed}"))
+      }
+      libraries += [fp"{library_path}/{needed}"]
+    }
+  }
+  let database = fp"{manpath}/mandoc.db"
+  if database.exists() {
+    if receipt.generated_entries.is_empty() {
+      return Err(types.PmError.PackageConflict("manual index path is already owned"))
+    }
+    database.remove(missing_ok: false)
+  }
+  let status = process.run(process.command_argv(loader, [loader.display(), "--library-path", library_path.display(), program.display(), manpath.display()], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"}))?
+  if ! status.ok {
+    return Err(types.PmError.PackageContract("selected-root makewhatis failed; generation was not published"))
+  }
+  database.chmod(0o644)
+  let generated: List[types.ArtifactEntry] = [{path: "usr/share/man/mandoc.db", kind: types.file_kind_file(), mode: 0o644, sha256: hash.sha256(database)?.hex(), target: ""}]
+  let plan: types.RootPlan = {format: "laputa-root-plan-1", target: receipt.target, artifacts: receipt.artifacts, entries: receipt.entries, root_sha256: root_digest(receipt.target, receipt.artifacts, receipt.entries)}
+  let completed: types.RootReceipt = {...receipt, generated_entries: generated, root_sha256: root_completed_digest(plan, generated)}
+  root_validate_receipt(completed)
+  root_receipt_path(output).write(json.encode(root_receipt_dto(completed))? + "\n")
+  completed
+}
+
+## Verifies generated root contents against the root identity embedded in a generation receipt.
+export proc root_verify_generated_contents(output: Path, expected_sha256: Str) [fs, error] {
+  let receipt = root_read_receipt(output)?
+  if receipt.root_sha256 != expected_sha256 {
+    return Err(types.PmError.PackageContract("generation root identity does not match its root receipt"))
+  }
+  for entry in receipt.generated_entries {
     root_verify_entry_at(output, entry)
   }
 }

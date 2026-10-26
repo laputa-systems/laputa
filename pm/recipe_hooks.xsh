@@ -1,6 +1,4 @@
 ##! Checked procedure contracts for package recipe hook capabilities.
-# Module contracts compare declared effects exactly, so each supported hook
-# keeps the recipe's own capability set instead of widening every recipe.
 
 ## Validates a build hook with fs, error capabilities.
 export type BuildFilesystem = module {

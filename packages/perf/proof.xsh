@@ -17,7 +17,6 @@ proc prove_perf(loader: Path, perf: Path, ver: Str) {
   let version = (run.text $loader $perf "--version").trim()
   proof.ensure(version == f"perf version {ver}", "perf-version", f"perf --version printed '{version}'")
 
-  # The minimal feature set links only musl: every optional library is off.
   let options = run.text $loader $perf "version" "--build-options"
 
   for feature in ["libelf", "libtraceevent", "libpython", "zlib", "libunwind"] {
@@ -79,8 +78,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # perf runs on the proof root's musl loader and libraries, not the
-  # container's.
   let os = system.uname()?
   let loader = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let ver = recorded_version(rootfs)?

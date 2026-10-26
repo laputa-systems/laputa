@@ -81,8 +81,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let triple = f"{pm_util.target_arch()?}-linux-musl"
   write_config_h()
 
-  # Flags from configure.ac (regular_CPPFLAGS, regular_CFLAGS, and the
-  # -fvisibility=hidden that CHECK_GCC_FVISIBILITY adds) and Make_global.am.
   let libmnl = make.c_shared_library({
     cc,
     triple,
@@ -100,10 +98,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     defs: ["-DHAVE_CONFIG_H", "-D_FILE_OFFSET_BITS=64", "-D_REENTRANT"],
     includes: ["-I.", "-Iinclude"],
     root: p".",
-    # src/Makefile.am libmnl_la_SOURCES.
     sources: [p"src/socket.c", p"src/callback.c", p"src/nlmsg.c", p"src/attr.c"],
     out_dir: p"obj",
-    # libtool -version-info 2:0:2 names the file libmnl.so.0.2.0.
     out: p"obj/libmnl.so.0.2.0",
     soname: "libmnl.so.0",
     ldflags: ["-Wl,--version-script=src/libmnl.map"],
@@ -114,11 +110,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   fs.install(libmnl.output, fp"{dest}/usr/lib/libmnl.so.0.2.0", 0o755, parents: true, overwrite: true)
   fp"{dest}/usr/lib/libmnl.so.0".symlink(to: p"libmnl.so.0.2.0")
   fp"{dest}/usr/lib/libmnl.so".symlink(to: p"libmnl.so.0.2.0")
-  # include/libmnl/Makefile.am pkginclude_HEADERS; include/linux/ is noinst.
   fs.install(p"include/libmnl/libmnl.h", fp"{dest}/usr/include/libmnl/libmnl.h", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  # libmnl.pc.in with configure's /usr prefix substituted.
   fp"{dest}/usr/lib/pkgconfig/libmnl.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}

@@ -19,8 +19,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # The bootstrap's cmVersionConfig.h is written by the recipe; the installed
-  # cmake must report the release it was built from.
   let ver = proof.package_version(rootfs, "cmake")?
   let version = run.text $cmake "--version"
 
@@ -35,11 +33,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
 
   tempdir tmp at fp"{rootfs}/var/tmp/proof-cmake" {
 
-    # Artifact proofs deliberately compose runtime edges only. `samurai` is a
-    # build-host tool, so use this explicit proof-local generator instead of
-    # resolving a build dependency through the proof root. It gives CMake the
-    # generator capability required for a configure-only package smoke test;
-    # `llvm-toolchain` proves compiler execution independently.
     let proof_samu = fp"{tmp}/proof-samu"
     proof_samu.write(
       """#!/bin/xsh

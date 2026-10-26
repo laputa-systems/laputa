@@ -3,7 +3,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
   let muon = fp"{rootfs}/usr/bin/muon"
 
   if ! muon.exists() {
@@ -20,7 +20,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
       return Err(ScriptError.Failed(kind: "proof-muon", message: "muon version produced no output"))?
     }
 
-    # fontconfig 2.18 requires meson 1.11 semantics.
     if "meson compatibility version 1.11" not in trimmed {
       return Err(ScriptError.Failed(kind: "proof-muon", message: f"muon is not meson 1.11 compatible: {trimmed}"))?
     }

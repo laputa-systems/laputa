@@ -1,10 +1,4 @@
 ##! Executes one immutable BuildPlan through Store receipts and isolated mutable work roots.
-# Proof input is intentionally separate from artifact input: a changed proof writes a second immutable
-# attestation under `store.reproof_receipt_path` after rechecking the unchanged payload.
-#
-# Each built payload is hashed once, when it is staged; its proof receipt and Store receipt reuse
-# that digest. Store lookups trust the hashes recorded at commit, so reused artifacts are not
-# re-read. Every dependency payload is extracted once per root, directly into that root.
 use build as pm_build
 use fingerprint
 use local
@@ -18,9 +12,6 @@ use store
 use types
 use util
 
-# State one node execution shares with its whole build. `executor` is computed
-# once per build, and only when some node actually builds; `published` holds
-# the receipts of completed levels by artifact key.
 type ExecuteContext = {
   plan: types.BuildPlan,
   repo_root: Path,
@@ -38,9 +29,6 @@ proc execute_load_package(plan_value: types.BuildPlan, node: types.PlanNode, rep
     return Err(types.PmError.PackageContract(f"recipe {node.recipe_dir} does not match plan node {node.package_id}"))
   }
 
-  # A recipe edited after planning would be built under a key naming other
-  # inputs. Re-fingerprinting the recipe costs milliseconds next to the
-  # recipe load itself, so it is checked rather than trusted.
   if fingerprint.package_build_input(repo_root, pkg, plan_value.target)? != node.recipe_sha256 {
     return Err(types.PmError.PackageContract(f"recipe build input changed after plan creation for {node.package_id}"))
   }
@@ -99,11 +87,6 @@ proc execute_receipt_closure(context: ExecuteContext, keys: List[Str]) -> Result
   receipts |> sort-by .package_name
 }
 
-# Creates `root` holding exactly the payloads of `artifacts`. Store commit
-# recorded these artifacts' hashes, and the trusted Root plan rejects path
-# ownership conflicts from metadata, so each payload is extracted once,
-# straight into the root. Payload archives share top-level directories such
-# as `usr`, so extraction merges into what earlier payloads created.
 proc execute_compose_root(target: types.Target, root: Path, artifacts: List[types.ArtifactReceipt]) {
   let root_plan = pm_root.trusted_preflight(target, artifacts)?
   let payload_keys = {artifact.artifact_key: true for artifact in root_plan.artifacts if artifact.payload}
@@ -136,15 +119,10 @@ proc execute_stage_local(
   let payload = fp"{work}/payload.tar.gz"
   let metadata = fp"{work}/metadata.json"
   let proof = fp"{work}/proof.json"
-  # build_prepared_package creates a traced dynamic runner beside its recipe. Keep that implementation
-  # detail inside this node's work tree so execution never writes the checkout or another node's recipe.
   let _ = fs.copy_tree(pkg.dir, recipe_dir, parents: true, overwrite: true)?
   util.normalize_checkout_tree(recipe_dir)
   let isolated_pkg = {...pkg, dir: recipe_dir}
   source.mkdir()
-  # Package recipes may explicitly name repository-owned inputs (for example
-  # laputa-pm's PM entrypoint/tree). Resolve those against the plan repository
-  # while the recipe itself remains isolated under `work/recipe`.
   env ({
     XSH_PM_REPOSITORY_ROOT: context.repo_root.display(),
     XSH_PM_TARGET_ARCH: target_arch,
@@ -152,10 +130,6 @@ proc execute_stage_local(
     sources.prepare_package_source_tree(isolated_pkg, source)
   }
 
-  # Builds are native, so the composed build root is also the target root.
-  # Recipes resolve target files through LAPUTA_ROOT and build tools through
-  # XSH_PM_BUILD_ROOT.
-  #
   # CC and CXX name the compiler PATH resolves first, the build root's. Build
   # tools that score every compiler they find instead of taking the first on
   # PATH (muon since 0.6) would otherwise prefer a host GCC behind it, such as
@@ -168,7 +142,9 @@ proc execute_stage_local(
     CXX: "c++",
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
-    pm_build.build_prepared_package(recipe_dir, source, dest, payload)
+    ctx f"building package {node.package_id}" {
+      pm_build.build_prepared_package(recipe_dir, source, dest, payload)?
+    }
   }
 
   let built = local.load_built_package_from_dest(isolated_pkg, node.package_id, payload, dest)?
@@ -201,10 +177,6 @@ proc execute_publish_proof_cache(store_root: Path, node: types.PlanNode, payload
   temporary.rename(to: cached)
 }
 
-# Runs the package proof against `payload` in a fresh root holding its runtime
-# closure, then writes the proof receipt to `proof`. That closure follows
-# `deps` edges only: a runtime-only dependency orders no build, so it may not
-# exist yet when this node is proved. Generations compose it with the rest.
 proc execute_run_proof(
   context: ExecuteContext,
   node: types.PlanNode,
@@ -213,30 +185,27 @@ proc execute_run_proof(
   payload_sha256: Str,
   proof: Path,
 ) {
-  # Metapackages select an already-proved dependency closure. They own neither
-  # a payload archive nor a proof program, but still receive an immutable proof
-  # receipt that binds this exact selector node to its opaque Store marker.
   if pkg.kind == types.package_meta() {
     pm_proof.write_artifact_receipt(proof, node, payload_sha256)
     return
   }
 
-  let runtime_keys = [
+  let proof_keys = [
     dependency.artifact_key
     for dependency in node.dependencies
-    if dependency.kind == types.dependency_runtime()
+    if dependency.kind == types.dependency_runtime() or dependency.kind == types.dependency_proof()
   ]
-  let runtime_artifacts = execute_receipt_closure(context, runtime_keys)?
+  let proof_artifacts = execute_receipt_closure(context, proof_keys)?
   let root_handle = fs.tempdir()?
-  # A proof root is a target runtime closure only: no executor substrate, so
-  # the proof cannot pass on files the runner happens to provide.
   let proof_root = fp"{root_handle.host_path()?}/proof-root"
-  execute_compose_root(context.plan.target, proof_root, runtime_artifacts)
+  execute_compose_root(context.plan.target, proof_root, proof_artifacts)
   archive.tar_extract(payload, proof_root, 0, "auto", true)
   env ({
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {
-    pm_proof.run_artifact_proof(proof_root, pkg)
+    ctx f"proving package {node.package_id}" {
+      pm_proof.run_artifact_proof(proof_root, pkg)?
+    }
   }
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)
 }
@@ -248,22 +217,14 @@ proc execute_build_local(context: ExecuteContext, node: types.PlanNode) -> Resul
   let build_root = fp"{work}/build-root"
 
   if pkg.kind == types.package_meta() {
-    # Selectors have no build sandbox; their declared dependencies are ordered
-    # by the BuildPlan and proved independently before this node executes.
     build_root.mkdir()
   } else {
     let dependencies = execute_receipt_closure(context, store.receipt_dependency_keys(node))?
     execute_compose_root(context.plan.target, build_root, dependencies)
-    # Only compilation receives the host executor substrate.  A proof root is a
-    # target runtime closure; leaking /bin and /usr from the runner both masks
-    # missing dependencies and conflicts with baselayout's owned symlinks.
     pm_build.seed_executor_substrate(build_root)
   }
 
   let staged = execute_stage_local(context, node, pkg, build_root, work)?
-  # Keep the proof outcome as Result data through this build-node boundary.
-  # The published runner otherwise propagates a failing Unit proc directly out
-  # of a par-map worker before its node-status marker can be written.
   execute_run_proof(context, node, pkg, staged.payload, staged.payload_sha256, staged.proof)
 
   let receipt = store.commit(context.plan.target, context.store_root, node, staged)?
@@ -275,7 +236,6 @@ proc execute_existing_local(context: ExecuteContext, node: types.PlanNode) -> Re
   let receipt = store.lookup(context.store_root, node.artifact_key)?
   execute_require_receipt(context.plan, node, receipt)
 
-  # The proof key binds the package, the artifact key, and the proof input.
   return receipt when receipt.proof_key == node.proof_key
 
   let cached = store.reproof_receipt_path(context.store_root, node.artifact_key, node.proof_key)
@@ -307,7 +267,6 @@ proc execute_remote_node(context: ExecuteContext, node: types.PlanNode) -> Resul
   receipt
 }
 
-# Executes one node of a plan that `build_plan` already validated.
 proc execute_node(context: ExecuteContext, node: types.PlanNode) -> Result[types.ArtifactReceipt] {
   if store.artifact_path(context.store_root, node.artifact_key).exists() {
     return execute_existing_local(context, node)
@@ -321,20 +280,14 @@ proc execute_node(context: ExecuteContext, node: types.PlanNode) -> Result[types
   execute_remote_node(context, node)
 }
 
-# The edges a node waits for before it starts: everything its build root or
-# proof root composes. A runtime-only dependency orders no build, so it is
-# not one of them.
 pure execute_wait_keys(node: types.PlanNode) -> List[Str] {
   [dependency.artifact_key for dependency in node.dependencies if dependency.kind != types.dependency_runtime_only()]
 }
 
-# One node building in its own child process.
-type RunningNode = {handle: ProcessHandle, node: types.PlanNode, log: Path, started: Int}
+type RunningNode = {handle: ProcessHandle, node: types.PlanNode, log: Path, started_ns: Int}
 
 type FinishedNode = {name: Str, seconds: Int, log: Path}
 
-# The last lines of a failed node's log: the cause, without the rest of a
-# build that can run to tens of thousands of lines.
 proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
   return "" unless log.exists()
 
@@ -343,8 +296,6 @@ proc execute_log_tail(log: Path, count: Int) -> Result[Str] {
   lines[first..].join("\n")
 }
 
-# The `err:` lines of a failed node's log, which name the cause above the
-# runtime traceback; the plain tail when there are none.
 proc execute_log_errors(log: Path) -> Result[Str] {
   return "" unless log.exists()
 
@@ -371,12 +322,6 @@ proc execute_report_slowest(finished: List[FinishedNode]) {
   }
 }
 
-# Schedules by dependency, not by plan level. A node starts as soon as every
-# node it waits for is in the store, so one slow package delays only its own
-# dependents. Each build runs as `pm repo build-node` in a child process
-# writing logs/NAME.log, so parallel builds never interleave their output and a
-# failure names its package and log. Store publication stays receipt-last: a
-# dependent reads only receipts its children already published.
 proc execute_scheduled(
   context: ExecuteContext,
   plan_path: Path,
@@ -403,8 +348,6 @@ proc execute_scheduled(
         continue
       }
 
-      # Stored artifacts and exact remote imports cost no build; they run here,
-      # so the scheduler's slots go to real builds.
       let stored = store.artifact_path(context.store_root, node.artifact_key).exists()?
 
       if stored or ! types.plan_action_is_build(node.action) {
@@ -439,15 +382,14 @@ proc execute_scheduled(
         stdout_append: true,
         stderr_append: true,
       )
+      let started_ns = time.monotonic()?
       let handle = spawn command?
-      running += [{handle, node, log, started: time.now()}]
+      running += [{handle, node, log, started_ns}]
     }
 
     pending = waiting
 
     if running.is_empty() {
-      # Nothing runs and nothing can start: a failure drained the running
-      # builds, or no pending node has its dependencies (an invalid plan).
       return Err(types.PmError.ExtensionFailed(failure)) when failure != ""
 
       return Err(types.PmError.PackageContract(f"no plan node can start; {pending.len()} wait on missing dependencies")) when ! pending.is_empty()
@@ -458,7 +400,9 @@ proc execute_scheduled(
     let next = process.wait_any([entry.handle for entry in running])?
     let entry = running[next.index]
     running = [other for other in running if other.node.artifact_key != entry.node.artifact_key]
-    let seconds = (time.now() - entry.started) / 1000
+    let finished_ns = time.monotonic()?
+    let elapsed_ns = finished_ns - entry.started_ns
+    let seconds = elapsed_ns / 1000000000
 
     if next.status.ok {
       let receipt = store.lookup(context.store_root, entry.node.artifact_key)?
@@ -474,10 +418,8 @@ proc execute_scheduled(
     print $tail
 
     if failure == "" {
-      failure = f"package build for {entry.node.package_id} failed (log {entry.log}):\n{execute_log_errors(entry.log)?}"
+      failure = f"build log {entry.log}:\n{execute_log_errors(entry.log)?}"
 
-      # Stop the other builds: their results are not needed once the build has
-      # failed, and the store never keeps a partial artifact.
       for other in running {
         print f"repo build cancel {other.node.name}"
         other.handle.cancel(signal: "TERM", kill_after: 5s)
@@ -489,7 +431,6 @@ proc execute_scheduled(
 
   execute_report_slowest(finished)
 
-  # The failed node may have been the last one, which ends the loop normally.
   return Err(types.PmError.ExtensionFailed(failure)) when failure != ""
 
   done
@@ -529,8 +470,6 @@ export proc build_plan_node(
   receipt
 }
 
-# Executor provenance hashes the XSH runners and the PM tree, so compute it only
-# when some node will actually build.
 proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) -> Result[Bool] {
   for node in plan_value.nodes {
     if types.plan_action_is_build(node.action) and ! store.artifact_path(store_root, node.artifact_key).exists() {
@@ -566,7 +505,6 @@ export proc build_plan(
   var done: Map[types.ArtifactReceipt] = {}
 
   if jobs == 1 {
-    # One job builds in this process, in plan order, with output inline.
     for node in plan_value.nodes {
       let receipt = execute_node({...context, published: done}, node)?
       execute_require_receipt(plan_value, node, receipt)
@@ -575,7 +513,6 @@ export proc build_plan(
   } else {
     let handle = fs.tempdir()?
     let scratch = handle.host_path()?
-    # Children read the plan from disk; write_plan seals it with its digest.
     let plan_path = fp"{scratch}/plan.json"
     plan_json.write_plan(plan_path, plan_value)
     let log_dir = if logs == "" { fp"{scratch}/logs" } else { logs }
@@ -584,9 +521,6 @@ export proc build_plan(
 
   let artifacts = [done.get(node.artifact_key)? for node in plan_value.nodes]
 
-  # Keep the receipt list concrete at the public executor boundary. The
-  # generated profile adapter crosses this boundary in a separate module and
-  # must never receive an unparameterized List from the published runner.
   let result: types.BuildResult = types.BuildResult(
     format: "laputa-build-result-1",
     plan_sha256: plan_value.plan_sha256,

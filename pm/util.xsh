@@ -1,9 +1,6 @@
 ##! PM util operations and shared package-manager policy.
 use types
 
-# Placeholders are whole uppercase words in a source string. Matching words
-# rather than substrings keeps names such as PATCH, PACKAGE, or SEARCH from
-# being rewritten through the ARCH or other placeholders they contain.
 const source_placeholder_word = rx"[A-Z]+"
 
 ## Exported PM declaration `package_id`.
@@ -31,14 +28,6 @@ export pure remote_index_cache_path(out: Path) -> Path {
   fp"{out}/remote-index.json"
 }
 
-# Remote package objects are content-addressed and therefore immutable: a
-# rebuild under the same ver-rel (a new seed, a PM edit, a rebuilt
-# dependency) gets new object names instead of overwriting the old ones, and
-# the index row is the only mutable pointer. The payload is named by its
-# artifact key; metadata and proof also carry the proof key, because a
-# proof-only change re-proves the same payload with a new proof receipt and
-# metadata. Twelve hex digits of each key keep names readable; the index row
-# carries the full keys.
 pure remote_key_prefix(key: Str) -> Str {
   key.byte_slice(0, 12)
 }

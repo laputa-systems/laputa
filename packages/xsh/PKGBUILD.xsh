@@ -142,7 +142,6 @@ export const filetree = [
   {path: p"usr/lib/xsh/core", kind: "tree"},
 ]
 
-# The seed products the build installs, each checked against the seed manifest.
 const seed_products = ["xsh", "xshi", "xsht", "core.tar.xz"]
 
 proc verified_seed(arch: Str) -> Result[Path] {

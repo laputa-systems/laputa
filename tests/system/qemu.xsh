@@ -10,6 +10,9 @@ type SupervisorFixture = {
   qmp_attempt_one: Path,
   qmp_attempt_two: Path,
   qmp_attempt_three: Path,
+  qmp_calls: Path,
+  qemu_pid: Path,
+  foot_reader_alive: Path,
   input_record: Path,
 }
 
@@ -124,7 +127,24 @@ QEMU_FATAL after success""") {
   }
 }
 
-proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[SupervisorFixture] {
+test test_qmp_retry_type_rejects_input_dispatch [fs, process, error] { |ctx|
+  let module_source = p"system/qemu.xsh".read_text()?
+  let invalid_dispatch = module_source + """
+proc qmp_retry_input(value: QemuConfig, socket: Path) -> Result[Unit] {
+  qemu_qmp_retry(value, QmpInput, socket)
+}
+"""
+  let result = test.run_script(ctx, invalid_dispatch)?
+  assert result.status != 0, "QMP input unexpectedly type-checked as retryable"
+  assert "QmpRetryOperation" in result.stderr, result.stderr
+}
+
+proc supervisor_fixture(
+  ctx: TestContext,
+  final_failure: Bool,
+  ignore_term: Bool = true,
+  reader_exits_after_input: Bool = false,
+) -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
   let bundle = fp"{outputs.builds}/fixture"
@@ -135,32 +155,45 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[Supervi
   let attempt_one = fp"{root}/qmp-attempt-one"
   let attempt_two = fp"{root}/qmp-attempt-two"
   let attempt_three = fp"{root}/qmp-attempt-three"
+  let qmp_calls = fp"{root}/qmp-calls"
+  let qemu_pid = fp"{root}/qemu-pid"
+  let foot_reader_alive = fp"{root}/foot-reader-alive"
   let input_record = fp"{root}/input-record"
   let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '{outputs.qemu_log}'" } else { "" }
+  let term_trap = if ignore_term { "trap '' TERM" } else { "trap 'exit 0' TERM" }
+  let reader_exit = if reader_exits_after_input { f"rm '{foot_reader_alive}'; " } else { "" }
 
   outputs.kernel.write("kernel")
   outputs.disk.write("disk")
 
-  # This fake QEMU ignores TERM, proving managed cancellation escalates to KILL.
   fake_qemu.write_lines(
     [
       "#!/bin/sh",
-      "trap '' TERM",
+      term_trap,
+      f"printf '%s\\n' \"$$\" > '{qemu_pid}'",
+      f": > '{foot_reader_alive}'",
       f"printf qmp > '{outputs.qmp_socket}'",
       "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'",
       "while :; do sleep 1; done",
     ],
   )
 
-  # The failed first call makes the side-effect-free QMP readiness check retry.
-  # The third call is the one proof input; the fourth writes screenshot evidence.
   fake_qmp.write_lines(
     [
       "#!/bin/sh",
+      f"printf '%s\\n' \"$2\" >> '{qmp_calls}'",
       f"if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
       f"if [ ! -e '{attempt_two}' ]; then : > '{attempt_two}'; exit 0; fi",
-      f"if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0; fi",
-      f"printf 'P6\\n1 1\\n255\\nX' > '{outputs.screenshot}'",
+      f"if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; {reader_exit}printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0; fi",
+      f"if [ -e '{foot_reader_alive}' ]; then",
+      f"  printf 'P6\\n16 1\\n255\\n' > '{outputs.screenshot}'",
+      "  pixel='\\377\\000\\377'",
+      "else",
+      f"  printf 'P6\\n16 1\\n255\\n' > '{outputs.screenshot}'",
+      "  pixel='\\000\\000\\000'",
+      "fi",
+      "index=0",
+      f"while [ \"$index\" -lt 16 ]; do printf '%b' \"$pixel\" >> '{outputs.screenshot}'; index=$((index + 1)); done",
       final_log,
       "exit 0",
     ],
@@ -178,6 +211,9 @@ proc supervisor_fixture(ctx: TestContext, final_failure: Bool) -> Result[Supervi
     qmp_attempt_one: attempt_one,
     qmp_attempt_two: attempt_two,
     qmp_attempt_three: attempt_three,
+    qmp_calls,
+    qemu_pid,
+    foot_reader_alive,
     input_record,
   }
 }
@@ -196,14 +232,50 @@ X""",
   assert qemu.screenshot_is_valid(screenshot)?
 }
 
-test test_qemu_supervisor_retries_qmp_injects_once_and_escalates_shutdown [fs, process, time, error] { |ctx|
+test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
   qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)
   assert fixture.qmp_attempt_one.exists()?
   assert fixture.qmp_attempt_two.exists()?
   assert fixture.qmp_attempt_three.exists()?
+  assert fixture.qmp_calls.read_text()? == "ready\nready\ninput\nscreenshot\n"
   assert fixture.input_record.read_text()? == """laputa
 """
+  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
+}
+
+test test_qemu_supervisor_stops_qemu_after_indeterminate_input [fs, process, time, error] { |ctx|
+  let fixture = supervisor_fixture(ctx, false, false)?
+  fixture.config.python.write_lines(
+    [
+      "#!/bin/sh",
+      f"printf '%s\\n' \"$2\" >> '{fixture.qmp_calls}'",
+      "if [ \"$2\" = input ]; then exit 75; fi",
+      "exit 0",
+    ],
+  )
+  fixture.config.python.chmod(0o755)
+
+  match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
+    Ok(_) => test.fail("supervisor accepted an indeterminate QMP input outcome")
+    Err(problem) => assert "OutcomeIndeterminate" in problem.message, problem.message
+  }
+
+  assert fixture.qmp_calls.read_text()? == "ready\ninput\n"
+  let pid = fixture.qemu_pid.read_text()?.trim().parse_int()?
+  for entry in process.list()? {
+    assert entry.pid != pid, f"QEMU process {pid} remained after input failure"
+  }
+}
+
+test test_qemu_supervisor_rejects_capture_after_foot_reader_exits [fs, process, time, error] { |ctx|
+  let fixture = supervisor_fixture(ctx, false, false, true)?
+  match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
+    Ok(_) => test.fail("supervisor accepted a screenshot without the live foot marker")
+    Err(problem) => assert "visual marker" in problem.message, problem.message
+  }
+
+  assert fixture.qmp_calls.read_text()? == "ready\nready\ninput\nscreenshot\n"
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
@@ -245,10 +317,6 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   assert "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
 }
 
-# A QEMU that dies at startup (a missing device model, say) stays an unreaped
-# child until the supervisor waits for it, so liveness must not count it. A
-# supervisor that does would wait out its 180 s proof timeout, past xsht's
-# per-test limit.
 test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx, false)?
   fixture.config.qemu.write("#!/bin/sh\necho 'qemu: device model missing' >&2\nexit 1\n")

@@ -1,9 +1,6 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-# A compiled entry read back from ncurses' binary format, independently of the
-# compiler: header, names, booleans, numbers (16-bit for magic 0432, 32-bit
-# for 01036), string offsets, the string table, and the extended section.
 type Compiled = {
   magic: Int,
   names: Str,
@@ -17,8 +14,6 @@ type Compiled = {
 
 error ReadError = Malformed(file: Path, message: Str)
 
-# Standard capability indexes, fixed by the SVr4-compatible order of
-# ncurses' include/Caps.
 const AUTO_RIGHT_MARGIN = 1
 const COLUMNS = 0
 const MAX_COLORS = 13
@@ -41,7 +36,6 @@ pure s32(data: Bytes, at: Int) -> Int {
   if value >= 2147483648 { value - 4294967296 } else { value }
 }
 
-# The NUL-terminated string at `at`.
 pure c_string(data: Bytes, at: Int) -> Bytes {
   var end = at
   while (data.byte_at(end) ?? 0) != 0 {
@@ -96,7 +90,6 @@ proc read_compiled(file: Path) -> Result[Compiled] {
     let ext_table_at = ext_offset_at + 2 * (es + total)
     let values = [s16(data, ext_offset_at + 2 * k) for k in range(es)]
     let value_strings = [table_string(data, ext_table_at, offset) for offset in values]
-    # Names follow the string values; their offsets restart at zero.
     var names_at = ext_table_at
     for k in range(es) {
       let text = value_strings[k]
@@ -146,10 +139,8 @@ proc main(root = /rootfs) [fs, error] {
   expect_string(xterm, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")
   expect_string(xterm, KEY_UP, b"\x1bOA", "kcuu1")
   expect_string(xterm, KEYPAD_XMIT, b"\x1b[?1h\x1b=", "smkx")
-  # The Linux edit of the xterm+kbs fragment: backspace sends DEL.
   expect_string(xterm, KEY_BACKSPACE, b"\x7f", "kbs")
 
-  # foot's own description, not ncurses' copy: it declares Tc and Su.
   let foot = read_compiled(fp"{database}/f/foot")?
   proof.ensure(number(foot, MAX_COLORS) == 256, "proof-terminfo", "foot does not have 256 colors")
   expect_string(foot, CURSOR_ADDRESS, b"\x1b[%i%p1%d;%p2%dH", "cup")
@@ -162,7 +153,6 @@ proc main(root = /rootfs) [fs, error] {
     "foot lost Smulx",
   )
 
-  # Direct color needs the 32-bit number format.
   let foot_direct = read_compiled(fp"{database}/f/foot-direct")?
   proof.ensure(foot_direct.magic == 0o1036, "proof-terminfo", "foot-direct is not in the 32-bit number format")
   proof.ensure(number(foot_direct, MAX_COLORS) == 16777216, "proof-terminfo", "foot-direct does not have 2^24 colors")
@@ -178,7 +168,6 @@ proc main(root = /rootfs) [fs, error] {
   proof.ensure(number(dumb, COLUMNS) == 80, "proof-terminfo", "dumb does not have 80 columns")
   proof.ensure(string(dumb, CURSOR_ADDRESS) == null, "proof-terminfo", "dumb has cursor addressing")
 
-  # Aliases name the same compiled entry.
   let alias = fp"{database}/v/vt100-am".read_bytes()?
   proof.ensure(alias == fp"{database}/v/vt100".read_bytes()?, "proof-terminfo", "vt100-am differs from vt100")
 

@@ -1,8 +1,4 @@
 ##! Compose the installer's target, installer, and tools roots from the local mirror.
-# Like `make root`, the host plans the roots against the mirror, requires every
-# node to be an exact mirror artifact, and imports them into a fresh store.
-# Composing is file extraction, so it runs on the host as well: no container
-# writes root-owned files into the work tree, and no package builds here.
 use seed.world
 
 error InstallerPackageHostError = Failed : InvalidData
@@ -59,8 +55,6 @@ export proc prepare(
   packages.mkdir()
   let plan = fp"{packages}/build-plan.json"
   let store = fp"{packages}/store"
-  # Every root the installer composes comes from one plan, so the three roots
-  # agree on each shared package.
   var plan_roots = []
 
   for name in [@target_roots(kernel_package, smoke), @installer_roots(), @tools_roots()] {

@@ -10,6 +10,17 @@ Laputa removed `update-certdata`. That command downloaded a bundle over HTTPS an
 
 `trust.release.compose_signed_release` accepts the exact metadata, detached signature, root bundle, next policy, and installed-policy snapshot bytes. It verifies the metadata signature before parsing the metadata. It checks expiry, generation, and payload digests. It validates every root certificate. It stages those same root and policy bytes in an owner-only temporary root for `pm.generation.compose`; callers cannot supply a path that cleanup might remove. Generation and root composition keep intermediate work beneath owner-only temporary roots. Root composition creates its staging child with mode `0700`; generation restricts the completed root to `0700` before applying the trust overlay. Immediately before each no-replace publication, the completed directory receives mode `0777` narrowed by the process umask, read without changing it. Existing paths and symlink aliases are never removed to prepare staging. Signed-release validation failures happen before staging. Composition failures remove only temporary roots created by that call and leave prior generations intact.
 
+Composition uses `laputa-root-2` receipts and inherits PM's selected-root
+manual-index execution when the selected packages include mandoc and pages.
+Its effect contract therefore includes process execution. Roots with previous-format receipts
+require recomposition. The signed certificate-release format stays
+`laputa-trust-release-v1`.
+
+The staging guarantees above assume trusted parent directories. The selected
+filesystem path still uses ambient operations and has an unqualified cleanup
+ownership boundary. See [filesystem authority limits](PM.md#filesystem-authority-limits)
+for the replacement reproducer and the separate durability gap.
+
 Signed metadata uses LF-terminated UTF-8 with exactly five ordered lines: `laputa-trust-release-v1`, `generation`, `expires-at`, `root-bundle-sha256`, and `trust-policy-sha256`. A raw 64-byte detached Ed25519 signature covers the original metadata bytes. Metadata is limited to 4 KiB. Root bundles are limited to 4 MiB. Releases must expire within 90 days. The policy generation must equal the signed generation and advance the installed-policy snapshot. The caller must provide the snapshot and a raw 32-byte public key. There is no empty-state or test-key default. The caller supplies `now_epoch_seconds` from the host wall clock, such as `time.now() / 1000`.
 
 Laputa has no production verification key or release-fetch command yet. Provision the public key through a Laputa-controlled source independent of WebPKI. Then connect release acquisition to `compose_signed_release`. The function creates an immutable candidate generation. It does not select that generation, install into a live root, or restart host services. After activation, restart or reload affected services with `xinit restart SERVICE` or `xinit reload SERVICE`.

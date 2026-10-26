@@ -108,9 +108,6 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
   env ({
     XSH_PM_REPOSITORY_ROOT: root.display(),
   }) {
-    # `pkg.dir` intentionally points at an isolated recipe copy. Repository
-    # inputs must still stage from the explicit repository root, not parent
-    # traversal from that directory.
     sources.stage_package_sources(pkg, source)
   }
 
@@ -138,7 +135,6 @@ test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process,
   let package_dir = fp"{root}/baselayout"
   let source = fp"{root}/source"
   let _ = fs.copy_tree(p"packages/baselayout", package_dir, parents: true, overwrite: true)?
-  # A checkout below a setgid directory, under a group-writable umask.
   fp"{package_dir}/files/rootfs/usr".chmod(0o2775)
   fp"{package_dir}/files/rootfs/etc/passwd".chmod(0o664)
   source.mkdir()
@@ -154,8 +150,6 @@ test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error]
   let pkg = recipe.load_package(p"packages/baselayout")?
   let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.file_kind_tree()]
 
-  # The kernel mounts devtmpfs before `/init`; the remaining mount points must
-  # also be present before rc.boot performs its explicit mounts and fstab pass.
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     assert required in trees
   }
@@ -264,10 +258,6 @@ test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |_|
   assert "seatd" in pkg.deps
 }
 
-# Planning the real repository keys the `xsh` package by the local XSH seed, a
-# derived input under `.out/` that only `make seed` produces. Plan a disposable
-# root that shares the checked-in recipes and repository inputs and holds a
-# fixture seed instead.
 proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name: "repository-with-seed")?

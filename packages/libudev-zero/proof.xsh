@@ -17,9 +17,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # libinput and wlroots find input and DRM devices by enumerating sysfs and
-  # reading each device's uevent; /sys/class/mem/null exists in every
-  # container and guest, so the proof enumerates the mem subsystem.
   fp"{tmp}/proof-libudev.c".write(
     """#include <string.h>
 #include <libudev.h>

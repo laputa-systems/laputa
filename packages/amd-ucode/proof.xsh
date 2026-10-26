@@ -1,8 +1,6 @@
 ##! amd-ucode proof: the pinned containers are installed for late loading, and the early-load cpio carries their concatenation.
 use pm.proof
 
-# The linux-firmware 20260916 amd-ucode containers, in the order the early
-# image concatenates them.
 const containers = [
   {name: "microcode_amd.bin", sha256: "8a9d9e8b788e31e61cddc03cb1eeab5db99e0f667128943ff0780e6437d2e43e"},
   {name: "microcode_amd_fam15h.bin", sha256: "9d4a668410e72a4bdb86dc23e4261eca04daa83456ada02504115223f356981a"},
@@ -12,7 +10,6 @@ const containers = [
   {name: "microcode_amd_fam1ah.bin", sha256: "605aecca9583a3710efb482b4940fe3dd1f96b1cea19818e766f298d8ba06a5d"},
 ]
 
-# sha256 of `cat microcode_amd*.bin` over the containers above.
 const early_sha256 = "49995102b0a6eac9c25e601d148f0a46176ae3a85fe644b13a66dcbcc47e2e18"
 
 const early_member = "kernel/x86/microcode/AuthenticAMD.bin"

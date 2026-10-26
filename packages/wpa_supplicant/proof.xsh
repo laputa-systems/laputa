@@ -18,8 +18,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     "missing default config",
   )
 
-  # Run the binaries against the proof root's libraries so the check covers
-  # the libnl3 the package depends on, not the build host's.
   let wpa_supplicant = fp"{root}/usr/bin/wpa_supplicant"
   let wpa_passphrase = fp"{root}/usr/bin/wpa_passphrase"
   var version = ""

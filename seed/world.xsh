@@ -1,16 +1,4 @@
 ##! Package builds on the local seed behind `make plan`, `make build`, `make publish`, and `make root`.
-# Containers never get a network. Planning and building run in package-tools
-# with `--network none`, the seed mounted at /bin and /usr/lib/xsh/core, the
-# checkout (and with it the source cache) read-only at /src/laputa, and the
-# artifact store `.out/artifacts/ARCH` at /artifacts. The store is the build
-# cache: plans are offline, so every node says `build`, and the executor skips
-# each one whose artifact the store already holds.
-#
-# Only host processes talk to the loopback mirror. `publish` builds, then
-# uploads that plan's verified store artifacts from the host; `root` imports
-# a root's closure from the mirror into a fresh store on the host, then
-# composes and inspects it in an offline container. Sources need no mirror inside a build: the read-only
-# cache already holds every pinned upstream.
 use pm.cli as pm_cli
 use pm.plan_json as pm_plan_json
 use pm.types as pm_types
@@ -123,11 +111,6 @@ export pure world_store(laputa_root: Path, arch: Str) -> Path {
   fp"{laputa_root}/.out/artifacts/{arch}"
 }
 
-# A kernel build reads and writes its discovered-plan and archive-plan caches
-# at /var/cache/laputa/linux-kbuild. Inside a throwaway container that never
-# survives, so every changed kernel rediscovered its whole Kbuild graph. Each
-# entry is checked against a fingerprint of the kernel source and .config
-# before use, so a stale entry is rebuilt, never trusted.
 ## The linux recipe's Kbuild plan cache, kept across builds under `.out/`.
 export pure world_kbuild_cache(laputa_root: Path) -> Path {
   fp"{laputa_root}/.out/cache/linux-kbuild"
@@ -231,7 +214,6 @@ proc world_run(container: WorldContainer, output: Path, store: Path, inner: List
   }
 }
 
-# PM names targets `ARCH-linux-musl`; the seed's `triple` is Rust's.
 pure pm_target(value: xsh_seed.SeedArch) -> Str {
   f"{value.arch}-linux-musl"
 }
@@ -305,9 +287,6 @@ export proc host_pm_compose(repo_url: Str, input: Path, store: Path, runtime_roo
   }?
 }
 
-# Publishing the last plan could upload a stale selection (a reverted rel
-# bump, say) under tuples the checkout no longer declares, so publish first
-# builds the current checkout's plan; an unchanged build is a no-op.
 proc world_publish(container: WorldContainer, args: WorldArgs) {
   world_build(container, args)
   let plan = fp"{world_dir(container.laputa_root, args.arch)}/plan.json"
@@ -319,8 +298,6 @@ export pure world_root_dir(laputa_root: Path, arch: Str) -> Path {
   fp"{world_dir(laputa_root, arch)}/root"
 }
 
-# The root's whole closure must come from the mirror: a node the mirror lacks
-# would build on the host, which is not a build environment.
 ## Require every node of a host plan to be an exact mirror artifact.
 export proc require_mirror_plan(plan: Path, repo: Str) [fs, error] {
   let value = pm_plan_json.read(plan)?

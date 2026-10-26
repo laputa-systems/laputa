@@ -9,8 +9,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libfreetype.so.6]" in dynamic, "proof-freetype", "freetype has no libfreetype.so.6 SONAME")
 
-  # Color emoji glyphs need PNG support, and compressed fonts need zlib; both
-  # are optional in upstream's build, so check that they were linked.
   for needed in ["[libpng16.so.16]", "[libz.so.1]"] {
     proof.ensure(needed in dynamic, "proof-freetype", f"freetype does not link {needed}")
   }

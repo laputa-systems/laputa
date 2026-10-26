@@ -1,5 +1,4 @@
 #!/bin/xsh
-# Kbuild discovery-worker entry script, executed from the staged recipe tree.
 use kbuild
 
 proc main(...argv: List[Str]) [fs, time, error] {

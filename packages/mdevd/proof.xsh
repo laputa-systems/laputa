@@ -20,9 +20,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   fp"{tmp}/dev".mkdir(true)
   defer tmp.remove()
 
-  # `-N` opens the uevent netlink socket, parses the configuration in both
-  # passes, and exits: 0 for a valid file, 2 for a syntax error. That
-  # exercises the static skalibs build without touching the host's devices.
   let good = fp"{tmp}/good.conf"
   let bad = fp"{tmp}/bad.conf"
 

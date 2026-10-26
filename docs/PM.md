@@ -8,13 +8,19 @@ publishes verified snapshots, and composes runtime-only root generations.
 
 Recipes live at `packages/<package>/PKGBUILD.xsh` and export:
 
-- `name: Str`, `ver: Str`, and positive `rel: Str`;
-- `package_kind: "payload" | "meta"`;
+- `ver: Str`, optional `name: Str`, and optional positive `rel: Str`;
+- optional `package_kind: "payload" | "meta"`;
 - optional `architectures: List[Str]`, the targets (`aarch64`, `x86_64`) the
   package exists for;
 - `deps`, `mkdeps_host`, and optional `mkdeps_target` and `runtime_only_deps`;
 - `upstream_sources` and `filetree`;
 - `build(dest: Path)` for payload packages.
+
+An omitted `name` uses the recipe directory name, `rel` defaults to `"1"`,
+and `package_kind` defaults to `"payload"`. Production recipe names must match
+their directories. An upstream source without `architectures` uses `["all"]`;
+a checksum without `arch` uses `"all"`. Explicit values remain authoritative.
+`repo lint` reports declarations equal to these defaults without rewriting them.
 
 `deps` and `mkdeps_*` are build inputs: each is installed into the build root
 with its runtime closure, and its artifact key enters the dependent's key.
@@ -48,9 +54,23 @@ Payload recipes also carry `proof.xsh`. Metapackages declare no payload
 contract: each file or symlink is explicit, while a `tree` declaration covers
 ordinary descendants. ELF outputs must be declared as `binary`.
 
+A package may also carry `proof_deps.xsh`, exporting `proof_deps: List[Str]`.
+These target-native packages and their `deps` closures enter only the proof
+root. They order execution, but enter neither the package build root nor its
+payload artifact key. They do not enter an installed generation unless a
+runtime edge selects them. For example, `man-pages` declares `mandoc` here.
+
 Recipe loading is quarantined in `pm/recipe.xsh`. The rest of PM receives only
 typed `Package` values; runtime lifecycle hooks are not part of the package
 contract.
+
+Use `pm/target.xsh::recipe_target()` and `build_target()` for typed `Target`
+values at recipe target boundaries. Match `Aarch64LinuxMusl` and
+`X86_64LinuxMusl` explicitly; reject `TargetReserved`. `rust_triple(target)`,
+`kernel_arch(target)`, and `lp64_musl_abi(target)` own the supported mappings.
+Package proof entry points validate `Target` before inspecting payload files.
+Recipe architecture declarations and serialized target names remain strings
+validated at their loading boundaries.
 
 Recipe hooks (`build`, optional `prepare` and `prepare_sources`) take one `Path`
 and return `Result[Unit]`. `pm/recipe_hooks.xsh` lists the accepted effect sets,
@@ -125,12 +145,35 @@ For a profile-owned overlay, `pm/generation.xsh::plan_profile` selects the
 runtime closure and binds the overlay digest into its identity. The saved
 generation plan must match the BuildPlan and overlay used for execution.
 
+### Maintainer reports
+
+`repo lint [--repo PATH]` loads recipes and reports redundant default
+declarations. It changes no files. Recipes are executable modules, so loading
+one is not inert data parsing.
+
+`repo update-filetree PACKAGE --plan PLAN --store STORE [--repo PATH]` selects
+the saved plan's target and exact immutable artifact. It verifies current recipe
+inputs, receipt identity, object hashes, metadata, and the payload inventory,
+including the required runtime artifact closure. The report shows removed and
+added entries and a typed `filetree_aarch64` or `filetree_x86_64` replacement.
+Review and apply that declaration yourself. The command never rewrites a
+recipe. It requires a current recipe and a committed valid artifact; it cannot
+recover output from a failed unpublished build or use a stale recipe plan.
+
+`repo outdated PACKAGE --github-release OWNER/REPO [--repo PATH]` compares the
+recipe version with the explicitly selected public GitHub repository's latest
+stable release. For example, `repo outdated uv --github-release astral-sh/uv`
+reports the current and upstream versions with the API source URL. Select the
+upstream repository after reviewing the package's sources. PM does not infer
+that mapping. Tags accept an optional `v` and dotted numeric components within
+signed integer range. HTTP, network, JSON, draft, prerelease, and unsupported
+version failures are errors. The command changes no recipe or source pin.
+
 ## Sources
 
 URL sources are content-addressed. `pm sources fetch` (`make fetch`, with
-`ARCH=x86_64` for the other target) is the only command that contacts upstream
-hosts: it downloads every pinned URL source of the selected packages into
-`LAPUTA_SOURCE_CACHE` (default `.cache/sources`) as `sha256/<hash>`, at most four
+`ARCH=x86_64` for the other target) downloads every pinned URL source of the
+selected packages into `LAPUTA_SOURCE_CACHE` (default `.cache/sources`) as `sha256/<hash>`, at most four
 at a time with retries, verifies each digest before the entry appears, skips
 entries already present, and fails after reporting every dead URL and checksum
 mismatch. The local mirror serves the same layout at `/sources/sha256/<hash>`.
@@ -141,7 +184,13 @@ else it fails and names the missing source. Builds locate the cache through
 `LAPUTA_SOURCE_CACHE` or `XSH_PM_REPOSITORY_ROOT`. Artifact keys hash the
 recipe's source string and checksum, never where the bytes came from.
 `repo checksum` and `repo update-checksums` read upstream directly to compute new
-pins and add those bytes to the cache.
+pins and add those bytes to the cache. `repo outdated` also contacts its
+explicitly selected upstream release API.
+
+`packages/upstream_pins.xsh` owns shared upstream pins. `cargo` and `sudo-rs`
+use its Rust distribution date and target standard-library checksums. `linux`,
+`linux-headers`, and `perf` use its kernel version and source record. Update
+those declarations once when changing a shared upstream release.
 
 A `cargo-vendor` source names a Cargo.lock (a pinned URL or a recipe file) and
 a destination, `LOCK => vendor`. Its crates.io `[[package]]` records are a
@@ -163,13 +212,14 @@ destination may not be the source root.
 `pm/catalog.xsh` is the repository-wide typed catalog boundary. It rejects
 duplicate package names and malformed recipes before resolution.
 `pm/policy.xsh` holds the explicit bootstrap exceptions (the same seed rules
-for both targets); `pm/graph.xsh` resolves runtime, runtime-only, build-host, and
-build-target edges and adds no implicit package-manager dependency. Sorted
-topological levels and typed edge kinds are persisted in `BuildPlan`. A plan includes the runtime-only dependencies of its packages
-(roots compose them), but runtime-only and bootstrap edges order no build, so
-a runtime-only edge may close a cycle; plan format 3 records them as
-`runtime-only` node dependencies. A bootstrap edge names a build input a seed
-substitutes, so it selects no package either: planning `musl` does not pull in
+for both targets). `pm/graph.xsh` resolves runtime, runtime-only, build-host,
+build-target, and proof edges without an implicit package-manager dependency.
+`BuildPlan` records sorted topological levels and typed edge kinds. A plan
+includes the runtime-only dependencies of its packages (roots compose them), but runtime-only and bootstrap edges order no build, so
+a runtime-only edge may close a cycle. Plan format 4 (`laputa-build-plan-4`)
+records `runtime-only` and `proof` node dependencies. Older plan formats are
+rejected; resolve a new plan before building. A bootstrap edge names a build
+input a seed substitutes, so it selects no package either: planning `musl` does not pull in
 `zlib`, and through it `cmake`.
 The Docker adapter (`system/docker.xsh`) passes
 `XSH_PM_BOOTSTRAP_LLVM_ROOT=/usr/lib/llvm23` for `gnu-stubs`: its LLVM edge is a
@@ -193,20 +243,42 @@ write or a setgid inherited from a parent directory, are host noise, so the
 same checkout gets the same keys and payload modes on every host.
 
 An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
-package id, the recipe input digest (recipe files except `proof.xsh`, source
-records and checksums, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
+package id, the recipe input digest (recipe files except `proof.xsh` and
+`proof_deps.xsh`, source records and checksums, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
 and the key of every direct `deps` and `mkdeps_*` dependency. Each of those is
 installed into the build root with its runtime closure, because recipes link
 against libraries they declare only in `deps`; each dependency key covers that
 dependency's own closure. Runtime-only dependency keys are excluded, and Store
 receipts omit them (one artifact serves every plan that pairs it with any
-runtime-only artifact). The executor (XSH runners, PM tree,
-core applets) is not a key input, so XSH and PM changes rebuild nothing. The
-executor that built an artifact is recorded as provenance in its metadata
-(`executor`) and receipt (`executor_sha256`). Bump `BUILD_EPOCH` to rebuild
-every package after an executor change that alters payloads; bump a recipe's
-`rel` to rebuild one package and its dependents. Executing a plan resolved at
-another `BUILD_EPOCH` is rejected.
+runtime-only artifact). Proof dependency keys are also excluded from payload
+identity and artifact dependency receipts. The proof input hashes both
+`proof.xsh` and the optional `proof_deps.xsh` declaration, including its evaluated
+dependency names. Build and reproof reject a changed selection after planning.
+Already-proved immutable cached plans retain their attested closure without
+reloading recipes. The proof key binds
+the payload key, proof input, and each proof dependency artifact key; changing
+a proof tool re-proves the payload without rebuilding it.
+
+Executor identity (XSH runners, PM tree, and core applets) is provenance, not a
+payload identity input. Artifact metadata records the executor (`executor`),
+and receipts record its digest (`executor_sha256`). Artifact keys exclude both
+values. A changed executor does not automatically invalidate cache entries.
+Fingerprints cannot tell whether an executor change alters recipe meaning.
+
+If your executor change can alter payloads without changing recipe inputs,
+bump `pm/policy.xsh::BUILD_EPOCH` before you resolve a new plan. The new epoch
+changes every package artifact key. `repo build` rejects plans resolved at the
+previous epoch. Keep the epoch unchanged for provenance-only changes and other
+changes that cannot affect payloads. Compatible artifacts can then be reused.
+
+`BUILD_EPOCH` is currently 2. This invalidates payloads from before installed
+package metadata stopped serializing the recipe checkout `dir`. The installed
+package database records package semantics without that absolute build path,
+so relocating an otherwise identical checkout does not change those metadata
+bytes. This is a metadata invariant, not proof of whole-payload reproducibility.
+
+For a package-specific payload revision, bump that recipe's `rel`. Changed
+fingerprinted recipe inputs also change artifact keys.
 
 When a dependency is rebuilt, `repo plan` builds its dependents even if the
 remote index already holds their tuple, and when the remote row's artifact key
@@ -218,7 +290,10 @@ are never read. It locks a key, stages the payload, records the payload digest
 computed once at staging plus metadata and proof hashes, writes the receipt
 last, and atomically renames the final directory. Lookups trust those
 commit-time hashes; `store verify` and `repo publish` re-hash every object.
-Final artifacts are never overwritten. `pm/repo.xsh` publishes only verified
+Final artifacts are never overwritten. Remote rows without semantic artifact
+identity remain decodable for tuple comparisons but require local rebuilding.
+Their retrieval bytes carry no build-epoch claim, so legacy retrieval-only
+identities are rejected in saved plans. `pm/repo.xsh` publishes only verified
 plan receipts and updates a file or remote snapshot index last. An index row's
 `deps` are the recipe's `deps`; `runtime_only_deps` lists the rest of its
 runtime set (rows without the field declare none).
@@ -226,9 +301,10 @@ runtime set (rows without the field declare none).
 `repo build` composes each build and proof root by extracting every dependency
 payload once, directly into the root, after a metadata-only ownership check
 (`pm/root.xsh::trusted_preflight`). A proof root holds the payload's `deps`
-closure only: a runtime-only dependency may not be built yet when its
-dependent is proved, so package proofs never check its files. Recipes see the build root as both
-`LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin` first on
+and `proof_deps` packages, following their `deps` edges transitively.
+Runtime-only edges are excluded: their targets may not be built yet when the
+package is proved, so proofs cannot rely on their files. Recipes see the build
+root as both `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin` first on
 `PATH`, and `CC=cc` and `CXX=c++`, so tools that score every compiler they find
 (muon) take the build root's.
 
@@ -285,13 +361,29 @@ closure unless a typed runtime edge requires them. Regular files and
 directories keep permission bits through `0o7777`, including setuid helpers;
 symlink metadata stays `0o777`.
 
+Generation composition builds `usr/share/man/mandoc.db` after package extraction
+and profile overlays, before atomic publication, when the selected runtime
+closure contains `mandoc` and manual pages. It runs the selected root's
+`makewhatis` with that root's musl loader and libraries. A missing required tool
+or library, or an indexing failure, aborts publication. Package artifacts may
+not own this generated path. Dependency build and proof roots do not generate
+the database.
+
+Root receipts use `laputa-root-2`. The `generated_entries` field records the
+manual index path, kind, mode, and hash; the completed root digest binds those contents.
+Generation verification checks the generated file against that receipt. Old
+root receipts are rejected and require recomposition. This changes the root
+receipt format; package artifact receipts and root plans retain their formats.
+
 ## Verification
 
 PM behavior is covered by the modules under `tests/pm/`; `tests/pm/fixtures/`
 holds staged inputs. Run the module for the contract you are changing, for
 example `$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`. Suites and wider
-runs are in [Testing](TESTING.md). The seed is always the current `XSH_ROOT`
-checkout; there is no published runner pin.
+runs are in [Testing](TESTING.md). Ordinary Make targets build the local `XSH_ROOT` checkout. Independent
+qualification uses the explicitly supplied frozen tool snapshot described in
+[Testing](TESTING.md#use-the-fixed-xinit-tool-snapshot). There is no implicit
+published runner pin.
 
 ## Recipe authoring
 
@@ -303,3 +395,31 @@ document their regeneration path beside them.
 
 The `xsh` recipe exposes only the core applets declared in its `filetree`. Add
 command links only when Laputa needs them, and keep `su` outside `/usr/bin`.
+
+## Filesystem authority limits
+
+Current staging and no-replace publication establish atomic visibility under a
+trusted parent directory. They do not qualify an adversarially replaced parent
+or power-loss durability. Archive extraction and publication still use ambient
+`Path` operations after staging exports an `FsRoot.host_path()`.
+The supplied XSH snapshot has no rooted extraction, no-replace rename, or fsync
+operations that retain the opened root through the entire path.
+
+A scratch-only Linux probe also demonstrates a cleanup ownership defect in
+that snapshot. Rename an owned temporary directory, create a replacement tree
+at its saved pathname, and close the handle. Cleanup removes the replacement
+tree and leaves the moved original. The reproducer is
+`tests/system/fixtures/fsroot-cleanup-identity.xsh`. Run it with `TMPDIR` inside
+an ignored `.work/tmp`; it changes only its own temporary tree:
+
+```bash
+TMPDIR="$PWD/.work/tmp" "$XSH_HOST" tests/system/fixtures/fsroot-cleanup-identity.xsh
+```
+
+Root-backed reads and writes remain anchored in the corresponding replacement
+probe, but that does not qualify ambient extraction or cleanup.
+
+LAP-33 needs retained-root extraction, publication, synchronization, and cleanup
+ownership before end-to-end confinement can be claimed. The selected PM path
+has no explicit fsync boundary. Process termination does not establish storage
+power-loss behavior.

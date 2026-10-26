@@ -4,8 +4,6 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-# A scanner with a start condition, a named definition, yylineno, and a
-# generated header: flex pipes its skeleton through m4 for both outputs.
 const lexer = r"""%option noyywrap nounput noinput yylineno
 %x COMMENT
 %{
@@ -40,16 +38,11 @@ word gamma line 3
 words=3 numbers=2 comments=1
 """
 
-# sha256 of GNU flex 2.6.4's `flex --header-file=words.h -o words.c words.l`
-# on `lexer`: the generated scanner must match it byte for byte.
 const gnu_outputs = [
   {name: "words.c", sha256: "16155f0d15411f2b37af60b262fb1c7d1de3304e4d317dcf3019aa7e7e536285"},
   {name: "words.h", sha256: "31ac026fbbdd94178fd3b7f1d9da2bde5a3b792844f1fb4a6b9ebf8a2963e97e"},
 ]
 
-# Compile C against the proof root's own musl: the runner's `cc` builds with
-# the root as sysroot and records the root's dynamic linker, so the program
-# exercises the root's libc rather than the runner's. Native targets only.
 proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
@@ -63,8 +56,6 @@ proc prove_scanner(rootfs: Path, flex: Path) {
     fp"{tmp}/words.l".write(lexer)
     let stderr = fp"{tmp}/flex.stderr"
 
-    # flex runs m4 as a filter; name the root's m4 so the proof cannot pass on
-    # another m4 the runner happens to provide.
     env ({M4: fp"{rootfs}/usr/bin/m4".display()}) {
       cd $tmp {
         let status = process.run(
@@ -103,7 +94,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
   let flex = fp"{rootfs}/usr/bin/flex"
   let lex = fp"{rootfs}/usr/bin/lex"
 

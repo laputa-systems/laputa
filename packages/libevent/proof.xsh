@@ -16,9 +16,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # tmux drives its whole client and server through an event_base, a pipe
-  # read event, and timers. Both events here are one-shot, so dispatch returns
-  # once each has fired.
   fp"{tmp}/proof-libevent.c".write(
     """#include <string.h>
 #include <unistd.h>

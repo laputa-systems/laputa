@@ -2,13 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# Build containers and proof roots have no sound card, so the program drives
-# libasound's software PCMs. It parses a config from memory with
-# snd_config_load, plays through the "null" PCM that the installed alsa.conf
-# defines, then through a plug PCM from the loaded config that converts the
-# client's 48 kHz S16 stream into a 44.1 kHz S32 null slave (the plug, linear,
-# and rate plugins). Each stream reports its state before, during, and after
-# the writes.
 const program = r"""#include <stdio.h>
 #include <string.h>
 #include <alsa/asoundlib.h>
@@ -99,13 +92,11 @@ proc main(root = /rootfs) [fs, process, env, error] {
     proof.ensure(f"[{lib}.so.2]" in dynamic, "proof-alsa-lib", f"{lib} has no {lib}.so.2 SONAME")
   }
 
-  # pkg-config expands ${name} references, so consumers get real paths.
   let pc = fp"{root}/usr/lib/pkgconfig/alsa.pc".read_text()?
   proof.ensure(r"exec_prefix=${prefix}" in pc, "proof-alsa-lib", "alsa.pc does not derive exec_prefix from prefix")
   proof.ensure(r"Cflags: -I${includedir}" in pc, "proof-alsa-lib", "alsa.pc does not reference includedir")
   proof.ensure(r"Libs: -L${libdir} -lasound" in pc, "proof-alsa-lib", "alsa.pc does not reference libdir")
 
-  # The configuration tree libasound reads from ALSA_CONFIG_DIR.
   let share = fp"{root}/usr/share/alsa"
 
   for conf in [
@@ -133,8 +124,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let binary = fp"{tmp}/proof-alsa-lib"
   run $cc fp"{tmp}/proof-alsa-lib.c" f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lasound" "-o" $binary
 
-  # ALSA_CONFIG_DIR points libasound at the proof root's tree instead of the
-  # compiled-in /usr/share/alsa.
   let out = env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     ALSA_CONFIG_DIR: share.display(),

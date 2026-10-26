@@ -5,6 +5,7 @@ use generation
 use generation_adapter as pm_generation_adapter
 use graph
 use local
+use maintainer
 use plan as pm_plan
 use plan_json as pm_plan_json
 use policy
@@ -158,8 +159,6 @@ export proc pm_cli_repo_plan(args: PmRepoPlanArgs) [fs, net, process, env, time,
   var roots = args.roots
   var all = args.all
 
-  # `--all --without` plans an explicit root set: every package that builds
-  # without the excluded ones, so the plan records exactly what it selected.
   if ! args.without.is_empty() {
     roots = graph.packages_buildable_without(catalog_value, args.without, policy_value)?
     all = false
@@ -291,8 +290,6 @@ export proc pm_cli_sources_fetch(repo: Str, all: Bool, packages: List[Str], targ
 
   sources.fetch_sources(cache_root, items)
 
-  # A `cargo-vendor` source's crate set is named by its lockfile, which the
-  # first pass has just cached.
   var crate_items: List[sources.SourceFetchItem] = []
 
   for selection in selections {
@@ -325,9 +322,6 @@ export proc pm_cli_root_compose(args: PmRootComposeArgs) {
 
 ## Execute the typed root inspect command.
 export proc pm_cli_root_inspect(args: PmRootInspectArgs) {
-  # Image builders retain the receipt JSON after atomically publishing their final
-  # image and removing container-local generation staging. Accept that durable
-  # boundary as well as an intact generation root.
   let receipt = if args.input.is_file() {
     generation.read_generation_receipt_file(args.input)?
   } else {
@@ -338,8 +332,6 @@ export proc pm_cli_root_inspect(args: PmRootInspectArgs) {
   print "artifacts" receipt.artifacts.len()
 }
 
-# Every artifact a kept plan names stays, whatever its action: a plan that
-# reuses a remote artifact still runs from the imported copy.
 ## Execute the typed store gc command.
 export proc pm_cli_store_gc(args: PmStoreGcArgs) {
   return Err(types.PmError.Usage("pm store gc needs at least one --keep PLAN")) when args.keep.is_empty()
@@ -381,4 +373,34 @@ export proc pm_cli_repo_checksum(args: PmRepoPackagesArgs) {
 ## Update checksums for the selected repository packages.
 export proc pm_cli_repo_update_checksums(args: PmRepoPackagesArgs) {
   command_repo_checksums(args, true)
+}
+
+## Report redundant recipe defaults without rewriting executable recipes.
+export proc pm_cli_repo_lint(repo_root: Path) {
+  let value = catalog.load(repo_root)?
+  for pkg in value.packages {
+    for field in recipe.redundant_defaults(fp"{repo_root}/{pkg.dir}")? {
+      print f"{pkg.name}: redundant {field}"
+    }
+  }
+}
+
+## Report a selected recipe against an explicitly named GitHub release source.
+export proc pm_cli_repo_outdated(repo: Str, package: Str, github_release: Str) {
+  let repo_root = pm_cli_resolve_repo_root(repo)?
+  let pkg = selected_packages(repo_root, [package])?[0]
+  maintainer.maintainer_outdated(pkg, github_release)
+}
+
+## Print a reviewable filetree change from the selected saved build artifact.
+export proc pm_cli_repo_update_filetree(repo: Str, package: Str, input: Path, store_root: Path) {
+  let repo_root = pm_cli_resolve_repo_root(repo)?
+  let value = pm_plan_json.read(input)?
+  let packages = catalog.package_map(catalog.load_for_target(repo_root, value.target)?)
+  guard package in packages else {
+    return Err(types.PmError.MissingDependency(f"package {package} is not in {repo_root} for {types.target_text(value.target)}"))
+  }
+  let listed: types.Package = packages.get(package)?
+  let pkg = recipe.load_package_for_target(fp"{repo_root}/{listed.dir}", value.target)?
+  print (maintainer.maintainer_filetree_diff(pkg, repo_root, value, store_root)?)
 }

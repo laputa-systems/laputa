@@ -113,11 +113,8 @@ export type ArchiveAnalysisResult = {
   missing_sources: List[Str],
 }
 
-# A compile task spec as emitted for materialized archive plans.
 type ArchiveCompileTaskSpec = {source: Str, output: Str, argv: List[Str], depfile: Str, stamp: Str}
 
-# A position-independent object spec: its base compile, then objcopy and the
-# relocation check derived from `base` and `output`.
 type ArchivePiTaskSpec = {base: Str, output: Str, base_task: ArchiveCompileTaskSpec}
 
 type CompileFlagsCache = {format: Str, fingerprint: Str, flags: List[CompileFlagsEntry]}
@@ -435,8 +432,6 @@ export proc load_config(path_value: Path) [fs, error] -> Result[Kconfig, Error] 
     let line = raw.trim()
 
     if line.starts_with("CONFIG_") and "=" in line {
-      # Only the first `=` ends the name: string values such as CONFIG_CMDLINE
-      # contain more of them.
       let split_at = line.find("=") ?? 0
       let name = line.byte_slice(0, split_at).replace("CONFIG_", with: "")
       let value = clean_config_value(line.byte_slice(split_at + 1))
@@ -503,7 +498,6 @@ export proc write_config_headers(config_path: Path, root: Path, release: Str, ar
   )
 }
 
-# linux/version.h for MAJOR.MINOR.SUB, as the top-level Makefile writes it.
 proc version_header(release: Str) -> Result[Str] {
   let parts = [part as Int for part in release.split(".")]
 
@@ -568,7 +562,6 @@ export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [
   write_text_if_changed(fp"{root}/include/generated/uapi/linux/version.h", version_header(release)?)
 }
 
-# The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_header_list(file: Path, variable: Str) -> Result[List[Str]] {
   let names: List[Str] = collect {
     for line in file.lines()? {
@@ -581,10 +574,6 @@ proc kbuild_header_list(file: Path, variable: Str) -> Result[List[Str]] {
   names
 }
 
-# scripts/Makefile.asm-headers for one asm directory: asm-generic's
-# mandatory-y headers the arch does not provide, plus the arch's generic-y,
-# minus its generated-y, each become a one-line include of the asm-generic
-# header in the arch's generated directory.
 proc write_asm_wrapper_dir(root: Path, mandatory_kbuild: Path, arch_dir: Path, generated_dir: Path) {
   let arch_kbuild = fp"{root}/{arch_dir}/Kbuild"
   let arch_lists_exist = arch_kbuild.exists()?
@@ -1398,8 +1387,6 @@ pure kbuild_compile_flags_for_object(by_dir: Map[Map[List[Str]]], obj: Path) -> 
   kbuild_compile_flags_in_makefile_dir(by_dir, object_dir(obj), obj)
 }
 
-# A composite's members build under the Makefile that lists them, which is
-# the composite's directory even for a member such as x86/xor-avx.o.
 pure kbuild_compile_flags_for_member(by_dir: Map[Map[List[Str]]], composite: Path, member: Path) -> List[Str] {
   kbuild_compile_flags_in_makefile_dir(by_dir, object_dir(composite), member)
 }
@@ -2513,7 +2500,6 @@ proc discover_records_process_pool(
   let worker_count = if options.jobs < 1 { 1 } else if options.jobs > 16 { 16 } else { options.jobs }
   var handles = []
   var output_paths = []
-  # Loop-body defers run per iteration; remove worker outputs after the merge instead.
   defer {
     for output_path in output_paths {
       output_path.remove()
@@ -3101,8 +3087,6 @@ proc fingerprint_dir_line(root: Path, dir: Path) -> Result[Str] {
 
 ## Exported declaration `plan_fingerprint`.
 export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str, Error] {
-  # The top-level Makefile carries VERSION/PATCHLEVEL/SUBLEVEL, so a plan
-  # discovered in another kernel release never matches.
   f"""format linux-kbuild-plan-fingerprint-v10
 config {hash.sha256(config_path)?.hex()}
 makefile {hash.sha256(fp"{root}/Makefile")?.hex()}
@@ -6685,7 +6669,6 @@ proc analyze_archive_items_impl(
   results
 }
 
-# Caller-built items may use the legacy `members: [{object, flags}]` composite shape.
 proc archive_analysis_item_from_record(item: Record) -> Result[ArchiveAnalysisItem] {
   let members = if "members" in item { item.get("members")?.require(List[Record])? } else { [] }
   let member_objects = if "member_objects" in item {
@@ -6769,7 +6752,6 @@ proc archive_analysis_process_pool(
   var handles = []
   var output_paths = []
   var input_paths = []
-  # Loop-body defers run per iteration, before workers read their inputs.
   defer {
     for temp_path in [@input_paths, @output_paths] {
       temp_path.remove()
@@ -7168,11 +7150,6 @@ export proc plan_builtin_archives(
   assemble_builtin_archive_plan(plan, cc, results)
 }
 
-# Archive analysis is isolated at a process boundary because source probes and
-# task-spec construction dominate cold planning on the mounted kernel tree.
-# The serial planner remains the fallback for callers that do not request
-# workers; parallel results are merged in the original object order above the
-# archive dependency barriers.
 ## Exported declaration `plan_builtin_archives_with_analysis_workers`.
 export proc plan_builtin_archives_with_analysis_workers(
   plan: KbuildPlan,

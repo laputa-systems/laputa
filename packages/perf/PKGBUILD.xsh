@@ -1,6 +1,9 @@
 ##! perf, the Linux performance tool, built from the kernel tarball's tools/perf.
 use pm.make
 use pm.util as pm_util
+use pm.types
+use pm.target as pm_target
+use packages.upstream_pins as upstream_pins
 
 error PerfBuildError = UnsupportedArch | MissingKernelVersion
 
@@ -11,7 +14,7 @@ export const name = "perf"
 export const package_kind = "payload"
 
 ## The kernel release whose tools/perf this is; `perf --version` reports it.
-export const ver = "7.2.9"
+export const ver = upstream_pins.linux_kernel_version
 
 ## Package recipe export.
 export const rel = "1"
@@ -43,20 +46,8 @@ export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
 # arm-spe decoding needs the arm64 sysreg header on every architecture, so one
 # set serves both targets.
 ## Package recipe export.
-export const upstream_sources = [
-  {
-    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba",
-      },
-    ],
-  },
+export let upstream_sources = [
+  upstream_pins.linux_kernel_source,
   {
     source: p"files/generated/arch/arm64/include/generated/asm/sysreg-defs.h => build/arch/arm64/include/generated/asm",
     kind: "auto",
@@ -273,23 +264,14 @@ export const filetree = [
   {path: p"usr/share/doc/perf-tip/tips.txt", kind: "file"},
 ]
 
-# The upstream output directory: generated inputs stage here, the libraries'
-# public headers install here, and every object lands here.
 const out = "build"
 
-# One compiled unit: its object path under `build/` and its source path from
-# the tree root.
 type PerfUnit = {obj: Str, src: Str}
 
-# What differs between architectures: the kernel's name for the architecture,
-# the defines it adds, and its tools/perf sources.
 type PerfArch = {srcarch: Str, defs: List[Str], sources: List[Str]}
 
-# A library's public headers, copied from `src` to `build/<dest>` the way its
-# Makefile's install_headers does; perf includes them from there.
 type HeaderSet = {src: Str, dest: Str, names: List[Str]}
 
-# perf objects whose source is outside tools/perf, generated, or renamed.
 const perf_moved_units: List[PerfUnit] = [
   {obj: "pmu-events/pmu-events.o", src: "tools/perf/pmu-events/empty-pmu-events.c"},
   {obj: "util/argv_split.o", src: "tools/lib/argv_split.c"},
@@ -334,8 +316,6 @@ const extra_warnings = [
   "-Wshadow",
 ]
 
-# The upstream feature probes' results against musl; none depends on the
-# architecture.
 const musl_feature_defs = [
   "-DHAVE_PTHREAD_BARRIER",
   "-DHAVE_EVENTFD_SUPPORT",
@@ -356,15 +336,6 @@ const flex_cflags = [
 
 const workload_cflags = ["-g", "-O0", "-fno-inline"]
 
-# The object lists below transcribe a host run of the upstream build
-# (`make -C tools/perf V=1 prefix=/usr`, ARCH=x86_64 and ARCH=arm64) with
-# NO_LIBELF NO_LIBTRACEEVENT NO_JEVENTS NO_LIBPYTHON NO_SLANG NO_LIBNUMA
-# NO_LIBBABELTRACE NO_ZLIB NO_LZMA NO_LIBZSTD NO_LIBPFM4 NO_SDT NO_LIBLLVM
-# NO_CAPSTONE NO_DEMANGLE NO_RUST NO_LIBDEBUGINFOD NO_AIO and BUILD_BPF_SKEL=0:
-# perf then links only musl. The upstream build links the same objects through
-# nested `ld -r` objects and --whole-archive libraries; linking them directly
-# is equivalent. The dlfilter examples, the shell scripts (perf-archive,
-# perf-iostat, tests/shell), and the documentation are not built.
 proc perf_sources() -> List[Str] {
   """
 perf.c builtin-annotate.c builtin-bench.c builtin-buildid-cache.c
@@ -464,11 +435,9 @@ util/util.c util/values.c util/vdso.c
 """.words()
 }
 
-# The aarch64 list comes from an ARCH=arm64 cross run against musl and kernel
-# headers for arm64; nothing built from it has run on aarch64 yet.
-proc perf_arch(target: Str) [error] -> Result[PerfArch] {
-  if target == "x86_64" {
-    return {
+pure perf_arch(target: types.Target) -> Result[PerfArch] {
+  match target {
+    types.X86_64LinuxMusl => {
       srcarch: "x86",
       defs: [
         "-DHAVE_ARCH_X86_64_SUPPORT",
@@ -485,10 +454,7 @@ arch/x86/util/tsc.c bench/mem-memcpy-x86-64-asm.S
 bench/mem-memset-x86-64-asm.S
 """.words(),
     }
-  }
-
-  if target == "aarch64" {
-    return {
+    types.Aarch64LinuxMusl => {
       srcarch: "arm64",
       defs: [],
       sources: """
@@ -499,9 +465,8 @@ arch/arm64/util/hisi-ptt.c arch/arm64/util/mem-events.c arch/arm64/util/pmu.c
 arch/arm64/util/tsc.c
 """.words(),
     }
+    types.TargetReserved => Err(PerfBuildError.UnsupportedArch("perf has no object list for unsupported target"))
   }
-
-  Err(PerfBuildError.UnsupportedArch(f"perf has no object list for {target}"))
 }
 
 proc library_headers() -> List[HeaderSet] {
@@ -543,8 +508,6 @@ pure tree_units(obj_prefix: Str, src_dir: Str, sources: List[Str]) -> List[PerfU
   [{obj: fp"{obj_prefix}{source}".with_ext("o").display(), src: f"{src_dir}/{source}"} for source in sources]
 }
 
-# perf's CFLAGS between the compiler and BUILD_STR, in upstream order. perf
-# drops -Wnested-externs from the shared warning set.
 pure perf_cflags(arch: PerfArch) -> List[Str] {
   let a = arch.srcarch
   let warnings = [warning for warning in extra_warnings if warning != "-Wnested-externs"]
@@ -590,9 +553,6 @@ pure perf_cflags(arch: PerfArch) -> List[Str] {
   ]
 }
 
-# Per-object CFLAGS from the Build files, appended after the shared flags.
-# DOCDIR is upstream's fallback tips location for running perf from its source
-# tree; it points at the installed tips so no build path leaks into the binary.
 pure unit_cflags(obj: Str) -> List[Str] {
   match obj {
     "perf.o" => [
@@ -636,8 +596,6 @@ pure unit_cflags(obj: Str) -> List[Str] {
   }
 }
 
-# PERF-VERSION-GEN outside a git checkout writes the top Makefile's
-# `kernelversion`: VERSION.PATCHLEVEL.SUBLEVEL followed by EXTRAVERSION.
 proc write_perf_version_file() {
   var fields: Map[Str] = {}
 
@@ -683,7 +641,7 @@ proc install_library_headers() {
 
 proc build_perf(cc: Path) -> Result[Path] {
   let target = pm_util.target_arch()?
-  let arch = perf_arch(target)?
+  let arch = perf_arch(pm_target.recipe_target()?)?
   let a = arch.srcarch
   let triple = f"{target}-linux-musl"
   install_library_headers()

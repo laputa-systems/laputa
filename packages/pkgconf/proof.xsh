@@ -47,9 +47,6 @@ Description: data-only fixture
 Version: 5
 """
 
-# Runs pkg-config as pm/env.xsh's pkg_config_context does for a build root:
-# both search variables name only the root's pkgconfig directories, and the
-# root is the sysroot. An empty `sysroot` is the installed-system case.
 proc query(pkg_config: Path, dynlinker: Path, libdir: Str, sysroot: Str, args: List[Str]) -> Result[Str] {
   var out = ""
 
@@ -90,7 +87,7 @@ proc expect_status(pkg_config: Path, dynlinker: Path, libdir: Str, args: List[St
   )
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
   proof.package_metadata(rootfs, "pkgconf")
   proof.target_elf(rootfs, p"usr/bin/pkgconf", "pkgconf")
   proof.target_elf(rootfs, p"usr/lib/libpkgconf.so.8", "pkgconf")
@@ -104,11 +101,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # Every build resolves --cflags and --libs through this binary, so the
-  # proof pins the answers recipes depend on (identical to pkgconf 2.5.1's):
-  # Requires and Requires.private expansion, --static adding Libs.private,
-  # sysroot injection into -I and -L and into path variables, system
-  # directory filtering without a sysroot, version constraints, and errors.
   let os = system.uname()?
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let pkg_config = fp"{rootfs}/usr/bin/pkg-config"
@@ -161,8 +153,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   expect(pkg_config, dynlinker, libdir, s, ["--print-requires", "laputa-app"], "laputa-base >= 1.2")
   expect(pkg_config, dynlinker, libdir, s, ["--print-requires-private", "laputa-app"], "laputa-priv")
 
-  # An installed system: /usr/include and /usr/lib are the compiler's own
-  # search directories, so they are filtered out.
   expect(
     pkg_config,
     dynlinker,
@@ -176,7 +166,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   expect_status(pkg_config, dynlinker, libdir, ["--exists", "laputa-base >= 1.3"], false)
   expect_status(pkg_config, dynlinker, libdir, ["--cflags", "laputa-missing"], false)
 
-  # The shared library loads and exports only the public pkgconf_ API.
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "--dyn-syms" "-W" fp"{rootfs}/usr/lib/libpkgconf.so.8"
   proof.ensure(

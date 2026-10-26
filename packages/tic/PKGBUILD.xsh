@@ -60,7 +60,6 @@ export const filetree = [{path: p"usr/bin/tic", kind: "file"}]
 
 error CapsTableError = Missing(block: Str) | Mismatch(block: Str, row: Str)
 
-# The text of the requested raw-string constant in tic.xsh.
 proc embedded_block(script: Str, block_name: Str) [error] -> Result[Str] {
   let opening = f"const {block_name} = r\"\"\"\n"
   let start = script.find(opening)
@@ -73,23 +72,18 @@ proc embedded_block(script: Str, block_name: Str) [error] -> Result[Str] {
   script.byte_slice(body, end - body)
 }
 
-# `awk '!/^#/ && NF {print $1, $2, $3}' include/Caps`
 pure standard_rows(caps: Str) -> Str {
   [line.fields()[0..3].join(" ") for line in caps.split("\n") if ! line.starts_with("#") and ! line.fields().is_empty()].join(
     "\n",
   )
 }
 
-# `awk '$1 == "infoalias" || $1 == "userdef" {print $1, $2, $3}' include/Caps-ncurses`
 pure ncurses_rows(caps: Str) -> Str {
   [line.fields()[0..3].join(" ") for line in caps.split("\n") if ! line.fields().is_empty() and (line.fields()[0] == "infoalias" or line.fields()[0] == "userdef")].join(
     "\n",
   )
 }
 
-# The binary format's capability order is the order of include/Caps; a
-# compiler whose table drifted from the pinned release would write entries
-# that readers misinterpret, so a mismatch fails the build.
 proc check_caps_table() {
   let script = p"tic.xsh".read_text()?
   let checks = [

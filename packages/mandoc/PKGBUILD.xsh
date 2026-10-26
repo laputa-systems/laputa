@@ -37,8 +37,6 @@ export const upstream_sources = [
   },
 ]
 
-# man, apropos, whatis, and makewhatis are mandoc itself: it selects its mode
-# from argv[0], so upstream installs them as links to one binary.
 const mandoc_links = ["man", "apropos", "whatis", "makewhatis"]
 
 ## Package recipe export.
@@ -148,9 +146,6 @@ extern	void	 *recallocarray(void *, size_t, size_t, size_t);
 extern	long long strtonum(const char *, long long, long long, const char **);
 """
 
-# Object lists from the upstream Makefile: LIBMANDOC_OBJS with the compat
-# objects configure selected (MANDOC_COBJS), MAIN_OBJS, DEMANDOC_OBJS, and
-# soelim's SOELIM_COBJS.
 const libmandoc_stems = """
 man man_macro man_validate
 att lib mdoc mdoc_argv mdoc_macro mdoc_state mdoc_validate st
@@ -171,9 +166,6 @@ main manpath mdoc_man mdoc_markdown out tree
 
 const soelim_stems = ["compat_progname", "compat_stringlist", "soelim"]
 
-# Pages from upstream's base-install, as (source, installed path). mandoc
-# owns man7/man.7: Linux man-pages' page of that name only sources groff's
-# groff_man(7), so the man-pages recipe leaves it out.
 const manuals = [
   ["mandoc.1", "man1/mandoc.1"],
   ["demandoc.1", "man1/demandoc.1"],

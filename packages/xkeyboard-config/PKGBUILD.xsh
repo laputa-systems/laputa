@@ -124,7 +124,6 @@ export proc build(dest: Path) [fs, error] {
     let _ = fs.copy_tree(dir, fp"{base}/{dir.name}", parents: true, overwrite: true)?
   }
 
-  # Upstream installs neither its symbols build file nor the custom types stub.
   fp"{base}/symbols/meson.build".remove(missing_ok: false)
   fp"{base}/types/custom".remove(missing_ok: false)
   fp"{base}/rules".mkdir()

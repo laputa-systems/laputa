@@ -1,22 +1,5 @@
 ##! Golden tests for the XSH terminfo compiler (packages/tic/files/tic.xsh):
 ##! its compiled entries must be byte-identical to ncurses 6.6 `tic -x`.
-#
-# The fixtures under tests/pm/fixtures/tic were made on the host from
-# ncurses-6.6.tar.gz (sha256 355b4cbb...9ff11) and foot-1.27.0.tar.gz, with
-# ncurses' own tic built from that tarball (`./configure && make`, progs/tic):
-#
-#   sed '/^xterm+kbs|fragment for backspace key/,/^#/s/kbs=^H,/kbs=^?,/' \
-#     ncurses-6.6/misc/terminfo.src > terminfo.src
-#   xsh tests/pm/fixtures/tic/sample-closure.xsh -- terminfo.src $SAMPLE \
-#     > tests/pm/fixtures/tic/ncurses-sample.src
-#   sed 's/@default_terminfo@/foot/g' foot/foot.info > tests/pm/fixtures/tic/foot.info
-#   TERMINFO=/nonexistent tic -x -o expected-ncurses -e "${SAMPLE// /,}" ncurses-sample.src
-#   TERMINFO=/nonexistent tic -x -o expected-foot -e foot,foot-direct foot.info
-#
-# with SAMPLE="xterm-256color tmux-256color screen linux vt100 xterm-direct
-# dumb foot konsole-256color terminology-1.8.1 screen.xterm-xfree86".  The
-# last three exercise use= chains with cancelled standard and extended
-# capabilities; xterm-direct and foot-direct use the 32-bit number format.
 
 const ncurses_sample = [
   "xterm-256color",
@@ -60,7 +43,6 @@ proc compile(out: Path, names: List[Str], source: Path) -> Result[Status] {
   process.run(process.command_argv(xsh, argv))?
 }
 
-# Every compiled name under a database root, as `<leaf>/<name>`.
 proc compiled_paths(root: Path) -> Result[List[Str]] {
   fs.walk(root)?
     |> where .kind == "file"
@@ -94,8 +76,6 @@ test test_foot_entries_match_ncurses_tic [fs, process, env, error] { |ctx|
   assert_same_tree(p"tests/pm/fixtures/tic/expected-foot", out)
 }
 
-# tic would look an unknown use= target up in whatever database the host has;
-# this compiler fails instead, so a build never depends on the build machine.
 test test_unresolved_use_fails [fs, process, env, error] { |ctx|
   let dir = test.temp_dir(ctx, name: "tic-unresolved")?
   let source = fp"{dir}/missing.src"

@@ -14,7 +14,6 @@ pure doubled(value: Int) -> Int {
 
 proc main() [fs, process, env, time, net, error] {
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_START"
-  # xinit reaches this sysinit only after its production PID 1 guard succeeds.
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_OK"
 
   require(linux.is_mountpoint(/proc)?, "proc", "/proc is not mounted")
@@ -54,7 +53,6 @@ proc main() [fs, process, env, time, net, error] {
   let pipeline = run.text /usr/bin/printf "laputa\n" | run /usr/bin/tr a-z A-Z
   require(pipeline.trim() == "LAPUTA", "pipeline", "the XSH pipeline produced the wrong output")
 
-  # A TCP echo over 127.0.0.1 exercises the guest network stack without host networking.
   let socket_abi = linux.net_constants()
   let server = linux.socket(socket_abi.AF_INET, socket_abi.SOCK_STREAM)?
   defer unix.close_fd(server)
@@ -135,7 +133,7 @@ proc main() [fs, process, env, time, net, error] {
     "new tmpfs directory was not visible through rooted enumeration",
   )
   let raw_name = b"raw\xfffile" as Path
-  raw_tmp_root.write(raw_name, b"ok")
+  raw_tmp_root.write(raw_name.require(RelPath)?, b"ok")
   require(raw_tmp_dir.exists()?, "tmpfs-path", "rooted create removed its parent path")
   require(
     raw_tmp_root.children(p".")?.children == [raw_name],
@@ -162,7 +160,6 @@ proc main() [fs, process, env, time, net, error] {
 
   if test_selection_path.exists() {
     let source_root = p"/usr/lib/asterinas/xsh-source"
-    # XSH's filesystem test checks the repository root marker and specification file.
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir()
     let test_selection = test_selection_path.read_text()?.trim()

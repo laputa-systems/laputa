@@ -1,4 +1,5 @@
 ##! Linux package metadata and the dynamic recipe boundary.
+use packages.upstream_pins as upstream_pins
 
 ## Exported declaration `name`.
 export const name = "linux"
@@ -7,7 +8,7 @@ export const name = "linux"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "7.2.9"
+export const ver = upstream_pins.linux_kernel_version
 
 ## Exported declaration `rel`.
 export const rel = "1"
@@ -42,20 +43,8 @@ export const nostrip = true
 # - files/generated/sha256-core.S and sha512-core.S: `perl
 #   lib/crypto/arm64/sha2-armv8.pl void <out>` with the output name.
 ## Exported declaration `upstream_sources`.
-export const upstream_sources = [
-  {
-    source: p"https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba",
-      },
-    ],
-  },
+export let upstream_sources = [
+  upstream_pins.linux_kernel_source,
   {
     source: p"files/config/aarch64/base-aarch64.fragment => .laputa-inputs/files/config/aarch64",
     kind: "auto",

@@ -2,8 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# A 16-frame 8 kHz mono S16_LE WAVE file: RIFF size 68, a 16-byte PCM fmt
-# chunk (byte rate 16000, block align 2), and a 32-byte square-wave data chunk.
 const square_wav = b"RIFFD\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0@\x1f\0\0\x80>\0\0\x02\0\x10\0data \0\0\0\0\x10\0\x10\0\x10\0\x10\0\xf0\0\xf0\0\xf0\0\xf0\0\x10\0\x10\0\x10\0\x10\0\xf0\0\xf0\0\xf0\0\xf0"
 
 const kind = "proof-alsa-utils-minimal"
@@ -15,7 +13,6 @@ proc tool(root: Path, name: Str, args: List[Str]) [fs, process, env, error] -> R
   let loader = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let program = fp"{root}/usr/bin/{name}"
 
-  # The proof root's libasound reads the proof root's configuration tree.
   let result = env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
     ALSA_CONFIG_DIR: fp"{root}/usr/share/alsa".display(),
@@ -56,8 +53,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # The no-card failures below are the behavior of a machine without sound
-  # hardware; a build container that passed /dev/snd through would change them.
   proof.ensure(
     ! p"/dev/snd".exists()?,
     kind,
@@ -94,16 +89,12 @@ proc main(root = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # Playback of a WAVE file through the null PCM parses the header and
-  # configures the stream from it.
   let wav = fp"{tmp}/square.wav"
   wav.write(square_wav)
   let played = expect_ok(root, "aplay", ["-D", "null", wav.display()])?
   let playing = f"Playing WAVE '{wav}' : Signed 16 bit Little Endian, Rate 8000 Hz, Mono"
   proof.ensure(played.stderr.trim() == playing, kind, f"unexpected aplay report: {played.stderr.trim()}")
 
-  # One second of 8 kHz mono S16 capture from the null PCM is 16000 data
-  # bytes behind a 44-byte WAVE header, and aplay plays it back.
   let recorded = fp"{tmp}/capture.wav"
   let capture = expect_ok(
     root,
@@ -131,7 +122,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     f"unexpected speaker-test output: {tone.stdout.trim()}",
   )
 
-  # Without a card, mixer and UCM clients fail at card lookup.
   expect_failure(root, "amixer", ["-c", "0", "scontrols"], 1, "Invalid card number '0'.")
   let ucm = tool(root, "alsaucm", ["-c", "hw:0", "list", "_verbs"])?
   proof.ensure(ucm.code == 1, kind, f"alsaucm on a missing card exited {ucm.code}")
@@ -141,8 +131,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     f"unexpected alsaucm failure: {ucm.stderr.trim()}",
   )
 
-  # alsactl over every card succeeds with nothing to save or restore and
-  # leaves an empty state file; naming card 0 fails with its lookup error.
   let state = fp"{tmp}/asound.state"
   let _ = expect_ok(root, "alsactl", ["-f", state.display(), "store"])?
   proof.ensure(state.read_text()? == "", kind, "alsactl store with no cards wrote state")

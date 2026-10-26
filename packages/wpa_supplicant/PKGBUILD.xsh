@@ -14,9 +14,6 @@ export const ver = "2.12"
 ## Package recipe export.
 export const rel = "1"
 
-# Internal TLS/crypto — no openssl needed.
-# The nl80211 driver unconditionally includes <netlink/genl/genl.h>, so libnl3
-# headers and library are required at build and runtime.
 ## Package recipe export.
 export const deps = ["musl", "libnl3"]
 
@@ -129,10 +126,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     "/usr/include",
   ]
 
-  # The defines upstream's Makefile derives from the `config` file, as printed
-  # by `make -n V=1`. CONFIG_SME, CONFIG_WNM, and CONFIG_BGSCAN follow from the
-  # nl80211 driver and bgscan_simple; CONFIG_DEBUG_SYSLOG_FACILITY becomes
-  # LOG_HOSTAPD.
   var defs = [
     "-DCONFIG_BACKEND_FILE",
     "-DCONFIG_BGSCAN",
@@ -154,11 +147,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   var ldflags = ["-L", "/usr/lib", "-lnl-3", "-lnl-genl-3", "-Wl,--gc-sections"]
 
-  # Every object upstream's wpa_supplicant/Makefile builds for wpa_supplicant,
-  # wpa_cli, and wpa_passphrase from the `config` file (all but their main
-  # files), as listed by `make -n V=1 wpa_supplicant wpa_cli wpa_passphrase`
-  # run in wpa_supplicant/ with that file as .config. No EAP method needs TLS,
-  # so upstream links tls_none rather than the internal TLS client.
   let shared_sources = [
     p"src/utils/base64.c",
     p"src/utils/bitfield.c",
@@ -291,8 +279,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let wpa_cli_out = multi.outputs.get("wpa_cli")?
   let passphrase_out = multi.outputs.get("wpa_passphrase")?
 
-  # Install under /usr/bin: baselayout symlinks /usr/sbin -> bin so
-  # installing to /usr/sbin would fail proof extraction with "symlink escape".
   fs.install(wpa_supplicant_out, fp"{dest}/usr/bin/wpa_supplicant", 0o755, parents: true, overwrite: true)
   fs.install(wpa_cli_out, fp"{dest}/usr/bin/wpa_cli", 0o755, parents: true, overwrite: true)
   fs.install(passphrase_out, fp"{dest}/usr/bin/wpa_passphrase", 0o755, parents: true, overwrite: true)

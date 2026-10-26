@@ -23,7 +23,6 @@ proc main(rootfs = /rootfs) [fs, process, env, time, error] {
   let tmp = /tmp/dropbear-proof
   tmp.mkdir()
 
-  # RSA: exercises libtommath (big-integer arithmetic) + libtomcrypt (RSA ops).
   let rsa_key = fp"{tmp}/host_rsa"
   run $dynlinker $dropbearkey "-t" "rsa" "-s" "2048" "-f" $rsa_key
   let rsa_out = run.text $dynlinker $dropbearkey "-y" "-f" $rsa_key
@@ -34,7 +33,6 @@ proc main(rootfs = /rootfs) [fs, process, env, time, error] {
 
   print "dropbear ok: rsa 2048 key generated"
 
-  # ed25519: exercises curve25519 (ECC) in libtomcrypt.
   let ed_key = fp"{tmp}/host_ed25519"
   run $dynlinker $dropbearkey "-t" "ed25519" "-f" $ed_key
   let ed_out = run.text $dynlinker $dropbearkey "-y" "-f" $ed_key
@@ -45,7 +43,6 @@ proc main(rootfs = /rootfs) [fs, process, env, time, error] {
 
   print "dropbear ok: ed25519 key generated"
 
-  # ecdsa-256: exercises ECDSA / prime256v1 in libtomcrypt.
   let ec_key = fp"{tmp}/host_ecdsa"
   run $dynlinker $dropbearkey "-t" "ecdsa" "-s" "256" "-f" $ec_key
   let ec_out = run.text $dynlinker $dropbearkey "-y" "-f" $ec_key
@@ -68,11 +65,6 @@ proc public_key_line(body: Str) [error] -> Result[Str] {
   Err(ScriptError.Failed(kind: "dropbear-proof", message: "dropbearkey did not print an SSH public key"))
 }
 
-# Runs one command over SSH as `login` on loopback and returns its output, or
-# "" when the login fails. `-y -y` skips host key checking entirely, so the
-# client writes no known_hosts; BatchMode keeps it from prompting; HOME keeps
-# it away from the user's own ~/.ssh. Output goes to a file, not a pipe, so a
-# descendant that outlives the client cannot hold the read open.
 proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, port: Int) -> Result[Str] {
   let dbclient = fp"{rootfs}/usr/bin/dbclient"
   let out = fp"{home}/ssh.out"
@@ -90,11 +82,6 @@ proc ssh_echo(dynlinker: Path, rootfs: Path, home: Path, login: Str, key: Path, 
   out.read_text()?.trim()
 }
 
-# The installer's QEMU proof logs in over SSH with an ed25519 host key and
-# public-key authentication; this runs the same exchange on loopback: the
-# server with an ed25519 host key and no password logins, a client with an
-# authorized key that runs a command, and one with an unknown key that dropbear
-# must refuse.
 proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
   let dropbearkey = fp"{rootfs}/usr/bin/dropbearkey"
   let dropbear = fp"{rootfs}/usr/bin/dropbear"
@@ -125,7 +112,6 @@ proc ssh_session(dynlinker: Path, rootfs: Path, tmp: Path, host_key: Path) {
     var output = ""
     var tries = 50
 
-    # Retry while the server comes up.
     while tries > 0 and output == "" {
       output = ssh_echo(dynlinker, rootfs, client_home, me.name, client_key, port)?
 

@@ -17,8 +17,6 @@ export const rel = "1"
 ## Package recipe export.
 export const deps = ["musl", "libdrm", "wayland-libs-client"]
 
-# Mesa's C++ (the GLSL compiler) links libc++ statically through the
-# llvm-toolchain wrapper, so no runtime package carries a C++ library.
 ## Package recipe export.
 export const mkdeps_host = [
   "llvm-toolchain",
@@ -237,9 +235,6 @@ const mesa_options = [
   "-Dhtml-docs=disabled",
 ]
 
-# Mesa runs every Python, bison, and flex generator through this program. The
-# recipe removes each build edge that names it and stages the vendored output,
-# so it only runs if an output the build needs was never vendored.
 const vendored_generator = "build-support/laputa-vendored-output.xsh"
 
 error MesaBuildError = Failed(kind: Str, message: Str)
@@ -296,7 +291,6 @@ proc patch_build() {
 """,
         new: "",
       },
-      # No Python in the build world: every Python output is vendored.
       {
         old: """# Find a python executable that meets our version requirement.
 # - On Windows, a venv has no versioned aliased to 'python'.
@@ -362,8 +356,6 @@ endif
 prog_python = prog_vendored
 """,
       },
-      # Laputa's bison and flex cannot process Mesa's grammars; the generated
-      # parsers and lexers are vendored with the Python outputs.
       {
         old: """  prog_bison = find_program('bison', required : false)
 
@@ -421,7 +413,6 @@ prog_python = prog_vendored
     wp_files += {name : mod_wl.scan_xml(xml, include_core_only : false)}
   endforeach
 """,
-        # Same outputs and names as scan_xml: private code plus a client header.
         new: """  wl_scanner = find_program(dependency('wayland-scanner', native : true).get_variable(pkgconfig : 'wayland_scanner'))
   wl_protocol_dir = dep_wl_protocols.get_variable(pkgconfig : 'pkgdatadir')
   wp_protos = {
@@ -481,12 +472,6 @@ proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
   {kept: split.kept.extend(block), vendored: split.vendored}
 }
 
-# Removes every build edge that runs the vendored generator, along with its
-# `default` line, and copies its outputs from the staged generated tree into
-# the build directory before samu runs. Outputs the default target does not
-# need (Windows .def files, glvnd and GLX tables) may stay unvendored; samu
-# fails if one is needed. Every vendored file must match a removed edge, so a
-# stale set fails here.
 proc stage_vendored_outputs() {
   let ninja = p"build/build.ninja"
   var split: NinjaSplit = NinjaSplit(kept: [], vendored: [])

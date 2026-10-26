@@ -149,7 +149,7 @@ proc expect_generation_error(_: TestContext, result: Result[types.GenerationRece
   }
 }
 
-test test_generation_runtime_closure_excludes_build_toolchain [fs, env, error] { |ctx|
+test test_generation_runtime_closure_excludes_build_toolchain [fs, process, env, error] { |ctx|
   let build_value = generation_build_plan(ctx, "generation-runtime-plan")?
   let overlay = empty_overlay(ctx, "generation-runtime-overlay")?
   let value = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?
@@ -168,7 +168,7 @@ test test_generation_runtime_closure_excludes_build_toolchain [fs, env, error] {
   generation.verify_generation(output, receipt)
 }
 
-test test_generation_x86_64_plan_and_composition_preserve_target [fs, env, error] { |ctx|
+test test_generation_x86_64_plan_and_composition_preserve_target [fs, process, env, error] { |ctx|
   let target = types.target_x86_64()
   let repo_root = copied_generation_repository(ctx, "generation-x86-plan")?
   let build_value = plan.resolve(
@@ -194,7 +194,7 @@ test test_generation_x86_64_plan_and_composition_preserve_target [fs, env, error
   generation.verify_generation(output, receipt)
 }
 
-test test_generation_plan_and_receipt_are_deterministic_for_root_order_and_duplicates [fs, env, error] { |ctx|
+test test_generation_plan_and_receipt_are_deterministic_for_root_order_and_duplicates [fs, process, env, error] { |ctx|
   let build_value = generation_build_plan(ctx, "generation-deterministic-plan")?
   let overlay = empty_overlay(ctx, "generation-deterministic-overlay")?
   let overlay_sha256 = generation.overlay_digest(overlay)?
@@ -215,7 +215,7 @@ test test_generation_plan_and_receipt_are_deterministic_for_root_order_and_dupli
   )?
 }
 
-test test_generation_plan_json_round_trips_and_rejects_changed_identity [fs, env, error] { |ctx|
+test test_generation_plan_json_round_trips_and_rejects_changed_identity [fs, process, env, error] { |ctx|
   let build_value = generation_build_plan(ctx, "generation-plan-json")?
   let overlay = empty_overlay(ctx, "generation-plan-json-overlay")?
   let planned = generation.plan_profile(
@@ -238,7 +238,7 @@ test test_generation_plan_json_round_trips_and_rejects_changed_identity [fs, env
   }
 }
 
-test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutation [fs, env, error] { |ctx|
+test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutation [fs, process, env, error] { |ctx|
   let build_value = generation_build_plan(ctx, "generation-invalid-plan")?
   let overlay = empty_overlay(ctx, "generation-invalid-overlay")?
   let value = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?
@@ -260,7 +260,7 @@ test test_generation_rejects_missing_and_corrupt_runtime_artifacts_before_mutati
   assert corrupt_output.exists()? == false
 }
 
-test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env, error] { |ctx|
+test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, process, env, error] { |ctx|
   let build_value = generation_build_plan(ctx, "generation-overlay-plan")?
   let store_root = test.temp_dir(ctx, name: "generation-overlay-store")?
   stage_generation_artifacts(ctx, build_value, store_root)
@@ -306,14 +306,11 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, env,
   assert fp"{replacement_output}/usr/share/app".read_text()? == "replaced app\n"
 }
 
-test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects_conflicts [fs, env, error] { |ctx|
+test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects_conflicts [fs, process, env, error] { |ctx|
   let build_value = generation_baselayout_build_plan(ctx, "generation-baselayout-plan")?
   let store_root = test.temp_dir(ctx, name: "generation-baselayout-store")?
   stage_generation_baselayout_artifact(ctx, build_value, store_root)
 
-  # The profile owns a new hook below baselayout's directory.  Its matching
-  # directory declaration is structural, not a package replacement; the
-  # profile's overlay digest remains explicit receipt provenance.
   let overlay = empty_overlay(ctx, "generation-baselayout-overlay")?
   let hook_directory = fp"{overlay}/usr/lib/init/rc.d"
   hook_directory.mkdir()
@@ -353,12 +350,8 @@ test test_generation_overlay_coalesces_matching_baselayout_directory_and_rejects
   assert mode_output.exists()? == false
 }
 
-# Artifact keys exclude the executor, so a package can be rebuilt under the
-# same ver-rel. The generation follows the artifact key, not the tuple: the
-# rebuilt package yields a new generation (and so a new system bundle).
-test test_generation_follows_artifact_keys_not_releases [fs, env, error] { |ctx|
+test test_generation_follows_artifact_keys_not_releases [fs, process, env, error] { |ctx|
   let first = generation_build_plan(ctx, "generation-key-first")?
-  # A separate checkout: one process loads each recipe path once.
   let repo_root = copied_generation_repository(ctx, "generation-key-rebuilt")?
   let recipe = fp"{repo_root}/packages/runtime-lib/PKGBUILD.xsh"
   recipe.write(recipe.read_text()? + "# A rebuild input without a rel bump.\n")
@@ -381,6 +374,40 @@ test test_generation_follows_artifact_keys_not_releases [fs, env, error] { |ctx|
     for artifact in after.artifacts
     if before_keys.get(artifact.package_name)? != artifact.artifact_key
   ]
-  # runtime-lib and app, which builds against it.
   assert changed == ["app", "runtime-lib"]
+}
+
+
+test test_generation_rejects_package_owned_manual_index_before_publication [fs, process, env, error] { |ctx|
+  let build_value = generation_build_plan(ctx, "generation-manual-index-owner-plan")?
+  let store_root = test.temp_dir(ctx, name: "generation-manual-index-owner-store")?
+  stage_generation_artifacts(ctx, build_value, store_root)
+  let overlay = empty_overlay(ctx, "generation-manual-index-owner-overlay")?
+  fp"{overlay}/usr/share/man".mkdir()
+  fp"{overlay}/usr/share/man/mandoc.db".write("unverified manual index")
+  let value = generation.plan(build_value, ["app"], generation.overlay_digest(overlay)?)?
+  let output = fp"{test.temp_dir(ctx, name: "generation-manual-index-owner-output")?}/root"
+  expect_generation_error(ctx, generation.compose(value, store_root, output, overlay), "reserved usr/share/man/mandoc.db")
+  assert ! output.exists()?
+}
+
+test test_generation_manual_index_failure_preserves_published_generation [fs, process, env, error] { |ctx|
+  let repo_root = copied_generation_repository(ctx, "generation-manual-index-failure-repo")?
+  let recipe = fp"{repo_root}/packages/app/PKGBUILD.xsh"
+  recipe.write(recipe.read_text()?.replace("name = \"app\"", with: "name = \"mandoc\"").replace("[\"runtime-lib\"]", with: "[]").replace("[\"host-tool\"]", with: "[]").replace("[\"target-sdk\"]", with: "[]"))
+  recipe.parent.rename(to: fp"{repo_root}/packages/mandoc")
+  let build_value = plan.resolve(catalog.load(repo_root)?, generation_empty_remote(), policy.aarch64_docker(), ["mandoc"], false)?
+  let store_root = test.temp_dir(ctx, name: "generation-manual-index-failure-store")?
+  stage_generation_artifacts(ctx, build_value, store_root)
+  let overlay = empty_overlay(ctx, "generation-manual-index-failure-overlay")?
+  fp"{overlay}/usr/share/man/man1".mkdir()
+  fp"{overlay}/usr/share/man/man1/laputa.1".write(".TH LAPUTA 1\n.SH NAME\nlaputa \\- floating island\n")
+  let value = generation.plan(build_value, ["mandoc"], generation.overlay_digest(overlay)?)?
+  let previous = fp"{test.temp_dir(ctx, name: "generation-manual-index-previous")?}/root"
+  previous.mkdir()
+  fp"{previous}/sentinel".write("published generation")
+  let output = fp"{previous.parent}/candidate"
+  expect_generation_error(ctx, generation.compose(value, store_root, output, overlay), "manual index requires selected-root")
+  assert ! output.exists()?
+  assert fp"{previous}/sentinel".read_text()? == "published generation"
 }

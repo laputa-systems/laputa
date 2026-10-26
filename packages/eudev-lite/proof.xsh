@@ -18,8 +18,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynlinker = fp"{root}/usr/lib/ld-musl-{os.machine}.so.1"
   let udevadm = fp"{root}/usr/bin/udevadm"
 
-  # Boot scripts call `udevadm trigger` and `udevadm settle`; both must succeed,
-  # and an unsupported subcommand must fail rather than pretend.
   let ver = proof.package_version(root, "eudev-lite")?
   let version = run.text $dynlinker $udevadm "--version"
   proof.ensure(

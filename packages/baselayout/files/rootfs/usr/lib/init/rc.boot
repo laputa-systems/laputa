@@ -3,10 +3,10 @@ for dir in [/proc, /sys, /run, /dev] {
   dir.mkdir()
 }
 
-let mount_proc = linux.mount("proc", /proc, fstype: "proc", options: ["nosuid", "noexec", "nodev"])
-let mount_sys = linux.mount("sys", /sys, fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
-let mount_run = linux.mount("run", /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
-let mount_dev = linux.mount("dev", /dev, fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
+let mount_proc = linux.mount(b"proc", /proc, fstype: "proc", options: ["nosuid", "noexec", "nodev"])
+let mount_sys = linux.mount(b"sys", /sys, fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
+let mount_run = linux.mount(b"run", /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
+let mount_dev = linux.mount(b"dev", /dev, fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
 
 for dir in [/dev/pts, /dev/shm] {
   dir.mkdir()
@@ -16,7 +16,7 @@ let proc_filesystems = p"/proc/filesystems".read_text()?
 
 if "devpts" in proc_filesystems {
   let _ = linux.mount(
-    "devpts",
+    b"devpts",
     /dev/pts,
     fstype: "devpts",
     options: ["mode=0620", "gid=5", "ptmxmode=0666", "nosuid", "noexec"],
@@ -33,7 +33,7 @@ if ! p"/dev/ptmx".exists() {
   let _ = linux.mknod(/dev/ptmx, "char", 5, 2)
 }
 
-let mount_shm = linux.mount("shm", /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
+let mount_shm = linux.mount(b"shm", /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
 
 if ! p"/dev/fd".exists() {
   p"/dev/fd".symlink(to: /proc/self/fd)

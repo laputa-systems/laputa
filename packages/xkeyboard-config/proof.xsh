@@ -4,9 +4,6 @@ proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "xkeyboard-config")
   let xkb = fp"{root}/usr/share/X11/xkb"
 
-  # libxkbcommon resolves an RMLVO keymap through the rules file to these
-  # component files, so the rules must map models, layouts, and options to
-  # components that exist.
   for ruleset in ["base", "evdev"] {
     let lines = fp"{xkb}/rules/{ruleset}".read_text()?.split("\n")
     let headers = [line.words().join(" ") for line in lines if line.starts_with("! ")]

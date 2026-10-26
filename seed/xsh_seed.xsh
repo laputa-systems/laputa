@@ -1,10 +1,4 @@
 ##! The local XSH seed: static musl `xsh`, `xshi`, `xsht` and the core applet tarball built from the XSH_ROOT checkout.
-# The seed is never a published release. It is built from whatever XSH_ROOT
-# holds, inside XSH's own `Dockerfile.test` image (`xsh-test`) with the musl
-# link flags XSH's Linux test path uses, so a Linux build here is the same
-# evidence `cargo dev test linux` produces. The build runs with
-# `--network none`: the crate registry comes from `.cache/cargo`, filled by
-# `seed fetch`.
 
 ## One supported seed architecture and the names each tool uses for it.
 export type SeedArch = {arch: Str, triple: Str, docker_platform: Str}
@@ -20,15 +14,12 @@ export const xsh_seed_build_image = "xsh-test"
 
 const xsh_seed_manifest_format = "laputa-xsh-seed-1"
 
-# XSH's distribution feature set: release binaries carry the network and tool
-# modules and xsht's native test runner, but not the xsh crate's own tests.
 const xsh_seed_features = "xsh/net xsh/tools xsht/native-tests"
 const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
 
 ## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
 export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
 
-# Select XSH features for the ordinary seed or Laputa's Asterinas shell.
 pure xsh_seed_features_for(asterinas_shell: Bool) -> Str {
   return f"{xsh_seed_features} {xsh_seed_asterinas_shell_feature}" when asterinas_shell
   xsh_seed_features
@@ -53,8 +44,6 @@ export pure xsh_seed_manifest_path(laputa_root: Path, arch: Str) -> Path {
   fp"{xsh_seed_dir(laputa_root, arch)}/manifest.json"
 }
 
-# Cargo separates outputs by target triple, so one target directory serves
-# every seed architecture and survives between seeds for incremental builds.
 pure xsh_seed_cargo_target(laputa_root: Path) -> Path {
   fp"{laputa_root}/.out/xsh-target"
 }
@@ -63,8 +52,6 @@ pure xsh_seed_cargo_registry(laputa_root: Path) -> Path {
   fp"{laputa_root}/.cache/cargo/registry"
 }
 
-# Records which Cargo.lock the cached registry was fetched for, so a seed
-# build fails with a clear instruction instead of a cargo offline error.
 pure xsh_seed_registry_stamp(laputa_root: Path) -> Path {
   fp"{laputa_root}/.cache/cargo/Cargo.lock.sha256"
 }
@@ -116,11 +103,6 @@ export pure xsh_seed_cargo_build_argv(
     "CARGO_TARGET_DIR=/target",
     "--env",
     "CARGO_NET_OFFLINE=true",
-    # The release profile's thin LTO and non-incremental codegen made a
-    # one-line XSH edit cost a full ~7 minute rebuild at -j 4; without LTO and
-    # with incremental codegen the same edit rebuilds in ~13 s. The binaries
-    # stay opt-level 3 and grow by about 1%. The dist profile is reserved for
-    # XSH's release packaging.
     "--env",
     "CARGO_PROFILE_RELEASE_LTO=false",
     "--env",
@@ -275,9 +257,6 @@ proc xsh_seed_core_sources(xsh_root: Path) -> Result[List[Path]] {
   sources |> sort
 }
 
-# Tar members carry staging mtimes, so the tarball is rebuilt only when this
-# digest of the packaged sources changes; otherwise its sha256 stays stable and
-# the `xsh` package keeps its build key.
 proc xsh_seed_core_digest(xsh_root: Path, sources: List[Path]) [fs, error] -> Result[Str] {
   let lines = [f"{relative}\t{hash.sha256(fp"{xsh_root}/core/{relative}")?.hex()}" for relative in sources]
   bytes.from_text(lines.join("\n") + "\n").sha256().hex()
@@ -300,8 +279,6 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
   }
 }
 
-# Replace a product only when its bytes changed, so an unchanged rebuild keeps
-# the seed directory, and with it the `xsh` package key, byte-identical.
 proc xsh_seed_publish_binary(source: Path, dest: Path) {
   guard source.exists() else {
     return Err(SeedError.Missing(f"cargo did not produce {source}"))
@@ -372,8 +349,6 @@ export proc xsh_seed_build(
     core_tree.remove()
   }
 
-  # The extracted tree is what containers mount at /usr/lib/xsh/core, so the
-  # mounted applets are exactly the packaged ones.
   if ! core_tree.exists() {
     archive.tar_extract(core_archive, out, 0, "xz", true)
   }

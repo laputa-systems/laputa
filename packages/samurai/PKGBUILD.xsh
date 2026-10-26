@@ -45,9 +45,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let os = system.uname()?
   let triple = f"{os.machine}-linux-musl"
 
-  # samurai has a simple hand-written Makefile; compile all .c files directly.
-  # Source list and flags from the Makefile's OBJ and ALL_CFLAGS, with OS=posix.
-  # Its LDLIBS=-lrt is omitted: musl's librt is an empty stub.
   let cflags = [
     "-std=c99",
     "-Wall",
@@ -91,7 +88,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(samu.tasks, make.jobs()?)
 
-  # Install binary and ninja symlink.
   fs.install(samu.output, fp"{dest}/usr/bin/samu", 0o755, parents: true, overwrite: true)
   fp"{dest}/usr/bin/ninja".symlink(to: p"samu")
 }

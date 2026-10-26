@@ -19,8 +19,6 @@ export pure image_size_mib(data_blocks: Int) -> Int {
   ) + 1
   let last_group_blocks = needed_mib * blocks_per_mib % ext4_blocks_per_group
 
-  # Each group needs four header blocks and a 512-block inode table. A partial
-  # final group below that size would truncate its inode table in the image.
   let padded_mib = if last_group_blocks > 0 and last_group_blocks < ext4_group_metadata_blocks {
     needed_mib + ceil_div(ext4_group_metadata_blocks - last_group_blocks, blocks_per_mib)
   } else {

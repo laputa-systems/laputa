@@ -62,8 +62,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
-  # Flags from the Makefile's XCFLAGS with PREFIX=/usr. libudev looks up USB
-  # vendor and product names in usb.ids and leaves them unset when it is absent.
   let cflags = [
     "-std=c99",
     "-Wall",

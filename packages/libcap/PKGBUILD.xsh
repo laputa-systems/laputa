@@ -80,8 +80,6 @@ export const filetree = [
   },
 ]
 
-# Make.Rules' CPPFLAGS (with lib=lib, prefix=/usr) and the library's own
-# -D_LIBPSX_PTHREAD_LINKAGE; the bundled uapi header precedes the system's.
 const cppflags = [
   "-Dlinux",
   "-D_LARGEFILE64_SOURCE",
@@ -128,7 +126,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   var build_cc = cc
   var build_task_env: Record = {}
 
-  # _makenames runs here, so a cross build compiles it for the build machine.
   if build_arch != arch {
     let build_root = fp"{e"XSH_PM_BUILD_ROOT" ?? ""}"
     build_cc = fp"{build_root}/usr/bin/cc"
@@ -142,7 +139,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   write_cap_names_list()
 
-  # cap_names.h is printed by _makenames, which tabulates the names above.
   let makenames = make.c_program({
     cc: build_cc,
     triple: f"{build_arch}-linux-musl",
@@ -191,7 +187,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     [@objects.deps, magic.name],
   )
 
-  # Programs link the shared library, as upstream's SHARED=yes build does.
   let progs_deps = [link.name]
 
   var prog_tasks: List[make.MakeTask] = []
@@ -254,8 +249,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     overwrite: true,
   )
 
-  # libcap.pc.in with the substitutions libcap/Makefile applies; @deps@ is
-  # empty because the library links nothing beyond libc.
   let pc = (p"libcap/libcap.pc.in".read_text()?).replace("@prefix@", with: "/usr")
     .replace("@exec_prefix@", with: "/usr")
     .replace("@libdir@", with: "/usr/lib")

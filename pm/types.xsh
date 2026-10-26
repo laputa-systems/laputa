@@ -30,7 +30,7 @@ export error PmError {
 ## The package build target carried by plans, artifacts, and roots.
 export enum Target { Aarch64LinuxMusl, X86_64LinuxMusl, TargetReserved }
 
-## The package payload model selected explicitly by every recipe.
+## The normalized payload model of a loaded package recipe.
 export enum PackageKind { Payload, Meta }
 
 ## The semantic reason one package depends on another.
@@ -38,11 +38,13 @@ export enum PackageKind { Payload, Meta }
 ## their runtime closure, so their artifact keys are artifact-key inputs.
 ## `RuntimeOnly` dependencies are never installed into a build root and never
 ## enter an artifact key; only root composition installs them.
+## `Proof` dependencies enter only proof roots and proof identities.
 export enum DependencyKind {
     Runtime,
     RuntimeOnly,
     BuildHost,
     BuildTarget,
+    Proof,
     Bootstrap,
 }
 
@@ -66,8 +68,6 @@ export enum PlanAction { Build(Str), ReuseRemote(Str) }
 ## The immutable origin of one package artifact in the local store.
 export enum ArtifactOrigin { Built, Remote }
 
-# Typed accessors keep package policy and persistence callers independent of
-# constructor namespace lookup while preserving nominal enum identity.
 ## Return the aarch64 build target without a qualified union-tag expression.
 export pure target_aarch64() -> Target {
   Aarch64LinuxMusl
@@ -111,6 +111,11 @@ export pure dependency_build_host() -> DependencyKind {
 ## Return the target build dependency edge kind.
 export pure dependency_build_target() -> DependencyKind {
   BuildTarget
+}
+
+## Return the proof-only dependency edge kind.
+export pure dependency_proof() -> DependencyKind {
+  Proof
 }
 
 ## Return the policy-provided bootstrap edge kind.
@@ -292,6 +297,7 @@ export pure dependency_kind_text(kind: DependencyKind) -> Str {
     Runtime => "runtime"
     RuntimeOnly => "runtime-only"
     BuildHost => "build-host"
+    Proof => "proof"
     BuildTarget => "build-target"
     Bootstrap => "bootstrap"
   }
@@ -303,6 +309,7 @@ export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind, Error] {
     "runtime" => Runtime
     "runtime-only" => RuntimeOnly
     "build-host" => BuildHost
+    "proof" => Proof
     "build-target" => BuildTarget
     "bootstrap" => Bootstrap
     else => Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
@@ -387,6 +394,7 @@ export type Package = {
   architectures: List[Str],
   deps: List[Str],
   runtime_only_deps: List[Str],
+  proof_deps: List[Str],
   mkdeps_host: List[Str],
   mkdeps_target: List[Str],
   upstream_sources: List[UpstreamSource],
@@ -430,7 +438,7 @@ export type RemoteRetrieval = {
 }
 
 ## Remote artifact identity as observed while resolving one selected snapshot.
-## Empty semantic fields represent legacy metadata and use the retrieval identity instead.
+## Empty semantic fields represent legacy metadata that requires a local rebuild.
 ## `executor_sha256` is provenance only and never decides reuse.
 export type RemotePlanArtifact = {
   name: Str,
@@ -532,6 +540,7 @@ export type RootReceipt = {
   target: Target,
   artifacts: List[RootArtifact],
   entries: List[RootEntry],
+  generated_entries: List[ArtifactEntry],
   root_sha256: Str,
 }
 

@@ -2,6 +2,7 @@
 use pm.env as pm_env
 use pm.sources as pm_sources
 use pm.util as pm_util
+use pm.target as pm_target
 
 error DenoBuildError = V8Mismatch(locked: Str, pinned: Str)
 
@@ -17,8 +18,6 @@ export const ver = "2.9.7"
 ## Package release revision.
 export const rel = "2"
 
-# libffi backs Deno.dlopen (the crate's own libffi build runs autotools);
-# gnu-stubs' libgcc_s provides the unwinder Rust std and V8's libc++abi call.
 ## Runtime package dependencies.
 export const deps = ["musl", "gnu-stubs", "libffi"]
 
@@ -35,10 +34,6 @@ export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers"]
 # pins, which the build checks; the rusty-v8 source URL names it too.
 const rusty_v8_ver = "150.4.0"
 
-# Every crate the release's Cargo.lock pins is a `cargo-vendor` source: `make
-# fetch` caches each `.crate` by the lockfile's checksum and the build stages
-# them under vendor/, so cargo runs offline. The lockfile is the same file the
-# release source carries.
 ## Upstream sources and checksums.
 export const upstream_sources = [
   {
@@ -120,14 +115,6 @@ export const filetree = [
   },
 ]
 
-pure rust_triple(arch: Str) -> Str {
-  return "aarch64-unknown-linux-musl" when arch == "aarch64" or arch == "arm64"
-
-  return "x86_64-unknown-linux-musl" when arch == "amd64"
-
-  f"{arch}-unknown-linux-musl"
-}
-
 proc ensure_locked_v8(lockfile: Path) {
   for item in pm_sources.cargo_lock_crates(lockfile)? {
     if item.name == "v8" and item.version != rusty_v8_ver {
@@ -143,14 +130,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   let bin = fp"{build_root}/usr/bin"
   let cc = fp"{bin}/cc"
   let arch = pm_util.target_arch()?
-  let triple = rust_triple(arch)
+  let triple = pm_target.rust_triple(pm_target.recipe_target()?)?
   let src = fs.cwd()?
   ensure_locked_v8(p"Cargo.lock")
 
-  # Two patches, applied in XSH (no `patch` binary):
-  # deno-distribution-features drops the `upgrade` subcommand (it would
-  # replace this binary with upstream's glibc build) and the zlib-ng vendoring,
-  # whose libz-sys build runs cmake under ninja, and links Laputa's libffi.
   # deno-musl-glibc-extensions compiles out glibc's malloc_trim and the
   # `.init_array` hook that reads the (argc, argv, envp) arguments only glibc
   # passes; under musl it dereferences garbage before main.
@@ -174,10 +157,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-isystem",
     fp"{build_root}/usr/include".display(),
   ].join(" ")
-  # The build root is both host and target, and cargo runs without
-  # `--target`, so the native triple's flags cover build scripts and the
-  # binary alike. Deno's own `.cargo/config.toml` adds
-  # `--cfg tokio_unstable`, which these target flags join rather than replace.
   let rustflags = [
     "-C",
     "target-feature=-crt-static",
@@ -202,15 +181,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: cc.display(),
     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: rustflags,
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: rustflags,
-    # The static V8 (gzip; the build script inflates it) instead of a download.
     RUSTY_V8_ARCHIVE: rusty_v8.display(),
     LIBCLANG_PATH: fp"{build_root}/usr/lib/llvm23/lib".display(),
     BINDGEN_EXTRA_CLANG_ARGS: bindgen_args,
     # aws-lc's cc builder needs neither cmake nor perl nor go; select it
     # explicitly so a fallback to cmake fails instead.
     AWS_LC_SYS_CMAKE_BUILDER: "0",
-    # Bundled zlib and xz sources compile with cc; pkg-config may only see
-    # the build root, never the build host's libraries.
     LIBZ_SYS_STATIC: "1",
     LZMA_API_STATIC: "1",
     PKG_CONFIG_LIBDIR: fp"{build_root}/usr/lib/pkgconfig".display(),

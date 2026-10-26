@@ -1,9 +1,5 @@
 ##! In-container `make root` step: compose a runtime root from an imported store, inspect it, and run it.
 #!/bin/xsh
-# `world_cli.xsh root` runs this in package-tools with `--network none` after the
-# host imported the plan's artifacts from the local mirror into the store.
-# The root is composed on the container's filesystem; only its receipt and an
-# inspection report reach /output.
 
 # Alpine's chroot lives in /usr/sbin, which package-tools leaves off PATH.
 const chroot = "/usr/sbin/chroot"
@@ -47,7 +43,6 @@ pure needed_sonames(elves: List[ElfReport]) -> List[Str] {
   seen.keys() |> sort
 }
 
-# readelf rejects anything that is not ELF, so its status classifies the file.
 proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport?] {
   let status = run.status readelf -h $file > /dev/null 2> /dev/null
   return null unless status.ok
@@ -63,7 +58,6 @@ proc elf_report(root: Path, file: Path) [fs, process, error] -> Result[ElfReport
 }
 
 proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[Str]) [fs, process, env, error] {
-  # Every dynamic ELF in a Laputa root must name musl's loader.
   let musl_interpreter = f"/lib/ld-musl-{arch}.so.1"
   let handle = fs.tempdir()?
   let root = fp"{handle.host_path()?}/root"
@@ -92,7 +86,6 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
       failures += [f"{report.path} requests interpreter {report.interpreter}"]
     }
 
-    # musl's loader resolves every NEEDED soname inside the root, as at boot.
     if report.interpreter != "" or ! report.needed.is_empty() {
       let listed = run.status $chroot $root $musl_interpreter --list $report.path > /dev/null 2> $loader_err
 
@@ -117,8 +110,6 @@ proc main(arch: Str, plan: Str, store: Str, output: Str, ...runtime_roots: List[
   fp"{output}/files.txt".write_lines(if files.is_empty() { [""] } else { files |> sort })
   fp"{root}/var/lib/laputa/generation.json".copy(to: fp"{output}/generation.json", overwrite: true)
 
-  # The root's own xsh must run a script from inside it. The probe lands after
-  # the receipt was copied; the throwaway root is never used again.
   fp"{root}/tmp".mkdir()
   fp"{root}/tmp/world-root-probe.xsh".write(
     "print f\"xsh runs in the root on {system.uname()?.sysname} {system.uname()?.machine}\"\n",

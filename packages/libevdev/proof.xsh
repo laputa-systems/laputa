@@ -9,7 +9,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libevdev.so.2]" in dynamic, "proof-libevdev", "libevdev has no libevdev.so.2 SONAME")
 
-  # The event-name tables come from the recipe's port of make-event-names.py.
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
 
   for name in ["KEY_ESC", "BTN_SOUTH", "ABS_MT_POSITION_X", "INPUT_PROP_POINTER"] {

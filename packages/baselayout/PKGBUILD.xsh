@@ -247,9 +247,6 @@ export const filetree = [
 export proc build(dest: Path) [fs, error] {
   let _ = fs.copy_tree(p".", dest, parents: true, overwrite: true)?
 
-  # `copy_tree` need not retain an otherwise empty source directory. Materialize
-  # every declared base-layout directory before removing its `.keep` marker, so
-  # the immutable payload archives the boot mountpoints.
   for tree in [
     "boot",
     "dev",
@@ -279,9 +276,6 @@ export proc build(dest: Path) [fs, error] {
     fp"{dest}/{tree}".mkdir()
   }
 
-  # `.keep` is hidden, so it must be visible to the cleanup walk. Leaving it
-  # behind makes every declared directory non-empty and drops the real
-  # mountpoint from the immutable archive.
   for keep in fs.walk(dest, hidden: true) |> where .kind == "file" and .name == ".keep" {
     keep.path.remove(missing_ok: false)
   }

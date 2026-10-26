@@ -30,8 +30,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   fp"{tmp}/pam.d".mkdir(true)
   defer tmp.remove()
 
-  # Two services in a private config directory: libpam must parse each stack,
-  # dlopen the named module from the payload, and return that module's verdict.
   fp"{tmp}/pam.d/proof-permit".write(f"auth required {rootfs}/usr/lib/security/pam_permit.so\n")
   fp"{tmp}/pam.d/proof-deny".write(f"auth required {rootfs}/usr/lib/security/pam_deny.so\n")
 

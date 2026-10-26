@@ -1,7 +1,10 @@
-##! Typed package-recipe loading and dynamic procedure invocation. This is the sole boundary that reads dynamic `PKGBUILD.xsh` exports; all callers receive `types.Package` records and use its call helpers rather than retaining dynamic module values.
+##! Typed package-recipe loading and dynamic procedure invocation. This is the sole boundary that reads dynamic recipe and proof-dependency exports; all callers receive `types.Package` records and use its call helpers rather than retaining dynamic module values.
 use recipe_hooks as hooks
 use types
 use util
+
+const initial_release = "1"
+const neutral_source_architecture = "all"
 
 type PackageMetadata = {
   name: Str,
@@ -45,8 +48,6 @@ proc validate_positive_release(name: Str, rel: Str) {
   }
 }
 
-# A package architecture list names each supported target at most once and
-# never `all`: omitting the export is the one way to say every target.
 proc validate_package_architectures(name: Str, architectures: List[Str]) {
   if architectures.is_empty() {
     return package_contract_error(name, "architectures must name at least one target architecture")
@@ -83,9 +84,6 @@ proc validate_dependencies(name: Str, label: Str, dependencies: List[Str]) {
   }
 }
 
-# A runtime-only dependency is excluded from build roots and artifact keys, so
-# a package the build also uses can never be runtime-only. Such a package is a
-# `deps` entry (installed into the build root and needed at runtime).
 proc validate_runtime_only_dependencies(name: Str, metadata: PackageMetadata) {
   validate_dependencies(name, "runtime_only_deps", metadata.runtime_only_deps)
   let build_dependencies = [@metadata.deps, @metadata.mkdeps_host, @metadata.mkdeps_target]
@@ -106,7 +104,7 @@ proc source_is_repository_local(source: Path) -> Bool {
 }
 
 proc decode_source_checksum(name: Str, raw: Record) -> Result[types.SourceChecksum] {
-  let arch: Str = raw.get("arch")?.require()?
+  let arch: Str = if let Ok(value) = raw.get("arch") { value.require()? } else { neutral_source_architecture }
   let sha256: Str = raw.get("sha256")?.require()?
 
   if arch != "aarch64" and arch != "all" and arch != "x86_64" {
@@ -124,15 +122,13 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
   let source: Path = raw.get("source")?.require()?
   let raw_kind: Str = raw.get("kind")?.require()?
   let kind = types.parse_source_kind(raw_kind)?
-  let architectures: List[Str] = raw.get("architectures")?.require()?
+  let architectures: List[Str] = if let Ok(value) = raw.get("architectures") { value.require()? } else { [neutral_source_architecture] }
   let raw_checksums: List[Record] = raw.get("checksums")?.require()?
 
   if architectures.is_empty() {
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
-  # A crate set replaces its destination directory, so it may not be the
-  # source root that other sources stage into.
   if kind == types.source_cargo_vendor() and util.parse_source_line(source)?.dest.normalize() == "." {
     return Err(types.PmError.PackageContract(f"{name}: cargo-vendor source {source} needs a `=> DIR` destination"))
   }
@@ -239,13 +235,10 @@ proc decode_filetree(name: Str, raw_entries: List[Record]) -> Result[List[types.
   entries
 }
 
-# The recipe data contract. `.require` checks every present export's type, so
-# an optional export read through `.get` can fail only by being absent, and
-# its `??` fallback is that export's documented default.
 type RecipeModule = module {
-  export let name: Str
+  export optional let name: Str
   export let ver: Str
-  export let rel: Str
+  export optional let rel: Str
   export let deps: List[Str]
   export let mkdeps_host: List[Str]
   export let upstream_sources: List[Record]
@@ -260,11 +253,21 @@ type RecipeModule = module {
   export optional let source_mirror: Bool
 }
 
-# The hook callers need only the recipe's identity; this contract makes the
-# loaded module's exports readable by name, and each hook is then validated
-# against its own capability contract.
 type RecipeProcedures = module {
-  export let name: Str
+  export optional let name: Str
+}
+
+type ProofDependenciesModule = module {
+  export let proof_deps: List[Str]
+}
+
+proc load_proof_dependencies(dir: Path, name: Str) -> Result[List[Str]] {
+  let declaration = fp"{dir}/proof_deps.xsh"
+  return [] unless declaration.exists()
+  let metadata = module.load(declaration)?.require(ProofDependenciesModule).context("package-proof-dependencies", declaration.display())?
+  let dependencies = metadata.proof_deps
+  validate_dependencies(name, "proof_deps", dependencies)
+  dependencies
 }
 
 proc load_recipe_procedures(pkgbuild: Path) -> Result[RecipeProcedures] {
@@ -295,15 +298,14 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
   let has_filetree_aarch64 = recipe.get("filetree_aarch64") is Ok(_)
   let has_filetree_x86_64 = recipe.get("filetree_x86_64") is Ok(_)
   let has_package_kind = recipe.get("package_kind") is Ok(_)
-  let name = recipe.name
+  let name: Str = recipe.get("name") ?? pkgbuild.parent.name
   let ver = recipe.ver
-  let rel = recipe.rel
+  let rel: Str = recipe.get("rel") ?? initial_release
   let deps = recipe.deps
   let mkdeps_host = recipe.mkdeps_host
   let upstream_sources = recipe.upstream_sources
   let filetree = recipe.filetree
   let mkdeps_target: List[Str] = recipe.get("mkdeps_target") ?? []
-  # A recipe without an `architectures` export exists for every supported target.
   let architectures = recipe.get("architectures") ?? ["aarch64", "x86_64"]
   let runtime_only_deps: List[Str] = recipe.get("runtime_only_deps") ?? []
   let filetree_aarch64: List[Record] = recipe.get("filetree_aarch64") ?? []
@@ -333,6 +335,38 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
     nostrip,
     source_mirror,
   }
+}
+
+## Reports explicit recipe declarations that equal the loader's defaults.
+export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], Error] {
+  let recipe = load_recipe_module(fp"{dir}/PKGBUILD.xsh")?
+  var diagnostics: List[Str] = []
+  if let Ok(value) = recipe.get("name") {
+    let name: Str = value.require()?
+    if name == dir.name { diagnostics += ["name repeats the recipe directory name"] }
+  }
+  if let Ok(value) = recipe.get("rel") {
+    let rel: Str = value.require()?
+    if rel == initial_release { diagnostics += ["rel repeats the initial release default"] }
+  }
+  if let Ok(value) = recipe.get("package_kind") {
+    let kind: Str = value.require()?
+    if kind == types.package_kind_text(types.package_payload()) { diagnostics += ["package_kind repeats the payload default"] }
+  }
+  for source in recipe.upstream_sources {
+    if let Ok(value) = source.get("architectures") {
+      let architectures: List[Str] = value.require()?
+      if architectures == [neutral_source_architecture] { diagnostics += ["upstream_sources.architectures repeats the architecture-neutral default"] }
+    }
+    let checksums: List[Record] = source.get("checksums")?.require()?
+    for checksum in checksums {
+      if let Ok(value) = checksum.get("arch") {
+        let arch: Str = value.require()?
+        if arch == neutral_source_architecture { diagnostics += ["upstream_sources.checksums.arch repeats the architecture-neutral default"] }
+      }
+    }
+  }
+  diagnostics
 }
 
 ## Loads, decodes, and validates one package recipe into its typed metadata record.
@@ -370,10 +404,6 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
     )
   }
 
-  if is_production_recipe_directory(dir) and ! metadata.has_package_kind {
-    return Err(types.PmError.PackageContract(f"{name}: production recipe must export package_kind"))
-  }
-
   let kind = if metadata.has_package_kind {
     types.parse_package_kind(metadata.package_kind)?
   } else {
@@ -403,6 +433,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
     architectures: metadata.architectures,
     deps: metadata.deps,
     runtime_only_deps: metadata.runtime_only_deps,
+    proof_deps: load_proof_dependencies(dir, name)?,
     mkdeps_host: metadata.mkdeps_host,
     mkdeps_target,
     upstream_sources,

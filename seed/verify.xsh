@@ -1,10 +1,5 @@
 #!/bin/xsh
 ##! `make verify`: the whole host proof from `make clean`, one step at a time, with a timing report.
-# Every step is a make target run in order; the first failure stops the run.
-# The mirror runs for the steps that need it and is stopped afterwards, so the
-# run leaves no process behind. Each step's output is in .out/verify/STEP.log
-# and the table in .out/verify/report.md. `make clean` deletes .out/, so the
-# logs are written only after it.
 
 type Step = {name: Str, argv: List[Str]}
 
@@ -36,11 +31,13 @@ pure steps(arch: Str) -> List[Step] {
 proc run_step(root: Path, logs: Path, step: Step) [fs, process, time, error] -> Result[Timed] {
   let make = process.which("make")?
   let log = fp"{logs}/{step.name}.log"
-  let started = time.now()
+  let started_ns = time.monotonic()?
   let status = process.run(
     process.command_argv(make, step.argv, root, stdout: log, stderr: log, stdout_append: true, stderr_append: true),
   )?
-  let timed = {name: step.name, seconds: (time.now() - started) / 1000, ok: status.ok}
+  let finished_ns = time.monotonic()?
+  let elapsed_ns = finished_ns - started_ns
+  let timed = {name: step.name, seconds: elapsed_ns / 1000000000, ok: status.ok}
   print f"verify {step.name}: {if timed.ok { "ok" } else { "FAILED" }} {timed.seconds}s"
   timed
 }
@@ -50,8 +47,6 @@ proc mirror_ready(curl: Path) [process, error] -> Result[Bool] {
   status.ok
 }
 
-# Cancelling the `make mirror` handle signals its whole process group, the
-# server included.
 proc stop_mirror(mirror: ProcessHandle?) [process, error] {
   guard let handle = mirror else {
     return
@@ -74,20 +69,19 @@ proc main(arch: Str) [fs, process, env, time, error] {
   let make = process.which("make")?
   let curl = process.which("curl")?
 
-  # `clean` removes .out/, so its output goes to the console only.
-  let started = time.now()
+  let started_ns = time.monotonic()?
   let cleaned = process.run(process.command_argv(make, ["make", "clean"], root))?
   fail "make clean failed" unless cleaned.ok
 
-  var timed: List[Timed] = [{name: "clean", seconds: (time.now() - started) / 1000, ok: true}]
+  let finished_ns = time.monotonic()?
+  let elapsed_ns = finished_ns - started_ns
+  var timed: List[Timed] = [{name: "clean", seconds: elapsed_ns / 1000000000, ok: true}]
   let logs = fp"{root}/.out/verify"
   logs.mkdir()
   var mirror = null
 
   for step in steps(arch) {
     if step.name == "publish" {
-      # Started after the world build, so its own first-run build does not
-      # overlap the heaviest step.
       let handle = spawn process.command_argv(
         make,
         ["make", "mirror"],

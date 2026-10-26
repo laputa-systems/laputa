@@ -8,8 +8,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libwlroots-0.20.so]" in dynamic, "proof-wlroots0.20", "wlroots has no libwlroots-0.20.so SONAME")
 
-  # The built-in feature set the profile relies on: DRM and libinput backends,
-  # a session through libseat, and the GBM allocator behind the GLES2 renderer.
   let config = fp"{root}/usr/include/wlroots-0.20/wlr/config.h".read_text()?
 
   for feature in [
@@ -23,7 +21,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     proof.ensure(feature in config, "proof-wlroots0.20", f"wlr/config.h lacks `{feature}`")
   }
 
-  # The DRM backend names monitor vendors from the table the recipe generates.
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
   proof.ensure("Dell Inc." in strings, "proof-wlroots0.20", "wlroots lacks the generated PNP vendor table")
 

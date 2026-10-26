@@ -7,9 +7,8 @@ use types
 use util
 
 ## The durable on-disk and in-memory build-plan format.
-## Format 2 artifact keys hash `BUILD_EPOCH` and no executor identity.
-## Format 3 adds `runtime-only` dependencies, which order no build and are no key input.
-export const format = "laputa-build-plan-3"
+## Proof edges order execution and enter proof identity, independently of payload keys.
+export const format = "laputa-build-plan-4"
 
 pure plan_canonical_field(value: Str) -> Str {
   value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
@@ -42,25 +41,6 @@ pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
   result
 }
 
-# An artifact key names exactly the inputs that can change a payload: the
-# target, the package id, the recipe input digest (recipe files except
-# proof.xsh, source records and checksums, and repository inputs), the global
-# build epoch, and the key of every direct build-input dependency.
-#
-# Every direct `deps` and `mkdeps_*` dependency is installed into the build
-# root together with its runtime closure: recipes link against libraries they
-# declare only in `deps` (musl in every C package, for example). Each direct
-# dependency key already covers that dependency's own runtime closure, so the
-# direct keys pin the complete build root. A metapackage has no build root,
-# but its artifact is its runtime selection, which the same keys pin.
-#
-# A `runtime_only_deps` dependency is never in a build root, so its key is
-# excluded: rebuilding it (a new XSH seed, say) rebuilds none of its
-# dependents. Its name stays a key input through the recipe digest.
-#
-# The executor (XSH runners, PM tree, core applets) is deliberately absent; it
-# is recorded as artifact provenance. `BUILD_EPOCH` is the explicit way to
-# rebuild everything after an executor change that alters payloads.
 proc artifact_key_for(
   target: types.Target,
   build_epoch: Int,
@@ -86,23 +66,15 @@ proc artifact_key_for(
   plan_digest_lines(lines)?
 }
 
-proc legacy_remote_artifact_key(package_id: Str, remote: types.RemoteRetrieval) -> Result[Str] {
+proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str, dependencies: List[types.PlanDependency]) -> Result[Str] {
+  let proof_dependencies = [
+    f"dependency\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}"
+    for dependency in dependencies |> sort-by(dependency_key)
+    if dependency.kind == types.dependency_proof()
+  ]
   plan_digest_lines(
     [
-      "format\tlaputa-legacy-remote-artifact-1",
-      f"arch\t{plan_canonical_field(remote.arch)}",
-      f"package\t{plan_canonical_field(package_id)}",
-      f"tarball\t{plan_canonical_field(remote.tarball)}",
-      f"tarball-sha256\t{plan_canonical_field(remote.tarball_sha256)}",
-      f"metadata\t{plan_canonical_field(remote.metadata)}",
-      f"metadata-sha256\t{plan_canonical_field(remote.metadata_sha256)}",
-    ],
-  )?
-}
-
-proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str) -> Result[Str] {
-  plan_digest_lines(
-    [
+      @proof_dependencies,
       "format\tlaputa-package-proof-key-1",
       f"package\t{plan_canonical_field(package_id)}",
       f"artifact\t{plan_canonical_field(artifact_key)}",
@@ -121,7 +93,6 @@ proc durable_recipe_dir(value: types.PackageCatalog, pkg: types.Package) -> Resu
   util.ensure_relative_path(durable, "plan recipe directory")?
 }
 
-# Hashes each recipe once; resolution reuses these digests for its nodes.
 proc recipe_build_inputs(value: types.PackageCatalog, target: types.Target) -> Result[Map[Str]] {
   {
     pkg.name: pm_fingerprint.package_build_input(value.root, absolute_recipe_package(value, pkg)?, target)?
@@ -163,8 +134,6 @@ pure plan_compare_lex(left: Str, right: Str) -> Int {
   1
 }
 
-# One run of a version string: digits or letters, and whether a separator
-# (`.`, `-`, `_`, `+`) came right before it.
 type VersionRun = {text: Str, numeric: Bool, separated: Bool}
 
 pure plan_version_runs(value: Str) -> List[VersionRun] {
@@ -195,16 +164,12 @@ pure plan_compare_version_run(left: VersionRun, right: VersionRun) -> Int {
     return 0
   }
 
-  # A digit run outranks a letter run: `3.7c` is newer than `next-3.7`.
   return 1 when left.numeric
   return -1 when right.numeric
 
   plan_compare_lex(left.text, right.text)
 }
 
-# Versions compare run by run, as rpm and apk order them. When one runs out,
-# the longer is newer (`3.7c` after `3.7`), unless its next run is letters
-# after a separator, which marks a pre-release (`23.1.0-rc2` before `23.1.0`).
 pure plan_compare_version(left: Str, right: Str) -> Int {
   let left_runs = plan_version_runs(left)
   let right_runs = plan_version_runs(right)
@@ -258,8 +223,6 @@ pure remote_is_exact(
     and remote.proof_sha256 == proof_sha256
 }
 
-# Returns the build-input dependencies of one node. Their nodes are on earlier
-# levels, so their keys are already resolved.
 proc dependency_nodes(
   name: Str,
   edges: List[types.DependencyEdge],
@@ -268,7 +231,7 @@ proc dependency_nodes(
 ) -> Result[List[types.PlanDependency]] {
   let dependencies: List[types.PlanDependency] = collect {
     for edge in edges {
-      continue unless edge.from == name and graph.edge_orders_builds(edge.kind) and (selected.get(edge.to) ?? false)
+      continue unless edge.from == name and graph.edge_orders_execution(edge.kind) and (selected.get(edge.to) ?? false)
 
       if ! (edge.to in keys) {
         return Err(
@@ -283,8 +246,6 @@ proc dependency_nodes(
   dependencies |> sort-by(dependency_key)
 }
 
-# Adds each node's runtime-only dependencies once every key is resolved: they
-# order no build, so their nodes may sit on the same or a later level.
 proc with_runtime_only_dependencies(
   nodes: List[types.PlanNode],
   edges: List[types.DependencyEdge],
@@ -381,9 +342,9 @@ export proc resolve(
         recipe_sha256,
         dependencies,
       )?
-      let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256)?
+      let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256, dependencies)?
       let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
-      var artifact_key = local_artifact_key
+      let artifact_key = local_artifact_key
       var action: types.PlanAction = types.plan_action_build("new package")
       var remote: types.RemoteRetrieval? = null
 
@@ -392,9 +353,6 @@ export proc resolve(
       if candidate != null {
         let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
 
-        # A remote tuple newer than the recipe means this checkout is behind
-        # what was published; building and publishing it would move the
-        # repository index backwards.
         if tuple_order < 0 {
           return Err(
             types.PmError.PackageContract(
@@ -414,20 +372,15 @@ export proc resolve(
           action = types.plan_action_reuse_remote("exact remote artifact")
           remote = candidate.retrieval
         } else if ! changed_dependencies.is_empty() {
-          # The remote tuple was built against other dependency artifacts.
-          # Build locally; publishing the result under the same tuple
-          # replaces the remote index row with the new artifact key.
           action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
         } else if candidate.artifact_key != "" {
           action = types.plan_action_build("remote artifact identity differs")
         } else {
-          artifact_key = legacy_remote_artifact_key(package_id, candidate.retrieval)?
-          action = types.plan_action_reuse_remote("legacy remote artifact")
-          remote = candidate.retrieval
+          action = types.plan_action_build("remote artifact lacks semantic build identity")
         }
       }
 
-      let proof_key = proof_key_for(package_id, artifact_key, proof_sha256)?
+      let proof_key = proof_key_for(package_id, artifact_key, proof_sha256, dependencies)?
       let node = {
         name: pkg.name,
         ver: pkg.ver,
@@ -540,7 +493,7 @@ proc validate_node(
       )
     }
 
-    if graph.edge_orders_builds(dependency.kind) and levels.get(dependency.name)? >= node.level {
+    if graph.edge_orders_execution(dependency.kind) and levels.get(dependency.name)? >= node.level {
       return Err(types.PmError.PackageContract(f"build plan node {node.name} is not dependency-first"))
     }
 
@@ -581,9 +534,7 @@ proc validate_node(
       return Err(types.PmError.PackageContract(f"build plan node {node.name} reuses remote without retrieval data"))
     } else {
       validate_retrieval(retrieval, value.target)
-      let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
-
-      if node.artifact_key != expected_local and node.artifact_key != expected_legacy {
+      if node.artifact_key != expected_local {
         return Err(
           types.PmError.PackageContract(f"build plan node {node.name} artifact key does not match remote inputs"),
         )
@@ -591,36 +542,8 @@ proc validate_node(
     }
   }
 
-  if node.proof_key != proof_key_for(node.package_id, node.artifact_key, node.proof_sha256)? {
+  if node.proof_key != proof_key_for(node.package_id, node.artifact_key, node.proof_sha256, node.dependencies)? {
     return Err(types.PmError.PackageContract(f"build plan node {node.name} proof key does not match its inputs"))
-  }
-}
-
-## Reports whether one validated remote node uses the retrieval-derived legacy artifact identity.
-## Legacy metadata predates semantic artifact keys, so its key is bound to verified retrieval bytes instead.
-export proc node_uses_legacy_remote_identity(
-  value: types.BuildPlan,
-  node: types.PlanNode,
-) [error] -> Result[Bool, Error] {
-  return false when types.plan_action_is_build(node.action)
-
-  let retrieval = node.remote
-
-  if retrieval == null {
-    return false
-  } else {
-    let expected_local = artifact_key_for(
-      value.target,
-      value.build_epoch,
-      node.package_id,
-      node.recipe_sha256,
-      node.dependencies,
-    )?
-
-    return false when node.artifact_key == expected_local
-
-    let expected_legacy = legacy_remote_artifact_key(node.package_id, retrieval)?
-    return node.artifact_key == expected_legacy
   }
 }
 

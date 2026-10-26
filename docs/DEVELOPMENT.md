@@ -81,6 +81,37 @@ The LLVM seed stays prebuilt. Its pin belongs to
 `packages/llvm-toolchain/PKGBUILD.xsh`. The `xsh` recipe packages the local
 seed rather than compiling another interpreter in the package world.
 
+### Package build authority
+
+World containers and system-profile containers without `LAPUTA_REPO_URL` use
+Docker's `--network none`. Recipes in those containers cannot reach host or
+external IP endpoints through the container network. Loopback remains available.
+Profiles with `LAPUTA_REPO_URL` retain Docker networking because PM fetches the
+configured repository's index and artifacts inside the container. That path
+also exposes networking to recipes and remains outside the offline boundary.
+World fetch and mirror publication run on the host.
+
+The trusted bootstrap closure includes the Docker daemon and Linux kernel,
+the complete package-tools image, the mounted XSH seed, and the checkout.
+The host-tools image contains Alpine packages installed by unpinned `apk`.
+Its saved image is the bootstrap input; rebuilding the Dockerfile can change
+those packages. The LLVM archive and the XSH seed are additional trusted
+prebuilt inputs.
+
+The checkout and seed mounts are read-only. Writable host mounts are `/output`,
+`/artifacts`, and `/var/cache/laputa/linux-kbuild`. The container's image layer,
+temporary directories, and Docker-provided device and pseudo-filesystems also
+remain writable. Builds run as root with Docker's default capabilities.
+The checkout mount exposes the whole checkout, including its cached inputs.
+These containers do not enforce a per-package executable, library, environment,
+or filesystem-read closure. The image environment and ambient tool paths inside
+the container remain build inputs. The adapters request only explicit PM
+environment settings. Docker client proxy configuration can still inject
+additional environment values.
+
+The opt-in closed cohort below qualifies a stricter invocation. Ordinary
+package-tools builds retain the authority described above.
+
 ## Local bootstrap
 
 ```sh
@@ -149,6 +180,60 @@ leave root-owned target directories, so `make clean` and `make root` delete
 derived state from a container on Linux and no `sudo` is needed.
 
 On macOS, Docker maps container writes to the host user.
+
+### Closed cohort qualification
+
+Run `bash tests/docker/closed_build.sh TOOL_SNAPSHOT [COMPILER_IMAGE]` on Linux
+x86_64 with a local Docker daemon. `TOOL_SNAPSHOT` contains frozen
+`bin/{xsh,xshi,xsht}` and `core/` directories. The default compiler image is
+the locally available `xsh-test`. The test resolves its immutable image ID
+before building, uses `--network none`, and never pulls an image.
+
+`tests/docker/closed_build.Dockerfile` declares the compiler seed paths copied
+into a scratch image: LLVM 23, musl headers and static libc, binutils, their
+listed shared libraries, and the fixed Rust nightly toolchain. These are
+trusted bootstrap exceptions, alongside the selected XSH runners, core
+applets, PM modules, and cohort recipe sources. The compiler seed is not a
+source bootstrap or a declaration of each tool as a PM artifact.
+The `/usr/bin/clang` symlink preserves LLVM's canonical executable location,
+so Clang resolves its builtin headers from `/usr/lib/llvm23/lib/clang/23`.
+
+The driver also copies the host's selected `kache` and `mold` executables into
+the declared seed at `/bin`. Rust compilation runs through `kache`. All cohort
+musl links use `mold`. Kache's cache, runtime directory, and daemon socket stay
+under the container's `/scratch`, with local-only caching and no host cache mount.
+The run output reports both host tool versions and copied file sizes alongside
+the compiler image identity. The image identity alone does not identify these
+two host-selected seed inputs. The qualified kache 1.0.0 and mold 3.0.0 copies
+add 45,455,072 file bytes
+to the seed. This qualification does not measure their build-time cost.
+
+The cohort runs through `pm.execute.build_plan` as your nonzero UID with no Linux
+capabilities, no new privileges, and no network. A root caller uses UID 65534.
+Docker makes the image root
+read-only. Only `/scratch` and the fresh `/output` store are writable, apart
+from the standard null, random, and terminal device interfaces. Source and
+seed files are read-only. Only standard input, output, and error descriptors
+enter the recipe. The Linux kernel, Docker daemon, Docker's default seccomp
+policy, and its proc, sys, and device mounts remain trusted host interfaces.
+
+The C recipe probes forbidden reads, writes, tools, libraries, environment,
+privileges, and inherited descriptors once in each container. Three separate
+PM recipes build a static C program, a static Rust program, and an XSH-generated
+payload offline. PM runs each package's payload proof and publishes all three
+artifacts. The driver builds twice into independent stores with different
+checkout locations and ambient host environment values. It checks the poison
+sentinels and matches receipts by package name. Each package's artifact key,
+payload digest, and actual payload archive must match across both stores.
+The output identifies the compiler seed and
+executor provenance. The driver removes its disposable containers, image,
+and working directories on exit.
+
+This qualifies the bounded cohort invocation. Ordinary package-tools builds
+still run recipes with the host executor's filesystem and environment.
+Their build-root PATH prefix is not confinement. The cohort does not prove
+production per-package isolation, a self-hosted compiler, resource isolation,
+or protection against a compromised kernel or Docker daemon.
 
 ## The qemu-dwl-foot profile
 
@@ -246,6 +331,7 @@ below carry behavior not stated elsewhere in this guide.
 | `make check` | `xsht check` over the tree, plus XSH scripts without a `.xsh` name, found by their `#!/bin/xsh` shebang |
 | `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
 | `make fetch` | pinned sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
+| `make fetch-mirror` | fetch the mirror's locked crates into the shared Cargo registry using the local `xsh-test` image |
 | `make seed-asterinas-shell` | opt-in xshi integration seed; the pinned Asterinas backend builds its own seed |
 | `make seed-smoke` | the seed in package-tools with `--network none`: offline plan plus a PM subset |
 | `make mirror-build` | host `cargo build` for `mirror/`; needs a host Rust toolchain |

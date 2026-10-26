@@ -93,7 +93,6 @@ pure event_prefixes() -> List[Str] {
   ]
 }
 
-# The script's code_prefixes, in the sorted order it prints them.
 pure code_prefixes() -> List[Str] {
   [
     "ABS_",
@@ -129,7 +128,6 @@ pure ignored_prefixes() -> List[Str] {
   ["SND_PROFILE_"]
 }
 
-# `prefix[:-1].lower()`: "INPUT_PROP_" names the `input_prop` class.
 pure attr_name(prefix: Str) -> Str {
   if let [_, stem] = rx"^(.*)_$".captures(prefix) {
     return stem.lower()
@@ -138,8 +136,6 @@ pure attr_name(prefix: Str) -> Str {
   prefix.lower()
 }
 
-# Python's `int(text, 0)`: decimal, or 0x/0o/0b prefixed. A decimal with a
-# leading zero is rejected, so such a define names no code.
 pure define_value(text: Str) -> Int {
   return -1 when rx"^0[0-9]*[1-9][0-9]*$".captures(text) != []
 

@@ -6,9 +6,6 @@ proc main(root = /rootfs) [fs, error] {
   let share = fp"{root}/usr/share/alsa"
   let ucm = fp"{share}/ucm2"
 
-  # alsa-lib (ALSA_CONFIG_DIR /usr/share/alsa) opens ucm2/ucm.conf first,
-  # then finds a card's profile through conf.d/<driver>/<driver>.conf, a
-  # symlink into the shared tree, so those links must resolve.
   proof.ensure(
     "Syntax" in fp"{ucm}/ucm.conf".read_text()?,
     "proof-alsa-ucm-conf",
@@ -24,7 +21,6 @@ proc main(root = /rootfs) [fs, error] {
   # directory is missing; the release keeps it with only a hidden marker file.
   proof.ensure(fp"{ucm}/conf.virt.d".is_dir()?, "proof-alsa-ucm-conf", "missing ucm2/conf.virt.d")
 
-  # Every link in the release resolves to a file inside the installed tree.
   var links = 0
   var files = 0
 

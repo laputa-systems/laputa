@@ -6,8 +6,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "foot-minimal")
   proof.target_elf(root, p"usr/bin/foot", "foot-minimal")
 
-  # foot answers XTGETTCAP queries from its built-in terminfo, which the
-  # recipe vendors; its query-os-name must name the system foot runs on.
   let strings = fp"{root}/usr/bin/foot".read_bytes()?.strings()
   proof.ensure("query-os-name" in strings, "proof-foot-minimal", "foot lacks its built-in terminfo")
   proof.ensure("Darwin" not in strings, "proof-foot-minimal", "foot's built-in terminfo names another OS")

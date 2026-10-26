@@ -148,7 +148,6 @@ test test_store_receipts_deduplicate_shared_runtime_and_build_host_artifacts [fs
   let runtime_first = node_with_shared_runtime_and_build_host_dependency(key, dependency_key)
   let build_host_first = node_with_shared_runtime_and_build_host_dependency(key, dependency_key, true)
 
-  # Edge order and kind stay in PlanNode; receipt lists are canonical artifact identities.
   assert store.receipt_dependency_keys(runtime_first) == [dependency_key]
   assert store.receipt_dependency_keys(build_host_first) == [dependency_key]
   assert store.receipt_runtime_dependency_keys(runtime_first) == [dependency_key]
@@ -262,14 +261,16 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
   let stage = staged_artifact(ctx, "store-corrupt-stage")?
   let committed = store.commit(types.target_aarch64(), root, test_node(key), stage.staged)?
 
-  # Lookups trust the hashes recorded at commit; explicit verification re-hashes.
   fp"{final_dir}/payload.tar.gz".write("corrupted payload")
   assert store.lookup(root, key)? == committed
   expect_store_error(ctx, store.verify_artifact(root, key), "payload SHA-256 does not match receipt")
 
   fp"{final_dir}/payload.tar.gz".write("payload")
   fp"{final_dir}/artifact.json".write("not JSON")
-  expect_store_error(ctx, store.verify_artifact(root, key), "invalid JSON")
+  match store.verify_artifact(root, key) {
+    Ok(_) => test.fail("malformed artifact receipt was accepted")
+    Err(problem) => assert problem is InvalidData
+  }
 
   let clean_root = store_root(ctx, "store-key-corrupt")?
   let clean_dir = store.artifact_path(clean_root, key)
@@ -394,7 +395,6 @@ test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs
     f"unsupported receipt format laputa-package-artifact-1; this PM reads {store.receipt_format}",
   )
 
-  # Artifacts under an older layout directory are never read or listed.
   let legacy_root = store_root(ctx, "store-legacy-layout")?
   let legacy_dir = fp"{legacy_root}/v1/sha256/{key}"
   legacy_dir.mkdir()
@@ -403,8 +403,6 @@ test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs
   test.eq(store.verify_all(legacy_root)?, [])
 }
 
-# Garbage collection keeps exactly the artifacts the kept plans name, with
-# their re-proof receipts, and removes the rest with their leftover state.
 test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx|
   let root = store_root(ctx, "store-gc")?
   let kept = digest("gc-kept")

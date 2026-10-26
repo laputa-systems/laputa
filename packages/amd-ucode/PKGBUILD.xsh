@@ -20,10 +20,6 @@ export const deps: List[Str] = []
 ## Package recipe export.
 export const mkdeps_host: List[Str] = []
 
-# Each file is fetched from the linux-firmware tree at the release tag through
-# cgit's plain/ view; the sha256 makes every one content-addressed, so the
-# fetch does not depend on a regenerated archive. The microcode containers
-# stage into amd-ucode/, the license at the source root.
 ## Package recipe export.
 export const upstream_sources = [
   {

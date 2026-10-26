@@ -2,11 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# strace traces the root's musl loader running `strace -V`: the loader opens
-# the program it was given (open on x86_64, openat on aarch64), and the
-# program writes its version banner to stdout (musl's stdio flushes with
-# writev). `-s 256` keeps the root's long paths from being truncated. Tracing a child it forked needs only
-# ptrace on that child, which Docker's default seccomp profile allows.
 proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "strace")
   proof.target_elf(root, p"usr/bin/strace", "strace")

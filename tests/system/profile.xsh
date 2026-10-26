@@ -126,7 +126,6 @@ test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] 
   assert profile.forbidden_runtime_packages(value, ["baselayout", "llvm-toolchain", "pkgconf"]) == ["llvm-toolchain", "pkgconf"]
 }
 
-# Profiles name libraries by their base name; real sonames carry versions.
 test test_forbidden_soname_entries_match_versioned_sonames [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
 

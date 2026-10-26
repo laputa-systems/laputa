@@ -18,8 +18,6 @@ proc ensure_file(path_value: Path, label: Str) {
 proc main(rootfs = /rootfs) [fs, process, env, error] {
   ensure_executable(fp"{rootfs}/usr/bin/tailscale", "tailscale")
   ensure_executable(fp"{rootfs}/usr/bin/tailscaled", "tailscaled")
-  # iptables and xinit are runtime-only dependencies: generations install
-  # them, but a package proof root holds only this payload's `deps` closure.
   ensure_file(fp"{rootfs}/usr/lib/xinit/services/tailscaled.xsh", "tailscaled service")
   proof.target_elf(rootfs, p"usr/bin/tailscale", "tailscale")
   proof.target_elf(rootfs, p"usr/bin/tailscaled", "tailscale")
@@ -29,7 +27,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
     return
   }
 
-  # Both binaries are static; each must run and report the pinned release.
   let ver = proof.package_version(rootfs, "tailscale")?
 
   for tool in ["tailscale", "tailscaled"] {

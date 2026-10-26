@@ -390,8 +390,8 @@ installer-image: need-xsh
 installer-qemu-test: need-xsh
 	$(HOST_XSH_ENV) LAPUTA_REPO_URL="$(MIRROR_URL)" LAPUTA_INSTALLER_ARCH=$(ARCH) $(XSH_HOST) installer-qemu-test.xsh
 
-installer-qemu-manual:
-	$(XSH_HOST) installer-qemu-manual.xsh
+installer-qemu-manual: need-xsh
+	$(HOST_XSH_ENV) LAPUTA_REPO_URL="$(MIRROR_URL)" $(XSH_HOST) installer-qemu-manual.xsh
 
 # The mirror is a host tool; cargo must run inside mirror/ so its
 # rust-toolchain.toml applies.

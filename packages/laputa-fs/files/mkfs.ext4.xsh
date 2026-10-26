@@ -774,7 +774,7 @@ proc image_size(image: Path) -> Result[Int] {
   size
 }
 
-proc format_ext_image(image: Path, source_root: Path, label: Str) {
+proc format_ext_image(image: Path, source_root_path: Path, label: Str) {
   let size = image_size(image)?
 
   if size < 8MiB {
@@ -800,7 +800,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) {
 
   var used = reserve_metadata_blocks(total_blocks, groups)
   var next = 4 + INODE_TABLE_BLOCKS
-  let source_root = source_root.resolve()?
+  let source_root = source_root_path.resolve()?
   let collected = collect_entries(source_root, source_root, [])?
   let entries = assign_inodes(collected)
   zero_image(image, size)
@@ -889,7 +889,7 @@ proc format_ext_image(image: Path, source_root: Path, label: Str) {
 
 type MkfsExt4Options = {label: Str, source_root: Str, features: Str, image: List[Str]}
 
-proc main(...argv: List[Str]) [fs, error] {
+proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
   let opts: MkfsExt4Options = cli.applet(
     argv,
     {

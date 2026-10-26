@@ -1,8 +1,6 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-# A `readelf --dyn-syms -W` row ends in the symbol name; undefined imports
-# carry UND in the section column.
 pure exports_symbol(syms: Str, symbol: Str) -> Bool {
   for line in syms.lines() {
     return true when line.ends_with(f" {symbol}") and " UND " not in line
@@ -20,9 +18,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   proof.target_elf(root, p"usr/lib/libnl-3.so.200", "libnl3")
   proof.target_elf(root, p"usr/lib/libnl-genl-3.so.200", "libnl3")
 
-  # nl_cache_resync_v2 first ships in 3.12, so a defined export proves the
-  # library was built from the 3.12 sources; genl_connect proves the genl
-  # library carries the API wpa_supplicant's nl80211 driver links against.
   let readelf = proof.readelf_tool()?
   let core_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-3.so.200"
   let genl_syms = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libnl-genl-3.so.200"

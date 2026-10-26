@@ -13,7 +13,7 @@ pure entry_matches(database: Str, line: Str, key: Str) -> Bool {
   false
 }
 
-proc main(database = "", key = "") [fs, error] {
+proc main(database = "", key = "") [fs, process, error] {
   if database == "" {
     exit 2
   }

@@ -177,9 +177,6 @@ proc write_config_h() [fs, error] {
   )
 }
 
-# src/Makefile.am libasound_la_SOURCES plus each component's convenience
-# library (control, mixer, pcm, timer, rawmidi, hwdep, seq, ucm), in the
-# order the captured libtool link names them.
 pure libasound_sources() -> List[Path] {
   let core = """
 conf.c confeval.c confmisc.c input.c output.c async.c error.c dlmisc.c
@@ -227,7 +224,6 @@ ucm_repeat.c ucm_exec.c main.c
   ]
 }
 
-# src/topology/Makefile.am libatopology_la_SOURCES.
 pure libatopology_sources() -> List[Path] {
   let sources = """
 parser.c builder.c ctl.c dapm.c pcm.c data.c text.c channel.c ops.c elem.c
@@ -237,9 +233,6 @@ save.c decoder.c log.c
   [fp"src/topology/{source}" for source in sources]
 }
 
-# include/Makefile.am alsainclude_HEADERS with every component enabled, and
-# the installed halves of include/sound and include/sound/uapi (asound.h and
-# asequencer.h stay private).
 pure alsa_headers() -> List[Str] {
   """
 asoundlib.h asoundef.h version.h global.h input.h output.h error.h conf.h
@@ -275,12 +268,10 @@ proc install_headers(dest: Path) {
     )
   }
 
-  # include/Makefile.am's install-data-hook: deprecated forwarding headers.
   fs.install(p"include/sys.h", fp"{inc}/asoundlib.h", 0o644, parents: true, overwrite: true)
   fs.install(p"include/sys.h", fp"{inc}/sys/asoundlib.h", 0o644, parents: true, overwrite: true)
 }
 
-# utils/alsa.pc.in and utils/alsa-topology.pc.in as configure fills them.
 proc install_pkg_config(dest: Path) {
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 
@@ -316,8 +307,6 @@ Cflags: -I${{includedir}}
   )
 }
 
-# src/conf and its cards, ctl, and pcm subdirectories install every .conf
-# file under ALSA_CONFIG_DIR with the same layout.
 proc install_config_tree(dest: Path) {
   let conf_root = path.absolute(p"src/conf")?
 
@@ -340,9 +329,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let triple = f"{pm_util.target_arch()?}-linux-musl"
   write_config_h()
 
-  # src/*/Makefile.am compile every object with -I. -I$(top_srcdir)/include
-  # and DEFS=-DHAVE_CONFIG_H; include/alsa is upstream's link back to include,
-  # so <alsa/...> resolves inside the tree.
   let cflags = ["-O2", "-DHAVE_CONFIG_H", "-Iinclude"]
   # Upstream links -lm -lpthread -lrt -ldl; musl's libc holds all four, so
   # -z defs alone proves every reference resolves and no empty DT_NEEDED

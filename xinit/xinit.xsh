@@ -44,6 +44,9 @@ type ServiceFile = module {
 
 type DeadMark = {runtime: List[RuntimeEntry], event: Str}
 
+type InittabPolicy = {delay_ms: UInt, launch_limit: UInt}
+type InitArguments = {command: Str, action: Str, args: List[Str]}
+
 type StartPlan = {done: List[Str], out: List[Str]}
 
 type SavedStatus = {
@@ -60,6 +63,8 @@ type SavedStatus = {
 }
 
 type SpawnResult = {status: SavedStatus, notify_fd: Int}
+
+type ChildExit = {pid: Int, status: Status}
 
 type ServiceUnit = {
   service: Service,
@@ -79,12 +84,14 @@ pure usage_text() -> Str {
   """xinit 0.0.1
 
 Usage:
-  xinit [INITTAB]
+  xinit [INITTAB] [--respawn-delay-ms N] [--launch-limit N]
   xinit boot [TARGET]
   xinit scan [SERVICE|TARGET]
   xinit <start|up|stop|down|restart|reload|status|logs|supervise> SERVICE
   xinit <list|graph> [SERVICE|TARGET]
   xinit check [SERVICE|PATH]
+  xinit inspect SERVICE
+  xinit start-plan SERVICE
 """
 }
 
@@ -109,6 +116,33 @@ proc env_int(name: Str, fallback: Int) -> Result[Int] {
   return fallback when value == ""
 
   value as Int
+}
+
+pure clock_millis(nanoseconds: UInt) -> Int {
+  nanoseconds / 1000000
+}
+
+proc elapsed_now_ms() -> Result[Int] {
+  clock_millis(time.monotonic()?.require(UInt)?)
+}
+
+proc test_mode() -> Result[Bool] {
+  env_enabled("XINIT_TEST_ALLOW_NON_PID1") and process.current_pid()? != 1
+}
+
+proc test_flag(name: Str) -> Result[Bool] {
+  test_mode()? and env_enabled(name)
+}
+
+proc fake_pids() -> Result[Bool] {
+  test_flag("XINIT_TEST_FAKE_PIDS")?
+}
+
+proc inittab_policy(parsed: Record) -> Result[InittabPolicy] {
+  {
+    delay_ms: parsed.get("respawn_delay_ms")?.require(UInt)?,
+    launch_limit: parsed.get("launch_limit")?.require(UInt)?,
+  }
 }
 
 proc service_dir() [env, error] -> Result[Path] {
@@ -239,18 +273,17 @@ pure spawn_due(pid: Int, now: Int, next_ms: Int) -> Bool {
 proc spawn_entries(
   entries: List[InittabEntry],
   runtime: List[RuntimeEntry],
-  launch_limit: Int,
-  delay_ms: Int,
+  policy: InittabPolicy,
 ) -> Result[List[RuntimeEntry]] {
   var out = runtime
-  let now = time.now()
+  let now = elapsed_now_ms()?
 
   for entry in entries {
     if entry_spawns(entry) {
       let current = runtime_get(out, entry.key)
 
       let launch_allowed = if entry.action == "respawn" {
-        launch_limit == 0 or current.launches < launch_limit
+        policy.launch_limit == 0 or current.launches < policy.launch_limit
       } else {
         current.launches == 0
       }
@@ -270,7 +303,7 @@ proc spawn_entries(
             key: entry.key,
             pid: child.pid,
             launches: current.launches + 1,
-            next_ms: now + delay_ms,
+            next_ms: now + policy.delay_ms,
             action: entry.action,
           },
         )
@@ -346,7 +379,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
 }
 
 proc finalize(kind: Str) {
-  let action_log = env_value("XSH_INIT_TEST_ACTION_LOG", "")
+  let action_log = if test_mode()? { env_value("XINIT_TEST_ACTION_LOG", "") } else { "" }
 
   if action_log != "" {
     fp"{action_log}".write(f"""{kind}
@@ -355,7 +388,7 @@ proc finalize(kind: Str) {
     return
   }
 
-  if env_enabled("XSH_INIT_FINAL_CLEANUP") or env_value("XSH_INIT_FINAL_CLEANUP", "") == "" {
+  if ! test_flag("XINIT_TEST_SKIP_FINAL_CLEANUP")? {
     linux.kill_all(signal: "TERM", except_pid1: true)
     time.sleep(2s)
     linux.kill_all(signal: "KILL", except_pid1: true)
@@ -370,21 +403,19 @@ proc finalize(kind: Str) {
   }
 }
 
-proc run_pid1(inittab: Path) {
-  let allow = env_enabled("XINIT_TEST_ALLOW_NON_PID1") or env_enabled("XSH_INIT_TEST_ALLOW_NON_PID1")
+proc run_pid1(inittab: Path, policy: InittabPolicy) {
+  let allow = test_mode()?
   unix.pid1_setup(["HUP", "TERM", "USR1", "USR2", "INT"], subreaper: true, allow_non_pid1: allow)
   let entries = parse_inittab(inittab)?
-  let launch_limit = env_int("XSH_INIT_TEST_MAX_RESPAWNS", 0)?
-  let delay_ms = env_int("XSH_INIT_TEST_RESPAWN_DELAY_MS", 1000)?
-  let exit_when_idle = env_enabled("XSH_INIT_TEST_EXIT_WHEN_IDLE")
-  let fast = env_enabled("XSH_INIT_FAST_SHUTDOWN")
+  let exit_when_idle = test_flag("XINIT_TEST_EXIT_WHEN_IDLE")?
+  let fast = test_flag("XINIT_TEST_FAST_SHUTDOWN")?
   var runtime: List[RuntimeEntry] = []
   var event = ""
   run_phase(entries, "sysinit")
   run_phase(entries, "wait")
-  runtime = spawn_entries(entries, runtime, launch_limit, delay_ms)?
+  runtime = spawn_entries(entries, runtime, policy)?
 
-  return when should_exit_idle(entries, runtime, exit_when_idle, launch_limit)
+  return when should_exit_idle(entries, runtime, exit_when_idle, policy.launch_limit)
 
   while event == "" {
     let pid_event = unix.wait_pid1_event()?
@@ -411,9 +442,9 @@ proc run_pid1(inittab: Path) {
     }
 
     if event == "" {
-      runtime = spawn_entries(entries, runtime, launch_limit, delay_ms)?
+      runtime = spawn_entries(entries, runtime, policy)?
 
-      return when should_exit_idle(entries, runtime, exit_when_idle, launch_limit)
+      return when should_exit_idle(entries, runtime, exit_when_idle, policy.launch_limit)
     }
   }
 
@@ -458,50 +489,148 @@ pure field_context(source: Path, field: Str) -> Str {
   f"{source}: field `{field}`"
 }
 
-proc field_str(raw: Record, field: Str, fallback: Str, source: Path) -> Result[Str] {
+proc field_str(raw: Record, field: Str, fallback: Str, source: Path, scope: Str = "") -> Result[Str] {
   return fallback when field not in raw
 
-  raw.get(field)?.require(Str).context("xinit-service", field_context(source, field))?
+  raw.get(field)?.require(Str).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_int(raw: Record, field: Str, fallback: Int, source: Path) -> Result[Int] {
+proc field_int(raw: Record, field: Str, fallback: Int, source: Path, scope: Str = "") -> Result[Int] {
   return fallback when field not in raw
 
-  raw.get(field)?.require(Int).context("xinit-service", field_context(source, field))?
+  raw.get(field)?.require(Int).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_str_list(raw: Record, field: Str, source: Path) -> Result[List[Str]] {
+proc field_str_list(raw: Record, field: Str, source: Path, scope: Str = "") -> Result[List[Str]] {
   return [] when field not in raw
 
-  raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, field))?
+  raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_record(raw: Record, field: Str, source: Path) -> Result[Record] {
+proc field_record(raw: Record, field: Str, source: Path, scope: Str = "") -> Result[Record] {
   if field not in raw {
     let empty: Record = {}
     return empty
   }
 
-  raw.get(field)?.require(Record).context("xinit-service", field_context(source, field))?
+  raw.get(field)?.require(Record).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
+}
+
+proc service_field_error(source: Path, field: Str, message: Str) [error] {
+  Err(XinitError.Failed(kind: "xinit-service", message: f"{field_context(source, field)}: {message}"))
+}
+
+proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope: Str = "") [error] {
+  for field in raw.keys() {
+    if field not in fields {
+      service_field_error(source, if scope == "" { field } else { f"{scope}.{field}" }, "unknown field")
+    }
+  }
+}
+
+proc check_service_name(value: Str, source: Path, field: Str) [error] {
+  let pattern = rx"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+
+  if ! pattern.matches(value) {
+    service_field_error(source, field, "must match [A-Za-z0-9][A-Za-z0-9_.-]*")
+  }
+}
+
+proc check_service_names(values: List[Str], source: Path, field: Str) [error] {
+  var seen: List[Str] = []
+
+  for value in values {
+    check_service_name(value, source, field)
+
+    if value in seen {
+      service_field_error(source, field, f"duplicate name '{value}'")
+    }
+
+    seen = seen.push(value)
+  }
+}
+
+proc check_service_values(service: Service) [error] {
+  let source = service.path
+  check_service_name(service.name, source, "name")
+
+  if service.kind not in ["longrun", "oneshot", "scripted"] {
+    service_field_error(source, "kind", "must be longrun, oneshot, or scripted")
+  }
+
+  if service.restart_mode not in ["always", "on_failure", "never"] {
+    service_field_error(source, "restart.mode", "must be always, on_failure, or never")
+  }
+
+  if service.readiness not in ["auto", "notify"] or (service.readiness == "notify" and service.kind != "longrun") {
+    service_field_error(source, "readiness", "must be auto, or notify for a longrun")
+  }
+
+  for range in [
+    {field: "restart.delay_ms", value: service.delay_ms},
+    {field: "restart.max_delay_ms", value: service.max_delay_ms},
+    {field: "restart.stable_after_ms", value: service.stable_after_ms},
+    {field: "ready_timeout_ms", value: service.ready_timeout_ms},
+    {field: "stop_timeout_ms", value: service.stop_timeout_ms},
+    {field: "log.max_size", value: service.log_max_size},
+    {field: "log.keep", value: service.log_keep},
+    {field: "resources.cpu_max", value: service.cpu_max},
+  ] {
+    if range.value < 0 {
+      service_field_error(source, range.field, "must be nonnegative")
+    }
+  }
+
+  if service.max_delay_ms > 0 and service.max_delay_ms < service.delay_ms {
+    service_field_error(source, "restart.max_delay_ms", "must be zero or at least restart.delay_ms")
+  }
+
+  check_service_names(service.targets, source, "targets")
+
+  for edge in [
+    {field: "dependencies.need", names: service.need},
+    {field: "dependencies.uses", names: service.uses},
+    {field: "dependencies.after", names: service.after},
+    {field: "dependencies.before", names: service.before},
+  ] {
+    check_service_names(edge.names, source, edge.field)
+
+    if service.name in edge.names {
+      service_field_error(source, edge.field, "service cannot depend on itself")
+    }
+  }
+
+  for dep in service.uses {
+    if dep in service.need {
+      service_field_error(source, "dependencies.uses", f"'{dep}' is already required by dependencies.need")
+    }
+  }
 }
 
 proc service_from_record(path_value: Path, raw: Record) [process, error] -> Result[Service] {
+  check_service_fields(raw, ["name", "command", "kind", "targets", "dependencies", "restart", "readiness", "ready_timeout_ms", "stop_timeout_ms", "logging", "log", "resources"], path_value)
   let identity = raw.require(ServiceIdentity).context("xinit-service", field_context(path_value, "name"))?
   let kind = field_str(raw, "kind", "longrun", path_value)?
 
-  let command = if "command" in raw {
-    raw.get("command")?.require(Command).context("xinit-service", field_context(path_value, "command"))?
-  } else {
-    process.command_argv("/bin/true", ["true"])
+  if "command" not in raw {
+    service_field_error(path_value, "command", "required field is missing")
   }
 
+  let command = raw.get("command")?.require(Command).context("xinit-service", field_context(path_value, "command"))?
+
   let restart = field_record(raw, "restart", path_value)?
-  let restart_mode = field_str(restart, "mode", if kind == "longrun" { "on_failure" } else { "never" }, path_value)?
-  let delay_ms = field_int(restart, "delay_ms", 1000, path_value)?
-  let max_delay_ms = field_int(restart, "max_delay_ms", 30000, path_value)?
-  let stable_after_ms = field_int(restart, "stable_after_ms", 10000, path_value)?
+  check_service_fields(restart, ["mode", "delay_ms", "max_delay_ms", "stable_after_ms"], path_value, scope: "restart")
+  let restart_mode = field_str(restart, "mode", if kind == "longrun" { "on_failure" } else { "never" }, path_value, scope: "restart")?
+  let delay_ms = field_int(restart, "delay_ms", 1000, path_value, scope: "restart")?
+  let max_delay_ms = field_int(restart, "max_delay_ms", 30000, path_value, scope: "restart")?
+  let stable_after_ms = field_int(restart, "stable_after_ms", 10000, path_value, scope: "restart")?
+  if "logging" in raw and "log" in raw {
+    service_field_error(path_value, "logging", "conflicts with log")
+  }
+
   let logging = field_str(raw, "logging", "", path_value)?
   let log = field_record(raw, "log", path_value)?
+  check_service_fields(log, ["mode", "max_size", "keep"], path_value, scope: "log")
   var log_mode = "append"
 
   var log_max_size = 1048576
@@ -512,8 +641,12 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
   } else if "log" in raw {
     log_mode = log.require(LogPolicy).context("xinit-service", field_context(path_value, "log.mode"))?.mode
 
-    log_max_size = field_int(log, "max_size", log_max_size, path_value)?
-    log_keep = field_int(log, "keep", log_keep, path_value)?
+    log_max_size = field_int(log, "max_size", log_max_size, path_value, scope: "log")?
+    log_keep = field_int(log, "keep", log_keep, path_value, scope: "log")?
+  }
+
+  if log_mode not in ["append", "off"] {
+    service_field_error(path_value, if "logging" in raw { "logging" } else { "log.mode" }, "must be append or off")
   }
 
   if log_mode == "off" {
@@ -522,17 +655,19 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
 
   let targets = field_str_list(raw, "targets", path_value)?
   let deps = field_record(raw, "dependencies", path_value)?
-  let need = field_str_list(deps, "need", path_value)?
-  let uses = field_str_list(deps, "uses", path_value)?
-  let after = field_str_list(deps, "after", path_value)?
-  let before = field_str_list(deps, "before", path_value)?
+  check_service_fields(deps, ["need", "uses", "after", "before"], path_value, scope: "dependencies")
+  let need = field_str_list(deps, "need", path_value, scope: "dependencies")?
+  let uses = field_str_list(deps, "uses", path_value, scope: "dependencies")?
+  let after = field_str_list(deps, "after", path_value, scope: "dependencies")?
+  let before = field_str_list(deps, "before", path_value, scope: "dependencies")?
   let resources = field_record(raw, "resources", path_value)?
-  let cpu_max = field_int(resources, "cpu_max", 0, path_value)?
+  check_service_fields(resources, ["cpu_max"], path_value, scope: "resources")
+  let cpu_max = field_int(resources, "cpu_max", 0, path_value, scope: "resources")?
   let ready_timeout_ms = field_int(raw, "ready_timeout_ms", 5000, path_value)?
   let stop_timeout_ms = field_int(raw, "stop_timeout_ms", 200, path_value)?
   let readiness = field_str(raw, "readiness", "auto", path_value)?
 
-  {
+  let service: Service = {
     name: identity.name,
     path: path_value,
     kind,
@@ -554,6 +689,9 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
     ready_timeout_ms,
     readiness,
   }
+
+  check_service_values(service)
+  service
 }
 
 proc load_service_path(path_value: Path) [fs, process, env, error] -> Result[Service] {
@@ -618,12 +756,24 @@ proc check_service_graph(services: List[Service]) [error] {
   let names = service_names(services)
   let facilities = builtin_facilities()
 
+  var seen: List[Str] = []
+
   for service in services {
+    if service.name in seen {
+      service_field_error(service.path, "name", f"duplicate service name '{service.name}'")
+    }
+
+    seen = seen.push(service.name)
+
     for dep in dependency_edges(service).extend(service.before) {
       if dep not in names and dep not in facilities {
-        return Err(XinitError.Failed(kind: "xinit-deps", message: f"{service.name}: unknown dependency '{dep}'"))
+        return Err(XinitError.Failed(kind: "xinit-deps", message: f"{field_context(service.path, "dependencies")}: unknown dependency '{dep}'"))
       }
     }
+  }
+
+  for service in services {
+    let _ = visit_plan(services, service.name, [], [], []).context("xinit-deps", field_context(service.path, "dependencies"))?
   }
 }
 
@@ -801,7 +951,7 @@ proc read_status(name: Str) -> Result[SavedStatus] {
     start_time_ms:,
   )
 
-  if status.state == "running" and status.pid > 0 and ! env_enabled("XSH_UNIX_DRY_RUN") and ! pid_live_and_ours(
+  if status.state == "running" and status.pid > 0 and ! fake_pids()? and ! pid_live_and_ours(
     status.pid,
     status.start_time_ms,
   ) {
@@ -887,9 +1037,9 @@ proc wait_ready(service: Service) -> Result[Bool] {
 
   return true when "ready" not in loaded.keys()
 
-  let deadline = time.now() + service.ready_timeout_ms
+  let deadline = elapsed_now_ms()? + service.ready_timeout_ms
 
-  while time.now() <= deadline {
+  while elapsed_now_ms()? <= deadline {
     return true when loaded.ready()
 
     time.sleep(100ms)
@@ -941,7 +1091,7 @@ proc reload_unit(service: Service, pid: Int) {
 }
 
 proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[SpawnResult] {
-  let cgroup_path = if service.cpu_max > 0 and env_enabled("XSH_UNIX_DRY_RUN") and env_value("XSH_CGROUP_ROOT", "") == "" {
+  let cgroup_path = if service.cpu_max > 0 and fake_pids()? and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
   } else {
     ""
@@ -1054,7 +1204,7 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
 }
 
 proc scanner_active() -> Result[Bool] {
-  return false when env_enabled("XSH_UNIX_DRY_RUN")
+  return false when fake_pids()?
 
   let marker = scanner_marker_path()?
 
@@ -1214,11 +1364,15 @@ proc check_service(...targets: List[Str]) {
 }
 
 pure escalate_delay(used_ms: Int, max_delay_ms: Int) -> Int {
-  let doubled = used_ms * 2
+  return max_delay_ms when max_delay_ms > 0 and used_ms > max_delay_ms / 2
 
-  return max_delay_ms when max_delay_ms > 0 and doubled > max_delay_ms
+  used_ms * 2
+}
 
-  doubled
+pure restart_delay(service: Service, current_delay: Int, started_at: Int, now: Int) -> Int {
+  return service.delay_ms when now >= started_at and now - started_at >= service.stable_after_ms
+
+  current_delay
 }
 
 pure unit_init(service: Service) -> ServiceUnit {
@@ -1436,8 +1590,7 @@ proc mark_unit_dead(unit: ServiceUnit, child_status: Status, now: Int) -> Result
     return stopped
   }
 
-  let reset = now - unit.started_at >= unit.service.stable_after_ms
-  let delay = if reset { unit.service.delay_ms } else { unit.current_delay }
+  let delay = restart_delay(unit.service, current_delay: unit.current_delay, started_at: unit.started_at, now:)
 
   let dead: ServiceUnit = ServiceUnit(
     service: unit.service,
@@ -1476,7 +1629,36 @@ proc mark_children_dead(
   out
 }
 
+proc reconcile_child_exits(units: List[ServiceUnit], children: List[ChildExit], now: Int) -> Result[List[ServiceUnit]] {
+  var out = units
+  var pending = children
+  var index = 0
+
+  while index < pending.len() {
+    let child = pending[index]
+    index += 1
+
+    for unit in out {
+      if unit.pid > 0 and unit.pid == child.pid and (unit.state == "running" or unit.state == "starting") {
+        let cleanup = unix.shutdown_process_groups([unit.pid], time.millis(unit.service.stop_timeout_ms), 100ms)?
+
+        guard cleanup.remaining.is_empty() else {
+          return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"service {unit.service.name} retained process group {unit.pid}"))
+        }
+
+        pending = pending + cleanup.reaped
+      }
+    }
+
+    out = mark_children_dead(out, child.pid, child.status, now)?
+  }
+
+  out
+}
+
 proc kill_unit(unit: ServiceUnit) {
+  return when unit.pid <= 0 and unit.state not in ["running", "starting"]
+
   if unit.notify_fd > 0 {
     unix.notify_close(unit.notify_fd)
   }
@@ -1671,7 +1853,7 @@ proc enforce_log_caps(units: List[ServiceUnit]) {
 proc scan_units(names: List[Str]) {
   unix.pid1_setup(["HUP", "TERM", "INT"], subreaper: true, allow_non_pid1: true)
   var units = [unit_init(load_service(name)?) for name in names]
-  var remaining = env_int("XINIT_TEST_MAX_EVENTS", -1)?
+  var remaining = if test_mode()? { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
   var shutting_down = false
   write_scanner_marker()
 
@@ -1680,28 +1862,31 @@ proc scan_units(names: List[Str]) {
       units = drain_inbox(units)?
     }
 
-    units = reconcile_all(units, time.now())?
+    units = reconcile_all(units, elapsed_now_ms()?)?
     enforce_log_caps(units)
 
     return when shutting_down and all_units_stopped(units)
 
     return when remaining == 0
 
-    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, time.now())))?
+    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)))?
 
     if remaining > 0 {
       remaining -= 1
     }
 
     if event.kind == "signal" and (event.signal == "TERM" or event.signal == "INT") {
+      let groups = [unit.pid for unit in units if unit.pid > 0]
       units = shutdown_all(units)?
+      let cleanup = unix.shutdown_process_groups(groups, 0ms, 100ms)?
+
+      guard cleanup.remaining.is_empty() else {
+        return Err(XinitError.Failed(kind: "xinit-cleanup", message: "scanner retained owned process groups during shutdown"))
+      }
+
       shutting_down = true
     } else if event.kind == "children" {
-      let now = time.now()
-
-      for child in event.children {
-        units = mark_children_dead(units, child.pid, child.status, now)?
-      }
+      units = reconcile_child_exits(units, event.children, elapsed_now_ms()?)?
     }
   }
 }
@@ -1723,6 +1908,32 @@ proc boot_target(target: Str) {
   }
 
   print status_line(last)
+}
+
+pure service_configuration(service: Service) -> Record {
+  {
+    name: service.name,
+    source: service.path.display(),
+    command: "redacted",
+    kind: service.kind,
+    targets: service.targets,
+    dependencies: {need: service.need, uses: service.uses, after: service.after, before: service.before},
+    restart: {mode: service.restart_mode, delay_ms: service.delay_ms, max_delay_ms: service.max_delay_ms, stable_after_ms: service.stable_after_ms},
+    readiness: service.readiness,
+    ready_timeout_ms: service.ready_timeout_ms,
+    stop_timeout_ms: service.stop_timeout_ms,
+    log: {mode: service.log, max_size: service.log_max_size, keep: service.log_keep},
+    resources: {cpu_max: service.cpu_max},
+  }
+}
+
+proc inspect_service(name: Str) {
+  print json.encode(service_configuration(load_service(name)?))?
+}
+
+proc show_start_plan(name: Str) {
+  let plan = [service_configuration(load_service(item)?) for item in plan_service_start(name)?]
+  print json.encode(plan)?
 }
 
 proc list_services() {
@@ -1776,11 +1987,16 @@ proc control(verb: Str, name: Str) {
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
-  let parsed = cli.commands(
+  let init_options = {
+    respawn_delay_ms: {kind: "UInt", default: 1000},
+    launch_limit: {kind: "UInt", default: 0},
+  }
+  let parsed_raw = cli.commands(
     argv,
     rootless_default: "pid1",
     commands: {
       pid1: {
+        options: init_options,
         rest: "args",
       },
       help: {
@@ -1800,6 +2016,12 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
         rest: "args",
       },
       graph: {
+        rest: "args",
+      },
+      inspect: {
+        rest: "args",
+      },
+      "start-plan": {
         rest: "args",
       },
       start: {
@@ -1840,15 +2062,16 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
         rest: "args",
       },
     },
-    fallback_command: {positionals: ["inittab"], types: {inittab: "Path"}, rest: "args"},
+    fallback_command: {positionals: ["inittab"], types: {inittab: "Path"}, options: init_options, rest: "args"},
   )?
+  let parsed = parsed_raw.require(InitArguments)?
 
   if parsed.command == "pid1" {
     guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit"))
     }
 
-    run_pid1(fp"{env_value("XSH_INIT_INITTAB", "/etc/inittab")}")
+    run_pid1(fp"{env_value("XSH_INIT_INITTAB", "/etc/inittab")}", inittab_policy(parsed_raw)?)
   } else if parsed.command == "help" {
     guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit help"))
@@ -1867,6 +2090,16 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
     }
 
     scan_command(parsed.args.get(0) ?? "boot")
+  } else if parsed.command == "inspect" or parsed.command == "start-plan" {
+    guard parsed.args.len() == 1 else {
+      return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <inspect|start-plan> SERVICE"))
+    }
+
+    if parsed.command == "inspect" {
+      inspect_service(parsed.args[0])
+    } else {
+      show_start_plan(parsed.args[0])
+    }
   } else if parsed.command == "list" {
     guard parsed.args.is_empty() else {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit list"))
@@ -1888,7 +2121,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
-    control(parsed.action, parsed.get("service")?.require()?)
+    control(parsed.action, parsed_raw.get("service")?.require(Str)?)
   } else if parsed.command == "check" {
     if parsed.args.len() > 1 {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit check [SERVICE|PATH]"))
@@ -1904,6 +2137,6 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit INITTAB"))
     }
 
-    run_pid1(parsed.get("inittab")?.require()?)
+    run_pid1(parsed_raw.get("inittab")?.require(Path)?, inittab_policy(parsed_raw)?)
   }
 }

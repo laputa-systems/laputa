@@ -35,8 +35,8 @@ policy.
 ## Entry points
 
 `ARCH` defaults to the host's and `MIRROR_URL` to the loopback mirror. The
-manual harness is aarch64-only and reads `LAPUTA_REPO_URL`, also defaulting to
-the loopback mirror. Variables are read in `build-installer-common.xsh`,
+manual harness is aarch64-only and receives `MIRROR_URL` as
+`LAPUTA_REPO_URL`. Variables are read in `build-installer-common.xsh`,
 `build-installer-image.xsh`, `installer-qemu-test.xsh`, and
 `installer-qemu-manual.xsh`.
 
@@ -55,9 +55,9 @@ the loopback mirror. Variables are read in `build-installer-common.xsh`,
 - `make installer-qemu-manual` is aarch64-only regardless of `ARCH`. It builds a
   non-CI image under `target/laputa-installer/` and starts QEMU with stdio
   serial and no monitor, so `^C` interrupts QEMU. In the guest run
-  `setup-laputa` (`setup-laputa --ci` for a CI-sized disk). Run it as
-  `XSH_MODULE_PATH="$PWD" make installer-qemu-manual` with host XSH on `PATH`;
-  the aarch64 packages must be published to the running mirror.
+  `setup-laputa` (`setup-laputa --ci` for a CI-sized disk). The target sets the
+  XSH module path and passes `MIRROR_URL` to the image builder. The aarch64
+  packages must be published to the running mirror.
 
 ## Components
 

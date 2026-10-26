@@ -5,10 +5,8 @@
 ## Image-construction failures retained at the narrow image boundary.
 export error ImageError = Failed : InvalidData
 
-# The byte size of one GPT sector.
 const sector_size = 512
 
-# The first aligned sector assigned to the root filesystem.
 const root_start_lba = 2048
 
 ## Return the root partition UUID shared by GPT and the ARM kernel command line.
@@ -146,7 +144,6 @@ export proc image_put_le(data: Bytes, offset: Int, value: Int, width: Int) [erro
   image_put_bytes(data, offset, bytes.pack_le(value, width)?)
 }
 
-# Encodes a GPT UTF-16LE partition name with its fixed 72-byte width.
 proc gpt_name(name: Str) -> Result[Bytes] {
   let raw = bytes.from_text(name)
   var parts = [bytes.zero(0)?]

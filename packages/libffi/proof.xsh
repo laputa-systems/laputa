@@ -18,9 +18,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # wayland marshals every request through ffi_call and dispatches events
-  # through closures, which use the static trampolines on Linux; the proof
-  # makes one call of each kind, including a struct return by value.
   fp"{tmp}/proof-libffi.c".write(
     """#include <string.h>
 #include <ffi.h>
@@ -80,7 +77,6 @@ int main(int argc, char **argv) {
     run $binary $ver
   }
 
-  # The version script must export the symbol nodes consumers bind to.
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "--dyn-syms" "-W" fp"{root}/usr/lib/libffi.so.8"
 

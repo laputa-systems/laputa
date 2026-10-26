@@ -1,12 +1,13 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 use pm.util as pm_util
+use pm.target as pm_target
 
 proc main(rootfs = /rootfs) [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/cargo", "cargo")
   proof.target_elf(rootfs, p"usr/bin/rustc", "rustc")
   let target_arch = pm_util.target_arch()?
-  let rust_triple = if target_arch == "aarch64" { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
+  let rust_triple = pm_target.rust_triple(pm_target.recipe_target()?)?
 
   if ! fp"{rootfs}/usr/lib/rustlib/{rust_triple}/lib".exists() {
     return Err(proof.ProofError.Failed(kind: "proof-cargo", message: f"missing rust std for {rust_triple}"))

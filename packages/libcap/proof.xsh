@@ -2,15 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# The program parses capability text into a capability set, prints it back in
-# libcap's canonical form, reads one flag, maps names to and from numbers
-# through the generated name table, and rejects an unknown name.
-#
-# <sys/capability.h> includes the kernel's <linux/capability.h>, which a
-# consumer's build gets from linux-headers; libcap does not depend on it at
-# runtime, so the proof root lacks it. The program declares the subset of the
-# libcap ABI it calls instead, with the header's types and the kernel's
-# capability numbers.
 const program = r"""#include <stdio.h>
 #include <sys/types.h>
 
@@ -111,15 +102,11 @@ proc main(root = /rootfs) [fs, process, env, error] {
       let current = current_caps(printed)
       proof.ensure(current != "" and "Bounding set =" in printed, "libcap-capsh", f"unexpected capsh --print:\n{printed}")
 
-      # capsh and getpcaps run as children of this proof with its capabilities.
       let pid = process.current_pid()?
       let pcaps = run.text $loader fp"{bin}/getpcaps" $pid
       proof.ensure(pcaps.trim() == f"{pid}: {current}", "libcap-getpcaps", f"getpcaps disagrees with capsh: {pcaps.trim()} vs {current}")
       checks += ["capsh --print/--decode", "getpcaps"]
 
-      # `--shell` selects an executable; arguments after `--` pass through
-      # unchanged. Re-enter capsh through the musl loader so the bounding-set
-      # check observes the dropped capability after exec as well.
       let dropped = run.capture --text $loader fp"{bin}/capsh" "--drop=cap_net_raw" f"--shell={loader}" "--" \
         fp"{bin}/capsh" "--print"
 

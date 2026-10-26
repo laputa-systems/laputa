@@ -1304,8 +1304,6 @@ export proc link_executable_cxx_task(
   }
 }
 
-# Link an executable from .o objects and shared library files.
-# libs are full paths to .so files linked directly (SONAME comes from the library).
 ## Exported PM declaration `link_executable_task`.
 export proc link_executable_task(
   toolchain: Path,
@@ -1356,8 +1354,6 @@ export proc link_archive_task(toolchain: Path, objs: List[Path], out: Path, deps
   }
 }
 
-# Compile a .c file to a position-independent .lo object (for shared libraries).
-# out is the full path of the output object file; parent directories are created.
 ## Exported PM declaration `compile_lo`.
 export proc compile_lo(
   toolchain: Path,
@@ -1371,7 +1367,6 @@ export proc compile_lo(
   run_tasks([compile_lo_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
-# Compile a .cxx/.cpp file to a regular .o object using the C++ compiler.
 ## Exported PM declaration `compile_cxx`.
 export proc compile_cxx(
   toolchain: Path,
@@ -1385,7 +1380,6 @@ export proc compile_cxx(
   run_tasks([compile_cxx_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
-# Compile a .c file to a regular .o object (for executables).
 ## Exported PM declaration `compile_c`.
 export proc compile_c(
   toolchain: Path,
@@ -1399,7 +1393,6 @@ export proc compile_c(
   run_tasks([compile_c_task(toolchain, triple, cflags, defs, includes, src, out)], 1)
 }
 
-# Link a shared library from .lo objects with a given SONAME.
 ## Exported PM declaration `link_shared`.
 export proc link_shared(
   toolchain: Path,
@@ -1412,7 +1405,6 @@ export proc link_shared(
   run_tasks([link_shared_task(toolchain, triple, objs, soname, ldflags, out)], 1)
 }
 
-# Link a C++ executable using the C++ compiler driver.
 ## Exported PM declaration `link_executable_cxx`.
 export proc link_executable_cxx(
   toolchain: Path,
@@ -1437,7 +1429,6 @@ export proc link_executable(
   run_tasks([link_executable_task(toolchain, triple, objs, libs, ldflags, out)], 1)
 }
 
-# Create a static archive from .lo/.o objects.
 ## Exported PM declaration `link_archive`.
 export proc link_archive(
   toolchain: Path,

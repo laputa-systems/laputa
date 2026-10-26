@@ -4,11 +4,6 @@ use pm.util as pm_util
 
 type RuleCase = {command: Str, table: Str, args: List[Str]}
 
-# Rules of the kind tailscaled installs through go-iptables: conntrack state,
-# comments, mark matching and setting, NAT masquerade, and an ICMPv6 match.
-# iptables parses every match and target option through the statically linked
-# extensions before it opens the kernel table, so failing only at the table
-# (iptc_init) proves the extensions registered and accepted their options.
 const rule_cases: List[RuleCase] = [
   {
     command: "iptables",

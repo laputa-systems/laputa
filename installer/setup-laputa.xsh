@@ -305,9 +305,6 @@ proc target_interfaces(network_method: Str) -> Result[Str] {
   target_dhcp_interfaces()?
 }
 
-# Like Alpine setup, ask whether the target should use DHCP or a static address
-# and write that choice explicitly. Non-interactive (--ci) installs keep the
-# deterministic static configuration derived from the live network.
 proc prompt_network_method(ci: Bool) -> Result[Str] {
   return "static" when ci
 
@@ -320,9 +317,6 @@ proc prompt_network_method(ci: Bool) -> Result[Str] {
 }
 
 proc write_target_config(root: Path, esp_part: Path, swap_part: Path, root_part: Path, ci: Bool, network_method: Str) {
-  # laputa-net provides /usr/bin/ifup as a symlink into xsh core.
-  # The target rootfs already has laputa-net installed, so the symlink
-  # is already present after extraction. No need to copy anything.
   let fstab_root = if ci { "/dev/vda3" } else { root_part.display() }
   let fstab_esp = if ci { "/dev/vda1" } else { esp_part.display() }
   let fstab_swap = if ci { "/dev/vda2" } else { swap_part.display() }
@@ -432,8 +426,6 @@ tty1::respawn:/usr/bin/login -f pazu
 """,
     )
 
-    # laputa-ci-smoke.boot is installed into the installer rootfs by
-    # install_installer_tools. Copy it into the target rootfs.
     fs.install(
       /usr/lib/init/rc.d/laputa-ci-smoke.boot,
       fp"{root}/usr/lib/init/rc.d/laputa-ci-smoke.boot",
@@ -517,11 +509,11 @@ proc install_to_disk(disk: Path, ci: Bool) {
 
   linux.mkswap(parts.swap)
   p"/mnt/target".mkdir()
-  linux.mount(parts.root.display(), /mnt/target, fstype: "ext4")
+  linux.mount(parts.root.bytes(), /mnt/target, fstype: "ext4")
   archive.tar_extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, 0, "auto", true)
   normalize_target_ownership(/mnt/target)
   p"/mnt/target/boot".mkdir()
-  linux.mount(parts.esp.display(), /mnt/target/boot, fstype: "vfat")
+  linux.mount(parts.esp.bytes(), /mnt/target/boot, fstype: "vfat")
 
   if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI".exists() {
     fs.install(
@@ -548,7 +540,7 @@ proc install_to_disk(disk: Path, ci: Bool) {
   write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")
 }
 
-proc main(...argv: List[Str]) [fs, process, time, error, io] {
+proc run_installer(argv: List[Str]) [fs, process, time, error, io] -> Result[Unit, Error] {
   var ci = false
   var auto = false
   var disk_text = ""
@@ -606,6 +598,8 @@ proc main(...argv: List[Str]) [fs, process, time, error, io] {
   install_to_disk(disk, ci)
 }
 
-env XSH_LINUX_REAL="1" {
-  main(@args)
+proc main(...argv: List[Str]) [fs, process, time, env, error, io] -> Result[Unit, Error] {
+  env XSH_LINUX_REAL="1" {
+    run_installer(argv)?
+  }
 }

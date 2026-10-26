@@ -19,7 +19,7 @@ pure sorted_unique_names(names: List[Str]) -> List[Str] {
 }
 
 pure package_dependencies(pkg: types.Package) -> List[Str] {
-  [@pkg.deps, @pkg.runtime_only_deps, @pkg.mkdeps_host, @pkg.mkdeps_target]
+  [@pkg.deps, @pkg.runtime_only_deps, @pkg.mkdeps_host, @pkg.mkdeps_target, @pkg.proof_deps]
 }
 
 proc make_catalog(

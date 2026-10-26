@@ -355,7 +355,6 @@ test test_repo_plan_writes_and_show_renders_verified_fields [fs, process, env, e
   let shown = pm_output(["repo", "show", output.display()])?
 
   assert output.exists()?
-  # Without --target, a plan targets the machine planning it.
   assert types.target_text(value.target) == f"{util.host_arch()?}-linux-musl"
   assert "level 1 app build" in planned
   assert "level 1 app build" in shown
@@ -427,8 +426,6 @@ test test_repo_show_rejects_corrupt_plan [fs, process, env, error] { |ctx|
   assert "build plan digest does not match" in observed_output_10
 }
 
-# Artifact keys exclude the executor: a plan resolved through the CLI does not
-# change when the XSH runner bytes or a PM module change.
 test test_repo_plan_ignores_xsh_runner_bytes_and_pm_modules [fs, process, env, error] { |ctx|
   let repository = copied_repository(ctx, "plan-executor-repository")?
   let pm_copy = test.temp_dir(ctx, name: "plan-executor-pm")?
@@ -479,4 +476,25 @@ test test_cli_empty_groups_and_declared_help_remain_successful [fs, process, env
   }
   assert pm_output(["repo", "plan", "help"])? == pm_output(["repo", "plan", "--help"])?
   assert pm_output(["--", "repo", "plan", "--help"])? == pm_output(["repo", "plan", "--help"])?
+}
+
+test test_repo_lint_reports_defaults_without_rewriting_recipes [fs, process, env, error] { |ctx|
+  let root = copied_repository(ctx, "repo-lint")?
+  let source = fp"{root}/packages/app/PKGBUILD.xsh"
+  let before = source.read_text()?
+  let report = pm_output(["repo", "lint", "--repo", root.display()])?
+  assert "app: redundant name" in report
+  assert "app: redundant rel" in report
+  assert source.read_text()? == before
+}
+
+test test_repo_outdated_requires_explicit_reviewed_source [fs, process, env, error] { |ctx|
+  let root = copied_repository(ctx, "repo-outdated")?
+  let err = test.temp_path(ctx, name: "outdated.err")
+  let missing = pm_status(["repo", "outdated", "app", "--repo", root.display()], err)?
+  assert missing.exited_with(2)
+  assert "missing required argument --github-release" in err.read_text()?
+  let invalid = pm_status(["repo", "outdated", "app", "--repo", root.display(), "--github-release", "../escape/repo"], err)?
+  assert invalid.exited_with(3)
+  assert "requires OWNER/REPO" in err.read_text()?
 }

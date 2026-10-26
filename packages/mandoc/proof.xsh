@@ -2,8 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# One page in each input language mandoc parses: mdoc(7) semantic markup
-# and man(7) presentational markup.
 const mdoc_page = """.Dd October 4, 2026
 .Dt LAPUTA-HELLO 1
 .Os Laputa
@@ -123,8 +121,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
       let man_out = overstrike.replace(run.text $loader fp"{bin}/mandoc" "-T" "ascii" "-O" "width=60" $man_file ?, with: "")
       proof.ensure(man_out == man_text, "mandoc-man", f"unexpected man rendering:\n{man_out}")
 
-      # makewhatis indexes the tree into mandoc.db; apropos and whatis then
-      # answer from that database, and man finds the page by section and name.
       run $loader fp"{bin}/makewhatis" $manpath
       proof.ensure(fp"{manpath}/mandoc.db".exists()?, "mandoc-makewhatis", "makewhatis wrote no mandoc.db")
       let found = run.text $loader fp"{bin}/apropos" "-M" $manpath "island"

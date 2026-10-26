@@ -55,7 +55,6 @@ proc run_m4(ctx: TestContext, name: Str, input: Str, argv: List[Str] = []) -> Re
   }
 }
 
-# Expected text below is GNU m4 1.4.20's output for the same input.
 const gnu_corpus = r"""define(`fact', `ifelse(`$1', `0', `1', `eval($1 * fact(decr($1)))')')dnl
 fact(5) fact(10)
 define(`forloop', `pushdef(`$1', `$2')_forloop($@)popdef(`$1')')dnl
@@ -162,9 +161,6 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   let xsh = runner()?
   m4.parent.mkdir()
 
-  # The proof invokes the staged runner as an executable.  Its shebang points
-  # at this host test runner solely so the behavior can be checked without a
-  # target rootfs; the package payload still ships `#!/bin/xsh`.
   let staged = p"packages/m4/files/m4.xsh".read_text()?.replace("#!/bin/xsh", with: f"#!{xsh}")
   m4.write(staged, mode: 0o755)
 
@@ -180,8 +176,6 @@ test test_m4_proof_reads_its_file_operand_and_handles_directory_rejection [fs, p
   }
 }
 
-# Recursion, `$@` requoting, pushdef stacks, builtin tokens, numbered
-# diversions, comment and quote changes, regexes, eval, and LIFO m4wrap.
 test test_m4_matches_gnu_m4_on_skeleton_constructs [fs, process, env, error] { |ctx|
   let result = run_m4(ctx, "m4-gnu-corpus", gnu_corpus)?
   assert result.ok, result.stderr
@@ -189,24 +183,18 @@ test test_m4_matches_gnu_m4_on_skeleton_constructs [fs, process, env, error] { |
   assert result.stdout == gnu_corpus_output
 }
 
-# bison's `b4_cat` writes diagnostics through `syscmd` with a `cat`
-# here-document; it must reach stdout in order without a shell.
 test test_m4_syscmd_cat_heredoc_keeps_output_order [fs, process, env, error] { |ctx|
   let result = run_m4(ctx, "m4-cat-heredoc", cat_heredoc)?
   assert result.ok, result.stderr
   assert result.stdout == cat_heredoc_output
 }
 
-# m4exit ends the run with its status, flushing diversion 0 and discarding
-# other diversions and wrapped text, as GNU m4 does.
 test test_m4exit_status_and_discarded_diversions [fs, process, env, error] { |ctx|
   let result = run_m4(ctx, "m4-exit", "m4wrap(`wrapped')divert(1)one\ndivert(0)zero\nm4exit(3)after\n")?
   assert result.code == 3
   assert result.stdout == "zero\n"
 }
 
-# Failures are loud: a nonzero status and a diagnostic, never truncated
-# output with success.
 test test_m4_unterminated_call_fails [fs, process, env, error] { |ctx|
   let result = run_m4(ctx, "m4-unterminated", "define(`x', `y')x(\nmore\n")?
   assert ! result.ok

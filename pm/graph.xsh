@@ -25,6 +25,11 @@ pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKi
 ## dependent's build root holds, so it must be built first and its key enters the
 ## dependent's artifact key.
 export pure edge_orders_builds(kind: types.DependencyKind) -> Bool {
+  edge_orders_execution(kind) and kind != types.dependency_proof()
+}
+
+## Returns whether execution needs a dependency artifact before building or proving a node.
+export pure edge_orders_execution(kind: types.DependencyKind) -> Bool {
   kind != types.dependency_bootstrap() and kind != types.dependency_runtime_only()
 }
 
@@ -44,7 +49,6 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
     result += [{from: pkg.name, to: dependency, kind}]
   }
 
-  # Bootstrap seeds substitute build inputs; a runtime-only edge is never one.
   for dependency in pkg.runtime_only_deps {
     result += [{from: pkg.name, to: dependency, kind: types.dependency_runtime_only()}]
   }
@@ -56,6 +60,10 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
       types.dependency_build_host()
     }
     result += [{from: pkg.name, to: dependency, kind}]
+  }
+
+  for dependency in pkg.proof_deps {
+    result += [{from: pkg.name, to: dependency, kind: types.dependency_proof()}]
   }
 
   for dependency in pkg.mkdeps_target {
@@ -228,7 +236,7 @@ export proc topological_levels(
   let local_edges = [
     edge
     for edge in dependency_edges
-    if edge_orders_builds(edge.kind) and (selected_map.get(edge.from) ?? false) and (selected_map.get(edge.to) ?? false)
+    if edge_orders_execution(edge.kind) and (selected_map.get(edge.from) ?? false) and (selected_map.get(edge.to) ?? false)
   ]
   var unresolved: Map[Int] = {}
   var emitted: Map[Bool] = {}
@@ -278,15 +286,13 @@ export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [er
   closure(catalog, roots, [types.dependency_runtime(), types.dependency_runtime_only()])?
 }
 
-# A bootstrap edge names a build input the seed substitutes (the container's
-# LLVM for musl), so it selects nothing: a plan for musl must not pull in zlib
-# and, through zlib, cmake.
 pure build_closure_kinds() -> List[types.DependencyKind] {
   [
     types.dependency_runtime(),
     types.dependency_runtime_only(),
     types.dependency_build_host(),
     types.dependency_build_target(),
+    types.dependency_proof(),
   ]
 }
 

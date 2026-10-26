@@ -106,8 +106,6 @@ export const filetree = [
   },
 ]
 
-# Makefile.am's `-export-symbols-regex '^pkgconf_'`: libtool turns it into a
-# version script, so the shared library exports only the public API.
 const libpkgconf_version_script = """{
   global:
     pkgconf_*;
@@ -122,7 +120,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let arch = pm_util.target_arch()?
   let triple = f"{arch}-linux-musl"
 
-  # Step 1: generate libpkgconf/config.h from autoheader's config.h.in.
   # Values are those configure (--prefix=/usr --sysconfdir=/etc) detects for
   # Clang + musl on aarch64 and x86_64: every probed declaration exists except
   # OpenBSD's pledge and unveil. 64-bit musl needs no _FILE_OFFSET_BITS.
@@ -157,12 +154,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   defines["VERSION"] = f"\"{ver}\""
   configure.config_h(p"libpkgconf/config.h.in", p"libpkgconf/config.h", defines)
 
-  # configure's CFLAGS and CPPFLAGS.
   let cflags = ["-g", "-O2", "-Wall", "-Wextra", "-Wformat=2", "-std=c99"]
 
-  # The search paths are AM_CFLAGS -D flags (not config.h) from configure's
-  # defaults: PKG_DEFAULT_PATH is ${libdir}/pkgconfig:${datadir}/pkgconfig,
-  # and PERSONALITY_PATH looks under both ${datadir} and ${sysconfdir}.
   let defs = [
     "-D_ATFILE_SOURCE",
     "-D_BSD_SOURCE",
@@ -176,14 +169,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DPERSONALITY_PATH=\"/usr/share/pkgconfig/personality.d:/etc/pkgconfig/personality.d\"",
   ]
 
-  # -I. finds <libpkgconf/config.h>; each program's CPPFLAGS add -Ilibpkgconf,
-  # -Icli, and its own directory.
   let includes = ["-I.", "-Ilibpkgconf", "-Icli"]
   p"obj".mkdir()
   p"obj/libpkgconf.map".write(libpkgconf_version_script)
 
-  # Step 2: libpkgconf, shared and static. Sources from Makefile.am's
-  # libpkgconf_la_SOURCES; -version-info 8:0:0 makes libpkgconf.so.8.0.0.
   let lib_srcs = [
     p"libpkgconf/argvsplit.c",
     p"libpkgconf/audit.c",
@@ -236,9 +225,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     deps: [],
   })
 
-  # Step 3: the four programs from Makefile.am, each linked against the
-  # static archive so they need no libpkgconf.so at run time.
-  # cli/getopt_long.c is compiled once per program, as automake does.
   let programs = [
     {
       name: "pkgconf",
@@ -308,7 +294,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(tasks, make.jobs()?)
 
-  # Step 4: install into dest.
   fs.install(lib.output, fp"{dest}/usr/lib/libpkgconf.so.8.0.0", 0o755, parents: true, overwrite: true)
   fp"{dest}/usr/lib/libpkgconf.so.8".symlink(to: p"libpkgconf.so.8.0.0")
   fp"{dest}/usr/lib/libpkgconf.so".symlink(to: p"libpkgconf.so.8.0.0")
@@ -320,8 +305,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fp"{dest}/usr/bin/pkg-config".symlink(to: p"pkgconf")
 
-  # Makefile.am's nobase_pkginclude_HEADERS; config.h and the Windows
-  # dirent shim stay private to the build.
   for hdr in ["bsdstubs.h", "iter.h", "libpkgconf.h", "stdinc.h", "libpkgconf-api.h"] {
     fs.install(
       fp"libpkgconf/{hdr}",
@@ -332,7 +315,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     )
   }
 
-  # libpkgconf.pc names its license file, which dist_doc_DATA installs.
   configure.substitute(
     p"libpkgconf.pc.in",
     fp"{dest}/usr/lib/pkgconfig/libpkgconf.pc",

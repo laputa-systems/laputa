@@ -16,8 +16,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   let deno = fp"{rootfs}/usr/bin/deno"
   tempdir tmp at fp"{rootfs}/var/tmp/proof-deno" {
 
-    # A relative import and a type annotation: `deno run` strips the types and
-    # resolves the module graph, `deno check` runs the TypeScript checker.
     fp"{tmp}/sum.ts".write(
       """export function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
@@ -31,7 +29,6 @@ const total: number = sum([40, 1, 1]);
 console.log(`total=${total}`);
 """,
     )
-    # The checker must reject a mistyped program, or a passing check proves nothing.
     fp"{tmp}/mistyped.ts".write(
       """import { sum } from "./sum.ts";
 

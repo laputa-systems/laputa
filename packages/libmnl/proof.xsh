@@ -2,11 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# linux/netlink.h comes from linux-headers, a build-only dependency that proof
-# roots do not hold, so the program declares the slice of libmnl's stable
-# LIBMNL_1.0 ABI it calls instead of including libmnl.h. It links the shipped
-# library and dumps the links of the proof's network namespace over a real
-# NETLINK_ROUTE socket, which needs no capability; loopback is always there.
 const program = r"""#include <stdint.h>
 #include <stdio.h>
 #include <string.h>

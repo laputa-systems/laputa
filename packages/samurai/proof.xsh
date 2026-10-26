@@ -1,7 +1,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
   proof.package_metadata(rootfs, "samurai")
   proof.target_elf(rootfs, p"usr/bin/samu", "samurai")
 
@@ -22,8 +22,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # A dry run parses the manifest and orders the graph without spawning the
-  # rule commands, so the proof needs no shell.
   fp"{tmp}/build.ninja".write(
     """ninja_required_version = 1.9
 rule cc

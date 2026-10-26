@@ -1,18 +1,9 @@
 #!/bin/xsh
 ##! Run one command in a Laputa build container, then hand its writable mounts back to the host user.
-# Containers run as root under rootful Docker: `make root` chroots, and recipes
-# build as root. Everything a container writes into a bind mount would stay
-# root-owned on the host, so `make clean` could only delete it through another
-# container and host tools could not rewrite it. This entry runs the real
-# command, then gives every writable mount to the uid and gid that started
-# the build, whatever the command's outcome, and exits with the command's status.
-#
-# usage: container_entry.xsh UID GID DIR... -- COMMAND ARG...
 
 proc give_tree(root: Path, uid: Int, gid: Int) {
   return unless root.exists()
 
-  # The ids need not exist in the image's /etc/passwd or /etc/group.
   let owner = {uid, gid, name: "", home: /, shell: ""}
   let owning_group = {gid, members: [], name: ""}
   fs.chown(root, owner, false)

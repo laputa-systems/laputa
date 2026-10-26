@@ -1,38 +1,7 @@
 #!/bin/xsh
 error ScriptError = Failed(kind: Str, message: Str)
 
-# m4 — macro processor in pure XSH, following GNU M4 1.4.x.
-#
-# Bison runs its skeletons (m4sugar, c-skel.m4, yacc.c, glr.c, lalr1.cc) and
-# flex runs its scanner skeleton through this program, so it implements the
-# GNU m4 language rather than a subset: an input stack that rescans every
-# expansion, arguments collected while expanding the macros inside them,
-# nested quotes, comments, `$@`/`$*`/`$#`/`$N` substitution, builtin tokens
-# (`defn` of a builtin), pushdef stacks, numbered diversions, LIFO `m4wrap`,
-# 32-bit `eval`, GNU regular expressions, and `-P` prefixed builtins.
-#
-# The expander keeps all mutable state in locals of `expand_inputs`. XSH
-# values are copied when a mutated collection is shared, so the macro table,
-# the input stack, and the pending-call stack never cross a call boundary;
-# helpers receive only strings and small argument lists.
-#
-# Differences from GNU m4 that bison and flex do not reach:
-# - text is UTF-8 and string builtins count bytes like GNU m4, so `substr`
-#   and `format` precision fail loudly rather than split a multi-byte
-#   character, `translit` maps characters, and `%c` of a byte above 127
-#   gives the Latin-1 character (m4sugar's unused `m4_cr_all` table);
-# - regular expressions run on the Rust engine: alternation is leftmost-first
-#   rather than POSIX leftmost-longest, and back-references in a pattern fail
-#   loudly;
-# - multi-byte quote and comment delimiters must lie inside one input block;
-# - `syscmd` runs `cat` here-documents (bison's `b4_cat`) natively and needs
-#   `/bin/sh` for any other command, as does `esyscmd`;
-# - `traceon`, `traceoff`, `debugmode`, and `debugfile` accept their
-#   arguments and trace nothing; floating-point `format` conversions fail.
 
-# A macro call whose arguments are still being collected. `at_*` locate the
-# macro name for diagnostics when it was read from a file (`at_pos` is -1
-# otherwise).
 type PendingCall = {
   name: Str,
   defn: Str,
@@ -76,7 +45,6 @@ const int32_span = 4294967296
 
 const nesting_limit = 1024
 
-# Every ASCII character at its own byte offset, for `translit` ranges and `%c`.
 const ascii_table = "\0\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\t\n\u{b}\u{c}\r\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f} !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u{7f}"
 
 # U+0080..U+00FF, two bytes each: `%c` of a byte above 127 yields the Latin-1
@@ -102,7 +70,6 @@ proc read_input_file(filepath: Str) -> Result[Str] {
   input.read_text()
 }
 
-# ── byte classes and scanning ────────────────────────────────────────────────
 pure is_word_char(b: Int) -> Bool {
   (b >= 97 and b <= 122) or (b >= 65 and b <= 90) or b == 95 or (b >= 48 and b <= 57)
 }
@@ -141,8 +108,6 @@ pure word_end(text: Str, pos: Int, len: Int) -> Int {
   i
 }
 
-# End of a run of ordinary text starting at `pos`. The byte at `pos` is
-# always taken, so a lone first byte of a longer delimiter still advances.
 pure plain_end(text: Str, pos: Int, len: Int, lq0: Int, bc0: Int, in_args: Bool) -> Int {
   var i = pos + 1
 
@@ -236,7 +201,6 @@ pure count_lines(text: Str, pos: Int) -> Int {
   line
 }
 
-# ── numbers ──────────────────────────────────────────────────────────────────
 pure wrap32(v: Int) -> Int {
   var r = v % int32_span
 
@@ -251,7 +215,6 @@ pure to_u32(v: Int) -> Int {
   if v < 0 { v + int32_span } else { v }
 }
 
-# strtol over the whole argument, as GNU m4's numeric arguments are read.
 pure parse_c_long(text: Str) -> NumArg {
   let n = text.byte_len()
   var i = 0
@@ -289,7 +252,6 @@ pure parse_c_long(text: Str) -> NumArg {
   {ok: true, value: if negative { -value } else { value }, note: if leading { "leading" } else { "" }}
 }
 
-# A numeric builtin argument: empty is 0 with a warning, trailing junk fails.
 pure numeric_arg(text: Str, builtin_name: Str) -> NumArg {
   if text == "" {
     return {ok: true, value: 0, note: f"empty string treated as 0 in builtin `{builtin_name}'"}
@@ -356,7 +318,6 @@ pure format_radix(value: Int, radix: Int, width: Int) -> Str {
   if negative { f"-{padded}" } else { padded }
 }
 
-# ── eval ─────────────────────────────────────────────────────────────────────
 # Tokens are operator spellings or "#" followed by a decimal value; an
 # unknown character ends the list with "!bad". Lexing
 # follows GNU m4 1.4: 0x/0b/0r prefixes, octal after a leading zero, and a
@@ -520,9 +481,6 @@ pure eval_prec(op: Str) -> Int {
   }
 }
 
-# One operator on 32-bit values. `err` marks a value whose evaluation failed;
-# it propagates except through the side of `&&`/`||` that is not evaluated,
-# which is how GNU m4 lets `0 && 1/0` be 0.
 pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
   if op == "&&" {
     return a when a.err != ""
@@ -594,9 +552,6 @@ pure eval_apply(op: Str, a: EvalValue, b: EvalValue) -> EvalValue {
   {v, err: ""}
 }
 
-# Operator-precedence evaluation of GNU m4's eval grammar. `err` is a syntax
-# reason ("bad expression", "bad input", "excess input", "missing right
-# parenthesis") or an arithmetic failure.
 pure eval_tokens_value(tokens: List[Str]) -> EvalValue {
   var values: List[EvalValue] = []
   var ops = []
@@ -724,13 +679,10 @@ pure eval_text(expr: Str, radix: Int, width: Int) -> BuiltinOutput {
   {text: format_radix(result.v, radix, width), notes}
 }
 
-# ── translit, format, and regular expressions ────────────────────────────────
 pure text_chars(text: Str) -> List[Str] {
   [c for c in text]
 }
 
-# GNU m4's expand_ranges: `a-z` expands inclusively in either direction; a
-# leading or trailing dash is literal.
 pure expand_ranges(spec: Str) -> List[Str] {
   let chars = text_chars(spec)
   var out = []
@@ -841,8 +793,6 @@ pure format_int_arg(text: Str) -> NumArg {
   {ok: true, value: wrap32(parsed.value), note: ""}
 }
 
-# GNU m4's format: printf directives with flags, `*` widths and precisions,
-# integer, character, and string conversions.
 pure format_text(args: List[Str]) -> Result[BuiltinOutput] {
   let fmt = format_arg(args, 0)
   let n = fmt.byte_len()
@@ -1302,7 +1252,6 @@ pure compile_gnu_regex(pat: Str) -> Result[RegexTranslation] {
   tr
 }
 
-# Width of the UTF-8 character that ends at byte offset `e`.
 pure char_width_before(text: Str, e: Int) -> Int {
   var w = 1
 
@@ -1313,11 +1262,6 @@ pure char_width_before(text: Str, e: Int) -> Int {
   w
 }
 
-# Captures of the match the pattern makes at byte `s`, ending at or before
-# `e`, seen with one character of context on each side: `at_start` is the
-# pattern anchored at the text start, `at_offset` the pattern behind one
-# consumed character, so anchors and word boundaries see their real
-# neighbours. The first capture is the match itself.
 pure captures_at(text: Str, s: Int, e: Int, at_start: Regex, at_offset: Regex) -> List[Str] {
   let n = text.byte_len()
   let tail = if e < n { utf8_width(text.byte_at(e) ?? 0) } else { 0 }
@@ -1423,7 +1367,6 @@ pure regexp_text(text: Str, pat: Str, repl: Str, has_repl: Bool) -> Result[Built
   substitute_captures(repl, caps)
 }
 
-# ── macro bodies and builtins ────────────────────────────────────────────────
 pure quote_args(args: List[Str], from: Int, lq: Str, rq: Str, quoted: Bool) -> Str {
   var i = from
 
@@ -1437,7 +1380,6 @@ pure quote_args(args: List[Str], from: Int, lq: Str, rq: Str, quoted: Bool) -> S
   out.join(",")
 }
 
-# Substitute `$0`..`$N` (multi-digit), `$#`, `$*`, and `$@` in a user macro.
 pure expand_user_body(body: Str, name: Str, args: List[Str], lq: Str, rq: Str) -> Str {
   let n = body.byte_len()
   var p = 0
@@ -1539,7 +1481,6 @@ pure builtin_names() -> List[Str] {
   ]
 }
 
-# Builtins that are recognized only when called with parentheses.
 pure builtin_blind(name: Str) -> Bool {
   match name {
     "builtin" | "decr" | "define" | "defn" | "errprint" | "esyscmd" | "eval" | "format" | "ifdef" | "ifelse" | "include" | "incr" | "index" | "indir" | "len" | "m4wrap" | "maketemp" | "mkstemp" | "patsubst" | "popdef" | "pushdef" | "regexp" | "shift" | "sinclude" | "substr" | "syscmd" | "translit" | "undefine" => true
@@ -1563,8 +1504,6 @@ pure arg_at(args: List[Str], i: Int) -> Str {
   if i < args.len() { args[i] } else { "" }
 }
 
-# Builtins whose result depends only on their arguments and the quotes. The
-# result is pushed back as input and rescanned, as GNU m4 does.
 pure call_builtin(name: Str, args: List[Str], lq: Str, rq: Str) -> Result[BuiltinOutput] {
   let argc = args.len() + 1
 
@@ -1724,8 +1663,6 @@ pure is_argument_builtin(name: Str) -> Bool {
   }
 }
 
-# `cat` here-documents are what bison's `b4_cat` passes to `syscmd`; run
-# them without a shell. Returns null for any other command.
 pure cat_heredoc(cmd: Str) -> Heredoc? {
   let caps = rx"(?s)^cat(?: >>([^ \t\n<>|&;$`'\x22\\]+))? <<('?)([A-Za-z_][A-Za-z0-9_]*)'?\n(.*)\n([A-Za-z_][A-Za-z0-9_]*)\n?$".captures(
     cmd,
@@ -1757,7 +1694,6 @@ pure numeric_key_order(keys: List[Str]) -> List[Int] {
   numbers |> sort
 }
 
-# ── core expander ────────────────────────────────────────────────────────────
 proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
   let direct = fp"{name}"
 
@@ -1775,8 +1711,6 @@ proc include_candidate(name: Str, include_paths: List[Str]) -> Result[Str] {
 }
 
 proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
-  # Macro table: name -> top definition, "t" + text or "b" + builtin name;
-  # `stacks` holds the older pushdef'd definitions, bottom first.
   var defs: Map[Str] = {}
   var stacks: Map[List[Str]] = {}
 
@@ -1801,9 +1735,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var bc = "#"
   var ec = "\n"
 
-  # Input stack. The current block lives in locals; suspended blocks are in
-  # the f_* lists. Kinds: 0 expansion text, 1 file, 2 builtin token (name in
-  # `iname`), 3 m4wrap text (file and line where it was registered).
   var text = ""
   var pos = 0
   var tlen = 0
@@ -1817,14 +1748,11 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var f_line = []
   var nf = 0
 
-  # Pending calls: `cur` is the innermost, `calls[0..nc - 1]` the outer ones.
   let blank = new_call("", "", "", -1, "")
   var calls: List[PendingCall] = []
   var cur = blank
   var nc = 0
 
-  # Output: `sink` collects the current diversion (stdout for 0, discarded
-  # when negative); other diversions accumulate in `diversions`.
   var div = 0
   var sink = []
   var diversions: Map[Str] = {}
@@ -1836,8 +1764,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var next_input = 0
   var temp_counter = 0
 
-  # First bytes and lengths of the delimiters (-1 and 0 when disabled), kept
-  # beside the delimiters for the scanner's per-token tests.
   var lq0 = lq.byte_at(0) ?? -1
   var lql = lq.byte_len()
   var rql = rq.byte_len()
@@ -1854,7 +1780,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   var warned_backslash_zero = false
 
   while true {
-    # Pull the next block when the current one is exhausted.
     if pos >= tlen {
       if nf > 0 {
         nf -= 1
@@ -1892,7 +1817,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       }
 
       if ! wraps.is_empty() {
-        # Wrapped text is read last-registered first, each as its own block.
         var k = 0
 
         while k < wraps.len() - 1 {
@@ -1929,11 +1853,7 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       break
     }
 
-    # Each token either is emitted (to the innermost pending argument or the
-    # current diversion) and loops, or leaves a call in `call_*` to run below.
     if kind == 2 {
-      # A builtin token from `defn`: it becomes an argument's definition when
-      # it starts that argument, and is dropped anywhere else.
       if nc > 0 {
         if cur.parts.is_empty() and cur.func == "" {
           cur.func = iname
@@ -2008,8 +1928,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       var word = text.byte_slice(pos, end - pos)
       pos = end
 
-      # A name continues into the following input block, as GNU m4 reads
-      # it through the input stack.
       while pos >= tlen and nf > 0 {
         var i = nf - 1
         var next_byte = -1
@@ -2267,7 +2185,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       continue
     }
 
-    # Run the call. `indir` and `builtin` retarget it and loop.
     var push_text = ""
     var push_macdef = ""
     var notes = []
@@ -2286,8 +2203,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       let argc = args.len() + 1
 
       if is_argument_builtin(bi) {
-        # m4sugar's loops evaluate the same few expressions thousands of
-        # times; eval results without diagnostics are remembered.
         let memo_key = if bi == "eval" { args.join("\u{1}") } else { "" }
         let memo = if memo_key != "" { eval_memo.get(memo_key) ?? "\0" } else { "\0" }
 
@@ -2781,8 +2696,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
     }
 
     if ! notes.is_empty() {
-      # Diagnostics name the line of the macro name when it was read from a
-      # file, else the current position in the innermost file.
       var where = ""
 
       if call_at_pos >= 0 {
@@ -2811,7 +2724,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
       }
 
       for note in notes {
-        # GNU m4 gives the `\0` deprecation once per run.
         if note.starts_with("Warning: \\0 will disappear") {
           continue when warned_backslash_zero
 
@@ -2823,8 +2735,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
     }
 
     if push_text != "" or push_macdef != "" {
-      # Exhausted expansion blocks are dropped rather than suspended, so tail
-      # calls do not grow the input stack; file blocks stay for locations.
       if pos < tlen or kind == 1 or kind == 3 {
         if nf < f_text.len() {
           f_text[nf] = text
@@ -2857,7 +2767,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
     }
   }
 
-  # End of input: diversions are emitted in numeric order.
   if div == 0 {
     io.write_stdout(sink.join(""))
   } else if div > 0 and ! sink.is_empty() {
@@ -2873,7 +2782,6 @@ proc expand_inputs(opts: Options) [fs, process, env, error, io] -> Result[Int] {
   status
 }
 
-# ── command line ─────────────────────────────────────────────────────────────
 proc parse_options(argv: List[Str]) -> Result[Options?] {
   var prefix = false
   var include_paths = []

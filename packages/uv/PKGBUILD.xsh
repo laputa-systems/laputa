@@ -21,8 +21,6 @@ export const runtime_only_deps = ["ca-certificates"]
 ## Package recipe export.
 export const mkdeps_host: List[Str] = []
 
-# Astral's official static musl release archives; each holds one directory
-# with the `uv` and `uvx` executables, which source staging strips.
 ## Package recipe export.
 export const upstream_sources = [
   {

@@ -5,7 +5,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "wayland-dev")
   proof.target_elf(root, p"usr/bin/wayland-scanner", "wayland-dev")
 
-  # Dependents find the scanner through this variable.
   let scanner_pc = fp"{root}/usr/lib/pkgconfig/wayland-scanner.pc".read_text()?
   proof.ensure(r"bindir=${prefix}/bin" in scanner_pc, "proof-wayland-dev", "wayland-scanner.pc has no bindir")
   proof.ensure(

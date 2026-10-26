@@ -1,26 +1,4 @@
 #!/bin/xsh
-# tic: compile terminfo source into ncurses' binary terminfo database.
-#
-#   tic -x [-o DIR] [-e NAME[,NAME...]] FILE
-#
-# This is a port of the compiler path of ncurses 6.6's `tic -x`, written so that
-# the files it writes are byte-identical to the real tic's.  It reproduces the
-# ncurses scanner (continuation lines, `#` comment lines, `.cap` commented-out
-# capabilities, string escapes), `use=` resolution with ncurses' merge and
-# cancellation rules, the extended-capability alignment, tic's write-time
-# `%{n}` to `%'c'` rewrite, and the legacy (magic 0432) and 32-bit-number
-# (magic 01036) object formats.  Aliases become hard links, as tic makes them.
-#
-# Deliberate differences from tic, each of which tic itself handles in a way
-# that depends on the machine rather than the input:
-# - termcap-syntax source is rejected (Laputa compiles terminfo source only);
-# - two entries sharing a name are rejected (tic's collision check compares
-#   heap addresses, so whether it fires depends on malloc);
-# - a `use=` that names no entry in the source is rejected instead of being
-#   looked up in whatever terminfo database the build host happens to have;
-# - an entry larger than 32768 bytes is rejected instead of skipped;
-# - writing into a directory that already holds entries replaces each path
-#   this run writes, without tic's file-timestamp heuristics.
 
 error TicError = Usage | Source | Resolve | Output
 
@@ -45,8 +23,6 @@ const HARD_MAX_USES = 40
 const MAX_NUMBER = 2147483647
 const MAX_SHORT = 32767
 
-# tic synthesizes this alternate-character map for entries that can switch
-# character sets but describe no map.
 const VT_ACSC = "``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~"
 
 # The capability table.  The first block is every row of ncurses 6.6's
@@ -58,7 +34,6 @@ const VT_ACSC = "``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~"
 #   awk '!/^#/ && NF {print $1, $2, $3}' include/Caps
 #   awk '$1 == "infoalias" || $1 == "userdef" {print $1, $2, $3}' include/Caps-ncurses
 # The tic package build checks this text against the pinned ncurses tarball.
-# The standard capability rows of include/Caps.
 const standard_caps_rows = r"""
 auto_left_margin bw bool
 auto_right_margin am bool
@@ -559,7 +534,6 @@ memory_unlock memu str
 box_chars_1 box1 str
 """
 
-# The `infoalias` and `userdef` rows of include/Caps-ncurses.
 const ncurses_caps_rows = r"""
 infoalias font0 s0ds
 infoalias font1 s1ds
@@ -705,15 +679,8 @@ type CapTable = {
   box1: Int,
 }
 
-# A string capability slot.  Standard strings are kept only when present or
-# cancelled; extended strings are positional and may be absent.
 enum StrCap { Absent, Cancelled, Text(Bytes) }
 
-# Extended (user-defined) capabilities in ncurses' positional form: `names`
-# lists the boolean, then numeric, then string names, each group sorted, and
-# the value lists line up with their group.  ncurses' alignment and
-# cancellation code indexes this flat list directly, and its edge cases depend
-# on that layout, so the layout is kept rather than a map.
 type Ext = {
   names: List[Str],
   nb: Int,
@@ -724,8 +691,6 @@ type Ext = {
   strs: List[StrCap],
 }
 
-# A terminal description.  Standard booleans hold TRUE or CANCELLED, numbers a
-# value or CANCELLED, strings Cancelled or Text; a missing key is absent.
 type Term = {
   names: Str,
   bools: Map[Int, Int],
@@ -778,7 +743,6 @@ pure is_print(c: Int) -> Bool {
   c >= 32 and c <= 126
 }
 
-# The user-capability type bits, standing in for ncurses' `1 << type` masks.
 pure kind_bit(kind: Int) -> Int {
   if kind == BOOLEAN {
     1
@@ -823,7 +787,6 @@ pure text_of(value: StrCap) -> Bytes? {
   }
 }
 
-# The type column of a capability row, or -1.
 pure cap_kind(type_name: Str) -> Int {
   match type_name {
     "bool" => BOOLEAN
@@ -898,12 +861,6 @@ proc parse_cap_table(standard_rows: Str, ncurses_rows: Str) [error] -> Result[Ca
   )
 }
 
-# The scanner reads a character stream that already reflects ncurses'
-# line reader: `#` lines are gone, each line's leading blanks are stripped,
-# CR LF is LF, and the text ends with a newline.  `cols` holds, per stream
-# byte, the column ncurses' reader reports after reading it, clamped to 3 (the
-# scanner only distinguishes columns 1 and 2 from the rest): column 1 marks
-# the first character of a line that had no leading blanks.
 type CharStream = {chars: Str, cols: Str, lines: List[Int]}
 
 pure threes(count: Int) -> Str {
@@ -917,8 +874,6 @@ pure threes(count: Int) -> Str {
 
 type StreamLine = {body: Str, cols: Str, number: Int}
 
-# One source line as ncurses' reader delivers it: leading blanks stripped,
-# CR LF made LF, with the column of each remaining byte.
 pure stream_line(raw: Str, number: Int) -> StreamLine {
   let line = if raw.ends_with("\r") { raw.byte_slice(0, raw.byte_len() - 1) } else { raw }
   var lead = 0
@@ -953,7 +908,6 @@ pure char_stream(source: Str) -> CharStream {
   let text = if source.ends_with("\n") { source } else { source + "\n" }
   let raw_lines = text.split("\n")
   let count = raw_lines.len() - 1
-  # `#` in the first column makes the whole line a comment.
   let kept = [stream_line(raw_lines[k], k + 1) for k in range(count) if raw_lines[k].byte_at(0) != 35]
   CharStream(
     chars: [line.body for line in kept].join(""),
@@ -969,8 +923,6 @@ pure char_at(text: Str, index: Int) -> Int {
   text.byte_at(index) ?? -1
 }
 
-# The last non-blank character of the rest of the current line (from `index`
-# through its newline), or the one `from_end` places before it.
 pure last_char(chars: Str, index: Int, from_end: Int) -> Int {
   var end = index
   while (chars.byte_at(end) ?? 10) != 10 {
@@ -994,8 +946,6 @@ pure last_char(chars: Str, index: Int, from_end: Int) -> Int {
   0
 }
 
-# strtol(text + start, base 0): the value and the offset just past it, or
-# `start` itself when no number is there.
 pure parse_c_long(text: Bytes, start: Int) -> CLong {
   var i = start
   while is_space(text.byte_at(i) ?? 0) {
@@ -1053,7 +1003,6 @@ pure parse_c_long(text: Bytes, start: Int) -> CLong {
   {value: if negative { -value } else { value }, end: i}
 }
 
-# Report a malformed source from inside the scanner's stream.
 proc source_error(message: Str) [error] {
   Err(TicError.Source(message))
 }
@@ -1065,12 +1014,9 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
   var col = 0
   var c = 0
   var line_index = 0
-  # The separator follows the syntax of the most recent names line; it is
-  # unset before the first one.
   var separator = 0
 
   loop {
-    # Skip blanks and newlines between tokens.
     loop {
       c = chars.byte_at(i) ?? -1
       break when c < 0
@@ -1084,7 +1030,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       break unless c == 10 or is_white(c)
     }
 
-    # A backslash before a newline continues a termcap line.
     if c == 92 {
       loop {
         c = chars.byte_at(i) ?? -1
@@ -1102,7 +1047,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
 
     break when c < 0
 
-    # A leading `.` comments out the capability that follows.
     var dot = false
     if c == 46 {
       dot = true
@@ -1125,7 +1069,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
     let line = input.lines.get(line_index) ?? 0
     if ! is_alnum(c) and c != 64 and c != 37 and c != 38 and c != 42 and c != 33 and c != 35 {
       eprint f"tic: line {line}: illegal character (expected alphanumeric or @%&*!#) - {c}"
-      # Panic mode: skip to the next separator.
       loop {
         let d = chars.byte_at(i) ?? -1
         break when d < 0
@@ -1143,7 +1086,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
     }
 
     if col == 1 {
-      # A names line: everything up to the separator that ends the names.
       var tok: List[Int] = [c]
       var syntax = -1
       var after_name = -1
@@ -1176,8 +1118,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
           let c0 = last_char(chars, i, 0)
           let c1 = last_char(chars, i, 1)
           if c1 != 58 and c0 != 92 and c0 != 58 {
-            # A comma may sit inside the description.  Treat it as the end of
-            # the names only when what follows looks like a capability.
             var s = i
             while is_space(char_at(chars, s)) and char_at(chars, s) != 10 {
               s += 1
@@ -1226,7 +1166,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
         source_error(f"line {line}: termcap-syntax entries are not supported")
       }
 
-      # Drop trailing blanks and commas.
       var keep = tok.len()
       while keep > 0 and (is_white(tok[keep - 1]) or tok[keep - 1] == 44) {
         keep -= 1
@@ -1238,7 +1177,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       continue
     }
 
-    # A capability: its name, then the character that gives its type.
     let name_start = i - 1
     loop {
       c = chars.byte_at(i) ?? -1
@@ -1296,7 +1234,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
       let number = if parsed.value > MAX_NUMBER { MAX_NUMBER } else { parsed.value }
       token = {...token, kind: NUMBER, number}
     } else if c == 61 {
-      # The string value, translating escapes as ncurses' _nc_trans_string.
       var out = []
       var last_ch = 0
       loop {
@@ -1386,7 +1323,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
 
             out += [number]
           } else if c == 10 {
-            # An escaped newline joins the next line into the string.
             continue
           } else {
             let translated = match c {
@@ -1407,8 +1343,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
               else => c,
             }
 
-            # The \E \n \r \b \f \t \\ \^ \, forms leave `c` as the escape
-            # letter; the \a \e \l \s \: forms and unknown escapes replace it.
             if c == 97 or c == 101 or c == 108 or c == 115 {
               c = translated
             }
@@ -1416,7 +1350,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
             out += [translated]
           }
         } else if c == 10 {
-          # Newlines inside a terminfo string are dropped.
           ignored = true
         } else {
           out += [c]
@@ -1424,7 +1357,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
 
         if ! ignored {
           guard col > 1 else {
-            # A character in the first column starts the next entry.
             i -= 1
             col -= 1
             if c == 10 {
@@ -1449,7 +1381,6 @@ stream scan(source: Str, table: CapTable) -> Stream[Token] {
   }
 }
 
-# ncurses' rule for names that may appear in a names line or use= clause.
 pure valid_entry_name(name: Str) -> Bool {
   var first = true
   var i = 0
@@ -1491,8 +1422,6 @@ pure remove_at(items: List[Str], pos: Int) -> List[Str] {
   items[0..pos] + items[pos + 1..]
 }
 
-# Insert an extended name of `kind` with a default value at its sorted place
-# within its group, as _nc_extend_names does; returns the slot of the name.
 pure extend_names(ext: Ext, name: Str, kind: Int) -> Extended {
   if kind == CANCEL {
     var n = 0
@@ -1580,7 +1509,6 @@ pure delete_ext_name(ext: Ext, name: Str, kind: Int) -> Ext? {
   }
 }
 
-# Delete `name` from the `first` group, else from the `second`.
 pure delete_either(ext: Ext, name: Str, first: Int, second: Int) -> Ext? {
   let removed = delete_ext_name(ext, name, first)
   return removed when removed != null
@@ -1588,7 +1516,6 @@ pure delete_either(ext: Ext, name: Str, first: Int, second: Int) -> Ext? {
   delete_ext_name(ext, name, second)
 }
 
-# _nc_ins_ext_name: insert a name of `kind` unless that group has it already.
 pure insert_ext_name(ext: Ext, name: Str, kind: Int) -> Inserted {
   let range = ext_range(ext, kind)
   var j = range.first
@@ -1614,9 +1541,6 @@ pure insert_ext_name(ext: Ext, name: Str, kind: Int) -> Inserted {
   {ext: grown, pos}
 }
 
-# adjust_cancels: a string-typed cancellation of a name that `other` defines
-# as a boolean or number takes that type instead.  The loop bounds are fixed
-# when it starts, exactly as in ncurses.
 pure adjust_cancels(start: Ext, other: Ext) -> Ext {
   var ext = start
   let first = ext.nb + ext.nn
@@ -1704,7 +1628,6 @@ pure name_in(names: List[Str], from: Int, to: Int, name: Str) -> Bool {
   false
 }
 
-# realign_data: lay `ext`'s values out over the merged name list.
 pure realign(ext: Ext, merged: List[Str], eb: Int, en: Int, es: Int) -> Ext {
   var out = ext
   if ext.nb != eb {
@@ -1768,7 +1691,6 @@ pure same_names(a: Ext, b: Ext) -> Bool {
   a.nb == b.nb and a.nn == b.nn and a.ns == b.ns and a.names == b.names
 }
 
-# _nc_align_termtype: give both sides the union of their extended names.
 pure align(to_start: Ext, from_start: Ext) -> Aligned {
   var to = to_start
   var from = from_start
@@ -1802,7 +1724,6 @@ pure align(to_start: Ext, from_start: Ext) -> Aligned {
   {to, from}
 }
 
-# The keys of `to` followed by the keys only `from` has.
 pure union_keys(to: List[Int], from: List[Int], present: Map[Int, Bool]) -> List[Int] {
   to + [key for key in from if key not in present]
 }
@@ -1864,8 +1785,6 @@ pure merge_str(to: StrCap, from: StrCap) -> StrCap {
   }
 }
 
-# _nc_merge_entry: fill `to` from `from` (a use= target).  Cancelled slots of
-# `to` stay cancelled; a cancellation in `from` clears the slot.
 pure merge_term(to_term: Term, from_term: Term) -> Term {
   let aligned = align(to_term.ext, from_term.ext)
   var to = {...to_term, ext: aligned.to}
@@ -1929,7 +1848,6 @@ pure first_name(names: Str) -> Str {
   names.split("|")[0]
 }
 
-# postprocess_terminfo: AIX box1 characters become acsc pairs.
 proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   let box = text_of(term.strs.get(table.box1) ?? Absent)
   return term when box == null
@@ -1961,8 +1879,6 @@ proc postprocess(term: Term, table: CapTable) -> Result[Term] {
   {...term, strs}
 }
 
-# A standard capability by terminfo name, by Caps-ncurses alias, or by its
-# variable name, in the order ncurses tries them.
 pure lookup_cap(table: CapTable, name: Str) -> CapRef? {
   return table.info_names[name] when name in table.info_names
 
@@ -1975,7 +1891,6 @@ pure lookup_cap(table: CapTable, name: Str) -> CapRef? {
   null
 }
 
-# One capability token of an entry, as _nc_parse_entry handles it.
 proc apply_token(entry: Entry, token: Token, table: CapTable) [error] -> Result[Entry] {
   var term = entry.term
   var uses = entry.uses
@@ -2025,7 +1940,6 @@ proc apply_token(entry: Entry, token: Token, table: CapTable) [error] -> Result[
   let found_kind = cap?.kind ?? (ext_ref ?? ExtRef(kind: 0, pos: 0)).kind
   if kind != CANCEL and found_kind != kind {
     if kind == BOOLEAN and found_kind == STRING {
-      # A string capability without `=` is an empty string.
       kind = STRING
     } else {
       eprint f"tic: line {token.line}: wrong type used for capability '{name}'"
@@ -2078,7 +1992,6 @@ proc finish_entry(entry: Entry, table: CapTable) -> Result[Entry] {
   {...entry, term: postprocess(entry.term, table)?}
 }
 
-# _nc_parse_entry over the token stream: one Entry per names token.
 proc parse_entries(tokens: Stream[Token], table: CapTable) -> Result[List[Entry]] {
   var started = false
   var entry = Entry(empty_term(""), [], 0)
@@ -2117,14 +2030,11 @@ pure entry_names(names: Str) -> List[Str] {
   names.split("|")
 }
 
-# The distinct fields of a names line, in order.
 pure unique_names(names: Str) -> List[Str] {
   let fields = entry_names(names)
   [fields[k] for k in range(fields.len()) if fields[k] not in fields[0..k]]
 }
 
-# Merge one entry's use= targets into it: start from the entry, merge its uses
-# from last to first (so earlier uses win), then the entry itself on top.
 pure merge_uses(term: Term, targets: List[Term]) -> Term {
   var merged = term
   var n = targets.len() - 1
@@ -2141,8 +2051,6 @@ pure merge_uses(term: Term, targets: List[Term]) -> Term {
 }
 
 proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]] {
-  # Every name, alias, and description of every entry, to its entries in
-  # source order.  A use= resolves to the last other entry carrying the name.
   let pairs = [
     {name, index}
     for index in range(entries.len())
@@ -2199,8 +2107,6 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
     index += 1
   }
 
-  # Merge in passes, as ncurses does: an entry merges once every entry it uses
-  # has merged, so each merge sees fully resolved targets.
   var resolved: Map[Int, Term] = {}
   while resolved.len() < entries.len() {
     var progress = false
@@ -2220,7 +2126,6 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
     }
   }
 
-  # fixup_acsc: an entry that switches character sets gets the VT100 map.
   index = 0
   let out: List[Term] = collect {
     while index < entries.len() {
@@ -2240,7 +2145,6 @@ proc resolve(entries: List[Entry], table: CapTable) [error] -> Result[List[Term]
   out
 }
 
-# tic's write-time rewrite of `%{n}` into the shorter `%'c'` for printable n.
 proc shorten_constants(text: Bytes) -> Result[Bytes] {
   var t = 0
   let n = text.len()
@@ -2273,8 +2177,6 @@ proc shorten_constants(text: Bytes) -> Result[Bytes] {
   bytes.from_ints(out)?
 }
 
-# Little-endian byte values of a 16- or 32-bit field; negative values are
-# written in two's complement, as the C writer's unsigned conversion does.
 pure le_ints(value: Int, width: Int) -> List[Int] {
   if width == 2 {
     let unsigned = if value < 0 { value + 65536 } else { value }
@@ -2289,8 +2191,6 @@ pure le_fields(values: List[Int], width: Int) -> List[Int] {
   [byte for value in values for byte in le_ints(value, width)]
 }
 
-# compute_offsets: each string's offset in its table, -1 for absent and -2
-# for cancelled.
 stream string_offsets(values: List[StrCap]) -> Stream[Int] {
   var next = 0
   for value in values {
@@ -2334,7 +2234,6 @@ pure table_size(parts: List[Bytes]) -> Int {
   size
 }
 
-# _nc_write_object: the compiled form of one resolved entry.
 proc write_object(term: Term) -> Result[Bytes] {
   let names = bytes.from_text(term.names)
   guard names.len() <= MAX_NAME_SIZE else {

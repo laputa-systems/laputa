@@ -20,10 +20,6 @@ export const deps = ["musl"]
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain"]
 
-# The release tarball ships help.c and funcs.h already generated from
-# less.hlp and the sources (upstream's mkhelp.pl and mkfuncs.pl), so the build
-# needs neither perl nor a generator. The patch replaces configure's
-# defines.h and the curses/termcap layer: see the patch's screen.c table.
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
   {
@@ -63,16 +59,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   let target_arch = pm_util.target_arch()?
   let triple = f"{target_arch}-linux-musl"
 
-  # Laputa ships no curses library: the patch adds a checked-in defines.h in
-  # place of configure's and gives screen.c built-in xterm-compatible
-  # capabilities (LESS_TERMCAP_* still overrides each one).
   let _ = patch.apply(p".", p"less-builtin-terminal.patch".read_text()?, 1)?
 
   let cflags = ["-O2"]
   let defs = ["-DBINDIR=\"/usr/bin\"", "-DLIBEXECDIR=\"/usr/libexec\"", "-DSYSDIR=\"/etc\"", "-DSECURE_COMPILE=0"]
   let includes = ["-I."]
 
-  # Makefile.in's OBJ list with REGEX_O empty (POSIX regcomp from libc).
   let less_srcs = [
     p"main.c",
     p"screen.c",

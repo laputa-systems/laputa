@@ -14,8 +14,10 @@ The command list is in the [README](../README.md); `xinit help` prints it.
 
 With no argument, `xinit` runs as PID 1 on the inittab named by
 `XSH_INIT_INITTAB`, default `/etc/inittab`. It refuses to run unless
-`getpid() == 1`. Test-only `XINIT_TEST_*` and `XSH_INIT_TEST_*` switches are
-read in `xinit.xsh`.
+`getpid() == 1`. The typed inittab execution policy accepts `--respawn-delay-ms N` (default 1000)
+and `--launch-limit N` (default 0, unlimited). Both are `UInt` values. They apply
+to respawn entries; the inittab line format is unchanged. Legacy
+`XSH_INIT_TEST_MAX_RESPAWNS` and `XSH_INIT_TEST_RESPAWN_DELAY_MS` are ignored.
 
 - `XINIT_SERVICE_DIR`, default `/usr/lib/xinit/services`.
 - `XINIT_RUN_DIR`, default `/run/xinit`.
@@ -60,27 +62,82 @@ x86_64. Example hooks: [boot](minimal-rc.boot.xsh),
 [demo-service.xsh](demo-service.xsh), and `packages/*/service.xsh` for the
 installed ones. `xinit check` validates the files and the dependency graph.
 
-The fields read are defined in `service_from_record` in `xinit.xsh`. Other
-fields are not rejected and have no effect.
+`service_from_record` in `xinit.xsh` constructs the normalized `Service` used
+by validation, planning, and execution. Unknown fields are errors at the top
+level and inside `dependencies`, `restart`, `log`, and `resources`. Supplying
+both `logging` and `log` is an error. A present field must have its declared
+type. Explicit `null` never selects a default.
+
+`name` and `command` are required. Names, targets, and dependency names must
+match `[A-Za-z0-9][A-Za-z0-9_.-]*`. A service cannot depend on itself. Duplicate
+names within a list, duplicate service identities, and dependencies appearing
+in both `need` and `uses` are errors. All entry points reject invalid service
+values before application. `check` also rejects missing dependencies and cycles.
 
 | Field | Meaning |
 |---|---|
-| `name`, `command` | Service name and spawn command. |
-| `kind` | `longrun` (default), `oneshot`, or `scripted`. |
-| `targets` | Targets selected by `boot [TARGET]`; default target is `boot`. |
+| `name`, `command` | Required service name and typed `Command`. A `start()` hook still requires a command declaration. |
+| `kind` | `longrun` (default), `oneshot`, or `scripted`. Other values are errors. |
+| `targets` | Targets selected by `boot [TARGET]`; defaults to `[]`. The boot command defaults to target `boot`. |
 | `dependencies` | `need`, `uses`, `after`, `before`. |
 | `restart` | `mode`: `always`, `on_failure`, `never`; default `on_failure` for `longrun`, `never` otherwise. `delay_ms`, `max_delay_ms`, `stable_after_ms`. |
-| `readiness` | `"notify"` or the default. |
+| `readiness` | `"auto"` (default), or `"notify"` for a longrun. |
 | `ready_timeout_ms`, `stop_timeout_ms` | Defaults 5000 and 200. |
 | `logging` | `"append"` (default) or `"off"`. |
-| `log` | `{mode, max_size, keep}`; ignored when `logging` is set. |
+| `log` | `{mode, max_size, keep}`; `mode` is required and must be `"append"` or `"off"`. Conflicts with `logging`. |
 | `resources` | `{cpu_max: N}`. |
+
+Timing values, log size and retention, and CPU percentages must be nonnegative.
+`restart.max_delay_ms` must be zero or at least `restart.delay_ms`. Zero retains
+its documented meaning for uncapped backoff, immediate restart, and disabled
+rotation. Defaults apply only when a field is absent.
+
+`xinit inspect SERVICE` prints normalized JSON with the module's source path.
+The entire command, including argv and environment, is replaced by `"redacted"`.
+`xinit start-plan SERVICE` prints the same records in dependency start order.
+These commands and `check` do not launch services or write runtime state.
+Executable availability, log permissions, and cgroup permissions remain
+execution preconditions checked when a service starts.
+Service modules are trusted executable XSH: loading them can run module-level
+effects. Inspection does not confine or make module evaluation inert. There is
+one module per service and no additional configuration layering or merge order.
 
 A module may also export lifecycle procs. `start()` and `stop()` replace the
 default spawn and stop, `reload()` replaces the `SIGHUP`, `ready()` gates
 dependents, `status()` appends text to the `status` line, and `finish()` runs after the
 instance exits, on a clean stop or a crash, while the unit reports
-`finishing`. Signatures are in `ServiceFile` in `xinit.xsh`.
+`finishing`. The scanner does not call stop or finish for a pending unit that
+never started, or repeat finish after an already processed crash. A completed
+oneshot remains a running logical unit until stopped. Signatures are in
+`ServiceFile` in `xinit.xsh`.
+
+### Test controls
+
+`XINIT_TEST_ALLOW_NON_PID1=1` is the only non-PID1 test opt-in. It enables test
+controls only when the process is not PID 1. Actual PID 1 ignores every test
+control, even when that opt-in is set. No environment variable installs XSH's
+native Unix or Linux fake providers.
+
+The remaining explicitly controlled fields are:
+
+- `XINIT_TEST_FAKE_PIDS`: preserves fake saved PIDs and bypasses live scanner
+  detection for native fixtures. It also selects their synthetic cgroup label.
+- `XINIT_TEST_MAX_EVENTS`: bounds scanner events for native fixtures.
+- `XINIT_TEST_EXIT_WHEN_IDLE`: returns when a bounded inittab fixture is idle.
+- `XINIT_TEST_FAST_SHUTDOWN`: skips the owned-group TERM grace in an inittab fixture.
+- `XINIT_TEST_SKIP_FINAL_CLEANUP`: omits the Linux-wide cleanup in an inittab fixture.
+- `XINIT_TEST_ACTION_LOG`: records the selected final action instead of invoking it.
+
+Those fields are inert without the opt-in. The old `XSH_UNIX_DRY_RUN`,
+`XSH_INIT_TEST_ALLOW_NON_PID1`, `XSH_INIT_FAST_SHUTDOWN`,
+`XSH_INIT_FINAL_CLEANUP`, and other `XSH_INIT_TEST_*` controls are ignored.
+The production `XSH_INIT_INITTAB` path setting remains supported.
+
+The explicit fake-PID adapter remains necessary because the qualified XSH fake
+provider cannot supply fake-aware `process.kill(..., signal: "0")`, process
+start identities, or scanner liveness. Its `test.mock` dispatcher currently
+supports DNS and networking, not those process operations. Removing that adapter
+requires a qualified XSH observation primitive; it is not a production fallback.
 
 ### Dependencies
 
@@ -101,6 +158,10 @@ scanner owns the run directory.
 holds one unit; `scan` holds a target's services, or a service and its
 dependencies. The scanner owns and reaps its children, writes their status
 JSON, and on `SIGTERM` or `SIGINT` stops them in reverse dependency order.
+When a service leader exits, the scanner stops and reaps its remaining process
+group before `finish()` and respawn. Scanner shutdown reaps owned groups before
+returning. Group cleanup allows `stop_timeout_ms` for TERM and 100 ms after KILL.
+A group surviving that bound produces an `xinit-cleanup` error.
 
 While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
 `start`/`stop`/`restart`/`reload SERVICE` post a request to
@@ -118,6 +179,18 @@ After a crash the scanner waits `delay_ms`, doubles the delay on each further
 crash up to `max_delay_ms` (`0` is uncapped), and resets it to `delay_ms` after a
 run of at least `stable_after_ms`. `delay_ms: 0` restarts immediately. A unit
 awaiting respawn reports `dead`.
+
+Elapsed readiness, backoff, and inittab gates use monotonic milliseconds from
+the current process. XSH supplies process-local monotonic nanoseconds, converted
+once at the private clock boundary. No deadline or elapsed origin is persisted.
+A new scanner initializes fresh gates from its command and inbox rather than
+reusing an old process's deadlines. Saved process-start identity remains a
+separate kernel observation.
+
+After a VM pause, reconciliation follows the guest monotonic clock. An expired
+gate is due on resume; a clock that excludes the pause retains its remaining
+budget. No host-duration accounting is assumed. The qualified x86_64 KVM guest
+excludes a three-second host QMP pause from its observed elapsed clock delta.
 
 ### Readiness
 

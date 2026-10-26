@@ -129,8 +129,6 @@ proc generation_adapter_require_no_forbidden_packages(
   }
 }
 
-# Validate the concrete executor result before this adapter crosses from PM's
-# typed graph into the primitive-only profile process.
 proc generation_adapter_completed_build(expected: types.BuildPlan, actual: types.BuildResult) [error] {
   if actual.format != "laputa-build-result-1" or actual.plan_sha256 != expected.plan_sha256 {
     return Err(GenerationAdapterError.Failed("executor result does not match the saved BuildPlan"))

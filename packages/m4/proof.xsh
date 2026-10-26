@@ -1,9 +1,5 @@
 error ScriptError = Failed(kind: Str, message: Str)
 
-# GNU m4 1.4 semantics bison's and flex's skeletons depend on: recursion,
-# `$@` requoting, builtin tokens through `defn`, pushdef stacks, regexes with
-# groups, numbered diversions, LIFO m4wrap, multi-character quotes, comments,
-# and include through -I. The expected text is GNU m4 1.4.20's output.
 const semantics_input = r"""divert(-1)
 # Recursion, nested quoting, and argument rescanning.
 define(`fact', `ifelse(`$1', `0', `1', `eval($1 * fact(decr($1)))')')
@@ -62,8 +58,6 @@ wrapped last
 diverted one
 """
 
-# Flex's skeleton dialect: `-P` prefixed builtins, comments disabled, and
-# `[[`/`]]` quotes, read from standard input as flex pipes it.
 const prefixed_input = r"""m4_changecom`'m4_dnl
 m4_changequote`'m4_dnl
 m4_changequote([[,]])[[]]m4_dnl
@@ -111,7 +105,7 @@ proc expect_text(label: Str, actual: Str, expected: Str) {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, process, error] {
+proc main(rootfs = /rootfs) [fs, process, error] -> Result[Unit, Error] {
   tempdir tmp at fp"{rootfs}/var/tmp/proof-m4" {
     let m4 = fp"{rootfs}/usr/bin/m4"
 
@@ -133,7 +127,6 @@ proc main(rootfs = /rootfs) [fs, process, error] {
       return Err(ScriptError.Failed(kind: "proof-m4", message: f"unexpected output: {trimmed}"))?
     }
 
-    # The include directory is reached only through -I, never the cwd.
     let include_dir = fp"{tmp}/include"
     include_dir.mkdir()
     fp"{include_dir}/proof-inc.m4".write(semantics_include)
@@ -147,8 +140,6 @@ proc main(rootfs = /rootfs) [fs, process, error] {
     let prefixed_out = run.text $m4 "-P" < $prefixed
     expect_text("prefixed", prefixed_out, prefixed_expected)
 
-    # An unterminated macro call is a fatal error with a nonzero status, never
-    # truncated output with success.
     let unterminated = fp"{tmp}/unterminated.m4"
     unterminated.write("define(`x', `y')x(\n")
     let unterminated_stderr = fp"{tmp}/unterminated.stderr"
@@ -164,8 +155,6 @@ proc main(rootfs = /rootfs) [fs, process, error] {
       return Err(ScriptError.Failed(kind: "proof-m4", message: "m4 rejected an unterminated call without its diagnostic"))?
     }
 
-    # Positional operands must remain literal file inputs. A directory must not
-    # be silently resolved as the proof cwd by the published XSH runner.
     let directory_stderr = fp"{tmp}/directory-input.stderr"
     let directory_input = process.run(
       process.command_argv(m4, [m4, tmp], stderr: directory_stderr),

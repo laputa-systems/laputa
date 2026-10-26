@@ -8,10 +8,10 @@ XSH for its package manager, recipes, init system, installer, and system tools.
 The current installer workflow uses locally built packages and runs in QEMU.
 Prepare the checkout's local packages with the
 [bootstrap instructions](docs/DEVELOPMENT.md#local-bootstrap). Then, on aarch64
-with host XSH on `PATH` and the local mirror running, run:
+with the local mirror running, run:
 
 ```sh
-XSH_MODULE_PATH="$PWD" make installer-qemu-manual
+make installer-qemu-manual
 ```
 
 Inside the guest, run `setup-laputa` to choose an installation disk, or

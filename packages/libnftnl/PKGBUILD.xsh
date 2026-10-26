@@ -61,7 +61,6 @@ export const filetree = [
   },
 ]
 
-# include/libnftnl/Makefile.am pkginclude_HEADERS.
 pure public_headers() -> List[Str] {
   """
 batch.h table.h trace.h chain.h object.h rule.h expr.h set.h flowtable.h
@@ -69,7 +68,6 @@ ruleset.h common.h udata.h gen.h
 """.words()
 }
 
-# src/Makefile.am libnftnl_la_SOURCES, in upstream order.
 pure library_sources() -> List[Str] {
   """
 utils.c batch.c flowtable.c common.c gen.c table.c trace.c chain.c object.c
@@ -108,8 +106,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let mnl = make.pkg_config_flags(["libmnl"])?
   write_config_h()
 
-  # Flags from configure.ac (regular_CPPFLAGS, regular_CFLAGS, and the
-  # -fvisibility=hidden that CHECK_GCC_FVISIBILITY adds) and Make_global.am.
   let libnftnl = make.c_shared_library({
     cc,
     triple,
@@ -130,7 +126,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     root: p"src",
     sources: [fp"{source}" for source in library_sources()],
     out_dir: p"obj",
-    # libtool -version-info 19:0:8 names the file libnftnl.so.11.8.0.
     out: p"obj/libnftnl.so.11.8.0",
     soname: "libnftnl.so.11",
     ldflags: ["-Wl,--version-script=src/libnftnl.map"].extend(mnl.libs),
@@ -154,7 +149,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fp"{dest}/usr/lib/pkgconfig".mkdir()
 
-  # libnftnl.pc.in with configure's /usr prefix substituted.
   fp"{dest}/usr/lib/pkgconfig/libnftnl.pc".write(
     f"""prefix=/usr
 exec_prefix=${{prefix}}

@@ -165,7 +165,7 @@ proc release_stage_overlay(overlay_root: Path, value: VerifiedTrustRelease) [fs,
 }
 
 ## Composes one signed release as a new immutable generation and leaves prior generations untouched.
-export proc compose_signed_release(input: SignedReleaseInput, target: TrustGenerationTarget) [fs, error] -> Result[types.GenerationReceipt, Error] {
+export proc compose_signed_release(input: SignedReleaseInput, target: TrustGenerationTarget) [fs, process, error] -> Result[types.GenerationReceipt, Error] {
   let verified = release_verify(input)?
   release_require(! target.output_root.exists()?, "immutable generation output already exists")
   target.output_root.parent.mkdir(parents: true)

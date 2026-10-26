@@ -57,7 +57,7 @@ proc write_root_receipt(root: Path, target: Str, packages: List[Str]) [fs, error
   json.write(
     fp"{root}/var/lib/laputa/root.json",
     {
-      format: "laputa-root-1",
+      format: "laputa-root-2",
       target,
       artifacts: [
         {
@@ -69,12 +69,12 @@ proc write_root_receipt(root: Path, target: Str, packages: List[Str]) [fs, error
         for package in packages
       ],
       entries: [],
+      generated_entries: [],
       root_sha256: "typed-root-receipt",
     },
   )
 }
 
-# Proofs run with the build's XSH_PM_TARGET_ARCH, as in package-tools.
 proc run_build_essential_proof(xsh: Path, arch: Str, root: Path, stderr: Path) -> Result[Status] {
   env ({XSH_PM_TARGET_ARCH: arch}) {
     process.run(

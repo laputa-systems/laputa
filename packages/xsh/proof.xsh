@@ -3,9 +3,6 @@ use pm.proof
 proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "xsh")
   proof.ensure(fp"{root}/usr/bin/sh".exists()?, "proof-xsh", "missing sh runner")
-  # `xsh` owns the canonical `usr/bin` runners.  A proof root deliberately
-  # contains only the node's declared runtime closure, so it must not rely on
-  # baselayout's optional `/bin -> usr/bin` compatibility symlink.
   proof.ensure(fp"{root}/usr/bin/xsh".exists()?, "proof-xsh", "missing xsh runner")
   proof.ensure(fp"{root}/usr/bin/xshi".exists()?, "proof-xsh", "missing xshi runner")
   proof.ensure(fp"{root}/usr/bin/xsht".exists()?, "proof-xsh", "missing xsht runner")

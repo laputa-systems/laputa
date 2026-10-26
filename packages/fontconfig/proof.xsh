@@ -10,8 +10,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libfontconfig.so.1]" in dynamic, "proof-fontconfig", "fontconfig has no libfontconfig.so.1 SONAME")
 
-  # fonts.conf includes conf.d and skips what it cannot read, so a dangling
-  # link silently drops its rules (generic family aliases among them).
   let conf_d = fp"{root}/etc/fonts/conf.d"
 
   for entry in fs.children(conf_d)? |> where .name.ends_with(".conf") {
@@ -28,8 +26,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let home = fp"{root}/tmp/fontconfig-proof"
   home.mkdir()
 
-  # Loading the whole configuration parses every linked conf.d file and the
-  # generated language rules; fontconfig reports any problem on stderr.
   env ({
     LD_LIBRARY_PATH: fp"{root}/usr/lib",
     FONTCONFIG_FILE: fp"{root}/etc/fonts/fonts.conf",

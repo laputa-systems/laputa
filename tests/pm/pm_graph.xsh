@@ -31,6 +31,7 @@ pure fixture_package(
     kind: types.Meta,
     deps,
     runtime_only_deps,
+    proof_deps: [],
     mkdeps_host,
     mkdeps_target,
     upstream_sources: [],
@@ -144,9 +145,6 @@ test test_graph_resolution_is_repeatable [fs, env, error] {
   assert graph.build_closure(first, ["app"], value)? == graph.build_closure(second, ["app"], value)?
 }
 
-# A runtime-only edge selects its target for runtime roots and for the plan
-# that must produce them, but is no build input: it orders no build, so it
-# may close a cycle with a build edge.
 test test_runtime_only_edge_selects_closures_without_ordering_builds [error] {
   let runner = fixture_package("runner", [], [], [])
   let service = fixture_package("service", [], [], [], runtime_only_deps: ["runner"])
@@ -173,8 +171,6 @@ test test_catalog_rejects_missing_runtime_only_dependency [error] {
   }
 }
 
-# A bootstrap edge names a build input the seed substitutes, so it selects
-# nothing: planning the dependent must not pull in the seed's replacement.
 test test_bootstrap_edge_selects_no_package [error] {
   let tool = fixture_package("tool", [], [], [])
   let replacement = fixture_package("replacement", [], ["tool"], [])
@@ -199,12 +195,29 @@ test test_packages_buildable_without_drops_every_dependent_of_an_excluded_packag
   let tool = fixture_package("tool", ["library"], [], [], runtime_only_deps: ["runner"])
   let value = catalog.from_packages(p".", [kernel, builder, headers, library, runner, service, tool])?
   let selected = graph.packages_buildable_without(value, ["kernel"], policy.aarch64_docker())?
-  # A runtime-only edge counts: a plan for `service` must produce `headers`.
   assert selected == ["builder", "library", "runner", "tool"]
   assert graph.packages_buildable_without(value, ["kernel", "builder"], policy.aarch64_docker())? == ["runner"]
 
   match graph.packages_buildable_without(value, ["absent"], policy.aarch64_docker()) {
     Ok(_) => test.fail("an unknown excluded package was accepted")
     Err(problem) => assert "excluded package absent is not in the catalog" in problem.message
+  }
+}
+
+test test_proof_edges_select_and_order_tools_without_becoming_payload_or_runtime_inputs [error] {
+  let tool = fixture_package("proof-tool", [], [], [])
+  let base = fixture_package("payload", [], [], [])
+  let payload = {...base, proof_deps: ["proof-tool"]}
+  let value = catalog.from_packages(p".", [payload, tool])?
+  assert graph.runtime_closure(value, ["payload"])? == ["payload"]
+  assert graph.build_closure(value, ["payload"], policy.aarch64_docker())? == ["payload", "proof-tool"]
+  let edges = graph.edges(value, policy.aarch64_docker())?
+  assert edges.len() == 1
+  assert graph.edge_orders_execution(edges[0].kind)
+  assert ! graph.edge_orders_builds(edges[0].kind)
+  assert graph.topological_levels(["payload", "proof-tool"], edges)? == [["proof-tool"], ["payload"]]
+  match catalog.from_packages(p".", [payload]) {
+    Ok(_) => test.fail("missing proof tool unexpectedly loaded")
+    Err(problem) => assert "payload depends on missing proof-tool" in problem.message
   }
 }

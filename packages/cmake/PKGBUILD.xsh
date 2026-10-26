@@ -20,7 +20,6 @@ export const rel = "1"
 ## Exported declaration `deps`.
 export const deps = ["musl", "llvm-toolchain"]
 
-# The bundled libuv includes <linux/errqueue.h> for UDP error queues.
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain", "linux-headers", "samurai"]
 
@@ -128,7 +127,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  # Step 1: apply musl compatibility patches in XSH (no `patch` binary required).
   for patch_file in [
     p"cmake-no-execinfo.patch",
     p"cmake-musl-ioctl-fallbacks.patch",
@@ -137,8 +135,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     let _ = patch.apply(p".", patch_file.read_text()?, 1)?
   }
 
-  # Step 2: generate bootstrap headers — replaces cmake's bootstrap shell script.
-  # All values are precomputed for Clang + musl on aarch64 and x86_64.
   let bsdir = p"Bootstrap.cmk"
   bsdir.mkdir()
 
@@ -167,15 +163,11 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   fp"{bsdir}/cmSTL.hxx".write("")
 
-  # cmThirdParty.h: only #pragma once when using bundled libs (no system libs).
-  # cmake's bootstrap only adds #define CMAKE_USE_SYSTEM_* when system libs are found.
   fp"{bsdir}/cmThirdParty.h".write(
     """#pragma once
 """,
   )
 
-  # Generate kwsys headers from *.in templates (cmake's bootstrap processes these
-  # with sed; we use configure.substitute). All values precomputed for Clang + musl.
   let kwsys_subs = [
     [
       "KWSYS_NAMESPACE",
@@ -223,12 +215,8 @@ export proc build(dest: Path) [fs, process, env, error] {
     configure.substitute(fp"Source/kwsys/{hdr}.in", fp"{bsdir}/cmsys/{hdr}", kwsys_subs)
   }
 
-  # Step 3: compile bootstrap cmake from source. No sh, no configure, no make.
-  # Source categories from CMAKE_*_SOURCES in cmake's bootstrap script.
   fp"{bsdir}/obj".mkdir()
 
-  # Pre-combined flag lists (XSH has no list concat, so build them explicitly).
-  # Linux system flags + cmake bootstrap flags + includes
   let cxx_all = [
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
@@ -252,9 +240,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-IUtilities",
   ]
 
-  # kwsys feature flags for Clang + musl (captured from cmake's bootstrap log).
-  # setenv=1, unsetenv=1: musl has them. environ_in_stdlib=0: musl doesn't expose it.
-  # utimensat=1, utimes=1: musl has both. backtrace/demangle/symbol_lookup=0: patched out.
   let kwsys_all = [
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
@@ -272,7 +257,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-ISource/kwsys",
   ]
 
-  # SystemTools also has backtrace/demangle/symbol_lookup flags
   let kwsys_st = [
     "-D_FILE_OFFSET_BITS=64",
     "-D_TIME_BITS=64",
@@ -322,7 +306,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-IUtilities",
   ]
 
-  # cmake CXX sources: Source/cm*.cxx (list from CMAKE_CXX_SOURCES in bootstrap)
   let cmake_cxx_sources = [
     fp"Source/{s}.cxx"
     for s in [
@@ -590,7 +573,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     ]
   ]
 
-  # Ninja generator sources (bootstrap uses Ninja so samu can drive the full build).
   let ninja_cxx_sources = [
     fp"Source/{s}.cxx"
     for s in [
@@ -605,19 +587,15 @@ export proc build(dest: Path) [fs, process, env, error] {
     ]
   ]
 
-  # Fortran LexerParser sources needed by the Ninja generator.
   let fortran_lexer_sources = [fp"Source/LexerParser/{s}.cxx" for s in ["cmFortranLexer", "cmFortranParser"]]
 
-  # Utilities/std: fs_path.cxx, string_view.cxx
   let std_cxx_sources = [fp"Utilities/std/cm/bits/{s}.cxx" for s in ["fs_path", "string_view"]]
 
-  # LexerParser CXX
   let lexer_parser_cxx_sources = [
     fp"Source/LexerParser/{s}.cxx"
     for s in ["cmExprLexer", "cmExprParser", "cmGccDepfileLexer"]
   ]
 
-  # kwsys C sources (KWSYS_C_SOURCES from bootstrap — unix branch).
   # Per-source flags: String.c requires -DKWSYS_STRING_C to activate its body.
   let kwsys_c_base = [
     "-D_FILE_OFFSET_BITS=64",
@@ -642,13 +620,11 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-ISource/kwsys",
   ]
 
-  # kwsys CXX (KWSYS_CXX_SOURCES from bootstrap)
   let kwsys_cxx_sources = [
     fp"Source/kwsys/{s}.cxx"
     for s in ["Directory", "EncodingCXX", "FStream", "Glob", "RegularExpression", "Status"]
   ]
 
-  # libuv C sources (unix branch, bundled)
   let uv_sources = [
     fp"Utilities/cmlibuv/{s}"
     for s in [
@@ -674,7 +650,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     ]
   ]
 
-  # librhash C sources (bundled)
   let rhash_sources = [
     fp"Utilities/cmlibrhash/{s}"
     for s in [
@@ -691,13 +666,11 @@ export proc build(dest: Path) [fs, process, env, error] {
     ]
   ]
 
-  # jsoncpp CXX sources (bundled)
   let jsoncpp_sources = [
     fp"Utilities/cmjsoncpp/{s}"
     for s in ["src/lib_json/json_reader.cpp", "src/lib_json/json_value.cpp", "src/lib_json/json_writer.cpp"]
   ]
 
-  # Step 4: link the bootstrap cmake binary (C++ program needs C++ compiler driver).
   let bootstrap_cmake = fp"{bsdir}/cmake"
 
   let bootstrap_target = make.c_multi_program(
@@ -900,8 +873,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(tasks, make.jobs()?)
 
-  # Step 5: generate InitialCacheFlags.cmake — passed as -C to bootstrap cmake.
-  # The bootstrap script generates this to configure install paths and features.
   fp"{bsdir}/InitialCacheFlags.cmake".write(
     """# Generated by cmake PKGBUILD.xsh bootstrap
 set (CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type." FORCE)
@@ -924,8 +895,6 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
 """,
   )
 
-  # Step 6: run bootstrap cmake with Ninja generator, then build with samu.
-  # No Alpine make required — samu is a mkdep and on PATH via /build-env.
   let samu = process.which("samu")?
   let jobs = make.jobs()?
   let jobs_flag = f"-j{jobs}"

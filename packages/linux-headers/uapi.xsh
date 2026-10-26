@@ -1,9 +1,4 @@
 ##! Kbuild's scripts/headers_install.sh in XSH: turn a kernel uapi header into the header userspace includes.
-# The script runs two passes over each header: sed rewrites that drop kernel
-# annotations and the `_UAPI` guard prefix, then `unifdef -U__KERNEL__
-# -D__EXPORTED_HEADERS__`, which removes kernel-only conditional blocks. A raw
-# uapi header is not usable as is: asm/swab.h, for one, includes
-# <linux/compiler.h>, which only the kernel tree has.
 
 ## A header the rewrite cannot process: an unbalanced conditional or a malformed expression.
 export error UapiError = Failed(kind: Str, message: Str)
@@ -18,8 +13,6 @@ export pure rewrite_line(line: Str) -> Str {
   rx"#(ifndef|define|endif[[:space:]]*/[*])[[:space:]]*_UAPI".replace(out, with: "#$1 ")
 }
 
-# A preprocessor condition after substituting the two symbols unifdef knows:
-# a constant, or `known: false` when other macros decide it.
 type Cond = {known: Bool, value: Bool}
 
 type Parsed = {cond: Cond, next: Int}
@@ -36,8 +29,6 @@ pure negate(cond: Cond) -> Cond {
   unknown
 }
 
-# `&&` (absorbing false) or `||` (absorbing true): an absorbing constant
-# decides the result whatever the unknown parts are.
 pure combine(parts: List[Cond], op: Str) -> Cond {
   let absorbing = op == "||"
   var decided = true
@@ -133,8 +124,6 @@ proc parse_primary(tokens: List[Str], start: Int) -> Result[Parsed] {
     }
   }
 
-  # Anything else up to the next top-level `&&`, `||`, or closing `)` is an
-  # opaque term such as `__BITS_PER_LONG == 32`.
   var at = start
   var depth = 0
   let words: List[Str] = collect {
@@ -173,7 +162,6 @@ pure directive(line: Str) -> Directive? {
 
   return null when parts.len() < 2
 
-  # Comments in the condition are not part of the expression.
   let tail = if parts.len() > 2 { parts[2] } else { "" }
   let expr = rx"//.*$".replace(rx"/\*.*?\*/".replace(tail, with: " "), with: "").trim()
   {kind: parts[1], expr}
@@ -195,11 +183,6 @@ proc directive_cond(found: Directive) -> Result[Cond] {
   eval_condition(found.expr)?
 }
 
-# A conditional block as unifdef rewrites it. `kept` blocks stay in the output
-# with their directives; `resolved` blocks lose their directives and keep at
-# most the one branch that is true; `closed` is a kept block whose remaining
-# branches follow a branch that became `#else`; `dropped` sits inside a branch
-# that is gone.
 type Frame = {mode: Str, taking: Bool, done: Bool}
 
 pure all_taking(frames: List[Frame]) -> Bool {
@@ -214,9 +197,6 @@ pure set_top(frames: List[Frame], frame: Frame) -> List[Frame] {
   frames[..frames.len() - 1].push(frame)
 }
 
-# Like unifdef, only a condition that resolves to a constant changes the
-# output; any other directive, mixed ones included, passes through byte for
-# byte.
 ## Remove kernel-only conditional blocks as `unifdef -U__KERNEL__ -D__EXPORTED_HEADERS__` does.
 export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
   var out = []
@@ -224,7 +204,6 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
   var index = 0
 
   while index < lines.len() {
-    # A directive continued with backslashes is one logical line.
     var physical = [lines[index]]
 
     while physical[-1].ends_with("\\") and index + 1 < lines.len() {
@@ -296,8 +275,6 @@ export proc unifdef(lines: List[Str]) [error] -> Result[List[Str], Error] {
           if cond.known {
             frames = set_top(frames, {...top, taking: cond.value, done: cond.value})
           } else {
-            # The first surviving branch opens the block: unifdef overwrites
-            # `elif` with `if  ` in place and keeps the rest of the line.
             frames = set_top(frames, {mode: "kept", taking: true, done: false})
             out += [rx"^([[:space:]]*#[[:space:]]*)elif".replace(physical[0], with: r"${1}if  ")].extend(physical[1..])
           }

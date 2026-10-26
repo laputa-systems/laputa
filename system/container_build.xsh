@@ -27,8 +27,8 @@ pure container_overlay_root(name: Str) -> Path {
   fp"/src/laputa/profiles/{name}"
 }
 
-pure container_guest_proof_source() -> Path {
-  /src/laputa/guest/qemu-dwl-foot-proof.xsh
+pure container_guest_proof_source(profile: types.SystemProfile) -> Path {
+  fp"/src/laputa/guest/{profile.name}-proof.xsh"
 }
 
 pure container_store_root() -> Path {
@@ -70,7 +70,7 @@ proc container_load_profile(name: Str) -> Result[types.SystemProfile] {
 proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Result[Path] {
   let source = container_overlay_root(profile.name)
   let overlay = fp"{work}/overlay"
-  let guest_proof = container_guest_proof_source()
+  let guest_proof = container_guest_proof_source(profile)
 
   if ! source.exists() or ! source.is_dir() {
     return Err(ContainerBuildError.Failed(f"profile overlay is missing: {source}"))
@@ -81,9 +81,7 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Resu
   }
 
   let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
-  fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/qemu-dwl-foot-proof.xsh", 0o755, parents: true, overwrite: true)
-  # The overlay is a checkout tree: only git's modes may reach the image, not
-  # host bits such as a setgid directory (which new subdirectories inherit).
+  fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/{profile.name}-proof.xsh", 0o755, parents: true, overwrite: true)
   pm_util.normalize_checkout_tree(overlay)
   overlay
 }
@@ -172,9 +170,6 @@ proc container_generation_plan(
   pm_generation.plan_profile(pm_plan_json.read(build_plan)?, profile.package_roots, overlay_profile)?
 }
 
-# Extract only the profile-declared kernel from the exact artifact selected by the saved BuildPlan.
-# Laputa owns no PM archive logic: the child PM process verifies and extracts the
-# immutable artifact before this container can publish an image.
 proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, output: Path) {
   container_pm(
     [
@@ -252,7 +247,6 @@ proc container_execute_profile(profile: types.SystemProfile, jobs: Int) {
     return Err(ContainerBuildError.Failed("saved generation plan differs from the current BuildPlan or overlay"))
   }
 
-  # A forbidden package in the runtime closure fails before anything builds.
   let forbidden = system_profile.forbidden_runtime_packages(
     profile,
     [

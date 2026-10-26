@@ -100,7 +100,6 @@ pure x86_vdso_cflags() -> List[Str] {
     "-fpic",
     "-m64",
     "-mcmodel=small",
-    # The vDSO keeps the kernel's baseline -march (see x86_kbuild_cflags).
     "-march=x86-64",
     "-mtune=generic",
     "-DDISABLE_BRANCH_PROFILING",
@@ -300,10 +299,6 @@ proc build_x86_vdso(cc: Path) {
   PKGBUILD_shared.emit_kbuild_progress("xsh-kbuild-x86-vdso generated vdso64-image.c")
 }
 
-# NR_PAGEFLAGS and the other bounds follow the kernel version and config
-# (page flags come and go with options such as MEMORY_FAILURE and with new
-# releases), so x86 compiles kernel/bounds.c as upstream Kbuild does instead
-# of carrying a hand-copied header.
 proc generate_x86_bounds_header(cc: Path) {
   p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/bounds.s"
@@ -372,10 +367,6 @@ proc generate_x86_kvm_asm_offsets_header(cc: Path) {
   kbuild.generate_offsets_header(asm_out, p"arch/x86/kvm/kvm-asm-offsets.h", "__KVM_ASM_OFFSETS_H__")
 }
 
-# offsetof(struct rq, nr_pinned) depends on the arch and config (x86 adds
-# PARAVIRT and HOTPLUG_CPU fields ahead of it), and inline migrate_disable()
-# writes through it, so x86 generates it as upstream Kbuild does instead of
-# sharing the aarch64-derived files/generated/rq-offsets.h.
 proc generate_x86_rq_offsets_header(cc: Path) {
   p".xsh-kbuild/generated".mkdir()
   let asm_out = p".xsh-kbuild/generated/rq-offsets.s"

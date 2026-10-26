@@ -1,4 +1,5 @@
-use pm.util as pm_util
+use pm.target as pm_target
+use pm.types
 
 error ProofError = Failed(kind: Str, message: Str)
 
@@ -8,12 +9,12 @@ proc ensure(condition: Bool, kind: Str, message: Str) {
   }
 }
 
-pure elf_machine_name(arch: Str) -> Str {
-  return "AArch64" when arch == "aarch64"
-
-  return "X86-64" when arch == "x86_64"
-
-  arch
+pure elf_machine_name(target: types.Target) -> Result[Str, Error] {
+  match target {
+    types.Aarch64LinuxMusl => "AArch64"
+    types.X86_64LinuxMusl => "X86-64"
+    types.TargetReserved => Err(types.PmError.PackageContract("unsupported ELF target"))
+  }
 }
 
 proc build_root_path() -> Result[Path] {
@@ -117,8 +118,9 @@ proc prove_public_surface(root: Path, arch: Str) {
   ensure_file(fp"{root}/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")
 }
 
-proc prove_default_compile(root: Path, arch: Str) [fs, process, env, error] {
-  let machine = elf_machine_name(arch)
+proc prove_default_compile(root: Path, target: types.Target) [fs, process, env, error] {
+  let arch = types.pm_target_arch(target)
+  let machine = elf_machine_name(target)?
   let cc = process.which("cc")?
   let readelf = process.which("llvm-readelf")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-default" {
@@ -225,9 +227,10 @@ proc prove_explicit_aarch64_target(root: Path) {
   }
 }
 
-proc prove_target_tools(root: Path, arch: Str) {
+proc prove_target_tools(root: Path, target: types.Target) {
+  let arch = types.pm_target_arch(target)
   let readelf = proof_readelf_path(root)?
-  let machine = elf_machine_name(arch)
+  let machine = elf_machine_name(target)?
   let cc = fp"{root}/usr/bin/cc"
   let clang = fp"{root}/usr/lib/llvm23/bin/clang"
   let clang_header = run.text $readelf "-h" $clang
@@ -251,28 +254,29 @@ proc prove_target_tools(root: Path, arch: Str) {
 }
 
 proc main(root = /rootfs) [fs, process, env, error] {
+  let target = pm_target.recipe_target()?
+  let build_target = pm_target.build_target()?
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"
 
   if ! db.exists() {
     return Err(ProofError.Failed(kind: "proof-llvm-toolchain", message: f"missing package metadata: {db}"))
   }
 
-  let target_arch = pm_util.target_arch()?
-  let build_arch = pm_util.build_arch()?
+  let target_arch = types.pm_target_arch(target)
   prove_public_surface(root, target_arch)
-  prove_default_compile(root, target_arch)
+  prove_default_compile(root, target)
 
-  if build_arch == target_arch and target_arch == "x86_64" {
-    prove_x86_64_v3(root)
-    prove_explicit_aarch64_target(root)
-    prove_native_link(root)
-    prove_native_cxx_link(root)
-  } else if build_arch == target_arch {
+  if build_target == target {
+    match target {
+      types.X86_64LinuxMusl => prove_x86_64_v3(root)
+      types.Aarch64LinuxMusl => {}
+      types.TargetReserved => { return Err(ProofError.Failed(kind: "proof-llvm-toolchain", message: "unsupported target")) }
+    }
     prove_explicit_aarch64_target(root)
     prove_native_link(root)
     prove_native_cxx_link(root)
   } else {
-    prove_target_tools(root, target_arch)
+    prove_target_tools(root, target)
   }
 
   print "llvm-toolchain ok"

@@ -1,6 +1,4 @@
 ##! Deterministic runtime-only system generations assembled from verified BuildPlan artifacts.
-# `plan` is the generic boundary. Profile callers that own overlay replacement policy use
-# `plan_profile`; `overlay_profile` decodes the explicit `overlay.json` metadata file.
 use plan as build_plan
 use root as pm_root
 use store as artifact_store
@@ -144,7 +142,7 @@ proc generation_validate_profile(value: types.GenerationProfile) {
   for replacement in value.replacements {
     generation_require_overlay_path(replacement, "generation profile replacement")
 
-    if replacement == "overlay.json" or replacement == "var/lib/laputa/generation.json" or replacement == "var/lib/laputa/root.json" {
+    if replacement == "overlay.json" or replacement == "var/lib/laputa/generation.json" or replacement == "var/lib/laputa/root.json" or replacement == "usr/share/man/mandoc.db" {
       return Err(types.PmError.PackageContract(f"generation profile may not replace reserved {replacement}"))
     }
   }
@@ -254,9 +252,6 @@ proc generation_runtime_artifacts(
     selected[name] = true
     artifacts += [{package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key}]
 
-    # BuildPlan dependencies are the typed graph projection; only Runtime and
-    # RuntimeOnly edges reach a system root. Store receipts omit RuntimeOnly
-    # edges, so the plan is their only source.
     for dependency in node.dependencies {
       let runtime = dependency.kind == types.dependency_runtime() or dependency.kind == types.dependency_runtime_only()
 
@@ -456,11 +451,6 @@ proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOve
   entries
 }
 
-# Overlay directory entries are structural declarations, just like RootPlan tree
-# entries.  They may share a package directory only when their exact metadata
-# agrees.  The completed generation receipt binds the overlay digest, while the
-# RootReceipt retains the canonical package owner, so this coalescing cannot
-# erase either source of provenance.
 pure generation_same_directory_metadata(entry: GenerationOverlayEntry, package_entry: types.RootEntry) -> Bool {
   entry.kind == "dir"
     and package_entry.kind == types.file_kind_tree()
@@ -490,7 +480,7 @@ proc generation_preflight_overlay(
   var used_replacements: Set[Str] = set.empty()
 
   for entry in entries {
-    if entry.path == "var/lib/laputa/root.json" or entry.path == "var/lib/laputa/generation.json" {
+    if entry.path == "var/lib/laputa/root.json" or entry.path == "var/lib/laputa/generation.json" or entry.path == "usr/share/man/mandoc.db" {
       return Err(types.PmError.PackageContract(f"generation overlay may not own reserved {entry.path}"))
     }
 
@@ -707,7 +697,7 @@ export proc compose(
   store_root: Path,
   output_root: Path,
   overlay_root: Path,
-) [fs, error] -> Result[types.GenerationReceipt, Error] {
+) [fs, process, error] -> Result[types.GenerationReceipt, Error] {
   generation_validate_plan(value)
   let actual_overlay_sha256 = overlay_digest(overlay_root)?
 
@@ -735,9 +725,10 @@ export proc compose(
   with staging_root = fs.tempdir_in(output_root.parent)? {
     let staging_path = staging_root.host_path()?
     let temporary = fp"{staging_path}/generation"
-    let root_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
+    let package_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
     temporary.chmod(0o700)
     generation_apply_overlay(temporary, entries)
+    let root_receipt = pm_root.root_index_manual_pages(temporary, package_receipt)?
     let receipt = generation_receipt_for(value, root_receipt)?
     let receipt_path = generation_receipt_path(temporary)
     receipt_path.parent.mkdir()
@@ -764,6 +755,7 @@ export proc compose(
 export proc verify_generation(output_root: Path, expected: types.GenerationReceipt) [fs, error] {
   generation_validate_receipt(expected)
   let stored = read_generation_receipt(output_root)?
+  pm_root.root_verify_generated_contents(output_root, expected.root_sha256)
 
   if stored != expected {
     return Err(types.PmError.PackageContract("generation receipt does not match the completed generation"))

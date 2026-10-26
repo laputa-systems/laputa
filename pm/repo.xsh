@@ -6,9 +6,6 @@ use store
 use types
 use util
 
-# Artifact metadata gained `package_kind` after the legacy repository format.
-# Keep the required tuple typed, then accept only that one omitted legacy field
-# at this boundary.  New metadata must name an explicit valid kind.
 type RepoArtifactMetadataDto = {name: Str, ver: Str, rel: Str}
 
 type RepoIndexMerge = {index: List[types.RemotePackage], already_published: Bool}
@@ -51,14 +48,12 @@ proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) -> 
     return types.parse_package_kind(raw.get("package_kind")?.require()?)
   }
 
-  # Package-kind fields appeared after legacy remote metadata. Its omitted form was payload.
   types.package_payload()
 }
 
 proc repo_verified_proof_path(store_root: Path, node: types.PlanNode, receipt: types.ArtifactReceipt) -> Result[Path] {
   let primary = fp"{receipt.artifact_dir}/proof.json"
 
-  # import_remote hashes and verifies its opaque remote proof object through the Store receipt.
   return primary when receipt.origin == types.artifact_origin_remote()
 
   if receipt.proof_key == node.proof_key {
@@ -86,8 +81,6 @@ export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Re
   var packages: List[types.RepoPublication] = []
 
   for node in value.nodes {
-    # Publication leaves this Store, so re-hash every object instead of
-    # trusting commit-time hashes as builds do.
     let receipt = store.verify_artifact(store_root, node.artifact_key)?
     repo_verify_node_receipt(value, node, receipt)
     let kind = repo_package_kind(receipt, node)?
@@ -176,12 +169,6 @@ proc repo_same_publication(left: types.RemotePackage, right: types.RemotePackage
   left.arch == right.arch and left.name == right.name and left.ver == right.ver and left.rel == right.rel and left.deps == right.deps and left.runtime_only_deps == right.runtime_only_deps and left.mkdeps_host == right.mkdeps_host and left.mkdeps_target == right.mkdeps_target and left.sha256 == right.sha256 and left.size == right.size and left.tarball == right.tarball and left.metadata == right.metadata and left.metadata_sha256 == right.metadata_sha256 and left.artifact_key == right.artifact_key and left.recipe_sha256 == right.recipe_sha256 and left.executor_sha256 == right.executor_sha256 and left.proof_key == right.proof_key and left.proof_sha256 == right.proof_sha256 and left.proof == right.proof and left.proof_receipt_sha256 == right.proof_receipt_sha256 and left.source_sha256 == right.source_sha256 and left.metapackage == right.metapackage
 }
 
-# The index row is the only mutable pointer to a package; its objects are
-# named by artifact and proof key, so replacing a row never touches published
-# bytes. A rebuild under the same ver-rel (a different artifact key) replaces
-# the row; a row behind the remote's ver-rel is refused, because publishing it
-# would move the index backwards. The same keys with different bytes (another
-# store's payload or executor) fail at the immutable object upload instead.
 proc repo_merge_publication(
   index: List[types.RemotePackage],
   entry: types.RemotePackage,
@@ -235,8 +222,6 @@ export proc publish(
     return Err(types.PmError.RemoteRepo("repository publication needs a remote repository"))
   }
 
-  # The loopback local mirror and file trees need no credentials; any other
-  # network remote does.
   if ! util.is_local_repo_url(remote_repo) and token.trim() == "" {
     return Err(
       types.PmError.Auth("repository publication needs LAPUTA_TOKEN for network remotes other than the local mirror"),
@@ -263,8 +248,6 @@ export proc publish(
     }
   }
 
-  # This is the sole remote-index read. It rejects rows behind the remote
-  # before any object upload.
   var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
   let pending: List[RepoPublishStage] = collect {
     for stage in stages {

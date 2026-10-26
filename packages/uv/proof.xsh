@@ -2,12 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# Package builds and proofs have no network and no Python interpreter, so the
-# proof sticks to project-metadata commands that need neither: `uv init
-# --bare` writes pyproject.toml from an explicit `--python` request, and `uv
-# version` reads and bumps it without resolving or syncing. Every uv state
-# directory points into the scratch tree so the proof neither reads nor
-# writes the container's home or caches.
 const expected_pyproject = """[project]
 name = "laputa-proof"
 version = "0.2.0"

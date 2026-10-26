@@ -57,10 +57,6 @@ export proc discover_options_from_env() [env, error] -> Result[kbuild.DiscoverOp
   }
 }
 
-# Kbuild workers are recipe programs, not source-tree files.  The executor
-# copies the complete typed recipe into XSH_PM_RECIPE_DIR, whose .xsh inputs are
-# fingerprinted with the package build input; resolving from ../pkg silently
-# depended on a legacy staging layout that no longer exists.
 proc staged_recipe_helper(name: Str) -> Result[Path] {
   let recipe_dir = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
 
@@ -371,10 +367,6 @@ export proc cached_archive_plan(
   archive_plan
 }
 
-# A cached plan is used only when its fingerprint (the .config and the
-# kernel release) still matches; anything else rediscovers the whole plan,
-# which takes about a second. Patching a stale plan for a few known config
-# symbols would silently miss every other config change.
 ## Exported declaration `cached_package_plan`.
 export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] -> Result[kbuild.KbuildPlan, Error] {
   let _ = kbuild.load_config(p".config")?

@@ -5,9 +5,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libpng")
   proof.target_elf(root, p"usr/lib/libpng16.so.16", "libpng")
 
-  # A shared libpng must not defer optional ARM NEON implementations to a
-  # nonexistent DSO.  The historical broken artifact passed metadata checks
-  # but failed only when foot loaded it in the guest.
   let readelf = proof.readelf_tool()?
   let symbols = run.text $readelf "-Ws" fp"{root}/usr/lib/libpng16.so.16"
 

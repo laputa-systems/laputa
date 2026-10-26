@@ -156,9 +156,6 @@ export proc run_artifact_proof(root: Path, pkg: types.Package) [fs, process, env
   verify_package_elf_dependencies(root, pkg.name)
   let xsh = proof_xsh_runner()?
 
-  # Preserve a nonzero proof Status as data at this boundary. Returning an Err
-  # from inside the effect block and then applying `?` would bypass a parallel
-  # executor worker's typed completion marker on the published runner.
   var proof_ok = false
   var proof_exited = false
   var proof_exit_code = 0

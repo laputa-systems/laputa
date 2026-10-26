@@ -85,7 +85,6 @@ export proc build(dest: Path) [fs, error] {
   fs.install(p"tailscaled", fp"{dest}/usr/bin/tailscaled", 0o755, parents: true, overwrite: true)
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/tailscaled.xsh", 0o644, parents: true, overwrite: true)
 
-  # Persistent state survives reboots on the root filesystem.
   fp"{dest}/var/lib/tailscale".mkdir()
   fp"{dest}/usr/lib/sysctl.d".mkdir()
 

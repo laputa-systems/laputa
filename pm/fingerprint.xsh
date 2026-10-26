@@ -14,7 +14,7 @@ pure ignored_tree_path(rel: Path) -> Bool {
 }
 
 pure package_input_path(rel: Path) -> Bool {
-  return false when ignored_tree_path(rel) or rel.name == "proof.xsh"
+  return false when ignored_tree_path(rel) or rel.name == "proof.xsh" or rel.name == "proof_deps.xsh"
 
   let key = rel.display()
   rel.name.ends_with(".xsh") or key == "files" or key.starts_with("files/") or key == "patches" or key.starts_with(
@@ -57,8 +57,6 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
   Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
 }
 
-# Returns whether a relative symlink target, resolved lexically from the link's
-# own directory, stays inside the tree that contains the link at `rel`.
 pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
   return false when target == "" or target.starts_with("/")
 
@@ -79,11 +77,6 @@ pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
   true
 }
 
-# The digest records a symlink by its target text and never follows it, so a
-# link out of the recipe directory would let content outside the digest reach
-# a build (staging copies the recipe tree) or a module import. Recipes name
-# shared code through the module path and outside inputs as `repository/`
-# sources instead.
 proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
   let lines: List[Str] = collect {
     for entry in fs.walk(pkg.dir) |> sort-by .path {
@@ -107,15 +100,6 @@ proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
   lines
 }
 
-# Repository inputs are explicit recipe declarations, but live outside the
-# recipe directory. Hash their complete declared file/tree contents so a PM
-# module edit changes laputa-pm's package build identity without recording an
-# absolute checkout path.
-#
-# Only the sources the target stages are hashed, after the same placeholder
-# expansion staging applies, so `repository/.out/seed/ARCH` keys each target by
-# its own seed and another target's inputs never change this key. Builds are
-# native, so the build architecture is the target's.
 proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) -> Result[List[Str]] {
   let arch = types.pm_target_arch(target)
   let lines: List[Str] = collect {
@@ -216,8 +200,15 @@ proc pm_proof_module(pm_root: Path) -> Result[Str] {
 export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error] -> Result[Str, Error] {
   let proof = fp"{pkg.dir}/proof.xsh"
   let proof_sha256 = if proof.exists() { hash.sha256(proof)?.hex() } else { "missing" }
+  let declaration = fp"{pkg.dir}/proof_deps.xsh"
+  var declaration_lines: List[Str] = []
+  if declaration.exists() {
+    declaration_lines = [f"proof-dependencies\t{hash.sha256(declaration)?.hex()}"]
+  }
   digest_lines(
     [
+      @declaration_lines,
+      @[f"proof-dependency\t{canonical_field(dependency)}" for dependency in pkg.proof_deps],
       "format\tlaputa-package-proof-input-1",
       f"package\t{canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
       f"proof\t{proof_sha256}",

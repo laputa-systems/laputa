@@ -177,9 +177,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let os = system.uname()?
   let triple = f"{os.machine}-linux-musl"
 
-  # LAPUTA_ROOT: prefix where musl/zlib deps are installed (empty = system /usr).
-  # Set to /build-env or /rootfs in the Makefile test target so configure can
-  # find zlib headers and libs. Matches the YSH PKGBUILD's $kr variable.
   var kr = ""
 
   if let Ok(v) = e"LAPUTA_ROOT" {
@@ -479,7 +476,6 @@ Local customisation goes in localoptions.h
   fs.install(p"dropbearkey", fp"{dest}/usr/bin/dropbearkey", 0o755, parents: true, overwrite: true)
   fs.install(p"dropbearconvert", fp"{dest}/usr/bin/dropbearconvert", 0o755, parents: true, overwrite: true)
 
-  # Runtime configuration and xinit service module.
   fp"{dest}/etc/dropbear".mkdir()
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)
 }

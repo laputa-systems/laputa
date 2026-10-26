@@ -1,5 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
-use pm.util as pm_util
+use pm.types
+use pm.target as pm_target
 
 ## Exported declaration `name`.
 export const name = "gnu-stubs"
@@ -58,10 +59,11 @@ export const filetree = [
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
-  let build_arch = pm_util.build_arch()?
-  let target_arch = pm_util.target_arch()?
+  let build_target = pm_target.build_target()?
+  let target = pm_target.recipe_target()?
+  let target_arch = types.pm_target_arch(target)
 
-  if build_arch != target_arch or (target_arch != "aarch64" and target_arch != "x86_64") {
+  if build_target != target {
     fail "gnu-stubs requires a native aarch64 or x86_64 build"
   }
 

@@ -107,8 +107,6 @@ export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
   let value = profile.load_system_profile(parsed.profile_name, fp"{root}/profiles")?
-  # The image is built in native Docker and booted with hardware acceleration,
-  # so its architecture is always the host's.
   let target = qemu.host_qemu_target()?
 
   match parsed.command {

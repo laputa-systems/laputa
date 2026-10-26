@@ -1,18 +1,9 @@
 ##! Install the kernel's userspace headers the way `make headers_install` does.
-use pm.util as pm_util
+use pm.target as pm_target
 use uapi
 
-pure kernel_srcarch(arch: Str) -> Result[Str] {
-  return "arm64" when arch == "aarch64"
 
-  return "x86" when arch == "x86_64"
 
-  Err(uapi.UapiError.Failed(kind: "linux-headers-arch", message: f"unsupported linux-headers arch {arch}"))
-}
-
-# One generated asm/unistd header: its syscall table, the ABIs it selects,
-# and the offset added to each number, as each arch's Kbuild names them
-# (arch/x86/entry/syscalls/Makefile, arch/arm64/kernel/Makefile.syscalls).
 type SyscallHeader = {name: Str, table: Path, abis: List[Str], offset: Str}
 
 pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
@@ -41,7 +32,6 @@ pure syscall_headers(srcarch: Str) -> List[SyscallHeader] {
   ]
 }
 
-# The `NAME += header.h` entries of one Kbuild variable.
 proc kbuild_list(file: Path, variable: Str) -> Result[List[Str]] {
   let names: List[Str] = collect {
     for line in file.lines()? {
@@ -70,7 +60,6 @@ proc generate_asm_wrappers(srcarch: Str, generated: Path) {
   }
 }
 
-# One asm/unistd header, as scripts/syscallhdr.sh --emit-nr writes it.
 proc generate_syscall_header(header: SyscallHeader, generated: Path) {
   let header_guard = "_UAPI_ASM_" + rx"__".replace(rx"[^A-Z0-9_]".replace(header.name.upper(), with: "_"), with: "_")
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
@@ -89,7 +78,6 @@ proc generate_syscall_header(header: SyscallHeader, generated: Path) {
 """)
 }
 
-# linux/version.h for this release, as the top-level Makefile writes it.
 proc generate_version_header(version: Str, out: Path) {
   let parts = [part as Int for part in version.split(".")]
 
@@ -109,11 +97,8 @@ proc generate_version_header(version: Str, out: Path) {
   )
 }
 
-# Like headers_install: every include/uapi directory, the target's arch uapi
-# as asm/, and the headers Kbuild generates for them, all through the same
-# userspace rewrite. Runs in the unpacked kernel source.
 proc main(dest: Path) [fs, env, error] {
-  let srcarch = kernel_srcarch(pm_util.target_arch()?)?
+  let srcarch = pm_target.kernel_arch(pm_target.recipe_target()?)?
   let generated_linux = p"include/generated/uapi/linux"
   let generated_asm = fp"arch/{srcarch}/include/generated/uapi/asm"
   generated_linux.mkdir()
@@ -135,8 +120,6 @@ proc main(dest: Path) [fs, env, error] {
   uapi.install_tree(fp"arch/{srcarch}/include/uapi/asm", fp"{include}/asm")
   uapi.install_tree(generated_asm, fp"{include}/asm")
 
-  # include/uapi/Kbuild's no-export-headers: these linux/ headers only make
-  # sense on an arch that provides the asm/ header of the same name.
   for header in ["a.out.h", "kvm.h", "kvm_para.h"] {
     if ! fp"arch/{srcarch}/include/uapi/asm/{header}".exists() and ! fp"{generated_asm}/{header}".exists() {
       fp"{include}/linux/{header}".remove()

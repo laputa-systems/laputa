@@ -12,8 +12,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let pc = fp"{root}/usr/lib/pkgconfig/libdrm.pc".read_text()?
   proof.ensure("Version: 2.4.134" in pc, "proof-libdrm", "libdrm.pc has the wrong version")
 
-  # The format-modifier table the recipe generates in place of upstream's
-  # Python script supplies drmGetFormatModifierVendor's vendor names.
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
   proof.ensure("ALLWINNER" in strings, "proof-libdrm", "libdrm lacks the generated modifier vendor table")
   print "libdrm ok"

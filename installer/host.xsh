@@ -1,7 +1,4 @@
 ##! Host-side helpers shared by the installer build, size report, and QEMU scripts.
-# These run on the build host only. The guest installer (`setup-laputa.xsh`) is
-# installed alone into the image and resolves no checkout modules, so it keeps
-# its own helpers.
 
 ## Read an environment setting, treating an unset or blank value as absent so
 ## an empty `VAR=` from a Makefile or wrapper falls back to the default.
@@ -25,6 +22,66 @@ export pure installer_arch(arch: Str) -> Result[Str, Error] {
   return "x86_64" when arch == "amd64" or arch == "x86_64"
 
   fail f"unsupported installer arch {arch}"
+}
+
+## Selects the caller-specific values in the installer image build environment.
+export enum InstallerBuildPurpose { Manual, QemuSmoke(Path, Str) }
+
+## Select the manual installer image build environment.
+export pure installer_manual_build_purpose() -> InstallerBuildPurpose {
+  Manual
+}
+
+## Select the QEMU smoke image build environment.
+export pure installer_qemu_smoke_build_purpose(authorized_key: Path, kernel_package: Str) -> InstallerBuildPurpose {
+  QemuSmoke(authorized_key, kernel_package)
+}
+
+## Build the environment passed to either installer image builder.
+export pure installer_build_environment(
+  purpose: InstallerBuildPurpose,
+  xsh: Path,
+  root: Path,
+  work: Path,
+  installer_iso: Path,
+  installer_kernel: Path,
+  kernel_source: Str?,
+) -> Record {
+  let shared = {
+    XSH_HOST: xsh.display(),
+    LAPUTA_ROOT: root.display(),
+    LAPUTA_INSTALLER_WORK: work.display(),
+    LAPUTA_INSTALLER_ISO: installer_iso.display(),
+    LAPUTA_INSTALLER_KERNEL: installer_kernel.display(),
+  }
+
+  match purpose {
+    Manual => {
+      if kernel_source == null {
+        {...shared, LAPUTA_INSTALLER_CI: "0"}
+      } else {
+        {...shared, LAPUTA_INSTALLER_CI: "0", LAPUTA_INSTALLER_KERNEL_SOURCE: kernel_source}
+      }
+    }
+    QemuSmoke(authorized_key, kernel_package) => {
+      if kernel_source == null {
+        {
+          ...shared,
+          LAPUTA_INSTALLER_QEMU_SMOKE: "1",
+          LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY: authorized_key.display(),
+          LAPUTA_INSTALLER_KERNEL_PACKAGE: kernel_package,
+        }
+      } else {
+        {
+          ...shared,
+          LAPUTA_INSTALLER_QEMU_SMOKE: "1",
+          LAPUTA_INSTALLER_QEMU_AUTHORIZED_KEY: authorized_key.display(),
+          LAPUTA_INSTALLER_KERNEL_PACKAGE: kernel_package,
+          LAPUTA_INSTALLER_KERNEL_SOURCE: kernel_source,
+        }
+      }
+    }
+  }
 }
 
 ## Run one step of the installer pipeline. A failing child aborts this script

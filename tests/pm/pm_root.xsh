@@ -108,7 +108,6 @@ proc stage_artifact(
   }
 }
 
-# Records the digest of a payload a test rewrote after staging it.
 proc rehashed(staged: types.StagedArtifact) [fs, error] -> Result[types.StagedArtifact] {
   {...staged, payload_sha256: hash.sha256(staged.payload)?.hex()}
 }
@@ -253,8 +252,6 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
   let store_root = test.temp_dir(ctx, name: "root-legacy-metadata-store")?
   let entries = [payload_file("usr/bin/legacy", "legacy", mode: 0o755)]
   let legacy = stage_artifact(ctx, "legacy", types.Payload, entries)?
-  # The legacy remote boundary had the verified `files` inventory but no
-  # package_kind. Root decoding owns the one payload-default compatibility rule.
   write_legacy_sidecar_metadata(legacy.staged, "legacy", entries)
   rewrite_legacy_database_payload(ctx, legacy.staged, "legacy", entries)
   let receipt = store.commit(types.target_aarch64(), store_root, legacy.node, rehashed(legacy.staged)?)?
@@ -298,8 +295,6 @@ test test_root_legacy_metadata_defaults_only_omitted_package_kind_to_payload [fs
 
 test test_root_preserves_file_mode_symlink_and_empty_directory [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-single-store")?
-  # The receipt validates the lexically contained late link without resolving
-  # its target; package composition may supply that target later.
   let receipt = commit_artifact(
     ctx,
     store_root,
@@ -624,4 +619,25 @@ test test_root_failed_composition_leaves_completed_output_untouched [fs, error] 
   }
   assert competing_output.is_symlink()?
   assert competing_output.readlink()? == missing_target
+}
+
+
+test test_root_receipt_requires_generated_entry_format [fs, error] { |ctx|
+  let value = root.preflight(types.target_aarch64(), [])?
+  let output = fp"{test.temp_dir(ctx, name: "root-generated-entry-format")?}/root"
+  let receipt = root.compose_artifacts(output, value, [])?
+  assert receipt.format == "laputa-root-2"
+  assert receipt.generated_entries.is_empty()
+  let receipt_path = fp"{output}/var/lib/laputa/root.json"
+  receipt_path.write(receipt_path.read_text()?.replace("laputa-root-2", with: "laputa-root-1"))
+  match root.verify(output, receipt) {
+    Ok(_) => test.fail("legacy root receipt was accepted")
+    Err(problem) => assert "recompose the root" in problem.message
+  }
+}
+
+test test_root_rejects_package_supplied_manual_index [fs, error] { |ctx|
+  let store_root = test.temp_dir(ctx, name: "root-package-manual-index")?
+  let artifact = commit_artifact(ctx, store_root, "manuals", types.Payload, [payload_file("usr/share/man/mandoc.db", "unverified index")])?
+  expect_root_error(ctx, root.preflight(types.target_aarch64(), [artifact]), "may not own generated root path usr/share/man/mandoc.db")
 }

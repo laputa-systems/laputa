@@ -5,6 +5,8 @@ produces with Python (Mako/PyYAML), GNU bison, or flex for the configuration
 in [the recipe](../../PKGBUILD.xsh) (`mesa_options`). Laputa's build world has
 no Python. The recipe replaces the generator edges with archived outputs.
 Bison and flex outputs remain vendored alongside the Python outputs.
+The [parser generation evaluation](EVALUATION.md) records the measured reason
+for retaining that policy.
 
 `OUTPUTS` lists the archived paths, relative to the Mesa build directory. The
 archive has one top-level directory, `mesa-26.2.4-generated/`, which PM strips

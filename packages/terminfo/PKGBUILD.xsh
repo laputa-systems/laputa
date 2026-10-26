@@ -71,8 +71,6 @@ proc linux_terminfo_source(text: Str) [error] -> Result[Str] {
   text.replace(fragment, with: "xterm+kbs|fragment for backspace key,\n\tkbs=^?,\n")
 }
 
-# foot's meson substitutes its terminfo base name into foot.info before
-# compiling it; Laputa keeps foot's default name.
 proc foot_terminfo_source(text: Str) [error] -> Result[Str] {
   guard "@default_terminfo@|foot terminal emulator," in text else {
     return Err(
@@ -91,8 +89,5 @@ export proc build(dest: Path) [fs, process, env, error] {
   p"foot.info".write(foot_terminfo_source(p"foot/foot.info".read_text()?)?)
 
   run $tic -x -o $database terminfo.src
-  # foot's own descriptions replace ncurses' copies of `foot` and
-  # `foot-direct`: they are released with foot itself, so they describe the
-  # foot Laputa ships.  `foot+base` stays ncurses' fragment.
   run $tic -x -o $database -e foot,foot-direct foot.info
 }

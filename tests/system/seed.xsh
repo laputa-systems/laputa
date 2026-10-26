@@ -128,7 +128,6 @@ test test_image_tags_are_content_keys_over_their_own_inputs [fs, error] { |ctx|
   assert tools.starts_with("laputa-package-tools:aarch64-")
   assert images.package_tools_tag(root, value)? == tools
 
-  # XSH and PM run in containers from mounts; editing them rebuilds no image.
   fp"{root}/pm/cli.xsh".write("changed pm module\n")
   assert images.package_tools_tag(root, value)? == tools
   assert images.host_tools_tag(root, value)? == host
@@ -186,8 +185,6 @@ test test_image_dockerfiles_take_only_local_inputs [fs, error] {
   assert ! ("/src/packages" in tools)
 }
 
-# The `xsh` package is the seed: a rebuilt seed must change its build key even
-# though `.out/` is gitignored and the repository source uses `SKIP`.
 test test_xsh_package_key_follows_the_seed_bytes [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "xsh-package-key")?
   fp"{root}/packages".symlink(to: fp"{fs.cwd()?}/packages")
@@ -235,8 +232,6 @@ test test_world_args_reject_ambiguous_or_incomplete_commands [error] {
   }
 }
 
-# Containers never get a network: the source cache arrives with the read-only
-# checkout, and only host processes reach the loopback mirror.
 test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
   let argv = world.world_container_argv(
@@ -260,7 +255,6 @@ test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   assert "type=bind,src=/work/laputa/.out/cache/linux-kbuild,dst=/var/cache/laputa/linux-kbuild" in argv
   assert ! (argv |> any .starts_with("XSH_PM_REPO"))
   assert argv[-2] == "/bin/xsh"
-  # The command runs through the entry that hands the writable mounts back.
   assert "/src/laputa/seed/container_entry.xsh" in argv
   assert "1000" in argv
 }
@@ -269,7 +263,6 @@ pure shell_word(item: Str) -> Str {
   if " " in item { f"\"{item}\"" } else { item }
 }
 
-# The words before and after the build image: Docker options, then the cargo command.
 type ImageSplit = {docker: List[Str], cargo: List[Str]}
 
 pure split_at_image(words: List[Str]) -> ImageSplit {
@@ -286,9 +279,6 @@ pure split_at_image(words: List[Str]) -> ImageSplit {
   {docker: words, cargo: []}
 }
 
-# `make host-xsh` builds the host tools with plain Docker because no XSH exists
-# yet. It must stay the seed's cargo build for the host triple, or the two
-# stop sharing `.out/xsh-target` and a Linux host compiles XSH twice.
 test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process, error] {
   let laputa_root = fs.cwd()?
 

@@ -4,10 +4,6 @@ use installer.package_roots_host
 use installer.rootfs_size
 use system.image as system_image
 
-# laputa-fs's mkfs.ext4 layout: 4 KiB blocks in 32768-block groups, each of
-# which reserves its first 516 blocks (headers and the inode table), and files
-# mapped through indirect blocks of 1024 entries. Sizing from apparent bytes
-# plus a fixed slack fails once a root spans more than a group or two.
 const EXT4_BLOCK = 4096
 
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
@@ -111,8 +107,6 @@ pure efi_boot_filename(arch: Str) -> Result[Str] {
   Err(error.failure(f"unsupported installer EFI arch {arch}"))
 }
 
-# Image overlays change these roots after package composition, so a package
-# generation receipt must not claim to describe the finished image.
 proc drop_generation_receipt(rootfs: Path) {
   fp"{rootfs}/var/lib/laputa/generation.json".remove()
   fp"{rootfs}/var/lib/laputa/root.json".remove()
@@ -148,9 +142,6 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
   (value + divisor - 1) / divisor
 }
 
-# Data and mapping blocks for one tree: whole blocks per file plus one
-# indirect block per 1024 data blocks and one for the double-indirect root,
-# and for a directory, its entries at their 264-byte worst case.
 proc tree_blocks(path_value: Path) -> Result[Int] {
   let meta = path_value.metadata()?
 

@@ -3,33 +3,16 @@ use recipe
 use types
 use util
 
-# URL sources are content-addressed: `make fetch` (`pm sources fetch`) is the
-# only step that contacts upstream hosts. Builds resolve a pinned URL source from
-# the cache, then from the local mirror named by LAPUTA_MIRROR, and otherwise
-# fail. The source string and checksum stay the recipe's identity, so where the
-# bytes come from never changes a fingerprint.
 const sha256_hex = rx"^[0-9a-f]{64}$"
 
-# A `cargo-vendor` source names a Cargo.lock. Its crates.io records are a
-# content-addressed crate set: each `checksum` is the sha256 crates.io serves
-# that `.crate` under, so `make fetch` caches every crate like any pinned URL
-# and a build stages them offline as a cargo directory source. Cargo.lock
-# names crates.io by its git index or, with the sparse protocol, its HTTP
-# index; both serve the same archives.
 const crates_io_lock_sources = [
   "registry+https://github.com/rust-lang/crates.io-index",
   "sparse+https://index.crates.io/",
 ]
 
-# Crate names and versions become vendor directory names, so neither may
-# carry a path separator.
 const crate_name_pattern = rx"^[A-Za-z0-9_-]+$"
 const crate_version_pattern = rx"^[0-9A-Za-z.+-]+$"
 
-# `repository/` names a declared package-repository input rather than a path
-# relative to an isolated recipe copy. The executor supplies its exact
-# repository root, so recipes can stage repository-owned source trees without
-# `..` traversal or an ambient working directory.
 pure sources_is_repository_input(source: Str) -> Bool {
   source.starts_with("repository/")
 }
@@ -70,8 +53,6 @@ export proc source_cache_root(repo_root: Path) [fs, env, error] -> Result[Path, 
   fp"{repo_root}/.cache/sources"
 }
 
-# Builds name their package repository through XSH_PM_REPOSITORY_ROOT, the same
-# root that `repository/` inputs resolve against.
 proc build_source_cache_root() -> Result[Path] {
   let configured = (e"LAPUTA_SOURCE_CACHE" ?? "").trim()
   let repo_root = (e"XSH_PM_REPOSITORY_ROOT" ?? "").trim()
@@ -133,7 +114,6 @@ export proc fill_source_cache_entry(
   let partial_dir = fp"{root}/partial"
   entry.parent.mkdir()
   partial_dir.mkdir()
-  # Packages built in parallel can share one source, so one writer fills an entry.
   let lock = fs.lock(fp"{partial_dir}/{sha256}.lock")?
   defer fs.unlock(lock)
 
@@ -217,9 +197,6 @@ export proc resolve_source(
   if sources_is_repository_input(source) {
     local = sources_repository_input_path(source)?
   } else if ! source.starts_with("/") {
-    # Recipe-local paths are durable package inputs, including explicit parent
-    # inputs such as laputa-pm's checked-in PM entrypoint.  Normalize after
-    # anchoring to the typed recipe directory so no process cwd participates.
     local = fp"{pkg.dir}/{source_path}".normalize()
   }
 
@@ -236,17 +213,12 @@ export type LockedCrate = {name: Str, version: Str, checksum: Str}
 
 type LockRecord = {name: Str, version: Str, source: Str, checksum: Str}
 
-# A locked crate resolved to its verified `.crate` archive.
 type ResolvedCrate = {item: LockedCrate, path: Path}
 
 pure empty_lock_record() -> LockRecord {
   {name: "", version: "", source: "", checksum: ""}
 }
 
-# A record without `source` is a workspace or path package, built from the
-# staged tree. Any other source (git, another registry) has no
-# content-addressed download, so it fails here instead of reaching the
-# network during a build.
 pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[LockedCrate]] {
   return [] when record.source == ""
 
@@ -279,7 +251,6 @@ export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedC
   var current = empty_lock_record()
   var in_package = false
 
-  # The trailing header flushes the last record.
   for raw in lockfile.read_lines()?.push("[end]") {
     let line = raw.trim()
 
@@ -313,7 +284,6 @@ export pure crate_download_url(item: LockedCrate) -> Str {
   f"https://static.crates.io/crates/{item.name}/{item.name}-{item.version}.crate"
 }
 
-# The lockfile is verified before it is trusted to name the crate set.
 proc resolve_locked_crates(
   pkg: types.Package,
   resolved: types.ResolvedSource,
@@ -386,8 +356,6 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
   0
 }
 
-# `resolved.name` is the upstream file name: a content-addressed cache entry has
-# none, and archive detection and plain-file staging both depend on it.
 proc stage_resolved_source(
   line: types.SourceLine,
   resolved: types.ResolvedSource,
@@ -409,7 +377,6 @@ proc stage_resolved_source(
   if source_kind == types.source_directory() or resolved.kind == "dir" {
     dest.mkdir()
     let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
-    # Directory sources are checkout trees (recipe files or repository inputs).
     util.normalize_checkout_tree(dest)
     return
   }
@@ -496,9 +463,6 @@ export proc prepare_package_source_tree(pkg: types.Package, src: Path) [fs, net,
   print --flush "pm-build-source-done" $pkg.name "prepare-tree" ${time.now() - tree_started} "ms"
 }
 
-# Checksum generation is a maintainer step that reads upstream directly: a new
-# pin has no cache entry yet. The downloaded bytes enter the cache under the
-# digest they produce, so the next build finds them.
 proc upstream_sha256(cache_root: Path, package_name: Str, url: Str) -> Result[Str] {
   let partial_dir = fp"{cache_root}/partial"
   partial_dir.mkdir()
@@ -710,8 +674,6 @@ export proc cargo_crate_fetch_items(
   sorted_fetch_items(by_sha256)
 }
 
-# A dead host or a transient failure gets a few spaced retries. A checksum
-# mismatch or a missing `file://` path is deterministic, so neither is retried.
 proc fetch_source_item(root: Path, item: SourceFetchItem) -> Result[SourceFetchOutcome] {
   return Cached when source_cache_entry(root, item.sha256).exists()
 

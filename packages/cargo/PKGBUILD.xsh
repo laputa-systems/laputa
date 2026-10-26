@@ -1,5 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.util as pm_util
+use packages.upstream_pins as upstream_pins
 
 ## Exported declaration `name`.
 export const name = "cargo"
@@ -20,9 +21,9 @@ export const deps = ["musl", "llvm-toolchain", "gnu-stubs"]
 export let mkdeps_host = []
 
 ## Exported declaration `upstream_sources`.
-export const upstream_sources = [
+export let upstream_sources = [
   {
-    source: p"https://static.rust-lang.org/dist/2026-10-01/cargo-VERSION-ARCH-unknown-linux-musl.tar.xz => cargo",
+    source: fp"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/cargo-VERSION-ARCH-unknown-linux-musl.tar.xz => cargo",
     kind: "auto",
     architectures: [
       "all",
@@ -39,7 +40,7 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"https://static.rust-lang.org/dist/2026-10-01/rustc-VERSION-ARCH-unknown-linux-musl.tar.xz => rustc",
+    source: fp"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/rustc-VERSION-ARCH-unknown-linux-musl.tar.xz => rustc",
     kind: "auto",
     architectures: [
       "all",
@@ -56,21 +57,12 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"https://static.rust-lang.org/dist/2026-10-01/rust-std-VERSION-ARCH-unknown-linux-musl.tar.xz => rust-std",
+    source: fp"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/rust-std-VERSION-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
     architectures: [
       "all",
     ],
-    checksums: [
-      {
-        arch: "aarch64",
-        sha256: "ea8fd309578a09c9e12401621a470e6d6b1047f25933207fb8a39d66647d4561",
-      },
-      {
-        arch: "x86_64",
-        sha256: "b106b0aa4565cc3525fd3161c69203a9e39044e6e6b4d618f261c3eeda14ad50",
-      },
-    ],
+    checksums: upstream_pins.rust_std_checksums,
   },
 ]
 
@@ -327,17 +319,9 @@ export let filetree_x86_64 = filetree_common.extend(
 ## Exported declaration `filetree`.
 export let filetree = filetree_aarch64
 
-pure rust_dist_arch(arch: Str) -> Str {
-  return "aarch64" when arch == "arm64"
-
-  return "x86_64" when arch == "amd64"
-
-  arch
-}
-
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, env, error] {
-  let arch = rust_dist_arch(pm_util.target_arch()?)
+  let arch = pm_util.target_arch()?
   var cargo_src = p"cargo/cargo"
   var rustc_src = p"rustc/rustc"
   var rust_std_src = fp"rust-std/rust-std-{arch}-unknown-linux-musl"

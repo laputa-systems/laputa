@@ -16,8 +16,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   tmp.mkdir(true)
   defer tmp.remove()
 
-  # tmux asks utf8proc for display widths, so the proof checks a wide CJK
-  # character and a combining mark alongside NFC composition.
   fp"{tmp}/proof-utf8proc.c".write(
     """#include <stdlib.h>
 #include <string.h>

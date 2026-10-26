@@ -143,12 +143,6 @@ proc write_aconfig_h() [fs, error] {
   )
 }
 
-# The minimal set is playback and capture (aplay, with arecord as its other
-# name), the mixer CLI (amixer), card state save/restore/init (alsactl), the
-# UCM CLI (alsaucm), and speaker-test. alsamixer needs ncurses and alsabat
-# needs fftw; the sequencer, MIDI, IEC958, loop, and topology tools, and the
-# udev rule (it runs /bin/sh) and systemd units, are left out. The sources and
-# per-tool flags come from each tool's Makefile.am.
 type AlsaTool = {name: Str, sources: List[Str], cflags: List[Str]}
 
 pure alsa_tools() -> List[AlsaTool] {
@@ -216,8 +210,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let triple = f"{pm_util.target_arch()?}-linux-musl"
   write_aconfig_h()
 
-  # Upstream links -lasound -lrt -lm -lpthread; musl's libc holds the last
-  # three.
   var tasks = []
   var outputs: Map[Path] = {}
 

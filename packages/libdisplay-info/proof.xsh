@@ -13,7 +13,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     "libdisplay-info has no libdisplay-info.so.4 SONAME",
   )
 
-  # The PNP ID table the recipe generates from hwdata names monitor vendors.
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
 
   for vendor in ["Dell Inc.", "Red Hat, Inc."] {

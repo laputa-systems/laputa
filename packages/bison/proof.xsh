@@ -8,9 +8,6 @@ type Grammar = {file: Str, argv: List[Str], outputs: List[Str]}
 
 type GeneratedFile = {name: Str, sha256: Str}
 
-# An LALR(1) calculator on the yacc.c skeleton with the features real
-# grammars lean on: a pure parser with parameters, locations, %union types,
-# named references, %printer/%destructor, error recovery, and a header.
 const calc_grammar = r"""%code requires {
   typedef struct { int line; int column; } proof_place;
 }
@@ -122,8 +119,6 @@ line 6: division by zero
 error at line 6
 """
 
-# A %glr-parser grammar on glr.c: a reduce/reduce conflict only the second
-# token after 'x' resolves, and an ambiguity merged by %merge.
 const glr_grammar = r"""/* After 'x' with 'y' ahead, LALR(1) cannot choose between reducing to `a'
    or `b'; the GLR parser splits and the third token picks the survivor. An
    ambiguous sum is merged by %merge. */
@@ -179,8 +174,6 @@ merged 3 3
 sum 3
 """
 
-# The lalr1.cc skeleton with variants, token constructors, and locations.
-# The proof root has no C++ library, so its output is checked by digest.
 const list_grammar = r"""%skeleton "lalr1.cc"
 %require "3.8"
 %header
@@ -220,8 +213,6 @@ const grammars: List[Grammar] = [
   {file: "list.yy", argv: ["-Wall", "-o", "list.cc", "list.yy"], outputs: ["list.cc", "list.hh", "location.hh"]},
 ]
 
-# sha256 of GNU bison 3.8.2's output for `grammars` with upstream's skeletons:
-# every generated file must match it byte for byte.
 const gnu_outputs: List[GeneratedFile] = [
   {name: "calc.c", sha256: "fd7ab25921795a1be7c73c39e5ebcf9d52e3dbc3f0c97044c31c7d521e5d2cb7"},
   {name: "calc.h", sha256: "6caf6cbc025e6be258e7eeda28db75dbbcce45fb4cdf925cd7b66ad94e22575f"},
@@ -239,9 +230,6 @@ pure grammar_text(file: Str) -> Str {
   }
 }
 
-# Compile C against the proof root's own musl: the runner's `cc` builds with
-# the root as sysroot and records the root's dynamic linker, so the program
-# exercises the root's libc rather than the runner's. Native targets only.
 proc compile_root_c_program(rootfs: Path, source: Path, output: Path) {
   let arch = pm_util.target_arch()?
   let cc = process.which("cc")?
@@ -264,8 +252,6 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   tempdir tmp at fp"{rootfs}/var/tmp/proof-bison" {
     let stderr = fp"{tmp}/bison.stderr"
 
-    # Name the root's m4 and skeletons so the proof cannot pass on another m4
-    # or data directory the runner happens to provide.
     env ({
       M4: fp"{rootfs}/usr/bin/m4".display(),
       BISON_PKGDATADIR: fp"{rootfs}/usr/share/bison".display(),
@@ -303,7 +289,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
   proof.package_metadata(rootfs, "bison")
   proof.target_elf(rootfs, p"usr/bin/bison", "bison")
   let bison = fp"{rootfs}/usr/bin/bison"

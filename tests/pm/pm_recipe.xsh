@@ -158,9 +158,6 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
     return
   }
 
-  # The host xsh stands in for cargo and rustc, so the target is the host's
-  # arch and the build arch is the other one, which keeps the proof on its
-  # cross-built path.
   let target_arch = util.normalize_arch(system.uname()?.machine)
   let build_arch = if target_arch == "aarch64" { "x86_64" } else { "aarch64" }
   let root = test.temp_dir(ctx, name: "cargo-proof-root")?
@@ -183,13 +180,11 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   assert succeeded, stderr
 }
 
-# A stand-in executable that prints `output` only when run against the proof
-# root's libraries, and aborts otherwise.
 proc write_wpa_tool(xsh: Path, root: Path, name: Str, output: Str) {
   let bin = fp"{root}/usr/bin/{name}"
   bin.write(
     f"""#!{xsh}
-proc main(...argv: List[Str]) [env, error] {{
+proc main(...argv: List[Str]) [process, env, error] {{
   if ! (env.get("LD_LIBRARY_PATH") ?? "").starts_with("{root}/usr/lib") {{
     exit 3
   }}
@@ -308,19 +303,15 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
   }
 }
 
-# musl's arch/*/bits/alltypes.h.in: aarch64 declares `unsigned wchar_t`,
-# x86_64 `int wchar_t`; gnulib-configured packages (bison) take this table.
 test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
-  let arm = target.lp64_musl_abi("aarch64")
+  let arm = target.lp64_musl_abi(types.target_aarch64())?
   assert ! arm.signed_wchar_t
   assert arm.wchar_t_suffix == "\"UINT\""
-  let x86 = target.lp64_musl_abi("x86_64")
+  let x86 = target.lp64_musl_abi(types.target_x86_64())?
   assert x86.signed_wchar_t
   assert x86.wchar_t_suffix == "\"INT\""
 }
 
-# Writes a metapackage recipe into `repo`'s packages directory. `extra` is
-# appended exports, such as an `architectures` list.
 proc write_arch_recipe(repo: Path, name: Str, deps: Str, extra: Str) -> Result[Path] {
   let dir = fp"{repo}/packages/{name}"
   dir.mkdir()
@@ -394,5 +385,84 @@ test test_catalog_omits_a_package_outside_its_architectures_and_rejects_its_depe
   match catalog.load_for_target(repo, types.target_aarch64()) {
     Ok(_) => test.fail("a dependency on an x86_64-only package unexpectedly loaded for aarch64")
     Err(problem) => assert "needs-firmware depends on x86-firmware, which does not exist for aarch64" in problem.message
+  }
+}
+
+proc write_default_recipe(ctx: TestContext, declarations: Str) -> Result[Path] {
+  let dir = test.temp_dir(ctx, name: "default-payload")?
+  let body = f"""export let ver = "1"
+export let deps = []
+export let mkdeps_host = []
+export let upstream_sources = [{{source: p"files/input", kind: "auto", checksums: [{{sha256: "SKIP"}}]}}]
+export let filetree = []
+export proc build(dest: Path) [fs, error] {{}}
+{declarations}
+"""
+  fp"{dir}/PKGBUILD.xsh".write("##! Default recipe fixture.\n" + body.replace("export ", with: "## Fixture export.\nexport "))
+  fp"{dir}/proof.xsh".write("")
+  dir
+}
+
+test test_recipe_infers_identity_and_neutral_source_defaults [fs, env, error] { |ctx|
+  let dir = write_default_recipe(ctx, "")?
+  let pkg = recipe.load_package_for_target(dir, types.target_x86_64())?
+  assert pkg.name == dir.name
+  assert pkg.rel == "1"
+  assert pkg.kind == types.package_payload()
+  assert pkg.upstream_sources[0].architectures == ["all"]
+  assert pkg.upstream_sources[0].checksums[0].arch == "all"
+  assert recipe.redundant_defaults(dir)? == []
+}
+
+test test_recipe_reports_redundant_defaults_and_preserves_overrides [fs, env, error] { |ctx|
+  let dir = write_default_recipe(ctx, "")?
+  let path_value = fp"{dir}/PKGBUILD.xsh"
+  path_value.write(path_value.read_text()? + f"\n## Fixture identity.\nexport let name = \"{dir.name}\"\n## Fixture release.\nexport let rel = \"1\"\n## Fixture payload kind.\nexport let package_kind = \"payload\"\n")
+  let diagnostics = recipe.redundant_defaults(dir)?
+  assert diagnostics.len() == 3
+  assert "name" in diagnostics[0]
+  assert "rel" in diagnostics[1]
+  assert "package_kind" in diagnostics[2]
+  path_value.write(path_value.read_text()?.replace(f"name = \"{dir.name}\"", with: "name = \"override\"").replace("rel = \"1\"", with: "rel = \"2\""))
+  let pkg = recipe.load_package(dir)?
+  assert pkg.name == "override"
+  assert pkg.rel == "2"
+  assert recipe.redundant_defaults(dir)?.len() == 1
+}
+
+test test_recipe_reports_neutral_source_defaults_and_rejects_present_invalid_types [fs, env, error] { |ctx|
+  let dir = write_default_recipe(ctx, "")?
+  let path_value = fp"{dir}/PKGBUILD.xsh"
+  let original = path_value.read_text()?
+  path_value.write(original.replace("kind: \"auto\"", with: "kind: \"auto\", architectures: [\"all\"]").replace("sha256:", with: "arch: \"all\", sha256:"))
+  assert recipe.redundant_defaults(dir)?.len() == 2
+  for declaration in ["export let name = 3", "export let rel = 3", "export let package_kind = 3"] {
+    path_value.write(original + "\n" + declaration + "\n")
+    expect_contract_rejection(dir, declaration)
+  }
+  for invalid in [
+    original.replace("kind: \"auto\"", with: "kind: \"auto\", architectures: 3"),
+    original.replace("sha256:", with: "arch: 3, sha256:"),
+  ] {
+    path_value.write(invalid)
+    expect_contract_rejection(dir, "present source field has an invalid type")
+  }
+}
+
+test test_recipe_loads_proof_dependencies_without_running_the_proof [fs, env, error] { |ctx|
+  let dir = write_default_recipe(ctx, "")?
+  fp"{dir}/proof.xsh".write("fail \"proof must run only during execution\"\n")
+  assert recipe.load_package(dir)?.proof_deps == []
+  let declarations = fp"{dir}/proof_deps.xsh"
+  declarations.write("##! Proof dependency fixture.\n## Declared formatter.\nexport let proof_deps = [\"formatter\"]\n")
+  assert recipe.load_package(dir)?.proof_deps == ["formatter"]
+  for invalid in [
+    "export let proof_deps = [\"formatter\", \"formatter\"]",
+    f"export let proof_deps = [\"{dir.name}\"]",
+    "export let proof_deps = 3",
+    "export let other = []",
+  ] {
+    declarations.write("##! Invalid proof dependency fixture.\n## Invalid declaration.\n" + invalid + "\n")
+    expect_contract_rejection(dir, "invalid proof dependency contract")
   }
 }

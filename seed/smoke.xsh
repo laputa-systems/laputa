@@ -1,11 +1,6 @@
 ##! In-container seed smoke test: the mounted seed XSH runs, plans the repository, and passes PM suites offline.
 #!/bin/xsh
-# `seed.xsh smoke` runs this inside package-tools with `--network none`, the
-# seed mounted at /bin and /usr/lib/xsh/core, and the checkout read-only at
-# /src/laputa.
 
-# The default suites need no Docker, privilege, or network, and cover the
-# recipe, plan, graph, and store contracts the seed must execute.
 const seed_smoke_default_suites = [
   "tests/pm/pm_recipe.xsh",
   "tests/pm/pm_plan.xsh",

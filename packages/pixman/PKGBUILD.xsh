@@ -1,6 +1,7 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
-use pm.util as pm_util
+use pm.types
+use pm.target as pm_target
 
 ## Package recipe export.
 export const name = "pixman"
@@ -66,16 +67,20 @@ proc patch_musl_math() {
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let jobs_flag = f"-j{cpu.count()}"
-  let arch = pm_util.target_arch()?
+  let target = pm_target.recipe_target()?
   patch_musl_math()
 
-  if arch == "x86_64" {
-    run "muon" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
-      "-Dlibpng=disabled" "-Dgtk=disabled" "-Dtests=disabled" "-Ddemos=disabled" "build"
-  } else {
-    run "muon" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
-      "-Dlibpng=disabled" "-Dgtk=disabled" "-Dtests=disabled" "-Ddemos=disabled" "-Dmmx=disabled" "-Dsse2=disabled" \
-      "-Dssse3=disabled" "build"
+  match target {
+    types.X86_64LinuxMusl => {
+      run "muon" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
+        "-Dlibpng=disabled" "-Dgtk=disabled" "-Dtests=disabled" "-Ddemos=disabled" "build"
+    }
+    types.Aarch64LinuxMusl => {
+      run "muon" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
+        "-Dlibpng=disabled" "-Dgtk=disabled" "-Dtests=disabled" "-Ddemos=disabled" "-Dmmx=disabled" "-Dsse2=disabled" \
+        "-Dssse3=disabled" "build"
+    }
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported pixman target")) }
   }
 
   run "muon" "-C" "build" samu $jobs_flag

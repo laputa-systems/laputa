@@ -53,7 +53,6 @@ proc plan_publish_repository(repo_root: Path) -> Result[types.BuildPlan] {
   plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false)?
 }
 
-# Builds, stores and publishes one plan of `repo_root` to the file remote.
 proc publish_repository_once(ctx: TestContext, repo_root: Path, remote_url: Str, name: Str) -> Result[types.BuildPlan] {
   let value = plan_publish_repository(repo_root)?
   let store_root = test.temp_dir(ctx, name: f"{name}-store")?
@@ -163,7 +162,10 @@ test test_snapshot_rejects_missing_unproved_and_corrupt_plan_artifacts [fs, env,
 
   let unproved_store = test.temp_dir(ctx, name: "publish-unproved-store")?
   stage_plan_artifacts(ctx, value, unproved_store, valid_proofs: false)
-  expect_snapshot_error(ctx, value, unproved_store, "invalid JSON")
+  match repo.snapshot(value, unproved_store) {
+    Ok(_) => test.fail("snapshot accepted a malformed proof receipt")
+    Err(problem) => assert problem is InvalidData
+  }
 
   let incomplete_store = test.temp_dir(ctx, name: "publish-incomplete-store")?
   stage_plan_artifacts(ctx, value, incomplete_store)
@@ -217,8 +219,6 @@ test test_publish_file_snapshot_is_exact_deterministic_and_idempotent [fs, net, 
   assert fp"{remote_root}/index.json".read_text()? == first_index
 }
 
-# The index keeps `deps` as the recipe declares them and lists runtime-only
-# dependencies separately; together they are the package's runtime set.
 test test_publish_index_lists_runtime_only_dependencies_beside_deps [fs, net, env, time, error] { |ctx|
   let repo_root = copied_publish_repository(ctx, "publish-runtime-only-repo")?
   let service = fp"{repo_root}/packages/service"
@@ -306,14 +306,10 @@ test test_publish_conflict_and_failed_object_do_not_switch_file_index [fs, net, 
   let raw = remote.load_remote_index_from(fp"{clean_remote}/index.json")?
   fp"{clean_remote}/index.json".write(json.encode([{...raw[0], sha256: "different tuple bytes"}])? + "\n")
 
-  # The index row is a mutable pointer: republishing the verified snapshot
-  # points it back at the same immutable objects.
   repo.publish(snapshot, clean_url, "", clean_work)
   assert fp"{clean_remote}/index.json".read_text()? == published
 }
 
-# Artifact keys exclude the executor, so a new seed or PM rebuilds a package
-# under the same ver-rel. Its objects get new names; only its index row moves.
 test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, net, env, time, error] { |ctx|
   let repo_root = copied_publish_repository(ctx, "publish-rebuild-repo")?
   let remote_root = test.temp_dir(ctx, name: "publish-rebuild-remote")?
@@ -336,7 +332,6 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
     assert index_row(after, name)? == index_row(before, name)?
   }
 
-  # The earlier objects stay published and unchanged beside the new ones.
   let old_row = index_row(before, "app")?
   let new_row = index_row(after, "app")?
 
@@ -346,7 +341,6 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
 
   assert hash.sha256(fp"{remote_root}/{old_row.tarball}")?.hex() == old_row.sha256
 
-  # Publishing the first build again moves the row back; its objects already exist.
   recipe.write(recipe.read_text()?.replace("# A rebuild input without a rel bump.\n", with: ""))
   let _ = publish_repository_once(ctx, repo_root, remote_url, "publish-rebuild-revert")?
   assert index_row(remote.load_remote_index_from(fp"{remote_root}/index.json")?, "app")?.artifact_key == old_app.artifact_key
@@ -355,7 +349,6 @@ test test_publish_rebuild_under_same_release_replaces_only_its_index_row [fs, ne
 test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, error] { |ctx|
   let remote_root = test.temp_dir(ctx, name: "publish-behind-remote")?
   let remote_url = f"file://{remote_root}"
-  # Separate checkouts: one process loads each recipe path once.
   let ahead_root = copied_publish_repository(ctx, "publish-behind-ahead-repo")?
   let recipe = fp"{ahead_root}/packages/app/PKGBUILD.xsh"
   recipe.write(recipe.read_text()?.replace("export let rel = \"1\"", with: "export let rel = \"2\""))
@@ -372,8 +365,6 @@ test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, e
   assert fp"{remote_root}/index.json".read_text()? == published
 }
 
-# Publication takes the arch from the plan target: object paths, index rows
-# and published metadata all name x86_64.
 test test_publish_x86_64_plan_uses_its_target_arch [fs, net, env, time, error] { |ctx|
   let repo_root = copied_publish_repository(ctx, "publish-x86-repo")?
   let target = types.target_x86_64()
@@ -482,7 +473,6 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
     source_sha256: "",
     metapackage: false,
   })?
-  # Index rows written before runtime-only dependencies existed declare none.
   assert modern.runtime_only_deps == []
   let modern_plan = remote.plan_artifact_from_package(modern)?
   assert modern_plan.artifact_key == "artifact"
@@ -593,14 +583,32 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
   let snapshot = repo.snapshot(value, store_root)?
   let work = test.temp_dir(ctx, name: "publish-local-mirror-work")?
   let local_mirror = "http://127.0.0.1:3000"
-  let created = {status: 201, reason: "Created", bytes: 0, headers: [], url: local_mirror}
+  let response_headers: List[NetHeader] = []
+  let created = {
+    status: 201,
+    reason: "Created",
+    bytes: 0,
+    headers: response_headers,
+    url: local_mirror,
+    effective_url: local_mirror,
+    redirect_count: 0,
+  }
+  let missing_index: NetResponse = {
+    status: 404,
+    reason: "Not Found",
+    bytes: 0,
+    headers: [],
+    url: f"{local_mirror}/index.json",
+    effective_url: f"{local_mirror}/index.json",
+    redirect_count: 0,
+    body: b"",
+  }
   test.mock(
     ctx,
     "net.request",
     {url: f"{local_mirror}/index.json"},
-    Ok({status: 404, reason: "Not Found", bytes: 0, headers: [], url: f"{local_mirror}/index.json", body: b""}),
+    Ok(missing_index),
   )
-  # Three immutable objects per package, then the index.
   test.mock(ctx, "net.upload", {method: "PUT"}, Ok(created), snapshot.packages.len() * 3 + 1)
 
   repo.publish(snapshot, local_mirror, "", work)

@@ -30,9 +30,6 @@ proc main(rootfs = /rootfs) [fs, process, env, time, error] {
     Err(_) => {}
   }
 
-  # Execute the proof's pane program directly with the host XSH runner.
-  # The package's runtime proof exercises tmux's terminal transport without
-  # requiring an interactive command interpreter in the composed root.
   let runner = process.which("xsh")?
   let tmp = /tmp/tmux-proof
   tmp.mkdir()
@@ -113,15 +110,8 @@ set -g focus-events on
   print "tmux ok: config, pty capture, window creation, clean stop, attach under xterm-256color, foot, linux, tmux-256color"
 }
 
-# A client attached from foot (TERM=foot or xterm-256color), the Linux
-# console, a serial line, or a nested tmux must find its outer terminal's
-# capabilities without a terminfo database: tmux carries built-in entries
-# compiled from ncurses' terminfo.src. Each attach runs one pane command on a
-# real pty, and the client must draw it with that terminal's own sequences.
 proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, runner: Path, tmp: Path, config: Path) {
   let driver = proof.pty_driver(tmp)?
-  # The marker is assembled at run time so that only the pane's output, never
-  # the command text, can match it.
   let pane_program = fp"{tmp}/attached-pane.xsh"
   pane_program.write("let state = \"ok\"\nprint f\"tmux-attached-{state}\"\ntime.sleep(1s)?")
 
@@ -158,7 +148,6 @@ proc outer_terminals(rootfs: Path, dynlinker: Path, tmux: Path, runner: Path, tm
     }
   }
 
-  # As with ncurses, a terminal tmux knows nothing about is refused.
   env ({
     HOME: fp"{tmp}/home",
     LD_LIBRARY_PATH: fp"{rootfs}/usr/lib",

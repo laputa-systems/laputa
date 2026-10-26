@@ -98,8 +98,9 @@ make preflight-mirror
 make deploy-mirror
 ```
 
-`deploy-mirror` always runs preflight, builds the x86_64 MUSL server and
-frontend, then converges Cloudflare and the host. The first deployment creates
+`deploy-mirror` always runs preflight, runs `mirror-build-x86_64-musl` to build
+the x86_64 MUSL server with Docker Buildx, builds the frontend, then converges
+Cloudflare and the host. The first deployment creates
 the R2 bucket or remotely managed tunnel only when missing. It starts the new
 tunnel and checks local health before changing DNS. It checks public health
 before retiring the old mirror tunnel and any installed legacy `laputa-mirror`

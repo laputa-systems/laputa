@@ -44,7 +44,6 @@ test test_ext4_uses_inline_storage_only_below_sixty_byte_symlink_boundary [fs, p
   )?
   assert status.ok
 
-  # Entries are ordered lexically: block is inode 11 and fast is inode 12.
   let block_inode = inode_offset(11)
   let fast_inode = inode_offset(12)
   assert bytes.unpack_le(bytes.read_at(image, block_inode + 28, 4)?, 4)? == 8

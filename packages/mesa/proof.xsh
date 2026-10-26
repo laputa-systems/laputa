@@ -1,13 +1,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# The proof runs headless in the build container with no /dev/dri. It renders
-# through EGL's surfaceless platform, which falls back to softpipe: compiling
-# GLSL shaders, drawing into a renderbuffer, and reading the pixels back
-# exercises the vendored GLSL parser and NIR tables, the GL API dispatch, and
-# the gallium driver. A GBM device on /dev/null cannot allocate buffers (that
-# needs a DRM node), but creating it and initializing EGL on it proves libgbm
-# loads the dri_gbm backend from the GBM backends path and reaches libgallium.
 const program_source = """#include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
@@ -130,7 +123,6 @@ int main(void)
 }
 """
 
-# The gallium library is named for the Mesa version.
 proc gallium_library(root: Path) -> Result[Path] {
   let found = [
     entry.path
@@ -141,8 +133,6 @@ proc gallium_library(root: Path) -> Result[Path] {
   found[0].relative_to(root)
 }
 
-# Mesa is built without LLVM and links libc++ statically, so the runtime
-# closure carries neither libLLVM nor a C++ library.
 proc check_runtime_needs(root: Path, rels: List[Path]) {
   for rel in rels {
     for needed in elf.inspect(fp"{root}/{rel}")?.needed {

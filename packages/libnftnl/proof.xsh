@@ -2,11 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-# The program compiles against the installed public headers, which need only
-# libc, links the shipped library (and through it libmnl), and round-trips a
-# table, a base chain with a hook, a rule with two expressions, and a set
-# through nf_tables netlink messages. That exercises libnftnl's message
-# builders and parsers without the kernel, so the proof needs no capability.
 const program = r"""#include <stdint.h>
 #include <stdio.h>
 #include <string.h>

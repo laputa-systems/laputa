@@ -50,8 +50,12 @@ together.
 
 ## System images
 
-The `GenerationReceipt` (`pm/types.xsh`) records the runtime-only closure and is
-written unchanged to `/var/lib/laputa/generation.json`. The profile build constructs and
+The `GenerationReceipt` (`pm/types.xsh`) records the runtime-only closure.
+`pm/generation.xsh` serializes it to `/var/lib/laputa/generation.json` using
+`laputa-generation-1`, with the profile name and overlay fields flattened.
+Use `read_generation_receipt` to recover the typed value. The separate package
+root receipt uses `laputa-root-2` and includes generated manual-index entries.
+The profile build constructs and
 verifies the kernel, ext4 root filesystem, and GPT disk inside Linux, then
 publishes all of them as one immutable `builds/<system-key>/` directory.
 `current` switches atomically to a complete bundle. `laputa test` and
@@ -59,6 +63,14 @@ publishes all of them as one immutable `builds/<system-key>/` directory.
 disk from the same current system. The acceptance proof boots QEMU with
 hardware acceleration, drives the real dwl and foot session through QMP, and
 requires the guest success marker plus a screenshot; see [QEMU proof](QEMU.md).
+
+## Boot device policy
+
+`packages/baselayout/files/rootfs/etc/mdev.conf` assigns `root:root` mode `0666`
+to `null`, `zero`, `full`, `random`, and `urandom`. Unprivileged processes need
+these nodes for standard I/O redirection and random data. The first matching
+whole-name rule applies when `rc.boot` runs the installed `mdev` applet after
+mounting devtmpfs.
 
 ## Implementation constraints
 

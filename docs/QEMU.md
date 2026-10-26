@@ -65,14 +65,64 @@ complete verified bundle is copied atomically to the host output mount.
 
 The guest coldplugs devices, starts seatd, dwl, and foot, and emits
 `LAPUTA_DWL_FOOT_PROOF_OK` only after foot launches. A passing test requires
-that marker and a nonempty screenshot. It rejects `Kernel panic`, `not
+that marker and a screenshot containing the terminal's magenta visual marker. It rejects `Kernel panic`, `not
 syncing`, and `LAPUTA_DWL_FOOT_PROOF_FAILED`; inspect `console.log` and
 `qemu.log` first when it fails.
 
-QMP retry, the 180 s proof timeout, TERM/KILL escalation, the final
-console-marker scan, and screenshot presence are all supervisor-owned
-behaviors. A QEMU that exits early is reported as such, not as a timeout. The
-profile overlay digest is bound into the generated image so a guest proof
-cannot validate a different root generation.
+QMP retries use a closed operation type that admits readiness and screenshot
+requests. Input injection is a separate one-shot operation and cannot be passed
+to the retry path. If the helper sends an input event but loses its response,
+it reports an indeterminate outcome and exits with status 75. XSH maps that
+status to `QmpFailure.OutcomeIndeterminate` and does not retry the operation.
+The helper remains Python pending LAP-35's reusable XSH client.
+
+The terminal reader prints and flushes its visual marker, records the injected
+input, then waits for another terminal read. The host captures and checks the
+marker before stopping QEMU. A nonempty screenshot without the marker fails.
+The supervisor regression proves this ordering against a fake peer. Actual
+visual VM qualification remains open until the graphical artifact builds.
+
+Readiness and screenshot retry up to 20 times with 250 ms between attempts.
+The supervisor owns the 180 s proof timeout, TERM/KILL escalation, final
+console-marker scan, and screenshot check. The supervisor reports an early
+QEMU exit as an error. The profile overlay digest is bound into the generated
+image so a guest proof cannot validate a different root generation.
+
+Run `$XSHT test tests/system/qemu.xsh` for typed dispatch and supervisor
+coverage. Run `python3 tests/system/qmp_proof.py` for the disconnect-after-send
+case against a local QMP peer.
 
 Browsers, real hardware, IPv6, and Wi-Fi are outside this proof.
+
+The test-only clock qualification invokes `boot/qmp-proof.py stop SOCKET` and
+`cont SOCKET` once each, with a five-second process budget in its host harness.
+These modes reuse the existing protocol client and never retry. They control
+the disposable VM only.
+
+## QMP replacement baseline
+
+Before LAP-35, QMP has the following boundary. LAP-39's final comparison remains
+open until a replacement passes the same behavior checks.
+
+| Responsibility | Current owner and cost |
+|---|---|
+| Host entry points | `system/qemu.xsh` dispatches readiness, input, and screenshot operations. Guest clock qualification also uses one-shot `stop` and `cont` helper modes. |
+| Process boundary | One Python helper process per operation attempt. Readiness and screenshot can each start up to 20 processes. Input starts once. |
+| Wire conversion | XSH passes argv to Python. Python serializes QMP JSON and decodes replies over a new Unix connection for each invocation. |
+| Protocol ownership | Python reads the greeting and negotiates capabilities on each connection. It skips events while waiting for a command response. |
+| Input mutation | Seven key presses plus Ctrl-D produce 18 input requests. A lost response stops the operation with exit 75. |
+| Error ownership | Python distinguishes rejection from an unknown mutation outcome. XSH owns typed status mapping, read-only retries, and QEMU cleanup. |
+| Source and dependencies | The helper is 160 lines and requires host Python. The complete supervisor module is 405 lines, including launch and visual checks outside QMP. QEMU remains external. |
+| Missing protocol guarantees | No request IDs, bounded frame size, or socket deadline. The supervisor's process timeout does not establish those guarantees. |
+| Verification | Thirteen native supervisor tests (including the visual-marker regression) and three local peer tests covering input disconnect and one-shot pause dispatch/errors. A replacement also needs fragmented frames, interleaved events, errors, EOF, and actual VM proofs. |
+
+This baseline measures responsibilities and crossings, not a runtime speedup.
+Removing Python earns credit only when the implementation and dependency are
+actually removed without losing the one-shot mutation and cleanup contracts.
+
+The supplied fixed XSH source already provides bounded fd reads, short-write
+counts, polling, close, and process-local monotonic time. The remaining portable
+socket gap is connection setup: AF_UNIX socket creation and connect are exposed
+under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
+opens files and does not connect to socket paths. LAP-35 therefore still needs
+a portable, bounded Unix-stream connection boundary to preserve the macOS path.

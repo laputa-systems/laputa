@@ -561,8 +561,6 @@ proc replace_required(file: Path, old: Str, new: Str) {
   file.write(text.replace(old, with: new))
 }
 
-# Port of render/gles2/shaders/embed.sh: the shader source as a
-# NUL-terminated byte array, one byte per line.
 proc write_shader_header(src: Path, dest: Path, symbol: Str) {
   var lines = [f"static const char {symbol}[] = {{"]
 

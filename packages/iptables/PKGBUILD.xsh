@@ -97,17 +97,6 @@ export const filetree = [
   },
 ]
 
-# This is upstream's legacy (x_tables) build only, configured as
-# `--enable-static --disable-shared --disable-nftables --disable-connlabel`:
-# every extension is linked into xtables-legacy-multi (ALL_INCLUSIVE), so
-# nothing is dlopened from an xtables plugin directory at runtime. Both kernel
-# configs enable the legacy ip_tables and ip6_tables tables; only x86_64 has
-# nf_tables, which nftables' nft drives directly, so the xtables-nft backend
-# is not built.
-#
-# iptables/Makefile.am v4_sbin_links and v6_sbin_links, plus iptables-xml from
-# vx_bin_links. baselayout makes /usr/sbin a link to bin, so they live in
-# /usr/bin beside the multi binary.
 const command_links = [
   "iptables",
   "iptables-restore",
@@ -124,9 +113,6 @@ const command_links = [
   "iptables-xml",
 ]
 
-# configure's blacklist_modules: connlabel needs libnetfilter_conntrack, which
-# Laputa does not ship. dccp and ipvs stay because linux-headers provides
-# linux/dccp.h and linux/ip_vs.h.
 const blacklisted_extensions = ["connlabel"]
 
 # configure.ac regular_CPPFLAGS (with large-file support) and regular_CFLAGS,
@@ -154,13 +140,6 @@ const regular_defs = [
   "-DXTABLES_INTERNAL",
 ]
 
-# Captured from upstream `./configure --prefix=/usr --sbindir=/usr/bin
-# --enable-static --disable-shared --disable-nftables --disable-connlabel
-# --disable-libnfnetlink` on an x86_64 musl host, then trimmed to the macros
-# the built sources read: the kernel header probes libxtables/xtables.c and
-# extensions/libxt_bpf.c select on (linux-headers provides both), the version
-# string, the IPv6 header size libxt_TCPMSS.c bounds its MSS with, and the
-# xtables lock path.
 proc write_config_h() [fs, error] {
   p"config.h".write(
     f"""#ifndef IPTABLES_CONFIG_H
@@ -175,8 +154,6 @@ proc write_config_h() [fs, error] {
   )
 }
 
-# include/xtables-version.h.in with configure's libxtables_vmajor:
-# libxtables_vcurrent 19 minus libxtables_vage 7.
 proc write_xtables_version_h() [fs, error] {
   p"include/xtables-version.h".write(
     """#define XTABLES_VERSION "libxtables.so.12"
@@ -185,8 +162,6 @@ proc write_xtables_version_h() [fs, error] {
   )
 }
 
-# extensions/GNUmakefile.in builds every extensions/<prefix><module>.c it finds
-# (a sorted wildcard) except the blacklisted modules.
 proc extension_modules(prefix: Str) -> Result[List[Str]] {
   let modules = collect {
     for entry in fs.children(p"extensions")? |> sort-by .name {
@@ -200,8 +175,6 @@ proc extension_modules(prefix: Str) -> Result[List[Str]] {
   modules
 }
 
-# The initext*.c files extensions/GNUmakefile.in generates: one function that
-# calls each built extension's registration hook.
 proc write_initext(file: Path, function_name: Str, hooks: List[Str]) [fs, error] {
   var body = "\n"
 
@@ -228,7 +201,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   var tasks = []
   var objects = []
 
-  # libiptc/Makefile.am libip4tc_la_SOURCES and libip6tc_la_SOURCES.
   let libiptc = make.compile_c_tasks(
     cc,
     triple,
@@ -240,8 +212,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     p"obj/libiptc",
   )
 
-  # libxtables/Makefile.am libxtables_la_SOURCES; NO_SHARED_LIBS removes the
-  # dlopen plugin loader.
   let libxtables = make.compile_c_tasks(
     cc,
     triple,
@@ -256,8 +226,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   tasks = tasks.extend(libiptc.tasks).extend(libxtables.tasks)
   objects = [@objects, @libiptc.objects, @libxtables.objects]
 
-  # extensions/GNUmakefile.in libext.a, libext4.a, and libext6.a: each
-  # extension object names its registration hook through _INIT.
   for ext_archive in [
     {prefix: "libxt_", initext: "initext", function_name: "init_extensions"},
     {prefix: "libipt_", initext: "initext4", function_name: "init_extensions4"},
@@ -299,8 +267,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  # iptables/Makefile.am xtables_legacy_multi_SOURCES with ENABLE_IPV4,
-  # ENABLE_IPV6, and ENABLE_STATIC.
   let multi = make.compile_c_tasks(
     cc,
     triple,
@@ -326,9 +292,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   objects += multi.objects
   let multi_out = p"obj/xtables-legacy-multi"
 
-  # The static extension archives are linked whole in practice: initext*.c
-  # references every extension object, so linking the objects directly is the
-  # same program.
   let link = make.link_executable_task(cc, triple, objects, [], ["-lm"], multi_out, [task.name for task in tasks])
   make.run_tasks(tasks.push(link), make.jobs()?)
 

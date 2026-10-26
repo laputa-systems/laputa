@@ -33,7 +33,6 @@ test test_event_name_lookups_are_sorted_by_name [error] { |_|
 ],
   )
 
-  # libevdev binary-searches these tables, so file order would break lookups.
   assert lines_between(header, "static const struct name_entry ev_names[] = {", "};") == [
     """    { .name = "EV_KEY", .value = EV_KEY },""",
     """    { .name = "EV_MAX", .value = EV_MAX },""",
@@ -59,8 +58,6 @@ test test_event_names_keep_the_last_name_per_code [error] { |_|
 ],
   )
 
-  # A later define of a code replaces the earlier name, SND_PROFILE_ codes
-  # never take a sound code's name, and a leading-zero decimal is no code.
   assert """    [FF_STATUS_MAX] = "FF_STATUS_MAX",""" in header
   assert "FF_STATUS_PLAYING" not in header
   assert """    [SND_CLICK] = "SND_CLICK",""" in header

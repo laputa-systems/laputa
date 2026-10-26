@@ -471,9 +471,6 @@ proc replace_required(file: Path, old: Str, new: Str) {
   file.write(text.replace(old, with: new))
 }
 
-# Upstream's makealias.py emits hidden internal aliases for the public
-# symbols, an optimization only; empty headers build the same library with
-# PLT calls between its own functions.
 proc write_empty_alias_headers() {
   for header in [p"fcalias.h", p"fcaliastail.h", p"fcftalias.h", p"fcftaliastail.h"] {
     header.write("")
@@ -674,7 +671,6 @@ fcobjshash_h = custom_target(
 """,
   )
 
-  # The fc-const target also writes a test-only source; tests are disabled.
   replace_required(
     p"fc-const/meson.build",
     """fcconst_h = custom_target('fcconst.h',
@@ -715,7 +711,6 @@ test_const_name_c = custom_target('test_const_name.c',
 """,
   )
 
-  # The recipe links conf_links itself after install.
   replace_required(
     conf_meson,
     """meson.add_install_script('link_confs.py', fc_templatedir,
@@ -758,8 +753,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fp"{dest}/usr/bin/{bin}".remove()
   }
 
-  # The links are relative to /etc/fonts/conf.d, as upstream's link_confs.py
-  # makes them, so they resolve in any root the package is installed into.
   for conf in conf_links {
     fp"{dest}/etc/fonts/conf.d/{conf}".symlink(to: fp"../../../usr/share/fontconfig/conf.avail/{conf}")
   }

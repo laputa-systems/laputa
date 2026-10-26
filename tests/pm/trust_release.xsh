@@ -137,7 +137,7 @@ proc expect_rejected_without_mutation(
   assert fp"{old_generation}/generation-marker".read_text()? == "prior generation\n"
 }
 
-test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, error] { |ctx|
+test trust_release_composes_authenticated_bytes_as_one_generation [fs, process, env, error] { |ctx|
   let input = signed_release_input("valid")?
   let value = trust_build_plan(ctx)?
   let store_root = test.temp_dir(ctx, name: "trust-release-store")?
@@ -180,7 +180,7 @@ test trust_release_composes_authenticated_bytes_as_one_generation [fs, env, erro
   assert fp"{output_root}/etc/laputa/trust-policy".read_bytes()? == input.next_policy
 }
 
-test trust_release_rejects_bad_metadata_and_keeps_the_old_generation [fs, env, error] { |ctx|
+test trust_release_rejects_bad_metadata_and_keeps_the_old_generation [fs, process, env, error] { |ctx|
   let value = trust_build_plan(ctx)?
   let store_root = test.temp_dir(ctx, name: "trust-release-reject-store")?
   let old_generation = test.temp_dir(ctx, name: "trust-release-reject-old")?
@@ -276,7 +276,7 @@ test trust_release_rejects_bad_metadata_and_keeps_the_old_generation [fs, env, e
   )
 }
 
-test trust_release_preserves_unowned_staging_paths [fs, env, error] { |ctx|
+test trust_release_preserves_unowned_staging_paths [fs, process, env, error] { |ctx|
   let input = signed_release_input("valid")?
   let value = trust_build_plan(ctx)?
   let store_root = test.temp_dir(ctx, name: "trust-release-staging-store")?
@@ -310,7 +310,7 @@ test trust_release_preserves_unowned_staging_paths [fs, env, error] { |ctx|
   assert fp"{root_stage_sentinel}/sentinel".read_text()? == "prior root stage\n"
 }
 
-test trust_release_never_replaces_a_broken_destination_alias [fs, env, error] { |ctx|
+test trust_release_never_replaces_a_broken_destination_alias [fs, process, env, error] { |ctx|
   let input = signed_release_input("valid")?
   let value = trust_build_plan(ctx)?
   let store_root = test.temp_dir(ctx, name: "trust-release-alias-store")?
@@ -338,7 +338,7 @@ test trust_release_never_replaces_a_broken_destination_alias [fs, env, error] { 
   assert ! missing_target.exists()?
 }
 
-test trust_release_composition_failure_keeps_the_old_generation [fs, env, error] { |ctx|
+test trust_release_composition_failure_keeps_the_old_generation [fs, process, env, error] { |ctx|
   let input = signed_release_input("valid")?
   let value = trust_build_plan(ctx)?
   let store_root = test.temp_dir(ctx, name: "trust-release-missing-store")?
@@ -394,7 +394,7 @@ use pm.policy
 use pm.types
 use trust.release as trust_release
 
-proc main(...argv: List[Str]) [fs, env, error] {
+proc main(...argv: List[Str]) [fs, process, env, error] {
   let repo_root = fp"{argv[0]}"
   let store_root = fp"{argv[1]}"
   let output_root = fp"{argv[2]}"

@@ -5,13 +5,8 @@ use pm.plan
 use pm.policy
 use pm.types
 
-# Packages whose keys must not follow the XSH seed: XSH scripts, service
-# modules run by xinit, and their dependents.
 const seed_independent = ["dropbear", "laputa-fs", "laputa-net", "laputa-pm", "tailscale", "xinit"]
 
-# The `xsh` recipe hashes the local seed under `.out/`, which only `make seed`
-# produces. Share the checked-in recipes and repository inputs with a
-# disposable root that holds a fixture seed for each target.
 proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name:)?
@@ -87,12 +82,10 @@ test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, en
   let roots = ["dropbear", "laputa-net", "tailscale"]
   let before = plan_for(value, types.target_aarch64(), roots)?
 
-  # dropbear links zlib, so a zlib rebuild rebuilds it.
   let zlib = plan_for(with_release(value, "zlib", "999")?, types.target_aarch64(), roots)?
   assert "zlib" in changed_key_names(before, zlib)?
   assert "dropbear" in changed_key_names(before, zlib)?
 
-  # Service modules only run under xinit; an xinit rebuild rebuilds xinit alone.
   let xinit = plan_for(with_release(value, "xinit", "999")?, types.target_aarch64(), roots)?
   assert changed_key_names(before, xinit)? == ["xinit"]
 }

@@ -1,6 +1,7 @@
 ##! musl libc package definition and build operations.
 use pm.make
-use pm.util as pm_util
+use pm.types
+use pm.target as pm_target
 
 ## Package name.
 export const name = "musl"
@@ -153,21 +154,12 @@ proc compiler_rt_builtins(arch: Str) -> Result[List[Path]] {
 ## Build and install the musl libc package.
 export proc build(dest: Path) [fs, process, env, error] {
   let cc = process.which("cc")?
-  let arch = pm_util.target_arch()?
+  let package_target = pm_target.recipe_target()?
+  let arch = types.pm_target_arch(package_target)
   let triple = f"{arch}-linux-musl"
 
-  # Generate include/bits/alltypes.h and include/bits/syscall.h.
-  # bits/ does not exist in the source tree — create it first.
   p"include/bits".mkdir()
 
-  # Replicates tools/mkalltypes.sed.
-  # Input: arch/ARCH/bits/alltypes.h.in then include/alltypes.h.in (concatenated).
-  # TYPEDEF T name;  →  #if defined(__NEED_name) && !defined(__DEFINED_name)
-  #                     typedef T name;
-  #                     #define __DEFINED_name
-  #                     #endif
-  # STRUCT name body; and UNION name body; get equivalent struct/union wrappers.
-  # All other lines (#define, #if, #endif, blank, etc.) pass through unchanged.
   let arch_at = fp"arch/{arch}/bits/alltypes.h.in".read_text()?
   let generic_at = p"include/alltypes.h.in".read_text()?
   var at_lines = []
@@ -204,22 +196,16 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   p"include/bits/alltypes.h".write(at_lines.join("\n"))
 
-  # Generate include/bits/syscall.h as musl's Makefile does: the __NR_* header
-  # as is, then a SYS_* copy of each __NR_ line (`sed -n s/__NR_/SYS_/p`).
-  # Programs use both names.
   let syscall_in = fp"arch/{arch}/bits/syscall.h.in".read_text()?
   let sys_names = [line.replace("__NR_", with: "SYS_") for line in syscall_in.lines() if "__NR_" in line]
   let base = if syscall_in.ends_with("\n") { syscall_in } else { syscall_in + "\n" }
   p"include/bits/syscall.h".write(base + sys_names.join("\n") + "\n")
 
-  # Generate src/internal/version.h (included by src/internal/version.c).
-  # configure normally produces this from tools/version.sh + VERSION file.
   p"src/internal/version.h".write(
     f"""#define VERSION "{ver}"
 """,
   )
 
-  # Compilation flags matching musl configure output for Clang + musl targets.
   # -U_FORTIFY_SOURCE: Clang enables _FORTIFY_SOURCE by default, injecting
   #   LOCAL __memcpy_chk wrappers that shadow musl's assembly GLOBAL memcpy.
   # -fno-sanitize=all: UBSan instrumentation introduces HIDDEN memcpy references
@@ -240,18 +226,10 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let includes = [f"-I./arch/{arch}", "-I./arch/generic", "-I./src/include", "-I./src/internal", "-I./include"]
 
-  # Collect arch sources from two places, matching musl's Makefile:
-  # 1. arch/${arch}/*.{c,s} — top-level arch files (empty for aarch64/x86_64)
-  # 2. src/{subsystem}/${arch}/*.[csS] — in-source arch overrides (math, thread,
-  #    signal, etc. optimised assembly/C for the target architecture)
-  # An override replaces only the generic file at its own path, as the
-  # Makefile's REPLACED_OBJS (`/$(ARCH)/` removed) does: src/thread/x86_64/clone.s
-  # replaces src/thread/clone.c (__clone), never src/linux/clone.c (clone()).
   var replaced = []
   var arch_c_files = []
   var arch_s_files = []
 
-  # 1. arch/${arch}/ direct children (headers only for aarch64/x86_64 in practice).
   for e in fs.children(fp"arch/{arch}")? |> where .kind == "file" {
     if e.ext == "c" {
       arch_c_files += [e.path]
@@ -260,7 +238,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  # 2. src/{subsystem}/${arch}/*.[csS] — in-source arch overrides.
   for subsys in fs.children(p"src")? |> where .kind == "dir" {
     let arch_subdir = fp"{subsys.path}/{arch}"
 
@@ -277,46 +254,32 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  # Enumerate src/ .c files, matching musl's Makefile: SRC_DIRS = src/* (one
-  # level deep per subsystem) plus src/malloc/mallocng (two levels, the default
-  # malloc implementation), minus the generic files an arch override replaces.
-  # fs.children is non-recursive here intentionally: src/{subsystem}/{arch}/*.c files
-  # at two levels deep must not be included (they are wrong-arch implementations).
   var libc_srcs = [
     e.path
     for subsys in fs.children(p"src")? |> where .kind == "dir"
     for e in fs.children(subsys.path)? |> where .ext == "c"
     if ! (f"{subsys.name}/{e.name.replace(".c", with: "")}" in replaced)
   ]
-  # src/malloc/mallocng/*.c — the default malloc implementation (two levels deep).
   for e in fs.children(p"src/malloc/mallocng")? |> where .ext == "c" {
     libc_srcs += [e.path]
   }
 
   p"obj".mkdir()
 
-  # Compile all src/ sources → LOBJS (PIC; go into both libc.a and libc.so).
   var tasks = []
   let libc = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", libc_srcs, p"obj/libc")
   tasks += libc.tasks
 
-  # Compile arch/ C overrides → LOBJS.
   let arch_c = make.compile_lo_tasks(cc, triple, cflags, [], includes, p"", arch_c_files, p"obj/arch")
   tasks += arch_c.tasks
   var lobjs = libc.objects.extend(arch_c.objects)
   var lobj_deps = libc.deps.extend(arch_c.deps)
 
-  # Compile arch/ assembly overrides → LOBJS (skip C-specific flags; include
-  # paths still passed for any .S files that use the C preprocessor).
   let arch_asm = make.compile_asm_lo_tasks(cc, triple, includes, p"", arch_s_files, p"obj/arch-asm")
   tasks += arch_asm.tasks
   lobj_deps += arch_asm.deps
   lobjs += arch_asm.objects
 
-  # Compile top-level ldso/ → LDSO_OBJS (PIC; libc.so only, not in libc.a).
-  # ldso/dlstart.c defines _dlstart (ELF entry of libc.so / the dynamic linker).
-  # ldso/dynlink.c is the main dynamic-linker implementation.
-  # Hardcoded list — ldso/ contains exactly these two files in every musl release.
   var ldso_objs = []
   var ldso_deps = []
   p"obj/ldso".mkdir()
@@ -326,7 +289,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   ldso_objs = ldso_compile.objects
   ldso_deps = ldso_compile.deps
 
-  # libc.a — static archive from LOBJS only (ldso not needed for static linking).
   let libc_a = p"obj/libc.a"
   tasks += [make.link_archive_task(cc, lobjs, libc_a, lobj_deps)]
 
@@ -382,9 +344,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   make.run_tasks(tasks, make.jobs()?)
 
-  # CRT startup objects — compiled with -DCRT, installed as .o files.
-  # Non-PIE: crt1, crti, crtn (compile_c, no -fPIC).
-  # PIE:     Scrt1, rcrt1 (compile_lo adds -fPIC/-DPIC for PIE executables).
   let crt_cflags = cflags.push("-DCRT")
   var crt_tasks = []
   var crt_outs = []
@@ -411,7 +370,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(out, fp"{dest}/usr/lib/{out.name()}", 0o644, parents: true, overwrite: true)
   }
 
-  # Install shared library and static archive.
   fs.install(libc_so, fp"{dest}/usr/lib/libc.so", 0o755, parents: true, overwrite: true)
   fs.install(libc_a, fp"{dest}/usr/lib/libc.a", 0o644, parents: true, overwrite: true)
 
@@ -425,10 +383,6 @@ export proc build(dest: Path) [fs, process, env, error] {
     fs.install(packaged_builtin, fp"{dest}/usr/lib/{packaged_builtin.name()}", 0o644, parents: true, overwrite: true)
   }
 
-  # These libraries are folded into libc on musl, but compiler drivers and
-  # upstream build systems still commonly link with their conventional names.
-  # Keep the aliases as relative symlinks so they do not duplicate libc in the
-  # installed root or package archive.
   for lib in ["m", "dl", "rt", "crypt", "pthread"] {
     fp"{dest}/usr/lib/lib{lib}.so".symlink(to: p"libc.so")
     fp"{dest}/usr/lib/lib{lib}.a".symlink(to: p"libc.a")
@@ -441,8 +395,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   run $ar "rcs" $libssp
   fs.install(libssp, fp"{dest}/usr/lib/libssp_nonshared.a", 0o644, parents: true, overwrite: true)
 
-  # Install public headers from include/ (.h.in templates are excluded by the
-  # .ext filter; the generated bits/ headers are picked up by recursive walk).
   let include_root = path.absolute(p"include")?
 
   for e in fs.files(p"include")? |> where .ext == "h" {
@@ -459,32 +411,24 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  # musl installs ld-musl-*.so.1 as a hard link to libc.so. Use a relative
-  # symlink in the package so the alias does not duplicate the libc payload.
-  # Ship the loader under /usr/lib; baselayout provides /lib -> usr/lib
-  # for binaries whose ELF interpreter is /lib/ld-musl-*.so.1.
-  var ldso = ""
-
-  if arch == "aarch64" {
-    ldso = "ld-musl-aarch64.so.1"
-  } else if arch == "x86_64" {
-    ldso = "ld-musl-x86_64.so.1"
+  let ldso = match package_target {
+    types.Aarch64LinuxMusl => "ld-musl-aarch64.so.1"
+    types.X86_64LinuxMusl => "ld-musl-x86_64.so.1"
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported musl loader target")) }
   }
 
-  if ldso != "" {
-    fp"{dest}/usr/lib/{ldso}".symlink(to: p"libc.so")
-    fp"{dest}/usr/bin".mkdir()
-    fp"{dest}/usr/bin/ldd".remove()
+  fp"{dest}/usr/lib/{ldso}".symlink(to: p"libc.so")
+  fp"{dest}/usr/bin".mkdir()
+  fp"{dest}/usr/bin/ldd".remove()
 
-    fp"{dest}/usr/bin/ldd".write(
-      f"""#!/bin/xsh
+  fp"{dest}/usr/bin/ldd".write(
+    f"""#!/bin/xsh
 proc main(...argv: List[Str]) [process, error] {{{{
   unix.exec(process.command_argv("/usr/lib/{ldso}", ["/usr/lib/{ldso}", "--list"].extend(argv)))?
 }}}}
 
 main(@args)?
 """,
-      mode: 0o755,
-    )
-  }
+    mode: 0o755,
+  )
 }

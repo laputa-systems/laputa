@@ -1,5 +1,6 @@
 ##! PM target operations and shared package-manager policy.
 use pm.util as pm_util
+use pm.types
 
 ## Exported PM declaration `MuslAbi`.
 export type MuslAbi = {
@@ -18,11 +19,42 @@ export type MuslAbi = {
   signed_wchar_t: Bool,
 }
 
-# The arch's musl bits/alltypes.h.in decides wchar_t: `unsigned` on aarch64,
-# `int` on x86_64.
-## The C type properties of a 64-bit musl target, for gnulib-style configure substitutes.
-export pure lp64_musl_abi(arch: Str) -> MuslAbi {
-  let signed_wchar_t = arch != "aarch64"
+## Read and validate the selected recipe target.
+export proc recipe_target() [env, error] -> Result[types.Target, Error] {
+  types.parse_target(pm_util.target_arch()?)?
+}
+
+## Read and validate the build tool target.
+export proc build_target() [env, error] -> Result[types.Target, Error] {
+  types.parse_target(pm_util.build_arch()?)?
+}
+
+## Render the Rust target triple of a supported recipe target.
+export pure rust_triple(target: types.Target) -> Result[Str, Error] {
+  match target {
+    types.Aarch64LinuxMusl => "aarch64-unknown-linux-musl"
+    types.X86_64LinuxMusl => "x86_64-unknown-linux-musl"
+    types.TargetReserved => Err(types.PmError.PackageContract("unsupported recipe target"))
+  }
+}
+
+## Render the kernel source architecture of a supported recipe target.
+export pure kernel_arch(target: types.Target) -> Result[Str, Error] {
+  match target {
+    types.Aarch64LinuxMusl => "arm64"
+    types.X86_64LinuxMusl => "x86"
+    types.TargetReserved => Err(types.PmError.PackageContract("unsupported recipe target"))
+  }
+}
+
+## Return the C type properties of a supported LP64 musl target.
+export pure lp64_musl_abi(target: types.Target) -> Result[MuslAbi, Error] {
+  let signed_wchar_t = match target {
+    types.Aarch64LinuxMusl => false
+    types.X86_64LinuxMusl => true
+    types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported musl ABI target")) }
+  }
+  let arch = types.pm_target_arch(target)
 
   {
     arch,
@@ -43,5 +75,5 @@ export pure lp64_musl_abi(arch: Str) -> MuslAbi {
 
 ## Exported PM declaration `musl_abi`.
 export proc musl_abi() [env, error] -> Result[MuslAbi, Error] {
-  lp64_musl_abi(pm_util.target_arch()?)
+  lp64_musl_abi(recipe_target()?)?
 }

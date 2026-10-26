@@ -9,8 +9,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let dynamic = run.text $readelf "-d" fp"{root}/{lib}"
   proof.ensure("[libxkbcommon.so.0]" in dynamic, "proof-libxkbcommon", "libxkbcommon has no libxkbcommon.so.0 SONAME")
 
-  # The library looks up keymaps under its built-in root, which must be the
-  # xkeyboard-config tree this root ships.
   let strings = fp"{root}/{lib}".read_bytes()?.strings()
   proof.ensure("/usr/share/X11/xkb" in strings, "proof-libxkbcommon", "libxkbcommon has another XKB config root")
   proof.ensure(
@@ -19,7 +17,6 @@ proc main(root = /rootfs) [fs, process, env, error] {
     "the XKB config root has no evdev rules",
   )
 
-  # Every lookup path must name the installed system, never the build root.
   let pc = fp"{root}/usr/lib/pkgconfig/xkbcommon.pc".read_text()?
 
   for lookup in ["/usr/share/xkeyboard-config-2.d", "/usr/share/xkeyboard-config.d", "/etc/xkb"] {
