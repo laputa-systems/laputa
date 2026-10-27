@@ -196,8 +196,16 @@ proc archive_plan_cache_fingerprint(
   let plan = prepared.plan
   let triple = prepared.triple
   let items = prepared.items
-  let inputs_hash = bytes.from_text(json.encode({cc: cc.display(), srcarch: srcarch, triple: triple, cflags: cflags, includes: includes, items: items})?).sha256().hex()
-  f"""format linux-archive-plan-cache-v3
+  let efi_stubs = [item for item in items if srcarch == "x86" and item.library and
+    item.object.starts_with("drivers/firmware/efi/libstub/") and item.object.ends_with(".stub.o")]
+  let helper = if efi_stubs.is_empty() {
+    {path: "", digest: ""}
+  } else {
+    let helper_path = staged_recipe_helper("efi-stubcopy.xsh")?
+    {path: helper_path.display(), digest: hash.sha256(helper_path)?.hex()}
+  }
+  let inputs_hash = bytes.from_text(json.encode({cc: cc.display(), srcarch: srcarch, triple: triple, cflags: cflags, includes: includes, items: items, efi_stub_helper: helper})?).sha256().hex()
+  f"""format linux-archive-plan-cache-v4
 srcarch {srcarch}
 triple {triple}
 inputs {inputs_hash}

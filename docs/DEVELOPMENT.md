@@ -165,8 +165,12 @@ PM has no default remote; these make targets use the loopback mirror.
   The compile-flags cache binds parsed inputs and stored flags with format
   `linux-kbuild-compile-flags-v4`, and
   discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v12`.
-  Archive-plan cache format `linux-archive-plan-cache-v3` binds the compiler
-  path, prepared flags and source selections, and the report and summary.
+  Archive-plan cache format `linux-archive-plan-cache-v4` binds the compiler
+  path, prepared flags and source selections, EFI stub helper, and the report
+  and summary.
+  X86 EFI stub plans require `XSH_PM_RECIPE_DIR` to name the staged recipe;
+  the copy task binds the helper digest and checks stripped objects for absolute
+  relocations before running the stub copy.
   `kbuild.prepare_archive_analysis` returns a `PreparedArchivePlan` containing
   the plan, target and captured items consumed by
   `kbuild.plan_builtin_archives_with_analysis_workers`; worker inputs carry

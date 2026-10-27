@@ -821,6 +821,7 @@ test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |c
   let root = test.temp_dir(ctx, name: "linux-efi-stub-plan")?
   let cache = test.temp_dir(ctx, name: "linux-efi-stub-cache")?
   let worker = path.absolute(p"packages/linux/kbuild-archive-analysis-worker.xsh")?
+  let recipe = path.absolute(p"packages/linux")?
   let xsh_bin = process.which("xsh")?
   fp"{root}/drivers/firmware/efi/libstub".mkdir()
   fp"{root}/lib".mkdir()
@@ -834,6 +835,7 @@ test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |c
       p"drivers/firmware/efi/libstub/missing.stub.o"],
     archive_owners: [], composites: [], unsupported: [],
   )
+  env ({XSH_PM_RECIPE_DIR: recipe.display()}) {
   cd root {
     let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
     assert archive_plan.missing_sources == [p"drivers/firmware/efi/libstub/missing.stub.o"]
@@ -872,12 +874,74 @@ test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |c
         if task.name == output {
           saw_copy = true
           assert task.deps == [base]
-          assert make.argv_text(task.argv)? == ["llvm-objcopy", "--remove-section=.note.gnu.property", base, output]
+          let helper = fp"{recipe}/efi-stubcopy.xsh"
+          assert helper in task.inputs
+          assert make.argv_text(task.argv)? == ["xsh", helper.display(), "--", base, output, helper.display(), hash.sha256(helper)?.hex()]
         }
       }
       assert saw_compile and saw_copy
     }
   }
+  }?
+}
+
+test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-efi-helper-plan")?
+  let cache = test.temp_dir(ctx, name: "linux-efi-helper-cache")?
+  let recipe = test.temp_dir(ctx, name: "linux-efi-helper-recipe")?
+  let helper = fp"{recipe}/efi-stubcopy.xsh"
+  let fake = fp"{root}/fake-tools"
+  fake.mkdir()
+  fp"{fake}/xsh".write("#!/bin/sh\nprintf x >> \"$(dirname \"$0\")/calls\"\nexec /bin/cp \"$3\" \"$4\"\n", mode: 0o755)
+  helper.write(p"packages/linux/efi-stubcopy.xsh".read_text()?)
+  fs.set_times(helper, mtime_sec: 1000000000)?
+  fp"{recipe}/kbuild-archive-analysis-worker.xsh".write(p"packages/linux/kbuild-archive-analysis-worker.xsh".read_text()?)
+  fp"{root}/drivers/firmware/efi/libstub".mkdir()
+  fp"{root}/.config".write("CONFIG_X86=y\n")
+  fp"{root}/Makefile".write("")
+  fp"{root}/Kbuild".write("")
+  fp"{root}/drivers/firmware/efi/libstub/Makefile".write("")
+  fp"{root}/drivers/firmware/efi/libstub/gop.c".write("int gop(void) { return 0; }\n")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p".", p"drivers/firmware/efi/libstub"], objects: [],
+    lib_objects: [p"drivers/firmware/efi/libstub/gop.stub.o"],
+    archive_owners: [], composites: [], unsupported: [],
+  )
+  env ({XSH_PM_RECIPE_DIR: recipe.display(), XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(),
+    XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_REUSE_ARCHIVE_PLAN: "1",
+    XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS: "1", XSH_LINUX_KBUILD_FORCE_ARCHIVES: "0",
+    PATH: f"{fake}:{e"PATH" ?? ""}"}) {
+    cd root {
+      let first = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      assert first.missing_sources.is_empty()
+      let base = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.o"
+      let output = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.stub.o"
+      base.parent.mkdir(parents: true)
+      base.write("compiled object\n")
+      let copies = [task for task in first.tasks if task.name == output.display()]
+      assert copies.len() == 1
+      make.run_tasks([{...copies[0], deps: []}], 1)
+      make.run_tasks([{...copies[0], deps: []}], 1)
+      assert fp"{fake}/calls".read_text()? == "x"
+      let fingerprint = p".xsh-kbuild-archive-plan.fingerprint"
+      let before = fingerprint.read_text()?
+      helper.write(helper.read_text()? + "\n")
+      fs.set_times(helper, mtime_sec: 1000000000)?
+      let second = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      assert second.missing_sources.is_empty()
+      assert fingerprint.read_text()? != before
+      let changed_copies = [task for task in second.tasks if task.name == output.display()]
+      assert changed_copies.len() == 1
+      make.run_tasks([{...changed_copies[0], deps: []}], 1)
+      assert fp"{fake}/calls".read_text()? == "xx"
+      helper.remove(missing_ok: false)
+      match linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], []) {
+        Ok(_) => test.fail("missing EFI stub helper unexpectedly reused a cached plan")
+        Err(kbuild.ScriptError.Failed {kind, ..}) => assert kind == "linux-recipe-helper"
+        Err(problem) => test.fail(f"unexpected helper error: {problem.message}")
+      }
+    }
+  }?
 }
 
 test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
@@ -1368,13 +1432,13 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       assert p"foo.o" in first.missing_sources
       for fingerprint in [p".xsh-kbuild-archive-plan.fingerprint", fp"{cache}/linux-x86.archive-plan.fingerprint"] {
         let current = fingerprint.read_text()?
-        let legacy = current.replace("linux-archive-plan-cache-v3", with: "linux-archive-plan-cache-v2")
+        let legacy = current.replace("linux-archive-plan-cache-v4", with: "linux-archive-plan-cache-v3")
         assert legacy != current
         fingerprint.write(legacy)
       }
       let rebuilt = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" in rebuilt.missing_sources
-      assert "linux-archive-plan-cache-v3" in p".xsh-kbuild-archive-plan.fingerprint".read_text()?
+      assert "linux-archive-plan-cache-v4" in p".xsh-kbuild-archive-plan.fingerprint".read_text()?
       p"foo.c".write("int foo(void) { return 0; }\n")
       let second = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" not in second.missing_sources

@@ -35,6 +35,39 @@ proc linux_config_source(pkg: types.Package) [error] -> Result[types.UpstreamSou
   Err(types.PmError.PackageContract("linux is missing its aarch64 config input"))
 }
 
+test test_linux_x86_efi_stubcopy_rejects_absolute_relocations [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-efi-stubcopy")?
+  let xsh = runner()?
+  let script = path.absolute(p"packages/linux/efi-stubcopy.xsh")?
+  let helper_digest = hash.sha256(script)?.hex()
+  let input = fp"{root}/input.o"
+  let output = fp"{root}/stub.o"
+  let fake_path = f"{root}:{e"PATH" ?? ""}"
+  input.write("object bytes\n")
+  fp"{root}/llvm-strip".write("#!/bin/sh\n[ \"$EFI_RELOCATION_TEST\" != strip-failure ] || exit 9\nexec /bin/cp \"$4\" \"$3\"\n", mode: 0o755)
+  fp"{root}/llvm-objcopy".write("#!/bin/sh\n[ \"$EFI_RELOCATION_TEST\" != copy-failure ] || exit 9\nexec /bin/cp \"$2\" \"$3\"\n", mode: 0o755)
+  fp"{root}/llvm-objdump".write("""#!/bin/sh
+case "$EFI_RELOCATION_TEST" in
+  absolute) printf '00000000 R_X86_64_64 symbol\\n' ;;
+  failure) exit 9 ;;
+  *) printf '00000000 R_X86_64_PC32 symbol\\n' ;;
+esac
+""", mode: 0o755)
+  let good = run.capture --text PATH=$fake_path EFI_RELOCATION_TEST="relative" $xsh $script "--" $input $output $script $helper_digest
+  assert good.status.ok, good.stderr
+  assert output.read_text()? == "object bytes\n"
+  for kind in ["absolute", "failure", "strip-failure", "copy-failure"] {
+    output.write("unchanged\n")
+    let rejected = run.capture --text PATH=$fake_path EFI_RELOCATION_TEST=$kind $xsh $script "--" $input $output $script $helper_digest
+    assert ! rejected.status.ok
+    assert output.read_text()? == "unchanged\n"
+  }
+  let changed = run.capture --text PATH=$fake_path EFI_RELOCATION_TEST="relative" $xsh $script "--" $input $output $script "wrong-digest"
+  assert ! changed.status.ok
+  assert "helper changed after planning" in changed.stderr
+  assert output.read_text()? == "unchanged\n"
+}
+
 test test_linux_kbuild_modules_parse_and_preserve_job_error_branch [fs, process, env, error] { |ctx|
   let stderr = test.temp_path(ctx, name: "linux-kbuild-jobs.err")
   let xsh = runner()?

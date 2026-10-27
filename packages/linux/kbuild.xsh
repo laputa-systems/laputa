@@ -5483,7 +5483,7 @@ export proc build_scratch_x86_final(
       obj,
     )
 
-    let copy_task = efi_stubcopy_task_x86(obj, stub, [compile_task.name])
+    let copy_task = efi_stubcopy_task_x86(obj, stub, [compile_task.name])?
     tasks += [compile_task]
     tasks += [copy_task]
     stub_objs += [stub]
@@ -5733,8 +5733,16 @@ proc efi_stubcopy_task(input: Path, out: Path, deps: List[Str]) -> make.MakeTask
   }
 }
 
-proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) -> make.MakeTask {
+proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) -> Result[make.MakeTask] {
   let tool_path = host_build_path()
+  let recipe = (e"XSH_PM_RECIPE_DIR" ?? "").trim()
+  if recipe == "" {
+    return Err(ScriptError.Failed(kind: "linux-recipe-helper", message: "missing XSH_PM_RECIPE_DIR for efi-stubcopy.xsh"))
+  }
+  let helper = fp"{recipe}/efi-stubcopy.xsh"
+  if ! helper.exists() {
+    return Err(ScriptError.Failed(kind: "linux-recipe-helper", message: f"missing staged recipe helper: {helper}"))
+  }
 
   {
     name: out.display(),
@@ -5742,14 +5750,17 @@ proc efi_stubcopy_task_x86(input: Path, out: Path, deps: List[Str]) -> make.Make
       out,
     ],
     inputs: [
-      input,
+      input, helper,
     ],
     deps: deps,
     argv: [
-      "llvm-objcopy",
-      "--remove-section=.note.gnu.property",
+      "xsh",
+      helper.display(),
+      "--",
       input.display(),
       out.display(),
+      helper.display(),
+      hash.sha256(helper)?.hex(),
     ],
     cwd: p".",
     env: {
@@ -6759,7 +6770,7 @@ proc assemble_builtin_archive_plan(
           let stub_spec = spec.require(ArchiveStubTaskSpec)?
           let out = fp"{stub_spec.output}"
           let base_task = archive_compile_task_from_spec(stub_spec.base_task)
-          let copy_task = efi_stubcopy_task_x86(fp"{stub_spec.base}", out, [base_task.name])
+          let copy_task = efi_stubcopy_task_x86(fp"{stub_spec.base}", out, [base_task.name])?
           tasks += [base_task, copy_task]
           task_count += 2
           let input_key = path_key(out)
