@@ -212,13 +212,6 @@ directly. See [the Tailscale release](https://github.com/tailscale/tailscale/rel
 [Go's eMudhra fix](https://github.com/golang/go/issues/82345), and
 [Go 1.27.3 Linux root lookup](https://github.com/golang/go/blob/go1.27.3/src/crypto/x509/root_linux.go).
 
-Deno remains at 2.9.7. Laputa sets `DENO_TLS_CA_STORE=system` for login-shell
-applications and declares `ca-certificates` as a runtime-only dependency. As
-of 2026-10-21, Deno's SPKI distrust fix is merged but unreleased. The system
-store removes the retired root, but it does not block cross-signed chains
-with a compromised intermediate key. See [Deno's change](https://github.com/denoland/deno/pull/37046)
-and [TLS store setting](https://docs.deno.com/runtime/reference/env_variables/).
-
 ## Evidence
 
 - `tests/pm/trust_update.xsh`: cryptographic matrix (wrong signer, tampered

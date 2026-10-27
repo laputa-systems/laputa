@@ -165,8 +165,8 @@ and real-hardware enablement remain outside that scope.
 ### LAP-42 · P3 · Track per-consumer enforcement of the distrust policy
 
 - **Area:** Trust consumers
-- **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`, `packages/deno/`
-- **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv, Go-based Tailscale, and Deno each carry their own verifier with distinct distrust behavior.
+- **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`
+- **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv and Go-based Tailscale each carry their own verifier with distinct distrust behavior.
 - **Recommendation:** Qualify each named consumer against the cross-signed fixture pair: blocked intermediate fails, unblocked control succeeds. Record the actual enforcement per consumer instead of assuming file sharing is proof.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
