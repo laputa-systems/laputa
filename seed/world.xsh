@@ -263,28 +263,28 @@ proc world_build(container: WorldContainer, args: WorldArgs) {
 export proc host_pm_plan(repo_url: Str, repo_root: Path, roots: List[Str], target: Str, output: Path) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo_url}) {
     pm_cli.pm_cli_repo_plan({repo: repo_root.display(), all: false, roots, without: [], target, output})
-  }?
+  }
 }
 
 ## Import or build a saved plan in this host process against the mirror.
 export proc host_pm_build(repo_url: Str, input: Path, store: Path, jobs: Int) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo_url}) {
     pm_cli.pm_cli_repo_build({input, store, jobs, logs: p""})
-  }?
+  }
 }
 
 ## Publish a saved plan's verified artifacts in this host process.
 export proc host_pm_publish(repo_url: Str, input: Path, store: Path) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo_url}) {
     pm_cli.pm_cli_repo_publish({input, store})
-  }?
+  }
 }
 
 ## Compose a generation from a saved plan and store in this host process.
 export proc host_pm_compose(repo_url: Str, input: Path, store: Path, runtime_roots: List[Str], output: Path) [fs, net, process, env, time, error] {
   env ({XSH_PM_REPO: repo_url}) {
     pm_cli.pm_cli_root_compose({input, store, runtime_roots, output})
-  }?
+  }
 }
 
 proc world_publish(container: WorldContainer, args: WorldArgs) {
