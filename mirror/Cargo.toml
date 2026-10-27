@@ -16,8 +16,13 @@ serde_json = "1"
 tiny_http = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-h12tiny-client-sync = { version = "0.1.1", features = ["tls"] }
+h12tiny-client-sync = { git = "https://github.com/laputa-systems/h12tiny", rev = "62de2e4666047768db7ec7e37106bd3fc605a901", features = ["tls"] }
 uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+rcgen = "0.14"
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
+rustls-graviola = "0.4"
 
 [profile.dev]
 debug = "line-tables-only"

@@ -28,7 +28,11 @@ impl Reply {
     }
 }
 
-/// One client owns one TLS configuration; building it loads the root store.
+/// One client owns one TLS configuration. The default verifier loads the
+/// host system trust store on first use and refreshes it as the store
+/// changes, so this process-global client observes CA updates without a
+/// restart. A failed refresh fails the handshake rather than reusing stale
+/// trust.
 fn client() -> &'static Client {
     static CLIENT: OnceLock<Client> = OnceLock::new();
     CLIENT.get_or_init(Client::new)

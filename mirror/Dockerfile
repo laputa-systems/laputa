@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM alpine:3.24.1 AS builder
 
-RUN apk add --no-cache musl-dev libgcc
+# git resolves the pinned h12tiny revision; ca-certificates lets cargo and
+# rustup verify TLS when fetching registries and toolchains.
+RUN apk add --no-cache musl-dev libgcc git ca-certificates
 
 ADD https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz /tmp/llvm.tar.xz
 RUN mkdir -p /opt/llvm-musl \
@@ -42,4 +44,8 @@ COPY . .
 RUN cargo +"$MUSL_TOOLCHAIN" build --locked --bins --target x86_64-unknown-linux-musl --release
 
 FROM scratch
+# Build-only artifact image: `mirror-build-x86_64-musl` copies the static
+# binary out of this stage with `--output type=local`. It is never run, so
+# it carries no CA store. Production runs on the Ubuntu host and verifies
+# HTTPS against the host system trust store; no bundle is shipped here.
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/laputa-mirror /
