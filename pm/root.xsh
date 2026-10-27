@@ -790,7 +790,7 @@ export proc compose_artifacts(
     return Err(types.PmError.PackageConflict(f"immutable root {output} already exists"))
   }
 
-  output.parent.mkdir(parents: true)
+  output.parent.mkdir()
   let publication_mode = 0o777.clear_bits(fs.umask()?)
   with staging_root = fs.tempdir_in(output.parent)? {
     let staging_path = staging_root.host_path()?

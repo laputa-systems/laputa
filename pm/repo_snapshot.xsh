@@ -167,7 +167,7 @@ export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[Verifi
 export proc snapshot_load_keys(key_path: Path) [fs, error] -> Result[List[Bytes], Error] {
   guard key_path.exists() else {
     return Err(
-      snapshot_fail(f"no repository snapshot verification key is provisioned at {key_path.display()}; refusing to plan from a production repository"),
+      snapshot_fail(f"no repository snapshot verification key is provisioned at {key_path}; refusing to plan from a production repository"),
     )
   }
 

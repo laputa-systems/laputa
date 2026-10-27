@@ -342,15 +342,15 @@ export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], 
   let recipe = load_recipe_module(fp"{dir}/PKGBUILD.xsh")?
   var diagnostics: List[Str] = []
   if let Ok(value) = recipe.get("name") {
-    let name: Str = value.require()?
+    let name: Str = value
     if name == dir.name { diagnostics += ["name repeats the recipe directory name"] }
   }
   if let Ok(value) = recipe.get("rel") {
-    let rel: Str = value.require()?
+    let rel: Str = value
     if rel == initial_release { diagnostics += ["rel repeats the initial release default"] }
   }
   if let Ok(value) = recipe.get("package_kind") {
-    let kind: Str = value.require()?
+    let kind: Str = value
     if kind == types.package_kind_text(types.package_payload()) { diagnostics += ["package_kind repeats the payload default"] }
   }
   for source in recipe.upstream_sources {

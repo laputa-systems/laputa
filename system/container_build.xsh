@@ -103,7 +103,7 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Resu
 ## container_seed_overlay_trust_store.
 export proc container_seed_overlay_trust_store(overlay: Path, seed_bundle: Path, seed_policy: Path) [fs, error] {
   let generations = fp"{overlay}/var/lib/laputa/trust/generations/1"
-  generations.mkdir(parents: true)
+  generations.mkdir()
   seed_bundle.copy(to: fp"{generations}/ca-certificates.crt", overwrite: true)
   seed_policy.copy(to: fp"{generations}/trust-policy", overwrite: true)
   fp"{generations}/owner".write(bytes.from_text("package-seed\n"))

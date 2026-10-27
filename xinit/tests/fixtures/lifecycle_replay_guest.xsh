@@ -1,5 +1,5 @@
 #!/bin/xsh --
-use pm.generation as generation
+use pm.generation
 error ReplayGuestError = Failed(message: Str)
 
 proc require_disposable_guest() {

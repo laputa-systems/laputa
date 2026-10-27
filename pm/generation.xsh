@@ -720,7 +720,7 @@ export proc compose(
     return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
   }
 
-  output_root.parent.mkdir(parents: true)
+  output_root.parent.mkdir()
   let publication_mode = 0o777.clear_bits(fs.umask()?)
   with staging_root = fs.tempdir_in(output_root.parent)? {
     let staging_path = staging_root.host_path()?

@@ -153,10 +153,10 @@ export proc trust_store_active_present(paths: TrustStorePaths) [fs, error] -> Re
 
 ## trust_store_take_lock.
 export proc trust_store_take_lock(paths: TrustStorePaths) [fs, error] -> Result[FsLock, Error] {
-  paths.store.mkdir(parents: true)
+  paths.store.mkdir()
   match fs.lock(paths.lock_file, shared: false, nonblocking: true) {
     Ok(held) => held,
-    Err(_) => return Err(
+    Err(_) => Err(
       trust_store_fail("another trust update holds the store lock; refusing to run concurrently"),
     ),
   }
@@ -176,7 +176,7 @@ export proc trust_store_read_accepted(paths: TrustStorePaths) [fs, error] -> Res
   text
 }
 
-proc trust_store_write_line_durable(target: Path, line: Str) [fs, error] -> Result[Unit, Error] {
+proc trust_store_write_line_durable(target: Path, line: Str) [fs, error] {
   let sibling = fs.temp_sibling(target)?
   sibling.write(bytes.from_text(line), mode: 0o644)
   fs.fsync(sibling)
@@ -332,8 +332,8 @@ export proc trust_store_stage_candidate(
     return Err(trust_store_fail(f"refusing to stage an invalid generation: {generation}"))
   }
 
-  paths.staging.mkdir(parents: true)
-  fp"{paths.staging}".chmod(0o700)
+  paths.staging.mkdir()
+  paths.staging.chmod(0o700)
 
   let pid = process.current_pid()?
   let base = f"candidate-{generation}-{pid}"
@@ -573,7 +573,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
 
   let dir = trust_store_generation_dir(paths, generation)
   if ! dir.exists() {
-    paths.generations.mkdir(parents: true)
+    paths.generations.mkdir()
     dir.mkdir()
     fp"{dir}/{TRUST_BUNDLE_NAME}".write(seed_bundle)
     fp"{dir}/{TRUST_POLICY_NAME}".write(seed_policy)

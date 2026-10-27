@@ -163,10 +163,10 @@ proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int) [fs, net, error] -> 
   })?
 
   if response.status < 200 or response.status >= 300 {
-    return Err(types.PmError.RemoteIndex(f"failed to fetch repository snapshot {rel.display()}: HTTP {response.status}"))
+    return Err(types.PmError.RemoteIndex(f"failed to fetch repository snapshot {rel}: HTTP {response.status}"))
   }
 
-  response.body.require(Bytes)?
+  response.body
 }
 
 ## Fetches the signed snapshot and the exact index it binds, verifies the
@@ -197,7 +197,7 @@ export proc load_verified_remote_index(
     return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP {index_response.status}"))
   }
 
-  let index_bytes = index_response.body.require(Bytes)?
+  let index_bytes = index_response.body
   let accepted = if state_dir == "" {
     null
   } else {

@@ -204,7 +204,7 @@ pure qmp_retry_operation(operation: QmpRetryOperation) -> QmpOperation {
   }
 }
 
-proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) -> Result[Unit, Error] {
+proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) {
   var argv = [value.python.display(), value.qmp_helper.display(), qmp_mode(operation), socket.display()]
   if let QmpScreenshot(output) = operation {
     argv += [output.display()]
@@ -216,12 +216,12 @@ proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) -> Resul
   Ok()
 }
 
-proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path) -> Result[Unit, Error] {
+proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path) {
   let qmp_operation = qmp_retry_operation(operation)
   var attempt = 0
   while attempt < 20 {
     match qemu_qmp(value, qmp_operation, socket) {
-      Ok(_) => return Ok()
+      Ok(_) => return
       Err(QmpFailure.OutcomeIndeterminate {operation: detail}) => return Err(QmpFailure.OutcomeIndeterminate(detail))
       Err(_) => {
         time.sleep(250ms)

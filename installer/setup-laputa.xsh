@@ -550,7 +550,7 @@ proc seed_target_trust_store(root: Path) {
   write_stdout_line(f"Trust store seeded at generation {generation} from package seeds.")
 }
 
-proc run_installer(argv: List[Str]) [fs, process, time, error, io] -> Result[Unit, Error] {
+proc run_installer(argv: List[Str]) [fs, process, time, error, io] {
   var ci = false
   var auto = false
   var disk_text = ""
@@ -608,7 +608,7 @@ proc run_installer(argv: List[Str]) [fs, process, time, error, io] -> Result[Uni
   install_to_disk(disk, ci)
 }
 
-proc main(...argv: List[Str]) [fs, process, time, env, error, io] -> Result[Unit, Error] {
+proc main(...argv: List[Str]) [fs, process, time, env, error, io] {
   env XSH_LINUX_REAL="1" {
     run_installer(argv)
   }

@@ -1,5 +1,5 @@
 #!/bin/xsh --
-use pm.generation as generation
+use pm.generation
 error ClockGuestError = Failed(message: Str)
 
 type ClockGuestStatus = {state: Str, pid: Int, ready: Bool, restarts: Int}
