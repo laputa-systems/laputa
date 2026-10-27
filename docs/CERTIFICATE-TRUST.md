@@ -67,18 +67,26 @@ symlink onto `generations/<N>`. Around it:
   `generations/<N>`. Committed generations are immutable; a conflicting
   commit with different bytes fails, a byte-identical one is adopted.
 - The journal (`locked → staged → committed → activated → persisted`)
-  records each step. Interrupted runs recover deterministically on the next
-  update, keyed by what survived: staged work with its directory intact is
-  removed; a staged journal whose directory already renamed is adopted by
-  verifying and flipping the committed generation; a committed candidate is
-  re-verified with new-candidate rules (expiry enforced) before flipping; an
-  already-flipped generation rolls forward with bookkeeping verification
-  (signature and digests, no expiry — an expired but correctly activated
-  generation is reconciled, never re-authorized, and new candidates still
-  require fresh expiry). Every recovery step persists the accepted
-  generation and the time lower bound before clearing the journal.
-  Unreadable or unknown journals, active/journal disagreements, and
-  staging/commitment collisions fail closed for manual inspection.
+  records each step. Each phase replacement is an atomic rename, so recovery
+  observes a complete phase, never a torn write from an interrupted
+  transition; a torn journal from any cause fails closed for manual
+  inspection. Interrupted runs recover deterministically on the next
+  update, keyed by what survived: a journal naming a generation below the
+  accepted high-water mark or below an already-active newer generation is
+  rejected before any branch mutates the store; staged work with its
+  directory intact is removed; a staged journal whose directory already
+  renamed is adopted by verifying and flipping the committed generation,
+  with expiry enforced for a candidate that never activated (an
+  already-active generation still rolls forward without re-authorization);
+  a committed candidate is re-verified with new-candidate rules (expiry
+  enforced) before flipping; an already-flipped generation rolls forward
+  with bookkeeping verification (signature and digests, no expiry — an
+  expired but correctly activated generation is reconciled, never
+  re-authorized, and new candidates still require fresh expiry). Every
+  recovery step persists the accepted generation and the time lower bound
+  before clearing the journal. Unreadable or unknown journals,
+  active/journal disagreements, and staging/commitment collisions fail
+  closed for manual inspection.
 - Atomic visibility and power-loss durability are separate claims. The
   active-pointer flip is a single atomic rename: readers never observe a
   half-written pointer. Durability across power loss comes from fsync
@@ -218,8 +226,10 @@ directly. See [the Tailscale release](https://github.com/tailscale/tailscale/rel
   metadata, expiry bounds, digest mismatches, malformed inputs, oversize
   bounds), stale/conflicting re-application, generation advance, lock
   serialization, existing-generation conflicts, time-bound enforcement and
-  persistence, staged/committed/unknown journal recovery, and kill -9 at
-  random points converging on re-run.
+  persistence, staged/committed/unknown journal recovery, stale-journal
+  rejection with zero mutation, monotonic accepted persistence, expired
+  staged-adoption refusal with already-activated roll-forward preserved,
+  torn-journal refusal, and kill -9 at random points converging on re-run.
 - `tests/pm/trust_update_cli.xsh`: entrypoint wiring, usage errors,
   `--url` convergence with `--from`, trickle-download kill with no store
   mutation, and killed-mid-transaction recovery.
@@ -234,7 +244,9 @@ directly. See [the Tailscale release](https://github.com/tailscale/tailscale/rel
   `--from` baked-in release B, reboot, update `--url` from a host fixture
   TLS server at 10.0.2.2, reboot, and replay generation 3; a second test
   SIGKILLs the guest mid-download and requires forward-only recovery to
-  generation 3. Serial markers carry the exact bundle and policy digests,
+  generation 3; a third test crafts a stale generation-1 committed journal on
+  the booted generation-2 store and requires refusal with the store
+  untouched. Serial markers carry the exact bundle and policy digests,
   which the host recomputes from fixtures.
 - `packages/ca-certificates/proof.xsh`: layout, pinned roots, blocked SPKIs,
   provisioned key format, and an actually seeded store.

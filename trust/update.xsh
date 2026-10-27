@@ -414,6 +414,39 @@ proc trust_recover(
     )
   }
 
+  # A stale journal must never roll the store back: reject a generation below
+  # the accepted high-water mark or below an already-active newer generation
+  # before any recovery branch mutates the store.
+  if trust_policy.policy_u64_text_is_valid(journal.generation) {
+    let accepted_floor = match trust_store.trust_store_read_accepted(paths) {
+      Ok(found) => found,
+      Err(_) => "",
+    }
+    if accepted_floor != "" {
+      guard ! trust_policy.policy_u64_is_greater(accepted_floor, journal.generation) else {
+        return Err(
+          update_fail(
+            f"trust journal generation {journal.generation} is behind accepted generation {accepted_floor}; refusing automatic recovery",
+          ),
+        )
+      }
+    }
+
+    let current_active = match trust_store.trust_store_read_active(paths) {
+      Ok(found) => found,
+      Err(_) => "",
+    }
+    if current_active != "" {
+      guard ! trust_policy.policy_u64_is_greater(current_active, journal.generation) else {
+        return Err(
+          update_fail(
+            f"trust journal generation {journal.generation} is behind active generation {current_active}; refusing automatic recovery",
+          ),
+        )
+      }
+    }
+  }
+
   if journal.phase == "locked" or journal.phase == "staged" {
     let staged_path = fp"{paths.store}/{journal.staging}"
     if journal.staging != "" and staged_path.exists()? {
@@ -433,6 +466,22 @@ proc trust_recover(
       }
 
       let verified = trust_verify_committed_bookkeeping(paths, key, journal.generation)?
+      # A committed generation that was never activated is a new candidate:
+      # it must still pass expiry validation. A generation that already
+      # flipped active before the interruption rolls forward without
+      # re-authorization, like the activated-phase branch below.
+      let already_active = match trust_store.trust_store_read_active(paths) {
+        Ok(found) => found == journal.generation,
+        Err(_) => false,
+      }
+      if ! already_active {
+        guard verified.expires_at > now_epoch_seconds else {
+          trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+          trust_store.trust_store_clear_journal(paths)?
+          return Err(update_fail(f"staged trust release has expired: generation {journal.generation}"))
+        }
+      }
+
       trust_store.trust_store_flip_active(paths, journal.generation)?
       trust_store.trust_store_persist_accepted(paths, journal.generation)?
       trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?

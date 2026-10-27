@@ -190,6 +190,17 @@ export proc trust_store_persist_accepted(paths: TrustStorePaths, generation: Str
     return Err(trust_store_fail(f"refusing to persist an invalid accepted generation: {generation}"))
   }
 
+  # The accepted file is the rollback high-water mark: never move it backward.
+  # Re-persisting the current generation is an idempotent no-op.
+  if paths.accepted.exists()? {
+    let current = trust_store_read_accepted(paths)?
+    guard ! trust_policy.policy_u64_is_greater(current, generation) else {
+      return Err(
+        trust_store_fail(f"refusing to roll back the accepted generation from {current} to {generation}"),
+      )
+    }
+  }
+
   trust_store_write_line_durable(paths.accepted, f"{generation}\n")?
 }
 
@@ -247,6 +258,8 @@ export proc trust_store_read_journal(paths: TrustStorePaths) [fs, error] -> Resu
 }
 
 ## trust_store_write_journal.
+## The replacement is atomic: readers observe the previous complete phase or
+## the next one, never a torn write from an interrupted phase transition.
 export proc trust_store_write_journal(
   paths: TrustStorePaths,
   phase: Str,
@@ -254,10 +267,13 @@ export proc trust_store_write_journal(
   staging: Str,
   token: Str,
 ) [fs, error] -> Result[Unit, Error] {
+  let sibling = fs.temp_sibling(paths.journal)?
   json.write(
-    paths.journal,
+    sibling,
     {format: "laputa-trust-journal-1", phase, generation, staging, token},
   )
+  fs.fsync(sibling)?
+  sibling.rename(to: paths.journal, overwrite: true)
   fs.fsync(paths.journal)?
   fs.fsync(paths.journal.parent)?
 }
