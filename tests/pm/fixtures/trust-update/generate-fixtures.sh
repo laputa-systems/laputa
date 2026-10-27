@@ -50,7 +50,7 @@ rm "$ROOT/.r.priv" "$ROOT/.r.spki.der"
 openssl genpkey -algorithm ed25519 -out "$ROOT/.s.priv"
 openssl pkey -in "$ROOT/.s.priv" -pubout -outform DER -out "$ROOT/.s.spki.der"
 tail -c 32 "$ROOT/.s.spki.der" | b64 > "$KEYS/rotation-key.public.base64"
-cp "$ROOT/.s.priv" "$KEYS/.rotation-key.private.tmp"
+cp "$ROOT/.s.priv" "$ROOT/.skey.tmp"
 rm "$ROOT/.s.priv" "$ROOT/.s.spki.der"
 echo "fixture signing keys ready (private halves are NOT committed)"
 
@@ -223,9 +223,9 @@ cat "$TLS/ca-b.crt" >> "$REL_D/ca-certificates.crt"
   echo "root-bundle-sha256 $(sha256hex < "$REL_D/ca-certificates.crt")"
   echo "trust-policy-sha256 $(sha256hex < "$REL_D/trust-policy")"
 } > "$REL_D/metadata"
-openssl pkeyutl -sign -inkey "$KEYS/.rotation-key.private.tmp" -rawin -in "$REL_D/metadata" -out "$REL_D/metadata.sig"
+openssl pkeyutl -sign -inkey "$ROOT/.skey.tmp" -rawin -in "$REL_D/metadata" -out "$REL_D/metadata.sig"
 [ "$(wc -c < "$REL_D/metadata.sig")" = "64" ] || { echo "bad signature length" >&2; exit 1; }
-rm -f "$KEYS/.rotation-key.private.tmp"
+rm -f "$ROOT/.skey.tmp"
 
 # Expiry boundary variants over release B bytes (signed by Q).
 REL_EXP=$OUT/release-expired
