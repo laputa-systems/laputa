@@ -123,7 +123,7 @@ pure clock_millis(nanoseconds: UInt) -> Int {
 }
 
 proc elapsed_now_ms() -> Result[Int] {
-  clock_millis(time.monotonic()?.require(UInt)?)
+  clock_millis(time.monotonic()?.require()?)
 }
 
 proc test_mode() -> Result[Bool] {
@@ -140,8 +140,8 @@ proc fake_pids() -> Result[Bool] {
 
 proc inittab_policy(parsed: Record) -> Result[InittabPolicy] {
   {
-    delay_ms: parsed.get("respawn_delay_ms")?.require(UInt)?,
-    launch_limit: parsed.get("launch_limit")?.require(UInt)?,
+    delay_ms: parsed.get("respawn_delay_ms")?.require()?,
+    launch_limit: parsed.get("launch_limit")?.require()?,
   }
 }
 
@@ -489,25 +489,25 @@ pure field_context(source: Path, field: Str) -> Str {
   f"{source}: field `{field}`"
 }
 
-proc field_str(raw: Record, field: Str, fallback: Str, source: Path, scope: Str = "") -> Result[Str] {
+proc field_str(raw: Record, field: Str, fallback: Str, source: Path, scope = "") -> Result[Str] {
   return fallback when field not in raw
 
   raw.get(field)?.require(Str).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_int(raw: Record, field: Str, fallback: Int, source: Path, scope: Str = "") -> Result[Int] {
+proc field_int(raw: Record, field: Str, fallback: Int, source: Path, scope = "") -> Result[Int] {
   return fallback when field not in raw
 
   raw.get(field)?.require(Int).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_str_list(raw: Record, field: Str, source: Path, scope: Str = "") -> Result[List[Str]] {
+proc field_str_list(raw: Record, field: Str, source: Path, scope = "") -> Result[List[Str]] {
   return [] when field not in raw
 
   raw.get(field)?.require(List[Str]).context("xinit-service", field_context(source, if scope == "" { field } else { f"{scope}.{field}" }))?
 }
 
-proc field_record(raw: Record, field: Str, source: Path, scope: Str = "") -> Result[Record] {
+proc field_record(raw: Record, field: Str, source: Path, scope = "") -> Result[Record] {
   if field not in raw {
     let empty: Record = {}
     return empty
@@ -520,7 +520,7 @@ proc service_field_error(source: Path, field: Str, message: Str) [error] {
   Err(XinitError.Failed(kind: "xinit-service", message: f"{field_context(source, field)}: {message}"))
 }
 
-proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope: Str = "") [error] {
+proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope = "") [error] {
   for field in raw.keys() {
     if field not in fields {
       service_field_error(source, if scope == "" { field } else { f"{scope}.{field}" }, "unknown field")
@@ -537,7 +537,7 @@ proc check_service_name(value: Str, source: Path, field: Str) [error] {
 }
 
 proc check_service_names(values: List[Str], source: Path, field: Str) [error] {
-  var seen: List[Str] = []
+  var seen = []
 
   for value in values {
     check_service_name(value, source, field)
@@ -756,7 +756,7 @@ proc check_service_graph(services: List[Service]) [error] {
   let names = service_names(services)
   let facilities = builtin_facilities()
 
-  var seen: List[Str] = []
+  var seen = []
 
   for service in services {
     if service.name in seen {
@@ -2121,7 +2121,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
-    control(parsed.action, parsed_raw.get("service")?.require(Str)?)
+    control(parsed.action, parsed_raw.get("service")?.require()?)
   } else if parsed.command == "check" {
     if parsed.args.len() > 1 {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit check [SERVICE|PATH]"))
@@ -2137,6 +2137,6 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit INITTAB"))
     }
 
-    run_pid1(parsed_raw.get("inittab")?.require(Path)?, inittab_policy(parsed_raw)?)
+    run_pid1(parsed_raw.get("inittab")?.require()?, inittab_policy(parsed_raw)?)
   }
 }

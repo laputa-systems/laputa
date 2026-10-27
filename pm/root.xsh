@@ -153,7 +153,7 @@ proc root_legacy_package_db_file(
   receipt: types.ArtifactReceipt,
   name: Str,
 ) -> Result[LegacyPackageDbFile] {
-  let rel: RelPath = root_legacy_package_db_path(receipt, name).require(RelPath)?
+  let rel: RelPath = root_legacy_package_db_path(receipt, name).require()?
   let root_handle = fs.open_root(extracted)?
 
   match root_handle.readlink(rel) {
@@ -283,7 +283,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
 }
 
 proc root_verify_entry_at(root: Path, entry: types.ArtifactEntry) {
-  let rel: RelPath = fp"{entry.path}".require(RelPath)?
+  let rel: RelPath = fp"{entry.path}".require()?
   let root_handle = fs.open_root(root)?
 
   if entry.kind == types.file_kind_symlink() {

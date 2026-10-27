@@ -252,7 +252,7 @@ export pure is_local_repo_url(url: Str) -> Bool {
 ## text, or "" on success. `dest` only ever holds complete bytes. net.download
 ## follows redirects itself, so release hosts and mirrors that redirect need no
 ## separate probe.
-export proc download_file(url: Str, dest: Path, timeout: Duration = 1800s) [fs, net, error] -> Result[Str, Error] {
+export proc download_file(url: Str, dest: Path, timeout = 1800s) [fs, net, error] -> Result[Str, Error] {
   dest.parent.mkdir()
 
   if is_file_url(url) {

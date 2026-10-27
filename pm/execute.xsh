@@ -487,7 +487,7 @@ export proc build_plan(
   store_root: Path,
   remote_repo: Str,
   jobs: Int,
-  logs: Path = p"",
+  logs = p"",
 ) [fs, net, process, env, time, error] -> Result[types.BuildResult, Error] {
   build_plan.validate(plan_value)
   build_plan.require_current_build_epoch(plan_value)

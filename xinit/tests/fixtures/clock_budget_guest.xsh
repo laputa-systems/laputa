@@ -16,7 +16,7 @@ proc clock_ms() -> Result[Int] {
 }
 
 proc clock_status(root: Path) -> Result[ClockGuestStatus] {
-  json.read(fp"{root}/run/clock.json")?.require(ClockGuestStatus)?
+  json.read(fp"{root}/run/clock.json")?.require()?
 }
 
 proc wait_state(root: Path, wanted: Str) -> Result[ClockGuestStatus] {

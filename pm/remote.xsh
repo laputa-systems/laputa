@@ -21,7 +21,7 @@ export proc try_fetch_repo_file(
   repo: Str,
   rel: Path,
   dest: Path,
-  timeout: Duration = 1800s,
+  timeout = 1800s,
 ) [fs, net, error] -> Result[Str, Error] {
   util.download_file(util.repo_url_for(repo, rel)?, dest, timeout)?
 }

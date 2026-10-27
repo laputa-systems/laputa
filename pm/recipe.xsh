@@ -298,9 +298,9 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
   let has_filetree_aarch64 = recipe.get("filetree_aarch64") is Ok(_)
   let has_filetree_x86_64 = recipe.get("filetree_x86_64") is Ok(_)
   let has_package_kind = recipe.get("package_kind") is Ok(_)
-  let name: Str = recipe.get("name") ?? pkgbuild.parent.name
+  let name = recipe.get("name") ?? pkgbuild.parent.name
   let ver = recipe.ver
-  let rel: Str = recipe.get("rel") ?? initial_release
+  let rel = recipe.get("rel") ?? initial_release
   let deps = recipe.deps
   let mkdeps_host = recipe.mkdeps_host
   let upstream_sources = recipe.upstream_sources
@@ -340,17 +340,17 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
 ## Reports explicit recipe declarations that equal the loader's defaults.
 export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], Error] {
   let recipe = load_recipe_module(fp"{dir}/PKGBUILD.xsh")?
-  var diagnostics: List[Str] = []
+  var diagnostics = []
   if let Ok(value) = recipe.get("name") {
-    let name: Str = value
+    let name = value
     if name == dir.name { diagnostics += ["name repeats the recipe directory name"] }
   }
   if let Ok(value) = recipe.get("rel") {
-    let rel: Str = value
+    let rel = value
     if rel == initial_release { diagnostics += ["rel repeats the initial release default"] }
   }
   if let Ok(value) = recipe.get("package_kind") {
-    let kind: Str = value
+    let kind = value
     if kind == types.package_kind_text(types.package_payload()) { diagnostics += ["package_kind repeats the payload default"] }
   }
   for source in recipe.upstream_sources {

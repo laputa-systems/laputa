@@ -201,7 +201,7 @@ export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error]
   let proof = fp"{pkg.dir}/proof.xsh"
   let proof_sha256 = if proof.exists() { hash.sha256(proof)?.hex() } else { "missing" }
   let declaration = fp"{pkg.dir}/proof_deps.xsh"
-  var declaration_lines: List[Str] = []
+  var declaration_lines = []
   if declaration.exists() {
     declaration_lines = [f"proof-dependencies\t{hash.sha256(declaration)?.hex()}"]
   }

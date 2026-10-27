@@ -125,7 +125,7 @@ cli main store(...unknown: List[Str]) with {name: "pm store", help: STORE_HELP} 
   }
 }
 
-cli main repo check(repo: Str = "") with {
+cli main repo check(repo = "") with {
   name: "pm repo check",
   help: REPO_HELP,
   parameters: {
@@ -135,7 +135,7 @@ cli main repo check(repo: Str = "") with {
   pm_cli.pm_cli_repo_check({repo: pm_cli.pm_cli_resolve_repo_root(repo)?})
 }
 
-cli main repo plan(output: Path, repo: Str = "", all: Bool = false, roots: List[Str] = [], without: List[Str] = [], target: Str = "") with {
+cli main repo plan(output: Path, repo = "", all = false, roots: List[Str] = [], without: List[Str] = [], target = "") with {
   name: "pm repo plan",
   help: REPO_PLAN_HELP,
   parameters: {
@@ -160,7 +160,7 @@ cli main repo show(input: Path) with {
   pm_cli.pm_cli_repo_show({input})
 }
 
-cli main repo build(input: Path, store: Path, jobs: Int = cpu.count(), logs: Str = "") with {
+cli main repo build(input: Path, store: Path, jobs = cpu.count(), logs = "") with {
   name: "pm repo build",
   help: REPO_HELP,
   parameters: {
@@ -207,7 +207,7 @@ cli main repo publish_snapshot(snapshot_dir: Path) with {
   pm_cli.pm_cli_repo_publish_snapshot({snapshot_dir})
 }
 
-cli main repo checksum(repo: Str = "", ...packages: List[Str]) with {
+cli main repo checksum(repo = "", ...packages: List[Str]) with {
   name: "pm repo checksum",
   help: REPO_HELP,
   parameters: {
@@ -218,7 +218,7 @@ cli main repo checksum(repo: Str = "", ...packages: List[Str]) with {
   pm_cli.pm_cli_repo_checksum({repo, packages})
 }
 
-cli main repo update_checksums(repo: Str = "", ...packages: List[Str]) with {
+cli main repo update_checksums(repo = "", ...packages: List[Str]) with {
   name: "pm repo update-checksums",
   help: REPO_HELP,
   parameters: {
@@ -229,7 +229,7 @@ cli main repo update_checksums(repo: Str = "", ...packages: List[Str]) with {
   pm_cli.pm_cli_repo_update_checksums({repo, packages})
 }
 
-cli main sources fetch(repo: Str = "", all: Bool = false, targets: List[Str] = [], ...packages: List[Str]) with {
+cli main sources fetch(repo = "", all = false, targets: List[Str] = [], ...packages: List[Str]) with {
   name: "pm sources fetch",
   help: SOURCES_HELP,
   parameters: {
@@ -297,14 +297,14 @@ cli main store extract(input: Path, store: Path, package: Str, payload_path: Pat
   pm_cli.pm_cli_store_extract({input, store, package, path: payload_path, output})
 }
 
-cli main repo lint(repo: Str = "") with {
+cli main repo lint(repo = "") with {
   name: "pm repo lint",
   parameters: {repo: {form: "--repo PATH"}},
 } {
   pm_cli.pm_cli_repo_lint(pm_cli.pm_cli_resolve_repo_root(repo)?)
 }
 
-cli main repo outdated(package: Str, github_release: Str, repo: Str = "") with {
+cli main repo outdated(package: Str, github_release: Str, repo = "") with {
   name: "pm repo outdated",
   parameters: {
     package: {form: "PACKAGE"},
@@ -315,7 +315,7 @@ cli main repo outdated(package: Str, github_release: Str, repo: Str = "") with {
   pm_cli.pm_cli_repo_outdated(repo, package, github_release)
 }
 
-cli main repo update_filetree(package: Str, input: Path, store_root: Path, repo: Str = "") with {
+cli main repo update_filetree(package: Str, input: Path, store_root: Path, repo = "") with {
   name: "pm repo update-filetree",
   parameters: {
     package: {form: "PACKAGE"},

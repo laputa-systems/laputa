@@ -595,7 +595,7 @@ proc emit_dynamic_state(
   jobs_count: Int,
   peak_running: Int,
   idle_intervals: Int,
-  task: Str = "",
+  task = "",
 ) {
   let task_suffix = if task == "" { "" } else { f" task={task}" }
   make_progress(
