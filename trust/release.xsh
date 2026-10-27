@@ -25,7 +25,9 @@ export type TrustGenerationTarget = {
 ## Signed trust release validation failed.
 export error ReleaseError = InvalidData(message: Str)
 
-type VerifiedTrustRelease = {
+## A verified trust release: the exact bytes to activate.
+## VerifiedTrustRelease.
+export type VerifiedTrustRelease = {
   root_bundle: Bytes,
   trust_policy: Bytes,
 }
@@ -56,7 +58,8 @@ pure release_sha256_is_valid(value: Str) -> Bool {
   value.byte_len() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
 }
 
-proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, Error] {
+## Parses one exact signed-release metadata document.
+export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, Error] {
   release_require(! message.is_empty() and message.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
   let text = message.utf8()?
   release_require(text.ends_with("\n") and "\r" not in text, "signed metadata must use LF-terminated UTF-8 lines")
@@ -94,7 +97,9 @@ proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, E
   }
 }
 
-proc release_verify(input: SignedReleaseInput) [error] -> Result[VerifiedTrustRelease, Error] {
+## Verifies one signed release against the installed snapshot.
+## release_verify.
+export proc release_verify(input: SignedReleaseInput) [error] -> Result[VerifiedTrustRelease, Error] {
   release_require(input.provisioned_public_key.len() == 32, "a provisioned 32-byte Laputa trust public key is required")
   release_require(input.signature.len() == 64, "trust release signature must contain 64 raw Ed25519 bytes")
   release_require(! input.metadata.is_empty() and input.metadata.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
