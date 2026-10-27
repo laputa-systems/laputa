@@ -390,6 +390,22 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
     assert ! fp"{reuse_logs}/{name}.log".exists()?
   }
 
+  let app_recipe = fp"{repo_root}/packages/execute-app/PKGBUILD.xsh"
+  app_recipe.write(app_recipe.read_text()?.replace("application v1\\n", with: "application v2\\n"))?
+  let app_plan = resolve_execute_plan(repo_root)?
+  let app_logs = test.temp_dir(ctx, name: "execute-count-app")?
+  let app_rebuilt = execute.build_plan(app_plan, repo_root, object_store, "", 2, app_logs)?
+  assert app_rebuilt.artifacts.len() == 3
+  for name in ["execute-dep", "execute-tool"] {
+    assert ! fp"{app_logs}/{name}.log".exists()?
+    assert receipt_named(app_rebuilt, name)? == receipt_named(first, name)?
+  }
+  assert fp"{app_logs}/execute-app.log".read_text()?.split("build-hook:execute-app").len() == 2
+  let old_app = receipt_named(first, "execute-app")?
+  let new_app = receipt_named(app_rebuilt, "execute-app")?
+  assert old_app.key != new_app.key
+  assert old_app.payload_sha256 != new_app.payload_sha256
+
   let recipe = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
   recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))?
   let changed = resolve_execute_plan(repo_root)?
