@@ -72,6 +72,13 @@ export LAPUTA_TOKEN=<token_from_settings>
 
 The local mirror (`make mirror`) needs no token.
 
+## Outbound HTTPS trust
+
+Production outbound HTTPS (R2/S3 and JWKS) uses the host operating-system
+trust store with no bundled roots; see the
+[deployment guide](../docs/MIRROR-DEPLOYMENT.md#outbound-tls-trust) for the
+host requirement, refresh behavior, and the exact TLS dependency closure.
+
 ## Frontend and passkey demo
 
 `make mirror-frontend` installs pnpm through Deno at `PNPM_VERSION` (default

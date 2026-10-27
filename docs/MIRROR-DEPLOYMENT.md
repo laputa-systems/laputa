@@ -21,6 +21,34 @@ The deployment installs immutable releases under `/opt/laputa-mirror/releases/`
 and switches the `/opt/laputa-mirror/current` symlink to activate one. Database
 and upload state stay under `/var/lib/laputa-mirror/`.
 
+## Outbound TLS trust
+
+Outbound HTTPS (R2/S3 API calls and JWKS retrieval) verifies against the
+host operating-system trust store; the mirror ships no root bundle. The
+Ubuntu service host needs its normal system CA store readable
+(`/etc/ssl/certs/ca-certificates.crt` via the `ca-certificates` package,
+the default on Ubuntu). No private CA configuration, file mounts, or
+elevated file access are needed for ordinary HTTPS. The bundled container
+stage in `mirror/Dockerfile` is build-only and never runs; production is
+the musl binary on the Ubuntu host.
+
+Trust refreshes without a restart: the client reloads the store when its
+files change and fails closed when the store becomes unreadable, empty, or
+invalid. The October 2026 eMudhra compromise is mitigated at the verifier
+level (`rustls-webpki 0.103.16` rejects the distrusted intermediate keys
+even under alternative trust anchors), so rotating the host store and
+keeping the verifier patched are independent layers.
+
+Resolved production TLS closure (from `cargo tree -e normal` on `mirror`):
+
+- `h12tiny-client-sync 0.5.0` (pinned h12tiny revision, `tls` feature)
+- `h12tiny-tls-system 0.5.0`, `h12tiny-client-normalize 0.5.0`
+- `rustls 0.23.45` with the explicit Graviola provider; no OpenSSL,
+  native-tls, ring, or AWS-LC backend
+- `rustls-webpki 0.103.16`, `rustls-native-certs 0.8.5`,
+  `openssl-probe 0.2.2` (path discovery only)
+- No `webpki-roots` in the normal dependency graph
+
 ## One-time prerequisites
 
 The deployment host must be x86_64 Linux with systemd 247 or newer, SSH access
