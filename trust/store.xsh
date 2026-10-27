@@ -145,20 +145,22 @@ export proc trust_store_has_store(paths: TrustStorePaths) [fs, error] -> Result[
 ## Whether the active generation pointer exists as a symlink.
 ## trust_store_active_present.
 export proc trust_store_active_present(paths: TrustStorePaths) [fs, error] -> Result[Bool, Error] {
-  match paths.active.is_symlink() {
-    Ok(present) => Ok(present),
-    Err(_) => Ok(false),
+  if let Ok(present) = paths.active.is_symlink() {
+    Ok(present)
+  } else {
+    Ok(false)
   }
 }
 
 ## trust_store_take_lock.
 export proc trust_store_take_lock(paths: TrustStorePaths) [fs, error] -> Result[FsLock, Error] {
   paths.store.mkdir()
-  match fs.lock(paths.lock_file, shared: false, nonblocking: true) {
-    Ok(held) => held,
-    Err(_) => Err(
+  if let Ok(held) = fs.lock(paths.lock_file, shared: false, nonblocking: true) {
+    held
+  } else {
+    Err(
       trust_store_fail("another trust update holds the store lock; refusing to run concurrently"),
-    ),
+    )
   }
 }
 
@@ -251,9 +253,10 @@ export proc trust_store_read_journal(paths: TrustStorePaths) [fs, error] -> Resu
     }
   }
 
-  match parsed {
-    Ok(record) => Ok(record),
-    Err(_) => Ok({present: true, phase: "unknown", generation: "", staging: "", token: ""}),
+  if let Ok(record) = parsed {
+    Ok(record)
+  } else {
+    Ok({present: true, phase: "unknown", generation: "", staging: "", token: ""})
   }
 }
 

@@ -246,18 +246,14 @@ export proc collect_archive_paths(
         include = true
       }
 
-      if include {
-        yield entry.path.strip_prefix(root)?
-      }
+      yield entry.path.strip_prefix(root)? when include
     }
 
     for entry in filetree {
       if entry.kind == types.file_kind_tree() {
         let tree = fp"{root}/{entry.path}"
 
-        if dir_empty(tree) {
-          yield entry.path
-        }
+        yield entry.path when dir_empty(tree)
       }
     }
   }

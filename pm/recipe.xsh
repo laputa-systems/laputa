@@ -343,12 +343,12 @@ export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], 
   let diagnostics = collect {
     if let Ok(value) = recipe.get("name") {
       let name = value
-      if name == dir.name { yield "name repeats the recipe directory name" }
+      yield "name repeats the recipe directory name" when name == dir.name
     }
 
     if let Ok(value) = recipe.get("rel") {
       let rel = value
-      if rel == initial_release { yield "rel repeats the initial release default" }
+      yield "rel repeats the initial release default" when rel == initial_release
     }
 
     if let Ok(value) = recipe.get("package_kind") {
