@@ -340,29 +340,38 @@ proc decode_metadata(pkgbuild: Path) -> Result[PackageMetadata] {
 ## Reports explicit recipe declarations that equal the loader's defaults.
 export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], Error] {
   let recipe = load_recipe_module(fp"{dir}/PKGBUILD.xsh")?
-  var diagnostics = []
-  if let Ok(value) = recipe.get("name") {
-    let name = value
-    if name == dir.name { diagnostics += ["name repeats the recipe directory name"] }
-  }
-  if let Ok(value) = recipe.get("rel") {
-    let rel = value
-    if rel == initial_release { diagnostics += ["rel repeats the initial release default"] }
-  }
-  if let Ok(value) = recipe.get("package_kind") {
-    let kind = value
-    if kind == types.package_kind_text(types.package_payload()) { diagnostics += ["package_kind repeats the payload default"] }
-  }
-  for source in recipe.upstream_sources {
-    if let Ok(value) = source.get("architectures") {
-      let architectures: List[Str] = value.require()?
-      if architectures == [neutral_source_architecture] { diagnostics += ["upstream_sources.architectures repeats the architecture-neutral default"] }
+  let diagnostics = collect {
+    if let Ok(value) = recipe.get("name") {
+      let name = value
+      if name == dir.name { yield "name repeats the recipe directory name" }
     }
-    let checksums: List[Record] = source.get("checksums")?.require()?
-    for checksum in checksums {
-      if let Ok(value) = checksum.get("arch") {
-        let arch: Str = value.require()?
-        if arch == neutral_source_architecture { diagnostics += ["upstream_sources.checksums.arch repeats the architecture-neutral default"] }
+
+    if let Ok(value) = recipe.get("rel") {
+      let rel = value
+      if rel == initial_release { yield "rel repeats the initial release default" }
+    }
+
+    if let Ok(value) = recipe.get("package_kind") {
+      let kind = value
+      if kind == types.package_kind_text(types.package_payload()) { yield "package_kind repeats the payload default" }
+    }
+
+    for source in recipe.upstream_sources {
+      if let Ok(value) = source.get("architectures") {
+        let architectures: List[Str] = value.require()?
+        if architectures == [neutral_source_architecture] {
+          yield "upstream_sources.architectures repeats the architecture-neutral default"
+        }
+      }
+
+      let checksums: List[Record] = source.get("checksums")?.require()?
+      for checksum in checksums {
+        if let Ok(value) = checksum.get("arch") {
+          let arch: Str = value.require()?
+          if arch == neutral_source_architecture {
+            yield "upstream_sources.checksums.arch repeats the architecture-neutral default"
+          }
+        }
       }
     }
   }

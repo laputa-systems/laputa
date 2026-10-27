@@ -38,41 +38,41 @@ pure edge_key(from: Str, to: Str) -> Str {
 }
 
 pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.DependencyEdge] {
-  var result: List[types.DependencyEdge] = []
-
-  for dependency in pkg.deps {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-      types.dependency_bootstrap()
-    } else {
-      types.dependency_runtime()
+  let result: List[types.DependencyEdge] = collect {
+    for dependency in pkg.deps {
+      let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+        types.dependency_bootstrap()
+      } else {
+        types.dependency_runtime()
+      }
+      yield {from: pkg.name, to: dependency, kind}
     }
-    result += [{from: pkg.name, to: dependency, kind}]
-  }
 
-  for dependency in pkg.runtime_only_deps {
-    result += [{from: pkg.name, to: dependency, kind: types.dependency_runtime_only()}]
-  }
-
-  for dependency in pkg.mkdeps_host {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-      types.dependency_bootstrap()
-    } else {
-      types.dependency_build_host()
+    for dependency in pkg.runtime_only_deps {
+      yield {from: pkg.name, to: dependency, kind: types.dependency_runtime_only()}
     }
-    result += [{from: pkg.name, to: dependency, kind}]
-  }
 
-  for dependency in pkg.proof_deps {
-    result += [{from: pkg.name, to: dependency, kind: types.dependency_proof()}]
-  }
-
-  for dependency in pkg.mkdeps_target {
-    let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-      types.dependency_bootstrap()
-    } else {
-      types.dependency_build_target()
+    for dependency in pkg.mkdeps_host {
+      let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+        types.dependency_bootstrap()
+      } else {
+        types.dependency_build_host()
+      }
+      yield {from: pkg.name, to: dependency, kind}
     }
-    result += [{from: pkg.name, to: dependency, kind}]
+
+    for dependency in pkg.proof_deps {
+      yield {from: pkg.name, to: dependency, kind: types.dependency_proof()}
+    }
+
+    for dependency in pkg.mkdeps_target {
+      let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
+        types.dependency_bootstrap()
+      } else {
+        types.dependency_build_target()
+      }
+      yield {from: pkg.name, to: dependency, kind}
+    }
   }
 
   result

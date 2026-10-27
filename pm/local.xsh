@@ -236,27 +236,28 @@ export proc collect_archive_paths(
   root: Path,
   filetree: List[types.FileTreeEntry],
 ) [fs, error] -> Result[List[Path], Error] {
-  var entries: List[Path] = []
   let root_text = root.display()
 
-  for entry in fs.walk(root) {
-    var include = entry.kind == "file" or entry.kind == "symlink"
+  let entries: List[Path] = collect {
+    for entry in fs.walk(root) {
+      var include = entry.kind == "file" or entry.kind == "symlink"
 
-    if entry.kind == "dir" and entry.path.display() != root_text and dir_empty(entry.path) {
-      include = true
+      if entry.kind == "dir" and entry.path.display() != root_text and dir_empty(entry.path) {
+        include = true
+      }
+
+      if include {
+        yield entry.path.strip_prefix(root)?
+      }
     }
 
-    if include {
-      entries += [entry.path.strip_prefix(root)?]
-    }
-  }
+    for entry in filetree {
+      if entry.kind == types.file_kind_tree() {
+        let tree = fp"{root}/{entry.path}"
 
-  for entry in filetree {
-    if entry.kind == types.file_kind_tree() {
-      let tree = fp"{root}/{entry.path}"
-
-      if dir_empty(tree) {
-        entries += [entry.path]
+        if dir_empty(tree) {
+          yield entry.path
+        }
       }
     }
   }

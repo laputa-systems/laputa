@@ -79,23 +79,21 @@ proc repo_verified_proof_path(store_root: Path, node: types.PlanNode, receipt: t
 ## Selects every BuildPlan node from verified immutable Store receipts without building or resolving a remote index.
 export proc snapshot(value: types.BuildPlan, store_root: Path) [fs, error] -> Result[types.RepoSnapshot, Error] {
   build_plan.validate(value)
-  var packages: List[types.RepoPublication] = []
-
-  for node in value.nodes {
-    let receipt = store.verify_artifact(store_root, node.artifact_key)?
-    repo_verify_node_receipt(value, node, receipt)
-    let kind = repo_package_kind(receipt, node)?
-    let proof = repo_verified_proof_path(store_root, node, receipt)?
-    packages += [
-      {
+  let packages: List[types.RepoPublication] = collect {
+    for node in value.nodes {
+      let receipt = store.verify_artifact(store_root, node.artifact_key)?
+      repo_verify_node_receipt(value, node, receipt)
+      let kind = repo_package_kind(receipt, node)?
+      let proof = repo_verified_proof_path(store_root, node, receipt)?
+      yield {
         node,
         receipt,
         payload: fp"{receipt.artifact_dir}/payload.tar.gz",
         metadata: fp"{receipt.artifact_dir}/metadata.json",
         proof,
         kind,
-      },
-    ]
+      }
+    }
   }
 
   {format: "laputa-repo-snapshot-1", target: value.target, plan_sha256: value.plan_sha256, packages}

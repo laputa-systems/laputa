@@ -321,87 +321,88 @@ export proc resolve(
   let levels = graph.topological_levels(selected_names, edges)?
   let recipe_inputs = recipe_build_inputs(value, policy.target)?
   let repository_digest = repository_fingerprint(policy.target, recipe_inputs)?
-  var nodes: List[types.PlanNode] = []
   var keys: Map[Str] = {}
   var actions: Map[types.PlanAction] = {}
   var level = 0
 
-  for names in levels {
-    for name in names {
-      let pkg = packages.get(name)?
-      let source_pkg = absolute_recipe_package(value, pkg)?
-      let recipe_dir = durable_recipe_dir(value, pkg)?
-      let package_id = util.package_id(pkg.name, pkg.ver, pkg.rel)
-      let dependencies = dependency_nodes(name, edges, selected, keys)?
-      let recipe_sha256 = recipe_inputs.get(name)?
-      let proof_sha256 = pm_fingerprint.package_proof_input(value.root, source_pkg)?
-      let local_artifact_key = artifact_key_for(
-        policy.target,
-        policy.build_epoch,
-        package_id,
-        recipe_sha256,
-        dependencies,
-      )?
-      let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256, dependencies)?
-      let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
-      let artifact_key = local_artifact_key
-      var action: types.PlanAction = types.plan_action_build("new package")
-      var remote: types.RemoteRetrieval? = null
+  let nodes: List[types.PlanNode] = collect {
+    for names in levels {
+      for name in names {
+        let pkg = packages.get(name)?
+        let source_pkg = absolute_recipe_package(value, pkg)?
+        let recipe_dir = durable_recipe_dir(value, pkg)?
+        let package_id = util.package_id(pkg.name, pkg.ver, pkg.rel)
+        let dependencies = dependency_nodes(name, edges, selected, keys)?
+        let recipe_sha256 = recipe_inputs.get(name)?
+        let proof_sha256 = pm_fingerprint.package_proof_input(value.root, source_pkg)?
+        let local_artifact_key = artifact_key_for(
+          policy.target,
+          policy.build_epoch,
+          package_id,
+          recipe_sha256,
+          dependencies,
+        )?
+        let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256, dependencies)?
+        let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
+        let artifact_key = local_artifact_key
+        var action: types.PlanAction = types.plan_action_build("new package")
+        var remote: types.RemoteRetrieval? = null
 
-      let candidate = find_remote(snapshot, name)?
+        let candidate = find_remote(snapshot, name)?
 
-      if candidate != null {
-        let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
+        if candidate != null {
+          let tuple_order = plan_compare_version_release(pkg.ver, pkg.rel, candidate.ver, candidate.rel)
 
-        if tuple_order < 0 {
-          return Err(
-            types.PmError.PackageContract(
-              f"{name} declares {util.version_id(pkg.ver, pkg.rel)} behind remote {util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
-            ),
-          )
-        }
-
-        if tuple_order > 0 {
-          let reason = if pkg.ver != candidate.ver {
-            f"local version differs from remote {util.version_id(candidate.ver, candidate.rel)}"
-          } else {
-            f"local release is above remote {util.version_id(candidate.ver, candidate.rel)}"
+          if tuple_order < 0 {
+            return Err(
+              types.PmError.PackageContract(
+                f"{name} declares {util.version_id(pkg.ver, pkg.rel)} behind remote {util.version_id(candidate.ver, candidate.rel)}; bump PKGBUILD.xsh rel explicitly",
+              ),
+            )
           }
-          action = types.plan_action_build(reason)
-        } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
-          action = types.plan_action_reuse_remote("exact remote artifact")
-          remote = candidate.retrieval
-        } else if ! changed_dependencies.is_empty() {
-          action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
-        } else if candidate.artifact_key != "" {
-          action = types.plan_action_build("remote artifact identity differs")
-        } else {
-          action = types.plan_action_build("remote artifact lacks semantic build identity")
+
+          if tuple_order > 0 {
+            let reason = if pkg.ver != candidate.ver {
+              f"local version differs from remote {util.version_id(candidate.ver, candidate.rel)}"
+            } else {
+              f"local release is above remote {util.version_id(candidate.ver, candidate.rel)}"
+            }
+            action = types.plan_action_build(reason)
+          } else if remote_is_exact(candidate, recipe_sha256, proof_sha256, local_artifact_key, local_proof_key) {
+            action = types.plan_action_reuse_remote("exact remote artifact")
+            remote = candidate.retrieval
+          } else if ! changed_dependencies.is_empty() {
+            action = types.plan_action_build(f"dependencies rebuilt ({changed_dependencies.join(", ")})")
+          } else if candidate.artifact_key != "" {
+            action = types.plan_action_build("remote artifact identity differs")
+          } else {
+            action = types.plan_action_build("remote artifact lacks semantic build identity")
+          }
         }
+
+        let proof_key = proof_key_for(package_id, artifact_key, proof_sha256, dependencies)?
+        let node = {
+          name: pkg.name,
+          ver: pkg.ver,
+          rel: pkg.rel,
+          package_id,
+          recipe_dir,
+          recipe_sha256,
+          proof_sha256,
+          artifact_key,
+          proof_key,
+          action,
+          level,
+          dependencies,
+          remote,
+        }
+        keys[name] = artifact_key
+        actions[name] = action
+        yield node
       }
 
-      let proof_key = proof_key_for(package_id, artifact_key, proof_sha256, dependencies)?
-      let node = {
-        name: pkg.name,
-        ver: pkg.ver,
-        rel: pkg.rel,
-        package_id,
-        recipe_dir,
-        recipe_sha256,
-        proof_sha256,
-        artifact_key,
-        proof_key,
-        action,
-        level,
-        dependencies,
-        remote,
-      }
-      keys[name] = artifact_key
-      actions[name] = action
-      nodes += [node]
+      level += 1
     }
-
-    level += 1
   }
 
   let bare = {
