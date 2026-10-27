@@ -817,6 +817,69 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
   assert calls.read_text()? == "first\nsecond\nfirst\nsecond\n"
 }
 
+test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-efi-stub-plan")?
+  let cache = test.temp_dir(ctx, name: "linux-efi-stub-cache")?
+  let worker = path.absolute(p"packages/linux/kbuild-archive-analysis-worker.xsh")?
+  let xsh_bin = process.which("xsh")?
+  fp"{root}/drivers/firmware/efi/libstub".mkdir()
+  fp"{root}/lib".mkdir()
+  fp"{root}/.config".write("CONFIG_X86=y\n")
+  fp"{root}/drivers/firmware/efi/libstub/Makefile".write("CFLAGS_gop.o := -DGOP_FLAG\n")
+  fp"{root}/drivers/firmware/efi/libstub/gop.c".write("int gop(void) { return 0; }\n")
+  fp"{root}/lib/ctype.c".write("int ctype(void) { return 0; }\n")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p".", p"drivers/firmware/efi/libstub"], objects: [],
+    lib_objects: [p"drivers/firmware/efi/libstub/gop.stub.o", p"drivers/firmware/efi/libstub/lib-ctype.stub.o",
+      p"drivers/firmware/efi/libstub/missing.stub.o"],
+    archive_owners: [], composites: [], unsupported: [],
+  )
+  cd root {
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    assert archive_plan.missing_sources == [p"drivers/firmware/efi/libstub/missing.stub.o"]
+    let parallel = test_builtin_archive_plan_with_workers(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
+    assert parallel.missing_sources == archive_plan.missing_sources
+    assert parallel.task_count == archive_plan.task_count
+    assert parallel.link_inputs == archive_plan.link_inputs
+    for index in range(archive_plan.tasks.len()) {
+      assert parallel.tasks[index].name == archive_plan.tasks[index].name
+      assert parallel.tasks[index].deps == archive_plan.tasks[index].deps
+      assert make.argv_text(parallel.tasks[index].argv)? == make.argv_text(archive_plan.tasks[index].argv)?
+    }
+    env ({XSH_LINUX_KBUILD_ARCHIVE_ONLY: "1"}) {
+      let compact = test_builtin_archive_plan_with_workers(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
+      assert compact.task_count == archive_plan.task_count
+      assert compact.link_inputs == archive_plan.link_inputs
+      assert compact.missing_sources == archive_plan.missing_sources
+    }
+    let other_arch = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    assert other_arch.missing_sources == plan.lib_objects
+    for stem in ["gop", "lib-ctype"] {
+      let base = f".xsh-kbuild/obj/drivers/firmware/efi/libstub/{stem}.o"
+      let output = f".xsh-kbuild/obj/drivers/firmware/efi/libstub/{stem}.stub.o"
+      var saw_compile = false
+      var saw_copy = false
+      for task in archive_plan.tasks {
+        if task.name == base {
+          saw_compile = true
+          let argv = make.argv_text(task.argv)?
+          assert "-fPIC" in argv
+          assert "-fpie" not in argv
+          if stem == "gop" { assert "-DGOP_FLAG" in argv }
+          let expected = if stem == "gop" { p"drivers/firmware/efi/libstub/gop.c" } else { p"lib/ctype.c" }
+          assert expected in task.inputs
+        }
+        if task.name == output {
+          saw_copy = true
+          assert task.deps == [base]
+          assert make.argv_text(task.argv)? == ["llvm-objcopy", "--remove-section=.note.gnu.property", base, output]
+        }
+      }
+      assert saw_compile and saw_copy
+    }
+  }
+}
+
 test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-missing")?
   let cache = test.temp_dir(ctx, name: "linux-missing-cache")?
@@ -1303,6 +1366,15 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
     cd root {
       let first = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" in first.missing_sources
+      for fingerprint in [p".xsh-kbuild-archive-plan.fingerprint", fp"{cache}/linux-x86.archive-plan.fingerprint"] {
+        let current = fingerprint.read_text()?
+        let legacy = current.replace("linux-archive-plan-cache-v3", with: "linux-archive-plan-cache-v2")
+        assert legacy != current
+        fingerprint.write(legacy)
+      }
+      let rebuilt = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      assert p"foo.o" in rebuilt.missing_sources
+      assert "linux-archive-plan-cache-v3" in p".xsh-kbuild-archive-plan.fingerprint".read_text()?
       p"foo.c".write("int foo(void) { return 0; }\n")
       let second = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" not in second.missing_sources

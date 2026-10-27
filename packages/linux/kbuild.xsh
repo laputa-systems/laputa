@@ -128,6 +128,8 @@ type ArchiveCompileTaskSpec = {source: Str, output: Str, argv: List[Str], depfil
 
 type ArchivePiTaskSpec = {base: Str, output: Str, base_task: ArchiveCompileTaskSpec}
 
+type ArchiveStubTaskSpec = {base: Str, output: Str, base_task: ArchiveCompileTaskSpec}
+
 type CompileFlagsCache = {format: Str, fingerprint: Str, flags: List[CompileFlagsEntry]}
 
 type LocalRecordCache = {format: Str, key: Str, records: List[ScanRecord]}
@@ -3468,7 +3470,17 @@ proc source_for_object(obj: Path) -> Result[Path] {
   Err(ScriptError.Failed(kind: "kbuild-missing-source", message: f"missing source for {obj}"))
 }
 
-proc archive_item_sources(item: ArchiveAnalysisItem) -> Result[PreparedArchiveItem] {
+pure is_x86_efi_stub(obj: Path, library: Bool, triple: Str) -> Bool {
+  let key = path_key(obj)
+  triple == "x86_64-linux-gnu" and library and
+    path_key(object_dir(obj)) == "drivers/firmware/efi/libstub" and key.ends_with(".stub.o")
+}
+
+pure efi_stub_base_object(obj: Path) -> Path {
+  fp"{path_key(obj).replace(".stub.o", with: ".o")}"
+}
+
+proc archive_item_sources(item: ArchiveAnalysisItem, triple: Str) -> Result[PreparedArchiveItem] {
   var source = ""
   var members: List[Str] = []
   var output_exists = false
@@ -3483,6 +3495,12 @@ proc archive_item_sources(item: ArchiveAnalysisItem) -> Result[PreparedArchiveIt
   } else if item.pi {
     let found = pi_source(fp"{item.object}")
     source = path_key(found) when found.exists()
+  } else if is_x86_efi_stub(fp"{item.object}", item.library, triple) {
+    if let Ok(found) = source_for_object(efi_stub_base_object(fp"{item.object}")) {
+      source = path_key(found)
+    } else {
+      output_exists = obj_out_path(fp"{item.object}").exists()?
+    }
   } else if let Ok(found) = source_for_object(fp"{item.object}") {
     source = path_key(found)
   } else {
@@ -4090,9 +4108,10 @@ pure is_pi_object(obj: Path) -> Bool {
   path_key(obj).ends_with(".pi.o")
 }
 
-pure archive_object_cflags_from_extra(cflags: List[Str], extra_flags: List[Str], obj: Path) -> List[Str] {
+pure archive_object_cflags_from_extra(cflags: List[Str], extra_flags: List[Str], obj: Path, triple: Str) -> List[Str] {
   let base = cflags.extend(extra_flags)
   if path_key(obj).starts_with("drivers/firmware/efi/libstub/") {
+    return efi_libstub_cflags_x86(base) when triple == "x86_64-linux-gnu"
     return efi_libstub_cflags(base)
   }
 
@@ -6154,6 +6173,7 @@ pure archive_analysis_record_for_object(
   owner: Path,
   library: Bool,
   pi: Bool,
+  triple: Str,
   composites_by_object: Map[CompositeObject],
   compile_flags_by_dir: Map[Map[List[Str]]],
 ) -> ArchiveAnalysisItem {
@@ -6177,7 +6197,9 @@ pure archive_analysis_record_for_object(
     }
   }
 
-  let flags_object = if pi { pi_base_object(obj) } else { obj }
+  let flags_object = if pi { pi_base_object(obj) } else if is_x86_efi_stub(obj, library, triple) {
+    efi_stub_base_object(obj)
+  } else { obj }
   {
     object: key,
     owner: path_key(owner),
@@ -6193,6 +6215,7 @@ pure archive_analysis_record_for_object(
 proc archive_analysis_items(
   plan: KbuildPlan,
   config: Kconfig,
+  triple: Str,
   compile_flags_by_dir: Map[Map[List[Str]]],
 ) -> Result[List[PreparedArchiveItem]] {
   let maps_start = archive_plan_timing_start("item-maps")
@@ -6214,6 +6237,7 @@ proc archive_analysis_items(
         archive_owner_key(archive_owner_by_object, obj),
         false,
         is_pi_object(obj),
+        triple,
         composites_by_object,
         compile_flags_by_dir,
       )
@@ -6226,6 +6250,7 @@ proc archive_analysis_items(
         archive_owner_key(archive_owner_by_object, obj),
         true,
         false,
+        triple,
         composites_by_object,
         compile_flags_by_dir,
       )
@@ -6234,7 +6259,7 @@ proc archive_analysis_items(
 
   archive_plan_timing_done("item-objects", object_items_start)
 
-  [archive_item_sources(item)? for item in items]
+  [archive_item_sources(item, triple)? for item in items]
 }
 
 ## Capture archive items, compile flags and source selections for a plan.
@@ -6250,7 +6275,7 @@ export proc prepare_archive_analysis(plan: KbuildPlan, triple: Str) [fs, env, ti
       "arm64"
     },
   )?
-  {plan: plan, triple: triple, items: archive_analysis_items(plan, config, compile_flags_by_dir)?}
+  {plan: plan, triple: triple, items: archive_analysis_items(plan, config, triple, compile_flags_by_dir)?}
 }
 
 pure archive_analysis_result(
@@ -6295,7 +6320,7 @@ proc archive_compile_task_spec(
   emit_task_specs: Bool,
 ) [error] -> Result[Record] {
   if emit_task_specs {
-    let compile_cflags = pi_compile_cflags(archive_object_cflags_from_extra(cflags, extra_flags, object), out) |> object_compile_cflags(
+    let compile_cflags = pi_compile_cflags(archive_object_cflags_from_extra(cflags, extra_flags, object, triple), out) |> object_compile_cflags(
       _,
       out,
     )
@@ -6434,6 +6459,18 @@ proc analyze_archive_items_impl(
       } else {
         generated_objects += [obj]
       }
+    } else if is_x86_efi_stub(obj, library, triple) and item.source != "" {
+      let base_object = efi_stub_base_object(obj)
+      let base_out = obj_out_path(base_object)
+      let out = obj_out_path(obj)
+      let base_task_spec = archive_compile_task_spec(
+        base_object, fp"{item.source}", base_out, base_out, flags, cc, triple,
+        cflags, defs, includes, emit_task_specs,
+      )?
+      task_specs += [{kind: "efi-stub", base: base_out.display(), output: out.display(), base_task: base_task_spec}]
+      task_count += 2
+      archive_outputs += [out]
+      archive_deps += [out.display()]
     } else {
       if item.source != "" {
         let source = fp"{item.source}"
@@ -6516,7 +6553,7 @@ proc archive_analysis_item_from_record(item: Record) -> Result[ArchiveAnalysisIt
 ## Exported declaration `analyze_archive_items`.
 export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
-  let prepared = [archive_item_sources(item)? for item in typed_items]
+  let prepared = [archive_item_sources(item, "")? for item in typed_items]
   analyze_archive_items_impl(prepared, p".", "", [], [], [], false)?
 }
 
@@ -6529,7 +6566,7 @@ export proc analyze_archive_items_with_task_specs(
   defs: List[Str],
   includes: List[Str],
 ) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
-  let prepared = [archive_item_sources(item)? for item in items]
+  let prepared = [archive_item_sources(item, triple)? for item in items]
   analyze_archive_items_impl(prepared, cc, triple, cflags, defs, includes, true)?
 }
 
@@ -6718,6 +6755,25 @@ proc assemble_builtin_archive_plan(
 
           objects_by_dir = objects_by_dir.push(owner_key, out)
           deps_by_dir = deps_by_dir.push(owner_key, check_task_name)
+        } else if kind == "efi-stub" {
+          let stub_spec = spec.require(ArchiveStubTaskSpec)?
+          let out = fp"{stub_spec.output}"
+          let base_task = archive_compile_task_from_spec(stub_spec.base_task)
+          let copy_task = efi_stubcopy_task_x86(fp"{stub_spec.base}", out, [base_task.name])
+          tasks += [base_task, copy_task]
+          task_count += 2
+          let input_key = path_key(out)
+          if ! (link_input_seen.get(input_key) ?? false) {
+            link_input_seen[input_key] = true
+            link_inputs += [out]
+          }
+          if library {
+            lib_objects_by_dir = lib_objects_by_dir.push(owner_key, out)
+            lib_deps_by_dir = lib_deps_by_dir.push(owner_key, out.display())
+          } else {
+            objects_by_dir = objects_by_dir.push(owner_key, out)
+            deps_by_dir = deps_by_dir.push(owner_key, out.display())
+          }
         } else if kind == "compile" {
           let compile_spec = spec.require(ArchiveCompileTaskSpec)?
           let out = fp"{compile_spec.output}"

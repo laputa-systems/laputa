@@ -197,7 +197,7 @@ proc archive_plan_cache_fingerprint(
   let triple = prepared.triple
   let items = prepared.items
   let inputs_hash = bytes.from_text(json.encode({cc: cc.display(), srcarch: srcarch, triple: triple, cflags: cflags, includes: includes, items: items})?).sha256().hex()
-  f"""format linux-archive-plan-cache-v2
+  f"""format linux-archive-plan-cache-v3
 srcarch {srcarch}
 triple {triple}
 inputs {inputs_hash}
