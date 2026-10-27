@@ -35,7 +35,7 @@ export proc parse(data: Bytes) [error] -> Result[TrustPolicy, Error] {
     return Err(PolicyError.InvalidData("policy size is invalid"))
   }
 
-  let text = data.utf8()?
+  let text = data as Str
   guard text.ends_with("\n") and "\r" not in text else {
     return Err(PolicyError.InvalidData("policy must use LF-terminated UTF-8 lines"))
   }

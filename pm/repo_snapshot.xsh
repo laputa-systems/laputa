@@ -70,7 +70,7 @@ export pure snapshot_metadata_text(generation: Str, expires_at: Int, index_sha25
 ## Parses one exact signed-snapshot metadata document.
 export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapshotMetadata, Error] {
   snapshot_require(! message.is_empty() and message.len() <= MAX_SNAPSHOT_METADATA_BYTES, "signed snapshot metadata size is invalid")
-  let text = message.utf8()?
+  let text = message as Str
   snapshot_require(text.ends_with("\n") and "\r" not in text, "signed snapshot metadata must use LF-terminated UTF-8 lines")
   let lines = text.byte_slice(0, text.byte_len() - 1).split("\n")
   snapshot_require(lines.len() == 4 and lines[0] == "laputa-repo-snapshot-v1", "signed snapshot metadata header or field count is invalid")

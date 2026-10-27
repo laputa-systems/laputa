@@ -546,7 +546,7 @@ proc check_service_names(values: List[Str], source: Path, field: Str) [error] {
       service_field_error(source, field, f"duplicate name '{value}'")
     }
 
-    seen = seen.push(value)
+    seen += [value]
   }
 }
 
@@ -667,28 +667,28 @@ proc service_from_record(path_value: Path, raw: Record) [process, error] -> Resu
   let stop_timeout_ms = field_int(raw, "stop_timeout_ms", 200, path_value)?
   let readiness = field_str(raw, "readiness", "auto", path_value)?
 
-  let service: Service = {
+  let service: Service = Service(
     name: identity.name,
     path: path_value,
-    kind,
-    command,
-    restart_mode,
-    targets,
-    need,
-    uses,
-    after,
-    before,
-    delay_ms,
-    max_delay_ms,
-    stable_after_ms,
-    stop_timeout_ms,
+    kind:,
+    command:,
+    restart_mode:,
+    targets:,
+    need:,
+    uses:,
+    after:,
+    before:,
+    delay_ms:,
+    max_delay_ms:,
+    stable_after_ms:,
+    stop_timeout_ms:,
     log: log_mode,
-    log_max_size,
-    log_keep,
-    cpu_max,
-    ready_timeout_ms,
-    readiness,
-  }
+    log_max_size:,
+    log_keep:,
+    cpu_max:,
+    ready_timeout_ms:,
+    readiness:,
+  )
 
   check_service_values(service)
   service
@@ -763,7 +763,7 @@ proc check_service_graph(services: List[Service]) [error] {
       service_field_error(service.path, "name", f"duplicate service name '{service.name}'")
     }
 
-    seen = seen.push(service.name)
+    seen += [service.name]
 
     for dep in dependency_edges(service).extend(service.before) {
       if dep not in names and dep not in facilities {

@@ -1,6 +1,6 @@
 ##! PM target operations and shared package-manager policy.
-use pm.util as pm_util
 use pm.types
+use pm.util as pm_util
 
 ## Exported PM declaration `MuslAbi`.
 export type MuslAbi = {

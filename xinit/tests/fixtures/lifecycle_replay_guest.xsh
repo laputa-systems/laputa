@@ -113,7 +113,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   }
   wait_file(fp"{root}/original-leader")
   let first = fp"{root}/original-leader".read_text()?.parse_int()?
-  groups = groups.push(first)
+  groups += [first]
   wait_file(fp"{root}/descendant-ready")
   let child = fp"{root}/original-child".read_text()?.parse_int()?
   assert fp"{root}/descendant-ready".read_text()?.parse_int()? == child
@@ -128,7 +128,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   } else {
     wait_file(fp"{root}/replacement")
     let replacement = fp"{root}/replacement".read_text()?.parse_int()?
-    groups = groups.push(replacement)
+    groups += [replacement]
     assert replacement != first and process.group_id(replacement)? == replacement
     assert ! present(child)? and ! present(first)?, "canonical replay retained crashed group"
     assert fp"{root}/finished".exists()? and ! fp"{root}/violation".exists()?
@@ -139,7 +139,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
 proc main(...argv: List[Str]) {
   require_disposable_guest()
   if argv.len() == 2 {
-    let root = Path(argv[1])
+    let root = fp"{argv[1]}"
     if argv[0] == "descendant" {
       descendant(root)
     } else if argv[0] == "leader" {

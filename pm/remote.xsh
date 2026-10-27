@@ -212,7 +212,7 @@ export proc load_verified_remote_index(
     now_epoch_seconds,
   })?
 
-  let rows: List[Record] = json.decode(index_bytes.utf8()?)?.require()?
+  let rows: List[Record] = json.decode(index_bytes as Str)?.require()?
   let items = decode_remote_index(rows)?
   out.mkdir()
   util.remote_index_cache_path(out).write_atomic(index_bytes)

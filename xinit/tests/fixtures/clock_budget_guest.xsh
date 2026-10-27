@@ -119,7 +119,7 @@ export let service = {{
     assert cleanup.remaining.is_empty(), "clock fixture retained owned process groups"
   }
   let starting = wait_state(root, "starting")?
-  owned_groups = owned_groups.push(starting.pid)
+  owned_groups += [starting.pid]
   linux.set_system_clock(original_wall + 86400000)
   time.sleep(100ms)
   assert clock_status(root)?.state == "starting", "forward wall jump expired readiness early"
@@ -150,7 +150,7 @@ export let service = {{
   print f"LAP27_RESUME_OBSERVED monotonic_delta_ms={pause_delta} wall_delta_ms={wall_delta}"
   io.flush_stdout()
   let replacement = wait_replacement(root, first.pid)?
-  owned_groups = owned_groups.push(replacement.pid)
+  owned_groups += [replacement.pid]
   assert clock_ms()? - crash >= 2000, "restart occurred before its monotonic budget"
   assert replacement.restarts == first.restarts + 1
   wait_worker(root, replacement.pid)
@@ -192,7 +192,7 @@ proc main(...argv: List[Str]) {
   require_disposable_guest()
 
   if argv.len() == 2 and argv[0] == "worker" {
-    worker(Path(argv[1]))
+    worker(fp"{argv[1]}")
   } else {
     assert argv.is_empty(), "usage: clock_budget_guest.xsh"
     exercise_clock(fp"/run/xinit-clock-{process.current_pid()?}")
