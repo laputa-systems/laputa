@@ -68,24 +68,9 @@ export type PoolState = {
   config_enabled: List[PoolConfigEnabled], config_values: List[PoolConfigValue],
 }
 
-## Archive-analysis plan context shared with analysis workers.
-export type ArchivePlanContext = {
-  dirs: List[Str],
-  objects: List[Str],
-  lib_objects: List[Str],
-  archive_owners: List[ArchiveOwnerRecord],
-  composites: List[CompositeRecord],
-}
-
-## Archive-analysis compile flags shared with analysis workers.
-export type ArchiveAnalysisFlags = {flags: List[CompileFlagsEntry]}
-
 ## Archive-analysis worker input for one object slice.
 export type ArchiveAnalysisInput = {
-  context: Str,
-  start: Int,
-  end: Int,
-  flags: Str,
+  items: List[PreparedArchiveItem],
   emit_task_specs: Bool,
   cc: Str,
   triple: Str,
@@ -105,6 +90,24 @@ export type ArchiveAnalysisItem = {
   member_flags: List[List[Str]],
   flags: List[Str],
 }
+
+## Archive-analysis item with captured source selections.
+export type PreparedArchiveItem = {
+  object: Str,
+  owner: Str,
+  library: Bool,
+  pi: Bool,
+  composite: Str,
+  member_objects: List[Str],
+  member_flags: List[List[Str]],
+  flags: List[Str],
+  source: Str,
+  member_sources: List[Str],
+  output_exists: Bool,
+}
+
+## A plan, target and the archive inputs captured for them.
+export type PreparedArchivePlan = {plan: KbuildPlan, triple: Str, items: List[PreparedArchiveItem]}
 
 ## Archive-analysis output for one item; task specs keep their kind-specific shape.
 export type ArchiveAnalysisResult = {
@@ -151,6 +154,9 @@ type ArchivePlanSummaryFile = {
 }
 
 type ArchivePlanTasksFile = {tasks: List[ArchiveTaskRecord]}
+
+## Serialized archive report and summary written together by the cache owner.
+export type ArchivePlanPayloads = {report: Str, summary: Str}
 
 ## Exported declaration `DiscoverOptions`.
 export type DiscoverOptions = {
@@ -3175,8 +3181,7 @@ pure duplicate_task_outputs(tasks: List[make.MakeTask]) -> List[Path] {
   duplicates
 }
 
-## Exported declaration `write_archive_plan_summary`.
-export proc write_archive_plan_summary(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
+proc archive_plan_summary_text(archive_plan: BuiltinArchivePlan) -> Result[Str] {
   let encode_start = archive_plan_timing_start("report-summary-encode")
   let summary = json.encode({
     format: archive_plan_report_format(),
@@ -3188,11 +3193,16 @@ export proc write_archive_plan_summary(archive_plan: BuiltinArchivePlan, out: Pa
     task_count: archive_plan.tasks.len(),
   })?
   archive_plan_timing_done("report-summary-encode", encode_start)
-  write_text_if_changed(out, summary)
+  summary
 }
 
-## Exported declaration `write_archive_plan_report`.
-export proc write_archive_plan_report(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
+## Exported declaration `write_archive_plan_summary`.
+export proc write_archive_plan_summary(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
+  write_text_if_changed(out, archive_plan_summary_text(archive_plan)?)
+}
+
+## Serialize the report and summary for an archive plan.
+export proc archive_plan_payloads(archive_plan: BuiltinArchivePlan) [env, time, error] -> Result[ArchivePlanPayloads, Error] {
   let records_start = archive_plan_timing_start("report-task-records")
   let task_rows = task_records(archive_plan.tasks)?
   archive_plan_timing_done("report-task-records", records_start)
@@ -3210,11 +3220,16 @@ export proc write_archive_plan_report(archive_plan: BuiltinArchivePlan, out: Pat
   })?
   archive_plan_timing_done("report-encode", encode_start)
 
-  let write_start = archive_plan_timing_start("report-write")
-  write_text_if_changed(out, report)
-  archive_plan_timing_done("report-write", write_start)
+  {report: report, summary: archive_plan_summary_text(archive_plan)?}
+}
 
-  write_archive_plan_summary(archive_plan, archive_plan_summary_path(out))
+## Exported declaration `write_archive_plan_report`.
+export proc write_archive_plan_report(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
+  let payloads = archive_plan_payloads(archive_plan)?
+  let write_start = archive_plan_timing_start("report-write")
+  write_text_if_changed(out, payloads.report)
+  write_text_if_changed(archive_plan_summary_path(out), payloads.summary)
+  archive_plan_timing_done("report-write", write_start)
 }
 
 proc path_from_string(item: Str) [error] -> Result[Path] {
@@ -3237,8 +3252,8 @@ proc task_from_record(item: ArchiveTaskRecord) -> Result[make.MakeTask] {
   }
 }
 
-proc read_archive_plan_record(path_value: Path, stale_message: Str) -> Result[Record] {
-  let stored = json.read(path_value)?.require(Record)?
+pure archive_plan_record(text: Str, stale_message: Str) -> Result[Record] {
+  let stored = json.decode(text)?.require(Record)?
   let format = if "format" in stored { stored.get("format")?.require(Str)? } else { "" }
 
   if format != archive_plan_report_format() {
@@ -3269,22 +3284,32 @@ proc archive_plan_from_summary(
   }
 }
 
-## Exported declaration `read_archive_plan_report`.
-export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
-  let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
+## Parse an archive plan report from its captured text.
+export proc parse_archive_plan_report(text: Str) [error] -> Result[BuiltinArchivePlan, Error] {
+  let stored = archive_plan_record(text, "archive plan cache has stale format")?
   let tasks = [task_from_record(row)? for row in stored.require(ArchivePlanTasksFile)?.tasks]
   archive_plan_from_summary(stored.require()?, tasks)?
 }
 
+## Parse an archive plan summary from its captured text.
+export proc parse_archive_plan_summary(text: Str) [error] -> Result[BuiltinArchivePlan, Error] {
+  let stored = archive_plan_record(text, "archive plan summary has stale format")?
+  archive_plan_from_summary(stored.require()?, [])?
+}
+
+## Exported declaration `read_archive_plan_report`.
+export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
+  parse_archive_plan_report(path_value.read_text()?)
+}
+
 ## Exported declaration `read_archive_plan_summary`.
 export proc read_archive_plan_summary(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
-  let stored = read_archive_plan_record(path_value, "archive plan summary has stale format")?
-  archive_plan_from_summary(stored.require()?, [])?
+  parse_archive_plan_summary(path_value.read_text()?)
 }
 
 ## Exported declaration `read_archive_plan_object_outputs`.
 export proc read_archive_plan_object_outputs(path_value: Path) [fs, error] -> Result[List[Path], Error] {
-  let stored = read_archive_plan_record(path_value, "archive plan cache has stale format")?
+  let stored = archive_plan_record(path_value.read_text()?, "archive plan cache has stale format")?
   var outputs: List[Path] = [
     path_from_string(item)?
     for row in stored.require(ArchivePlanTasksFile)?.tasks
@@ -3441,6 +3466,29 @@ proc source_for_object(obj: Path) -> Result[Path] {
   }
 
   Err(ScriptError.Failed(kind: "kbuild-missing-source", message: f"missing source for {obj}"))
+}
+
+proc archive_item_sources(item: ArchiveAnalysisItem) -> Result[PreparedArchiveItem] {
+  var source = ""
+  var members: List[Str] = []
+  var output_exists = false
+  if item.composite != "" {
+    for member in item.member_objects {
+      if let Ok(found) = source_for_object(fp"{member}") {
+        members += [path_key(found)]
+      } else {
+        members += [""]
+      }
+    }
+  } else if item.pi {
+    let found = pi_source(fp"{item.object}")
+    source = path_key(found) when found.exists()
+  } else if let Ok(found) = source_for_object(fp"{item.object}") {
+    source = path_key(found)
+  } else {
+    output_exists = obj_out_path(fp"{item.object}").exists()?
+  }
+  {...item, source: source, member_sources: members, output_exists: output_exists}
 }
 
 pure is_asm_source(src: Path) -> Bool {
@@ -6142,273 +6190,11 @@ pure archive_analysis_record_for_object(
   }
 }
 
-pure archive_analysis_plan_context(plan: KbuildPlan) -> ArchivePlanContext {
-  {
-    dirs: path_strings(plan.dirs),
-    objects: path_strings(plan.objects),
-    lib_objects: path_strings(plan.lib_objects),
-    archive_owners: [
-      {
-        object: path_key(owner.object),
-        dir: path_key(owner.dir),
-      }
-      for owner in plan.archive_owners
-    ],
-    composites: [
-      {
-        object: path_key(composite.object),
-        members: path_strings(composite.members),
-      }
-      for composite in plan.composites
-    ],
-  }
-}
-
-proc archive_analysis_plan_context_slice(
-  context: ArchivePlanContext,
-  start: Int,
-  end: Int,
-) [error] -> Result[ArchivePlanContext] {
-  let {objects: object_values, lib_objects: lib_object_values, ..} = context
-  let object_count = object_values.len()
-  let object_start = if start < object_count { start } else { object_count }
-  let object_end = if end < object_count { end } else { object_count }
-  let lib_start = if start > object_count { start - object_count } else { 0 }
-  let lib_end = if end > object_count { end - object_count } else { 0 }
-  let objects = object_values
-    |> drop(object_start)
-    |> take(object_end - object_start)
-  let lib_objects = lib_object_values
-    |> drop(lib_start)
-    |> take(lib_end - lib_start)
-  var selected: Map[Bool] = {obj: true for obj in objects}
-  for obj in lib_objects {
-    selected[obj] = true
-  }
-
-  var archive_owners: List[ArchiveOwnerRecord] = [
-    owner
-    for owner in context.archive_owners
-    if selected.get(owner.object) ?? false
-  ]
-  var composites: List[CompositeRecord] = []
-  for composite in context.composites {
-    var selected_member = selected.get(composite.object) ?? false
-    for member in composite.members {
-      if selected.get(member) ?? false {
-        selected_member = true
-      }
-    }
-
-    if selected_member {
-      composites += [composite]
-    }
-  }
-
-  {
-    dirs: [],
-    objects: objects,
-    lib_objects: lib_objects,
-    archive_owners: archive_owners,
-    composites: composites,
-  }
-}
-
-proc archive_analysis_plan_from_context(context: ArchivePlanContext) -> Result[KbuildPlan] {
-  {
-    dirs: paths_from_strings(context.dirs)?,
-    objects: paths_from_strings(context.objects)?,
-    lib_objects: paths_from_strings(context.lib_objects)?,
-    archive_owners: archive_owners_from_records(context.archive_owners)?,
-    composites: composites_from_records(context.composites)?,
-    unsupported: [],
-  }
-}
-
-pure archive_analysis_raw_item(
-  obj: Path,
-  owner: Path,
-  library: Bool,
-  pi: Bool,
-  composites_by_object: Map[CompositeObject],
-) -> ArchiveAnalysisItem {
-  let key = path_key(obj)
-
-  if key in composites_by_object {
-    let default_composite: CompositeObject = CompositeObject(obj, [])
-    let composite = composites_by_object.get(key) ?? default_composite
-    return {
-      object: key,
-      owner: path_key(owner),
-      library: library,
-      pi: pi,
-      composite: path_key(composite.object),
-      member_objects: [path_key(member) for member in composite.members],
-      member_flags: [],
-      flags: [],
-    }
-  }
-
-  {
-    object: key,
-    owner: path_key(owner),
-    library: library,
-    pi: pi,
-    composite: "",
-    member_objects: [],
-    member_flags: [],
-    flags: [],
-  }
-}
-
-proc archive_analysis_slice_items(
-  plan: KbuildPlan,
-  config: Kconfig,
-  start: Int,
-  end: Int,
-) [error] -> Result[List[ArchiveAnalysisItem]] {
-  let composites_by_object = composite_map(plan.composites)
-  let composite_members_by_object = composite_member_map(plan.composites)
-  var archive_owner_by_object = {
-    [path_key(owner.object)]: path_key(owner.dir)
-    for owner in plan.archive_owners
-  }
-  let object_count = plan.objects.len()
-  var index = start
-
-  let items: List[ArchiveAnalysisItem] = collect {
-    while index < end {
-      let library = index >= object_count
-      let object_index = if library { index - object_count } else { index }
-      let obj = if library {
-        plan.lib_objects.get(object_index) ?? p"."
-      } else {
-        plan.objects.get(object_index) ?? p"."
-      }
-
-      if ! skip_planned_object(config, obj) and path_key(obj) not in composite_members_by_object {
-        yield archive_analysis_raw_item(
-          obj,
-          archive_owner_key(archive_owner_by_object, obj),
-          library,
-          if library {
-            false
-          } else {
-            is_pi_object(obj)
-          },
-          composites_by_object,
-        )
-      }
-
-      index += 1
-    }
-  }
-
-  items
-}
-
-proc archive_analysis_items_with_compile_flags(
-  items: List[ArchiveAnalysisItem],
-  compile_flags_by_dir: Map[Map[List[Str]]],
-) [error] -> Result[List[ArchiveAnalysisItem]] {
-  let enriched: List[ArchiveAnalysisItem] = collect {
-    for item in items {
-      let object = fp"{item.object}"
-      let flags_object = if item.pi { pi_base_object(object) } else { object }
-      let member_flags = [
-        kbuild_compile_flags_for_member(compile_flags_by_dir, fp"{item.composite}", fp"{member}")
-        for member in item.member_objects
-      ]
-
-      yield {
-        ...item,
-        flags: if item.composite == "" {
-          kbuild_compile_flags_for_object(compile_flags_by_dir, flags_object)
-        } else {
-          []
-        },
-        member_flags: member_flags,
-      }
-    }
-  }
-
-  enriched
-}
-
-proc archive_analysis_flag_entries_for_plan_range(
-  plan: KbuildPlan,
-  start: Int,
-  end: Int,
-  flag_entries: List[CompileFlagsEntry],
-) [error] -> Result[List[CompileFlagsEntry]] {
-  var dirs: Map[Bool] = {}
-  var objects: Map[Bool] = {}
-  let object_count = plan.objects.len()
-  let composites_by_object = composite_map(plan.composites)
-  var index = start
-
-  while index < end {
-    let library = index >= object_count
-    let object_index = if library { index - object_count } else { index }
-    let obj = if library {
-      plan.lib_objects.get(object_index) ?? p"."
-    } else {
-      plan.objects.get(object_index) ?? p"."
-    }
-    let flags_object = if ! library and is_pi_object(obj) { pi_base_object(obj) } else { obj }
-    let flags_key = path_key(flags_object)
-    dirs[path_key(object_dir(flags_object))] = true
-    objects[flags_key] = true
-
-    if path_key(obj) in composites_by_object {
-      let object_key = path_key(obj)
-      let default_composite: CompositeObject = CompositeObject(obj, [])
-      let composite = composites_by_object.get(object_key) ?? default_composite
-      for member in composite.members {
-        dirs[path_key(object_dir(member))] = true
-        objects[path_key(member)] = true
-      }
-    }
-
-    index += 1
-  }
-
-  var filtered: List[CompileFlagsEntry] = [
-    entry
-    for entry in flag_entries
-    if (entry.object == "*" and (dirs.get(entry.dir) ?? false)) or (objects.get(entry.object) ?? false)
-  ]
-  filtered
-}
-
-## Exported declaration `analyze_archive_plan_slice`.
-export proc analyze_archive_plan_slice(
-  context: ArchivePlanContext,
-  start: Int,
-  end: Int,
-  flag_entries: List[CompileFlagsEntry],
-  emit_task_specs: Bool,
-  cc: Path,
-  triple: Str,
-  cflags: List[Str],
-  defs: List[Str],
-  includes: List[Str],
-) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
-  let slice_context = archive_analysis_plan_context_slice(context, start, end)?
-  let plan = archive_analysis_plan_from_context(slice_context)?
-  let config = load_config_if_present(p".config")?
-  let relevant_flags = archive_analysis_flag_entries_for_plan_range(plan, 0, end - start, flag_entries)?
-  let compile_flags_by_dir = compile_flags_from_cache_entries(relevant_flags)?
-  let items = archive_analysis_slice_items(plan, config, 0, end - start)?
-  let enriched = archive_analysis_items_with_compile_flags(items, compile_flags_by_dir)?
-  analyze_archive_items_impl(enriched, cc, triple, cflags, defs, includes, emit_task_specs)?
-}
-
 proc archive_analysis_items(
   plan: KbuildPlan,
   config: Kconfig,
   compile_flags_by_dir: Map[Map[List[Str]]],
-) -> Result[List[ArchiveAnalysisItem]] {
+) -> Result[List[PreparedArchiveItem]] {
   let maps_start = archive_plan_timing_start("item-maps")
   let composites_by_object = composite_map(plan.composites)
   let composite_members_by_object = composite_member_map(plan.composites)
@@ -6448,10 +6234,11 @@ proc archive_analysis_items(
 
   archive_plan_timing_done("item-objects", object_items_start)
 
-  items
+  [archive_item_sources(item)? for item in items]
 }
 
-proc archive_analysis_items_for_plan(plan: KbuildPlan, triple: Str) -> Result[List[ArchiveAnalysisItem]] {
+## Capture archive items, compile flags and source selections for a plan.
+export proc prepare_archive_analysis(plan: KbuildPlan, triple: Str) [fs, env, time, error] -> Result[PreparedArchivePlan, Error] {
   let config = load_config_if_present(p".config")?
   let compile_flags_by_dir = cached_kbuild_compile_flags_for_dirs(
     p".",
@@ -6463,7 +6250,7 @@ proc archive_analysis_items_for_plan(plan: KbuildPlan, triple: Str) -> Result[Li
       "arm64"
     },
   )?
-  archive_analysis_items(plan, config, compile_flags_by_dir)?
+  {plan: plan, triple: triple, items: archive_analysis_items(plan, config, compile_flags_by_dir)?}
 }
 
 pure archive_analysis_result(
@@ -6549,7 +6336,7 @@ proc archive_compile_task_spec(
 }
 
 proc analyze_archive_items_impl(
-  items: List[ArchiveAnalysisItem],
+  items: List[PreparedArchiveItem],
   cc: Path,
   triple: Str,
   cflags: List[Str],
@@ -6579,8 +6366,10 @@ proc analyze_archive_items_impl(
       for member_key in member_objects {
         let member_cflags = member_flags.get(member_index) ?? []
         let member = fp"{member_key}"
+        let source_key = item.member_sources.get(member_index)?
 
-        if let Ok(source) = source_for_object(member) {
+        if source_key != "" {
+          let source = fp"{source_key}"
           let member_out = obj_out_path(member)
           let task_spec = archive_compile_task_spec(
             member,
@@ -6610,9 +6399,9 @@ proc analyze_archive_items_impl(
         member_index += 1
       }
     } else if pi {
-      let source = pi_source(obj)
+      let source = fp"{item.source}"
 
-      if source.exists() {
+      if item.source != "" {
         let base_out = pi_base_object(obj) |> obj_out_path(_)
         let out = obj_out_path(obj)
         let base_task_spec = archive_compile_task_spec(
@@ -6646,7 +6435,8 @@ proc analyze_archive_items_impl(
         generated_objects += [obj]
       }
     } else {
-      if let Ok(source) = source_for_object(obj) {
+      if item.source != "" {
+        let source = fp"{item.source}"
         let out = obj_out_path(obj)
         let task_spec = archive_compile_task_spec(
           obj,
@@ -6668,7 +6458,7 @@ proc analyze_archive_items_impl(
       } else {
         let out = obj_out_path(obj)
 
-        if out.exists() {
+        if item.output_exists {
           link_inputs += [out]
         } else if is_known_generated_object(obj) {
           generated_objects += [obj]
@@ -6726,7 +6516,8 @@ proc archive_analysis_item_from_record(item: Record) -> Result[ArchiveAnalysisIt
 ## Exported declaration `analyze_archive_items`.
 export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
-  analyze_archive_items_impl(typed_items, p".", "", [], [], [], false)?
+  let prepared = [archive_item_sources(item)? for item in typed_items]
+  analyze_archive_items_impl(prepared, p".", "", [], [], [], false)?
 }
 
 ## Exported declaration `analyze_archive_items_with_task_specs`.
@@ -6738,7 +6529,16 @@ export proc analyze_archive_items_with_task_specs(
   defs: List[Str],
   includes: List[Str],
 ) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
-  analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, true)?
+  let prepared = [archive_item_sources(item)? for item in items]
+  analyze_archive_items_impl(prepared, cc, triple, cflags, defs, includes, true)?
+}
+
+## Analyze archive inputs whose source selections have already been captured.
+export proc analyze_prepared_archive_items(
+  items: List[PreparedArchiveItem], cc: Path, triple: Str, cflags: List[Str], defs: List[Str],
+  includes: List[Str], emit_task_specs: Bool,
+) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
+  analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, emit_task_specs)?
 }
 
 pure archive_analysis_worker_count(requested: Int, item_count: Int) -> Int {
@@ -6749,8 +6549,7 @@ pure archive_analysis_worker_count(requested: Int, item_count: Int) -> Int {
 }
 
 proc archive_analysis_process_pool(
-  plan: KbuildPlan,
-  compile_flags_by_dir: Map[Map[List[Str]]],
+  items: List[PreparedArchiveItem],
   requested_jobs: Int,
   xsh_bin: Path,
   worker: Path,
@@ -6760,24 +6559,17 @@ proc archive_analysis_process_pool(
   defs: List[Str],
   includes: List[Str],
 ) -> Result[List[ArchiveAnalysisResult]] {
-  let item_count = plan.objects.len() + plan.lib_objects.len()
-  let flag_entries = compile_flags_cache_entries(compile_flags_by_dir)
+  let item_count = items.len()
   let worker_count = archive_analysis_worker_count(requested_jobs, item_count)
   let emit_task_specs = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
 
   if worker_count <= 1 {
-    let config = load_config_if_present(p".config")?
-    let items = archive_analysis_items(plan, config, compile_flags_by_dir)?
     return analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, emit_task_specs)?
   }
 
-  let prefix = f"/tmp/xsh-kbuild-archive-analysis-{time.now()}"
-  let context_path = fp"{prefix}-context.json"
-  json.write(context_path, archive_analysis_plan_context(plan))
-  defer context_path.remove()
-  let flags_path = fp"{prefix}-flags.json"
-  json.write(flags_path, ArchiveAnalysisFlags(flag_entries))
-  defer flags_path.remove()
+  let temporary_dir = e"TMPDIR" ?? "/tmp"
+  return Err(ScriptError.Failed(kind: "kbuild-archive-tmpdir", message: "TMPDIR must not be empty")) when temporary_dir == ""
+  let prefix = f"{temporary_dir}/xsh-kbuild-archive-analysis-{time.now()}"
   var handles = []
   var output_paths = []
   var input_paths = []
@@ -6795,10 +6587,7 @@ proc archive_analysis_process_pool(
     json.write(
       input_path,
       ArchiveAnalysisInput(
-        context: context_path.display(),
-        start:,
-        end:,
-        flags: flags_path.display(),
+        items: items |> drop(start) |> take(end - start),
         emit_task_specs:,
         cc: cc.display(),
         triple:,
@@ -7165,10 +6954,10 @@ export proc plan_builtin_archives(
   defs: List[Str],
   includes: List[Str],
 ) [fs, env, time, error] -> Result[BuiltinArchivePlan, Error] {
-  let items = archive_analysis_items_for_plan(plan, triple)?
+  let prepared = prepare_archive_analysis(plan, triple)?
   let emit_task_specs = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let results = analyze_archive_items_impl(
-    items,
+    prepared.items,
     cc,
     triple,
     cflags,
@@ -7181,9 +6970,8 @@ export proc plan_builtin_archives(
 
 ## Exported declaration `plan_builtin_archives_with_analysis_workers`.
 export proc plan_builtin_archives_with_analysis_workers(
-  plan: KbuildPlan,
+  prepared: PreparedArchivePlan,
   cc: Path,
-  triple: Str,
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
@@ -7191,30 +6979,14 @@ export proc plan_builtin_archives_with_analysis_workers(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, env, time, error] -> Result[BuiltinArchivePlan, Error] {
-  guard analysis_jobs > 1 else {
-    return plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
-  }
-
-  let config = load_config_if_present(p".config")?
-  let flags_start = archive_plan_timing_start("item-flags")
-  let compile_flags_by_dir = cached_kbuild_compile_flags_for_dirs(
-    p".",
-    plan.dirs,
-    config,
-    if triple == "x86_64-linux-gnu" {
-      "x86"
-    } else {
-      "arm64"
-    },
-  )?
-  archive_plan_timing_done("item-flags", flags_start)
+  let plan = prepared.plan
+  let triple = prepared.triple
   archive_plan_progress(
     f"xsh-kbuild-archive-plan analysis-start {plan.objects.len() + plan.lib_objects.len()} items {analysis_jobs} requested-workers",
   )
   let analysis_start = archive_plan_timing_start("analysis")
   let results = archive_analysis_process_pool(
-    plan,
-    compile_flags_by_dir,
+    prepared.items,
     analysis_jobs,
     xsh_bin,
     worker,

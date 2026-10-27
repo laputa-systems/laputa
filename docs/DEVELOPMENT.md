@@ -165,6 +165,13 @@ PM has no default remote; these make targets use the loopback mirror.
   The compile-flags cache binds parsed inputs and stored flags with format
   `linux-kbuild-compile-flags-v4`, and
   discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v12`.
+  Archive-plan cache format `linux-archive-plan-cache-v2` binds the compiler
+  path, prepared flags and source selections, and the report and summary.
+  `kbuild.prepare_archive_analysis` returns a `PreparedArchivePlan` containing
+  the plan, target and captured items consumed by
+  `kbuild.plan_builtin_archives_with_analysis_workers`; worker inputs carry
+  prepared items. Plan-only cache hits validate the summary without reading the
+  full report.
 - Containers have no network, so only host processes reach the mirror.
   Host planning, importing, publishing, and composition call typed PM operations
   in the same process under a scoped `XSH_PM_REPO` value.

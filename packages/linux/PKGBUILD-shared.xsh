@@ -187,15 +187,20 @@ proc remove_archive_plan_cache() {
 }
 
 proc archive_plan_cache_fingerprint(
-  plan: kbuild.KbuildPlan,
+  prepared: kbuild.PreparedArchivePlan,
+  cc: Path,
   srcarch: Str,
-  triple: Str,
   cflags: List[Str],
   includes: List[Str],
 ) -> Result[Str] {
-  f"""format linux-archive-plan-cache-v1
+  let plan = prepared.plan
+  let triple = prepared.triple
+  let items = prepared.items
+  let inputs_hash = bytes.from_text(json.encode({cc: cc.display(), srcarch: srcarch, triple: triple, cflags: cflags, includes: includes, items: items})?).sha256().hex()
+  f"""format linux-archive-plan-cache-v2
 srcarch {srcarch}
 triple {triple}
+inputs {inputs_hash}
 plan
 {kbuild.plan_fingerprint(p".", p".config", plan, srcarch)?}
 cflags
@@ -205,33 +210,34 @@ includes
 """
 }
 
-proc archive_plan_fingerprint_matches(path_value: Path, fingerprint: Str) -> Result[Bool] {
-  guard path_value.exists() else {
-    return false
-  }
+type ArchiveCacheRead = {plan: kbuild.BuiltinArchivePlan, payloads: kbuild.ArchivePlanPayloads}
+type ArchiveCacheManifest = {fingerprint: Str, report_hash: Str, summary_hash: Str}
 
-  path_value.read_text()?.trim() == fingerprint.trim()
+pure archive_payload_hash(payload: Str) -> Str {
+  bytes.from_text(payload).sha256().hex()
 }
 
-proc write_archive_plan_fingerprint(path_value: Path, fingerprint: Str) {
-  kbuild.write_text_if_changed(
-    path_value,
-    f"""{fingerprint}
-""",
-  )
+proc read_archive_plan_cache(path_value: Path, fingerprint: Str, report: Path, plan_only: Bool) -> Result[ArchiveCacheRead] {
+  let manifest = json.read(path_value)?.require(ArchiveCacheManifest)?
+  let payloads: kbuild.ArchivePlanPayloads = {
+    report: if plan_only { "" } else { report.read_text()? },
+    summary: kbuild.archive_plan_summary_path(report).read_text()?,
+  }
+  if manifest.fingerprint != fingerprint or manifest.summary_hash != archive_payload_hash(payloads.summary) or
+      (! plan_only and manifest.report_hash != archive_payload_hash(payloads.report)) {
+    return Err(kbuild.ScriptError.Failed(kind: "kbuild-archive-plan-cache-stale", message: "archive plan cache fingerprint mismatch"))
+  }
+  let plan = if plan_only { kbuild.parse_archive_plan_summary(payloads.summary)? } else { kbuild.parse_archive_plan_report(payloads.report)? }
+  {plan: plan, payloads: payloads}
 }
 
-proc copy_archive_plan_cache(source: Path, dest: Path) {
-  guard source.exists() else {
-    return
+proc write_archive_plan_cache(report: Path, path_value: Path, fingerprint: Str, payloads: kbuild.ArchivePlanPayloads) {
+  kbuild.write_text_if_changed(report, payloads.report)
+  kbuild.write_text_if_changed(kbuild.archive_plan_summary_path(report), payloads.summary)
+  let manifest: ArchiveCacheManifest = {
+    fingerprint: fingerprint, report_hash: archive_payload_hash(payloads.report), summary_hash: archive_payload_hash(payloads.summary),
   }
-
-  fs.install(source, dest, 0o644, parents: true, overwrite: true)
-  let source_summary = kbuild.archive_plan_summary_path(source)
-
-  if source_summary.exists() {
-    fs.install(source_summary, kbuild.archive_plan_summary_path(dest), 0o644, parents: true, overwrite: true)
-  }
+  kbuild.write_text_if_changed(path_value, json.encode(manifest)?)
 }
 
 ## Exported declaration `cached_archive_plan`.
@@ -257,79 +263,35 @@ export proc cached_archive_plan(
   let stable_cache_dir = fp"{e"XSH_LINUX_KBUILD_PLAN_CACHE_DIR" ?? "/var/cache/laputa/linux-kbuild"}"
   let stable_archive_report = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.json"
   let stable_archive_fingerprint = fp"{stable_cache_dir}/linux-{srcarch}.archive-plan.fingerprint"
+  let prepared = kbuild.prepare_archive_analysis(plan, triple)?
   let fingerprint_start = timing_start("archive-fingerprint")
-  let fingerprint = archive_plan_cache_fingerprint(plan, srcarch, triple, cflags, includes)?
+  let fingerprint = archive_plan_cache_fingerprint(prepared, cc, srcarch, cflags, includes)?
   timing_done("archive-fingerprint", fingerprint_start)
   let reuse_archive_plan = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVE_PLAN" ?? "") == "1"
   let archive_only = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") == "1"
   let plan_only = requested_stop_after()? == "plan" and (e"XSH_LINUX_KBUILD_ONLY" ?? "") == ""
 
   if reuse_archive_plan and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
-    if archive_report.exists() and archive_plan_fingerprint_matches(archive_fingerprint, fingerprint) {
-      if plan_only {
-        match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(archive_report)) {
-          Ok(archive_plan) => {
-            emit_kbuild_progress(
-              f"xsh-kbuild-archive-plan-summary-cache {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
-            )
-
-            return archive_plan
-          }
-          Err(error) => emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-summary-cache miss {error.message}",
-          )
+    if archive_report.exists() or (plan_only and kbuild.archive_plan_summary_path(archive_report).exists()) {
+      match read_archive_plan_cache(archive_fingerprint, fingerprint, archive_report, plan_only) {
+        Ok(cached) => {
+          emit_kbuild_progress(f"xsh-kbuild-archive-plan-cache {cached.plan.task_count} tasks")
+          return cached.plan
         }
-      }
-
-      match kbuild.read_archive_plan_report(archive_report) {
-        Ok(archive_plan) => {
-          emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-cache {archive_plan.tasks.len()} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
-          )
-
-          if plan_only {
-            kbuild.write_archive_plan_summary(archive_plan, kbuild.archive_plan_summary_path(archive_report))
-          }
-
-          return archive_plan
-        }
-        Err(error) => emit_kbuild_progress(
-          f"xsh-kbuild-archive-plan-cache miss {error.message}",
-        )
+        Err(error) => emit_kbuild_progress(f"xsh-kbuild-archive-plan-cache miss {error.message}")
       }
     }
 
-    if stable_archive_report.exists() and archive_plan_fingerprint_matches(stable_archive_fingerprint, fingerprint) {
-      if plan_only {
-        match kbuild.read_archive_plan_summary(kbuild.archive_plan_summary_path(stable_archive_report)) {
-          Ok(archive_plan) => {
-            emit_kbuild_progress(
-              f"xsh-kbuild-archive-plan-stable-summary-cache {archive_plan.task_count} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
-            )
-
-            copy_archive_plan_cache(stable_archive_report, archive_report)
-            write_archive_plan_fingerprint(archive_fingerprint, fingerprint)
-            return archive_plan
+    if stable_archive_report.exists() or (plan_only and kbuild.archive_plan_summary_path(stable_archive_report).exists()) {
+      match read_archive_plan_cache(stable_archive_fingerprint, fingerprint, stable_archive_report, plan_only) {
+        Ok(cached) => {
+          emit_kbuild_progress(f"xsh-kbuild-archive-plan-stable-cache {cached.plan.task_count} tasks")
+          if ! plan_only {
+            write_archive_plan_cache(archive_report, archive_fingerprint, fingerprint, cached.payloads)
           }
-          Err(error) => emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-stable-summary-cache miss {error.message}",
-          )
+          return cached.plan
         }
-      }
-
-      match kbuild.read_archive_plan_report(stable_archive_report) {
-        Ok(archive_plan) => {
-          emit_kbuild_progress(
-            f"xsh-kbuild-archive-plan-stable-cache {archive_plan.tasks.len()} tasks {archive_plan.archives.len()} archives {archive_plan.link_inputs.len()} link-inputs",
-          )
-
-          copy_archive_plan_cache(stable_archive_report, archive_report)
-          write_archive_plan_fingerprint(archive_fingerprint, fingerprint)
-          return archive_plan
-        }
-        Err(error) => emit_kbuild_progress(
-          f"xsh-kbuild-archive-plan-stable-cache miss {error.message}",
-        )
+        Err(error) => emit_kbuild_progress(f"xsh-kbuild-archive-plan-stable-cache miss {error.message}")
       }
     }
   }
@@ -341,9 +303,8 @@ export proc cached_archive_plan(
   let analysis_jobs = archive_analysis_jobs()?
   let worker = staged_recipe_helper("kbuild-archive-analysis-worker.xsh")?
   let archive_plan = kbuild.plan_builtin_archives_with_analysis_workers(
-    plan,
+    prepared,
     cc,
-    triple,
     cflags,
     [],
     includes,
@@ -360,11 +321,10 @@ export proc cached_archive_plan(
   }
 
   let report_start = timing_start("archive-report")
-  kbuild.write_archive_plan_report(archive_plan, archive_report)
-  write_archive_plan_fingerprint(archive_fingerprint, fingerprint)
+  let payloads = kbuild.archive_plan_payloads(archive_plan)?
+  write_archive_plan_cache(archive_report, archive_fingerprint, fingerprint, payloads)
   stable_cache_dir.mkdir()
-  copy_archive_plan_cache(archive_report, stable_archive_report)
-  write_archive_plan_fingerprint(stable_archive_fingerprint, fingerprint)
+  write_archive_plan_cache(stable_archive_report, stable_archive_fingerprint, fingerprint, payloads)
   timing_done("archive-report", report_start)
 
   emit_kbuild_progress(
