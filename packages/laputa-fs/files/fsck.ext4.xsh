@@ -112,7 +112,7 @@ proc check_image(image: Path) {
 
 type Ext4FsckOptions = {image: List[Str]}
 
-proc main(...argv: List[Str]) [error] {
+proc main(...argv: List[Str]) [fs, error] {
   let opts: Ext4FsckOptions = cli.applet(
     argv,
     {

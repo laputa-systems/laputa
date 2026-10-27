@@ -5,18 +5,18 @@ for dir in [/proc, /sys, /run, /dev, /dev/pts, /dev/shm] {
   }
 }
 
-let mount_proc = linux.mount("proc", /proc, fstype: "proc", options: ["nosuid", "noexec", "nodev"])
-let mount_sys = linux.mount("sys", /sys, fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
-let mount_run = linux.mount("run", /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
-let mount_dev = linux.mount("dev", /dev, fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
+let mount_proc = linux.mount(bytes.from_text("proc"), /proc, fstype: "proc", options: ["nosuid", "noexec", "nodev"])
+let mount_sys = linux.mount(bytes.from_text("sys"), /sys, fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
+let mount_run = linux.mount(bytes.from_text("run"), /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
+let mount_dev = linux.mount(bytes.from_text("dev"), /dev, fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
 
 if "devpts" in p"/proc/filesystems".read_text()? {
-  match linux.mount("devpts", /dev/pts, fstype: "devpts", options: ["mode=0620", "gid=5", "nosuid", "noexec"]) {
+  match linux.mount(bytes.from_text("devpts"), /dev/pts, fstype: "devpts", options: ["mode=0620", "gid=5", "nosuid", "noexec"]) {
     Ok(_) | Err(_) => {}
   }
 }
 
-let mount_shm = linux.mount("shm", /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
+let mount_shm = linux.mount(bytes.from_text("shm"), /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
 
 if p"/etc/hostname".exists() {
   let hostname = p"/etc/hostname".read_text()?.trim()

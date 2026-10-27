@@ -222,7 +222,7 @@ proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Pat
   while attempt < 20 {
     match qemu_qmp(value, qmp_operation, socket) {
       Ok(_) => return Ok()
-      Err(QmpFailure.OutcomeIndeterminate {operation}) => return Err(QmpFailure.OutcomeIndeterminate(operation))
+      Err(QmpFailure.OutcomeIndeterminate {operation: detail}) => return Err(QmpFailure.OutcomeIndeterminate(detail))
       Err(_) => {
         time.sleep(250ms)
         attempt += 1
@@ -342,12 +342,12 @@ export proc run_test(
     if proof.succeeded(log_text) {
       if ! screenshot_taken {
         qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket)
-        if ! screenshot_is_valid(outputs.screenshot)? {
+        if ! screenshot_is_valid(outputs.screenshot) {
           return Err(
             types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
           )
         }
-        if ! screenshot_has_foot_marker(outputs.screenshot)? {
+        if ! screenshot_has_foot_marker(outputs.screenshot) {
           return Err(
             types.LaputaError.Profile(
               f"QMP screenshot does not contain the foot visual marker; inspect {qemu_output_locations(outputs)}",

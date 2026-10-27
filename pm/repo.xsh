@@ -304,18 +304,18 @@ export proc publish_snapshot(
   let metadata_path = fp"{snapshot_dir}/snapshot.json"
   let signature_path = fp"{snapshot_dir}/snapshot.sig"
 
-  guard metadata_path.exists()? else {
+  guard metadata_path.exists() else {
     return Err(types.PmError.PackageContract(f"repository snapshot directory is missing snapshot.json: {snapshot_dir}"))
   }
 
-  guard signature_path.exists()? else {
+  guard signature_path.exists() else {
     return Err(types.PmError.PackageContract(f"repository snapshot directory is missing snapshot.sig: {snapshot_dir}"))
   }
 
   let metadata = metadata_path.read_bytes()?
   let signature = signature_path.read_bytes()?
-  let snapshot = repo_snapshot.snapshot_parse_metadata(metadata)?
-  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)?
+  let parsed = repo_snapshot.snapshot_parse_metadata(metadata)?
+  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)
 
   let index_work = fp"{work}/snapshot-index"
   index_work.mkdir()
@@ -327,7 +327,7 @@ export proc publish_snapshot(
   }
 
   let index_bytes = index_dest.read_bytes()?
-  guard index_bytes.sha256().hex() == snapshot.index_sha256 else {
+  guard index_bytes.sha256().hex() == parsed.index_sha256 else {
     return Err(types.PmError.RemoteIndex("repository snapshot index digest does not match the published index; re-issue the snapshot after publication"))
   }
 
@@ -336,14 +336,14 @@ export proc publish_snapshot(
 
   if prior_failure == "" {
     let prior = repo_snapshot.snapshot_parse_metadata(prior_dest.read_bytes()?)?
-    guard repo_snapshot.snapshot_u64_is_greater(snapshot.generation, prior.generation) else {
-      if snapshot.generation == prior.generation and snapshot.index_sha256 == prior.index_sha256 {
-        print "snapshot" $snapshot.generation "already-published"
+    guard repo_snapshot.snapshot_u64_is_greater(parsed.generation, prior.generation) else {
+      if parsed.generation == prior.generation and parsed.index_sha256 == prior.index_sha256 {
+        print "snapshot" $parsed.generation "already-published"
         return
       }
 
       return Err(
-        types.PmError.PackageContract(f"repository snapshot generation {snapshot.generation} does not advance the published generation {prior.generation}"),
+        types.PmError.PackageContract(f"repository snapshot generation {parsed.generation} does not advance the published generation {prior.generation}"),
       )
     }
   }
