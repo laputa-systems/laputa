@@ -154,12 +154,16 @@ PM has no default remote; these make targets use the loopback mirror.
   overrides can bypass fingerprint checks. `kbuild.plan_fingerprint` requires
   the source architecture to resolve those inputs.
   `kbuild.discover_plan_with_process_pool` takes a parsed configuration and
-  shares it with every discovery worker. Its temporary pool files use `TMPDIR`
-  when set and `/tmp` otherwise; an empty `TMPDIR` is rejected.
+  shares it with every discovery worker. It returns a `KbuildDiscovery` with
+  the plan and per-directory input records; `kbuild.discover_with_inputs`
+  returns the same information for local discovery.
+  `kbuild.plan_fingerprint_for_discovery` binds those records to a plan.
+  Temporary pool files use `TMPDIR` when set and `/tmp` otherwise; an empty
+  `TMPDIR` is rejected.
   The source tree's local scan-record cache uses format `linux-local-records-v4`;
   older records are discarded and rebuilt on the next discovery.
   The compile-flags cache uses format `linux-kbuild-compile-flags-v3`, and
-  discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v11`.
+  discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v12`.
 - Containers have no network, so only host processes reach the mirror.
   Host planning, importing, publishing, and composition call typed PM operations
   in the same process under a scoped `XSH_PM_REPO` value.

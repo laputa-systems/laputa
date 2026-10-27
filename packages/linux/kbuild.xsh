@@ -57,6 +57,9 @@ export type PlanRecord = {
 ## Serialized directory scan exchanged with discovery workers and the local-record cache.
 export type ScanRecord = {dir: Str, file_hash: Str, plan: PlanRecord, child_dirs: List[Str], entries: List[Str]}
 
+## A discovered plan and the inputs consumed while building it.
+export type KbuildDiscovery = {plan: KbuildPlan, records: List[ScanRecord]}
+
 type PoolConfigEnabled = {name: Str, value: Bool}
 type PoolConfigValue = {name: Str, value: Str}
 ## Shared discovery-worker pool state guarded by the pool lock file.
@@ -2449,7 +2452,7 @@ proc discover_records_process_pool(
   options: DiscoverOptions,
   xsh_bin: Path,
   worker: Path,
-) -> Result[KbuildPlan] {
+) -> Result[KbuildDiscovery] {
   let temporary_dir = e"TMPDIR" ?? "/tmp"
   return Err(ScriptError.Failed(kind: "kbuild-pool-tmpdir", message: "TMPDIR must not be empty")) when temporary_dir == ""
   let prefix = f"{temporary_dir}/xsh-kbuild-pool-{time.now()}"
@@ -2515,7 +2518,7 @@ proc discover_records_process_pool(
     }
   }
 
-  plan_from_record_values(records)?
+  {plan: plan_from_record_values(records)?, records: records}
 }
 
 ## Exported declaration `discover_plan_with_process_pool`.
@@ -2526,7 +2529,7 @@ export proc discover_plan_with_process_pool(
   options: DiscoverOptions,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, env, time, error] -> Result[KbuildPlan, Error] {
+) [fs, process, env, time, error] -> Result[KbuildDiscovery, Error] {
   discover_records_process_pool(root, config, srcarch, options, xsh_bin, worker)?
 }
 
@@ -2790,6 +2793,16 @@ export proc discover_plan_with_options(
   srcarch: Str,
   options: DiscoverOptions,
 ) [fs, error] -> Result[KbuildPlan, Error] {
+  (discover_with_inputs(root, config, srcarch, options)?).plan
+}
+
+## Discover the plan and retain the inputs consumed by each directory scan.
+export proc discover_with_inputs(
+  root: Path,
+  config: Kconfig,
+  srcarch: Str,
+  options: DiscoverOptions,
+) [fs, error] -> Result[KbuildDiscovery, Error] {
   var scans: Map[DirScan] = {}
   var local_graph = LocalRecordGraph(records: {}, barriers: {}, plan: empty_plan())
 
@@ -2838,7 +2851,12 @@ export proc discover_plan_with_options(
     f"xsh-kbuild-discover-complete {plan.dirs.len()} dirs {plan.objects.len()} objects {plan.composites.len()} composites",
   )
 
-  plan
+  let records: List[ScanRecord] = collect {
+    for dir in plan.dirs {
+      yield local_record_record(scans.get(path_key(dir))?)
+    }
+  }
+  {plan: plan, records: records}
 }
 
 pure path_strings(paths: List[Path]) -> List[Str] {
@@ -3051,8 +3069,8 @@ proc fingerprint_dir_line(root: Path, dir: Path, config: Kconfig, srcarch: Str, 
 
   match kbuild_file(join_root(root, dir)) {
     Ok(file) => {
-      let rel = file.strip_prefix(root)?
-      line = f"{path_key(rel)} {kbuild_inputs_fingerprint(root, dir, config, srcarch, mode)?}"
+      let label = if mode == DiscoveryInputs { path_key(dir) } else { path_key(file.strip_prefix(root)?) }
+      line = f"{label} {kbuild_inputs_fingerprint(root, dir, config, srcarch, mode)?}"
     }
     Err(err) => line = f"{path_key(dir)} missing {err.message}"
   }
@@ -3060,15 +3078,13 @@ proc fingerprint_dir_line(root: Path, dir: Path, config: Kconfig, srcarch: Str, 
   line
 }
 
-## Exported declaration `plan_fingerprint`.
-export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan, srcarch: Str) [fs, error] -> Result[Str, Error] {
-  let config = load_config(config_path)?
-  let inputs = plan.dirs |> par-map(jobs: planner_jobs()) { |dir| fingerprint_dir_line(root, dir, config, srcarch, DiscoveryInputs)? }
+pure plan_fingerprint_with_lines(config: Kconfig, plan: KbuildPlan, srcarch: Str, makefile_hash: Str, inputs: List[Str]) -> Result[Str] {
+  let config_hash = bytes.from_text(json.encode(config)?).sha256().hex()
   let plan_hash = bytes.from_text(json.encode(plan_record(plan))?).sha256().hex()
-  f"""format linux-kbuild-plan-fingerprint-v11
+  f"""format linux-kbuild-plan-fingerprint-v12
 srcarch {srcarch}
-config {hash.sha256(config_path)?.hex()}
-makefile {hash.sha256(fp"{root}/Makefile")?.hex()}
+config {config_hash}
+makefile {makefile_hash}
 dirs {plan.dirs.len()}
 objects {plan.objects.len()}
 lib_objects {plan.lib_objects.len()}
@@ -3077,6 +3093,30 @@ plan {plan_hash}
 inputs
 {inputs.join("\n")}
 """
+}
+
+## Fingerprint a plan using the inputs captured during discovery.
+export pure plan_fingerprint_for_discovery(config: Kconfig, discovery: KbuildDiscovery, srcarch: Str, makefile_hash: Str) -> Result[Str, Error] {
+  let records: Map[ScanRecord] = {record.dir: record for record in discovery.records}
+  let inputs: List[Str] = collect {
+    for dir in discovery.plan.dirs {
+      let key = path_key(dir)
+      let record = records.get(key)?
+      if record.file_hash == "" {
+        yield f"{key} missing {record.plan.unsupported.get(0)?}"
+      } else {
+        yield f"{key} {record.file_hash}"
+      }
+    }
+  }
+  plan_fingerprint_with_lines(config, discovery.plan, srcarch, makefile_hash, inputs)
+}
+
+## Exported declaration `plan_fingerprint`.
+export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan, srcarch: Str) [fs, error] -> Result[Str, Error] {
+  let config = load_config(config_path)?
+  let inputs = plan.dirs |> par-map(jobs: planner_jobs()) { |dir| fingerprint_dir_line(root, dir, config, srcarch, DiscoveryInputs)? }
+  plan_fingerprint_with_lines(config, plan, srcarch, hash.sha256(fp"{root}/Makefile")?.hex(), inputs)
 }
 
 pure task_record(task: make.MakeTask) -> Result[ArchiveTaskRecord] {

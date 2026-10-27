@@ -375,3 +375,41 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
     }
   }?
 }
+
+test test_linux_plan_cache_rejects_inputs_changed_after_worker_scan [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-plan-worker-input")?
+  let recipe_root = fp"{root}/recipe"
+  let source = fp"{root}/source"
+  let cache = fp"{root}/cache"
+  let worker = fp"{recipe_root}/kbuild-pool-worker.xsh"
+  let _ = fs.copy_tree(p"packages/linux", recipe_root, parents: true, overwrite: true)?
+  source.mkdir()
+  fp"{source}/.config".write("")
+  fp"{source}/Makefile".write("")
+  fp"{source}/Kbuild".write("obj-y += before.o\n")
+  let original = worker.read_text()?
+  let change_input = f"""    fp"{source}/Kbuild".write("obj-y += after.o\\n")?
+"""
+  let instrumented = original.replace("    if let Ok(scan) = scan_result {", with: change_input + "    if let Ok(scan) = scan_result {")
+  assert instrumented != original
+  worker.write(instrumented)
+  env ({
+    XSH_PM_RECIPE_DIR: recipe_root.display(),
+    XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(),
+    XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
+    XSH_LINUX_KBUILD_TRUST_PLAN_CACHE: "0",
+    XSH_LINUX_KBUILD_FORCE_DISCOVER: "0",
+    XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE: "0",
+  }) {
+    cd source {
+      let first = linux_shared.cached_package_plan("arm64")?
+      assert p"before.o" in first.objects
+      let second = linux_shared.cached_package_plan("arm64")?
+      assert p"after.o" in second.objects
+      assert p"before.o" not in second.objects
+      worker.remove(missing_ok: false)
+      let third = linux_shared.cached_package_plan("arm64")?
+      assert p"after.o" in third.objects
+    }
+  }?
+}

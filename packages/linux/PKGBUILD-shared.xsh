@@ -77,13 +77,19 @@ proc staged_recipe_helper(name: Str) -> Result[Path] {
 
 ## Exported declaration `discover_package_plan`.
 export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] -> Result[kbuild.KbuildPlan, Error] {
+  (discover_package_with_inputs(srcarch)?).discovery.plan
+}
+
+type PackageDiscovery = {config: kbuild.Kconfig, discovery: kbuild.KbuildDiscovery}
+
+proc discover_package_with_inputs(srcarch: Str) [fs, process, env, time, error] -> Result[PackageDiscovery, Error] {
   let config = kbuild.load_config(p".config")?
   let options = discover_options_from_env()?
 
   if ! options.local_record_cache {
     let xsh_bin = process.which("xsh")?
     let worker = staged_recipe_helper("kbuild-pool-worker.xsh")?
-    return kbuild.discover_plan_with_process_pool(
+    let discovery = kbuild.discover_plan_with_process_pool(
       p".",
       config,
       srcarch,
@@ -91,9 +97,10 @@ export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] 
       xsh_bin,
       worker,
     )?
+    return {config: config, discovery: discovery}
   }
 
-  kbuild.discover_plan_with_options(p".", config, srcarch, options)?
+  {config: config, discovery: kbuild.discover_with_inputs(p".", config, srcarch, options)?}
 }
 
 ## Exported declaration `write_materialized_outputs`.
@@ -474,12 +481,14 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   }
 
   emit_kbuild_progress("xsh-kbuild-plan discover-start")
-  let plan = discover_package_plan(srcarch)?
+  let makefile_hash = hash.sha256(p"Makefile")?.hex()
+  let observed = discover_package_with_inputs(srcarch)?
+  let plan = observed.discovery.plan
   emit_kbuild_progress(f"xsh-kbuild-plan write {plan.dirs.len()} dirs {plan.objects.len()} objects")
   kbuild.write_discovered_plan(plan, plan_path)
   remove_archive_plan_cache()
   emit_kbuild_progress("xsh-kbuild-plan fingerprint")
-  let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan, srcarch)?
+  let fingerprint = kbuild.plan_fingerprint_for_discovery(observed.config, observed.discovery, srcarch, makefile_hash)?
 
   kbuild.write_text_if_changed(
     fingerprint_path,

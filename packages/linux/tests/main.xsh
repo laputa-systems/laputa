@@ -245,7 +245,7 @@ test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
   write_fixture(root)
   let config = kbuild.load_config(fp"{root}/.config")?
   let default_plan = kbuild.discover_plan(root, config, "arm64")?
-  let local_plan = kbuild.discover_plan_with_options(
+  let observed = kbuild.discover_with_inputs(
     root,
     config,
     "arm64",
@@ -258,9 +258,13 @@ test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
       build_plan: true,
     },
   )?
+  let local_plan = observed.plan
   kbuild.write_discovered_plan(default_plan, default_out)
   kbuild.write_discovered_plan(local_plan, local_out)
   assert default_out.read_text()? == local_out.read_text()?
+  let makefile_hash = hash.sha256(fp"{root}/Makefile")?.hex()
+  assert kbuild.plan_fingerprint_for_discovery(config, observed, "arm64", makefile_hash)? ==
+    kbuild.plan_fingerprint(root, fp"{root}/.config", local_plan, "arm64")?
 }
 
 test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
@@ -339,12 +343,12 @@ test test_kbuild_rebuilds_legacy_discovered_plan_cache [fs, process, env, time, 
       }
       for fingerprint in [p".xsh-kbuild-plan.fingerprint", fp"{cache}/linux-arm64.plan.fingerprint"] {
         let current = fingerprint.read_text()?
-        fingerprint.write(current.replace("linux-kbuild-plan-fingerprint-v11", with: "linux-kbuild-plan-fingerprint-v10"))
+        fingerprint.write(current.replace("linux-kbuild-plan-fingerprint-v12", with: "linux-kbuild-plan-fingerprint-v11"))
       }
       let refreshed = linux_shared.cached_package_plan("arm64")?
       assert contains_path(refreshed.objects, "init/main.o")
       assert ! contains_path(refreshed.objects, "init/stale.o")
-      assert "linux-kbuild-plan-fingerprint-v11" in p".xsh-kbuild-plan.fingerprint".read_text()?
+      assert "linux-kbuild-plan-fingerprint-v12" in p".xsh-kbuild-plan.fingerprint".read_text()?
       for plan_file in [p".xsh-kbuild-plan.json", fp"{cache}/linux-arm64.plan.json"] {
         let original = plan_file.read_text()?
         plan_file.write(original.replace("init/main.o", with: "init/stale.o"))
