@@ -24,10 +24,10 @@ export type VerifiedRepoSnapshot = {generation: Str, expires_at: Int, index_sha2
 ## Durable accepted-snapshot state for one repository.
 export type SnapshotStatePaths = {accepted: Path}
 
-let MAX_SNAPSHOT_METADATA_BYTES = 4096
-let MAX_SNAPSHOT_SIGNATURE_BYTES = 64
-let MAX_SNAPSHOT_INDEX_BYTES = 10485760
-let MAX_SNAPSHOT_VALIDITY_SECONDS = 7776000
+const MAX_SNAPSHOT_METADATA_BYTES = 4096
+const MAX_SNAPSHOT_SIGNATURE_BYTES = 64
+const MAX_SNAPSHOT_INDEX_BYTES = 10485760
+const MAX_SNAPSHOT_VALIDITY_SECONDS = 7776000
 
 pure snapshot_fail(message: Str) -> Error {
   types.PmError.RemoteIndex(message)

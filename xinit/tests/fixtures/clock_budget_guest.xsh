@@ -1,6 +1,6 @@
 #!/bin/xsh --
 use pm.generation
-error ClockGuestError = Failed(message: Str)
+error ClockGuestError = Failed
 
 type ClockGuestStatus = {state: Str, pid: Int, ready: Bool, restarts: Int}
 
@@ -32,7 +32,7 @@ proc wait_state(root: Path, wanted: Str) -> Result[ClockGuestStatus] {
     time.sleep(20ms)
   }
 
-  Err(ClockGuestError.Failed(message: f"deadline waiting for clock service state {wanted}"))
+  Err(ClockGuestError.Failed(f"deadline waiting for clock service state {wanted}"))
 }
 
 proc wait_replacement(root: Path, old_pid: Int) -> Result[ClockGuestStatus] {
@@ -46,7 +46,7 @@ proc wait_replacement(root: Path, old_pid: Int) -> Result[ClockGuestStatus] {
     time.sleep(20ms)
   }
 
-  Err(ClockGuestError.Failed(message: "deadline waiting for replacement service"))
+  Err(ClockGuestError.Failed("deadline waiting for replacement service"))
 }
 
 proc wait_worker(root: Path, pid: Int) {
@@ -61,7 +61,7 @@ proc wait_worker(root: Path, pid: Int) {
     time.sleep(20ms)
   }
 
-  Err(ClockGuestError.Failed(message: "service identity did not match the owned process group"))
+  Err(ClockGuestError.Failed("service identity did not match the owned process group"))
 }
 
 proc worker(root: Path) {

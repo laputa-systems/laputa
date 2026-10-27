@@ -1,6 +1,6 @@
 #!/bin/xsh --
 use pm.generation
-error ReplayGuestError = Failed(message: Str)
+error ReplayGuestError = Failed
 
 proc require_disposable_guest() {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
@@ -20,7 +20,7 @@ proc wait_file(marker: Path) {
     return when marker.exists()
     time.sleep(20ms)
   }
-  Err(ReplayGuestError.Failed(message: f"deadline waiting for {marker}"))
+  Err(ReplayGuestError.Failed(f"deadline waiting for {marker}"))
 }
 
 proc descendant(root: Path) {
