@@ -321,6 +321,10 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
     return Err(MakeError.InvalidJobs("job count must be positive"))
   }
 
+  check_task_graph(tasks)?
+}
+
+pure check_task_graph(tasks: List[MakeTask]) -> Result[Unit, Error] {
   var names: Map[Bool] = {}
   var outputs: Map[Bool] = {}
 
@@ -361,6 +365,44 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
       }
     }
   }
+}
+
+## Validate and return the graph in input order without inspecting files or executing tasks.
+export pure plan_tasks(tasks: List[MakeTask]) -> Result[List[MakeTask], Error] {
+  check_task_graph(tasks)?
+  var dependents: Map[List[Str]] = {}
+  var remaining: Map[Int] = {}
+  var ready: List[Str] = []
+  let no_dependents: List[Str] = []
+
+  for task in tasks {
+    remaining[task.name] = task.deps.len()
+    if task.deps.is_empty() {
+      ready += [task.name]
+    }
+    for dep in task.deps {
+      dependents[dep] = (dependents.get(dep) ?? no_dependents).push(task.name)
+    }
+  }
+
+  var index = 0
+  while index < ready.len() {
+    let name = ready[index]
+    index += 1
+    for dependent in dependents.get(name) ?? no_dependents {
+      let count = (remaining.get(dependent) ?? 0) - 1
+      remaining[dependent] = count
+      if count == 0 {
+        ready += [dependent]
+      }
+    }
+  }
+
+  if index != tasks.len() {
+    return Err(MakeError.DependencyCycle("cycle in make task graph"))
+  }
+
+  tasks
 }
 
 pure dep_path(cwd: Path, dep: Str) -> Path {
@@ -414,10 +456,10 @@ proc output_missing(task: MakeTask) -> Result[Bool] {
 }
 
 proc oldest_output_mtime(outputs: List[Path]) -> Result[Int] {
-  var oldest = outputs[0].metadata()?.modified
+  var oldest = fs.stat(outputs[0])?.mtime_ns
 
   for output in outputs {
-    let modified = output.metadata()?.modified
+    let modified = fs.stat(output)?.mtime_ns
 
     if modified < oldest {
       oldest = modified
@@ -437,7 +479,7 @@ proc input_newer(task: MakeTask) -> Result[Bool] {
       return true
     }
 
-    return true when input.metadata()?.modified > oldest_output
+    return true when fs.stat(input)?.mtime_ns > oldest_output
   }
 
   false
@@ -469,6 +511,13 @@ proc should_run(task: MakeTask) -> Result[Bool] {
   return true when has_path(task.depfile) and ! task.depfile.exists()
 
   input_newer(task)?
+}
+
+pure dependencies_rebuilt(task: MakeTask, rebuilt: Set[Str]) -> Bool {
+  for dep in task.deps {
+    return true when dep in rebuilt
+  }
+  false
 }
 
 proc prepare_task_dirs(task: MakeTask) {
@@ -573,6 +622,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
   var ready = []
   var ready_index = 0
   var done: Set[Str] = set.empty()
+  var rebuilt: Set[Str] = set.empty()
   var scheduled: Map[Bool] = {}
   var running: List[RunningTask] = []
   var pending_stamps: List[RunningTask] = []
@@ -607,7 +657,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
         let task = task_by_name.get(task_name)?
         scheduled[task.name] = true
 
-        if should_run(task) {
+        if dependencies_rebuilt(task, rebuilt) or should_run(task) {
           running += [spawn_task(task)?]
           spawn_count += 1
           if running.len() > peak_running {
@@ -701,6 +751,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
 
     for row in completed_tasks {
       pending_stamps += [row]
+      rebuilt = rebuilt.add(row.task.name)
       done = done.add(row.task.name)
       done_count += 1
 
@@ -721,7 +772,7 @@ export proc run_tasks(tasks: List[MakeTask], jobs_count: Int) [fs, process, env,
           let task = task_by_name.get(task_name)?
           scheduled[task.name] = true
 
-          if should_run(task) {
+          if dependencies_rebuilt(task, rebuilt) or should_run(task) {
             running += [spawn_task(task)?]
             spawn_count += 1
             if running.len() > peak_running {

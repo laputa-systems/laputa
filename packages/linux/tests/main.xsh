@@ -1,4 +1,5 @@
 use packages.linux.kbuild
+use packages.linux.PKGBUILD-shared as linux_shared
 use pm.make
 
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}
@@ -136,7 +137,8 @@ proc test_builtin_archive_plan(
   defs: List[Str],
   includes: List[Str],
 ) [fs, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
-  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display()}) {
+  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
+    XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
   }
 }
@@ -153,7 +155,8 @@ proc test_builtin_archive_plan_with_workers(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
-  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display()}) {
+  env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
+    XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives_with_analysis_workers(
       plan,
       cc,
@@ -219,6 +222,22 @@ test test_kbuild_discovers_configured_obj_y_dirs_and_objects [fs, error] { |ctx|
   assert plan.unsupported.is_empty()
 }
 
+test test_kbuild_worker_records_bind_included_inputs [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-kbuild-worker-inputs")?
+  fp"{root}/.config".write("")
+  fp"{root}/Kbuild".write("include $(src)/objects.include\n")
+  let included = fp"{root}/objects.include"
+  included.write("obj-y := before.o\n")
+  let config = kbuild.load_config(fp"{root}/.config")?
+  let before = kbuild.scan_record_for_dir(root, config, "x86", p".")?
+  included.write("obj-y := after.o\n")
+  let after = kbuild.scan_record_for_dir(root, config, "x86", p".")?
+  assert before.plan.objects == ["before.o"]
+  assert after.plan.objects == ["after.o"]
+  assert before.file_hash != ""
+  assert before.file_hash != after.file_hash
+}
+
 test test_kbuild_local_record_graph_matches_default [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild-local-records")?
   let default_out = test.temp_path(ctx, name: "linux-kbuild-default-plan")
@@ -270,6 +289,124 @@ test test_kbuild_local_record_cache_reuses_and_invalidates [fs, error] { |ctx|
   assert contains_path(third.objects, "cached.o")
 }
 
+test test_kbuild_local_record_cache_binds_parsed_configuration [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-kbuild-config-snapshot")?
+  let config_path = fp"{root}/.config"
+  fp"{root}/Kbuild".write("obj-$(CONFIG_TEST) += chosen.o\n")
+  config_path.write("CONFIG_TEST=y\n")
+  let enabled = kbuild.load_config(config_path)?
+  config_path.write("# CONFIG_TEST is not set\n")
+  let disabled = kbuild.load_config(config_path)?
+  let options = {progress: false, progress_every: 100, jobs: 1, local_records: true, local_record_cache: true, build_plan: true}
+  let first = kbuild.discover_plan_with_options(root, enabled, "x86", options)?
+  assert contains_path(first.objects, "chosen.o")
+  let second = kbuild.discover_plan_with_options(root, disabled, "x86", options)?
+  assert ! contains_path(second.objects, "chosen.o")
+}
+
+test test_kbuild_rebuilds_legacy_local_records_after_make_semantics_change [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-kbuild-legacy-records")?
+  write_fixture(root)
+  let config = kbuild.load_config(fp"{root}/.config")?
+  let options = {progress: false, progress_every: 100, jobs: 1, local_records: true, local_record_cache: true, build_plan: true}
+  let _ = kbuild.discover_plan_with_options(root, config, "arm64", options)?
+  let cache = fp"{root}/.xsh-kbuild-local-records.json"
+  let original = cache.read_text()?
+  let stale = original.replace("init/main.o", with: "init/stale.o").replace("linux-local-records-v4", with: "linux-local-records-v3")
+  assert stale != original
+  cache.write(stale)
+  let refreshed = kbuild.discover_plan_with_options(root, config, "arm64", options)?
+  assert contains_path(refreshed.objects, "init/main.o")
+  assert ! contains_path(refreshed.objects, "init/stale.o")
+  assert "linux-local-records-v4" in cache.read_text()?
+}
+
+test test_kbuild_rebuilds_legacy_discovered_plan_cache [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-legacy-plan")?
+  let cache = test.temp_dir(ctx, name: "linux-legacy-plan-cache")?
+  write_fixture(root)
+  cd root {
+    env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_LOCAL_RECORDS: "1",
+      XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE: "1", XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
+      XSH_LINUX_KBUILD_TRUST_PLAN_CACHE: "0", XSH_LINUX_KBUILD_FORCE_DISCOVER: "0",
+      XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE: "", XSH_LINUX_KBUILD_USE_PLAN_TEXT: "", XSH_LINUX_KBUILD_USE_PLAN: ""}) {
+      let _ = linux_shared.cached_package_plan("arm64")?
+      for plan_file in [p".xsh-kbuild-plan.json", fp"{cache}/linux-arm64.plan.json"] {
+        let original = plan_file.read_text()?
+        let stale = original.replace("init/main.o", with: "init/stale.o")
+        assert stale != original
+        plan_file.write(stale)
+      }
+      for fingerprint in [p".xsh-kbuild-plan.fingerprint", fp"{cache}/linux-arm64.plan.fingerprint"] {
+        let current = fingerprint.read_text()?
+        fingerprint.write(current.replace("linux-kbuild-plan-fingerprint-v11", with: "linux-kbuild-plan-fingerprint-v10"))
+      }
+      let refreshed = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(refreshed.objects, "init/main.o")
+      assert ! contains_path(refreshed.objects, "init/stale.o")
+      assert "linux-kbuild-plan-fingerprint-v11" in p".xsh-kbuild-plan.fingerprint".read_text()?
+      for plan_file in [p".xsh-kbuild-plan.json", fp"{cache}/linux-arm64.plan.json"] {
+        let original = plan_file.read_text()?
+        plan_file.write(original.replace("init/main.o", with: "init/stale.o"))
+      }
+      let repaired = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(repaired.objects, "init/main.o")
+      assert ! contains_path(repaired.objects, "init/stale.o")
+    }?
+  }
+}
+
+test test_kbuild_plan_cache_distinguishes_source_architectures [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-plan-arch-change")?
+  let cache = test.temp_dir(ctx, name: "linux-plan-arch-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/Makefile".write("")
+  fp"{root}/Kbuild".write("""ifeq ($(SRCARCH),arm64)
+obj-y += arm.o
+else
+obj-y += x86.o
+endif
+""")
+  cd root {
+    env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_LOCAL_RECORDS: "1",
+      XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE: "1", XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
+      XSH_LINUX_KBUILD_TRUST_PLAN_CACHE: "0", XSH_LINUX_KBUILD_FORCE_DISCOVER: "0",
+      XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE: "", XSH_LINUX_KBUILD_USE_PLAN_TEXT: "", XSH_LINUX_KBUILD_USE_PLAN: ""}) {
+      let arm = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(arm.objects, "arm.o")
+      let x86 = linux_shared.cached_package_plan("x86")?
+      assert contains_path(x86.objects, "x86.o")
+      assert ! contains_path(x86.objects, "arm.o")
+    }?
+  }
+}
+
+test test_kbuild_plan_cache_invalidates_nested_and_included_makefiles [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-plan-input-change")?
+  let cache = test.temp_dir(ctx, name: "linux-plan-input-cache")?
+  write_fixture(root)
+  let nested = fp"{root}/init/Kbuild"
+  nested.write(nested.read_text()? + "include $(src)/extra.include\n")
+  let included = fp"{root}/init/extra.include"
+  included.write("obj-y += included-before.o\n")
+  cd root {
+    env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_LOCAL_RECORDS: "1",
+      XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE: "1", XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
+      XSH_LINUX_KBUILD_TRUST_PLAN_CACHE: "0", XSH_LINUX_KBUILD_FORCE_DISCOVER: "0",
+      XSH_LINUX_KBUILD_USE_PLAN_TEXT_INLINE: "", XSH_LINUX_KBUILD_USE_PLAN_TEXT: "", XSH_LINUX_KBUILD_USE_PLAN: ""}) {
+      let first = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(first.objects, "init/included-before.o")
+      included.write("obj-y += included-after.o\n")
+      let second = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(second.objects, "init/included-after.o")
+      assert ! contains_path(second.objects, "init/included-before.o")
+      nested.write(nested.read_text()? + "obj-y += nested-added.o\n")
+      let third = linux_shared.cached_package_plan("arm64")?
+      assert contains_path(third.objects, "init/nested-added.o")
+    }?
+  }
+}
+
 test test_kbuild_writes_text_plan [fs, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-kbuild-text")?
   let out = test.temp_path(ctx, name: "plan.json")
@@ -280,6 +417,46 @@ test test_kbuild_writes_text_plan [fs, error] { |ctx|
   let loaded = kbuild.read_discovered_plan(out)?
   assert loaded.objects.len() == plan.objects.len()
   assert contains_path(loaded.objects, "init/main.o")
+}
+
+test test_kbuild_expands_nested_make_functions_and_replaces_object_assignments [fs, error] { |ctx|
+  for mode in ["flat", "conditional"] {
+    let root = test.temp_dir(ctx, name: f"linux-kbuild-make-functions-{mode}")?
+    fp"{root}/.config".write("CONFIG_TEST=y\n")
+    let assignments = """obj-y := one.o café.o
+obj-y := $(patsubst %.o,%.pi.o,$(obj-y))
+lib-y := core.o
+lib-y := $(patsubst %.o,%.stub.o,$(lib-y))
+vdsos-y := 64 x32 café
+obj-y += $(foreach x,$(vdsos-y),café$(x)-image.o)
+empty-y :=
+empty-y ?= unwanted.o
+obj-y += $(empty-y)
+"""
+    let source = if mode == "conditional" { "ifeq ($(CONFIG_TEST),y)\n" + assignments + "endif\n" } else { assignments }
+    fp"{root}/Kbuild".write(source)
+    let config = kbuild.load_config(fp"{root}/.config")?
+    let plan = kbuild.discover_plan(root, config, "x86")?
+    assert [item.display() for item in plan.objects] == ["one.pi.o", "café.pi.o", "café64-image.o", "caféx32-image.o", "cafécafé-image.o"]
+    assert [item.display() for item in plan.lib_objects] == ["core.stub.o"]
+    assert plan.unsupported.is_empty(), plan.unsupported.join("\n")
+  }
+}
+
+test test_kbuild_simple_assignments_replace_prior_object_lists [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-kbuild-simple-assignments")?
+  fp"{root}/.config".write("")
+  fp"{root}/Kbuild".write("""obj-y := discarded.o
+obj-y := retained.o
+obj-y += appended.o
+lib-y := old.o
+lib-y := new.o
+""")
+  let config = kbuild.load_config(fp"{root}/.config")?
+  let plan = kbuild.discover_plan(root, config, "x86")?
+  assert [item.display() for item in plan.objects] == ["retained.o", "appended.o"]
+  assert [item.display() for item in plan.lib_objects] == ["new.o"]
+  assert plan.unsupported.is_empty(), plan.unsupported.join("\n")
 }
 
 test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
@@ -510,12 +687,16 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
   }
 }
 
-test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { |ctx|
+test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-runner")?
   let first = fp"{root}/first.txt"
   let second = fp"{root}/second.txt"
+  let unused = fp"{root}/unused.txt"
+  let source = fp"{root}/source.txt"
+  let calls = fp"{root}/calls.txt"
   let plan = fp"{root}/archive-plan.json"
   let no_strings: List[Str] = []
+  source.write("first")
 
   json.write(
     plan,
@@ -523,19 +704,19 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
       archives: no_strings,
       generated_objects: no_strings,
       missing_sources: no_strings,
-      task_count: 2,
+      task_count: 3,
       tasks: [
         {
           name: "first",
           outputs: [
             first.display(),
           ],
-          inputs: no_strings,
+          inputs: [source.display()],
           deps: no_strings,
           argv: [
             "/bin/sh",
             "-c",
-            f"printf first > {first}",
+            f"cat {source} > {first}; printf 'first\\n' >> {calls}",
           ],
           env: {},
           cwd: root.display(),
@@ -556,12 +737,23 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
           argv: [
             "/bin/sh",
             "-c",
-            f"cat {first} > {second}; printf second >> {second}",
+            f"cat {first} > {second}; printf second >> {second}; printf 'second\\n' >> {calls}",
           ],
           env: {},
           cwd: root.display(),
           depfile: "",
           stamp: fp"{root}/second.cmd".display(),
+        },
+        {
+          name: "unused",
+          outputs: [unused.display()],
+          inputs: no_strings,
+          deps: no_strings,
+          argv: ["/bin/sh", "-c", f"printf unused > {unused}"],
+          env: {},
+          cwd: root.display(),
+          depfile: "",
+          stamp: fp"{root}/unused.cmd".display(),
         },
       ],
     },
@@ -570,6 +762,51 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, error] { 
   kbuild.run_archive_plan_output(plan, second, 1)
   assert first.read_text()? == "first"
   assert second.read_text()? == "firstsecond"
+  assert ! unused.exists()?
+  assert calls.read_text()? == "first\nsecond\n"
+  kbuild.run_archive_plan_output(plan, second, 1)
+  assert calls.read_text()? == "first\nsecond\n"
+  fs.set_times(second, mtime_sec: 4039372800)?
+  source.write("changed")
+  fs.set_times(source, mtime_sec: 4070908800)?
+  kbuild.run_archive_plan_output(plan, second, 1)
+  assert first.read_text()? == "changed"
+  assert second.read_text()? == "changedsecond"
+  assert calls.read_text()? == "first\nsecond\nfirst\nsecond\n"
+  assert ! unused.exists()?
+  let archive_plan: kbuild.BuiltinArchivePlan = {
+    tasks: [
+      {name: "first", outputs: [first], inputs: [source], deps: [], argv: ["/bin/true"], cwd: root,
+        env: {}, depfile: p"", stamp: p""},
+      {name: "second", outputs: [second], inputs: [first], deps: ["first"], argv: ["/bin/true"], cwd: root,
+        env: {}, depfile: p"", stamp: p""},
+      {name: "unused", outputs: [unused], inputs: [], deps: [], argv: ["/bin/true"], cwd: root,
+        env: {}, depfile: p"", stamp: p""},
+    ],
+    task_specs: [],
+    task_count: 3,
+    archives: [],
+    link_inputs: [],
+    missing_sources: [],
+    generated_objects: [],
+    duplicate_outputs: [],
+  }
+  cd root {
+    env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_LINUX_KBUILD_JOBS: "1"}) {
+      match linux_shared.run_targeted_kbuild_outputs(archive_plan, second.display()) {
+        Ok(_) => test.fail("plan stop unexpectedly succeeded")
+        Err(kbuild.ScriptError.Failed {kind, message}) => {
+          assert kind == "linux-kbuild-stopped"
+          assert message == "stopped after plan"
+        }
+        Err(problem) => test.fail(f"unexpected plan stop error: {problem.message}")
+      }
+    }
+    let report = json.read(p".xsh-kbuild-archive-plan.json")?.require(ArchivePlanReport)?
+    assert report.task_count == 3
+    assert report.tasks.len() == 3
+  }
+  assert calls.read_text()? == "first\nsecond\nfirst\nsecond\n"
 }
 
 test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
@@ -858,6 +1095,70 @@ CFLAGS_intel.o := -I$(src)
 
     assert saw_controller
     assert saw_intel
+  }
+}
+
+test test_kbuild_defined_empty_flags_reject_conditional_defaults [fs, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-empty-flags")?
+  let cache = test.temp_dir(ctx, name: "linux-empty-flags-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/foo.c".write("int foo(void) { return 0; }\n")
+  fp"{root}/Kbuild".write("""empty-y :=
+empty-y ?= unwanted
+ccflags-y :=
+ccflags-y ?= -DUNEXPECTED_DIR
+subdir-ccflags-y :=
+subdir-ccflags-y ?= -DUNEXPECTED_SUBDIR
+CFLAGS_foo.o :=
+CFLAGS_foo.o ?= -DUNEXPECTED_OBJECT
+CFLAGS_foo.o += -DVALUE=$(empty-y)
+""")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
+  )
+  cd root {
+    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let tasks = [task for task in archive_plan.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert tasks.len() == 1
+    assert "-DVALUE=" in tasks[0].argv
+    assert "-DUNEXPECTED_DIR" not in tasks[0].argv
+    assert "-DUNEXPECTED_SUBDIR" not in tasks[0].argv
+    assert "-DUNEXPECTED_OBJECT" not in tasks[0].argv
+  }
+}
+
+test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-legacy-flags")?
+  let cache = test.temp_dir(ctx, name: "linux-legacy-flags-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/foo.c".write("int foo(void) { return 0; }\n")
+  fp"{root}/Kbuild".write("CFLAGS_include.o := flags.include\ninclude $(CFLAGS_include.o)\n")
+  fp"{root}/flags.include".write("CFLAGS_foo.o := -DVALID\n")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
+  )
+  cd root {
+    let _ = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let local = p".xsh-kbuild-compile-flags.json"
+    let stable = fp"{cache}/linux-x86.compile-flags.json"
+    for cache_file in [local, stable] {
+      let original = cache_file.read_text()?
+      let stale = original.replace("-DVALID", with: "-DSTALE").replace("linux-kbuild-compile-flags-v3", with: "linux-kbuild-compile-flags-v2")
+      assert stale != original
+      cache_file.write(stale)
+    }
+    let refreshed = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let tasks = [task for task in refreshed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert tasks.len() == 1
+    assert "-DVALID" in tasks[0].argv
+    assert "-DSTALE" not in tasks[0].argv
+    assert "linux-kbuild-compile-flags-v3" in local.read_text()?
+    p"flags.include".write("CFLAGS_foo.o := -DUPDATED\n")
+    let updated = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let updated_tasks = [task for task in updated.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert updated_tasks.len() == 1
+    assert "-DUPDATED" in updated_tasks[0].argv
+    assert "-DVALID" not in updated_tasks[0].argv
   }
 }
 

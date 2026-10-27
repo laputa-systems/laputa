@@ -190,7 +190,7 @@ proc archive_plan_cache_fingerprint(
 srcarch {srcarch}
 triple {triple}
 plan
-{kbuild.plan_fingerprint(p".", p".config", plan)?}
+{kbuild.plan_fingerprint(p".", p".config", plan, srcarch)?}
 cflags
 {cflags.join("\n")}
 includes
@@ -420,7 +420,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
       return plan
     }
 
-    let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan)?
+    let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan, srcarch)?
 
     if fingerprint_path.read_text()?.trim() == fingerprint.trim() {
       print "xsh-kbuild-plan-cache" "hit" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.composites.len() \
@@ -431,7 +431,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
     if stable_plan_path.exists() and stable_fingerprint_path.exists() {
       emit_kbuild_progress("xsh-kbuild-plan-cache stale-stable-read")
       let stable_plan = kbuild.read_discovered_plan(stable_plan_path)?
-      let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan)?
+      let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan, srcarch)?
 
       if stable_fingerprint_path.read_text()?.trim() == stable_fingerprint.trim() {
         kbuild.write_discovered_plan(stable_plan, plan_path)
@@ -454,7 +454,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   if ! force_discover and stable_plan_path.exists() and stable_fingerprint_path.exists() {
     emit_kbuild_progress("xsh-kbuild-plan-cache stable-read")
     let stable_plan = kbuild.read_discovered_plan(stable_plan_path)?
-    let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan)?
+    let stable_fingerprint = kbuild.plan_fingerprint(p".", p".config", stable_plan, srcarch)?
 
     if stable_fingerprint_path.read_text()?.trim() == stable_fingerprint.trim() {
       kbuild.write_discovered_plan(stable_plan, plan_path)
@@ -479,7 +479,7 @@ export proc cached_package_plan(srcarch: Str) [fs, process, env, time, error] ->
   kbuild.write_discovered_plan(plan, plan_path)
   remove_archive_plan_cache()
   emit_kbuild_progress("xsh-kbuild-plan fingerprint")
-  let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan)?
+  let fingerprint = kbuild.plan_fingerprint(p".", p".config", plan, srcarch)?
 
   kbuild.write_text_if_changed(
     fingerprint_path,

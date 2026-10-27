@@ -148,8 +148,15 @@ PM has no default remote; these make targets use the loopback mirror.
   plan is `.out/world/<arch>/plan.json`.
 - The kernel recipe keeps its Kbuild discovered-plan and archive-plan caches
   in `.out/cache/linux-kbuild`, mounted into world and profile containers.
-  Every entry is checked against a fingerprint of the kernel source and
-  `.config` before use.
+  By default, entries are checked against `.config`, reachable Kbuild or
+  Makefile inputs, the active included files, the source architecture, and the
+  cached plan before use. Explicit trust
+  overrides can bypass fingerprint checks. `kbuild.plan_fingerprint` requires
+  the source architecture to resolve those inputs.
+  The source tree's local scan-record cache uses format `linux-local-records-v4`;
+  older records are discarded and rebuilt on the next discovery.
+  The compile-flags cache uses format `linux-kbuild-compile-flags-v3`, and
+  discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v11`.
 - Containers have no network, so only host processes reach the mirror.
   Host planning, importing, publishing, and composition call typed PM operations
   in the same process under a scoped `XSH_PM_REPO` value.

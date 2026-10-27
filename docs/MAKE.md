@@ -6,8 +6,8 @@ implement implicit rules, or run recursive make.
 
 ## Helpers
 
-- `MakeTask` is the low-level graph unit; `check_tasks` validates it and
-  `run_tasks` schedules it.
+- `MakeTask` is the low-level graph unit; `plan_tasks` validates and returns
+  the graph inventory in input order, and `run_tasks` schedules it.
 - `compile_*_task` and `link_*_task` construct individual steps.
 - `compile_c_tasks`, `compile_lo_tasks`, and `compile_cxx_tasks` map explicit
   source lists to stable object names and return `tasks`, `objects`, and `deps`.
@@ -19,11 +19,18 @@ implement implicit rules, or run recursive make.
 - `discover_sources`, `pkg_config_flags`, and `install_header_tree` handle
   source discovery, typed pkg-config flags, and header installation.
 
+`plan_tasks` checks graph structure and cycles without reading files or executing
+tasks. Its inventory preserves dependency order and does not predict which tasks
+are current or will run.
+
 `MakeTask.argv` carries paths and strings as individual process arguments,
 never shell source. `PkgConfigFlags` keeps compiler and linker flags as string
-lists. The scheduler validates dependencies, honors depfiles and command
-stamps, rewrites native-cross compiler commands, and runs independent tasks
-in parallel. A failed command cancels unfinished peers; completed-task stamps
+lists. The scheduler validates dependencies, compares input and output times at
+nanosecond precision, honors depfiles and command stamps, rewrites native-cross
+compiler commands, and runs independent tasks
+in parallel. A task runs when any declared dependency ran in the same graph,
+even if its output timestamps would otherwise appear current. A failed command
+cancels unfinished peers; completed-task stamps
 are published only after the entire graph succeeds.
 
 Keep build decisions visible in recipes. Helpers should remove repeated object

@@ -30,6 +30,86 @@ pure task(
   }
 }
 
+test make_plan_preserves_graph_inventory_without_effects [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "make plan")?
+  let output = fp"{root}/output"
+  let base = task("base", root, ["touch", output], [output])
+  let left = task("left", root, ["touch", output], [fp"{root}/left"], deps: ["base"])
+  let right = task("right", root, ["touch", output], [fp"{root}/right"], deps: ["base"])
+  let top = task("top", root, ["touch", output], [fp"{root}/top"], deps: ["right", "left"])
+  let detached = task("detached", root, ["touch", output], [])
+  let inventory = make.plan_tasks([top, detached, right, base, left])?
+  assert [item.name for item in inventory] == ["top", "detached", "right", "base", "left"]
+  assert inventory[0].deps == ["right", "left"]
+  assert inventory[2].deps == ["base"]
+  assert inventory[3].outputs == [output]
+  assert make.plan_tasks([])?.is_empty()
+  assert ! output.exists()?
+  assert ! top.stamp.exists()?
+}
+
+test make_plan_rejects_invalid_graphs [error] {
+  let a = task("a", p".", ["true"], [p"a"])
+  let b = task("b", p".", ["true"], [p"b"], deps: ["a"])
+  match make.plan_tasks([a, a]) {
+    Ok(_) => test.fail("duplicate names accepted")
+    Err(problem) => assert problem.message.starts_with("duplicate make")
+  }
+  match make.plan_tasks([a, {...b, outputs: [p"a"]}]) {
+    Ok(_) => test.fail("duplicate outputs accepted")
+    Err(problem) => assert problem.message.starts_with("duplicate make")
+  }
+  match make.plan_tasks([b]) {
+    Ok(_) => test.fail("missing dependency accepted")
+    Err(problem) => assert problem.message.starts_with("make task")
+  }
+  match make.plan_tasks([{...a, name: ""}]) {
+    Ok(_) => test.fail("empty name accepted")
+    Err(problem) => assert problem is InvalidData
+  }
+  match make.plan_tasks([{...a, argv: []}]) {
+    Ok(_) => test.fail("empty argv accepted")
+    Err(problem) => assert problem is InvalidData
+  }
+  match make.plan_tasks([{...a, outputs: [p""]}]) {
+    Ok(_) => test.fail("empty output accepted")
+    Err(problem) => assert problem is InvalidData
+  }
+  match make.plan_tasks([{...a, deps: ["a"]}]) {
+    Ok(_) => test.fail("self cycle accepted")
+    Err(problem) => assert problem.message == "cycle in make task graph"
+  }
+  match make.plan_tasks([{...a, deps: ["b"]}, b]) {
+    Ok(_) => test.fail("cycle accepted")
+    Err(problem) => assert problem.message == "cycle in make task graph"
+  }
+}
+
+test make_scheduler_contract_invalid_jobs_precede_invalid_graph [fs, process, env, error] {
+  let invalid = task("", p".", [], [])
+  match make.run_tasks([invalid], 0) {
+    Ok(_) => test.fail("invalid jobs accepted")
+    Err(problem) => assert problem.message == "job count must be positive"
+  }
+}
+
+test make_scheduler_contract_ready_task_runs_before_disconnected_cycle [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "make cycle timing")?
+  let script = fp"{root}/write.xsh"
+  let output = fp"{root}/output"
+  script.write(r"""fp"{args[0]}".write("completed")?
+""")?
+  let ready = task("ready", root, [task_runner()?, script, "--", output], [output])
+  let a = task("a", root, ["unused"], [], deps: ["b"])
+  let b = task("b", root, ["unused"], [], deps: ["a"])
+  match make.run_tasks([a, ready, b], 1) {
+    Ok(_) => test.fail("cycle accepted")
+    Err(problem) => assert problem.message == "cycle in make task graph"
+  }
+  assert output.read_text()? == "completed"
+  assert ! ready.stamp.exists()?
+}
+
 test make_tasks_preserve_typed_argv_dependencies_and_stamp_reuse [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "make task argv")?
   let script = fp"{root}/task runner.xsh"
@@ -69,6 +149,20 @@ json.write(output, {arguments: args, environment: env.get("TASK_LABEL") ?? ""})?
   make.run_tasks([second, first], 2)
   assert first_counter.read_text()? == "x"
   assert second_counter.read_text()? == "x"
+}
+
+test make_tasks_rebuild_for_subsecond_input_changes [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "make subsecond input")?
+  let input = fp"{root}/input"
+  let output = fp"{root}/output"
+  input.write("old")
+  let copy = task("copy", root, ["/bin/cp", input, output], [output], [input])
+  make.run_tasks([copy], 1)
+  input.write("new")
+  fs.set_times(output, mtime_sec: 1700000000, mtime_nsec: 100)?
+  fs.set_times(input, mtime_sec: 1700000000, mtime_nsec: 200)?
+  make.run_tasks([copy], 1)
+  assert output.read_text()? == "new"
 }
 
 test make_tasks_cancel_running_peers_and_do_not_publish_failed_stamps [fs, process, env, time, error] { |ctx|

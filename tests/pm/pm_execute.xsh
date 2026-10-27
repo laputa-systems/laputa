@@ -364,6 +364,46 @@ test test_execute_builds_dependency_levels_in_isolated_roots_and_reuses [fs, net
   assert second == first
 }
 
+test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-count-repo")?
+  let object_store = execute_store(ctx, "execute-count-store")?
+  let names = ["execute-dep", "execute-tool", "execute-app"]
+  for name in names {
+    let recipe = fp"{repo_root}/packages/{name}/PKGBUILD.xsh"
+    let source = recipe.read_text()?
+    recipe.write(source.replace("  let target =", with: f"  print \"build-hook:{name}\"\n  let target ="))?
+  }
+
+  let initial = resolve_execute_plan(repo_root)?
+  let first_logs = test.temp_dir(ctx, name: "execute-count-first")?
+  let first = execute.build_plan(initial, repo_root, object_store, "", 2, first_logs)?
+  assert first.artifacts.len() == 3
+  for name in names {
+    let log = fp"{first_logs}/{name}.log".read_text()?
+    assert log.split(f"build-hook:{name}").len() == 2
+  }
+
+  let reuse_logs = test.temp_dir(ctx, name: "execute-count-reuse")?
+  let reused = execute.build_plan(initial, repo_root, object_store, "", 2, reuse_logs)?
+  assert reused == first
+  for name in names {
+    assert ! fp"{reuse_logs}/{name}.log".exists()?
+  }
+
+  let recipe = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
+  recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))?
+  let changed = resolve_execute_plan(repo_root)?
+  let changed_logs = test.temp_dir(ctx, name: "execute-count-changed")?
+  let rebuilt = execute.build_plan(changed, repo_root, object_store, "", 2, changed_logs)?
+  assert rebuilt.artifacts.len() == 3
+  for name in ["execute-dep", "execute-app"] {
+    let log = fp"{changed_logs}/{name}.log".read_text()?
+    assert log.split(f"build-hook:{name}").len() == 2
+  }
+  assert ! fp"{changed_logs}/execute-tool.log".exists()?
+  assert receipt_named(rebuilt, "execute-tool")? == receipt_named(first, "execute-tool")?
+}
+
 test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-x86-repo")?
   let pkgbuild = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"

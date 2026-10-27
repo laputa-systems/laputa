@@ -14,6 +14,10 @@ make test-linux    # the kernel recipe's Kbuild tests and linux-headers' headers
 make test          # all four
 ```
 
+Kbuild planner tests cover object-list replacement, nested `patsubst` and
+`foreach` expansion, and conditional defaults for defined empty flags. These
+fixtures do not qualify a complete kernel build.
+
 `xsht-config.ini` sets `module_path` to this checkout, so `xsht` resolves
 `system.*`, `seed.*`, and PM imports, including `use` imports inside profiles
 loaded through `module.load`. It excludes the fixture trees under

@@ -156,7 +156,7 @@ export type DiscoverOptions = {
 
 type DiscoverState = {plan: KbuildPlan, seen: Map[Bool], visited: Int}
 
-type DirScan = {dir: Path, plan: KbuildPlan, child_dirs: List[Path], entries: List[Path]}
+type DirScan = {dir: Path, plan: KbuildPlan, child_dirs: List[Path], entries: List[Path], file_hash: Str}
 
 type AggregateBarriers = {builtin_archive: Path, module_order: Path}
 
@@ -165,6 +165,8 @@ type LocalRecordGraph = {records: Map[DirScan], barriers: Map[AggregateBarriers]
 type DiscoverScans = {records: Map[DirScan], plan: KbuildPlan}
 
 type KbuildSource = {file: Path, body: Str}
+type KbuildVariables = {values: Map[Str], inputs: List[Str]}
+enum KbuildInputMode { GeneralVariables, DiscoveryInputs, CompileFlagInputs }
 
 type ActiveDirObjects = {dir: Path, objects: List[Path]}
 
@@ -733,25 +735,84 @@ pure expand_config_refs(raw: Str, config: Kconfig) -> Str {
   out
 }
 
-pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
-  let marker = "$("
-
-  return raw unless marker in raw
-
-  let chunks = raw.split(marker)
-  var out = chunks[0]
-
-  for chunk in chunks |> drop(1) {
-    let parts = chunk.split(")")
-
-    if parts.len() == 1 {
-      out = f"{out}{marker}{chunk}"
-    } else {
-      out = f"{out}{vars.get(parts[0]) ?? ""}{parts |> drop(1).join(")")}"
+pure make_arguments(raw: Str) -> List[Str] {
+  var arguments: List[Str] = []
+  var depth = 0
+  var start = 0
+  for index in range(raw.byte_len()) {
+    let byte = raw.byte_at(index)
+    if byte == 40 { depth += 1 }
+    if byte == 41 { depth -= 1 }
+    if byte == 44 and depth == 0 {
+      arguments += [raw.byte_slice(start, index - start)]
+      start = index + 1
     }
   }
+  arguments += [raw.byte_slice(start)]
+  arguments
+}
 
-  out
+pure make_patsubst_word(pattern: Str, replacement: Str, word: Str) -> Str {
+  let parts = pattern.split("%")
+  if parts.len() == 1 { return if word == pattern { replacement } else { word } }
+  let prefix = parts[0]
+  let suffix = parts |> drop(1).join("%")
+  return word when ! word.starts_with(prefix) or ! word.ends_with(suffix) or word.byte_len() < prefix.byte_len() + suffix.byte_len()
+  let stem = word.byte_slice(prefix.byte_len(), word.byte_len() - prefix.byte_len() - suffix.byte_len())
+  let replacement_parts = replacement.split("%")
+  return replacement when replacement_parts.len() == 1
+  f"{replacement_parts[0]}{stem}{replacement_parts |> drop(1).join("%")}"
+}
+
+pure expand_make_expression(expression: Str, vars: Map[Str]) -> Str {
+  if expression.starts_with("patsubst ") {
+    let arguments = make_arguments(expression.byte_slice(9))
+    return f"$({expression})" when arguments.len() != 3
+    let pattern = expand_make_vars(arguments[0], vars).trim()
+    let replacement = expand_make_vars(arguments[1], vars).trim()
+    let words = expand_make_vars(arguments[2], vars).fields()
+    return [make_patsubst_word(pattern, replacement, word) for word in words].join(" ")
+  }
+  if expression.starts_with("foreach ") {
+    let arguments = make_arguments(expression.byte_slice(8))
+    return f"$({expression})" when arguments.len() != 3
+    let name = expand_make_vars(arguments[0], vars).trim()
+    let words = expand_make_vars(arguments[1], vars).fields()
+    var output: List[Str] = []
+    for word in words {
+      var local = vars
+      local[name] = word
+      output += [expand_make_vars(arguments[2], local)]
+    }
+    return output.join(" ")
+  }
+  return f"$({expression})" when " " in expression
+  vars.get(expand_make_vars(expression, vars)) ?? ""
+}
+
+pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
+  var output = ""
+  var cursor = 0
+  while cursor < raw.byte_len() {
+    let remaining = raw.byte_slice(cursor)
+    let offset = remaining.find("$(") ?? -1
+    if offset < 0 { return output + remaining }
+    output += remaining.byte_slice(0, offset)
+    let start = cursor + offset
+    var index = start + 2
+    var depth = 1
+    while index < raw.byte_len() and depth > 0 {
+      let byte = raw.byte_at(index)
+      if byte == 40 { depth += 1 }
+      if byte == 41 { depth -= 1 }
+      index += 1
+    }
+    return output + raw.byte_slice(start) when depth != 0
+    let expression = raw.byte_slice(start + 2, index - start - 3)
+    output += expand_make_expression(expression, vars)
+    cursor = index
+  }
+  output
 }
 
 pure expand_braced_config_refs(raw: Str, config: Kconfig) -> Str {
@@ -835,21 +896,28 @@ proc logical_lines(body: Str) -> List[Str] {
   lines
 }
 
-proc included_kbuild_lines(root: Path, line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[List[Str]] {
+proc included_kbuild_file(root: Path, line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[Path?] {
   guard line.starts_with("include ") else {
-    return []
+    return null
   }
 
   let raw_spec = (line.split("include ").get(1) ?? "").trim()
 
-  return [] when "$(objtree)" in raw_spec
+  return null when "$(objtree)" in raw_spec
 
   let spec = expand_vars(raw_spec, vars, config, srcarch)
 
-  return [] when spec == "" or " " in spec or "$(" in spec or spec.starts_with("/")
+  return null when spec == "" or " " in spec or "$(" in spec or spec.starts_with("/")
 
   let rel = normalize_rel_path(fp"{spec}")
-  logical_lines(join_root(root, rel).read_text()?)
+  join_root(root, rel)
+}
+
+proc included_kbuild_lines(root: Path, line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[List[Str]] {
+  if let file = included_kbuild_file(root, line, vars, config, srcarch)? {
+    return logical_lines(file.read_text()?)
+  }
+  []
 }
 
 pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) -> ParsedAssignment {
@@ -880,10 +948,6 @@ pure parse_assignment(line: Str) -> Result[ParsedAssignment] {
   Err(ScriptError.Failed(kind: "kbuild-skip-line", message: line))
 }
 
-pure active_obj_lhs(expanded: Str) -> Bool {
-  expanded == "obj-y" or expanded == "lib-y" or expanded == "subdir-y"
-}
-
 pure active_var_lhs(expanded: Str) -> Str {
   return expanded when expanded == "KVM"
 
@@ -894,6 +958,12 @@ pure active_var_lhs(expanded: Str) -> Str {
   return expanded when expanded.ends_with("_files")
 
   ""
+}
+
+pure assigned_make_value(current: Str, exists: Bool, op: Str, rhs: Str) -> Str {
+  if op == "+=" { return f"{current} {rhs}".trim() }
+  if op == "?=" and exists { return current }
+  rhs
 }
 
 proc conditional_value(raw: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Str {
@@ -958,14 +1028,6 @@ pure object_stem(item: Str) -> Str {
   item.replace(".o", with: "")
 }
 
-pure object_item_for_dir(dir: Path, item: Str, as_lib: Bool = false) -> Str {
-  if ! as_lib and path_key(dir) == "arch/x86/boot/startup" and item.ends_with(".o") {
-    return f"{object_stem(item)}.pi.o"
-  }
-
-  item
-}
-
 proc composite_members(dir: Path, item: Str, vars: Map[Str]) -> List[Path] {
   let stem = object_stem(item)
 
@@ -988,7 +1050,7 @@ stream active_objects_for_dir(dir: Path, vars: Map[Str]) -> Stream[Path] {
   words += (vars.get("lib-y") ?? "").fields()
 
   for item in words {
-    let active_item = object_item_for_dir(dir, item)
+    let active_item = item
 
     if active_item.ends_with(".o") {
       let obj = join_rel(dir, active_item)
@@ -1007,31 +1069,34 @@ stream active_objects_for_dir(dir: Path, vars: Map[Str]) -> Stream[Path] {
     }
   }
 
-  for obj in extra_objects_for_dir(dir) {
-    if ! has_plan_path(objects, obj) {
-      objects += [obj]
-      yield obj
-    }
-  }
-}
-
-pure extra_objects_for_dir(dir: Path) -> List[Path] {
-  if path_key(dir) == "arch/x86/entry/vdso/vdso64" {
-    return [join_rel(dir, "vdso64-image.o")]
-  }
-
-  []
 }
 
 pure plan_objects(plan: KbuildPlan) -> List[Path] {
   plan.objects.extend(plan.lib_objects)
 }
 
-proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[Map[Str]] {
+pure input_record(root: Path, file: Path, body: Str) -> Result[Str] {
+  let rel = file.strip_prefix(root)?
+  f"{path_key(rel)} {bytes.from_text(body).sha256().hex()}"
+}
+
+pure input_records_hash(inputs: List[Str]) -> Str {
+  bytes.from_text(inputs.join("\n")).sha256().hex()
+}
+
+proc vars_and_inputs_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str, mode: KbuildInputMode) -> Result[KbuildVariables] {
   let file = join_root(root, dir) |> kbuild_file(_)?
+  let body = file.read_text()?
+  var inputs = [input_record(root, file, body)?]
   var vars = kbuild_vars_for_dir(dir, srcarch)
+  if mode == CompileFlagInputs {
+    let dir_key = path_key(dir)
+    let local_dir = if dir_key == "." { "." } else { f"./{dir_key}" }
+    vars["src"] = local_dir
+    vars["obj"] = local_dir
+  }
   var active_stack = [true]
-  var lines = logical_lines(file.read_text()?)
+  var lines = logical_lines(body)
   var line_index = 0
 
   while line_index < lines.len() {
@@ -1065,35 +1130,34 @@ proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Resul
     continue unless active_conditional(active_stack)
 
     if line.starts_with("include ") {
-      let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
+      if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
+        let body = included.read_text()?
+        inputs += [input_record(root, included, body)?]
+        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+      }
       continue
     }
 
     if let Ok(assign) = parse_assignment(line) {
-      let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
+      continue when mode == DiscoveryInputs and ! eligible_plan_assignment(line)
+      let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+      let lhs = if mode == CompileFlagInputs and object_cflags_lhs(expanded_lhs) != "" {
+        expanded_lhs
+      } else { active_var_lhs(expanded_lhs) }
 
       if lhs != "" {
-        if path_key(dir) == "arch/x86/boot/startup" and lhs == "obj-y" and assign.rhs.starts_with(
-          "$(patsubst %.o,%.pi.o,$(obj-y))",
-        ) {
-          var rewritten = [object_item_for_dir(dir, item) for item in (vars.get("obj-y") ?? "").fields()]
-          vars[lhs] = rewritten.join(" ")
-          continue
-        }
-
         let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
-        if assign.op == "+=" {
-          vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-        } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-          vars[lhs] = rhs
-        }
+        vars[lhs] = assigned_make_value(vars.get(lhs) ?? "", lhs in vars, assign.op, rhs)
       }
     }
   }
 
-  vars
+  {values: vars, inputs: inputs}
+}
+
+proc vars_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[Map[Str]] {
+  (vars_and_inputs_for_dir(root, dir, config, srcarch, GeneralVariables)?).values
 }
 
 pure object_cflags_lhs(expanded: Str) -> Str {
@@ -1119,7 +1183,6 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
   vars["src"] = local_dir
   vars["obj"] = local_dir
   var flags: Map[List[Str]] = {}
-  var subdir_flags = []
   var active_stack = [true]
   var lines = logical_lines(file.read_text()?)
   var line_index = 0
@@ -1165,14 +1228,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
       let rhs = expand_vars(assign.rhs, vars, config, srcarch)
 
       if expanded_lhs == "subdir-ccflags-y" or expanded_lhs == "ccflags-y" {
-        let rhs_flags = rhs.fields()
-
-        if assign.op == "+=" {
-          subdir_flags += rhs_flags
-        } else if assign.op != "?=" or subdir_flags.is_empty() {
-          subdir_flags = rhs_flags
-        }
-
+        vars[expanded_lhs] = assigned_make_value(vars.get(expanded_lhs) ?? "", expanded_lhs in vars, assign.op, rhs)
         continue
       }
 
@@ -1182,11 +1238,13 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
         let key = join_rel(dir, object_name) |> path_key(_)
         let current = flags.get(key) ?? []
 
+        if assign.op == "?=" and key in flags { continue }
         if assign.op == "+=" {
           flags[key] = current.extend(rhs.fields())
-        } else if assign.op != "?=" or current.is_empty() {
+        } else {
           flags[key] = rhs.fields()
         }
+        vars[expanded_lhs] = assigned_make_value(vars.get(expanded_lhs) ?? "", expanded_lhs in vars, assign.op, rhs)
 
         continue
       }
@@ -1194,15 +1252,12 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
       let lhs = active_var_lhs(expanded_lhs)
 
       if lhs != "" {
-        if assign.op == "+=" {
-          vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-        } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-          vars[lhs] = rhs
-        }
+        vars[lhs] = assigned_make_value(vars.get(lhs) ?? "", lhs in vars, assign.op, rhs)
       }
     }
   }
 
+  let subdir_flags = (vars.get("subdir-ccflags-y") ?? "").fields().extend((vars.get("ccflags-y") ?? "").fields())
   if ! subdir_flags.is_empty() {
     flags["*"] = subdir_flags
   }
@@ -1235,7 +1290,7 @@ proc kbuild_compile_flags_for_dirs(
 }
 
 pure compile_flags_cache_format() -> Str {
-  "linux-kbuild-compile-flags-v2"
+  "linux-kbuild-compile-flags-v3"
 }
 
 pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlagsEntry] {
@@ -1265,10 +1320,10 @@ pure compile_flags_from_cache_entries(entries: List[CompileFlagsEntry]) -> Resul
   flags
 }
 
-proc compile_flags_fingerprint(root: Path, dirs: List[Path], config_path: Path, srcarch: Str) -> Result[Str] {
+proc compile_flags_fingerprint(root: Path, dirs: List[Path], config_path: Path, config: Kconfig, srcarch: Str) -> Result[Str] {
   let dir_fingerprints = dirs
     |> par-map(jobs: planner_jobs()) { |dir|
-      fingerprint_dir_line(root, dir)?
+      fingerprint_dir_line(root, dir, config, srcarch, CompileFlagInputs)?
     }
   let config_hash = if config_path.exists() { hash.sha256(config_path)?.hex() } else { "missing" }
 
@@ -1325,7 +1380,7 @@ proc cached_kbuild_compile_flags_for_dirs(
   let fingerprint = if trust_cache {
     ""
   } else {
-    compile_flags_fingerprint(root, dirs, fp"{root}/.config", srcarch)?
+    compile_flags_fingerprint(root, dirs, fp"{root}/.config", config, srcarch)?
   }
 
   if stable_cache_path.exists() {
@@ -1903,7 +1958,7 @@ proc apply_item(
   }
 
   if item.ends_with(".o") {
-    let active_item = object_item_for_dir(dir, item, as_lib)
+    let active_item = item
     let obj = join_rel(dir, active_item)
     let members = if build_plan { composite_members(dir, active_item, vars) } else { [] }
     var next = if ! build_plan {
@@ -2054,6 +2109,10 @@ pure maybe_plan_assignment(line: Str) -> Bool {
   line.starts_with("obj") or line.starts_with("lib") or line.starts_with("subdir") or line.starts_with("KVM") or "-y" in line or "-objs" in line or "_files" in line or "$(" in line
 }
 
+pure eligible_plan_assignment(line: Str) -> Bool {
+  "=" in line and maybe_plan_assignment(line) and ! line.starts_with("ccflags-") and ! line.starts_with("asflags-") and ! line.starts_with("ldflags-") and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with("subdir-asflags-") and ! line.starts_with("subdir-rustflags-")
+}
+
 proc scan_simple_kbuild(
   root: Path,
   rel: Path,
@@ -2066,8 +2125,6 @@ proc scan_simple_kbuild(
   var mutable_vars = vars
   var child_dirs = []
   var entries = []
-  var object_rhs = []
-  var lib_rhs = []
   var line_no = 0
 
   for line in lines {
@@ -2076,59 +2133,27 @@ proc scan_simple_kbuild(
       emit_line_progress(root, options, rel, line_no, line)
     }
 
-    if "=" in line and maybe_plan_assignment(line) and ! line.starts_with("ccflags-") and ! line.starts_with("asflags-") and ! line.starts_with(
-      "ldflags-",
-    ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
-      "subdir-asflags-",
-    ) and ! line.starts_with("subdir-rustflags-") {
+    if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
         let lhs = assign.lhs
 
-        if active_obj_lhs(lhs) {
-          if lhs == "lib-y" {
-            lib_rhs += [assign.rhs]
-          } else if lhs == "subdir-y" {
-            for item in assign.rhs.fields() {
-              child_dirs += [join_rel(rel, item)]
-            }
-          } else {
-            object_rhs += [assign.rhs]
-          }
-        } else if active_var_lhs(lhs) != "" {
-          if assign.op == "+=" {
-            mutable_vars[lhs] = f"{mutable_vars.get(lhs) ?? ""} {assign.rhs}".trim()
-          } else if assign.op != "?=" or (mutable_vars.get(lhs) ?? "") == "" {
-            mutable_vars[lhs] = assign.rhs
-          }
+        if active_var_lhs(lhs) != "" {
+          mutable_vars[lhs] = assigned_make_value(mutable_vars.get(lhs) ?? "", lhs in mutable_vars, assign.op, assign.rhs)
         }
       }
     }
   }
 
-  for rhs in object_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), mutable_vars, false, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-    entries += applied.entries
-  }
+  let objects = apply_words(plan, rel, (mutable_vars.get("obj-y") ?? "").fields(), mutable_vars, false, options.build_plan)
+  plan = objects.plan
+  child_dirs += objects.dirs
+  entries += objects.entries
+  let libraries = apply_words(plan, rel, (mutable_vars.get("lib-y") ?? "").fields(), mutable_vars, true, options.build_plan)
+  plan = libraries.plan
+  child_dirs += libraries.dirs
+  for item in (mutable_vars.get("subdir-y") ?? "").fields() { child_dirs += [join_rel(rel, item)] }
 
-  if srcarch == "x86" {
-    for obj in extra_objects_for_dir(rel) {
-      if options.build_plan {
-        plan = add_object(plan, obj)
-      }
-
-      entries += [obj]
-    }
-  }
-
-  for rhs in lib_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), mutable_vars, true, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-  }
-
-  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries, file_hash: ""}
 }
 
 proc scan_flat_kbuild(
@@ -2143,8 +2168,6 @@ proc scan_flat_kbuild(
   var vars = kbuild_vars_for_dir(rel, srcarch)
   var child_dirs = []
   var entries = []
-  var object_rhs = []
-  var lib_rhs = []
   var line_no = 0
 
   for line in lines {
@@ -2153,64 +2176,29 @@ proc scan_flat_kbuild(
       emit_line_progress(root, options, rel, line_no, line)
     }
 
-    if "=" in line and maybe_plan_assignment(line) and ! line.starts_with("ccflags-") and ! line.starts_with("asflags-") and ! line.starts_with(
-      "ldflags-",
-    ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
-      "subdir-asflags-",
-    ) and ! line.starts_with("subdir-rustflags-") {
+    if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
         let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
         let lhs = active_var_lhs(expanded_lhs)
 
-        if active_obj_lhs(expanded_lhs) {
+        if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)
-
-          if expanded_lhs == "lib-y" {
-            lib_rhs += [rhs]
-          } else if expanded_lhs == "subdir-y" {
-            for item in rhs.fields() {
-              child_dirs += [join_rel(rel, item)]
-            }
-          } else {
-            object_rhs += [rhs]
-          }
-        } else if lhs != "" {
-          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
-
-          if assign.op == "+=" {
-            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-            vars[lhs] = rhs
-          }
+          vars[lhs] = assigned_make_value(vars.get(lhs) ?? "", lhs in vars, assign.op, rhs)
         }
       }
     }
   }
 
-  for rhs in object_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), vars, false, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-    entries += applied.entries
-  }
+  let objects = apply_words(plan, rel, (vars.get("obj-y") ?? "").fields(), vars, false, options.build_plan)
+  plan = objects.plan
+  child_dirs += objects.dirs
+  entries += objects.entries
+  let libraries = apply_words(plan, rel, (vars.get("lib-y") ?? "").fields(), vars, true, options.build_plan)
+  plan = libraries.plan
+  child_dirs += libraries.dirs
+  for item in (vars.get("subdir-y") ?? "").fields() { child_dirs += [join_rel(rel, item)] }
 
-  if srcarch == "x86" {
-    for obj in extra_objects_for_dir(rel) {
-      if options.build_plan {
-        plan = add_object(plan, obj)
-      }
-
-      entries += [obj]
-    }
-  }
-
-  for rhs in lib_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), vars, true, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-  }
-
-  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries, file_hash: ""}
 }
 
 proc scan_discover_dir(
@@ -2226,10 +2214,11 @@ proc scan_discover_dir(
 
   if let Err(err) = source_result {
     let plan = add_unsupported(add_dir(empty_plan(), rel), err.message)
-    return {dir: rel, plan: plan, child_dirs: [], entries: []}
+    return {dir: rel, plan: plan, child_dirs: [], entries: [], file_hash: ""}
   }
 
   let source = source_result?
+  var inputs = [input_record(root, source.file, source.body)?]
 
   if options.progress and options.progress_every == 1 {
     emit_stage_progress(root, options, f"xsh-kbuild-scan-start current={rel_key}")
@@ -2239,18 +2228,20 @@ proc scan_discover_dir(
 
   let scanner_kind = kbuild_scanner_kind(source.body)
 
-  return scan_simple_kbuild(root, rel, lines, srcarch, options) when scanner_kind == 0
+  if scanner_kind == 0 {
+    let scan = scan_simple_kbuild(root, rel, lines, srcarch, options)?
+    return {...scan, file_hash: input_records_hash(inputs)}
+  }
 
   if scanner_kind == 1 {
-    return scan_flat_kbuild(root, rel, config, lines, srcarch, options)
+    let scan = scan_flat_kbuild(root, rel, config, lines, srcarch, options)?
+    return {...scan, file_hash: input_records_hash(inputs)}
   }
 
   var plan = add_dir(empty_plan(), rel)
   var vars = kbuild_vars_for_dir(rel, srcarch)
   var child_dirs = []
   var entries = []
-  var object_rhs = []
-  var lib_rhs = []
   var active_stack = [true]
   var line_no = 0
   var line_index = 0
@@ -2290,69 +2281,37 @@ proc scan_discover_dir(
     continue unless active_conditional(active_stack)
 
     if line.starts_with("include ") {
-      let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
+      if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
+        let body = included.read_text()?
+        inputs += [input_record(root, included, body)?]
+        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+      }
       continue
     }
 
-    if "=" in line and maybe_plan_assignment(line) and ! line.starts_with("ccflags-") and ! line.starts_with("asflags-") and ! line.starts_with(
-      "ldflags-",
-    ) and ! line.starts_with("rustflags-") and ! line.starts_with("subdir-ccflags-") and ! line.starts_with(
-      "subdir-asflags-",
-    ) and ! line.starts_with("subdir-rustflags-") {
+    if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
         let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
         let lhs = active_var_lhs(expanded_lhs)
 
-        if active_obj_lhs(expanded_lhs) {
+        if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)
-
-          if expanded_lhs == "lib-y" {
-            lib_rhs += [rhs]
-          } else if expanded_lhs == "subdir-y" {
-            for item in rhs.fields() {
-              child_dirs += [join_rel(rel, item)]
-            }
-          } else {
-            object_rhs += [rhs]
-          }
-        } else if lhs != "" {
-          let rhs = expand_vars(assign.rhs, vars, config, srcarch)
-
-          if assign.op == "+=" {
-            vars[lhs] = f"{vars.get(lhs) ?? ""} {rhs}".trim()
-          } else if assign.op != "?=" or (vars.get(lhs) ?? "") == "" {
-            vars[lhs] = rhs
-          }
+          vars[lhs] = assigned_make_value(vars.get(lhs) ?? "", lhs in vars, assign.op, rhs)
         }
       }
     }
   }
 
-  for rhs in object_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), vars, false, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-    entries += applied.entries
-  }
+  let objects = apply_words(plan, rel, (vars.get("obj-y") ?? "").fields(), vars, false, options.build_plan)
+  plan = objects.plan
+  child_dirs += objects.dirs
+  entries += objects.entries
+  let libraries = apply_words(plan, rel, (vars.get("lib-y") ?? "").fields(), vars, true, options.build_plan)
+  plan = libraries.plan
+  child_dirs += libraries.dirs
+  for item in (vars.get("subdir-y") ?? "").fields() { child_dirs += [join_rel(rel, item)] }
 
-  if srcarch == "x86" {
-    for obj in extra_objects_for_dir(rel) {
-      if options.build_plan {
-        plan = add_object(plan, obj)
-      }
-
-      entries += [obj]
-    }
-  }
-
-  for rhs in lib_rhs {
-    let applied = apply_words(plan, rel, rhs.fields(), vars, true, options.build_plan)
-    plan = applied.plan
-    child_dirs += applied.dirs
-  }
-
-  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries}
+  {dir: rel, plan: plan, child_dirs: child_dirs, entries: entries, file_hash: input_records_hash(inputs)}
 }
 
 proc unique_unseen_paths(paths: List[Path], seen: Map[Bool]) -> List[Path] {
@@ -2410,7 +2369,7 @@ export proc scan_record_for_dir(
   dir: Path,
 ) [fs, error] -> Result[ScanRecord, Error] {
   let scan = scan_discover_dir(root, dir, config, srcarch, default_discover_options())?
-  local_record_record(scan, "")
+  local_record_record(scan)
 }
 
 ## Exported declaration `plan_from_record_values`.
@@ -2644,19 +2603,21 @@ proc discover_local_record_graph(
   {records: scans.records, barriers: barriers, plan: scans.plan}
 }
 
+const LOCAL_RECORD_FORMAT = "linux-local-records-v4"
+
 pure local_record_cache_path(root: Path) -> Path {
   fp"{root}/.xsh-kbuild-local-records.json"
 }
 
-proc local_record_cache_key(config: Path, srcarch: Str) -> Result[Str] {
-  let config_hash = if config.exists() { hash.sha256(config)?.hex() } else { "missing" }
-  bytes.from_text(f"linux-local-records-v1\t{srcarch}\t{config_hash}").sha256().hex()
+pure local_record_cache_key(config: Kconfig, srcarch: Str) -> Result[Str] {
+  let config_hash = bytes.from_text(json.encode(config)?).sha256().hex()
+  bytes.from_text(f"{LOCAL_RECORD_FORMAT}\t{srcarch}\t{config_hash}").sha256().hex()
 }
 
-pure local_record_record(scan: DirScan, file_hash: Str) -> ScanRecord {
+pure local_record_record(scan: DirScan) -> ScanRecord {
   {
     dir: path_key(scan.dir),
-    file_hash: file_hash,
+    file_hash: scan.file_hash,
     plan: plan_record(scan.plan),
     child_dirs: path_strings(scan.child_dirs),
     entries: path_strings(scan.entries),
@@ -2676,24 +2637,25 @@ proc local_record_from_record(item: ScanRecord) -> Result[DirScan] {
     },
     child_dirs: paths_from_strings(item.child_dirs)?,
     entries: paths_from_strings(item.entries)?,
+    file_hash: item.file_hash,
   }
 }
 
-proc write_local_record_graph(root: Path, config: Path, srcarch: Str, graph: LocalRecordGraph) {
+proc write_local_record_graph(root: Path, config: Kconfig, srcarch: Str, graph: LocalRecordGraph) {
   let cache = local_record_cache_path(root)
   let key = local_record_cache_key(config, srcarch)?
   var records: List[ScanRecord] = []
 
   for dir_key in graph.records.keys() {
     let scan = graph.records.get(dir_key)?
-    let file = join_root(root, scan.dir) |> kbuild_file(_)?
-    records += [local_record_record(scan, hash.sha256(file)?.hex())]
+    return Err(ScriptError.Failed(kind: "local-record-input-missing", message: f"cannot cache {dir_key} without its Kbuild input")) when scan.file_hash == ""
+    records += [local_record_record(scan)]
   }
 
-  json.write(cache, LocalRecordCache(format: "linux-local-records-v1", key:, records:))
+  json.write(cache, LocalRecordCache(format: LOCAL_RECORD_FORMAT, key:, records:))
 }
 
-proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[LocalRecordGraph] {
+proc read_local_record_graph(root: Path, config: Kconfig, srcarch: Str) -> Result[LocalRecordGraph] {
   let cache = local_record_cache_path(root)
 
   if ! cache.exists() {
@@ -2703,7 +2665,7 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[L
   let stored = json.read(cache)?.require(Record)?
   let format = stored.get("format")?.require(Str)?
 
-  if format != "linux-local-records-v1" {
+  if format != LOCAL_RECORD_FORMAT {
     return Err(ScriptError.Failed(kind: "local-record-cache-format", message: "unsupported local-record cache format"))
   }
 
@@ -2719,9 +2681,7 @@ proc read_local_record_graph(root: Path, config: Path, srcarch: Str) -> Result[L
 
   for item in cached.records {
     let scan = local_record_from_record(item)?
-    let file = join_root(root, scan.dir) |> kbuild_file(_)?
-
-    if hash.sha256(file)?.hex() != item.file_hash {
+    if kbuild_inputs_fingerprint(root, scan.dir, config, srcarch, DiscoveryInputs)? != item.file_hash {
       return Err(
         ScriptError.Failed(kind: "local-record-cache-stale", message: f"local-record cache is stale for {path_key(scan.dir)}"),
       )
@@ -2825,11 +2785,11 @@ export proc discover_plan_with_options(
 
   if options.local_records {
     if options.local_record_cache {
-      if let Ok(cached) = read_local_record_graph(root, fp"{root}/.config", srcarch) {
+      if let Ok(cached) = read_local_record_graph(root, config, srcarch) {
         local_graph = cached
       } else {
         local_graph = discover_local_record_graph(root, config, srcarch, options)?
-        write_local_record_graph(root, fp"{root}/.config", srcarch, local_graph)
+        write_local_record_graph(root, config, srcarch, local_graph)
       }
     } else {
       local_graph = discover_local_record_graph(root, config, srcarch, options)?
@@ -3071,13 +3031,18 @@ export proc read_discovered_plan_text(path_value: Path) [fs, error] -> Result[Kb
   parse_discovered_plan_text(path_value.read_text()?)
 }
 
-proc fingerprint_dir_line(root: Path, dir: Path) -> Result[Str] {
+proc kbuild_inputs_fingerprint(root: Path, dir: Path, config: Kconfig, srcarch: Str, mode: KbuildInputMode) -> Result[Str] {
+  let observed = vars_and_inputs_for_dir(root, dir, config, srcarch, mode)?
+  input_records_hash(observed.inputs)
+}
+
+proc fingerprint_dir_line(root: Path, dir: Path, config: Kconfig, srcarch: Str, mode: KbuildInputMode) -> Result[Str] {
   var line = ""
 
   match kbuild_file(join_root(root, dir)) {
     Ok(file) => {
       let rel = file.strip_prefix(root)?
-      line = f"{path_key(rel)} {hash.sha256(file)?.hex()}"
+      line = f"{path_key(rel)} {kbuild_inputs_fingerprint(root, dir, config, srcarch, mode)?}"
     }
     Err(err) => line = f"{path_key(dir)} missing {err.message}"
   }
@@ -3086,14 +3051,21 @@ proc fingerprint_dir_line(root: Path, dir: Path) -> Result[Str] {
 }
 
 ## Exported declaration `plan_fingerprint`.
-export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan) [fs, error] -> Result[Str, Error] {
-  f"""format linux-kbuild-plan-fingerprint-v10
+export proc plan_fingerprint(root: Path, config_path: Path, plan: KbuildPlan, srcarch: Str) [fs, error] -> Result[Str, Error] {
+  let config = load_config(config_path)?
+  let inputs = plan.dirs |> par-map(jobs: planner_jobs()) { |dir| fingerprint_dir_line(root, dir, config, srcarch, DiscoveryInputs)? }
+  let plan_hash = bytes.from_text(json.encode(plan_record(plan))?).sha256().hex()
+  f"""format linux-kbuild-plan-fingerprint-v11
+srcarch {srcarch}
 config {hash.sha256(config_path)?.hex()}
 makefile {hash.sha256(fp"{root}/Makefile")?.hex()}
 dirs {plan.dirs.len()}
 objects {plan.objects.len()}
 lib_objects {plan.lib_objects.len()}
 composites {plan.composites.len()}
+plan {plan_hash}
+inputs
+{inputs.join("\n")}
 """
 }
 
