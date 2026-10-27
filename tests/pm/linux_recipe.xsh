@@ -340,9 +340,16 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   let worker = fp"{recipe_root}/kbuild-pool-worker.xsh"
   let _ = fs.copy_tree(p"packages/linux", recipe_root, parents: true, overwrite: true)?
   source.mkdir()
-  fp"{source}/.config".write("")
-  fp"{source}/Kbuild".write("obj-y += one.o\n")
+  let config = fp"{source}/.config"
+  config.write("CONFIG_TEST=y\n")
+  fp"{source}/Kbuild".write("obj-$(CONFIG_TEST) += one.o\n")
   assert worker.exists()?
+  let original = worker.read_text()?
+  let change_config = f"""  fp"{source}/.config".write("# CONFIG_TEST is not set\\n")?
+"""
+  let instrumented = original.replace("  let root = ", with: f"{change_config}  let root = ")
+  assert instrumented != original
+  worker.write(instrumented)
 
   env ({
     XSH_PM_SOURCE_DIR: source.display(),
@@ -352,6 +359,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
     cd source {
       let plan = linux_shared.discover_package_plan("arm64")?
       assert p"one.o" in plan.objects
+      assert config.read_text()? == "# CONFIG_TEST is not set\n"
     }
   }?
 }

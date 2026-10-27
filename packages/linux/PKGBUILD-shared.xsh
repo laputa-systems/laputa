@@ -85,7 +85,7 @@ export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] 
     let worker = staged_recipe_helper("kbuild-pool-worker.xsh")?
     return kbuild.discover_plan_with_process_pool(
       p".",
-      p".config",
+      config,
       srcarch,
       options,
       xsh_bin,

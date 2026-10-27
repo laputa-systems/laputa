@@ -3,11 +3,11 @@ use kbuild
 
 proc main(...argv: List[Str]) [fs, time, error] {
   let root = fp"{argv[0]}"
-  let config = kbuild.load_config(fp"{argv[1]}")?
-  let srcarch = argv[2]
-  let state_path = fp"{argv[3]}"
-  let lock_path = fp"{argv[4]}"
-  let output_path = fp"{argv[5]}"
+  let srcarch = argv[1]
+  let state_path = fp"{argv[2]}"
+  let lock_path = fp"{argv[3]}"
+  let output_path = fp"{argv[4]}"
+  let config = json.read(state_path)?.require(kbuild.PoolState)?.config
   var records: List[kbuild.ScanRecord] = []
 
   while true {

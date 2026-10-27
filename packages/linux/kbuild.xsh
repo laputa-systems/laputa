@@ -58,7 +58,7 @@ export type PlanRecord = {
 export type ScanRecord = {dir: Str, file_hash: Str, plan: PlanRecord, child_dirs: List[Str], entries: List[Str]}
 
 ## Shared discovery-worker pool state guarded by the pool lock file.
-export type PoolState = {pending: List[Str], active: Int, done: Bool, seen: List[Str], error: Str}
+export type PoolState = {pending: List[Str], active: Int, done: Bool, seen: List[Str], error: Str, config: Kconfig}
 
 ## Archive-analysis plan context shared with analysis workers.
 export type ArchivePlanContext = {
@@ -2439,7 +2439,7 @@ export proc plan_from_record_values(records: List[ScanRecord]) [error] -> Result
 
 proc discover_records_process_pool(
   root: Path,
-  config: Path,
+  config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
   xsh_bin: Path,
@@ -2453,7 +2453,7 @@ proc discover_records_process_pool(
 
   json.write(
     state_path,
-    PoolState(pending: ["."], active: 0, done: false, seen: ["."], error: ""),
+    PoolState(pending: ["."], active: 0, done: false, seen: ["."], error: "", config:),
   )
 
   let worker_count = if options.jobs < 1 { 1 } else if options.jobs > 16 { 16 } else { options.jobs }
@@ -2475,7 +2475,6 @@ proc discover_records_process_pool(
         worker,
         "--",
         root,
-        config,
         srcarch,
         state_path,
         lock_path,
@@ -2511,7 +2510,7 @@ proc discover_records_process_pool(
 ## Exported declaration `discover_plan_with_process_pool`.
 export proc discover_plan_with_process_pool(
   root: Path,
-  config: Path,
+  config: Kconfig,
   srcarch: Str,
   options: DiscoverOptions,
   xsh_bin: Path,
