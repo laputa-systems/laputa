@@ -61,6 +61,16 @@ export pure legacy_remote_metadata_rel(arch: Str, name: Str, ver: Str, rel: Str)
   fp"metadata/{arch}/{name}/{package_id(name, ver, rel)}.json"
 }
 
+## Versioned signed snapshot binding the exact published index bytes.
+export pure remote_snapshot_rel() -> Path {
+  p"snapshot.json"
+}
+
+## Detached Ed25519 signature over the snapshot metadata.
+export pure remote_snapshot_signature_rel() -> Path {
+  p"snapshot.sig"
+}
+
 ## Exported PM declaration `ensure_relative_path`.
 export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path, Error] {
   let normalized = path_value.normalize()

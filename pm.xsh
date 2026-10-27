@@ -15,6 +15,7 @@ repository commands:
   repo build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
   repo build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
   repo publish PLAN --store STORE
+  repo publish-snapshot --from DIR
   repo checksum [--repo PATH] PACKAGE...
   repo update-checksums [--repo PATH] PACKAGE...
 
@@ -44,6 +45,7 @@ const REPO_HELP = """usage: pm repo COMMAND [OPTIONS]
   build PLAN --store STORE [-j N|--jobs N] [--logs DIR]
   build-node PLAN --repo PATH --store STORE --node ARTIFACT_KEY
   publish PLAN --store STORE
+  publish-snapshot --from DIR
   checksum [--repo PATH] PACKAGE...
   update-checksums [--repo PATH] PACKAGE...
 
@@ -193,6 +195,16 @@ cli main repo publish(input: Path, store: Path) with {
   },
 } {
   pm_cli.pm_cli_repo_publish({input, store})
+}
+
+cli main repo publish_snapshot(snapshot_dir: Path) with {
+  name: "pm repo publish-snapshot",
+  help: REPO_HELP,
+  parameters: {
+    snapshot_dir: {form: "--from DIR"},
+  },
+} {
+  pm_cli.pm_cli_repo_publish_snapshot({snapshot_dir})
 }
 
 cli main repo checksum(repo: Str = "", ...packages: List[Str]) with {

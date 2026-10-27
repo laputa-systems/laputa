@@ -350,6 +350,81 @@ new system bundle key. Rows published before content-addressed names point at
 legacy `<name>-<ver>-<rel>` objects; they stay readable, and republishing the
 artifact moves the row to content-addressed names.
 
+### Snapshot authentication
+
+`index.json` stays the only mutable package pointer, but production clients
+never plan from its raw bytes. `repo publish-snapshot --from DIR` publishes
+two further mutable objects after the index:
+
+```text
+snapshot.json
+snapshot.sig
+```
+
+`snapshot.json` is a versioned signed-release boundary
+(`pm/repo_snapshot.xsh`) over the exact index bytes. It mirrors the
+trust-release verification shape instead of inventing a cryptographic
+protocol:
+
+```text
+laputa-repo-snapshot-v1
+generation <canonical u64, strictly increasing>
+expires-at <unix seconds>
+index-sha256 <hex of the exact published index.json bytes>
+```
+
+`snapshot.sig` is the raw 64-byte Ed25519 signature over those bytes.
+Verification (`remote.load_verified_remote_index`) checks the signature
+against the provisioned key set, the expiry against wall-clock time within a
+90-day validity limit, the generation against the persisted accepted floor,
+and the digest against the fetched index bytes. Any failure fails closed:
+planning from a production repository without provisioned keys, or with a
+bad snapshot, is an error, never a silent fallback to the unsigned index.
+
+This follows TUF's snapshot role in miniature: one role binds the full file
+set (here the index digest transitively binds every referenced
+content-addressed object, the way a TUF snapshot binds targets metadata),
+with monotonic versions against rollback and expiries against freeze
+attacks. There is no root/threshold delegation. Rotation is a key-set file
+of concatenated raw 32-byte public keys named by `XSH_PM_REPO_KEY_FILE`:
+listing the current and next key opens a rotation window, removing a key
+revokes it. Snapshots themselves never carry keys.
+
+The key ceremony mirrors the trust-update ceremony: generate the pair
+offline (`openssl genpkey -algorithm ed25519`), install only the raw
+32-byte public key on publishers and verifiers, compose `snapshot.json`
+with `repo_snapshot.snapshot_metadata_text` (generation = previous + 1,
+`expires-at` = now + at most 90 days), and sign it offline
+(`openssl pkeyutl -sign -rawin`). Losing the signing key means
+re-provisioning keys out of band and re-issuing snapshots; there is no
+in-band recovery. `repo publish-snapshot` pre-verifies the signature, the
+digest against the live remote index, and the generation advance before
+uploading, then uploads `snapshot.json` before `snapshot.sig`, so the
+signature is the linearization point: readers that race publication see a
+digest mismatch and fail closed. `repo publish` still writes objects first
+and `index.json` last; the snapshot covers the index that publication
+produced.
+
+Expiry coordinates with the R2 time-bootstrap policy: verification takes
+wall-clock `now`, refuses a clock behind the persisted lower bound, and
+rejects expired or over-long snapshots. The bound lives in per-repository
+accepted state under `XSH_PM_REPO_STATE_DIR` (generation, index digest,
+and highest observed time). Without disciplined time, expiry cannot tell a
+freeze from a slow clock; without the state dir, rollback protection covers
+only the current invocation. `file://` trees and the loopback local mirror
+stay explicit local workflows and bypass verification: possession of the
+tree is the trust assumption there.
+
+Parser and size limits: snapshot metadata is LF-terminated UTF-8 of exactly
+four lines at most 4 KiB; signatures are exactly 64 bytes; provisioned keys
+are non-empty multiples of 32 bytes; fetched indexes stay bounded at
+10 MiB. Oversize, malformed, or mismatched snapshot inputs fail closed.
+
+Remaining: provisioned-key distribution is manual (no package-seeded key
+yet); durable accepted state needs `XSH_PM_REPO_STATE_DIR`; `file://`
+verification even when keys are present; threshold or multi-signer
+snapshots; and guest proof of the production fetch path.
+
 ## Root composition
 
 `pm/root.xsh` preflights exact artifact inventories and ownership before it
