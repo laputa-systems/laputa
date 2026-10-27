@@ -282,16 +282,22 @@ test trust_update_never_replaces_an_existing_generation [fs, process, time, erro
   let source = stage_release(ctx, "trust-update-conflict-source", "release-b")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("trust update replaced an existing generation"),
-    Err(problem) => assert "immutable trust generation already exists" in problem.message
+    Err(problem) => assert "already installed; refusing to bootstrap seeds over it" in problem.message
   }
 
   assert fp"{blocker}/sentinel".read_text()? == "foreign generation\n"
-  assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "1"
+  assert ! fp"{root}/var/lib/laputa/trust/active".exists()?
+  assert ! fp"{root}/var/lib/laputa/trust/accepted".exists()?
+  assert ! fp"{root}/var/lib/laputa/trust/generations/1".exists()?
 
+  blocker.remove()?
   let release_c = stage_release(ctx, "trust-update-conflict-c", "release-c")?
-  let applied = trust_update.trust_update_from_dir(root, release_c)?
-  assert applied.generation == "3"
-  assert fp"{blocker}/sentinel".read_text()? == "foreign generation\n"
+  match trust_update.trust_update_from_dir(root, release_c) {
+    Ok(applied) => assert applied.generation == "3"
+    Err(problem) => test.fail(f"update failed after removing the foreign generation: {problem.message}")
+  }
+
+  assert fp"{blocker}/sentinel".exists()? == false
 }
 
 test trust_update_rejects_releases_behind_the_time_lower_bound [fs, process, time, error] { |ctx|
@@ -384,4 +390,71 @@ test trust_update_refuses_unknown_journal_state [fs, process, time, error] { |ct
 
   assert trust_store.trust_store_read_active(paths)? == "2"
   assert active_bundle(root)? == fixture("release-b/ca-certificates.crt").read_bytes()?
+}
+
+test trust_bootstrap_refuses_over_accepted_generation_without_mutation [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-bootstrap-downgrade", "signing-key")?
+  let release_b = stage_release(ctx, "trust-bootstrap-downgrade-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+  fp"{root}/var/lib/laputa/trust/active".remove()?
+
+  match trust_store.trust_store_bootstrap_from_seeds(root) {
+    Ok(_) => test.fail("bootstrap activated generation 1 over accepted generation 2"),
+    Err(_) => {},
+  }
+
+  assert ! fp"{root}/var/lib/laputa/trust/active".exists()?
+  assert trust_store.trust_store_read_accepted(trust_store.trust_store_paths(root))? == "2"
+}
+
+test trust_bootstrap_refuses_dangling_active_without_mutation [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-bootstrap-dangling", "signing-key")?
+  let release_b = stage_release(ctx, "trust-bootstrap-dangling-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+  fp"{root}/var/lib/laputa/trust/active".remove()?
+  fp"{root}/var/lib/laputa/trust/active".symlink(to: p"generations/9")?
+
+  match trust_store.trust_store_bootstrap_from_seeds(root) {
+    Ok(_) => test.fail("bootstrap activated generation 1 over a dangling active pointer"),
+    Err(_) => {},
+  }
+
+  assert fp"{root}/var/lib/laputa/trust/active".readlink()? == p"generations/9"
+  assert trust_store.trust_store_read_accepted(trust_store.trust_store_paths(root))? == "2"
+}
+
+test trust_update_repairs_lost_active_pointer_without_downgrade [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-repair", "signing-key")?
+  let release_b = stage_release(ctx, "trust-update-repair-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+  fp"{root}/var/lib/laputa/trust/active".remove()?
+
+  let release_c = stage_release(ctx, "trust-update-repair-c", "release-c")?
+  let applied = trust_update.trust_update_from_dir(root, release_c)?
+  assert applied.generation == "3"
+  assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "3"
+  assert trust_store.trust_store_read_accepted(trust_store.trust_store_paths(root))? == "3"
+}
+
+test trust_status_reports_seed_provenance_after_bootstrap [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-status-seed", "signing-key")?
+  let generation = trust_store.trust_store_bootstrap_from_seeds(root)?
+  assert generation == "1"
+  let status = trust_update.trust_status(root)?
+  assert status.generation == "1"
+  assert status.accepted == "1"
+  assert status.provenance == "package-seed"
+  assert status.pending == "none"
+  assert status.freshness == "seed (no signed expiry; apply a signed release)"
+}
+
+test trust_status_reports_signed_provenance_after_update [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-status-signed", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  let source = stage_release(ctx, "trust-status-signed-source", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, source)?
+  let status = trust_update.trust_status(root)?
+  assert status.generation == "2"
+  assert status.provenance == "signed-release"
+  assert status.expires_at.require(Int)? > 0
 }

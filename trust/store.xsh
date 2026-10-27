@@ -495,6 +495,80 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
   net.validate_root_bundle(seed_bundle)?
   let parsed = trust_policy.parse(seed_policy)?
   let generation = parsed.generation
+  let bundle_digest = seed_bundle.sha256().hex()
+  let policy_digest = seed_policy.sha256().hex()
+
+  guard canonical_bundle_path(system_root).is_symlink()? else {
+    return Err(
+      trust_store_fail(
+        "canonical root bundle is not a managed symlink; upgrade ca-certificates before updating trust",
+      ),
+    )
+  }
+
+  guard canonical_policy_path(system_root).is_symlink()? else {
+    return Err(
+      trust_store_fail(
+        "canonical trust policy is not a managed symlink; upgrade ca-certificates before updating trust",
+      ),
+    )
+  }
+
+  if paths.accepted.exists()? {
+    let accepted = trust_store_read_accepted(paths)?
+    guard accepted == generation else {
+      return Err(
+        trust_store_fail(
+          f"accepted generation {accepted} is already installed; refusing to bootstrap seeds over it",
+        ),
+      )
+    }
+  }
+
+  if paths.active.exists()? or trust_store_active_present(paths)? {
+    let active = match trust_store_read_active(paths) {
+      Ok(found) => found,
+      Err(_) => {
+        return Err(
+          trust_store_fail(
+            "active trust pointer is unreadable; refusing to bootstrap over installed state",
+          ),
+        )
+      },
+    }
+    guard active == generation else {
+      return Err(
+        trust_store_fail(
+          f"active generation {active} is already installed; refusing to bootstrap seeds over it",
+        ),
+      )
+    }
+  }
+
+  if paths.journal.exists()? {
+    return Err(
+      trust_store_fail(
+        "a trust update journal is pending; refusing to bootstrap over it",
+      ),
+    )
+  }
+
+  if paths.generations.exists()? {
+    for entry in fs.children(paths.generations)? {
+      guard entry.name == generation else {
+        return Err(
+          trust_store_fail(
+            f"trust generation {entry.name} is already installed; refusing to bootstrap seeds over it",
+          ),
+        )
+      }
+    }
+
+    let dir = trust_store_generation_dir(paths, generation)
+    if dir.exists()? {
+      trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)?
+    }
+  }
 
   let dir = trust_store_generation_dir(paths, generation)
   if ! dir.exists()? {
@@ -509,12 +583,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     fs.fsync(dir)?
   }
 
-  trust_store_verify_generation(
-    paths,
-    generation,
-    seed_bundle.sha256().hex(),
-    seed_policy.sha256().hex(),
-  )?
+  trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)?
   trust_store_flip_active(paths, generation)?
 
   let accepted_path = fp"{paths.store}/{TRUST_ACCEPTED_NAME}"
@@ -533,22 +602,6 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     trust_store_persist_accepted(paths, generation)?
   }
 
-  guard canonical_bundle_path(system_root).is_symlink()? else {
-    return Err(
-      trust_store_fail(
-        "canonical root bundle is not a managed symlink; upgrade ca-certificates before updating trust",
-      ),
-    )
-  }
-
-  guard canonical_policy_path(system_root).is_symlink()? else {
-    return Err(
-      trust_store_fail(
-        "canonical trust policy is not a managed symlink; upgrade ca-certificates before updating trust",
-      ),
-    )
-  }
-
-  let _ = trust_store_reobserve(paths, generation, seed_bundle.sha256().hex(), seed_policy.sha256().hex())?
+  let _ = trust_store_reobserve(paths, generation, bundle_digest, policy_digest)?
   generation
 }

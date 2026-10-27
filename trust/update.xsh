@@ -159,6 +159,19 @@ proc trust_verify_active_release(
   generation: Str,
   now_epoch_seconds: Int,
 ) [fs, error] -> Result[TrustVerifiedRelease, Error] {
+  let verified = trust_verify_committed_bookkeeping(paths, key, generation)?
+  guard verified.expires_at > now_epoch_seconds else {
+    return Err(update_fail(f"active trust release has expired: generation {generation}"))
+  }
+
+  verified
+}
+
+proc trust_verify_committed_bookkeeping(
+  paths: trust_store.TrustStorePaths,
+  key: Bytes,
+  generation: Str,
+) [fs, error] -> Result[TrustVerifiedRelease, Error] {
   let dir = trust_store.trust_store_generation_dir(paths, generation)
   let metadata = fp"{dir}/{trust_store.TRUST_METADATA_NAME}".read_bytes()?
   let signature = fp"{dir}/{trust_store.TRUST_SIGNATURE_NAME}".read_bytes()?
@@ -175,10 +188,6 @@ proc trust_verify_active_release(
   let parsed = trust_release.release_parse_metadata(metadata)?
   guard parsed.generation == generation else {
     return Err(update_fail(f"active trust metadata names the wrong generation: {generation}"))
-  }
-
-  guard parsed.expires_at > now_epoch_seconds else {
-    return Err(update_fail(f"active trust release has expired: generation {generation}"))
   }
 
   guard bundle.sha256().hex() == parsed.root_bundle_sha256 else {
@@ -236,14 +245,33 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
   }
 
   let atomic = trust_store.trust_store_probe_atomic(paths)?
-  let active_meta = fp"{trust_store.trust_store_generation_dir(paths, active)}/{trust_store.TRUST_METADATA_NAME}".read_bytes()?
-  let active_parsed = trust_release.release_parse_metadata(active_meta)?
-  let now = time.now() / 1000
-  let freshness = if active_parsed.expires_at > now {
-    f"current (expires {active_parsed.expires_at})"
-  } else {
-    "EXPIRED"
+  let active_dir = trust_store.trust_store_generation_dir(paths, active)
+  let active_meta_path = fp"{active_dir}/{trust_store.TRUST_METADATA_NAME}"
+  let provenance = if active_meta_path.exists()? { "signed-release" } else { "package-seed" }
+  if provenance == "package-seed" {
+    let owner_path = fp"{active_dir}/{trust_store.TRUST_OWNER_NAME}"
+    guard owner_path.exists()? and owner_path.read_text()? == "package-seed\n" else {
+      return Err(
+        update_fail(
+          f"generation {active} has no signed release and no seed provenance; the store is incomplete",
+        ),
+      )
+    }
   }
+
+  let now = time.now() / 1000
+  var freshness = "seed (no signed expiry; apply a signed release)"
+  var expires_at = 0
+  if provenance == "signed-release" {
+    let active_parsed = trust_release.release_parse_metadata(active_meta_path.read_bytes()?)?
+    expires_at = active_parsed.expires_at
+    freshness = if active_parsed.expires_at > now {
+      f"current (expires {active_parsed.expires_at})"
+    } else {
+      "EXPIRED"
+    }
+  }
+
   let activated_at = fs.stat(paths.active, follow_symlinks: false)?.mtime_ns / 1000000000
 
   print f"trust status: generation {active}"
@@ -254,6 +282,7 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
   print f"  accepted generation: {accepted}"
   print f"  pending: {pending}"
   print f"  staging debris: {debris}"
+  print f"  provenance: {provenance}"
   print f"  freshness: {freshness}"
   print f"  atomic activation: {atomic}"
 
@@ -266,7 +295,9 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
     accepted,
     pending,
     debris,
+    provenance,
     freshness,
+    expires_at,
     atomic_capable: atomic,
     activated_at,
   }
@@ -536,6 +567,58 @@ proc trust_resume_active_release(
   effective
 }
 
+proc trust_repair_active_pointer(
+  paths: trust_store.TrustStorePaths,
+  key: Bytes,
+) [fs, error] -> Result[Str, Error] {
+  let accepted = match trust_store.trust_store_read_accepted(paths) {
+    Ok(found) => found,
+    Err(_) => {
+      return Err(
+        update_fail(
+          "installed trust state is incomplete and the accepted generation is unreadable; refusing to bootstrap over it",
+        ),
+      )
+    },
+  }
+  let dir = trust_store.trust_store_generation_dir(paths, accepted)
+  guard dir.exists()? else {
+    return Err(
+      update_fail(
+        f"installed trust state is incomplete and accepted generation {accepted} is absent; refusing to bootstrap over it",
+      ),
+    )
+  }
+
+  let metadata_path = fp"{dir}/{trust_store.TRUST_METADATA_NAME}"
+  if metadata_path.exists()? {
+    let _ = trust_verify_committed_bookkeeping(paths, key, accepted)?
+  } else {
+    let owner_path = fp"{dir}/{trust_store.TRUST_OWNER_NAME}"
+    guard owner_path.exists()? and owner_path.read_text()? == "package-seed\n" else {
+      return Err(
+        update_fail(
+          f"accepted generation {accepted} has no signed release and no seed provenance; refusing to repair it",
+        ),
+      )
+    }
+
+    let policy = fp"{dir}/{trust_store.TRUST_POLICY_NAME}".read_bytes()?
+    let parsed_policy = trust_policy.parse(policy)?
+    guard parsed_policy.generation == accepted else {
+      return Err(
+        update_fail(f"accepted seed generation {accepted} names the wrong generation; refusing to repair it"),
+      )
+    }
+
+    net.validate_root_bundle(fp"{dir}/{trust_store.TRUST_BUNDLE_NAME}".read_bytes()?)?
+  }
+
+  trust_store.trust_store_flip_active(paths, accepted)?
+  print f"trust update: repaired lost active pointer at accepted generation {accepted}"
+  accepted
+}
+
 proc trust_apply_release(
   system_root: Path,
   release: TrustReleaseBytes,
@@ -548,16 +631,22 @@ proc trust_apply_release(
 
   let _ = trust_recover(paths, key, now_epoch_seconds)?
 
-  let bootstrapped = match trust_store.trust_store_read_active(paths) {
-    Ok(_) => false,
+  match trust_store.trust_store_read_active(paths) {
+    Ok(_) => {},
     Err(_) => {
-      let _ = trust_store.trust_store_bootstrap_from_seeds(system_root)?;
-      true
+      let repairable = match trust_store.trust_store_read_accepted(paths) {
+        Ok(accepted) => {
+          trust_store.trust_store_generation_dir(paths, accepted).exists()?
+        },
+        Err(_) => false,
+      }
+      if repairable {
+        let _ = trust_repair_active_pointer(paths, key)?
+      } else {
+        let bootstrapped = trust_store.trust_store_bootstrap_from_seeds(system_root)?
+        print f"trust update: bootstrapped generation {bootstrapped} from package seeds"
+      }
     },
-  }
-
-  if bootstrapped {
-    print f"trust update: bootstrapped generation {trust_store.trust_store_read_active(paths)?} from package seeds"
   }
 
   let accepted = trust_reconcile_accepted(paths, key, now_epoch_seconds)?

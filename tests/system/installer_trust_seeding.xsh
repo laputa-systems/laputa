@@ -1,5 +1,6 @@
 ##! Fresh installs seed the trust store from pinned package seeds.
 use trust.store as trust_store
+use trust.update as trust_update
 
 proc stage_target(ctx: TestContext, name: Str) [fs, error] -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: name)?
@@ -24,6 +25,14 @@ test installer_seeds_fresh_target_trust_from_package_seeds [fs, error] { |ctx|
   assert generation == "1"
   assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "1"
   assert fp"{root}/var/lib/laputa/trust/accepted".read_text()? == "1\n"
+}
+
+test installer_seed_reports_functional_generation_one_status [fs, time, error] { |ctx|
+  let root = stage_target(ctx, "installer trust status")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  let status = trust_update.trust_status(root)?
+  assert status.generation == "1"
+  assert status.provenance == "package-seed"
 }
 
 test installer_wires_trust_seeding_after_target_config [fs, error] {

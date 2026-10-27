@@ -82,8 +82,33 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Resu
 
   let _ = fs.copy_tree(source, overlay, parents: true, overwrite: true)?
   fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/{profile.name}-proof.xsh", 0o755, parents: true, overwrite: true)
+
+  if "ca-certificates" in profile.package_roots {
+    container_seed_overlay_trust_store(
+      overlay,
+      fp"{container_repo_root()}/packages/ca-certificates/files/cacert.pem",
+      fp"{container_repo_root()}/packages/ca-certificates/files/trust-policy",
+    )?
+  }
+
   pm_util.normalize_checkout_tree(overlay)
   overlay
+}
+
+## Factories the versioned trust store into a profile overlay from pinned
+## package seeds, so composed images boot with readable CA roots and distrust
+## policy before first network use. Only profiles whose closure includes the
+## CA package get factory trust state; the bytes are ordinary overlay inputs
+## covered by the generation overlay digest, not post-receipt mutations.
+## container_seed_overlay_trust_store.
+export proc container_seed_overlay_trust_store(overlay: Path, seed_bundle: Path, seed_policy: Path) [fs, error] {
+  let generations = fp"{overlay}/var/lib/laputa/trust/generations/1"
+  generations.mkdir(parents: true)
+  seed_bundle.copy(to: fp"{generations}/ca-certificates.crt", overwrite: true)?
+  seed_policy.copy(to: fp"{generations}/trust-policy", overwrite: true)?
+  fp"{generations}/owner".write(bytes.from_text("package-seed\n"))?
+  fp"{overlay}/var/lib/laputa/trust/accepted".write(bytes.from_text("1\n"))?
+  fp"{overlay}/var/lib/laputa/trust/active".symlink(to: p"generations/1")?
 }
 
 proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemProfile) [fs, error] {
