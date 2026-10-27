@@ -15,7 +15,7 @@ proc apply_static_interface(cfg: StaticInterface) {
   linux.add_default_ipv4_route(cfg.gateway, interface: cfg.iface)
 }
 
-proc main() [fs, process, error] {
+proc main() [fs, process, net, error] {
   if p"/usr/bin/ifup".exists() {
     run /usr/bin/ifup "-a"
     return
