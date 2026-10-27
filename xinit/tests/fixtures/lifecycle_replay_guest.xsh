@@ -42,7 +42,7 @@ proc leader(root: Path) {
     assert fp"{root}/finished".exists()?, "replacement preceded finish"
     fp"{root}/replacement".write_atomic(f"{process.current_pid()?}")
   }
-  let child = process.spawn(process.command_argv("/usr/bin/xsh", ["xsh", fixture.display(), "--", "descendant", root.display()], same_group: true))?
+  let child = process.spawn(process.command_argv("/usr/bin/xsh", ["xsh", fixture, "--", "descendant", root], same_group: true))?
   assert process.group_id(child.pid)? == process.group_id()?
   if ! fp"{root}/original-child".exists() {
     fp"{root}/original-child".write_atomic(f"{child.pid}")
@@ -93,11 +93,11 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   run /usr/bin/xsh "{fixture}" -- finish "{root}"
 }}
 """)
-  let scanner = unix.spawn_process_group_log(process.command_argv("/usr/bin/xsh", ["xsh", source.display(), "--", "supervise", "replay"], env: {
+  let scanner = unix.spawn_process_group_log(process.command_argv("/usr/bin/xsh", ["xsh", source, "--", "supervise", "replay"], env: {
     XSH_ROOT: "/usr/lib/xsh",
-    XINIT_SERVICE_DIR: fp"{root}/services".display(),
-    XINIT_RUN_DIR: fp"{root}/run".display(),
-    XINIT_LOG_ROOT: fp"{root}/logs".display(),
+    XINIT_SERVICE_DIR: fp"{root}/services",
+    XINIT_RUN_DIR: fp"{root}/run",
+    XINIT_LOG_ROOT: fp"{root}/logs",
     XINIT_TEST_ALLOW_NON_PID1: "0",
   }), fp"{root}/scanner.log")?
   var groups = [scanner.pid]

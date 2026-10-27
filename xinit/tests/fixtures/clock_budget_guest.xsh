@@ -104,11 +104,11 @@ export let service = {{
   logging: "off",
 }}
 """)
-  let command = process.command_argv("/usr/bin/xsh", ["xsh", xinit.display(), "--", "supervise", "clock"], env: {
+  let command = process.command_argv("/usr/bin/xsh", ["xsh", xinit, "--", "supervise", "clock"], env: {
     XSH_ROOT: "/usr/lib/xsh",
-    XINIT_SERVICE_DIR: fp"{root}/services".display(),
-    XINIT_RUN_DIR: fp"{root}/run".display(),
-    XINIT_LOG_ROOT: fp"{root}/logs".display(),
+    XINIT_SERVICE_DIR: fp"{root}/services",
+    XINIT_RUN_DIR: fp"{root}/run",
+    XINIT_LOG_ROOT: fp"{root}/logs",
     XINIT_TEST_ALLOW_NON_PID1: "0",
   })
   let launch = clock_ms()?

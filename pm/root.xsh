@@ -878,7 +878,7 @@ export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [f
     }
     database.remove(missing_ok: false)
   }
-  let status = process.run(process.command_argv(loader, [loader.display(), "--library-path", library_path.display(), program.display(), manpath.display()], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"}))?
+  let status = process.run(process.command_argv(loader, [loader, "--library-path", library_path, program, manpath], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"}))?
   if ! status.ok {
     return Err(types.PmError.PackageContract("selected-root makewhatis failed; generation was not published"))
   }

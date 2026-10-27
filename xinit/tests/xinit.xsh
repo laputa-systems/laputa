@@ -1399,7 +1399,7 @@ test test_fake_pid_and_event_flags_require_explicit_test_control [fs, process, e
   run_dir.mkdir()
   fp"{run_dir}/gone.json".write("{\"name\":\"gone\",\"state\":\"running\",\"desired\":\"up\",\"pid\":2147480000}")
   let result = test.run_xsh(ctx, xinit_script().read_text()?, [], ["status", "gone"], {
-    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_RUN_DIR: run_dir,
     XSH_UNIX_DRY_RUN: "1",
     XINIT_TEST_FAKE_PIDS: "1",
     XINIT_TEST_MAX_EVENTS: "0",
@@ -1577,7 +1577,7 @@ assert fresh.next_ms == 0
 assert fresh.started_at == 0
 assert spawn_due(fresh.pid, 0, fresh.next_ms)
 """
-  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: run_dir.display()}, name: "elapsed-budgets.xsh")?
+  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: run_dir}, name: "elapsed-budgets.xsh")?
   assert result.success, result.stderr
   assert "\"state\":\"running\"" in fp"{run_dir}/demo.json".read_text()?
 }
