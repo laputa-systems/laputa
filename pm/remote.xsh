@@ -218,7 +218,7 @@ export proc load_verified_remote_index(
   util.remote_index_cache_path(out).write_atomic(index_bytes)
 
   if state_dir != "" {
-    repo_snapshot.snapshot_persist_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo), verified, now_epoch_seconds)?
+    repo_snapshot.snapshot_persist_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo), verified, now_epoch_seconds)
   }
 
   items

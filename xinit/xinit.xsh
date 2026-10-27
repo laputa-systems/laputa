@@ -379,7 +379,7 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
 }
 
 proc finalize(kind: Str) {
-  let action_log = if test_mode()? { env_value("XINIT_TEST_ACTION_LOG", "") } else { "" }
+  let action_log = if test_mode() { env_value("XINIT_TEST_ACTION_LOG", "") } else { "" }
 
   if action_log != "" {
     fp"{action_log}".write(f"""{kind}
@@ -388,7 +388,7 @@ proc finalize(kind: Str) {
     return
   }
 
-  if ! test_flag("XINIT_TEST_SKIP_FINAL_CLEANUP")? {
+  if ! test_flag("XINIT_TEST_SKIP_FINAL_CLEANUP") {
     linux.kill_all(signal: "TERM", except_pid1: true)
     time.sleep(2s)
     linux.kill_all(signal: "KILL", except_pid1: true)
@@ -951,7 +951,7 @@ proc read_status(name: Str) -> Result[SavedStatus] {
     start_time_ms:,
   )
 
-  if status.state == "running" and status.pid > 0 and ! fake_pids()? and ! pid_live_and_ours(
+  if status.state == "running" and status.pid > 0 and ! fake_pids() and ! pid_live_and_ours(
     status.pid,
     status.start_time_ms,
   ) {
@@ -1091,7 +1091,7 @@ proc reload_unit(service: Service, pid: Int) {
 }
 
 proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[SpawnResult] {
-  let cgroup_path = if service.cpu_max > 0 and fake_pids()? and env_value("XSH_CGROUP_ROOT", "") == "" {
+  let cgroup_path = if service.cpu_max > 0 and fake_pids() and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
   } else {
     ""
@@ -1204,7 +1204,7 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
 }
 
 proc scanner_active() -> Result[Bool] {
-  return false when fake_pids()?
+  return false when fake_pids()
 
   let marker = scanner_marker_path()?
 
@@ -1853,7 +1853,7 @@ proc enforce_log_caps(units: List[ServiceUnit]) {
 proc scan_units(names: List[Str]) {
   unix.pid1_setup(["HUP", "TERM", "INT"], subreaper: true, allow_non_pid1: true)
   var units = [unit_init(load_service(name)?) for name in names]
-  var remaining = if test_mode()? { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
+  var remaining = if test_mode() { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
   var shutting_down = false
   write_scanner_marker()
 

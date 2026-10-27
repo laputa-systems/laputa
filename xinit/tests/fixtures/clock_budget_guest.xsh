@@ -71,7 +71,7 @@ proc worker(root: Path) {
   while true {
     let event = unix.wait_pid1_event(timeout: 100ms)?
 
-    if event.kind == "signal" and event.signal == "TERM" and ! fp"{root}/ignore-term".exists()? {
+    if event.kind == "signal" and event.signal == "TERM" and ! fp"{root}/ignore-term".exists() {
       return
     }
   }

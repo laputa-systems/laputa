@@ -610,6 +610,6 @@ proc run_installer(argv: List[Str]) [fs, process, time, error, io] -> Result[Uni
 
 proc main(...argv: List[Str]) [fs, process, time, env, error, io] -> Result[Unit, Error] {
   env XSH_LINUX_REAL="1" {
-    run_installer(argv)?
+    run_installer(argv)
   }
 }

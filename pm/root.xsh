@@ -794,7 +794,7 @@ export proc compose_artifacts(
   let publication_mode = 0o777.clear_bits(fs.umask()?)
   with staging_root = fs.tempdir_in(output.parent)? {
     let staging_path = staging_root.host_path()?
-    staging_root.mkdir(p"root", mode: 0o700)?
+    staging_root.mkdir(p"root", mode: 0o700)
     let temporary = fp"{staging_path}/root"
     let verified = root_checked_artifacts(artifacts)?
     var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}

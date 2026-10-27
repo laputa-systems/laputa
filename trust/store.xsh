@@ -110,8 +110,8 @@ export pure provisioned_key_path(system_root: Path) -> Path {
 
 ## trust_store_read_active.
 export proc trust_store_read_active(paths: TrustStorePaths) [fs, error] -> Result[Str, Error] {
-  guard paths.active.is_symlink()? else {
-    if paths.active.exists()? {
+  guard paths.active.is_symlink() else {
+    if paths.active.exists() {
       return Err(trust_store_fail("active trust pointer is not a symlink; refusing to interpret it"))
     }
 
@@ -130,7 +130,7 @@ export proc trust_store_read_active(paths: TrustStorePaths) [fs, error] -> Resul
     return Err(trust_store_fail(f"active trust pointer names an invalid generation: {text}"))
   }
 
-  guard trust_store_generation_dir(paths, generation).exists()? else {
+  guard trust_store_generation_dir(paths, generation).exists() else {
     return Err(trust_store_fail(f"active trust pointer is dangling: {text}"))
   }
 
@@ -164,7 +164,7 @@ export proc trust_store_take_lock(paths: TrustStorePaths) [fs, error] -> Result[
 
 ## trust_store_read_accepted.
 export proc trust_store_read_accepted(paths: TrustStorePaths) [fs, error] -> Result[Str, Error] {
-  guard paths.accepted.exists()? else {
+  guard paths.accepted.exists() else {
     return Err(trust_store_fail("no accepted trust generation is recorded"))
   }
 
@@ -179,9 +179,9 @@ export proc trust_store_read_accepted(paths: TrustStorePaths) [fs, error] -> Res
 proc trust_store_write_line_durable(target: Path, line: Str) [fs, error] -> Result[Unit, Error] {
   let sibling = fs.temp_sibling(target)?
   sibling.write(bytes.from_text(line), mode: 0o644)
-  fs.fsync(sibling)?
+  fs.fsync(sibling)
   sibling.rename(to: target, overwrite: true)
-  fs.fsync(target.parent)?
+  fs.fsync(target.parent)
 }
 
 ## trust_store_persist_accepted.
@@ -192,7 +192,7 @@ export proc trust_store_persist_accepted(paths: TrustStorePaths, generation: Str
 
   # The accepted file is the rollback high-water mark: never move it backward.
   # Re-persisting the current generation is an idempotent no-op.
-  if paths.accepted.exists()? {
+  if paths.accepted.exists() {
     let current = trust_store_read_accepted(paths)?
     guard ! trust_policy.policy_u64_is_greater(current, generation) else {
       return Err(
@@ -201,12 +201,12 @@ export proc trust_store_persist_accepted(paths: TrustStorePaths, generation: Str
     }
   }
 
-  trust_store_write_line_durable(paths.accepted, f"{generation}\n")?
+  trust_store_write_line_durable(paths.accepted, f"{generation}\n")
 }
 
 ## trust_store_read_lower_bound.
 export proc trust_store_read_lower_bound(paths: TrustStorePaths) [fs, error] -> Result[Int, Error] {
-  guard paths.lower_bound.exists()? else {
+  guard paths.lower_bound.exists() else {
     return Ok(0)
   }
 
@@ -228,7 +228,7 @@ export proc trust_store_persist_lower_bound(paths: TrustStorePaths, seconds: Int
   let current = trust_store_read_lower_bound(paths)?
   return when seconds <= current
 
-  trust_store_write_line_durable(paths.lower_bound, f"{seconds}\n")?
+  trust_store_write_line_durable(paths.lower_bound, f"{seconds}\n")
 }
 
 ## Recovery journal state.
@@ -236,7 +236,7 @@ export proc trust_store_persist_lower_bound(paths: TrustStorePaths, seconds: Int
 export type TrustJournal = {present: Bool, phase: Str, generation: Str, staging: Str, token: Str}
 ## trust_store_read_journal.
 export proc trust_store_read_journal(paths: TrustStorePaths) [fs, error] -> Result[TrustJournal, Error] {
-  guard paths.journal.exists()? else {
+  guard paths.journal.exists() else {
     return Ok({present: false, phase: "clean", generation: "", staging: "", token: ""})
   }
 
@@ -272,20 +272,20 @@ export proc trust_store_write_journal(
     sibling,
     {format: "laputa-trust-journal-1", phase, generation, staging, token},
   )
-  fs.fsync(sibling)?
+  fs.fsync(sibling)
   sibling.rename(to: paths.journal, overwrite: true)
-  fs.fsync(paths.journal)?
-  fs.fsync(paths.journal.parent)?
+  fs.fsync(paths.journal)
+  fs.fsync(paths.journal.parent)
 }
 
 ## trust_store_clear_journal.
 export proc trust_store_clear_journal(paths: TrustStorePaths) [fs, error] -> Result[Unit, Error] {
-  guard paths.journal.exists()? else {
+  guard paths.journal.exists() else {
     return
   }
 
   paths.journal.remove()
-  fs.fsync(paths.journal.parent)?
+  fs.fsync(paths.journal.parent)
 }
 
 ## trust_store_remove_owned_staging.
@@ -299,12 +299,12 @@ export proc trust_store_remove_owned_staging(paths: TrustStorePaths, staging: St
   }
 
   let staging_path = fp"{paths.store}/{staging}"
-  guard staging_path.exists()? else {
+  guard staging_path.exists() else {
     return
   }
 
   let owner_path = fp"{staging_path}/{TRUST_OWNER_NAME}"
-  guard owner_path.exists()? else {
+  guard owner_path.exists() else {
     return Err(trust_store_fail(f"refusing to remove staging without an owner token: {staging}"))
   }
 
@@ -313,7 +313,7 @@ export proc trust_store_remove_owned_staging(paths: TrustStorePaths, staging: St
   }
 
   staging_path.remove()
-  fs.fsync(paths.staging)?
+  fs.fsync(paths.staging)
 }
 
 ## Staged candidate location and ownership token.
@@ -342,7 +342,7 @@ export proc trust_store_stage_candidate(
   while attempt < 100 {
     let candidate = if attempt == 0 { base } else { f"{base}-{attempt}" }
     let staging_path = fp"{paths.staging}/{candidate}"
-    guard ! staging_path.exists()? else {
+    guard ! staging_path.exists() else {
       attempt += 1
       continue
     }
@@ -365,12 +365,12 @@ export proc trust_store_stage_candidate(
   fp"{staging_path}/{TRUST_POLICY_NAME}".write(policy, mode: 0o644)
   fp"{staging_path}/{TRUST_METADATA_NAME}".write(metadata, mode: 0o644)
   fp"{staging_path}/{TRUST_SIGNATURE_NAME}".write(signature, mode: 0o644)
-  fs.fsync(fp"{staging_path}/{TRUST_OWNER_NAME}")?
-  fs.fsync(fp"{staging_path}/{TRUST_BUNDLE_NAME}")?
-  fs.fsync(fp"{staging_path}/{TRUST_POLICY_NAME}")?
-  fs.fsync(fp"{staging_path}/{TRUST_METADATA_NAME}")?
-  fs.fsync(fp"{staging_path}/{TRUST_SIGNATURE_NAME}")?
-  fs.fsync(staging_path)?
+  fs.fsync(fp"{staging_path}/{TRUST_OWNER_NAME}")
+  fs.fsync(fp"{staging_path}/{TRUST_BUNDLE_NAME}")
+  fs.fsync(fp"{staging_path}/{TRUST_POLICY_NAME}")
+  fs.fsync(fp"{staging_path}/{TRUST_METADATA_NAME}")
+  fs.fsync(fp"{staging_path}/{TRUST_SIGNATURE_NAME}")
+  fs.fsync(staging_path)
 
   guard fp"{staging_path}/{TRUST_BUNDLE_NAME}".read_bytes()? == bundle else {
     return Err(trust_store_fail("staged root bundle differs from verified bytes"))
@@ -390,13 +390,13 @@ export proc trust_store_commit_generation(
   generation: Str,
 ) [fs, error] -> Result[Unit, Error] {
   let final = trust_store_generation_dir(paths, generation)
-  guard ! final.exists()? else {
+  guard ! final.exists() else {
     return Err(trust_store_fail(f"immutable trust generation already exists: {generation}"))
   }
 
   fp"{paths.store}/{staging}".rename(to: final)
-  fs.fsync(paths.generations)?
-  fs.fsync(paths.staging)?
+  fs.fsync(paths.generations)
+  fs.fsync(paths.staging)
 }
 
 ## trust_store_verify_generation.
@@ -407,7 +407,7 @@ export proc trust_store_verify_generation(
   policy_sha256: Str,
 ) [fs, error] -> Result[Unit, Error] {
   let dir = trust_store_generation_dir(paths, generation)
-  guard dir.exists()? else {
+  guard dir.exists() else {
     return Err(trust_store_fail(f"trust generation is absent: {generation}"))
   }
 
@@ -430,19 +430,19 @@ export proc trust_store_verify_generation(
 ## trust_store_flip_active.
 export proc trust_store_flip_active(paths: TrustStorePaths, generation: Str) [fs, error] -> Result[Unit, Error] {
   let scratch = fp"{paths.store}/{TRUST_ACTIVE_SCRATCH_NAME}"
-  guard ! scratch.exists()? or scratch.is_symlink()? else {
+  guard ! scratch.exists() or scratch.is_symlink() else {
     return Err(trust_store_fail("active pointer scratch state is not a symlink; refusing to proceed"))
   }
 
-  if scratch.exists()? {
+  if scratch.exists() {
     scratch.remove()
   }
 
   let link = fp"{paths.store}/{TRUST_ACTIVE_SCRATCH_NAME}"
   link.symlink(to: fp"generations/{generation}")
-  fs.fsync(paths.store)?
+  fs.fsync(paths.store)
   link.rename(to: paths.active, overwrite: true)
-  fs.fsync(paths.store)?
+  fs.fsync(paths.store)
 }
 
 ## Observed canonical trust state after re-reading.
@@ -493,13 +493,13 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
   let paths = trust_store_paths(system_root)
   let seed_bundle = seed_bundle_path(system_root).read_bytes()?
   let seed_policy = seed_policy_path(system_root).read_bytes()?
-  net.validate_root_bundle(seed_bundle)?
+  net.validate_root_bundle(seed_bundle)
   let parsed = trust_policy.parse(seed_policy)?
   let generation = parsed.generation
   let bundle_digest = seed_bundle.sha256().hex()
   let policy_digest = seed_policy.sha256().hex()
 
-  guard canonical_bundle_path(system_root).is_symlink()? else {
+  guard canonical_bundle_path(system_root).is_symlink() else {
     return Err(
       trust_store_fail(
         "canonical root bundle is not a managed symlink; upgrade ca-certificates before updating trust",
@@ -507,7 +507,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     )
   }
 
-  guard canonical_policy_path(system_root).is_symlink()? else {
+  guard canonical_policy_path(system_root).is_symlink() else {
     return Err(
       trust_store_fail(
         "canonical trust policy is not a managed symlink; upgrade ca-certificates before updating trust",
@@ -515,7 +515,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     )
   }
 
-  if paths.accepted.exists()? {
+  if paths.accepted.exists() {
     let accepted = trust_store_read_accepted(paths)?
     guard accepted == generation else {
       return Err(
@@ -526,7 +526,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     }
   }
 
-  if paths.active.exists()? or trust_store_active_present(paths)? {
+  if paths.active.exists() or trust_store_active_present(paths) {
     let active = match trust_store_read_active(paths) {
       Ok(found) => found,
       Err(_) => {
@@ -546,7 +546,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     }
   }
 
-  if paths.journal.exists()? {
+  if paths.journal.exists() {
     return Err(
       trust_store_fail(
         "a trust update journal is pending; refusing to bootstrap over it",
@@ -554,7 +554,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     )
   }
 
-  if paths.generations.exists()? {
+  if paths.generations.exists() {
     for entry in fs.children(paths.generations)? {
       guard entry.name == generation else {
         return Err(
@@ -566,31 +566,31 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     }
 
     let dir = trust_store_generation_dir(paths, generation)
-    if dir.exists()? {
-      trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)?
+    if dir.exists() {
+      trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)
     }
   }
 
   let dir = trust_store_generation_dir(paths, generation)
-  if ! dir.exists()? {
+  if ! dir.exists() {
     paths.generations.mkdir(parents: true)
     dir.mkdir()
     fp"{dir}/{TRUST_BUNDLE_NAME}".write(seed_bundle)
     fp"{dir}/{TRUST_POLICY_NAME}".write(seed_policy)
     fp"{dir}/{TRUST_OWNER_NAME}".write(bytes.from_text("package-seed\n"))
-    fs.fsync(fp"{dir}/{TRUST_BUNDLE_NAME}")?
-    fs.fsync(fp"{dir}/{TRUST_POLICY_NAME}")?
-    fs.fsync(fp"{dir}/{TRUST_OWNER_NAME}")?
-    fs.fsync(dir)?
-    fs.fsync(paths.generations)?
+    fs.fsync(fp"{dir}/{TRUST_BUNDLE_NAME}")
+    fs.fsync(fp"{dir}/{TRUST_POLICY_NAME}")
+    fs.fsync(fp"{dir}/{TRUST_OWNER_NAME}")
+    fs.fsync(dir)
+    fs.fsync(paths.generations)
   }
 
-  trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)?
-  trust_store_flip_active(paths, generation)?
+  trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)
+  trust_store_flip_active(paths, generation)
 
   let accepted_path = fp"{paths.store}/{TRUST_ACCEPTED_NAME}"
-  if ! accepted_path.exists()? {
-    trust_store_persist_accepted(paths, generation)?
+  if ! accepted_path.exists() {
+    trust_store_persist_accepted(paths, generation)
   } else {
     let accepted = trust_store_read_accepted(paths)?
     guard ! trust_policy.policy_u64_is_greater(accepted, generation) else {
@@ -601,7 +601,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
       )
     }
 
-    trust_store_persist_accepted(paths, generation)?
+    trust_store_persist_accepted(paths, generation)
   }
 
   let _ = trust_store_reobserve(paths, generation, bundle_digest, policy_digest)?

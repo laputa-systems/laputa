@@ -17,7 +17,7 @@ proc present(pid: Int) -> Result[Bool] {
 proc wait_file(marker: Path) {
   let deadline = time.monotonic()? + 8000000000
   while time.monotonic()? < deadline {
-    return when marker.exists()?
+    return when marker.exists()
     time.sleep(20ms)
   }
   Err(ReplayGuestError.Failed(message: f"deadline waiting for {marker}"))
@@ -33,9 +33,9 @@ proc descendant(root: Path) {
 
 proc leader(root: Path) {
   let fixture = p"/mnt/self-hosting/inputs/laputa/xinit/tests/fixtures/lifecycle_replay_guest.xsh"
-  if fp"{root}/original-child".exists()? {
+  if fp"{root}/original-child".exists() {
     let old = fp"{root}/original-child".read_text()?.parse_int()?
-    if present(old)? {
+    if present(old) {
       fp"{root}/violation".write_atomic("surviving-owned-descendant")
       return
     }
@@ -44,7 +44,7 @@ proc leader(root: Path) {
   }
   let child = process.spawn(process.command_argv("/usr/bin/xsh", ["xsh", fixture.display(), "--", "descendant", root.display()], same_group: true))?
   assert process.group_id(child.pid)? == process.group_id()?
-  if ! fp"{root}/original-child".exists()? {
+  if ! fp"{root}/original-child".exists() {
     fp"{root}/original-child".write_atomic(f"{child.pid}")
     fp"{root}/original-leader".write_atomic(f"{process.current_pid()?}")
   }
@@ -55,7 +55,7 @@ proc leader(root: Path) {
 
 proc finish(root: Path) {
   let child = fp"{root}/original-child".read_text()?.parse_int()?
-  if present(child)? {
+  if present(child) {
     fp"{root}/violation".write_atomic("surviving-owned-descendant")
   } else {
     fp"{root}/finished".write_atomic("1")
@@ -105,7 +105,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
     let cleanup = unix.shutdown_process_groups(groups, 2s, 100ms)?
     assert cleanup.remaining.is_empty(), "VM replay retained owned groups"
     for diagnostic in [fp"{root}/scanner.log", fp"{root}/services/replay.xsh", fp"{root}/run/replay.json", fp"{root}/logs/replay/current"] {
-      if diagnostic.exists()? {
+      if diagnostic.exists() {
         print f"LAP34_DIAGNOSTIC {diagnostic}"
         print diagnostic.read_text()?
       }

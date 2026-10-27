@@ -116,7 +116,7 @@ export proc snapshot_verify_signature(metadata: Bytes, signature: Bytes, keys: L
   }
 
   for key in keys {
-    if crypto.ed25519_verify(metadata, key, signature)? {
+    if crypto.ed25519_verify(metadata, key, signature) {
       return
     }
   }
@@ -130,7 +130,7 @@ export proc snapshot_verify_signature(metadata: Bytes, signature: Bytes, keys: L
 export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[VerifiedRepoSnapshot, Error] {
   snapshot_require(! input.metadata.is_empty() and input.metadata.len() <= MAX_SNAPSHOT_METADATA_BYTES, "signed snapshot metadata size is invalid")
   snapshot_require(! input.index_bytes.is_empty() and input.index_bytes.len() <= MAX_SNAPSHOT_INDEX_BYTES, "repository snapshot index size is invalid")
-  snapshot_verify_signature(input.metadata, input.signature, input.keys)?
+  snapshot_verify_signature(input.metadata, input.signature, input.keys)
 
   let snapshot = snapshot_parse_metadata(input.metadata)?
   snapshot_require(input.now_epoch_seconds >= 0, "current UTC time is invalid")
@@ -165,7 +165,7 @@ export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[Verifi
 ## Ed25519 public keys. A multi-key file is a rotation window; removing a key
 ## revokes it. Snapshots themselves never carry keys.
 export proc snapshot_load_keys(key_path: Path) [fs, error] -> Result[List[Bytes], Error] {
-  guard key_path.exists()? else {
+  guard key_path.exists() else {
     return Err(
       snapshot_fail(f"no repository snapshot verification key is provisioned at {key_path.display()}; refusing to plan from a production repository"),
     )
@@ -194,7 +194,7 @@ proc snapshot_accepted_from_record(raw: Record) [error] -> Result[SnapshotAccept
 
 ## Reads the accepted snapshot floor, or null when no snapshot was accepted yet.
 export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Result[SnapshotAccepted?, Error] {
-  guard paths.accepted.exists()? else {
+  guard paths.accepted.exists() else {
     return null
   }
 

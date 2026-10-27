@@ -143,7 +143,7 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     ctx f"building package {node.package_id}" {
-      pm_build.build_prepared_package(recipe_dir, source, dest, payload)?
+      pm_build.build_prepared_package(recipe_dir, source, dest, payload)
     }
   }
 
@@ -204,7 +204,7 @@ proc execute_run_proof(
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {
     ctx f"proving package {node.package_id}" {
-      pm_proof.run_artifact_proof(proof_root, pkg)?
+      pm_proof.run_artifact_proof(proof_root, pkg)
     }
   }
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)

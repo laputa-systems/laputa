@@ -321,7 +321,7 @@ proc check_tasks(tasks: List[MakeTask], jobs_count: Int) [error] {
     return Err(MakeError.InvalidJobs("job count must be positive"))
   }
 
-  check_task_graph(tasks)?
+  check_task_graph(tasks)
 }
 
 pure check_task_graph(tasks: List[MakeTask]) -> Result[Unit, Error] {
@@ -369,7 +369,7 @@ pure check_task_graph(tasks: List[MakeTask]) -> Result[Unit, Error] {
 
 ## Validate and return the graph in input order without inspecting files or executing tasks.
 export pure plan_tasks(tasks: List[MakeTask]) -> Result[List[MakeTask], Error] {
-  check_task_graph(tasks)?
+  check_task_graph(tasks)
   var dependents: Map[List[Str]] = {}
   var remaining: Map[Int] = {}
   var ready: List[Str] = []
