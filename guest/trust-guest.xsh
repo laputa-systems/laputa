@@ -231,6 +231,53 @@ proc run_phase_one(
   write_phase("2")?
 }
 
+proc run_phase_one_stale(paths: trust_store.TrustStorePaths) [fs, process, time, error] {
+  let active = trust_store.trust_store_read_active(paths)?
+  say(f"ENTRY phase=1 active={active} journal={journal_present(paths)?}")?
+  guard active == "2" else {
+    return fail_phase("phase1", "expected active generation 2 on entry")
+  }
+
+  let accepted_before = trust_store.trust_store_read_accepted(paths)?
+  guard accepted_before == "2" else {
+    return fail_phase("phase1", "expected accepted generation 2 on entry")
+  }
+
+  trust_store.trust_store_write_journal(paths, "committed", "1", "staging/stale-gone", "stale")?
+  let journal_before = paths.journal.read_bytes()?
+
+  match trust_update.trust_update_from_dir(p"/", p"/releases/release-c") {
+    Ok(_) => {
+      return fail_phase("phase1", "stale generation-1 journal was recovered over accepted generation 2")
+    },
+    Err(problem) => {
+      guard "behind accepted generation" in problem.message else {
+        return fail_phase("phase1", f"stale journal failed with the wrong error: {problem.message}")
+      }
+    },
+  }
+
+  guard trust_store.trust_store_read_active(paths)? == "2" else {
+    return fail_phase("phase1", "active generation moved during stale journal recovery")
+  }
+
+  guard trust_store.trust_store_read_accepted(paths)? == accepted_before else {
+    return fail_phase("phase1", "accepted generation moved during stale journal recovery")
+  }
+
+  guard paths.journal.read_bytes()? == journal_before else {
+    return fail_phase("phase1", "stale journal was mutated during refused recovery")
+  }
+
+  let status = trust_update.trust_status(p"/")?
+  guard status.generation.require(Str)? == "2" and status.accepted.require(Str)? == "2" else {
+    return fail_phase("phase1", "status is not a clean generation 2 after refused recovery")
+  }
+
+  say(f"STALE_OK generation=2 bundle={status.bundle_sha256.require(Str)?} policy={status.policy_sha256.require(Str)?}")?
+  write_phase("2")?
+}
+
 proc run_phase_two(paths: trust_store.TrustStorePaths) [fs, time, error] {
   let active = trust_store.trust_store_read_active(paths)?
   say(f"ENTRY phase=2 active={active} journal={journal_present(paths)?}")?
@@ -285,6 +332,13 @@ proc main() [fs, process, time, net, error, io] {
   }
 
   if phase == "1" {
+    if mode == "stale" {
+      run_phase_one_stale(paths)?
+      say("POWEROFF")?
+      linux.poweroff()?
+      return
+    }
+
     run_phase_one(paths, url, mode)?
     if mode == "replay" {
       say("REBOOTING")?

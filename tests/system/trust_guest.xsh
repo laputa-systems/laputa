@@ -150,6 +150,10 @@ proc stage_initramfs(ctx: TestContext, name: Str, xsh: Path, modules_dir: Path) 
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture("release-b")}/{file}".copy(to: fp"{root}/releases/release-b/{file}", overwrite: true)?
   }
+  fp"{root}/releases/release-c".mkdir(parents: true)
+  for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
+    fp"{fixture("release-c")}/{file}".copy(to: fp"{root}/releases/release-c/{file}", overwrite: true)?
+  }
 
   for name in GUEST_MODULES {
     let command = process.command_argv(
@@ -445,4 +449,34 @@ test trust_guest_power_cut_recovers_forward [fs, process, env, time, error] { |c
   assert "ENTRY phase=1 active=2 journal=" in final or "ENTRY phase=1 active=3 journal=" in final, final
 
   assert "active=1" not in final
+}
+
+test trust_guest_rejects_stale_journal_without_mutation [fs, process, env, time, error] { |ctx|
+  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  let kernel = guest_kernel()?
+  let modules_dir = guest_modules_dir()?
+  let xsh = guest_xsh()?
+  let _ = guest_tool_or_skip("cpio")?
+  let _ = guest_tool_or_skip("mke2fs")?
+  let _ = guest_tool_or_skip("gzip")?
+  let digests = expected_digests()?
+
+  let work = test.temp_dir(ctx, name: "trust-guest-stale-work")?
+  let staging = stage_initramfs(ctx, "trust-guest-stale-root", xsh, modules_dir)?
+  let initramfs = fp"{work}/initramfs.cpio"
+  build_initramfs(staging, initramfs)?
+  let store = fp"{work}/store.ext4"
+  build_store_disk(store, 64)?
+
+  let boot = launch_guest(ctx, "trust-guest-stale", kernel, initramfs, store, "https://10.0.2.2:1/", "stale")?
+  defer stop_guest(boot.pid)?
+  var text = wait_for_marker(boot.log, "PHASE0_OK", 50)?
+  assert_clean_markers(text, digests, true)?
+  text = wait_for_marker(boot.log, "BOOT phase=1", 50)?
+  text = wait_for_marker(boot.log, "STALE_OK", 50)?
+  assert f"STALE_OK generation=2 bundle={digests.b_bundle} policy={digests.b_policy}" in text
+  wait_for_exit(boot.pid, 50)?
+  let final = boot.log.read_text()?
+  assert "LAPUTA_TRUST_GUEST FAIL" not in final
+  assert "ENTRY phase=1 active=2 journal=false" in final
 }
