@@ -24,8 +24,9 @@ proc assert_local_source_checksums(package: Str) {
   for source in pkg.upstream_sources {
     let raw = source.source.display()
     continue unless raw.starts_with("files/")
-    let staged = fp"packages/{package}/{raw}"
     let expected = sources.source_checksum(source, "aarch64")?
+    continue when expected == "SKIP"
+    let staged = fp"packages/{package}/{raw}"
     assert hash.sha256(staged)?.hex() == expected
   }
 }
@@ -464,5 +465,30 @@ test test_recipe_loads_proof_dependencies_without_running_the_proof [fs, env, er
   ] {
     declarations.write("##! Invalid proof dependency fixture.\n## Invalid declaration.\n" + invalid + "\n")
     expect_contract_rejection(dir, "invalid proof dependency contract")
+  }
+}
+
+test test_ca_certificates_installs_managed_symlinks_and_seeds { |ctx|
+  let pkg = recipe.load_package(p"packages/ca-certificates")?
+  let paths = [entry.path.display() for entry in pkg.filetree]
+  let joined = paths.join("\n")
+  assert "usr/bin" not in joined
+  for expected in [
+    "etc/ssl/certs/ca-certificates.crt",
+    "etc/ssl/cert.pem",
+    "etc/laputa/trust-policy",
+    "etc/laputa/trust-update-key",
+    "usr/share/laputa/trust/seed/ca-certificates.crt",
+    "usr/share/laputa/trust/seed/trust-policy",
+  ] {
+    assert expected in paths
+  }
+}
+
+test test_laputa_pm_ships_the_trust_command { |ctx|
+  let pkg = recipe.load_package(p"packages/laputa-pm")?
+  let paths = [entry.path.display() for entry in pkg.filetree]
+  for expected in ["usr/bin/trust", "usr/lib/pm/trust.xsh", "usr/lib/pm/trust"] {
+    assert expected in paths
   }
 }

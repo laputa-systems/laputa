@@ -55,16 +55,23 @@ export const upstream_sources = [
 
 ## Exported declaration `filetree`.
 ## PM's module set changes as PM evolves, so the modules ship as one tree.
+## The trust command rides along: its entrypoint and modules are ordinary
+## files under the same library root.
 export const filetree = [
   {path: p"usr/bin/pm", kind: "file"},
   {path: p"usr/lib/pm/pm.xsh", kind: "file"},
   {path: p"usr/lib/pm/pm", kind: "tree"},
+  {path: p"usr/bin/trust", kind: "file"},
+  {path: p"usr/lib/pm/trust.xsh", kind: "file"},
+  {path: p"usr/lib/pm/trust", kind: "tree"},
 ]
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, error] {
   fs.install(p"pm.xsh", fp"{dest}/usr/lib/pm/pm.xsh", 0o644, parents: true, overwrite: true)
   let _ = fs.copy_tree(p"pm", fp"{dest}/usr/lib/pm/pm", parents: true, overwrite: true)?
+  fs.install(p"trust.xsh", fp"{dest}/usr/lib/pm/trust.xsh", 0o644, parents: true, overwrite: true)
+  let _ = fs.copy_tree(p"trust", fp"{dest}/usr/lib/pm/trust", parents: true, overwrite: true)?
   fp"{dest}/usr/bin".mkdir()
 
   fp"{dest}/usr/bin/pm".write(
@@ -88,6 +95,35 @@ proc main(...argv: List[Str]) [process, env, error] {
     }
 
     return Err(WrapperError.Failed("pm command was signaled"))
+  }
+}
+
+main(@args)?
+""",
+    mode: 0o755,
+  )
+
+  fp"{dest}/usr/bin/trust".write(
+    """#!/bin/xsh
+error WrapperError = Failed(message: Str)
+
+proc main(...argv: List[Str]) [process, env, error] {
+  let forwarded = ["/bin/xsh", "/usr/lib/pm/trust.xsh", "--"].extend(argv)
+  let status = process.run(
+    process.command_argv(
+      /bin/xsh,
+      forwarded,
+      /,
+      {XSH_MODULE_PATH: "/usr/lib/pm"},
+    ),
+  )?
+
+  if ! status.ok {
+    if status.exited() {
+      exit status.exit_code()?
+    }
+
+    return Err(WrapperError.Failed("trust command was signaled"))
   }
 }
 
