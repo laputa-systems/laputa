@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 41
+Next: 44
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -152,3 +152,30 @@ and real-hardware enablement remain outside that scope.
 - **Coordination:** XSH-46 owns the optional tooling feature and signature trust policy.
 - **Fix with:** reference-parity
 - **Effort:** S (hours)
+
+### LAP-41 · P3 · Prove a trust-update key rotation end to end
+
+- **Area:** Trust recovery
+- **Where:** `trust/`, `packages/ca-certificates/`, `docs/CERTIFICATE-TRUST.md`
+- **Problem:** The key ceremony documents rotation through an OS package update, but no test ships a new key plus new seeds, re-issues a release under it, and verifies the update path accepts the rotation while rejecting the old key's releases.
+- **Recommendation:** Stage a rotated fixture key as a second package input, compose a release under it, and prove `trust update` converges while the superseded key's releases fail closed. Keep the rotation package-only; releases still carry no keys.
+- **Fix with:** reference-parity
+- **Effort:** S (hours)
+
+### LAP-42 · P3 · Track per-consumer enforcement of the distrust policy
+
+- **Area:** Trust consumers
+- **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`, `packages/deno/`
+- **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv, Go-based Tailscale, and Deno each carry their own verifier with distinct distrust behavior.
+- **Recommendation:** Qualify each named consumer against the cross-signed fixture pair: blocked intermediate fails, unblocked control succeeds. Record the actual enforcement per consumer instead of assuming file sharing is proof.
+- **Fix with:** reference-parity
+- **Effort:** M (days)
+
+### LAP-43 · P3 · Authenticate the package repository index
+
+- **Area:** Repository trust
+- **Where:** `pm/remote.xsh`, `docs/ROADMAP.md` (R4)
+- **Problem:** Artifact hashes and mirror publisher authentication do not authenticate the mutable `index.json` to a client. The trust-release path signs trust inputs; repository metadata has no equivalent versioned, signed snapshot boundary.
+- **Recommendation:** Add a versioned, signed release/snapshot boundary binding the exact index and referenced artifacts, with key provisioning, rotation/revocation, expiry, rollback/freeze handling, parser/size limits, and atomic publication. Compare an established update-metadata design before inventing a cryptographic protocol.
+- **Fix with:** architect
+- **Effort:** L (weeks)

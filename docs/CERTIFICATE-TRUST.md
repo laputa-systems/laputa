@@ -1,34 +1,204 @@
 # Certificate trust
 
-Laputa installs curl's 2026-10-20 Mozilla-derived bundle at `/etc/ssl/certs/ca-certificates.crt`. The pinned export contains 118 certificates and omits `emSign ECC Root CA - G3`. The package proof checks the count, the removed root, and every certificate's PEM encoding. `/etc/ssl/cert.pem` remains a symlink to the bundle.
+## Layout
 
-Curl's PEM export does not preserve Mozilla root-specific Name Constraints. Treat the bundle as a list of roots, not as Mozilla's complete trust program. See [curl's CA extraction notes](https://curl.se/docs/caextract.html).
+| Path | Owner | Content |
+|---|---|---|
+| `/etc/ssl/certs/ca-certificates.crt` | ca-certificates package (symlink) | Active root bundle → `../../../var/lib/laputa/trust/active/ca-certificates.crt` |
+| `/etc/ssl/cert.pem` | ca-certificates package (symlink) | `certs/ca-certificates.crt` alias of the bundle |
+| `/etc/laputa/trust-policy` | ca-certificates package (symlink) | Active distrust policy → `../../var/lib/laputa/trust/active/trust-policy` |
+| `/etc/laputa/trust-update-key` | ca-certificates package, mode 0444 | Operator-provisioned 32-byte Ed25519 verification key |
+| `/usr/share/laputa/trust/seed/` | ca-certificates package | Pinned bundle + policy seeds; install inputs, never network content |
+| `/var/lib/laputa/trust/` | trust update (durable state) | `generations/<u64>/`, `active` symlink, `accepted`, `time-lower-bound`, `journal.json`, `update.lock`, `staging/` |
+| `/usr/bin/trust` | laputa-pm package | `status`, `verify`, `update` entrypoint |
 
-The CA package installs `/etc/laputa/trust-policy`. Generation 1 blocks the six compromised eMudhra TLS intermediate SPKI SHA-256 hashes in [Mozilla Bugzilla 2083449](https://bugzilla.mozilla.org/show_bug.cgi?id=2083449). The file uses LF-terminated UTF-8: `laputa-trust-policy-v1`, a canonical positive `u64` generation, then zero or more unique lowercase 64-digit `blocked-spki-sha256` values. PEM roots cannot express intermediate-key distrust. Keep broad alternative roots so unrelated sites remain trusted.
+Laputa installs curl's 2026-10-20 Mozilla-derived bundle as the generation-1
+seed. The pinned export contains 118 certificates and omits
+`emSign ECC Root CA - G3`. The package proof checks the count, the removed
+root, and every certificate's PEM encoding. The installer seeds the trust
+store from these package seeds on every fresh install, so installed systems
+verify trust from first boot; `trust update` bootstraps the same way when no
+store exists, and refuses to bootstrap over a newer accepted generation.
 
-Laputa removed `update-certdata`. That command downloaded a bundle over HTTPS and replaced the live file without verifying a Laputa signature, checking rollback or expiry, or coordinating process state.
+Curl's PEM export does not preserve Mozilla root-specific Name Constraints.
+Treat the bundle as a list of roots, not as Mozilla's complete trust program.
+See [curl's CA extraction notes](https://curl.se/docs/caextract.html).
 
-`trust.release.compose_signed_release` accepts the exact metadata, detached signature, root bundle, next policy, and installed-policy snapshot bytes. It verifies the metadata signature before parsing the metadata. It checks expiry, generation, and payload digests. It validates every root certificate. It stages those same root and policy bytes in an owner-only temporary root for `pm.generation.compose`; callers cannot supply a path that cleanup might remove. Generation and root composition keep intermediate work beneath owner-only temporary roots. Root composition creates its staging child with mode `0700`; generation restricts the completed root to `0700` before applying the trust overlay. Immediately before each no-replace publication, the completed directory receives mode `0777` narrowed by the process umask, read without changing it. Existing paths and symlink aliases are never removed to prepare staging. Signed-release validation failures happen before staging. Composition failures remove only temporary roots created by that call and leave prior generations intact.
+The distrust policy uses LF-terminated UTF-8: `laputa-trust-policy-v1`, a
+canonical positive `u64` generation, then zero or more unique lowercase
+64-digit `blocked-spki-sha256` values. Generation 1 blocks the six
+compromised eMudhra TLS intermediate SPKI SHA-256 hashes in
+[Mozilla Bugzilla 2083449](https://bugzilla.mozilla.org/show_bug.cgi?id=2083449).
+PEM roots cannot express intermediate-key distrust. Keep broad alternative
+roots so unrelated sites remain trusted.
 
-Composition uses `laputa-root-2` receipts and inherits PM's selected-root
-manual-index execution when the selected packages include mandoc and pages.
-Its effect contract therefore includes process execution. Roots with previous-format receipts
-require recomposition. The signed certificate-release format stays
-`laputa-trust-release-v1`.
+## Releases
 
-The staging guarantees above assume trusted parent directories. The selected
-filesystem path still uses ambient operations and has an unqualified cleanup
-ownership boundary. See [filesystem authority limits](PM.md#filesystem-authority-limits)
-for the replacement reproducer and the separate durability gap.
+Signed releases are the only trust mutations. A release is exactly four
+files: `metadata`, `metadata.sig` (raw 64-byte Ed25519), `ca-certificates.crt`
+(≤ 4 MiB), `trust-policy` (≤ 1 MiB). Metadata is ≤ 4 KiB of LF-terminated
+UTF-8 with exactly five ordered lines: `laputa-trust-release-v1`,
+`generation`, `expires-at`, `root-bundle-sha256`, and `trust-policy-sha256`.
+Releases expire within 90 days of signing. The policy generation must equal
+the signed generation and advance the installed-policy snapshot. There is no
+empty-state or test-key default; every check takes the provisioned key and
+`now_epoch_seconds` from the host wall clock.
 
-Signed metadata uses LF-terminated UTF-8 with exactly five ordered lines: `laputa-trust-release-v1`, `generation`, `expires-at`, `root-bundle-sha256`, and `trust-policy-sha256`. A raw 64-byte detached Ed25519 signature covers the original metadata bytes. Metadata is limited to 4 KiB. Root bundles are limited to 4 MiB. Releases must expire within 90 days. The policy generation must equal the signed generation and advance the installed-policy snapshot. The caller must provide the snapshot and a raw 32-byte public key. There is no empty-state or test-key default. The caller supplies `now_epoch_seconds` from the host wall clock, such as `time.now() / 1000`.
+`trust.verify --from DIR` checks a release directory without changing state.
+`trust update (--from DIR | --url URL)` verifies and atomically activates.
+`--from` is the deterministic offline and emergency path: it needs no
+networking and no working WebPKI trust store. `--url` fetches the same four
+files over HTTPS; HTTPS is transport only and the detached signature over
+pinned key material authorizes the release. Source files above their size
+bounds, non-regular files, digest mismatches, stale generations, conflicting
+bytes for the active generation, expired or over-long expiries, malformed
+bundles or policies, and a clock behind the persisted lower bound all fail
+closed without touching the store.
 
-Laputa has no production verification key or release-fetch command yet. Provision the public key through a Laputa-controlled source independent of WebPKI. Then connect release acquisition to `compose_signed_release`. The function creates an immutable candidate generation. It does not select that generation, install into a live root, or restart host services. After activation, restart or reload affected services with `xinit restart SERVICE` or `xinit reload SERVICE`.
+## Activation
 
-The `uv` package is 0.13.4 and uses Laputa's system store through `/etc/uv/uv.toml`. It depends on `ca-certificates`. Its bundled roots use `webpki-root-certs` 1.0.10, but its pinned Cargo.lock still uses `rustls-webpki` 0.103.14. The system store removes the retired G3 root but does not establish rejection of cross-signed chains. See the [uv 0.13.4 changelog](https://github.com/astral-sh/uv/blob/0.13.4/CHANGELOG.md), [Cargo.lock](https://github.com/astral-sh/uv/blob/0.13.4/Cargo.lock), and [rustls-webpki advisory](https://rustsec.org/advisories/RUSTSEC-2026-0382).
+Activation is one linearization point: the atomic rename of the `active`
+symlink onto `generations/<N>`. Around it:
 
-Tailscale is 1.104.2, built with Go 1.27.3, and depends on `ca-certificates`. Go's Linux verifier reads the canonical bundle and certificate files in `/etc/ssl/certs`. Laputa installs only the canonical bundle there. The `qemu-dwl-foot` profile includes `ca-certificates` directly. See the [Tailscale release](https://github.com/tailscale/tailscale/releases/tag/v1.104.2), [Go's eMudhra fix](https://github.com/golang/go/issues/82345), and [Go 1.27.3 Linux root lookup](https://github.com/golang/go/blob/go1.27.3/src/crypto/x509/root_linux.go).
+- Staging writes the verified bytes to an owner-token directory under
+  `staging/`, fsyncs every file, then commits by renaming the directory to
+  `generations/<N>`. Committed generations are immutable; a conflicting
+  commit with different bytes fails, a byte-identical one is adopted.
+- The journal (`locked → staged → committed → activated → persisted`)
+  records each step. Interrupted runs recover on the next update: staged
+  work is removed, committed work rolls forward (flip, persist, clear).
+  Unreadable or unknown journals, active/journal disagreements, and
+  staging/commitment collisions fail closed for manual inspection.
+- `accepted` is a high-water mark that never rolls back distrust: updates
+  must advance it, and a store whose accepted generation is ahead of active
+  refuses to proceed.
+- The persisted time lower bound advances on every activation and rejects
+  releases the local clock reads as expired relative to it.
+- After the flip, activation re-reads the canonical paths until they agree
+  with the activated digests, so `status` never reports a half-visible
+  generation.
 
-Deno remains at 2.9.7. Laputa sets `DENO_TLS_CA_STORE=system` for login-shell applications and declares `ca-certificates` as a runtime-only dependency. As of 2026-10-21, Deno's SPKI distrust fix is merged but unreleased. The system store removes the retired root, but it does not block cross-signed chains with a compromised intermediate key. See [Deno's change](https://github.com/denoland/deno/pull/37046) and [TLS store setting](https://docs.deno.com/runtime/reference/env_variables/).
+`trust.status` reports the active generation, bundle and policy digests,
+key fingerprint, last activation, accepted generation, pending journal work,
+staging debris, freshness, and atomic-activation capability. Concurrent
+updates serialize on `update.lock`; a second updater is refused, never
+queued.
 
-XSH TLS clients enforce `/etc/laputa/trust-policy` for every transport admission, including requests that use custom roots or disable ordinary certificate verification. Redirects are new admissions and recheck the policy. A request admitted before an update may finish, including work already queued by the transport, internal retries, or TLS resumption. A job submitted but not yet admitted must fail after the pinned root or policy snapshot changes. Changed, removed, or malformed snapshots fail closed until the client is recreated. New clients read the activated generation. To cut over existing services promptly, drain and restart them with `xinit restart SERVICE` or `xinit reload SERVICE`. Laputa has no trust daemon.
+`trust.release.compose_signed_release` remains the PM-side path: it verifies
+the same metadata, signature, expiry, generation, and digests, validates
+every root certificate, and stages those root and policy bytes in an
+owner-only temporary root for `pm.generation.compose`. Signed-release
+validation failures happen before staging; composition failures remove only
+temporary roots created by that call. Root composition creates its staging
+child with mode `0700`; generation restricts the completed root to `0700`
+before applying the trust overlay. Immediately before each no-replace
+publication, the completed directory receives mode `0777` narrowed by the
+process umask. Existing paths and symlink aliases are never removed to
+prepare staging. The staging guarantees assume trusted parent directories.
+See [filesystem authority limits](PM.md#filesystem-authority-limits).
+
+Laputa removed `update-certdata`. That command downloaded a bundle over HTTPS
+and replaced the live file without verifying a Laputa signature, checking
+rollback or expiry, or coordinating process state.
+
+## Key ceremony
+
+Production trusts exactly one key: the 32 raw Ed25519 bytes at
+`/etc/laputa/trust-update-key`, installed by the ca-certificates package at
+mode 0444. The key file is operator-provisioned and never in the repository
+(it is git-ignored; package builds fail closed without it). Provision it on
+the build host before `make build`:
+
+1. Generate 32 random bytes offline (`head -c 32 /dev/urandom`).
+2. Place them at `packages/ca-certificates/files/trust-update-key`.
+3. Record the fingerprint `trust.status` reports and distribute it
+   out-of-band for release verification.
+
+Rotate only through an OS package update that ships a new key file and new
+seeds together; releases themselves never carry keys and cannot rotate,
+revoke, or recover one. Losing the signing key means building a new key,
+shipping it in a package update, and re-issuing releases. There is no
+in-band recovery.
+
+## Recovery
+
+- Reboot or power loss mid-update: run `trust update` again (or reboot the
+  guest). Journal recovery rolls forward committed candidates, removes owned
+  staging, and never restores older policy. `trust.status` pending work
+  returns to `none`.
+- `trust journal is unreadable; refusing automatic recovery`: inspect
+  `active`, `accepted`, and the generation directories by hand, verify the
+  active bytes with `trust verify --from`, then remove `journal.json` only
+  once active state is confirmed good.
+- `accepted generation is ahead of active generation`: the store was copied
+  or restored inconsistently. Do not delete `accepted` to work around it;
+  reconcile which generation is genuinely installed and re-apply it.
+- `system clock reads behind the persisted time lower bound`: fix the clock
+  (see R2 time discipline) and retry; the bound only moves forward.
+- Emergency trust repair without networking or WebPKI: `trust update
+  --from DIR` with a verified release directory.
+
+## Consumers
+
+XSH TLS clients enforce `/etc/laputa/trust-policy` for every transport
+admission, including requests that use custom roots or disable ordinary
+certificate verification. Redirects are new admissions and recheck the
+policy. A request admitted before an update may finish, including work
+already queued by the transport, internal retries, or TLS resumption. A job
+submitted but not yet admitted must fail after the pinned root or policy
+snapshot changes. Changed, removed, or malformed snapshots fail closed until
+the client is recreated. New clients read the activated generation. To cut
+over existing services promptly, restart them after updating (for example
+with `xinit restart SERVICE`). Laputa has no trust daemon and no service
+cutover layer; the operator restarts long-lived processes.
+
+The `uv` package is 0.13.4 and uses Laputa's system store through
+`/etc/uv/uv.toml`. It depends on `ca-certificates`. Its bundled roots use
+`webpki-root-certs` 1.0.10, but its pinned Cargo.lock still uses
+`rustls-webpki` 0.103.14. The system store removes the retired G3 root but
+does not establish rejection of cross-signed chains. See the
+[uv 0.13.4 changelog](https://github.com/astral-sh/uv/blob/0.13.4/CHANGELOG.md),
+[Cargo.lock](https://github.com/astral-sh/uv/blob/0.13.4/Cargo.lock), and
+[rustls-webpki advisory](https://rustsec.org/advisories/RUSTSEC-2026-0382).
+
+Tailscale is 1.104.2, built with Go 1.27.3, and depends on
+`ca-certificates`. Go's Linux verifier reads the canonical bundle and
+certificate files in `/etc/ssl/certs`. Laputa installs only the canonical
+bundle there. The `qemu-dwl-foot` profile includes `ca-certificates`
+directly. See [the Tailscale release](https://github.com/tailscale/tailscale/releases/tag/v1.104.2),
+[Go's eMudhra fix](https://github.com/golang/go/issues/82345), and
+[Go 1.27.3 Linux root lookup](https://github.com/golang/go/blob/go1.27.3/src/crypto/x509/root_linux.go).
+
+Deno remains at 2.9.7. Laputa sets `DENO_TLS_CA_STORE=system` for login-shell
+applications and declares `ca-certificates` as a runtime-only dependency. As
+of 2026-10-21, Deno's SPKI distrust fix is merged but unreleased. The system
+store removes the retired root, but it does not block cross-signed chains
+with a compromised intermediate key. See [Deno's change](https://github.com/denoland/deno/pull/37046)
+and [TLS store setting](https://docs.deno.com/runtime/reference/env_variables/).
+
+## Evidence
+
+- `tests/pm/trust_update.xsh`: cryptographic matrix (wrong signer, tampered
+  metadata, expiry bounds, digest mismatches, malformed inputs, oversize
+  bounds), stale/conflicting re-application, generation advance, lock
+  serialization, existing-generation conflicts, time-bound enforcement and
+  persistence, staged/committed/unknown journal recovery, and kill -9 at
+  random points converging on re-run.
+- `tests/pm/trust_update_cli.xsh`: entrypoint wiring, usage errors,
+  `--url` convergence with `--from`, trickle-download kill with no store
+  mutation, and killed-mid-transaction recovery.
+- `tests/pm/trust_update_tls.xsh`: trusted-chain acceptance, untrusted-chain
+  rejection, pinned-snapshot poison requiring client recreation, and an
+  unblocked control pair — all against fixture PKI, never touching host
+  trust.
+- `tests/pm/ca_certificates_recipe.xsh`: layout, seed, provisioned-key, and
+  seeded-store proof checks.
+- `tests/system/trust_guest.xsh`: real KVM guests boot from the host kernel
+  with a staged initramfs and a dedicated ext4 store disk, then update
+  `--from` baked-in release B, reboot, update `--url` from a host fixture
+  TLS server at 10.0.2.2, reboot, and replay generation 3; a second test
+  SIGKILLs the guest mid-download and requires forward-only recovery to
+  generation 3. Serial markers carry the exact bundle and policy digests,
+  which the host recomputes from fixtures.
+- `packages/ca-certificates/proof.xsh`: layout, pinned roots, blocked SPKIs,
+  provisioned key format, and an actually seeded store.

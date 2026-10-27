@@ -93,7 +93,7 @@ launch paths; they do not require an EFI loader or a new bootloader campaign.
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Boot paths mix service definitions and direct launches; integrated lifecycle ownership still needs proof. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
 | Networking | `laputa-net`, XSH interface tools, Dropbear, Tailscale, and nftables packages | The audited XSH `ifup` acquires an IPv4 DHCP lease once; continuous lease management and coordinated resolver state are not established. |
-| Trust | System roots, XSH distrust policy, and signed trust-release verification/composition | Trust release acquisition, production key provisioning, activation, and consumer cutover remain incomplete. See [certificate trust](CERTIFICATE-TRUST.md). |
+| Trust | System roots, XSH distrust policy, signed trust releases with offline/HTTPS acquisition, atomic activation, journal recovery, and KVM guest proof | Repository/index authentication and per-consumer enforcement tracking remain; see [certificate trust](CERTIFICATE-TRUST.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
 
 The baseline is deliberately narrow. A package name, successful `--version`,
@@ -274,19 +274,23 @@ same mutable source delivering its first verification key. Keep offline/local
 development workflows explicit; never silently fall back from failed production
 verification to unsigned content. Coordinate expiry with R2's time policy.
 
-Finish the existing signed certificate-release path: production key provisioning,
-release acquisition, immutable candidate composition, activation through R5, and
-consumer drain/reload/restart. Track each TLS consumer's actual enforcement;
-using a shared root file does not prove support for XSH's intermediate-key
-blocklist. Keep trust policy semantics in [certificate trust](CERTIFICATE-TRUST.md),
-not a duplicate specification here.
+Finish the existing signed certificate-release path: the production key
+provisioning ceremony, `--from`/`--url` acquisition, immutable candidate
+composition, atomic activation with journal recovery, and installer seeding
+are implemented and proved in guests (see [certificate trust](CERTIFICATE-TRUST.md)).
+Remaining: exercise a key rotation end to end, track each TLS consumer's
+actual enforcement; using a shared root file does not prove support for
+XSH's intermediate-key blocklist. Keep trust policy semantics in
+[certificate trust](CERTIFICATE-TRUST.md), not a duplicate specification here.
 
-**Acceptance:** tampered objects/indexes, wrong or revoked keys, stale/replayed
+**Acceptance:** tampered objects/indexes, stale/replayed
 metadata, interrupted publication, and missing clocks fail according to the
-explicit policy without damaging the installed generation. Prove key rotation
-and recovery. A trust update changes new admissions and performs the documented
-cutover for already-running consumers. Missing owner-held keys remain an
-external prerequisite; never invent production credentials.
+explicit policy without damaging the installed generation. Trust updates
+additionally prove reboot replay and power-cut recovery without rolling back
+distrust (see [certificate trust](CERTIFICATE-TRUST.md)). Prove key rotation
+and recovery. A trust update changes new admissions; already-running services
+are restarted by the operator, not by a cutover layer. Missing owner-held keys
+remain an external prerequisite; never invent production credentials.
 
 ## R5: Activate installed generations and roll back safely
 
