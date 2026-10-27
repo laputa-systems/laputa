@@ -20,6 +20,9 @@ packages/*/run-package-build.xsh
 # trust depends on this key staying outside the repository. Builds fail
 # closed without it; see docs/CERTIFICATE-TRUST.md (key ceremony).
 packages/ca-certificates/files/trust-update-key
+# The private signing half must live offline, never in the tree.
+# Ignored anywhere as a safety net against accidental commit.
+trust-signing.key
 
 # cf cli
 .cloudflare/
