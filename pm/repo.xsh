@@ -2,6 +2,7 @@
 use plan as build_plan
 use proof as pm_proof
 use remote
+use repo_snapshot
 use store
 use types
 use util
@@ -275,4 +276,92 @@ export proc publish(
   if ! pending.is_empty() {
     remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)
   }
+}
+
+## Publishes an offline-signed repository snapshot. The snapshot files are
+## composed and signed outside PM (see docs/PM.md); this verifies the
+## signature, binds the snapshot to the exact current remote index, requires
+## a generation advance over any published snapshot, and uploads the metadata
+## before the signature so the signature is the linearization point.
+export proc publish_snapshot(
+  remote_repo: Str,
+  token: Str,
+  work: Path,
+  snapshot_dir: Path,
+  keys: List[Bytes],
+) [fs, net, time, error] {
+  if remote_repo == "" {
+    return Err(types.PmError.RemoteRepo("repository snapshot publication needs a remote repository"))
+  }
+
+  if ! util.is_local_repo_url(remote_repo) and token.trim() == "" {
+    return Err(
+      types.PmError.Auth("repository snapshot publication needs LAPUTA_TOKEN for network remotes other than the local mirror"),
+    )
+  }
+
+  work.mkdir()
+  let metadata_path = fp"{snapshot_dir}/snapshot.json"
+  let signature_path = fp"{snapshot_dir}/snapshot.sig"
+
+  guard metadata_path.exists()? else {
+    return Err(types.PmError.PackageContract(f"repository snapshot directory is missing snapshot.json: {snapshot_dir}"))
+  }
+
+  guard signature_path.exists()? else {
+    return Err(types.PmError.PackageContract(f"repository snapshot directory is missing snapshot.sig: {snapshot_dir}"))
+  }
+
+  let metadata = metadata_path.read_bytes()?
+  let signature = signature_path.read_bytes()?
+  let snapshot = repo_snapshot.snapshot_parse_metadata(metadata)?
+  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)?
+
+  let index_work = fp"{work}/snapshot-index"
+  index_work.mkdir()
+  let index_dest = fp"{index_work}/index.json"
+  let failure = remote.try_fetch_repo_file(remote_repo, p"index.json", index_dest)?
+
+  guard failure == "" else {
+    return Err(types.PmError.RemoteIndex(f"repository snapshot publication needs the published index: {failure}"))
+  }
+
+  let index_bytes = index_dest.read_bytes()?
+  guard index_bytes.sha256().hex() == snapshot.index_sha256 else {
+    return Err(types.PmError.RemoteIndex("repository snapshot index digest does not match the published index; re-issue the snapshot after publication"))
+  }
+
+  let prior_dest = fp"{index_work}/prior-snapshot.json"
+  let prior_failure = remote.try_fetch_repo_file(remote_repo, util.remote_snapshot_rel(), prior_dest)?
+
+  if prior_failure == "" {
+    let prior = repo_snapshot.snapshot_parse_metadata(prior_dest.read_bytes()?)?
+    guard repo_snapshot.snapshot_u64_is_greater(snapshot.generation, prior.generation) else {
+      if snapshot.generation == prior.generation and snapshot.index_sha256 == prior.index_sha256 {
+        print "snapshot" $snapshot.generation "already-published"
+        return
+      }
+
+      return Err(
+        types.PmError.PackageContract(f"repository snapshot generation {snapshot.generation} does not advance the published generation {prior.generation}"),
+      )
+    }
+  }
+
+  if util.is_file_url(remote_repo) {
+    let metadata_dest = util.repo_file_path(remote_repo, util.remote_snapshot_rel())?
+    let signature_dest = util.repo_file_path(remote_repo, util.remote_snapshot_signature_rel())?
+    metadata_dest.parent.mkdir()
+    atomically replace metadata_dest as temporary {
+      metadata_path.copy(to: temporary, overwrite: true)
+    }
+    signature_dest.parent.mkdir()
+    atomically replace signature_dest as temporary {
+      signature_path.copy(to: temporary, overwrite: true)
+    }
+    return
+  }
+
+  remote.upload_repo_file(remote_repo, util.remote_snapshot_rel(), metadata_path, token, work)
+  remote.upload_repo_file(remote_repo, util.remote_snapshot_signature_rel(), signature_path, token, work)
 }

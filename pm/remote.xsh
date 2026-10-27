@@ -1,4 +1,5 @@
 ##! PM remote operations and shared package-manager policy.
+use repo_snapshot
 use types
 use util
 
@@ -147,6 +148,79 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
   let items = decode_remote_index(rows)?
   out.mkdir()
   util.remote_index_cache_path(out).write_atomic(body)
+  items
+}
+
+proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int) [fs, net, error] -> Result[Bytes, Error] {
+  let response = net.request({
+    method: "GET",
+    url: util.repo_url_for(repo, rel)?,
+    headers: [{name: "Cache-Control", value: "no-cache"}, {name: "Pragma", value: "no-cache"}],
+    pool: "pm",
+    timeout: 15s,
+    connect_timeout: 5s,
+    max_body_bytes: bound,
+  })?
+
+  if response.status < 200 or response.status >= 300 {
+    return Err(types.PmError.RemoteIndex(f"failed to fetch repository snapshot {rel.display()}: HTTP {response.status}"))
+  }
+
+  response.body.require(Bytes)?
+}
+
+## Fetches the signed snapshot and the exact index it binds, verifies the
+## snapshot against the provisioned keys and the accepted floor, and caches
+## the verified index bytes. Production remotes only: file and loopback-local
+## repositories stay explicit local workflows. Any verification failure fails
+## closed without falling back to unsigned content.
+export proc load_verified_remote_index(
+  repo: Str,
+  out: Path,
+  keys: List[Bytes],
+  now_epoch_seconds: Int,
+  state_dir: Str,
+) [fs, net, time, error] -> Result[List[types.RemotePackage], Error] {
+  let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192)?
+  let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256)?
+  let index_response = net.request({
+    method: "GET",
+    url: util.repo_url_for(repo, p"index.json")?,
+    headers: [{name: "Cache-Control", value: "no-cache"}, {name: "Pragma", value: "no-cache"}],
+    pool: "pm",
+    timeout: 15s,
+    connect_timeout: 5s,
+    max_body_bytes: 10485760,
+  })?
+
+  if index_response.status < 200 or index_response.status >= 300 {
+    return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP {index_response.status}"))
+  }
+
+  let index_bytes = index_response.body.require(Bytes)?
+  let accepted = if state_dir == "" {
+    null
+  } else {
+    repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo))?
+  }
+  let verified = repo_snapshot.snapshot_verify({
+    metadata,
+    signature,
+    keys,
+    index_bytes,
+    accepted,
+    now_epoch_seconds,
+  })?
+
+  let rows: List[Record] = json.decode(index_bytes.utf8()?)?.require()?
+  let items = decode_remote_index(rows)?
+  out.mkdir()
+  util.remote_index_cache_path(out).write_atomic(index_bytes)
+
+  if state_dir != "" {
+    repo_snapshot.snapshot_persist_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo), verified, now_epoch_seconds)?
+  }
+
   items
 }
 

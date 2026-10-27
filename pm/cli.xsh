@@ -12,6 +12,7 @@ use policy
 use recipe
 use remote
 use repo
+use repo_snapshot
 use sources
 use store
 use types
@@ -28,6 +29,8 @@ type PmRepoBuildArgs = {input: Path, store: Path, jobs: Int, logs: Path}
 type PmRepoBuildNodeArgs = {input: Path, repo: Path, store: Path, node: Str}
 
 type PmRepoPublishArgs = {input: Path, store: Path}
+
+type PmRepoPublishSnapshotArgs = {snapshot_dir: Path}
 
 type PmRepoPackagesArgs = {repo: Str, packages: List[Str]}
 
@@ -91,7 +94,20 @@ proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) -> Result[
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()
 
-  if repo_url != "" {
+  if repo_url != "" and ! util.is_local_repo_url(repo_url) {
+    let key_file = (e"XSH_PM_REPO_KEY_FILE" ?? "").trim()
+
+    guard key_file != "" else {
+      return Err(
+        types.PmError.Auth("planning from a production repository needs XSH_PM_REPO_KEY_FILE naming the provisioned snapshot keys; refusing to use the unsigned index"),
+      )
+    }
+
+    let keys = repo_snapshot.snapshot_load_keys(fp"{key_file}")?
+    let now = time.now() / 1000
+    let state_dir = (e"XSH_PM_REPO_STATE_DIR" ?? "").trim()
+    index = remote.load_verified_remote_index(repo_url, cache_root, keys, now, state_dir)?
+  } else if repo_url != "" {
     for entry in remote.load_remote_index_from_repo(repo_url, cache_root)? {
       index = remote.upsert_remote_package(index, entry)?
     }
@@ -219,6 +235,31 @@ export proc pm_cli_repo_publish(args: PmRepoPublishArgs) {
   let token = (e"LAPUTA_TOKEN" ?? "").trim()
   repo.publish(snapshot, repo_url, token, work_handle.host_path()?)
   print "repo" "publish" $value.plan_sha256 snapshot.packages.len() "artifacts"
+}
+
+## Execute the typed repo publish-snapshot command.
+export proc pm_cli_repo_publish_snapshot(args: PmRepoPublishSnapshotArgs) {
+  let repo_url = remote.repo_url()
+
+  if repo_url == "" {
+    return Err(
+      types.PmError.RemoteRepo("pm repo publish-snapshot needs XSH_PM_REPO, for example http://127.0.0.1:3000 for the local mirror"),
+    )
+  }
+
+  let key_file = (e"XSH_PM_REPO_KEY_FILE" ?? "").trim()
+
+  guard key_file != "" else {
+    return Err(
+      types.PmError.Auth("repository snapshot publication needs XSH_PM_REPO_KEY_FILE naming the provisioned snapshot keys"),
+    )
+  }
+
+  let work_handle = fs.tempdir()?
+  let token = (e"LAPUTA_TOKEN" ?? "").trim()
+  let keys = repo_snapshot.snapshot_load_keys(fp"{key_file}")?
+  repo.publish_snapshot(repo_url, token, work_handle.host_path()?, args.snapshot_dir, keys)
+  print "repo" "publish-snapshot" $args.snapshot_dir
 }
 
 proc command_repo_checksums(args: PmRepoPackagesArgs, update: Bool) [fs, net, process, env, time, error] {

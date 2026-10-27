@@ -56,7 +56,8 @@ when it is shown. Tokens are displayed only at creation time.
 
 `pm.xsh -- repo publish` is the only publisher. It uploads content-addressed
 payload, metadata, and proof objects (large ones in chunks) and writes
-`index.json` last. See [PM publication](../docs/PM.md#publication) and `make publish` for a
+`index.json` last. `pm.xsh -- repo publish-snapshot --from DIR` then publishes
+an offline-signed snapshot binding that exact index (see [PM publication](../docs/PM.md#snapshot-authentication)). See [PM publication](../docs/PM.md#publication) and `make publish` for a
 local mirror. The mirror service is the only component that writes to R2.
 
 ## Configure PM clients
