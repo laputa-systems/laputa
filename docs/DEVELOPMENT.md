@@ -153,6 +153,9 @@ PM has no default remote; these make targets use the loopback mirror.
   cached plan before use. Explicit trust
   overrides can bypass fingerprint checks. `kbuild.plan_fingerprint` requires
   the source architecture to resolve those inputs.
+  `kbuild.discover_plan_with_process_pool` takes a parsed configuration and
+  shares it with every discovery worker. Its temporary pool files use `TMPDIR`
+  when set and `/tmp` otherwise; an empty `TMPDIR` is rejected.
   The source tree's local scan-record cache uses format `linux-local-records-v4`;
   older records are discarded and rebuilt on the next discovery.
   The compile-flags cache uses format `linux-kbuild-compile-flags-v3`, and

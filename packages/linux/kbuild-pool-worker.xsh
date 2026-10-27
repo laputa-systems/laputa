@@ -7,7 +7,14 @@ proc main(...argv: List[Str]) [fs, time, error] {
   let state_path = fp"{argv[2]}"
   let lock_path = fp"{argv[3]}"
   let output_path = fp"{argv[4]}"
-  let config = json.read(state_path)?.require(kbuild.PoolState)?.config
+  let initial_lock = fs.lock(lock_path)?
+  let initial = json.read(state_path)?.require(kbuild.PoolState)?
+  fs.unlock(initial_lock)
+  var enabled: Map[Bool] = {}
+  var values: Map[Str] = {}
+  for item in initial.config_enabled { enabled[item.name] = item.value }
+  for item in initial.config_values { values[item.name] = item.value }
+  let config: kbuild.Kconfig = {enabled: enabled, values: values}
   var records: List[kbuild.ScanRecord] = []
 
   while true {

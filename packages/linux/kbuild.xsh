@@ -57,8 +57,13 @@ export type PlanRecord = {
 ## Serialized directory scan exchanged with discovery workers and the local-record cache.
 export type ScanRecord = {dir: Str, file_hash: Str, plan: PlanRecord, child_dirs: List[Str], entries: List[Str]}
 
+type PoolConfigEnabled = {name: Str, value: Bool}
+type PoolConfigValue = {name: Str, value: Str}
 ## Shared discovery-worker pool state guarded by the pool lock file.
-export type PoolState = {pending: List[Str], active: Int, done: Bool, seen: List[Str], error: Str, config: Kconfig}
+export type PoolState = {
+  pending: List[Str], active: Int, done: Bool, seen: List[Str], error: Str,
+  config_enabled: List[PoolConfigEnabled], config_values: List[PoolConfigValue],
+}
 
 ## Archive-analysis plan context shared with analysis workers.
 export type ArchivePlanContext = {
@@ -2445,7 +2450,9 @@ proc discover_records_process_pool(
   xsh_bin: Path,
   worker: Path,
 ) -> Result[KbuildPlan] {
-  let prefix = f"/tmp/xsh-kbuild-pool-{time.now()}"
+  let temporary_dir = e"TMPDIR" ?? "/tmp"
+  return Err(ScriptError.Failed(kind: "kbuild-pool-tmpdir", message: "TMPDIR must not be empty")) when temporary_dir == ""
+  let prefix = f"{temporary_dir}/xsh-kbuild-pool-{time.now()}"
   let state_path = fp"{prefix}-state.json"
   let lock_path = fp"{prefix}-lock"
   defer state_path.remove()
@@ -2453,7 +2460,11 @@ proc discover_records_process_pool(
 
   json.write(
     state_path,
-    PoolState(pending: ["."], active: 0, done: false, seen: ["."], error: "", config:),
+    PoolState(
+      pending: ["."], active: 0, done: false, seen: ["."], error: "",
+      config_enabled: [{name: key, value: config.enabled.get(key)?} for key in config.enabled.keys()],
+      config_values: [{name: key, value: config.values.get(key)?} for key in config.values.keys()],
+    ),
   )
 
   let worker_count = if options.jobs < 1 { 1 } else if options.jobs > 16 { 16 } else { options.jobs }
@@ -2515,7 +2526,7 @@ export proc discover_plan_with_process_pool(
   options: DiscoverOptions,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, time, error] -> Result[KbuildPlan, Error] {
+) [fs, process, env, time, error] -> Result[KbuildPlan, Error] {
   discover_records_process_pool(root, config, srcarch, options, xsh_bin, worker)?
 }
 

@@ -331,6 +331,7 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
       Err(error) => assert "missing kernel config fragment files/config/aarch64/base-aarch64.fragment" in error.message
     }
   }?
+
 }
 
 test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, env, time, error] { |ctx|
@@ -342,7 +343,9 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   source.mkdir()
   let config = fp"{source}/.config"
   config.write("CONFIG_TEST=y\n")
-  fp"{source}/Kbuild".write("obj-$(CONFIG_TEST) += one.o\n")
+  fp"{source}/Kbuild".write("obj-$(CONFIG_TEST) += one.o sub/\n")
+  fp"{source}/sub".mkdir()
+  fp"{source}/sub/Kbuild".write("obj-$(CONFIG_TEST) += two.o\n")
   assert worker.exists()?
   let original = worker.read_text()?
   let change_config = f"""  fp"{source}/.config".write("# CONFIG_TEST is not set\\n")?
@@ -354,12 +357,21 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
   env ({
     XSH_PM_SOURCE_DIR: source.display(),
     XSH_PM_RECIPE_DIR: recipe_root.display(),
-    XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
+    XSH_LINUX_KBUILD_DISCOVER_JOBS: "2",
   }) {
     cd source {
       let plan = linux_shared.discover_package_plan("arm64")?
       assert p"one.o" in plan.objects
+      assert p"sub/two.o" in plan.objects
       assert config.read_text()? == "# CONFIG_TEST is not set\n"
+    }
+  }?
+  env ({XSH_PM_RECIPE_DIR: recipe_root.display(), XSH_LINUX_KBUILD_DISCOVER_JOBS: "1", TMPDIR: ""}) {
+    cd source {
+      match linux_shared.discover_package_plan("arm64") {
+        Ok(_) => test.fail("empty TMPDIR unexpectedly accepted")
+        Err(problem) => assert problem.message == "TMPDIR must not be empty"
+      }
     }
   }?
 }
