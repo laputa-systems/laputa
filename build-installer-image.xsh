@@ -72,6 +72,16 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     overwrite: true,
   )
 
+  for name in ["key.xsh", "policy.xsh", "release.xsh", "store.xsh", "update.xsh"] {
+    fs.install(
+      fp"{root}/trust/{name}",
+      fp"{rootfs}/usr/bin/trust/{name}",
+      0o644,
+      parents: true,
+      overwrite: true,
+    )
+  }
+
   fs.install(
     fp"{installer_root}/laputa-network.boot",
     fp"{rootfs}/usr/lib/init/rc.d/laputa-network.boot",

@@ -1,5 +1,6 @@
 #!/bin/xsh
 use disk_selection
+use trust.store as trust_store
 
 error InstallerError = Failed(kind: Str, message: Str)
 
@@ -536,8 +537,17 @@ proc install_to_disk(disk: Path, ci: Bool) {
   }
 
   write_target_config(/mnt/target, parts.esp, parts.swap, parts.root, ci, network_method)
+  seed_target_trust_store(/mnt/target)
   linux.umount_all(["vfat", "ext4"])
   write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")
+}
+
+## Seeds the fresh target's trust store from its pinned package seeds so the
+## installed system verifies trust from first boot. Fails the install closed
+## when the target's seeds or managed symlinks are not intact.
+proc seed_target_trust_store(root: Path) {
+  let generation = trust_store.trust_store_bootstrap_from_seeds(root)?
+  write_stdout_line(f"Trust store seeded at generation {generation} from package seeds.")
 }
 
 proc run_installer(argv: List[Str]) [fs, process, time, error, io] -> Result[Unit, Error] {

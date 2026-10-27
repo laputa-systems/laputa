@@ -16,5 +16,10 @@ packages/*/run-package-build.xsh
 # Local secrets; nothing in the tree reads them.
 .env
 
+# Operator-provisioned trust-update signing key. Never commit: production
+# trust depends on this key staying outside the repository. Builds fail
+# closed without it; see docs/CERTIFICATE-TRUST.md (key ceremony).
+packages/ca-certificates/files/trust-update-key
+
 # cf cli
 .cloudflare/
