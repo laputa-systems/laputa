@@ -1147,7 +1147,7 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |c
     let stable = fp"{cache}/linux-x86.compile-flags.json"
     for cache_file in [local, stable] {
       let original = cache_file.read_text()?
-      let stale = original.replace("-DVALID", with: "-DSTALE").replace("linux-kbuild-compile-flags-v3", with: "linux-kbuild-compile-flags-v2")
+      let stale = original.replace("-DVALID", with: "-DSTALE").replace("linux-kbuild-compile-flags-v4", with: "linux-kbuild-compile-flags-v3")
       assert stale != original
       cache_file.write(stale)
     }
@@ -1156,13 +1156,63 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |c
     assert tasks.len() == 1
     assert "-DVALID" in tasks[0].argv
     assert "-DSTALE" not in tasks[0].argv
-    assert "linux-kbuild-compile-flags-v3" in local.read_text()?
+    assert "linux-kbuild-compile-flags-v4" in local.read_text()?
+    for cache_file in [local, stable] {
+      cache_file.write(cache_file.read_text()?.replace("-DVALID", with: "-DSTALE"))
+    }
+    let repaired = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let repaired_tasks = [task for task in repaired.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert repaired_tasks.len() == 1
+    assert "-DVALID" in repaired_tasks[0].argv
+    assert "-DSTALE" not in repaired_tasks[0].argv
     p"flags.include".write("CFLAGS_foo.o := -DUPDATED\n")
     let updated = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
     let updated_tasks = [task for task in updated.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert updated_tasks.len() == 1
     assert "-DUPDATED" in updated_tasks[0].argv
     assert "-DVALID" not in updated_tasks[0].argv
+  }
+}
+
+test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-flags-input-snapshot")?
+  let cache = test.temp_dir(ctx, name: "linux-flags-input-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/foo.c".write("int foo(void) { return 0; }\n")
+  fp"{root}/Kbuild".write("include flags.include\n")
+  let included = fp"{root}/flags.include"
+  let replacement = fp"{root}/replacement"
+  replacement.write("CFLAGS_foo.o := -DNEW\n")
+  fs.mkfifo(included, 0o600)?
+  let command = process.command_argv(
+    /bin/sh,
+    ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
+  )
+  let writer = spawn command?
+  defer writer.cancel(kill_after: 0ms)
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
+  )
+  cd root {
+    let _ = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    assert (wait writer?).ok
+    included.write("CFLAGS_foo.o := -DOLD\n")
+    let refreshed = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let tasks = [task for task in refreshed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert tasks.len() == 1
+    assert "-DOLD" in tasks[0].argv
+    assert "-DNEW" not in tasks[0].argv
+    included.remove(missing_ok: false)
+    fs.mkfifo(included, 0o600)?
+    replacement.write("CFLAGS_foo.o := -DNEW\n")
+    let second_writer = spawn command?
+    defer second_writer.cancel(kill_after: 0ms)
+    let reused = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    assert (wait second_writer?).ok
+    let reused_tasks = [task for task in reused.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert reused_tasks.len() == 1
+    assert "-DOLD" in reused_tasks[0].argv
+    assert "-DNEW" not in reused_tasks[0].argv
   }
 }
 

@@ -174,6 +174,8 @@ type DiscoverScans = {records: Map[DirScan], plan: KbuildPlan}
 
 type KbuildSource = {file: Path, body: Str}
 type KbuildVariables = {values: Map[Str], inputs: List[Str]}
+type CompileFlagsForDir = {flags: Map[List[Str]], input_line: Str}
+type CompileFlagsForDirs = {flags: Map[Map[List[Str]]], input_lines: List[Str]}
 enum KbuildInputMode { GeneralVariables, DiscoveryInputs, CompileFlagInputs }
 
 type ActiveDirObjects = {dir: Path, objects: List[Path]}
@@ -921,13 +923,6 @@ proc included_kbuild_file(root: Path, line: Str, vars: Map[Str], config: Kconfig
   join_root(root, rel)
 }
 
-proc included_kbuild_lines(root: Path, line: Str, vars: Map[Str], config: Kconfig, srcarch: Str) -> Result[List[Str]] {
-  if let file = included_kbuild_file(root, line, vars, config, srcarch)? {
-    return logical_lines(file.read_text()?)
-  }
-  []
-}
-
 pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) -> ParsedAssignment {
   {
     lhs: line.byte_slice(0, index).trim(),
@@ -1176,13 +1171,11 @@ pure object_cflags_lhs(expanded: Str) -> Str {
   ""
 }
 
-proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[Map[List[Str]]] {
+proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: Str) -> Result[CompileFlagsForDir] {
   var file = p""
-
-  if let Ok(value) = kbuild_file(join_root(root, dir)) {
-    file = value
-  } else {
-    return map.empty()
+  match kbuild_file(join_root(root, dir)) {
+    Ok(value) => file = value
+    Err(error) => { return {flags: {}, input_line: f"{path_key(dir)} missing {error.message}"} }
   }
 
   var vars = kbuild_vars_for_dir(dir, srcarch)
@@ -1192,7 +1185,9 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
   vars["obj"] = local_dir
   var flags: Map[List[Str]] = {}
   var active_stack = [true]
-  var lines = logical_lines(file.read_text()?)
+  let body = file.read_text()?
+  var inputs = [input_record(root, file, body)?]
+  var lines = logical_lines(body)
   var line_index = 0
 
   while line_index < lines.len() {
@@ -1226,8 +1221,11 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
     continue unless active_conditional(active_stack)
 
     if line.starts_with("include ") {
-      let included = included_kbuild_lines(root, line, vars, config, srcarch)?
-      lines = [@lines |> take(line_index), @included, @lines |> drop(line_index)]
+      if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
+        let body = included.read_text()?
+        inputs += [input_record(root, included, body)?]
+        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+      }
       continue
     }
 
@@ -1270,7 +1268,8 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
     flags["*"] = subdir_flags
   }
 
-  flags
+  let label = path_key(file.strip_prefix(root)?)
+  {flags: flags, input_line: f"{label} {input_records_hash(inputs)}"}
 }
 
 proc kbuild_compile_flags_for_dirs(
@@ -1278,8 +1277,9 @@ proc kbuild_compile_flags_for_dirs(
   dirs: List[Path],
   config: Kconfig,
   srcarch: Str,
-) -> Result[Map[Map[List[Str]]]] {
+) -> Result[CompileFlagsForDirs] {
   var by_dir: Map[Map[List[Str]]] = {}
+  var input_lines: List[Str] = []
   var dir_index = 0
 
   for dir in dirs {
@@ -1291,14 +1291,16 @@ proc kbuild_compile_flags_for_dirs(
 """,
     )
 
-    by_dir[path_key(dir)] = kbuild_compile_flags_for_dir(root, dir, config, srcarch)?
+    let observed = kbuild_compile_flags_for_dir(root, dir, config, srcarch)?
+    by_dir[path_key(dir)] = observed.flags
+    input_lines += [observed.input_line]
   }
 
-  by_dir
+  {flags: by_dir, input_lines: input_lines}
 }
 
 pure compile_flags_cache_format() -> Str {
-  "linux-kbuild-compile-flags-v3"
+  "linux-kbuild-compile-flags-v4"
 }
 
 pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlagsEntry] {
@@ -1328,12 +1330,8 @@ pure compile_flags_from_cache_entries(entries: List[CompileFlagsEntry]) -> Resul
   flags
 }
 
-proc compile_flags_fingerprint(root: Path, dirs: List[Path], config_path: Path, config: Kconfig, srcarch: Str) -> Result[Str] {
-  let dir_fingerprints = dirs
-    |> par-map(jobs: planner_jobs()) { |dir|
-      fingerprint_dir_line(root, dir, config, srcarch, CompileFlagInputs)?
-    }
-  let config_hash = if config_path.exists() { hash.sha256(config_path)?.hex() } else { "missing" }
+pure compile_flags_fingerprint(dirs: List[Path], config: Kconfig, srcarch: Str, dir_fingerprints: List[Str]) -> Result[Str] {
+  let config_hash = bytes.from_text(json.encode(config)?).sha256().hex()
 
   f"""format {compile_flags_cache_format()}
 srcarch {srcarch}
@@ -1357,7 +1355,7 @@ proc read_compile_flags_cache(path_value: Path, fingerprint: Str) -> Result[Map[
 
   let cache = stored.require(CompileFlagsCache)?
 
-  if fingerprint != "" and cache.fingerprint.trim() != fingerprint.trim() {
+  if fingerprint != "" and cache.fingerprint.trim() != compile_flags_bound_fingerprint(fingerprint, cache.flags)?.trim() {
     return Err(
       ScriptError.Failed(kind: "kbuild-compile-flags-cache-stale", message: "compile flags cache fingerprint mismatch"),
     )
@@ -1366,11 +1364,18 @@ proc read_compile_flags_cache(path_value: Path, fingerprint: Str) -> Result[Map[
   compile_flags_from_cache_entries(cache.flags)?
 }
 
+pure compile_flags_bound_fingerprint(fingerprint: Str, flags: List[CompileFlagsEntry]) -> Result[Str] {
+  let flags_hash = bytes.from_text(json.encode(flags)?).sha256().hex()
+  f"{fingerprint.trim()}\nflags {flags_hash}\n"
+}
+
 proc write_compile_flags_cache(path_value: Path, fingerprint: Str, flags: Map[Map[List[Str]]]) {
+  let entries = compile_flags_cache_entries(flags)
+  let bound = if fingerprint == "" { "" } else { compile_flags_bound_fingerprint(fingerprint, entries)? }
   write_text_if_changed(
     path_value,
     json.encode(
-      {format: compile_flags_cache_format(), fingerprint: fingerprint, flags: compile_flags_cache_entries(flags)},
+      {format: compile_flags_cache_format(), fingerprint: bound, flags: entries},
     )?,
   )
 }
@@ -1388,7 +1393,8 @@ proc cached_kbuild_compile_flags_for_dirs(
   let fingerprint = if trust_cache {
     ""
   } else {
-    compile_flags_fingerprint(root, dirs, fp"{root}/.config", config, srcarch)?
+    let inputs = dirs |> par-map(jobs: planner_jobs()) { |dir| fingerprint_dir_line(root, dir, config, srcarch, CompileFlagInputs)? }
+    compile_flags_fingerprint(dirs, config, srcarch, inputs)?
   }
 
   if stable_cache_path.exists() {
@@ -1432,11 +1438,12 @@ proc cached_kbuild_compile_flags_for_dirs(
     }
   }
 
-  let flags = kbuild_compile_flags_for_dirs(root, dirs, config, srcarch)?
-  write_compile_flags_cache(local_cache_path, fingerprint, flags)
+  let observed = kbuild_compile_flags_for_dirs(root, dirs, config, srcarch)?
+  let scanned_fingerprint = if trust_cache { "" } else { compile_flags_fingerprint(dirs, config, srcarch, observed.input_lines)? }
+  write_compile_flags_cache(local_cache_path, scanned_fingerprint, observed.flags)
   cache_dir.mkdir()
-  write_compile_flags_cache(stable_cache_path, fingerprint, flags)
-  flags
+  write_compile_flags_cache(stable_cache_path, scanned_fingerprint, observed.flags)
+  observed.flags
 }
 
 pure kbuild_compile_flags_in_makefile_dir(by_dir: Map[Map[List[Str]]], makefile_dir: Path, obj: Path) -> List[Str] {

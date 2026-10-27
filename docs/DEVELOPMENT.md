@@ -162,7 +162,8 @@ PM has no default remote; these make targets use the loopback mirror.
   `TMPDIR` is rejected.
   The source tree's local scan-record cache uses format `linux-local-records-v4`;
   older records are discarded and rebuilt on the next discovery.
-  The compile-flags cache uses format `linux-kbuild-compile-flags-v3`, and
+  The compile-flags cache binds parsed inputs and stored flags with format
+  `linux-kbuild-compile-flags-v4`, and
   discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v12`.
 - Containers have no network, so only host processes reach the mirror.
   Host planning, importing, publishing, and composition call typed PM operations
