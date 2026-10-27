@@ -240,7 +240,7 @@ proc run_phase_two(paths: trust_store.TrustStorePaths) [fs, time, error] {
   }
 
   let status = trust_update.trust_status(p"/")?
-  guard status.accepted.require(Str)? == "3" and status.pending.require(Str)? == "none" and status.atomic_capable.require(Bool)? == true else {
+  guard status.accepted.require(Str)? == "3" and status.pending.require(Str)? == "none" else {
     say("FAIL phase2 replayed status is not a clean generation 3")?
     return Err(GuestTrustError.Failed(phase: "phase2", message: "replayed status is not clean"))
   }

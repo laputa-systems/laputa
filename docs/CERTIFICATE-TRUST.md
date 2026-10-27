@@ -53,7 +53,9 @@ pinned key material authorizes the release. Source files above their size
 bounds, non-regular files, digest mismatches, stale generations, conflicting
 bytes for the active generation, expired or over-long expiries, malformed
 bundles or policies, and a clock behind the persisted lower bound all fail
-closed without touching the store.
+closed without touching the store. Offline inputs are read through bounded
+reads and re-statted after the read, so a file replaced or resized
+concurrently is rejected instead of trusted.
 
 ## Activation
 
@@ -65,10 +67,26 @@ symlink onto `generations/<N>`. Around it:
   `generations/<N>`. Committed generations are immutable; a conflicting
   commit with different bytes fails, a byte-identical one is adopted.
 - The journal (`locked → staged → committed → activated → persisted`)
-  records each step. Interrupted runs recover on the next update: staged
-  work is removed, committed work rolls forward (flip, persist, clear).
+  records each step. Interrupted runs recover deterministically on the next
+  update, keyed by what survived: staged work with its directory intact is
+  removed; a staged journal whose directory already renamed is adopted by
+  verifying and flipping the committed generation; a committed candidate is
+  re-verified with new-candidate rules (expiry enforced) before flipping; an
+  already-flipped generation rolls forward with bookkeeping verification
+  (signature and digests, no expiry — an expired but correctly activated
+  generation is reconciled, never re-authorized, and new candidates still
+  require fresh expiry). Every recovery step persists the accepted
+  generation and the time lower bound before clearing the journal.
   Unreadable or unknown journals, active/journal disagreements, and
   staging/commitment collisions fail closed for manual inspection.
+- Atomic visibility and power-loss durability are separate claims. The
+  active-pointer flip is a single atomic rename: readers never observe a
+  half-written pointer. Durability across power loss comes from fsync
+  ordering — file data before directory entries, directory entries before
+  the renames that publish them, and the store directory after the flip —
+  so a crash replays to the last journaled step, never to torn state.
+  Process kills alone do not prove the power-loss path; the journal
+  phase tests inject each crash window deterministically.
 - `accepted` is a high-water mark that never rolls back distrust: updates
   must advance it, and a store whose accepted generation is ahead of active
   refuses to proceed.
@@ -80,22 +98,24 @@ symlink onto `generations/<N>`. Around it:
 
 `trust.status` reports the active generation, bundle and policy digests,
 key fingerprint, last activation, accepted generation, pending journal work,
-staging debris, freshness, and atomic-activation capability. Concurrent
+staging debris, and freshness. Status performs no writes: it never creates,
+removes, or renames anything under the store, so concurrent status queries
+are safe and leave sentinel files untouched. Status validates instead of
+assuming: canonical bundle and policy bytes must match the committed
+generation, the accepted generation must not lead the active one, and a
+generation without either a signed release or seed provenance is reported
+as incomplete rather than healthy. Concurrent
 updates serialize on `update.lock`; a second updater is refused, never
 queued.
 
-`trust.release.compose_signed_release` remains the PM-side path: it verifies
-the same metadata, signature, expiry, generation, and digests, validates
-every root certificate, and stages those root and policy bytes in an
-owner-only temporary root for `pm.generation.compose`. Signed-release
-validation failures happen before staging; composition failures remove only
-temporary roots created by that call. Root composition creates its staging
-child with mode `0700`; generation restricts the completed root to `0700`
-before applying the trust overlay. Immediately before each no-replace
-publication, the completed directory receives mode `0777` narrowed by the
-process umask. Existing paths and symlink aliases are never removed to
-prepare staging. The staging guarantees assume trusted parent directories.
-See [filesystem authority limits](PM.md#filesystem-authority-limits).
+`trust.release.release_verify` is the single verification path: it checks
+the same metadata, signature, expiry, generation, and digests, and validates
+every root certificate. The retired PM-side `compose_signed_release` was
+removed: it created regular-file overlays at paths the ca-certificates
+package owns as symlinks, and nothing called it. Activation goes only
+through the versioned store. Existing paths and symlink aliases are never
+removed to prepare staging. The staging guarantees assume trusted parent
+directories. See [filesystem authority limits](PM.md#filesystem-authority-limits).
 
 Laputa removed `update-certdata`. That command downloaded a bundle over HTTPS
 and replaced the live file without verifying a Laputa signature, checking
@@ -147,6 +167,21 @@ in-band recovery.
   --from DIR` with a verified release directory.
 
 ## Consumers
+
+Known TLS consumers and their cutover:
+
+| Consumer | TLS state | Cutover after `trust update` |
+|---|---|---|
+| `tailscale` (Go daemon, xinit-supervised) | Reads system roots at startup | `xinit restart tailscale` |
+| `dropbear` (SSH daemon, xinit-supervised) | Host keys only; no TLS roots | None needed |
+| `laputa-net` (`ifup`, oneshot) | No long-lived client | None needed |
+| `mdevd`, `seatd`, `wpa_supplicant` | No TLS | None needed |
+| Long-lived XSH network clients | Pool pins its trust snapshot; changes fail closed until the pool is recreated | Close and recreate the pool (`net.close_pool`, then `net.pool`); the service keeps the rest of its state |
+
+`trust update` never restarts services itself, so a restart failure cannot
+roll back an activation: the store stays at the new generation and the
+operator retries the restart. `trust.status` reports the last activation
+time to correlate running processes with trust generations.
 
 XSH TLS clients enforce `/etc/laputa/trust-policy` for every transport
 admission, including requests that use custom roots or disable ordinary

@@ -259,6 +259,7 @@ export proc trust_store_write_journal(
     {format: "laputa-trust-journal-1", phase, generation, staging, token},
   )
   fs.fsync(paths.journal)?
+  fs.fsync(paths.journal.parent)?
 }
 
 ## trust_store_clear_journal.
@@ -379,6 +380,7 @@ export proc trust_store_commit_generation(
 
   fp"{paths.store}/{staging}".rename(to: final)
   fs.fsync(paths.generations)?
+  fs.fsync(paths.staging)?
 }
 
 ## trust_store_verify_generation.
@@ -468,23 +470,6 @@ export proc trust_store_reobserve(
   }
 
   Err(trust_store_fail("canonical trust paths changed during re-observation; retry the update"))
-}
-
-## trust_store_probe_atomic.
-export proc trust_store_probe_atomic(paths: TrustStorePaths) [fs, error] -> Result[Bool, Error] {
-  paths.store.mkdir(parents: true)
-  let probe = fs.temp_sibling(fp"{paths.store}/probe")?
-  probe.write(bytes.from_text("trust atomicity probe\n"))
-  let target = fp"{paths.store}/.probe-target"
-  if target.exists()? {
-    target.remove()
-  }
-
-  probe.rename(to: target, overwrite: true)
-  let ok = target.read_text()? == "trust atomicity probe\n"
-  target.remove()
-  fs.fsync(paths.store)?
-  ok
 }
 
 ## trust_store_bootstrap_from_seeds.
@@ -581,6 +566,7 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
     fs.fsync(fp"{dir}/{TRUST_POLICY_NAME}")?
     fs.fsync(fp"{dir}/{TRUST_OWNER_NAME}")?
     fs.fsync(dir)?
+    fs.fsync(paths.generations)?
   }
 
   trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)?

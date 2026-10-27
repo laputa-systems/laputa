@@ -181,3 +181,46 @@ test trust_tls_unrelated_chains_keep_working [fs, process, env, time, net, error
   assert response.status == 200
   net.close_pool("trust-tls-control")?
 }
+
+test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env, time, net, error] { |ctx|
+  let python = match process.which("python3") {
+    Ok(found) => found.display(),
+    Err(_) => {
+      test.skip("python3 is unavailable for the fixture TLS server")
+      return
+    },
+  }
+
+  let routes = fixture_routes(ctx, "trust-tls-service-routes", "service payload\n")?
+  let service_bundle = test.temp_path(ctx, name: "trust-tls-service-bundle.pem")
+  service_bundle.write(fixture("tls/ca-a.crt").read_bytes()?)
+  let first = serve_fixture_tls(ctx, "trust-tls-service-first", python, fixture("tls/server-a.crt").display(), fixture("tls/server-a.key").display(), routes, "", "")?
+  defer stop_fixture(first)?
+
+  var served = 0
+  let _ = net.pool("trust-tls-service", 4, 1s)?
+  let first_url = f"https://127.0.0.1:{first.port}/hello"
+  let ready = https_get(first_url, service_bundle, "trust-tls-service")?
+  assert ready.status == 200
+  served += 1
+
+  stop_fixture(first)?
+  service_bundle.write(bytes.from_text(fixture("tls/ca-a.crt").read_text()? + fixture("tls/ca-b.crt").read_text()?))?
+  let second = serve_fixture_tls(ctx, "trust-tls-service-second", python, fixture("tls/server-b.crt").display(), fixture("tls/server-b.key").display(), routes, "", "")?
+  defer stop_fixture(second)?
+
+  let second_url = f"https://127.0.0.1:{second.port}/hello"
+  match https_get(second_url, service_bundle, "trust-tls-service") {
+    Ok(_) => test.fail("rotated server chain was accepted without recreating the client"),
+    Err(_) => {},
+  }
+
+  net.close_pool("trust-tls-service")?
+  let _ = net.pool("trust-tls-service-next", 4, 1s)?
+  let recovered = https_get(second_url, service_bundle, "trust-tls-service-next")?
+  assert recovered.status == 200
+  assert recovered.body.utf8()? == "service payload\n"
+  served += 1
+  assert served == 2
+  net.close_pool("trust-tls-service-next")?
+}

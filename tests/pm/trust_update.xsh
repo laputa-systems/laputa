@@ -85,7 +85,6 @@ test trust_update_bootstraps_and_applies_release [fs, process, time, error] { |c
   assert after.generation == "2"
   assert after.accepted == "2"
   assert after.pending == "none"
-  assert after.atomic_capable == true
   assert after.freshness != "EXPIRED"
   assert active_bundle(root)? == fixture("release-b/ca-certificates.crt").read_bytes()?
   assert active_policy(root)? == fixture("release-b/trust-policy").read_bytes()?
@@ -214,6 +213,13 @@ test trust_update_rejects_malformed_releases [fs, process, env, time, error] { |
   let bad_policy = stage_release(ctx, "trust-update-bad-policy", "release-b")?
   fp"{bad_policy}/trust-policy".write(bytes.from_text("laputa-trust-policy-v1\ngeneration 2\nunknown-field x\n"))
   expect_rejected(trust_update.trust_update_from_dir(root, bad_policy), "unknown or malformed", root, "1", "malformed-policy")
+
+  let linked = stage_release(ctx, "trust-update-linked", "release-b")?
+  let outside = test.temp_path(ctx, name: "trust-update-linked-outside")
+  outside.write(bytes.from_text("not a release\n"))?
+  fp"{linked}/metadata".remove()?
+  fp"{linked}/metadata".symlink(to: outside)?
+  expect_rejected(trust_update.trust_update_from_dir(root, linked), "not a regular file", root, "1", "symlinked-metadata")
 
   let duped = stage_release(ctx, "trust-update-duped", "release-b")?
   fp"{duped}/trust-policy".write(bytes.from_text("laputa-trust-policy-v1\ngeneration 2\nblocked-spki-sha256 0000000000000000000000000000000000000000000000000000000000000000\nblocked-spki-sha256 0000000000000000000000000000000000000000000000000000000000000000\n"))
@@ -457,4 +463,114 @@ test trust_status_reports_signed_provenance_after_update [fs, process, time, err
   assert status.generation == "2"
   assert status.provenance == "signed-release"
   assert status.expires_at.require(Int)? > 0
+}
+
+test trust_update_adopts_orphaned_commit_after_staged_journal [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-adopt", "signing-key")?
+  let release_b = stage_release(ctx, "trust-update-adopt-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+
+  let paths = trust_store.trust_store_paths(root)
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "3",
+    fixture("release-c/ca-certificates.crt").read_bytes()?,
+    fixture("release-c/trust-policy").read_bytes()?,
+    fixture("release-c/metadata").read_bytes()?,
+    fixture("release-c/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_write_journal(paths, "staged", "3", staged.path, staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
+
+  let applied = trust_update.trust_update_from_dir(root, stage_release(ctx, "trust-update-adopt-c", "release-c")?)?
+  assert applied.generation == "3"
+  assert trust_store.trust_store_read_active(paths)? == "3"
+  assert trust_store.trust_store_read_accepted(paths)? == "3"
+  let journal = trust_store.trust_store_read_journal(paths)?
+  assert journal.present == false
+}
+
+test trust_update_refuses_expired_commit_and_cleans_up [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-expired-commit", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+
+  let paths = trust_store.trust_store_paths(root)
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "2",
+    fixture("release-expired/ca-certificates.crt").read_bytes()?,
+    fixture("release-expired/trust-policy").read_bytes()?,
+    fixture("release-expired/metadata").read_bytes()?,
+    fixture("release-expired/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_write_journal(paths, "committed", "2", staged.path, staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+
+  let source = stage_release(ctx, "trust-update-expired-commit-c", "release-c")?
+  match trust_update.trust_update_from_dir(root, source) {
+    Ok(_) => test.fail("expired committed candidate was activated"),
+    Err(problem) => assert "expired" in problem.message
+  }
+
+  assert ! fp"{paths.store}/{staged.path}".exists()?
+  let journal = trust_store.trust_store_read_journal(paths)?
+  assert journal.present == false
+  assert trust_store.trust_store_read_active(paths)? == "1"
+  assert trust_store.trust_store_read_accepted(paths)? == "1"
+
+  let followup = stage_release(ctx, "trust-update-expired-commit-retry", "release-c")?
+  let applied = trust_update.trust_update_from_dir(root, followup)?
+  assert applied.generation == "3"
+}
+
+test trust_update_rolls_forward_expired_active_without_bricking [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-expired-active", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+
+  let paths = trust_store.trust_store_paths(root)
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "2",
+    fixture("release-expired/ca-certificates.crt").read_bytes()?,
+    fixture("release-expired/trust-policy").read_bytes()?,
+    fixture("release-expired/metadata").read_bytes()?,
+    fixture("release-expired/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  trust_store.trust_store_flip_active(paths, "2")?
+  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)?
+
+  let source = stage_release(ctx, "trust-update-expired-active-c", "release-c")?
+  let applied = trust_update.trust_update_from_dir(root, source)?
+  assert applied.generation == "3"
+  assert trust_store.trust_store_read_accepted(paths)? == "3"
+  assert trust_store.trust_store_read_lower_bound(paths)? > 0
+  let journal = trust_store.trust_store_read_journal(paths)?
+  assert journal.present == false
+}
+
+test trust_update_finishes_flip_lagging_commit_journal [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-flip-lag", "signing-key")?
+  let release_b = stage_release(ctx, "trust-update-flip-lag-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+
+  let paths = trust_store.trust_store_paths(root)
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "3",
+    fixture("release-c/ca-certificates.crt").read_bytes()?,
+    fixture("release-c/trust-policy").read_bytes()?,
+    fixture("release-c/metadata").read_bytes()?,
+    fixture("release-c/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
+  trust_store.trust_store_flip_active(paths, "3")?
+
+  let applied = trust_update.trust_update_from_dir(root, stage_release(ctx, "trust-update-flip-lag-c", "release-c")?)?
+  assert applied.generation == "3"
+  assert trust_store.trust_store_read_accepted(paths)? == "3"
+  assert ! fp"{paths.store}/{staged.path}".exists()?
+  let journal = trust_store.trust_store_read_journal(paths)?
+  assert journal.present == false
 }

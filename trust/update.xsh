@@ -62,16 +62,22 @@ proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) [fs, error] ->
     return Err(update_fail(f"release directory is missing {name}"))
   }
 
-  let meta = target.metadata()?
-  guard meta.kind == "file" and ! target.is_symlink()? else {
+  let before = target.metadata()?
+  guard before.kind == "file" and ! target.is_symlink()? else {
     return Err(update_fail(f"release file is not a regular file: {name}"))
   }
 
-  guard meta.size <= max_bytes else {
+  guard before.size <= max_bytes else {
     return Err(update_fail(f"release file exceeds its size bound: {name}"))
   }
 
-  target.read_bytes()
+  let window = bytes.read_at(target, 0, before.size, regular: true)?
+  let after = target.metadata()?
+  guard after.kind == "file" and after.size == before.size else {
+    return Err(update_fail(f"release file changed during read: {name}"))
+  }
+
+  window
 }
 
 proc trust_read_source_dir(dir: Path) [fs, error] -> Result[TrustReleaseBytes, Error] {
@@ -226,12 +232,37 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
   let policy_path = trust_store.canonical_policy_path(paths.root)
   let bundle = bundle_path.read_bytes()?
   let policy = policy_path.read_bytes()?
+  let committed_bundle = fp"{trust_store.trust_store_generation_dir(paths, active)}/{trust_store.TRUST_BUNDLE_NAME}".read_bytes()?
+  let committed_policy = fp"{trust_store.trust_store_generation_dir(paths, active)}/{trust_store.TRUST_POLICY_NAME}".read_bytes()?
+  guard bundle.sha256().hex() == committed_bundle.sha256().hex() else {
+    return Err(
+      update_fail(
+        f"canonical root bundle differs from committed generation {active}; refusing to report healthy status",
+      ),
+    )
+  }
+
+  guard policy.sha256().hex() == committed_policy.sha256().hex() else {
+    return Err(
+      update_fail(
+        f"canonical trust policy differs from committed generation {active}; refusing to report healthy status",
+      ),
+    )
+  }
+
   let parsed_policy = trust_policy.parse(policy)?
   let key_status = match trust_key.trust_key_load(paths.root) {
     Ok(key) => f"present sha256:{trust_key.trust_key_fingerprint(key)}",
     Err(_) => "MISSING (updates will fail closed)",
   }
   let accepted = trust_store.trust_store_read_accepted(paths)?
+  guard ! trust_policy.policy_u64_is_greater(accepted, active) else {
+    return Err(
+      update_fail(
+        f"accepted generation {accepted} is ahead of active generation {active}; refusing to report healthy status",
+      ),
+    )
+  }
   let journal = trust_store.trust_store_read_journal(paths)?
   let pending = if journal.present { f"{journal.phase} generation {journal.generation}" } else { "none" }
   var debris = ""
@@ -244,7 +275,6 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
     }
   }
 
-  let atomic = trust_store.trust_store_probe_atomic(paths)?
   let active_dir = trust_store.trust_store_generation_dir(paths, active)
   let active_meta_path = fp"{active_dir}/{trust_store.TRUST_METADATA_NAME}"
   let provenance = if active_meta_path.exists()? { "signed-release" } else { "package-seed" }
@@ -284,7 +314,6 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
   print f"  staging debris: {debris}"
   print f"  provenance: {provenance}"
   print f"  freshness: {freshness}"
-  print f"  atomic activation: {atomic}"
 
   {
     initialized: true,
@@ -298,7 +327,6 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
     provenance,
     freshness,
     expires_at,
-    atomic_capable: atomic,
     activated_at,
   }
 }
@@ -387,7 +415,31 @@ proc trust_recover(
   }
 
   if journal.phase == "locked" or journal.phase == "staged" {
-    trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+    let staged_path = fp"{paths.store}/{journal.staging}"
+    if journal.staging != "" and staged_path.exists()? {
+      trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+      trust_store.trust_store_clear_journal(paths)?
+      return Ok({recovered: true, phase: journal.phase})
+    }
+
+    if journal.staging != "" {
+      let adopted = trust_store.trust_store_generation_dir(paths, journal.generation)
+      guard adopted.exists()? else {
+        return Err(
+          update_fail(
+            "trust journal references staging and a committed generation that are both absent; refusing automatic recovery",
+          ),
+        )
+      }
+
+      let verified = trust_verify_committed_bookkeeping(paths, key, journal.generation)?
+      trust_store.trust_store_flip_active(paths, journal.generation)?
+      trust_store.trust_store_persist_accepted(paths, journal.generation)?
+      trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+      trust_store.trust_store_clear_journal(paths)?
+      return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
+    }
+
     trust_store.trust_store_clear_journal(paths)?
     return Ok({recovered: true, phase: journal.phase})
   }
@@ -401,6 +453,19 @@ proc trust_recover(
   }
 
   if journal.phase == "committed" {
+    let already_flipped = match trust_store.trust_store_read_active(paths) {
+      Ok(found) => found == journal.generation,
+      Err(_) => false,
+    }
+    if already_flipped {
+      let verified = trust_verify_committed_bookkeeping(paths, key, journal.generation)?
+      trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+      trust_store.trust_store_persist_accepted(paths, journal.generation)?
+      trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+      trust_store.trust_store_clear_journal(paths)?
+      return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
+    }
+
     let committed = trust_store.trust_store_generation_dir(paths, journal.generation)
     let staged_path = fp"{paths.store}/{journal.staging}"
     if committed.exists()? and staged_path.exists()? {
@@ -419,10 +484,24 @@ proc trust_recover(
       trust_store.trust_store_commit_generation(paths, journal.staging, journal.generation)?
     }
 
-    let verified = trust_verify_active_release(paths, key, journal.generation, now_epoch_seconds)?
-    trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+    let candidate = {
+      metadata: fp"{committed}/{trust_store.TRUST_METADATA_NAME}".read_bytes()?,
+      signature: fp"{committed}/{trust_store.TRUST_SIGNATURE_NAME}".read_bytes()?,
+      bundle: fp"{committed}/{trust_store.TRUST_BUNDLE_NAME}".read_bytes()?,
+      policy: fp"{committed}/{trust_store.TRUST_POLICY_NAME}".read_bytes()?,
+    }
+    let verified = match trust_verify_candidate(paths, key, candidate, now_epoch_seconds) {
+      Ok(found) => found,
+      Err(problem) => {
+        trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
+        trust_store.trust_store_clear_journal(paths)?
+        return Err(problem)
+      },
+    }
     trust_store.trust_store_flip_active(paths, journal.generation)?
     trust_store.trust_store_persist_accepted(paths, journal.generation)?
+    trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+    trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
     trust_store.trust_store_clear_journal(paths)?
     return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
   }
@@ -436,8 +515,9 @@ proc trust_recover(
     )
   }
 
-  let verified = trust_verify_active_release(paths, key, active, now_epoch_seconds)?
+  let verified = trust_verify_committed_bookkeeping(paths, key, active)?
   trust_store.trust_store_persist_accepted(paths, active)?
+  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
   trust_store.trust_store_clear_journal(paths)?
   Ok({recovered: true, phase: journal.phase, generation: verified.generation})
 }
@@ -461,8 +541,9 @@ proc trust_reconcile_accepted(
     return accepted
   }
 
-  let _ = trust_verify_active_release(paths, key, active, now_epoch_seconds)?
+  let _ = trust_verify_committed_bookkeeping(paths, key, active)?
   trust_store.trust_store_persist_accepted(paths, active)?
+  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
   active
 }
 
@@ -523,6 +604,7 @@ proc trust_activate_release(
   print f"trust update: activated generation {generation}"
   print f"  root bundle: sha256:{effective.bundle_sha256}"
   print f"  trust policy: sha256:{effective.policy_sha256}"
+  print "trust update: restart TLS-caching services to cut over (for example: xinit restart tailscale); long-lived XSH clients must close and recreate their network pools"
   effective
 }
 

@@ -284,3 +284,55 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
     assert trust_store.trust_store_read_journal(trust_store.trust_store_paths(root))?.present == false
   }
 }
+
+proc store_snapshot(root: Path) [fs, error] -> Result[Str, Error] {
+  var entries: List[Str] = []
+  for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
+    let rel = entry.path.strip_prefix(root)?
+    entries += [f"{rel.display()} {entry.kind} {entry.size}"]
+  }
+
+  entries.join("\n")
+}
+
+test trust_cli_status_is_read_only_under_concurrency [fs, process, env, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-cli-status-race", "signing-key")?
+  let source = stage_release(ctx, "trust-cli-status-race-source", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, source)?
+
+  fp"{root}/var/lib/laputa/trust/sentinel-keep".write("keep\n")?
+  fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".write("keep\n")?
+  let before = store_snapshot(root)?
+
+  let xsh = runner()?
+  let modules = module_root()?
+  let iodir = test.temp_dir(ctx, name: "trust-status-race-io")?
+  let script = fp"{modules}/trust.xsh"
+  var outputs: List[Path] = []
+  var handles: List[ProcessHandle] = []
+  for index in range(8) {
+    let err = fp"{iodir}/status-{index}.err"
+    let out = fp"{iodir}/status-{index}.out"
+    outputs += [out]
+    handles += [spawn run XSH_MODULE_PATH=$modules XSH_HOST=$xsh $xsh $script -- status --root $root > $out 2> $err ?]
+  }
+
+  for _ in range(20) {
+    let status = trust_update.trust_status(root)?
+    assert status.generation == "2"
+  }
+
+  for handle in handles {
+    let _ = process.wait_any([handle])?
+  }
+
+  for out in outputs {
+    assert "generation 2" in out.read_text()?
+  }
+
+  assert store_snapshot(root)? == before
+  assert fp"{root}/var/lib/laputa/trust/sentinel-keep".read_text()? == "keep\n"
+  assert fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".read_text()? == "keep\n"
+  assert ! fp"{root}/var/lib/laputa/trust/.probe-target".exists()?
+  assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "2"
+}

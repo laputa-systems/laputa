@@ -1,6 +1,4 @@
-##! Verifies and stages signed certificate releases into immutable system generations.
-use pm.generation
-use pm.types
+##! Verifies signed certificate releases for atomic trust activation.
 use trust.policy
 
 ## Exact release inputs captured from the source and installed-policy snapshots.
@@ -12,14 +10,6 @@ export type SignedReleaseInput = {
   next_policy: Bytes,
   installed_policy_snapshot: Bytes,
   now_epoch_seconds: Int,
-}
-
-## Existing build and store inputs plus the candidate-generation output path.
-export type TrustGenerationTarget = {
-  build_plan: types.BuildPlan,
-  runtime_roots: List[Str],
-  store_root: Path,
-  output_root: Path,
 }
 
 ## Signed trust release validation failed.
@@ -42,7 +32,6 @@ type ReleaseMetadata = {
 let MAX_METADATA_BYTES = 4096
 let MAX_ROOT_BUNDLE_BYTES = 4194304
 let MAX_RELEASE_VALIDITY_SECONDS = 7776000
-let RELEASE_REPLACEMENTS = ["etc/laputa/trust-policy", "etc/ssl/certs/ca-certificates.crt"]
 
 pure release_fail(message: Str) -> Error {
   ReleaseError.InvalidData(message)
@@ -137,47 +126,4 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
     root_bundle: input.root_bundle,
     trust_policy: input.next_policy,
   }
-}
-
-proc release_stage_overlay(overlay_root: Path, value: VerifiedTrustRelease) [fs, error] -> Result[types.GenerationProfile, Error] {
-  let policy_path = fp"{overlay_root}/etc/laputa/trust-policy"
-  let root_bundle_path = fp"{overlay_root}/etc/ssl/certs/ca-certificates.crt"
-  policy_path.parent.mkdir(parents: true)
-  root_bundle_path.parent.mkdir(parents: true)
-  policy_path.write(value.trust_policy)
-  policy_path.chmod(0o644)
-  root_bundle_path.write(value.root_bundle)
-  root_bundle_path.chmod(0o644)
-  release_require(policy_path.read_bytes()? == value.trust_policy, "staged trust policy differs from the verified release")
-  release_require(root_bundle_path.read_bytes()? == value.root_bundle, "staged root bundle differs from the verified release")
-
-  json.write(
-    fp"{overlay_root}/overlay.json",
-    {format: "laputa-generation-overlay-1", profile: "trust-release", replacements: RELEASE_REPLACEMENTS},
-  )
-  let profile = generation.overlay_profile(overlay_root)?
-  release_require(profile.name == "trust-release", "staged trust overlay profile is invalid")
-  release_require(profile.replacements == RELEASE_REPLACEMENTS, "staged trust overlay replacements are invalid")
-  release_require(
-    hash.sha256(policy_path)?.hex() == value.trust_policy.sha256().hex(),
-    "staged trust policy digest differs from the verified release",
-  )
-  release_require(
-    hash.sha256(root_bundle_path)?.hex() == value.root_bundle.sha256().hex(),
-    "staged root bundle digest differs from the verified release",
-  )
-  profile
-}
-
-## Composes one signed release as a new immutable generation and leaves prior generations untouched.
-export proc compose_signed_release(input: SignedReleaseInput, target: TrustGenerationTarget) [fs, process, error] -> Result[types.GenerationReceipt, Error] {
-  let verified = release_verify(input)?
-  release_require(! target.output_root.exists()?, "immutable generation output already exists")
-  target.output_root.parent.mkdir(parents: true)
-  with overlay_root = fs.tempdir_in(target.output_root.parent)? {
-    let overlay_path = overlay_root.host_path()?
-    let profile = release_stage_overlay(overlay_path, verified)?
-    let plan = generation.plan_profile(target.build_plan, target.runtime_roots, profile)?
-    generation.compose(plan, target.store_root, target.output_root, overlay_path)?
-  }?
 }
