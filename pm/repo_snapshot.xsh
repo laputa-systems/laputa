@@ -177,7 +177,7 @@ export pure snapshot_state_paths(state_dir: Path, repo: Str) -> SnapshotStatePat
   {accepted: fp"{state_dir}/accepted/{bytes.from_text(repo).sha256().hex()}.json"}
 }
 
-proc snapshot_accepted_from_record(raw: Record) [error] -> Result[SnapshotAccepted, Error] {
+proc snapshot_accepted_from_record(raw: Record) -> Result[SnapshotAccepted, Error] {
   let generation: Str = raw.get("generation")?.require()?
   let index_sha256: Str = raw.get("index_sha256")?.require()?
   let lower_bound: Int = raw.get("lower_bound")?.require()?

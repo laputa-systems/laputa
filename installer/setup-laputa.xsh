@@ -550,7 +550,7 @@ proc seed_target_trust_store(root: Path) {
   write_stdout_line(f"Trust store seeded at generation {generation} from package seeds.")
 }
 
-proc run_installer(argv: List[Str]) [fs, process, time, error, io] {
+proc run_installer(argv: List[Str]) {
   var ci = false
   var auto = false
   var disk_text = ""

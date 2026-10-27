@@ -520,7 +520,7 @@ proc service_field_error(source: Path, field: Str, message: Str) [error] {
   Err(XinitError.Failed(kind: "xinit-service", message: f"{field_context(source, field)}: {message}"))
 }
 
-proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope = "") [error] {
+proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope = "") {
   for field in raw.keys() {
     if field not in fields {
       service_field_error(source, if scope == "" { field } else { f"{scope}.{field}" }, "unknown field")
@@ -528,7 +528,7 @@ proc check_service_fields(raw: Record, fields: List[Str], source: Path, scope = 
   }
 }
 
-proc check_service_name(value: Str, source: Path, field: Str) [error] {
+proc check_service_name(value: Str, source: Path, field: Str) {
   let pattern = rx"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
 
   if ! pattern.matches(value) {
@@ -536,7 +536,7 @@ proc check_service_name(value: Str, source: Path, field: Str) [error] {
   }
 }
 
-proc check_service_names(values: List[Str], source: Path, field: Str) [error] {
+proc check_service_names(values: List[Str], source: Path, field: Str) {
   var seen = []
 
   for value in values {
@@ -550,7 +550,7 @@ proc check_service_names(values: List[Str], source: Path, field: Str) [error] {
   }
 }
 
-proc check_service_values(service: Service) [error] {
+proc check_service_values(service: Service) {
   let source = service.path
   check_service_name(service.name, source, "name")
 
@@ -752,7 +752,7 @@ pure dependency_edges(service: Service) -> List[Str] {
   [@service.need, @service.uses, @service.after]
 }
 
-proc check_service_graph(services: List[Service]) [error] {
+proc check_service_graph(services: List[Service]) {
   let names = service_names(services)
   let facilities = builtin_facilities()
 

@@ -1422,7 +1422,7 @@ test test_legacy_non_pid1_switch_does_not_bypass_pid1_requirement [fs, process, 
   assert "pid1-required" in result.stderr
 }
 
-proc xinit_policy_source() [fs, error] -> Result[Str] {
+proc xinit_policy_source() -> Result[Str] {
   let source = xinit_script().read_text()?
   let entry = "proc main(...argv: List[Str])"
   assert source.split(entry).len() == 2

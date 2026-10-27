@@ -111,7 +111,7 @@ export proc container_seed_overlay_trust_store(overlay: Path, seed_bundle: Path,
   fp"{overlay}/var/lib/laputa/trust/active".symlink(to: p"generations/1")
 }
 
-proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemProfile) [fs, error] {
+proc container_require_no_forbidden_sonames(root: Path, profile: types.SystemProfile) {
   for entry in fs.walk(root, hidden: true) {
     continue unless entry.kind == "file"
 

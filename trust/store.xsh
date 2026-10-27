@@ -176,7 +176,7 @@ export proc trust_store_read_accepted(paths: TrustStorePaths) [fs, error] -> Res
   text
 }
 
-proc trust_store_write_line_durable(target: Path, line: Str) [fs, error] {
+proc trust_store_write_line_durable(target: Path, line: Str) {
   let sibling = fs.temp_sibling(target)?
   sibling.write(bytes.from_text(line), mode: 0o644)
   fs.fsync(sibling)

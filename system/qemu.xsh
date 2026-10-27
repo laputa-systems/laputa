@@ -290,7 +290,7 @@ pure ppm_has_foot_marker(image: Bytes) -> Bool {
   false
 }
 
-proc screenshot_has_foot_marker(path_value: Path) [fs, error] -> Result[Bool, Error] {
+proc screenshot_has_foot_marker(path_value: Path) -> Result[Bool, Error] {
   ppm_has_foot_marker(path_value.read_bytes()?)
 }
 
