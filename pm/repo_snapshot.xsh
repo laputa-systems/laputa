@@ -42,13 +42,9 @@ proc snapshot_require(condition: Bool, message: Str) [error] {
 ## Whether `value` is a canonical positive unsigned 64-bit decimal string.
 export pure snapshot_u64_text_is_valid(value: Str) -> Bool {
   let length = value.byte_len()
-  if length == 0 or length > 20 or value.starts_with("0") {
-    return false
-  }
+  return false when length == 0 or length > 20 or value.starts_with("0")
 
-  if value.delete("0123456789") != "" {
-    return false
-  }
+  return false when value.delete("0123456789") != ""
 
   length < 20 or value <= "18446744073709551615"
 }
@@ -83,11 +79,10 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
 
   let expiry_fields = lines[2].split(" ")
   snapshot_require(expiry_fields.len() == 2 and expiry_fields[0] == "expires-at", "signed snapshot metadata expiry field is invalid")
-  let expires_at = match expiry_fields[1].parse_int_decimal() {
-    Ok(found) => found,
-    Err(_) => {
-      return Err(snapshot_fail("signed snapshot metadata expiry is invalid"))
-    },
+  let expires_at = if let Ok(found) = expiry_fields[1].parse_int_decimal() {
+    found
+  } else {
+    return Err(snapshot_fail("signed snapshot metadata expiry is invalid"))
   }
   snapshot_require(expires_at > 0 and f"{expires_at}" == expiry_fields[1], "signed snapshot metadata expiry is invalid")
 
@@ -116,9 +111,7 @@ export proc snapshot_verify_signature(metadata: Bytes, signature: Bytes, keys: L
   }
 
   for key in keys {
-    if crypto.ed25519_verify(metadata, key, signature) {
-      return
-    }
+    return when crypto.ed25519_verify(metadata, key, signature)
   }
 
   Err(snapshot_fail("repository snapshot metadata signature is invalid"))
@@ -198,25 +191,22 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
     return null
   }
 
-  let raw_value = match json.read(paths.accepted) {
-    Ok(found) => found,
-    Err(_) => {
-      return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
-    },
+  let raw_value = if let Ok(found) = json.read(paths.accepted) {
+    found
+  } else {
+    return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
-  let raw_record = match raw_value.require(Record) {
-    Ok(found) => found,
-    Err(_) => {
-      return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
-    },
+  let raw_record = if let Ok(found) = raw_value.require(Record) {
+    found
+  } else {
+    return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
-  let decoded = match snapshot_accepted_from_record(raw_record) {
-    Ok(found) => found,
-    Err(_) => {
-      return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
-    },
+  let decoded = if let Ok(found) = snapshot_accepted_from_record(raw_record) {
+    found
+  } else {
+    return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
   guard snapshot_u64_text_is_valid(decoded.generation) and snapshot_sha256_is_valid(decoded.index_sha256) and decoded.lower_bound >= 0 else {

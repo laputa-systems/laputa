@@ -527,15 +527,14 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
   }
 
   if paths.active.exists() or trust_store_active_present(paths) {
-    let active = match trust_store_read_active(paths) {
-      Ok(found) => found,
-      Err(_) => {
-        return Err(
-          trust_store_fail(
-            "active trust pointer is unreadable; refusing to bootstrap over installed state",
-          ),
-        )
-      },
+    let active = if let Ok(found) = trust_store_read_active(paths) {
+      found
+    } else {
+      return Err(
+        trust_store_fail(
+          "active trust pointer is unreadable; refusing to bootstrap over installed state",
+        ),
+      )
     }
     guard active == generation else {
       return Err(

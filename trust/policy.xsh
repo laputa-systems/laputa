@@ -13,13 +13,9 @@ pure policy_sha256_is_valid(value: Str) -> Bool {
 ## Whether `value` is a canonical positive unsigned 64-bit decimal string.
 export pure policy_u64_text_is_valid(value: Str) -> Bool {
   let length = value.byte_len()
-  if length == 0 or length > 20 or value.starts_with("0") {
-    return false
-  }
+  return false when length == 0 or length > 20 or value.starts_with("0")
 
-  if value.delete("0123456789") != "" {
-    return false
-  }
+  return false when value.delete("0123456789") != ""
 
   length < 20 or value <= "18446744073709551615"
 }

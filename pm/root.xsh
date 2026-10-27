@@ -542,9 +542,7 @@ proc root_validate_receipt(value: types.RootReceipt) {
 }
 
 pure root_completed_digest(plan: types.RootPlan, generated: List[types.ArtifactEntry]) -> Str {
-  if generated.is_empty() {
-    return plan.root_sha256
-  }
+  return plan.root_sha256 when generated.is_empty()
   let lines = [f"generated\t{entry.path}\t{types.file_kind_text(entry.kind)}\t{entry.mode}\t{entry.sha256}\t{entry.target}" for entry in generated]
   bytes.from_text(plan.root_sha256 + "\n" + lines.join("\n") + "\n").sha256().hex()
 }
@@ -839,13 +837,9 @@ export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [f
     return Err(types.PmError.PackageContract("manual index root receipt does not match"))
   }
   let mandoc = [artifact for artifact in receipt.artifacts if artifact.package_name == "mandoc" and artifact.payload]
-  if mandoc.is_empty() {
-    return receipt
-  }
+  return receipt when mandoc.is_empty()
   let manpath = fp"{output}/usr/share/man"
-  if ! manpath.exists() {
-    return receipt
-  }
+  return receipt unless manpath.exists()
   var has_pages = false
   for entry in fs.walk(manpath, gitignore: false, hidden: true) {
     let relative = entry.path.strip_prefix(manpath)?.display()
@@ -853,9 +847,7 @@ export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [f
       has_pages = true
     }
   }
-  if ! has_pages {
-    return receipt
-  }
+  return receipt unless has_pages
   let loader = fp"{output}/usr/lib/ld-musl-{types.pm_target_arch(receipt.target)}.so.1"
   let program = fp"{output}/usr/bin/makewhatis"
   let library_path = fp"{output}/usr/lib"
