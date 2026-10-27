@@ -574,3 +574,62 @@ test trust_update_finishes_flip_lagging_commit_journal [fs, process, time, error
   let journal = trust_store.trust_store_read_journal(paths)?
   assert journal.present == false
 }
+
+test trust_update_rotates_keys_package_only [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-rotation", "signing-key")?
+  let release_b = stage_release(ctx, "trust-update-rotation-b", "release-b")?
+  let _ = trust_update.trust_update_from_dir(root, release_b)?
+  let release_c = stage_release(ctx, "trust-update-rotation-c", "release-c")?
+  let _ = trust_update.trust_update_from_dir(root, release_c)?
+  assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "3"
+
+  var names: List[Str] = []
+  for entry in fs.children(fixture("release-d"))? {
+    names += [entry.name]
+  }
+
+  assert names.len() == 4
+  for expected in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
+    assert expected in names
+  }
+
+  let release_text = fixture("release-d/metadata").read_text()?
+  assert release_text.ends_with("\n") and "\r" not in release_text
+  assert release_text.byte_slice(0, release_text.byte_len() - 1).split("\n").len() == 5
+  assert "generation 4" in release_text
+
+  let early_rotated = stage_release(ctx, "trust-update-rotation-early", "release-d")?
+  expect_rejected(trust_update.trust_update_from_dir(root, early_rotated), "signature is invalid", root, "3", "rotated-before-package-update")
+
+  fp"{root}/etc/laputa/trust-update-key".write(key_bytes("rotation-key")?)
+  fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".write(fixture("release-d/ca-certificates.crt").read_bytes()?)
+  fp"{root}/usr/share/laputa/trust/seed/trust-policy".write(fixture("release-d/trust-policy").read_bytes()?)
+  assert fp"{root}/etc/laputa/trust-update-key".read_bytes()? == fixture("keys/rotation-key.public.base64").read_text()?.trim().base64_decode()?
+  assert fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".read_bytes()? == fixture("release-d/ca-certificates.crt").read_bytes()?
+  assert fp"{root}/usr/share/laputa/trust/seed/trust-policy".read_bytes()? == fixture("release-d/trust-policy").read_bytes()?
+
+  let replay_old = stage_release(ctx, "trust-update-rotation-replay", "release-c")?
+  expect_rejected(trust_update.trust_update_from_dir(root, replay_old), "signature", root, "3", "superseded-resume")
+
+  let release_d = stage_release(ctx, "trust-update-rotation-d", "release-d")?
+  let checked = trust_update.trust_verify(root, release_d)?
+  assert checked.generation == "4"
+  let applied = trust_update.trust_update_from_dir(root, release_d)?
+  assert applied.generation == "4"
+  assert applied.bundle_sha256 == fixture("release-d/ca-certificates.crt").read_bytes()?.sha256().hex()
+  assert applied.policy_sha256 == fixture("release-d/trust-policy").read_bytes()?.sha256().hex()
+  assert active_bundle(root)? == fixture("release-d/ca-certificates.crt").read_bytes()?
+  assert active_policy(root)? == fixture("release-d/trust-policy").read_bytes()?
+
+  let after = trust_update.trust_status(root)?
+  assert after.generation == "4"
+  assert after.accepted == "4"
+  assert after.pending == "none"
+  assert after.provenance == "signed-release"
+
+  let superseded_c = stage_release(ctx, "trust-update-rotation-old-c", "release-c")?
+  expect_rejected(trust_update.trust_update_from_dir(root, superseded_c), "does not advance", root, "4", "superseded-c")
+  let superseded_b = stage_release(ctx, "trust-update-rotation-old-b", "release-b")?
+  expect_rejected(trust_update.trust_update_from_dir(root, superseded_b), "does not advance", root, "4", "superseded-b")
+  assert active_bundle(root)? == fixture("release-d/ca-certificates.crt").read_bytes()?
+}

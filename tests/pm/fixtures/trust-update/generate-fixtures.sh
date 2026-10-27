@@ -27,11 +27,14 @@ command -v openssl >/dev/null || { echo "need openssl on the fixture machine" >&
 command -v python3 >/dev/null || { echo "need python3 on the fixture machine" >&2; exit 1; }
 
 mkdir -p "$KEYS" "$REL_B" "$REL_C" "$REL_WRONG" "$REL_A" "$TLS"
+REL_D=$OUT/release-d
+mkdir -p "$REL_D"
 
 b64() { python3 -c 'import base64,sys; sys.stdout.write(base64.b64encode(sys.stdin.buffer.read()).decode())'; }
 sha256hex() { python3 -c 'import hashlib,sys; sys.stdout.write(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'; }
 
-# Disposable Ed25519 signing keys Q (release signer) and R (wrong signer).
+# Disposable Ed25519 signing keys Q (release signer), R (wrong signer), and
+# S (rotated package key for the LAP-41 rotation proof).
 # Fresh on every run: private halves are never committed, so regeneration
 # rotates every fixture consistently.
 openssl genpkey -algorithm ed25519 -out "$ROOT/.q.priv"
@@ -44,6 +47,11 @@ openssl pkey -in "$ROOT/.r.priv" -pubout -outform DER -out "$ROOT/.r.spki.der"
 tail -c 32 "$ROOT/.r.spki.der" | b64 > "$KEYS/wrong-key.public.base64"
 cp "$ROOT/.r.priv" "$ROOT/.rkey.tmp"
 rm "$ROOT/.r.priv" "$ROOT/.r.spki.der"
+openssl genpkey -algorithm ed25519 -out "$ROOT/.s.priv"
+openssl pkey -in "$ROOT/.s.priv" -pubout -outform DER -out "$ROOT/.s.spki.der"
+tail -c 32 "$ROOT/.s.spki.der" | b64 > "$KEYS/rotation-key.public.base64"
+cp "$ROOT/.s.priv" "$KEYS/.rotation-key.private.tmp"
+rm "$ROOT/.s.priv" "$ROOT/.s.spki.der"
 echo "fixture signing keys ready (private halves are NOT committed)"
 
 # Test TLS PKI: roots A and B, servers, and a cross-signed intermediate pair.
@@ -195,6 +203,29 @@ cp "$REL_B/ca-certificates.crt" "$REL_WRONG/ca-certificates.crt"
 cp "$REL_B/trust-policy" "$REL_WRONG/trust-policy"
 openssl pkeyutl -sign -inkey "$ROOT/.rkey.tmp" -rawin -in "$REL_WRONG/metadata" -out "$REL_WRONG/metadata.sig"
 rm -f "$ROOT/.rkey.tmp"
+
+# Rotation generation 4: seed bundle plus both test roots, signed by the
+# rotated package key S. The package update ships S plus these bytes as new
+# seeds; releases still carry no keys (exact four files).
+cp "$SEED_BUNDLE" "$REL_D/ca-certificates.crt"
+cat "$TLS/ca-a.crt" >> "$REL_D/ca-certificates.crt"
+cat "$TLS/ca-b.crt" >> "$REL_D/ca-certificates.crt"
+{
+  echo "laputa-trust-policy-v1"
+  echo "generation 4"
+  grep "^blocked-spki-sha256" "$SEED_POLICY"
+  echo "blocked-spki-sha256 $BLOCKED_X"
+} > "$REL_D/trust-policy"
+{
+  echo "laputa-trust-release-v1"
+  echo "generation 4"
+  echo "expires-at $EXPIRES"
+  echo "root-bundle-sha256 $(sha256hex < "$REL_D/ca-certificates.crt")"
+  echo "trust-policy-sha256 $(sha256hex < "$REL_D/trust-policy")"
+} > "$REL_D/metadata"
+openssl pkeyutl -sign -inkey "$KEYS/.rotation-key.private.tmp" -rawin -in "$REL_D/metadata" -out "$REL_D/metadata.sig"
+[ "$(wc -c < "$REL_D/metadata.sig")" = "64" ] || { echo "bad signature length" >&2; exit 1; }
+rm -f "$KEYS/.rotation-key.private.tmp"
 
 # Expiry boundary variants over release B bytes (signed by Q).
 REL_EXP=$OUT/release-expired
