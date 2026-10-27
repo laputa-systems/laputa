@@ -103,16 +103,24 @@ rollback or expiry, or coordinating process state.
 
 ## Key ceremony
 
-Production trusts exactly one key: the 32 raw Ed25519 bytes at
+Production trusts exactly one key: the raw 32-byte Ed25519 *public* key at
 `/etc/laputa/trust-update-key`, installed by the ca-certificates package at
 mode 0444. The key file is operator-provisioned and never in the repository
-(it is git-ignored; package builds fail closed without it). Provision it on
-the build host before `make build`:
+(it is git-ignored; package builds fail closed without it). Generate the
+pair offline, keep the private half on the signing machine, and install
+only the public half:
 
-1. Generate 32 random bytes offline (`head -c 32 /dev/urandom`).
-2. Place them at `packages/ca-certificates/files/trust-update-key`.
-3. Record the fingerprint `trust.status` reports and distribute it
-   out-of-band for release verification.
+1. Offline, on the signing machine (never the build host):
+   `openssl genpkey -algorithm ed25519 -out trust-signing.key`
+2. Extract the raw 32-byte public key and install it as the provisioned file:
+   `openssl pkey -in trust-signing.key -pubout -outform DER | tail -c 32 > packages/ca-certificates/files/trust-update-key`
+3. Back up `trust-signing.key` offline. Sign each release's `metadata` with
+   `openssl pkeyutl -sign -inkey trust-signing.key -rawin -in metadata -out metadata.sig`
+   (exactly 64 bytes). Never commit the private key or move it to the build host.
+4. After install, confirm `trust status` reports
+   `verification key: present sha256:<hex>` matching
+   `sha256sum packages/ca-certificates/files/trust-update-key`.
+   Distribute that fingerprint out-of-band; verifiers compare releases against it.
 
 Rotate only through an OS package update that ships a new key file and new
 seeds together; releases themselves never carry keys and cannot rotate,
