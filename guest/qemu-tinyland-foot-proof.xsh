@@ -1,9 +1,8 @@
 #!/bin/xsh
 ##! In-guest tinyland and foot keyboard-input proof for qemu-tinyland-foot.
 ##! seatd mediates as root; the compositor and foot run unprivileged as laputa.
-##! Before readiness the proof kills the compositor mid-session and recovers
-##! behind the same markers. Broker loss stays out of the guest until the
-##! pinned tinyland reports daemon death (see R3).
+##! Before readiness the proof kills the compositor (crash reclaim) and the
+##! broker (fail-closed loss) and recovers each behind the same markers.
 error GuestProofError = Failed(phase: Str, message: Str)
 
 proc guest_console(message: Str) [fs, error] {
@@ -82,12 +81,11 @@ proc main() [fs, process, time, error] {
 
   # The serial-only QEMU proof has no virtual terminal.  An unbound seat is
   # immediately active while still mediating the virtio DRM and input devices.
-  let _seatd = spawn process.command_argv(
+  let seatd = spawn process.command_argv(
     /usr/bin/seatd,
     ["seatd", "-g", "seat"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
   )?
-  let _ = _seatd
   guest_wait_for(/run/seatd.sock, "seatd", 20)
 
   # The broker socket must stay group-mediated: laputa reaches it through
@@ -161,6 +159,44 @@ proc main() [fs, process, time, error] {
   guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-crash-restart", 30)
   guest_tick("crash-recovered")
 
+  # R3: broker loss must fail closed. SIGKILL seatd: the session cannot
+  # reopen or fall back to direct open, so it exits; a fresh broker reclaims
+  # the stale socket and a fresh session recovers. Needs a compositor that
+  # reports daemon death from dispatch (tinyland e40d653).
+  guest_tick("broker-loss-before-kill")
+  process.kill(seatd.pid, signal: "KILL")?
+  match wait session_crash {
+    Ok(status) => match status.exit_code() {
+      Ok(code) => guest_console(f"LAPUTA_TINYLAND_BROKER_LOSS session exited code={code}")
+      Err(_) => guest_console("LAPUTA_TINYLAND_BROKER_LOSS session exited unknown")
+    },
+    Err(_) => {
+      guest_fail("broker-loss", "session wait failed")
+    },
+  }
+  guest_tick("broker-loss-reaped")
+  let _ = wait seatd
+  p"/run/user/1000/laputa-foot-input.txt".remove()
+  p"/run/user/1000/laputa-foot-read-ready".remove()
+  p"/run/user/1000/laputa-direct-denied".remove()
+  p"/run/user/1000/laputa-tinyland.pid".remove()
+  let seatd_restarted = spawn process.command_argv(
+    /usr/bin/seatd,
+    ["seatd", "-g", "seat"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "0"},
+  )?
+  let _ = seatd_restarted
+  guest_wait_for(/run/seatd.sock, "seatd-restart", 20)
+  let session_broker = spawn process.command_argv(
+    /usr/bin/su,
+    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
+  )?
+  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid-broker-restart", 30)
+  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny-broker-restart", 30)
+  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-broker-restart", 30)
+  guest_tick("broker-recovered")
+
   guest_console("LAPUTA_TINYLAND_FOOT_PROOF_READY")
   guest_wait_for(/run/user/1000/laputa-foot-input.txt, "input", 90)
   let input = p"/run/user/1000/laputa-foot-input.txt".read_text()?.trim()
@@ -169,7 +205,7 @@ proc main() [fs, process, time, error] {
   }
 
   guest_console("LAPUTA_TINYLAND_FOOT_PROOF_OK")
-  let _ = wait session_crash
+  let _ = wait session_broker
 }
 
 main()

@@ -32,12 +32,13 @@ export const mkdeps_host = ["cargo", "llvm-toolchain"]
 
 ## Package recipe export.
 ## The source tarball and Cargo.lock pin the qualified upstream commit
-## (GitHub prerelease workflow, green tests plus musl build). The
+## (GitHub prerelease workflow, green tests plus musl build; e40d653 adds
+## the dispatch hangup check that makes daemon loss fatal). The
 ## cargo-vendor entry vendors every locked crates.io crate beside the
 ## extracted tree; the PM verifies each crate against Cargo.lock.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/tinyland/archive/182bedd41ba49e662e6ff2a5eba914557c87bb98.tar.gz",
+    source: p"https://github.com/laputa-systems/tinyland/archive/e40d653c0194b9b78f0836e504ac818e0d1329f4.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -45,12 +46,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "b00f82fea4caa05c16d65ddab018e51d3e42582d44e719bfa2041d2c70b66019",
+        sha256: "3f0c436191358da9c59b3f5bccbf6e0c798e0d595ac97767edf38f0ba054ec6a",
       },
     ],
   },
   {
-    source: p"https://raw.githubusercontent.com/laputa-systems/tinyland/182bedd41ba49e662e6ff2a5eba914557c87bb98/Cargo.lock => vendor",
+    source: p"https://raw.githubusercontent.com/laputa-systems/tinyland/e40d653c0194b9b78f0836e504ac818e0d1329f4/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",

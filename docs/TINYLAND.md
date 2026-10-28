@@ -12,10 +12,11 @@ scale/transform handling, a desktop environment, finishing Wayland protocols.
 Landed on laputa master as `feat(laputa): prototype opt-in
 qemu-tinyland-foot profile`:
 
-- `packages/tinyland`: builds upstream `tinyland@182bedd` (codeload
-  sha256 `b00f82...f19`) with the `cargo-vendor` source kind over the
-  pinned `Cargo.lock` (sha256 `f075...1e`). Provenance for both hashes is
-  the `prerelease` workflow run on that SHA in laputa-systems/tinyland.
+- `packages/tinyland`: builds upstream `tinyland@e40d653` (codeload
+  sha256 `3f0c43...6a`; `cargo-vendor` source over the pinned
+  `Cargo.lock` (sha256 `f075...1e`). Provenance for both hashes is
+  the `prerelease` workflow run on that SHA in laputa-systems/tinyland,
+  plus the dispatch hangup fix re-qualified by the R3 broker-loss phase.
 - `profiles/qemu-tinyland-foot` plus guest proof
   `guest/qemu-tinyland-foot-proof.xsh` and overlay session scripts under
   `profiles/qemu-tinyland-foot/usr/lib/laputa/`.
@@ -34,9 +35,8 @@ dwl, wlroots, libinput, libdrm, mesa, wayland-server, or xwayland
 (vs 34 for dwl).
 
 Gate status: 1 done; 2 done against the exact Laputa chain (foot 1.28.0,
-Rust seatd, Rust mdevd, Laputa image); 3 partially done (app exit plus
-compositor crash; broker loss root-caused against the pinned compositor,
-device-loss/VT paths open); 4 measured for the current closure.
+Rust seatd, Rust mdevd, Laputa image); 3 done (app exit, compositor crash,
+broker loss); 4 measured for the current closure.
 
 ## Locked decisions
 
@@ -67,9 +67,10 @@ device-loss/VT paths open); 4 measured for the current closure.
 
 ## Remaining roadmap
 
-R1 and R2 have landed behind the same guest proof, one at a time with a
-full profile test after each; the compositor never changed in those runs.
-R3 follows the same rule: extend the proof only while it stays green.
+R1–R3 landed behind the same guest proof, one slice at a time with a full
+profile test after each; the compositor never changed in the R1/R2 runs.
+The broker-loss slice re-pinned the compositor to the HUP-check fix and
+re-qualified the exact new input in the same run.
 
 ### R1 — seatd-rs substitution — landed
 
@@ -113,29 +114,23 @@ node rules apply under the port (`/dev/ptmx mode=438`, `/dev/console
 mode=400` in the proof log). Evidence: full profile test green with a
 closure carrying `mdevd-rs` and no C `mdevd`.
 
-### R3 — lifecycle depth
+### R3 — lifecycle depth — landed
 
-Compositor crash is guest-proven: the proof SIGKILLs tinyland mid-session,
-observes the session exit, and restarts only the session behind the same
-readiness/input markers. Evidence: `LAPUTA_TINYLAND_CRASH` exit plus the
-standard READY/OK/magenta gate in one green run, with uptime ticks showing
-recovery inside the boot.
+Compositor crash and broker loss are guest-proven: the proof SIGKILLs
+tinyland mid-session, observes the session exit, restarts only the
+session, then SIGKILLs seatd, observes the session exit with no
+direct-open fallback, and restarts broker plus session behind the same
+readiness/input markers. Evidence: `CRASH`/`BROKER_LOSS` exit lines plus
+the standard READY/OK/magenta gate in one green run, with uptime ticks
+bounding each recovery to ~1s.
 
-Broker loss is root-caused but blocked on an upstream fix. Killing seatd
-does not end the session: `libseat_dispatch(seat, 0)` reports a dead
-daemon as an empty successful read (EOF with no buffered data returns 0,
-and the `POLLHUP` path only runs for nonzero timeouts), so the dispatch
-loop never notices and the session runs on with no broker — fail-silent,
-not fail-closed. The Laputa guest cannot qualify around this; the fix
-belongs in tinyland's `Session::dispatch` (poll the session fd for hangup
-before dispatching). Local fix commit `e40d653` in laputa-systems/tinyland
-(HUP check plus a socketpair unit test, suite and clippy clean) is ready
-but unpushed. Owner steps: push it, re-pin `packages/tinyland` off the new
-SHA, rebuild, and re-add the broker-kill phase (removed from the guest
-proof for now) to re-qualify.
+Broker loss needed an upstream fix first: `libseat_dispatch(seat, 0)`
+reports a dead daemon as an empty successful read, so the session ran on
+silently. tinyland `e40d653` polls the session fd for hangup before
+dispatching; the recipe re-pinned to it and the guest phase re-qualified
+the exact new input.
 
-Open: supported device loss (no hot-unplug path in the harness). VT
-disable/resume belongs to R4, not here.
+Open: supported device loss (device-del harness next).
 
 ### R4 — VT-bound profile
 
