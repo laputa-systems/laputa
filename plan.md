@@ -5,14 +5,13 @@
 - Goal: small robust Rust mdevd/mdevd-coldplug replacing the C implementation and skalibs, Laputa-compatible, libudev-zero-compatible on `-O 4`.
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
-  P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6. Red: none.
-  Parked: privileged kernel/device proof (see Needs environment).
+  P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6 (f082eb8). Red: none.
+  Parked: daemon-driven kernel device-node creation (see Needs environment).
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
-  `tools/build-oracle.sh` (un-parked from Needs environment; privileged and
-  live-multicast proof stays parked).
+  `tools/build-oracle.sh`. Docker now supplies real-device adapter proof and
+  kernel-event daemon publication proof on isolated resources.
 - Live-multicast bonus: `unshare -U -n -r` runs the full P4 exchange here
-  (consumer proof + Rust self-exchange); only truly privileged tests stay
-  parked.
+  (consumer proof + Rust self-exchange).
 - P6: 34 C-oracle transcript goldens (15 handling, 19 Laputa devices),
   selected applied-operation traces, config acceptance, acknowledged unicast
   drops with byte-exact empty `-o`, FIFO-acknowledged reload matrix,
@@ -21,10 +20,23 @@
 - Boundary: daemon intake rejects all userspace senders, including on `-I 2`;
   handling/order proof remains at dump-run and adapter level. Unicast warnings
   acknowledge every injected daemon record before comparing `-o` bytes.
-- Next: `H1` (adversarial), then `H2` and `O1`.
+- H1 device slice: Docker proves real character/block nodes, modes, ownership,
+  aliases, repeated add/remove, identity refusal, inode/root replacement safety,
+  execute-only ancestors, and zero FD growth over 10k repetitions.
+  Kernel dummy-interface add/remove (including queue events) matches every
+  C/Rust daemon `-o` byte and `-O 4` datagram after `-D` readiness, including
+  traffic queued while a FIFO handshake holds config reload open.
+  Ancestor-symlink mkdir/unlink and leaf-symlink chmod regressions were
+  reproduced and fixed. Mutations now walk held non-symlink directory fds;
+  metadata stays on the verified device inode. chmod requires procfs.
+- Verified: `tools/check-privileged.sh`, adversarial tests, affected engine/bins/
+  parity suites, and all-target clippy pass. Test boundaries: [local verification](docs/testing.md).
+- Next: finish `H1` restart-during-coldplug, then
+  `H2` and `O1`.
 - H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
   coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
   absolute/`..` refusal and EEXIST identity adoption in RealOps,
+  symlink-ancestor refusal and inode-pinned metadata (procfs required),
   uevent-NUL robustness, coldplug NULL-crash fixes.
 - Resume: run `tools/check-pins.sh && cargo test --locked -q -- pins` on a clean tree.
 
@@ -46,7 +58,8 @@ Owner (2026-10-28):
 - Hooks: v1 is declarative-only. Any line carrying a command (`@`/`$`/`*`/`+`/`-`/`&`) is rejected at parse with file, line, and "hooks unsupported". Laputa's `mdev.conf` needs none.
 - Firmware: v1 excludes firmware loading. `FIRMWARE=` events are logged and skipped; `-F` is rejected with a non-zero exit naming the exclusion. No reads of `/lib/firmware`, no writes to `/sys/.../loading|data`.
 - Upstream policy: this fork is not upstream; delete `CONTRIBUTING`'s LLM ban here (`H2`) and commit AI-authored work to this fork for human review and push.
-- Test boundary: synthetic roots only. All privileged proof parks in Needs environment.
+- Test boundary: synthetic roots only. Owner authorized Docker proof on private
+  tmpfs and private networks (2026-10-28). Host sysfs and device mutations remain forbidden.
 
 Prescribed (from code, docs, or principles; reversed only by a new owner decision):
 - Pins: `mdevd-rs` `eac18f5`, `libudev-zero` `8f1d3d06`, upstream mdevd `0.1.8.3` (`package/info`), Laputa-vendored `0.1.8.2` + skalibs `2.15.1.0` (`PKGBUILD.xsh`).
@@ -95,11 +108,13 @@ Delegated (executor picks the smallest reversible option inside the bound and lo
 
 ## Needs environment
 
-- Privileged suite (real netlink, `/dev` nodes, event floods, restart-during-coldplug): owner runs `cargo test --locked -q -- bins,adversarial,parity` in a disposable VM with virtual devices; a normal container does not qualify. Justify any container use in the commit body.
-- Namespace probe: `unshare -U -n -m -r` can mount tmpfs here, but `mknod`
-  of a synthetic character device still fails with EPERM. Real kernel uevents
-  and real device-node mutations remain unverified. The C oracle build is
-  available locally via `tools/build-oracle.sh`.
+- Docker now proves real node mutations through RealOps and daemon publication
+  of genuine kernel add/remove events from private dummy network interfaces.
+  `tools/check-privileged.sh` is the required command. Container isolation and
+  capability limits are documented in [local verification](docs/testing.md).
+- End-to-end daemon device creation from kernel events carrying major/minor
+  numbers remains unverified. Private interface events do not carry them.
+  Real hardware coldplug remains outside the synthetic-root boundary.
 - Quiet-host perf confirmation for `O1` numbers (preflight host was loaded).
 
 ## Execution boundary and non-goals

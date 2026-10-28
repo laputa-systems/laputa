@@ -76,228 +76,148 @@ pub trait Ops {
     fn unlink(&mut self, path: &[u8]);
 }
 
+/// Mutations reject symlink ancestors and retain the last verified device inode
+/// for metadata updates. chmod requires a mounted /proc/self/fd.
 pub struct RealOps {
     dev: OwnedFd,
     sys: OwnedFd,
+    node: Option<(Vec<u8>, OwnedFd)>,
     tmp_counter: u64,
 }
 
+fn openat_owned(dir: libc::c_int, name: &std::ffi::CStr, flags: libc::c_int) -> Result<OwnedFd, OpErr> {
+    // SAFETY: name is NUL-terminated; the returned descriptor has one owner.
+    let fd = unsafe { libc::openat(dir, name.as_ptr(), flags | libc::O_CLOEXEC) };
+    if fd == -1 { return Err(os_err("open", name.to_bytes())); }
+    // SAFETY: openat returned an open descriptor.
+    Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+}
+
 impl RealOps {
-    pub fn open(dev_dir: &std::path::Path, sys_dir: &std::path::Path) -> std::io::Result<RealOps> {        fn open_dir(p: &std::path::Path) -> std::io::Result<OwnedFd> {
-            let c = CString::new(p.as_os_str().as_encoded_bytes())
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad dir"))?;
-            // SAFETY: c is NUL-terminated; the fd is owned on success.
-            let fd = unsafe {
-                libc::open(
-                    c.as_ptr(),
-                    libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
-                )
-            };
-            if fd == -1 {
-                return Err(std::io::Error::last_os_error());
-            }
-            // SAFETY: fd is open and owned.
-            Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+    pub fn open(dev_dir: &std::path::Path, sys_dir: &std::path::Path) -> std::io::Result<RealOps> {
+        fn open_dir(path: &std::path::Path) -> std::io::Result<OwnedFd> {
+            use std::os::unix::fs::OpenOptionsExt;
+            let file = std::fs::OpenOptions::new().read(true)
+                .custom_flags(libc::O_DIRECTORY).open(path)?;
+            Ok(file.into())
         }
-        Ok(RealOps {
-            dev: open_dir(dev_dir)?,
-            sys: open_dir(sys_dir)?,
-            tmp_counter: 0,
-        })
+        Ok(RealOps { dev: open_dir(dev_dir)?, sys: open_dir(sys_dir)?, node: None, tmp_counter: 0 })
+    }
+
+    fn parent(&self, path: &[u8], create: bool) -> Result<(OwnedFd, CString), OpErr> {
+        if has_escape(path) { return Err(refused("resolve", path)); }
+        let mut components = path.split(|b| *b == b'/').peekable();
+        let mut dir = self.dev.try_clone().map_err(|e| OpErr(e.to_string()))?;
+        while let Some(component) = components.next() {
+            let name = cstr(component)?;
+            if components.peek().is_none() { return Ok((dir, name)); }
+            if component.is_empty() { continue; }
+            if create {
+                // SAFETY: dir is held open and name is NUL-terminated.
+                if unsafe { libc::mkdirat(dir.as_raw_fd(), name.as_ptr(), 0o755) } == -1 {
+                    let e = std::io::Error::last_os_error();
+                    if e.raw_os_error() != Some(libc::EEXIST) { return Err(OpErr(format!("mkdir: {e}"))); }
+                }
+            }
+            dir = openat_owned(dir.as_raw_fd(), &name, libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW)?;
+        }
+        Err(refused("resolve", path))
+    }
+
+    fn metadata_fd(&self, path: &[u8]) -> Result<OwnedFd, OpErr> {
+        if let Some((name, fd)) = &self.node {
+            if name == path { return fd.try_clone().map_err(|e| OpErr(e.to_string())); }
+        }
+        let (parent, name) = self.parent(path, false)?;
+        let fd = openat_owned(parent.as_raw_fd(), &name, libc::O_PATH | libc::O_NOFOLLOW)?;
+        let file = std::fs::File::from(fd);
+        if file.metadata().map_err(|e| OpErr(e.to_string()))?.file_type().is_symlink() {
+            return Err(refused("metadata", path));
+        }
+        Ok(file.into())
     }
 }
 
 impl Ops for RealOps {
     fn read_sys(&mut self, rel: &[u8], max: usize) -> Result<Vec<u8>, OpErr> {
-        if has_escape(rel) {
-            return Err(refused("read", rel));
-        }
-        let c = cstr(rel)?;
-        // SAFETY: sys fd is valid; c is NUL-terminated. Symlinks are
-        // followed deliberately: legitimate sysfs traversal needs them
-        // (e.g. /sys/class links); `..` above bounds the escape.
-        let fd = unsafe { libc::openat(self.sys.as_raw_fd(), c.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
-        if fd == -1 {
-            return Err(os_err("open", rel));
-        }
+        use std::io::Read;
+        if has_escape(rel) { return Err(refused("read", rel)); }
+        let name = cstr(rel)?;
+        let fd = openat_owned(self.sys.as_raw_fd(), &name, libc::O_RDONLY)?;
         let mut out = Vec::new();
-        let mut chunk = [0u8; 1024];
-        loop {
-            // SAFETY: fd is open; chunk is valid for reads.
-            let r = unsafe { libc::read(fd, chunk.as_mut_ptr() as *mut _, chunk.len()) };
-            if r == -1 {
-                let e = std::io::Error::last_os_error();
-                unsafe { libc::close(fd) };
-                if e.raw_os_error() == Some(libc::EINTR) {
-                    continue;
-                }
-                return Err(OpErr(format!("read {}: {e}", String::from_utf8_lossy(rel))));
-            }
-            if r == 0 {
-                break;
-            }
-            let n = (r as usize).min(max.saturating_sub(out.len()));
-            out.extend_from_slice(&chunk[..n]);
-            if out.len() >= max || n < r as usize {
-                break;
-            }
-        }
-        unsafe { libc::close(fd) };
+        std::fs::File::from(fd).take(max as u64).read_to_end(&mut out)
+            .map_err(|e| OpErr(format!("read {}: {e}", String::from_utf8_lossy(rel))))?;
         Ok(out)
     }
 
     fn subdirs(&mut self, path: &[u8]) -> Result<(), OpErr> {
-        // Mirrors mdevd_mkdirp: every slash-terminated prefix, 0755. An
-        // empty prefix (absolute path) fails naturally with ENOENT, exactly
-        // like the reference; deeper absolute/`..` damage is still refused
-        // by the mutating methods below.
-        for (i, &b) in path.iter().enumerate() {
-            if b != b'/' {
-                continue;
-            }
-            let prefix = &path[..i];
-            let c = cstr(prefix)?;
-            // SAFETY: dev fd is valid; c is NUL-terminated.
-            let r = unsafe { libc::mkdirat(self.dev.as_raw_fd(), c.as_ptr(), 0o755) };
-            if r == -1 {
-                let e = std::io::Error::last_os_error();
-                if e.raw_os_error() != Some(libc::EEXIST) {
-                    return Err(OpErr(format!(
-                        "mkdir {}: {e}",
-                        String::from_utf8_lossy(prefix)
-                    )));
-                }
-            }
-        }
-        Ok(())
+        self.parent(path, true).map(|_| ())
     }
 
-    fn mknod(
-        &mut self,
-        path: &[u8],
-        mode: u32,
-        kind: NodeKind,
-        maj: u32,
-        min: u32,
-    ) -> Result<MknodOut, OpErr> {
-        if has_escape(path) {
-            return Err(refused("mknod", path));
-        }
-        let c = cstr(path)?;
-        let ftype = match kind {
-            NodeKind::Char => libc::S_IFCHR,
-            NodeKind::Block => libc::S_IFBLK,
-        };
+    fn mknod(&mut self, path: &[u8], mode: u32, kind: NodeKind, maj: u32, min: u32) -> Result<MknodOut, OpErr> {
+        use std::os::unix::fs::MetadataExt;
+        self.node = None;
+        let (parent, name) = self.parent(path, false)?;
+        let ftype = match kind { NodeKind::Char => libc::S_IFCHR, NodeKind::Block => libc::S_IFBLK };
         let dev = libc::makedev(maj, min);
-        // SAFETY: dev fd is valid; c is NUL-terminated.
-        let r = unsafe {
-            libc::mknodat(
-                self.dev.as_raw_fd(),
-                c.as_ptr(),
-                (mode & 0o7777) | ftype,
-                dev,
-            )
+        // SAFETY: parent is held open and name is NUL-terminated.
+        let result = unsafe { libc::mknodat(parent.as_raw_fd(), name.as_ptr(), (mode & 0o7777) | ftype, dev) };
+        let outcome = if result == 0 { MknodOut::Created } else {
+            let e = std::io::Error::last_os_error();
+            if e.raw_os_error() != Some(libc::EEXIST) { return Err(OpErr(format!("mknod {}: {e}", String::from_utf8_lossy(path)))); }
+            MknodOut::Exists
         };
-        if r == 0 {
-            return Ok(MknodOut::Created);
+        let fd = openat_owned(parent.as_raw_fd(), &name, libc::O_PATH | libc::O_NOFOLLOW)?;
+        let file = std::fs::File::from(fd);
+        let metadata = file.metadata().map_err(|e| OpErr(e.to_string()))?;
+        if metadata.mode() & libc::S_IFMT != ftype || metadata.rdev() != dev {
+            return Err(OpErr(format!("mknod {}: refused (existing object is not the expected device)", String::from_utf8_lossy(path))));
         }
-        let e = std::io::Error::last_os_error();
-        if e.raw_os_error() != Some(libc::EEXIST) {
-            return Err(OpErr(format!("mknod {}: {e}", String::from_utf8_lossy(path))));
-        }
-        // Adopt only the expected device identity; never chmod/chown an
-        // unrelated replacement object.
-        let mut st: libc::stat = unsafe { std::mem::zeroed() };
-        // SAFETY: dev fd is valid; st is a valid output struct. No-follow:
-        // a swapped-in symlink must not be adopted.
-        let sr = unsafe {
-            libc::fstatat(
-                self.dev.as_raw_fd(),
-                c.as_ptr(),
-                &mut st,
-                libc::AT_SYMLINK_NOFOLLOW,
-            )
-        };
-        if sr == -1 {
-            return Err(os_err("stat", path));
-        }
-        let is_dev = st.st_mode & libc::S_IFMT == ftype;
-        if !is_dev || st.st_rdev != dev as libc::dev_t {
-            return Err(OpErr(format!(
-                "mknod {}: refused (existing object is not the expected device)",
-                String::from_utf8_lossy(path)
-            )));
-        }
-        Ok(MknodOut::Exists)
+        self.node = Some((path.to_vec(), file.into()));
+        Ok(outcome)
     }
 
     fn chmod(&mut self, path: &[u8], mode: u32) -> Result<(), OpErr> {
-        if has_escape(path) {
-            return Err(refused("chmod", path));
-        }
-        let c = cstr(path)?;
-        // SAFETY: dev fd is valid; c is NUL-terminated.
-        let r = unsafe { libc::fchmodat(self.dev.as_raw_fd(), c.as_ptr(), mode & 0o7777, 0) };
-        if r == -1 {
-            return Err(os_err("chmod", path));
-        }
+        let fd = self.metadata_fd(path)?;
+        let proc_path = CString::new(format!("/proc/self/fd/{}", fd.as_raw_fd())).unwrap();
+        // SAFETY: procfs resolves this held O_PATH descriptor without opening the device.
+        if unsafe { libc::chmod(proc_path.as_ptr(), mode & 0o7777) } == -1 { return Err(os_err("chmod", path)); }
         Ok(())
     }
 
     fn chown(&mut self, path: &[u8], uid: u32, gid: u32) -> Result<(), OpErr> {
-        if has_escape(path) {
-            return Err(refused("chown", path));
-        }
-        let c = cstr(path)?;
-        // SAFETY: dev fd is valid; c is NUL-terminated.
-        let r = unsafe { libc::fchownat(self.dev.as_raw_fd(), c.as_ptr(), uid, gid, 0) };
-        if r == -1 {
+        let fd = self.metadata_fd(path)?;
+        // SAFETY: fd pins the inode; the empty path selects that inode.
+        if unsafe { libc::fchownat(fd.as_raw_fd(), c"".as_ptr(), uid, gid, libc::AT_EMPTY_PATH) } == -1 {
             return Err(os_err("chown", path));
         }
         Ok(())
     }
 
     fn symlink_replace(&mut self, target: &[u8], link: &[u8]) -> Result<(), OpErr> {
-        if has_escape(target) || has_escape(link) {
-            return Err(refused("symlink", link));
-        }
-        // Atomic replace via a unique temp name + rename, like
-        // atomic_symlink4 in the reference.
+        if has_escape(target) { return Err(refused("symlink", target)); }
+        let (parent, name) = self.parent(link, false)?;
         self.tmp_counter += 1;
-        let tmp = format!(".mdevd-tmp-{}-{}", std::process::id(), self.tmp_counter);
-        let t = cstr(target)?;
-        let l = cstr(link)?;
-        let tc = CString::new(tmp).unwrap();
-        // SAFETY: dev fd is valid; all pointers are NUL-terminated.
-        unsafe {
-            if libc::symlinkat(t.as_ptr(), self.dev.as_raw_fd(), tc.as_ptr()) == -1 {
-                return Err(os_err("symlink", link));
-            }
-            if libc::renameat(
-                self.dev.as_raw_fd(),
-                tc.as_ptr(),
-                self.dev.as_raw_fd(),
-                l.as_ptr(),
-            ) == -1
-            {
-                let e = os_err("symlink", link);
-                libc::unlinkat(self.dev.as_raw_fd(), tc.as_ptr(), 0);
-                return Err(e);
-            }
+        let temporary = CString::new(format!(".mdevd-tmp-{}-{}", std::process::id(), self.tmp_counter)).unwrap();
+        let target = cstr(target)?;
+        // SAFETY: parent is held open; all names are NUL-terminated.
+        if unsafe { libc::symlinkat(target.as_ptr(), parent.as_raw_fd(), temporary.as_ptr()) } == -1 {
+            return Err(os_err("symlink", link));
+        }
+        // SAFETY: both names are relative to the same held parent.
+        if unsafe { libc::renameat(parent.as_raw_fd(), temporary.as_ptr(), parent.as_raw_fd(), name.as_ptr()) } == -1 {
+            let e = os_err("symlink", link);
+            // SAFETY: remove only the temporary entry created above.
+            unsafe { libc::unlinkat(parent.as_raw_fd(), temporary.as_ptr(), 0); }
+            return Err(e);
         }
         Ok(())
     }
 
     fn unlink(&mut self, path: &[u8]) {
-        if has_escape(path) {
-            return;
-        }
-        if let Ok(c) = cstr(path) {
-            // SAFETY: dev fd is valid; c is NUL-terminated. Errors are
-            // ignored like the reference unlink_void.
-            unsafe {
-                libc::unlinkat(self.dev.as_raw_fd(), c.as_ptr(), 0);
-            }
+        if let Ok((parent, name)) = self.parent(path, false) {
+            // SAFETY: unlink acts on the leaf entry in the held parent directory.
+            unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0); }
         }
     }
 }
