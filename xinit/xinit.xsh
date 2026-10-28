@@ -1048,6 +1048,26 @@ proc wait_ready(service: Service) -> Result[Bool] {
   false
 }
 
+proc has_ready_hook(service: Service) -> Result[Bool] {
+  require_service_file(service.path)
+  let loaded = module.load(service.path)?.require(ServiceFile)?
+
+  "ready" in loaded.keys()
+}
+
+proc hook_ready(service: Service) -> Result[Bool] {
+  require_service_file(service.path)
+  let loaded = module.load(service.path)?.require(ServiceFile)?
+
+  return true when "ready" not in loaded.keys()
+
+  if let Ok(answer) = loaded.ready() {
+    answer
+  } else {
+    false
+  }
+}
+
 proc run_start_proc(service: Service) -> Result[Bool] {
   require_service_file(service.path)
   let loaded = module.load(service.path)?.require(ServiceFile)?
@@ -1124,16 +1144,18 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
   }
 
   let use_notify = notify and service.readiness == "notify"
+  let defer_ready = notify and ! use_notify and has_ready_hook(service)?
+  let settled_state = if defer_ready { "starting" } else { "running" }
 
   if service.log == "none" {
     let child = unix.spawn_process_group(service.command, notify: use_notify)?
-    let ready = if use_notify { false } else { wait_ready(service)? }
+    let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
     return {
       status: {
         name: service.name,
         desired: "up",
-        state: "running",
+        state: settled_state,
         pid: child.pid,
         supervisor_pid: 0,
         log: service.log,
@@ -1155,13 +1177,13 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   maybe_rotate_log(service.name, service.log_max_size, service.log_keep)
   let child = unix.spawn_process_group_log(service.command, path_value, notify: use_notify)?
-  let ready = if use_notify { false } else { wait_ready(service)? }
+  let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
   {
     status: {
       name: service.name,
       desired: "up",
-      state: "running",
+      state: settled_state,
       pid: child.pid,
       supervisor_pid: 0,
       log: service.log,
@@ -1331,7 +1353,7 @@ proc show_status(name: Str) {
     let module_value = module.load(loaded.path)?.require(ServiceFile)?
 
     if "status" in module_value.keys() {
-      let detail = module_value.status()?
+      let detail = module_value.status() ?? { f"status-error={.message.replace("\n", with: " ")}" }
 
       if detail != "" {
         print f"{status_line(current)} {detail}"
@@ -1442,7 +1464,9 @@ pure all_units_stopped(units: List[ServiceUnit]) -> Bool {
 }
 
 proc advance_readiness(unit: ServiceUnit, now: Int) -> Result[ServiceUnit] {
-  let ready = unit.notify_fd > 0 and unix.notify_ready(unit.notify_fd)?
+  let notified = unit.notify_fd > 0 and unix.notify_ready(unit.notify_fd)?
+  let answered = unit.service.readiness != "notify" and unit.notify_fd <= 0 and hook_ready(unit.service)?
+  let ready = notified or answered
   let timed_out = now - unit.started_at >= unit.service.ready_timeout_ms
 
   return unit when ! ready and ! timed_out
@@ -1510,7 +1534,7 @@ proc reconcile_one(unit: ServiceUnit, units: List[ServiceUnit], now: Int) -> Res
 
   let restarts = if unit.state == "dead" { unit.restarts + 1 } else { unit.restarts }
   let spawned = spawn_service(unit.service, restarts, true)?
-  let state = if spawned.notify_fd > 0 { "starting" } else { "running" }
+  let state = if spawned.notify_fd > 0 or spawned.status.state == "starting" { "starting" } else { "running" }
 
   let started: ServiceUnit = ServiceUnit(
     service: unit.service,

@@ -1616,3 +1616,251 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   assert ! finished.exists()?
   assert unix_log.read_text()?.split("spawn_process_group").len() == 2
 }
+
+proc scan_env(service_dir: Path, run_dir: Path, log_root: Path, events: Int) -> Record {
+  {
+    XINIT_SERVICE_DIR: service_dir.display(),
+    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_LOG_ROOT: log_root.display(),
+    XINIT_TEST_MAX_EVENTS: f"{events}",
+    XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_TEST_FAKE_PIDS: "1",
+  }
+}
+
+test test_scan_is_not_stalled_by_a_ready_hook_that_has_not_answered_yet [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "hook-readiness")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let counter = fp"{root}/asked"
+  service_dir.mkdir()
+  counter.write("0")
+
+  fp"{service_dir}/lazy.xsh".write(f"""##! A service whose readiness hook needs several scanner passes to answer.
+
+## The service declaration.
+export let service = {{
+  name: "lazy",
+  kind: "longrun",
+  command: process.command_argv("lazy", ["lazy"]),
+  ready_timeout_ms: 600000,
+  restart: {{mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000}},
+}}
+
+## Answers true on the third question.
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {{
+  let asked = Path({json.encode(counter.display())?}).read_text()?.parse_int()? + 1
+  Path({json.encode(counter.display())?}).write(f"{{asked}}")
+  asked >= 3
+}}
+""")
+
+  test.unix_fake(ctx, {event_kind: "poll"})
+  let started = time.monotonic()?
+  let first = xinit_text(ctx, ["scan", "lazy"], scan_env(service_dir, run_dir, log_root, 1))?
+  assert first == ""
+  let elapsed_ms = (time.monotonic()? - started) / 1000000
+  assert elapsed_ms < 20000, f"the scan waited {elapsed_ms} ms for a hook that answers on its third question"
+  let status = xinit_text(ctx, ["status", "lazy"], {XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1"})?
+  assert "lazy starting" in status and "ready=false" in status, status
+  assert counter.read_text()?.parse_int()? < 3
+
+  let later = xinit_text(ctx, ["scan", "lazy"], scan_env(service_dir, run_dir, log_root, 4))?
+  assert later == ""
+  let ready = xinit_text(ctx, ["status", "lazy"], {XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1"})?
+  assert "lazy running" in ready and "ready=true" in ready, ready
+}
+
+test test_a_ready_hook_that_never_answers_times_out_to_running_not_ready [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "hook-timeout")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  service_dir.mkdir()
+
+  fp"{service_dir}/never.xsh".write("""##! A service whose readiness hook never answers true.
+
+## The service declaration.
+export let service = {
+  name: "never",
+  kind: "longrun",
+  command: process.command_argv("never", ["never"]),
+  ready_timeout_ms: 0,
+  restart: {mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000},
+}
+
+## Always false.
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {
+  false
+}
+""")
+
+  test.unix_fake(ctx, {event_kind: "poll"})
+  let scan = xinit_text(ctx, ["scan", "never"], scan_env(service_dir, run_dir, log_root, 3))?
+  assert scan == ""
+  let status = xinit_text(ctx, ["status", "never"], {XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1"})?
+  assert "never running" in status and "ready=false" in status, status
+}
+
+test test_a_failing_status_hook_degrades_to_status_error_and_the_command_succeeds [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "status-error")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  service_dir.mkdir()
+
+  fp"{service_dir}/demo.xsh".write("""##! A service whose status hook cannot read its state.
+
+## The service declaration.
+export let service = {
+  name: "demo",
+  kind: "longrun",
+  command: process.command_argv("demo", ["demo"]),
+  restart: {mode: "never"},
+}
+
+## Fails the way a missing state file does.
+export proc status() [fs, process, env, error] -> Result[Str, Error] {
+  Err(error.failure("state file missing\\nsecond line"))
+}
+""")
+
+  test.unix_fake(ctx, {})
+  let status = xinit_text(
+    ctx,
+    ["status", "demo"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1"},
+  )?
+  assert status.ends_with(" status-error=state file missing second line\n"), status
+  assert status.lines().len() == 1
+}
+
+test test_a_logger_service_file_resolves_before_the_facility_name_and_gates_need [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "logger-gate")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  service_dir.mkdir()
+
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "need: [\"logger\"]")
+
+  let alone = xinit_text(ctx, ["start-plan", "app"], {XINIT_SERVICE_DIR: service_dir.display()})?
+  assert "\"name\":\"logger\"" not in alone and "\"name\":\"app\"" in alone, alone
+
+  write_named_service(
+    fp"{service_dir}/logger.xsh",
+    "logger",
+    "process.command_argv(\"logger\", [\"logger\"])",
+    ["boot"],
+    "",
+    extra: "  readiness: \"notify\",\n",
+  )
+  let planned = xinit_text(ctx, ["start-plan", "app"], {XINIT_SERVICE_DIR: service_dir.display()})?
+  let logger_at = planned.find("\"name\":\"logger\"") ?? -1
+  let app_at = planned.find("\"name\":\"app\"") ?? -1
+  assert logger_at >= 0 and app_at > logger_at, planned
+
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll", ready: 0})
+  let scan = xinit_text(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 3))?
+  assert scan == ""
+  let spawned = unix_log.read_text()?.split("\"op\":\"spawn_process_group").len() - 1
+  assert spawned == 1, f"{spawned} services started while the logger had not reported readiness"
+  assert "starting" in fp"{run_dir}/logger.json".read_text()? or "running" in fp"{run_dir}/logger.json".read_text()?
+  assert ! fp"{run_dir}/app.json".exists()? or "pending" in fp"{run_dir}/app.json".read_text()?
+}
+
+test test_rotation_by_copy_and_truncate_keeps_a_live_append_writer_intact [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "live-rotation")?
+  let log_root = fp"{root}/logs"
+  let source = xinit_policy_source()? + """
+let current = log_path("demo")?
+current.parent.mkdir()
+current.write("")
+let writer = unix.open_fd(current, write: true, flags: ["append"])?
+assert unix.write_fd(writer, b"before rotation\\n")? == 16
+rotate_log("demo", 2)
+assert unix.write_fd(writer, b"after rotation\\n")? == 15
+unix.close_fd(writer)
+assert current.read_text()? == "after rotation\\n"
+assert fp"{current}.1".read_text()? == "before rotation\\n"
+"""
+  let result = test.run_xsh(ctx, source, env: {XINIT_LOG_ROOT: log_root.display(), XINIT_RUN_DIR: fp"{root}/run".display()}, name: "live-rotation.xsh")?
+  assert result.success, result.stderr
+}
+
+test test_a_service_that_ignores_term_is_killed_after_the_stop_timeout [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "stubborn")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  service_dir.mkdir()
+  let marker = fp"{root}/running"
+
+  fp"{service_dir}/stubborn.xsh".write(f"""##! A service that ignores TERM.
+
+## The service declaration.
+export let service = {{
+  name: "stubborn",
+  kind: "longrun",
+  command: process.command_argv("sh", ["sh", "-c", "trap '' TERM; printf up > '{marker.display()}'; while :; do sleep 0.1; done"]),
+  stop_timeout_ms: 300,
+  restart: {{mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000}},
+}}
+""")
+
+  let control = {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}
+  let started = xinit_text(ctx, ["start", "stubborn"], control)?
+  let pid = rx"pid=([0-9]+)".captures(started)[1].parse_int()?
+  var tries = 0
+  while ! marker.exists()? and tries < 200 {
+    time.sleep(25ms)?
+    tries += 1
+  }
+  assert marker.exists()?
+  let before = time.monotonic()?
+  let stopped = xinit_text(ctx, ["stop", "stubborn"], control)?
+  let elapsed_ms = (time.monotonic()? - before) / 1000000
+  assert "stubborn down" in stopped, stopped
+  assert elapsed_ms >= 250 and elapsed_ms < 5000, f"stop took {elapsed_ms} ms"
+  var alive = true
+  var waits = 0
+  while alive and waits < 100 {
+    alive = process.kill(pid, signal: "0") is Ok(_)
+    waits += 1
+    time.sleep(20ms)?
+  }
+  assert ! alive, "the TERM-ignoring service survived the stop"
+}
+
+test test_a_crashing_service_is_respawned_with_real_processes [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "real-crash")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  service_dir.mkdir()
+
+  fp"{service_dir}/crasher.xsh".write("""##! A service that exits at once, so the scanner has to respawn it.
+
+## The service declaration.
+export let service = {
+  name: "crasher",
+  kind: "longrun",
+  command: process.command_argv("sh", ["sh", "-c", "echo started; exit 7"]),
+  restart: {mode: "always", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 100000},
+}
+""")
+
+  let scan = xinit_text(ctx, ["scan", "crasher"], {
+    XINIT_SERVICE_DIR: service_dir.display(),
+    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_LOG_ROOT: log_root.display(),
+    XINIT_TEST_MAX_EVENTS: "4",
+    XINIT_TEST_ALLOW_NON_PID1: "1",
+  })?
+  assert scan == ""
+  let saved = fp"{run_dir}/crasher.json".read_text()?
+  let restarts = rx"\x22restarts\x22:([0-9]+)".captures(saved)[1].parse_int()?
+  assert restarts >= 1, saved
+  assert fp"{log_root}/crasher/current".read_text()?.lines().len() >= 2
+}
