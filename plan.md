@@ -6,9 +6,9 @@
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
   P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6 (f082eb8),
-  H1 (ec12bb3, e8894dc), H2 (36e2437), O1 (3271eb3). Red: none.
+  H1 (ec12bb3, e8894dc), H2 (36e2437), O1 (3271eb3), C1 (84e3a75). Red: none.
   Parked: daemon-driven kernel device-node creation (see Needs environment).
-  C1 done, pending acceptance: workflows, release profile, CI pin gate.
+  Campaign complete: all slices green for human review and push.
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
   `tools/build-oracle.sh`. Docker now supplies real-device adapter proof and
   kernel-event daemon publication proof on isolated resources.
@@ -39,7 +39,9 @@
   Test boundaries: [local verification](docs/testing.md).
   Perf: [method and busy-host numbers](docs/perf.md).
   Divergences: [register](docs/divergence.md).
-- Next: accept `C1`, then close the campaign.
+- Next: none. Steering checkpoint: accepted `H1` restart/device/kernel,
+  `H2` register/xinit/CONTRIBUTING-removal, `O1` benches/gate/perf-doc,
+  `C1` workflows/release/CI-gate; tree green.
 - H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
   coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
   absolute/`..` refusal and EEXIST identity adoption in RealOps,
