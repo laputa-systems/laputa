@@ -276,6 +276,10 @@ export proc build(dest: Path) [fs, error] {
     fp"{dest}/{tree}".mkdir()
   }
 
+  for scratch in ["tmp", "var/tmp"] {
+    fp"{dest}/{scratch}".chmod(0o1777)
+  }
+
   for keep in fs.walk(dest, hidden: true) |> where .kind == "file" and .name == ".keep" {
     keep.path.remove(missing_ok: false)
   }

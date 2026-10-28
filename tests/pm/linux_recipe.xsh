@@ -204,6 +204,10 @@ test test_baselayout_build_materializes_empty_boot_mount_directories [fs, net, p
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     assert fp"{dest}/{required}".is_dir()?
   }
+
+  for scratch in ["tmp", "var/tmp"] {
+    assert fp"{dest}/{scratch}".metadata()?.mode % 8192 == 0o1777
+  }
 }
 
 test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, process, env, time, error] { |ctx|
