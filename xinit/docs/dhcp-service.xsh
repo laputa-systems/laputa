@@ -15,7 +15,7 @@ const interface = "eth0"
 export let service = {
   name: f"dhcp-{interface}",
   kind: "longrun",
-  command: process.command_argv("dhcpc", ["dhcpc", "--state", "/run/dhcpc", interface]),
+  command: process.command_argv("dhcpc", ["dhcpc", "--run-dir", "/run/dhcpc", interface]),
   targets: [
     "boot",
   ],
@@ -38,9 +38,17 @@ export proc status() [fs, process, env, error] -> Result[Str, Error] {
 
   return Ok("lease=unknown") unless published.exists()
 
-  if let Ok(text) = published.read_text() {
-    Ok(text.trim())
-  } else {
-    Ok("lease=unknown")
+  let summary = try {
+    let report = json.decode(published.read_text()?)?.require(Record)?
+    let state = report.get("state")?.require(Str)?
+    let address = report.get("address")?
+    let prefix = report.get("prefix")?
+    if address != null and prefix != null {
+      f"lease={state} address={address.require(Str)?}/{prefix.require(Int)?}"
+    } else {
+      f"lease={state}"
+    }
   }
+
+  Ok(summary ?? "lease=unknown")
 }
