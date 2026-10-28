@@ -87,6 +87,44 @@ fn sysdir() -> PathBuf {
     d
 }
 
+/// Coldplug with an alternate sysfs root must never open the host's real
+/// /sys: strace the child and reject any open of a /sys path. The alt
+/// tree is still triggered, proving the scan went to the selected root.
+#[test]
+fn bins_coldplug_never_touches_host_sys() {
+    let ours = bin("mdevd-coldplug");
+    let tree = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/cptree-nosys");
+    let _ = std::fs::remove_dir_all(&tree);
+    for dev in ["bar", "baz"] {
+        let d = tree.join("subsystem/foo/devices").join(dev);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("uevent"), format!("PLACEHOLDER-{dev}\n")).unwrap();
+    }
+    let trace = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/cptree-nosys.trace");
+    let _ = std::fs::remove_file(&trace);
+    let mut cmd = Command::new("strace");
+    cmd.args(["-f", "-e", "trace=openat,open,openat2", "-o"])
+        .arg(&trace)
+        .arg(&ours)
+        .arg("-s")
+        .arg(&tree);
+    let done = run_timeout(cmd, 30);
+    assert_eq!(done.code, Some(0), "coldplug under strace exit");
+    for dev in ["bar", "baz"] {
+        let content = std::fs::read(tree.join("subsystem/foo/devices").join(dev).join("uevent")).unwrap();
+        assert!(content.starts_with(b"add\n"), "{dev}: alt uevent not triggered");
+    }
+    let log = std::fs::read_to_string(&trace).unwrap();
+    for line in log.lines() {
+        for pat in ["/sys/", "/sys\""] {
+            assert!(
+                !line.contains(pat),
+                "host /sys touched: {line}"
+            );
+        }
+    }
+}
+
 /// CLI matrix: identical exit codes and byte-identical stderr.
 #[test]
 fn bins_cli_diff() {
