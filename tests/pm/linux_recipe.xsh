@@ -134,6 +134,8 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
   let _ = fs.copy_tree(p"packages/laputa-pm", package_dir, parents: true, overwrite: true)?
   p"pm.xsh".copy(to: fp"{root}/pm.xsh", overwrite: true)
   let _ = fs.copy_tree(p"pm", fp"{root}/pm", parents: true, overwrite: true)?
+  p"trust.xsh".copy(to: fp"{root}/trust.xsh", overwrite: true)
+  let _ = fs.copy_tree(p"trust", fp"{root}/trust", parents: true, overwrite: true)?
   source.mkdir()
   let pkg = recipe.load_package(package_dir)?
   let first = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
@@ -146,6 +148,8 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
 
   assert fp"{source}/pm.xsh".exists()?
   assert fp"{source}/pm/execute.xsh".exists()?
+  assert fp"{source}/trust.xsh".exists()?
+  assert fp"{source}/trust/store.xsh".exists()?
   fp"{root}/pm/execute.xsh".write("changed PM executor input\n")
   let second = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
   assert second == first == false
@@ -295,7 +299,7 @@ proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name: "repository-with-seed")?
 
-  for name in ["packages", "pm", "pm.xsh", "xinit"] {
+  for name in ["packages", "pm", "pm.xsh", "trust", "trust.xsh", "xinit"] {
     fp"{root}/{name}".symlink(to: fp"{checkout}/{name}")
   }
 
