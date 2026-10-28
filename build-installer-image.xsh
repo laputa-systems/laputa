@@ -56,31 +56,44 @@ pure serial_console(arch: Str) -> Str {
 proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, error] {
   let installer_root = fp"{root}/installer"
 
-  fs.install(
-    fp"{installer_root}/setup-laputa.xsh",
-    fp"{rootfs}/usr/bin/setup-laputa",
-    0o755,
-    parents: true,
-    overwrite: true,
-  )
-
-  fs.install(
-    fp"{installer_root}/disk_selection.xsh",
-    fp"{rootfs}/usr/bin/disk_selection.xsh",
-    0o644,
-    parents: true,
-    overwrite: true,
-  )
-
-  for name in ["key.xsh", "policy.xsh", "release.xsh", "store.xsh", "update.xsh"] {
+  for name in ["setup-laputa.xsh", "disk_selection.xsh"] {
     fs.install(
-      fp"{root}/trust/{name}",
-      fp"{rootfs}/usr/bin/trust/{name}",
+      fp"{installer_root}/{name}",
+      fp"{rootfs}/usr/lib/laputa-installer/{name}",
       0o644,
       parents: true,
       overwrite: true,
     )
   }
+
+  fp"{rootfs}/usr/bin/setup-laputa".write(
+    """#!/bin/xsh
+error WrapperError = Failed(message: Str)
+
+proc main(...argv: List[Str]) [process, env, error] {
+  let forwarded = ["/bin/xsh", "/usr/lib/laputa-installer/setup-laputa.xsh", "--"].extend(argv)
+  let status = process.run(
+    process.command_argv(
+      /bin/xsh,
+      forwarded,
+      /,
+      {XSH_MODULE_PATH: "/usr/lib/pm"},
+    ),
+  )?
+
+  if ! status.ok {
+    if status.exited() {
+      exit status.exit_code()?
+    }
+
+    return Err(WrapperError.Failed("setup-laputa was signaled"))
+  }
+}
+
+main(@args)?
+""",
+    mode: 0o755,
+  )
 
   fs.install(
     fp"{installer_root}/laputa-network.boot",

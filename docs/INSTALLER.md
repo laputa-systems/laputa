@@ -65,7 +65,10 @@ manual harness is aarch64-only and receives `MIRROR_URL` as
   boot hooks. Disk discovery, swap metadata, and IPv4 setup are native XSH;
   there are no installer C helpers. `/etc/laputa-installer/ci` enables the CI
   hook. `build-installer-image.xsh` installs these files into the installer and
-  target roots and adds a serial `xshi` respawn entry to `/etc/inittab`.
+  target roots and adds a serial `xshi` respawn entry to `/etc/inittab`. The
+  installer programs live in `/usr/lib/laputa-installer` behind a
+  `/usr/bin/setup-laputa` wrapper, which resolves `trust.*` from laputa-pm's
+  `/usr/lib/pm` because `/usr/bin/trust` is the trust command.
 - `laputa-pm` installs PM into `/usr/lib/pm` with a `/usr/bin/pm` wrapper. PM has
   no default remote; `XSH_PM_REPO` names one.
 - `laputa-fs` provides `mkfs.vfat`, `mkfs.ext4`, and `fsck.ext4`

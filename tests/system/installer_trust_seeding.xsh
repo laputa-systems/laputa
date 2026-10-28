@@ -42,10 +42,9 @@ test installer_wires_trust_seeding_after_target_config [fs, error] {
   assert "seed_target_trust_store(/mnt/target)" in after_config
 }
 
-test installer_image_ships_trust_modules [fs, error] {
+test installer_resolves_trust_modules_from_the_laputa_pm_library [fs, error] {
   let builder = p"build-installer-image.xsh".read_text()?
-  assert "/usr/bin/trust/{name}" in builder
-  for name in ["key.xsh", "policy.xsh", "release.xsh", "store.xsh", "update.xsh"] {
-    assert f"\"{name}\"" in builder
-  }
+  assert "/usr/bin/trust/" not in builder
+  assert "{XSH_MODULE_PATH: \"/usr/lib/pm\"}" in builder
+  assert "/usr/lib/laputa-installer/setup-laputa.xsh" in builder
 }
