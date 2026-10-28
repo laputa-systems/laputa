@@ -34,6 +34,7 @@ proc main() [fs, process, env, error] {
       /usr/bin/tinyland,
       ["tinyland", "--seat", "--", "/usr/bin/foot", "--", "/bin/xsh", "/usr/lib/laputa/tinyland-foot-read.xsh"],
     )?
+    p"/run/user/1000/laputa-tinyland.pid".write(f"{session.pid}")
     let _ = wait session
   }
 }

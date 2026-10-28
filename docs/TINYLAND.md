@@ -34,9 +34,9 @@ dwl, wlroots, libinput, libdrm, mesa, wayland-server, or xwayland
 (vs 34 for dwl).
 
 Gate status: 1 done; 2 done against the exact Laputa chain (foot 1.28.0,
-C seatd 0.9.3, Laputa image); 3 partially done (app exit plus broker-loss
-hard failure; crash/device-loss/VT paths open); 4 measured for the current
-closure.
+Rust seatd, Rust mdevd, Laputa image); 3 partially done (app exit plus
+compositor crash; broker loss root-caused against the pinned compositor,
+device-loss/VT paths open); 4 measured for the current closure.
 
 ## Locked decisions
 
@@ -67,9 +67,9 @@ closure.
 
 ## Remaining roadmap
 
-R1 and R2 substitute the Rust daemons behind the same guest proof. Do them
-one at a time and re-run the full profile test after each; never change the
-compositor and both brokers in one debugging run.
+R1 and R2 have landed behind the same guest proof, one at a time with a
+full profile test after each; the compositor never changed in those runs.
+R3 follows the same rule: extend the proof only while it stays green.
 
 ### R1 — seatd-rs substitution — landed
 
@@ -115,17 +115,38 @@ closure carrying `mdevd-rs` and no C `mdevd`.
 
 ### R3 — lifecycle depth
 
-Qualify, with bounded observable outcomes: compositor crash (kill tinyland
-mid-session), broker loss (kill seatd: must fail closed, no direct-open
-fallback), and supported device loss. VT disable/resume belongs to R4,
-not here.
+Compositor crash is guest-proven: the proof SIGKILLs tinyland mid-session,
+observes the session exit, and restarts only the session behind the same
+readiness/input markers. Evidence: `LAPUTA_TINYLAND_CRASH` exit plus the
+standard READY/OK/magenta gate in one green run, with uptime ticks showing
+recovery inside the boot.
+
+Broker loss is root-caused but blocked on an upstream fix. Killing seatd
+does not end the session: `libseat_dispatch(seat, 0)` reports a dead
+daemon as an empty successful read (EOF with no buffered data returns 0,
+and the `POLLHUP` path only runs for nonzero timeouts), so the dispatch
+loop never notices and the session runs on with no broker — fail-silent,
+not fail-closed. The Laputa guest cannot qualify around this; the fix
+belongs in tinyland's `Session::dispatch` (poll the session fd for hangup
+before dispatching). Local fix commit `e40d653` in laputa-systems/tinyland
+(HUP check plus a socketpair unit test, suite and clippy clean) is ready
+but unpushed. Owner steps: push it, re-pin `packages/tinyland` off the new
+SHA, rebuild, and re-add the broker-kill phase (removed from the guest
+proof for now) to re-qualify.
+
+Open: supported device loss (no hot-unplug path in the harness). VT
+disable/resume belongs to R4, not here.
 
 ### R4 — VT-bound profile
 
 A VT-bound variant of the profile with real VT switching: VT-bound seatd
 session, switch handling, disable/resume with reestablished input and no
 stuck modifiers or reused revoked descriptors. Tinyland implements the
-resume path but it has never been guest-proven.
+resume path but it has never been guest-proven. Blocked on the harness:
+the proof machine is serial-only virtio-GPU with no tty0, so a VT-bound
+variant needs a different QEMU machine (display/keyboard/VTs) plus a new
+proof path for switch handling — substantially more than a profile flag.
+Next after R3, not tonight.
 
 ### R5 — device node ownership follow-up — landed
 
@@ -149,13 +170,16 @@ pins the R1 watch point.
 The profile proves fixed-device coldplug plus deterministic discovery. If a
 lifecycle ever requires live hotplug, add a processed-event consumer over
 the libudev-zero rebroadcast. Do not add libinput or libudev-zero to
-tinyland for the static contract.
+tinyland for the static contract. Not needed by R1–R5: no qualified path
+adds or removes devices at runtime, so no action.
 
 ### R7 — publication
 
-Releases and Laputa integration remain the owner's call. When published
-tarballs exist, migrate the recipe sources off the pinned git SHAs and
-re-qualify the exact new inputs.
+Releases and Laputa integration remain the owner's call. Neither
+seatd-rs nor mdevd-rs has release tags (their staged contracts pin
+`e32d931` and `4334f17` with measured hashes), so there are no published
+tarballs to migrate the recipe sources to yet. When tags exist, migrate
+off the pinned git SHAs and re-qualify the exact new inputs.
 
 ### R8 — dwl default swap and removal (owner decision)
 
