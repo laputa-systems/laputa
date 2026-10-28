@@ -11,7 +11,7 @@ inputs, provenance, and the Laputa-side obligations.
 |---|---|---|---|
 | `doas` | doas-rs `d43bbbb` | `d218736b535a69bf9f4ac374c94d88626a9c633b777554f819e1c902eb6b1edc` (measured at `d8a6400`; delta to here is docs/tests/CI-pin only) | not built here (see constraint C1) |
 | `seatd` | seatd-rs `e32d931` | `339e726d9e4607fc00c8acf974a706bb2d19e2938a98b57b4de13a844c88cfae` (measured at `62da737`; delta to here is docs/harness/CI only, no `src/`) | `810e72a4670450355898428bd0965503224ebfab6ba31c7dad1ecf10d4826c00` (same basis) |
-| `mdevd`, `mdevd-coldplug` | mdevd-rs `8218041` | `f424788a456cfd83f44742f61968fc91819bec4625b60fdd8e7877536beef57e`, `f678eda65de90e17e6449af0267e3fa33a1f54b6a1eecdd65d654b4d2911b76f` (built at `deda1fb`; delta to here is docs/CI/tests only) | `03aa518233d2650f20b9501f94c67ff26ccdb91cbd88baa07bee849d8fbbd637`, `b0da5b7191d1da8d9b62266fba72fef630408fa723c3abd427c102f04ad2dd65` (same basis; user-mode `-N` smoke green) |
+| `mdevd`, `mdevd-coldplug` | mdevd-rs `HEAD` | `f424788a456cfd83f44742f61968fc91819bec4625b60fdd8e7877536beef57e`, `f678eda65de90e17e6449af0267e3fa33a1f54b6a1eecdd65d654b4d2911b76f` (built at `deda1fb`; delta to HEAD is docs/CI/tests only) | `03aa518233d2650f20b9501f94c67ff26ccdb91cbd88baa07bee849d8fbbd637`, `b0da5b7191d1da8d9b62266fba72fef630408fa723c3abd427c102f04ad2dd65` (same basis; user-mode `-N` smoke green) |
 
 Full hashes: see the combined-run evidence log (`tools/check-combined.sh`
 prints all four x86_64 hashes) and seatd `doc/validation.md` (both seatd
@@ -122,4 +122,8 @@ fails publication.
 - C3: hidraw revoke unqualified (restricted scope, documented).
 - C4: seatd R4 single-test failure remains unclassified (documented,
   not resolved by the fixed R7 crash).
-- C5: hosted CI has not run on these commits; local suites are green.
+- C5: hosted CI is green on all three staged heads (doas `d43bbbb`,
+  seatd `e32d931`, mdevd here): full test suites, Clippy, both musl
+  release builds, and the aarch64 user-mode smoke. Privileged,
+  KVM-guest, and idle-gate proofs remain local-only evidence (see
+  above); CI does not cover them.
