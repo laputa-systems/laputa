@@ -1,0 +1,118 @@
+# Prebuilt artifact contract (staged, not published)
+
+The owner arranges publication and Laputa integration after review.
+No release tags have been created or moved. This file stages the exact
+contract so publication is mechanical: payloads, targets, pinned
+inputs, provenance, and the Laputa-side obligations.
+
+## Payloads and targets
+
+| Payload | Source repo @ staged SHA | x86_64-musl SHA-256 | aarch64-musl SHA-256 |
+|---|---|---|---|
+| `doas` | doas-rs `d8a6400` | `d218736b535a69bf9f4ac374c94d88626a9c633b777554f819e1c902eb6b1edc` | not built here (see constraint C1) |
+| `seatd` | seatd-rs `62264be` | `339e726d9e4607fc00c8acf974a706bb2d19e2938a98b57b4de13a844c88cfae` | `810e72a4670450355898428bd0965503224ebfab6ba31c7dad1ecf10d4826c00` |
+| `mdevd`, `mdevd-coldplug` | mdevd-rs `11e0a28` | `4dcf7b1b19186b040e75d75bc3bc07bfe871348ad57ea24d4cf0de0eed4ba916`, `5e24de53d42d7f13d1df1af936ca8445d7e4a867a4bdd4320d05e39e7d3ec1a6` | `01e7b28d4fc84a9d310168e1fbfc0e274031aed6af84a1f37cba2d7c4f70a6e1`, `faaec554425efc12bd1005165db7fa2befc5cec49f5e99e421275355c3640348` (user-mode `-N` smoke green) |
+
+Full hashes: see the combined-run evidence log (`tools/check-combined.sh`
+prints all four x86_64 hashes) and seatd `doc/validation.md` (both seatd
+targets with sizes). All binaries are static (`DT_NEEDED` count 0, no
+`INTERP`): x86_64 static-pie, aarch64 static.
+
+## Pinned build inputs
+
+- Toolchain `nightly-2026-09-15` plus `rust-src`/`clippy`
+  (`rust-toolchain.toml` in each repo), `Cargo.lock` enforced.
+- x86_64 link: container `~/.cargo` kache wrapper + mold; aarch64 link:
+  `RUSTFLAGS="-Clinker=mold -Clinker-flavor=ld"` (mold links both
+  targets; the container's x86_64 gcc cannot link aarch64 objects).
+- No `target-cpu=native`: default generic CPU for both targets.
+  CPU baseline is whatever rustc's generic `x86-64` / `aarch64`
+  implies on this toolchain; nothing opts into `-march=native`.
+- Rust deps: doas `libc`+`rustix`; seatd `libc`+`rustix` (+transitives
+  `bitflags`, `linux-raw-sys`, `errno` via rustix); mdevd `libc` only.
+  Native linked code beyond Rust: doas links the build container's
+  static `libcrypt.a` (Alpine `musl-dev`; see doas `docs/upstream.md`
+  "Password hash provider"). seatd/mdevd link no native crypto or
+  provider libraries.
+- libudev-zero consumer reference: laputa-systems fork
+  `8f1d3d0624496f1c4967f18d6afaddbd552d8bce`, used unmodified
+  (`tools/check-udev-consumer.sh` prefers `~/d/libudev-zero`).
+
+## Reproducibility
+
+Release profiles strip (`mdevd`) or ship unstripped (`doas`, `seatd`;
+`strip` is a publication-packaging choice, not a code property).
+Rebuilding the x86_64 release binaries above with the same recipe
+reproduces the same hashes (verified by rebuild). Recipe notes:
+mdevd/seatd x86_64 and all aarch64 builds use `RUSTFLAGS="-Clinker=mold
+-Clinker-flavor=ld"`, identical to the CI recipe, so those hashes have
+no local-config deviation. doas x86_64 was built under the container's
+`~/.cargo/config.toml` (kache wrapper, cc driver with
+`-B/usr/local/libexec/mold`) because bare mold cannot resolve its
+`-lcrypt`; doas aarch64 is not attempted here (C1). Canonical release
+hashes must still come from CI; any mismatch against the values here
+fails publication.
+
+## Kernel / runtime prerequisites
+
+- Linux x86_64 or aarch64; netlink (mdevd), Unix sockets + `SCM_RIGHTS`
+  (seatd), setuid + shadow + `/dev/tty` + `legacy_tiocsti` sysctl
+  (doas). No D-Bus, systemd, logind, elogind, polkit.
+- Minimums actually exercised: Alpine virt `6.6.142-0-virt` in KVM
+  guests (mdevd node creation, seatd N1/N2, doas priv guest, combined
+  run). Native aarch64 hardware, physical DRM/input/VT, and hidraw
+  revoke are unqualified (named constraints, not passes).
+
+## Licenses and attribution
+
+- mdevd: ISC; retains Laurent Bercot attribution (`AUTHORS`,
+  `COPYING`, `DCO`); libudev-zero consumer test uses the pinned fork
+  unmodified.
+- seatd: MIT; retains Kenny Levinsen attribution; oracle sources are
+  test-only inputs, not runtime deps.
+- doas: MIT; oracle/packaging pins in `docs/upstream.md`.
+
+## Which binary each qualification exercised
+
+- mdevd: x86_64 release binaries in `check-qemu.sh` (real kernel add,
+  both daemons) and `check-combined.sh` (hashes logged); aarch64
+  release under `qemu-aarch64` user mode (`-N` smoke in CI).
+- seatd: x86_64 release in guest transition/shutdown modes plus the C
+  client differential natively; aarch64 release under `qemu-aarch64`
+  user mode plus the differential via wrapper (see `doc/validation.md`).
+- doas: x86_64 release installed setuid inside the disposable guest
+  (`harness/vm-priv.sh`, all three markers); aarch64 pending (C1).
+- libseat provenance: repo-local oracle only; a Rust `seatd` daemon
+  does not provide `libseat.so`. doas does not replace `su`/`sudoedit`.
+
+## Laputa contract (for the owner)
+
+- Installed paths/ownership: `doas` → setuid `4755 root:root`
+  (installer operation, never in the archive); `seatd` socket
+  `/run/seatd.sock` `0770` via `-u`/`-g` or default restrictive mode;
+  runtime dirs `/run/doas` `0700`, config `/etc/doas.conf` `640` +
+  optional `/etc/doas.d/` `750` (never overwritten or deleted by
+  install/rollback).
+- Foreground invocation and readiness: `seatd -n <fd>` (s6-style `\n`);
+  `mdevd -D <fd>` readiness before coldplug completion; `doas -C`
+  for policy checks.
+- Compatibility: libseat seatd-protocol clients; libudev-zero "udev"
+  group consumers of mdevd's `-O 4` rebroadcast.
+- Upgrade/restart/recovery/rollback: stop clients → replace daemon →
+  reconnect/reopen (seatd `doc/recovery.md`); mdevd keeps last valid
+  config on bad reload; doas rollback removes only the setuid binary
+  and `/run/doas`, keeps admin policy and a recovery shell.
+- Still supplied by the old packages, NOT these replacements:
+  `su`, `sudoedit`, `libseat.so`, firmware loading, hook spawning.
+
+## Constraints (blockers, not passes)
+
+- C1: doas aarch64-musl cannot link in this container (no aarch64
+  `libcrypt.a`; native-aarch64 Docker build per doas README is the
+  supported path). No aarch64 doas execution evidence exists.
+- C2: aarch64 full-system/device proof absent everywhere (user-mode
+  only). Native/VT/DRM/evdev on aarch64 hardware unqualified.
+- C3: hidraw revoke unqualified (restricted scope, documented).
+- C4: seatd R4 single-test failure remains unclassified (documented,
+  not resolved by the fixed R7 crash).
+- C5: hosted CI has not run on these commits; local suites are green.
