@@ -6,9 +6,16 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: 11bd71901bbe5b1630ceea73d27597364c9af683 # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: provision toolchain and targets
+        run: |
+          rustup show active-toolchain
+          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y musl-tools gcc-aarch64-linux-gnu qemu-user
+          cargo fetch --locked --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
       - name: pins and deps
         run: |
           tools/check-pins.sh

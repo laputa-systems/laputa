@@ -16,6 +16,14 @@ echo "check-ci-pins: toolchain pin"
 grep -q 'channel = "nightly-2026-09-15"' rust-toolchain.toml
 
 echo "check-ci-pins: workflow pins are full SHAs"
+if rg -n 'uses:\s*[0-9a-f]{40}\s*(#|$)' .github/workflows; then
+  echo "check-ci-pins: bare SHA without owner/repo@ found" >&2
+  exit 1
+fi
+if rg -n 'uses:' .github/workflows | grep -v -E 'uses:\s*[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}'; then
+  echo "check-ci-pins: workflow pin must be owner/repo@full-SHA" >&2
+  exit 1
+fi
 bad=$(rg -n 'uses:[^#]*@[A-Za-z0-9._/-]+' .github/workflows || true)
 echo "$bad"
 echo "$bad" | while IFS= read -r line; do
