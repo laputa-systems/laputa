@@ -214,11 +214,11 @@ proc assert_ssh_smoke(
     return Err(InstallerQemuTestError.Failed(kind: "ssh-dropbear", message: "dropbear status assertion failed"))
   }
 
-  let result = ssh_guest(ssh, ssh_key, port, known_hosts, "run /bin/xshi --help ?")?
+  let result = ssh_guest(ssh, ssh_key, port, known_hosts, "run /bin/xsh --help ?")?
 
-  if ! ("xshi 0.0.1" in result) {
+  if ! ("xsh 0.0.1" in result) {
     print $result
-    return Err(InstallerQemuTestError.Failed(kind: "ssh-xshi", message: "xshi help assertion failed"))
+    return Err(InstallerQemuTestError.Failed(kind: "ssh-xsh", message: "xsh help assertion failed"))
   }
 }
 

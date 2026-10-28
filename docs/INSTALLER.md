@@ -43,11 +43,13 @@ manual harness is aarch64-only and receives `MIRROR_URL` as
 - `make installer-image` builds the CI ISO at
   `target/laputa-installer-ARCH/laputa-installer-ARCH.iso` and extracts the
   matching kernel for direct boot.
-- `make installer-qemu-test` boots the ISO with a blank 128M virtio disk,
-  waits for `LAPUTA_INSTALLER_CI_OK`, then boots the installed disk with a
-  QEMU-only Dropbear and key overlay. The host SSHes as `pazu` through
-  user-mode port forwarding, checks `xinit status dropbear`, and runs an `xshi`
-  command. x86_64 runs under KVM. Logs:
+- `make installer-qemu-test` boots the ISO with a blank virtio disk sized from
+  the target root, waits for `LAPUTA_INSTALLER_CI_OK`, then boots the installed
+  disk with a QEMU-only Dropbear and key overlay. The host SSHes as `pazu`
+  through user-mode port forwarding, checks `xinit status dropbear`, and runs
+  `xsh --help`. Installed accounts log in through `/usr/bin/xsh-login`, which
+  runs `-c SOURCE` with `xsh`; the default seed's `xshi` is the documented
+  stub, so there is no interactive login shell. x86_64 runs under KVM. Logs:
   `target/laputa-installer-ARCH-qemu/qemu-installer.log` and `qemu-target.log`.
   If `target/laputa-installer/local-linux-aarch64.Image` (or
   `local-linux-x86_64.bzImage`) exists, it is used as

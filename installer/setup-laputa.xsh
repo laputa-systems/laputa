@@ -340,8 +340,8 @@ tmpfs /dev/shm tmpfs mode=1777,nosuid,nodev 0 0
 
   write_file(
     fp"{root}/etc/passwd",
-    """root:x:0:0:root:/root:/bin/xshi
-pazu:x:1000:1000:Pazu:/home/pazu:/bin/xshi
+    """root:x:0:0:root:/root:/usr/bin/xsh-login
+pazu:x:1000:1000:Pazu:/home/pazu:/usr/bin/xsh-login
 nobody:x:99:99:Unprivileged User:/dev/null:/bin/false
 """,
   )

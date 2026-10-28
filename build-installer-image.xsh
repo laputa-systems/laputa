@@ -65,6 +65,11 @@ proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, erro
     )
   }
 
+  fs.install(fp"{installer_root}/xsh-login.xsh", fp"{rootfs}/usr/bin/xsh-login", 0o755, parents: true, overwrite: true)
+  let shells = fp"{rootfs}/etc/shells"
+  let listed = shells.read_text()?
+  shells.write(listed + "/usr/bin/xsh-login\n") unless "/usr/bin/xsh-login" in listed.lines()
+
   fp"{rootfs}/usr/bin/setup-laputa".write(
     """#!/bin/xsh
 error WrapperError = Failed(message: Str)
