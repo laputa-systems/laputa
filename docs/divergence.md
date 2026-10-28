@@ -41,6 +41,13 @@ a syntax error on initial load still exits `2`. `read` errors other than
 Proof: `cargo test --locked -q --test bins --test parity`
 (`bins_hup_retain_diverges`, `parity_reload_matrix` FIFO handshake).
 
+Constraint: the config reader accepts FIFOs so the parity handshake
+can synchronize a reload mid-test, which means pointing the configured
+path at a FIFO with no writer blocks the reloader (at startup or on
+`SIGHUP`) until one arrives. Only an administrator can install the
+config path or signal the daemon, so this is an admin footgun, not a
+remote vector — but do not configure a FIFO in production.
+
 ## Bounded coldplug sync
 
 Reference `mdevd-coldplug -O` waits forever for the last triggered event.
@@ -49,7 +56,15 @@ Rust waits at most 60 seconds by default, overridden by
 `MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`, and exits `1` loudly on timeout
 instead of hanging boot.
 
-Proof: `bins_coldplug_sync_timeout`, `parity_coldplug_tree`.
+The daemon spawns the helper fire-and-forget, as the reference does
+with `cspawn`: spawn failures are warned loudly with the helper path,
+but the helper's exit status is never tracked, so a helper that exits
+nonzero is invisible beyond its own stderr. No orphaned or duplicate
+work results: `SIGCHLD` stays ignored (no zombies) and `-C` arms the
+spawn exactly once per daemon start.
+
+Proof: `bins_coldplug_sync_timeout`, `parity_coldplug_tree`,
+`bins_coldplug_missing_helper_still_ready`.
 
 ## Oversize config is an error
 
