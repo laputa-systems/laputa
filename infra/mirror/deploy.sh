@@ -97,13 +97,13 @@ resolve_account() {
     local_accounts=$1
     cf accounts list >"$local_accounts" || fail 'Cloudflare authentication failed; run cf auth login or configure CLOUDFLARE_API_TOKEN'
     if [ -z "${CF_ACCOUNT_ID-}" ]; then
-        count=$(jq 'length' "$local_accounts") || fail 'cf accounts list did not return JSON'
+        count=$(jaq 'length' "$local_accounts") || fail 'cf accounts list did not return JSON'
         [ "$count" -eq 1 ] || fail 'set CF_ACCOUNT_ID because cf authentication can access multiple accounts'
-        CF_ACCOUNT_ID=$(jq -er '.[0].id' "$local_accounts") || fail 'cf accounts list has no account ID'
+        CF_ACCOUNT_ID=$(jaq -er '.[0].id' "$local_accounts") || fail 'cf accounts list has no account ID'
     fi
     case "$CF_ACCOUNT_ID" in *[!0-9a-f]*) fail 'cf accounts list returned an invalid account ID' ;; esac
     [ "${#CF_ACCOUNT_ID}" -eq 32 ] || fail 'Cloudflare account IDs must contain 32 hexadecimal characters'
-    jq -e --arg account "$CF_ACCOUNT_ID" '[.[] | select(.id == $account)] | length == 1' "$local_accounts" >/dev/null ||
+    jaq -e --arg account "$CF_ACCOUNT_ID" '[.[] | select(.id == $account)] | length == 1' "$local_accounts" >/dev/null ||
         fail 'CF_ACCOUNT_ID is not available to the authenticated cf profile'
     export CF_ACCOUNT_ID CLOUDFLARE_ACCOUNT_ID
     CLOUDFLARE_ACCOUNT_ID=$CF_ACCOUNT_ID
@@ -128,7 +128,7 @@ secret_source_is_usable() {
 check_local() {
     need_command ssh
     need_command tar
-    need_command jq
+    need_command jaq
     need_command curl
     need_command cf
     need_command docker

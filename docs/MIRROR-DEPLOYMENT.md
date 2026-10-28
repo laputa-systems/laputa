@@ -58,7 +58,7 @@ these (`check_remote` in `infra/mirror/deploy.sh`). The deployment does not
 install host packages or configure SSH.
 
 The build machine needs Docker with Buildx, Deno, Node.js, Make, OpenSSH,
-`curl`, `jq`, and the Cloudflare `cf` CLI. Preflight checks them before
+`curl`, `jaq`, and the Cloudflare `cf` CLI. Preflight checks them before
 building.
 
 Authenticate the Cloudflare CLI with `cf auth login`, or provide a scoped
