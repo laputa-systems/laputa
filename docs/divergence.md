@@ -146,3 +146,18 @@ is missing.
 
 Proof: `bins_coldplug_cli`, `bins_coldplug_sync_match`, coldplug sync
 timeout matrix.
+
+## `-N` keeps the reference runtime init (deliberate parity)
+
+`mdevd -N` validates the configuration file and exits, but like the
+reference it first performs the normal runtime setup: `chdir` to the
+device root, standard-fd sanitation, notification/output fd checks,
+root-device stat, netlink intake bind, rebroadcast connect, and signal
+handling. A failing netlink bind therefore fails `-N` with `111` on
+both implementations (`bins_cli_diff` pins this byte-identically).
+
+This means `-N` is not an unprivileged or sandbox-free check: run it
+in the same environment (namespaces, `/dev`, `/sys`) as the daemon.
+Skipping the init would silently change `-N` error behavior relative
+to the oracle, so the init stays and this constraint is documented
+instead.

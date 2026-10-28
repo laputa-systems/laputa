@@ -32,6 +32,12 @@ The device tests exercise the real filesystem adapter on private tmpfs instead.
 RealOps rejects symlink ancestors for mutations and retains the verified device inode for subsequent metadata changes.
 Its chmod implementation requires `/proc/self/fd` to update that inode without opening the device.
 
+Event loss stays observable: netlink overruns increment a counter and
+emit the reference's `missed events! you should increase the -b kbufsz
+value` warning at every level. No synchronized-state claim follows an
+overrun; re-establishing device state requires a rescan
+(`mdevd-coldplug -s /sys`).
+
 `tools/check-qemu.sh` requires Linux x86_64 with KVM (`/dev/kvm`),
 `qemu-system-x86_64`, `mkfs.ext4`, and `apk`. It builds a pinned Alpine
 guest (minirootfs 3.20.3 plus the locked package set in
