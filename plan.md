@@ -4,8 +4,8 @@
 
 - Goal: small robust Rust mdevd/mdevd-coldplug replacing the C implementation and skalibs, Laputa-compatible, libudev-zero-compatible on `-O 4`.
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
-- Accepted: none. Red: none. Parked: none.
-- Next: `R0` (pins, oracle recipe, Laputa fixtures).
+- Accepted: R0 (be467c3). Red: none. Parked: none.
+- Next: `R1` (workspace, loop, dep gate).
 - Resume: run `tools/check-pins.sh && cargo test --locked -q -- pins` on a clean tree; land `R0` before `R1`.
 
 ## Charter
