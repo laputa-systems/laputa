@@ -491,4 +491,8 @@ test test_laputa_pm_ships_the_trust_command { |ctx|
   for expected in ["usr/bin/trust", "usr/lib/pm/trust.xsh", "usr/lib/pm/trust"] {
     assert expected in paths
   }
+  let staged = [source.source.display() for source in pkg.upstream_sources]
+  for expected in ["repository/pm.xsh", "repository/pm => pm", "repository/trust.xsh", "repository/trust => trust"] {
+    assert expected in staged, expected
+  }
 }

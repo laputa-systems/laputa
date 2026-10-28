@@ -51,6 +51,32 @@ export const upstream_sources = [
       },
     ],
   },
+  {
+    source: p"repository/trust.xsh",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
+  },
+  {
+    source: p"repository/trust => trust",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
+  },
 ]
 
 ## Exported declaration `filetree`.
