@@ -132,7 +132,9 @@ test-linux: need-xsh
 # publish, root, the installer image and its QEMU proof, the qemu-dwl-foot
 # proof, check, the native suites, mirror-test, and a no-op rebuild, one step
 # at a time. Logs and the timing table go to .out/verify/.
-verify: need-xsh
+VERIFY_HOST_TOOLS := $(if $(filter $(HOST_TOOLS_DIR),$(XSH_BIN_DIR)),host-xsh)
+verify: $(VERIFY_HOST_TOOLS)
+	@$(MAKE) --no-print-directory need-xsh
 	$(HOST_XSH_ENV) $(XSH) seed/verify.xsh -- $(ARCH)
 
 # The artifact store only grows; this removes every artifact that neither the
