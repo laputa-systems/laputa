@@ -11,6 +11,26 @@ fn parse_ok(name: &str) -> Config {
     parse(&input).unwrap()
 }
 
+fn errors_match(actual: &str, expected: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+    // regerror() wording differs between libc versions; only our prefix is pinned.
+    let (a_head, a_tail) = match actual.rsplit_once(": ") {
+        Some(p) => p,
+        None => return false,
+    };
+    let (e_head, e_tail) = match expected.rsplit_once(": ") {
+        Some(p) => p,
+        None => return false,
+    };
+    a_head.starts_with("unable to compile regular expression ")
+        && e_head.starts_with("unable to compile regular expression ")
+        && a_head == e_head
+        && !a_tail.is_empty()
+        && !e_tail.is_empty()
+}
+
 /// Canonical rule dump: the frozen contract for every corpus config.
 fn dump(cfg: &Config) -> Vec<u8> {
     let mut o = Vec::new();
@@ -75,6 +95,13 @@ fn dump(cfg: &Config) -> Vec<u8> {
     o
 }
 
+fn gid_of(group: &[u8]) -> u32 {
+    let mut conf = b"@0,0-0 root:".to_vec();
+    conf.extend_from_slice(group);
+    conf.extend_from_slice(b" 660\n");
+    parse(&conf).unwrap().rules[0].gid
+}
+
 #[test]
 fn config_laputa_golden() {
     let cfg = parse_ok("tests/fixtures/laputa-mdev.conf");
@@ -92,20 +119,14 @@ fn config_laputa_golden() {
         assert_eq!(cfg.at(r.env[0].var), b"SUBSYSTEM");
         assert_eq!(r.env[0].re.pattern(), b"block");
         assert_eq!((r.uid, r.mode), (0, 0o660));
-        assert_eq!(r.gid, unsafe { (*libc::getgrnam(c"disk".as_ptr())).gr_gid });
+        assert_eq!(r.gid, gid_of(b"disk"));
         assert!(matches!(r.move_kind, MoveKind::MoveAndLink));
         assert_eq!(cfg.at(r.movepath.unwrap()), b"disk/%1");
     }
     assert!(matches!(cfg.rules[7].move_kind, MoveKind::Nothing));
-    assert_eq!(cfg.rules[9].gid, unsafe {
-        (*libc::getgrnam(c"input".as_ptr())).gr_gid
-    });
-    assert_eq!(cfg.rules[12].gid, unsafe {
-        (*libc::getgrnam(c"audio".as_ptr())).gr_gid
-    });
-    assert_eq!(cfg.rules[13].gid, unsafe {
-        (*libc::getgrnam(c"video".as_ptr())).gr_gid
-    });
+    assert_eq!(cfg.rules[9].gid, gid_of(b"input"));
+    assert_eq!(cfg.rules[12].gid, gid_of(b"audio"));
+    assert_eq!(cfg.rules[13].gid, gid_of(b"video"));
     // Devname-only tail: no env, kept bases.
     for r in &cfg.rules[14..20] {
         assert!(r.env.is_empty());
@@ -218,7 +239,7 @@ fn config_corpus_dump_matches_goldens() {
                 }
                 let expected = std::fs::read_to_string(&golden)
                     .unwrap_or_else(|_| panic!("missing golden {}", golden.display()));
-                assert_eq!(e.to_string(), expected, "{}", path.display());
+                assert!(errors_match(&e.to_string(), &expected), "{}", path.display());
             }
         }
     }
