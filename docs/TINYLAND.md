@@ -71,14 +71,27 @@ R1 and R2 substitute the Rust daemons behind the same guest proof. Do them
 one at a time and re-run the full profile test after each; never change the
 compositor and both brokers in one debugging run.
 
-### R1 — seatd-rs substitution
+### R1 — seatd-rs substitution — landed
 
-Add a Laputa package for seatd-rs (URL tarball + vendored crates, mirroring
-`packages/tinyland`), swap the profile and the guest proof from C seatd to
-it, and re-qualify. Watch: socket mode/ownership (`root:seat`, 0770),
-`SEATD_VTBOUND=0`-equivalent unbound operation, and the exact seatd-only
-libseat behavior tinyland depends on. seatd-rs was qualified as a scoped
-experimental prerelease; this is its first real consumer.
+`packages/seatd-rs` builds the qualified seatd-rs head
+`e32d93117f24aaddfc64be8a07104a36a28c927c` (codeload sha256
+`e237fc42...`; Cargo.lock sha256 `77e0f156...`; staged scope: guest and
+protocol proofs green at `62da737`, docs/harness-only delta to the pin)
+with the locked vendored crates, plus the libseat client library cut from
+the same C 0.9.3 release the old package used (`-Dserver=disabled`, so the
+daemon binary is always Rust). Same installed filetree as `seatd`
+(`usr/bin/seatd`, libseat headers/library, identical xinit service), so the
+profile swaps one package name and tinyland keeps linking the unchanged
+seatd-only libseat client. `qemu-tinyland-foot` roots `seatd-rs` instead of
+`seatd` and forbids `seatd`; `tinyland` deps follow.
+
+Evidence: package proof (daemon reports `seatd version 0.9.3`, carries no
+libseat DT_NEEDED, names no `/bin/sh`) plus the full profile test green
+end to end (`make profile-tinyland-test`: coldplug, direct-open denial,
+brokered session, QMP input, magenta screenshot). Closure carries
+`seatd-rs`, not `seatd`. Watch points hold: `-g seat` socket stays 0770
+through group mediation (`laputa` in `seat`), `SEATD_VTBOUND=0` unbound
+operation is unchanged, and no automatic fallback exists anywhere.
 
 ### R2 — mdevd-rs substitution
 

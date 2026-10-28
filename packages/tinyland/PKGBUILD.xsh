@@ -18,11 +18,11 @@ export const ver = "0.1.0"
 export const rel = "1"
 
 ## Package recipe export.
-## musl and the shared client libraries tinyland links: the seatd daemon
+## musl and the shared client libraries tinyland links: the seatd-rs daemon
 ## package ships the libseat client for the seatd-only broker session,
 ## libxkbcommon for keymaps, gnu-stubs for the CRT objects and libgcc_s
 ## the dynamic link needs.
-export const deps = ["musl", "gnu-stubs", "libxkbcommon", "seatd"]
+export const deps = ["musl", "gnu-stubs", "libxkbcommon", "seatd-rs"]
 
 ## XKB data is a runtime lookup, not a link input.
 export const runtime_only_deps = ["xkeyboard-config"]
