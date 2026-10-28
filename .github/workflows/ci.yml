@@ -14,7 +14,7 @@ jobs:
           rustup show active-toolchain
           rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y musl-tools gcc-aarch64-linux-gnu qemu-user
+          sudo apt-get install --no-install-recommends -y musl-tools mold qemu-user
           cargo fetch --locked --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
       - name: pins and deps
         run: |
@@ -28,7 +28,13 @@ jobs:
         run: cargo clippy --locked -q --all-targets
       - name: release x86_64 musl
         run: cargo build --locked --release --target x86_64-unknown-linux-musl
+        env:
+          RUSTFLAGS: -Clinker=mold -Clinker-flavor=ld
       - name: release aarch64 musl
         run: cargo build --locked --release --target aarch64-unknown-linux-musl
+        env:
+          RUSTFLAGS: -Clinker=mold -Clinker-flavor=ld
+      - name: smoke aarch64 binary under user-mode emulation
+        run: qemu-aarch64 target/aarch64-unknown-linux-musl/release/mdevd -N -f "$GITHUB_WORKSPACE/tests/fixtures/laputa-mdev.conf" -d /tmp -s /tmp
       - name: ci pins
         run: tools/check-ci-pins.sh
