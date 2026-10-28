@@ -159,7 +159,9 @@ impl fmt::Display for ConfigError {
 
 impl std::error::Error for ConfigError {}
 
-fn scan_decimal(text: &[u8]) -> Option<u32> {
+/// Decimal scan mirroring `uint0_scan` (also used for `uid0`/`gid0`): ASCII
+/// digits only, checked arithmetic, `None` on empty/non-digit/overflow.
+pub fn scan_decimal(text: &[u8]) -> Option<u32> {
     if text.is_empty() {
         return None;
     }

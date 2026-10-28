@@ -1,0 +1,3 @@
+DEVPATH=/devices/x
+SUBSYSTEM=test
+DEVNAME=mydev

@@ -1,0 +1,3 @@
+ACTION=add
+DEVPATH=/devices/z
+SUBSYSTEM=test

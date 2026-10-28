@@ -30,6 +30,7 @@ if [ ! -x "$O/src-tree/mdevd" ]; then
   echo "oracle: mdevd built"
 fi
 # Instrumented copy for the dump harness (PAT lines before each regcomp).
+cp "$ROOT/tools/dump-run.c" "$O/dump-run.c"
 cp "$O/src-tree/src/mdevd/mdevd.c" "$O/mdevd_impl.c"
 cp "$O/src-tree/src/mdevd/mdevd-internal.h" "$O/"
 for f in mdevd_uevent_getvar.c mdevd_netlink_init.c mdevd_uevent_read.c; do
