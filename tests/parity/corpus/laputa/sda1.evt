@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=block
+DEVNAME=sda1
+MAJOR=8
+MINOR=1

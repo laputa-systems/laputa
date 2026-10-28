@@ -1,0 +1,2 @@
+dry run: mknod fromfile c 1 5
+dry run: chmod 600 fromfile

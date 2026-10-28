@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=tty
+DEVNAME=tty0
+MAJOR=4
+MINOR=0

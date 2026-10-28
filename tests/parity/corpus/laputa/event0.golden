@@ -1,0 +1,3 @@
+dry run: mknod event0 c 13 64
+dry run: chmod 660 event0
+dry run: chown 0:23 event0

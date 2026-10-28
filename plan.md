@@ -5,15 +5,28 @@
 - Goal: small robust Rust mdevd/mdevd-coldplug replacing the C implementation and skalibs, Laputa-compatible, libudev-zero-compatible on `-O 4`.
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
-  P3 (40ac52e), P4 (6267d45), P5 (09a3ea5). Red: none. Parked: none.
+  P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6. Red: none.
+  Parked: privileged kernel/device proof (see Needs environment).
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
   `tools/build-oracle.sh` (un-parked from Needs environment; privileged and
   live-multicast proof stays parked).
 - Live-multicast bonus: `unshare -U -n -r` runs the full P4 exchange here
   (consumer proof + Rust self-exchange); only truly privileged tests stay
   parked.
-- Next: `P6` (differential harness).
-- Resume: run `tools/check-pins.sh && cargo test --locked -q -- pins` on a clean tree; land `R0` before `R1`.
+- P6: 34 C-oracle transcript goldens (15 handling, 19 Laputa devices),
+  selected applied-operation traces, config acceptance, acknowledged unicast
+  drops with byte-exact empty `-o`, FIFO-acknowledged reload matrix,
+  coldplug scan/CLI. Full locked suite and all-target clippy pass.
+  A chmod-transcript mutation failed the comparison as required.
+- Boundary: daemon intake rejects all userspace senders, including on `-I 2`;
+  handling/order proof remains at dump-run and adapter level. Unicast warnings
+  acknowledge every injected daemon record before comparing `-o` bytes.
+- Next: `H1` (adversarial), then `H2` and `O1`.
+- H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
+  coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
+  absolute/`..` refusal and EEXIST identity adoption in RealOps,
+  uevent-NUL robustness, coldplug NULL-crash fixes.
+- Resume: run `tools/check-pins.sh && cargo test --locked -q -- pins` on a clean tree.
 
 ## Charter
 
@@ -83,7 +96,10 @@ Delegated (executor picks the smallest reversible option inside the bound and lo
 ## Needs environment
 
 - Privileged suite (real netlink, `/dev` nodes, event floods, restart-during-coldplug): owner runs `cargo test --locked -q -- bins,adversarial,parity` in a disposable VM with virtual devices; a normal container does not qualify. Justify any container use in the commit body.
-- C-oracle build (needs skalibs): owner runs `./configure && make && ./mdevd -N -f tests/fixtures/laputa-mdev.conf` with skalibs `2.15.1.0` sysdeps present.
+- Namespace probe: `unshare -U -n -m -r` can mount tmpfs here, but `mknod`
+  of a synthetic character device still fails with EPERM. Real kernel uevents
+  and real device-node mutations remain unverified. The C oracle build is
+  available locally via `tools/build-oracle.sh`.
 - Quiet-host perf confirmation for `O1` numbers (preflight host was loaded).
 
 ## Execution boundary and non-goals

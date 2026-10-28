@@ -1,0 +1,5 @@
+dry run: mkdir disk
+dry run: mknod disk/nvme0n1 b 259 0
+dry run: chmod 660 disk/nvme0n1
+dry run: chown 0:6 disk/nvme0n1
+dry run: symlink disk/nvme0n1 to nvme0n1

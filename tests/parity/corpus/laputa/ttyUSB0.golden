@@ -1,0 +1,3 @@
+dry run: mknod ttyUSB0 c 188 0
+dry run: chmod 660 ttyUSB0
+dry run: chown 0:20 ttyUSB0

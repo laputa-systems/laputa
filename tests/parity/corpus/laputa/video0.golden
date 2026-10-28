@@ -1,0 +1,3 @@
+dry run: mknod video0 c 81 0
+dry run: chmod 660 video0
+dry run: chown 0:27 video0
