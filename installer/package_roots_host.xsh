@@ -7,7 +7,7 @@ error InstallerPackageHostError = Failed : InvalidData
 export type InstallerRoots = {target: Path, installer: Path, tools: Path}
 
 pure target_roots(kernel_package: Str, smoke: Bool) -> List[Str] {
-  var roots = ["baselayout", "sudo-rs", "xsh", "xinit", "laputa-pm", "laputa-net", kernel_package]
+  var roots = ["baselayout", "sudo-rs", "xsh", "xinit", "laputa-pm", "laputa-net", "ca-certificates", kernel_package]
   if smoke {
     roots += ["dropbear"]
   }

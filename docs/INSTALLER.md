@@ -83,7 +83,8 @@ against the mirror on the host, requires every node to be an exact mirror
 artifact, imports them into a fresh store under the work tree's `packages/`,
 and composes target, installer, and image-tools roots from that one plan.
 Composition is file extraction on the host; no container writes into the work
-tree. The target root adds the kernel and `sudo-rs`, the installer and tools
+tree. The target root adds the kernel, `sudo-rs`, and `ca-certificates` (the
+trust seeds the installer bootstraps from), the installer and tools
 roots add `laputa-fs`, and the QEMU test adds Dropbear to the target. Installer
 files are overlaid after composition, so image roots carry no PM generation
 receipts. `LAPUTA_INSTALLER_JOBS` sets import concurrency (default 4).
