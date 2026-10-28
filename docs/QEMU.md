@@ -64,7 +64,8 @@ complete verified bundle is copied atomically to the host output mount.
 ## Proof contract
 
 The guest coldplugs devices, starts seatd, dwl, and foot, and emits
-`LAPUTA_DWL_FOOT_PROOF_OK` only after foot launches. A passing test requires
+`LAPUTA_DWL_FOOT_PROOF_OK` only after foot launches, then keeps the compositor
+running until the host stops the guest. A passing test requires
 that marker and a screenshot containing the terminal's magenta visual marker. It rejects `Kernel panic`, `not
 syncing`, and `LAPUTA_DWL_FOOT_PROOF_FAILED`; inspect `console.log` and
 `qemu.log` first when it fails.

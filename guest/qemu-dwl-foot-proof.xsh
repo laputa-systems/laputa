@@ -91,7 +91,6 @@ let _ = io.stdin_text()?
     },
   )
   let compositor = spawn command?
-  let _ = compositor
 
   guest_wait_for(/run/laputa-foot-read-ready, "foot", 30)
   guest_console("LAPUTA_DWL_FOOT_PROOF_READY")
@@ -102,6 +101,7 @@ let _ = io.stdin_text()?
   }
 
   guest_console("LAPUTA_DWL_FOOT_PROOF_OK")
+  let _ = wait compositor
 }
 
 main()
