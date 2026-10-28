@@ -64,11 +64,17 @@ out COMBINED_MDEVD_OK
 # --- 3. seatd admits an ordinary client; restart reclaims ------------------
 SEATD_SOCK=/run/combined-seatd.sock
 export SEATD_SOCK
-addgroup -g 2000 seatgrp > /dev/console 2>&1 || out "addgroup rc=$?"
-adduser -D -u 2000 -G seatgrp seatuser > /dev/console 2>&1 || out "adduser rc=$?"
+# minirootfs busybox lacks addgroup/adduser: create the test identity by
+# direct file edits (deterministic, no network, no shadow tools needed).
+grep -q '^seatgrp:' /etc/group || echo 'seatgrp:x:2000:' >> /etc/group
+grep -q '^seatuser:' /etc/passwd || echo 'seatuser:x:2000:2000:combined test:/tmp:/bin/sh' >> /etc/passwd
+command -v su >/dev/null || fail "no su in guest"
 chown root:seatgrp /run
 chmod 770 /run
 /usr/local/bin/seatd -v > /dev/console 2>&1 || fail "seatd binary does not run"
+timeout 3 env SEATD_VTBOUND=0 /usr/local/bin/seatd -g seatgrp -l debug > /tmp/seatd.log 2>&1
+out "seatd foreground rc=$? (124 means it stayed up)"
+cat /tmp/seatd.log > /dev/console 2>/dev/null || true
 SEATD_VTBOUND=0 /usr/local/bin/seatd -g seatgrp -l error > /tmp/seatd.log 2>&1 &
 SPID=$!
 sleep 1
