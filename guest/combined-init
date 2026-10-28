@@ -84,6 +84,8 @@ if ! kill -0 $SPID 2>/dev/null; then
   fail "seatd exited early"
 fi
 [ -c /dev/dri/card0 ] || fail "no virtual DRM device"
+ls /dev/input > /dev/console 2>&1 || out "no /dev/input"
+ls /sys/class/input > /dev/console 2>&1 || out "no /sys/class/input"
 [ -c /dev/input/event0 ] || fail "no virtual input device"
 su -p -s /bin/sh seatuser -c '/usr/local/bin/combined-seat-client /dev/dri/card0' > /tmp/seat.out 2>&1 || fail "seat client (drm) failed"
 grep -q COMBINED_SEAT_OK /tmp/seat.out || fail "seat client (drm) incomplete"
