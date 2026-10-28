@@ -3,6 +3,7 @@ use mdevd::uevent::{bind_intake, read_event, ReadOutcome, Stats};
 use std::io::{Read, Write};
 use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::os::unix::fs::OpenOptionsExt;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -84,9 +85,9 @@ fn ip(args: &[&str]) {
 #[test]
 #[ignore = "requires tools/check-privileged.sh kernel network namespace"]
 fn adversarial_kernel_daemon_publication_matches_intake() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    for (index, program) in [root.join(".work/oracle/src-tree/mdevd"), env!("CARGO_BIN_EXE_mdevd").into()].iter().enumerate() {
-        let f = Fixture::new(&format!("kernel-{index}"));
+    let program = PathBuf::from(env!("CARGO_BIN_EXE_mdevd"));
+    {
+        let f = Fixture::new("kernel");
         let config = f.root.join("config");
         std::fs::write(&config, b".* 0:0 600\n").unwrap();
         let kernel = bind_intake(1, 1048576).unwrap();
@@ -94,11 +95,10 @@ fn adversarial_kernel_daemon_publication_matches_intake() {
         let (mut ready, notify) = pipe();
         let (mut output, sink) = pipe();
         let inherited = [notify.as_raw_fd(), sink.as_raw_fd()];
-        let mut cmd = Command::new(program);
+        let mut cmd = Command::new(&program);
         cmd.arg("-f").arg(&config).arg("-d").arg(f.root.join("dev"))
             .arg("-s").arg(f.root.join("sys")).args(["-O", "4", "-D"])
             .arg(notify.as_raw_fd().to_string()).arg("-o").arg(sink.as_raw_fd().to_string())
-            .env("LD_LIBRARY_PATH", root.join(".work/vendor/sysdeps-root/lib"))
             .stdout(Stdio::null()).stderr(Stdio::inherit());
         // SAFETY: only the validated pipe ends have CLOEXEC cleared in the child.
         unsafe { cmd.pre_exec(move || {
@@ -111,7 +111,7 @@ fn adversarial_kernel_daemon_publication_matches_intake() {
         drop(notify);
         drop(sink);
         exact(&mut ready, b"\n");
-        let name = format!("mdevd-proof{index}");
+        let name = "mdevd-proof".to_string();
         std::fs::remove_file(&config).unwrap();
         let fifo = std::ffi::CString::new(config.as_os_str().as_encoded_bytes()).unwrap();
         // SAFETY: fifo is NUL-terminated and the parent is our private fixture.

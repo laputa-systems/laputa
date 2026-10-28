@@ -11,7 +11,6 @@ use mdevd::engine::{
     Action, Caps, Device, Out, Outcome, Request, Run, alias_format, match_rule, node_for, on_event,
 };
 use mdevd::uevent::Uevent;
-use std::path::Path;
 
 fn uevent_of(lines: &[&str]) -> Uevent {
     let mut buf = b"add@/devices/x\0".to_vec();
@@ -338,59 +337,32 @@ fn engine_real_guards() {
     assert!(null.read_sys(b"devices/x/dev", 22).is_err());
 }
 
-/// Dry transcript differential against the C oracle (rule dumps were P1;
-/// this covers event handling). Warn lines need DUMP_VERBOSE=1.
+/// Dry transcripts pinned as committed goldens (one per case).
 #[test]
-fn engine_transcript_diff() {
-    let oracle = Path::new(".work/oracle/dump-run");
-    if !oracle.exists() {
-        println!("note: oracle harness absent; transcript differential skipped");
-        return;
-    }
+fn engine_transcript_matches_goldens() {
     pin_c_locale();
     let abs = std::env::current_dir().unwrap();
     let sysroot = abs.join("tests/sysroot");
-    // (conf text, event file, sysfiles for our side; oracle reads tests/sysroot)
-    let cases: &[(&str, &str)] = &[
-        ("mydev root:root 600\n", "add-basic.evt"),
-        ("SUBSYSTEM=block;(sd[a-z]) root:disk 660 >disk/%1\n", "add-block.evt"),
-        ("B=2;C=3;mydev root:root 600\n", "add-env.evt"),
-        ("mydev root:root 600\n", "remove.evt"),
-        ("mydev root:root 600\n", "change.evt"),
-        ("mydev root:root 600\n", "no-action.evt"),
-        ("mydev root:root 600\n", "no-devpath.evt"),
-        ("-nomatch root:root 600\nmydev root:root 601\n", "add-basic.evt"),
-        ("mydev root:root 600\n.* root:root 601\n", "add-basic.evt"),
-        ("mydev root:root 600\n", "no-mm.evt"),
-        ("fromfile root:root 600\n", "no-major.evt"),
-        ("(sd[a-z]) root:disk 660 =disk/%1\n", "add-block.evt"),
-        ("mydev root:root 660 !\n.* root:root 601\n", "add-basic.evt"),
+    // (conf text, event file, golden stem).
+    let cases: &[(&str, &str, &str)] = &[
+        ("mydev root:root 600\n", "add-basic.evt", "add-basic"),
+        ("SUBSYSTEM=block;(sd[a-z]) root:disk 660 >disk/%1\n", "add-block.evt", "add-block"),
+        ("B=2;C=3;mydev root:root 600\n", "add-env.evt", "add-env"),
+        ("mydev root:root 600\n", "remove.evt", "remove"),
+        ("mydev root:root 600\n", "change.evt", "change"),
+        ("mydev root:root 600\n", "no-action.evt", "no-action"),
+        ("mydev root:root 600\n", "no-devpath.evt", "no-devpath"),
+        ("-nomatch root:root 600\nmydev root:root 601\n", "add-basic.evt", "add-basic-nomatch"),
+        ("mydev root:root 600\n.* root:root 601\n", "add-basic.evt", "add-basic-catchall"),
+        ("mydev root:root 600\n", "no-mm.evt", "no-mm"),
+        ("fromfile root:root 600\n", "no-major.evt", "no-major"),
+        ("(sd[a-z]) root:disk 660 =disk/%1\n", "add-block.evt", "add-block-alias"),
+        ("mydev root:root 660 !\n.* root:root 601\n", "add-basic.evt", "add-basic-cmd"),
     ];
-    for (conf, evt) in cases {
-        let work = abs.join(".work/tmp/eng-diff.conf");
-        std::fs::write(&work, conf).unwrap();
-        let out = std::process::Command::new(oracle)
-            .arg(&work)
-            .arg(abs.join("tests/events").join(evt))
-            .env("DUMP_SLASHSYS", &sysroot)
-            .env("DUMP_VERBOSE", "1")
-            .output()
-            .expect("run dump-run");
-        assert_eq!(out.status.code(), Some(0), "{conf}/{evt}: oracle failed");
-        let text = String::from_utf8_lossy(&out.stdout).into_owned()
-            + &String::from_utf8_lossy(&out.stderr);
-        let mut expected: Vec<String> = Vec::new();
-        for line in text.lines() {
-            if let Some(rest) = line.strip_prefix("dump-run: info: ") {
-                expected.push(rest.to_string());
-            } else if let Some(rest) = line.strip_prefix("dump-run: warn: ") {
-                expected.push(format!("warn: {rest}"));
-            }
-        }
+    for (conf, evt, stem) in cases {
         let cfg = cfg_of(conf);
         let evtext = std::fs::read_to_string(abs.join("tests/events").join(evt)).unwrap();
         let ev = uevent_of(&evtext.lines().collect::<Vec<_>>());
-        // Our side reads the same checked-in sysroot through FakeOps.
         let mut ops = FakeOps::default();
         for name in ["devices/x/dev", "devices/x/uevent", "devices/y/dev", "devices/z/uevent"] {
             let bytes = std::fs::read(abs.join("tests/sysroot").join(name)).unwrap();
@@ -408,6 +380,15 @@ fn engine_transcript_diff() {
             out: Out::Dry(&mut t),
         };
         assert_eq!(on_event(&req, &mut run).unwrap(), Outcome::Publish, "{conf}/{evt}");
-        assert_eq!(t, expected, "{conf}/{evt}: transcript differs");
+        let actual: Vec<u8> = t.iter().flat_map(|line| line.bytes().chain(*b"\n")).collect();
+        let golden = abs.join("tests/events/transcript").join(format!("{stem}.golden"));
+        if std::env::var_os("UPDATE_EXPECT").is_some() {
+            std::fs::create_dir_all(golden.parent().unwrap()).unwrap();
+            std::fs::write(&golden, &actual).unwrap();
+            continue;
+        }
+        let expected = std::fs::read(&golden)
+            .unwrap_or_else(|_| panic!("missing golden {}", golden.display()));
+        assert_eq!(actual, expected, "{conf}/{evt}: transcript differs");
     }
 }

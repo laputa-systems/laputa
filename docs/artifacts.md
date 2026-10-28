@@ -68,22 +68,27 @@ fails publication.
 - mdevd: ISC; retains Laurent Bercot attribution (`AUTHORS`,
   `COPYING`, `DCO`); libudev-zero consumer test uses the pinned fork
   unmodified.
-- seatd: MIT; retains Kenny Levinsen attribution; oracle sources are
-  test-only inputs, not runtime deps.
-- doas: MIT; oracle/packaging pins in `docs/upstream.md`.
+- seatd: MIT; retains Kenny Levinsen attribution. The wire protocol is
+  pinned by `harness/protocol.golden` and a raw-protocol guest client;
+  no C libseat client has been run against the daemon since the
+  upstream sources left the repo (open gap, see seatd
+  `doc/validation.md`).
+- doas: MIT; upstream and packaging pins in `docs/upstream.md`.
 
 ## Which binary each qualification exercised
 
 - mdevd: x86_64 release binaries in `check-qemu.sh` (real kernel add,
-  both daemons) and `check-combined.sh` (hashes logged); aarch64
-  release under `qemu-aarch64` user mode (`-N` smoke in CI).
-- seatd: x86_64 release in guest transition/shutdown modes plus the C
-  client differential natively; aarch64 release under `qemu-aarch64`
-  user mode plus the differential via wrapper (see `doc/validation.md`).
+  node creation, framed output, coldplug sync) and `check-combined.sh`
+  (hashes logged); aarch64 release under `qemu-aarch64` user mode
+  (`-N` smoke in CI).
+- seatd: x86_64 release in guest transition/shutdown modes with the
+  raw-protocol client; aarch64 release under `qemu-aarch64` user mode
+  (`-v` smoke in CI). The frozen protocol golden pins client-visible
+  behavior (see seatd `doc/validation.md`).
 - doas: x86_64 release installed setuid inside the disposable guest
   (`harness/vm-priv.sh`, all three markers); aarch64 pending (C1).
-- libseat provenance: repo-local oracle only; a Rust `seatd` daemon
-  does not provide `libseat.so`. doas does not replace `su`/`sudoedit`.
+- No Rust `seatd` daemon provides `libseat.so`. doas does not replace
+  `su`/`sudoedit`.
 
 ## Laputa contract (for the owner)
 

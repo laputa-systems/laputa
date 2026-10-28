@@ -1,6 +1,6 @@
 #!/bin/sh
 # QEMU proof: real kernel uevents with major/minor drive node creation.
-# Boots a pinned Alpine guest under KVM, runs Rust then C daemons against
+# Boots a pinned Alpine guest under KVM, runs the Rust daemon against
 # /sys/block/vda, triggers `add` through the real sysfs uevent file, and
 # requires matching block identity, mode 660, framed -o output, and a clean
 # mdevd-coldplug sync. Prior art: tinyland harness/run-proof.sh (read-only).
@@ -65,4 +65,4 @@ while kill -0 "$QEMU_PID" 2>/dev/null && [ $i -lt 15 ]; do sleep 1; i=$((i + 1))
 if kill -0 "$QEMU_PID" 2>/dev/null; then echo 'check-qemu: QEMU did not exit' >&2; exit 1; fi
 wait "$QEMU_PID" 2>/dev/null || true
 QEMU_PID=
-echo 'check-qemu: OK (real kernel add with major/minor, coldplug sync, both daemons)'
+echo 'check-qemu: OK (real kernel add with major/minor, coldplug sync)'

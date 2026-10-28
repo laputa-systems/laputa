@@ -1,12 +1,11 @@
-/* Minimal raw-protocol libseat client for the combined guest.
- * Opens seat0, opens one supported device, closes both, exits 0.
- * Speaks the seatd wire protocol directly (u16 opcode + u16 size,
- * device FD via SCM_RIGHTS) with no upstream code. Test-only. */
+/* Minimal raw-protocol seatd client for the combined guest.
+ * Opens seat0, opens one device named on the command line, closes both.
+ * Speaks the seatd wire protocol directly (u16 opcode + u16 size, device
+ * FD via SCM_RIGHTS) with no upstream code. Test-only. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -15,10 +14,6 @@
 #define C_CLOSE_SEAT 2
 #define C_OPEN_DEVICE 3
 #define C_CLOSE_DEVICE 4
-#define S_DEVICE_OPENED 0x8003
-#define S_DISABLE_SEAT 0x8005
-#define S_ENABLE_SEAT 0x8006
-#define S_SEAT_DISABLED 0x8009
 
 static int sock = -1;
 static uint8_t rbuf[4096];
@@ -108,7 +103,7 @@ int main(int argc, char **argv) {
 	uint8_t rb[256];
 	size_t rn = 0;
 	if (!sockpath)
-		sockpath = "/run/combined-seatd.sock";
+		sockpath = "/run/seatd.sock";
 	memset(&addr, 0, sizeof addr);
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, sockpath, sizeof addr.sun_path - 1);
@@ -117,7 +112,7 @@ int main(int argc, char **argv) {
 	require(connect(sock, (struct sockaddr *)&addr, sizeof addr) == 0, "connect");
 	send_msg(C_OPEN_SEAT, NULL, 0);
 	expect(0x8001, rb, &rn);
-	expect(S_ENABLE_SEAT, rb, &rn);
+	expect(0x8006, rb, &rn);
 	uint8_t body[2 + 256];
 	size_t plen = strlen(devpath) + 1;
 	require(plen <= 256, "path too long");
@@ -125,7 +120,7 @@ int main(int argc, char **argv) {
 	body[1] = (plen >> 8) & 0xff;
 	memcpy(body + 2, devpath, plen);
 	send_msg(C_OPEN_DEVICE, body, (uint16_t)(2 + plen));
-	expect(S_DEVICE_OPENED, rb, &rn);
+	expect(0x8003, rb, &rn);
 	require(rn == 4, "device id size");
 	require(pending_fd >= 0, "no device fd arrived");
 	int fd = pending_fd;

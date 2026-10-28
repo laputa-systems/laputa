@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Extract parse tables verbatim from the reference mdevd.c into Rust syntax.
+"""Extract parse tables verbatim from upstream mdevd.c into Rust syntax.
 Test tool: generated files are checked in; rerunning must be a no-op.
-Usage: gen-tables.py MDEVD_C CONFIG_RS ENGINE_RS"""
+Usage: gen-tables.py MDEVD_C CONFIG_RS ENGINE_RS, where MDEVD_C is an
+upstream mdevd 0.1.8.3 mdevd.c (the in-repo copy was removed when the
+port went independent; the tables in src/config/tables.rs and
+src/engine/tables.rs are frozen and must not be hand-edited)."""
 import re
 import sys
 
