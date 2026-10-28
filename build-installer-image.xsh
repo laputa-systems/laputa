@@ -4,7 +4,6 @@ use installer.package_roots_host
 use installer.rootfs_size
 use system.image as system_image
 
-const EXT4_BLOCK = 4096
 
 proc run_xsh_tool(root: Path, xsh: Path, tool: Path, argv: List[Str]) [fs, process, env, error] {
   host.installer_run_argv(
@@ -56,7 +55,7 @@ pure serial_console(arch: Str) -> Str {
 proc install_installer_tools(root: Path, rootfs: Path, arch: Str) [fs, env, error] {
   let installer_root = fp"{root}/installer"
 
-  for name in ["setup-laputa.xsh", "disk_selection.xsh"] {
+  for name in ["setup-laputa.xsh", "disk_selection.xsh", "rootfs_size.xsh"] {
     fs.install(
       fp"{installer_root}/{name}",
       fp"{rootfs}/usr/lib/laputa-installer/{name}",
@@ -165,30 +164,12 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
   (value + divisor - 1) / divisor
 }
 
-proc tree_blocks(path_value: Path) -> Result[Int] {
-  let meta = path_value.metadata()?
-
-  if meta.kind != "dir" {
-    let data = ceil_div(meta.size, EXT4_BLOCK)
-    return data + ceil_div(data, 1024) + 1
-  }
-
-  let children = fs.children(path_value)?.collect()
-  var total = 1 + ceil_div(children.len() * 264, EXT4_BLOCK)
-
-  for child in children {
-    total += if child.kind == "symlink" { 1 } else { tree_blocks(child.path)? }
-  }
-
-  total
-}
-
 proc installer_root_size_mb(rootfs: Path, override_mb: Str) -> Result[Int] {
   guard override_mb == "" else {
     return override_mb as Int
   }
 
-  rootfs_size.image_size_mib(tree_blocks(rootfs)?)
+  rootfs_size.image_size_mib(rootfs_size.tree_blocks(rootfs)?)
 }
 
 proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) [fs, error] {

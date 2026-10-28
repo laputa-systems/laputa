@@ -1,5 +1,6 @@
 #!/bin/xsh
 use installer.host
+use installer.rootfs_size
 
 error InstallerQemuTestError = Failed(kind: Str, message: Str)
 
@@ -363,6 +364,12 @@ pure qemu_target_args(
   with_devices.extend(qemu_console_args(target_log))
 }
 
+## The CI target disk: the 1 MiB GPT lead, the ESP, the 8 MiB CI swap, the root
+## filesystem, and the 1 MiB tail and alignment the installer reserves.
+pure target_disk_mib(esp_mib: Int, root_mib: Int) -> Int {
+  1 + esp_mib + 8 + root_mib + 2
+}
+
 proc clean_build_state(work: Path) {
   for name in [
     "rootfs-target",
@@ -448,7 +455,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   let work = host.installer_env_path("LAPUTA_INSTALLER_WORK", fp"{root}/target/laputa-installer-{arch}-qemu")?
   let installer_iso = host.installer_env_path("LAPUTA_INSTALLER_ISO", fp"{work}/laputa-installer-{arch}.iso")?
   let installer_kernel = host.installer_env_path("LAPUTA_INSTALLER_KERNEL", fp"{work}/laputa-installer-{arch}.vmlinuz")?
-  let target_image = host.installer_env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target-128m.img")?
+  let target_image = host.installer_env_path("LAPUTA_INSTALLER_TARGET_IMAGE", fp"{work}/laputa-target.img")?
   let installer_log = host.installer_env_path("LAPUTA_INSTALLER_QEMU_LOG", fp"{work}/qemu-installer.log")?
   let target_log = host.installer_env_path("LAPUTA_TARGET_QEMU_LOG", fp"{work}/qemu-target.log")?
 
@@ -507,8 +514,10 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   target_image.remove()
   installer_log.remove()
   target_log.remove()
+  let target_esp_mib = host.installer_env_value("LAPUTA_TARGET_ESP_MB", "16") as Int
+  let target_root_mib = rootfs_size.image_size_mib(rootfs_size.tree_blocks(fp"{work}/rootfs-target")?)
   target_image.write("")
-  target_image.truncate(128MiB)
+  target_image.truncate(target_disk_mib(target_esp_mib, target_root_mib) * 1MiB)
 
   let installer = spawn process.command_argv(
     qemu,

@@ -1,5 +1,6 @@
 #!/bin/xsh
 use disk_selection
+use rootfs_size
 use trust.store as trust_store
 
 error InstallerError = Failed(kind: Str, message: Str)
@@ -19,10 +20,6 @@ pure ceil_div(value: Int, divisor: Int) -> Int {
 
 pure align_up(value: Int, alignment: Int) -> Int {
   ceil_div(value, alignment) * alignment
-}
-
-pure align_down(value: Int, alignment: Int) -> Int {
-  value / alignment * alignment
 }
 
 pure is_disk_name(name: Str) -> Bool {
@@ -447,6 +444,11 @@ proc configured_ci_esp_bytes() -> Result[Int] {
 }
 
 proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
+  let sector_size = fp"/sys/block/{disk.name}/queue/logical_block_size".read_text()?.trim() as Int
+  if sector_size != 512 {
+    return Err(InstallerError.Failed(kind: "unsupported-sector-size", message: f"{disk} has {sector_size}-byte logical sectors; the installer lays out 512-byte sectors"))
+  }
+
   let total_sectors = fp"/sys/block/{disk.name}/size".read_text()?.trim() as Int
   let esp_bytes = if ci { configured_ci_esp_bytes()? } else { 128MiB }
   let swap_bytes = if ci { 8MiB } else { linux.meminfo()?.total * 2 }
@@ -458,24 +460,23 @@ proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
   let swap_start = align_up(esp_end + 1, 2048)
   let swap_end = swap_start + swap_sectors - 1
   let root_start = align_up(swap_end + 1, 2048)
-  let root_sectors = align_down(total_sectors - 2048 - root_start + 1, 8)
+  let root_sectors = rootfs_size.ext4_partition_sectors(total_sectors - 2048 - root_start + 1)
   let root_end = root_start + root_sectors - 1
 
   if root_sectors <= 0 or root_end <= root_start {
     return Err(InstallerError.Failed(kind: "disk-too-small", message: f"{disk} is too small for Laputa"))
   }
 
-  let table = json.decode(
-    f"""{{
-  "label": "gpt",
-  "uuid": "11111111-2222-3333-4444-555555555555",
-  "partitions": [
-    {{"index": 1, "start": {esp_start}, "end": {esp_end}, "type": "{ESP_TYPE}", "uuid": "11111111-1111-1111-1111-111111111111", "name": "LAPUTA_ESP"}},
-    {{"index": 2, "start": {swap_start}, "end": {swap_end}, "type": "{SWAP_TYPE}", "uuid": "22222222-2222-2222-2222-222222222222", "name": "LAPUTA_SWAP"}},
-    {{"index": 3, "start": {root_start}, "end": {root_end}, "type": "{LINUX_TYPE}", "uuid": "33333333-3333-3333-3333-333333333333", "name": "LAPUTA_ROOT"}}
-  ]
-}}""",
-  )?.require(Record)?
+  let table = {
+    id: "11111111-2222-3333-4444-555555555555",
+    label: "gpt",
+    sector_size: sector_size,
+    partitions: [
+      {index: 1, start: esp_start, end: esp_end, size: esp_end - esp_start + 1, type: ESP_TYPE, uuid: "11111111-1111-1111-1111-111111111111", name: "LAPUTA_ESP"},
+      {index: 2, start: swap_start, end: swap_end, size: swap_end - swap_start + 1, type: SWAP_TYPE, uuid: "22222222-2222-2222-2222-222222222222", name: "LAPUTA_SWAP"},
+      {index: 3, start: root_start, end: root_end, size: root_sectors, type: LINUX_TYPE, uuid: TARGET_ROOT_PARTUUID, name: "LAPUTA_ROOT"},
+    ],
+  }
 
   linux.write_partition_table(disk, table)
   DiskParts(esp: partition_path(disk, 1), swap: partition_path(disk, 2), root: partition_path(disk, 3))
