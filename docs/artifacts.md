@@ -9,9 +9,9 @@ inputs, provenance, and the Laputa-side obligations.
 
 | Payload | Source repo @ staged SHA | x86_64-musl SHA-256 | aarch64-musl SHA-256 |
 |---|---|---|---|
-| `doas` | doas-rs `d8a6400` | `d218736b535a69bf9f4ac374c94d88626a9c633b777554f819e1c902eb6b1edc` | not built here (see constraint C1) |
-| `seatd` | seatd-rs `62264be` | `339e726d9e4607fc00c8acf974a706bb2d19e2938a98b57b4de13a844c88cfae` | `810e72a4670450355898428bd0965503224ebfab6ba31c7dad1ecf10d4826c00` |
-| `mdevd`, `mdevd-coldplug` | mdevd-rs `11e0a28` | `4dcf7b1b19186b040e75d75bc3bc07bfe871348ad57ea24d4cf0de0eed4ba916`, `5e24de53d42d7f13d1df1af936ca8445d7e4a867a4bdd4320d05e39e7d3ec1a6` | `01e7b28d4fc84a9d310168e1fbfc0e274031aed6af84a1f37cba2d7c4f70a6e1`, `faaec554425efc12bd1005165db7fa2befc5cec49f5e99e421275355c3640348` (user-mode `-N` smoke green) |
+| `doas` | doas-rs `d43bbbb` | `d218736b535a69bf9f4ac374c94d88626a9c633b777554f819e1c902eb6b1edc` (measured at `d8a6400`; delta to here is docs/tests/CI-pin only) | not built here (see constraint C1) |
+| `seatd` | seatd-rs `e32d931` | `339e726d9e4607fc00c8acf974a706bb2d19e2938a98b57b4de13a844c88cfae` (measured at `62da737`; delta to here is docs/harness/CI only, no `src/`) | `810e72a4670450355898428bd0965503224ebfab6ba31c7dad1ecf10d4826c00` (same basis) |
+| `mdevd`, `mdevd-coldplug` | mdevd-rs `deda1fb` | `f424788a456cfd83f44742f61968fc91819bec4625b60fdd8e7877536beef57e`, `f678eda65de90e17e6449af0267e3fa33a1f54b6a1eecdd65d654b4d2911b76f` | `03aa518233d2650f20b9501f94c67ff26ccdb91cbd88baa07bee849d8fbbd637`, `b0da5b7191d1da8d9b62266fba72fef630408fa723c3abd427c102f04ad2dd65` (user-mode `-N` smoke green) |
 
 Full hashes: see the combined-run evidence log (`tools/check-combined.sh`
 prints all four x86_64 hashes) and seatd `doc/validation.md` (both seatd
@@ -42,8 +42,10 @@ targets with sizes). All binaries are static (`DT_NEEDED` count 0, no
 
 Release profiles strip (`mdevd`) or ship unstripped (`doas`, `seatd`;
 `strip` is a publication-packaging choice, not a code property).
-Rebuilding the x86_64 release binaries above with the same recipe
-reproduces the same hashes (verified by rebuild). Recipe notes:
+Rebuilding the seatd/doas x86_64 release binaries above with the same
+recipe reproduces the same hashes (verified by rebuild). The mdevd
+hashes above are fresh single-recipe builds at the staged SHA;
+CI must confirm them by rebuild. Recipe notes:
 mdevd/seatd x86_64 and all aarch64 builds use `RUSTFLAGS="-Clinker=mold
 -Clinker-flavor=ld"`, identical to the CI recipe, so those hashes have
 no local-config deviation. doas x86_64 was built under the container's
