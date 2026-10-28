@@ -15,8 +15,10 @@ make test          # all four
 ```
 
 Kbuild planner tests cover object-list replacement, nested `patsubst` and
-`foreach` expansion, and conditional defaults for defined empty flags. These
-fixtures do not qualify a complete kernel build.
+`foreach` expansion, conditional defaults for defined empty flags, and
+`cc-option`/`cc-disable-warning` calls, which are probed with the target
+compiler when archive tasks are planned. Planning fails on any compile
+argument that still contains `$(`. These fixtures do not qualify a complete kernel build.
 
 `xsht-config.ini` sets `module_path` to this checkout, so `xsht` resolves
 `system.*`, `seed.*`, and PM imports, including `use` imports inside profiles

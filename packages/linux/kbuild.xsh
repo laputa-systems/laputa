@@ -770,6 +770,27 @@ pure make_arguments(raw: Str) -> List[Str] {
   arguments
 }
 
+pure make_fields(raw: Str) -> List[Str] {
+  var fields: List[Str] = []
+  var depth = 0
+  var start = -1
+  for index in range(raw.byte_len()) {
+    let byte = raw.byte_at(index)
+    if byte == 40 and (depth > 0 or (index > 0 and raw.byte_at(index - 1) == 36)) { depth += 1 }
+    if byte == 41 and depth > 0 { depth -= 1 }
+    if depth == 0 and (byte == 32 or byte == 9 or byte == 10) {
+      if start >= 0 {
+        fields += [raw.byte_slice(start, index - start)]
+        start = -1
+      }
+    } else if start < 0 {
+      start = index
+    }
+  }
+  if start >= 0 { fields += [raw.byte_slice(start)] }
+  fields
+}
+
 pure make_patsubst_word(pattern: Str, replacement: Str, word: Str) -> Str {
   let parts = pattern.split("%")
   if parts.len() == 1 { return if word == pattern { replacement } else { word } }
@@ -783,6 +804,10 @@ pure make_patsubst_word(pattern: Str, replacement: Str, word: Str) -> Str {
 }
 
 pure expand_make_expression(expression: Str, vars: Map[Str]) -> Str {
+  if expression.starts_with("call ") {
+    let arguments = make_arguments(expression.byte_slice(5))
+    return f"$(call {[expand_make_vars(argument, vars).trim() for argument in arguments].join(",")})"
+  }
   if expression.starts_with("patsubst ") {
     let arguments = make_arguments(expression.byte_slice(9))
     return f"$({expression})" when arguments.len() != 3
@@ -1254,9 +1279,9 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
 
         if assign.op == "?=" and key in flags { continue }
         if assign.op == "+=" {
-          flags[key] = current.extend(rhs.fields())
+          flags[key] = current.extend(make_fields(rhs))
         } else {
-          flags[key] = rhs.fields()
+          flags[key] = make_fields(rhs)
         }
         vars[expanded_lhs] = assigned_make_value(vars.get(expanded_lhs) ?? "", expanded_lhs in vars, assign.op, rhs)
 
@@ -1271,7 +1296,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
     }
   }
 
-  let subdir_flags = (vars.get("subdir-ccflags-y") ?? "").fields().extend((vars.get("ccflags-y") ?? "").fields())
+  let subdir_flags = make_fields(vars.get("subdir-ccflags-y") ?? "").extend(make_fields(vars.get("ccflags-y") ?? ""))
   if ! subdir_flags.is_empty() {
     flags["*"] = subdir_flags
   }
@@ -1308,7 +1333,7 @@ proc kbuild_compile_flags_for_dirs(
 }
 
 pure compile_flags_cache_format() -> Str {
-  "linux-kbuild-compile-flags-v4"
+  "linux-kbuild-compile-flags-v5"
 }
 
 pure compile_flags_cache_entries(flags: Map[Map[List[Str]]]) -> List[CompileFlagsEntry] {
@@ -6371,6 +6396,99 @@ proc archive_compile_task_spec(
   }
 }
 
+type CompilerOptionProbe = {tested: Str, accepted: Str, rejected: Str}
+
+pure compiler_option_probe(flag: Str) -> CompilerOptionProbe? {
+  return null unless flag.starts_with("$(call ") and flag.ends_with(")")
+
+  let arguments = make_arguments(flag.byte_slice(7, flag.byte_len() - 8))
+  let name = arguments[0]
+
+  if name == "cc-option" and (arguments.len() == 2 or arguments.len() == 3) {
+    let option = arguments[1]
+    return {tested: if option.starts_with("-Wno-") { f"-W{option.byte_slice(5)}" } else { option }, accepted: option, rejected: arguments.get(2) ?? ""}
+  }
+
+  if name == "cc-disable-warning" and arguments.len() == 2 {
+    return {tested: f"-W{arguments[1]}", accepted: f"-Wno-{arguments[1]}", rejected: ""}
+  }
+
+  null
+}
+
+proc probe_compiler_options(
+  items: List[PreparedArchiveItem],
+  cc: Path,
+  triple: Str,
+  cflags: List[Str],
+  defs: List[Str],
+) -> Result[Map[Str]] {
+  var verdicts: Map[Str] = {}
+
+  for item in items {
+    let member_flags: List[Str] = collect {
+      for member in item.member_flags {
+        for flag in member {
+          yield flag
+        }
+      }
+    }
+
+    for flag in item.flags.extend(member_flags) {
+      continue when flag in verdicts
+
+      if let probe = compiler_option_probe(flag) {
+        let argv = [cc.display(), "-target", triple, "-Werror", @cflags, @defs, probe.tested, "-c", "-x", "c", "/dev/null", "-o", "/dev/null"]
+        let status = process.run(process.command_argv(argv[0], argv, stdout: /dev/null, stderr: /dev/null))?
+        verdicts[flag] = if status.ok { probe.accepted } else { probe.rejected }
+      }
+    }
+  }
+
+  verdicts
+}
+
+pure resolve_compile_flags(object: Str, flags: List[Str], verdicts: Map[Str]) -> Result[List[Str]] {
+  var resolved: List[Str] = []
+
+  for flag in flags {
+    let words = if flag in verdicts { (verdicts.get(flag) ?? "").fields() } else { [flag] }
+
+    for word in words {
+      if "$(" in word {
+        return Err(ScriptError.Failed(kind: "kbuild-unexpanded-flag", message: f"{object}: compile argument {word} was not expanded"))
+      }
+
+      resolved += [word]
+    }
+  }
+
+  resolved
+}
+
+proc resolve_item_compile_flags(
+  items: List[PreparedArchiveItem],
+  cc: Path,
+  triple: Str,
+  cflags: List[Str],
+  defs: List[Str],
+) -> Result[List[PreparedArchiveItem]] {
+  let verdicts = probe_compiler_options(items, cc, triple, cflags, defs)?
+  var resolved: List[PreparedArchiveItem] = []
+
+  for item in items {
+    var member_flags: List[List[Str]] = []
+
+    for member in item.member_flags {
+      member_flags += [resolve_compile_flags(item.object, member, verdicts)?]
+    }
+
+    resolved += [{...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}]
+  }
+
+  resolved
+}
+
 proc analyze_archive_items_impl(
   items: List[PreparedArchiveItem],
   cc: Path,
@@ -6381,8 +6499,9 @@ proc analyze_archive_items_impl(
   emit_task_specs: Bool,
 ) -> Result[List[ArchiveAnalysisResult]] {
   var results: List[ArchiveAnalysisResult] = []
+  let resolved_items = if emit_task_specs { resolve_item_compile_flags(items, cc, triple, cflags, defs)? } else { items }
 
-  for item in items {
+  for item in resolved_items {
     let {object: object_key, owner: owner_key, library, pi, composite: composite_key, flags, ..} = item
     let obj = fp"{object_key}"
     var task_specs = []
@@ -6562,7 +6681,7 @@ proc archive_analysis_item_from_record(item: Record) -> Result[ArchiveAnalysisIt
 }
 
 ## Exported declaration `analyze_archive_items`.
-export proc analyze_archive_items(items: List[Record]) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
+export proc analyze_archive_items(items: List[Record]) [fs, process, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
   let prepared = [archive_item_sources(item, "")? for item in typed_items]
   analyze_archive_items_impl(prepared, p".", "", [], [], [], false)?
@@ -6576,7 +6695,7 @@ export proc analyze_archive_items_with_task_specs(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
+) [fs, process, error] -> Result[List[ArchiveAnalysisResult], Error] {
   let prepared = [archive_item_sources(item, triple)? for item in items]
   analyze_archive_items_impl(prepared, cc, triple, cflags, defs, includes, true)?
 }
@@ -6585,7 +6704,7 @@ export proc analyze_archive_items_with_task_specs(
 export proc analyze_prepared_archive_items(
   items: List[PreparedArchiveItem], cc: Path, triple: Str, cflags: List[Str], defs: List[Str],
   includes: List[Str], emit_task_specs: Bool,
-) [fs, error] -> Result[List[ArchiveAnalysisResult], Error] {
+) [fs, process, error] -> Result[List[ArchiveAnalysisResult], Error] {
   analyze_archive_items_impl(items, cc, triple, cflags, defs, includes, emit_task_specs)?
 }
 
@@ -7020,7 +7139,7 @@ export proc plan_builtin_archives(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, env, time, error] -> Result[BuiltinArchivePlan, Error] {
+) [fs, process, env, time, error] -> Result[BuiltinArchivePlan, Error] {
   let prepared = prepare_archive_analysis(plan, triple)?
   let emit_task_specs = (e"XSH_LINUX_KBUILD_ARCHIVE_ONLY" ?? "") != "1"
   let results = analyze_archive_items_impl(

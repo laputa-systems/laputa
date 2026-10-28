@@ -141,7 +141,7 @@ proc test_builtin_archive_plan(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
@@ -467,7 +467,7 @@ lib-y := new.o
   assert plan.unsupported.is_empty(), plan.unsupported.join("\n")
 }
 
-test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
+test test_kbuild_constructs_builtin_archive_tasks [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-tasks")?
   let cache = test.temp_dir(ctx, name: "linux-archive-cache")?
   write_fixture(root)
@@ -623,7 +623,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, env, time, error] { |ctx|
   }
 }
 
-test test_kbuild_plans_pi_relacheck_after_objcopy [fs, env, time, error] { |ctx|
+test test_kbuild_plans_pi_relacheck_after_objcopy [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-pi-relacheck")?
   let cache = test.temp_dir(ctx, name: "linux-pi-cache")?
   fp"{root}/arch/arm64/kernel/pi".mkdir()
@@ -944,7 +944,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
   }?
 }
 
-test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] { |ctx|
+test test_kbuild_reports_missing_builtin_archive_sources [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-missing")?
   let cache = test.temp_dir(ctx, name: "linux-missing-cache")?
 
@@ -976,7 +976,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, env, time, error] 
   }
 }
 
-test test_kbuild_archive_analysis_preserves_item_order [fs, env, error] { |ctx|
+test test_kbuild_archive_analysis_preserves_item_order [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-archive-analysis")?
   fp"{root}/first.c".write(
     """int first(void) { return 0; }
@@ -1140,7 +1140,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
   }
 }
 
-test test_kbuild_adds_x86_kvm_local_include [fs, env, time, error] { |ctx|
+test test_kbuild_adds_x86_kvm_local_include [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-x86-kvm-include")?
   let cache = test.temp_dir(ctx, name: "linux-kvm-cache")?
   fp"{root}/arch/x86/kvm/mmu".mkdir()
@@ -1186,7 +1186,7 @@ int mmu(void) { return 0; }
   }
 }
 
-test test_kbuild_applies_object_and_subdir_cflags [fs, env, time, error] { |ctx|
+test test_kbuild_applies_object_and_subdir_cflags [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-cflags")?
   let cache = test.temp_dir(ctx, name: "linux-cflags-cache")?
   fp"{root}/sound/hda/common".mkdir()
@@ -1252,7 +1252,7 @@ CFLAGS_intel.o := -I$(src)
   }
 }
 
-test test_kbuild_defined_empty_flags_reject_conditional_defaults [fs, env, time, error] { |ctx|
+test test_kbuild_defined_empty_flags_reject_conditional_defaults [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-empty-flags")?
   let cache = test.temp_dir(ctx, name: "linux-empty-flags-cache")?
   fp"{root}/.config".write("")
@@ -1281,7 +1281,62 @@ CFLAGS_foo.o += -DVALUE=$(empty-y)
   }
 }
 
-test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |ctx|
+test test_kbuild_resolves_compiler_option_calls_in_compile_flags [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-compiler-option-calls")?
+  let cache = test.temp_dir(ctx, name: "linux-compiler-option-calls-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/foo.c".write("int foo(void) { return 0; }\n")
+  fp"{root}/bar.c".write("int bar(void) { return 0; }\n")
+  fp"{root}/Kbuild".write("""ccflags-y += $(call cc-disable-warning, unused-but-set-variable)
+CFLAGS_foo.o := $(call cc-option,-fxsh-no-such-flag,-DFALLBACK) -DAFTER
+CFLAGS_bar.o := $(call cc-disable-warning,xsh-no-such-warning) -DBAR
+""")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"."], objects: [p"foo.o", p"bar.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
+  )
+  let clang = process.which("clang")?
+  cd root {
+    let archive_plan = test_builtin_archive_plan(cache, plan, clang, "x86_64-linux-gnu", [], [], [])?
+    for name in ["foo", "bar"] {
+      let tasks = [task for task in archive_plan.tasks if task.name == f".xsh-kbuild/obj/{name}.o"]
+      assert tasks.len() == 1
+      assert "-Wno-unused-but-set-variable" in tasks[0].argv
+      let argv = tasks[0].argv.require(List[Str])?
+      assert [arg for arg in argv if "$(" in arg or arg.ends_with(",") or arg.ends_with(")")].is_empty()
+    }
+    let foo = [task for task in archive_plan.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
+    assert "-DFALLBACK" in foo[0].argv
+    assert "-DAFTER" in foo[0].argv
+    assert "-fxsh-no-such-flag" not in foo[0].argv
+    let bar = [task for task in archive_plan.tasks if task.name == ".xsh-kbuild/obj/bar.o"]
+    assert "-DBAR" in bar[0].argv
+    assert "-Wno-xsh-no-such-warning" not in bar[0].argv
+  }
+}
+
+test test_kbuild_rejects_unexpanded_compile_arguments [fs, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "linux-unexpanded-flags")?
+  let cache = test.temp_dir(ctx, name: "linux-unexpanded-flags-cache")?
+  fp"{root}/.config".write("")
+  fp"{root}/foo.c".write("int foo(void) { return 0; }\n")
+  fp"{root}/Kbuild".write("CFLAGS_foo.o := $(shell echo -DX) -DY\n")
+  let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
+    dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
+  )
+  cd root {
+    match test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], []) {
+      Ok(_) => test.fail("planning accepted an unexpanded compile argument")
+      Err(kbuild.ScriptError.Failed {kind, message}) => {
+        assert kind == "kbuild-unexpanded-flag"
+        assert "foo.o" in message
+        assert "$(shell" in message
+      }
+      Err(problem) => test.fail(f"unexpected planning error: {problem.message}")
+    }
+  }
+}
+
+test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-legacy-flags")?
   let cache = test.temp_dir(ctx, name: "linux-legacy-flags-cache")?
   fp"{root}/.config".write("")
@@ -1297,7 +1352,7 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |c
     let stable = fp"{cache}/linux-x86.compile-flags.json"
     for cache_file in [local, stable] {
       let original = cache_file.read_text()?
-      let stale = original.replace("-DVALID", with: "-DSTALE").replace("linux-kbuild-compile-flags-v4", with: "linux-kbuild-compile-flags-v3")
+      let stale = original.replace("-DVALID", with: "-DSTALE").replace("linux-kbuild-compile-flags-v5", with: "linux-kbuild-compile-flags-v4")
       assert stale != original
       cache_file.write(stale)
     }
@@ -1306,7 +1361,7 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, env, time, error] { |c
     assert tasks.len() == 1
     assert "-DVALID" in tasks[0].argv
     assert "-DSTALE" not in tasks[0].argv
-    assert "linux-kbuild-compile-flags-v4" in local.read_text()?
+    assert "linux-kbuild-compile-flags-v5" in local.read_text()?
     for cache_file in [local, stable] {
       cache_file.write(cache_file.read_text()?.replace("-DVALID", with: "-DSTALE"))
     }
@@ -1527,7 +1582,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
   }?
 }
 
-test test_kbuild_applies_composite_makefile_cflags_to_subdir_members [fs, env, time, error] { |ctx|
+test test_kbuild_applies_composite_makefile_cflags_to_subdir_members [fs, process, env, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-composite-cflags")?
   let cache = test.temp_dir(ctx, name: "linux-composite-cache")?
   fp"{root}/lib/xor/x86".mkdir()

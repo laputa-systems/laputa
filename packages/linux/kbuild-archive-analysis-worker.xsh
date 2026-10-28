@@ -1,7 +1,7 @@
 #!/bin/xsh
 use kbuild
 
-proc main(...argv: List[Str]) [fs, error] {
+proc main(...argv: List[Str]) [fs, process, error] {
   let input_path = fp"{argv[0]}"
   let output_path = fp"{argv[1]}"
   let input = json.read(input_path)?.require(kbuild.ArchiveAnalysisInput)?
