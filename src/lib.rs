@@ -6,6 +6,8 @@
 //! behind narrow adapters defined in their modules.
 
 pub mod config;
+pub mod engine;
+pub mod publish;
 pub mod uevent;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
