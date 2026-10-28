@@ -1,0 +1,134 @@
+# Tinyland kiosk profile
+
+Opt-in Laputa profile `qemu-tinyland-foot`: unprivileged tinyland through
+seatd-mediated devices, running Laputa foot. `qemu-dwl-foot` remains the
+canonical reference until the owner swaps the default on the evidence below.
+
+Non-goals: tiling, pointer/multiwindow operation, GPU rendering, general
+scale/transform handling, a desktop environment, finishing Wayland protocols.
+
+## Status
+
+Landed on laputa master as `feat(laputa): prototype opt-in
+qemu-tinyland-foot profile`:
+
+- `packages/tinyland`: builds upstream `tinyland@182bedd` (codeload
+  sha256 `b00f82...f19`) with the `cargo-vendor` source kind over the
+  pinned `Cargo.lock` (sha256 `f075...1e`). Provenance for both hashes is
+  the `prerelease` workflow run on that SHA in laputa-systems/tinyland.
+- `profiles/qemu-tinyland-foot` plus guest proof
+  `guest/qemu-tinyland-foot-proof.xsh` and overlay session scripts under
+  `profiles/qemu-tinyland-foot/usr/lib/laputa/`.
+- `packages/baselayout`: `laputa` joins the `seat` group (socket access)
+  and the `tty` group (pty allocation).
+- Proof markers are typed profile data (`SystemProfile.proof`); the dwl
+  profile keeps its exact markers, and its guest test still passes.
+
+## Evidence
+
+`make profile-tinyland-test` passes end to end: mdevd coldplug, unprivileged
+direct-open denial for DRM and evdev, seat open through the broker, mediated
+DRM/input, QMP input to the post-input magenta marker, confirmed
+presentation, clean shutdown. The runtime closure is 26 packages with no
+dwl, wlroots, libinput, libdrm, mesa, wayland-server, or xwayland
+(vs 34 for dwl).
+
+Gate status: 1 done; 2 done against the exact Laputa chain (foot 1.28.0,
+C seatd 0.9.3, Laputa image); 3 partially done (app exit plus broker-loss
+hard failure; crash/device-loss/VT paths open); 4 measured for the current
+closure.
+
+## Locked decisions
+
+- seatd-only libseat, `LIBSEAT_BACKEND=seatd` enforced in tinyland; no
+  automatic fallback, ever. Daemon loss is a fatal error, not a reopen.
+- The Laputa binary links dynamically (`-C target-feature=-crt-static`).
+  A static-PIE binary with DT_NEEDED entries crashes under an explicit
+  loader invocation, and the proof runs the binary that way. The harness
+  `.cargo/config.toml` must not leak into the container build (it carries
+  mold flags and guest-root paths); the recipe deletes it and supplies
+  its own flags.
+- The xkbcommon crate links without a kind, which rustc resolves
+  statically; the image ships only the shared library, so the recipe
+  patches the vendored crate to a dylib link.
+- `panic=abort` plus `gnu-stubs` for the GCC runtime: the image has no
+  libgcc provider package, and sudo-rs sets the same precedent.
+- The guest session runs as `laputa` via `su` + `/usr/bin/xsh`
+  (`/usr/bin/xshi` is disabled in the guest). XDG_RUNTIME_DIR is
+  laputa-owned 0700; there is no working `chown` in the image, so the
+  session user creates its own runtime dir under a world-writable
+  `/run/user`, and the seat/tty group memberships live in baselayout.
+- The visual marker must spell SGR truecolor completely
+  (`48;2;255;0;255`); a truncated sequence renders as plain text and the
+  screenshot gate fails with zero magenta pixels.
+- Hosted tinyland CI pins `XKB_CONFIG_ROOT` at the system path; ambient
+  XKB defaults do not resolve there. Laputa builds are unaffected (the
+  recipe drops that env).
+
+## Remaining roadmap
+
+R1 and R2 substitute the Rust daemons behind the same guest proof. Do them
+one at a time and re-run the full profile test after each; never change the
+compositor and both brokers in one debugging run.
+
+### R1 — seatd-rs substitution
+
+Add a Laputa package for seatd-rs (URL tarball + vendored crates, mirroring
+`packages/tinyland`), swap the profile and the guest proof from C seatd to
+it, and re-qualify. Watch: socket mode/ownership (`root:seat`, 0770),
+`SEATD_VTBOUND=0`-equivalent unbound operation, and the exact seatd-only
+libseat behavior tinyland depends on. seatd-rs was qualified as a scoped
+experimental prerelease; this is its first real consumer.
+
+### R2 — mdevd-rs substitution
+
+Same pattern for mdevd/mdevd-coldplug. Watch: coldplug completion before
+deterministic discovery, `-O 4` rebroadcast semantics, and `-C` behavior.
+mdevd-rs was qualified for a controlled replacement trial; re-prove the
+node-creation and permission points in this guest.
+
+### R3 — lifecycle depth
+
+Qualify, with bounded observable outcomes: compositor crash (kill tinyland
+mid-session), broker loss (kill seatd: must fail closed, no direct-open
+fallback), and supported device loss. VT disable/resume belongs to R4,
+not here.
+
+### R4 — VT-bound profile
+
+A VT-bound variant of the profile with real VT switching: VT-bound seatd
+session, switch handling, disable/resume with reestablished input and no
+stuck modifiers or reused revoked descriptors. Tinyland implements the
+resume path but it has never been guest-proven.
+
+### R5 — device node ownership follow-up
+
+`/dev/ptmx` (0660 in the guest; the proof chmods it to 0666) and
+`/dev/console` (chmodded 0666 for test markers) need a proper home:
+an mdev rule and/or baselayout static nodes instead of proof-time chmod.
+Investigate who creates `/dev/ptmx` (devtmpfs vs mdev) first.
+
+### R6 — hotplug, only if needed
+
+The profile proves fixed-device coldplug plus deterministic discovery. If a
+lifecycle ever requires live hotplug, add a processed-event consumer over
+the libudev-zero rebroadcast. Do not add libinput or libudev-zero to
+tinyland for the static contract.
+
+### R7 — publication
+
+Releases and Laputa integration remain the owner's call. When published
+tarballs exist, migrate the recipe sources off the pinned git SHAs and
+re-qualify the exact new inputs.
+
+### R8 — dwl default swap and removal (owner decision)
+
+Swap the canonical profile only after R1–R3 plus the exact-chain evidence
+hold without qualification gaps. Waiting for a broad desktop feature set
+would defeat the purpose; the kiosk profile is the intended endpoint.
+
+## Explicit non-goals
+
+doas-rs is unrelated to display devices and does not block any item above.
+Pointer support, multiwindow behavior, and GPU composition are separate
+projects with their own qualification.

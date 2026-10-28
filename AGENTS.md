@@ -50,6 +50,7 @@ Host-tool setup, the full target reference, and cleanup are in
 | Open work | [TODO](TODO.md) |
 | Focused tests and wider verification | [Testing](docs/TESTING.md) |
 | Native Docker/QEMU profile and graphical proof | [QEMU](docs/QEMU.md) |
+| Tinyland kiosk profile, evidence, and remaining roadmap | [Tinyland](docs/TINYLAND.md) |
 | Installer images, install policy, QEMU harness | [Installer](docs/INSTALLER.md) |
 | Pinned Asterinas/Firecracker build, test, serial shell | [Asterinas](docs/ASTERINAS.md) |
 | Root bundle, trust policy, signed releases | [Certificate trust](docs/CERTIFICATE-TRUST.md) |
