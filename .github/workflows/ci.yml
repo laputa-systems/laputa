@@ -16,6 +16,8 @@ jobs:
           rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y musl-tools mold qemu-user
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          unshare -U -n -r true && echo "userns probe: ok" || echo "userns probe: BLOCKED"
           cargo fetch --locked --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
       - name: pins and deps
         run: |
