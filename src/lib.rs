@@ -5,6 +5,9 @@
 //! Privileged filesystem, netlink, process, and device operations stay
 //! behind narrow adapters defined in their modules.
 
+pub mod config;
+pub mod uevent;
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(test)]
