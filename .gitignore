@@ -7,3 +7,6 @@
 /src/include/mdevd/config.h
 /mdevd
 /mdevd-coldplug
+
+/target/
+.work/

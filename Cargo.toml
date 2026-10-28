@@ -1,0 +1,10 @@
+[package]
+name = "mdevd"
+version = "0.1.0"
+edition = "2021"
+description = "Rust replacement for mdevd and mdevd-coldplug"
+license = "ISC"
+
+[lib]
+name = "mdevd"
+path = "src/lib.rs"
