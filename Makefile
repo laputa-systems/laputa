@@ -177,6 +177,7 @@ need-xsh:
 XSH_TEST_IMAGE := xsh-test
 XSH_SEED_FEATURES := xsh/net xsh/tools xsht/native-tests
 CARGO_REGISTRY := $(CURDIR)/.cache/cargo/registry
+CARGO_GIT := $(CURDIR)/.cache/cargo/git
 CARGO_REGISTRY_STAMP := $(CURDIR)/.cache/cargo/Cargo.lock.sha256
 XSH_CARGO_TARGET := $(CURDIR)/.out/xsh-target
 MIRROR_CARGO_TARGET := $(CURDIR)/.out/mirror-target
@@ -186,9 +187,11 @@ SHA256 := $(if $(filter Darwin,$(HOST_OS)),shasum -a 256,sha256sum)
 HOST_DOCKER_RUN = docker run --rm --pull never --platform $(HOST_DOCKER_PLATFORM)
 HOST_CARGO_FETCH = $(HOST_DOCKER_RUN) \
 	--mount type=bind,src=$(CARGO_REGISTRY),dst=/root/.cargo/registry \
+	--mount type=bind,src=$(CARGO_GIT),dst=/root/.cargo/git \
 	--workdir /work
 HOST_CARGO_BUILD = $(HOST_DOCKER_RUN) --network none \
 	--mount type=bind,src=$(CARGO_REGISTRY),dst=/root/.cargo/registry \
+	--mount type=bind,src=$(CARGO_GIT),dst=/root/.cargo/git \
 	--workdir /work \
 	--env CARGO_TARGET_DIR=/target \
 	--env CARGO_NET_OFFLINE=true \
@@ -203,7 +206,7 @@ host-xsh:
 	    { echo "make host-xsh: XSH_ROOT=$(XSH_ROOT_ABS) is not an XSH checkout" >&2; exit 1; }
 	docker image inspect $(XSH_TEST_IMAGE) >/dev/null 2>&1 || \
 	    docker build --platform $(HOST_DOCKER_PLATFORM) --tag $(XSH_TEST_IMAGE) --file "$(XSH_ROOT_ABS)/Dockerfile.test" "$(XSH_ROOT_ABS)"
-	mkdir -p "$(CARGO_REGISTRY)" "$(XSH_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
+	mkdir -p "$(CARGO_REGISTRY)" "$(CARGO_GIT)" "$(XSH_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
 	@lock="$$($(SHA256) "$(XSH_ROOT_ABS)/Cargo.lock" | cut -d ' ' -f 1)"; \
 	    if [ "$$(cat "$(CARGO_REGISTRY_STAMP)" 2>/dev/null)" != "$$lock" ]; then \
 	        echo "fetching XSH crates for $(XSH_ROOT_ABS)/Cargo.lock"; \
@@ -230,7 +233,7 @@ host-xsh:
 # nightly XSH's Dockerfile.test installs.
 MIRROR_TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' $(MIRROR)/rust-toolchain.toml)
 host-mirror:
-	mkdir -p "$(MIRROR_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
+	mkdir -p "$(CARGO_GIT)" "$(MIRROR_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
 	$(HOST_CARGO_BUILD) --env RUSTUP_TOOLCHAIN=$(MIRROR_TOOLCHAIN) \
 	    --mount type=bind,src=$(CURDIR)/$(MIRROR),dst=/work,readonly \
 	    --mount type=bind,src=$(MIRROR_CARGO_TARGET),dst=/target \
@@ -299,7 +302,7 @@ fetch: fetch-seed $(FETCH_HOST_MIRROR)
 
 # The mirror's crates for `make host-mirror`, in the image `fetch-seed` provides.
 fetch-mirror: fetch-seed
-	mkdir -p "$(CARGO_REGISTRY)"
+	mkdir -p "$(CARGO_REGISTRY)" "$(CARGO_GIT)"
 	$(HOST_CARGO_FETCH) --mount type=bind,src=$(CURDIR)/$(MIRROR),dst=/work,readonly $(XSH_TEST_IMAGE) cargo fetch --locked
 
 # The networked seed inputs: XSH's crates for XSH_ROOT's Cargo.lock in
@@ -414,7 +417,7 @@ mirror: $(MIRROR_SERVER_DEPS)
 ifeq ($(HOST_OS),Linux)
 mirror-test:
 	sh infra/mirror/test.sh
-	mkdir -p "$(MIRROR_CARGO_TARGET)"
+	mkdir -p "$(CARGO_GIT)" "$(MIRROR_CARGO_TARGET)"
 	$(HOST_CARGO_BUILD) --env RUSTUP_TOOLCHAIN=$(MIRROR_TOOLCHAIN) \
 	    --mount type=bind,src=$(CURDIR)/$(MIRROR),dst=/work,readonly \
 	    --mount type=bind,src=$(MIRROR_CARGO_TARGET),dst=/target \
