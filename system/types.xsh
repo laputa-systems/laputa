@@ -1,9 +1,20 @@
-##! Typed contracts for the single supported Laputa reference system.
+##! Typed contracts for the supported Laputa reference systems.
 
 ## The execution mode selected for the reference QEMU system.
 export enum QemuMode { Test, Interactive }
 
-## The data-only description of the supported Laputa system profile. The
+## The guest proof markers owned by one system profile. The guest emits the
+## ready marker when its session accepts input, the success marker only
+## after it consumes the injected input, and the failure marker on any
+## proof failure; the kernel command line selects the proof with the flag.
+export type ProofMarkers = {
+  cmdline_flag: Str,
+  ready_marker: Str,
+  success_marker: Str,
+  failure_marker: Str,
+}
+
+## The data-only description of a supported Laputa system profile. The
 ## QEMU machine, CPU, and accelerator belong to the host (`system.qemu`).
 export type SystemProfile = {
   name: Str,
@@ -16,6 +27,7 @@ export type SystemProfile = {
   qemu_height: Int,
   forbidden_packages: List[Str],
   forbidden_sonames: List[Str],
+  proof: ProofMarkers,
 }
 
 ## Errors raised when a profile or system command violates its declared contract.

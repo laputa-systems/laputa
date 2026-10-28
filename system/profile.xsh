@@ -63,6 +63,12 @@ export proc validate_system_profile(value: types.SystemProfile) [error] -> Resul
     return Err(types.LaputaError.Profile(f"{value.name} has an invalid QEMU specification"))
   }
 
+  for marker in [value.proof.cmdline_flag, value.proof.ready_marker, value.proof.success_marker, value.proof.failure_marker] {
+    if marker == "" or " " in marker {
+      return Err(types.LaputaError.Profile(f"{value.name} has an invalid proof marker"))
+    }
+  }
+
   var forbidden_packages: Map[Bool] = {}
   for package_name in value.forbidden_packages {
     guard valid_package_name(package_name) else {
@@ -120,6 +126,10 @@ width\t{value.qemu_width}
 height\t{value.qemu_height}
 forbidden-packages\t{value.forbidden_packages.join(",")}
 forbidden-sonames\t{value.forbidden_sonames.join(",")}
+proof-flag\t{value.proof.cmdline_flag}
+proof-ready\t{value.proof.ready_marker}
+proof-success\t{value.proof.success_marker}
+proof-failure\t{value.proof.failure_marker}
 """
   bytes.from_text(body).sha256().hex()
 }

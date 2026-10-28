@@ -1,8 +1,11 @@
 # QEMU Proof
 
-`qemu-dwl-foot` is the one supported profile. Its acceptance test boots the
-immutable image built by `laputa build`; it does not assemble a filesystem from
-a handwritten package list.
+`qemu-dwl-foot` is the canonical reference profile. `qemu-tinyland-foot`
+is the opt-in kiosk profile: unprivileged tinyland through seatd-mediated
+devices and Laputa foot, without dwl, wlroots, libinput, libdrm, Mesa, or
+wayland-libs-server in the runtime closure. Each profile's acceptance test
+boots the immutable image built by `laputa build`; it does not assemble a
+filesystem from a handwritten package list.
 
 ## Host targets
 
@@ -34,6 +37,11 @@ make profile-plan     # laputa.xsh -- plan qemu-dwl-foot
 make profile-clean    # laputa.xsh -- clean qemu-dwl-foot
 ```
 
+The `qemu-tinyland-foot` profile has the same verbs under
+`make profile-tinyland-build`, `profile-tinyland-test`,
+`profile-tinyland-boot`, `profile-tinyland-plan`, and
+`profile-tinyland-clean`.
+
 `laputa.xsh` also takes `--jobs N` (`$XSH_HOST laputa.xsh -- build
 qemu-dwl-foot --jobs 4`).
 
@@ -63,12 +71,16 @@ complete verified bundle is copied atomically to the host output mount.
 
 ## Proof contract
 
-The guest coldplugs devices, starts seatd, dwl, and foot, and emits
-`LAPUTA_DWL_FOOT_PROOF_OK` only after foot launches, then keeps the compositor
-running until the host stops the guest. A passing test requires
-that marker and a screenshot containing the terminal's magenta visual marker. It rejects `Kernel panic`, `not
-syncing`, and `LAPUTA_DWL_FOOT_PROOF_FAILED`; inspect `console.log` and
-`qemu.log` first when it fails.
+The guest coldplugs devices, starts seatd, the profile compositor, and foot,
+and emits its `*_PROOF_OK` marker only after foot launches, then keeps the
+compositor running until the host stops the guest. A passing test requires
+that marker and a screenshot containing the terminal's magenta visual marker.
+It rejects `Kernel panic`, `not syncing`, and the profile's `*_PROOF_FAILED`
+marker; inspect `console.log` and `qemu.log` first when it fails.
+
+The tinyland profile additionally requires the direct-open denial marker:
+unprivileged opens of the DRM and evdev nodes must fail while the brokered
+session succeeds.
 
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed

@@ -16,6 +16,15 @@ type SupervisorFixture = {
   input_record: Path,
 }
 
+pure fixture_proof() -> types.ProofMarkers {
+  {
+    cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF",
+    ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY",
+    success_marker: "LAPUTA_DWL_FOOT_PROOF_OK",
+    failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
+  }
+}
+
 pure fixture_profile() -> types.SystemProfile {
   {
     name: "qemu-dwl-foot",
@@ -30,6 +39,7 @@ pure fixture_profile() -> types.SystemProfile {
     qemu_height: 800,
     forbidden_packages: [],
     forbidden_sonames: [],
+    proof: fixture_proof(),
   }
 }
 
@@ -70,8 +80,8 @@ test test_qemu_command_on_macos_is_aarch64_under_hvf [error] {
     assert_profile_devices(argv)
   }
 
-  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test), "test proof flag"
-  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Interactive)), "interactive omits proof flag"
+  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test, fixture_proof()), "test proof flag"
+  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Interactive, fixture_proof())), "interactive omits proof flag"
   assert "none" in pair[0], "headless test"
   assert "cocoa,zoom-to-fit=on,show-cursor=on" in pair[1], "cocoa interactive"
 }
@@ -109,18 +119,21 @@ test test_qemu_target_runs_on_linux_aarch64_under_kvm_and_rejects_other_hosts [e
 }
 
 test test_console_markers_fail_before_success [error] {
+  let markers = fixture_proof()
+
   for marker in proof.failure_markers {
-    assert proof.failure_marker(f"before {marker} after") == marker
+    assert proof.failure_marker(markers, f"before {marker} after") == marker
   }
 
-  assert ! proof.succeeded("booting")
-  assert proof.succeeded(proof.success_marker)
-  match proof.verify_console("LAPUTA_DWL_FOOT_PROOF_FAILED input") {
+  assert proof.failure_marker(markers, "LAPUTA_DWL_FOOT_PROOF_FAILED input") == "LAPUTA_DWL_FOOT_PROOF_FAILED"
+  assert ! proof.succeeded(markers, "booting")
+  assert proof.succeeded(markers, markers.success_marker)
+  match proof.verify_console(markers, "LAPUTA_DWL_FOOT_PROOF_FAILED input") {
     Ok(_) => assert false
     Err(_) => {}
   }
 
-  match proof.verify_console(f"""{proof.success_marker}
+  match proof.verify_console(markers, f"""{markers.success_marker}
 QEMU_FATAL after success""") {
     Ok(_) => assert false
     Err(_) => {}

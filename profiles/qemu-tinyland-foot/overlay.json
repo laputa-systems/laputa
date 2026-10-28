@@ -1,0 +1,5 @@
+{
+  "format": "laputa-generation-overlay-1",
+  "profile": "qemu-tinyland-foot",
+  "replacements": []
+}

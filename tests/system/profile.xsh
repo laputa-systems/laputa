@@ -87,6 +87,12 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
     qemu_height: 1,
     forbidden_packages: [],
     forbidden_sonames: [],
+    proof: {
+      cmdline_flag: "VALID_PROOF",
+      ready_marker: "VALID_PROOF_READY",
+      success_marker: "VALID_PROOF_OK",
+      failure_marker: "VALID_PROOF_FAILED",
+    },
   )
   profile.validate_system_profile(valid)
   match profile.validate_system_profile({...valid, package_roots: ["one", "one"]}) {
@@ -95,6 +101,11 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
   }
 
   match profile.validate_system_profile({...valid, package_roots: ["/one"]}) {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+
+  match profile.validate_system_profile({...valid, proof: {...valid.proof, success_marker: ""}}) {
     Ok(_) => assert false
     Err(_) => {}
   }

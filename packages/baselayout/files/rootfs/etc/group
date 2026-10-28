@@ -3,7 +3,7 @@ bin:x:1:
 sys:x:2:
 kmem:x:3:
 wheel:x:4:laputa
-tty:x:5:
+tty:x:5:laputa
 tape:x:6:
 daemon:x:7:
 floppy:x:8:
@@ -22,7 +22,7 @@ scanner:x:20:
 network:x:21:
 kvm:x:24:
 input:x:25:
-seat:x:26:
+seat:x:26:laputa
 nogroup:x:99:
 users:x:100:
 laputa:x:1000:

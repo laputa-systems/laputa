@@ -43,4 +43,10 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "python",
   ],
   forbidden_sonames: ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse"],
+  proof: {
+    cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF",
+    ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY",
+    success_marker: "LAPUTA_DWL_FOOT_PROOF_OK",
+    failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
+  },
 )

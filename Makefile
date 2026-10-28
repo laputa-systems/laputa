@@ -327,6 +327,22 @@ profile-boot:
 profile-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
 
+# Opt-in kiosk profile: unprivileged tinyland through seatd mediation.
+profile-tinyland-plan:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-foot
+
+profile-tinyland-build:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-foot
+
+profile-tinyland-test:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-foot
+
+profile-tinyland-boot:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-foot
+
+profile-tinyland-clean:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-foot
+
 # Install Firecracker locally, build the pinned Asterinas PVH kernel, and boot
 # a small serial smoke initramfs under KVM.
 asterinas-setup:

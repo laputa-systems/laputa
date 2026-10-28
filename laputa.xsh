@@ -1,4 +1,4 @@
-##! The explicit command entrypoint for Laputa's qemu-dwl-foot system profile.
+##! The explicit command entrypoint for Laputa's QEMU system profiles.
 #!/bin/xsh
 use system.cli as laputa_cli
 

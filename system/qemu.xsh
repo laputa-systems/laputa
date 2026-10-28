@@ -1,4 +1,4 @@
-##! Structured QEMU construction and supervision for qemu-dwl-foot.
+##! Structured QEMU construction and supervision for the QEMU profiles.
 use system.build
 use system.image
 use system.proof
@@ -72,7 +72,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
 
   Err(
     types.LaputaError.Profile(
-      f"no QEMU target for {os} {arch}; qemu-dwl-foot runs natively on macOS aarch64 or Linux aarch64/x86_64",
+      f"no QEMU target for {os} {arch}; profiles run natively on macOS aarch64 or Linux aarch64/x86_64",
     ),
   )
 }
@@ -95,10 +95,10 @@ export pure root_partuuid() -> Str {
 }
 
 ## Build the serial-console kernel command line for a host target and profile mode.
-export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode) -> Str {
+export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode, proof: types.ProofMarkers) -> Str {
   let base = f"{target.console} ignore_loglevel devtmpfs.mount=1 root=PARTUUID={root_partuuid()} rootfstype=ext4 rootwait rootdelay=2 rw init=/init loglevel=8 XSH_LINUX_REAL=1 XSH_UNIX_REAL=1"
 
-  return f"{base} LAPUTA_QEMU_DWL_FOOT_PROOF=1" when mode == .Test
+  return f"{base} {proof.cmdline_flag}=1" when mode == .Test
 
   base
 }
@@ -141,7 +141,7 @@ export pure qemu_command_argv(
     "-kernel",
     outputs.kernel.display(),
     "-append",
-    kernel_cmdline(target, mode),
+    kernel_cmdline(target, mode, profile.proof),
     "-drive",
     f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on",
     "-device",
@@ -305,7 +305,7 @@ export proc run_test(
   outputs: build.ProfileOutputs,
 ) [fs, process, time, error] {
   if ! outputs.kernel.exists() or ! outputs.disk.exists() {
-    return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
+    return Err(types.LaputaError.Profile(f"{profile.name} image is missing; run laputa build first"))
   }
 
   outputs.console_log.remove()
@@ -326,20 +326,20 @@ export proc run_test(
 
   while qemu_process_live(launched.pid) {
     let log_text = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-    let failed = proof.failure_marker(log_text)
+    let failed = proof.failure_marker(profile.proof, log_text)
     if failed != "" {
       return Err(
         types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
-    if ! injected and outputs.qmp_socket.exists() and "LAPUTA_DWL_FOOT_PROOF_READY" in log_text {
+    if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {
       qemu_qmp_retry(value, QmpRetryReady, outputs.qmp_socket)
       qemu_qmp(value, QmpInput, outputs.qmp_socket)
       injected = true
     }
 
-    if proof.succeeded(log_text) {
+    if proof.succeeded(profile.proof, log_text) {
       if ! screenshot_taken {
         qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket)
         if ! screenshot_is_valid(outputs.screenshot) {
@@ -360,15 +360,15 @@ export proc run_test(
 
       qemu_stop(launched)
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-      proof.verify_console(final_log)
+      proof.verify_console(profile.proof, final_log)
 
-      print "laputa test qemu-dwl-foot: ok"
+      print f"laputa test {profile.name}: ok"
       return
     }
 
     if elapsed >= 180 {
       return Err(
-        types.LaputaError.Profile(f"timed out waiting for qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
+        types.LaputaError.Profile(f"timed out waiting for {profile.name} proof; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
@@ -378,14 +378,14 @@ export proc run_test(
 
   let _ = wait launched?
   let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
-  match proof.verify_console(final_log) {
+  match proof.verify_console(profile.proof, final_log) {
     Ok(_) => return Err(
       types.LaputaError.Profile(
         f"QEMU exited after guest proof before supervisor completion; inspect {qemu_output_locations(outputs)}",
       ),
     )
     Err(_) => return Err(
-      types.LaputaError.Profile(f"QEMU exited before qemu-dwl-foot proof; inspect {qemu_output_locations(outputs)}"),
+      types.LaputaError.Profile(f"QEMU exited before {profile.name} proof; inspect {qemu_output_locations(outputs)}"),
     )
   }
 }
@@ -393,7 +393,7 @@ export proc run_test(
 ## Run the profile's normal interactive session and return its real QEMU exit status.
 export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, error] {
   if ! outputs.kernel.exists() or ! outputs.disk.exists() {
-    return Err(types.LaputaError.Profile("qemu-dwl-foot image is missing; run laputa build first"))
+    return Err(types.LaputaError.Profile(f"{profile.name} image is missing; run laputa build first"))
   }
 
   let status = process.run(
