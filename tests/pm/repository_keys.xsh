@@ -100,7 +100,7 @@ test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ct
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?
 
   let tailscale = generation_names(generation.plan(value, ["tailscale"], overlay)?)
-  assert tailscale == ["iptables", "musl", "tailscale", "xinit", "xsh"]
+  assert tailscale == ["ca-certificates", "iptables", "musl", "tailscale", "xinit", "xsh"]
 
   let network = generation_names(generation.plan(value, ["laputa-net"], overlay)?)
   for name in ["wpa_supplicant", "xinit", "xsh"] {

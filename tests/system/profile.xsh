@@ -10,6 +10,7 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
   assert value.package_roots == [
     "baselayout",
+    "ca-certificates",
     "xsh",
     "laputa-pm",
     "xinit",
