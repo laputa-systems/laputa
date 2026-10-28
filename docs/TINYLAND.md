@@ -93,12 +93,25 @@ brokered session, QMP input, magenta screenshot). Closure carries
 through group mediation (`laputa` in `seat`), `SEATD_VTBOUND=0` unbound
 operation is unchanged, and no automatic fallback exists anywhere.
 
-### R2 — mdevd-rs substitution
+### R2 — mdevd-rs substitution — landed
 
-Same pattern for mdevd/mdevd-coldplug. Watch: coldplug completion before
-deterministic discovery, `-O 4` rebroadcast semantics, and `-C` behavior.
-mdevd-rs was qualified for a controlled replacement trial; re-prove the
-node-creation and permission points in this guest.
+`packages/mdevd-rs` builds the staged port head
+`4334f17` (codeload sha256 `33b93330…`; Cargo.lock sha256 `ef1bbbda…`;
+docs-only delta to the qualified `c3f4593`, whose guest, protocol, and
+combined-run proofs are green) with the locked vendored crates: `mdevd`
+and `mdevd-coldplug` with the same installed filetree and the same xinit
+service name/argv as the C pair (`-O 4 -f /etc/mdev.conf -C`). Only the
+tinyland profile swaps (`mdevd-rs` for `mdevd`, `mdevd` forbidden); the dwl
+profile and the installer keep the C daemons. The package proof checks
+`-N` against live-syntax rules (move, alternation, new ptmx rule) and
+rejects a syntax error with exit 2.
+
+Watch points re-proven in the guest: coldplug completes before
+deterministic discovery (`/dev/dri/card0`, both input nodes), `-O 4`
+rebroadcast still feeds the session, `-C` spawns the helper, and the R5
+node rules apply under the port (`/dev/ptmx mode=438`, `/dev/console
+mode=400` in the proof log). Evidence: full profile test green with a
+closure carrying `mdevd-rs` and no C `mdevd`.
 
 ### R3 — lifecycle depth
 
