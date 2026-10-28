@@ -142,3 +142,4 @@ while kill -0 $MPID 2>/dev/null; do sleep 0.1; i=$((i + 1)); [ $i -lt 50 ] || fa
 wait $MPID
 [ $? = 0 ] || fail "mdevd exit nonzero"
 out COMBINED_OK
+poweroff -f
