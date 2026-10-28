@@ -8,3 +8,6 @@ license = "ISC"
 [lib]
 name = "mdevd"
 path = "src/lib.rs"
+
+[dependencies]
+libc = "0.2"
