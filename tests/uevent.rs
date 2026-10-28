@@ -1,6 +1,7 @@
 //! P2: uevent intake tests. `uevent` filter.
 use mdevd::config::UEVENT_MAX_VARS;
-use mdevd::uevent::{Invalid, Stats, bind_intake, parse_record, read_datagram, read_event};
+use mdevd::uevent::{DataOutcome, Invalid, Stats, bind_intake, parse_record, read_datagram, read_event};
+use mdevd::uevent::ReadOutcome;
 use std::os::unix::io::BorrowedFd;
 
 fn record(parts: &[&[u8]]) -> Vec<u8> {
@@ -55,19 +56,16 @@ fn uevent_rejects() {
 
 #[test]
 fn uevent_datagram_policy() {
-    let mut stats = Stats::default();
-    assert!(read_datagram(&[], 0, true, &mut stats).is_none());
     let buf = record(&[b"add@/x", b"ACTION=add"]);
     // Kernel sender passes the userspace drop.
-    assert!(read_datagram(&buf, 0, true, &mut stats).is_some());
-    // Userspace sender is dropped and counted when configured.
-    assert!(read_datagram(&buf, 99, true, &mut stats).is_none());
-    assert_eq!(stats.dropped_userspace, 1);
+    assert!(matches!(read_datagram(&buf, 0, true), DataOutcome::Event(_)));
+    // Userspace sender is dropped when configured...
+    assert_eq!(read_datagram(&buf, 99, true), DataOutcome::DroppedUserspace);
     // ...and accepted (like coldplug's options=0) otherwise.
-    assert!(read_datagram(&buf, 99, false, &mut stats).is_some());
-    // Invalid records are counted, never fatal.
-    assert!(read_datagram(b"junk\0", 0, true, &mut stats).is_none());
-    assert_eq!(stats.invalid, 1);
+    assert!(matches!(read_datagram(&buf, 99, false), DataOutcome::Event(_)));
+    // Invalid records are classified, never fatal.
+    assert!(matches!(read_datagram(b"junk\0", 0, true), DataOutcome::Invalid(Invalid::BadHeader)));
+    assert_eq!(read_datagram(&[], 0, true), DataOutcome::Empty);
 }
 
 /// Full fd-level loopback over real netlink sockets (unicast to self, so no
@@ -109,17 +107,21 @@ fn uevent_loopback() {
     // SAFETY: rx is a valid owned fd for the duration of the borrow.
     let fd = unsafe { BorrowedFd::borrow_raw(rx.as_raw_fd()) };
     // Sender pid is nonzero (ourselves): dropped when configured...
-    let got = read_event(fd, true, &mut stats).unwrap();
-    assert!(got.is_none());
+    match read_event(fd, true, &mut stats).unwrap() {
+        ReadOutcome::DroppedUserspace(pid) => assert!(pid != 0),
+        other => panic!("expected drop, got {other:?}"),
+    }
     assert_eq!(stats.dropped_userspace, 1);
     // ...accepted otherwise, with fields intact.
     let r = send(&buf);
     assert!(r != -1);
-    let got = read_event(fd, false, &mut stats).unwrap().expect("event");
+    let got = match read_event(fd, false, &mut stats).unwrap() {
+        ReadOutcome::Event(ev) => ev,
+        other => panic!("expected event, got {other:?}"),
+    };
     assert_eq!(got.getvar(b"DEVNAME"), Some(b"lo".as_slice()));
-    // Nothing queued: clean None.
-    let got = read_event(fd, false, &mut stats).unwrap();
-    assert!(got.is_none());
+    // Nothing queued: clean Nothing.
+    assert!(matches!(read_event(fd, false, &mut stats).unwrap(), ReadOutcome::Nothing));
 }
 
 fn netlink_pid(fd: &std::os::unix::io::OwnedFd) -> u32 {

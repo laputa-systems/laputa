@@ -303,7 +303,7 @@ fn engine_real_sequences() {
     assert_eq!(on_event(&req, &mut run).unwrap(), Outcome::Publish);
     assert_eq!(warns.len(), 1);
     assert_eq!(warns[0].level, 1);
-    assert!(warns[0].msg.starts_with("mknod disk/sda: "));
+    assert!(warns[0].msg.starts_with("unable to mknod disk/sda: "));
 }
 
 #[test]

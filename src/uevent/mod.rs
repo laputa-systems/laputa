@@ -143,18 +143,18 @@ fn recv_once(fd: BorrowedFd, buf: &mut [u8]) -> Result<Recv, Fatal> {
     })
 }
 
-/// Read one datagram: `Ok(None)` means no event this round (nothing queued
-/// or userspace-dropped; invalid records are counted too). `Err` is fatal
-/// (`MSG_TRUNC`, I/O failure), like the reference dying.
+/// Read one datagram: `Nothing` means no event this round. `Err` is fatal
+/// (`MSG_TRUNC`, I/O failure), like the reference dying. Overruns,
+/// userspace drops, and invalid records are counted in `stats`.
 pub fn read_event(
     fd: BorrowedFd,
     drop_userspace: bool,
     stats: &mut Stats,
-) -> Result<Option<Uevent>, Fatal> {
+) -> Result<ReadOutcome, Fatal> {
     let mut buf = vec![0u8; UEVENT_MAX_SIZE];
     loop {
         match recv_once(fd, &mut buf)? {
-            Recv::None => return Ok(None),
+            Recv::None => return Ok(ReadOutcome::Nothing),
             Recv::Overrun => {
                 stats.overruns += 1;
                 continue;
@@ -164,33 +164,54 @@ pub fn read_event(
                     stats.truncated += 1;
                     return Err(Fatal::Truncated);
                 }
-                return Ok(read_datagram(&buf[..n], pid, drop_userspace, stats));
+                return Ok(match read_datagram(&buf[..n], pid, drop_userspace) {
+                    DataOutcome::Event(ev) => ReadOutcome::Event(ev),
+                    DataOutcome::Empty => ReadOutcome::Nothing,
+                    DataOutcome::DroppedUserspace => {
+                        stats.dropped_userspace += 1;
+                        ReadOutcome::DroppedUserspace(pid)
+                    }
+                    DataOutcome::Invalid(e) => {
+                        stats.invalid += 1;
+                        ReadOutcome::Invalid(e)
+                    }
+                });
             }
         }
     }
 }
 
+/// Pure datagram policy: what one received datagram means.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DataOutcome {
+    Event(Uevent),
+    Empty,
+    DroppedUserspace,
+    Invalid(Invalid),
+}
+
 /// Pure half of `read_event`, over an already-received datagram.
-pub fn read_datagram(
-    datagram: &[u8],
-    pid: u32,
-    drop_userspace: bool,
-    stats: &mut Stats,
-) -> Option<Uevent> {
+pub fn read_datagram(datagram: &[u8], pid: u32, drop_userspace: bool) -> DataOutcome {
     if datagram.is_empty() {
-        return None;
+        return DataOutcome::Empty;
     }
     if drop_userspace && pid != 0 {
-        stats.dropped_userspace += 1;
-        return None;
+        return DataOutcome::DroppedUserspace;
     }
     match parse_record(datagram) {
-        Ok(ev) => Some(ev),
-        Err(_) => {
-            stats.invalid += 1;
-            None
-        }
+        Ok(ev) => DataOutcome::Event(ev),
+        Err(e) => DataOutcome::Invalid(e),
     }
+}
+
+/// What one `read_event` call produced.
+#[derive(Debug)]
+pub enum ReadOutcome {
+    /// Nothing queued, or an empty datagram: no event this round.
+    Nothing,
+    Event(Uevent),
+    DroppedUserspace(u32),
+    Invalid(Invalid),
 }
 
 /// Bind the intake socket, like `mdevd_netlink_init`: nonblocking,

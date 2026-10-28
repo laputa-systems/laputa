@@ -276,7 +276,7 @@ fn apply_rule(
             run.warn(
                 1,
                 format!(
-                    "process expression \"{}\" with devname \"{}\": {}",
+                    "unable to process expression \"{}\" with devname \"{}\": {}",
                     lossy(p),
                     lossy(d),
                     errno_msg(errno)
@@ -299,7 +299,7 @@ fn apply_rule(
                     run.emit(format!("dry run: mkdir {}", lossy(p)));
                 }
             } else if let Err(e) = run.ops.subdirs(&node) {
-                run.warn(1, format!("create subdirectories for {node_s}: {e}"));
+                run.warn(1, format!("unable to create subdirectories for {node_s}: {e}"));
                 return Ok(Step::Stop);
             }
         }
@@ -319,17 +319,17 @@ fn apply_rule(
                 Ok(MknodOut::Created) => {}
                 Ok(MknodOut::Exists) => {
                     if let Err(e) = run.ops.chmod(&node, rule.mode) {
-                        run.warn(2, format!("chmod {node_s}: {e}"));
+                        run.warn(2, format!("unable to chmod {node_s}: {e}"));
                     }
                 }
                 Err(e) => {
-                    run.warn(1, format!("mknod {node_s}: {e}"));
+                    run.warn(1, format!("unable to mknod {node_s}: {e}"));
                     return Ok(Step::Stop);
                 }
             }
             if rule.uid != 0 || rule.gid != 0 {
                 if let Err(e) = run.ops.chown(&node, rule.uid, rule.gid) {
-                    run.warn(2, format!("chown {node_s}: {e}"));
+                    run.warn(2, format!("unable to chown {node_s}: {e}"));
                 }
             }
         }
@@ -351,12 +351,12 @@ fn apply_rule(
             } else {
                 if dev.devname.contains(&b'/') {
                     if let Err(e) = run.ops.subdirs(&dev.devname) {
-                        run.warn(1, format!("create subdirectories for {dev_s}: {e}"));
+                        run.warn(1, format!("unable to create subdirectories for {dev_s}: {e}"));
                         return Ok(Step::Stop);
                     }
                 }
                 if let Err(e) = run.ops.symlink_replace(&node, &dev.devname) {
-                    run.warn(1, format!("symlink {node_s} to {dev_s}: {e}"));
+                    run.warn(1, format!("unable to symlink {node_s} to {dev_s}: {e}"));
                     return Ok(Step::Stop);
                 }
             }

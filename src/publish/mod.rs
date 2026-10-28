@@ -73,7 +73,7 @@ impl Output {
             let e = std::io::Error::last_os_error();
             notes.push(Note {
                 level: 1,
-                msg: format!("write to descriptor {fd} (closing it): {}", errno_msg(e)),
+                msg: format!("unable to write to descriptor {fd} (closing it): {}", errno_msg(e)),
             });
             self.fd = None;
         }
@@ -155,7 +155,7 @@ impl Rebroadcast {
             let e = std::io::Error::last_os_error();
             notes.push(Note {
                 level: 1,
-                msg: format!("rebroadcast uevent: {}", errno_msg(e)),
+                msg: format!("unable to rebroadcast uevent: {}", errno_msg(e)),
             });
         }
     }
