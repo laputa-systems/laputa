@@ -13,6 +13,7 @@ mount -o remount,rw / || fail "remount"
 mkdir -p /dev/pts /dev/shm /run /tmp
 mount -t devpts none /dev/pts || fail "devpts"
 export PATH=/usr/local/bin:/usr/bin:/bin:/sbin
+modprobe evdev || fail "modprobe evdev"
 mdev -s
 
 # --- 1+2. mdevd handles a virtual device; real consumer sees events -------
