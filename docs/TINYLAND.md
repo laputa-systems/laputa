@@ -114,12 +114,22 @@ session, switch handling, disable/resume with reestablished input and no
 stuck modifiers or reused revoked descriptors. Tinyland implements the
 resume path but it has never been guest-proven.
 
-### R5 — device node ownership follow-up
+### R5 — device node ownership follow-up — landed
 
-`/dev/ptmx` (0660 in the guest; the proof chmods it to 0666) and
-`/dev/console` (chmodded 0666 for test markers) need a proper home:
-an mdev rule and/or baselayout static nodes instead of proof-time chmod.
-Investigate who creates `/dev/ptmx` (devtmpfs vs mdev) first.
+mdevd coldplug is the last writer on the static nodes (its catch-all sets
+root:root 0660), so `baselayout` `mdev.conf` now owns both modes outright:
+`(ptmx) root:tty 666` and `(console) root:tty 620`. The guest proof no
+longer chmods either node; it logs the effective modes and asserts the
+broker socket stays 0770. Evidence: `LAPUTA_TINYLAND_NODE` lines show
+`/dev/ptmx mode=438`, `/dev/console mode=400`, `/run/seatd.sock mode=504`
+with the proof green, and the dwl proof still passes against the shared
+config. Answered first: devtmpfs/`rc.boot` create `/dev/ptmx` first at
+boot, then mdevd coldplug rewrites it — the observed pre-rule 0660 was the
+mdevd catch-all, which is why the fix had to be a rule.
+
+Socket ownership is root:seat (daemon runs as root, `-g seat`); the mode
+assert plus successful group mediation through `laputa`'s seat membership
+pins the R1 watch point.
 
 ### R6 — hotplug, only if needed
 

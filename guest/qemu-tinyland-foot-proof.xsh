@@ -52,12 +52,19 @@ proc main() [fs, process, time, error] {
     guest_wait_for(device, "input-devices", 20)
   }
 
-  p"/dev/console".chmod(0o666)
-  # devtmpfs/mdev leave /dev/ptmx root-owned without group access; the
-  # unprivileged session needs it to allocate foot's pty.
-  # TODO(laputa): own /dev/ptmx creation (mdev rule or baselayout) instead
-  # of relaxing it in the proof guest.
-  p"/dev/ptmx".chmod(0o666)
+  # Device nodes are owned by mdev rules (see baselayout mdev.conf); log the
+  # effective modes before the unprivileged session needs them. The mdevd
+  # catch-all would set root:root 0660 here, which the session cannot use.
+  for node in [/dev/ptmx, /dev/console] {
+    match node.metadata() {
+      Ok(meta) => {
+        guest_console(f"LAPUTA_TINYLAND_NODE {node.display()} mode={meta.mode % 4096}")
+      },
+      Err(_) => {
+        guest_fail("device-nodes", f"missing {node.display()}")
+      },
+    }
+  }
   p"/run/seatd.sock".remove()
 
   # The serial-only QEMU proof has no virtual terminal.  An unbound seat is
@@ -69,6 +76,21 @@ proc main() [fs, process, time, error] {
   )?
   let _ = _seatd
   guest_wait_for(/run/seatd.sock, "seatd", 20)
+
+  # The broker socket must stay group-mediated: laputa reaches it through
+  # the seat group, never through a world-accessible or root-only socket.
+  match p"/run/seatd.sock".metadata() {
+    Ok(meta) => {
+      guest_console(f"LAPUTA_TINYLAND_NODE /run/seatd.sock mode={meta.mode % 4096}")
+
+      if meta.mode % 4096 != 0o770 {
+        guest_fail("seatd-socket", f"unexpected seatd socket mode {meta.mode % 4096}")
+      }
+    },
+    Err(_) => {
+      guest_fail("seatd-socket", "missing seatd socket")
+    },
+  }
   if ! p"/run/user".exists() {
     p"/run/user".mkdir()
   }
