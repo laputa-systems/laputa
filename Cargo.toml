@@ -19,3 +19,15 @@ path = "src/bin/mdevd.rs"
 [[bin]]
 name = "mdevd-coldplug"
 path = "src/bin/mdevd-coldplug.rs"
+
+[[bench]]
+name = "parse"
+harness = true
+
+[[bench]]
+name = "handle"
+harness = true
+
+[[bench]]
+name = "storm"
+harness = false
