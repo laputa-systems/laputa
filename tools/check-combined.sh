@@ -67,6 +67,15 @@ GROOT="$ROOT/.work/combined/root"
 rm -rf "$GROOT"
 mkdir -p "$GROOT"
 tar -xzf "$ROOT/.work/dl/$TARBALL" -C "$GROOT"
+# Kernel modules must match .work/vmlinuz-virt, which build-qemu-guest.sh
+# copies out of .work/guest-root: reuse that root's module tree verbatim.
+# Without it the virt kernel has no evdev and mdev creates no event nodes.
+if [ ! -d "$ROOT/.work/guest-root/lib/modules" ]; then
+  echo 'check-combined: guest modules missing (run tools/build-qemu-guest.sh once)' >&2
+  exit 1
+fi
+mkdir -p "$GROOT/lib"
+cp -a "$ROOT/.work/guest-root/lib/modules" "$GROOT/lib/modules"
 mkdir -p "$GROOT/usr/local/bin"
 cp "$ROOT/target/x86_64-unknown-linux-musl/release/mdevd" "$GROOT/usr/local/bin/mdevd"
 cp "$ROOT/target/x86_64-unknown-linux-musl/release/mdevd-coldplug" "$GROOT/usr/local/bin/mdevd-coldplug"
