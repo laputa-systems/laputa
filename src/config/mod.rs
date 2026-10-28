@@ -136,19 +136,19 @@ impl fmt::Display for ConfigError {
                 let what = if *is_env { "envmatch" } else { "devmatch" };
                 write!(
                     f,
-                    "compile regular expression {} for {what} at line {line}: {}",
+                    "unable to compile regular expression {} for {what} at line {line}: {}",
                     lossy(&err.pattern),
                     err.msg
                 )
             }
             ConfigError::Number { line, what, text } => {
-                write!(f, "get {what} from string {} at line {line}", lossy(text))
+                write!(f, "unable to get {what} from string {} at line {line}", lossy(text))
             }
             ConfigError::User { line, name } => {
-                write!(f, "get uid from string {} at line {line}", lossy(name))
+                write!(f, "unable to get uid from string {} at line {line}", lossy(name))
             }
             ConfigError::Group { line, name } => {
-                write!(f, "get gid from string {} at line {line}", lossy(name))
+                write!(f, "unable to get gid from string {} at line {line}", lossy(name))
             }
             ConfigError::HooksUnsupported { line } => {
                 write!(f, "command hooks are unsupported in this build (line {line})")

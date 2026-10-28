@@ -229,18 +229,17 @@ fn config_oracle_diff() {
             }
             Err(e) => {
                 assert_ne!(out.status.code(), Some(0), "{f}: we failed but oracle passed");
-                let body = if e.to_string().starts_with("configuration too large") {
+                if e.to_string().starts_with("configuration too large") {
                     // Registered divergence: the reference truncates; skip.
                     println!("note: {f} oversize, oracle comparison skipped (divergence)");
                     continue;
-                } else {
-                    e.to_string()
-                };
+                }
                 let exp = String::from_utf8_lossy(&expected);
-                assert!(
-                    exp.contains(&body),
-                    "{f}: error differs: ours `{body}` vs oracle `{exp}`"
-                );
+                // Drop pre-failure PAT lines: success-path coverage already
+                // pins every compiled pattern; here only the fatal line
+                // and the exit code must agree.
+                let exp: String = exp.lines().filter(|l| !l.starts_with("PAT ")).collect::<Vec<_>>().join("\n");
+                assert_eq!(exp.trim_end(), e.to_string().as_str(), "{f}: error differs");
             }
         }
     }
