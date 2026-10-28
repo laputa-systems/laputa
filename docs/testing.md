@@ -2,7 +2,7 @@
 
 | Command | Evidence |
 | --- | --- |
-| `cargo test --locked -q -- adversarial` | Ancestor confinement, leaf symlink refusal, netlink truncation and spoof flood, output backpressure |
+| `cargo test --locked -q -- adversarial` | Ancestor confinement, leaf symlink refusal, netlink truncation and spoof flood, output backpressure, restart during coldplug |
 | `tools/check-privileged.sh` | Real character and block nodes, identity adoption, modes, ownership, aliases, replacement safety, FD stability, kernel-event publication |
 | `cargo test --locked -q --test engine --test bins --test parity` | Engine behavior, daemon lifecycle, C-oracle comparisons |
 | `cargo clippy --locked -q --all-targets` | Rust lint checks |

@@ -7,6 +7,7 @@
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
   P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6 (f082eb8). Red: none.
   Parked: daemon-driven kernel device-node creation (see Needs environment).
+  H1 done, pending acceptance: restart-during-coldplug plus the device/kernel slices.
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
   `tools/build-oracle.sh`. Docker now supplies real-device adapter proof and
   kernel-event daemon publication proof on isolated resources.
@@ -29,10 +30,11 @@
   Ancestor-symlink mkdir/unlink and leaf-symlink chmod regressions were
   reproduced and fixed. Mutations now walk held non-symlink directory fds;
   metadata stays on the verified device inode. chmod requires procfs.
+  Restart during coldplug keeps readiness prompt, HUP alive, TERM bounded,
+  and the restarted daemon ready with the slow child reparented, not waited on.
 - Verified: `tools/check-privileged.sh`, adversarial tests, affected engine/bins/
   parity suites, and all-target clippy pass. Test boundaries: [local verification](docs/testing.md).
-- Next: finish `H1` restart-during-coldplug, then
-  `H2` and `O1`.
+- Next: `H2` and `O1`.
 - H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
   coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
   absolute/`..` refusal and EEXIST identity adoption in RealOps,

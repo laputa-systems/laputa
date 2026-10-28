@@ -11,6 +11,9 @@ mod backpressure;
 #[path = "adversarial/kernel.rs"]
 mod kernel;
 
+#[path = "adversarial/restart.rs"]
+mod restart;
+
 use std::path::PathBuf;
 
 struct Fixture {
