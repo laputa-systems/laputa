@@ -4,6 +4,7 @@
 | --- | --- |
 | `cargo test --locked -q -- adversarial` | Ancestor confinement, leaf symlink refusal, netlink truncation and spoof flood, output backpressure, restart during coldplug |
 | `tools/check-privileged.sh` | Real character and block nodes, identity adoption, modes, ownership, aliases, replacement safety, FD stability, kernel-event publication |
+| `tools/check-qemu.sh` | Real kernel `add` with major/minor drives node creation, framed `-o` output, and coldplug sync for both daemons in a KVM guest |
 | `cargo test --locked -q --test engine --test bins --test parity` | Engine behavior, daemon lifecycle, C-oracle comparisons |
 | `cargo clippy --locked -q --all-targets` | Rust lint checks |
 
@@ -30,3 +31,15 @@ Network events lack device major and minor numbers, so this test does not exerci
 The device tests exercise the real filesystem adapter on private tmpfs instead.
 RealOps rejects symlink ancestors for mutations and retains the verified device inode for subsequent metadata changes.
 Its chmod implementation requires `/proc/self/fd` to update that inode without opening the device.
+
+`tools/check-qemu.sh` requires Linux x86_64 with KVM (`/dev/kvm`),
+`qemu-system-x86_64`, `mkfs.ext4`, and `apk`. It builds a pinned Alpine
+guest (minirootfs 3.20.3 plus the locked package set in
+`guest/packages.sha256`, following tinyland's harness as prior art) with
+musl-static Rust daemons, the C oracle, and its skalibs libs, then boots it
+with KVM on a private disk image under `.work/`. The guest init triggers a
+real kernel `add` via `/sys/block/vda/uevent`, and each daemon must create
+the matching block node (identity from `/sys/block/vda/dev`, mode 660),
+emit framed `-o` output carrying `ACTION`, `DEVNAME`, `MAJOR`, and `MINOR`,
+pass a real `mdevd-coldplug -s /sys -O 4` sync, and exit 0 on `SIGTERM`.
+Guest mutations stay inside the guest; host sysfs and `/dev` are untouched.

@@ -7,8 +7,12 @@
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
   P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6 (f082eb8),
   H1 (ec12bb3, e8894dc), H2 (36e2437), O1 (3271eb3), C1 (84e3a75). Red: none.
-  Parked: daemon-driven kernel device-node creation (see Needs environment).
+  Parked: real-hardware coldplug (see Needs environment).
   Campaign complete: all slices green for human review and push.
+- QEMU bonus (post-C1): `tools/check-qemu.sh` boots a pinned Alpine guest
+  under KVM and proves daemon-driven node creation from a real kernel `add`
+  carrying major/minor, framed `-o` output, and coldplug sync for both the
+  Rust and C daemons.
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
   `tools/build-oracle.sh`. Docker now supplies real-device adapter proof and
   kernel-event daemon publication proof on isolated resources.
@@ -33,9 +37,10 @@
   metadata stays on the verified device inode. chmod requires procfs.
   Restart during coldplug keeps readiness prompt, HUP alive, TERM bounded,
   and the restarted daemon ready with the slow child reparented, not waited on.
-- Verified: `tools/check-privileged.sh`, adversarial tests, affected engine/bins/
-  parity suites, all-target clippy, `tools/measure-perf.sh`, musl release builds
-  for both targets, and `tools/check-ci-pins.sh` pass.
+- Verified: `tools/check-privileged.sh`, `tools/check-qemu.sh`, adversarial tests,
+  affected engine/bins/parity suites, all-target clippy,
+  `tools/measure-perf.sh`, musl release builds for both targets, and
+  `tools/check-ci-pins.sh` pass.
   Test boundaries: [local verification](docs/testing.md).
   Perf: [method and busy-host numbers](docs/perf.md).
   Divergences: [register](docs/divergence.md).
@@ -133,9 +138,11 @@ Delegated (executor picks the smallest reversible option inside the bound and lo
   of genuine kernel add/remove events from private dummy network interfaces.
   `tools/check-privileged.sh` is the required command. Container isolation and
   capability limits are documented in [local verification](docs/testing.md).
-- End-to-end daemon device creation from kernel events carrying major/minor
-  numbers remains unverified. Private interface events do not carry them.
-  Real hardware coldplug remains outside the synthetic-root boundary.
+- QEMU now proves end-to-end daemon device creation from a real kernel `add`
+  carrying major/minor numbers, plus real coldplug sync, for both daemons.
+  `tools/check-qemu.sh` is the required command. Guest isolation is documented
+  in [local verification](docs/testing.md).
+- Real hardware coldplug remains outside the virtualization boundary.
 - Quiet-host perf confirmation for `O1` numbers (preflight host was loaded).
 
 ## Execution boundary and non-goals
