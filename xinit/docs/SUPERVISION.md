@@ -44,7 +44,8 @@ pending -> starting -> running -> dead -> running ...
 ```
 
 - `pending`: not yet started; the first start waits for the dependency gate.
-- `starting`: spawned, waiting for a `readiness: "notify"` byte.
+- `starting`: spawned, waiting for a `readiness: "notify"` byte or for a
+  `ready()` hook to answer true; the hook is evaluated once per scanner pass.
 - `running`: up (and ready, unless a notify timeout promoted it).
 - `dead`: the child exited and a backoff respawn is scheduled. Callers see
   `dead` so they can tell a unit awaiting respawn from one that is up.
@@ -59,7 +60,7 @@ scanner sleeps in `unix.wait_pid1_event(timeout:)` until the soonest gate and
 wakes early on a signal or child exit, so an idle tree does not spin and
 backing one unit off never delays stopping or starting another. Units blocked
 on the dependency gate are left out of that deadline. Units in `starting` poll
-readiness every 100 ms. The restart fields are in
+readiness every 100 ms, whether the signal is a notify byte or a `ready()` hook. The restart fields are in
 [INIT.md](INIT.md#restart).
 
 ### Dependency gating and readiness

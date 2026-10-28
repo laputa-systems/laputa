@@ -104,7 +104,8 @@ one module per service and no additional configuration layering or merge order.
 
 A module may also export lifecycle procs. `start()` and `stop()` replace the
 default spawn and stop, `reload()` replaces the `SIGHUP`, `ready()` gates
-dependents, `status()` appends text to the `status` line, and `finish()` runs after the
+dependents, `status()` appends text to the `status` line (a failing hook appends
+`status-error=MESSAGE` and the command still succeeds), and `finish()` runs after the
 instance exits, on a clean stop or a crash, while the unit reports
 `finishing`. The scanner does not call stop or finish for a pending unit that
 never started, or repeat finish after an already processed crash. A completed
@@ -195,10 +196,28 @@ excludes a three-second host QMP pause from its observed elapsed clock delta.
 ### Readiness
 
 By default a longrun is ready once spawned, or, if it exports `ready()`, when
-that returns true within `ready_timeout_ms`. With `readiness: "notify"` the
-scanner passes a pipe whose fd number is in `NOTIFY_FD`; the unit is `starting`
-until the service writes any byte to it. On timeout the unit becomes `running`
-with `ready` false. `status` and `list` report readiness.
+that returns true within `ready_timeout_ms`. The scanner evaluates `ready()`
+once per pass while the unit is `starting`, so a hook that stays false never
+stalls the scanner, rescue or login; it must return promptly and is not run in a
+loop. The one-shot `xinit start` path, which has no scanner to protect, still
+waits for the hook. With `readiness: "notify"` the scanner passes a pipe whose fd
+number is in `NOTIFY_FD`; the unit is `starting` until the service writes any
+byte to it. On timeout the unit becomes `running` with `ready` false. `status`
+and `list` report readiness.
+
+Four levels stay distinct, and only the first three are ever reported:
+
+| Level | Where it shows | Meaning |
+|---|---|---|
+| Process running | `state`, `pid` | The leader was spawned and has not exited. |
+| Ready | `ready` | The notify byte arrived or `ready()` returned true: the service says it can serve, for example that its socket is bound. |
+| Configured | `status()` text such as `lease=bound` | The service's own state, read by its `status()` hook. |
+| Reachable | never | Nothing here checks that the Internet or a remote host is up. |
+
+`need` waits for `running`, which for a notify service is the readiness byte. A
+service file named `logger`, `net`, `dns` or `firewall` is an ordinary service
+and takes precedence over the built-in facility of that name; without such a
+file the name resolves to nothing and gates nothing.
 
 ### Stop and reload
 
@@ -212,6 +231,21 @@ Append logging is owned by `xinit`: stdout and stderr go as raw combined bytes
 to `${XINIT_LOG_ROOT}/SERVICE/current` (directory `0755`, file `0600`). If the
 file cannot be created or opened, start fails. `logging: "off"` disables
 capture and shows as `log=none` in status.
+
+Stdout is the only channel a service has: it should write one line per record
+and never send its own diagnostics to a syslog socket. The file is opened
+`O_APPEND` before the spawn, so each write lands at the current end. Rotation is
+copy-then-truncate, at service start and on every scanner pass once the file
+reaches `log.max_size` (default 1 MiB, `log.keep` copies, default 3): the
+content is copied to `current.1`, older copies shift up, and `current` is
+truncated in place. The service keeps writing to the same inode, which is why a
+live writer is undisturbed. A removed `current` is not noticed by `xinit`: the
+service keeps writing to an unlinked inode without an error, so a service that
+cares must watch its own output (`syslogd` does, and exits so the supervisor
+reopens the file). The reference modules [syslog-service.xsh](syslog-service.xsh)
+(service `logger`) and [dhcp-service.xsh](dhcp-service.xsh) (service
+`dhcp-IFACE`) show a longrun with `readiness: "notify"`, `restart.mode:
+"always"`, a `stop_timeout_ms` of 2000 and a `status()` hook.
 
 `current` rotates to `current.1` and shifts older copies up to
 `current.<keep>` when it reaches `max_size` bytes; defaults are 1 MiB and 3.
