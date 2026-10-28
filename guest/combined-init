@@ -1,0 +1,134 @@
+#!/bin/sh
+# Combined cross-project qualification guest init.
+# Runs pinned mdevd + seatd + doas candidates plus a real libudev-zero
+# consumer in one disposable KVM guest. Host /dev, /sys, networking,
+# console, and privilege tools are untouched; every mutation below stays
+# inside this guest. Markers go to /dev/console for tools/check-combined.sh.
+set -u
+
+out() { echo "$@" > /dev/console; }
+fail() { out "COMBINED_FAIL $1"; exit 1; }
+
+mount -o remount,rw / || fail "remount"
+mkdir -p /dev/pts /dev/shm /run /tmp
+mount -t devpts none /dev/pts || fail "devpts"
+export PATH=/usr/local/bin:/usr/bin:/bin:/sbin
+mdev -s
+
+# --- 1+2. mdevd handles a virtual device; real consumer sees events -------
+cat > /tmp/combined.conf <<'EOF'
+vda root:root 660
+.* root:root 600
+EOF
+rm -rf /tmp/qdev /tmp/ready.log /tmp/output.bin /tmp/consumer.out
+mkdir -p /tmp/qdev
+exec 3> /tmp/ready.log
+exec 4> /tmp/output.bin
+/usr/local/bin/mdevd -f /tmp/combined.conf -d /tmp/qdev -s /sys -O 4 -D 3 -o 4 &
+MPID=$!
+exec 3>&-
+exec 4>&-
+i=0
+while [ $i -lt 50 ]; do
+  if [ -s /tmp/ready.log ]; then break; fi
+  kill -0 $MPID 2>/dev/null || fail "mdevd exited before readiness"
+  sleep 0.1
+  i=$((i + 1))
+done
+[ -s /tmp/ready.log ] || fail "mdevd no readiness"
+/usr/local/bin/combined-consumer > /tmp/consumer.out 2>&1 &
+CPID=$!
+sleep 1
+echo add > /sys/block/vda/uevent || fail "uevent add"
+sleep 1
+[ -b /tmp/qdev/vda ] || fail "mdevd node missing"
+tr '\0' '\n' < /tmp/output.bin | grep -q 'DEVNAME=vda' || fail "mdevd output missing DEVNAME"
+tr '\0' '\n' < /tmp/output.bin | grep -q 'MAJOR=' || fail "mdevd output missing MAJOR"
+echo change > /sys/block/vda/uevent || fail "uevent change"
+echo remove > /sys/block/vda/uevent || fail "uevent remove"
+i=0
+while [ $i -lt 100 ]; do
+  [ "$(wc -l < /tmp/consumer.out)" -ge 3 ] && break
+  kill -0 $CPID 2>/dev/null || break
+  sleep 0.1
+  i=$((i + 1))
+done
+kill $CPID 2>/dev/null
+wait $CPID 2>/dev/null
+grep -q '^ACTION=add ' /tmp/consumer.out || fail "consumer missing add"
+grep -q '^ACTION=change ' /tmp/consumer.out || fail "consumer missing change"
+grep -q '^ACTION=remove ' /tmp/consumer.out || fail "consumer missing remove"
+grep -q 'DEVNAME=/dev/vda' /tmp/consumer.out || fail "consumer missing device state"
+out COMBINED_MDEVD_OK
+
+# --- 3. seatd admits an ordinary client; restart reclaims ------------------
+SEATD_SOCK=/run/combined-seatd.sock
+export SEATD_SOCK
+addgroup -g 2000 seatgrp 2>/dev/null || true
+adduser -D -u 2000 -G seatgrp seatuser 2>/dev/null || true
+chown root:seatgrp /run
+chmod 770 /run
+SEATD_VTBOUND=0 /usr/local/bin/seatd -g seatgrp -l error &
+SPID=$!
+sleep 1
+kill -0 $SPID 2>/dev/null || fail "seatd exited early"
+[ -c /dev/dri/card0 ] || fail "no virtual DRM device"
+[ -c /dev/input/event0 ] || fail "no virtual input device"
+su -p -s /bin/sh seatuser -c '/usr/local/bin/combined-seat-client /dev/dri/card0' > /tmp/seat.out 2>&1 || fail "seat client (drm) failed"
+grep -q COMBINED_SEAT_OK /tmp/seat.out || fail "seat client (drm) incomplete"
+su -p -s /bin/sh seatuser -c '/usr/local/bin/combined-seat-client /dev/input/event0' > /tmp/seat-in.out 2>&1 || fail "seat client (input) failed"
+grep -q COMBINED_SEAT_OK /tmp/seat-in.out || fail "seat client (input) incomplete"
+kill -TERM $SPID || fail "seatd term failed"
+i=0
+while kill -0 $SPID 2>/dev/null; do
+  sleep 0.1
+  i=$((i + 1))
+  [ $i -lt 50 ] || fail "seatd ignored TERM"
+done
+wait $SPID
+[ $? = 0 ] || fail "seatd exit nonzero"
+# Restart on the same path: the stale socket must be reclaimed, and a
+# second concurrent start must not steal the live one.
+SEATD_VTBOUND=0 /usr/local/bin/seatd -g seatgrp -l error &
+SPID=$!
+sleep 1
+kill -0 $SPID 2>/dev/null || fail "seatd restart failed"
+SEATD_VTBOUND=0 /usr/local/bin/seatd -g seatgrp -l error 2>/dev/null &
+SPID2=$!
+sleep 1
+if kill -0 $SPID2 2>/dev/null; then
+  kill -KILL $SPID2 2>/dev/null
+  fail "second seatd stole live socket"
+fi
+wait $SPID2 2>/dev/null
+su -p -s /bin/sh seatuser -c '/usr/local/bin/combined-seat-client /dev/dri/card0' > /tmp/seat2.out 2>&1 || fail "seat client after restart failed"
+grep -q COMBINED_SEAT_OK /tmp/seat2.out || fail "seat client after restart incomplete"
+kill -TERM $SPID || fail "restarted seatd term failed"
+i=0
+while kill -0 $SPID 2>/dev/null; do sleep 0.1; i=$((i + 1)); [ $i -lt 50 ] || fail "restarted seatd ignored TERM"; done
+wait $SPID
+[ $? = 0 ] || fail "restarted seatd exit nonzero"
+out COMBINED_SEATD_OK
+
+# --- 4. doas permits a narrow op and denies the rest -----------------------
+chown root:root /usr/local/bin/doas
+chmod 4755 /usr/local/bin/doas
+[ -u /usr/local/bin/doas ] || fail "doas not setuid"
+chown root:root /etc
+chmod 755 /etc
+printf 'permit nopass seatuser cmd /bin/echo\n' > /etc/doas.conf
+chmod 640 /etc/doas.conf
+chown root:root /etc/doas.conf
+got=$(su -p -s /bin/sh seatuser -c '/usr/local/bin/doas /bin/echo NARROW-OK' 2>&1) || fail "doas narrow op denied: $got"
+[ "$got" = NARROW-OK ] || fail "doas narrow op wrong output: $got"
+if su -p -s /bin/sh seatuser -c '/usr/local/bin/doas /bin/id' >/dev/null 2>&1; then
+  fail "doas unauthorized op permitted"
+fi
+out COMBINED_DOAS_OK
+
+kill -TERM $MPID || fail "mdevd term failed"
+i=0
+while kill -0 $MPID 2>/dev/null; do sleep 0.1; i=$((i + 1)); [ $i -lt 50 ] || fail "mdevd ignored TERM"; done
+wait $MPID
+[ $? = 0 ] || fail "mdevd exit nonzero"
+out COMBINED_OK
