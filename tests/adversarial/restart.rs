@@ -53,6 +53,7 @@ fn spawn_daemon(root: &std::path::Path, path_env: &str) -> (Child, std::fs::File
     let read = unsafe {
         std::fs::File::from(std::os::unix::io::OwnedFd::from_raw_fd(fds[0]))
     };
+    let helper = root.join("bin").join("mdevd-coldplug");
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_mdevd"));
     cmd.args([
         "-I",
@@ -68,6 +69,7 @@ fn spawn_daemon(root: &std::path::Path, path_env: &str) -> (Child, std::fs::File
         &fds[1].to_string(),
     ])
     .env("PATH", path_env)
+    .env("MDEVD_COLDPLUG_HELPER", &helper)
     .stdout(Stdio::null())
     .stderr(Stdio::null());
     let child = cmd.spawn().expect("spawn mdevd");

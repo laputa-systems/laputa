@@ -203,8 +203,110 @@ fn fd_sanitize() {
     }
 }
 
+fn read_bounded_config(path: &str) -> std::io::Result<Vec<u8>> {
+    let cpath = std::ffi::CString::new(path)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))?;
+    // SAFETY: openat with O_NOFOLLOW, then fstat.
+    unsafe {
+        let fd = libc::openat(
+            libc::AT_FDCWD,
+            cpath.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        );
+        if fd < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mut sb: libc::stat = std::mem::zeroed();
+        if libc::fstat(fd, &mut sb) != 0 {
+            let e = std::io::Error::last_os_error();
+            libc::close(fd);
+            return Err(e);
+        }
+        if (sb.st_mode & libc::S_IFMT) != libc::S_IFREG
+            && (sb.st_mode & libc::S_IFMT) != libc::S_IFIFO
+        {
+            libc::close(fd);
+            if (sb.st_mode & libc::S_IFMT) == libc::S_IFDIR {
+                return Err(std::io::Error::from_raw_os_error(libc::EISDIR));
+            }
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "not a regular file",
+            ));
+        }
+        if sb.st_size < 0 || sb.st_size as u64 > mdevd::config::CONF_MAX as u64 {
+            libc::close(fd);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration too large",
+            ));
+        }
+        let file = std::fs::File::from_raw_fd(fd);
+        let mut data = Vec::new();
+        use std::io::Read;
+        file.take(mdevd::config::CONF_MAX as u64 + 1)
+            .read_to_end(&mut data)?;
+        if data.len() > mdevd::config::CONF_MAX {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration too large",
+            ));
+        }
+        Ok(data)
+    }
+}
+
+fn coldplug_helper_path() -> std::path::PathBuf {
+    if let Ok(helper) = std::env::var("MDEVD_COLDPLUG_HELPER") {
+        if !helper.is_empty() {
+            return std::path::PathBuf::from(helper);
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sibling = dir.join("mdevd-coldplug");
+            if std::fs::metadata(&sibling).is_ok() {
+                return sibling;
+            }
+        }
+    }
+    std::path::PathBuf::from("/usr/libexec/mdevd-coldplug")
+}
+
+fn spawn_coldplug(a: &Args) {
+    let helper = coldplug_helper_path();
+    let mut cmd = std::process::Command::new(&helper);
+    cmd.arg("-s").arg(&a.slashsys);
+    cmd.arg("-b").arg(a.kbufsz.to_string());
+    cmd.arg("-v").arg(a.verbosity.to_string());
+    unsafe {
+        use std::os::unix::process::CommandExt;
+        cmd.pre_exec(|| {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            libc::sigaddset(&mut set, libc::SIGTERM);
+            libc::sigaddset(&mut set, libc::SIGHUP);
+            libc::sigprocmask(libc::SIG_UNBLOCK, &set, std::ptr::null_mut());
+            libc::signal(libc::SIGCHLD, libc::SIG_DFL);
+            Ok(())
+        });
+    }
+    match cmd.spawn() {
+        Ok(_) => {}
+        Err(e) => warn(
+            a.verbosity,
+            1,
+            &format!(
+                "unable to spawn {}: {}",
+                helper.display(),
+                errno_text(e)
+            ),
+        ),
+    }
+}
+
 fn load_config(path: &str, verbosity: u32, initial: bool, old: Option<Config>) -> Config {
-    let bytes = match std::fs::read(path) {
+    let bytes = match read_bounded_config(path) {
         Ok(b) => b,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -373,10 +475,7 @@ fn run(
         }
         if coldplug_pending {
             coldplug_pending = false;
-            match std::process::Command::new("mdevd-coldplug").spawn() {
-                Ok(_) => {}
-                Err(e) => warn(a.verbosity, 1, &format!("unable to spawn mdevd-coldplug: {}", errno_text(e))),
-            }
+            spawn_coldplug(&a);
         }
         if let Some(n) = notif.take() {
             let one = *b"\n";
