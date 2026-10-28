@@ -139,3 +139,24 @@ implementation and that empty-group repair.
 These Linux x86_64 proofs do not qualify scanner SIGKILL, disk power loss,
 Asterinas, or architecture parity. The Python oracle uses the standard library
 already in `xsh-test`; installed packages gain no Python dependency.
+
+## Qualify the DHCP client in a disposable VM
+
+`xinit/tests/fixtures/dhcp_vm_host.xsh` boots a KVM guest from a staged
+initramfs (a static musl `xsh`, its `core/` tree and the `dhcp_*_guest.xsh`
+fixtures) with a kernel you supply, and drives it over QMP. Run it from this
+checkout with `XSH_ROOT` holding `bin/xsh` and `core/`:
+
+```bash
+XSH_MODULE_PATH="$XSH_ROOT/core" xsh xinit/tests/fixtures/dhcp_vm_host.xsh \
+  "$XSH_ROOT" "$KERNEL" .work/tmp/dhcp-vm/pause pause 45
+```
+
+The scenarios are `pause SECONDS [QEMU_ARGUMENT...]` (QMP `stop`, wait, `cont`
+while a 60 s lease is bound), `wall` (the guest steps its wall clock a day
+forward and two days back) and `nic` (a carrier flap with `set_link`, then the
+guest removes and rescans its virtio-net device). Each prints one `HOSTRESULT`
+JSON line of measurements; none is a pass condition. The guests mutate the
+clock and the PCI bus, so they refuse to run anywhere but this disposable
+machine. The numbers and what they do and do not show are in the xsh
+repository's `docs/TESTING.md`.
