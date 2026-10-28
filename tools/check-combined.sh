@@ -48,7 +48,7 @@ cc -O2 -static -Wall -DUSB_IDS_PATH='"/usr/share/hwdata/usb.ids"' \
   $LIBUDEV_ZERO/udev.c $LIBUDEV_ZERO/udev_device.c $LIBUDEV_ZERO/udev_enumerate.c \
   $LIBUDEV_ZERO/udev_list.c $LIBUDEV_ZERO/udev_monitor.c -I$LIBUDEV_ZERO
 echo 'check-combined: consumer built (static musl, unpatched fork API)'
-cc -O2 -static -D_XOPEN_SOURCE=700 -DLIBSEAT=1 -DSEATD_ENABLED=1 \
+cc -std=c11 -O2 -static -D_XOPEN_SOURCE=700 -DLIBSEAT=1 -DSEATD_ENABLED=1 \
   '-DSEATD_DEFAULTPATH="/run/combined-seatd.sock"' \
   -I$SEATD/oracle/include \
   "$ROOT/tools/combined-seat-client.c" \
