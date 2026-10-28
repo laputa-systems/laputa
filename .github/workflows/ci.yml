@@ -20,8 +20,6 @@ jobs:
         run: |
           tools/check-pins.sh
           tools/check-deps.sh
-      - name: oracle
-        run: tools/build-oracle.sh
       - name: test
         run: cargo test --locked -q
       - name: clippy

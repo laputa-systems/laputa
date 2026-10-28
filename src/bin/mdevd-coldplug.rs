@@ -123,8 +123,8 @@ fn force_c_locale() {
 }
 
 /// Scan one sysfs listing for `uevent` files and trigger them. Returns
-/// whether anything was triggered; records the last entry name on success,
-/// exactly like the reference dance (last entry read, not last triggered).
+/// whether anything was triggered; records the last entry name on success
+/// (last entry read, not last triggered).
 fn scan_subdir(path: &std::path::Path, list: &str, pathat: &str, mdev: &mut String) -> bool {
     let dir = path.join(list);
     let entries = match std::fs::read_dir(&dir) {
@@ -203,7 +203,7 @@ fn main() {
             Ok(fd) => fd,
             Err(e) => fatal(111, format!("unable to init netlink: {e}")),
         };
-        // Blocking reads for the sync wait, like the reference.
+        // Blocking reads for the sync wait.
         // SAFETY: fd is a valid netlink socket.
         unsafe {
             let flags = libc::fcntl(fd.as_raw_fd(), libc::F_GETFL);
@@ -237,9 +237,8 @@ fn main() {
 
 /// Bounded synchronous wait for the last triggered event to come back
 /// through the daemon (default 60 s, `MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`
-/// overrides). The reference waits forever; a timeout exits 1 loudly
-/// instead of hanging boot. Malformed events never match (the reference
-/// crashes on them; see divergence.md).
+/// overrides). Upstream waits forever; a timeout exits 1 loudly instead
+/// of hanging boot. Malformed events never match (see divergence.md).
 fn wait_sync(
     a: &Args,
     subsystem: &str,
@@ -303,7 +302,7 @@ fn wait_sync(
 }
 
 /// Whether a received event is the last triggered one. Missing fields never
-/// match (the reference crashes on them; see divergence.md).
+/// match (see divergence.md).
 fn sync_match(ev: &mdevd::uevent::Uevent, subsystem: &str, mdev: &str) -> bool {
     if ev.getvar(b"ACTION") != Some(b"add".as_slice()) {
         return false;

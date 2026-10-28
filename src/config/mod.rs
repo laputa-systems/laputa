@@ -1,14 +1,9 @@
-//! mdev.conf grammar and rule matching (P1).
+//! mdev.conf grammar and rule matching.
 //!
-//! Faithful port of the reference two-pass state machines in
-//! `src/mdevd/mdevd.c` (`script_firstpass`, `script_secondpass`). The
-//! transition tables are generated verbatim from the C source by
-//! `tools/gen-tables.py` into `tables.rs`; only the action application is
-//! hand-written, mirroring the C statement order, including its quirks
-//! (e.g. an `@`-led rule keeps `env_base` 0; see the differential corpus).
-//!
-//! Like the reference, tokens live as offsets into the surviving zeroed
-//! working copy (`Config.storage`); nothing is re-sliced or re-encoded.
+//! The grammar runs as two generated state machines in `tables.rs` plus
+//! hand-written action application. Tokens live as offsets into the
+//! surviving zeroed working copy (`Config.storage`); nothing is
+//! re-sliced or re-encoded. An `@`-led rule keeps `env_base` 0.
 //!
 //! Deliberate divergences, all registered in `docs/divergence.md`: input
 //! larger than 8191 bytes is an error instead of a silent truncation;
@@ -23,9 +18,9 @@ use std::ffi::CStr;
 use std::fmt;
 use tables::{FIRSTPASS_CCLASS, FIRSTPASS_TABLE, SECONDPASS_CCLASS, SECONDPASS_TABLE};
 
-/// Reference CONFBUFSIZE; input may hold at most this minus the NUL.
+/// Input may hold at most this minus the NUL.
 pub const CONF_MAX: usize = 8192;
-/// Reference UEVENT bounds, kept for the intake side (P2).
+/// Uevent bounds shared with the intake side.
 pub const UEVENT_MAX_VARS: usize = 63;
 pub const UEVENT_MAX_SIZE: usize = 8192;
 
@@ -72,8 +67,8 @@ pub enum MoveKind {
 pub struct Rule {
     /// The rule's own env matches (mirrors `envmatch[base..base+len]`).
     pub env: Vec<EnvMatch>,
-    /// Absolute base, mirroring the reference `envmatchs` field (an
-    /// `@`-led rule keeps 0 even after earlier rules; quirk preserved).
+    /// Absolute base into the env table (an `@`-led rule keeps 0 even
+    /// after earlier rules; quirk preserved).
     pub env_base: usize,
     pub dev: DevMatch,
     pub cont: bool,
@@ -87,7 +82,7 @@ pub struct Rule {
     pub action_mask: u8,
     pub execline: bool,
     /// Offset of the NUL-terminated command text. `None` with a nonzero
-    /// mask is the reference empty-command quirk (offset 0 there).
+    /// mask is the empty-command quirk (offset 0 there).
     pub cmd: Option<usize>,
     pub line: u32,
 }
@@ -231,7 +226,7 @@ fn resolve_group(name: &[u8]) -> Option<u32> {
     gid.or_else(|| scan_decimal(name))
 }
 
-// Action bits, named after PARSING.txt.
+// Action bits for the two-pass state machines.
 const A_ENVINIT: u32 = 0x4000_0000;
 const A_MAJMIN: u32 = 0x2000_0000;
 const A_DEVRE: u32 = 0x1000_0000;
@@ -361,7 +356,7 @@ fn second_pass(buf: &mut [u8]) -> Result<(Vec<Rule>, Vec<EnvMatch>), ConfigError
         let next = what & 0x1f;
         // Capture a move path / command text when its state is left. Every
         // exit from INPATH/INCMD carries ZERO, and no stay carries it. The
-        // stored offset is the token start recorded by p/c, like the C code.
+        // stored offset is the token start recorded by p/c.
         if state == ST_INPATH && next != ST_INPATH {
             if path_start.is_some() {
                 cur.movepath = path_start;
@@ -374,8 +369,8 @@ fn second_pass(buf: &mut [u8]) -> Result<(Vec<Rule>, Vec<EnvMatch>), ConfigError
             }
             cmd_start = None;
         }
-        // The three initializers touch only their own fields, like the C
-        // code; in particular they preserve a leading `-` cont flag.
+        // The three initializers touch only their own fields, so a leading
+        // `-` cont flag survives them.
         if what & A_ENVINIT != 0 {
             cur.dev = BuildDev::Nothing;
             cur.env_base = env.len();
@@ -457,8 +452,7 @@ fn second_pass(buf: &mut [u8]) -> Result<(Vec<Rule>, Vec<EnvMatch>), ConfigError
             cur.dev = BuildDev::DevRe(re);
         }
         if what & A_VAR != 0 {
-            // The name resolves lazily from storage (like the reference,
-            // which reads storage+var after all zeroing is done).
+            // The name resolves lazily from storage after all zeroing is done.
             var_start = mark;
         }
         if what & A_UID != 0 {
@@ -480,7 +474,7 @@ fn second_pass(buf: &mut [u8]) -> Result<(Vec<Rule>, Vec<EnvMatch>), ConfigError
                 text: buf[mark..pos].to_vec(),
             })?;
         }
-        // Reference order: r/a clear the execline flag, E sets it last.
+        // Order matters: r/a clear the execline flag, E sets it last.
         if what & A_REMOVE != 0 {
             cur.action_mask |= 0x2;
             cur.execline = false;
@@ -559,7 +553,7 @@ fn second_pass(buf: &mut [u8]) -> Result<(Vec<Rule>, Vec<EnvMatch>), ConfigError
     Ok((rules, env))
 }
 
-/// Parse `input` exactly like the reference (hooks included). The daemon
+/// Parse `input` (hooks included). The daemon
 /// path follows up with [`validate_v1`].
 pub fn parse(input: &[u8]) -> Result<Config, ConfigError> {
     if input.len() > CONF_MAX - 1 {
@@ -591,7 +585,7 @@ pub fn parse(input: &[u8]) -> Result<Config, ConfigError> {
 }
 
 /// v1 admission: reject every command-carrying rule (owner decision),
-/// including the reference empty-command quirk (mask without text).
+/// including the empty-command quirk (mask without text).
 pub fn validate_v1(cfg: &Config) -> Result<(), ConfigError> {
     for r in &cfg.rules {
         if r.action_mask != 0 {

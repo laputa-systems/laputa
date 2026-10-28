@@ -1,8 +1,7 @@
-//! P3: match+apply tests. `engine` filter.
+//! Match-and-apply tests. `engine` filter.
 //!
-//! Hermetic unit tests always run. `engine_transcript_diff` diffs dry-run
-//! transcripts against the C oracle harness (`tools/build-oracle.sh`);
-//! it passes with a note when the harness is absent.
+//! Hermetic unit tests always run. `engine_transcript_matches_goldens`
+//! pins every dry-run transcript against a committed golden file.
 use mdevd::config::regex::pin_c_locale;
 use mdevd::config::parse;
 use mdevd::engine::fake::{FakeOps, NullOps};
@@ -50,7 +49,7 @@ fn engine_alias_units() {
     assert_eq!(&w[..w.len() - 1], b"disk/sda");
     let w = alias_format(4091, b"a%%b", b"sda", &caps).unwrap();
     assert_eq!(&w[..w.len() - 1], b"a%b");
-    // Trailing % and stray %x are invalid, like the C state machine.
+    // Trailing % and stray %x are invalid.
     assert!(alias_format(4091, b"a%", b"sda", &caps).is_err());
     assert!(alias_format(4091, b"a%x", b"sda", &caps).is_err());
     // Unmatched groups substitute empty.
@@ -219,7 +218,7 @@ fn engine_sysfs_fallbacks() {
     assert_eq!(o, Outcome::Publish);
     assert_eq!(t, vec!["dry run: mknod fromfile c 1 5", "dry run: chmod 600 fromfile",]);
     // A sys uevent file without trailing newline ends the value instead of
-    // crashing (robustness fix over the reference; see divergence.md).
+    // crashing (see divergence.md).
     let (o, t) = dry_run(
         "fromuevent root:root 600\n",
         &read_evt("no-devname-z.evt"),

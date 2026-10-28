@@ -1,10 +1,10 @@
-//! mdevd: Rust replacement for the mdevd daemon (P5).
+//! mdevd: hotplug management daemon.
 //!
 //! Wiring around the library: CLI, startup order, readiness, signals,
-//! config reload, and the poll loop. Mirrors `main` in `src/mdevd/mdevd.c`
-//! step for step, except for registered divergences: hook/firmware
-//! rejection, invalid reloads retaining the last valid config, and a
-//! bounded coldplug-sync wait owned by mdevd-coldplug.
+//! config reload, and the poll loop. Registered divergences from upstream
+//! behavior (hook/firmware rejection, invalid reloads retaining the last
+//! valid config, bounded coldplug-sync wait) live in
+//! `docs/divergence.md`.
 
 use mdevd::config::{Config, parse, validate_v1};
 use mdevd::engine::{Out, Outcome, Request, Run, Warn};
@@ -35,7 +35,7 @@ fn info(line: &str) {
 }
 
 fn errno_text(e: std::io::Error) -> String {
-    // libc strerror text, matching the reference byte-for-byte.
+    // libc strerror text for diagnostics.
     // SAFETY: strerror handles any errno value.
     unsafe {
         let p = libc::strerror(e.raw_os_error().unwrap_or(0));
@@ -112,7 +112,7 @@ fn parse_args(argv: &[String]) -> Result<Args, ()> {
             opts_done = true;
             continue;
         }
-        // Bare "-" and positionals are ignored, like the reference.
+        // Bare "-" and positionals are ignored.
         if arg.len() <= 1 || !arg.starts_with('-') {
             continue;
         }
@@ -274,11 +274,10 @@ fn coldplug_helper_path() -> std::path::PathBuf {
 }
 
 fn spawn_coldplug(a: &Args) {
-    // No pre_exec signal unblocking: like the reference cspawn, the child
-    // inherits the daemon's blocked TERM/HUP and ignored SIGCHLD. Besides
-    // parity, std's fork-based spawn path waitpids the child, which panics
-    // under an ignored SIGCHLD; plain spawn uses posix_spawn and tolerates
-    // a missing helper with a loud warning instead.
+    // No pre_exec here: std's fork-based spawn path waitpids the child,
+    // which panics under the daemon's ignored SIGCHLD; plain spawn reaps
+    // nothing and tolerates a missing helper with a loud warning instead.
+    // The child inherits the blocked TERM/HUP mask.
     let helper = coldplug_helper_path();
     let mut cmd = std::process::Command::new(&helper);
     cmd.arg("-s").arg(&a.slashsys);
@@ -304,7 +303,7 @@ fn load_config(path: &str, verbosity: u32, initial: bool, old: Option<Config>) -
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
                 warn(verbosity, 1, &format!("unable to read {path}: {}", errno_text(e)));
-                // Empty config: just the catchall, like the reference.
+                // Empty config: just the catchall.
                 return parse(b"").unwrap_or_else(|err| fatal(2, err.to_string()));
             }
             fatal(111, format!("unable to read {path}: {}", errno_text(e)));
@@ -472,7 +471,7 @@ fn run(
         }
         if let Some(n) = notif.take() {
             let one = *b"\n";
-            // SAFETY: notif was validated open; result ignored like the C code.
+            // SAFETY: notif was validated open; the write result is ignored.
             unsafe {
                 libc::write(n as libc::c_int, one.as_ptr() as *const libc::c_void, 1);
                 libc::close(n as libc::c_int);
@@ -634,7 +633,7 @@ mod tests {
         assert!(args(&["-v", "nan"]).is_err());
         assert!(args(&["-O", "0x4"]).is_err());
         assert!(args(&["-Z"]).is_err());
-        // Extra positionals are ignored, like the reference.
+        // Extra positionals are ignored.
         assert!(args(&["extra", "-v2"]).unwrap().verbosity == 2);
     }
 }

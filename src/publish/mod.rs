@@ -1,10 +1,9 @@
-//! Post-processing event publication (P4).
+//! Post-processing event publication.
 //!
-//! Ports `output_event`, `rebc_event`, `rebc_init`, and the startup loop
-//! guard from `src/mdevd/mdevd.c`. Both sinks fire only after handling
-//! completes — the daemon (P5) enforces the ordering; this module is the
-//! byte-exact send side. Output is bounded: a failing `-o` fd is closed
-//! and never retried; rebroadcast failures warn without buffering.
+//! Both sinks fire only after handling completes — the daemon binary
+//! enforces the ordering; this module is the send side. Output is
+//! bounded: a failing `-o` fd is closed and never retried; rebroadcast
+//! failures warn without buffering.
 
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 
@@ -14,7 +13,7 @@ pub struct Note {
     pub msg: String,
 }
 
-/// `-o` output fd. A short write closes and disables it, like the C code.
+/// `-o` output fd. A short write closes and disables it.
 pub struct Output {
     fd: Option<OwnedFd>,
 }
@@ -139,8 +138,7 @@ impl Rebroadcast {
         }
     }
 
-    /// Mirror `rebc_event`: a single `send`; only `-1` warns. Short sends
-    /// are accepted silently, exactly like the reference.
+    /// A single `send`; only `-1` warns. Short sends are accepted silently.
     pub fn send(&self, record: &[u8], notes: &mut Vec<Note>) {
         // SAFETY: record is live for the call.
         let r = unsafe {
@@ -163,7 +161,7 @@ impl Rebroadcast {
 
 /// Mirror the startup loop guard: `intake|1` bits are dropped from the
 /// rebroadcast mask. Returns the masked value plus dropped bits, if any
-/// (the daemon warns naming them, like the reference).
+/// (the daemon warns naming them).
 pub fn apply_loop_guard(intake: u32, rebc: u32) -> (u32, Option<u32>) {
     let dropped = rebc & (intake | 1);
     (rebc & !dropped, if dropped != 0 { Some(dropped) } else { None })

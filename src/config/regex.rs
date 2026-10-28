@@ -1,7 +1,7 @@
 //! POSIX extended regex via libc, with process-locale caveats documented.
 //!
-//! The reference compiles every pattern with `regcomp(REG_EXTENDED)` under
-//! whatever locale the daemon runs in. musl's regex engine is effectively
+//! Patterns compile with `regcomp(REG_EXTENDED)` under whatever locale the
+//! daemon runs in. musl's regex engine is effectively
 //! locale-independent, but glibc's is not, so the binaries force the `C`
 //! locale at startup and tests pin it with [`pin_c_locale`]. A `Regex`
 //! must only be used while that holds.
@@ -76,7 +76,7 @@ impl Regex {
         v
     }
 
-    /// Unanchored search, like the reference envmatch check.
+    /// Unanchored substring search.
     pub fn is_match(&self, text: &[u8]) -> bool {
         let c = Self::as_c_vec(text);
         // SAFETY: c is NUL-terminated; nmatch=0 takes no pmatch pointer.
@@ -84,7 +84,7 @@ impl Regex {
     }
 
     /// Up to 10 capture groups; the caller applies the full-match anchor
-    /// check (`off[0] == whole input`), like the reference devmatch check.
+    /// check (`off[0] == whole input`).
     pub fn captures10(&self, text: &[u8]) -> Option<[Option<(usize, usize)>; 10]> {
         let c = Self::as_c_vec(text);
         let mut pm: [libc::regmatch_t; 10] = unsafe { std::mem::zeroed() };
@@ -129,8 +129,7 @@ impl Drop for Regex {
 pub fn pin_c_locale() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        // SAFETY: constant string, return value unchecked like the
-        // reference (which never calls setlocale at all).
+        // SAFETY: constant string; the return value is unchecked.
         unsafe {
             libc::setlocale(libc::LC_ALL, c"C".as_ptr());
         }

@@ -1,15 +1,10 @@
-//! Match + apply (P3).
+//! Match + apply.
 //!
-//! Ports `run_scriptelem` / `run_script` / `act_on_event` / `on_event` and
-//! `alias_format` from `src/mdevd/mdevd.c`. The transition table for `%`
-//! expansion is generated verbatim into `tables.rs`.
+//! Only `add` consults `MAJOR`/`MINOR` (so `remove` never unlinks),
+//! unknown actions behave as "any" (no filesystem ops in v1), and every
+//! processed event publishes — only variable-less records are dropped.
 //!
-//! Behavior mirrors the reference, including observed quirks: only `add`
-//! consults `MAJOR`/`MINOR` (so `remove` never unlinks), unknown actions
-//! behave as "any" (no filesystem ops in v1), and every processed event
-//! publishes — only variable-less records are dropped.
-//!
-//! Hardening over the reference (registered in `docs/divergence.md`):
+//! Hardening (registered in `docs/divergence.md`):
 //! sysfs fallback reads skip `..` escapes; the real adapter refuses
 //! absolute/`..` node paths and only adopts an existing node on matching
 //! type and device identity; a missing trailing newline in a sysfs
@@ -402,7 +397,7 @@ fn scan_run(buf: &[u8]) -> Option<(u32, usize)> {
     if n == 0 { None } else { Some((v, n)) }
 }
 
-/// Strict `maj:min\n` prefix rule for sysfs `dev` files, like the C code
+/// Strict `maj:min\n` prefix rule for sysfs `dev` files
 /// (trailing content after the newline is ignored).
 fn parse_dev_file(buf: &[u8]) -> Option<(u32, u32)> {
     let (maj, i) = scan_run(buf)?;

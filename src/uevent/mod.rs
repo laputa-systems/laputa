@@ -1,10 +1,9 @@
-//! NETLINK_KOBJECT_UEVENT intake (P2).
+//! NETLINK_KOBJECT_UEVENT intake.
 //!
-//! Ports `mdevd_netlink_init.c` and `mdevd_uevent_read.c`. Record parsing
-//! is pure and rootless-testable; only the small recvmsg seam touches an
-//! fd. Semantics mirror the reference, including its quirks: the `@/`
-//! check searches the whole datagram, and persistent `ENOBUFS` retries
-//! forever while counting overruns.
+//! Record parsing is pure and rootless-testable; only the small recvmsg
+//! seam touches an fd. Quirks are contractual: the `@/` check searches
+//! the whole datagram, and persistent `ENOBUFS` retries forever while
+//! counting overruns.
 
 use crate::config::{UEVENT_MAX_SIZE, UEVENT_MAX_VARS};
 use std::mem;
@@ -33,8 +32,8 @@ pub struct Uevent {
 }
 
 impl Uevent {
-    /// First `name=value` record at index 1+, like `mdevd_uevent_getvar`
-    /// (index 0 is the `@/...` header and never matches).
+    /// First `name=value` record at index 1+ (index 0 is the `@/...`
+    /// header and never matches).
     pub fn getvar(&self, name: &[u8]) -> Option<&[u8]> {
         for &v in self.vars.iter().skip(1) {
             let rec = &self.buf[v..];
@@ -47,14 +46,13 @@ impl Uevent {
         None
     }
 
-    /// Records with no variables are skipped by the caller, like the
-    /// reference (`event->varn <= 1`).
+    /// Records with no variables are skipped by the caller.
     pub fn is_empty(&self) -> bool {
         self.vars.len() <= 1
     }
 }
 
-/// Split a raw datagram exactly like `mdevd_uevent_read`.
+/// Split a raw datagram into NUL-terminated records with a trailing NUL check.
 pub fn parse_record(buf: &[u8]) -> Result<Uevent, Invalid> {
     if buf.is_empty() {
         return Err(Invalid::Empty);
@@ -144,7 +142,7 @@ fn recv_once(fd: BorrowedFd, buf: &mut [u8]) -> Result<Recv, Fatal> {
 }
 
 /// Read one datagram: `Nothing` means no event this round. `Err` is fatal
-/// (`MSG_TRUNC`, I/O failure), like the reference dying. Overruns,
+/// (`MSG_TRUNC`, I/O failure). Overruns,
 /// userspace drops, and invalid records are counted in `stats`.
 pub fn read_event(
     fd: BorrowedFd,
@@ -214,8 +212,8 @@ pub enum ReadOutcome {
     Invalid(Invalid),
 }
 
-/// Bind the intake socket, like `mdevd_netlink_init`: nonblocking,
-/// close-on-exec, `SO_RCVBUFFORCE` with an `EPERM` fallback to `SO_RCVBUF`.
+/// Bind the intake socket: nonblocking, close-on-exec,
+/// `SO_RCVBUFFORCE` with an `EPERM` fallback to `SO_RCVBUF`.
 pub fn bind_intake(group: u32, kbufsz: u32) -> std::io::Result<OwnedFd> {
     // SAFETY: straightforward socket/bind/setsockopt sequence; every
     // failure closes the fd and returns the errno.

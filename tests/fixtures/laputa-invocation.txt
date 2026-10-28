@@ -7,6 +7,6 @@
 # Serial coldplug step after daemon start:
 #   mdevd-coldplug -O 4
 # Proves: the exact Laputa argv shape must be accepted with identical semantics.
-# Does not prove: guest-boot end-to-end (needs VM; see Needs environment).
+# Does not prove: guest-boot end-to-end (needs a KVM guest; see docs/testing.md).
 mdevd -O 4 -f /etc/mdev.conf -C
 mdevd-coldplug -O 4

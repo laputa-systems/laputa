@@ -1,4 +1,4 @@
-//! R0: reference pins and fixture shape.
+//! Pinned sources and fixture shape.
 use std::path::Path;
 
 #[test]

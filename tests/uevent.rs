@@ -26,7 +26,7 @@ fn uevent_parse_valid() {
 
 #[test]
 fn uevent_header_never_matches() {
-    // Even if the header carries '=', lookup starts at index 1 like the C.
+    // Even if the header carries '=', lookup starts at index 1.
     let buf = record(&[b"add@/x?ACTION=zzz", b"ACTION=add"]);
     let ev = parse_record(&buf).unwrap();
     assert_eq!(ev.getvar(b"ACTION"), Some(b"add".as_slice()));

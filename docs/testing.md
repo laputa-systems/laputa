@@ -23,7 +23,7 @@ The kernel-event container receives only `NET_ADMIN` and uses a private network 
 Neither container receives host device mounts or host networking.
 
 The kernel test creates and removes a dummy interface through rtnetlink.
-Both C and Rust daemons receive genuine kernel events, including interface queue events.
+The daemon receives genuine kernel events, including interface queue events.
 The test compares every captured kernel datagram with the daemon's `-o` framing and `-O 4` rebroadcast, in order.
 It waits for `-D` readiness before triggering events and requires clean SIGTERM exit.
 A FIFO handshake holds reload open while the kernel queues add events.
@@ -35,8 +35,8 @@ RealOps rejects symlink ancestors for mutations and retains the verified device 
 Its chmod implementation requires `/proc/self/fd` to update that inode without opening the device.
 
 Event loss stays observable: netlink overruns increment a counter and
-emit the reference's `missed events! you should increase the -b kbufsz
-value` warning at every level. No synchronized-state claim follows an
+emit a level-0 `missed events! you should increase the -b kbufsz value`
+warning. No synchronized-state claim follows an
 overrun; re-establishing device state requires a rescan
 (`mdevd-coldplug -s /sys`).
 

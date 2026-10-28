@@ -19,7 +19,7 @@ impl FakeOps {
 
 /// No sysfs access and no mutations: for dry runs that must resolve every
 /// fallback as absent. (Daemon dry runs pass the real adapter instead, so
-/// `-n` still reads sysfs exactly like the reference.)
+/// `-n` still reads sysfs.)
 #[derive(Debug, Default)]
 pub struct NullOps;
 

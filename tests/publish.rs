@@ -75,7 +75,7 @@ fn publish_output_failure_closes() {
     assert!(notes[0].msg.starts_with("unable to write to descriptor "));
     assert!(notes[0].msg.contains("(closing it): "));
     assert!(!sinks.output.as_ref().unwrap().live());
-    // Further publishes are no-ops, like the reference stopping writes.
+    // Further publishes are no-ops; the fd stays closed.
     let mut notes2 = Vec::new();
     publish(&record("add", 2), &mut sinks, &mut notes2);
     assert!(notes2.is_empty());

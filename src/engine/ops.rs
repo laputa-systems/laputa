@@ -1,9 +1,8 @@
-//! Privileged filesystem/device adapter (P3).
+//! Privileged filesystem/device adapter.
 //!
 //! Every path is relative to a held directory fd (`openat` family); the
 //! daemon never re-resolves a pathname. Absolute paths and `..` escapes
-//! are refused loudly by every mutating method (the reference resolves
-//! them; dry-run transcripts stay identical, real runs fail safe — see
+//! are refused loudly by every mutating method (see
 //! `docs/divergence.md`). On `EEXIST`, an existing node is only adopted
 //! when its type and device identity match; anything else is refused
 //! instead of `chmod`/`chown`-ed blindly.
@@ -72,7 +71,7 @@ pub trait Ops {
     fn chmod(&mut self, path: &[u8], mode: u32) -> Result<(), OpErr>;
     fn chown(&mut self, path: &[u8], uid: u32, gid: u32) -> Result<(), OpErr>;
     fn symlink_replace(&mut self, target: &[u8], link: &[u8]) -> Result<(), OpErr>;
-    /// Like the reference `unlink_void`: errors are ignored.
+    /// Errors are ignored.
     fn unlink(&mut self, path: &[u8]);
 }
 

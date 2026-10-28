@@ -60,7 +60,7 @@ fn dump(cfg: &Config) -> Vec<u8> {
             o.extend_from_slice(format!("  path {}\n", lossy(p)).as_bytes());
         }
         if r.action_mask != 0 {
-            // Mirrors the reference empty-command quirk: offset 0 reads the
+            // Empty-command quirk: offset 0 reads the
             // whole buffer up to its first NUL.
             let t = r.cmd.map(|off| cfg.at(off)).unwrap_or_else(|| {
                 let end = cfg.storage.iter().position(|&b| b == 0).unwrap_or(cfg.storage.len());
@@ -117,7 +117,7 @@ fn config_laputa_golden() {
 #[test]
 fn config_hook_fixture_rejected() {
     let cfg = parse_ok("tests/fixtures/hook-mdev.conf");
-    // The reference accepts hooks; v1 rejects each command line (1-6).
+    // Upstream accepts hooks; v1 rejects each command line (1-6).
     assert_eq!(cfg.rules.len(), 8);
     assert!(matches!(cfg.rules[7].dev, DevMatch::Catchall));
     for r in &cfg.rules[..6] {
@@ -155,7 +155,7 @@ fn config_regex_semantics() {
     let re = Regex::compile(b"(sd[a-z])").unwrap();
     assert!(re.is_match(b"sda"));
     assert!(!re.is_match(b"hd"));
-    // Unanchored env search, like the reference.
+    // Env patterns match unanchored substrings.
     let env = Regex::compile(b"block").unwrap();
     assert!(env.is_match(b"block"));
     assert!(!env.is_match(b"blk"));
