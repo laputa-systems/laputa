@@ -274,23 +274,16 @@ fn coldplug_helper_path() -> std::path::PathBuf {
 }
 
 fn spawn_coldplug(a: &Args) {
+    // No pre_exec signal unblocking: like the reference cspawn, the child
+    // inherits the daemon's blocked TERM/HUP and ignored SIGCHLD. Besides
+    // parity, std's fork-based spawn path waitpids the child, which panics
+    // under an ignored SIGCHLD; plain spawn uses posix_spawn and tolerates
+    // a missing helper with a loud warning instead.
     let helper = coldplug_helper_path();
     let mut cmd = std::process::Command::new(&helper);
     cmd.arg("-s").arg(&a.slashsys);
     cmd.arg("-b").arg(a.kbufsz.to_string());
     cmd.arg("-v").arg(a.verbosity.to_string());
-    unsafe {
-        use std::os::unix::process::CommandExt;
-        cmd.pre_exec(|| {
-            let mut set: libc::sigset_t = std::mem::zeroed();
-            libc::sigemptyset(&mut set);
-            libc::sigaddset(&mut set, libc::SIGTERM);
-            libc::sigaddset(&mut set, libc::SIGHUP);
-            libc::sigprocmask(libc::SIG_UNBLOCK, &set, std::ptr::null_mut());
-            libc::signal(libc::SIGCHLD, libc::SIG_DFL);
-            Ok(())
-        });
-    }
     match cmd.spawn() {
         Ok(_) => {}
         Err(e) => warn(

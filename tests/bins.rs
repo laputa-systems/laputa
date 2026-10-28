@@ -246,6 +246,52 @@ fn bins_same_fd_diff() {
     }
 }
 
+/// A missing coldplug helper must not block readiness or kill startup:
+/// the spawn failure is warned loudly and the daemon serves events.
+#[test]
+fn bins_coldplug_missing_helper_still_ready() {
+    let ours = bin("mdevd");
+    let cfg = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/bins-missing-helper.conf");
+    std::fs::write(&cfg, b"mydev root:root 600\n").unwrap();
+    let mut fds = [0; 2];
+    assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+    let read = unsafe { std::os::unix::io::OwnedFd::from_raw_fd(fds[0]) };
+    let mut read = std::fs::File::from(read);
+    let mut cmd = Command::new(&ours);
+    cmd.args([
+        "-C",
+        "-f",
+        cfg.to_str().unwrap(),
+        "-d",
+        devdir().to_str().unwrap(),
+        "-s",
+        sysdir().to_str().unwrap(),
+    ])
+    .arg("-D")
+    .arg(fds[1].to_string())
+    .env("MDEVD_COLDPLUG_HELPER", "/nonexistent-mdevd-coldplug-xyz")
+    .stdout(Stdio::null())
+    .stderr(Stdio::piped());
+    let child = cmd.spawn().expect("daemon spawn");
+    unsafe {
+        libc::close(fds[1]);
+    }
+    assert!(await_ready(&mut read), "readiness blocked by missing helper");
+    assert!(alive(child.id()), "daemon died on missing helper");
+    // SIGTERM, not SIGKILL: the daemon must exit 0 by itself.
+    // SAFETY: child is our own daemon.
+    unsafe {
+        libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
+    }
+    let out = child.wait_with_output().expect("reap");
+    assert!(out.status.success(), "unclean exit after missing helper");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("unable to spawn /nonexistent-mdevd-coldplug-xyz"),
+        "spawn failure not reported: {err}"
+    );
+}
+
 /// Spawn a daemon with a readiness pipe on fd N (inherited, non-CLOEXEC).
 /// Returns the child plus the read end to await "\n" on.
 fn spawn_daemon(prog: &str, args: &[&str], ld: bool) -> (std::process::Child, std::fs::File, i32) {
