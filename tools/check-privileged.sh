@@ -2,7 +2,6 @@
 set -eu
 cd "$(dirname "$0")/.."
 ROOT=$PWD
-tools/build-oracle.sh
 mkdir -p .work/tmp
 export TMPDIR="$ROOT/.work/tmp"
 TEST_BIN=$(cargo test --locked --target x86_64-unknown-linux-musl --test adversarial --no-run --message-format json |

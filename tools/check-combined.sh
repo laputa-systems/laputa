@@ -57,15 +57,9 @@ cc -O2 -static -Wall -DUSB_IDS_PATH='"/usr/share/hwdata/usb.ids"' \
   $LIBUDEV_ZERO/udev.c $LIBUDEV_ZERO/udev_device.c $LIBUDEV_ZERO/udev_enumerate.c \
   $LIBUDEV_ZERO/udev_list.c $LIBUDEV_ZERO/udev_monitor.c -I$LIBUDEV_ZERO
 echo 'check-combined: consumer built (static musl, unpatched fork API)'
-cc -std=c11 -O2 -static -D_XOPEN_SOURCE=700 -DLIBSEAT=1 -DSEATD_ENABLED=1 \
-  '-DSEATD_DEFAULTPATH="/run/combined-seatd.sock"' \
-  -I$SEATD/oracle/include \
-  "$ROOT/tools/combined-seat-client.c" \
-  $SEATD/oracle/common/connection.c $SEATD/oracle/common/linked_list.c \
-  $SEATD/oracle/common/log.c $SEATD/oracle/libseat/backend/seatd.c \
-  $SEATD/oracle/libseat/backend/noop.c $SEATD/oracle/libseat/libseat.c \
-  -o "$ROOT/.work/combined/seat-client"
-echo 'check-combined: seat client built (static musl, oracle libseat)'
+cc -std=c11 -O2 -static -D_XOPEN_SOURCE=700 -Wall \
+  -o "$ROOT/.work/combined/seat-client" "$ROOT/tools/combined-seat-client.c"
+echo 'check-combined: seat client built (static musl, raw protocol, no C deps)'
 
 TARBALL=alpine-minirootfs-3.20.3-x86_64.tar.gz
 if [ ! -f "$ROOT/.work/dl/$TARBALL" ]; then

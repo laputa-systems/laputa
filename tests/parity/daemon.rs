@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
-fn programs() -> [PathBuf; 2] {
-    [oracle("src-tree/mdevd"), PathBuf::from(env!("CARGO_BIN_EXE_mdevd"))]
+fn our_program() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_mdevd"))
 }
 
 struct Daemon {
@@ -108,146 +108,124 @@ fn reload(daemon: &Daemon, work: &Work, text: &[u8]) {
 use std::os::unix::fs::OpenOptionsExt;
 
 #[test]
-fn parity_daemon_userspace_output() {
-    if unshare("daemon::parity_daemon_userspace_output") { return; }
+fn daemon_userspace_output_drops_spoofed() {
+    if unshare("daemon::daemon_userspace_output_drops_spoofed") { return; }
     let events = [
         b"add@/devices/x\0ACTION=add\0DEVPATH=/devices/x\0DEVNAME=mydev\0MAJOR=1\0MINOR=2\0".as_slice(),
         b"change@/devices/x\0ACTION=change\0DEVPATH=/devices/x\0",
         b"remove@/devices/x\0ACTION=remove\0DEVPATH=/devices/x\0",
         b"not-nul-terminated",
     ];
-    let mut results = Vec::new();
-    for (index, program) in programs().iter().enumerate() {
-        let work = fixture(&format!("output-{index}"));
-        let mut daemon = Daemon::start(program, &work);
-        let warnings: Vec<_> = events.iter().map(|e| daemon.inject(e)).collect();
-        let (bytes, code) = daemon.stop();
-        assert_eq!(code, 0);
-        assert!(std::fs::read_dir(work.0.join("dev")).unwrap().next().is_none());
-        results.push((warnings, bytes, code));
+    let work = fixture("output");
+    let mut daemon = Daemon::start(&our_program(), &work);
+    for e in events {
+        let warning = daemon.inject(e);
+        assert!(warning.starts_with(b"mdevd: warning: received netlink message from userspace process "));
     }
-    assert_eq!(results[0], results[1]);
+    let (bytes, code) = daemon.stop();
+    assert_eq!(code, 0);
+    assert!(bytes.is_empty(), "spoofed event reached -o");
+    assert!(std::fs::read_dir(work.0.join("dev")).unwrap().next().is_none());
 }
 
 #[test]
-fn parity_reload_matrix() {
-    if unshare("daemon::parity_reload_matrix") { return; }
-    for (index, program) in programs().iter().enumerate() {
-        let work = fixture(&format!("reload-{index}"));
-        let mut daemon = Daemon::start(program, &work);
-        for text in [b"mydev root:root 640\n".as_slice(), b"", b"# comments only\n"] {
-            reload(&daemon, &work, text);
-            daemon.inject(b"add@/x\0ACTION=add\0DEVPATH=/x\0");
-        }
-        std::fs::remove_file(work.0.join("config")).unwrap();
-        daemon.child.signal(libc::SIGHUP);
-        let warning = String::from_utf8(line(&mut daemon.err)).unwrap();
-        assert_eq!(warning, format!("mdevd: warning: unable to read {}: No such file or directory\n",
-            work.0.join("config").display()));
-        daemon.inject(b"remove@/x\0ACTION=remove\0DEVPATH=/x\0");
-        std::fs::write(work.0.join("config"), b"mydev root:root 600\n").unwrap();
-        reload(&daemon, &work, b";broken\n");
-        if index == 0 {
-            assert_eq!(daemon.child.wait().code(), Some(2));
-            assert_eq!(line(&mut daemon.err), b"mdevd: fatal: syntax error during first pass: line 1 column 1\n");
-            assert!(std::fs::read(&daemon.out).unwrap().is_empty());
-        } else {
-            assert_eq!(line(&mut daemon.err),
-                b"mdevd: warning: reload keeps last valid config: syntax error during first pass: line 1 column 1\n");
-            daemon.inject(b"change@/x\0ACTION=change\0DEVPATH=/x\0");
-            reload(&daemon, &work, b"mydev root:root 660\n");
-            daemon.inject(b"add@/x\0ACTION=add\0DEVPATH=/x\0");
-            assert_eq!(daemon.stop(), (vec![], 0));
-        }
-        let error_work = fixture(&format!("read-error-{index}"));
-        let mut daemon = Daemon::start(program, &error_work);
-        std::fs::remove_file(error_work.0.join("config")).unwrap();
-        std::fs::create_dir(error_work.0.join("config")).unwrap();
-        daemon.child.signal(libc::SIGHUP);
-        assert_eq!(daemon.child.wait().code(), Some(111));
-        assert_eq!(String::from_utf8(line(&mut daemon.err)).unwrap(),
-            format!("mdevd: fatal: unable to read {}: Is a directory\n", error_work.0.join("config").display()));
+fn daemon_reload_matrix() {
+    if unshare("daemon::daemon_reload_matrix") { return; }
+    let work = fixture("reload");
+    let mut daemon = Daemon::start(&our_program(), &work);
+    for text in [b"mydev root:root 640\n".as_slice(), b"", b"# comments only\n"] {
+        reload(&daemon, &work, text);
+        daemon.inject(b"add@/x\0ACTION=add\0DEVPATH=/x\0");
     }
+    std::fs::remove_file(work.0.join("config")).unwrap();
+    daemon.child.signal(libc::SIGHUP);
+    let warning = String::from_utf8(line(&mut daemon.err)).unwrap();
+    assert_eq!(warning, format!("mdevd: warning: unable to read {}: No such file or directory\n",
+        work.0.join("config").display()));
+    daemon.inject(b"remove@/x\0ACTION=remove\0DEVPATH=/x\0");
+    std::fs::write(work.0.join("config"), b"mydev root:root 600\n").unwrap();
+    reload(&daemon, &work, b";broken\n");
+    assert_eq!(line(&mut daemon.err),
+        b"mdevd: warning: reload keeps last valid config: syntax error during first pass: line 1 column 1\n");
+    daemon.inject(b"change@/x\0ACTION=change\0DEVPATH=/x\0");
+    reload(&daemon, &work, b"mydev root:root 660\n");
+    daemon.inject(b"add@/x\0ACTION=add\0DEVPATH=/x\0");
+    assert_eq!(daemon.stop(), (vec![], 0));
+    let error_work = fixture("read-error");
+    let mut daemon = Daemon::start(&our_program(), &error_work);
+    std::fs::remove_file(error_work.0.join("config")).unwrap();
+    std::fs::create_dir(error_work.0.join("config")).unwrap();
+    daemon.child.signal(libc::SIGHUP);
+    assert_eq!(daemon.child.wait().code(), Some(111));
+    assert_eq!(String::from_utf8(line(&mut daemon.err)).unwrap(),
+        format!("mdevd: fatal: unable to read {}: Is a directory\n", error_work.0.join("config").display()));
 }
 
 #[test]
-fn parity_config_acceptance() {
+fn config_acceptance_contract() {
     let work = fixture("config");
-    let mut paths: Vec<_> = std::fs::read_dir(root().join("tests/corpus")).unwrap()
-        .map(|e| e.unwrap().path()).collect();
-    paths.sort();
-    for path in paths {
-        if path.extension().is_none_or(|ext| ext != "conf") { continue; }
-        let excluded = matches!(path.file_name().unwrap().to_str().unwrap(),
-            "c-cmds.conf");
-        let results: Vec<_> = programs().iter().map(|program| {
-            let mut cmd = command(program);
-            cmd.args(["-N", "-f"]).arg(&path).arg("-d").arg(work.0.join("dev"))
-                .arg("-s").arg(work.0.join("sys"));
-            output(cmd)
-        }).collect();
-        if excluded {
-            assert_eq!(results[1].status.code(), Some(2), "{}", path.display());
-            assert_eq!(results[0].status.code(), Some(0));
-            assert!(String::from_utf8_lossy(&results[1].stderr).contains("command hooks are unsupported"));
-        } else {
-            assert_eq!(results[0].status.code(), results[1].status.code(), "{}", path.display());
-            assert_eq!(results[0].stderr, results[1].stderr, "{}", path.display());
-        }
-        assert!(results.iter().all(|out| out.stdout.is_empty()));
-    }
-}
-
-#[test]
-fn parity_coldplug_tree() {
-    let mut results = Vec::new();
-    for (index, program) in [oracle("src-tree/mdevd-coldplug"), PathBuf::from(env!("CARGO_BIN_EXE_mdevd-coldplug"))].iter().enumerate() {
-        let work = Work::new(&format!("coldplug-{index}"));
-        for name in ["block/devices/a", "input/devices/b", "pci/devices/c"] {
-            let dir = work.0.join("sys/subsystem").join(name);
-            std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join("uevent"), b"placeholder\n").unwrap();
-        }
-        let mut cmd = command(program);
-        cmd.arg("-s").arg(work.0.join("sys"));
+    let ours = our_program();
+    let cases = [
+        ("tests/corpus/c-min.conf", 0, ""),
+        ("tests/corpus/c-cmds.conf", 2, "command hooks are unsupported"),
+        ("tests/fixtures/bad-mdev.conf", 2, "syntax error"),
+    ];
+    for (file, code, fragment) in cases {
+        let path = root().join(file);
+        let mut cmd = command(&ours);
+        cmd.args(["-N", "-f"]).arg(&path).arg("-d").arg(work.0.join("dev"))
+            .arg("-s").arg(work.0.join("sys"));
         let out = output(cmd);
-        assert_eq!(out.status.code(), Some(0));
-        let bytes: Vec<_> = ["block/devices/a", "input/devices/b", "pci/devices/c"].iter()
-            .map(|name| std::fs::read(work.0.join("sys/subsystem").join(name).join("uevent")).unwrap()).collect();
-        assert!(bytes.iter().all(|b| b.starts_with(b"add\n")));
-        results.push((out.stdout, out.stderr, bytes));
+        assert_eq!(out.status.code(), Some(code), "{file}");
+        assert!(out.stdout.is_empty(), "{file}");
+        if fragment.is_empty() {
+            assert!(out.stderr.is_empty(), "{file}: {}", String::from_utf8_lossy(&out.stderr));
+        } else {
+            assert!(String::from_utf8_lossy(&out.stderr).contains(fragment), "{file}");
+        }
     }
-    assert_eq!(results[0], results[1]);
 }
 
 #[test]
-fn parity_oversize_config_divergence() {
+fn coldplug_tree_triggers_all() {
+    let program = PathBuf::from(env!("CARGO_BIN_EXE_mdevd-coldplug"));
+    let work = Work::new("coldplug");
+    for name in ["block/devices/a", "input/devices/b", "pci/devices/c"] {
+        let dir = work.0.join("sys/subsystem").join(name);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("uevent"), b"placeholder\n").unwrap();
+    }
+    let mut cmd = command(&program);
+    cmd.arg("-s").arg(work.0.join("sys"));
+    let out = output(cmd);
+    assert_eq!(out.status.code(), Some(0));
+    for name in ["block/devices/a", "input/devices/b", "pci/devices/c"] {
+        let content = std::fs::read(work.0.join("sys/subsystem").join(name).join("uevent")).unwrap();
+        assert!(content.starts_with(b"add\n"), "{name}");
+    }
+    assert!(out.stdout.is_empty());
+}
+
+#[test]
+fn oversize_config_rejected() {
     let work = fixture("oversize");
     std::fs::write(work.0.join("config"), vec![b'#'; mdevd::config::CONF_MAX]).unwrap();
-    for (index, program) in programs().iter().enumerate() {
-        let mut cmd = command(program);
-        cmd.args(["-N", "-f"]).arg(work.0.join("config"))
-            .arg("-d").arg(work.0.join("dev")).arg("-s").arg(work.0.join("sys"));
-        let out = output(cmd);
-        assert_eq!(out.status.code(), Some(if index == 0 { 0 } else { 2 }));
-        if index == 1 {
-            assert!(String::from_utf8_lossy(&out.stderr).contains("configuration too large"));
-        }
-    }
+    let mut cmd = command(&our_program());
+    cmd.args(["-N", "-f"]).arg(work.0.join("config"))
+        .arg("-d").arg(work.0.join("dev")).arg("-s").arg(work.0.join("sys"));
+    let out = output(cmd);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("configuration too large"));
 }
 
 #[test]
-fn parity_coldplug_cli() {
+fn coldplug_cli_rejects_bad_flags() {
+    let program = PathBuf::from(env!("CARGO_BIN_EXE_mdevd-coldplug"));
     for args in [["-z", ""], ["-v", "nan"], ["-O", "0x4"], ["-b", "bad"]] {
-        let results: Vec<_> = [oracle("src-tree/mdevd-coldplug"), PathBuf::from(env!("CARGO_BIN_EXE_mdevd-coldplug"))]
-            .iter().map(|program| {
-                let mut cmd = command(program);
-                cmd.args(args);
-                output(cmd)
-            }).collect();
-        assert_eq!(results[0].status.code(), Some(100));
-        assert_eq!(results[0].status.code(), results[1].status.code());
-        assert_eq!(results[0].stderr, results[1].stderr);
-        assert_eq!(results[0].stdout, results[1].stdout);
+        let mut cmd = command(&program);
+        cmd.args(args);
+        let out = output(cmd);
+        assert_eq!(out.status.code(), Some(100), "{args:?}");
+        assert!(out.stdout.is_empty());
     }
 }

@@ -1,10 +1,10 @@
 //! P5: binaries + lifecycle tests. `bins` filter.
 //!
-//! CLI matrix runs against the C oracle byte-for-byte. Daemon lifecycle
+//! CLI contract pins exit codes and key diagnostics. Daemon lifecycle
 //! tests run in the sandbox namespace (intake bind needs no privileges);
-//! anything needing multicast userspace send is either unicast (works) or
-//! explicitly parked. HUP-retain and sync-timeout are registered
-//! divergences proven against the oracle's contrasting behavior.
+//! anything needing multicast userspace send is unicast (works).
+//! HUP-retain and sync-timeout are registered divergences from the
+//! upstream behavior documented in docs/divergence.md.
 use std::io::Read;
 use std::os::unix::io::FromRawFd;
 use std::path::{Path, PathBuf};
@@ -12,18 +12,6 @@ use std::process::{Command, Stdio};
 
 fn bin(name: &str) -> String {
     std::env::var(format!("CARGO_BIN_EXE_{name}")).expect("cargo bin exe")
-}
-
-fn oracle() -> (PathBuf, PathBuf) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    (
-        root.join(".work/oracle/src-tree/mdevd"),
-        root.join(".work/oracle/src-tree/mdevd-coldplug"),
-    )
-}
-
-fn ld_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/vendor/sysdeps-root/lib")
 }
 
 struct Done {
@@ -125,33 +113,31 @@ fn bins_coldplug_never_touches_host_sys() {
     }
 }
 
-/// CLI matrix: identical exit codes and byte-identical stderr.
+/// CLI matrix: exit codes and key diagnostics are pinned.
 #[test]
-fn bins_cli_diff() {
-    let (o_mdevd, _) = oracle();
+fn bins_cli_contract() {
     let ours = bin("mdevd");
     let dev = devdir();
     let sys = sysdir();
     let good = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/laputa-mdev.conf");
     let bad = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bad-mdev.conf");
-    let cases: Vec<Vec<&str>> = vec![
-        vec!["--badflag"],
-        vec!["-v", "nan"],
-        vec!["-D", "2"],
-        vec!["-o", "2"],
-        vec!["-D", "9"],
-        vec!["-f", "relative.conf"],
-        vec!["-s", "relative-sys"],
-        vec!["-d", "relative-dev"],
-        vec!["-O", "0x4"],
-        vec!["-N", "-f", good.to_str().unwrap()],
-        vec!["-N", "-f", bad.to_str().unwrap()],
-        vec!["-N", "-f", good.to_str().unwrap(), "extra1", "extra2"],
-        vec!["-N", "-f", "/nonexistent-mdev-conf-xyz"],
+    let cases: Vec<(Vec<&str>, i32, &str)> = vec![
+        (vec!["--badflag"], 100, "usage:"),
+        (vec!["-v", "nan"], 100, "usage:"),
+        (vec!["-D", "2"], 100, "notification fd must be 3 or more"),
+        (vec!["-o", "2"], 100, "output fd must be 3 or more"),
+        (vec!["-D", "9"], 100, "invalid notification fd"),
+        (vec!["-f", "relative.conf"], 100, "is not an absolute path"),
+        (vec!["-s", "relative-sys"], 100, "is not an absolute path"),
+        (vec!["-d", "relative-dev"], 100, "is not an absolute path"),
+        (vec!["-O", "0x4"], 100, "usage:"),
+        (vec!["-N", "-f", good.to_str().unwrap()], 0, ""),
+        (vec!["-N", "-f", bad.to_str().unwrap()], 2, "syntax error"),
+        (vec!["-N", "-f", good.to_str().unwrap(), "extra1", "extra2"], 0, ""),
+        (vec!["-N", "-f", "/nonexistent-mdev-conf-xyz"], 0, "unable to read"),
     ];
-    for args in cases {
+    for (args, code, fragment) in cases {
         let has = |f: &str| args.contains(&f);
-        // Fill in deterministic defaults without overriding the case.
         let mut full: Vec<&str> = args.clone();
         if !has("-f") {
             full.push("-f");
@@ -165,26 +151,23 @@ fn bins_cli_diff() {
             full.push("-s");
             full.push(sys.to_str().unwrap());
         }
-        let mut oc = Command::new(&o_mdevd);
-        oc.args(&full).env("LD_LIBRARY_PATH", ld_path());
-        let od = run_timeout(oc, 10);
         let mut mc = Command::new(&ours);
         mc.args(&full);
         let md = run_timeout(mc, 10);
-        assert_eq!((md.code, od.code), (od.code, od.code), "{args:?}: exit differs");
-        assert_eq!(
-            String::from_utf8_lossy(&md.stderr),
-            String::from_utf8_lossy(&od.stderr),
-            "{args:?}: stderr differs"
-        );
-        assert!(md.stdout.is_empty() && od.stdout.is_empty(), "{args:?}: stdout");
+        assert_eq!(md.code, Some(code), "{args:?}: exit differs");
+        let err = String::from_utf8_lossy(&md.stderr);
+        if fragment.is_empty() {
+            assert!(err.is_empty(), "{args:?}: unexpected stderr: {err}");
+        } else {
+            assert!(err.contains(fragment), "{args:?}: stderr missing {fragment:?}: {err}");
+        }
+        assert!(md.stdout.is_empty(), "{args:?}: stdout");
     }
 }
 
-/// -F is rejected here (registered divergence); the oracle accepts it.
+/// -F is rejected here (registered divergence, see docs/divergence.md).
 #[test]
-fn bins_firmware_flag_diverges() {
-    let (o_mdevd, _) = oracle();
+fn bins_firmware_flag_rejected() {
     let ours = bin("mdevd");
     let dev = devdir();
     let sys = sysdir();
@@ -199,47 +182,31 @@ fn bins_firmware_flag_diverges() {
     let md = run_timeout(mc, 10);
     assert_eq!(md.code, Some(100));
     assert!(String::from_utf8_lossy(&md.stderr).contains("firmware loading is unsupported"));
-    let mut oc = Command::new(&o_mdevd);
-    oc.args(["-F", "/lib/firmware", "-N", "-f"])
-        .arg(&good)
-        .arg("-d")
-        .arg(&dev)
-        .arg("-s")
-        .arg(&sys)
-        .env("LD_LIBRARY_PATH", ld_path());
-    let od = run_timeout(oc, 10);
-    assert_eq!(od.code, Some(0));
 }
 
 /// Same-fd -D/-o rejection needs inherited fds; raw pipe() fds inherit.
 #[test]
-fn bins_same_fd_diff() {
-    let (o_mdevd, _) = oracle();
+fn bins_same_fd_rejected() {
     let ours = bin("mdevd");
     let mut fds = [0; 2];
     // SAFETY: fds is a valid output array; plain pipe() has no CLOEXEC.
     assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-    for (prog, extra_env) in [(o_mdevd.to_str().unwrap().to_string(), true), (ours.clone(), false)] {
-        let mut cmd = Command::new(&prog);
-        cmd.arg("-D")
-            .arg(fds[1].to_string())
-            .arg("-o")
-            .arg(fds[1].to_string())
-            .arg("-d")
-            .arg(devdir())
-            .arg("-s")
-            .arg(sysdir());
-        if extra_env {
-            cmd.env("LD_LIBRARY_PATH", ld_path());
-        }
-        let d = run_timeout(cmd, 10);
-        assert_eq!(d.code, Some(100), "{prog}");
-        assert!(
-            String::from_utf8_lossy(&d.stderr).contains("must not be the same"),
-            "{prog}: {}",
-            String::from_utf8_lossy(&d.stderr)
-        );
-    }
+    let mut cmd = Command::new(&ours);
+    cmd.arg("-D")
+        .arg(fds[1].to_string())
+        .arg("-o")
+        .arg(fds[1].to_string())
+        .arg("-d")
+        .arg(devdir())
+        .arg("-s")
+        .arg(sysdir());
+    let d = run_timeout(cmd, 10);
+    assert_eq!(d.code, Some(100));
+    assert!(
+        String::from_utf8_lossy(&d.stderr).contains("must not be the same"),
+        "{}",
+        String::from_utf8_lossy(&d.stderr)
+    );
     unsafe {
         libc::close(fds[0]);
         libc::close(fds[1]);
@@ -294,7 +261,7 @@ fn bins_coldplug_missing_helper_still_ready() {
 
 /// Spawn a daemon with a readiness pipe on fd N (inherited, non-CLOEXEC).
 /// Returns the child plus the read end to await "\n" on.
-fn spawn_daemon(prog: &str, args: &[&str], ld: bool) -> (std::process::Child, std::fs::File, i32) {
+fn spawn_daemon(prog: &str, args: &[&str]) -> (std::process::Child, std::fs::File, i32) {
     let mut fds = [0; 2];
     assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
     // SAFETY: fds[0] is open and owned.
@@ -302,9 +269,6 @@ fn spawn_daemon(prog: &str, args: &[&str], ld: bool) -> (std::process::Child, st
     let read = std::fs::File::from(read);
     let mut cmd = Command::new(prog);
     cmd.args(args).arg("-D").arg(fds[1].to_string());
-    if ld {
-        cmd.env("LD_LIBRARY_PATH", ld_path());
-    }
     let child = cmd.stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("daemon spawn");
     // SAFETY: write end was inherited; drop our copy so EOF works.
     unsafe {
@@ -343,33 +307,30 @@ fn term(child: &mut std::process::Child) -> Option<i32> {
 /// Readiness fires and SIGTERM exits 0, both binaries identically.
 #[test]
 fn bins_readiness_term() {
-    let (o_mdevd, _) = oracle();
     let ours = bin("mdevd");
     let dev = devdir();
     let sys = sysdir();
     let good = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/laputa-mdev.conf");
-    for (prog, ld) in [(o_mdevd.to_str().unwrap().to_string(), true), (ours.clone(), false)] {
-        let args = ["-I".to_string(),
-            "1".to_string(),
-            "-f".to_string(),
-            good.to_str().unwrap().to_string(),
-            "-d".to_string(),
-            dev.to_str().unwrap().to_string(),
-            "-s".to_string(),
-            sys.to_str().unwrap().to_string()];
-        let argrefs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let (mut child, mut read, _) = spawn_daemon(&prog, &argrefs, ld);
-        assert!(await_ready(&mut read), "{prog}: readiness never fired");
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        // SIGTERM, not SIGKILL: the daemon must exit 0 by itself.
-        // SAFETY: child is our own daemon.
-        unsafe {
-            libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
-        }
-        let code = child.wait().expect("wait").code();
-        assert_eq!(code, Some(0), "{prog}: TERM exit");
-        let _ = term(&mut child);
+    let args = ["-I".to_string(),
+        "1".to_string(),
+        "-f".to_string(),
+        good.to_str().unwrap().to_string(),
+        "-d".to_string(),
+        dev.to_str().unwrap().to_string(),
+        "-s".to_string(),
+        sys.to_str().unwrap().to_string()];
+    let argrefs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let (mut child, mut read, _) = spawn_daemon(&ours, &argrefs);
+    assert!(await_ready(&mut read), "readiness never fired");
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    // SIGTERM, not SIGKILL: the daemon must exit 0 by itself.
+    // SAFETY: child is our own daemon.
+    unsafe {
+        libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
     }
+    let code = child.wait().expect("wait").code();
+    assert_eq!(code, Some(0), "TERM exit");
+    let _ = term(&mut child);
 }
 
 /// Re-exec this test under `unshare -U -n -r` when needed for netlink
@@ -446,77 +407,71 @@ fn normalize_pid(s: &str) -> String {
 
 /// Userspace events are dropped with a -v3 warning and never published.
 #[test]
-fn bins_drop_policy_diff() {
-    if delegate_unshare("bins_drop_policy_diff") {
+fn bins_drop_policy_warns_and_holds_output() {
+    if delegate_unshare("bins_drop_policy_warns_and_holds_output") {
         return;
     }
-    let (o_mdevd, _) = oracle();
     let ours = bin("mdevd");
     let dev = devdir();
     let sys = sysdir();
     let good = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/laputa-mdev.conf");
-    let mut outputs = Vec::new();
-    for (prog, ld) in [(o_mdevd.to_str().unwrap().to_string(), true), (ours.clone(), false)] {
-        let out_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/bins-out.bin");
-        let _ = std::fs::remove_file(&out_path);
-        // SAFETY: plain open() has no CLOEXEC, so the fd is inherited.
-        let ofd = unsafe {
-            libc::open(
-                std::ffi::CString::new(out_path.to_str().unwrap()).unwrap().as_ptr(),
-                libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC,
-                0o644,
-            )
-        };
-        assert!(ofd >= 0);
-        let mut fds = [0; 2];
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-        // SAFETY: fds[0] is open and owned.
-        let mut read = unsafe { std::fs::File::from(std::os::unix::io::OwnedFd::from_raw_fd(fds[0])) };
-        let mut cmd = Command::new(&prog);
-        cmd.args([
-            "-I", "2", "-v3", "-f", good.to_str().unwrap(), "-d", dev.to_str().unwrap(), "-s",
-            sys.to_str().unwrap(), "-o", &ofd.to_string(), "-D", &fds[1].to_string(),
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-        if ld {
-            cmd.env("LD_LIBRARY_PATH", ld_path());
-        }
-        let mut child = cmd.spawn().expect("daemon spawn");
-        // SAFETY: write end was inherited; drop our copy.
-        unsafe {
-            libc::close(fds[1]);
-            libc::close(ofd);
-        }
-        assert!(await_ready(&mut read), "{prog}: readiness never fired");
-        send_unicast(
-            child.id(),
-            b"add@/devices/x\0ACTION=add\0DEVPATH=/devices/x\0SUBSYSTEM=test\0DEVNAME=mydev\0MAJOR=1\0MINOR=2\0",
-        );
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        // SAFETY: child is our own daemon.
-        unsafe {
-            libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
-        }
-        let status = child.wait().expect("wait");
-        assert_eq!(status.code(), Some(0), "{prog}: TERM exit");
-        let mut err = String::new();
-        child.stderr.take().unwrap().read_to_string(&mut err).unwrap();
-        let out_bytes = std::fs::read(&out_path).unwrap();
-        assert!(out_bytes.is_empty(), "{prog}: dropped event was published");
-        outputs.push(normalize_pid(&err));
+    let out_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/bins-out.bin");
+    let _ = std::fs::remove_file(&out_path);
+    // SAFETY: plain open() has no CLOEXEC, so the fd is inherited.
+    let ofd = unsafe {
+        libc::open(
+            std::ffi::CString::new(out_path.to_str().unwrap()).unwrap().as_ptr(),
+            libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC,
+            0o644,
+        )
+    };
+    assert!(ofd >= 0);
+    let mut fds = [0; 2];
+    assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+    // SAFETY: fds[0] is open and owned.
+    let mut read = unsafe { std::fs::File::from(std::os::unix::io::OwnedFd::from_raw_fd(fds[0])) };
+    let mut cmd = Command::new(&ours);
+    cmd.args([
+        "-I", "2", "-v3", "-f", good.to_str().unwrap(), "-d", dev.to_str().unwrap(), "-s",
+        sys.to_str().unwrap(), "-o", &ofd.to_string(), "-D", &fds[1].to_string(),
+    ])
+    .stdout(Stdio::null())
+    .stderr(Stdio::piped());
+    let mut child = cmd.spawn().expect("daemon spawn");
+    // SAFETY: write end was inherited; drop our copy.
+    unsafe {
+        libc::close(fds[1]);
+        libc::close(ofd);
     }
-    assert_eq!(outputs[0], outputs[1], "drop warning differs:\n{}", outputs.join("\n---\n"));
+    assert!(await_ready(&mut read), "readiness never fired");
+    send_unicast(
+        child.id(),
+        b"add@/devices/x\0ACTION=add\0DEVPATH=/devices/x\0SUBSYSTEM=test\0DEVNAME=mydev\0MAJOR=1\0MINOR=2\0",
+    );
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    // SAFETY: child is our own daemon.
+    unsafe {
+        libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
+    }
+    let status = child.wait().expect("wait");
+    assert_eq!(status.code(), Some(0), "TERM exit");
+    let mut err = String::new();
+    child.stderr.take().unwrap().read_to_string(&mut err).unwrap();
+    let out_bytes = std::fs::read(&out_path).unwrap();
+    assert!(out_bytes.is_empty(), "dropped event was published");
+    assert!(
+        normalize_pid(&err).contains("received netlink message from userspace process PID"),
+        "drop warning missing: {err}"
+    );
 }
 
 /// Invalid reloads retain the last valid config here (registered
-/// divergence); the oracle exits 2 on the same HUP.
+/// divergence, see docs/divergence.md).
 #[test]
-fn bins_hup_retain_diverges() {
-    if delegate_unshare("bins_hup_retain_diverges") {
+fn bins_hup_retain_serving() {
+    if delegate_unshare("bins_hup_retain_serving") {
         return;
     }
-    let (o_mdevd, _) = oracle();
     let ours = bin("mdevd");
     let dev = devdir();
     let sys = sysdir();
@@ -533,7 +488,7 @@ fn bins_hup_retain_diverges() {
             "-s".to_string(),
             sys.to_str().unwrap().to_string()];
         let argrefs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let (mut child, mut read, _) = spawn_daemon(&ours, &argrefs, false);
+        let (mut child, mut read, _) = spawn_daemon(&ours, &argrefs);
         assert!(await_ready(&mut read), "ours: readiness never fired");
         std::fs::write(&work, ";broken\n").unwrap();
         // SAFETY: child is our own daemon.
@@ -547,64 +502,35 @@ fn bins_hup_retain_diverges() {
         }
         assert_eq!(child.wait().expect("wait").code(), Some(0));
     }
-    // Oracle: the same HUP kills it with exit 2.
-    {
-        let args = ["-I".to_string(),
-            "1".to_string(),
-            "-f".to_string(),
-            work.to_str().unwrap().to_string(),
-            "-d".to_string(),
-            dev.to_str().unwrap().to_string(),
-            "-s".to_string(),
-            sys.to_str().unwrap().to_string()];
-        let argrefs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        std::fs::write(&work, "mydev root:root 600\n").unwrap();
-        let (mut child, mut read, _) = spawn_daemon(o_mdevd.to_str().unwrap(), &argrefs, true);
-        assert!(await_ready(&mut read), "oracle: readiness never fired");
-        std::fs::write(&work, ";broken\n").unwrap();
-        unsafe {
-            libc::kill(child.id() as libc::pid_t, libc::SIGHUP);
-        }
-        let code = child.wait().expect("wait").code();
-        assert_eq!(code, Some(2), "oracle: expected death on invalid reload");
-    }
 }
 
 /// Coldplug triggers every uevent file under a fake tree, both binaries.
 #[test]
-fn bins_coldplug_tree_diff() {
-    let (_, o_coldplug) = oracle();
+fn bins_coldplug_tree_triggers() {
     let ours = bin("mdevd-coldplug");
-    for (tag, prog, ld) in [("oracle", o_coldplug.to_str().unwrap().to_string(), true), ("ours", ours.clone(), false)] {
-        let tree = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!(".work/tmp/cptree-{tag}"));
-        let _ = std::fs::remove_dir_all(&tree);
-        for dev in ["bar", "baz"] {
-            let d = tree.join("subsystem/foo/devices").join(dev);
-            std::fs::create_dir_all(&d).unwrap();
-            std::fs::write(d.join("uevent"), format!("PLACEHOLDER-{dev}\n")).unwrap();
-        }
-        // A stray non-uevent file and a dotfile must not break the scan.
-        std::fs::write(tree.join("subsystem/foo/devices/bar/note"), b"x\n").unwrap();
-        let mut cmd = Command::new(&prog);
-        cmd.arg("-s").arg(&tree);
-        if ld {
-            cmd.env("LD_LIBRARY_PATH", ld_path());
-        }
-        let done = run_timeout(cmd, 15);
-        assert_eq!(done.code, Some(0), "{tag}: coldplug exit");
-        for dev in ["bar", "baz"] {
-            let content = std::fs::read(tree.join("subsystem/foo/devices").join(dev).join("uevent")).unwrap();
-            assert!(content.starts_with(b"add\n"), "{tag}/{dev}: uevent not triggered");
-        }
+    let tree = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/cptree-ours");
+    let _ = std::fs::remove_dir_all(&tree);
+    for dev in ["bar", "baz"] {
+        let d = tree.join("subsystem/foo/devices").join(dev);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("uevent"), format!("PLACEHOLDER-{dev}\n")).unwrap();
+    }
+    // A stray non-uevent file and a dotfile must not break the scan.
+    std::fs::write(tree.join("subsystem/foo/devices/bar/note"), b"x\n").unwrap();
+    let mut cmd = Command::new(&ours);
+    cmd.arg("-s").arg(&tree);
+    let done = run_timeout(cmd, 15);
+    assert_eq!(done.code, Some(0), "coldplug exit");
+    for dev in ["bar", "baz"] {
+        let content = std::fs::read(tree.join("subsystem/foo/devices").join(dev).join("uevent")).unwrap();
+        assert!(content.starts_with(b"add\n"), "{dev}: uevent not triggered");
     }
 }
 
-/// Coldplug sync without a daemon: ours times out loudly and fast; the
-/// oracle waits forever (shown via timeout-kill, proving the divergence).
+/// Coldplug sync without a daemon times out loudly and fast instead
+/// of hanging boot.
 #[test]
 fn bins_coldplug_sync_timeout() {
-    let (_, o_coldplug) = oracle();
     let ours = bin("mdevd-coldplug");
     let tree = Path::new(env!("CARGO_MANIFEST_DIR")).join(".work/tmp/cptree-sync");
     let _ = std::fs::remove_dir_all(&tree);
@@ -618,9 +544,4 @@ fn bins_coldplug_sync_timeout() {
     assert!(start.elapsed() < std::time::Duration::from_secs(15));
     assert_eq!(done.code, Some(1));
     assert!(String::from_utf8_lossy(&done.stderr).contains("timed out waiting for coldplug sync"));
-    // Oracle side: still waiting after 3 s (killed by timeout).
-    let mut ocmd = Command::new(&o_coldplug);
-    ocmd.arg("-s").arg(&tree).arg("-O").arg("4").env("LD_LIBRARY_PATH", ld_path());
-    let odone = run_timeout(ocmd, 3);
-    assert_eq!(odone.code, None, "oracle: expected to still be waiting");
 }

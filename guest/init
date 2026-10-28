@@ -40,11 +40,9 @@ check_output() {
 }
 
 run_case() {
-  tag=$1
-  daemon=$2
-  coldplug=$3
-  ldpath=$4
-  devdir=/tmp/qdev-$tag
+  daemon=$1
+  coldplug=$2
+  devdir=/tmp/qdev
   rm -rf "$devdir"
   mkdir -p "$devdir"
   cat > /tmp/mdev.conf <<'EOF'
@@ -54,11 +52,7 @@ EOF
   rm -f /tmp/ready.log /tmp/output.bin
   exec 3> /tmp/ready.log
   exec 4> /tmp/output.bin
-  if [ -n "$ldpath" ]; then
-    LD_LIBRARY_PATH=$ldpath "$daemon" -f /tmp/mdev.conf -d "$devdir" -s /sys -O 4 -D 3 -o 4 &
-  else
-    "$daemon" -f /tmp/mdev.conf -d "$devdir" -s /sys -O 4 -D 3 -o 4 &
-  fi
+  "$daemon" -f /tmp/mdev.conf -d "$devdir" -s /sys -O 4 -D 3 -o 4 &
   pid=$!
   exec 3>&-
   exec 4>&-
@@ -66,36 +60,30 @@ EOF
   i=0
   while [ $i -lt 50 ]; do
     if test -s /tmp/ready.log; then ready=1; break; fi
-    if ! kill -0 $pid 2>/dev/null; then fail "$tag daemon exited before readiness"; fi
+    if ! kill -0 $pid 2>/dev/null; then fail "daemon exited before readiness"; fi
     sleep 0.1
     i=$((i + 1))
   done
-  test $ready = 1 || fail "$tag no readiness"
-  test -b /sys/block/vda 2>/dev/null || test -e /sys/block/vda/uevent || fail "$tag no vda sysfs"
-  echo add > /sys/block/vda/uevent || fail "$tag trigger failed"
+  test $ready = 1 || fail "no readiness"
+  test -b /sys/block/vda 2>/dev/null || test -e /sys/block/vda/uevent || fail "no vda sysfs"
+  echo add > /sys/block/vda/uevent || fail "trigger failed"
   sleep 1
-  check_node "$devdir" || fail "$tag node check failed"
-  check_output /tmp/output.bin || fail "$tag output check failed"
-  cp /tmp/output.bin "/tmp/output-$tag.bin"
-  if [ -n "$ldpath" ]; then
-    LD_LIBRARY_PATH=$ldpath timeout 30 "$coldplug" -s /sys -O 4 || fail "$tag coldplug failed"
-  else
-    timeout 30 "$coldplug" -s /sys -O 4 || fail "$tag coldplug failed"
-  fi
-  kill -TERM $pid || fail "$tag term failed"
+  check_node "$devdir" || fail "node check failed"
+  check_output /tmp/output.bin || fail "output check failed"
+  timeout 30 "$coldplug" -s /sys -O 4 || fail "coldplug failed"
+  kill -TERM $pid || fail "term failed"
   i=0
   while kill -0 $pid 2>/dev/null; do
     sleep 0.1
     i=$((i + 1))
-    test $i -lt 50 || fail "$tag daemon ignored TERM"
+    test $i -lt 50 || fail "daemon ignored TERM"
   done
   wait $pid
-  test $? = 0 || fail "$tag daemon exit nonzero"
-  echo "MDEVD_QEMU_${tag}_OK" > /dev/console
+  test $? = 0 || fail "daemon exit nonzero"
+  echo "MDEVD_QEMU_NODE_OK" > /dev/console
 }
 
-run_case RUST /usr/local/bin/mdevd /usr/local/bin/mdevd-coldplug ""
-run_case C /usr/local/bin/mdevd-c /usr/local/bin/mdevd-coldplug-c /usr/local/lib/mdevd
+run_case /usr/local/bin/mdevd /usr/local/bin/mdevd-coldplug
 echo "MDEVD_QEMU_OK" > /dev/console
 sleep 1
 poweroff -f

@@ -8,16 +8,9 @@ pub fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-pub fn oracle(name: &str) -> PathBuf {
-    let path = root().join(".work/oracle").join(name);
-    assert!(path.is_file(), "missing {}; run tools/build-oracle.sh", path.display());
-    path
-}
-
 pub fn command(program: &Path) -> Command {
     let mut cmd = Command::new(program);
-    cmd.env("LC_ALL", "C")
-        .env("LD_LIBRARY_PATH", root().join(".work/vendor/sysdeps-root/lib"));
+    cmd.env("LC_ALL", "C");
     cmd
 }
 

@@ -59,8 +59,7 @@ if [ $ok != 1 ]; then
   grep -h MDEVD_QEMU_FAIL "$CONSOLE" 2>/dev/null || true
   exit 1
 fi
-grep -q MDEVD_QEMU_RUST_OK "$CONSOLE" || { echo 'check-qemu: rust case missing' >&2; exit 1; }
-grep -q MDEVD_QEMU_C_OK "$CONSOLE" || { echo 'check-qemu: C case missing' >&2; exit 1; }
+grep -q MDEVD_QEMU_NODE_OK "$CONSOLE" || { echo 'check-qemu: node case missing' >&2; exit 1; }
 i=0
 while kill -0 "$QEMU_PID" 2>/dev/null && [ $i -lt 15 ]; do sleep 1; i=$((i + 1)); done
 if kill -0 "$QEMU_PID" 2>/dev/null; then echo 'check-qemu: QEMU did not exit' >&2; exit 1; fi

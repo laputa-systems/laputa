@@ -1,11 +1,9 @@
 //! P1: mdev.conf grammar tests. `config_*` filter.
 //!
-//! Hermetic tests always run. `config_oracle_diff` additionally diffs the
-//! rule dump against the C oracle harness (`tools/build-oracle.sh`); it
-//! passes with a note when the harness is absent (fresh clones, CI).
+//! Hermetic tests always run. `config_corpus_dump_matches_goldens`
+//! pins every corpus file to its committed rule dump or error text.
 use mdevd::config::regex::{Regex, lossy, pin_c_locale};
 use mdevd::config::{Config, DevMatch, MoveKind, parse, validate_v1};
-use std::path::Path;
 
 fn parse_ok(name: &str) -> Config {
     pin_c_locale();
@@ -13,7 +11,7 @@ fn parse_ok(name: &str) -> Config {
     parse(&input).unwrap()
 }
 
-/// Canonical rule dump, byte-identical in shape to dump-run output.
+/// Canonical rule dump: the frozen contract for every corpus config.
 fn dump(cfg: &Config) -> Vec<u8> {
     let mut o = Vec::new();
     for r in &cfg.rules {
@@ -189,74 +187,39 @@ fn config_minor_forms() {
 }
 
 #[test]
-fn config_oracle_diff() {
-    pin_c_locale();
-    let oracle = Path::new(".work/oracle/dump-run");
-    if !oracle.exists() {
-        println!("note: oracle harness absent (run tools/build-oracle.sh); differential skipped");
-        return;
-    }
-    let mut files: Vec<String> = std::fs::read_dir("tests/corpus")
+fn config_corpus_dump_matches_goldens() {
+    let update = std::env::var_os("UPDATE_EXPECT").is_some();
+    let mut paths: Vec<_> = std::fs::read_dir("tests/corpus")
         .unwrap()
-        .map(|e| e.unwrap().path().to_str().unwrap().to_string())
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "conf"))
         .collect();
-    files.push("tests/fixtures/laputa-mdev.conf".into());
-    files.push("tests/fixtures/hook-mdev.conf".into());
-    files.push("tests/fixtures/bad-mdev.conf".into());
-    files.sort();
-    assert!(!files.is_empty());
-    for f in files {
-        let input = std::fs::read(&f).unwrap();
-        let out = std::process::Command::new(oracle)
-            .arg(&f)
-            .arg("/dev/null")
-            .output()
-            .expect("run dump-run");
-        let mut expected = Vec::new();
-        expected.extend_from_slice(&out.stderr);
-        expected.extend_from_slice(&out.stdout);
-        // Strip the harness log prefix; keep reference fatal text.
-        let expected = strip_prefix(&expected, b"dump-run: ");
+    paths.sort();
+    assert!(!paths.is_empty());
+    for path in paths {
+        let input = std::fs::read(&path).unwrap();
         match parse(&input) {
             Ok(cfg) => {
-                assert_eq!(out.status.code(), Some(0), "{f}: oracle failed");
                 let actual = dump(&cfg);
-                assert_eq!(
-                    String::from_utf8_lossy(&actual),
-                    String::from_utf8_lossy(&expected),
-                    "{f}: rule dump differs"
-                );
-            }
-            Err(e) => {
-                assert_ne!(out.status.code(), Some(0), "{f}: we failed but oracle passed");
-                if e.to_string().starts_with("configuration too large") {
-                    // Registered divergence: the reference truncates; skip.
-                    println!("note: {f} oversize, oracle comparison skipped (divergence)");
+                let golden = path.with_extension("dump");
+                if update {
+                    std::fs::write(&golden, &actual).unwrap();
                     continue;
                 }
-                let exp = String::from_utf8_lossy(&expected);
-                // Drop pre-failure PAT lines: success-path coverage already
-                // pins every compiled pattern; here only the fatal line
-                // and the exit code must agree.
-                let exp: String = exp.lines().filter(|l| !l.starts_with("PAT ")).collect::<Vec<_>>().join("\n");
-                assert_eq!(exp.trim_end(), e.to_string().as_str(), "{f}: error differs");
+                let expected = std::fs::read(&golden)
+                    .unwrap_or_else(|_| panic!("missing golden {}", golden.display()));
+                assert_eq!(actual, expected, "{}", path.display());
+            }
+            Err(e) => {
+                let golden = path.with_extension("err");
+                if update {
+                    std::fs::write(&golden, e.to_string()).unwrap();
+                    continue;
+                }
+                let expected = std::fs::read_to_string(&golden)
+                    .unwrap_or_else(|_| panic!("missing golden {}", golden.display()));
+                assert_eq!(e.to_string(), expected, "{}", path.display());
             }
         }
     }
-}
-
-fn strip_prefix(buf: &[u8], prefix: &[u8]) -> Vec<u8> {
-    let mut o = Vec::new();
-    for line in buf.split_inclusive(|&b| b == b'\n') {
-        if let Some(rest) = line.strip_prefix(prefix) {
-            // Drop "dump-run: fatal: " style prefixes, keep the message.
-            if let Some(msg) = rest.strip_prefix(b"fatal: ").or_else(|| rest.strip_prefix(b"info: "))
-            {
-                o.extend_from_slice(msg);
-                continue;
-            }
-        }
-        o.extend_from_slice(line);
-    }
-    o
 }

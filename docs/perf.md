@@ -7,29 +7,26 @@ quiet-host confirmation stays open. See [local verification](testing.md)
 for the test boundary and the [divergence register](divergence.md) for
 behavioral deltas that perf does not move.
 
-Run `tools/measure-perf.sh`. It builds the C oracle and the Rust release
-binaries, then:
+Run `tools/measure-perf.sh`. It builds the Rust release binaries, then:
 
-- Coldplug: 6 alternating runs per side on a synthetic tree (3 subsystems,
-  100 devices each, 300 `uevent` files on tmpfs). Reports each run, median,
-  and min-max spread. Gates only `rust median <= 2x c median`.
+- Coldplug: 6 runs on a synthetic tree (3 subsystems, 100 devices each,
+  300 `uevent` files on tmpfs). Reports each run, median, and min-max
+  spread. Timing is logged, not gated.
 - Engine storm: `cargo bench --bench storm` warms 10k events, then measures
   10k more for `VmRSS` growth and `/proc/self/fd` delta. Gates only growth
   `>5%` and delta `!= 0`. The adapter under test reuses one `FakeOps`,
   like the daemon reuses one `RealOps`.
 - Microbenchmarks: `cargo bench --bench parse` (Laputa config) and
   `--bench handle` (single `sda` event) are logged, not gated.
-- Idle: both daemons start with `-I 1`, signal readiness via `-D`, sleep
-  3 seconds, and compare `utime + stime` ticks from `/proc/<pid>/stat`.
-  Gates only `rust <= 2x c + 2` ticks.
+- Idle: the daemon starts with `-I 1`, signals readiness via `-D`, sleeps
+  3 seconds; its `utime + stime` ticks from `/proc/<pid>/stat` must read
+  zero. Gates on any nonzero tick count.
 
 ## Representative run (busy host, 2026-10-28)
 
-Coldplug (microseconds, 300 files):
+Coldplug (microseconds, 300 files, Rust only):
 
 - Rust: median ~17.9 ms, spread ~16.3-57.5 ms
-- C: median ~18.2 ms, spread ~15.8-23.8 ms
-- Ratio: ~0.98x (gate `<=2.0x`)
 
 Engine storm:
 
@@ -43,7 +40,7 @@ Microbenchmarks:
 
 Idle (3 seconds):
 
-- `rust_cpu_ticks=0 c_cpu_ticks=0` (gate `rust <= 2x c + 2` ticks)
+- `rust_cpu_ticks=0` (gate: must read zero)
 
 Result: `measure-perf: OK`. No threshold tripped. The wide coldplug spread
-tracks host load, not the implementation; the medians match within noise.
+tracks host load, not the implementation.

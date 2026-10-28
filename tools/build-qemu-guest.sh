@@ -1,7 +1,7 @@
 #!/bin/sh
-# Build the mdevd QEMU guest: pinned Alpine minirootfs + boot packages,
-# musl-static Rust daemons, C oracle with skalibs libs, and the guest init
-# that proves daemon-driven node creation from real kernel uevents.
+# Build the mdevd QEMU guest: pinned Alpine minirootfs + boot packages and
+# musl-static Rust daemons, plus the guest init that proves daemon-driven
+# node creation from real kernel uevents.
 # Prior art: tinyland harness/build-guest.sh + prepare-guest.sh (read-only).
 # All writes stay under this repo's .work/.
 set -eu
@@ -44,15 +44,9 @@ apk --root "$ROOT" --repositories-file /dev/null --no-network --keys-dir "$ROOT/
 echo GUEST_PACKAGES_VERIFIED
 echo 'building mdevd (musl static)'
 cargo build --locked --release --target x86_64-unknown-linux-musl 2>&1 | tail -n 3
-tools/build-oracle.sh >/dev/null
-mkdir -p "$ROOT/usr/local/bin" "$ROOT/usr/local/lib/mdevd"
+mkdir -p "$ROOT/usr/local/bin"
 cp target/x86_64-unknown-linux-musl/release/mdevd "$ROOT/usr/local/bin/mdevd"
 cp target/x86_64-unknown-linux-musl/release/mdevd-coldplug "$ROOT/usr/local/bin/mdevd-coldplug"
-cp .work/oracle/src-tree/mdevd "$ROOT/usr/local/bin/mdevd-c"
-cp .work/oracle/src-tree/mdevd-coldplug "$ROOT/usr/local/bin/mdevd-coldplug-c"
-cp .work/vendor/sysdeps-root/lib/libskarnet.so.2.15.1.0 "$ROOT/usr/local/lib/mdevd/"
-ln -sf libskarnet.so.2.15.1.0 "$ROOT/usr/local/lib/mdevd/libskarnet.so.2.15"
-ln -sf libskarnet.so.2.15.1.0 "$ROOT/usr/local/lib/mdevd/libskarnet.so"
 cp guest/init "$ROOT/init"
 chmod +x "$ROOT/init"
 cp "$ROOT/boot/vmlinuz-virt" .work/vmlinuz-virt

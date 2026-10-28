@@ -1,0 +1,4 @@
+PAT block
+rule 0 dev=0 envbase=0 envlen=1 cont=0 uid=0 gid=6 mode=660 move=0 cmd=0
+  env SUBSYSTEM
+rule 1 dev=1 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=0
