@@ -11,3 +11,11 @@ path = "src/lib.rs"
 
 [dependencies]
 libc = "0.2"
+
+[[bin]]
+name = "mdevd"
+path = "src/bin/mdevd.rs"
+
+[[bin]]
+name = "mdevd-coldplug"
+path = "src/bin/mdevd-coldplug.rs"

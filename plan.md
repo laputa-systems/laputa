@@ -4,8 +4,15 @@
 
 - Goal: small robust Rust mdevd/mdevd-coldplug replacing the C implementation and skalibs, Laputa-compatible, libudev-zero-compatible on `-O 4`.
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
-- Accepted: R0 (be467c3). Red: none. Parked: none.
-- Next: `R1` (workspace, loop, dep gate).
+- Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
+  P3 (40ac52e), P4 (6267d45). Red: none. Parked: none.
+- Oracle bonus: C oracle + behavioral dump harness build reproducibly via
+  `tools/build-oracle.sh` (un-parked from Needs environment; privileged and
+  live-multicast proof stays parked).
+- Live-multicast bonus: `unshare -U -n -r` runs the full P4 exchange here
+  (consumer proof + Rust self-exchange); only truly privileged tests stay
+  parked.
+- Next: `P5` (binaries+lifecycle), then `P6`.
 - Resume: run `tools/check-pins.sh && cargo test --locked -q -- pins` on a clean tree; land `R0` before `R1`.
 
 ## Charter
