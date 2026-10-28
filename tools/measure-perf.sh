@@ -3,7 +3,7 @@
 # thresholds fail the run: event-storm RSS growth >5% over 10k synthetic
 # events, FD delta != 0, idle wakeups or coldplug time >2x the C reference.
 # Absolute numbers are logged for the record; the host here is busy, so
-# quiet-host confirmation remains open (see docs/perf.md).
+# quiet-host confirmation remains open (see the perf doc under docs/).
 set -eu
 cd "$(dirname "$0")/.."
 ROOT=$PWD

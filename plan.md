@@ -6,9 +6,9 @@
 - Preflight: 2026-10-28, verdict `ready`. Base `eac18f5` (== `origin/main` HEAD).
 - Accepted: R0 (be467c3), R1 (9470cd3), P1 (cb2c927), P2 (4370bb1),
   P3 (40ac52e), P4 (6267d45), P5 (09a3ea5), P6 (f082eb8),
-  H1 (ec12bb3, e8894dc), H2 (36e2437). Red: none.
+  H1 (ec12bb3, e8894dc), H2 (36e2437), O1 (3271eb3). Red: none.
   Parked: daemon-driven kernel device-node creation (see Needs environment).
-  O1 done, pending acceptance: benches, perf gate, perf doc.
+  C1 done, pending acceptance: workflows, release profile, CI pin gate.
 - Oracle bonus: C oracle + behavioral dump harness build reproducibly via
   `tools/build-oracle.sh`. Docker now supplies real-device adapter proof and
   kernel-event daemon publication proof on isolated resources.
@@ -34,8 +34,24 @@
   Restart during coldplug keeps readiness prompt, HUP alive, TERM bounded,
   and the restarted daemon ready with the slow child reparented, not waited on.
 - Verified: `tools/check-privileged.sh`, adversarial tests, affected engine/bins/
-  parity suites, and all-target clippy pass. Test boundaries: [local verification](docs/testing.md).
-- Next: `C1` (needs `H1`, `H2`, `O1`; `mdtool check` waits on C1 paths).
+  parity suites, all-target clippy, `tools/measure-perf.sh`, musl release builds
+  for both targets, and `tools/check-ci-pins.sh` pass.
+  Test boundaries: [local verification](docs/testing.md).
+  Perf: [method and busy-host numbers](docs/perf.md).
+  Divergences: [register](docs/divergence.md).
+- Next: accept `C1`, then close the campaign.
+- H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
+  coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
+  absolute/`..` refusal and EEXIST identity adoption in RealOps,
+  symlink-ancestor refusal and inode-pinned metadata (procfs required),
+  uevent-NUL robustness, coldplug NULL-crash fixes.
+  O1 keeps: 6 alternating coldplug runs per side with median and spread,
+  10k-event storm with RSS and FD gates, microbenchmarks logged, 3s idle
+  CPU comparison; gates only the Charter thresholds.
+  C1 keeps: locked deps, repro musl both targets, full-SHA CI pins,
+  attribution, native-dep verification, dead-code removal, ultrareview P1/P2
+  clear, and the final report of unverified kernel behavior in
+  `tools/check-ci-pins.sh`.
 - H2 register must retain: hooks/firmware exclusions, HUP-retain, 60s bounded
   coldplug sync (`MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS`), oversize-config error,
   absolute/`..` refusal and EEXIST identity adoption in RealOps,

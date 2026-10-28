@@ -1,0 +1,27 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: 11bd71901bbe5b1630ceea73d27597364c9af683 # actions/checkout v4.2.2
+        with:
+          persist-credentials: false
+      - name: pins and deps
+        run: |
+          tools/check-pins.sh
+          tools/check-deps.sh
+      - name: oracle
+        run: tools/build-oracle.sh
+      - name: test
+        run: cargo test --locked -q
+      - name: clippy
+        run: cargo clippy --locked -q --all-targets
+      - name: release x86_64 musl
+        run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - name: release aarch64 musl
+        run: cargo build --locked --release --target aarch64-unknown-linux-musl
+      - name: ci pins
+        run: tools/check-ci-pins.sh

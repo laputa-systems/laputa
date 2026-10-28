@@ -9,6 +9,11 @@ license = "ISC"
 name = "mdevd"
 path = "src/lib.rs"
 
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
 [dependencies]
 libc = "0.2"
 
