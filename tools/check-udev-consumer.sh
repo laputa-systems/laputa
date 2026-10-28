@@ -13,11 +13,25 @@ ROOT=$PWD
 PIN=8f1d3d0624496f1c4967f18d6afaddbd552d8bce
 REF=$ROOT/.work/ref/libudev-zero
 
-if [ ! -d "$REF" ]; then
+if [ -n "${LIBUDEV_ZERO_SRC:-}" ] && [ -d "$LIBUDEV_ZERO_SRC" ]; then
+  mkdir -p "$ROOT/.work/ref"
+  rm -rf "$REF"
+  ln -sfn "$LIBUDEV_ZERO_SRC" "$REF"
+  echo "check-udev-consumer: using local LIBUDEV_ZERO_SRC=$LIBUDEV_ZERO_SRC"
+elif [ -d "$HOME/d/libudev-zero" ]; then
+  mkdir -p "$ROOT/.work/ref"
+  rm -rf "$REF"
+  ln -sfn "$HOME/d/libudev-zero" "$REF"
+  echo "check-udev-consumer: using local ~/d/libudev-zero"
+elif [ ! -d "$REF" ]; then
   git clone --quiet https://github.com/laputa-systems/libudev-zero "$REF"
 fi
-(cd "$REF" && git fetch --quiet origin && git checkout --quiet "$PIN")
-actual=$(cd "$REF" && git rev-parse HEAD)
+if [ -L "$REF" ]; then
+  actual=$(cd "$REF" && git rev-parse HEAD)
+else
+  (cd "$REF" && git fetch --quiet origin && git checkout --quiet "$PIN")
+  actual=$(cd "$REF" && git rev-parse HEAD)
+fi
 if [ "$actual" != "$PIN" ]; then
   echo "check-udev-consumer: pin mismatch: $actual != $PIN" >&2
   exit 1
