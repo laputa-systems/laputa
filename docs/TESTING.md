@@ -12,6 +12,8 @@ make test-system   # tests/system, then tests/integration
 make test-xinit
 make test-linux    # the kernel recipe's Kbuild tests and linux-headers' headers_install tests
 make test          # all four
+make test-components # Rust component suites, lint, and local harness tests
+make test-components-integration # components, PM, and all three guest profiles
 ```
 
 Kbuild planner tests cover object-list replacement, nested `patsubst` and
@@ -42,6 +44,21 @@ profile-owned ones:
 $XSHT check tests/integration/cross_consumer.xsh
 $XSHT test --jobs 1 tests/integration/cross_consumer.xsh
 ```
+
+`make test-components` runs the retained host tests for mdevd, seatd, doas,
+and tinyland, the documented Rust lints for the first three, and tinyland's
+Python harness tests. Seatd's differential tests are part of its Cargo suite;
+any external oracle requirements and skipped tests remain subject to that
+suite's own prerequisites. Tinyland's Rust tests need its guest-root build
+inputs, including libxkbcommon and the cached Alpine minirootfs tarball, as
+described in its [verification guide](../tinyland/docs/verification.md).
+This target does not build packages or boot guests.
+
+`make test-components-integration` additionally runs the PM suite and the
+canonical dwl, tinyland, and VT-bound tinyland profile tests in sequence. It
+requires the profile inputs and guest infrastructure described in [QEMU](QEMU.md)
+and [Tinyland](TINYLAND.md); it is an explicit integration gate, separate from
+`make test` and `make verify`.
 
 Use `cargo -j 4` for Rust checks. `make mirror-test` checks the mirror and its
 POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.

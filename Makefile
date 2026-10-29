@@ -88,7 +88,7 @@ endif
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
+.PHONY: check lint test test-components test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
@@ -111,6 +111,26 @@ lint: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit
 
 test: test-pm test-system test-xinit test-linux
+
+test-components:
+	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
+	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets
+	/bin/sh mdevd-rs/tools/test-check-combined.sh
+	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
+	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --offline --locked --all-targets -- -D warnings
+	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
+	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings
+	cd tinyland && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
+	mkdir -p tinyland/.work/tmp
+	cd tinyland && python3 -B harness/test-qmp.py
+	cd tinyland && python3 -B harness/test-guest-lock.py
+
+test-components-integration:
+	$(MAKE) test-components
+	$(MAKE) test-pm
+	$(MAKE) profile-test
+	$(MAKE) profile-tinyland-test
+	$(MAKE) profile-tinyland-vt-test
 
 test-pm: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/pm
