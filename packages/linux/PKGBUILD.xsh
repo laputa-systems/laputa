@@ -40,6 +40,10 @@ export const nostrip = true
 #     only on CONFIG_HZ, which both arches set to 250).
 # - files/generated/inat-tables-x86.c: `awk -f
 #   arch/x86/tools/gen-insn-attr-x86.awk arch/x86/lib/x86-opcode-map.txt`.
+# - files/generated/consolemap_deftbl.c: host-built `conmakehash` over
+#   drivers/tty/vt/cp437.uni, same trigger. The other generated VT inputs
+#   (defkeymap.c, the ucs tables) are used from their shipped `*_shipped`
+#   twins, copied into place below.
 # - files/generated/sha256-core.S and sha512-core.S: `perl
 #   lib/crypto/arm64/sha2-armv8.pl void <out>` with the output name.
 ## Exported declaration `upstream_sources`.
@@ -67,7 +71,7 @@ export let upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "44fd9e092e8dc9aa994b8d768a306289cd1cd7d2c0369c4c9961686384dd7994",
+        sha256: "6d37c6b7b1c294b7df22346df18e799d6e7944f25f5869722e6edb93f561691a",
       },
     ],
   },
@@ -172,6 +176,19 @@ export let upstream_sources = [
       {
         arch: "all",
         sha256: "5bc098c57c3bfaa8d3fbd05f6d7703c5573417431a48160a194961e7cf334525",
+      },
+    ],
+  },
+  {
+    source: p"files/generated/consolemap_deftbl.c",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "b47fc5d2894fd88d12fd59bed0c5a01d7f436396040b4aed92accee04b62f2ac",
       },
     ],
   },

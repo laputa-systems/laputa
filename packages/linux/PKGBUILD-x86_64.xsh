@@ -706,6 +706,13 @@ export proc build_x86_64_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process,
   generate_x86_rq_offsets_header(cc)
   generate_x86_capflags_source()
   generate_x86_inat_tables()
+  kbuild.copy_text_if_changed(p"consolemap_deftbl.c", p"drivers/tty/vt/consolemap_deftbl.c")
+  # The shipped twins stand in for Kbuild's $(obj)/%: $(src)/%_shipped rule,
+  # which the planner does not model.
+  kbuild.copy_text_if_changed(p"drivers/tty/vt/defkeymap.c_shipped", p"drivers/tty/vt/defkeymap.c")
+  kbuild.copy_text_if_changed(p"drivers/tty/vt/ucs_width_table.h_shipped", p"drivers/tty/vt/ucs_width_table.h")
+  kbuild.copy_text_if_changed(p"drivers/tty/vt/ucs_recompose_table.h_shipped", p"drivers/tty/vt/ucs_recompose_table.h")
+  kbuild.copy_text_if_changed(p"drivers/tty/vt/ucs_fallback_table.h_shipped", p"drivers/tty/vt/ucs_fallback_table.h")
   kbuild.generate_empty_root_dtb_asm(p".")
   kbuild.generate_crc32table_header(p".", cc)
   kbuild.generate_raid6_sources(p".", cc)
