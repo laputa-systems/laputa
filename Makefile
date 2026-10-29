@@ -49,6 +49,7 @@ XSHT ?= $(XSH_BIN_DIR)/xsht
 XSH_HOST ?= $(XSH)
 CARGO ?= cargo
 CARGO_JOBS ?= 4
+TINYLAND_XKB_ROOT ?= /usr/share/X11/xkb
 
 HOST_XSH_ENV = PATH="$(XSH_BIN_DIR):$$PATH" XSH_HOST="$(XSH_HOST)" XSH_ROOT="$(XSH_ROOT_ABS)" XSH_MODULE_PATH="$(CURDIR)"
 LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR)" XSH_ROOT="$(XSH_ROOT_ABS)"
@@ -116,17 +117,21 @@ test-components:
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets
 	/bin/sh mdevd-rs/tools/test-check-combined.sh
+	/bin/sh mdevd-rs/tools/test-check-deps.sh
+	cd mdevd-rs && /bin/sh tools/check-deps.sh
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --offline --locked --all-targets -- -D warnings
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings
-	cd tinyland && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
+	@test -f "$(TINYLAND_XKB_ROOT)/rules/evdev" || { echo "test-components: XKB rules missing at $(TINYLAND_XKB_ROOT); set TINYLAND_XKB_ROOT" >&2; exit 1; }
+	@lib="$$(cc -print-file-name=libxkbcommon.so)"; test "$$lib" != libxkbcommon.so -a -f "$$lib" || test -f tinyland/.work/guest-root/usr/lib/libxkbcommon.so || { echo "test-components: libxkbcommon development library missing" >&2; exit 1; }
+	cd tinyland && TINYLAND_XKB_ROOT="$(abspath $(TINYLAND_XKB_ROOT))" RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	mkdir -p tinyland/.work/tmp
 	cd tinyland && python3 -B harness/test-qmp.py
-	cd tinyland && python3 -B harness/test-guest-lock.py
 
 test-components-integration:
 	$(MAKE) test-components
+	cd tinyland && python3 -B harness/test-guest-lock.py
 	$(MAKE) test-pm
 	$(MAKE) profile-test
 	$(MAKE) profile-tinyland-test
