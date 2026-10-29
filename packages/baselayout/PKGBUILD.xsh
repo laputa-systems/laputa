@@ -194,6 +194,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/lib/sysctl.d/10-terminal.conf",
+    kind: "file",
+  },
+  {
     path: p"lib",
     kind: "symlink",
   },

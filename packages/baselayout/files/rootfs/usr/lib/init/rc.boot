@@ -82,6 +82,18 @@ let sysctl_result = linux.sysctl_load_dirs(
   fallback: /etc/sysctl.conf,
 )
 
+proc require_safe_terminal_policy() [fs, process, error] {
+  let tiocsti = linux.sysctl_get("dev.tty.legacy_tiocsti")?
+  if tiocsti.trim() != "0" {
+    fail "refusing user sessions: dev.tty.legacy_tiocsti must be 0"
+  }
+}
+
+if p"/usr/bin/doas".exists() {
+  sysctl_result?
+  require_safe_terminal_policy()
+}
+
 for hook in g"/usr/lib/init/rc.d/*.boot" {
   if hook.is_file() {
     run $hook
