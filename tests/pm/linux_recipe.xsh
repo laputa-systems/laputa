@@ -304,7 +304,7 @@ proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
   let checkout = fs.cwd()?
   let root = test.temp_dir(ctx, name: "repository-with-seed")?
 
-  for name in ["packages", "pm", "pm.xsh", "trust", "trust.xsh", "xinit"] {
+  for name in ["packages", "pm", "pm.xsh", "trust", "trust.xsh", "xinit", "doas-rs", "mdevd-rs", "seatd-rs", "tinyland"] {
     fp"{root}/{name}".symlink(to: fp"{checkout}/{name}")
   }
 
