@@ -24,6 +24,9 @@ proc deny_open(path_value: Path, write: Bool, runtime: Path) [fs, process, error
 proc main() [fs, process, env, error] {
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
+  for name in ["laputa-foot-input.txt", "laputa-foot-read-ready", "laputa-direct-denied", "laputa-tinyland.pid", "laputa-seat-disabled", "laputa-seat-enabled"] {
+    fp"{runtime}/{name}".remove()?
+  }
   let control = unix.open_fd(p"/dev/null", nonblock: true)?
   unix.close_fd(control)?
   match deny_open(p"/dev/null", false, runtime) {

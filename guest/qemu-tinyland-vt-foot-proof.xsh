@@ -39,6 +39,48 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) {
   }
 }
 
+proc guest_process_alive(pid: Int) [process, error] -> Result[Bool, Error] {
+  for entry in process.list()? {
+    if entry.pid == pid { return true }
+  }
+  false
+}
+
+proc guest_wait_unit(name: Str, previous: Int, ready: Bool) [fs, time, error] -> Result[Int, Error] {
+  let path_value = fp"/run/xinit/{name}.json"
+  var elapsed = 0
+  while elapsed < 60 {
+    if path_value.exists() {
+      let status = json.read(path_value)?
+      let pid = json.get(status, ["pid"], 0).require(Int)?
+      let state = json.get(status, ["state"], "").require(Str)?
+      let is_ready = json.get(status, ["ready"], false).require(Bool)?
+      if state == "running" and (! ready or is_ready) and pid != previous {
+        return pid
+      }
+    }
+    time.sleep(1s)
+    elapsed += 1
+  }
+  guest_fail(name, "service did not become ready")
+  return Err(GuestProofError.Failed(phase: name, message: "service did not become ready"))
+}
+
+proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error] -> Result[Int, Error] {
+  let path_value = fp"{runtime}/laputa-tinyland.pid"
+  var elapsed = 0
+  while elapsed < 60 {
+    if path_value.exists() and fp"{runtime}/laputa-direct-denied".exists() and fp"{runtime}/laputa-foot-read-ready".exists() {
+      let pid = path_value.read_text()?.trim().parse_int()?
+      if pid != previous and guest_process_alive(pid)? { return pid }
+    }
+    time.sleep(1s)
+    elapsed += 1
+  }
+  guest_fail("session", "replacement session did not become ready")
+  return Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
+}
+
 proc guest_run_required(command: Command, phase: Str) {
   if let Ok(status) = process.run(command) {
     if ! status.ok {
@@ -72,13 +114,10 @@ proc guest_granted_device_control(runtime: Path) [fs, process, error] {
 
 proc main() [fs, process, time, error] {
   guest_tick("start")
-  let _mdevd = spawn process.command_argv(
-    /usr/bin/mdevd,
-    ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-C"],
-    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
-  )?
-  let _ = _mdevd
-  guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")
+  let _ = guest_wait_unit("mdevd", -1, true)?
+  let _ = guest_wait_unit("coldplug", -1, true)?
+  let _ = guest_wait_unit("seatd", -1, true)?
+  guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")?
   guest_run_required(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/doas-qualification.xsh"]), "doas-qualification")
 
   guest_wait_for(/dev/dri/card0, "drm-device", 20)
@@ -104,20 +143,6 @@ proc main() [fs, process, time, error] {
       },
     }
   }
-  p"/run/seatd.sock".remove()
-
-  # VT-bound seat: the session is active while its virtual terminal is
-  # foreground. The guest switches away and back to prove disable/resume.
-  let _seatd = spawn process.command_argv(
-    /usr/bin/seatd,
-    ["seatd", "-g", "seat"],
-    env: {PATH: "/usr/local/bin:/usr/bin:/bin", SEATD_VTBOUND: "1"},
-  )?
-  let _ = _seatd
-  guest_wait_for(/run/seatd.sock, "seatd", 20)
-
-  # The broker socket must stay group-mediated: laputa reaches it through
-  # the seat group, never through a world-accessible or root-only socket.
   match p"/run/seatd.sock".metadata() {
     Ok(meta) => {
       guest_console(f"LAPUTA_TINYLAND_NODE /run/seatd.sock mode={meta.mode % 4096}")
@@ -132,10 +157,6 @@ proc main() [fs, process, time, error] {
   }
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
-  guest_run_required(
-    process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"]),
-    "runtime-dir",
-  )
   guest_run_required(process.command_argv(
     /usr/bin/su,
     ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-attack.xsh"],
@@ -143,53 +164,20 @@ proc main() [fs, process, time, error] {
     timeout: 10s,
   ), "runtime-attack")
   guest_granted_device_control(runtime)?
-  fp"{runtime}/laputa-foot-input.txt".remove()
-  fp"{runtime}/laputa-foot-read-ready".remove()
-  fp"{runtime}/laputa-direct-denied".remove()
-  fp"{runtime}/laputa-tinyland.pid".remove()
-  fp"{runtime}/laputa-seat-disabled".remove()
-  fp"{runtime}/laputa-seat-enabled".remove()
-  let session = spawn process.command_argv(
-    /usr/bin/su,
-    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
-    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
-  )?
-
-  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny", 30)
-  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot", 30)
+  p"/run/tinyland-proof-prepared".write("ready\n")?
+  let tinyland_pid = guest_wait_session(runtime, 0)?
   guest_tick("session-ready")
 
   # Compositor crash sanity: SIGKILL tinyland mid-session; foot and the
   # reader die with it, the broker stays up, and a fresh session recovers
   # without touching the broker.
-  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid", 30)
   guest_tick("crash-before-kill")
-  let tinyland_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
   guest_console(f"LAPUTA_TINYLAND_CRASH target={tinyland_pid}")
   process.kill(tinyland_pid, signal: "KILL")?
-  match wait session {
-    Ok(status) => match status.exit_code() {
-      Ok(code) => guest_console(f"LAPUTA_TINYLAND_CRASH session exited code={code}")
-      Err(_) => guest_console("LAPUTA_TINYLAND_CRASH session exited unknown")
-    },
-    Err(_) => {
-      guest_fail("compositor-crash", "session wait failed")
-    },
-  }
+  let _ = guest_wait_session(runtime, tinyland_pid)?
+  if guest_process_alive(tinyland_pid)? { guest_fail("compositor-crash", "old compositor survived") }
+  guest_console("LAPUTA_TINYLAND_CRASH session exited")?
   guest_tick("crash-reaped")
-  fp"{runtime}/laputa-foot-read-ready".remove()
-  fp"{runtime}/laputa-direct-denied".remove()
-  fp"{runtime}/laputa-tinyland.pid".remove()
-  fp"{runtime}/laputa-seat-disabled".remove()
-  fp"{runtime}/laputa-seat-enabled".remove()
-  let session_vt = spawn process.command_argv(
-    /usr/bin/su,
-    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
-    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
-  )?
-  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid-crash-restart", 30)
-  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny-crash-restart", 30)
-  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot-crash-restart", 30)
   guest_tick("crash-recovered")
 
   # R4: VT switch away. The host sends Ctrl+Alt+F2; the VT-bound seat
@@ -244,7 +232,6 @@ proc main() [fs, process, time, error] {
   }
 
   guest_console("LAPUTA_TINYLAND_VT_FOOT_PROOF_OK")
-  let _ = wait session_vt
 }
 
 main()
