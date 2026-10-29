@@ -78,7 +78,7 @@ manual harness is aarch64-only and receives `MIRROR_URL` as
   `mkfs.ext4` is XSH, supports only the installer profile, and writes a
   journal-less ext2-style 4K-block root the kernel ext4 driver mounts. It
   normalizes ownership to root and mtimes to a fixed timestamp so image builds
-  are reproducible. `fsck.ext4` only checks the superblock and does not repair.
+  are reproducible. `fsck.ext4` only checks the superblock. Repair is `e2fsck` from e2fsprogs, on a detached or read-only volume.
 
 `installer/package_roots_host.xsh` plans the union of the requested roots
 against the mirror on the host, requires every node to be an exact mirror
