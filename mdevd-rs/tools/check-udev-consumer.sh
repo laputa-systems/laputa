@@ -1,12 +1,4 @@
 #!/bin/sh
-# P4 proof: a real C consumer against the pinned libudev-zero fork receives
-# add/change/remove notifications published by the Rust sender and observes
-# the expected device state. Multicast needs a capable netns, so the live
-# exchange runs under `unshare -U -n -r` (verified available); the parent
-# namespace only builds.
-#
-# Fails loudly when any stage is skipped: the live tests print exchange
-# markers that are grepped below.
 set -eu
 cd "$(dirname "$0")/.."
 ROOT=$PWD
@@ -34,10 +26,9 @@ if [ "$actual" != "$PIN" ]; then
 fi
 echo "check-udev-consumer: fork at $PIN"
 
-# shellcheck disable=SC2086
 cc -O2 -Wall -DUSB_IDS_PATH='"/usr/share/hwdata/usb.ids"' -o "$ROOT/.work/ref/consumer" "$ROOT/tools/udev-consumer.c" \
-  $REF/udev.c $REF/udev_device.c $REF/udev_enumerate.c $REF/udev_list.c $REF/udev_monitor.c \
-  -I$REF
+  "$REF/udev.c" "$REF/udev_device.c" "$REF/udev_enumerate.c" "$REF/udev_list.c" "$REF/udev_monitor.c" \
+  -I"$REF"
 echo "check-udev-consumer: consumer built (unpatched fork API)"
 
 export CONSUMER_BIN="$ROOT/.work/ref/consumer"
