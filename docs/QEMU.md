@@ -148,31 +148,68 @@ under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
 opens files and does not connect to socket paths. LAP-35 therefore still needs
 a portable, bounded Unix-stream connection boundary to preserve the macOS path.
 
-## Maintained VM qualification
+## Maintained VM activation
 
 The x86_64 `qemu-maintained` overlay starts one `xinit scan boot` under PID 1
-and routes scanner diagnostics to ttyS0. Build it with `laputa.xsh -- build
-qemu-maintained`. Provision a disposable copy of its disk with
-`system.first_boot.apply` before launching it; image builds carry no operator
-keys or machine host key.
+and routes scanner diagnostics to ttyS0. `laputa.xsh -- build qemu-maintained`
+builds the immutable generation image. The image contains no operator keys or
+machine host key.
 
-`guest/qemu-maintained-proof.xsh` runs only when the kernel command line includes
-`LAPUTA_MAINTAINED_PROOF_FLAG=1`. It waits for the persistent Dropbear key and
-running service, saves seven identity/account file hashes, and sends TERM to
-PID 1 to request a real reboot. A second boot compares the hashes and emits
-`LAPUTA_MAINTAINED_PROOF_OK`. Use a writable disposable disk across both boots:
-the normal per-process QEMU snapshot would discard the first boot's writes.
-With the normal `-no-reboot` argument, relaunch after QEMU exits for the guest
-reboot. The launcher counts both pending boots; the proof does not confirm
-activation health.
+The launcher requires a separate, owner-private `{output}/state.ext4` containing
+`etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
+by a newline. Initialize those directories from the selected image, apply the
+first-boot document with `system.first_boot.apply`, and format the state tree as
+ext4. Keep the state image at mode 0600. The guest mounts this disk on virtio vdb
+and binds the three directories before starting services. Configuration belongs
+to this shared state. There is no automatic configuration merge or state migration.
+A candidate requiring incompatible state must not be admitted for automatic rollback.
 
-Adding `LAPUTA_FIREWALL_FAILURE_PROOF=1` selects the negative fixture check:
-remove or invalidate the ruleset on a fresh disposable disk, observe firewall
-startup failure on serial, and require the Dropbear PID to remain absent.
-The guest emits `LAPUTA_FIREWALL_FAILURE_PROOF_OK` and requests poweroff.
+Before binding persistent `/var`, the boot hook captures the immutable generation
+receipt in `/run/laputa-running-generation.json`. The guest health reporter writes
+`/run/laputa-health.json` after Dropbear reaches running state and emits the same
+JSON with `LAPUTA_ACTIVATION_HEALTH` on serial. The report contains the selected
+id, pending-boot sequence, full PM `generation_sha256`, profile, and named xinit
+service states. The full generation identity includes the profile overlay.
+`root_digest` in an activation receipt denotes this publisher identity, never
+the disk-file SHA-256.
 
-On 2026-10-29, the packaged maintained image passed both boots under Linux
-x86_64/KVM, and fresh missing/rejected-ruleset guests both kept the listener
-down. All owned QEMU PIDs were reaped. This evidence does not qualify a remote
-SSH client, DHCP lease lifecycle, first-boot crash atomicity, guest receipt
-reporting, activation health confirmation, or real failed-boot fallback.
+`launcher_publish_image` accepts already verified local inputs. It copies kernel
+and disk into a private staging directory, writes `receipt.json`, fsyncs the
+files and directory, and publishes the bundle without replacing an existing id.
+The receipt format is `laputa-activation-image-1`. It binds the activation receipt
+to separate kernel and disk hashes. Selection checks both hashes and the receipt
+before counting an attempt. Missing metadata or changed image bytes fail closed.
+These local checks do not authenticate a downloaded release or defend against an
+administrator who can rewrite both image and receipt.
+
+Activation records use `laputa-activation-2` and include `boot_serial`. Old
+unversioned records are rejected, with no silent migration. Every pending boot
+increments the sequence, including retries after restaging. The QEMU command line
+carries the selected id and sequence. `activation_confirm_guest_health` checks the
+report against the pending receipt, sequence, and a host-owned critical-service
+policy while holding the activation lock. A missing, duplicated, unhealthy, or
+stale required-service observation prevents confirmation. The caller must obtain
+a fresh report through its trusted guest channel. The lower-level
+`activation_confirm_health` remains an explicitly trusted manual transition.
+
+`guest/qemu-maintained-proof.xsh` runs only with
+`LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the
+state disk, requests reboot through PID 1, and compares the hashes on the next
+boot. The generation disk retains `snapshot=on`; only the state disk persists.
+Adding `LAPUTA_FIREWALL_FAILURE_PROOF=1` selects the negative firewall fixture.
+
+On 2026-10-29, Linux x86_64/KVM proofs established:
+
+- two verified generation boots with identity unchanged on the separate state disk;
+- staging a distinct B while A runs, A requesting reboot, B reporting its running
+  generation and critical services, and the host committing B while B remains alive;
+- two actual unbootable-B kernel panics followed by launcher selection of healthy A;
+- rejection of changed kernel/disk bytes, mismatched receipts, incomplete publication,
+  missing state, and public state permissions before consuming a boot attempt;
+- fresh guests with missing or rejected nftables rules keeping Dropbear down.
+
+All owned QEMU PIDs were reaped. The initial writable-generation reboot proof was
+superseded by the separate-state proof. The firewall fixtures and initial fallback
+proof predate the new bundle metadata contract. Remote XSH transport, DHCP lease
+lifecycle, first-boot crash atomicity, configuration migrations, and security-policy
+admission across rollback remain separate obligations.

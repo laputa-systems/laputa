@@ -23,6 +23,8 @@ export type GenerationReceipt = {
 
 ## Durable current, fallback, and pending generation selection.
 export type ActivationRecord = {
+  format: Str,
+  boot_serial: Int,
   current: GenerationReceipt,
   fallback: GenerationReceipt,
   pending: GenerationReceipt?,
@@ -32,9 +34,28 @@ export type ActivationRecord = {
 }
 
 ## Result of selecting the pending generation for one boot.
+export type BootSelection = {id: Str, serial: Int}
+
+## One named service state observed by the guest supervisor.
+export type ServiceHealth = {name: Str, state: Str}
+
+## Fresh guest identity and observed service states from one selected boot.
+export type GuestHealthReport = {
+  format: Str,
+  generation_id: Str,
+  boot_serial: Int,
+  root_digest: Str,
+  profile: Str,
+  services: List[ServiceHealth],
+}
+
+## Host-owned health requirements for an installed system profile.
+export type HealthPolicy = {profile: Str, critical_services: List[Str]}
+
+## Pending or fallback selection with its persistent boot sequence.
 export enum ActivationBoot {
-  PendingBoot(Str),
-  FellBack(Str),
+  PendingBoot(BootSelection),
+  FellBack(BootSelection),
 }
 
 pure activation_reject(message: Str) -> Error {
@@ -62,7 +83,7 @@ pure activation_pending_ok(pending: GenerationReceipt?) -> Bool {
 }
 
 pure activation_record_ok(record: ActivationRecord) -> Bool {
-  activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+  record.format == "laputa-activation-2" and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
 }
 
 proc activation_record_path(state_dir: Path) -> Path {
@@ -156,6 +177,8 @@ export proc activation_install(
     return Err(activation_reject("activation record already exists"))
   }
   activation_write(state_dir, {
+    format: "laputa-activation-2",
+    boot_serial: 0,
     current: receipt,
     fallback: receipt,
     pending: null,
@@ -202,14 +225,15 @@ export proc activation_begin_boot(
       pending: null,
       last_operation: "fell-back",
     })
-    return FellBack(record.fallback.id)
+    return FellBack({id: record.fallback.id, serial: record.boot_serial})
   }
   activation_write(state_dir, {
     ...record,
     boot_attempts: record.boot_attempts + 1,
+    boot_serial: record.boot_serial + 1,
     last_operation: "pending-boot",
   })
-  PendingBoot(pending.id)
+  PendingBoot({id: pending.id, serial: record.boot_serial + 1})
 }
 
 ## Commit the pending generation after a boot attempt when its id matches.
@@ -229,11 +253,45 @@ export proc activation_confirm_health(
     return Err(activation_reject("generation has not booted"))
   }
   activation_write(state_dir, {
+    format: record.format,
+    boot_serial: record.boot_serial,
     current: pending,
     fallback: record.current,
     pending: null,
     boot_attempts: 0,
     max_boot_attempts: record.max_boot_attempts,
+    last_operation: "confirmed",
+  })
+}
+
+## Confirm only a fresh guest report that matches the pending receipt and host health policy.
+export proc activation_confirm_guest_health(
+  state_dir: Path,
+  report: GuestHealthReport,
+  policy: HealthPolicy,
+) [fs, time, error] -> Result[Unit, Error] {
+  let lock = activation_acquire_lock(state_dir, ACTIVATION_LOCK_DEADLINE)?
+  defer lock.unlink()
+  let record = activation_status(state_dir)?
+  let pending = activation_require_pending(record)?
+  guard report.format == "laputa-guest-health-1" and report.generation_id == pending.id and report.root_digest == pending.root_digest and report.profile == policy.profile else {
+    fail "guest health identity differs"
+  }
+  guard record.boot_attempts > 0 and report.boot_serial == record.boot_serial else {
+    fail "guest health report is stale"
+  }
+  guard ! policy.critical_services.is_empty() else { fail "critical service health policy is empty" }
+  for name in policy.critical_services {
+    let matches = report.services |> where .name == name |> collect
+    guard matches.len() == 1 else { fail f"critical service observation is missing or duplicated: {name}" }
+    guard matches[0].state == "running" else { fail f"critical service is not healthy: {name}" }
+  }
+  activation_write(state_dir, {
+    ...record,
+    current: pending,
+    fallback: record.current,
+    pending: null,
+    boot_attempts: 0,
     last_operation: "confirmed",
   })
 }

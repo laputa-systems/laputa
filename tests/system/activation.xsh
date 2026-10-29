@@ -25,6 +25,50 @@ proc assert_pending(record: activation.ActivationRecord, id: Str) {
   }
 }
 
+proc health_services(names: List[Str], state: Str) -> List[activation.ServiceHealth] {
+  [activation.ServiceHealth(name: name, state: state) for name in names]
+}
+
+test test_guest_health_requires_current_boot_identity_and_critical_services [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-guest-health")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear", "firewall"], "running"))
+  let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "dropbear"])
+  let before = record_text(state)?
+  let invalid: List[activation.GuestHealthReport] = [
+    {...report, root_digest: sha256_text("tampered")},
+    {...report, generation_id: "a"},
+    {...report, boot_serial: 0},
+    {...report, services: health_services(["dropbear"], "running")},
+    {...report, services: health_services(["dropbear", "firewall"], "dead")},
+    {...report, services: health_services(["dropbear", "firewall", "dropbear"], "running")},
+  ]
+  for candidate in invalid {
+    assert activation.activation_confirm_guest_health(state, candidate, policy) is Err(_)
+    assert record_text(state)? == before
+  }
+  activation.activation_confirm_guest_health(state, report, policy)
+  let confirmed = activation.activation_status(state)?
+  assert confirmed.current.id == "b"
+  assert confirmed.fallback.id == "a"
+  assert confirmed.pending == null
+  assert confirmed.boot_serial == 1
+}
+
+test test_a_later_boot_rejects_a_delayed_health_report [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-delayed-health")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let _ = activation.activation_begin_boot(state)?
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  let before = record_text(state)?
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  assert record_text(state)? == before
+}
+
 test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-confirm")?
   let installed = generation("a")
@@ -48,8 +92,8 @@ test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx
   assert staged.last_operation == "staged"
 
   match activation.activation_begin_boot(state)? {
-    activation.PendingBoot(id) => assert id == "b"
-    activation.FellBack(id) => assert false, id
+    activation.PendingBoot(id) => assert id.id == "b"
+    activation.FellBack(id) => assert false, id.id
   }
   let booting = activation.activation_status(state)?
   assert booting.current.id == "a"
@@ -82,8 +126,8 @@ test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
   assert record_text(state)? == staged
 
   match activation.activation_begin_boot(state)? {
-    activation.PendingBoot(id) => assert id == "b"
-    activation.FellBack(id) => assert false, id
+    activation.PendingBoot(id) => assert id.id == "b"
+    activation.FellBack(id) => assert false, id.id
   }
   activation.activation_boot_failed(state)
   let once = activation.activation_status(state)?
@@ -94,8 +138,8 @@ test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
   assert once.last_operation == "boot-failed"
 
   match activation.activation_begin_boot(state)? {
-    activation.PendingBoot(id) => assert id == "b"
-    activation.FellBack(id) => assert false, id
+    activation.PendingBoot(id) => assert id.id == "b"
+    activation.FellBack(id) => assert false, id.id
   }
   activation.activation_boot_failed(state)
   let restored = activation.activation_status(state)?
@@ -124,8 +168,8 @@ test test_begin_boot_falls_back_when_another_attempt_would_exceed_max [fs, time,
   assert_pending(at_max, "b")
 
   match activation.activation_begin_boot(state)? {
-    activation.PendingBoot(id) => assert false, id
-    activation.FellBack(id) => assert id == "a"
+    activation.PendingBoot(id) => assert false, id.id
+    activation.FellBack(id) => assert id.id == "a"
   }
   let fallen = activation.activation_status(state)?
   assert fallen.current.id == "a"

@@ -40,6 +40,7 @@ proc main() {
   wait until host_key.exists()? within 30s every 100ms
   guard host_key.read_bytes()?.len() > 0 else { fail "persistent host key required" }
   wait until listener_ready()? within 30s every 100ms
+  wait until p"/run/laputa-health.json".exists()? within 30s every 100ms
   let files = [host_key, keys, p"/etc/passwd", p"/etc/group", p"/etc/shadow", p"/etc/hostname", p"/etc/laputa/first-boot/applied"]
   let hashes = [hash.sha256(item)?.hex() for item in files].join("\n") + "\n"
   let baseline = p"/var/lib/laputa/maintained-proof-before-reboot"

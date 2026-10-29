@@ -127,6 +127,9 @@ export pure qemu_command_argv(
 ) -> List[Str] {
   let target = value.target
   let display = if mode == .Test { ["-display", "none"] } else { target.interactive_display }
+  let state_drive = if profile.development { [] } else {
+    ["-drive", f"if=none,id=state,format=raw,file={outputs.root}/state.ext4", "-device", f"{target.block_device},drive=state"]
+  }
 
   [
     value.qemu.display(),
@@ -147,6 +150,7 @@ export pure qemu_command_argv(
     f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on",
     "-device",
     f"{target.block_device},drive=root",
+    @state_drive,
     "-netdev",
     "user,id=net0",
     "-device",
@@ -416,13 +420,28 @@ export proc boot_command_argv(
   mode: types.QemuMode,
   generations: Path? = null,
 ) [fs, time, error] -> Result[List[Str], Error] {
+  if ! profile.development {
+    let state_image = fp"{outputs.root}/state.ext4"
+    guard state_image.exists() and state_image.is_file() else {
+      fail "maintained state image is missing"
+    }
+    guard state_image.metadata()?.mode.bit_and(0o077) == 0 else {
+      fail "maintained state image must be private"
+    }
+  }
   let argv = qemu_command_argv(value, profile, outputs, mode)
 
   if generations == null {
     argv
   } else {
     let image = launcher.launcher_select(generations)?
-    launcher.launcher_qemu_argv(argv, image)?
+    var selected = launcher.launcher_qemu_argv(argv, image)?
+    for index in range(selected.len() - 1) {
+      if selected[index] == "-append" {
+        selected[index + 1] += f" LAPUTA_GENERATION_ID={image.id} LAPUTA_BOOT_SERIAL={image.boot_serial}"
+      }
+    }
+    selected
   }
 }
 

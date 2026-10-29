@@ -4,6 +4,7 @@ use system.build
 use system.launcher
 use system.qemu
 use system.types
+use profiles.qemu-maintained as maintained
 
 proc sha256_text(text: Str) -> Str {
   bytes.from_text(text).sha256().hex()
@@ -18,11 +19,102 @@ proc state_dir(ctx: TestContext, name: Str) -> Result[Path, Error] {
 }
 
 proc write_image(state: Path, id: Str) {
-  let kernel = fp"{state}/images/{id}/kernel"
-  let disk = fp"{state}/images/{id}/disk"
+  let kernel = fp"{state}/inputs/{id}/kernel"
+  let disk = fp"{state}/inputs/{id}/disk"
   kernel.parent.mkdir()
   kernel.write(f"kernel-{id}\n")
   disk.write(f"disk-{id}\n")
+  launcher.launcher_publish_image(state, generation(id), kernel, disk)
+}
+
+test test_tampered_pending_image_does_not_consume_an_attempt [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-tampered")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  write_image(state, "b")
+  let before = record_text(state)?
+  fp"{state}/images/b/disk".write("tampered\n")
+  match launcher.launcher_select(state) {
+    Ok(_) => assert false, "tampered image selected"
+    Err(problem) => assert "generation image digest differs" in problem.message
+  }
+  assert record_text(state)? == before
+}
+
+test test_image_publication_never_replaces_a_retained_generation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-publish")?
+  write_image(state, "a")
+  let before = fp"{state}/images/a/kernel".read_text()?
+  fp"{state}/inputs/a/kernel".write("replacement")
+  match launcher.launcher_publish_image(state, generation("a"), fp"{state}/inputs/a/kernel", fp"{state}/inputs/a/disk") {
+    Ok(_) => assert false, "retained generation replaced"
+    Err(_) => {}
+  }
+  assert fp"{state}/images/a/kernel".read_text()? == before
+}
+
+test test_pending_kernel_tampering_is_rejected_without_a_write [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-kernel-tampered")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  write_image(state, "b")
+  let before = record_text(state)?
+  fp"{state}/images/b/kernel".write("tampered kernel")
+  match launcher.launcher_select(state) {
+    Ok(_) => assert false
+    Err(problem) => assert "generation image digest differs" in problem.message
+  }
+  assert record_text(state)? == before
+}
+
+test test_image_receipt_must_match_the_selected_generation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-receipt-mismatch")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, {...generation("b"), root_digest: sha256_text("different")})
+  write_image(state, "b")
+  let before = record_text(state)?
+  match launcher.launcher_select(state) {
+    Ok(_) => assert false
+    Err(problem) => assert "generation image receipt differs" in problem.message
+  }
+  assert record_text(state)? == before
+}
+
+test test_incomplete_publication_does_not_install_an_image [fs, error] { |ctx|
+  let state = state_dir(ctx, "launcher-incomplete")?
+  let source = fp"{state}/kernel"
+  source.write("kernel")
+  match launcher.launcher_publish_image(state, generation("a"), source, fp"{state}/missing") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+  assert ! fp"{state}/images/a".exists()?
+}
+
+test test_missing_maintained_state_does_not_consume_an_attempt [fs, time, error] { |ctx|
+  let root = state_dir(ctx, "launcher-state-missing")?
+  let state = fp"{root}/generations"
+  state.mkdir()
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  write_image(state, "b")
+  let before = record_text(state)?
+  let target = qemu.qemu_target("Linux", "x86_64")?
+  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target:)
+  let outputs = build.outputs(root)
+  match qemu.boot_command_argv(config, maintained.profile, outputs, types.Test, state) {
+    Ok(_) => assert false
+    Err(problem) => assert "maintained state image is missing" in problem.message
+  }
+  assert record_text(state)? == before
+  let argv = qemu.qemu_command_argv(config, maintained.profile, outputs, types.Test)
+  assert f"if=none,id=state,format=raw,file={root}/state.ext4" in argv
+  fp"{root}/state.ext4".write("state", mode: 0o644)
+  match qemu.boot_command_argv(config, maintained.profile, outputs, types.Test, state) {
+    Ok(_) => assert false, "public state image accepted"
+    Err(problem) => assert "maintained state image must be private" in problem.message
+  }
+  assert record_text(state)? == before
 }
 
 proc record_text(state: Path) -> Result[Str, Error] {
@@ -140,6 +232,7 @@ test test_unsafe_generation_id_is_rejected_without_a_write [fs, time, error] { |
 
 test test_generation_path_with_a_comma_is_rejected [error] {
   let image = {
+    boot_serial: 0,
     id: "a",
     kernel_file: p"/var/laputa/kernel",
     disk_file: p"/var/laputa/disk,img",
@@ -176,7 +269,8 @@ test test_qemu_boot_command_selects_pending_generation [fs, time, error] { |ctx|
   let outputs = build.outputs(p"target/laputa/launcher-fixture")
   assert qemu.boot_command_argv(config, profile, outputs, types.Test, null)? == qemu.qemu_command_argv(config, profile, outputs, types.Test)
   let argv = qemu.boot_command_argv(config, profile, outputs, types.Test, state)?
-  assert_image(argv, {id: "b", kernel_file: fp"{state}/images/b/kernel", disk_file: fp"{state}/images/b/disk"})
+  assert_image(argv, {boot_serial: 0, id: "b", kernel_file: fp"{state}/images/b/kernel", disk_file: fp"{state}/images/b/disk"})
   assert ! (outputs.kernel.display() in argv)
+  assert argv |> any "LAPUTA_GENERATION_ID=b LAPUTA_BOOT_SERIAL=1" in .
   assert activation.activation_status(state)?.boot_attempts == 1
 }

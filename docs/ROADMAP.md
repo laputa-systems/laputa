@@ -445,17 +445,21 @@ mutable state. Rescue still works when neither normal generation boots. Linux
 and Asterinas results are recorded separately; Linux aarch64 is deferred pending
 a macOS aarch64 host via Docker.
 
-`system/activation.xsh` records install, stage,
-pending boot, health confirmation, and fallback after two failed attempts.
-`system/launcher.xsh` selects that record for a direct-kernel boot when
-`{output}/generations/activation.json` exists: current with no write, the
-pending generation after its image files exist, and the fallback after two
-attempts. A QEMU boot-command test checks that a boot with no record is unchanged
-and a pending boot uses its image and counts one attempt. The launcher does not
-confirm health. A Linux x86_64/KVM maintained guest has now booted pending B
-twice across a PID-1-requested reboot with unchanged identity/account files.
-This does not prove the health commit, tampered-image rejection, or failed-boot
-fallback acceptance above.
+`system/activation.xsh` records install, stage, pending boot, guest health
+confirmation, and fallback after two attempts. Versioned activation records bind
+health reports to a persistent pending-boot sequence. `system/launcher.xsh`
+publishes complete kernel/disk bundles atomically and verifies their receipts and
+hashes before consuming an attempt. The maintained guest keeps `/etc`, `/home`,
+and `/var` on a separate private state disk and captures its immutable running
+receipt before mounting that state.
+
+Linux x86_64/KVM evidence now includes a distinct A-to-B root transition, a
+PID-1-requested reboot, a matching running-generation/critical-service report,
+and a host health commit of B with A retained. Identity survives on the separate
+state disk. An earlier guest proof exercised two actual unbootable-B panics and
+launcher fallback to healthy A. These proofs do not close the full fault,
+concurrency, GC, trust-policy, migration, or remote-disconnect acceptance above.
+See [maintained activation](QEMU.md#maintained-vm-activation) for the contracts.
 
 ## R6: Separate disposable development from long-lived VM policy
 
