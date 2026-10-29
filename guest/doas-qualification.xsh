@@ -4,17 +4,23 @@ type ChildEvent = {pid: Int, status: Status}
 
 proc qualification_payload(marker: Str) [fs, process, error] {
   let identity = unix.id()?
-  assert identity.uid == 0 and identity.euid == 0
-  assert identity.gid == 0 and identity.egid == 0
-  assert identity.supplementary == [0]
+  let root = user.lookup("root")?
+  let groups = user.groups("root", primary_gid: root.gid)?
+  assert identity.uid == root.uid and identity.euid == root.uid
+  assert identity.gid == root.gid and identity.egid == root.gid
+  assert identity.supplementary.len() == groups.len()
+  for gid in groups { assert gid in identity.supplementary }
   fp"/run/doas-qualification/{marker}".write("executed\n")?
 }
 
 proc qualification_laputa(terminal: Bool) [fs, process, error] {
   let identity = unix.id()?
-  assert identity.uid == 1000 and identity.euid == 1000
-  assert identity.gid == 1000 and identity.egid == 1000
-  assert 4 in identity.supplementary
+  let laputa = user.lookup("laputa")?
+  let groups = user.groups("laputa", primary_gid: laputa.gid)?
+  assert identity.uid == laputa.uid and identity.euid == laputa.uid
+  assert identity.gid == laputa.gid and identity.egid == laputa.gid
+  assert identity.supplementary.len() == groups.len()
+  for gid in groups { assert gid in identity.supplementary }
   assert process.session_id()? == process.parent_pid()?
   if terminal {
     assert unix.isatty(0) and unix.isatty(1) and unix.isatty(2)
@@ -31,11 +37,7 @@ proc qualification_laputa(terminal: Bool) [fs, process, error] {
     /usr/bin/doas,
     ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", marker],
   ))?
-  if terminal and (! p"/proc/sys/dev/tty/legacy_tiocsti".exists() or p"/proc/sys/dev/tty/legacy_tiocsti".read_text()?.trim() != "0") {
-    assert ! status.ok
-  } else {
-    assert status.ok
-  }
+  assert status.ok
   let check = process.run(process.command_argv(
     /usr/bin/doas,
     ["doas", "-C", "/run/doas-qualification/private.conf"],
@@ -45,11 +47,14 @@ proc qualification_laputa(terminal: Bool) [fs, process, error] {
   assert ! check.ok
 }
 
-proc qualification_nobody() [process, error] {
+proc qualification_nobody() [fs, process, error] {
   let identity = unix.id()?
-  assert identity.uid == 99 and identity.euid == 99
-  assert identity.gid == 99 and identity.egid == 99
-  assert ! (4 in identity.supplementary)
+  let nobody = user.lookup("nobody")?
+  let groups = user.groups("nobody", primary_gid: nobody.gid)?
+  assert identity.uid == nobody.uid and identity.euid == nobody.uid
+  assert identity.gid == nobody.gid and identity.egid == nobody.gid
+  assert identity.supplementary.len() == groups.len()
+  for gid in groups { assert gid in identity.supplementary }
   let status = process.run(process.command_argv(
     /usr/bin/doas,
     ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", "unauthorized"],
@@ -59,7 +64,53 @@ proc qualification_nobody() [process, error] {
   assert ! status.ok
 }
 
+proc qualification_denied_command() [fs, process, error] {
+  let identity = unix.id()?
+  let laputa = user.lookup("laputa")?
+  assert identity.uid == laputa.uid and identity.euid == laputa.uid
+  assert identity.gid == laputa.gid and identity.egid == laputa.gid
+  let status = process.run(process.command_argv(
+    /usr/bin/doas,
+    ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", "unauthorized-command"],
+    stdout: /dev/null, stderr: /dev/null,
+  ))?
+  assert ! status.ok
+}
+
+proc qualification_restricted_policy() [fs, process, error] {
+  let config = p"/etc/doas.conf"
+  let original = config.read_text()?
+  defer config.write(original)?
+  config.write(f"{original}\ndeny laputa cmd /usr/bin/xsh args /usr/lib/laputa/doas-qualification.xsh payload unauthorized-command\n")?
+  let status = process.run(process.command_argv(
+    /usr/bin/su,
+    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "denied-command"],
+    stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
+  ))?
+  assert status.ok
+  assert ! p"/run/doas-qualification/unauthorized-command".exists()?
+}
+
 proc qualification_run() [fs, process, time, error] {
+  let executable = p"/usr/bin/doas".metadata()?
+  let root_user = user.lookup("root")?
+  assert executable.kind == "file" and executable.uid == root_user.uid and executable.setuid
+  assert ! executable.world_writable
+  var mount = ""
+  var mount_options = ""
+  for line in p"/proc/self/mountinfo".read_text()?.split("\n") {
+    let fields = line.split(" ")
+    if fields.len() >= 6 {
+      let point = fields[4]
+      if (point == "/" or point == "/usr/bin/doas" or "/usr/bin/doas".starts_with(f"{point}/")) and point.byte_len() > mount.byte_len() {
+        mount = point
+        mount_options = fields[5]
+      }
+    }
+  }
+  assert mount != ""
+  assert ! ("nosuid" in mount_options.split(",")) and ! ("noexec" in mount_options.split(","))
+  assert p"/proc/sys/dev/tty/legacy_tiocsti".read_text()?.trim() == "0"
   let root = p"/run/doas-qualification"
   root.mkdir()?
   root.chmod(0o755)?
@@ -98,11 +149,8 @@ proc qualification_run() [fs, process, time, error] {
   assert events.len() == 1 and events[0].pid == child.pid and events[0].status.ok
   unix.close_fd(pty.replica)?
   unix.close_fd(pty.master)?
-  if p"/proc/sys/dev/tty/legacy_tiocsti".exists() and p"/proc/sys/dev/tty/legacy_tiocsti".read_text()?.trim() == "0" {
-    assert p"/run/doas-qualification/terminal".read_text()? == "executed\n"
-  } else {
-    assert ! p"/run/doas-qualification/terminal".exists()?
-  }
+  assert p"/run/doas-qualification/terminal".read_text()? == "executed\n"
+  qualification_restricted_policy()?
   print "LAPUTA_DOAS_QUALIFICATION_OK"
 }
 
@@ -113,6 +161,8 @@ proc main(...argv: List[Str]) [fs, process, time, error] {
     qualification_laputa(false)?
   } else if argv == ["terminal"] {
     qualification_laputa(true)?
+  } else if argv == ["denied-command"] {
+    qualification_denied_command()?
   } else if argv == ["nobody"] {
     qualification_nobody()?
   } else if argv.len() == 2 and argv[0] == "payload" {
