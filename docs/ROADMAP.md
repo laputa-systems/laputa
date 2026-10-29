@@ -450,8 +450,9 @@ pending boot, health confirmation, and fallback after two failed attempts.
 `system/launcher.xsh` selects that record for a direct-kernel boot when
 `{output}/generations/activation.json` exists: current with no write, the
 pending generation after its image files exist, and the fallback after two
-attempts. A boot with no record is unchanged. The launcher does not confirm
-health. No guest reboot has been run.
+attempts. A QEMU boot-command test checks that a boot with no record is unchanged
+and a pending boot uses its image and counts one attempt. The launcher does not
+confirm health. No guest reboot has been run.
 
 ## R6: Separate disposable development from long-lived VM policy
 

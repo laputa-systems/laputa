@@ -1,6 +1,9 @@
 ##! Host launcher selection from the activation record.
 use system.activation
+use system.build
 use system.launcher
+use system.qemu
+use system.types
 
 proc sha256_text(text: Str) -> Str {
   bytes.from_text(text).sha256().hex()
@@ -155,4 +158,25 @@ test test_launcher_state_follows_the_activation_record [fs, error] { |ctx|
   state.mkdir()
   fp"{state}/{activation.ACTIVATION_RECORD_NAME}".write("{}\n")
   assert launcher.launcher_state(root)? == state
+}
+
+test test_qemu_boot_command_selects_pending_generation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-qemu")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  write_image(state, "b")
+  let target = qemu.qemu_target("Linux", "x86_64")?
+  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target:)
+  let profile = types.SystemProfile(
+    name: "qemu-dwl-foot", package_roots: ["baselayout"], kernel_package: "linux", kernel_path: p"boot/vmlinuz",
+    qemu_smp: 2, qemu_memory: "1536M", qemu_width: 1280, qemu_height: 800,
+    forbidden_packages: [], forbidden_sonames: [], development: true,
+    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: ""},
+  )
+  let outputs = build.outputs(p"target/laputa/launcher-fixture")
+  assert qemu.boot_command_argv(config, profile, outputs, types.Test, null)? == qemu.qemu_command_argv(config, profile, outputs, types.Test)
+  let argv = qemu.boot_command_argv(config, profile, outputs, types.Test, state)?
+  assert_image(argv, {id: "b", kernel_file: fp"{state}/images/b/kernel", disk_file: fp"{state}/images/b/disk"})
+  assert ! (outputs.kernel.display() in argv)
+  assert activation.activation_status(state)?.boot_attempts == 1
 }
