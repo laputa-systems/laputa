@@ -114,6 +114,7 @@ lint: need-xsh
 
 test: test-components test-pm test-system test-xinit test-linux
 
+test-components: export RUST_TEST_THREADS := 1
 test-components:
 	@test "$(HOST_OS)" = Linux || { echo "test-components: Linux is required" >&2; exit 1; }
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
@@ -123,7 +124,7 @@ test-components:
 	/bin/sh mdevd-rs/tools/test-check-udev-consumer.sh
 	/bin/sh mdevd-rs/tools/test-check-deps.sh
 	cd mdevd-rs && /bin/sh tools/check-deps.sh
-	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked -- --test-threads=1
+	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --offline --locked --all-targets -- -D warnings
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings

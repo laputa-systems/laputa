@@ -48,8 +48,9 @@ $XSHT test --jobs 1 tests/integration/cross_consumer.xsh
 `make test-components` runs the retained host tests for mdevd, seatd, doas,
 and tinyland, the documented Rust lints for the first three, mdevd's dependency
 gate, and tinyland's QMP and package-lock harness tests. Seatd's golden
-transcript is part of its Cargo suite. Its outer cases run serially to isolate listeners from subprocess
-creation in other cases; its concurrent-startup test retains its own threads.
+transcript is part of its Cargo suite. Outer Rust test cases run serially to
+isolate descriptors from subprocess creation in other cases. Tests that create
+concurrent clients or startup races retain their own concurrency.
 Tinyland needs the native libxkbcommon development library and XKB rules;
 set `TINYLAND_XKB_LIB_DIR` and `TINYLAND_XKB_ROOT` if those
 are not under `/usr/lib` and `/usr/share/X11/xkb`. A prepared guest root can
