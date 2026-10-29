@@ -58,6 +58,7 @@ proc main() [fs, process, time, error] {
   )?
   let _ = _mdevd
   guest_run_required(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]), "coldplug")
+  guest_run_required(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/doas-qualification.xsh"]), "doas-qualification")
 
   guest_wait_for(/dev/dri/card0, "drm-device", 20)
 
