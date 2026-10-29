@@ -50,6 +50,7 @@ XSH_HOST ?= $(XSH)
 CARGO ?= cargo
 CARGO_JOBS ?= 4
 TINYLAND_XKB_ROOT ?= /usr/share/X11/xkb
+TINYLAND_XKB_LIB_DIR ?= /usr/lib
 
 HOST_XSH_ENV = PATH="$(XSH_BIN_DIR):$$PATH" XSH_HOST="$(XSH_HOST)" XSH_ROOT="$(XSH_ROOT_ABS)" XSH_MODULE_PATH="$(CURDIR)"
 LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR)" XSH_ROOT="$(XSH_ROOT_ABS)"
@@ -114,9 +115,11 @@ lint: need-xsh
 test: test-pm test-system test-xinit test-linux
 
 test-components:
+	@test "$(HOST_OS)" = Linux || { echo "test-components: Linux is required" >&2; exit 1; }
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets
 	/bin/sh mdevd-rs/tools/test-check-combined.sh
+	/bin/sh mdevd-rs/tools/test-build-qemu-guest.sh
 	/bin/sh mdevd-rs/tools/test-check-deps.sh
 	cd mdevd-rs && /bin/sh tools/check-deps.sh
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
@@ -124,8 +127,11 @@ test-components:
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings
 	@test -f "$(TINYLAND_XKB_ROOT)/rules/evdev" || { echo "test-components: XKB rules missing at $(TINYLAND_XKB_ROOT); set TINYLAND_XKB_ROOT" >&2; exit 1; }
-	@lib="$$(cc -print-file-name=libxkbcommon.so)"; test "$$lib" != libxkbcommon.so -a -f "$$lib" || test -f tinyland/.work/guest-root/usr/lib/libxkbcommon.so || { echo "test-components: libxkbcommon development library missing" >&2; exit 1; }
-	cd tinyland && TINYLAND_XKB_ROOT="$(abspath $(TINYLAND_XKB_ROOT))" RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
+	@test -f "$(TINYLAND_XKB_LIB_DIR)/libxkbcommon.so" || { echo "test-components: libxkbcommon development library missing at $(TINYLAND_XKB_LIB_DIR); set TINYLAND_XKB_LIB_DIR" >&2; exit 1; }
+	@cd tinyland && host="$$(rustc -vV)" && flags="$${RUSTFLAGS:-} -Lnative=$(abspath $(TINYLAND_XKB_LIB_DIR))"; \
+	    case "$$host" in *"host: "*"linux-musl"*) flags="$$flags -Ctarget-feature=-crt-static -Clink-arg=-fuse-ld=mold" ;; esac; \
+	    TINYLAND_XKB_ROOT="$(abspath $(TINYLAND_XKB_ROOT))" LD_LIBRARY_PATH="$(abspath $(TINYLAND_XKB_LIB_DIR))$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+	    RUSTFLAGS="$$flags" RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	mkdir -p tinyland/.work/tmp
 	cd tinyland && python3 -B harness/test-qmp.py
 

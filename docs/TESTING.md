@@ -49,8 +49,9 @@ $XSHT test --jobs 1 tests/integration/cross_consumer.xsh
 and tinyland, the documented Rust lints for the first three, mdevd's dependency
 gate, and tinyland's QMP harness tests. Seatd's golden transcript is part of
 its Cargo suite. Tinyland needs the native libxkbcommon development library
-and XKB rules; set `TINYLAND_XKB_ROOT` if the rules are not under
-`/usr/share/X11/xkb`. A prepared Tinyland guest root can also supply the library.
+and XKB rules; set `TINYLAND_XKB_LIB_DIR` and `TINYLAND_XKB_ROOT` if those
+are not under `/usr/lib` and `/usr/share/X11/xkb`. A prepared guest root can
+also supply them. Linux musl host tests link libxkbcommon dynamically with mold.
 This target does not build packages or boot guests.
 
 `make test-components-integration` also runs Tinyland's package-lock test,
