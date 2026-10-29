@@ -277,7 +277,7 @@ export proc activation_confirm_guest_health(
   guard report.format == "laputa-guest-health-1" and report.generation_id == pending.id and report.root_digest == pending.root_digest and report.profile == policy.profile else {
     fail "guest health identity differs"
   }
-  guard record.boot_attempts > 0 and report.boot_serial == record.boot_serial else {
+  guard record.last_operation == "pending-boot" and record.boot_attempts > 0 and report.boot_serial == record.boot_serial else {
     fail "guest health report is stale"
   }
   guard ! policy.critical_services.is_empty() else { fail "critical service health policy is empty" }

@@ -69,6 +69,18 @@ test test_a_later_boot_rejects_a_delayed_health_report [fs, time, error] { |ctx|
   assert record_text(state)? == before
 }
 
+test test_a_failed_attempt_cannot_confirm_a_delayed_health_report [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-failed-health")?
+  activation.activation_install(state, generation("a"))
+  activation.activation_stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  activation.activation_boot_failed(state)
+  let before = record_text(state)?
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  assert record_text(state)? == before
+}
+
 test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-confirm")?
   let installed = generation("a")
