@@ -16,6 +16,7 @@ proc main() [fs, process, error] {
   guard identity.uid == attacker.uid and identity.euid == attacker.uid else { fail "runtime attack has wrong identity" }
   permission_denied(fs.symlink(p"/etc", p"/run/user/laputa-attack"))?
   permission_denied(fs.symlink(p"/etc", fp"/run/user/{session.uid}/laputa-attack"))?
+  permission_denied(fs.rename_noreplace(fp"/run/user/{session.uid}", p"/run/user/laputa-displaced"))?
 }
 
 main()
