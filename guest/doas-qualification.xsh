@@ -2,6 +2,17 @@
 
 type ChildEvent = {pid: Int, status: Status}
 
+proc qualification_detached(command: Command) [process, time, error] -> Result[Status, Error] {
+  let child = spawn command?
+  let event = process.wait_timeout([child], 30s)?
+  if event != null {
+    return event.status
+  }
+  process.kill(child.pid, signal: "KILL")?
+  let _ = process.wait_any([child])?
+  fail "detached privilege qualification timed out"
+}
+
 proc qualification_payload(marker: Str) [fs, process, error] {
   let identity = unix.id()?
   let root = user.lookup("root")?
@@ -77,12 +88,12 @@ proc qualification_denied_command() [fs, process, error] {
   assert ! status.ok
 }
 
-proc qualification_restricted_policy() [fs, process, error] {
+proc qualification_restricted_policy() [fs, process, time, error] {
   let config = p"/etc/doas.conf"
   let original = config.read_text()?
   defer config.write(original)?
   config.write(f"{original}\ndeny laputa cmd /usr/bin/xsh args /usr/lib/laputa/doas-qualification.xsh payload unauthorized-command\n")?
-  let status = process.run(process.command_argv(
+  let status = qualification_detached(process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "denied-command"],
     stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
@@ -116,14 +127,17 @@ proc qualification_run() [fs, process, time, error] {
   root.chmod(0o755)?
   p"/run/doas-qualification/private.conf".write("permit nopass root\n")?
   p"/run/doas-qualification/private.conf".chmod(0o600)?
-  let detached = process.run(process.command_argv(
+  let detached = qualification_detached(process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "detached"],
-    stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
+    stdin: /dev/null, stdout: /run/doas-qualification/detached.log, stderr: /run/doas-qualification/detached.log, new_session: true,
   ))?
+  if ! detached.ok {
+    p"/dev/console".write(p"/run/doas-qualification/detached.log".read_text()?)?
+  }
   assert detached.ok
   assert p"/run/doas-qualification/detached".read_text()? == "executed\n"
-  let denied = process.run(process.command_argv(
+  let denied = qualification_detached(process.command_argv(
     /usr/bin/su,
     ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "nobody"],
     stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
