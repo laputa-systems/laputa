@@ -1,4 +1,5 @@
 ##! Behavior coverage for first-boot identity, Dropbear argv, and the firewall plan.
+use packages.dropbear.service as dropbear_service
 use system.first_boot
 
 const ed25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
@@ -241,4 +242,16 @@ identity new
       assert ! ("auth-key" in text)
     }
   }
+}
+
+test test_dropbear_argv_uses_the_persistent_host_key [error] {
+  let persistent = "/etc/dropbear/dropbear_ed25519_host_key"
+  let argv = dropbear_service.dropbear_argv()
+  assert "-r" in argv
+  assert persistent in argv
+  assert ! ("-R" in argv)
+  let ephemeral = dropbear_service.dropbear_argv("0.0.0.0", 22, p"/etc/dropbear/dropbear_ed25519_host_key", true)
+  assert "-R" in ephemeral
+  assert ! ("-r" in ephemeral)
+  assert ! (persistent in ephemeral)
 }
