@@ -3,7 +3,7 @@
 ##! injected line, then a parked read. Runs as laputa inside foot.
 let account = user.lookup("laputa")?
 let runtime = fp"/run/user/{account.uid}"
-fp"{runtime}/laputa-foot-read-ready".write("ready\n")?
+fp"{runtime}/laputa-foot-read-ready".write(env.get("LAPUTA_SESSION_ID")?)?
 print "\x1b[48;2;255;0;255m     LAPUTA_TINYLAND_FOOT_VISUAL     \x1b[0m"
 io.flush_stdout()?
 let input = io.stdin_text()?

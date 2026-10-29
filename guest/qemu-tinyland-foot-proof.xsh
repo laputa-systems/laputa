@@ -104,12 +104,13 @@ proc guest_wait_unit(name: Str, previous: Int, ready: Bool) [fs, time, error] ->
   var elapsed = 0
   while elapsed < 60 {
     if path_value.exists() {
-      let status = json.read(path_value)?
-      let pid = json.get(status, ["pid"], 0).require(Int)?
-      let state = json.get(status, ["state"], "").require(Str)?
-      let is_ready = json.get(status, ["ready"], false).require(Bool)?
-      if state == "running" and (! ready or is_ready) and pid != previous {
-        return pid
+      if let Ok(status) = json.read(path_value) {
+        let pid = json.get(status, ["pid"], 0).require(Int)?
+        let state = json.get(status, ["state"], "").require(Str)?
+        let is_ready = json.get(status, ["ready"], false).require(Bool)?
+        if state == "running" and (! ready or is_ready) and pid != previous {
+          return pid
+        }
       }
     }
     time.sleep(1s)
@@ -124,14 +125,45 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
   var elapsed = 0
   while elapsed < 60 {
     if path_value.exists() and fp"{runtime}/laputa-direct-denied".exists() and fp"{runtime}/laputa-foot-read-ready".exists() {
-      let pid = path_value.read_text()?.trim().parse_int()?
-      if pid != previous and guest_process_alive(pid)? { return pid }
+      if let Ok(pid_text) = path_value.read_text() {
+        if let Ok(pid) = pid_text.trim().parse_int() {
+          let session_id = fp"{runtime}/laputa-session-id"
+          let ready_id = fp"{runtime}/laputa-foot-read-ready"
+          if session_id.exists() and pid != previous and guest_process_alive(pid)? {
+            if let Ok(expected) = session_id.read_text() {
+              if let Ok(observed) = ready_id.read_text() {
+                if expected != "" and expected == observed { return pid }
+              }
+            }
+          }
+        }
+      }
     }
     time.sleep(1s)
     elapsed += 1
   }
   guest_fail("session", "replacement session did not become ready")
   return Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
+}
+
+proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) [fs, process, error] {
+  var mdevd_count = 0
+  var seatd_count = 0
+  var matching_mdevd = false
+  var matching_seatd = false
+  for entry in process.list()? {
+    if entry.command == "mdevd" {
+      mdevd_count += 1
+      matching_mdevd = matching_mdevd or entry.pid == mdevd_pid
+    }
+    if entry.command == "seatd" {
+      seatd_count += 1
+      matching_seatd = matching_seatd or entry.pid == seatd_pid
+    }
+  }
+  guard mdevd_count == 1 and matching_mdevd else { fail "mdevd census differs from scanner ownership" }
+  guard seatd_count == 1 and matching_seatd else { fail "seatd census differs from scanner ownership" }
+  guest_console(f"LAPUTA_TINYLAND_BROKER_CENSUS mdevd={mdevd_pid} seatd={seatd_pid}")?
 }
 
 proc guest_run_required(command: Command, phase: Str) {
@@ -167,9 +199,10 @@ proc guest_granted_device_control(runtime: Path) [fs, process, error] {
 
 proc main() [fs, process, time, error] {
   guest_tick("start")
-  let _ = guest_wait_unit("mdevd", -1, true)?
+  let mdevd_pid = guest_wait_unit("mdevd", -1, true)?
   let _ = guest_wait_unit("coldplug", -1, true)?
   let seatd_pid = guest_wait_unit("seatd", -1, true)?
+  guest_require_broker_census(mdevd_pid, seatd_pid)?
   guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")?
   guest_run_required(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/doas-qualification.xsh"]), "doas-qualification")
 
@@ -217,9 +250,6 @@ proc main() [fs, process, time, error] {
   let tinyland_pid = guest_wait_session(runtime, 0)?
   guest_tick("session-ready")
 
-  # R3: compositor crash. SIGKILL tinyland mid-session: foot and the reader
-  # die with it, the broker stays up, and a fresh session recovers without
-  # touching the broker.
   guest_tick("crash-before-kill")
   guest_console(f"LAPUTA_TINYLAND_CRASH target={tinyland_pid}")
   process.kill(tinyland_pid, signal: "KILL")?
@@ -229,12 +259,6 @@ proc main() [fs, process, time, error] {
   guest_tick("crash-reaped")
   guest_tick("crash-recovered")
 
-  # R3: supported device loss. Resolve the virtio keyboard's event node and
-  # PCI address by name, remove it through sysfs, and require the session
-  # to survive on the remaining AT keyboard with no stuck modifiers. The
-  # guest drives removal itself so the outcome never depends on host
-  # scheduling; the observed sequence matches a host unplug (REMOVE uevent,
-  # ENODEV to open handles, node gone).
   let virtio_event = guest_find_input("QEMU Virtio Keyboard", "device-loss")?
   let virtio_pci = guest_pci_of_input(virtio_event.name, "device-loss")?
   guest_console(f"LAPUTA_TINYLAND_UNPLUG target={virtio_event.display()} pci={virtio_pci}")
@@ -253,13 +277,10 @@ proc main() [fs, process, time, error] {
     guest_fail("device-loss", "foot reader died on single keyboard loss")
   }
 
-  # R3: broker loss must fail closed. SIGKILL seatd: the session cannot
-  # reopen or fall back to direct open, so it exits; a fresh broker reclaims
-  # the stale socket and a fresh session recovers. Needs a compositor that
-  # reports daemon death from dispatch (tinyland e40d653).
   guest_tick("broker-loss-before-kill")
   process.kill(seatd_pid, signal: "KILL")?
-  let _ = guest_wait_unit("seatd", seatd_pid, true)?
+  let restarted_seatd_pid = guest_wait_unit("seatd", seatd_pid, true)?
+  guest_require_broker_census(mdevd_pid, restarted_seatd_pid)?
   let _ = guest_wait_session(runtime, crash_pid)?
   if guest_process_alive(crash_pid)? { guest_fail("broker-loss", "old session survived broker loss") }
   guest_console("LAPUTA_TINYLAND_BROKER_LOSS session exited")?

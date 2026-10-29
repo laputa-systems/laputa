@@ -51,12 +51,13 @@ proc guest_wait_unit(name: Str, previous: Int, ready: Bool) [fs, time, error] ->
   var elapsed = 0
   while elapsed < 60 {
     if path_value.exists() {
-      let status = json.read(path_value)?
-      let pid = json.get(status, ["pid"], 0).require(Int)?
-      let state = json.get(status, ["state"], "").require(Str)?
-      let is_ready = json.get(status, ["ready"], false).require(Bool)?
-      if state == "running" and (! ready or is_ready) and pid != previous {
-        return pid
+      if let Ok(status) = json.read(path_value) {
+        let pid = json.get(status, ["pid"], 0).require(Int)?
+        let state = json.get(status, ["state"], "").require(Str)?
+        let is_ready = json.get(status, ["ready"], false).require(Bool)?
+        if state == "running" and (! ready or is_ready) and pid != previous {
+          return pid
+        }
       }
     }
     time.sleep(1s)
@@ -71,14 +72,45 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
   var elapsed = 0
   while elapsed < 60 {
     if path_value.exists() and fp"{runtime}/laputa-direct-denied".exists() and fp"{runtime}/laputa-foot-read-ready".exists() {
-      let pid = path_value.read_text()?.trim().parse_int()?
-      if pid != previous and guest_process_alive(pid)? { return pid }
+      if let Ok(pid_text) = path_value.read_text() {
+        if let Ok(pid) = pid_text.trim().parse_int() {
+          let session_id = fp"{runtime}/laputa-session-id"
+          let ready_id = fp"{runtime}/laputa-foot-read-ready"
+          if session_id.exists() and pid != previous and guest_process_alive(pid)? {
+            if let Ok(expected) = session_id.read_text() {
+              if let Ok(observed) = ready_id.read_text() {
+                if expected != "" and expected == observed { return pid }
+              }
+            }
+          }
+        }
+      }
     }
     time.sleep(1s)
     elapsed += 1
   }
   guest_fail("session", "replacement session did not become ready")
   return Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
+}
+
+proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) [fs, process, error] {
+  var mdevd_count = 0
+  var seatd_count = 0
+  var matching_mdevd = false
+  var matching_seatd = false
+  for entry in process.list()? {
+    if entry.command == "mdevd" {
+      mdevd_count += 1
+      matching_mdevd = matching_mdevd or entry.pid == mdevd_pid
+    }
+    if entry.command == "seatd" {
+      seatd_count += 1
+      matching_seatd = matching_seatd or entry.pid == seatd_pid
+    }
+  }
+  guard mdevd_count == 1 and matching_mdevd else { fail "mdevd census differs from scanner ownership" }
+  guard seatd_count == 1 and matching_seatd else { fail "seatd census differs from scanner ownership" }
+  guest_console(f"LAPUTA_TINYLAND_BROKER_CENSUS mdevd={mdevd_pid} seatd={seatd_pid}")?
 }
 
 proc guest_run_required(command: Command, phase: Str) {
@@ -114,9 +146,10 @@ proc guest_granted_device_control(runtime: Path) [fs, process, error] {
 
 proc main() [fs, process, time, error] {
   guest_tick("start")
-  let _ = guest_wait_unit("mdevd", -1, true)?
+  let mdevd_pid = guest_wait_unit("mdevd", -1, true)?
   let _ = guest_wait_unit("coldplug", -1, true)?
-  let _ = guest_wait_unit("seatd", -1, true)?
+  let seatd_pid = guest_wait_unit("seatd", -1, true)?
+  guest_require_broker_census(mdevd_pid, seatd_pid)?
   guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")?
   guest_run_required(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/doas-qualification.xsh"]), "doas-qualification")
 
@@ -180,10 +213,6 @@ proc main() [fs, process, time, error] {
   guest_tick("crash-reaped")
   guest_tick("crash-recovered")
 
-  # R4: VT switch away. The host sends Ctrl+Alt+F2; the VT-bound seat
-  # disables the session and revokes its devices. The active VT is polled
-  # alongside the marker so a silent no-switch is distinguishable from a
-  # switch without disable.
   guest_console("LAPUTA_TINYLAND_VT_SWITCH_AWAY")
   var vt_elapsed = 0
   while ! fp"{runtime}/laputa-seat-disabled".exists() {
@@ -203,8 +232,6 @@ proc main() [fs, process, time, error] {
   }
   guest_tick("vt-disabled")
 
-  # R4: VT switch back. The host sends Ctrl+Alt+F1; the session reopens its
-  # devices and resumes with no stuck modifiers and no revoked descriptors.
   guest_console("LAPUTA_TINYLAND_VT_SWITCH_BACK")
   var vt_back_elapsed = 0
   while ! fp"{runtime}/laputa-seat-enabled".exists() {

@@ -24,7 +24,7 @@ proc deny_open(path_value: Path, write: Bool, runtime: Path) [fs, process, error
 proc main() [fs, process, env, error] {
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
-  for name in ["laputa-foot-input.txt", "laputa-foot-read-ready", "laputa-direct-denied", "laputa-tinyland.pid", "laputa-seat-disabled", "laputa-seat-enabled"] {
+  for name in ["laputa-foot-input.txt", "laputa-foot-read-ready", "laputa-direct-denied", "laputa-tinyland.pid", "laputa-session-id", "laputa-seat-disabled", "laputa-seat-enabled"] {
     fp"{runtime}/{name}".remove()?
   }
   let control = unix.open_fd(p"/dev/null", nonblock: true)?
@@ -64,8 +64,11 @@ proc main() [fs, process, env, error] {
       p"/dev/console".write("LAPUTA_TINYLAND_PTMX_MISSING\n")?
     },
   }
+  let session_id = f"{process.current_pid()?}"
+  fp"{runtime}/laputa-session-id".write(session_id)?
   env ({
     PATH: "/usr/local/bin:/usr/bin:/bin",
+    LAPUTA_SESSION_ID: session_id,
     XDG_RUNTIME_DIR: runtime.display(),
     LIBSEAT_BACKEND: "seatd",
     SEATD_SOCK: "/run/seatd.sock",
