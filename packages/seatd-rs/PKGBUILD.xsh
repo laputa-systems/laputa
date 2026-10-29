@@ -1,6 +1,7 @@
 ##! XSH module `seatd-rs` package and build operations.
 use pm.env as pm_env
 use pm.target as pm_target
+use pm.rust as pm_rust
 use pm.types
 use pm.util as pm_util
 
@@ -125,28 +126,6 @@ export const filetree = [
   },
 ]
 
-proc stage_rustlib(source: Path, dest: Path) {
-  dest.remove()
-  dest.mkdir()
-
-  for entry in fs.walk(source, gitignore: false)? |> sort-by .path {
-    continue when entry.path == source
-    let relative = entry.path.relative_to(source)
-    let out = fp"{dest}/{relative}"
-
-    if entry.kind == "dir" {
-      out.mkdir()
-    } else if entry.kind == "file" {
-      let mode = if entry.path.executable() { 0o755 } else { 0o644 }
-      fs.install(entry.path, out, mode, parents: true, overwrite: true)
-    } else if entry.kind == "symlink" {
-      out.parent.mkdir()
-      out.remove()
-      out.symlink(to: entry.path.readlink()?)
-    }
-  }
-}
-
 proc patch_realtime_dependency(root: Path) {
   let meson = fp"{root}/meson.build"
   let text = meson.read_text()?
@@ -189,7 +168,7 @@ export proc build(dest: Path) [fs, process, env, error] {
       return Err(SeatdRsBuildError.MissingRustStd(target_rustlib.display()))
     }
 
-    stage_rustlib(target_rustlib, staged_rustlib)
+    pm_rust.rust_stage_standard_library(target_rustlib, staged_rustlib)
   }
 
   # panic=abort keeps unwinding (and the libgcc runtime) out of the image.
