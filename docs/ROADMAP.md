@@ -446,8 +446,12 @@ and Asterinas results are recorded separately; Linux aarch64 is deferred pending
 a macOS aarch64 host via Docker.
 
 `system/activation.xsh` records install, stage,
-pending boot, health confirmation, and fallback after two failed attempts. The
-launcher does not yet select that record, and no guest reboot has been run.
+pending boot, health confirmation, and fallback after two failed attempts.
+`system/launcher.xsh` selects that record for a direct-kernel boot when
+`{output}/generations/activation.json` exists: current with no write, the
+pending generation after its image files exist, and the fallback after two
+attempts. A boot with no record is unchanged. The launcher does not confirm
+health. No guest reboot has been run.
 
 ## R6: Separate disposable development from long-lived VM policy
 

@@ -206,9 +206,9 @@ and real-hardware enablement remain outside that scope.
 ### LAP-46 · P1 · Select the fallback generation from the host launcher
 
 - **Area:** Activation
-- **Where:** `system/activation.xsh`, `system/qemu.xsh`
+- **Where:** `system/activation.xsh`, `system/launcher.xsh`, `system/qemu.xsh`
 - **Problem:** The activation record can fall back in a host-side test, but the launcher still boots whatever disk it was given.
 - **Recommendation:** Have the direct-kernel launcher read the record, boot the pending generation, and fall back after the recorded attempt limit. Keep the guest from rolling itself back. Do not put this in a package script.
-- **Progress:** `system/activation.xsh` installs a receipt, stages a candidate without changing current, begins a boot, confirms health only for the pending id, and clears a pending boot after two failures while current stays on the fallback. The lock is an exclusive `fs.mknod`, and record writes are temp file, fsync, rename, directory fsync. Ten activation tests pass. No guest reboot has been run. The QEMU launcher is unchanged.
+- **Progress:** `system/activation.xsh` installs a receipt, stages a candidate without changing current, begins a boot, confirms health only for the pending id, and clears a pending boot after two failures while current stays on the fallback. The lock is an exclusive `fs.mknod`, and record writes are temp file, fsync, rename, directory fsync. Ten activation tests pass. `system/launcher.xsh` selects that record for a direct-kernel argv: current with no write, the pending generation after `{output}/generations/images/{id}/kernel` and `disk` exist, and the fallback image once `boot_attempts` reaches the cap. The id must be one path segment. A comma or whitespace in a host path is rejected. `laputa boot` uses this selection when `{output}/generations/activation.json` exists and otherwise keeps the profile image. The launcher does not confirm health and does not start QEMU. Seven launcher tests pass. No guest reboot has been run.
 - **Fix with:** durable-state
 - **Effort:** M (days)

@@ -1,6 +1,7 @@
 ##! Structured QEMU construction and supervision for the QEMU profiles.
 use system.build
 use system.image
+use system.launcher
 use system.proof
 use system.types
 
@@ -407,15 +408,34 @@ export proc run_test(
   }
 }
 
+## QEMU argv for one boot. A profile generations directory selects that record's kernel and disk.
+export proc boot_command_argv(
+  value: QemuConfig,
+  profile: types.SystemProfile,
+  outputs: build.ProfileOutputs,
+  mode: types.QemuMode,
+  generations: Path? = null,
+) [fs, time, error] -> Result[List[Str], Error] {
+  let argv = qemu_command_argv(value, profile, outputs, mode)
+
+  if generations == null {
+    argv
+  } else {
+    let image = launcher.launcher_select(generations)?
+    launcher.launcher_qemu_argv(argv, image)?
+  }
+}
+
 ## Run the profile's normal interactive session and return its real QEMU exit status.
-export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, error] {
-  if ! outputs.kernel.exists() or ! outputs.disk.exists() {
+export proc boot(value: QemuConfig, profile: types.SystemProfile, outputs: build.ProfileOutputs) [fs, process, time, error] {
+  let generations = launcher.launcher_state(outputs.root)?
+
+  if generations == null and (! outputs.kernel.exists() or ! outputs.disk.exists()) {
     return Err(types.LaputaError.Profile(f"{profile.name} image is missing; run laputa build first"))
   }
 
-  let status = process.run(
-    process.command_argv(value.qemu, qemu_command_argv(value, profile, outputs, types.Interactive)),
-  )?
+  let argv = boot_command_argv(value, profile, outputs, types.Interactive, generations)?
+  let status = process.run(process.command_argv(value.qemu, argv))?
   if ! status.ok {
     return Err(types.LaputaError.Docker("interactive QEMU exited unsuccessfully"))
   }
