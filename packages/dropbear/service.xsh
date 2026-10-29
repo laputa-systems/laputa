@@ -41,3 +41,14 @@ export let service = {
   restart: restart_policy(),
   logging: "append",
 }
+
+## Readiness requires the supervised Dropbear child to own the configured listening socket.
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {
+  let owner = process.current_pid()?
+  for listener in process.port(port)? {
+    if listener.protocol == "tcp" and listener.state == "LISTEN" and listener.parent_pid == owner and listener.command == "dropbear" and listener.local_address == bind {
+      return true
+    }
+  }
+  false
+}

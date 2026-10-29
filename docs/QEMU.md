@@ -213,3 +213,17 @@ superseded by the separate-state proof. The firewall fixtures and initial fallba
 proof predate the new bundle metadata contract. Remote XSH transport, DHCP lease
 lifecycle, first-boot crash atomicity, configuration migrations, and security-policy
 admission across rollback remain separate obligations.
+
+The maintained state mount is an early boot hook under
+`/usr/lib/init/rc.early.d`, after `/proc`, `/sys`, `/dev`, and `/run` are mounted
+but before `fstab`, clock, hostname, and sysctl consumers read persistent `/etc`.
+A KVM regression fixture with persistent `vm.swappiness=17` failed before this
+ordering change and passed afterward. `LAPUTA_BOOT_POLICY_PROOF=1` enables that
+assertion in the guest proof.
+
+Dropbear readiness requires a listening TCP socket owned by the supervised
+Dropbear child of the scanner at the configured address and port. Merely spawning
+the process does not satisfy readiness. The native Linux regression command is
+`python3 tests/integration/dropbear_readiness.py PATH_TO_PACKAGED_DROPBEAR`.
+It verifies a real owned listener and a conflicting foreign listener, then stops
+and reaps every child it starts.

@@ -6,10 +6,16 @@ proc listener_ready() -> Result[Bool] {
   json.get(json.read(status)?, ["state"], "down").require(Str)? == "running"
 }
 
-proc main() {
+proc run_proof() {
   return unless "LAPUTA_MAINTAINED_PROOF_FLAG=1" in p"/proc/cmdline".read_text()?
 
   let cmdline = p"/proc/cmdline".read_text()?
+  if "LAPUTA_BOOT_POLICY_PROOF=1" in cmdline {
+    guard linux.sysctl_get("vm.swappiness")?.trim() == "17" else {
+      fail "persistent sysctl configuration was not applied"
+    }
+    p"/dev/console".write("LAPUTA_BOOT_POLICY_PROOF_OK persistent sysctl applied\n")
+  }
   if "LAPUTA_FIREWALL_FAILURE_PROOF=1" in cmdline {
     let firewall = p"/run/xinit/firewall.json"
     time.sleep(3s)
@@ -53,5 +59,15 @@ proc main() {
     fs.fsync(baseline.parent)
     p"/dev/console".write("LAPUTA_MAINTAINED_PROOF_READY rebooting through pid 1\n")
     process.kill(1, signal: "TERM")?
+  }
+}
+
+proc main() -> Result[Unit, Error] {
+  match run_proof() {
+    Ok(_) => {}
+    Err(problem) => {
+      p"/dev/console".write(f"LAPUTA_MAINTAINED_PROOF_FAILED {problem.message}\n")
+      return Err(problem)
+    }
   }
 }

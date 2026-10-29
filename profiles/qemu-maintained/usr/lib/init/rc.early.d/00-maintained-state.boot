@@ -16,5 +16,4 @@ proc main() {
     target.mkdir()
     linux.mount(source.bytes(), target, options: ["bind"])
   }
-  unix.set_hostname(p"/etc/hostname".read_text()?.trim())
 }

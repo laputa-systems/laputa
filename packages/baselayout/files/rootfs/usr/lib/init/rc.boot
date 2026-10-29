@@ -51,6 +51,12 @@ if ! p"/dev/stderr".exists() {
   p"/dev/stderr".symlink(to: p"fd/2")
 }
 
+for hook in g"/usr/lib/init/rc.early.d/*.boot" {
+  if hook.is_file() {
+    run $hook
+  }
+}
+
 if p"/usr/bin/mdev".exists() {
   run /usr/bin/mdev -s
 }
