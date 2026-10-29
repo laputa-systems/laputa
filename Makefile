@@ -112,7 +112,7 @@ check: need-xsh
 lint: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit
 
-test: test-pm test-system test-xinit test-linux
+test: test-components test-pm test-system test-xinit test-linux
 
 test-components:
 	@test "$(HOST_OS)" = Linux || { echo "test-components: Linux is required" >&2; exit 1; }
@@ -135,11 +135,10 @@ test-components:
 	    RUSTFLAGS="$$flags" RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	mkdir -p tinyland/.work/tmp
 	cd tinyland && python3 -B harness/test-qmp.py
+	cd tinyland && python3 -B harness/test-guest-lock.py
 
 test-components-integration:
-	$(MAKE) test-components
-	cd tinyland && python3 -B harness/test-guest-lock.py
-	$(MAKE) test-pm
+	$(MAKE) test
 	$(MAKE) profile-test
 	$(MAKE) profile-tinyland-test
 	$(MAKE) profile-tinyland-vt-test
