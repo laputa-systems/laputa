@@ -588,23 +588,8 @@ export proc trust_store_bootstrap_from_seeds(system_root: Path) [fs, error] -> R
   }
 
   trust_store_verify_generation(paths, generation, bundle_digest, policy_digest)
+  trust_store_persist_accepted(paths, generation)
   trust_store_flip_active(paths, generation)
-
-  let accepted_path = fp"{paths.store}/{TRUST_ACCEPTED_NAME}"
-  if ! accepted_path.exists() {
-    trust_store_persist_accepted(paths, generation)
-  } else {
-    let accepted = trust_store_read_accepted(paths)?
-    guard ! trust_policy.policy_u64_is_greater(accepted, generation) else {
-      return Err(
-        trust_store_fail(
-          f"accepted generation {accepted} is newer than package seeds; refusing to bootstrap over them",
-        ),
-      )
-    }
-
-    trust_store_persist_accepted(paths, generation)
-  }
 
   let _ = trust_store_reobserve(paths, generation, bundle_digest, policy_digest)?
   generation

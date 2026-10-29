@@ -19,6 +19,8 @@ root, and every certificate's PEM encoding. The installer seeds the trust
 store from these package seeds on every fresh install, so installed systems
 verify trust from first boot; `trust update` bootstraps the same way when no
 store exists, and refuses to bootstrap over a newer accepted generation.
+Bootstrap verifies the seed generation and records it as accepted before
+activating it, so an interrupted activation can resume from the verified seed.
 
 Curl's PEM export does not preserve Mozilla root-specific Name Constraints.
 Treat the bundle as a list of roots, not as Mozilla's complete trust program.

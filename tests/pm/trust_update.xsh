@@ -106,6 +106,26 @@ test trust_status_reports_uninitialized_system [fs, time, error] { |ctx|
   assert status.initialized == false
 }
 
+test trust_bootstrap_records_accepted_before_activation [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-bootstrap-activation-failure", "signing-key")?
+  let source = stage_release(ctx, "trust-bootstrap-activation-failure-source", "release-b")?
+  let paths = trust_store.trust_store_paths(root)
+  paths.store.mkdir(parents: true)
+  let scratch = fp"{paths.store}/active.new"
+  scratch.write("block activation")
+
+  match trust_store.trust_store_bootstrap_from_seeds(root) {
+    Ok(_) => test.fail("bootstrap activated with a blocked active pointer"),
+    Err(problem) => assert "scratch state is not a symlink" in problem.message
+  }
+  assert ! trust_store.trust_store_active_present(paths)?
+  assert trust_store.trust_store_read_accepted(paths)? == "1"
+  scratch.remove()
+  let applied = trust_update.trust_update_from_dir(root, source)?
+  assert applied.generation == "2"
+  assert trust_store.trust_store_read_accepted(paths)? == "2"
+}
+
 test trust_update_bootstraps_and_applies_release [fs, process, time, error] { |ctx|
   let root = stage_system(ctx, "trust-update-happy", "signing-key")?
   let source = stage_release(ctx, "trust-update-happy-source", "release-b")?
