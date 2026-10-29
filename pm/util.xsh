@@ -3,6 +3,18 @@ use types
 
 const source_placeholder_word = rx"[A-Z]+"
 
+## Enumerates repository source inputs shared by fingerprinting and staging, excluding component build and harness state.
+export proc repository_source_paths(source: Path) [fs, error] -> Result[List[Path], Error] {
+  collect {
+    for entry in fs.walk(source) |> sort-by .path {
+      let relative = entry.path.strip_prefix(source)?.display()
+      let first = relative.split("/")[0]
+      continue when first in ["target", ".work", "work", ".git"]
+      yield entry.path
+    }
+  }
+}
+
 ## Exported PM declaration `package_id`.
 export pure package_id(name: Str, ver: Str, rel: Str) -> Str {
   f"{name}-{ver}-{rel}"

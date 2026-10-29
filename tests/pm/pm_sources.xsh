@@ -72,6 +72,25 @@ proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) {
   }
 }
 
+test test_repository_staging_excludes_build_and_harness_outputs [fs, net, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "repository-staging-scratch")?
+  let source = fp"{root}/tool"
+  fp"{source}/src".mkdir(parents: true)?
+  fp"{source}/src/main.rs".write("fn main() {}\n")?
+  fp"{source}/.work/tmp".mkdir(parents: true)?
+  fp"{source}/target/debug".mkdir(parents: true)?
+  fp"{source}/target/debug/tool".write("stale executable\n")?
+  let python = process.which("python3")?
+  run $python "-c" "import os,socket,sys; os.chdir(sys.argv[1]); s=socket.socket(socket.AF_UNIX); s.bind('test.sock')" fp"{source}/.work/tmp"
+  let dest = fp"{root}/staged"
+  env ({XSH_PM_REPOSITORY_ROOT: root.display()}) {
+    sources.stage_package_sources(url_package("repository/tool", "SKIP"), dest)
+  }
+  test.eq(fp"{dest}/src/main.rs".read_text()?, "fn main() {}\n")
+  assert ! fp"{dest}/.work".exists()?
+  assert ! fp"{dest}/target".exists()?
+}
+
 test test_url_source_stages_from_a_cache_hit_without_network [fs, net, env, error] { |ctx|
   let tarball = demo_tarball(ctx, "cache-hit")?
   let cache = test.temp_dir(ctx, name: "cache-hit-cache")?

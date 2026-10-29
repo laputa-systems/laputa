@@ -376,7 +376,25 @@ proc stage_resolved_source(
 
   if source_kind == types.source_directory() or resolved.kind == "dir" {
     dest.mkdir()
-    let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
+    if sources_is_repository_input(line.source) {
+      for input in util.repository_source_paths(source_path)? {
+        let relative = input.strip_prefix(source_path)?
+        let output = fp"{dest}/{relative}"
+        let metadata = input.metadata()?
+        match metadata.kind {
+          "dir" => { output.mkdir(parents: true)? },
+          "file" => { fs.install(input, output, util.checkout_mode("file", metadata.mode), parents: true, overwrite: true)? },
+          "symlink" => {
+            output.parent.mkdir(parents: true)?
+            output.remove()?
+            output.symlink(to: input.readlink()?)?
+          },
+          else => { return Err(types.PmError.PackageContract(f"unsupported repository source entry {input}")) },
+        }
+      }
+    } else {
+      let _ = fs.copy_tree(source_path, dest, parents: true, overwrite: true)?
+    }
     util.normalize_checkout_tree(dest)
     return
   }

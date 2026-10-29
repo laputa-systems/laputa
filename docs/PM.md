@@ -83,7 +83,10 @@ incompatible signature or effects is rejected before invocation.
 strings may name whole-word placeholders such as `VERSION` and `ARCH`
 (`pm/util.xsh::expand_source` lists them); a word that merely contains one, such
 as `PATCHES`, is left alone. Source preparation is part of
-the package build identity. A `repository/` source is hashed after the same
+the package build identity. Repository directory staging and fingerprinting
+share one input enumeration. Component `target`, `.work`, `work`, and `.git`
+trees are excluded from both; test sockets and build products cannot enter a
+package's prepared source tree. A `repository/` source is hashed after the same
 expansion and only for the targets it selects, so `repository/.out/seed/ARCH`
 keys each target's `xsh` by that target's seed alone. A recipe directory may
 not hold a symlink that leaves it; shared PM code is imported through the

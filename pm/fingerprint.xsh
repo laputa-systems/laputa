@@ -118,17 +118,11 @@ proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.T
       }
 
       if input.is_dir() {
-        # Cargo build output never belongs in a fingerprint: a local check or
-        # build beside the tree must not invalidate the plan or the store.
-        let build_output = fp"{input}/target"
-
-        for entry in fs.walk(input) |> sort-by .path {
-          continue when entry.path == build_output or entry.path.display().starts_with(f"{build_output.display()}/")
-
-          let rel = entry.path.strip_prefix(repo_root)?
+        for source_path in util.repository_source_paths(input)? {
+          let rel = source_path.strip_prefix(repo_root)?
 
           if ! ignored_tree_path(rel) {
-            yield tree_entry_line(repo_root, entry.path, "repository-input")?
+            yield tree_entry_line(repo_root, source_path, "repository-input")?
           }
         }
       } else {
