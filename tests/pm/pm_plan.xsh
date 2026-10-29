@@ -147,6 +147,30 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
   assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? != before
 }
 
+test test_in_tree_components_invalidate_only_their_own_source_input [fs, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "component-inputs")?
+  let components = ["tinyland", "mdevd-rs", "seatd-rs", "doas-rs"]
+  for name in components {
+    let _ = fs.copy_tree(fp"packages/{name}", fp"{root}/packages/{name}", parents: true, overwrite: true)?
+    fp"{root}/{name}/src".mkdir(parents: true)?
+    fp"{root}/{name}/Cargo.lock".write("fixture lock\n")?
+    fp"{root}/{name}/src/main.rs".write("fn main() {}\n")?
+  }
+  let packages = [recipe.load_package(fp"{root}/packages/{name}")? for name in components]
+  let before = [fingerprint.package_build_input(root, pkg, types.target_x86_64())? for pkg in packages]
+  for index in range(0, components.len()) {
+    let name = components[index]
+    let source = fp"{root}/{name}/src/main.rs"
+    source.write("fn main() { println!(\"changed\"); }\n")?
+    for other in range(0, packages.len()) {
+      let after = fingerprint.package_build_input(root, packages[other], types.target_x86_64())?
+      test.eq(after != before[other], index == other)
+    }
+    source.write("fn main() {}\n")?
+    test.eq(fingerprint.package_build_input(root, packages[index], types.target_x86_64())?, before[index])
+  }
+}
+
 test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-symlinks")?
   let first = build_input(pkg)?
