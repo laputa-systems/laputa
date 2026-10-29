@@ -7,6 +7,7 @@
 //! upstream behavior documented in docs/divergence.md.
 use std::io::Read;
 use std::os::unix::io::FromRawFd;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -153,6 +154,18 @@ fn bins_cli_contract() {
         }
         let mut mc = Command::new(&ours);
         mc.args(&full);
+        if args.as_slice() == ["-D", "9"] {
+            // SAFETY: the callback only closes a descriptor in the forked child.
+            unsafe {
+                mc.pre_exec(|| {
+                    if libc::close(9) != 0 {
+                        let error = std::io::Error::last_os_error();
+                        if error.raw_os_error() != Some(libc::EBADF) { return Err(error); }
+                    }
+                    Ok(())
+                });
+            }
+        }
         let md = run_timeout(mc, 10);
         assert_eq!(md.code, Some(code), "{args:?}: exit differs");
         let err = String::from_utf8_lossy(&md.stderr);

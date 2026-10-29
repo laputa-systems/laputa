@@ -123,7 +123,7 @@ test-components:
 	/bin/sh mdevd-rs/tools/test-check-udev-consumer.sh
 	/bin/sh mdevd-rs/tools/test-check-deps.sh
 	cd mdevd-rs && /bin/sh tools/check-deps.sh
-	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
+	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked -- --test-threads=1
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --offline --locked --all-targets -- -D warnings
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
 	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings
