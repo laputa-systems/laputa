@@ -49,6 +49,13 @@ XSH su applet and the packaged `/usr/bin/doas`, including terminal-attached
 and detached execution. An explicit loader invocation cannot establish a
 setuid transition.
 
+One xinit scanner owns mdevd, seatd, and the session in both profiles.
+Mdevd signals readiness before the coldplug oneshot runs. Seatd starts after
+successful coldplug and signals readiness separately. Launchers require actual
+readiness rather than accepting xinit's timeout promotion. Session exit,
+compositor loss, and broker loss restart the session under that scanner.
+The proof counts broker instances and binds reader readiness to each session.
+
 ## Verification entry points
 
 `make test-components` runs the retained host component checks. Native
