@@ -282,11 +282,32 @@ proc main() [fs, process, time, error] {
   process.kill(seatd_pid, signal: "KILL")?
   let restarted_seatd_pid = guest_wait_unit("seatd", seatd_pid, true)?
   guest_require_broker_census(mdevd_pid, restarted_seatd_pid)?
-  let _ = guest_wait_session(runtime, crash_pid)?
+  let recovered_pid = guest_wait_session(runtime, crash_pid)?
   if guest_process_alive(crash_pid)? { guest_fail("broker-loss", "old session survived broker loss") }
   guest_console("LAPUTA_TINYLAND_BROKER_LOSS session exited")?
   guest_tick("broker-loss-reaped")
   guest_tick("broker-recovered")
+
+  let applications = [entry.pid for entry in process.list()? if entry.command == "foot"]
+  guard applications.len() == 1 else { fail "expected one application before exit qualification" }
+  process.kill(applications[0], signal: "TERM")?
+  let application_restart_pid = guest_wait_session(runtime, recovered_pid)?
+  guard ! guest_process_alive(recovered_pid)? else { fail "old compositor survived application exit" }
+  guest_console("LAPUTA_TINYLAND_APPLICATION_EXIT_RECOVERED")?
+
+  let scanner = json.get(json.read(p"/run/xinit/scanner.json")?, ["pid"], 0).require(Int)?
+  guard scanner > 1 else { fail "missing service scanner ownership" }
+  let shutdown_applications = [entry.pid for entry in process.list()? if entry.command == "foot"]
+  guard shutdown_applications.len() == 1 else { fail "expected one application before scanner shutdown" }
+  process.kill(scanner, signal: "TERM")?
+  let shutdown_mdevd = guest_wait_unit("mdevd", mdevd_pid, true)?
+  let shutdown_seatd = guest_wait_unit("seatd", restarted_seatd_pid, true)?
+  let _ = guest_wait_session(runtime, application_restart_pid)?
+  for old in [scanner, mdevd_pid, restarted_seatd_pid, application_restart_pid, shutdown_applications[0]] {
+    guard ! guest_process_alive(old)? else { fail f"owned process {old} survived scanner shutdown" }
+  }
+  guest_require_broker_census(shutdown_mdevd, shutdown_seatd)?
+  guest_console("LAPUTA_TINYLAND_SCANNER_SHUTDOWN_REAPED")?
 
   guest_console("LAPUTA_TINYLAND_FOOT_PROOF_READY")
   guest_wait_for(fp"{runtime}/laputa-foot-input.txt", "input", 90)
