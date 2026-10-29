@@ -8,9 +8,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-GUEST_ROOT="${1:-/home/josh/d/tinyland/.work/guest-root}"
-KERNEL="${2:-/home/josh/d/tinyland/.work/vmlinuz-virt}"
-INITRAMFS="${3:-/home/josh/d/tinyland/.work/initramfs-virt}"
+TINYLAND="$(cd ../tinyland && pwd)"
+GUEST_ROOT="${1:-$TINYLAND/.work/guest-root}"
+KERNEL="${2:-$TINYLAND/.work/vmlinuz-virt}"
+INITRAMFS="${3:-$TINYLAND/.work/initramfs-virt}"
 DOAS_BIN="${4:-target/x86_64-unknown-linux-musl/release/doas}"
 
 for p in "$GUEST_ROOT/init" "$KERNEL" "$INITRAMFS" "$DOAS_BIN"; do
