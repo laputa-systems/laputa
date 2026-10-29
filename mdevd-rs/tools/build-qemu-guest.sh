@@ -43,7 +43,7 @@ apk --root "$ROOT" --repositories-file /dev/null --no-network --keys-dir "$ROOT/
   --initdb --arch x86_64 --usermode add $APKS
 echo GUEST_PACKAGES_VERIFIED
 echo 'building mdevd (musl static)'
-cargo build --locked --release --target x86_64-unknown-linux-musl 2>&1 | tail -n 3
+cargo build --locked --release --target x86_64-unknown-linux-musl
 mkdir -p "$ROOT/usr/local/bin"
 cp target/x86_64-unknown-linux-musl/release/mdevd "$ROOT/usr/local/bin/mdevd"
 cp target/x86_64-unknown-linux-musl/release/mdevd-coldplug "$ROOT/usr/local/bin/mdevd-coldplug"
