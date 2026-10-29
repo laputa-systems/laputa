@@ -120,6 +120,7 @@ test-components:
 	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets
 	/bin/sh mdevd-rs/tools/test-check-combined.sh
 	/bin/sh mdevd-rs/tools/test-build-qemu-guest.sh
+	/bin/sh mdevd-rs/tools/test-check-udev-consumer.sh
 	/bin/sh mdevd-rs/tools/test-check-deps.sh
 	cd mdevd-rs && /bin/sh tools/check-deps.sh
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
