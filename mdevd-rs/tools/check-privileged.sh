@@ -4,8 +4,8 @@ cd "$(dirname "$0")/.."
 ROOT=$PWD
 mkdir -p .work/tmp
 export TMPDIR="$ROOT/.work/tmp"
-TEST_BIN=$(cargo test --locked --target x86_64-unknown-linux-musl --test adversarial --no-run --message-format json |
-  jaq -r 'select(.reason == "compiler-artifact" and .profile.test) | .executable // empty')
+artifacts=$(cargo test --locked --target x86_64-unknown-linux-musl --test adversarial --no-run --message-format json)
+TEST_BIN=$(printf '%s\n' "$artifacts" | jaq -r 'select(.reason == "compiler-artifact" and .profile.test) | .executable // empty')
 test -n "$TEST_BIN"
 docker run --rm --pull never --network none --read-only \
   --cap-drop ALL --cap-add MKNOD --cap-add CHOWN --cap-add FOWNER \

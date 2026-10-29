@@ -23,7 +23,7 @@ STUB
 chmod +x "$scratch/bin/"*
 for status in 0 1; do
   if PATH="$scratch/bin:$PATH" LIBUDEV_ZERO_SRC="$scratch/reference" TEST_CARGO_STATUS=$status \
-    sh "$scratch/tools/check-udev-consumer.sh" > "$scratch/output" 2>&1; then
+    /bin/sh "$scratch/tools/check-udev-consumer.sh" > "$scratch/output" 2>&1; then
     [ "$status" -eq 0 ] || { cat "$scratch/output"; exit 1; }
   else
     [ "$status" -ne 0 ] || { cat "$scratch/output"; exit 1; }

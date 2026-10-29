@@ -59,8 +59,11 @@ This target does not build packages or boot guests.
 
 `make test` includes component tests alongside the PM, system, xinit, and Linux
 suites. The package-lock test uses isolated fixture inputs without a cached guest.
-`make test-components-integration` runs `make test`, then the canonical dwl,
-tinyland, and VT-bound tinyland profile tests in sequence.
+`make test-components-privileged` runs the retained mdevd adversarial cases in
+disposable Docker containers on Linux x86_64. Other hosts fail with an explicit
+coverage-unavailable message. The ordinary Cargo run reports these cases as ignored.
+`make test-components-integration` runs `make test`, the privileged component
+cases, then the canonical dwl, tinyland, and VT-bound tinyland profiles in sequence.
 The profiles need the infrastructure described in [QEMU](QEMU.md) and
 [Tinyland](TINYLAND.md). This explicit integration gate is separate from
 `make verify`.

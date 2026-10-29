@@ -90,7 +90,7 @@ endif
 PNPM_VERSION ?= 11.0.2
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-components test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
+.PHONY: check lint test test-components test-components-privileged test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
@@ -122,6 +122,7 @@ test-components:
 	/bin/sh mdevd-rs/tools/test-check-combined.sh
 	/bin/sh mdevd-rs/tools/test-build-qemu-guest.sh
 	/bin/sh mdevd-rs/tools/test-check-udev-consumer.sh
+	/bin/sh mdevd-rs/tools/test-check-privileged.sh
 	/bin/sh mdevd-rs/tools/test-check-deps.sh
 	cd mdevd-rs && /bin/sh tools/check-deps.sh
 	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
@@ -138,8 +139,13 @@ test-components:
 	cd tinyland && python3 -B harness/test-qmp.py
 	cd tinyland && python3 -B harness/test-guest-lock.py
 
+test-components-privileged:
+	@test "$(HOST_OS)/$(HOST_ARCH)" = Linux/x86_64 || { echo "privileged component coverage unavailable on $(HOST_OS)/$(HOST_ARCH)" >&2; exit 1; }
+	RUSTC_WRAPPER=kache RUSTFLAGS="-Clinker=mold -Clinker-flavor=ld" /bin/sh mdevd-rs/tools/check-privileged.sh
+
 test-components-integration:
 	$(MAKE) test
+	$(MAKE) test-components-privileged
 	$(MAKE) profile-test
 	$(MAKE) profile-tinyland-test
 	$(MAKE) profile-tinyland-vt-test
