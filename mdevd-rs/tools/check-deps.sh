@@ -6,7 +6,13 @@
 # all covered); rustix adds nothing needed, so it stays out.
 set -eu
 allow="^mdevd v|^libc v"
-bad=$(cargo tree --offline -e normal --prefix none 2>/dev/null | grep -Ev "$allow" || true)
+tree=$(cargo tree --offline --locked -e normal --prefix none)
+if bad=$(printf '%s\n' "$tree" | rg -v "$allow"); then
+  :
+else
+  status=$?
+  [ "$status" -eq 1 ] || exit "$status"
+fi
 if [ -n "$bad" ]; then
   echo "check-deps: forbidden production dependency:" >&2
   echo "$bad" >&2
