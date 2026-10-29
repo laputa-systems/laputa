@@ -1,5 +1,6 @@
 ##! End-to-end signed trust update: verification matrix, atomic activation,
 ##! recovery, concurrency, and CLI behavior on disposable system roots.
+use pm.recipe
 use trust.release as trust_release
 use trust.store as trust_store
 use trust.update as trust_update
@@ -646,7 +647,7 @@ test trust_update_finishes_flip_lagging_commit_journal [fs, process, time, error
   assert journal.present == false
 }
 
-test trust_update_rotates_keys_package_only [fs, process, time, error] { |ctx|
+test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |ctx|
   let root = stage_system(ctx, "trust-update-rotation", "signing-key")?
   let release_b = stage_release(ctx, "trust-update-rotation-b", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, release_b)?
@@ -672,10 +673,31 @@ test trust_update_rotates_keys_package_only [fs, process, time, error] { |ctx|
   let early_rotated = stage_release(ctx, "trust-update-rotation-early", "release-d")?
   expect_rejected(trust_update.trust_update_from_dir(root, early_rotated), "signature is invalid", root, "3", "rotated-before-package-update")
 
-  fp"{root}/etc/laputa/trust-update-key".write(key_bytes("rotation-key")?)
-  fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".write(fixture("release-d/ca-certificates.crt").read_bytes()?)
-  fp"{root}/usr/share/laputa/trust/seed/trust-policy".write(fixture("release-d/trust-policy").read_bytes()?)
-  assert fp"{root}/etc/laputa/trust-update-key".read_bytes()? == fixture("keys/rotation-key.public.base64").read_text()?.trim().base64_decode()?
+  let pkg = recipe.load_package(p"packages/ca-certificates")?
+  let package_root = test.temp_dir(ctx, name: "trust-update-rotation-package")?
+  let src = fp"{package_root}/src"
+  let dest = fp"{package_root}/dest"
+  src.mkdir()
+  fp"{src}/cacert.pem".write(fixture("release-d/ca-certificates.crt").read_bytes()?)
+  fp"{src}/trust-policy".write(fixture("release-d/trust-policy").read_bytes()?)
+  fp"{src}/trust-update-key".write(key_bytes("rotation-key")?)
+  recipe.call_build(pkg, src, dest)?
+
+  let built_key = fp"{dest}/etc/laputa/trust-update-key"
+  let built_bundle = fp"{dest}/usr/share/laputa/trust/seed/ca-certificates.crt"
+  let built_policy = fp"{dest}/usr/share/laputa/trust/seed/trust-policy"
+  assert built_key.read_bytes()? == key_bytes("rotation-key")?
+  assert built_key.metadata()?.mode % 4096 == 0o444
+  assert built_bundle.read_bytes()? == fixture("release-d/ca-certificates.crt").read_bytes()?
+  assert built_policy.read_bytes()? == fixture("release-d/trust-policy").read_bytes()?
+  for release_file in ["metadata", "metadata.sig"] {
+    assert ! fp"{dest}/{release_file}".exists()?
+  }
+
+  built_key.copy(to: fp"{root}/etc/laputa/trust-update-key", overwrite: true)?
+  built_bundle.copy(to: fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt", overwrite: true)?
+  built_policy.copy(to: fp"{root}/usr/share/laputa/trust/seed/trust-policy", overwrite: true)?
+  assert fp"{root}/etc/laputa/trust-update-key".read_bytes()? == key_bytes("rotation-key")?
   assert fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".read_bytes()? == fixture("release-d/ca-certificates.crt").read_bytes()?
   assert fp"{root}/usr/share/laputa/trust/seed/trust-policy".read_bytes()? == fixture("release-d/trust-policy").read_bytes()?
 

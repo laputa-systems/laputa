@@ -156,7 +156,10 @@ Rotate only through an OS package update that ships a new key file and new
 seeds together; releases themselves never carry keys and cannot rotate,
 revoke, or recover one. Losing the signing key means building a new key,
 shipping it in a package update, and re-issuing releases. There is no
-in-band recovery.
+in-band recovery. `tests/pm/trust_update.xsh` builds that package update
+from the rotated key and the new seed bytes, then checks that `trust
+update` accepts the release signed by the new key and rejects releases
+signed by the superseded key.
 
 ## Recovery
 
