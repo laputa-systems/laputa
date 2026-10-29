@@ -142,6 +142,9 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
     time.sleep(1s)
     elapsed += 1
   }
+  for log in [/var/log/tinyland/current, /var/log/seatd/current] {
+    if log.exists() { guest_console(log.read_text()?) }
+  }
   guest_fail("session", "replacement session did not become ready")
   return Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
 }
