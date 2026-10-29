@@ -49,6 +49,27 @@ proc guest_run_required(command: Command, phase: Str) {
   }
 }
 
+proc guest_granted_device_control(runtime: Path) [fs, process, error] {
+  let device = p"/dev/dri/card0"
+  let original = fs.stat(device, follow_symlinks: false)?.mode % 4096
+  let marker = fp"{runtime}/laputa-direct-opened"
+  marker.remove()
+  defer device.chmod(original)
+  device.chmod(0o666)?
+  let result = process.run(process.command_argv(
+    /usr/bin/su,
+    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
+    timeout: 10s,
+  ))
+  device.chmod(original)?
+  let status = result?
+  guard ! status.ok else { fail "device denial probe accepted granted DRM access" }
+  guard marker.read_text()? == device.display() else { fail "granted DRM access did not reach the denial probe" }
+  marker.remove()?
+  guest_console("LAPUTA_TINYLAND_GRANTED_DEVICE_REJECTED")?
+}
+
 proc main() [fs, process, time, error] {
   guest_tick("start")
   let _mdevd = spawn process.command_argv(
@@ -115,6 +136,13 @@ proc main() [fs, process, time, error] {
     process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"]),
     "runtime-dir",
   )
+  guest_run_required(process.command_argv(
+    /usr/bin/su,
+    ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-attack.xsh"],
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
+    timeout: 10s,
+  ), "runtime-attack")
+  guest_granted_device_control(runtime)?
   fp"{runtime}/laputa-foot-input.txt".remove()
   fp"{runtime}/laputa-foot-read-ready".remove()
   fp"{runtime}/laputa-direct-denied".remove()

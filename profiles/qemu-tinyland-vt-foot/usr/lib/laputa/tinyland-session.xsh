@@ -5,10 +5,11 @@
 ##! success markers are owned by the outer guest proof and the host.
 error SessionError = DeniedOpen(device: Str)
 
-proc deny_open(path_value: Path) [fs, process, error] {
-  match unix.open_fd(path_value, nonblock: true) {
+proc deny_open(path_value: Path, write: Bool, runtime: Path) [fs, process, error] {
+  match unix.open_fd(path_value, write: write, nonblock: true) {
     Ok(fd) => {
       unix.close_fd(fd)?
+      fp"{runtime}/laputa-direct-opened".write(path_value.display())?
       return Err(SessionError.DeniedOpen(path_value.display()))
     },
     Err(error) => {
@@ -21,9 +22,11 @@ proc deny_open(path_value: Path) [fs, process, error] {
 }
 
 proc main() [fs, process, env, error] {
+  let account = user.lookup("laputa")?
+  let runtime = fp"/run/user/{account.uid}"
   let control = unix.open_fd(p"/dev/null", nonblock: true)?
   unix.close_fd(control)?
-  match deny_open(p"/dev/null") {
+  match deny_open(p"/dev/null", false, runtime) {
     Err(SessionError.DeniedOpen {device}) => {
       guard device == "/dev/null" else { fail "direct-open negative control returned the wrong path" }
     },
@@ -32,8 +35,7 @@ proc main() [fs, process, env, error] {
   }
   let identity = unix.id()?
   let status = p"/proc/self/status".read_text()?
-  let account = user.lookup("laputa")?
-  let runtime = fp"/run/user/{account.uid}"
+  fp"{runtime}/laputa-direct-opened".remove()?
   guard identity.uid == account.uid and identity.euid == account.uid else { fail "session is not running as laputa" }
   p"/dev/console".write(f"LAPUTA_TINYLAND_ID uid={identity.uid} euid={identity.euid} gid={identity.gid} egid={identity.egid}\n")?
   var cap_eff_seen = false
@@ -47,8 +49,8 @@ proc main() [fs, process, env, error] {
     }
   }
   guard cap_eff_seen else { fail "session capability state missing" }
-  deny_open(p"/dev/dri/card0")?
-  deny_open(p"/dev/input/event0")?
+  deny_open(p"/dev/dri/card0", true, runtime)?
+  deny_open(p"/dev/input/event0", false, runtime)?
   p"/dev/console".write("LAPUTA_TINYLAND_DIRECT_DENIED\n")?
   fp"{runtime}/laputa-direct-denied".write("denied\n")?
   match p"/dev/ptmx".metadata() {
