@@ -56,9 +56,10 @@ broker loss, device loss); 4 measured for the current closure.
   libgcc provider package, and doas-rs sets the same precedent.
 - The guest session runs as `laputa` via `su` + `/usr/bin/xsh`
   (`/usr/bin/xshi` is disabled in the guest). XDG_RUNTIME_DIR is
-  laputa-owned 0700; there is no working `chown` in the image, so the
-  session user creates its own runtime dir under a world-writable
-  `/run/user`, and the seat/tty group memberships live in baselayout.
+  created by root with the account's UID and GID and mode 0700 under a
+  root-owned 0755 `/run/user`. Existing entries with unexpected ownership,
+  type, or permissions are rejected. Seat/tty group memberships live in
+  baselayout.
 - The visual marker must spell SGR truecolor completely
   (`48;2;255;0;255`); a truncated sequence renders as plain text and the
   screenshot gate fails with zero magenta pixels.

@@ -163,38 +163,32 @@ proc main() [fs, process, time, error] {
       guest_fail("seatd-socket", "missing seatd socket")
     },
   }
-  if ! p"/run/user".exists() {
-    p"/run/user".mkdir()
-  }
-
-  p"/run/user".chmod(0o777)
-  p"/run/user/1000/laputa-foot-input.txt".remove()
-  p"/run/user/1000/laputa-foot-read-ready".remove()
-  p"/run/user/1000/laputa-direct-denied".remove()
-  p"/run/user/1000/laputa-tinyland.pid".remove()
+  let account = user.lookup("laputa")?
+  let runtime = fp"/run/user/{account.uid}"
   guest_run_required(
-    process.command_argv(
-      /usr/bin/su,
-      ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"],
-    ),
+    process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"]),
     "runtime-dir",
   )
+  fp"{runtime}/laputa-foot-input.txt".remove()
+  fp"{runtime}/laputa-foot-read-ready".remove()
+  fp"{runtime}/laputa-direct-denied".remove()
+  fp"{runtime}/laputa-tinyland.pid".remove()
   let session = spawn process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
 
-  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny", 30)
-  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot", 30)
+  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny", 30)
+  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot", 30)
   guest_tick("session-ready")
 
   # R3: compositor crash. SIGKILL tinyland mid-session: foot and the reader
   # die with it, the broker stays up, and a fresh session recovers without
   # touching the broker.
-  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid", 30)
+  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid", 30)
   guest_tick("crash-before-kill")
-  let tinyland_pid = p"/run/user/1000/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let tinyland_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
   guest_console(f"LAPUTA_TINYLAND_CRASH target={tinyland_pid}")
   process.kill(tinyland_pid, signal: "KILL")?
   match wait session {
@@ -207,17 +201,17 @@ proc main() [fs, process, time, error] {
     },
   }
   guest_tick("crash-reaped")
-  p"/run/user/1000/laputa-foot-read-ready".remove()
-  p"/run/user/1000/laputa-direct-denied".remove()
-  p"/run/user/1000/laputa-tinyland.pid".remove()
+  fp"{runtime}/laputa-foot-read-ready".remove()
+  fp"{runtime}/laputa-direct-denied".remove()
+  fp"{runtime}/laputa-tinyland.pid".remove()
   let session_crash = spawn process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
-  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid-crash-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny-crash-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot-crash-restart", 30)
   guest_tick("crash-recovered")
 
   # R3: supported device loss. Resolve the virtio keyboard's event node and
@@ -234,13 +228,13 @@ proc main() [fs, process, time, error] {
   guest_tick("unplugged")
   time.sleep(2s)
 
-  let survivor_pid = p"/run/user/1000/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
 
   if !guest_process_alive(survivor_pid)? {
     guest_fail("device-loss", "compositor died on single keyboard loss")
   }
 
-  if ! p"/run/user/1000/laputa-foot-read-ready".exists() {
+  if ! fp"{runtime}/laputa-foot-read-ready".exists() {
     guest_fail("device-loss", "foot reader died on single keyboard loss")
   }
 
@@ -261,10 +255,10 @@ proc main() [fs, process, time, error] {
   }
   guest_tick("broker-loss-reaped")
   let _ = wait seatd
-  p"/run/user/1000/laputa-foot-input.txt".remove()
-  p"/run/user/1000/laputa-foot-read-ready".remove()
-  p"/run/user/1000/laputa-direct-denied".remove()
-  p"/run/user/1000/laputa-tinyland.pid".remove()
+  fp"{runtime}/laputa-foot-input.txt".remove()
+  fp"{runtime}/laputa-foot-read-ready".remove()
+  fp"{runtime}/laputa-direct-denied".remove()
+  fp"{runtime}/laputa-tinyland.pid".remove()
   let seatd_restarted = spawn process.command_argv(
     /usr/bin/seatd,
     ["seatd", "-g", "seat"],
@@ -277,14 +271,14 @@ proc main() [fs, process, time, error] {
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
-  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid-broker-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny-broker-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-broker-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid-broker-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny-broker-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot-broker-restart", 30)
   guest_tick("broker-recovered")
 
   guest_console("LAPUTA_TINYLAND_FOOT_PROOF_READY")
-  guest_wait_for(/run/user/1000/laputa-foot-input.txt, "input", 90)
-  let input = p"/run/user/1000/laputa-foot-input.txt".read_text()?.trim()
+  guest_wait_for(fp"{runtime}/laputa-foot-input.txt", "input", 90)
+  let input = fp"{runtime}/laputa-foot-input.txt".read_text()?.trim()
   if input != "laputa" {
     guest_fail("input", f"expected laputa, got {input}")
   }

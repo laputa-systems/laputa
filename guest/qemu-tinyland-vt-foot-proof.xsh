@@ -108,40 +108,34 @@ proc main() [fs, process, time, error] {
       guest_fail("seatd-socket", "missing seatd socket")
     },
   }
-  if ! p"/run/user".exists() {
-    p"/run/user".mkdir()
-  }
-
-  p"/run/user".chmod(0o777)
-  p"/run/user/1000/laputa-foot-input.txt".remove()
-  p"/run/user/1000/laputa-foot-read-ready".remove()
-  p"/run/user/1000/laputa-direct-denied".remove()
-  p"/run/user/1000/laputa-tinyland.pid".remove()
-  p"/run/user/1000/laputa-seat-disabled".remove()
-  p"/run/user/1000/laputa-seat-enabled".remove()
+  let account = user.lookup("laputa")?
+  let runtime = fp"/run/user/{account.uid}"
   guest_run_required(
-    process.command_argv(
-      /usr/bin/su,
-      ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"],
-    ),
+    process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/tinyland-runtime-setup.xsh"]),
     "runtime-dir",
   )
+  fp"{runtime}/laputa-foot-input.txt".remove()
+  fp"{runtime}/laputa-foot-read-ready".remove()
+  fp"{runtime}/laputa-direct-denied".remove()
+  fp"{runtime}/laputa-tinyland.pid".remove()
+  fp"{runtime}/laputa-seat-disabled".remove()
+  fp"{runtime}/laputa-seat-enabled".remove()
   let session = spawn process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
 
-  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny", 30)
-  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot", 30)
+  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny", 30)
+  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot", 30)
   guest_tick("session-ready")
 
   # Compositor crash sanity: SIGKILL tinyland mid-session; foot and the
   # reader die with it, the broker stays up, and a fresh session recovers
   # without touching the broker.
-  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid", 30)
+  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid", 30)
   guest_tick("crash-before-kill")
-  let tinyland_pid = p"/run/user/1000/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let tinyland_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
   guest_console(f"LAPUTA_TINYLAND_CRASH target={tinyland_pid}")
   process.kill(tinyland_pid, signal: "KILL")?
   match wait session {
@@ -154,19 +148,19 @@ proc main() [fs, process, time, error] {
     },
   }
   guest_tick("crash-reaped")
-  p"/run/user/1000/laputa-foot-read-ready".remove()
-  p"/run/user/1000/laputa-direct-denied".remove()
-  p"/run/user/1000/laputa-tinyland.pid".remove()
-  p"/run/user/1000/laputa-seat-disabled".remove()
-  p"/run/user/1000/laputa-seat-enabled".remove()
+  fp"{runtime}/laputa-foot-read-ready".remove()
+  fp"{runtime}/laputa-direct-denied".remove()
+  fp"{runtime}/laputa-tinyland.pid".remove()
+  fp"{runtime}/laputa-seat-disabled".remove()
+  fp"{runtime}/laputa-seat-enabled".remove()
   let session_vt = spawn process.command_argv(
     /usr/bin/su,
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
   )?
-  guest_wait_for(/run/user/1000/laputa-tinyland.pid, "tinyland-pid-crash-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny-crash-restart", 30)
-  guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-tinyland.pid", "tinyland-pid-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-direct-denied", "direct-deny-crash-restart", 30)
+  guest_wait_for(fp"{runtime}/laputa-foot-read-ready", "foot-crash-restart", 30)
   guest_tick("crash-recovered")
 
   # R4: VT switch away. The host sends Ctrl+Alt+F2; the VT-bound seat
@@ -175,9 +169,9 @@ proc main() [fs, process, time, error] {
   # switch without disable.
   guest_console("LAPUTA_TINYLAND_VT_SWITCH_AWAY")
   var vt_elapsed = 0
-  while ! p"/run/user/1000/laputa-seat-disabled".exists() {
+  while ! fp"{runtime}/laputa-seat-disabled".exists() {
     if vt_elapsed >= 30 {
-      guest_fail("vt-disable", "missing /run/user/1000/laputa-seat-disabled")
+      guest_fail("vt-disable", "missing runtime seat-disabled marker")
     }
 
     if vt_elapsed % 5 == 0 {
@@ -196,9 +190,9 @@ proc main() [fs, process, time, error] {
   # devices and resumes with no stuck modifiers and no revoked descriptors.
   guest_console("LAPUTA_TINYLAND_VT_SWITCH_BACK")
   var vt_back_elapsed = 0
-  while ! p"/run/user/1000/laputa-seat-enabled".exists() {
+  while ! fp"{runtime}/laputa-seat-enabled".exists() {
     if vt_back_elapsed >= 30 {
-      guest_fail("vt-resume", "missing /run/user/1000/laputa-seat-enabled")
+      guest_fail("vt-resume", "missing runtime seat-enabled marker")
     }
 
     if vt_back_elapsed % 5 == 0 {
@@ -214,8 +208,8 @@ proc main() [fs, process, time, error] {
   guest_tick("vt-resumed")
 
   guest_console("LAPUTA_TINYLAND_VT_FOOT_PROOF_READY")
-  guest_wait_for(/run/user/1000/laputa-foot-input.txt, "input", 90)
-  let input = p"/run/user/1000/laputa-foot-input.txt".read_text()?.trim()
+  guest_wait_for(fp"{runtime}/laputa-foot-input.txt", "input", 90)
+  let input = fp"{runtime}/laputa-foot-input.txt".read_text()?.trim()
   if input != "laputa" {
     guest_fail("input", f"expected laputa, got {input}")
   }

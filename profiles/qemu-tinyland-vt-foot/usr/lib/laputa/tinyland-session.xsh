@@ -33,6 +33,7 @@ proc main() [fs, process, env, error] {
   let identity = unix.id()?
   let status = p"/proc/self/status".read_text()?
   let account = user.lookup("laputa")?
+  let runtime = fp"/run/user/{account.uid}"
   guard identity.uid == account.uid and identity.euid == account.uid else { fail "session is not running as laputa" }
   p"/dev/console".write(f"LAPUTA_TINYLAND_ID uid={identity.uid} euid={identity.euid} gid={identity.gid} egid={identity.egid}\n")?
   var cap_eff_seen = false
@@ -49,7 +50,7 @@ proc main() [fs, process, env, error] {
   deny_open(p"/dev/dri/card0")?
   deny_open(p"/dev/input/event0")?
   p"/dev/console".write("LAPUTA_TINYLAND_DIRECT_DENIED\n")?
-  p"/run/user/1000/laputa-direct-denied".write("denied\n")?
+  fp"{runtime}/laputa-direct-denied".write("denied\n")?
   match p"/dev/ptmx".metadata() {
     Ok(meta) => {
       p"/dev/console".write(f"LAPUTA_TINYLAND_PTMX mode={meta.mode % 4096}\n")?
@@ -60,7 +61,7 @@ proc main() [fs, process, env, error] {
   }
   env ({
     PATH: "/usr/local/bin:/usr/bin:/bin",
-    XDG_RUNTIME_DIR: "/run/user/1000",
+    XDG_RUNTIME_DIR: runtime.display(),
     LIBSEAT_BACKEND: "seatd",
     SEATD_SOCK: "/run/seatd.sock",
   }) {
@@ -68,7 +69,7 @@ proc main() [fs, process, env, error] {
       /usr/bin/tinyland,
       ["tinyland", "--seat", "--", "/usr/bin/foot", "--", "/bin/xsh", "/usr/lib/laputa/tinyland-foot-read.xsh"],
     )?
-    p"/run/user/1000/laputa-tinyland.pid".write(f"{session.pid}")
+    fp"{runtime}/laputa-tinyland.pid".write(f"{session.pid}")
     let _ = wait session
   }
 }
