@@ -1,5 +1,6 @@
 ##! End-to-end signed trust update: verification matrix, atomic activation,
 ##! recovery, concurrency, and CLI behavior on disposable system roots.
+use trust.release as trust_release
 use trust.store as trust_store
 use trust.update as trust_update
 
@@ -200,8 +201,23 @@ test trust_update_rejects_expired_and_overlong_releases [fs, process, time, erro
   let expired = stage_release(ctx, "trust-update-expired", "release-expired")?
   expect_rejected(trust_update.trust_update_from_dir(root, expired), "has expired", root, "1", "expired")
 
-  let far = stage_release(ctx, "trust-update-far", "release-too-far")?
-  expect_rejected(trust_update.trust_update_from_dir(root, far), "90-day", root, "1", "too-far")
+  let far = fixture("release-too-far")
+  let metadata = fp"{far}/metadata".read_bytes()?
+  let expiry = trust_release.release_parse_metadata(metadata)?.expires_at
+  let input = {
+    metadata,
+    signature: fp"{far}/metadata.sig".read_bytes()?,
+    provisioned_public_key: key_bytes("signing-key")?,
+    root_bundle: fp"{far}/ca-certificates.crt".read_bytes()?,
+    next_policy: fp"{far}/trust-policy".read_bytes()?,
+    installed_policy_snapshot: fp"{root}/usr/share/laputa/trust/seed/trust-policy".read_bytes()?,
+    now_epoch_seconds: expiry - 7776001,
+  }
+  match trust_release.release_verify(input) {
+    Ok(_) => test.fail("overlong signed release was accepted"),
+    Err(problem) => assert "90-day" in problem.message
+  }
+  let _ = trust_release.release_verify({...input, now_epoch_seconds: expiry - 7776000})?
 }
 
 test trust_update_rejects_unparseable_seed_bundle [fs, process, time, error] { |ctx|
