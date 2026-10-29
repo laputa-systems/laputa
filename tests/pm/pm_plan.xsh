@@ -140,6 +140,11 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
   fp"{tool}/target/debug/build/tool".mkdir(parents: true)?
   fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")?
   test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
+  fp"{tool}/.work/tmp".mkdir(parents: true)?
+  fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")?
+  test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
+  fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")?
+  assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? != before
 }
 
 test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, error] { |ctx|
