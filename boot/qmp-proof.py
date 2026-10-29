@@ -78,6 +78,9 @@ def send_qmp_key(sock, qcode):
 
 def with_qmp(sock_path, callback):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        # No QMP call may block forever: a silent socket must fail fast so
+        # the supervisor reports instead of hanging past its proof timeout.
+        sock.settimeout(60)
         sock.connect(sock_path)
         qmp_read(sock)
         qmp_cmd(sock, "qmp_capabilities")
