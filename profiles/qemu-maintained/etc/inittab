@@ -1,0 +1,5 @@
+::sysinit:/usr/lib/init/rc.boot
+ttyS0::respawn:/usr/bin/xinit scan boot
+::once:/usr/bin/xsh /usr/lib/laputa/qemu-maintained-proof.xsh
+::restart:/usr/bin/xinit /etc/inittab
+::shutdown:/usr/lib/init/rc.shutdown

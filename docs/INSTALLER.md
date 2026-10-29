@@ -131,3 +131,18 @@ detected memory and fails if the disk is too small.
 - The CI test reads console markers written to `ttyAMA0` or `ttyS0`, whichever
   exists, so it does not depend on the kernel's default console. There is no
   richer guest-control protocol.
+
+## Detached rescue guest proof
+
+On 2026-10-29, a disposable Linux x86_64/KVM rescue image composed from the
+maintained system image and packaged e2fsprogs ran `guest/rescue-proof.xsh`.
+Its root was read-only, its console was serial, and QEMU had no network device.
+Three detached 32-MiB ext filesystems returned 0 (clean), 1 (a deliberately
+incorrect superblock free-block count repaired), and 8 (destroyed superblock
+magic, unrecoverable with preen). The repaired filesystem was then mounted
+read-only and its payload SHA-256 matched
+`9bb5b5c962e4845752dfcfb930bfcf351919828bd7713e220d48ad6df5c88081`.
+The fixture payload is exactly `laputa rescue payload` followed by a newline.
+No writable-mounted filesystem was repaired. The owned QEMU process was reaped.
+This proves the detached rescue path for these fixtures, not arbitrary damage
+recovery or the R3 acceptance milestone as a whole.

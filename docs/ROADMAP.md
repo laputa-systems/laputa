@@ -452,7 +452,10 @@ pending boot, health confirmation, and fallback after two failed attempts.
 pending generation after its image files exist, and the fallback after two
 attempts. A QEMU boot-command test checks that a boot with no record is unchanged
 and a pending boot uses its image and counts one attempt. The launcher does not
-confirm health. No guest reboot has been run.
+confirm health. A Linux x86_64/KVM maintained guest has now booted pending B
+twice across a PID-1-requested reboot with unchanged identity/account files.
+This does not prove the health commit, tampered-image rejection, or failed-boot
+fallback acceptance above.
 
 ## R6: Separate disposable development from long-lived VM policy
 

@@ -147,3 +147,32 @@ socket gap is connection setup: AF_UNIX socket creation and connect are exposed
 under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
 opens files and does not connect to socket paths. LAP-35 therefore still needs
 a portable, bounded Unix-stream connection boundary to preserve the macOS path.
+
+## Maintained VM qualification
+
+The x86_64 `qemu-maintained` overlay starts one `xinit scan boot` under PID 1
+and routes scanner diagnostics to ttyS0. Build it with `laputa.xsh -- build
+qemu-maintained`. Provision a disposable copy of its disk with
+`system.first_boot.apply` before launching it; image builds carry no operator
+keys or machine host key.
+
+`guest/qemu-maintained-proof.xsh` runs only when the kernel command line includes
+`LAPUTA_MAINTAINED_PROOF_FLAG=1`. It waits for the persistent Dropbear key and
+running service, saves seven identity/account file hashes, and sends TERM to
+PID 1 to request a real reboot. A second boot compares the hashes and emits
+`LAPUTA_MAINTAINED_PROOF_OK`. Use a writable disposable disk across both boots:
+the normal per-process QEMU snapshot would discard the first boot's writes.
+With the normal `-no-reboot` argument, relaunch after QEMU exits for the guest
+reboot. The launcher counts both pending boots; the proof does not confirm
+activation health.
+
+Adding `LAPUTA_FIREWALL_FAILURE_PROOF=1` selects the negative fixture check:
+remove or invalidate the ruleset on a fresh disposable disk, observe firewall
+startup failure on serial, and require the Dropbear PID to remain absent.
+The guest emits `LAPUTA_FIREWALL_FAILURE_PROOF_OK` and requests poweroff.
+
+On 2026-10-29, the packaged maintained image passed both boots under Linux
+x86_64/KVM, and fresh missing/rejected-ruleset guests both kept the listener
+down. All owned QEMU PIDs were reaped. This evidence does not qualify a remote
+SSH client, DHCP lease lifecycle, first-boot crash atomicity, guest receipt
+reporting, activation health confirmation, or real failed-boot fallback.
