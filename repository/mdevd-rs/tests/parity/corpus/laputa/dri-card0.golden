@@ -1,0 +1,4 @@
+dry run: mkdir dri
+dry run: mknod dri/card0 c 226 0
+dry run: chmod 660 dri/card0
+dry run: chown 0:27 dri/card0

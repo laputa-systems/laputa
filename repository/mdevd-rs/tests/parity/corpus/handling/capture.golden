@@ -1,0 +1,4 @@
+dry run: mkdir nested
+dry run: mkdir nested/dev
+dry run: mknod nested/dev/my-% c 1 2
+dry run: chmod 644 nested/dev/my-%

@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=drm
+DEVNAME=dri/card0
+MAJOR=226
+MINOR=0

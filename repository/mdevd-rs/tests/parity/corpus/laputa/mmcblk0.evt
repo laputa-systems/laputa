@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=block
+DEVNAME=mmcblk0
+MAJOR=179
+MINOR=0

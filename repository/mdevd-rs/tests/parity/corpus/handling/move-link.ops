@@ -1,0 +1,4 @@
+subdirs:disk/sda
+mknod:disk/sda:660:b:8:0->Created
+chown:disk/sda:0:6
+symlink:disk/sda->sda

@@ -1,0 +1,5 @@
+dry run: mkdir disk
+dry run: mknod disk/mmcblk0 b 179 0
+dry run: chmod 660 disk/mmcblk0
+dry run: chown 0:6 disk/mmcblk0
+dry run: symlink disk/mmcblk0 to mmcblk0

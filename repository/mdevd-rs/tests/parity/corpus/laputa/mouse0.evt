@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=input
+DEVNAME=mouse0
+MAJOR=13
+MINOR=32

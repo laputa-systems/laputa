@@ -1,0 +1,3 @@
+subdirs:disk/sda
+mknod:disk/sda:640:b:8:0->Created
+chown:disk/sda:1000:100

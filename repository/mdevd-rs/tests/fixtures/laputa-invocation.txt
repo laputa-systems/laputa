@@ -1,0 +1,12 @@
+# Provenance (read-only, 2026-10-28):
+# - Laputa xinit service: laputa/packages/mdevd/service.xsh
+# - Laputa qemu-dwl-foot boot hook: laputa/profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot
+# Canonical daemon invocation under test:
+#   mdevd -O 4 -f /etc/mdev.conf -C
+# with PATH=/usr/local/bin:/usr/bin:/bin, restart always.
+# Serial coldplug step after daemon start:
+#   mdevd-coldplug -O 4
+# Proves: the exact Laputa argv shape must be accepted with identical semantics.
+# Does not prove: guest-boot end-to-end (needs a KVM guest; see docs/testing.md).
+mdevd -O 4 -f /etc/mdev.conf -C
+mdevd-coldplug -O 4

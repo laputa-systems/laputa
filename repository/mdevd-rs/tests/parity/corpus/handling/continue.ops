@@ -1,0 +1,3 @@
+mknod:mydev:600:c:1:2->Created
+mknod:mydev:640:c:1:2->Created
+chown:mydev:1000:100

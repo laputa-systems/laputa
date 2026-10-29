@@ -1,0 +1,15 @@
+# Pinned sources. Re-verify the live one with tools/check-pins.sh --live.
+mdevd-rs base (== origin/main HEAD at preflight): eac18f5
+libudev-zero fork master HEAD: 8f1d3d0624496f1c4967f18d6afaddbd552d8bce
+upstream mdevd release (this package): 0.1.8.3 (package/info)
+Laputa-vendored mdevd: 0.1.8.2 with skalibs 2.15.1.0 (laputa/packages/mdevd/PKGBUILD.xsh)
+
+# Fixture provenance (all sources read-only; do not modify upstream copies):
+# - tests/fixtures/laputa-mdev.conf <- laputa/packages/baselayout/files/rootfs/etc/mdev.conf
+#   Proves Laputa's live ruleset. Does not prove upstream-C byte behavior.
+# - tests/fixtures/laputa-invocation.txt <- service.xsh + qemu-dwl-foot boot hook
+#   Proves the canonical argv shape. Does not prove guest boot (needs VM).
+# - tests/fixtures/hook-mdev.conf: synthetic; proves hook rejection, nothing else.
+# - tests/fixtures/bad-mdev.conf: synthetic; proves syntax-error exit, nothing else.
+# (No C sources are vendored or built; behavior is pinned by committed
+# goldens and the guest proofs.)

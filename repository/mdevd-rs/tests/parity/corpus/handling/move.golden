@@ -1,0 +1,4 @@
+dry run: mkdir disk
+dry run: mknod disk/sda b 8 0
+dry run: chmod 640 disk/sda
+dry run: chown 1000:100 disk/sda

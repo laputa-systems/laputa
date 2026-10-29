@@ -1,0 +1,6 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=block
+DEVNAME=nvme0n1
+MAJOR=259
+MINOR=0

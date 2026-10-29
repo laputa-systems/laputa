@@ -1,0 +1,19 @@
+PAT a1
+PAT a2
+PAT a3
+PAT a4
+PAT a5
+PAT a6
+rule 0 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=1
+  cmd mask=1 excl=0 echo a
+rule 1 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=2
+  cmd mask=2 excl=0 echo r
+rule 2 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=3
+  cmd mask=3 excl=0 echo any
+rule 3 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=1
+  cmd mask=1 excl=1 echo a
+rule 4 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=2
+  cmd mask=2 excl=1 echo r
+rule 5 dev=2 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=3
+  cmd mask=3 excl=1 echo any
+rule 6 dev=1 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=0

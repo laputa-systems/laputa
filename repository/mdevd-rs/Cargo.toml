@@ -1,0 +1,38 @@
+[package]
+name = "mdevd"
+version = "0.1.0"
+edition = "2021"
+description = "Rust replacement for mdevd and mdevd-coldplug"
+license = "ISC"
+
+[lib]
+name = "mdevd"
+path = "src/lib.rs"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
+[dependencies]
+libc = "0.2"
+
+[[bin]]
+name = "mdevd"
+path = "src/bin/mdevd.rs"
+
+[[bin]]
+name = "mdevd-coldplug"
+path = "src/bin/mdevd-coldplug.rs"
+
+[[bench]]
+name = "parse"
+harness = true
+
+[[bench]]
+name = "handle"
+harness = true
+
+[[bench]]
+name = "storm"
+harness = false

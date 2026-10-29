@@ -1,0 +1,2 @@
+dry run: mknod mydev c 1 5
+dry run: chmod 600 mydev

@@ -1,0 +1,2 @@
+rule 0 dev=3 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=0 maj=10 lo=20 hi=20
+rule 1 dev=1 envbase=0 envlen=0 cont=0 uid=0 gid=0 mode=660 move=0 cmd=0

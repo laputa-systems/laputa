@@ -1,0 +1,8 @@
+ACTION=add
+DEVPATH=/devices/x
+SUBSYSTEM=test
+DEVNAME=mydev
+MAJOR=1
+MINOR=2
+B=2
+C=3

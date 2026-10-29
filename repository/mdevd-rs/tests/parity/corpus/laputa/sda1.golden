@@ -1,0 +1,5 @@
+dry run: mkdir disk
+dry run: mknod disk/sda1 b 8 1
+dry run: chmod 660 disk/sda1
+dry run: chown 0:6 disk/sda1
+dry run: symlink disk/sda1 to sda1

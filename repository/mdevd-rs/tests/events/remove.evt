@@ -1,0 +1,6 @@
+ACTION=remove
+DEVPATH=/devices/x
+SUBSYSTEM=test
+DEVNAME=mydev
+MAJOR=1
+MINOR=2
