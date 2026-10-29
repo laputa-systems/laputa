@@ -53,7 +53,12 @@ proc main() [fs, process, env, error] {
   }
   guard cap_eff_seen else { fail "session capability state missing" }
   deny_open(p"/dev/dri/card0", true, runtime)?
-  deny_open(p"/dev/input/event0", false, runtime)?
+  var input_count = 0
+  for device in g"/dev/input/event*" {
+    deny_open(device, false, runtime)?
+    input_count += 1
+  }
+  guard input_count > 0 else { fail "no input devices available for mediation proof" }
   p"/dev/console".write("LAPUTA_TINYLAND_DIRECT_DENIED\n")?
   fp"{runtime}/laputa-direct-denied".write("denied\n")?
   match p"/dev/ptmx".metadata() {
