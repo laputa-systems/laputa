@@ -94,7 +94,7 @@ proc execute_compose_root(target: types.Target, root: Path, artifacts: List[type
 
   for receipt in artifacts {
     if receipt.key in payload_keys {
-      archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", root, 0, "auto", true)
+      archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", root, .Tar, collision: .Replace, modes: .Exact)
     }
   }
 }
@@ -199,7 +199,7 @@ proc execute_run_proof(
   let root_handle = fs.tempdir()?
   let proof_root = fp"{root_handle.host_path()?}/proof-root"
   execute_compose_root(context.plan.target, proof_root, proof_artifacts)
-  archive.tar_extract(payload, proof_root, 0, "auto", true)
+  archive.extract(payload, proof_root, .Tar, collision: .Replace, modes: .Exact)
   env ({
     XSH_PM_TARGET_ARCH: types.pm_target_arch(context.plan.target),
   }) {

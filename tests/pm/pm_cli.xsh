@@ -136,7 +136,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   kernel.parent.mkdir()
   kernel.write("kernel payload\n")
   let payload = fp"{stage}/payload.tar.gz"
-  archive.tar_create(payload, contents, [p"."], compression: "gz")
+  archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   let metadata = fp"{stage}/metadata.json"
   json.write(
     metadata,

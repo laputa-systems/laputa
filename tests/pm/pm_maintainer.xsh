@@ -30,7 +30,7 @@ proc maintainer_artifact(ctx: TestContext, value: types.BuildPlan, metadata_name
   fp"{contents}/usr/new".write("new output\n")
   if inventory == "extra" { fp"{contents}/usr/extra".write("extra\n") }
   let payload = fp"{stage}/payload.tar.gz"
-  archive.tar_create(payload, contents, [p"."], compression: "gz")
+  archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   let metadata = fp"{stage}/metadata.json"
   let node = value.nodes[0]
   json.write(metadata, {

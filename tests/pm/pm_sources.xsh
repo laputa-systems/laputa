@@ -57,7 +57,7 @@ proc demo_tarball(ctx: TestContext, name: Str, text = "hello from the cache\n") 
   fp"{tree}/demo-1.0".mkdir()
   fp"{tree}/demo-1.0/hello.txt".write(text)
   let tarball = test.temp_path(ctx, name: f"{name}.tar.gz")
-  archive.tar_create(tarball, tree, [p"demo-1.0"])
+  archive.create(tarball, tree, [p"demo-1.0"], .Tar)
   {path: tarball, sha256: hash.sha256(tarball)?.hex()}
 }
 
@@ -363,7 +363,7 @@ proc demo_crate(ctx: TestContext, name: Str, version: Str) -> Result[DemoCrate] 
   fp"{tree}/{name}-{version}/Cargo.toml".write(f"[package]\nname = \"{name}\"\nversion = \"{version}\"\n")
   fp"{tree}/{name}-{version}/src/lib.rs".write("")
   let tarball = test.temp_path(ctx, name: f"{name}-{version}.tar.gz")
-  archive.tar_create(tarball, tree, [fp"{name}-{version}"])
+  archive.create(tarball, tree, [fp"{name}-{version}"], .Tar)
   {item: {name, version, checksum: hash.sha256(tarball)?.hex()}, path: tarball}
 }
 

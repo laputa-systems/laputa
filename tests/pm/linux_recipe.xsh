@@ -246,7 +246,7 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
     test.fail("baselayout prepared payload is missing dev")
   }
 
-  archive.tar_extract(archive_path, extracted)
+  archive.extract(archive_path, extracted, .Tar)
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     if ! fp"{extracted}/{required}".exists() {

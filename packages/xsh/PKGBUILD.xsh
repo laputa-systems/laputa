@@ -184,7 +184,7 @@ export proc build(dest: Path) [fs, env, error] {
 
   let core = fp"{dest}/usr/lib/xsh/core"
   core.parent.mkdir()
-  archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
+  archive.extract(fp"{seed}/core.tar.xz", core.parent, .Tar, compression: .Xz, collision: .Replace)
   let command_links = [item.path.display() for item in filetree if item.kind == "symlink"]
 
   for entry in fs.children(core)? |> where .kind == "file" {

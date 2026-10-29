@@ -274,7 +274,7 @@ proc xsh_seed_write_core(xsh_root: Path, sources: List[Path], archive_path: Path
     }
 
     atomically replace archive_path as temporary {
-      archive.tar_create(temporary, stage, entries, "xz", true)
+      archive.create(temporary, stage, entries, .Tar, compression: .Xz, collision: .Replace)
     }
   }
 }
@@ -350,7 +350,7 @@ export proc xsh_seed_build(
   }
 
   if ! core_tree.exists() {
-    archive.tar_extract(core_archive, out, 0, "xz", true)
+    archive.extract(core_archive, out, .Tar, compression: .Xz, collision: .Replace)
   }
 
   var files: Map[Str] = {product: hash.sha256(fp"{out}/{product}")?.hex() for product in xsh_seed_binaries}

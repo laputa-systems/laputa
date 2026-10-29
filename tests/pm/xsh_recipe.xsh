@@ -12,7 +12,7 @@ test xsh_seed_installs_declared_applet_links_and_keeps_libraries_private [fs, en
   }
   fp"{core_tree}/lib/identity.xsh".write("const fixture = true\n")
   seed.mkdir()
-  archive.tar_create(fp"{seed}/core.tar.xz", fp"{workspace}/archive", [p"core"], compression: "xz")
+  archive.create(fp"{seed}/core.tar.xz", fp"{workspace}/archive", [p"core"], .Tar, compression: .Xz)
 
   for binary in ["xsh", "xshi", "xsht"] {
     fp"{seed}/{binary}".write(f"fixture {binary}\n", mode: 0o755)

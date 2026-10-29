@@ -61,7 +61,7 @@ proc main() [fs, error] {
       extract_install: true,
     })?,
   )?
-  archive.tar_create(payload, contents, [p"."], compression: "gz")?
+  archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)?
   proof.write("published proof\n")?
   let node: types.PlanNode = {
     name: "demo",
@@ -97,7 +97,7 @@ proc main() [fs, error] {
   fp"{shared_alpha_contents}/usr".chmod(0o755)?
   fp"{shared_alpha_contents}/usr/share".chmod(0o755)?
   fp"{shared_alpha_contents}/usr/share/alpha".write("alpha\n")?
-  archive.tar_create(shared_alpha_payload, shared_alpha_contents, [p"."], compression: "gz")?
+  archive.create(shared_alpha_payload, shared_alpha_contents, [p"."], .Tar, compression: .Gzip)?
   shared_alpha_metadata.write(
     json.encode({
       name: "shared-alpha",
@@ -143,7 +143,7 @@ proc main() [fs, error] {
   fp"{shared_beta_contents}/usr".chmod(0o755)?
   fp"{shared_beta_contents}/usr/share".chmod(0o755)?
   fp"{shared_beta_contents}/usr/share/beta".write("beta\n")?
-  archive.tar_create(shared_beta_payload, shared_beta_contents, [p"."], compression: "gz")?
+  archive.create(shared_beta_payload, shared_beta_contents, [p"."], .Tar, compression: .Gzip)?
   shared_beta_metadata.write(
     json.encode({
       name: "shared-beta",

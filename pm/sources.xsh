@@ -308,7 +308,7 @@ proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) {
   for entry in crates {
     let dir = fp"{dest}/{entry.item.name}-{entry.item.version}"
     # crates.io packs every crate under one `NAME-VERSION/` directory.
-    archive.tar_extract(entry.path, dir, 1, "auto", true)
+    archive.extract(entry.path, dir, .Tar, strip_components: 1, collision: .Replace)
     json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: entry.item.checksum})
   }
 }
@@ -334,7 +334,7 @@ pure first_archive_path_component(path_value: Path) -> Str {
 
 ## Exported PM declaration `tar_source_strip_components`.
 export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result[Int, Error] {
-  let entries = archive.tar_list(source_path)?
+  let entries = archive.list(source_path, .Tar)?
   var first = ""
   var saw_entry = false
 
@@ -404,21 +404,21 @@ proc stage_resolved_source(
   )) {
     dest.remove()
     dest.parent.mkdir()
-    archive.tar_extract(source_path, dest, tar_source_strip_components(source_path)?, "auto", true)
+    archive.extract(source_path, dest, .Tar, strip_components: tar_source_strip_components(source_path)?, collision: .Replace)
     return
   }
 
   if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(name)) {
     dest.remove()
     dest.parent.mkdir()
-    archive.zip_extract(source_path, dest, overwrite: true)
+    archive.extract(source_path, dest, .Zip, collision: .Replace)
     return
   }
 
   if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(name)) {
     dest.remove()
     dest.parent.mkdir()
-    archive.cpio_extract(source_path, dest, overwrite: true)
+    archive.extract(source_path, dest, .Cpio, collision: .Replace)
     return
   }
 

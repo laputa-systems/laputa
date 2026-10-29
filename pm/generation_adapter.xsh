@@ -202,7 +202,7 @@ export proc generation_adapter_copy_manifest_file(
   let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(GenerationAdapterMetadataDto)?
   let manifest = generation_adapter_manifest_file(metadata, package_name, relative_path)?
   tempdir extracted {
-    archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, 0, "auto", true)
+    archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, collision: .Replace, modes: .Exact)
     let source = fp"{extracted}/{relative_path}"
 
     if ! source.exists() or ! source.is_file() {

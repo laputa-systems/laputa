@@ -66,7 +66,7 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
     let path_value = fp"{contents}/usr/share/{node.name}"
     path_value.parent.mkdir()
     path_value.write(f"payload {node.name}\n")
-    archive.tar_create(payload, contents, [p"."], compression: "gz")
+    archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
     json.write(
       metadata,
       {
@@ -107,7 +107,7 @@ proc stage_generation_baselayout_artifact(ctx: TestContext, value: types.BuildPl
   let init_directory = fp"{contents}/usr/lib/init/rc.d"
   init_directory.mkdir()
   init_directory.chmod(0o755)
-  archive.tar_create(payload, contents, [p"."], compression: "gz")
+  archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   json.write(
     metadata,
     {

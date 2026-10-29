@@ -192,6 +192,6 @@ export proc build(dest: Path) [fs, error] {
     fp"{early}/kernel/x86/microcode".mkdir()
     fp"{early}/kernel/x86/microcode/AuthenticAMD.bin".write(bytes.concat(containers))
     fp"{dest}/boot".mkdir()
-    archive.cpio_create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], overwrite: true)
+    archive.create(fp"{dest}/boot/amd-ucode.img", early, [p"kernel"], .Cpio, collision: .Replace)
   }
 }

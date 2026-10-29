@@ -42,11 +42,11 @@ proc main(root = /rootfs) [fs, error] {
   let magic = bytes.read_at(image, 0, 6)?
   proof.ensure(magic == bytes.from_text("070701"), "amd-ucode", "amd-ucode.img is not an uncompressed newc cpio")
 
-  var members = [entry.path.display() for entry in archive.cpio_list(image)?]
+  var members = [entry.path.display() for entry in archive.list(image, .Cpio)?]
   proof.ensure(early_member in members, "amd-ucode", f"amd-ucode.img lacks {early_member}: {members.join(", ")}")
 
   tempdir extracted {
-    archive.cpio_extract(image, extracted)
+    archive.extract(image, extracted, .Cpio)
     let early = fp"{extracted}/{early_member}"
     ensure_sha256(early, early_sha256)
     proof.ensure(

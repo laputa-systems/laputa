@@ -40,6 +40,6 @@ test test_build_prepared_archives_every_empty_directory_recorded_in_metadata [fs
   let built = local.load_built_package_from_dest(pkg, "recipe-empty-parent-1.0.0-1", payload, dest)?
 
   assert "usr/share" in [entry.path for entry in built.metadata_files]
-  archive.tar_extract(payload, extracted)
+  archive.extract(payload, extracted, .Tar)
   assert fp"{extracted}/usr/share".is_dir()?
 }

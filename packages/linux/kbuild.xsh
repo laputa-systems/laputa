@@ -5124,7 +5124,7 @@ proc build_x86_compressed_kernel(cc: Path, unstripped: Path, vmlinux: Path, efi_
   let boot_vmlinux_bin = p"arch/x86/boot/vmlinux.bin"
   make.run_tasks([x86_compressed_vmlinux_bin_task(objcopy, vmlinux, kernel_bin)], 1)
   append_x86_relocs(relocs, vmlinux, kernel_all)
-  archive.compress(kernel_all, kernel_gz, format: "gzip", level: 9, overwrite: true)
+  archive.compress(kernel_all, kernel_gz, format: .Gzip, level: 9, collision: .Replace)
   run $cc "-O2" "-std=gnu11" "-Wall" "-I./tools/include" "-o" $mkpiggy "arch/x86/boot/compressed/mkpiggy.c"
   let piggy_text = run.text $mkpiggy $kernel_gz
   write_text_if_changed(piggy_s, piggy_text)

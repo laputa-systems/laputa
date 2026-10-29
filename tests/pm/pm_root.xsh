@@ -68,7 +68,7 @@ proc stage_artifact(
   if kind == .Meta {
     payload.write("metapackages have no root payload")
   } else {
-    archive.tar_create(payload, contents, [p"."], compression: "gz")
+    archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   }
 
   metadata.write(
@@ -173,7 +173,7 @@ proc rewrite_legacy_database_payload(
     fp"{database}/unexpected.json".write("not a known legacy package database record", mode: 0o644)
   }
 
-  archive.tar_create(staged.payload, contents, [p"."], compression: "gz", overwrite: true)
+  archive.create(staged.payload, contents, [p"."], .Tar, compression: .Gzip, collision: .Replace)
 }
 
 proc commit_artifact(
@@ -329,7 +329,7 @@ test test_root_rejects_cyclic_payload_link_that_differs_from_receipt [fs, error]
   let payload_root = test.temp_dir(ctx, name: "root-symlink-loop-payload")?
   fp"{payload_root}/usr/lib".mkdir()
   fp"{payload_root}/usr/lib/link".symlink(to: p"link")
-  archive.tar_create(prepared.staged.payload, payload_root, [p"."], compression: "gz", overwrite: true)
+  archive.create(prepared.staged.payload, payload_root, [p"."], .Tar, compression: .Gzip, collision: .Replace)
   let receipt = store.commit(types.target_aarch64(), store_root, prepared.node, rehashed(prepared.staged)?)?
 
   expect_root_error(
@@ -539,7 +539,7 @@ test test_root_identifies_the_missing_payload_inventory_entry [fs, error] { |ctx
   let archive_root = test.temp_dir(ctx, name: "root-missing-entry-archive")?
   fp"{archive_root}/usr/bin".mkdir()
   fp"{archive_root}/usr/bin/present".write("present", mode: 0o644)
-  archive.tar_create(staged.staged.payload, archive_root, [p"."], compression: "gz", overwrite: true)
+  archive.create(staged.staged.payload, archive_root, [p"."], .Tar, compression: .Gzip, collision: .Replace)
   let receipt = store.commit(types.target_aarch64(), store_root, staged.node, rehashed(staged.staged)?)?
 
   expect_root_error(

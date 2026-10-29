@@ -548,12 +548,13 @@ proc build_filesystems(
     overwrite: true,
   )
 
-  archive.tar_create(
+  archive.create(
     fp"{work}/target-root.tar.gz",
     fp"{work}/rootfs-target",
     [p"."],
-    compression: "gz",
-    overwrite: true,
+    .Tar,
+    compression: .Gzip,
+    collision: .Replace,
   )
 
   fp"{work}/target-root.tar.gz".copy(

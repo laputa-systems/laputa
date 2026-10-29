@@ -56,7 +56,7 @@ export proc build(dest: Path) [fs, process, env, error] {}
     entries += [{path: relative, kind: if entry.kind == "dir" { "tree" } else { entry.kind }, mode: metadata.mode % 4096, sha256: if entry.kind == "file" { hash.sha256(entry.path)?.hex() } else { "" }, target: if entry.kind == "symlink" { entry.path.readlink()?.display() } else { "" }}]
   }
   let payload = fp"{stage}/payload.tar.gz"
-  archive.tar_create(payload, contents, [p"."], compression: "gz")
+  archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   let metadata = fp"{stage}/metadata.json"
   json.write(metadata, {name: "mandoc", ver: "1", rel: "1", package_kind: "payload", files: entries})
   let proof = fp"{stage}/proof.json"

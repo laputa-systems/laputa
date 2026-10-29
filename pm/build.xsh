@@ -289,5 +289,5 @@ main(@args)?
   local.write_package_db(dest, pkg, manifest, etcsums)
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
   tarball.parent.mkdir()
-  archive.tar_create(tarball, dest, archive_paths, compression: "gz", overwrite: true)
+  archive.create(tarball, dest, archive_paths, .Tar, compression: .Gzip, collision: .Replace)
 }

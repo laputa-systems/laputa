@@ -182,7 +182,7 @@ proc root_legacy_package_db_entries(
 ) -> Result[List[types.ArtifactEntry]] {
   let sandbox = fs.tempdir()?
   let extracted = fp"{sandbox.host_path()?}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
+  archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, modes: .Exact)
   let manifest_file = root_legacy_package_db_file(extracted, receipt, "manifest.json")?
   let etcsums_file = root_legacy_package_db_file(extracted, receipt, "etcsums.json")?
   let metadata_file = root_legacy_package_db_file(extracted, receipt, "metadata.json")?
@@ -329,7 +329,7 @@ proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[t
   let sandbox = fs.tempdir()?
   let sandbox_path = sandbox.host_path()?
   let extracted = fp"{sandbox_path}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
+  archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, modes: .Exact)
   var expected: Set[Str] = set.empty()
 
   for entry in entries {
@@ -596,7 +596,7 @@ proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEn
 proc root_materialize_artifact(output: Path, receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
   let extracted = fp"{sandbox.host_path()?}/payload"
-  archive.tar_extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted)
+  archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, modes: .Exact)
 
   for entry in entries {
     root_materialize_entry(extracted, output, entry)

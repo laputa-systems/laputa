@@ -512,7 +512,7 @@ proc install_to_disk(disk: Path, ci: Bool) {
   linux.mkswap(parts.swap)
   p"/mnt/target".mkdir()
   linux.mount(parts.root.bytes(), /mnt/target, fstype: "ext4")
-  archive.tar_extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, 0, "auto", true)
+  archive.extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, .Tar, collision: .Replace, modes: .Exact, special: .Create)
   normalize_target_ownership(/mnt/target)
   p"/mnt/target/boot".mkdir()
   linux.mount(parts.esp.bytes(), /mnt/target/boot, fstype: "vfat")
