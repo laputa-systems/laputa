@@ -168,6 +168,7 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`
 - **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv and Go-based Tailscale each carry their own verifier with distinct distrust behavior.
 - **Recommendation:** Qualify each named consumer against the cross-signed fixture pair: blocked intermediate fails, unblocked control succeeds. Record the actual enforcement per consumer instead of assuming file sharing is proof.
+- **Progress:** `tests/pm/trust_consumers.xsh` qualifies packaged uv 0.13.4 and tailscaled 1.104.2: control succeeds and the omitted-root chain fails, but the blocked-intermediate chain is accepted by both because neither reads the trust policy. Recorded in [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement). Open: an enforcement mechanism (consumer patch, pinning, or removing the retained cross-signed root) is an owner decision.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 

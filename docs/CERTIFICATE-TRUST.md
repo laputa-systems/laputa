@@ -222,6 +222,25 @@ directly. See [the Tailscale release](https://github.com/tailscale/tailscale/rel
 [Go's eMudhra fix](https://github.com/golang/go/issues/82345), and
 [Go 1.27.3 Linux root lookup](https://github.com/golang/go/blob/go1.27.3/src/crypto/x509/root_linux.go).
 
+### Per-consumer distrust enforcement
+
+`tests/pm/trust_consumers.xsh` runs the packaged `uv` 0.13.4 and `tailscaled`
+1.104.2 static binaries (selected with `LAPUTA_TRUST_CONSUMER_ROOT`) against
+the cross-signed fixture chains with a root bundle holding only `cross-r1`:
+
+| Chain | `uv` (rustls-webpki) | `tailscaled` (Go `crypto/x509`) |
+|---|---|---|
+| `chain-control` (unblocked intermediate under `cross-r1`) | Connects | Connects |
+| `chain-cross-r1` (blocked intermediate under `cross-r1`) | Connects | Connects |
+| `chain-cross-r2` (chains to the omitted `cross-r2` root) | `UnknownIssuer` | `x509: certificate signed by unknown authority` |
+
+Both consumers enforce root omission only. Neither reads
+`/etc/laputa/trust-policy`, so the blocked-intermediate SPKI list is enforced
+solely by XSH clients. A cross-signed chain that reaches a retained root
+through a blocked intermediate is still accepted by `uv` and Tailscale. The
+tests assert this behavior; a consumer that starts enforcing the policy fails
+them and must be recorded here.
+
 ## Evidence
 
 - `tests/pm/trust_update.xsh`: cryptographic matrix (wrong signer, tampered
