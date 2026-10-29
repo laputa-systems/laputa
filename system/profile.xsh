@@ -115,8 +115,10 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 ## Compute a canonical digest from all semantic profile fields.
 export proc digest(value: types.SystemProfile) [error] -> Result[Str, Error] {
   validate_system_profile(value)
+  let development = if value.development { "true" } else { "false" }
   let body = f"""laputa-system-profile-1
 name\t{value.name}
+development\t{development}
 roots\t{value.package_roots.join(",")}
 kernel-package\t{value.kernel_package}
 kernel-path\t{value.kernel_path}

@@ -46,6 +46,7 @@ pure fixture_profile() -> types.SystemProfile {
     forbidden_packages: [],
     forbidden_sonames: [],
     proof: fixture_proof(),
+    development: true,
   }
 }
 

@@ -13,4 +13,13 @@ export let profile: types.SystemProfile = types.SystemProfile(
   qemu_height: 480,
   forbidden_packages: [],
   forbidden_sonames: [],
+  proof: {
+    cmdline_flag: "LAPUTA_SELF_HOSTING_PROOF",
+    ready_marker: "LAPUTA_SELF_HOSTING_READY",
+    success_marker: "LAPUTA_SELF_HOSTING_OK",
+    failure_marker: "LAPUTA_SELF_HOSTING_FAILED",
+    vt_away_marker: "",
+    vt_back_marker: "",
+  },
+  development: true,
 )
