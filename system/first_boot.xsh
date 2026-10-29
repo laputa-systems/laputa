@@ -3,6 +3,9 @@ const hostname_re = rx"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 const operator_re = rx"^[a-z_][a-z0-9_-]{0,31}$"
 const digits_re = rx"^[0-9]+$"
 const host_key_path: RelPath = p"etc/dropbear/dropbear_ed25519_host_key"
+const operator_shell = "/usr/bin/xsh"
+const first_account_id = 1000
+const account_id_limit = 60000
 
 ## How the operator wants the Dropbear host key to be treated. Apply never generates one.
 export enum BootIdentity { New, Restore, Clone }
@@ -328,8 +331,7 @@ pure passwd_has_name(body: Str, name: Str) -> Bool {
   false
 }
 
-pure passwd_with_operator(body: Str, name: Str) -> Str {
-  let line = f"{name}:x:1000:1000::/home/{name}:/usr/bin/xsh"
+pure append_record(body: Str, line: Str) -> Str {
   if body == "" {
     f"{line}\n"
   } else if body.ends_with("\n") {
@@ -337,6 +339,63 @@ pure passwd_with_operator(body: Str, name: Str) -> Str {
   } else {
     f"{body}\n{line}\n"
   }
+}
+
+pure passwd_with_operator(body: Str, name: Str, id: Int) -> Str {
+  append_record(body, f"{name}:x:{id}:{id}::/home/{name}:{operator_shell}")
+}
+
+proc account_ids(body: Str, index: Int) -> Result[List[Int]] {
+  collect {
+    for line in body.lines() {
+      let trimmed = line.trim()
+
+      if trimmed != "" and ! trimmed.starts_with("#") {
+        let fields = trimmed.split(":")
+
+        if fields.len() > index {
+          let text = fields[index]
+
+          if digits_re.matches(text) and (text == "0" or ! text.starts_with("0")) {
+            yield text as Int
+          }
+        }
+      }
+    }
+  }
+}
+
+proc account_id(body: Str, name: Str) -> Result[Int] {
+  for line in body.lines() {
+    let trimmed = line.trim()
+
+    if trimmed != "" and ! trimmed.starts_with("#") {
+      let fields = trimmed.split(":")
+
+      if ! fields.is_empty() and fields[0] == name {
+        guard fields.len() > 2 else {
+          fail "account is missing an id"
+        }
+
+        return decimal(fields[2])?
+      }
+    }
+  }
+
+  fail "account is missing"
+}
+
+proc next_account_id(passwd: Str, group_text: Str) -> Result[Int] {
+  let used = account_ids(passwd, 2)?.extend(account_ids(group_text, 2)?)
+  var id = first_account_id
+
+  while id < account_id_limit {
+    return id when ! (id in used)
+
+    id += 1
+  }
+
+  fail "no free account id"
 }
 
 proc ensure_dir(rootfs: FsRoot, rel: RelPath, mode: Int) {
@@ -362,6 +421,41 @@ proc read_optional(rootfs: FsRoot, rel: RelPath) -> Result[Str] {
   } else {
     ""
   }
+}
+
+proc ensure_line(rootfs: FsRoot, rel: RelPath, line: Str) {
+  return when ! rootfs.exists(rel)
+
+  let body = rootfs.read_text(rel)?
+
+  return when line in body.lines()
+
+  write_text(rootfs, rel, append_record(body, line), 0o644)
+}
+
+proc ensure_account(rootfs: FsRoot, name: Str) {
+  let passwd_rel: RelPath = p"etc/passwd"
+  let group_rel: RelPath = p"etc/group"
+  let shadow_rel: RelPath = p"etc/shadow"
+  let existing = read_optional(rootfs, passwd_rel)?
+  let group_body = read_optional(rootfs, group_rel)?
+  let id = if passwd_has_name(existing, name) {
+    account_id(existing, name)?
+  } else {
+    let allocated = next_account_id(existing, group_body)?
+    write_text(rootfs, passwd_rel, passwd_with_operator(existing, name, allocated), 0o644)
+    allocated
+  }
+
+  if rootfs.exists(group_rel) {
+    ensure_line(rootfs, group_rel, f"{name}:x:{id}:")
+  }
+
+  if rootfs.exists(shadow_rel) {
+    ensure_line(rootfs, shadow_rel, f"{name}:*:0:0:99999:7:::")
+  }
+
+  ensure_line(rootfs, p"etc/shells", operator_shell)
 }
 
 proc require_identity(rootfs: FsRoot, identity: BootIdentity) {
@@ -399,12 +493,7 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   write_text(rootfs, p"etc/laputa/first-boot/tailscale", f"{tailscale}\n", 0o644)
   let key_text = [installed_key(key) for key in config.keys].join("\n") + "\n"
   write_text(rootfs, authorized, key_text, 0o600)
-  let passwd: RelPath = p"etc/passwd"
-  let existing = read_optional(rootfs, passwd)?
-
-  if ! passwd_has_name(existing, config.operator) {
-    write_text(rootfs, passwd, passwd_with_operator(existing, config.operator), 0o644)
-  }
+  ensure_account(rootfs, config.operator)
 
   if config.trust_key != null {
     write_bytes(rootfs, p"etc/laputa/trust-update-key", config.trust_key, 0o444)

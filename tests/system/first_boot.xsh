@@ -257,14 +257,48 @@ test test_dropbear_argv_uses_the_persistent_host_key [error] {
   assert ! (persistent in ephemeral)
 }
 
-test test_firewall_plan_runs_nft_once_when_the_config_exists [error] {
-  assert firewall_service.firewall_plan(false).is_empty()
-  let plans = firewall_service.firewall_plan(true)
-  assert plans.len() == 1
-  assert plans[0] == ["/usr/bin/nft", "-f", "/etc/nftables.conf"]
+test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
+  let root = prepare(ctx, name: "ids")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\nlaputa:x:1000:1000:Laputa User:/home/laputa:/bin/xshi\n")
+  fp"{root}/etc/group".write("root:x:0:\nlaputa:x:1000:\n")
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\nlaputa:*:0:0:99999:7:::\n")
+  fp"{root}/etc/shells".write("/bin/xshi\n")
+  first_boot.apply(root, base("new"))
+  let passwd = fp"{root}/etc/passwd".read_text()?
+  assert "pazu:x:1001:1001::/home/pazu:/usr/bin/xsh" in passwd.lines()
+  assert "laputa:x:1000:1000:Laputa User:/home/laputa:/bin/xshi" in passwd.lines()
+  assert "pazu:x:1001:" in fp"{root}/etc/group".read_lines()?
+  assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
+  assert "/usr/bin/xsh" in fp"{root}/etc/shells".read_lines()?
+  let after = snapshot(root)?
+  first_boot.apply(root, base("new"))
+  assert snapshot(root)? == after
+}
+
+test test_firewall_fails_closed_without_a_ruleset [fs, error] {
+  match firewall_service.firewall_plan(false) {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+
+  let plan = firewall_service.firewall_plan(true)?
+  assert plan == ["/usr/bin/nft", "-f", "/etc/nftables.conf"]
   firewall_service.firewall_result(0)
   match firewall_service.firewall_result(1) {
     Ok(_) => assert false
     Err(_) => {}
   }
+
+  let ruleset = p"packages/nftables/nftables.conf".read_text()?
+  let recipe = p"packages/nftables/PKGBUILD.xsh".read_text()?
+  assert "flush ruleset" in ruleset
+  assert "policy drop;" in ruleset
+  assert "tcp dport 22 accept" in ruleset
+  assert "meta l4proto icmp accept" in ruleset
+  assert "meta l4proto icmpv6 accept" in ruleset
+  assert "iif lo accept" in ruleset
+  assert "ct state established,related accept" in ruleset
+  assert ! ("dport 23" in ruleset)
+  assert "etc/nftables.conf" in recipe
 }

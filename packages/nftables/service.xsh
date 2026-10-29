@@ -2,13 +2,13 @@
 const nft_bin = p"/usr/bin/nft"
 const nft_conf = p"/etc/nftables.conf"
 
-## Argv for one nft load. An absent config runs no nft command.
-export pure firewall_plan(conf_present: Bool) -> List[List[Str]] {
-  if conf_present {
-    [["/usr/bin/nft", "-f", "/etc/nftables.conf"]]
-  } else {
-    []
+## Argv for the one nft load. A missing ruleset fails closed and runs no nft command.
+export pure firewall_plan(conf_present: Bool) -> Result[List[Str], Error] {
+  guard conf_present else {
+    fail "missing /etc/nftables.conf"
   }
+
+  ["/usr/bin/nft", "-f", "/etc/nftables.conf"]
 }
 
 ## A non-zero nft status fails the oneshot.
@@ -31,14 +31,7 @@ export let service = {
 
 ## Oneshot entry.
 export proc main() [fs, process, error] {
-  let plans = firewall_plan(nft_conf.exists()?)
-
-  guard plans.len() <= 1 else {
-    fail "nft runs once"
-  }
-
-  for argv in plans {
-    let status = process.run(process.command_argv(nft_bin, argv))?
-    firewall_result(status.shell_code()?)
-  }
+  let argv = firewall_plan(nft_conf.exists()?)?
+  let status = process.run(process.command_argv(nft_bin, argv))?
+  firewall_result(status.shell_code()?)
 }

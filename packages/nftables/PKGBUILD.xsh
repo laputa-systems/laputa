@@ -12,7 +12,7 @@ export const package_kind = "payload"
 export const ver = "1.1.7"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
 export const deps = ["musl", "libmnl", "libnftnl"]
@@ -40,6 +40,19 @@ export const upstream_sources = [
   },
   {
     source: p"service.xsh",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
+  },
+  {
+    source: p"nftables.conf",
     kind: "auto",
     architectures: [
       "all",
@@ -81,6 +94,10 @@ export const filetree = [
   },
   {
     path: p"usr/lib/xinit/services/firewall.xsh",
+    kind: "file",
+  },
+  {
+    path: p"etc/nftables.conf",
     kind: "file",
   },
 ]
@@ -279,4 +296,5 @@ Cflags: -I${{includedir}}
 """,
   )
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/firewall.xsh", 0o644, parents: true, overwrite: true)
+  fs.install(p"nftables.conf", fp"{dest}/etc/nftables.conf", 0o644, parents: true, overwrite: true)
 }
