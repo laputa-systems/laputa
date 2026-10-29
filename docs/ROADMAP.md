@@ -4,6 +4,13 @@ Make Laputa a small, reproducible, XSH-managed operating system that can remain
 useful unattended: a VM should survive service crashes, network loss, interrupted
 updates, and virtual-disk damage, with an inspectable recovery path.
 
+After the in-tree tinyland, mdevd-rs, seatd-rs, and doas-rs integration is
+qualified, the next step change is the [remotely maintainable VM](#g2-the-remotely-maintainable-vm):
+install, administer, update, recover, and eventually rebuild Laputa through XSH.
+SSH is the control path connecting those workflows, not an isolated additional
+command. Installed-generation activation is the centerpiece that turns composed
+images into an operating system that can be maintained in place.
+
 The next investment is lifecycle correctness, not a larger command catalog.
 Preserve the existing PM, typed profiles, xinit, and XSH boundaries rather than
 introducing a second package manager, service manager, or deployment framework.
@@ -42,11 +49,19 @@ durability; formal semantics are not native-adapter conformance. Require the
 corresponding host/guest evidence and state its limits. Keep the language core
 and substrate increasingly predictable while userspace grows above them.
 
+Keep the four native userland components in-tree beside their recipes and
+qualification. Preserve independent binaries and narrow responsibilities, but
+make a source change, package rebuild, and exact-image test one development
+loop. Do not restore four release-and-repin cycles or require a shared runtime
+framework merely because the code now shares a repository. XSH remains the
+separate substrate/toolchain boundary.
+
 The most direct feedback loop is to build XSH inside Laputa, use it to produce a
 successor system, and reduce discovered failures to ordinary regression tests.
-R10 adds that milestone; R1/R2/R4/R5 remain the operational consumers that give
-its abstractions purpose. No new language feature is justified solely by this
-roadmap, and no paused XSH campaign is resumed by it.
+R10 connects the existing bounded self-hosting workflow to normal activation;
+R1/R2/R4/R5/R6 remain the operational consumers that give its abstractions
+purpose. No new language feature is justified solely by this roadmap, and no
+paused XSH campaign is resumed by it.
 
 ## Authority and scope
 
@@ -57,12 +72,14 @@ implementation or permission to launch every workstream. Before implementation,
 recheck the source, choose a bounded slice, and record its acceptance evidence in
 the owning topic or campaign. Do not duplicate the TODO queue here.
 
-The planning baseline was reread after the documentation refactor at
-`44572a718e3067e9d03e6646036e67f04c4ac5b2` on 2026-10-25. This review did not
-rerun build or guest proofs. All milestones below remain open unless their
-owning documentation records subsequent verification. The systems-foundation
-follow-up used Laputa `85c175515312` and XSH `9d893e0075d2`; it adds design
-constraints and TODO slices, not new runtime evidence.
+The original planning baseline was reread after the documentation refactor at
+`44572a718e3067e9d03e6646036e67f04c4ac5b2` on 2026-10-25. The systems-foundation
+follow-up used Laputa `85c175515312` and XSH `9d893e0075d2`. The remote-lifecycle
+planning update incorporates the in-tree direction and the subsequently recorded
+DHCP/syslog, signed-snapshot, and self-hosting work. None of these documentation
+reviews reran build or guest proofs. Historical defects are not automatically
+current defects; the owning topic documents and exact-artifact evidence decide
+what remains. G2 below remains planned, not passed.
 
 **Supported direction:** Linux guests under QEMU on aarch64 and x86_64, plus the
 pinned x86_64 Asterinas/Firecracker backend. Linux aarch64 guest qualification
@@ -71,6 +88,8 @@ active proof target. Keep the existing graphical VM
 reference working while developing the headless operational path. A feature
 proved on Linux is not automatically proved on Asterinas or another architecture.
 Native build hosts are test infrastructure, not a bare-metal Laputa target.
+A macOS administration client is a separate host-side qualification, not evidence
+that the Linux aarch64 guest or the G0 XSH candidate has been qualified there.
 
 **Real hardware is out of scope.** Do not add physical-device enablement,
 Wi-Fi or Bluetooth integration, firmware collections, physical GPU/audio/storage
@@ -84,49 +103,112 @@ VM pause/resume, guest clock discontinuities, virtual NIC link changes,
 virtio-device behavior, guest reboot, and disposable virtual-disk failure tests
 remain in scope. Recovery and rollback may use the existing direct-kernel VM
 launch paths; they do not require an EFI loader or a new bootloader campaign.
+Keep D-Bus, systemd, logind/elogind, and polkit out of this direction. Runtime
+identity, supervision, and remote administration use the existing XSH/Laputa
+owners, not a new message bus or resident fleet-management service.
 
 ## Baseline: foundations are not missing
 
 | Area | Existing foundation | Remaining boundary |
 |---|---|---|
+| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, and doas-rs with package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
 | Packages and images | Typed plans, immutable artifacts, runtime-only generations, atomic publication of host-side system bundles | Installed-system activation, boot success, rollback, and state ownership are not the same as composing a generation. See [PM](PM.md) and [core infrastructure](CORE-INFRASTRUCTURE.md). |
-| Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Boot paths mix service definitions and direct launches; integrated lifecycle ownership still needs proof. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
+| Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
+| Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
-| Networking | `laputa-net`, XSH interface tools, Dropbear, Tailscale, and nftables packages | The audited XSH `ifup` acquires an IPv4 DHCP lease once; continuous lease management and coordinated resolver state are not established. |
-| Trust | System roots, XSH distrust policy, signed trust releases with offline/HTTPS acquisition, atomic activation, journal recovery, and KVM guest proof | Repository/index authentication and per-consumer enforcement tracking remain; see [certificate trust](CERTIFICATE-TRUST.md). |
+| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, Dropbear, Tailscale, and nftables foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
+| Trust | Signed repository snapshots plus signed certificate releases and system distrust policy | Provision repository verification keys and durable accepted state; prove the production guest fetch path and consumer-specific enforcement. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
+| Self-hosting | Bounded in-guest XSH rebuild and A-to-B successor workflow | Turn the existing development proof into the normal installed build/stage/boot path without overstating bootstrap closure or production admission. See [self-hosting](SELF-HOSTING.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
 
 The baseline is deliberately narrow. A package name, successful `--version`,
 content-addressed artifact, or boot marker is not evidence that the corresponding
-operational capability is complete.
+operational capability is complete. XSH-53/54 are outside the frozen XSH G0
+candidate; selecting newer services requires matching binaries/core scripts and
+renewed consumer qualification, not borrowing the older candidate's results.
 
 ## Priority and sequence
 
 P0 means required before trusting a long-lived installed VM; P1 strengthens the
 operational and self-hosting foundation; P2 is optional expansion. Priority is not
 execution order: service ownership and focused tests unblock several P0 tracks.
-These milestone priorities are not a renumbering of the bounded TODO priorities.
+Track IDs remain stable for existing TODO and topic references. Their numeric
+order is not the execution sequence below.
 
 | Track | Priority | Outcome |
 |---|---|---|
-| R1 | P1, start first | One supervised boot service graph with honest readiness and failure behavior |
-| R2 | P0 | Persistent VM networking and disciplined time |
+| R1 | P1, foundation | One supervised boot service graph with honest readiness and failure behavior |
+| R2 | P0 | Roll out persistent VM networking/syslog and qualify disciplined time |
 | R3 | P0 | Repairable virtual disks and an independent rescue path |
-| R4 | P0 | Authenticated repository/trust delivery with explicit freshness policy |
-| R5 | P0 | Installed-system generation activation and bounded rollback |
-| R6 | P1 | A safe long-lived VM profile distinct from disposable development images |
-| R7 | P1 | Backups, scheduled maintenance, and persistent diagnostics |
-| R8 | P2 | A qualified Linux OCI execution profile, only after the operational baseline |
-| R9 | P2 | Selective integration of Laputa-native tools, not catalog growth for its own sake |
-| R10 | P1, staged independently | Closed build cohort, in-guest XSH rebuild, and successor-system boot |
+| R4 | P0 | Operationalize authenticated repository/trust delivery with explicit freshness policy |
+| R5 | P0, centerpiece | Installed-system generation activation and bounded rollback |
+| R6 | P1, start alongside R1/R2 | SSH-native administration and first-boot identity for a safe long-lived VM profile |
+| R7 | P1 | Persistent diagnostics and proved restore; schedule backups/maintenance afterward |
+| R8 | P2, deferred expansion | A qualified opt-in Linux OCI execution profile, after the operational baseline |
+| R9 | P2, consumer-driven | Selective existing tools, not additional ports or catalog growth for its own sake |
+| R10 | P1, later routine workflow | Connect the existing self-hosted successor proof to normal activation |
 
-R1, R2, and R3 can advance in bounded independent slices. Design R4 alongside
-R2's time-bootstrap policy; R5 depends on R3's rescue path and R4's authenticated
-inputs. Basic diagnostic capture and manual backup/restore should arrive early;
-R7's automation is not a reason to delay them. No implementation needs to wait
-for the whole roadmap to be complete. R10 can progress alongside those tracks;
-it is not an entry fee for their bounded fixes, and its local development proof
-is not a substitute for R4/R5 production trust and activation.
+The owner-selected work order is:
+
+1. Establish typed remote XSH administration and first-boot provisioning (R6),
+   using the qualified xinit graph (R1) rather than a second control plane.
+2. Roll out existing DHCPv4/syslog and integrate time discipline (R2/R7). Bring
+   up a reachable VM without requiring the whole update system first.
+3. Join authenticated admission (R4), an independent rescue route (R3), and
+   reboot-based generation activation/fallback (R5).
+4. Prove persistent diagnostics and a manual restore to a blank disk (R7),
+   then automate backups and maintenance. Diagnostic capture starts earlier;
+   the final restore test must not be postponed behind a scheduler.
+5. Make the existing in-guest XSH/cohort rebuild and successor boot a routine
+   development workflow through the same activation path (R10).
+
+Bounded slices can overlap. Design R4 alongside R2's clock-bootstrap policy;
+R5 depends on R3's rescue path and R4's authenticated inputs. R10 can continue
+independently, but must not delay a useful remote/operational baseline or be
+presented as a substitute for production trust, state ownership, and fallback.
+Defer broad OCI work, desktop protocol expansion, additional utility ports,
+and firmware-boot work unless a concrete G2 workflow requires them.
+
+## G2: The remotely maintainable VM
+
+**Status: planned.** This is the organizing product milestone, not a new manager,
+new test framework, or a claim that every R1-R7 capability has shipped. The unit
+of delivery is one installed VM that can be maintained through its full lifecycle.
+Reuse the current image builder, PM receipts, xinit, launcher, and guest harness.
+
+The integrated acceptance scenario is:
+
+1. Install a fresh headless VM from trusted inputs. Provision its unique host
+   identity and operator access without shared default credentials. Keep secrets
+   out of public images and provide an independent local rescue path.
+2. Connect from a separate administration machine through XSH's verified SSH
+   path. Inspect the running generation, services, lease/resolver state, clock
+   status, and redacted diagnostics. Exercise lease renewal, daemon restart,
+   and temporary network loss without inventing success from process liveness.
+3. Build or fetch authenticated generation B while A remains usable. Verify and
+   durably stage the exact kernel/root/configuration bundle, retain A, and record
+   a queryable pending operation. Disconnect during a mutation: reconnect and
+   inspect its outcome, never blindly replay it.
+4. Reboot into B and inject a startup failure. The existing host launcher must
+   select an admissible known-good A after bounded failed attempts without
+   losing mutable state. A guest that never boots cannot perform its own fallback.
+5. Stage a repaired candidate, boot it, verify its running receipt and declared
+   local/service health, and only then commit it. Inspect the failure and
+   activation history across reboots; Internet reachability alone is not health.
+6. Restore the selected mutable state onto a blank virtual disk using backup
+   plus trusted artifacts, without relying on the original VM. Boot and verify
+   the restored system and its explicit identity/trust policy.
+
+Keep configuration, secrets, application data, machine identity, and persistent
+trust/revocation floors outside ordinary binary-generation rollback. Migrations
+that prevent fallback must be declared before activation. Restoring the same
+machine and cloning a new one have different host-key/identity requirements.
+
+The first integrated result may be Linux x86_64. Qualify the administration host,
+guest architecture, and backend independently; record macOS-client, Linux
+aarch64, and Asterinas gaps explicitly. Passing this scenario establishes only
+its stated scope, not arbitrary power-loss durability, all hardware, or a fully
+self-hosted world. Detailed state machines remain with the existing topic owners.
 
 ## R1: Make xinit the service lifecycle owner
 
@@ -137,24 +219,24 @@ inittab engine and service scanner's distinct responsibilities documented rather
 than merging them solely for code reuse.
 
 Audit `packages/baselayout/files/rootfs/etc/inittab`, the installer's generated
-inittab, profile boot hooks, and installed service modules together. The graphical
-hook directly launches daemons while other paths use service definitions; that
-is an ownership inconsistency, not proof of an observed concurrent duplicate.
-Prevent duplicate instances and conflicting scanner ownership when paths converge.
+inittab, profile boot hooks, and installed service modules together. Preserve
+completed ownership fixes and make the normal startup path the failure-test
+path. Prevent duplicate instances and conflicting scanner ownership when paths
+converge. Scripted recovery alone is not proof that installed supervision owns
+and performs the same recovery.
 
-Reject unknown top-level and nested service fields and conflicting log settings
-(LAP-5). Define startup-critical readiness failure separately from process
-liveness: today's notify timeout can leave a service `running` but not ready.
-A named facility without a provider must not masquerade as a satisfied critical
+Preserve strict service normalization and graph validation already covered by
+xinit's tests. Recheck readiness separately from process liveness: a named
+facility without a provider must not masquerade as a satisfied critical
 dependency. Keep local network configuration distinct from Internet reachability;
 do not block rescue/login forever waiting for external services. Longruns must
 remain foreground processes. Do not add blanket dependency restart cascades.
 
 Give service configuration one authoritative typed model, with shape validation,
-semantic checks and execution preconditions kept distinct. LAP-5 owns strict
-normalization, redacted inspection and read-only planning. Reuse XSH's data
-validator for external configuration; executable service modules remain trusted
-code, not inert data. A codec migration must not create a second service schema.
+semantic checks and execution preconditions kept distinct. Reuse existing
+redacted inspection and read-only planning. Executable service modules remain
+trusted code, not inert data. A codec migration must not create a second service
+schema, and SSH inspection must call the same local service owner.
 
 **Acceptance:** a real VM boots the selected graph once; killing a daemon
 exercises backoff and recovery; killing/restarting the scanner has a defined
@@ -166,18 +248,23 @@ shutdown. Existing xinit proofs and the graphical reference remain valid.
 
 ### Network lifecycle
 
-Keep XSH as the configuration/control layer; give a persistent supervised client
-ownership of DHCP leases. The audited `core/ifup.xsh` in the XSH repository has an
-initial IPv4 handshake, direct `/etc/resolv.conf` writes, and no lease renewal
-loop; it rejects non-`inet` configuration. Do not mistake this for a complete
-network manager or infer that the kernel lacks IPv6.
+Roll out the existing XSH-53/54 foreground services, rather than starting another
+DHCP or logging implementation. XSH's
+[roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md)
+records supervised DHCPv4 and local syslog as implemented; the
+[integration RFC](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-53-supervised-dhcp-and-syslog.md)
+records their consumer contract and rollout steps. Laputa owns package/profile
+selection and xinit service configuration. Keep protocol/policy in ordinary XSH
+and only reusable missing OS mechanisms in the substrate.
 
-Define renewal, rebinding, expiry, NAK handling, restart with saved leases, link
-loss, and virtual NIC reappearance. Remove expired addresses/routes and reconcile
-state after VM pause/resume. Start with one supported virtual Ethernet path.
-Add explicit IPv6 policy and tests for SLAAC/router advertisements and resolver
-information before claiming dual-stack support; add DHCPv6 where the selected
-profile requires it. Wi-Fi remains excluded.
+Select a matching XSH binary/core-script set and requalify the installed
+ifup/ifdown/client path. Demonstrate renewal, rebinding, expiry, NAK handling,
+restart with saved leases, link loss, and virtual NIC reappearance. Remove
+expired owned addresses/routes and reconcile state after VM pause/resume. Start
+with one supported virtual Ethernet path. Add explicit IPv6 policy and tests for
+SLAAC/router advertisements and resolver information before claiming dual-stack
+support; add DHCPv6 only where the selected profile requires it. Wi-Fi remains
+excluded and IPv6 is not an entry fee for the first IPv4 remote-management slice.
 
 Give resolver configuration one owner, atomic updates, and per-interface state.
 Define how DHCP, static settings, and Tailscale coexist, including the supported
@@ -189,16 +276,17 @@ Use the network path as a shared-library consumer: observe actual state, compute
 a typed plan, apply with preconditions, then re-observe. Preserve foreign resources,
 including Tailscale/operator state; detect lost notifications and stale snapshots.
 Partial application requires reconciliation, not a promise of generic rollback.
-LAP-32 owns the first virtual-interface slice with XSH-38's reusable operations.
+Recheck LAP-32/XSH-38 against the newer implementation and retire obsolete
+blockers only with the corresponding installed-system evidence.
 
-Evaluate a maintained DHCP client before writing a new one. `dhcproto` is a
-possible Rust protocol building block, not a ready-made lease manager. Select an
-implementation only after reviewing its lifecycle behavior, musl dependency
-closure, and tests; Rust alone is not an acceptance criterion.
+Do not install a parallel network manager to paper over a failure. Reduce a
+rollout defect to a regression in the owning XSH or Laputa layer. DHCP/syslog
+must remain separately supervised foreground processes, not loops inside PID 1.
 
 **Acceptance:** use a controlled local DHCP/DNS server with short leases in VM
 fixtures. Exercise renew/rebind, NAK/expiry, changed DNS/routes, daemon restart,
-link loss, and pause/resume without duplicate or stale configuration. Boot and
+link loss, and pause/resume without duplicate or stale configuration. Confirm
+that SSH administration recovers through the declared network behavior. Boot and
 local rescue still work offline. Qualify IPv4 and IPv6 separately and report
 unsupported modes explicitly.
 
@@ -251,7 +339,8 @@ than imposing Linux ext4 features it has not proved.
 Provide an independent rescue guest/image able to inspect and repair or restore
 a detached virtual disk even when that disk's XSH, PID 1, or package manager is
 broken. Use serial access and the existing VM launcher; physical media boot and
-new firmware support are not required.
+new firmware support are not required. Keep rescue independent of the normal
+VM's network, package manager, and ability to launch an SSH server.
 
 **Acceptance:** on disposable copies, exercise dirty shutdown, controlled
 metadata corruption, filesystem-full conditions, and unrecoverable damage.
@@ -261,39 +350,48 @@ and restore an unusable virtual disk. Journaling is not a backup policy.
 
 ## R4: Authenticate repository and trust delivery
 
-`pm/remote.xsh` currently fetches and parses mutable `index.json`; artifact
-hashes and mirror publisher authentication do not independently authenticate
-that index to a client. Preserve content-addressed objects while adding a
-versioned, signed release/snapshot boundary binding the exact index and referenced
-artifacts. Specify verification-key provisioning, rotation/revocation, expiry,
-rollback/freeze handling, parser/size limits, and atomic publication. Compare an
-established update-metadata design before inventing a new cryptographic protocol.
+The signed repository-snapshot boundary already exists in `pm/repo_snapshot.xsh`
+and the verified remote-index path; [PM snapshot authentication](PM.md#snapshot-authentication)
+owns the exact format and behavior. Do not restart this as a new signing protocol
+or describe production clients as simply trusting an unsigned index.
 
-Client trust must not depend solely on the mirror's HTTPS certificate or on the
-same mutable source delivering its first verification key. Keep offline/local
-development workflows explicit; never silently fall back from failed production
-verification to unsigned content. Coordinate expiry with R2's time policy.
+Finish operational integration: provision the verification-key set through a
+trusted image/first-boot channel, retain accepted generation/time state across
+reboots, exercise rotation/revocation, and qualify the production fetch path
+inside the installed guest. Keep parser/size limits, expiry, rollback/freeze
+handling, and publication consistency explicit. Existing metadata is not a claim
+of full TUF role/threshold support; evaluate any extension against established
+update-metadata designs rather than adding ad-hoc cryptography.
 
-Finish the existing signed certificate-release path: the production key
+Client trust must not depend solely on the mirror's HTTPS certificate, an SSH
+connection, or the same mutable source delivering its first verification key.
+A release copied over SSH must still pass the selected production admission
+policy; staging a file locally must not silently turn it into an unsigned
+local-development exception. Keep offline/local development workflows explicit.
+Never fall back from failed production verification to unsigned content.
+Coordinate expiry with R2's time policy and R6's durable provisioning.
+
+The signed certificate-release path already includes the production key
 provisioning ceremony, `--from`/`--url` acquisition, immutable candidate
-composition, atomic activation with journal recovery, and installer seeding
-are implemented and proved in guests (see [certificate trust](CERTIFICATE-TRUST.md)).
-Remaining: exercise a key rotation end to end, track each TLS consumer's
-actual enforcement; using a shared root file does not prove support for
-XSH's intermediate-key blocklist. Keep trust policy semantics in
-[certificate trust](CERTIFICATE-TRUST.md), not a duplicate specification here.
+composition, atomic activation with journal recovery, and installer seeding,
+with guest evidence in [certificate trust](CERTIFICATE-TRUST.md). Remaining:
+exercise a key rotation end to end and track each TLS consumer's actual
+enforcement; sharing a root file does not prove support for XSH's intermediate-key
+blocklist. Keep trust policy semantics in that topic document.
 
-**Acceptance:** tampered objects/indexes, stale/replayed
-metadata, interrupted publication, and missing clocks fail according to the
-explicit policy without damaging the installed generation. Trust updates
-additionally prove reboot replay and power-cut recovery without rolling back
-distrust (see [certificate trust](CERTIFICATE-TRUST.md)). Prove key rotation
-and recovery. A trust update changes new admissions; already-running services
-are restarted by the operator, not by a cutover layer. Missing owner-held keys
-remain an external prerequisite; never invent production credentials.
+**Acceptance:** tampered objects/indexes, stale/replayed metadata, interrupted
+publication, and missing/incorrect clocks fail according to the explicit policy
+without damaging the installed generation. Reboot preserves the accepted trust
+floor. Trust updates additionally prove reboot replay and power-cut recovery
+without rolling back distrust (see [certificate trust](CERTIFICATE-TRUST.md)).
+Prove key rotation and recovery. A trust update changes new admissions;
+already-running services are restarted by the operator, not by a cutover layer.
+Missing owner-held keys remain an external prerequisite; never invent production
+credentials or commit private keys to satisfy a test.
 
 ## R5: Activate installed generations and roll back safely
 
+This is the centerpiece after the first useful remote-administration slice.
 PM remains the plan/build/compose boundary. Put system selection and lifecycle
 coordination at the system/installer boundary instead of adding mutable package
 post-install scripts. The host-side atomic `current` bundle pointer is a useful
@@ -312,11 +410,19 @@ objects from garbage collection. Select kernel, root, and any bootstrap inputs
 as a matching bundle. Reboot-based activation is sufficient initially; arbitrary
 live replacement of PID 1 and running binaries is not required.
 
-For the direct-kernel VM workflow, the launcher may own boot selection, bounded
+Expose an inspectable plan and operation status through the existing system
+boundary, used identically by local and remote XSH callers. An SSH disconnect
+after staging or requesting reboot creates an uncertain caller outcome, not
+permission to repeat the mutation. Reconnect and reconcile the recorded state.
+A second remote-only deployment engine is out of scope.
+
+For the direct-kernel VM workflow, the launcher owns boot selection, bounded
 boot attempts, and fallback while the guest reports its identity and health.
 Define this host/guest contract rather than pretending the guest selects a
-kernel the host has already supplied. External Internet availability should not
-be the sole boot-success condition.
+kernel the host has already supplied. Confirm the running receipt and declared
+local/critical-service health, including remote administration where the profile
+promises it. External Internet availability must not be the sole boot-success
+condition. An unbootable guest cannot be responsible for its own rollback.
 
 Distinguish operator-authorized rollback to a retained generation from accepting
 stale remote metadata. Persist trust/revocation and anti-rollback state outside
@@ -327,37 +433,87 @@ as preventing automatic rollback; protect user data rather than faking success.
 
 **Acceptance:** install A, stage and boot B, verify the running receipt, and
 commit B only after the declared health check. Reject tampered B; recover from
-an unbootable B; inject termination at publication/selection/confirmation
-boundaries; exercise concurrent requests, full disks, and GC. Every recoverable
-case selects a complete admissible bundle with preserved mutable state. Rescue
-still works when neither normal generation boots. Linux and Asterinas results
-are recorded separately; Linux aarch64 is deferred pending a macOS aarch64
-host via Docker.
+an unbootable B; inject termination and remote disconnect at staging, selection,
+and confirmation boundaries; exercise concurrent requests, full disks, and GC.
+Every recoverable case selects a complete admissible bundle with preserved
+mutable state. Rescue still works when neither normal generation boots. Linux
+and Asterinas results are recorded separately; Linux aarch64 is deferred pending
+a macOS aarch64 host via Docker.
 
 ## R6: Separate disposable development from long-lived VM policy
 
-Keep current autologin/passwordless-doas conveniences in an explicitly selected
-development profile, not as an implicit policy for unattended reachable VMs.
-Define first-boot identity/key provisioning, least-privilege service execution,
-secret ownership, and supported remote administration without shared default
-credentials. Keep a documented local rescue route.
+Start this track alongside R1/R2: a secure, reachable first boot and useful SSH
+administration are the first user-visible increment toward G2. Keep current
+autologin/passwordless-doas conveniences in an explicitly selected development
+profile, not as an implicit policy for unattended reachable VMs. Preserve that
+convenient development profile; do not silently change its intended behavior.
+
+### First-boot identity and access
+
+Use one small typed first-boot input for the selected hostname, operator account,
+authorized public keys, network mode, repository trust provisioning, and optional
+Tailscale enrollment. Validate it before mutation and make restart/reapplication
+behavior explicit. Keep secrets in a separately provisioned, access-controlled
+channel, never in public images, source, plans, or logs. No cloud-init clone or
+plugin ecosystem is required.
+
+Create or securely provision unique host keys and persistent machine identity;
+do not regenerate them on every boot. Establish the administration client's
+host-key trust through an explicit channel rather than silently accepting the
+first network answer. Define rotation, failed/partial first boot, and the
+identity distinction between restore and clone. Preserve an independent local
+rescue route when provisioning or remote access fails.
 
 nftables and Dropbear already exist; the gap is policy and lifecycle integration,
-not another firewall or SSH implementation. Apply a tested profile-owned firewall
-before exposing listeners, handle failed ruleset updates atomically, and define
-Tailscale coexistence without accidentally removing recovery access.
+not another firewall or login-server implementation. Apply a tested profile-owned
+firewall before exposing listeners, handle failed ruleset updates atomically,
+and define Tailscale coexistence without accidentally removing recovery access.
+Use least-privilege service execution and explicit doas delegation where needed.
+No shared default passwords, implicit root login, or globally writable session
+state is justified by unattended setup.
 
-Check the actual VM kernel configuration before claiming sandboxing. The audited
-x86_64 fragment disables seccomp and the aarch64 fragment disables namespaces;
-these are guest security/OCI capability choices, not hardware enablement. Add
-only the capabilities required by selected services or R8, with explicit
-failure on unavailable enforcement. Address service resource limits as needed;
-never treat ignored fields or a macOS no-op as Linux enforcement.
+### SSH-native XSH administration
 
-**Acceptance:** a fresh long-lived VM has no unintended autologin, default
-credential, or listener; remote access uses provisioned identity; firewall failure
-has a documented safe outcome; selected privilege/isolation limits are verified
-inside the guest. The development profile remains convenient and visibly distinct.
+Coordinate with [XSH's remote-execution roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md#next-capability-ssh-native-remote-xsh).
+XSH owns reusable typed execution, stream, host-key, and file-transfer boundaries;
+Laputa owns a small administration library over the existing PM, xinit, network,
+and system-report owners. Do not create a generic Ansible replacement, a second
+service schema, or a mandatory resident fleet agent.
+
+First qualify the interface against an established SSH implementation. The
+OpenSSL-less client in [ssh-build](https://github.com/laputa-systems/ssh-build)
+is a candidate; a native Graviola/OxiSH-backed client may replace that transport
+without changing its XSH consumers. The current OxiSH server is Git-only, not a
+general login/PTY/SFTP server. Keep Dropbear until a separately qualified server
+has a concrete benefit; a server rewrite is not a dependency of G2.
+
+Use a fixed reviewed remote dispatcher with bounded versioned structured input,
+not request values interpolated into shell source. Preserve byte streams,
+explicit remote status, deadlines, backpressure, and cleanup. Keep file staging
+and digest verification separate from artifact authenticity. Unknown outcomes
+must be inspectable and reconciled, not automatically replayed. A closed SSH
+channel does not by itself prove a remote process or mutation stopped.
+
+Read-only generation/service/network inspection and redacted support collection
+should work without blanket root authority. Mutating operations use the same
+local validation and privilege boundaries as console administration. Keep the
+public API small until the one-VM consumer establishes what it actually needs.
+
+Check the actual VM kernel configuration before claiming sandboxing. Historical
+kernel audits found seccomp/namespaces gaps; recheck the selected configuration
+rather than treating old findings as current evidence. Add only capabilities
+required by selected services or R8, with explicit failure on unavailable
+enforcement. Address service resource limits as needed; never treat ignored
+fields or a macOS no-op as Linux enforcement.
+
+**Acceptance:** a fresh long-lived VM reaches authenticated, host-key-verified
+SSH without manual repair and without unintended autologin, shared credentials,
+or listeners. From a separate machine, inspect the running generation/services,
+run a controlled XSH operation, and stage a verified artifact. Test bad host keys,
+reboot with stable identity, partial provisioning, network loss, and disconnect
+after a mutation; preserve recovery access and do not duplicate side effects.
+Selected privilege/isolation limits are verified inside the guest. The
+development profile remains convenient and visibly distinct.
 
 ## R7: Backups, timers, and persistent diagnostics
 
@@ -367,7 +523,8 @@ copy/sync utility is not a substitute for retained backups. Define encryption-ke
 recovery, retention, repository checking, application quiescence, and which state
 is restored versus reconstructed from package generations. Distinguish restoring
 a machine's identity from creating a clone. Prove a manual restore before
-scheduling unattended backup or pruning.
+scheduling unattended backup or pruning. An actual blank-disk restore, not a
+successful backup command, is the G2 acceptance result.
 
 **Timers.** Prefer a small supervised XSH scheduler using xinit to own jobs, not
 a second init system or a mandatory new subsystem inside PID 1. Specify interval
@@ -375,20 +532,25 @@ versus calendar time, overlap policy, missed-run/coalescing behavior, persistenc
 across reboot, cancellation, bounded retries, and inspectable last/next results.
 Handle wall-clock corrections and VM pause explicitly. Do not promise exactly-once
 side effects across crashes; use idempotent jobs or explicit reconciliation.
+Scheduling is a follow-up to working manual maintenance, not an entry fee for
+remote inspection, diagnostics, or restore.
 
-**Diagnostics.** Extend the existing xinit log path rather than replacing it.
-Add bounded persistent kernel/boot/service-event capture, boot/generation IDs,
-and useful timestamps even before wall-clock synchronization. Document current
-copy-truncate loss semantics rather than promising lossless logs. Bound storage,
-handle disk-full failure, restrict sensitive data, and provide a redacted support
-bundle using existing system-report collectors. No fleet observability platform
-or separate per-service logger architecture is required.
+**Diagnostics.** Roll out the implemented XSH syslog service through xinit and
+extend its existing log path rather than replacing it. Reuse XSH's system-report
+collectors for bounded, redacted local/remote support bundles. Capture persistent
+kernel/boot/service events, generation and boot identity, lease changes, and
+activation/failure history with useful timestamps even before wall-clock sync.
+Document copy-truncate and datagram loss semantics rather than promising lossless
+logs. Bound storage, handle disk-full failure, and exclude secrets. No fleet
+observability platform, journald imitation, or per-service logger architecture
+is required. Basic diagnostics arrive before update-failure tests, not after G2.
 
 **Acceptance:** restore selected mutable state and a bootable system onto a blank
 virtual disk from backup plus trusted artifacts, without relying on the original
 VM. Test missed/overlapping jobs and clock changes without duplicate uncontrolled
-runs. After a forced reboot, diagnostics identify the failed generation and
-service history, stay within retention bounds, and exclude secrets.
+runs when scheduling is introduced. After a forced reboot, diagnostics identify
+the failed generation and service history, stay within retention bounds, and
+exclude secrets.
 
 ## R8: Optional Linux OCI execution
 
@@ -417,45 +579,54 @@ Treat `ntpd-rs` as R2's operational dependency, not optional catalog expansion.
 Defer `zzz` and other physical power/device integration under the scope boundary.
 Rust implementations are preferred where they fit, but reliability at storage,
 security, and protocol boundaries outranks avoiding every non-Rust dependency.
+Additional utility ports and desktop features do not hold G2 hostage.
 
 ## R10: Close the self-hosting loop
 
-The current xsh package imports seed products, and package-tools retains an
-external host-tools base. Treat these as declared bootstrap boundaries, not
-proof of a closed build or an in-world XSH rebuild. Keep the compiler in Rust;
-this is distribution self-hosting, not language self-implementation.
+The [existing self-hosting workflow](SELF-HOSTING.md) already describes a bounded
+Linux x86_64 development proof: rebuild XSH/xsht in guest A, use the replacement
+tools for a C/Rust/XSH cohort and successor bundle, boot B, verify its actual
+receipt/runner hashes, and boot the unchanged A again. Preserve and reuse it;
+do not launch a second self-hosting campaign as though no foundation exists.
 
-First qualify a small C/Rust/XSH-build cohort with declared tools, libraries,
-sources, environment and writable paths, plus explicit seed exceptions (LAP-28).
-No network or ambient host fallback should silently satisfy a missing input.
-Poison undeclared inputs and test OS-enforced authority separately from output
-reproducibility. LAP-10 owns independent rebuild comparisons; LAP-31 owns the
-semantic executor-invalidation contract. Executor provenance alone cannot stop
-reuse after an interpreter change alters recipe meaning.
+The next step is to make that loop routine: change XSH or an in-tree component
+inside Laputa, rebuild the affected package with declared inputs, stage the
+successor through R4/R5, and reboot with the same confirmation/fallback contract
+used for remotely supplied updates. Keep the compiler in Rust; this is
+distribution self-hosting, not language self-implementation.
 
-Then build and run replacement xsh/xsht inside a Laputa VM and use them to
-rebuild that cohort (LAP-29). Expand only after the bounded loop is useful.
-Finally use the in-guest tools and PM to produce a successor bundle and boot it
-through the existing launcher (LAP-30). Declare remaining bootstrap trust rather
-than claiming complete source bootstrap or a self-hosted world prematurely.
+The xsh package's seed products and package-tools' external host-tools base
+remain declared bootstrap boundaries. The current successor proof reuses the
+kernel artifact and is not a claim of complete source bootstrap, production
+remote admission, automatic promotion, or a fully self-hosted world. Do not make
+a whole-world rebuild an entry fee for a useful one-package feedback loop.
 
-**Acceptance:** one qualified target builds its replacement tools, uses them to
-produce the selected successor closure, boots the matching kernel/root bundle,
-and verifies the actual running receipt and behavior. No undeclared host tool
-supplies a missing capability. Preserve the prior system on failure. Keep local
-proof separate from production R4/R5 admission, state migration and fallback;
-Linux and Asterinas require their own evidence; Linux aarch64 is deferred
-pending a macOS aarch64 host via Docker.
+Maintain the closed cohort's declared tools, libraries, sources, environment,
+and writable paths, plus explicit seed exceptions. No network or ambient host
+fallback should silently satisfy a missing input. Poison undeclared inputs and
+test OS-enforced authority separately from output reproducibility. LAP-10 owns
+independent rebuild comparisons; LAP-31 owns semantic executor invalidation.
+Executor provenance alone cannot stop reuse after an interpreter change alters
+recipe meaning. Retain the completed cohort/successor regressions while expanding
+only the slice needed by the installed workflow.
+
+**Acceptance:** one qualified installed target builds its replacement tools or
+selected in-tree package, produces a successor using the normal PM, and activates
+it through the normal system/launcher path. Verify the actual running receipt
+and behavior, preserve the prior system and mutable state on failure, and name
+remaining bootstrap inputs. Keep local development admission distinct from
+production R4/R5 trust. Linux and Asterinas require separate evidence; Linux
+aarch64 remains deferred pending a macOS aarch64 host via Docker.
 
 ## Delivery gates and evidence
 
 | Gate | Required result |
 |---|---|
-| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. LAP-6's aarch64 verification gap is deferred pending a macOS aarch64 host via Docker; resolve or explicitly report LAP-7's visual-proof gap, and LAP-21's QMP retry boundary; missing proof is not a pass. |
+| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. Preserve the in-tree userland regressions and recheck historical TODO gaps against current topic evidence. Linux aarch64 qualification remains separately reported; missing proof is not a pass. |
 | G1: Reliable VM | R1-R3 work together with controlled network/time failure, daemon recovery, dirty-disk handling, independent rescue, and enough persistent diagnostics to explain failures. |
-| G2: Maintainable VM | R4-R7 deliver authenticated updates, observable activation/fallback, safe VM defaults, and a successful restore onto a blank virtual disk. |
+| G2: Remotely maintainable VM | Pass the integrated provision/SSH/inspect/stage/fail-B/recover-A/confirm/blank-disk-restore scenario above using R4-R7 and the G1 foundation. |
 | G3: Optional expansion | R8/R9 are admitted only with a concrete workload, bounded runtime cost, and their own proof; they do not hold G1/G2 hostage. |
-| G4: Self-hosted feedback loop | R10 proves a closed cohort, replacement XSH, and successor boot on a named target; it can advance independently of optional expansion and does not waive G1/G2. |
+| G4: Self-hosted feedback loop | R10 connects the existing cohort/replacement-XSH/successor proof to normal activation on a named target; it can advance independently of optional expansion and does not waive G1/G2. |
 
 Use focused tests first and the existing [testing](TESTING.md) and
 [development](DEVELOPMENT.md) entry points. Reserve `make verify` for an explicitly
