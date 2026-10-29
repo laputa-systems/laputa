@@ -16,7 +16,7 @@ pure primary_dump() -> LinuxNetworkDump {
 }
 
 pure derived_route() -> LinuxNetworkRoute {
-  {attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 1, data: b"\xc0\x00\x02\x00"}, {kind: 7, data: b"\xc0\x00\x02\x02"}, {kind: 4, data: b"\x07\x00\x00\x00"}], destination: "192.0.2.0", destination_prefix_length: 24, family: "inet", flags: 0, gateway: null, input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: "192.0.2.2", priority: null, protocol: 2, route_type: 1, scope: 253, source: null, source_prefix_length: 0, table: 254}
+  {attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 1, data: b"\xc0\x00\x02\x00"}, {kind: 7, data: b"\xc0\x00\x02\x02"}, {kind: 4, data: b"\x07\x00\x00\x00"}], destination: "192.0.2.0", destination_prefix_length: 24, family: "inet", flags: 0, gateway: null, input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: "192.0.2.2", priority: null, protocol: 2, route_type: 1, scope: 253, source: null, source_prefix_length: 0, table: 254, tos: 0}
 }
 
 test test_address_requests_select_exact_local_prefix_and_interface [fs, error] {
@@ -78,7 +78,7 @@ test test_secondary_addresses_block_mutation_without_a_promotion_policy [fs, err
 test test_foreign_route_preferred_source_blocks_even_on_another_interface [fs, error] {
   let plan = fixture_plan()?
   var dump = primary_dump()
-  dump.routes = [{attributes: [], destination: "203.0.113.0", destination_prefix_length: 24, family: "inet", flags: 0, gateway: "198.51.100.1", input_ifindex: null, nexthops: [], output_ifindex: 9, preferred_source: "192.0.2.2", priority: 300, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254}]
+  dump.routes = [{attributes: [], destination: "203.0.113.0", destination_prefix_length: 24, family: "inet", flags: 0, gateway: "198.51.100.1", input_ifindex: null, nexthops: [], output_ifindex: 9, preferred_source: "192.0.2.2", priority: 300, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos: 0}]
   match kernel.network_project_dump(dump, plan.intent, 1) {
     Err(problem) => assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
     Ok(_) => assert false
@@ -121,7 +121,7 @@ test test_customized_kernel_routes_are_never_exempted_as_address_derived [fs, er
 test test_selected_default_routes_require_an_observable_tos_header [fs, error] {
   let plan = fixture_plan()?
   var dump = primary_dump()
-  dump.routes = [{attributes: [], destination: null, destination_prefix_length: 0, family: "inet", flags: 0, gateway: "192.0.2.1", input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: null, priority: 100, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254}]
+  dump.routes = [{attributes: [], destination: null, destination_prefix_length: 0, family: "inet", flags: 0, gateway: "192.0.2.1", input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: null, priority: 100, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos: 0}]
   match kernel.network_project_dump(dump, plan.intent, 1) {
     Err(problem) => assert problem.message == "selected default routes require qualified TOS observations"
     Ok(_) => assert false, "a TOS-specific default cannot establish an ordinary-traffic default"
