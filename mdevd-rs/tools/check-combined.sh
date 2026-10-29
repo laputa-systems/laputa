@@ -37,13 +37,12 @@ fi
 echo "  libudev-zero $actual"
 
 export RUSTFLAGS="-Clinker=mold -Clinker-flavor=ld"
-export RUSTFLAGS="-Clinker=mold -Clinker-flavor=ld"
 echo 'building candidates (musl static)'
-cargo build --locked --release --target x86_64-unknown-linux-musl 2>&1 | tail -n 1
-(cd "$SEATD" && cargo build --locked --release --target x86_64-unknown-linux-musl 2>&1 | tail -n 1)
+cargo build --locked --release --target x86_64-unknown-linux-musl
+(cd "$SEATD" && cargo build --locked --release --target x86_64-unknown-linux-musl)
 # doas links system libcrypt through the cc driver; overriding the linker
 # to bare mold loses the driver's library paths, so build it unflagged.
-(cd "$DOAS" && env -u RUSTFLAGS cargo build --locked --release --target x86_64-unknown-linux-musl 2>&1 | tail -n 1)
+(cd "$DOAS" && env -u RUSTFLAGS cargo build --locked --release --target x86_64-unknown-linux-musl)
 echo 'check-combined: candidate hashes'
 sha256sum \
   "$ROOT/target/x86_64-unknown-linux-musl/release/mdevd" \
