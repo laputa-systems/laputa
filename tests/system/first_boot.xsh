@@ -1,5 +1,6 @@
 ##! Behavior coverage for first-boot identity, Dropbear argv, and the firewall plan.
 use packages.dropbear.service as dropbear_service
+use packages.nftables.service as firewall_service
 use system.first_boot
 
 const ed25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
@@ -254,4 +255,16 @@ test test_dropbear_argv_uses_the_persistent_host_key [error] {
   assert "-R" in ephemeral
   assert ! ("-r" in ephemeral)
   assert ! (persistent in ephemeral)
+}
+
+test test_firewall_plan_runs_nft_once_when_the_config_exists [error] {
+  assert firewall_service.firewall_plan(false).is_empty()
+  let plans = firewall_service.firewall_plan(true)
+  assert plans.len() == 1
+  assert plans[0] == ["/usr/bin/nft", "-f", "/etc/nftables.conf"]
+  firewall_service.firewall_result(0)
+  match firewall_service.firewall_result(1) {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
 }

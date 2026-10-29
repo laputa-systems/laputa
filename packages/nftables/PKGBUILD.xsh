@@ -12,10 +12,13 @@ export const package_kind = "payload"
 export const ver = "1.1.7"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl", "libmnl", "libnftnl"]
+
+## The build installs an xinit service module; xinit runs it at runtime.
+export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
 export const mkdeps_host = ["llvm-toolchain", "linux-headers", "pkgconf"]
@@ -32,6 +35,19 @@ export const upstream_sources = [
       {
         arch: "all",
         sha256: "a6fbf060d8d4fff001517a2b94f356bb4366bfbf0ba366366f9d27cc38caa58f",
+      },
+    ],
+  },
+  {
+    source: p"service.xsh",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
       },
     ],
   },
@@ -61,6 +77,10 @@ export const filetree = [
   },
   {
     path: p"usr/lib/pkgconfig/libnftables.pc",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/xinit/services/firewall.xsh",
     kind: "file",
   },
 ]
@@ -258,4 +278,5 @@ Libs: -L${{libdir}} -lnftables
 Cflags: -I${{includedir}}
 """,
   )
+  fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/firewall.xsh", 0o644, parents: true, overwrite: true)
 }
