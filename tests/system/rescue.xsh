@@ -52,13 +52,17 @@ test test_classify_clean_repaired_and_unrecoverable [error] {
 }
 
 test test_rescue_plan_is_independent_and_stable [error] {
-  let plan = rescue.rescue_plan(image, device, checker)
-  let again = rescue.rescue_plan(image, device, checker)
+  let plan = rescue.rescue_plan(image, device)?
+  let again = rescue.rescue_plan(image, device)?
+  let repair = rescue.rescue_repair_argv(p"/usr/bin/e2fsck", p"/dev/vdb", rescue.RescueUnmounted)?
 
   assert plan.image == image
   assert plan.disk == device
   assert command_has(plan.command, device.display()), "disk"
-  assert checker.display() in plan.command, "e2fsck"
+  assert command_has(plan.command, image.display()), "rescue image"
+  assert repair == ["/usr/bin/e2fsck", "-f", "-p", "/dev/vdb"]
+  assert ! command_has(plan.command, checker.display()), "launch does not run the host checker"
+  assert ! command_has(plan.command, "-f"), "repair is not part of the launch"
   assert ! command_has(plan.command, "-netdev"), "no network"
   assert ! command_has(plan.command, "/usr/bin/xsh"), "not the guest xsh"
   assert ! command_has(plan.command, "/usr/bin/pm"), "not the guest package manager"
@@ -67,4 +71,8 @@ test test_rescue_plan_is_independent_and_stable [error] {
   assert again.image == plan.image
   assert again.disk == plan.disk
   assert again.command == plan.command, "plan is stable"
+  match rescue.rescue_plan(p"/var/rescue/image,raw", device) {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
 }

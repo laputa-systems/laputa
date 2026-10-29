@@ -34,11 +34,21 @@ export pure rescue_classify(status: Int, mount: RescueMount) -> Result[RescueCla
   }
 }
 
-## Rescue command for a detached disk. It does not mount the broken guest or attach a network.
-export pure rescue_plan(image: Path, disk: Path, checker: Path) -> RescuePlan {
-  let image_text = image.display()
-  let disk_text = disk.display()
-  let checker_text = checker.display()
+pure drive_text(file: Path) -> Result[Str, Error] {
+  let text = file.display()
+
+  guard ! ("," in text or " " in text or "\n" in text or "\t" in text) else {
+    fail "rescue path cannot contain a comma or whitespace"
+  }
+
+  text
+}
+
+## QEMU arguments that attach a rescue image and a detached disk. Repair stays a separate e2fsck argv.
+export pure rescue_plan(image: Path, disk: Path) -> Result[RescuePlan, Error] {
+  let image_text = drive_text(image)?
+  let disk_text = drive_text(disk)?
+
   {
     image,
     disk,
@@ -55,10 +65,6 @@ export pure rescue_plan(image: Path, disk: Path, checker: Path) -> RescuePlan {
       f"if=none,id=broken,format=raw,file={disk_text}",
       "-device",
       "virtio-blk-pci,drive=broken",
-      checker_text,
-      "-f",
-      "-p",
-      "/dev/vdb",
     ],
   }
 }
