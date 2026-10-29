@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 44
+Next: 47
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -182,3 +182,33 @@ and real-hardware enablement remain outside that scope.
 - **Progress:** `pm/repo_snapshot.xsh` adds the `laputa-repo-snapshot-v1` boundary reusing the trust-release verification shape (pinned key set with rotation window, 90-day expiry, accepted generation floor); `repo plan` from production remotes requires `XSH_PM_REPO_KEY_FILE` and fails closed, `repo publish-snapshot` publishes the offline-signed snapshot with the signature as linearization point. `file://` and loopback repositories are verified whenever `XSH_PM_REPO_KEY_FILE` is set, and accepted state is persisted atomically with fsync and refuses generation rollback. 19 snapshot tests plus the surrounding pm publish/plan/cli/graph suites pass. Remaining: manual key distribution (no package-seeded repo key), durable accepted state via `XSH_PM_REPO_STATE_DIR`, threshold/multi-signer snapshots, and guest proof of the production fetch path. See [PM snapshot authentication](docs/PM.md#snapshot-authentication).
 - **Fix with:** architect
 - **Effort:** L (weeks)
+
+### LAP-44 · P1 · Prove maintained first boot on a fresh VM
+
+- **Area:** Identity and access
+- **Where:** `system/first_boot.xsh`, `profiles/qemu-maintained.xsh`, `packages/dropbear/`, `packages/nftables/`
+- **Problem:** The long-lived profile is distinct in source, but no VM has booted it, rebooted it, or shown that a bad ruleset leaves the listener down.
+- **Recommendation:** Boot `qemu-maintained` from a first-boot document, reboot, and confirm the Dropbear host key and operator files are unchanged. Confirm a missing or rejected `/etc/nftables.conf` does not start Dropbear. Keep the SSH client in XSH-55.
+- **Progress:** `qemu-maintained` sets `development` false. The other profiles set it true and keep their roots, including autologin in the installer. First-boot documents are rejected before any write. A new operator takes the next free id at or above 1000, a locked shadow entry, and `/usr/bin/xsh` in `/etc/shells` when those files exist. Dropbear uses `/etc/dropbear/dropbear_ed25519_host_key` and creates it only when absent; `XINIT_DROPBEAR_EPHEMERAL=1` is the only `-R` path. The nftables package installs `/etc/nftables.conf`. The firewall oneshot runs `nft -f` once and fails when the file is absent or nft returns non-zero. Ten first-boot tests, seven profile tests, and an xinit check of firewall, dropbear-keygen, and dropbear pass. The ruleset was not rebuilt into an image. A crash during apply can leave a partial tree. Test-mode self-hosting cmdline also carries `LAPUTA_SELF_HOSTING_PROOF=1`; the guest script still requires `LAPUTA_SELF_HOSTING=1`.
+- **Fix with:** security
+- **Effort:** M (days)
+
+### LAP-45 · P1 · Restore a detached disk from an independent rescue boot
+
+- **Area:** Storage repair
+- **Where:** `packages/e2fsprogs/`, `system/rescue.xsh`, `docs/INSTALLER.md`
+- **Problem:** Classification and a launch fragment do not show that a broken guest can be repaired without its own network, package manager, or XSH.
+- **Recommendation:** Build a rescue image that contains `e2fsck`, attach a disposable dirty ext disk, and boot it with serial and no network. Record clean, repaired, and unrecoverable results, including file hashes after a repair.
+- **Progress:** `e2fsprogs` 1.47.2 installs only `usr/bin/e2fsck` for x86_64, built with the package task graph and no shell. The package build printed `e2fsprogs ok: e2fsck -V`. `fsck.ext4` stays the superblock checker. `rescue_repair_argv` is `e2fsck -f -p` for an unmounted or read-only device and errors for a writable mount. Exit 0 is clean, 1 and 2 are repaired, 4 and 8 are unrecoverable, and any other status is failed. `rescue_plan` attaches a read-only rescue image and the detached disk on virtio with serial and no network; a comma or whitespace in either path is rejected. The plan does not boot the image. Four rescue tests pass.
+- **Fix with:** reference-parity
+- **Effort:** M (days)
+
+### LAP-46 · P1 · Select the fallback generation from the host launcher
+
+- **Area:** Activation
+- **Where:** `system/activation.xsh`, `system/qemu.xsh`
+- **Problem:** The activation record can fall back in a host-side test, but the launcher still boots whatever disk it was given.
+- **Recommendation:** Have the direct-kernel launcher read the record, boot the pending generation, and fall back after the recorded attempt limit. Keep the guest from rolling itself back. Do not put this in a package script.
+- **Progress:** `system/activation.xsh` installs a receipt, stages a candidate without changing current, begins a boot, confirms health only for the pending id, and clears a pending boot after two failures while current stays on the fallback. The lock is an exclusive `fs.mknod`, and record writes are temp file, fsync, rename, directory fsync. Ten activation tests pass. No guest reboot has been run. The QEMU launcher is unchanged.
+- **Fix with:** durable-state
+- **Effort:** M (days)

@@ -348,6 +348,11 @@ Distinguish clean, repaired, and unrecoverable results; verify known file hashes
 and metadata after recoverable cases. Boot the rescue environment independently
 and restore an unusable virtual disk. Journaling is not a backup policy.
 
+`e2fsprogs` builds `e2fsck` without a shell, and `system/rescue.xsh` classifies
+a detached repair. The launch fragment attaches the rescue image and the disk
+with no network. It does not boot a rescue image, and a dirty-disk restore has
+not been run.
+
 ## R4: Authenticate repository and trust delivery
 
 The signed repository-snapshot boundary already exists in `pm/repo_snapshot.xsh`
@@ -440,6 +445,10 @@ mutable state. Rescue still works when neither normal generation boots. Linux
 and Asterinas results are recorded separately; Linux aarch64 is deferred pending
 a macOS aarch64 host via Docker.
 
+`system/activation.xsh` records install, stage,
+pending boot, health confirmation, and fallback after two failed attempts. The
+launcher does not yet select that record, and no guest reboot has been run.
+
 ## R6: Separate disposable development from long-lived VM policy
 
 Start this track alongside R1/R2: a secure, reachable first boot and useful SSH
@@ -522,6 +531,12 @@ reboot with stable identity, partial provisioning, network loss, and disconnect
 after a mutation; preserve recovery access and do not duplicate side effects.
 Selected privilege/isolation limits are verified inside the guest. The
 development profile remains convenient and visibly distinct.
+
+`qemu-maintained` sets `development` false; the other profiles set it true and
+keep their roots. First boot is validated before any write, Dropbear keeps one
+ed25519 host key, and the nftables package installs the filter ruleset whose
+oneshot fails closed when the file is absent. No fresh VM boot has been run.
+The SSH client remains XSH-55.
 
 ## R7: Backups, timers, and persistent diagnostics
 

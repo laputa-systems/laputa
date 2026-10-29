@@ -323,6 +323,9 @@ docker run --rm --network none --platform "$PLATFORM" \
 `profiles/qemu-dwl-foot.xsh` owns `package_roots`, `forbidden_packages`, and
 `forbidden_sonames`. The profile build checks the runtime closure against
 these exclusions before execution and checks sonames in the composed files.
+`profiles/qemu-maintained.xsh` is the long-lived profile and sets `development`
+false. Its roots add Dropbear, nftables, and laputa-net. The other profiles set
+`development` true and keep their current roots.
 
 ## Derived state
 
