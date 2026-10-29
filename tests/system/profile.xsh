@@ -56,6 +56,7 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "libpipewire",
     "libpulse",
   ]
+  assert value.development
 }
 
 test test_profile_load_rejects_unknown_and_path_names [fs, error] {
@@ -95,6 +96,7 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       vt_away_marker: "",
       vt_back_marker: "",
     },
+    development: true,
   )
   profile.validate_system_profile(valid)
   match profile.validate_system_profile({...valid, package_roots: ["one", "one"]}) {
@@ -150,4 +152,22 @@ test test_forbidden_soname_entries_match_versioned_sonames [fs, error] {
   for soname in ["libc.so", "libEGL.so.1", "libgallium-26.2.4.so", "libLLVMish.so"] {
     assert ! profile.soname_is_forbidden(value, soname), soname
   }
+}
+
+test test_qemu_maintained_profile_is_not_a_development_image [fs, error] {
+  let value = profile.load_system_profile("qemu-maintained", profiles_root())?
+  assert ! value.development
+  assert "dropbear" in value.package_roots
+  assert "nftables" in value.package_roots
+  assert ! ("dwl-minimal" in value.package_roots)
+  assert value.kernel_package == "linux"
+  assert value.kernel_path == p"boot/vmlinuz"
+  assert value.qemu_smp == 2
+  assert value.qemu_memory == "1536M"
+  assert value.qemu_width == 1280
+  assert value.qemu_height == 800
+  assert value.proof.cmdline_flag.starts_with("LAPUTA_MAINTAINED_PROOF_")
+  assert value.proof.ready_marker.starts_with("LAPUTA_MAINTAINED_PROOF_")
+  assert value.proof.success_marker.starts_with("LAPUTA_MAINTAINED_PROOF_")
+  assert value.proof.failure_marker.starts_with("LAPUTA_MAINTAINED_PROOF_")
 }

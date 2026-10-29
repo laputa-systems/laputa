@@ -51,4 +51,5 @@ export let profile: types.SystemProfile = types.SystemProfile(
     vt_away_marker: "",
     vt_back_marker: "",
   },
+  development: true,
 )

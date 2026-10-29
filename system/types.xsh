@@ -33,6 +33,7 @@ export type SystemProfile = {
   forbidden_packages: List[Str],
   forbidden_sonames: List[Str],
   proof: ProofMarkers,
+  development: Bool,
 }
 
 ## Errors raised when a profile or system command violates its declared contract.

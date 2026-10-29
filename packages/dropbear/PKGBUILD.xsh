@@ -11,7 +11,7 @@ export const package_kind = "payload"
 export const ver = "2026.94"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "zlib"]
@@ -50,6 +50,19 @@ export const upstream_sources = [
       },
     ],
   },
+  {
+    source: p"dropbear-keygen.xsh",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
+  },
 ]
 
 ## Exported declaration `filetree`.
@@ -72,6 +85,10 @@ export const filetree = [
   },
   {
     path: p"usr/lib/xinit/services/dropbear.xsh",
+    kind: "file",
+  },
+  {
+    path: p"usr/lib/xinit/services/dropbear-keygen.xsh",
     kind: "file",
   },
 ]
@@ -478,4 +495,11 @@ Local customisation goes in localoptions.h
 
   fp"{dest}/etc/dropbear".mkdir()
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/dropbear.xsh", 0o644, parents: true, overwrite: true)
+  fs.install(
+    p"dropbear-keygen.xsh",
+    fp"{dest}/usr/lib/xinit/services/dropbear-keygen.xsh",
+    0o644,
+    parents: true,
+    overwrite: true,
+  )
 }
