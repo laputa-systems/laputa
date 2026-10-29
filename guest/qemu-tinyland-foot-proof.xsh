@@ -38,6 +38,67 @@ proc guest_wait_for(path_value: Path, phase: Str, seconds: Int) {
   }
 }
 
+proc guest_wait_for_removed(path_value: Path, phase: Str, seconds: Int) {
+  var elapsed = 0
+  while path_value.exists() {
+    if elapsed >= seconds {
+      guest_fail(phase, f"{path_value} still present")
+    }
+
+    if elapsed % 10 == 0 {
+      guest_tick(f"{phase}-wait")
+    }
+
+    time.sleep(1s)
+    elapsed += 1
+  }
+}
+
+proc guest_find_input(name: Str, phase: Str) -> Result[Path, Error] {
+  for entry in g"/dev/input/event*" {
+    let candidate = fp"/sys/class/input/{entry.name}/device/name"
+
+    if candidate.exists() and candidate.read_text()?.trim() == name {
+      return entry
+    }
+  }
+
+  guest_fail(phase, f"no input device named {name}")
+  return Err(GuestProofError.Failed(phase:, message: f"no input device named {name}"))
+}
+
+## Resolve the PCI address behind an input event node through sysfs, so the
+## guest can remove the device itself: unplug must not depend on host
+## scheduling.
+proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
+  let link = fp"/sys/class/input/{event_name}"
+  let target = link.readlink()?
+  let physical = if target.starts_with("/") {
+    fp"{target}"
+  } else {
+    fp"{link.parent.display()}/{target}".normalize()
+  }
+
+  for component in physical.display().split("/") {
+    if component.starts_with("0000:") {
+      return component
+    }
+  }
+
+  guest_fail(phase, f"no PCI parent for {event_name}")
+  return Err(GuestProofError.Failed(phase:, message: f"no PCI parent for {event_name}"))
+}
+
+proc guest_process_alive(pid: Int) [process, error] -> Result[Bool, Error] {
+  for entry in process.list()? {
+    if entry.pid == pid {
+      return true
+    }
+  }
+
+  false
+}
+
 proc guest_run_required(command: Command, phase: Str) {
   if let Ok(status) = process.run(command) {
     if ! status.ok {
@@ -158,6 +219,30 @@ proc main() [fs, process, time, error] {
   guest_wait_for(/run/user/1000/laputa-direct-denied, "direct-deny-crash-restart", 30)
   guest_wait_for(/run/user/1000/laputa-foot-read-ready, "foot-crash-restart", 30)
   guest_tick("crash-recovered")
+
+  # R3: supported device loss. Resolve the virtio keyboard's event node and
+  # PCI address by name, remove it through sysfs, and require the session
+  # to survive on the remaining AT keyboard with no stuck modifiers. The
+  # guest drives removal itself so the outcome never depends on host
+  # scheduling; the observed sequence matches a host unplug (REMOVE uevent,
+  # ENODEV to open handles, node gone).
+  let virtio_event = guest_find_input("QEMU Virtio Keyboard", "device-loss")?
+  let virtio_pci = guest_pci_of_input(virtio_event.name, "device-loss")?
+  guest_console(f"LAPUTA_TINYLAND_UNPLUG target={virtio_event.display()} pci={virtio_pci}")
+  fp"/sys/bus/pci/devices/{virtio_pci}/remove".write("1")?
+  guest_wait_for_removed(virtio_event, "device-loss", 60)
+  guest_tick("unplugged")
+  time.sleep(2s)
+
+  let survivor_pid = p"/run/user/1000/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+
+  if !guest_process_alive(survivor_pid)? {
+    guest_fail("device-loss", "compositor died on single keyboard loss")
+  }
+
+  if ! p"/run/user/1000/laputa-foot-read-ready".exists() {
+    guest_fail("device-loss", "foot reader died on single keyboard loss")
+  }
 
   # R3: broker loss must fail closed. SIGKILL seatd: the session cannot
   # reopen or fall back to direct open, so it exits; a fresh broker reclaims

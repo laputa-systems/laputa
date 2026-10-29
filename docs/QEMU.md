@@ -80,7 +80,8 @@ marker; inspect `console.log` and `qemu.log` first when it fails.
 
 The tinyland profile additionally requires the direct-open denial marker:
 unprivileged opens of the DRM and evdev nodes must fail while the brokered
-session succeeds.
+session succeeds. Its proof also covers lifecycle behind pre-readiness
+markers: compositor crash reclaim and broker-loss fail-closed restart.
 
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed

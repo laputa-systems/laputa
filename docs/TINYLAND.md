@@ -36,7 +36,7 @@ dwl, wlroots, libinput, libdrm, mesa, wayland-server, or xwayland
 
 Gate status: 1 done; 2 done against the exact Laputa chain (foot 1.28.0,
 Rust seatd, Rust mdevd, Laputa image); 3 done (app exit, compositor crash,
-broker loss); 4 measured for the current closure.
+broker loss, device loss); 4 measured for the current closure.
 
 ## Locked decisions
 
@@ -130,18 +130,28 @@ silently. tinyland `e40d653` polls the session fd for hangup before
 dispatching; the recipe re-pinned to it and the guest phase re-qualified
 the exact new input.
 
-Open: supported device loss (device-del harness next).
+Open: none in the static VM. Supported device loss is guest-proven: after
+crash recovery the proof resolves the virtio keyboard's PCI address by name
+and removes it through sysfs, and the session survives on the remaining AT
+keyboard — `TINYLAND_INPUT_LOST remaining=1`, node gone, no stuck
+modifiers, post-loss input still flows to the OK marker. The guest drives
+removal itself so the outcome never depends on host scheduling; the
+observed sequence matches a host unplug (REMOVE uevent, ENODEV to open
+handles, node gone). ENODEV on one of N keyboards drops just that device
+(modifiers reset), exit only at zero.
 
 ### R4 — VT-bound profile
 
 A VT-bound variant of the profile with real VT switching: VT-bound seatd
 session, switch handling, disable/resume with reestablished input and no
 stuck modifiers or reused revoked descriptors. Tinyland implements the
-resume path but it has never been guest-proven. Blocked on the harness:
-the proof machine is serial-only virtio-GPU with no tty0, so a VT-bound
-variant needs a different QEMU machine (display/keyboard/VTs) plus a new
-proof path for switch handling — substantially more than a profile flag.
-Next after R3, not tonight.
+resume path but it has never been guest-proven. The kernel prerequisites
+have landed on x86_64 (`CONFIG_VT`, `CONFIG_VT_CONSOLE`,
+`CONFIG_FRAMEBUFFER_CONSOLE`, `CONFIG_HOTPLUG_PCI_PCIE` with its port
+driver, all olddefconfig-derived and dwl-regression-green); aarch64 keeps
+the previous config until its qualification unblocks. Remaining: the
+profile variant and the switch/resume proof path on the existing serial
+plus QMP-key-driven machine (no new QEMU devices needed).
 
 ### R5 — device node ownership follow-up — landed
 
@@ -175,6 +185,16 @@ seatd-rs nor mdevd-rs has release tags (their staged contracts pin
 `e32d931` and `4334f17` with measured hashes), so there are no published
 tarballs to migrate the recipe sources to yet. When tags exist, migrate
 off the pinned git SHAs and re-qualify the exact new inputs.
+
+Consolidation (owner-approved): move tinyland, seatd-rs, and mdevd-rs
+in-tree as pure source (`repository/<name>`, one-time `git subtree add`
+per repo to preserve history), then point the recipes at the local trees
+and archive the old repos read-only. Carry everything: docs, harnesses,
+tests, benches. Drop `.github/` — Laputa's package proofs and guest
+qualifications replace hosted CI as the gate; do not recreate per-repo
+workflows inside the monorepo. Keep `xsh` a separate checkout (the
+substrate boundary runs one way), and leave `doas-rs` out until it becomes
+a real package input.
 
 ### R8 — dwl default swap and removal (owner decision)
 
