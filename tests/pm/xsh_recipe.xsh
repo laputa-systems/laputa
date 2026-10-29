@@ -26,12 +26,11 @@ test xsh_seed_installs_declared_applet_links_and_keeps_libraries_private [fs, en
   }
 
   let applet_paths = [entry.path for entry in xsh_recipe.filetree if entry.kind == "symlink"]
-  for command_name in ["arch", "id"] {
+  for command_name in ["arch", "id", "su"] {
     let relative = fp"usr/bin/{command_name}"
     assert relative in applet_paths, f"installed applet {command_name} is missing from the payload contract"
     assert fp"{dest}/{relative}".readlink()? == fp"../lib/xsh/core/{command_name}"
   }
-  assert ! fp"{dest}/usr/bin/su".exists()?
   assert ! fp"{dest}/usr/bin/identity.xsh".exists()?
   assert fp"{dest}/usr/lib/xsh/core/lib/identity.xsh".exists()?
   assert fp"{dest}/usr/bin/sh".readlink()? == p"xshi"

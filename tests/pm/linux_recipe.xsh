@@ -274,6 +274,7 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
     fp"{root}/usr/bin/cat",
     fp"{root}/usr/bin/ifup",
     fp"{root}/usr/bin/env",
+    fp"{root}/usr/bin/su",
     fp"{root}/usr/lib/xsh/core/cat",
   ] {
     path_value.write("typed xsh proof fixture\n")

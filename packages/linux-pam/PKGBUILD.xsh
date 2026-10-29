@@ -47,10 +47,6 @@ export const filetree = [
     kind: "file",
   },
   {
-    path: p"etc/pam.d/sudo",
-    kind: "file",
-  },
-  {
     path: p"etc/security/access.conf",
     kind: "file",
   },
@@ -435,13 +431,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   fp"{dest}/etc/environment".remove()
   fp"{dest}/usr/bin/unix_chkpwd".chmod(0o4755)
   fp"{dest}/etc/pam.d".mkdir()
-
-  fp"{dest}/etc/pam.d/sudo".write(
-    """auth required /usr/lib/security/pam_unix.so
-account required /usr/lib/security/pam_permit.so
-session required /usr/lib/security/pam_permit.so
-""",
-  )
 
   fp"{dest}/etc/pam.d/su".write(
     """auth sufficient /usr/lib/security/pam_rootok.so

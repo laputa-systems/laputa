@@ -85,7 +85,7 @@ against the mirror on the host, requires every node to be an exact mirror
 artifact, imports them into a fresh store under the work tree's `packages/`,
 and composes target, installer, and image-tools roots from that one plan.
 Composition is file extraction on the host; no container writes into the work
-tree. The target root adds the kernel, `sudo-rs`, and `ca-certificates` (the
+tree. The target root adds the kernel, `doas-rs`, and `ca-certificates` (the
 trust seeds the installer bootstraps from), the installer and tools
 roots add `laputa-fs`, and the QEMU test adds Dropbear to the target. Installer
 files are overlaid after composition, so image roots carry no PM generation
@@ -114,7 +114,7 @@ installer ext4 root.
    `linux.mkswap`.
 4. Extracts the target-root tarball, installs the fallback EFI kernel files on
    the ESP, and writes hostname, fstab, static networking, the `pazu` user,
-   passwordless wheel sudo, and autologin on the serial console and `tty1`.
+   passwordless wheel doas, and autologin on the serial console and `tty1`.
 5. Unmounts and asks for installer removal.
 
 CI mode forces an 8M swap partition so the 128M disk fits. Normal mode uses 2x

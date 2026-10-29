@@ -142,6 +142,10 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"etc/doas.conf",
+    kind: "file",
+  },
+  {
     path: p"etc/environment",
     kind: "file",
   },
@@ -187,10 +191,6 @@ export const filetree = [
   },
   {
     path: p"etc/shells",
-    kind: "file",
-  },
-  {
-    path: p"etc/sudoers",
     kind: "file",
   },
   {

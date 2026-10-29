@@ -127,7 +127,7 @@ proc normalize_target_ownership(root: Path) {
   for path_value in [
     fp"{root}/usr/bin/passwd",
     fp"{root}/usr/bin/su",
-    fp"{root}/usr/bin/sudo",
+    fp"{root}/usr/bin/doas",
     fp"{root}/usr/bin/unix_chkpwd",
   ] {
     if path_value.exists() {

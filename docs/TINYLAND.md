@@ -53,7 +53,7 @@ broker loss, device loss); 4 measured for the current closure.
   statically; the image ships only the shared library, so the recipe
   patches the vendored crate to a dylib link.
 - `panic=abort` plus `gnu-stubs` for the GCC runtime: the image has no
-  libgcc provider package, and sudo-rs sets the same precedent.
+  libgcc provider package, and doas-rs sets the same precedent.
 - The guest session runs as `laputa` via `su` + `/usr/bin/xsh`
   (`/usr/bin/xshi` is disabled in the guest). XDG_RUNTIME_DIR is
   laputa-owned 0700; there is no working `chown` in the image, so the

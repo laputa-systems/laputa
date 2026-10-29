@@ -10,7 +10,6 @@ proc main(rootfs = /rootfs) [fs, process, env, error] {
     p"usr/lib/security/pam_rootok.so",
     p"usr/lib/security/pam_permit.so",
     p"usr/lib/security/pam_deny.so",
-    p"etc/pam.d/sudo",
     p"etc/pam.d/su",
     p"etc/pam.d/su-l",
   ] {

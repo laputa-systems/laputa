@@ -25,15 +25,15 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
   let root = path.absolute(p".")?
   let cargo_aarch64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.target_aarch64())?
   let cargo_x86_64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.target_x86_64())?
-  let sudo_aarch64 = recipe.load_package_for_target(fp"{root}/packages/sudo-rs", types.target_aarch64())?
-  let sudo_x86_64 = recipe.load_package_for_target(fp"{root}/packages/sudo-rs", types.target_x86_64())?
+  let doas_aarch64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.target_aarch64())?
+  let doas_x86_64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.target_x86_64())?
 
   assert cargo_aarch64.ver == "1.99.0"
   assert cargo_x86_64.ver == "1.99.0"
-  assert sudo_aarch64.ver == "0.2.15"
-  assert sudo_x86_64.ver == "0.2.15"
+  assert doas_aarch64.ver == "0.1.0"
+  assert doas_x86_64.ver == "0.1.0"
   assert serialized_sources(cargo_aarch64)? == serialized_sources(cargo_x86_64)?
-  assert serialized_sources(sudo_aarch64)? == serialized_sources(sudo_x86_64)?
+  assert serialized_sources(doas_aarch64)? == serialized_sources(doas_x86_64)?
   let expected_cargo_rust_std = {
     source: "https://static.rust-lang.org/dist/2026-10-01/rust-std-VERSION-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
@@ -43,7 +43,7 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
       {arch: "x86_64", sha256: "b106b0aa4565cc3525fd3161c69203a9e39044e6e6b4d618f261c3eeda14ad50"},
     ],
   }
-  let expected_sudo_rust_std = {
+  let expected_doas_rust_std = {
     source: "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
     architectures: ["all"],
@@ -73,39 +73,28 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
     },
     expected_cargo_rust_std,
   ]
-  let expected_sudo_sources = [
+  let expected_doas_sources = [
     {
-      source: "https://static.crates.io/crates/sudo-rs/sudo-rs-VERSION.crate",
+      source: "repository/doas-rs",
       kind: "auto",
       architectures: ["all"],
       checksums: [
-        {arch: "aarch64", sha256: "2feba7868bd3c057f8362302112d00a18fd6ff458baa3c779c9254b761052a87"},
-        {arch: "x86_64", sha256: "2feba7868bd3c057f8362302112d00a18fd6ff458baa3c779c9254b761052a87"},
+        {arch: "all", sha256: "SKIP"},
       ],
     },
     {
-      source: "https://static.crates.io/crates/glob/glob-0.3.4.crate => vendor/glob-0.3.4",
-      kind: "auto",
+      source: "repository/doas-rs/Cargo.lock => vendor",
+      kind: "cargo-vendor",
       architectures: ["all"],
       checksums: [
-        {arch: "aarch64", sha256: "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"},
-        {arch: "x86_64", sha256: "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"},
+        {arch: "all", sha256: "SKIP"},
       ],
     },
-    {
-      source: "https://static.crates.io/crates/libc/libc-0.2.189.crate => vendor/libc-0.2.189",
-      kind: "auto",
-      architectures: ["all"],
-      checksums: [
-        {arch: "aarch64", sha256: "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"},
-        {arch: "x86_64", sha256: "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"},
-      ],
-    },
-    expected_sudo_rust_std,
+    expected_doas_rust_std,
   ]
 
   assert serialized_sources(cargo_aarch64)? == json.encode(expected_cargo_sources)?
-  assert serialized_sources(sudo_aarch64)? == json.encode(expected_sudo_sources)?
+  assert serialized_sources(doas_aarch64)? == json.encode(expected_doas_sources)?
   assert expanded_sources(cargo_aarch64, "aarch64") == [
     "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-aarch64-unknown-linux-musl.tar.xz => cargo",
     "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-aarch64-unknown-linux-musl.tar.xz => rustc",
@@ -116,9 +105,9 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
     "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-x86_64-unknown-linux-musl.tar.xz => rustc",
     "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-x86_64-unknown-linux-musl.tar.xz => rust-std",
   ]
-  assert util.expand_source(sudo_aarch64.upstream_sources[3].source.display(), sudo_aarch64, "aarch64", "aarch64") ==
+  assert util.expand_source(doas_aarch64.upstream_sources[2].source.display(), doas_aarch64, "aarch64", "aarch64") ==
     "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-aarch64-unknown-linux-musl.tar.xz => rust-std"
-  assert util.expand_source(sudo_x86_64.upstream_sources[3].source.display(), sudo_x86_64, "x86_64", "x86_64") ==
+  assert util.expand_source(doas_x86_64.upstream_sources[2].source.display(), doas_x86_64, "x86_64", "x86_64") ==
     "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-x86_64-unknown-linux-musl.tar.xz => rust-std"
 
   let rust_std = cargo_aarch64.upstream_sources[2]

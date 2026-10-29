@@ -13,7 +13,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "xinit",
     "mdevd-rs",
     "seatd-rs",
-    "sudo-rs",
+    "doas-rs",
     "tinyland",
     "foot-minimal",
   ],

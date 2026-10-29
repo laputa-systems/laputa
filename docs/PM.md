@@ -187,7 +187,7 @@ recipe's source string and checksum, never where the bytes came from.
 pins and add those bytes to the cache. `repo outdated` also contacts its
 explicitly selected upstream release API.
 
-`packages/upstream_pins.xsh` owns shared upstream pins. `cargo` and `sudo-rs`
+`packages/upstream_pins.xsh` owns shared upstream pins. `cargo` and `doas-rs`
 use its Rust distribution date and target standard-library checksums. `linux`,
 `linux-headers`, and `perf` use its kernel version and source record. Update
 those declarations once when changing a shared upstream release.

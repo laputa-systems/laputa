@@ -206,8 +206,8 @@ proc assert_ssh_smoke(
   wait_for_ssh(pid, kill, tail, ssh, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
 
   # xinit status uses signal-0 liveness which gets EPERM across UIDs
-  # (SSH user is pazu, dropbear runs as root). Use sudo.
-  let status = ssh_guest(ssh, ssh_key, port, known_hosts, "run /usr/bin/sudo /usr/bin/xinit status dropbear ?")?
+  # (SSH user is pazu, dropbear runs as root). Use doas.
+  let status = ssh_guest(ssh, ssh_key, port, known_hosts, "run /usr/bin/doas /usr/bin/xinit status dropbear ?")?
 
   if ! ("dropbear running" in status) {
     print $status

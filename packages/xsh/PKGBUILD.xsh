@@ -115,6 +115,7 @@ export const filetree = [
   {path: p"usr/bin/stat", kind: "symlink"},
   {path: p"usr/bin/strings", kind: "symlink"},
   {path: p"usr/bin/stty", kind: "symlink"},
+  {path: p"usr/bin/su", kind: "symlink"},
   {path: p"usr/bin/system-report", kind: "symlink"},
   {path: p"usr/bin/tac", kind: "symlink"},
   {path: p"usr/bin/tail", kind: "symlink"},
@@ -186,7 +187,7 @@ export proc build(dest: Path) [fs, env, error] {
   archive.tar_extract(fp"{seed}/core.tar.xz", core.parent, 0, "xz", true)
   let command_links = [item.path.display() for item in filetree if item.kind == "symlink"]
 
-  for entry in fs.children(core)? |> where .kind == "file" and .name != "su" {
+  for entry in fs.children(core)? |> where .kind == "file" {
     continue unless fp"usr/bin/{entry.name}".display() in command_links
     fp"{dest}/usr/bin/{entry.name}".symlink(to: fp"../lib/xsh/core/{entry.name}")
   }

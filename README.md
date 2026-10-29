@@ -17,7 +17,7 @@ make installer-qemu-manual
 Inside the guest, run `setup-laputa` to choose an installation disk, or
 `setup-laputa --ci` for the harness's small test disk. Installation repartitions
 the selected disk. The installed system creates user `pazu`, serial and tty1
-autologin, and passwordless wheel sudo.
+autologin, and passwordless wheel doas.
 
 The manual harness writes its ISO, matching kernel, and target disk under
 `target/laputa-installer/`. Image creation and the automated installation

@@ -10,5 +10,6 @@ proc main(root = /rootfs) [fs, error] {
   proof.ensure(fp"{root}/usr/bin/cat".exists()?, "proof-xsh", "missing xsh cat applet")
   proof.ensure(fp"{root}/usr/bin/ifup".exists()?, "proof-xsh", "missing xsh ifup applet")
   proof.ensure(fp"{root}/usr/bin/env".exists()?, "proof-xsh", "missing xsh env applet")
+  proof.ensure(fp"{root}/usr/bin/su".exists()?, "proof-xsh", "missing xsh su applet")
   print "xsh ok"
 }

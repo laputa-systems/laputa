@@ -336,7 +336,7 @@ host via Docker.
 
 ## R6: Separate disposable development from long-lived VM policy
 
-Keep current autologin/passwordless-sudo conveniences in an explicitly selected
+Keep current autologin/passwordless-doas conveniences in an explicitly selected
 development profile, not as an implicit policy for unattended reachable VMs.
 Define first-boot identity/key provisioning, least-privilege service execution,
 secret ownership, and supported remote administration without shared default
