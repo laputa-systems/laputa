@@ -187,9 +187,10 @@ tarballs to migrate the recipe sources to yet. When tags exist, migrate
 off the pinned git SHAs and re-qualify the exact new inputs.
 
 Consolidation (owner-approved): move tinyland, seatd-rs, and mdevd-rs
-in-tree as pure source (`repository/<name>`, one-time `git subtree add`
-per repo to preserve history), then point the recipes at the local trees
-and archive the old repos read-only. Carry everything: docs, harnesses,
+in-tree as top-level source trees (one-time history-preserving merge per
+repo; recipes address them as `repository/` sources, which the PM resolves
+against the checkout root and content-hashes into the plan), then point
+the recipes at the local trees and archive the old repos read-only. Carry everything: docs, harnesses,
 tests, benches. Drop `.github/` — Laputa's package proofs and guest
 qualifications replace hosted CI as the gate; do not recreate per-repo
 workflows inside the monorepo. Keep `xsh` a separate checkout (the

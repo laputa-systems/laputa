@@ -33,15 +33,16 @@ export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers", "muon", 
 export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
-## The Rust daemon pins the qualified seatd-rs head: the scope that passed
-## the staged guest and protocol proofs with docs/harness-only delta to the
-## measured binaries. The Cargo.lock pin vendors every locked crates.io
-## crate beside the extracted tree; the PM verifies each crate against it.
+## The Rust daemon lives in this monorepo as a top-level tree; the recipe
+## addresses it as a `repository/` source, which the PM resolves against
+## the checkout root and hashes into the plan fingerprint, so no URL pin
+## is needed. The Cargo.lock pin vendors every locked crates.io crate
+## beside the tree; the PM verifies each crate against it.
 ## The C release tarball builds only the libseat client library the
 ## tinyland compositor links; the daemon binary always comes from Rust.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/seatd-rs/archive/e32d93117f24aaddfc64be8a07104a36a28c927c.tar.gz",
+    source: p"repository/seatd-rs",
     kind: "auto",
     architectures: [
       "all",
@@ -49,12 +50,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "e237fc42541eba79c77a573b1b019c6acbede7dfc91e5d409548382e484dae1c",
+        sha256: "SKIP",
       },
     ],
   },
   {
-    source: p"https://raw.githubusercontent.com/laputa-systems/seatd-rs/e32d93117f24aaddfc64be8a07104a36a28c927c/Cargo.lock => vendor",
+    source: p"repository/seatd-rs/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",
@@ -62,7 +63,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "77e0f156bd0bcfb8e3606baeff6b7f18bad72caf88f438d5acd1ea8599be9510",
+        sha256: "SKIP",
       },
     ],
   },

@@ -29,14 +29,14 @@ export const mkdeps_host = ["cargo", "llvm-toolchain"]
 export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
-## The Rust port at the staged head: tip `4334f17` with docs-only delta to
-## the qualified `c3f4593` (guest, protocol, and combined-run proofs green
-## there; no `src/` delta since). The Cargo.lock pin vendors every locked
-## crates.io crate beside the extracted tree; the PM verifies each crate
-## against Cargo.lock.
+## The Rust port lives in this monorepo as a top-level tree; the recipe
+## addresses it as a `repository/` source, which the PM resolves against
+## the checkout root and hashes into the plan fingerprint, so no URL pin
+## is needed. The Cargo.lock pin vendors every locked crates.io crate
+## beside the tree; the PM verifies each crate against Cargo.lock.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/mdevd-rs/archive/4334f173134f3b952f52adb454a6573a54e8e666.tar.gz",
+    source: p"repository/mdevd-rs",
     kind: "auto",
     architectures: [
       "all",
@@ -44,12 +44,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "33b93330ce4ec7ed310a5deb064eceefec212f33592c9fe840c26288b64c927c",
+        sha256: "SKIP",
       },
     ],
   },
   {
-    source: p"https://raw.githubusercontent.com/laputa-systems/mdevd-rs/4334f173134f3b952f52adb454a6573a54e8e666/Cargo.lock => vendor",
+    source: p"repository/mdevd-rs/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",

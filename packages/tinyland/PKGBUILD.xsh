@@ -31,15 +31,14 @@ export const runtime_only_deps = ["xkeyboard-config"]
 export const mkdeps_host = ["cargo", "llvm-toolchain"]
 
 ## Package recipe export.
-## The source tarball and Cargo.lock pin the qualified upstream commit
-## (GitHub prerelease workflow, green tests plus musl build; e40d653 adds
-## the dispatch hangup check that makes daemon loss fatal, 7079c66 survives
-## single keyboard loss). The cargo-vendor entry vendors every locked
-## crates.io crate beside the extracted tree; the PM verifies each crate
-## against Cargo.lock.
+## The compositor lives in this monorepo as a top-level tree; the recipe
+## addresses it as a `repository/` source, which the PM resolves against
+## the checkout root and hashes into the plan fingerprint, so no URL pin
+## is needed. The cargo-vendor entry vendors every locked crates.io crate
+## beside the tree; the PM verifies each crate against Cargo.lock.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/tinyland/archive/7079c665740365dbbc5a2e5b1b3ced0b56b377bb.tar.gz",
+    source: p"repository/tinyland",
     kind: "auto",
     architectures: [
       "all",
@@ -47,12 +46,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "0be08d4e345e757499eeec156596f38e710d3a1bc4631ad50441e5dbda2c88f0",
+        sha256: "SKIP",
       },
     ],
   },
   {
-    source: p"https://raw.githubusercontent.com/laputa-systems/tinyland/7079c665740365dbbc5a2e5b1b3ced0b56b377bb/Cargo.lock => vendor",
+    source: p"repository/tinyland/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",
@@ -60,7 +59,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "f07572d3e86361e635713de20d4b8e1d7f698b8405bae4e10e1bce3d3182df1e",
+        sha256: "SKIP",
       },
     ],
   },
