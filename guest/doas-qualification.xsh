@@ -102,7 +102,7 @@ proc qualification_restricted_policy() [fs, process, time, error] {
   assert ! p"/run/doas-qualification/unauthorized-command".exists()?
 }
 
-proc qualification_run() [fs, process, time, error] {
+proc qualification_run() [fs, process, time, net, error] {
   let executable = p"/usr/bin/doas".metadata()?
   let root_user = user.lookup("root")?
   assert executable.kind == "file" and executable.uid == root_user.uid and executable.setuid
@@ -154,6 +154,11 @@ proc qualification_run() [fs, process, time, error] {
   while events.is_empty() and tries < 300 {
     time.sleep(100ms)?
     events = unix.reap_child_events()?.collect()
+    for chunk in range(0, 16) {
+      let _ = chunk
+      if ! ("readable" in unix.poll_fd(pty.master, ["readable"], timeout_ms: 0)?) { break }
+      p"/dev/console".write(unix.read_fd(pty.master, 4096)?)?
+    }
     tries += 1
   }
   if events.is_empty() {
@@ -168,7 +173,7 @@ proc qualification_run() [fs, process, time, error] {
   print "LAPUTA_DOAS_QUALIFICATION_OK"
 }
 
-proc main(...argv: List[Str]) [fs, process, time, error] {
+proc main(...argv: List[Str]) [fs, process, time, net, error] {
   if argv.is_empty() {
     qualification_run()?
   } else if argv == ["detached"] {
