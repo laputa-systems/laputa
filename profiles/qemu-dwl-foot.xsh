@@ -48,5 +48,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY",
     success_marker: "LAPUTA_DWL_FOOT_PROOF_OK",
     failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
+    vt_away_marker: "",
+    vt_back_marker: "",
   },
 )

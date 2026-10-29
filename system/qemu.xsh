@@ -22,7 +22,7 @@ export type QemuTarget = {
 ## The host executable, QMP helper, and host target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: QemuTarget}
 
-enum QmpOperation { QmpReady, QmpInput, QmpScreenshot(Path) }
+enum QmpOperation { QmpReady, QmpInput, QmpVtSwitch(Int), QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
 error QmpFailure = OutcomeIndeterminate(operation: QmpOperation)
 
@@ -193,6 +193,7 @@ pure qmp_mode(operation: QmpOperation) -> Str {
   match operation {
     QmpReady => "ready"
     QmpInput => "input"
+    QmpVtSwitch(_) => "vt-switch"
     QmpScreenshot(_) => "screenshot"
   }
 }
@@ -208,6 +209,10 @@ proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) {
   var argv = [value.python.display(), value.qmp_helper.display(), qmp_mode(operation), socket.display()]
   if let QmpScreenshot(output) = operation {
     argv += [output.display()]
+  }
+
+  if let QmpVtSwitch(vt) = operation {
+    argv += [f"{vt}"]
   }
 
   let status = process.run(process.command_argv(value.python, argv))?
@@ -322,6 +327,8 @@ export proc run_test(
   defer qemu_stop(launched)
   var elapsed = 0
   var injected = false
+  var vt_away = false
+  var vt_back = false
   var screenshot_taken = false
 
   while qemu_process_live(launched.pid) {
@@ -331,6 +338,16 @@ export proc run_test(
       return Err(
         types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
+    }
+
+    if !vt_away and profile.proof.vt_away_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_away_marker in log_text {
+      qemu_qmp(value, QmpVtSwitch(2), outputs.qmp_socket)
+      vt_away = true
+    }
+
+    if !vt_back and profile.proof.vt_back_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_back_marker in log_text {
+      qemu_qmp(value, QmpVtSwitch(1), outputs.qmp_socket)
+      vt_back = true
     }
 
     if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {

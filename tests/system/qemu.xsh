@@ -22,7 +22,13 @@ pure fixture_proof() -> types.ProofMarkers {
     ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY",
     success_marker: "LAPUTA_DWL_FOOT_PROOF_OK",
     failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
+    vt_away_marker: "",
+    vt_back_marker: "",
   }
+}
+
+pure fixture_vt_proof() -> types.ProofMarkers {
+  {...fixture_proof(), vt_away_marker: "LAPUTA_VT_SWITCH_AWAY", vt_back_marker: "LAPUTA_VT_SWITCH_BACK"}
 }
 
 pure fixture_profile() -> types.SystemProfile {
@@ -41,6 +47,10 @@ pure fixture_profile() -> types.SystemProfile {
     forbidden_sonames: [],
     proof: fixture_proof(),
   }
+}
+
+pure fixture_vt_profile() -> types.SystemProfile {
+  {...fixture_profile(), proof: fixture_vt_proof()}
 }
 
 proc fixture_qemu(os: Str, arch: Str) -> Result[qemu.QemuConfig] {
@@ -157,6 +167,7 @@ proc supervisor_fixture(
   final_failure: Bool,
   ignore_term: Bool = true,
   reader_exits_after_input: Bool = false,
+  vt_markers: Bool = false,
 ) -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
@@ -175,6 +186,7 @@ proc supervisor_fixture(
   let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '{outputs.qemu_log}'" } else { "" }
   let term_trap = if ignore_term { "trap '' TERM" } else { "trap 'exit 0' TERM" }
   let reader_exit = if reader_exits_after_input { f"rm '{foot_reader_alive}'; " } else { "" }
+  let vt_console = if vt_markers { "printf 'LAPUTA_VT_SWITCH_AWAY\\nLAPUTA_VT_SWITCH_BACK\\nLAPUTA_DWL_FOOT_PROOF_READY\\n'" } else { "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'" }
 
   outputs.kernel.write("kernel")
   outputs.disk.write("disk")
@@ -186,7 +198,7 @@ proc supervisor_fixture(
       f"printf '%s\\n' \"$$\" > '{qemu_pid}'",
       f": > '{foot_reader_alive}'",
       f"printf qmp > '{outputs.qmp_socket}'",
-      "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'",
+      vt_console,
       "while :; do sleep 1; done",
     ],
   )
@@ -195,9 +207,18 @@ proc supervisor_fixture(
     [
       "#!/bin/sh",
       f"printf '%s\\n' \"$2\" >> '{qmp_calls}'",
-      f"if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
-      f"if [ ! -e '{attempt_two}' ]; then : > '{attempt_two}'; exit 0; fi",
-      f"if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; {reader_exit}printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0; fi",
+      f"if [ \"$2\" = ready ]; then",
+      f"  if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
+      f"  if [ ! -e '{attempt_two}' ]; then : > '{attempt_two}'; exit 0; fi",
+      "  exit 0",
+      "fi",
+      f"if [ \"$2\" = input ]; then",
+      f"  if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; fi",
+      f"  {reader_exit}printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0",
+      "fi",
+      f"if [ \"$2\" = vt-switch ]; then",
+      "  exit 0",
+      "fi",
       f"if [ -e '{foot_reader_alive}' ]; then",
       f"  printf 'P6\\n16 1\\n255\\n' > '{outputs.screenshot}'",
       "  pixel='\\377\\000\\377'",
@@ -252,6 +273,15 @@ test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, proc
   assert fixture.qmp_attempt_two.exists()?
   assert fixture.qmp_attempt_three.exists()?
   assert fixture.qmp_calls.read_text()? == "ready\nready\ninput\nscreenshot\n"
+  assert fixture.input_record.read_text()? == """laputa
+"""
+  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
+}
+
+test test_qemu_supervisor_switches_vt_once_each_way [fs, process, time, error] { |ctx|
+  let fixture = supervisor_fixture(ctx, false, vt_markers: true)?
+  qemu.run_test(fixture.config, fixture_vt_profile(), fixture.outputs)
+  assert fixture.qmp_calls.read_text()? == "vt-switch\nvt-switch\nready\nready\ninput\nscreenshot\n"
   assert fixture.input_record.read_text()? == """laputa
 """
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?

@@ -92,6 +92,8 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       ready_marker: "VALID_PROOF_READY",
       success_marker: "VALID_PROOF_OK",
       failure_marker: "VALID_PROOF_FAILED",
+      vt_away_marker: "",
+      vt_back_marker: "",
     },
   )
   profile.validate_system_profile(valid)

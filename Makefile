@@ -343,6 +343,23 @@ profile-tinyland-boot:
 profile-tinyland-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-foot
 
+# VT-bound kiosk profile: the same tinyland/foot stack behind a VT-bound
+# seatd session, with switch/resume proven in the guest.
+profile-tinyland-vt-plan:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-vt-foot
+
+profile-tinyland-vt-build:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-vt-foot
+
+profile-tinyland-vt-test:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-vt-foot
+
+profile-tinyland-vt-boot:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-vt-foot
+
+profile-tinyland-vt-clean:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-vt-foot
+
 # Install Firecracker locally, build the pinned Asterinas PVH kernel, and boot
 # a small serial smoke initramfs under KVM.
 asterinas-setup:

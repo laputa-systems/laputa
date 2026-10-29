@@ -105,6 +105,21 @@ def control(sock_path, operation):
     print(f"laputa-qemu-qmp-{operation} ok")
 
 
+def vt_switch(sock_path, vt):
+    def run(sock):
+        keys = [
+            {"type": "qcode", "data": "ctrl"},
+            {"type": "qcode", "data": "alt"},
+            {"type": "qcode", "data": f"f{vt}"},
+        ]
+        qmp_input_event(sock, [{"type": "key", "data": {"key": key, "down": True}} for key in keys])
+        time.sleep(0.5)
+        qmp_input_event(sock, [{"type": "key", "data": {"key": key, "down": False}} for key in reversed(keys)])
+
+    with_qmp(sock_path, run)
+    print("laputa-qemu-qmp-vt-switch ok")
+
+
 def input_proof(sock_path):
     def run(sock):
         for key in ["l", "a", "p", "u", "t", "a", "ret"]:
@@ -141,6 +156,12 @@ def main(argv):
         if len(argv) != 3:
             raise SystemExit("usage: qmp-proof.py ready SOCKET")
         ready(sock_path)
+        return
+
+    if mode == "vt-switch":
+        if len(argv) != 4:
+            raise SystemExit("usage: qmp-proof.py vt-switch SOCKET VT")
+        vt_switch(sock_path, argv[3])
         return
 
     if mode in ["stop", "cont"]:

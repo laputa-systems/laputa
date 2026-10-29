@@ -1,6 +1,7 @@
 # Tinyland kiosk profile
 
-Opt-in Laputa profile `qemu-tinyland-foot`: unprivileged tinyland through
+Opt-in Laputa profiles `qemu-tinyland-foot` (unbound seat) and
+`qemu-tinyland-vt-foot` (VT-bound seat): unprivileged tinyland through
 seatd-mediated devices, running Laputa foot. `qemu-dwl-foot` remains the
 canonical reference until the owner swaps the default on the evidence below.
 
@@ -140,7 +141,7 @@ observed sequence matches a host unplug (REMOVE uevent, ENODEV to open
 handles, node gone). ENODEV on one of N keyboards drops just that device
 (modifiers reset), exit only at zero.
 
-### R4 — VT-bound profile
+### R4 — VT-bound profile — landed
 
 A VT-bound variant of the profile with real VT switching: VT-bound seatd
 session, switch handling, disable/resume with reestablished input and no
@@ -149,9 +150,20 @@ resume path but it has never been guest-proven. The kernel prerequisites
 have landed on x86_64 (`CONFIG_VT`, `CONFIG_VT_CONSOLE`,
 `CONFIG_FRAMEBUFFER_CONSOLE`, `CONFIG_HOTPLUG_PCI_PCIE` with its port
 driver, all olddefconfig-derived and dwl-regression-green); aarch64 keeps
-the previous config until its qualification unblocks. Remaining: the
-profile variant and the switch/resume proof path on the existing serial
-plus QMP-key-driven machine (no new QEMU devices needed).
+the previous config until its qualification unblocks. Guest qualification
+is green on the same serial plus QMP-key-driven machine (no new QEMU
+devices needed).
+
+Two findings from qualification. First, the switch must be compositor-
+initiated via `libseat_switch_session`: a grabbed AT keyboard never
+delivers the combo to the console layer, so host key injection alone
+cannot move the VT. Second, revoke lands in the kernel before its disable
+notification, so the compositor drains a bounded dispatch on ENODEV and
+lets a pending suspend win over an unplug verdict; it also closes dropped
+inputs on the broker, since the daemon hands back dups of its cached fds
+and a leaked entry poisons the next open. Evidence: one green run shows
+the tty1→tty2→tty1 transitions, `TINYLAND_SEAT_DISABLED`/`ENABLED` around
+the switch, and the magenta marker after resume.
 
 ### R5 — device node ownership follow-up — landed
 
