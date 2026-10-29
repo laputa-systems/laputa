@@ -242,6 +242,7 @@ proc main() [fs, process, time, error] {
   guest_run_required(process.command_argv(
     /usr/bin/su,
     ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-attack.xsh"],
+    stdout: /dev/console, stderr: /dev/console,
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 10s,
   ), "runtime-attack")
