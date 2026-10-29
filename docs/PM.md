@@ -423,10 +423,16 @@ four lines at most 4 KiB; signatures are exactly 64 bytes; provisioned keys
 are non-empty multiples of 32 bytes; fetched indexes stay bounded at
 10 MiB. Oversize, malformed, or mismatched snapshot inputs fail closed.
 
+When `XSH_PM_REPO_KEY_FILE` is set, `file://` and loopback repositories are
+verified like production remotes, so a release staged or copied locally cannot
+bypass the admission policy; without it they remain explicit unsigned local
+workflows. Accepted state is written through a sibling temp file with file and
+directory fsync, and persisting an older generation fails without touching
+the stored record.
+
 Remaining: provisioned-key distribution is manual (no package-seeded key
-yet); durable accepted state needs `XSH_PM_REPO_STATE_DIR`; `file://`
-verification even when keys are present; threshold or multi-signer
-snapshots; and guest proof of the production fetch path.
+yet); durable accepted state needs `XSH_PM_REPO_STATE_DIR`; threshold or
+multi-signer snapshots; and guest proof of the production fetch path.
 
 ## Root composition
 

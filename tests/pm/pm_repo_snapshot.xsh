@@ -428,3 +428,122 @@ test test_production_plan_without_provisioned_keys_fails_closed [fs, process, en
   assert status.ok == false
   assert "needs XSH_PM_REPO_KEY_FILE" in err.read_text()?
 }
+
+proc stage_signed_file_repository(ctx: TestContext, name: Str, which: Str) -> Result[Path] {
+  let root = test.temp_dir(ctx, name:)?
+  fixture("index.json").copy(to: fp"{root}/index.json")
+  fixture(f"{which}/metadata").copy(to: fp"{root}/snapshot.json")
+  fixture(f"{which}/metadata.sig").copy(to: fp"{root}/snapshot.sig")
+  root
+}
+
+test test_verified_fetch_accepts_signed_file_repository_and_rejects_tampering [fs, net, env, time, error] { |ctx|
+  let root = stage_signed_file_repository(ctx, "verified-file-repo", "snapshot-gen1")?
+  let repo = f"file://{root}"
+  let keys = [key_bytes("signing-key")?]
+  let out = test.temp_dir(ctx, name: "verified-file-out")?
+  let state = test.temp_dir(ctx, name: "verified-file-state")?
+
+  let index = remote.load_verified_remote_index(repo, out, keys, reference_now(), state.display())?
+  assert index.len() == 1
+  assert pm_util.remote_index_cache_path(out).read_bytes()? == fixture("index.json").read_bytes()?
+
+  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(state, repo))?
+  if accepted == null {
+    test.fail("file repository verification did not persist accepted state")
+  } else {
+    assert accepted.generation == "1"
+  }
+
+  fp"{root}/index.json".write(fixture("index.json").read_text()?.replace("fixture-payload", with: "tampered-payload"))
+  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-tampered-out")?, keys, reference_now(), state.display()) {
+    Ok(_) => test.fail("a tampered file repository index was accepted"),
+    Err(problem) => assert "does not match signed snapshot metadata" in problem.message
+  }
+
+  fp"{root}/snapshot.json".remove()
+  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-missing-out")?, keys, reference_now(), state.display()) {
+    Ok(_) => test.fail("a file repository without a snapshot was accepted"),
+    Err(problem) => assert "snapshot.json" in problem.message
+  }
+}
+
+test test_verified_fetch_rejects_rollback_of_accepted_file_repository [fs, net, env, time, error] { |ctx|
+  let root = stage_signed_file_repository(ctx, "verified-file-rollback", "snapshot-gen2")?
+  let url = f"file://{root}"
+  let keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
+  let state = test.temp_dir(ctx, name: "verified-file-rollback-state")?
+  let _ = remote.load_verified_remote_index(url, test.temp_dir(ctx, name: "verified-file-rollback-out")?, keys, reference_now(), state.display())?
+
+  fixture("snapshot-gen1/metadata").copy(to: fp"{root}/snapshot.json", overwrite: true)
+  fixture("snapshot-gen1/metadata.sig").copy(to: fp"{root}/snapshot.sig", overwrite: true)
+
+  match remote.load_verified_remote_index(url, test.temp_dir(ctx, name: "verified-file-rollback-replay-out")?, keys, reference_now(), state.display()) {
+    Ok(_) => test.fail("a rolled-back file repository snapshot was accepted"),
+    Err(problem) => assert "accepted snapshot" in problem.message
+  }
+
+  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(state, url))?
+  if accepted == null {
+    test.fail("accepted state vanished after a rejected rollback")
+  } else {
+    assert accepted.generation == "2"
+  }
+}
+
+test test_persist_accepted_refuses_generation_rollback_and_never_lowers_bound [fs, error] { |ctx|
+  let state = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "persist-rollback-state")?, "https://example.invalid/repo")
+  let keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
+  let gen2 = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, metadata: snapshot_bytes("snapshot-gen2", "metadata")?, signature: snapshot_bytes("snapshot-gen2", "metadata.sig")?})?
+  let gen1 = repo_snapshot.snapshot_verify(verify_input(keys, null)?)?
+
+  repo_snapshot.snapshot_persist_accepted(state, gen2, reference_now())?
+  let before = state.accepted.read_bytes()?
+
+  match repo_snapshot.snapshot_persist_accepted(state, gen1, reference_now()) {
+    Ok(_) => test.fail("direct persistence regressed the accepted generation"),
+    Err(problem) => assert "rolls back" in problem.message
+  }
+
+  assert state.accepted.read_bytes()? == before
+}
+
+test test_plan_over_local_repository_with_keys_requires_a_valid_snapshot [fs, process, env, error] { |ctx|
+  let repository = test.temp_dir(ctx, name: "snapshot-local-plan-repo")?
+  let _ = fs.copy_tree(fp"tests/pm/fixtures/graph-catalog/packages", fp"{repository}/packages", parents: true, overwrite: true)?
+  fp"{repository}/pm".mkdir()
+  p"pm/proof.xsh".copy(to: fp"{repository}/pm/proof.xsh", overwrite: true)
+  let mirror = stage_signed_file_repository(ctx, "snapshot-local-plan-mirror", "snapshot-gen1")?
+  let key_file = test.temp_path(ctx, name: "snapshot-local-plan-keys")
+  key_file.write(key_bytes("signing-key")?)
+  let state = test.temp_dir(ctx, name: "snapshot-local-plan-state")?
+  let xsh = runner()?
+  let modules = path.absolute(p".")?
+  let mirror_url = f"file://{mirror}"
+
+  let unsigned_dir = test.temp_dir(ctx, name: "snapshot-local-plan-unsigned")?
+  fixture("index.json").copy(to: fp"{unsigned_dir}/index.json")
+  let unsigned_output = test.temp_path(ctx, name: "snapshot-local-plan-unsigned.json")
+  let unsigned_err = test.temp_path(ctx, name: "snapshot-local-plan-unsigned.err")
+  let unsigned_url = f"file://{unsigned_dir}"
+  let unsigned = run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO=$unsigned_url XSH_PM_REPO_KEY_FILE=$key_file XSH_PM_REPO_STATE_DIR=$state $xsh pm.xsh -- repo plan \
+    --repo $repository --root app --output $unsigned_output 2> $unsigned_err
+
+  assert unsigned.ok == false
+  assert "snapshot.json" in unsigned_err.read_text()?
+
+  let verified_output = test.temp_path(ctx, name: "snapshot-local-plan-verified.json")
+  let verified_err = test.temp_path(ctx, name: "snapshot-local-plan-verified.err")
+  let verified = run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO=$mirror_url XSH_PM_REPO_KEY_FILE=$key_file XSH_PM_REPO_STATE_DIR=$state $xsh pm.xsh -- repo plan \
+    --repo $repository --root app --output $verified_output 2> $verified_err
+
+  assert verified.ok == false
+  assert "repository snapshot expiry" in verified_err.read_text()?
+
+  let keyless_output = test.temp_path(ctx, name: "snapshot-local-plan-keyless.json")
+  let keyless_err = test.temp_path(ctx, name: "snapshot-local-plan-keyless.err")
+  let keyless = run.status XSH_HOST=$xsh XSH_MODULE_PATH=$modules XSH_PM_REPO=$mirror_url $xsh pm.xsh -- repo plan \
+    --repo $repository --root app --output $keyless_output 2> $keyless_err
+
+  assert keyless.ok, keyless_err.read_text()?
+}

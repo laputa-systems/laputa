@@ -151,7 +151,20 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
   items
 }
 
-proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int) [fs, net, error] -> Result[Bytes, Error] {
+proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int, label: Str) -> Result[Bytes, Error] {
+  if util.is_file_url(repo) {
+    let source = util.repo_file_path(repo, rel)?
+    guard source.exists() else {
+      return Err(types.PmError.RemoteIndex(f"failed to fetch {label}: missing {source}"))
+    }
+
+    guard source.metadata()?.size <= bound else {
+      return Err(types.PmError.RemoteIndex(f"failed to fetch {label}: {source} exceeds {bound} bytes"))
+    }
+
+    return source.read_bytes()?
+  }
+
   let response = net.request({
     method: "GET",
     url: util.repo_url_for(repo, rel)?,
@@ -163,7 +176,7 @@ proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int) [fs, net, error] -> 
   })?
 
   if response.status < 200 or response.status >= 300 {
-    return Err(types.PmError.RemoteIndex(f"failed to fetch repository snapshot {rel}: HTTP {response.status}"))
+    return Err(types.PmError.RemoteIndex(f"failed to fetch {label}: HTTP {response.status}"))
   }
 
   response.body
@@ -171,8 +184,8 @@ proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int) [fs, net, error] -> 
 
 ## Fetches the signed snapshot and the exact index it binds, verifies the
 ## snapshot against the provisioned keys and the accepted floor, and caches
-## the verified index bytes. Production remotes only: file and loopback-local
-## repositories stay explicit local workflows. Any verification failure fails
+## the verified index bytes. Supports both network and file:// repositories
+## when verification keys are configured. Any verification failure fails
 ## closed without falling back to unsigned content.
 export proc load_verified_remote_index(
   repo: Str,
@@ -181,23 +194,9 @@ export proc load_verified_remote_index(
   now_epoch_seconds: Int,
   state_dir: Str,
 ) [fs, net, time, error] -> Result[List[types.RemotePackage], Error] {
-  let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192)?
-  let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256)?
-  let index_response = net.request({
-    method: "GET",
-    url: util.repo_url_for(repo, p"index.json")?,
-    headers: [{name: "Cache-Control", value: "no-cache"}, {name: "Pragma", value: "no-cache"}],
-    pool: "pm",
-    timeout: 15s,
-    connect_timeout: 5s,
-    max_body_bytes: 10485760,
-  })?
-
-  if index_response.status < 200 or index_response.status >= 300 {
-    return Err(types.PmError.RemoteIndex(f"failed to fetch remote index: HTTP {index_response.status}"))
-  }
-
-  let index_bytes = index_response.body
+  let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192, f"repository snapshot {util.remote_snapshot_rel()}")?
+  let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256, f"repository snapshot {util.remote_snapshot_signature_rel()}")?
+  let index_bytes = fetch_snapshot_bytes(repo, p"index.json", 10485760, "remote index")?
   let accepted = if state_dir == "" {
     null
   } else {

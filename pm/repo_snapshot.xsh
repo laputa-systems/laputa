@@ -218,12 +218,30 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
 
 ## Persists the accepted snapshot floor after successful verification.
 export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: VerifiedRepoSnapshot, now_epoch_seconds: Int) [fs, error] {
+  snapshot_require(
+    snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and now_epoch_seconds >= 0,
+    "refusing to persist an invalid accepted repository snapshot",
+  )
   var lower_bound = now_epoch_seconds
   let prior = snapshot_read_accepted(paths)?
 
   if prior != null {
+    snapshot_require(
+      verified.generation == prior.generation or snapshot_u64_is_greater(verified.generation, prior.generation),
+      "repository snapshot generation rolls back the accepted snapshot",
+    )
+    snapshot_require(
+      verified.index_sha256 == prior.index_sha256 or snapshot_u64_is_greater(verified.generation, prior.generation),
+      "repository snapshot generation does not advance the accepted snapshot",
+    )
     lower_bound = if now_epoch_seconds > prior.lower_bound { now_epoch_seconds } else { prior.lower_bound }
   }
+
   paths.accepted.parent.mkdir()
-  json.write(paths.accepted, {generation: verified.generation, index_sha256: verified.index_sha256, lower_bound})
+  let sibling = fs.temp_sibling(paths.accepted)?
+  json.write(sibling, {generation: verified.generation, index_sha256: verified.index_sha256, lower_bound})
+  fs.fsync(sibling)
+  sibling.rename(to: paths.accepted, overwrite: true)
+  fs.fsync(paths.accepted)
+  fs.fsync(paths.accepted.parent)
 }

@@ -93,10 +93,9 @@ proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) -> Result[
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()
+  let key_file = (e"XSH_PM_REPO_KEY_FILE" ?? "").trim()
 
-  if repo_url != "" and ! util.is_local_repo_url(repo_url) {
-    let key_file = (e"XSH_PM_REPO_KEY_FILE" ?? "").trim()
-
+  if repo_url != "" and (key_file != "" or ! util.is_local_repo_url(repo_url)) {
     guard key_file != "" else {
       return Err(
         types.PmError.Auth("planning from a production repository needs XSH_PM_REPO_KEY_FILE naming the provisioned snapshot keys; refusing to use the unsigned index"),
