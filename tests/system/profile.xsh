@@ -159,6 +159,8 @@ test test_qemu_maintained_profile_is_not_a_development_image [fs, error] {
   assert ! value.development
   assert "dropbear" in value.package_roots
   assert "nftables" in value.package_roots
+  assert "laputa-net" in value.package_roots
+  assert "laputa-syslog" in value.package_roots
   assert ! ("dwl-minimal" in value.package_roots)
   assert value.kernel_package == "linux"
   assert value.kernel_path == p"boot/vmlinuz"

@@ -13,6 +13,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "dropbear",
     "nftables",
     "laputa-net",
+    "laputa-syslog",
   ],
   kernel_package: "linux",
   kernel_path: p"boot/vmlinuz",

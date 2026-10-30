@@ -4,6 +4,7 @@ use pm.proof
 proc main(root = /rootfs) [fs, error] {
   proof.package_metadata(root, "laputa-net")
   proof.ensure(fp"{root}/usr/lib/xinit/services/net.xsh".exists()?, "laputa-net", "missing net service module")
+  proof.ensure(fp"{root}/usr/lib/xinit/services/dhcp-eth0.xsh".exists()?, "laputa-net", "missing dhcp-eth0 service module")
   proof.ensure(fp"{root}/etc/network/interfaces".exists()?, "laputa-net", "missing /etc/network/interfaces")
   proof.ensure(fp"{root}/etc/network/if-pre-down.d".is_dir()?, "laputa-net", "missing if-pre-down.d")
   proof.ensure(

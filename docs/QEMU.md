@@ -178,6 +178,25 @@ and routes scanner diagnostics to ttyS0. `laputa.xsh -- build qemu-maintained`
 builds the immutable generation image. The image contains no operator keys or
 machine host key.
 
+The boot target supervises two foreground services from the XSH core. The
+`logger` service runs `syslogd --state /run --socket /dev/log` with notify
+readiness and always-restart; its captured output lands in
+`/var/log/logger/current` on the state disk under xinit's bounded
+copy-truncate rotation. The `dhcp-eth0` service runs the supervised DHCPv4
+client with its lease directory in `/var/lib/dhcpc` on the state disk, run
+state in `/run/dhcpc`, and the resolver composed into `/etc`; the operator
+static file at `/etc/dhcpc/resolv.static` is read-only input, so dhcpc is the
+single owner of `resolv.conf`. Neither service blocks boot, rescue, or login:
+dependents use `after` at most, and Dropbear's `need` set stays
+`firewall`, `dropbear-keygen`, and `net`. The loopback-only `net` oneshot is
+unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no
+second client contends for the lease. IPv6 stays unsupported on this profile:
+no DHCPv6 or router-advertisement handling is configured or tested. Service
+declarations and the resolver split are pinned by
+`tests/system/maintained_services.xsh`; guest lifecycle requalification
+(renew, rebind, NAK, expiry, link loss, pause/resume, restart with a saved
+lease) remains a KVM-gated step and is not claimed here.
+
 The launcher requires a separate, owner-private `{output}/state.ext4` containing
 `etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
 by a newline. Initialize those directories from the selected image, apply the

@@ -11,7 +11,7 @@ export const package_kind = "payload"
 export const ver = "0.0.0"
 
 ## Package recipe export.
-export const rel = "17"
+export const rel = "18"
 
 ## Package recipe export.
 export let deps = []
@@ -60,6 +60,7 @@ export const filetree = [
   {path: p"usr/bin/cut", kind: "symlink"},
   {path: p"usr/bin/date", kind: "symlink"},
   {path: p"usr/bin/df", kind: "symlink"},
+  {path: p"usr/bin/dhcpc", kind: "symlink"},
   {path: p"usr/bin/dirname", kind: "symlink"},
   {path: p"usr/bin/du", kind: "symlink"},
   {path: p"usr/bin/echo", kind: "symlink"},
@@ -116,6 +117,7 @@ export const filetree = [
   {path: p"usr/bin/strings", kind: "symlink"},
   {path: p"usr/bin/stty", kind: "symlink"},
   {path: p"usr/bin/su", kind: "symlink"},
+  {path: p"usr/bin/syslogd", kind: "symlink"},
   {path: p"usr/bin/system-report", kind: "symlink"},
   {path: p"usr/bin/tac", kind: "symlink"},
   {path: p"usr/bin/tail", kind: "symlink"},
