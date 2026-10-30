@@ -105,7 +105,7 @@ export proc parse(argv: List[Str]) [error] -> Result[CliArgs, Error] {
 }
 
 ## Run the profile command through typed profile validation and Docker configuration.
-export proc dispatch(argv: List[Str]) [fs, process, env, time, error] {
+export proc dispatch(argv: List[Str]) [fs, process, net, env, time, error] {
   let parsed = parse(argv)?
   let root = fs.cwd()?
   let value = profile.load_system_profile(parsed.profile_name, fp"{root}/profiles")?

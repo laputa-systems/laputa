@@ -61,6 +61,17 @@ class QmpClientTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ok", result.stdout)
 
+    def test_multiple_commands_share_connection_and_use_unique_ids(self):
+        def peer(conn, stream):
+            first = self.negotiate(conn, stream)
+            conn.sendall(json.dumps({"return": {}, "id": first["id"]}).encode() + b'\n')
+            second = json.loads(stream.readline())
+            self.assertEqual(second["execute"], "query-name")
+            self.assertNotEqual(second["id"], first["id"])
+            conn.sendall(json.dumps({"return": {}, "id": second["id"]}).encode() + b'\n')
+        result = self.exchange(peer, "multi")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_rejected_command_is_not_indeterminate(self):
         def peer(conn, stream):
             request = self.negotiate(conn, stream)

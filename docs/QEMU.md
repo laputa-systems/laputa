@@ -24,7 +24,7 @@ console.
 - KVM on Linux: `/dev/kvm` must be usable by your user.
 - QEMU's virtio GPU PCI device; on Alpine install
   `qemu-hw-display-virtio-gpu` and `qemu-hw-display-virtio-gpu-pci`.
-- `python3`, which runs the QMP helper `boot/qmp-proof.py`.
+- On macOS, `python3` runs the legacy QMP helper `boot/qmp-proof.py`.
 - `make seed` done for the host arch. The profile build needs no mirror.
 
 ## Commands and outputs
@@ -92,10 +92,9 @@ never retried.
 
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed
-to the retry path. If the helper sends an input event but loses its response,
-it reports an indeterminate outcome and exits with status 75. XSH maps that
-status to `QmpFailure.OutcomeIndeterminate` and does not retry the operation.
-The helper remains Python pending LAP-35's reusable XSH client.
+to the retry path. If an input event loses its response, the supervisor reports an indeterminate
+outcome and does not retry. Linux uses `system/qmp.xsh`; macOS uses the legacy
+Python helper, which reports an indeterminate outcome with exit status 75.
 
 The terminal reader prints and flushes its visual marker, records the injected
 input, then waits for another terminal read. The host captures and checks the
@@ -110,15 +109,13 @@ QEMU exit as an error. The profile overlay digest is bound into the generated
 image so a guest proof cannot validate a different root generation.
 
 Run `$XSHT test tests/system/qemu.xsh` for typed dispatch and supervisor
-coverage. Run `python3 tests/system/qmp_proof.py` for the disconnect-after-send
-case against a local QMP peer.
+coverage. Run `XSH=/path/to/xsh python3 tests/system/qmp_client.py` for Linux
+protocol cases and `python3 tests/system/qmp_proof.py` for the legacy helper.
 
 Browsers, real hardware, IPv6, and Wi-Fi are outside this proof.
 
-The test-only clock qualification invokes `boot/qmp-proof.py stop SOCKET` and
-`cont SOCKET` once each, with a five-second process budget in its host harness.
-These modes reuse the existing protocol client and never retry. They control
-the disposable VM only.
+The test-only clock qualification sends `stop` and `cont` once each with a
+five-second budget. The commands control the disposable VM and are never retried.
 
 ## QMP replacement baseline
 
@@ -148,15 +145,12 @@ under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
 opens files and does not connect to socket paths. LAP-35 therefore still needs
 a portable, bounded Unix-stream connection boundary to preserve the macOS path.
 
-The experimental `system/qmp.xsh` client supports one command per Linux Unix
-socket connection. It bounds frames to 1 MiB, matches response IDs, skips
-events, and reports a lost mutation response as indeterminate. The production
-supervisor still uses the Python helper on both platforms. The XSH client has
-not yet covered the full input, screenshot, or visual proof workflow.
-
-Run `XSH=/path/to/xsh python3 tests/system/qmp_client.py` for its local peer
-checks. The client needs a portable Unix-stream connection operation before it
-can replace the helper on macOS.
+The Linux supervisor uses `system/qmp.xsh` for readiness, input, VT switches,
+screenshots, and the test-only pause and resume commands. Each session bounds
+frames to 1 MiB, matches response IDs, skips events, and applies a deadline.
+The local peer tests cover multi-command sessions and indeterminate mutation
+outcomes. Full graphical VM qualification remains open. A portable Unix-stream
+connection operation is still needed to replace the helper on macOS.
 
 ## Maintained VM activation
 

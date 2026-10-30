@@ -114,7 +114,7 @@ test test_missing_maintained_state_does_not_consume_an_attempt [fs, time, error]
   stage_b(state)
   let before = record_text(state)?
   let target = qemu.qemu_target("Linux", "x86_64")?
-  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target:)
+  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", qmp_transport: qemu.QemuQmpLegacy(p"python3", p"boot/qmp-proof.py"), target:)
   let outputs = build.outputs(root)
   match qemu.boot_command_argv(config, maintained.profile, outputs, types.Test, state) {
     Ok(_) => assert false
@@ -264,7 +264,7 @@ test test_qemu_boot_command_selects_pending_generation [fs, time, error] { |ctx|
   stage_b(state)
   fp"{state}/images/a".remove()
   let target = qemu.qemu_target("Linux", "x86_64")?
-  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", python: p"python3", qmp_helper: p"boot/qmp-proof.py", target:)
+  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", qmp_transport: qemu.QemuQmpLegacy(p"python3", p"boot/qmp-proof.py"), target:)
   let profile = types.SystemProfile(
     name: "qemu-dwl-foot", package_roots: ["baselayout"], kernel_package: "linux", kernel_path: p"boot/vmlinuz",
     qemu_smp: 2, qemu_memory: "1536M", qemu_width: 1280, qemu_height: 800,

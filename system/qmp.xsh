@@ -1,6 +1,8 @@
 ##! Bounded QMP exchanges over a connected Unix stream.
 ## Whether a lost response may hide a completed mutation.
 export enum QmpRequestKind { QmpReadOnly, QmpMutation }
+## A command or a pause between commands in one QMP session.
+export enum QmpStep { QmpExecute(Str, Str, QmpRequestKind), QmpDelay(Int) }
 ## Protocol failures, command rejections, and uncertain mutation outcomes.
 export error QmpError = Protocol(message: Str) | Rejected(message: Str) | Indeterminate(operation: Str)
 
@@ -62,8 +64,8 @@ proc qmp_command(fd: Int, pending: Bytes, execute: Str, arguments: Any, id: Int,
   qmp_response(fd, pending, id, deadline)?
 }
 
-## Execute one request on Linux. A mutation whose reply is lost is indeterminate.
-export proc qmp_linux_execute(socket: Path, execute: Str, arguments: Any, kind: QmpRequestKind, timeout_ms: Int) -> Result[Any, Error] {
+## Execute ordered steps on one Linux connection with a session deadline.
+export proc qmp_linux_run(socket: Path, steps: List[QmpStep], timeout_ms: Int) -> Result[Unit, Error] {
   if timeout_ms <= 0 { return Err(QmpError.Protocol("QMP timeout must be positive")) }
   let deadline = time.monotonic()? + timeout_ms * 1000000
   let constants = linux.net_constants()
@@ -73,13 +75,32 @@ export proc qmp_linux_execute(socket: Path, execute: Str, arguments: Any, kind: 
   let greeting = qmp_frame(fd, b"", deadline)?
   let _ = json.get(greeting.message, ["QMP"])?.require(Record)?
   let capabilities = qmp_command(fd, greeting.pending, "qmp_capabilities", {}, 1, deadline)?
-  let result = qmp_command(fd, capabilities.pending, execute, arguments, 2, deadline)
-  match result {
-    Ok(reply) => Ok(reply.value),
-    Err(QmpError.Rejected {message}) => Err(QmpError.Rejected(message)),
-    Err(failure) => {
-      if kind == QmpMutation { return Err(QmpError.Indeterminate(execute)) }
-      Err(failure)
-    },
+  var pending = capabilities.pending
+  var id = 2
+  for step in steps {
+    match step {
+      QmpDelay(milliseconds) => {
+        if milliseconds < 0 or milliseconds * 1000000 > deadline - time.monotonic()? {
+          return Err(QmpError.Protocol("QMP delay exceeds deadline"))
+        }
+        time.sleep(time.millis(milliseconds))?
+      },
+      QmpExecute(execute, arguments, kind) => {
+        let decoded = json.decode(arguments)?
+        let result = qmp_command(fd, pending, execute, decoded, id, deadline)
+        match result {
+          Ok(reply) => {
+            pending = reply.pending
+            id += 1
+          },
+          Err(QmpError.Rejected {message}) => return Err(QmpError.Rejected(message)),
+          Err(failure) => {
+            if kind == QmpMutation { return Err(QmpError.Indeterminate(execute)) }
+            return Err(failure)
+          },
+        }
+      },
+    }
   }
+  Ok()
 }

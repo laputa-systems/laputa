@@ -3,6 +3,7 @@ use system.build
 use system.image
 use system.launcher
 use system.proof
+use system.qmp
 use system.types
 
 ## The host half of a QEMU invocation, which the profile does not choose: the
@@ -20,8 +21,10 @@ export type QemuTarget = {
   interactive_display: List[Str],
 }
 
-## The host executable, QMP helper, and host target used by a QEMU invocation.
-export type QemuConfig = {qemu: Path, python: Path, qmp_helper: Path, target: QemuTarget}
+## The host transport for a QMP connection.
+export enum QemuQmpTransport { QemuQmpLinux, QemuQmpLegacy(Path, Path) }
+## The host executable, QMP transport, and host target used by a QEMU invocation.
+export type QemuConfig = {qemu: Path, qmp_transport: QemuQmpTransport, target: QemuTarget}
 
 enum QmpOperation { QmpReady, QmpInput, QmpVtSwitch(Int), QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
@@ -108,14 +111,17 @@ export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode, proof: type
 export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig, Error] {
   let raw_qemu = (env.get(f"QEMU_SYSTEM_{target.arch.upper()}") ?? "").trim()
   let qemu = if raw_qemu == "" { process.which(target.qemu_name)? } else { fp"{raw_qemu}" }
-  let python = process.which("python3")?
-  let qmp_helper = fp"{laputa_root}/boot/qmp-proof.py"
-
-  if ! qmp_helper.exists() {
-    return Err(types.LaputaError.Profile(f"missing QMP helper {qmp_helper}"))
+  let qmp_transport = if system.uname()?.sysname == "Linux" {
+    QemuQmpLinux
+  } else {
+    let python = process.which("python3")?
+    let helper = fp"{laputa_root}/boot/qmp-proof.py"
+    if ! helper.exists() {
+      return Err(types.LaputaError.Profile(f"missing QMP helper {helper}"))
+    }
+    QemuQmpLegacy(python, helper)
   }
-
-  {qemu, python, qmp_helper, target}
+  {qemu, qmp_transport, target}
 }
 
 ## Construct an exact QEMU argv without a shell command boundary.
@@ -210,20 +216,75 @@ pure qmp_retry_operation(operation: QmpRetryOperation) -> QmpOperation {
   }
 }
 
+type QemuQmpKey = {type: Str, data: Str}
+type QemuQmpKeyData = {key: QemuQmpKey, down: Bool}
+type QemuQmpKeyEvent = {type: Str, data: QemuQmpKeyData}
+
+proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
+  let events: List[QemuQmpKeyEvent] = [
+    {type: "key", data: {key: {type: "qcode", data: key}, down}}
+    for key in keys
+  ]
+  qmp.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation)
+}
+
+proc qmp_linux_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
+  match operation {
+    QmpReady => Ok([]),
+    QmpScreenshot(output) => Ok([qmp.QmpExecute("human-monitor-command", json.encode({"command-line": f"screendump {output}"})?, qmp.QmpReadOnly)]),
+    QmpVtSwitch(vt) => Ok([
+      qmp_key_step(["ctrl", "alt", f"f{vt}"], true)?,
+      qmp.QmpDelay(500),
+      qmp_key_step([f"f{vt}", "alt", "ctrl"], false)?,
+    ]),
+    QmpInput => {
+      var steps: List[qmp.QmpStep] = []
+      for key in ["l", "a", "p", "u", "t", "a", "ret"] {
+        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
+      }
+      for pair in [{key: "ctrl", down: true}, {key: "d", down: true}, {key: "d", down: false}, {key: "ctrl", down: false}] {
+        steps += [qmp_key_step([pair.key], pair.down)?]
+      }
+      Ok(steps)
+    },
+  }
+}
+
 proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) {
-  var argv = [value.python.display(), value.qmp_helper.display(), qmp_mode(operation), socket.display()]
-  if let QmpScreenshot(output) = operation {
-    argv += [output.display()]
+  match value.qmp_transport {
+    QemuQmpLinux => {
+      match qmp.qmp_linux_run(socket, qmp_linux_steps(operation)?, 60000) {
+        Ok(_) => Ok(),
+        Err(qmp.QmpError.Indeterminate {operation: _}) => Err(QmpFailure.OutcomeIndeterminate(operation)),
+        Err(problem) => Err(problem),
+      }
+    },
+    QemuQmpLegacy(python, helper) => {
+      var argv = [python.display(), helper.display(), qmp_mode(operation), socket.display()]
+      if let QmpScreenshot(output) = operation { argv += [output.display()] }
+      if let QmpVtSwitch(vt) = operation { argv += [f"{vt}"] }
+      let status = process.run(process.command_argv(python, argv))?
+      return Err(QmpFailure.OutcomeIndeterminate(operation)) when status.exited_with(75)
+      return Err(types.LaputaError.Docker(f"QMP {qmp_mode(operation)} helper failed")) unless status.ok
+      Ok()
+    },
   }
+}
 
-  if let QmpVtSwitch(vt) = operation {
-    argv += [f"{vt}"]
+## Pause or resume a disposable guest without retrying an unknown outcome.
+export enum QemuControl { QemuStop, QemuContinue }
+
+## Send a single pause or resume command over the configured host transport.
+export proc qemu_control(value: QemuConfig, socket: Path, control: QemuControl) -> Result[Unit, Error] {
+  let command = match control { QemuStop => "stop", QemuContinue => "cont" }
+  match value.qmp_transport {
+    QemuQmpLinux => qmp.qmp_linux_run(socket, [qmp.QmpExecute(command, "{}", qmp.QmpMutation)], 5000),
+    QemuQmpLegacy(python, helper) => {
+      let status = process.run(process.command_argv(python, [python.display(), helper.display(), command, socket.display()], timeout: 5s))?
+      if !status.ok { return Err(types.LaputaError.Docker(f"QMP {command} helper failed")) }
+      Ok()
+    },
   }
-
-  let status = process.run(process.command_argv(value.python, argv))?
-  return Err(QmpFailure.OutcomeIndeterminate(operation)) when status.exited_with(75)
-  return Err(types.LaputaError.Docker(f"QMP {qmp_mode(operation)} helper failed")) unless status.ok
-  Ok()
 }
 
 proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path) {
@@ -313,7 +374,7 @@ export proc run_test(
   value: QemuConfig,
   profile: types.SystemProfile,
   outputs: build.ProfileOutputs,
-) [fs, process, time, error] {
+) [fs, process, net, time, error] {
   if ! outputs.kernel.exists() or ! outputs.disk.exists() {
     return Err(types.LaputaError.Profile(f"{profile.name} image is missing; run laputa build first"))
   }
