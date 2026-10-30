@@ -6,15 +6,8 @@ use system.types
 
 type SupervisorFixture = {
   config: qemu.QemuConfig,
-  qmp_helper: Path,
   outputs: build.ProfileOutputs,
-  qmp_attempt_one: Path,
-  qmp_attempt_two: Path,
-  qmp_attempt_three: Path,
-  qmp_calls: Path,
   qemu_pid: Path,
-  foot_reader_alive: Path,
-  input_record: Path,
 }
 
 pure fixture_proof() -> types.ProofMarkers {
@@ -57,7 +50,7 @@ pure fixture_vt_profile() -> types.SystemProfile {
 
 proc fixture_qemu(os: Str, arch: Str) -> Result[qemu.QemuConfig] {
   let target = qemu.qemu_target(os, arch)?
-  {qemu: fp"{target.qemu_name}", qmp_transport: qemu.QemuQmpLegacy(p"python3", p"boot/qmp-proof.py"), target}
+  {qemu: fp"{target.qemu_name}", target}
 }
 
 proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
@@ -155,8 +148,8 @@ QEMU_FATAL after success""") {
 test test_qmp_retry_type_rejects_input_dispatch [fs, process, error] { |ctx|
   let module_source = p"system/qemu.xsh".read_text()?
   let invalid_dispatch = module_source + """
-proc qmp_retry_input(value: QemuConfig, socket: Path) -> Result[Unit] {
-  qemu_qmp_retry(value, QmpInput, socket, 1)
+proc qmp_retry_input(socket: Path) -> Result[Unit] {
+  qemu_qmp_retry(QmpInput, socket, 1)
 }
 """
   let result = test.run_script(ctx, invalid_dispatch)?
@@ -164,121 +157,21 @@ proc qmp_retry_input(value: QemuConfig, socket: Path) -> Result[Unit] {
   assert "QmpRetryOperation" in result.stderr, result.stderr
 }
 
-test test_qmp_retry_spends_the_shared_deadline_in_helper [fs, process, net, time, error] { |ctx|
-  let root = test.temp_dir(ctx, name: "qmp-deadline")?
-  let helper = fp"{root}/slow-helper"
-  helper.write_lines(["#!/bin/sh", "exec sleep 3"])
-  helper.chmod(0o755)
-  let source = p"system/qemu.xsh".read_text()? + """
-proc probe() -> Result[Unit, Error] {
-  let target = qemu_target("Linux", "x86_64")?
-  let config = QemuConfig(qemu: p"unused", qmp_transport: QemuQmpLegacy(p"FAKE_PATH", p"unused"), target:)
-  let started = time.monotonic()?
-  match qemu_qmp_retry(config, QmpRetryReady, p"unused", started + 200000000) {
-    Ok(_) => fail "accepted a silent QMP helper"
-    Err(_) => {}
-  }
-  assert time.monotonic()? - started < 1500000000, "QMP helper exceeded the supervisor deadline"
-  let input_deadline = time.monotonic()? + 200000000
-  match qemu_qmp(config, QmpInput, p"unused", input_deadline) {
-    Err(QmpFailure.OutcomeIndeterminate {operation: _}) => {}
-    Err(problem) => fail f"input timeout lost its indeterminate outcome: {problem.message}"
-    Ok(_) => fail "accepted a silent input helper"
-  }
-}
-probe()?
-""".replace("FAKE_PATH", with: helper.display())
-  let result = test.run_script(ctx, source)?
-  assert result.success, result.stderr
-}
-
-proc supervisor_fixture(
-  ctx: TestContext,
-  final_failure: Bool,
-  ignore_term: Bool = true,
-  reader_exits_after_input: Bool = false,
-  vt_markers: Bool = false,
-) -> Result[SupervisorFixture] {
+proc supervisor_fixture(ctx: TestContext) -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
   let bundle = fp"{outputs.builds}/fixture"
   bundle.mkdir()
   outputs.current.symlink(to: p"builds/fixture")
-  let fake_qemu = fp"{root}/fake-qemu.sh"
-  let fake_qmp = fp"{root}/fake-qmp.sh"
-  let attempt_one = fp"{root}/qmp-attempt-one"
-  let attempt_two = fp"{root}/qmp-attempt-two"
-  let attempt_three = fp"{root}/qmp-attempt-three"
-  let qmp_calls = fp"{root}/qmp-calls"
-  let qemu_pid = fp"{root}/qemu-pid"
-  let foot_reader_alive = fp"{root}/foot-reader-alive"
-  let input_record = fp"{root}/input-record"
-  let final_log = if final_failure { f"printf 'QEMU_FATAL after screenshot\\n' > '{outputs.qemu_log}'" } else { "" }
-  let term_trap = if ignore_term { "trap '' TERM" } else { "trap 'exit 0' TERM" }
-  let reader_exit = if reader_exits_after_input { f"rm '{foot_reader_alive}'; " } else { "" }
-  let vt_console = if vt_markers { "printf 'LAPUTA_VT_SWITCH_AWAY\\nLAPUTA_VT_SWITCH_BACK\\nLAPUTA_DWL_FOOT_PROOF_READY\\n'" } else { "printf 'LAPUTA_DWL_FOOT_PROOF_READY\\n'" }
-
   outputs.kernel.write("kernel")
   outputs.disk.write("disk")
-
-  fake_qemu.write_lines(
-    [
-      "#!/bin/sh",
-      term_trap,
-      f"printf '%s\\n' \"$$\" > '{qemu_pid}'",
-      f": > '{foot_reader_alive}'",
-      f"printf qmp > '{outputs.qmp_socket}'",
-      vt_console,
-      "while :; do sleep 1; done",
-    ],
-  )
-
-  fake_qmp.write_lines(
-    [
-      "#!/bin/sh",
-      f"printf '%s\\n' \"$2\" >> '{qmp_calls}'",
-      f"if [ \"$2\" = ready ]; then",
-      f"  if [ ! -e '{attempt_one}' ]; then : > '{attempt_one}'; exit 1; fi",
-      f"  if [ ! -e '{attempt_two}' ]; then : > '{attempt_two}'; exit 0; fi",
-      "  exit 0",
-      "fi",
-      f"if [ \"$2\" = input ]; then",
-      f"  if [ ! -e '{attempt_three}' ]; then : > '{attempt_three}'; fi",
-      f"  {reader_exit}printf 'LAPUTA_DWL_FOOT_PROOF_READY\\nLAPUTA_DWL_FOOT_PROOF_OK\\n' > '{outputs.console_log}'; printf 'laputa\\n' > '{input_record}'; exit 0",
-      "fi",
-      f"if [ \"$2\" = vt-switch ]; then",
-      "  exit 0",
-      "fi",
-      f"if [ -e '{foot_reader_alive}' ]; then",
-      f"  printf 'P6\\n16 1\\n255\\n' > '{outputs.screenshot}'",
-      "  pixel='\\377\\000\\377'",
-      "else",
-      f"  printf 'P6\\n16 1\\n255\\n' > '{outputs.screenshot}'",
-      "  pixel='\\000\\000\\000'",
-      "fi",
-      "index=0",
-      f"while [ \"$index\" -lt 16 ]; do printf '%b' \"$pixel\" >> '{outputs.screenshot}'; index=$((index + 1)); done",
-      final_log,
-      "exit 0",
-    ],
-  )
+  let fake_qemu = fp"{root}/fake-qemu"
+  fake_qemu.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?)
   fake_qemu.chmod(0o755)
-  fake_qmp.chmod(0o755)
   {
-    config: {
-      qemu: fake_qemu,
-      qmp_transport: qemu.QemuQmpLegacy(fake_qmp, fp"{root}/qmp-helper.py"),
-      target: qemu.qemu_target("Linux", "x86_64")?,
-    },
+    config: {qemu: fake_qemu, target: qemu.qemu_target("Linux", "x86_64")?},
     outputs,
-    qmp_helper: fake_qmp,
-    qmp_attempt_one: attempt_one,
-    qmp_attempt_two: attempt_two,
-    qmp_attempt_three: attempt_three,
-    qmp_calls,
-    qemu_pid,
-    foot_reader_alive,
-    input_record,
+    qemu_pid: fp"{root}/qemu-pid",
   }
 }
 
@@ -297,78 +190,37 @@ X""",
 }
 
 test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false)?
-  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)
-  assert fixture.qmp_attempt_one.exists()?
-  assert fixture.qmp_attempt_two.exists()?
-  assert fixture.qmp_attempt_three.exists()?
-  assert fixture.qmp_calls.read_text()? == "ready\nready\ninput\nscreenshot\n"
-  assert fixture.input_record.read_text()? == """laputa
-"""
+  let fixture = supervisor_fixture(ctx)?
+  fp"{fixture.outputs.root}/reject-ready".write("")
+  fp"{fixture.outputs.root}/reject-screenshot".write("")
+  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
+  assert fp"{fixture.outputs.root}/connections".read_lines()?.len() == 5
+  let events = fp"{fixture.outputs.root}/native-events".read_lines()?
+  assert events.len() == 18
+  assert "l" in events[0] and "ret" in events[12]
+  assert fp"{fixture.outputs.root}/screenshot-requests".read_lines()? == [fixture.outputs.screenshot.display(), fixture.outputs.screenshot.display()]
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
 test test_qemu_supervisor_switches_vt_once_each_way [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false, vt_markers: true)?
-  qemu.run_test(fixture.config, fixture_vt_profile(), fixture.outputs)
-  assert fixture.qmp_calls.read_text()? == "vt-switch\nvt-switch\nready\nready\ninput\nscreenshot\n"
-  assert fixture.input_record.read_text()? == """laputa
-"""
-  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
-}
-
-test test_qemu_supervisor_uses_native_qmp_for_input_vt_and_screenshot [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false)?
-  let fake = fixture.config.qemu
-  fake.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?)
-  fake.chmod(0o755)
-  let outputs = {...fixture.outputs, qmp_socket: p".work/tmp/qmp-supervisor.sock", screenshot: fp"{fixture.outputs.root}/screen \"native\".ppm"}
-  fp"{outputs.root}/reject-screenshot".write("")
-  defer outputs.qmp_socket.remove()
-  let config = {...fixture.config, qmp_transport: qemu.QemuQmpLinux}
-  qemu.run_test(config, fixture_vt_profile(), outputs)?
-  let events = fp"{outputs.root}/native-events".read_lines()?
+  let fixture = supervisor_fixture(ctx)?
+  qemu.run_test(fixture.config, fixture_vt_profile(), fixture.outputs)?
+  let events = fp"{fixture.outputs.root}/native-events".read_lines()?
   assert events.len() == 22
   assert "f2" in events[0] and "f1" in events[2]
   assert "ctrl" in events[0] and "alt" in events[0]
   assert "l" in events[4] and "ret" in events[16]
-  assert fp"{outputs.root}/screenshot-requests".read_lines()? == [outputs.screenshot.display(), outputs.screenshot.display()]
-  assert qemu.screenshot_is_valid(outputs.screenshot)?
+  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
-test test_qemu_supervisor_does_not_replay_native_input_after_disconnect [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false)?
-  fixture.config.qemu.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?)
-  fixture.config.qemu.chmod(0o755)
+test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect [fs, process, net, time, error] { |ctx|
+  let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/disconnect-input".write("")
-  let outputs = {...fixture.outputs, qmp_socket: p".work/tmp/qmp-disconnect.sock"}
-  defer outputs.qmp_socket.remove()
-  let config = {...fixture.config, qmp_transport: qemu.QemuQmpLinux}
-  match qemu.run_test(config, fixture_profile(), outputs) {
-    Ok(_) => test.fail("supervisor accepted an indeterminate native input outcome"),
+  match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
+    Ok(_) => test.fail("supervisor accepted an indeterminate input outcome"),
     Err(problem) => assert "OutcomeIndeterminate" in problem.message, problem.message,
   }
-  assert fp"{outputs.root}/native-events".read_lines()?.len() == 1
-}
-
-test test_qemu_supervisor_stops_qemu_after_indeterminate_input [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false, false)?
-  fixture.qmp_helper.write_lines(
-    [
-      "#!/bin/sh",
-      f"printf '%s\\n' \"$2\" >> '{fixture.qmp_calls}'",
-      "if [ \"$2\" = input ]; then exit 75; fi",
-      "exit 0",
-    ],
-  )
-  fixture.qmp_helper.chmod(0o755)
-
-  match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
-    Ok(_) => test.fail("supervisor accepted an indeterminate QMP input outcome")
-    Err(problem) => assert "OutcomeIndeterminate" in problem.message, problem.message
-  }
-
-  assert fixture.qmp_calls.read_text()? == "ready\ninput\n"
+  assert fp"{fixture.outputs.root}/native-events".read_lines()?.len() == 1
   let pid = fixture.qemu_pid.read_text()?.trim().parse_int()?
   for entry in process.list()? {
     assert entry.pid != pid, f"QEMU process {pid} remained after input failure"
@@ -376,23 +228,22 @@ test test_qemu_supervisor_stops_qemu_after_indeterminate_input [fs, process, net
 }
 
 test test_qemu_supervisor_rejects_capture_after_foot_reader_exits [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false, false, true)?
+  let fixture = supervisor_fixture(ctx)?
+  fp"{fixture.outputs.root}/reader-exits".write("")
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
     Ok(_) => test.fail("supervisor accepted a screenshot without the live foot marker")
     Err(problem) => assert "visual marker" in problem.message, problem.message
   }
-
-  assert fixture.qmp_calls.read_text()? == "ready\nready\ninput\nscreenshot\n"
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
 test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, true)?
+  let fixture = supervisor_fixture(ctx)?
+  fp"{fixture.outputs.root}/final-failure".write("")
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
     Ok(_) => test.fail("supervisor accepted QEMU fatal marker written with screenshot")
     Err(_) => {}
   }
-
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
@@ -425,8 +276,8 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
 }
 
 test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx, false)?
-  fixture.config.qemu.write("#!/bin/sh\necho 'qemu: device model missing' >&2\nexit 1\n")
+  let fixture = supervisor_fixture(ctx)?
+  fp"{fixture.outputs.root}/startup-exit".write("")
 
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
     Ok(_) => test.fail("supervisor accepted a QEMU that exited at startup")

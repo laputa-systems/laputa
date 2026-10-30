@@ -5,7 +5,7 @@ use system.types
 
 proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] -> Result[Unit, Error] {
   let intent = profile.load_system_profile("qemu-self-hosting", fp"{repository}/profiles")?
-  let config = qemu.qemu_config(repository, qemu.host_qemu_target()?)?
+  let config = qemu.qemu_config(qemu.host_qemu_target()?)?
   let outputs = build.outputs(output_root)
   outputs.console_log.remove()
   outputs.qemu_log.remove()
@@ -32,12 +32,12 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
       fail f"guest failed; inspect {outputs.console_log} and {outputs.qemu_log}"
     }
     if ! paused and "LAP27_PAUSE_READY" in log {
-      qemu.qemu_control(config, outputs.qmp_socket, qemu.QemuStop)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuStop)?
       print "LAP27_HOST_PAUSED"
       io.flush_stdout()?
       fail "guest resume marker preceded the QMP stop acknowledgment" when "LAP27_RESUME_OBSERVED" in qemu.qemu_log_text(outputs.console_log, outputs.qemu_log)?
       time.sleep(3s)
-      qemu.qemu_control(config, outputs.qmp_socket, qemu.QemuContinue)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuContinue)?
       print "LAP27_HOST_RESUMED"
       io.flush_stdout()?
       paused = true

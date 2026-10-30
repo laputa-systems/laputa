@@ -122,11 +122,11 @@ export proc dispatch(argv: List[Str]) [fs, process, net, env, time, error] {
     }
     LaputaTest => {
       let outputs = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?
-      qemu.run_test(qemu.qemu_config(root, target)?, value, outputs)
+      qemu.run_test(qemu.qemu_config(target)?, value, outputs)
     }
     LaputaBoot => {
       let outputs = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?
-      qemu.boot(qemu.qemu_config(root, target)?, value, outputs)
+      qemu.boot(qemu.qemu_config(target)?, value, outputs)
     }
     LaputaBuild => {
       let _ = build.build_profile(docker.build_config(root, value.name, target.arch)?, value, parsed.jobs)?

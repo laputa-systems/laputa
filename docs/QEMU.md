@@ -24,7 +24,6 @@ console.
 - KVM on Linux: `/dev/kvm` must be usable by your user.
 - QEMU's virtio GPU PCI device; on Alpine install
   `qemu-hw-display-virtio-gpu` and `qemu-hw-display-virtio-gpu-pci`.
-- On macOS, `python3` runs the legacy QMP helper `boot/qmp-proof.py`.
 - `make seed` done for the host arch. The profile build needs no mirror.
 
 ## Commands and outputs
@@ -93,8 +92,8 @@ never retried.
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed
 to the retry path. If an input event loses its response, the supervisor reports an indeterminate
-outcome and does not retry. Linux uses `system/qmp.xsh`; macOS uses the legacy
-Python helper, which reports an indeterminate outcome with exit status 75.
+outcome and does not retry. Both supported host platforms use `system/qmp.xsh`
+over `unix.connect_stream`; QMP control requires no Python process.
 
 The terminal reader prints and flushes its visual marker, records the injected
 input, then waits for another terminal read. The host captures and checks the
@@ -112,8 +111,8 @@ QEMU exit as an error. The profile overlay digest is bound into the generated
 image so a guest proof cannot validate a different root generation.
 
 Run `$XSHT test tests/system/qemu.xsh` for typed dispatch and supervisor
-coverage. Run `XSH=/path/to/xsh python3 tests/system/qmp_client.py` for Linux
-protocol cases and `python3 tests/system/qmp_proof.py` for the legacy helper.
+coverage. Run `XSH=/path/to/xsh python3 tests/system/qmp_client.py` for the local
+protocol cases. Python is a test-peer dependency, not a VM control dependency.
 
 Browsers, real hardware, IPv6, and Wi-Fi are outside this proof.
 
@@ -123,7 +122,7 @@ five-second budget. The commands control the disposable VM and are never retried
 ## QMP replacement baseline
 
 At `55b9f68`, before the native Linux client, QMP has the following boundary.
-The cross-host replacement remains incomplete while macOS retains the helper.
+The table records the retired boundary for the source and responsibility comparison.
 
 | Responsibility | Current owner and cost |
 |---|---|
@@ -141,33 +140,32 @@ This baseline measures responsibilities and crossings, not a runtime speedup.
 Removing Python earns credit only when the implementation and dependency are
 actually removed without losing the one-shot mutation and cleanup contracts.
 
-The supplied fixed XSH source already provides bounded fd reads, short-write
-counts, polling, close, and process-local monotonic time. The remaining portable
-socket gap is connection setup: AF_UNIX socket creation and connect are exposed
-under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
-opens files and does not connect to socket paths. LAP-35 therefore still needs
-a portable, bounded Unix-stream connection boundary to preserve the macOS path.
+The native client uses XSH's bounded fd reads, short-write counts, polling,
+close and process-local monotonic time. `unix.connect_stream(path, timeout)`
+returns a caller-owned nonblocking, close-on-exec descriptor with portable Unix
+address handling. `qmp_run_until` carries the supervisor's absolute deadline
+through connection setup and every exchange. Callers use `qmp_run` for a single
+operation with a duration budget.
 
-The Linux supervisor uses `system/qmp.xsh` for readiness, input, VT switches,
-screenshots, and the test-only pause and resume commands. Each session bounds
-frames to 1 MiB, matches response IDs, skips events, and applies a deadline.
-Twelve local peer tests cover framing, multi-command sessions, errors and
-indeterminate mutations. Seventeen supervisor cases cover dispatch, retry,
-visual content and the shared deadline. The integrated Linux x86_64/KVM
-graphical proof passes with the native client.
+The native supervisor covers readiness, input, VT switches, screenshots and
+pause/resume. Frames are limited to 1 MiB; replies match request IDs and events
+are skipped while awaiting replies. Fifteen peer cases and fourteen supervisor
+cases cover these contracts. `QemuConfig` contains only the QEMU executable and
+target; `qemu_config(target)` does not discover a Python helper.
 
-| Boundary | Linux after replacement |
+| Boundary | Native implementation |
 |---|---|
 | Host entry points | The same readiness, input, VT, screenshot, pause and resume operations. |
 | QMP subprocesses | None; requests stay in the host XSH process. |
 | Argument conversion | Native JSON encoding and decoding replace the XSH-to-Python argv crossing. Screenshot filenames use structured QMP arguments. |
 | Lifetime | One bounded connection per operation, with ordered input steps, response IDs and an absolute deadline shared with the supervisor. |
-| Source and dependencies | `system/qmp.xsh` is 112 lines and the supervisor is 544 lines. No new runtime dependency; Linux drops Python for QMP. |
-| Remaining cross-host cost | The 184-line Python helper remains for macOS, leaving two protocol implementations and more total source. No overall simplification or speedup is claimed. |
+| Laputa source | The client and supervisor total 615 lines, versus the previous 645 lines of helper and supervisor. The helper and its runtime dependency are removed. |
+| Shared substrate | XSH adds the reusable Unix stream connection operation using its existing rustix dependency. That Rust host boundary is additional first-party source. |
+| Verification | Local protocol peers and supervisor fixtures remain Python test tooling. Linux x86_64/KVM provides the graphical proof; macOS and aarch64 runtime qualification remain separate. |
 
-A portable Unix-stream connection operation is still needed to remove the
-helper and its macOS dependency. macOS and aarch64 runtime qualification remain
-separate from the Linux x86_64 evidence.
+This removes the subprocess, duplicated transport selection and second protocol
+implementation. Source counts do not establish a speedup. XSH's distribution
+size gate applies to the added shared operation.
 
 ## Maintained VM activation
 

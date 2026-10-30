@@ -21,10 +21,8 @@ export type QemuTarget = {
   interactive_display: List[Str],
 }
 
-## The host transport for a QMP connection.
-export enum QemuQmpTransport { QemuQmpLinux, QemuQmpLegacy(Path, Path) }
-## The host executable, QMP transport, and host target used by a QEMU invocation.
-export type QemuConfig = {qemu: Path, qmp_transport: QemuQmpTransport, target: QemuTarget}
+## The host executable and target used by a QEMU invocation.
+export type QemuConfig = {qemu: Path, target: QemuTarget}
 
 enum QmpOperation { QmpReady, QmpInput, QmpVtSwitch(Int), QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
@@ -108,20 +106,10 @@ export pure kernel_cmdline(target: QemuTarget, mode: types.QemuMode, proof: type
 }
 
 ## Resolve only the documented host-side QEMU configuration surface.
-export proc qemu_config(laputa_root: Path, target: QemuTarget) [fs, process, env, error] -> Result[QemuConfig, Error] {
+export proc qemu_config(target: QemuTarget) [process, env, error] -> Result[QemuConfig, Error] {
   let raw_qemu = (env.get(f"QEMU_SYSTEM_{target.arch.upper()}") ?? "").trim()
   let qemu = if raw_qemu == "" { process.which(target.qemu_name)? } else { fp"{raw_qemu}" }
-  let qmp_transport = if system.uname()?.sysname == "Linux" {
-    QemuQmpLinux
-  } else {
-    let python = process.which("python3")?
-    let helper = fp"{laputa_root}/boot/qmp-proof.py"
-    if ! helper.exists() {
-      return Err(types.LaputaError.Profile(f"missing QMP helper {helper}"))
-    }
-    QemuQmpLegacy(python, helper)
-  }
-  {qemu, qmp_transport, target}
+  {qemu, target}
 }
 
 ## Construct an exact QEMU argv without a shell command boundary.
@@ -228,7 +216,7 @@ proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
   qmp.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation)
 }
 
-proc qmp_linux_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
+proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
   match operation {
     QmpReady => Ok([]),
     QmpScreenshot(output) => Ok([qmp.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
@@ -250,60 +238,31 @@ proc qmp_linux_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error
   }
 }
 
-proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path, deadline: Int) {
+proc qemu_qmp(operation: QmpOperation, socket: Path, deadline: Int) {
   let now = time.monotonic()?
   if now >= deadline { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
   let limit = if deadline < now + 60000000000 { deadline } else { now + 60000000000 }
-  match value.qmp_transport {
-    QemuQmpLinux => {
-      match qmp.qmp_linux_run_until(socket, qmp_linux_steps(operation)?, limit) {
-        Ok(_) => Ok(),
-        Err(qmp.QmpError.Indeterminate {operation: _}) => Err(QmpFailure.OutcomeIndeterminate(operation)),
-        Err(problem) => Err(problem),
-      }
-    },
-    QemuQmpLegacy(python, helper) => {
-      var argv = [python.display(), helper.display(), qmp_mode(operation), socket.display()]
-      if let QmpScreenshot(output) = operation { argv += [output.display()] }
-      if let QmpVtSwitch(vt) = operation { argv += [f"{vt}"] }
-      let remaining_ms = (limit - time.monotonic()?) / 1000000
-      if remaining_ms <= 0 { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
-      let status = match process.run(process.command_argv(python, argv, timeout: time.millis(remaining_ms))) {
-        Ok(status) => status,
-        Err(ProcessError.Timeout {message: _}) => {
-          if operation is QmpInput or operation is QmpVtSwitch(_) { return Err(QmpFailure.OutcomeIndeterminate(operation)) }
-          return Err(types.LaputaError.Docker("QMP helper timed out"))
-        },
-        Err(problem) => { return Err(problem) },
-      }
-      return Err(QmpFailure.OutcomeIndeterminate(operation)) when status.exited_with(75)
-      return Err(types.LaputaError.Docker(f"QMP {qmp_mode(operation)} helper failed")) unless status.ok
-      Ok()
-    },
+  match qmp.qmp_run_until(socket, qmp_steps(operation)?, limit) {
+    Ok(_) => Ok(),
+    Err(qmp.QmpError.Indeterminate {operation: _}) => Err(QmpFailure.OutcomeIndeterminate(operation)),
+    Err(problem) => Err(problem),
   }
 }
 
 ## Pause or resume a disposable guest without retrying an unknown outcome.
 export enum QemuControl { QemuStop, QemuContinue }
 
-## Send a single pause or resume command over the configured host transport.
-export proc qemu_control(value: QemuConfig, socket: Path, control: QemuControl) -> Result[Unit, Error] {
+## Send one pause or resume command over the native Unix stream.
+export proc qemu_control(socket: Path, control: QemuControl) -> Result[Unit, Error] {
   let command = match control { QemuStop => "stop", QemuContinue => "cont" }
-  match value.qmp_transport {
-    QemuQmpLinux => qmp.qmp_linux_run(socket, [qmp.QmpExecute(command, "{}", qmp.QmpMutation)], 5000),
-    QemuQmpLegacy(python, helper) => {
-      let status = process.run(process.command_argv(python, [python.display(), helper.display(), command, socket.display()], timeout: 5s))?
-      if !status.ok { return Err(types.LaputaError.Docker(f"QMP {command} helper failed")) }
-      Ok()
-    },
-  }
+  qmp.qmp_run(socket, [qmp.QmpExecute(command, "{}", qmp.QmpMutation)], 5000)
 }
 
-proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path, deadline: Int) {
+proc qemu_qmp_retry(operation: QmpRetryOperation, socket: Path, deadline: Int) {
   let qmp_operation = qmp_retry_operation(operation)
   var attempt = 0
   while attempt < 20 {
-    match qemu_qmp(value, qmp_operation, socket, deadline) {
+    match qemu_qmp(qmp_operation, socket, deadline) {
       Ok(_) => return
       Err(QmpFailure.OutcomeIndeterminate {operation: detail}) => return Err(QmpFailure.OutcomeIndeterminate(detail))
       Err(_) => {
@@ -316,7 +275,7 @@ proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Pat
     }
   }
 
-  return Err(types.LaputaError.Docker(f"QMP {qmp_mode(qmp_operation)} helper did not become ready"))
+  return Err(types.LaputaError.Docker(f"QMP {qmp_mode(qmp_operation)} operation did not become ready"))
 }
 
 ## Combine QEMU's serial console and stderr log before scanning proof markers:
@@ -425,24 +384,24 @@ export proc run_test(
     }
 
     if !vt_away and profile.proof.vt_away_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_away_marker in log_text {
-      qemu_qmp(value, QmpVtSwitch(2), outputs.qmp_socket, deadline)
+      qemu_qmp(QmpVtSwitch(2), outputs.qmp_socket, deadline)
       vt_away = true
     }
 
     if !vt_back and profile.proof.vt_back_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_back_marker in log_text {
-      qemu_qmp(value, QmpVtSwitch(1), outputs.qmp_socket, deadline)
+      qemu_qmp(QmpVtSwitch(1), outputs.qmp_socket, deadline)
       vt_back = true
     }
 
     if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {
-      qemu_qmp_retry(value, QmpRetryReady, outputs.qmp_socket, deadline)
-      qemu_qmp(value, QmpInput, outputs.qmp_socket, deadline)
+      qemu_qmp_retry(QmpRetryReady, outputs.qmp_socket, deadline)
+      qemu_qmp(QmpInput, outputs.qmp_socket, deadline)
       injected = true
     }
 
     if proof.succeeded(profile.proof, log_text) {
       if ! screenshot_taken {
-        qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket, deadline)
+        qemu_qmp_retry(QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket, deadline)
         if ! screenshot_is_valid(outputs.screenshot) {
           return Err(
             types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),

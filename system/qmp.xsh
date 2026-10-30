@@ -66,18 +66,18 @@ proc qmp_command(fd: Int, pending: Bytes, execute: Str, arguments: Any, id: Int,
   qmp_response(fd, pending, id, deadline)?
 }
 
-## Execute ordered steps on one Linux connection with a session deadline.
-export proc qmp_linux_run(socket: Path, steps: List[QmpStep], timeout_ms: Int) -> Result[Unit, Error] {
+## Execute ordered steps on one Unix connection with a session deadline.
+export proc qmp_run(socket: Path, steps: List[QmpStep], timeout_ms: Int) -> Result[Unit, Error] {
   if timeout_ms <= 0 { return Err(QmpError.Protocol("QMP timeout must be positive")) }
-  qmp_linux_run_until(socket, steps, time.monotonic()? + timeout_ms * 1000000)?
+  qmp_run_until(socket, steps, time.monotonic()? + timeout_ms * 1000000)?
 }
 
 ## Execute ordered steps before an absolute process-local monotonic deadline in nanoseconds.
-export proc qmp_linux_run_until(socket: Path, steps: List[QmpStep], deadline: Int) -> Result[Unit, Error] {
-  let constants = linux.net_constants()
-  let fd = linux.socket(constants.AF_UNIX, constants.SOCK_STREAM + constants.SOCK_NONBLOCK)?
+export proc qmp_run_until(socket: Path, steps: List[QmpStep], deadline: Int) -> Result[Unit, Error] {
+  let remaining = deadline - time.monotonic()?
+  if remaining <= 0 { return Err(QmpError.Protocol("QMP deadline expired")) }
+  let fd = unix.connect_stream(socket, timeout: time.millis((remaining + 999999) / 1000000))?
   defer unix.close_fd(fd)
-  linux.connect(fd, {family: "unix", address: socket.display()})?
   let greeting = qmp_frame(fd, b"", deadline)?
   let _ = json.get(greeting.message, ["QMP"])?.require(Record)?
   let capabilities = qmp_command(fd, greeting.pending, "qmp_capabilities", {}, 1, deadline)?
