@@ -246,7 +246,7 @@ export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: Verif
     snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and now_epoch_seconds >= 0,
     "refusing to persist an invalid accepted repository snapshot",
   )
-  var lower_bound = now_epoch_seconds
+  let lower_bound = now_epoch_seconds
   let prior = snapshot_read_accepted(paths)?
 
   if prior != null {
@@ -258,10 +258,12 @@ export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: Verif
       verified.index_sha256 == prior.index_sha256 or snapshot_u64_is_greater(verified.generation, prior.generation),
       "repository snapshot generation does not advance the accepted snapshot",
     )
-    lower_bound = if now_epoch_seconds > prior.lower_bound { now_epoch_seconds } else { prior.lower_bound }
+    snapshot_require(
+      now_epoch_seconds >= prior.lower_bound,
+      "system clock reads behind the last observed repository snapshot time; refusing to commit acceptance",
+    )
   }
 
-  paths.accepted.parent.mkdir()
   let sibling = fs.temp_sibling(paths.accepted)?
   defer sibling.remove()
   json.write(sibling, {generation: verified.generation, index_sha256: verified.index_sha256, lower_bound})

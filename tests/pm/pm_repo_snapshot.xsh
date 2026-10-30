@@ -229,7 +229,10 @@ test test_snapshot_key_file_and_accepted_state_round_trip [fs, error] { |ctx|
     assert stored.lower_bound == reference_now()
   }
 
-  repo_snapshot.snapshot_persist_accepted(state, verified, reference_now() - 100)?
+  match repo_snapshot.snapshot_persist_accepted(state, verified, reference_now() - 100) {
+    Ok(_) => test.fail("a writer behind the accepted clock floor was allowed to commit"),
+    Err(problem) => assert "behind the last observed repository snapshot time" in problem.message
+  }
   let restored = repo_snapshot.snapshot_read_accepted(state)?
 
   if restored == null {
