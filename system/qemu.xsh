@@ -231,7 +231,7 @@ proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
 proc qmp_linux_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
   match operation {
     QmpReady => Ok([]),
-    QmpScreenshot(output) => Ok([qmp.QmpExecute("human-monitor-command", json.encode({"command-line": f"screendump {output}"})?, qmp.QmpReadOnly)]),
+    QmpScreenshot(output) => Ok([qmp.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
     QmpVtSwitch(vt) => Ok([
       qmp_key_step(["ctrl", "alt", f"f{vt}"], true)?,
       qmp.QmpDelay(500),

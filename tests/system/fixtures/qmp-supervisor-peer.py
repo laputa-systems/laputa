@@ -31,10 +31,16 @@ with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
                     with trace.open("a") as out:
                         out.write(json.dumps(events) + "\n")
                     received.append([(event["data"]["key"]["data"], event["data"]["down"]) for event in events])
-                elif request["execute"] == "human-monitor-command":
-                    command = request["arguments"]["command-line"]
-                    assert command.startswith("screendump ")
-                    Path(command[11:]).write_bytes(b"P6\n16 1\n255\n" + b"\xff\x00\xff" * 16)
+                elif request["execute"] == "screendump":
+                    filename = request["arguments"]["filename"]
+                    with (root / "screenshot-requests").open("a") as out:
+                        out.write(filename + "\n")
+                    reject = root / "reject-screenshot"
+                    if reject.exists():
+                        reject.unlink()
+                        conn.sendall(json.dumps({"error": {"class": "GenericError", "desc": "retry screenshot"}, "id": request["id"]}).encode() + b"\n")
+                        continue
+                    Path(filename).write_bytes(b"P6\n16 1\n255\n" + b"\xff\x00\xff" * 16)
                 else:
                     raise AssertionError(request)
                 if (root / "disconnect-input").exists() and received and received[-1] == [("l", True)]:

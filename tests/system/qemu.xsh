@@ -294,7 +294,8 @@ test test_qemu_supervisor_uses_native_qmp_for_input_vt_and_screenshot [fs, proce
   let fake = fixture.config.qemu
   fake.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?)
   fake.chmod(0o755)
-  let outputs = {...fixture.outputs, qmp_socket: p".work/tmp/qmp-supervisor.sock"}
+  let outputs = {...fixture.outputs, qmp_socket: p".work/tmp/qmp-supervisor.sock", screenshot: fp"{fixture.outputs.root}/screen \"native\".ppm"}
+  fp"{outputs.root}/reject-screenshot".write("")
   defer outputs.qmp_socket.remove()
   let config = {...fixture.config, qmp_transport: qemu.QemuQmpLinux}
   qemu.run_test(config, fixture_vt_profile(), outputs)?
@@ -303,6 +304,7 @@ test test_qemu_supervisor_uses_native_qmp_for_input_vt_and_screenshot [fs, proce
   assert "f2" in events[0] and "f1" in events[2]
   assert "ctrl" in events[0] and "alt" in events[0]
   assert "l" in events[4] and "ret" in events[16]
+  assert fp"{outputs.root}/screenshot-requests".read_lines()? == [outputs.screenshot.display(), outputs.screenshot.display()]
   assert qemu.screenshot_is_valid(outputs.screenshot)?
 }
 
