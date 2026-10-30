@@ -118,12 +118,12 @@ proc tailscaled_reaches_http(
 ) [fs, process, time, error] -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"tailscale-{label}")?
   let log = fp"{dir}/tailscaled.log"
-  let socket = fp"/tmp/laputa-trust-consumers-{bytes.from_text(dir.display()).sha256().hex()[..16]}.sock"
+  let socket = fp"{dir}/daemon.sock"
   defer socket.remove()
   let child_env = {SSL_CERT_FILE: bundle.display(), HOME: dir.display(), PATH: "/usr/bin:/bin"}
   let daemon = process.command_argv(
     tailscaled,
-    [tailscaled.display(), "--tun=userspace-networking", f"--state={dir.display()}/state", f"--socket={socket.display()}", "--no-logs-no-support", "--port=0"],
+    [tailscaled.display(), "--tun=userspace-networking", f"--state={dir.display()}/state", "--socket=daemon.sock", "--no-logs-no-support", "--port=0"],
     dir,
     child_env,
     stdout: log,
@@ -134,7 +134,7 @@ proc tailscaled_reaches_http(
   wait_for_path(socket, 100)?
   let up = process.command_argv(
     tailscale,
-    [tailscale.display(), f"--socket={socket.display()}", "up", f"--login-server=https://127.0.0.1:{port}", "--timeout=3s"],
+    [tailscale.display(), "--socket=daemon.sock", "up", f"--login-server=https://127.0.0.1:{port}", "--timeout=3s"],
     dir,
     child_env,
     timeout: 20s,
