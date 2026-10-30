@@ -9,7 +9,7 @@ proc main(root = /rootfs) [fs, process, env, error] {
   let readelf = proof.readelf_tool()?
   let dynamic = run.text $readelf "-d" $tinyland
   proof.ensure("[libseat.so.1]" in dynamic, "proof-tinyland", "tinyland does not link the system libseat")
-  proof.ensure("[libxkbcommon.so" in dynamic, "proof-tinyland", "tinyland does not link the system libxkbcommon")
+  proof.ensure("[libxkbcommon.so" not in dynamic, "proof-tinyland", "tinyland still links libxkbcommon; KBVM backend must be C-free")
 
   let strings = tinyland.read_bytes()?.strings()
   proof.ensure("/bin/sh" not in strings, "proof-tinyland", "tinyland still names /bin/sh")

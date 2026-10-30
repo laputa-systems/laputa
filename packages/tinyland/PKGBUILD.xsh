@@ -21,9 +21,9 @@ export const rel = "1"
 ## Package recipe export.
 ## musl and the shared client libraries tinyland links: the seatd-rs daemon
 ## package ships the libseat client for the seatd-only broker session,
-## libxkbcommon for keymaps, gnu-stubs for the CRT objects and libgcc_s
-## the dynamic link needs.
-export const deps = ["musl", "gnu-stubs", "libxkbcommon", "seatd-rs"]
+## gnu-stubs for the CRT objects and libgcc_s the dynamic link needs.
+## Keyboard maps are pure-Rust KBVM with XKB data lookups; no libxkbcommon link.
+export const deps = ["musl", "gnu-stubs", "seatd-rs"]
 
 ## XKB data is a runtime lookup, not a link input.
 export const runtime_only_deps = ["xkeyboard-config"]
@@ -103,10 +103,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # -crt-static selects the dynamic CRT (with an INTERP) like the harness
   # build: a static-PIE binary must not carry DT_NEEDED entries, and the
   # proof's explicit-loader run is only sound for real dynamics.
-  # The xkbcommon crate requests its native link without a kind, which
-  # rustc resolves statically; the image ships only the shared library,
-  # so the vendored crate is patched to a dylib link below (the harness
-  # instead links the proof-only static archive).
+  # KBVM is pure Rust; no native XKB link patching is needed.
   let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
   let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={host_cc} -L native={host_libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed"
   let aarch64_rustflags = match target {
@@ -136,18 +133,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   # CRT, proof-only XKB root) does not apply inside the container toolchain;
   # the recipe supplies its own link flags below.
   p".cargo/config.toml".remove()
-
-  # The xkbcommon crate requests its native link without a kind, which the
-  # toolchain resolves statically; the image ships only the shared library.
-  for entry in fs.walk(p"vendor", gitignore: false)? |> where .kind == "file" and .name == "ffi.rs" {
-    if ! entry.path.display().ends_with("xkb/ffi.rs") {
-      continue
-    }
-
-    var text = entry.path.read_text()?
-    let patched = text.replace("#[link(name = \"xkbcommon\")]", with: "#[link(name = \"xkbcommon\", kind = \"dylib\")]")
-    entry.path.write(patched)
-  }
 
   let current_path = e"PATH" ?? ""
   let cargo_path = f"{host_cc.parent}:{current_path}"
