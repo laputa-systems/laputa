@@ -13,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.28.0"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
 export const deps = [
@@ -149,8 +149,6 @@ proc patch_generated_inputs() {
   write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
-  text = text.replace("math = cc.find_library('m')", with: "math = declare_dependency(link_args: ['-lm'])")
-
   text = text.replace(
     "threads = [dependency('threads'), cc.find_library('stdthreads', required: false)]",
     with: "threads = [declare_dependency(), cc.find_library('stdthreads', required: false)]",
