@@ -110,12 +110,11 @@ and real-hardware enablement remain outside that scope.
 ### LAP-35 · P3 · Replace the QMP proof helper with a reusable XSH client
 
 - **Area:** VM control
-- **Where:** `boot/qmp-proof.py`, `system/qemu.xsh`, `tests/system/`, `docs/QEMU.md`
+- **Where:** `system/qmp.xsh`, `system/qemu.xsh`, `tests/system/`, `docs/QEMU.md`
 - **Problem:** QMP readiness/input/screenshot operations rely on a small Python helper. Translating it without a shared bounded protocol contract would only change the implementation language.
 - **Recommendation:** Build a narrow XSH QMP library over XSH-39's qualified Unix-stream operations. Own greeting/capability negotiation, bounded JSON framing, request IDs, unsolicited events, deadlines and cleanup in XSH. Integrate the three current operations and delete the helper/dependency only after parity. Preserve LAP-21's non-retryable mutation boundary and the current Linux/macOS launch paths.
 - **Acceptance:** Fragmented/coalesced messages, interleaved events, command errors, EOF and disconnect-after-send are deterministic local fixtures. Actual VM readiness/input/screenshot proofs pass without the Python helper. Unknown mutation outcomes are reported, not retried; retain LAP-7's independent visual-content requirement. No QMP-specific Rust intrinsic or new VM orchestration framework.
-- **Progress:** Linux uses `system/qmp.xsh` for readiness, input, VT switching, screenshots and pause/resume, with bounded frames, response IDs, event handling, explicit uncertain outcomes and a shared monotonic supervisor deadline. Twelve native peer tests and seventeen supervisor tests pass. Screenshot filenames are structured arguments. The integrated x86_64/KVM graphical proof passes at `e105c09` without the Python QMP helper.
-- **Blocked:** Complete helper removal still needs portable AF_UNIX connection setup in XSH. Existing socket/connect operations reject non-Linux hosts; macOS retains the explicit legacy Python transport. No macOS or aarch64 runtime qualification is claimed. See [QMP baseline](docs/QEMU.md#qmp-replacement-baseline).
+- **Progress:** Both supported host paths use `system/qmp.xsh` over portable `unix.connect_stream` for readiness, input, VT switching, screenshots and pause/resume. The client bounds frames, matches response IDs, handles events, reports uncertain outcomes and shares the supervisor's monotonic deadline. The Python helper and transport selector are deleted. Fifteen native peer cases, fourteen supervisor cases and the final Linux x86_64/KVM graphical proof pass with the qualified static SDK. No macOS or aarch64 runtime qualification is claimed. See [QMP baseline](docs/QEMU.md#qmp-replacement-baseline).
 - **Fix with:** deduplicate
 - **Effort:** M (days)
 
@@ -132,11 +131,11 @@ and real-hardware enablement remain outside that scope.
 ### LAP-39 · P4 · Measure the complexity delta of one removed glue boundary
 
 - **Area:** Design economy
-- **Where:** `docs/ROADMAP.md`, `docs/DEVELOPMENT.md`, `boot/qmp-proof.py`, `system/qemu.xsh`, `tests/system/`
+- **Where:** `docs/ROADMAP.md`, `docs/DEVELOPMENT.md`, `system/qmp.xsh`, `system/qemu.xsh`, `tests/system/`
 - **Problem:** The roadmap already prescribes architectural subtraction, but no selected change measures first-party glue and invariants removed versus new dependencies and host boundaries created. A source-line quota or replacement of mature libraries would be counterproductive.
 - **Recommendation:** Use LAP-35's Python QMP-helper replacement as one bounded case after its behavior proof. Record before/after entry points, argument/JSON round-trips, subprocesses, duplicate error rules, protocol ownership, first-party source, dependencies and verification cost. Relate the result to startup/binary measurements where XSH itself changes. Keep a compact evidence table in the owning docs, not a permanent scoring service or blanket LOC limit.
 - **Acceptance:** A reviewer can trace every retired responsibility to an actual removal and every retained contract to tests; the new XSH QMP client passes the same fragmented-input and lifecycle cases. If replacement increases obligations without a demonstrated gain, retain or redesign it rather than claim simplification from language choice alone.
-- **Progress:** The [QMP baseline](docs/QEMU.md#qmp-replacement-baseline) records current entry points, subprocesses, wire conversions, error owners, source/dependency cost and test obligations. The final comparison depends on LAP-35; no language-only simplification is claimed.
+- **Progress:** The [QMP baseline](docs/QEMU.md#qmp-replacement-baseline) compares the retired helper with the native client: no QMP subprocesses or argv crossing, one protocol owner, explicit reusable socket substrate cost, and preserved failure and visual-proof contracts. Laputa client/supervisor source is 615 lines versus 645 before replacement. This excludes XSH's added socket implementation and makes no global source-size or speed claim.
 - **Coordination:** XSH-49 owns substrate-complexity accounting; LAP-35 owns the actual QMP implementation and evidence.
 - **Fix with:** ultratriage
 - **Effort:** S (hours)
@@ -169,7 +168,7 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`
 - **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv and Go-based Tailscale each carry their own verifier with distinct distrust behavior.
 - **Recommendation:** Qualify each named consumer against the cross-signed fixture pair: blocked intermediate fails, unblocked control succeeds. Record the actual enforcement per consumer instead of assuming file sharing is proof.
-- **Progress:** `tests/pm/trust_consumers.xsh` characterizes packaged uv 0.13.4 and tailscaled 1.104.2: control succeeds and the omitted-root chain fails, but both accept the blocked intermediate because neither reads the policy. `tests/pm/trust_xsh_policy.xsh` proves the shipped XSH rejects both cross-signed forms with a fixture policy, including with ordinary verification disabled, while the unblocked control connects. The real TLS test runs in disposable containers without changing host trust. Recorded in [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement). Open: enforcing intermediate distrust in uv/Tailscale still requires a consumer patch, pinning, or a decision to remove retained roots.
+- **Progress:** Source-built Tailscale 1.104.2 enforces the canonical SPKI policy while retaining the root bundle. Real TLS fixtures reject both cross-signed forms and accept the unblocked control. XSH and Tailscale reject insecure incomplete-chain bypasses when policy is installed. Tailscale checks fresh and resumed handshakes, preserves system and extra control roots, and refuses policy deletion after observation. uv deliberately retains the checksum-pinned upstream prebuilt binary: it enforces root omission but accepts the blocked intermediate under a retained root. Its characterization remains in `tests/pm/trust_consumers.xsh`. See [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement) for lifecycle limits and the remaining uv enforcement gap.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 

@@ -186,6 +186,7 @@ Known TLS consumers and their cutover:
 | Consumer | TLS state | Cutover after `trust update` |
 |---|---|---|
 | `tailscale` (Go daemon, xinit-supervised) | Reads system roots at startup | `xinit restart tailscale` |
+| `uv` | Upstream binary caches TLS roots; no Laputa SPKI policy | Start a new process |
 | `dropbear` (SSH daemon, xinit-supervised) | Host keys only; no TLS roots | None needed |
 | `laputa-net` (`ifup`, oneshot) | No long-lived client | None needed |
 | `mdevd`, `seatd`, `wpa_supplicant` | No TLS | None needed |
@@ -197,10 +198,12 @@ operator retries the restart. `trust.status` reports the last activation
 time to correlate running processes with trust generations.
 
 XSH TLS clients enforce `/etc/laputa/trust-policy` for every transport
-admission, including requests that use custom roots or disable ordinary
-certificate verification. Redirects are new admissions and recheck the
-policy. A request admitted before an update may finish, including work
-already queued by the transport, internal retries, or TLS resumption. A job
+admission, including requests that use custom roots. An installed policy,
+even an empty blocklist, forbids disabling certificate verification. Without
+a policy, explicit insecure development requests remain available. Redirects
+are new admissions and recheck the policy. A request admitted before an update
+may finish, including work already queued by the transport, internal retries,
+or TLS resumption. A job
 submitted but not yet admitted must fail after the pinned root or policy
 snapshot changes. Changed, removed, or malformed snapshots fail closed until
 the client is recreated. New clients read the activated generation. To cut
@@ -208,41 +211,59 @@ over existing services promptly, restart them after updating (for example
 with `xinit restart SERVICE`). Laputa has no trust daemon and no service
 cutover layer; the operator restarts long-lived processes.
 
-The `uv` package is 0.13.4 and uses Laputa's system store through
-`/etc/uv/uv.toml`. It depends on `ca-certificates`. Its bundled roots use
-`webpki-root-certs` 1.0.10, but its pinned Cargo.lock still uses
-`rustls-webpki` 0.103.14. The system store removes the retired G3 root but
-does not establish rejection of cross-signed chains. See the
-[uv 0.13.4 changelog](https://github.com/astral-sh/uv/blob/0.13.4/CHANGELOG.md),
-[Cargo.lock](https://github.com/astral-sh/uv/blob/0.13.4/Cargo.lock), and
-[rustls-webpki advisory](https://rustsec.org/advisories/RUSTSEC-2026-0382).
+The `uv` 0.13.4 package downloads checksum-pinned upstream musl binaries.
+It uses Laputa's system store through `/etc/uv/uv.toml` and depends on
+`ca-certificates`. It carries no distribution verifier patch and does not
+read `/etc/laputa/trust-policy`. Root omission is enforced, but a blocked
+intermediate that reaches a retained root remains accepted. uv remains an
+explicit gap in per-consumer intermediate distrust enforcement.
 
-Tailscale is 1.104.2, built with Go 1.27.3, and depends on
-`ca-certificates`. Go's Linux verifier reads the canonical bundle and
-certificate files in `/etc/ssl/certs`. Laputa installs only the canonical
-bundle there. The `qemu-dwl-foot` profile includes `ca-certificates`
-directly. See [the Tailscale release](https://github.com/tailscale/tailscale/releases/tag/v1.104.2),
-[Go's eMudhra fix](https://github.com/golang/go/issues/82345), and
-[Go 1.27.3 Linux root lookup](https://github.com/golang/go/blob/go1.27.3/src/crypto/x509/root_linux.go).
+Source-built Tailscale 1.104.2 uses a package-scoped Go 1.27.3 overlay.
+Fresh and resumed TLS handshakes reread the canonical policy and check the
+provided and verified certificate paths. Once a process observes a policy,
+later deletion fails closed. Malformed, unreadable, and dangling policy paths
+also fail closed. Existing connections can continue after an update.
+System roots remain cached until process restart.
+
+Tailscale's custom control verifier first performs ordinary Go certificate
+verification, retaining both system and extra roots. Other configurations
+that disable verification are rejected when policy is installed. This prevents
+a server from hiding a blocked issuer by sending an incomplete chain.
+An explicitly trusted leaf remains a valid trust anchor.
+
+Both packages depend on `ca-certificates`. Go's Linux verifier reads the
+canonical bundle and certificate files in `/etc/ssl/certs`. Laputa installs
+only the canonical bundle there. The `qemu-dwl-foot` profile includes
+`ca-certificates` directly. These changes retain the remaining root bundle.
 
 ### Per-consumer distrust enforcement
 
-`tests/pm/trust_consumers.xsh` runs the packaged `uv` 0.13.4 and `tailscaled`
-1.104.2 static binaries (selected with `LAPUTA_TRUST_CONSUMER_ROOT`) against
-the cross-signed fixture chains with a root bundle holding only `cross-r1`:
+The XSH and Tailscale regressions run real TLS connections in disposable Docker
+containers without modifying host trust. They check each cross-signed form
+with its corresponding retained root. The uv characterization uses `cross-r1`:
 
-| Chain | `uv` (rustls-webpki) | `tailscaled` (Go `crypto/x509`) |
-|---|---|---|
-| `chain-control` (unblocked intermediate under `cross-r1`) | Connects | Connects |
-| `chain-cross-r1` (blocked intermediate under `cross-r1`) | Connects | Connects |
-| `chain-cross-r2` (chains to the omitted `cross-r2` root) | `UnknownIssuer` | `x509: certificate signed by unknown authority` |
+| Chain with installed policy | XSH | `uv` | `tailscaled` |
+|---|---|---|---|
+| Unblocked control | Connects | Connects | Connects |
+| Blocked intermediate under `cross-r1` | Rejects | Connects | Rejects |
+| Blocked intermediate under `cross-r2` | Rejects | No SPKI enforcement | Rejects |
 
-Both consumers enforce root omission only. Neither reads
-`/etc/laputa/trust-policy`, so the blocked-intermediate SPKI list is enforced
-solely by XSH clients. A cross-signed chain that reaches a retained root
-through a blocked intermediate is still accepted by `uv` and Tailscale. The
-tests assert this behavior; a consumer that starts enforcing the policy fails
-them and must be recorded here.
+Export `XSH_HOST` and `XSHT` as described in [development](DEVELOPMENT.md).
+Run the focused package fixtures with extracted package roots:
+
+```sh
+"$XSHT" test tests/pm/trust_xsh_policy.xsh
+LAPUTA_TRUST_CONSUMER_ROOT="$UV_ROOT" "$XSHT" test tests/pm/trust_consumers.xsh
+LAPUTA_TAILSCALE_ROOT="$TAILSCALE_ROOT" "$XSHT" test tests/pm/tailscale_policy.xsh
+```
+
+The uv characterization accepts the unblocked control and the blocked
+intermediate under `cross-r1`, and rejects the chain rooted in omitted
+`cross-r2`. The upstream binary is retained by explicit packaging policy.
+Tailscale's package-local Go fixtures cover fresh and resumed handshakes,
+policy deletion, custom control connections, and preservation of system and
+extra roots. `tailscale_policy.xsh` replaces Tailscale's former blocked-chain
+acceptance characterization with enforcement regressions.
 
 ## Evidence
 

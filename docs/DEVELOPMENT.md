@@ -98,6 +98,11 @@ Its saved image is the bootstrap input; rebuilding the Dockerfile can change
 those packages. The LLVM archive and the XSH seed are additional trusted
 prebuilt inputs.
 
+The uv recipe downloads pinned upstream musl binaries. It does not compile
+uv or carry a distribution verifier patch. Tailscale uses its package-scoped
+pinned Go distribution, offline vendor archive and distrust overlay. Its build
+and proof use the ordinary offline PM executor.
+
 The checkout and seed mounts are read-only. Writable host mounts are `/output`,
 `/artifacts`, and `/var/cache/laputa/linux-kbuild`. The container's image layer,
 temporary directories, and Docker-provided device and pseudo-filesystems also
