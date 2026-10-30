@@ -84,6 +84,7 @@ proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Resu
   fs.install(guest_proof, fp"{overlay}/usr/lib/laputa/{profile.name}-proof.xsh", 0o755, parents: true, overwrite: true)
   if profile.name == "qemu-maintained" {
     fs.install(fp"{container_repo_root()}/guest/qemu-maintained-health.xsh", fp"{overlay}/usr/lib/laputa/qemu-maintained-health.xsh", 0o755, parents: true, overwrite: true)
+    fs.install(fp"{container_repo_root()}/guest/qemu-maintained-restore.xsh", fp"{overlay}/usr/lib/laputa/qemu-maintained-restore.xsh", 0o755, parents: true, overwrite: true)
   }
   if profile.name == "qemu-tinyland-foot" or profile.name == "qemu-tinyland-vt-foot" {
     fs.install(fp"{container_repo_root()}/guest/doas-qualification.xsh", fp"{overlay}/usr/lib/laputa/doas-qualification.xsh", 0o755, parents: true, overwrite: true)?

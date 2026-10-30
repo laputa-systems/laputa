@@ -26,3 +26,5 @@ trust-signing.key
 
 # cf cli
 .cloudflare/
+
+__pycache__/
