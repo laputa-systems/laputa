@@ -1,7 +1,7 @@
 ##! Bounded QMP exchanges over a connected Unix stream.
 ## Whether a lost response may hide a completed mutation.
 export enum QmpRequestKind { QmpReadOnly, QmpMutation }
-## A command or a pause between commands in one QMP session.
+## A command or a pause in milliseconds between commands in one QMP session.
 export enum QmpStep { QmpExecute(Str, Str, QmpRequestKind), QmpDelay(Int) }
 ## Protocol failures, command rejections, and uncertain mutation outcomes.
 export error QmpError = Protocol(message: Str) | Rejected(message: Str) | Indeterminate(operation: Str)
