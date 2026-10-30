@@ -352,8 +352,11 @@ and restore an unusable virtual disk. Journaling is not a backup policy.
 a detached repair. A Linux x86_64/KVM rescue guest boots with a read-only root
 and no network, repairs controlled free-block accounting damage, and verifies
 the recovered payload hash. The rescue guest also works after both installed
-generation images fail to execute PID 1. Dirty shutdown, filesystem-full
-recovery, and arbitrary-damage restore acceptance remain open. See the
+generation images fail to execute PID 1. Further journaled-ext4 fixtures survive
+SIGKILL of QEMU during writes and after filesystem exhaustion. Offline journal
+replay preserves the synced payload and permissions in both cases. Host-storage
+power loss, independent Asterinas qualification, and restoration of missing
+generation files remain unproved. See the
 [detached rescue proof](INSTALLER.md#detached-rescue-guest-proof).
 
 ## R4: Authenticate repository and trust delivery

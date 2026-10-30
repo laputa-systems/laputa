@@ -156,3 +156,22 @@ booted with a read-only root and no network. Fresh detached fixtures returned
 owned QEMU processes were reaped. This demonstrates that rescue does not require
 either installed generation's userspace to work. It does not restore missing
 generation files or prove recovery from arbitrary disk damage.
+
+The same host also qualified journaled ext4 storage on two fresh 32-MiB disks
+with `guest/storage-recovery-proof.xsh` in an independent rescue image.
+The fixture writes and fsyncs `payload` containing `laputa durable payload`
+followed by a newline, with mode `0640`, and fsyncs its parent directory.
+With `LAPUTA_STORAGE_WRITE=1`, it then repeatedly overwrites unsynced files.
+The host kills the owned QEMU PID with SIGKILL after the serial marker
+`LAPUTA_STORAGE_WRITING`. A second run adds `LAPUTA_STORAGE_FULL=1` and waits
+for the fixture to encounter ENOSPC and emit `LAPUTA_STORAGE_FULL` before killing
+QEMU. The volume under test is `/dev/vdb`; the independent system root is read-only
+and networking is disabled.
+
+For recovery, boot the same fixture without `LAPUTA_STORAGE_WRITE=1`.
+It runs offline `e2fsck -f -p`, mounts the volume read-only, and requires the
+payload contents and mode to match. Both runs replayed the journal and returned
+e2fsck status 1, then emitted `LAPUTA_STORAGE_RECOVERED 1`. All four QEMU PIDs
+were reaped. The fixture is not installed in maintained images. These results
+establish the tested guest-power-loss cases, not loss of the host storage cache,
+arbitrary write reordering, or recovery of unsynced writes.
