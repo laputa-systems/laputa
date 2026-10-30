@@ -187,8 +187,13 @@ These local checks do not authenticate a downloaded release or defend against an
 administrator who can rewrite both image and receipt.
 
 Activation records use `laputa-activation-4` and include `boot_serial`. Older
-records are rejected, with no silent migration. Before first installation,
-stop every pre-v3 writer and use one writer version per state directory.
+records are rejected, with no silent migration. Before upgrading an existing
+installation, stop all activation writers, including v3 writers, and retain an
+independent rescue route. Re-publish verified images with v2 receipts and install
+a fresh v4 host record with explicit admission pins; do not relabel old JSON or
+delete the guest state disk. Keep the old host record separately until the
+replacement is verified. Before first installation, stop every pre-v3 writer
+and use one writer version per state directory.
 The earlier writer uses `activation.lock`; it cannot coordinate with
 `activation.flock`. Format rejection protects an existing record but does not
 serialize first installation by mixed writer versions. Every pending boot
@@ -243,6 +248,10 @@ Adding a candidate requires publishing it, authorizing its returned pin through
 `activation_update_policy` at a higher revision, and then calling
 `activation_stage`. A stale policy-update request fails instead of overwriting
 a newer revision. After losing a reply, read status and reconcile its revision.
+An older caller must upgrade before writing: a v3 record cannot express the v4
+admission policy. Policy revisions and shared-state compatibility need explicit
+review during replacement; recreating the record must not restore revoked pins
+or authorize an incompatible retained image.
 An operator can stage an already retained, still-admitted generation through
 the same API to request rollback. This preserves the current policy revision
 and does not authorize replaying stale remote repository metadata.
