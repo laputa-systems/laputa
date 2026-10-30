@@ -186,11 +186,11 @@ copy-truncate rotation. The `dhcp-eth0` service runs the supervised DHCPv4
 client with its lease directory in `/var/lib/dhcpc` on the state disk, run
 state in `/run/dhcpc`, and the resolver composed into `/etc`; the operator
 static file at `/etc/dhcpc/resolv.static` is read-only input, so dhcpc is the
-single owner of `resolv.conf`. The DHCP service keeps default readiness
-rather than notify: the XSH client mistakes the supervisor-side
-`unix.notify_ready` read for the service-side write, so a notify pipe kills
-it before its loop starts. The syslog receiver writes its readiness byte
-directly and keeps notify. Neither service blocks boot, rescue, or login:
+single owner of `resolv.conf`. The DHCP service uses notify readiness: the
+fixed XSH client writes its readiness byte to the supervisor pipe once the
+interface is resolved and its loop is armed, before it acquires a lease. The
+syslog receiver writes its readiness byte directly and keeps notify. Neither
+service blocks boot, rescue, or login:
 dependents use `after` at most, and Dropbear's `need` set stays
 `firewall`, `dropbear-keygen`, and `net`. The loopback-only `net` oneshot is
 unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no
@@ -207,8 +207,9 @@ with a marker count of three and the activation record resting on the
 fallback with pending cleared.
 
 The DHCP client itself is requalified with the existing
-`xinit/tests/fixtures/dhcp_vm_host.xsh` fixture against the frozen XSH
-services: a 5 s host pause leaves the guest bound (monotonic/boot clocks
+`xinit/tests/fixtures/dhcp_vm_host.xsh` fixture against the fixed XSH
+services (XSH `b6b5e5a1d`, which writes readiness to the supervisor pipe):
+a 5 s host pause leaves the guest bound (monotonic/boot clocks
 exclude the pause, only the RTC steps), a ±day wall step keeps the lease
 bound with one renewal, and a carrier flap plus a device remove/rescan
 rebinds on the new interface index. Renewal, rebind, NAK, and expiry paths
@@ -360,6 +361,12 @@ superseded by the separate-state proof. The firewall fixtures and initial fallba
 proof predate the new bundle metadata contract. Remote XSH transport, DHCP lease
 lifecycle, first-boot crash atomicity, automatic configuration migrations, signed
 production image delivery, and TLS consumer distrust remain separate obligations.
+
+On 2026-10-30, a Linux x86_64/KVM run re-proved the clean boot with the
+DHCP service back on notify readiness (XSH `6d992dd`, containing the `b6b5e5a1d`
+readiness-pipe repair). The guest reported `dhcp-eth0` running with a bound
+lease and a managed resolver, and the boot-marker log counted two across the
+PID-1 reboot. All owned QEMU PIDs were reaped.
 
 On 2026-10-30, a Linux x86_64/KVM run exercised v4 host admission with v2 image
 receipts. B panicked twice. Before fallback, host policy revision 2 revoked B
