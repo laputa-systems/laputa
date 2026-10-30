@@ -79,6 +79,17 @@ proc main() {
   p"/dev/console".write(f"LAPUTA_ACTIVATION_HEALTH {encoded}\n")
   let failed = boot_failed_id(cmdline)?
   let marker = boot_marker_line(id, serial, failed, report.root_digest, report.profile, services)?
+  var pre_lines: List[Str] = []
+  if p"/var/log/boot-markers.log".exists() {
+    pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+  }
+  var laputa_files: List[Str] = []
+  if p"/var/lib/laputa".exists() {
+    for entry in fs.children(p"/var/lib/laputa")? {
+      laputa_files += [entry.name]
+    }
+  }
+  p"/dev/console".write(f"LAPUTA_BOOT_STATE markers_before={pre_lines.len()} laputa_dir={laputa_files.join(",")}\n")
   p"/dev/console".write(f"LAPUTA_BOOT_MARKER {marker}\n")
   let _ = try {
     append_boot_marker(p"/var/log/boot-markers.log", marker)
