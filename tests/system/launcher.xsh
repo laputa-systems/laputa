@@ -186,6 +186,7 @@ test test_pending_boot_uses_the_staged_image_and_counts_an_attempt [fs, time, er
   let record = activation.activation_status(state)?
 
   assert image.id == "b"
+  assert image.failed == ""
   assert_image(argv, image)
   assert record.boot_attempts == 1
   assert record.last_operation == "pending-boot"
@@ -217,8 +218,11 @@ test test_attempt_cap_selects_the_fallback_image [fs, time, error] { |ctx|
   let record = activation.activation_status(state)?
 
   assert first.id == "b"
+  assert first.failed == ""
   assert second.id == "b"
+  assert second.failed == ""
   assert third.id == "a"
+  assert third.failed == "b"
   assert record.pending == null
   assert record.current.id == "a"
   assert record.last_operation == "fell-back"
@@ -241,6 +245,7 @@ test test_generation_path_with_a_comma_is_rejected [error] {
     id: "a",
     kernel_file: p"/var/laputa/kernel",
     disk_file: p"/var/laputa/disk,img",
+    failed: "",
   }
 
   match launcher.launcher_qemu_argv(sample_argv(), image) {
@@ -274,8 +279,33 @@ test test_qemu_boot_command_selects_pending_generation [fs, time, error] { |ctx|
   let outputs = build.outputs(p"target/laputa/launcher-fixture")
   assert qemu.boot_command_argv(config, profile, outputs, types.Test, null)? == qemu.qemu_command_argv(config, profile, outputs, types.Test)
   let argv = qemu.boot_command_argv(config, profile, outputs, types.Test, state)?
-  assert_image(argv, {boot_serial: 0, id: "b", kernel_file: fp"{state}/images/b/kernel", disk_file: fp"{state}/images/b/disk"})
+  assert_image(argv, {boot_serial: 0, id: "b", kernel_file: fp"{state}/images/b/kernel", disk_file: fp"{state}/images/b/disk", failed: ""})
   assert ! (outputs.kernel.display() in argv)
   assert argv |> any "LAPUTA_GENERATION_ID=b LAPUTA_BOOT_SERIAL=1" in .
+  assert ! (argv |> any "LAPUTA_FAILED_GENERATION" in .)
   assert activation.activation_status(state)?.boot_attempts == 1
+}
+
+test test_qemu_boot_command_names_the_failed_generation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "launcher-qemu-failed")?
+  install_a(state)
+  stage_b(state)
+  let _ = launcher.launcher_select(state)?
+  let _ = launcher.launcher_select(state)?
+  let target = qemu.qemu_target("Linux", "x86_64")?
+  let config = qemu.QemuConfig(qemu: fp"{target.qemu_name}", target:)
+  let profile = types.SystemProfile(
+    name: "qemu-dwl-foot", package_roots: ["baselayout"], kernel_package: "linux", kernel_path: p"boot/vmlinuz",
+    qemu_smp: 2, qemu_memory: "1536M", qemu_width: 1280, qemu_height: 800,
+    forbidden_packages: [], forbidden_sonames: [], development: true,
+    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: ""},
+  )
+  let outputs = build.outputs(p"target/laputa/launcher-fixture-failed")
+  let argv = qemu.boot_command_argv(config, profile, outputs, types.Test, state)?
+  assert argv |> any "LAPUTA_GENERATION_ID=a" in .
+  assert argv |> any "LAPUTA_FAILED_GENERATION=b" in .
+  let record = activation.activation_status(state)?
+  assert record.pending == null
+  assert record.current.id == "a"
+  assert record.last_operation == "fell-back"
 }

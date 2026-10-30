@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 47
+Next: 49
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -211,3 +211,21 @@ and real-hardware enablement remain outside that scope.
 - **Progress:** `system/activation.xsh` installs a receipt, stages a candidate without changing current, begins a boot, confirms health only for the pending id, and clears a pending boot after two failures while current stays on the fallback. The OS-backed `activation.flock` lock releases on writer death and serializes mutations with image collection. Record writes use a sibling file, fsync, rename, and directory fsync. Twenty-four activation tests pass. Install and stage require verified published bundles. `system/launcher.xsh` selects that record for a direct-kernel argv: current with no write, the pending generation after `{output}/generations/images/{id}/kernel` and `disk` exist, and the fallback image once `boot_attempts` reaches the cap. The id must be one path segment. A comma or whitespace in a host path is rejected. `laputa boot` uses this selection when `{output}/generations/activation.json` exists and otherwise keeps the profile image. The launcher does not confirm health. Fourteen launcher tests pass, including bundle tamper rejection, retained-image publication, private state preflight, and the QEMU boot command with and without an activation record; this test does not start QEMU. A separate Linux x86_64/KVM proof uses `boot_command_argv` to boot pending B twice across a PID-1-requested guest reboot, leaving two counted attempts and preserving identity files. A later separate-state proof boots distinct A and B roots, receives B’s running identity and service states, and commits B with A retained. An earlier real-guest proof drives B into two kernel panics and selects healthy A. Bundle metadata and private persistent state contracts are documented in [QEMU activation](docs/QEMU.md#maintained-vm-activation). Twenty-six Linux integration cases cover killed writers, injected sync errors, concurrent staging and GC, genuine filesystem exhaustion, and lost local replies. Independent rescue also succeeds after both normal generations fail to execute PID 1. Host admission pins include complete generation identities, kernel/disk hashes, and the exact shared-state format. Strictly increasing policy revisions survive confirmation and fallback; revocation also blocks retained images, and incompatible state is rejected without migration. Power-loss durability and native SSH disconnect qualification remain open; signed production delivery and per-consumer TLS distrust remain separate boundaries.
 - **Fix with:** durable-state
 - **Effort:** M (days)
+
+### LAP-47 · P2 · ntpd-rs fork is not yet a shippable clock service
+
+- **Area:** Time discipline
+- **Where:** `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
+- **Problem:** The fork is fetchable and musl-clean with a Graviola TLS provider, but its daemon is not operational: NTS/NTS-pool/sock/pps/csptp source arms are `todo!()` in `ntpd/src/daemon/mod.rs`, the observer spawn is commented out, `force_sync` prints "Disabled for now", `ntp-ctl validate` succeeds without reading the file, and the daemon `Config` carries no `[synchronization]` table while `SynchronizationConfig::default()` is hardcoded at two call sites, so step-limit policy is unreachable from any config that parses. The shipped sample config is rejected by the fork's own schema.
+- **Recommendation:** Do not package this as the R2 clock service. Re-pin and package the Graviola profile (`--no-default-features --features graviola,rustcrypto`, musl targets, `ntp-daemon`/`ntp-ctl`/`ntp-metrics-exporter` plus a pool-only config and an xinit service retaining `CAP_SYS_TIME`) only after upstream reconnects `daemon::run` and the `[synchronization]` table. Graviola work belongs upstream in that repository. Clock tests stay in disposable guests, never on the host.
+- **Fix with:** reference-parity
+- **Effort:** M (days)
+
+### LAP-48 · P1 · Prove a manual rustic restore onto a blank disk
+
+- **Area:** Backups
+- **Where:** R7/G2 step 6; no Laputa package yet
+- **Problem:** No retained backup exists and no restore has been shown. Upstream `rustic` v0.11.4 is the candidate: musl is a CI-tested shipped target, no openssl/libfuse hard deps, restic-format compatible (independent reader), offline password-file key management with a second key and exportable masterkey.
+- **Recommendation:** Pin `rustic` v0.11.4 with `rustic_core` git rev `6fa7b56e`. First spike PM `cargo-vendor` handling of that git dependency: `pm/sources.xsh::lock_record_crates` currently rejects any non-crates.io lock source, so the recipe cannot vendor the locked tree without a PM extension or a registry-only lockfile experiment. Then back up state dirs only (never generations), reinstall the base from trusted artifacts alone, `check` the repo, restore onto the blank disk, and confirm `diff`/re-backup cleanliness, with a one-off `restic check` cross-read. Key loss (no second key plus exported masterkey in trusted artifacts) fails the drill.
+- **Fix with:** durable-state
+- **Effort:** L (weeks)

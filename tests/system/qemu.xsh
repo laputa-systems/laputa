@@ -145,6 +145,35 @@ QEMU_FATAL after success""") {
   }
 }
 
+proc fixture_marker(failed: Str) -> Result[Str, Error] {
+  let marker = {format: "laputa-boot-marker-1", generation_id: "a", boot_serial: 3, failed_generation: failed, root_digest: "digest", profile: "qemu-maintained", services: [{name: "logger", state: "running"}, {name: "dhcp-eth0", state: "running"}]}
+  Ok(f"LAPUTA_BOOT_MARKER {json.encode(marker)?}")
+}
+
+test test_boot_marker_names_the_selected_boot_and_its_history [error] {
+  let good = fixture_marker("b")?
+  let parsed = proof.boot_marker_report(f"booting\n{good}\nready\n", "a", 3, "b")?
+  assert parsed.get("generation_id")?.require(Str)? == "a"
+  assert parsed.get("failed_generation")?.require(Str)? == "b"
+  assert (parsed.get("services")?.require(List[Record])?).len() == 2
+  match proof.boot_marker_report("booting without a marker\n", "a", 3, "") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+  match proof.boot_marker_report(fixture_marker("")?, "a", 3, "b") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+  match proof.boot_marker_report(good, "a", 4, "b") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+  match proof.boot_marker_report("LAPUTA_BOOT_MARKER {\"format\":\"laputa-boot-marker-1\",\"generation_id\":\"a\",\"boot_serial\":3,\"failed_generation\":\"\",\"root_digest\":\"digest\",\"profile\":\"qemu-maintained\",\"services\":[],\"extra\":\"ssh-ed25519 AAAAC3\"}", "a", 3, "") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+}
+
 test test_qmp_retry_type_rejects_input_dispatch [fs, process, error] { |ctx|
   let module_source = p"system/qemu.xsh".read_text()?
   let invalid_dispatch = module_source + """

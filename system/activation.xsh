@@ -29,8 +29,10 @@ type ImageReceipt = {format: Str, admission: ImageAdmission}
 
 ## Verified files for one published activation generation.
 export type GenerationImage = {id: Str, kernel_file: Path, disk_file: Path}
-## Verified and admitted boot image with its durable boot sequence.
-export type ActivationLaunch = {image: GenerationImage, boot_serial: Int}
+## Verified and admitted boot image with its durable boot sequence. `failed`
+## names the pending receipt the launcher is falling back from, if any, so a
+## fallback boot can report which generation did not come up.
+export type ActivationLaunch = {image: GenerationImage, boot_serial: Int, failed: GenerationReceipt?}
 
 ## Durable current, fallback, and pending generation selection.
 export type ActivationRecord = {
@@ -312,13 +314,17 @@ export proc activation_select_image(state_dir: Path) [fs, time, error] -> Result
   let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   let image = activation_admitted_selection(state_dir, record)?
-  return {image, boot_serial: record.boot_serial} when record.pending == null
+  return {image, boot_serial: record.boot_serial, failed: null} when record.pending == null
   let selection = activation_begin_boot_record(state_dir, record)?
   let serial = match selection {
     PendingBoot(boot) => boot.serial
     FellBack(boot) => boot.serial
   }
-  {image, boot_serial: serial}
+  let failed = match selection {
+    PendingBoot(_) => null
+    FellBack(_) => record.pending
+  }
+  {image, boot_serial: serial, failed: failed}
 }
 
 proc activation_begin_boot_record(state_dir: Path, record: ActivationRecord) -> Result[ActivationBoot, Error] {

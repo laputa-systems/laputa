@@ -481,6 +481,9 @@ export proc boot_command_argv(
     for index in range(selected.len() - 1) {
       if selected[index] == "-append" {
         selected[index + 1] += f" LAPUTA_GENERATION_ID={image.id} LAPUTA_BOOT_SERIAL={image.boot_serial}"
+        if image.failed != "" {
+          selected[index + 1] += f" LAPUTA_FAILED_GENERATION={image.failed}"
+        }
       }
     }
     selected

@@ -251,7 +251,11 @@ reopens the file). The reference modules [syslog-service.xsh](syslog-service.xsh
 `current.<keep>` when it reaches `max_size` bytes; defaults are 1 MiB and 3.
 `max_size: 0` disables rotation. Rotation runs before each start and, under a
 scanner, each pass by copy-truncate, so a write between copy and truncate may
-be lost. There is no compression or timestamping.
+be lost. There is no compression or timestamping. A failed rotation degrades
+instead of failing its caller: the current file stays in place, a service
+still starts, and the scanner stays alive to retry on the next pass. Log
+pressure itself stays visible at the writers (a syslog receiver counts its
+blocked and failed sinks) rather than in the supervisor.
 
 ### Resources
 

@@ -6,6 +6,27 @@ proc listener_ready() -> Result[Bool] {
   json.get(json.read(status)?, ["state"], "down").require(Str)? == "running"
 }
 
+proc service_state(name: Str) -> Result[Str] {
+  let status = fp"/run/xinit/{name}.json"
+  wait until status.exists()? within 30s every 100ms
+  json.get(json.read(status)?, ["state"], "").require(Str)?
+}
+
+proc supervised_network() -> Result[Str] {
+  wait until service_state("logger")? == "running" within 30s every 100ms
+  wait until service_state("dhcp-eth0")? == "running" within 30s every 100ms
+  let lease = p"/run/dhcpc/eth0.status"
+  wait until lease.exists()? within 30s every 100ms
+  let state = json.get(json.read(lease)?, ["state"], "").require(Str)?
+  guard state == "bound" else { fail f"dhcp lease is {state}, not bound" }
+  let resolv = p"/etc/resolv.conf".read_text()?
+  guard "# Managed by dhcpc" in resolv else { fail "resolv.conf is not owned by dhcpc" }
+  guard "nameserver" in resolv else { fail "resolv.conf names no server" }
+  p"/dev/console".write("LAPUTA_MAINTAINED_LOGGER_OK supervised syslog is running\n")
+  p"/dev/console".write(f"LAPUTA_MAINTAINED_DHCP_OK lease is {state} with a managed resolver\n")
+  f"logger=running dhcp-eth0=running lease={state}\n"
+}
+
 proc run_proof() {
   return unless "LAPUTA_MAINTAINED_PROOF_FLAG=1" in p"/proc/cmdline".read_text()?
 
@@ -48,7 +69,7 @@ proc run_proof() {
   wait until listener_ready()? within 30s every 100ms
   wait until p"/run/laputa-health.json".exists()? within 30s every 100ms
   let files = [host_key, keys, p"/etc/passwd", p"/etc/group", p"/etc/shadow", p"/etc/hostname", p"/etc/laputa/first-boot/applied"]
-  let hashes = [hash.sha256(item)?.hex() for item in files].join("\n") + "\n"
+  let hashes = [hash.sha256(item)?.hex() for item in files].join("\n") + "\n" + supervised_network()?
   let baseline = p"/var/lib/laputa/maintained-proof-before-reboot"
   if baseline.exists()? {
     guard baseline.read_text()? == hashes else { fail "identity changed across reboot" }

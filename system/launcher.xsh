@@ -2,15 +2,17 @@
 use system.activation
 
 ## Host files for one generation id. The activation receipt stays the identity.
+## `failed` is the pending generation id a fallback boot replaces, or empty.
 export type LauncherImage = {
   boot_serial: Int,
   id: Str,
   kernel_file: Path,
   disk_file: Path,
+  failed: Str,
 }
 
 pure selected_image(image: activation.GenerationImage, serial: Int) -> LauncherImage {
-  {id: image.id, kernel_file: image.kernel_file, disk_file: image.disk_file, boot_serial: serial}
+  {id: image.id, kernel_file: image.kernel_file, disk_file: image.disk_file, boot_serial: serial, failed: ""}
 }
 
 pure drive_text(file: Path) -> Result[Str, Error] {
@@ -37,7 +39,8 @@ export proc launcher_state(output_root: Path) [fs, error] -> Result[Path?, Error
 ## Boot the current generation, or count one pending attempt and boot that receipt.
 export proc launcher_select(state_dir: Path) [fs, time, error] -> Result[LauncherImage, Error] {
   let selected = activation.activation_select_image(state_dir)?
-  selected_image(selected.image, selected.boot_serial)
+  let failed = if let receipt = selected.failed { receipt.id } else { "" }
+  {...selected_image(selected.image, selected.boot_serial), failed: failed}
 }
 
 pure rewrite_kernel(argv: List[Str], kernel: Str) -> Result[List[Str], Error] {

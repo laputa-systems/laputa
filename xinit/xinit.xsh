@@ -1002,6 +1002,8 @@ proc rotated_log_path(current: Path, index: Int) [error] -> Result[Path] {
 
 proc rotate_log(name: Str, keep: Int) {
   let current = log_path(name)?
+  let first = rotated_log_path(current, 1)?
+  let had_first = first.exists()
   rotated_log_path(current, keep)?.remove(missing_ok: true)
   var index = keep - 1
 
@@ -1015,10 +1017,26 @@ proc rotate_log(name: Str, keep: Int) {
     index -= 1
   }
 
-  current.copy(to: rotated_log_path(current, 1)?, overwrite: true)
+  match current.copy(to: first, overwrite: true) {
+    Ok(_) => {}
+    Err(failure) => {
+      if ! had_first {
+        first.remove(missing_ok: true)
+      }
+
+      return Err(failure)
+    }
+  }
+
   current.truncate(0)
 }
 
+## Copy-truncate the named log once it reaches its cap. A failed rotation
+## (a full disk, say) degrades instead of failing the caller: the current
+## file stays in place, writers keep failing or counting against it, and the
+## next pass retries. Rotation must never take down the supervisor that owns
+## the logs, and a failed service start must not be caused by a log that
+## could not be rotated.
 proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) {
   return when max_size <= 0 or keep <= 0
 
@@ -1027,7 +1045,9 @@ proc maybe_rotate_log(name: Str, max_size: Int, keep: Int) {
   return unless current.exists()
 
   if current.metadata()?.size >= max_size {
-    rotate_log(name, keep)
+    let _ = try {
+      rotate_log(name, keep)
+    }
   }
 }
 
