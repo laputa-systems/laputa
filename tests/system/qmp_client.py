@@ -34,7 +34,7 @@ class QmpClientTests(unittest.TestCase):
                 thread = threading.Thread(target=serve)
                 self.client = subprocess.Popen(
                     [XSH, str(ROOT / "tests/system/fixtures/qmp-client.xsh"), str(path), kind],
-                    env={**os.environ, "XSH_MODULE_PATH": str(ROOT), "XSH_LINUX_REAL": "1", "XSH_UNIX_REAL": "1"},
+                    env={**os.environ, "XSH_MODULE_PATH": str(ROOT), "XSH_UNIX_REAL": "1"},
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 )
                 thread.start()
@@ -60,6 +60,50 @@ class QmpClientTests(unittest.TestCase):
         self.assertEqual(request["execute"], "query-status")
         self.assertNotEqual(request["id"], capability["id"])
         return request
+
+    def test_stop_and_continue_dispatch_once_and_skip_events(self):
+        for command in ("stop", "cont"):
+            with self.subTest(command=command):
+                requests = []
+                def peer(conn, stream):
+                    conn.sendall(b'{"QMP":{}}\n')
+                    capability = json.loads(stream.readline())
+                    requests.append(capability["execute"])
+                    conn.sendall(json.dumps({"return": {}, "id": capability["id"]}).encode() + b'\n')
+                    request = json.loads(stream.readline())
+                    requests.append(request["execute"])
+                    conn.sendall(b'{"event":"STOP"}\n' + json.dumps({"return": {}, "id": request["id"]}).encode() + b'\n')
+                    self.assertEqual(stream.readline(), b"")
+                result = self.exchange(peer, command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(requests, ["qmp_capabilities", command])
+
+    def test_stop_rejection_is_reported_without_replay(self):
+        requests = []
+        def peer(conn, stream):
+            conn.sendall(b'{"QMP":{}}\n')
+            capability = json.loads(stream.readline())
+            requests.append(capability["execute"])
+            conn.sendall(json.dumps({"return": {}, "id": capability["id"]}).encode() + b'\n')
+            request = json.loads(stream.readline())
+            requests.append(request["execute"])
+            conn.sendall(json.dumps({"error": {"class": "GenericError", "desc": "cannot stop"}, "id": request["id"]}).encode() + b'\n')
+            self.assertEqual(stream.readline(), b"")
+        result = self.exchange(peer, "stop")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot stop", result.stderr)
+        self.assertEqual(requests, ["qmp_capabilities", "stop"])
+
+    def test_commands_share_one_deadline_with_a_slow_peer(self):
+        def peer(conn, stream):
+            first = self.negotiate(conn, stream)
+            threading.Event().wait(0.12)
+            conn.sendall(json.dumps({"return": {}, "id": first["id"]}).encode() + b'\n')
+            self.assertEqual(json.loads(stream.readline())["execute"], "query-name")
+            self.assertEqual(stream.readline(), b"")
+        result = self.exchange(peer, "slow-multi")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue("timed out" in result.stderr or "deadline expired" in result.stderr, result.stderr)
 
     def test_fragmented_greeting_and_coalesced_event_and_response(self):
         def peer(conn, stream):
