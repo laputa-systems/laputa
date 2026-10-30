@@ -86,6 +86,11 @@ test xsh_enforces_intermediate_policy_across_cross_signed_chains [fs, process, e
   let control = serve_chain(ctx, "xsh-policy-control", python, fixture("tls/chain-control.pem").display(), fixture("tls/ee-control.key").display())?
   defer stop_server(control)
   run_client(ctx, "control", control.port, "cross-r1", "verify", "accept", true)?
+  let omitted = serve_chain(ctx, "xsh-policy-omitted-issuer", python, fixture("tls/ee-cross.crt").display(), fixture("tls/ee-cross.key").display())?
+  defer stop_server(omitted)
+  run_client(ctx, "omitted-issuer-without-policy", omitted.port, "cross-r1", "disabled", "accept", false)?
+  run_client(ctx, "omitted-issuer-with-policy", omitted.port, "cross-r1", "disabled", "reject", true)?
+  run_client(ctx, "control-disabled", control.port, "cross-r1", "disabled", "reject", true)?
   for entry in [["cross-r1", "cross-r1"], ["cross-r2", "cross-r2"]] {
     let server = serve_chain(ctx, f"xsh-policy-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture("tls/ee-cross.key").display())?
     defer stop_server(server)
