@@ -103,6 +103,10 @@ The supervisor regression proves this ordering against a fake peer. At
 passes on Linux x86_64/KVM with the canonical graphical closure and native XSH
 QMP. The host captures the terminal marker before stopping the guest.
 
+The portable-stream replacement also passes this Linux x86_64/KVM proof with
+the qualified static SDK built from XSH `ee486105c`. Its size budgets and
+matching-profile memory gate pass. macOS and aarch64 runtime proofs remain open.
+
 Readiness and screenshot retry up to 20 times with 250 ms between attempts.
 The supervisor owns the 180 s proof timeout, TERM/KILL escalation, final
 console-marker scan, and screenshot check. QMP attempts and retry delays share
