@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="activation-recovery-", dir=scratch) as 
                 before = (state / "activation.json").read_bytes()
                 result = run(
                     operation, state,
-                    ("strace", "-f", "-qq", "-e", "trace=fsync", "-e",
+                    ("strace", "--kill-on-exit", "-f", "-qq", "-e", "trace=fsync", "-e",
                      f"inject=fsync:{fault}:when={boundary}"), success=False,
                 )
                 assert result.returncode != 0, (operation, boundary, fault)
