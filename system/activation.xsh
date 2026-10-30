@@ -359,6 +359,7 @@ export proc activation_confirm_health(
     return Err(activation_reject("generation boot is no longer confirmable"))
   }
   let _ = activation_admitted_image(state_dir, record.admission_policy, pending)?
+  let _ = activation_admitted_image(state_dir, record.admission_policy, record.fallback)?
   activation_write(state_dir, {
     format: record.format,
     admission_policy: record.admission_policy,
@@ -389,6 +390,7 @@ export proc activation_confirm_guest_health(
   }
   guard ! policy.critical_services.is_empty() else { fail "critical service health policy is empty" }
   let _ = activation_admitted_image(state_dir, record.admission_policy, pending)?
+  let _ = activation_admitted_image(state_dir, record.admission_policy, record.fallback)?
   for name in policy.critical_services {
     let matches = report.services |> where .name == name |> collect
     guard matches.len() == 1 else { fail f"critical service observation is missing or duplicated: {name}" }

@@ -200,6 +200,10 @@ stale required-service observation prevents confirmation. The caller must obtain
 a fresh report through its trusted guest channel. The lower-level
 `activation_confirm_health` remains an explicitly trusted manual transition.
 Both confirmation APIs require an active pending boot and recheck host admission.
+They also verify the retained fallback remains admitted and intact. If policy
+revokes recovery, confirmation fails even when the candidate reports healthy.
+This guard does not depend on successfully saving a failed-boot marker when
+storage is unavailable.
 After exhausting attempts, an inadmissible fallback closes that boot's health
 window and returns an error requiring independent recovery.
 

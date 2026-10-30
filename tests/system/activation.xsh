@@ -528,3 +528,22 @@ test test_operator_rollback_uses_retained_pins_without_lowering_policy [fs, time
   assert record.current.id == "a" and record.fallback.id == "b"
   assert record.admission_policy.revision == 2
 }
+
+test test_failed_terminal_write_cannot_reopen_health_confirmation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-terminal-write-failed")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_update_policy(state, {revision: 2, images: [image_admission("b")]})
+  state.chmod(0o555)
+  defer state.chmod(0o755)
+  assert activation.activation_select_image(state) is Err(_)
+  state.chmod(0o755)
+  assert activation.activation_status(state)?.last_operation == "pending-boot"
+  let before = record_text(state)?
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  assert activation.activation_confirm_health(state, "b") is Err(_)
+  assert record_text(state)? == before
+}
