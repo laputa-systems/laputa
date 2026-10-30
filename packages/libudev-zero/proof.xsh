@@ -5,6 +5,8 @@ use pm.util as pm_util
 proc main(root = /rootfs) [fs, process, env, error] {
   proof.package_metadata(root, "libudev-zero")
   proof.target_elf(root, p"usr/lib/libudev.so.1", "libudev-zero")
+  let usb = fp"{root}/usr/share/hwdata/usb.ids".read_text()?
+  proof.ensure("\n1d6b  Linux Foundation\n\t0001  1.1 root hub\n" in usb, "proof-libudev-zero", "runtime USB database lacks a vendor and product")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print "libudev-zero ok: cross-built"
