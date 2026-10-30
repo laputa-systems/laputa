@@ -4,12 +4,12 @@ use packages.laputa-net.dhcp-eth0 as dhcp_service
 use packages.laputa-net.service as net_service
 use packages.laputa-syslog.service as logger_service
 
-test test_dhcp_service_is_a_boot_longrun_with_notify [error] {
+test test_dhcp_service_is_a_boot_longrun_without_a_lease_gate [error] {
   let service = dhcp_service.service
   assert service.name == "dhcp-eth0"
   assert service.kind == "longrun"
   assert service.targets == ["boot"]
-  assert service.readiness == "notify"
+  assert ! ("readiness" in service.keys())
   assert service.restart.mode == "always"
   assert ! ("dependencies" in service.keys())
 }

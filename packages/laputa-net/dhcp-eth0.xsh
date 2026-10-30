@@ -29,6 +29,13 @@ export pure dhcp_argv() -> List[Str] {
 ## The xinit service record. Nothing needs the lease: a missing DHCP server
 ## must not hold back boot, rescue or login, so nothing takes `need` on this
 ## service; dependents use `after` at most.
+##
+## Readiness stays at its default. The XSH client mistakes the supervisor-side
+## `unix.notify_ready` read for the service-side write and fails before its
+## loop starts whenever NOTIFY_FD is set; `readiness: "notify"` would
+## crash-loop the service under any supervisor. `ready` therefore means the
+## process runs; the published lease state below is the configured level.
+## Switch back to notify only with a client that writes its readiness byte.
 export let service = {
   name: f"dhcp-{interface}",
   kind: "longrun",
@@ -36,8 +43,6 @@ export let service = {
   targets: [
     "boot",
   ],
-  readiness: "notify",
-  ready_timeout_ms: 5000,
   stop_timeout_ms: 2000,
   restart: {
     mode: "always",
