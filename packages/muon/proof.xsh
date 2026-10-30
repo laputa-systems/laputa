@@ -1,15 +1,6 @@
+use pm.muon as pm_muon
 use pm.proof
 use pm.util as pm_util
-
-proc proof_encoded_argv(value: Str) -> Str {
-  let hex = "0123456789abcdef"
-  let parts = collect {
-    for byte in bytes.from_text(value) {
-      yield hex.byte_slice(byte / 16, 1) + hex.byte_slice(byte % 16, 1)
-    }
-  }
-  "x" + parts.join("")
-}
 
 error ScriptError = Failed(kind: Str, message: Str)
 
@@ -38,18 +29,23 @@ proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
     tmp.remove()
     tmp.mkdir(true)
     defer tmp.remove()
+    let old_script = fp"{tmp}/old script.xsh"
+    old_script.write("proc main(value: Str) { print \"wrong\" }\n")
     let script = fp"{tmp}/argument proof.xsh"
     script.write("proc main(value: Str) { print $value }\n")
     let argument = "space ; $literal \"quoted\""
-    let xsh_arg = proof_encoded_argv("/bin/xsh")
-    let script_arg = proof_encoded_argv(script.display())
-    let value_arg = proof_encoded_argv(argument)
-    fp"{tmp}/build.ninja".write(
-      f"""rule structured
- command = ignored
- argv = {xsh_arg} {script_arg} {value_arg}
+    let xsh_arg = pm_muon.muon_encoded_argument("/bin/xsh")
+    let script_arg = pm_muon.muon_encoded_argument(old_script.display())
+    let value_arg = pm_muon.muon_encoded_argument(argument)
+    let source = f"""rule structured
+ command = $COMMAND
+ argv = $ARGV_COMMAND
 build good: structured
-""",
+ COMMAND = /bin/xsh {old_script} {argument}
+ ARGV_COMMAND = {xsh_arg} {script_arg} {value_arg}
+"""
+    fp"{tmp}/build.ninja".write(
+      pm_muon.muon_rewrite_ninja_argument(source, old_script.display(), script.display())?,
     )
     let structured = run.text $muon "-C" $tmp "samu"
     proof.ensure(argument in structured, "proof-muon", "structured argv changed an argument")

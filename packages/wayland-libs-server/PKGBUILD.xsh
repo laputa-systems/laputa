@@ -1,5 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
+use pm.muon as pm_muon
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -12,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.26.0"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl", "libffi", "expat"]
@@ -34,6 +35,12 @@ export const upstream_sources = [
         sha256: "64176eaa46e4969903e286f8e5ef8331affc17fdf03ac9b58381d2b23162b7a3",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -178,7 +185,9 @@ proc build_wayland(dest: Path) {
 
       let ninja = p"build/build.ninja"
       let scanner_text = native_scanner_path.display()
-      let ninja_text = ninja.read_text()?
+      var ninja_text = ninja.read_text()?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, f"{build_root}/usr/bin/wayland-scanner", scanner_text)?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "src/wayland-scanner", scanner_text)?
 
       let ninja_text_build_root = ninja_text.replace(
         f" -- {build_root}/usr/bin/wayland-scanner ",

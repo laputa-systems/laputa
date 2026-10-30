@@ -1,5 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.env as pm_env
+use pm.muon as pm_muon
 use pm.make
 use pm.util as pm_util
 
@@ -116,6 +117,12 @@ export const upstream_sources = [
         sha256: "9053596e40a895d310fa3cf74a68ae1f87828d20a3cdcc927275acaf9d2104cc",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -280,6 +287,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../root/usr/bin/wayland-scanner", scanner_text)?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../build-root/usr/bin/wayland-scanner", scanner_text)?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)

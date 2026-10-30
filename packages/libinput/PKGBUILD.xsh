@@ -1,4 +1,5 @@
 ##! XSH module `PKGBUILD` package and build operations.
+use pm.muon as pm_muon
 use pm.env as pm_env
 use pm.util as pm_util
 
@@ -43,6 +44,12 @@ export const upstream_sources = [
         sha256: "7dd6c1ca964c86eb6810ccd6639cda634e68bdca43bf3afec39e94e942fac8d4",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -391,16 +398,6 @@ endif
   meson.write(text)
 }
 
-proc encoded_link_argument(value: Str) -> Str {
-  let hex = "0123456789abcdef"
-  let parts = collect {
-    for byte in bytes.from_text(value) {
-      yield hex.byte_slice(byte / 16, 1) + hex.byte_slice(byte % 16, 1)
-    }
-  }
-  "x" + parts.join("")
-}
-
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
@@ -428,13 +425,15 @@ export proc build(dest: Path) [fs, process, env, error] {
       let command = " -Wl,--end-group"
       let encoded = " x2d576c2c2d2d656e642d67726f7570"
       let text = ninja.read_text()?
-      if command not in text or encoded not in text {
-        return Err(error.failure("libinput linker group is missing from generated commands"))?
+      let commands = text.split(command).len() - 1
+      let arguments = text.split(encoded).len() - 1
+      if commands == 0 or commands != arguments {
+        return Err(error.failure("libinput linker groups differ from structured arguments"))?
       }
       ninja.write(
         text.replace(command, with: f"{command} {builtins}").replace(
           encoded,
-          with: f"{encoded} {encoded_link_argument(builtins)}",
+          with: f"{encoded} {pm_muon.muon_encoded_argument(builtins)}",
         ),
       )
     }

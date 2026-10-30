@@ -1,5 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
+use pm.muon as pm_muon
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -12,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.26.0"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl", "wayland-libs-client"]
@@ -34,6 +35,12 @@ export const upstream_sources = [
         sha256: "64176eaa46e4969903e286f8e5ef8331affc17fdf03ac9b58381d2b23162b7a3",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -156,7 +163,8 @@ proc build_wayland(dest: Path) {
 
       let ninja = p"build/build.ninja"
       let scanner_text = native_scanner_path.display()
-      ninja.write(ninja.read_text()?.replace(" -- src/wayland-scanner ", with: f" -- {scanner_text} "))
+      let ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja.read_text()?, "src/wayland-scanner", scanner_text)?
+      ninja.write(ninja_text.replace(" -- src/wayland-scanner ", with: f" -- {scanner_text} "))
     }
 
     run $muon "-C" "build" samu $jobs_flag

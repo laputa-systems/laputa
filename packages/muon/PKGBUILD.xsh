@@ -1,4 +1,5 @@
 ##! Package recipe metadata and build operations.
+use pm.muon as pm_muon
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -40,6 +41,12 @@ export const upstream_sources = [
     architectures: ["all"],
     checksums: [{arch: "all", sha256: "ab2539444b8232f1bdddaade5afac2136ea35d29e943700f6de3f48414600a94"}],
   },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
+  },
 ]
 
 ## Package recipe export.
@@ -75,16 +82,6 @@ proc patch_system_library_links() {
 """,
 ),
   )
-}
-
-proc encoded_argv(value: Str) -> Str {
-  let hex = "0123456789abcdef"
-  let parts = collect {
-    for byte in bytes.from_text(value) {
-      yield hex.byte_slice(byte / 16, 1) + hex.byte_slice(byte % 16, 1)
-    }
-  }
-  "x" + parts.join("")
 }
 
 ## Package recipe export.
@@ -153,7 +150,7 @@ export proc build(dest: Path) [fs, process, env, error] {
  command = {bootstrap_cc}""",
       )
 
-      let encoded_bootstrap_cc = encoded_argv(bootstrap_cc.display())
+      let encoded_bootstrap_cc = pm_muon.muon_encoded_argument(bootstrap_cc.display())
       patched_ninja = patched_ninja.replace(
         """rule muon_build_c_linker
  command = """ + bootstrap_cc.display() + """
