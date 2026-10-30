@@ -90,6 +90,9 @@ export proc pm_cli_resolve_repo_root(raw: Str) -> Result[Path, Error] {
 }
 
 proc remote_snapshot_for_plan(cache_root: Path, target: types.Target) -> Result[types.RemoteSnapshot] {
+  cache_root.mkdir()
+  let held = fs.lock(fp"{cache_root}/index.lock", shared: false, nonblocking: true)?
+  defer fs.unlock(held)
   var index: List[types.RemotePackage] = []
   let cache = util.remote_index_cache_path(cache_root)
   let repo_url = remote.repo_url()

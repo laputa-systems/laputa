@@ -218,6 +218,9 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
 
 ## Persists the accepted snapshot floor after successful verification.
 export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: VerifiedRepoSnapshot, now_epoch_seconds: Int) [fs, error] {
+  paths.accepted.parent.mkdir()
+  let held = fs.lock(fp"{paths.accepted}.lock", shared: false, nonblocking: true)?
+  defer fs.unlock(held)
   snapshot_require(
     snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and now_epoch_seconds >= 0,
     "refusing to persist an invalid accepted repository snapshot",
@@ -239,6 +242,7 @@ export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: Verif
 
   paths.accepted.parent.mkdir()
   let sibling = fs.temp_sibling(paths.accepted)?
+  defer sibling.remove()
   json.write(sibling, {generation: verified.generation, index_sha256: verified.index_sha256, lower_bound})
   fs.fsync(sibling)
   sibling.rename(to: paths.accepted, overwrite: true)

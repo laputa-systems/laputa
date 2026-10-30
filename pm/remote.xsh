@@ -194,14 +194,14 @@ export proc load_verified_remote_index(
   now_epoch_seconds: Int,
   state_dir: Str,
 ) [fs, net, time, error] -> Result[List[types.RemotePackage], Error] {
+  guard state_dir.trim() != "" else {
+    return Err(types.PmError.RemoteIndex("signed repository verification needs an accepted state directory; set XSH_PM_REPO_STATE_DIR"))
+  }
   let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192, f"repository snapshot {util.remote_snapshot_rel()}")?
   let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256, f"repository snapshot {util.remote_snapshot_signature_rel()}")?
   let index_bytes = fetch_snapshot_bytes(repo, p"index.json", 10485760, "remote index")?
-  let accepted = if state_dir == "" {
-    null
-  } else {
-    repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo))?
-  }
+  let state = repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo)
+  let accepted = repo_snapshot.snapshot_read_accepted(state)?
   let verified = repo_snapshot.snapshot_verify({
     metadata,
     signature,
@@ -213,12 +213,9 @@ export proc load_verified_remote_index(
 
   let rows: List[Record] = json.decode(index_bytes as Str)?.require()?
   let items = decode_remote_index(rows)?
+  repo_snapshot.snapshot_persist_accepted(state, verified, now_epoch_seconds)
   out.mkdir()
   util.remote_index_cache_path(out).write_atomic(index_bytes)
-
-  if state_dir != "" {
-    repo_snapshot.snapshot_persist_accepted(repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo), verified, now_epoch_seconds)
-  }
 
   items
 }

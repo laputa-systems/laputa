@@ -376,7 +376,7 @@ test test_verified_fetch_rejects_missing_snapshot [fs, net, env, time, error] { 
   }
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.json"}, Ok(missing))
 
-  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-fetch-missing-out")?, [key_bytes("signing-key")?], reference_now(), "") {
+  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-fetch-missing-out")?, [key_bytes("signing-key")?], reference_now(), test.temp_dir(ctx, name: "verified-state")?.display()) {
     Ok(_) => test.fail("a missing snapshot was accepted"),
     Err(problem) => assert "snapshot.json" in problem.message
   }
@@ -392,7 +392,7 @@ test test_verified_fetch_rejects_tampered_index [fs, net, env, time, error] { |c
 
   let out = test.temp_dir(ctx, name: "verified-fetch-tampered-out")?
 
-  match remote.load_verified_remote_index(repo, out, [key_bytes("signing-key")?], reference_now(), "") {
+  match remote.load_verified_remote_index(repo, out, [key_bytes("signing-key")?], reference_now(), test.temp_dir(ctx, name: "verified-state")?.display()) {
     Ok(_) => test.fail("a tampered index was accepted"),
     Err(problem) => assert "does not match signed snapshot metadata" in problem.message
   }
@@ -407,7 +407,7 @@ test test_verified_fetch_rejects_wrong_signer [fs, net, env, time, error] { |ctx
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.sig"}, Ok(snapshot_response(f"{repo}/snapshot.sig", snapshot_bytes("snapshot-gen1-wrongsigned", "metadata.sig")?)))
   test.mock(ctx, "net.request", {url: f"{repo}/index.json"}, Ok(snapshot_response(f"{repo}/index.json", bytes.from_text(index_text))))
 
-  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-fetch-wrong-out")?, [key_bytes("signing-key")?], reference_now(), "") {
+  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-fetch-wrong-out")?, [key_bytes("signing-key")?], reference_now(), test.temp_dir(ctx, name: "verified-state")?.display()) {
     Ok(_) => test.fail("a wrongly signed snapshot was accepted"),
     Err(problem) => assert "signature is invalid" in problem.message
   }
@@ -546,4 +546,25 @@ test test_plan_over_local_repository_with_keys_requires_a_valid_snapshot [fs, pr
     --repo $repository --root app --output $keyless_output 2> $keyless_err
 
   assert keyless.ok, keyless_err.read_text()?
+}
+
+test test_verified_fetch_requires_durable_accepted_state [fs, net, env, time, error] { |ctx|
+  let root = stage_signed_file_repository(ctx, "verified-file-stateless", "snapshot-gen1")?
+  match remote.load_verified_remote_index(f"file://{root}", test.temp_dir(ctx, name: "stateless-out")?, [key_bytes("signing-key")?], reference_now(), "") {
+    Ok(_) => test.fail("signed repository was admitted without durable rollback state"),
+    Err(problem) => assert "accepted state directory" in problem.message
+  }
+}
+
+test test_persist_accepted_refuses_a_concurrent_writer [fs, error] { |ctx|
+  let paths = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "persist-lock-state")?, "https://example.invalid/repo")
+  paths.accepted.parent.mkdir()
+  let held = fs.lock(fp"{paths.accepted}.lock", shared: false, nonblocking: true)?
+  defer fs.unlock(held)
+  let verified = repo_snapshot.snapshot_verify(verify_input([key_bytes("signing-key")?], null)?)?
+  match repo_snapshot.snapshot_persist_accepted(paths, verified, reference_now()) {
+    Ok(_) => test.fail("accepted snapshot changed while another writer held the lock"),
+    Err(problem) => assert problem.errno == 11 or problem.errno == 35
+  }
+  assert ! paths.accepted.exists()?
 }

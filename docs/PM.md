@@ -412,9 +412,10 @@ Expiry coordinates with the R2 time-bootstrap policy: verification takes
 wall-clock `now`, refuses a clock behind the persisted lower bound, and
 rejects expired or over-long snapshots. The bound lives in per-repository
 accepted state under `XSH_PM_REPO_STATE_DIR` (generation, index digest,
-and highest observed time). Without disciplined time, expiry cannot tell a
-freeze from a slow clock; without the state dir, rollback protection covers
-only the current invocation. `file://` trees and the loopback local mirror
+and highest observed time). Every signed fetch requires this directory and
+fails before returning packages if accepted-state persistence fails. Keep it
+outside disposable caches and OS-generation rollback. Without disciplined time,
+expiry cannot tell a freeze from a slow clock. `file://` trees and the loopback local mirror
 stay explicit local workflows and bypass verification: possession of the
 tree is the trust assumption there.
 
@@ -428,10 +429,13 @@ verified like production remotes, so a release staged or copied locally cannot
 bypass the admission policy; without it they remain explicit unsigned local
 workflows. Accepted state is written through a sibling temp file with file and
 directory fsync, and persisting an older generation fails without touching
-the stored record.
+the stored record. A per-repository OS lock serializes accepted-state writers;
+contention fails explicitly and process death releases the lock. Planning also
+locks its index cache until the selected index digest and package coordinates
+are captured, so concurrent planners cannot mix cache identities.
 
 Remaining: provisioned-key distribution is manual (no package-seeded key
-yet); durable accepted state needs `XSH_PM_REPO_STATE_DIR`; threshold or
+yet); threshold or
 multi-signer snapshots; and guest proof of the production fetch path.
 
 ## Root composition
