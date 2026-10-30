@@ -157,6 +157,22 @@ owned QEMU processes were reaped. This demonstrates that rescue does not require
 either installed generation's userspace to work. It does not restore missing
 generation files or prove recovery from arbitrary disk damage.
 
+A subsequent fixture, `guest/init-restore-proof.xsh`, repaired the known missing
+`/init` symlink on a disposable copy of the broken generation. The rescue guest
+mounted its detached `/dev/vdb1`, checked that its xinit hash matched the rescue
+copy, restored `init -> usr/bin/xinit`, fsynced the directory, and unmounted it.
+The host published the repaired copy under the new id `restored`, without
+modifying either retained bundle. The launcher then booted that generation with
+a private copy of the provisioned state disk. Its policy check, running receipt,
+critical-service health report, and identity-preservation proof passed.
+
+The host subsequently staged an unbootable B against `restored`. Two real B
+kernel panics consumed the two attempts. The third launcher invocation selected
+`restored`, which booted and passed its identity proof. All five QEMU processes
+from restoration, the restored boot, and this fresh fallback run were reaped.
+This is a repair of one known defect from trusted local fixture inputs; it is
+not authenticated remote recovery or a general missing-file restoration tool.
+
 The same host also qualified journaled ext4 storage on two fresh 32-MiB disks
 with `guest/storage-recovery-proof.xsh` in an independent rescue image.
 The fixture writes and fsyncs `payload` containing `laputa durable payload`
