@@ -19,11 +19,13 @@ type QmpReply = {value: Any, pending: Bytes}
 proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error] {
   var buffer = pending
   loop {
+    if time.monotonic()? >= deadline { return Err(QmpError.Protocol("QMP deadline expired")) }
     let endings = regex.find_bytes("\n", buffer)?
     if !endings.is_empty() {
       let end = endings[0].start
       if end > 1048576 { return Err(QmpError.Protocol("QMP frame exceeds 1 MiB")) }
       let message = json.decode(buffer.slice(0, end).utf8()?)?
+      if time.monotonic()? >= deadline { return Err(QmpError.Protocol("QMP deadline expired")) }
       return {message, pending: buffer.slice(end + 1)}
     }
     if buffer.len() > 1048576 { return Err(QmpError.Protocol("QMP frame exceeds 1 MiB")) }

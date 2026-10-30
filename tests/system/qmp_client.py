@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import socket
 import subprocess
 import threading
@@ -31,12 +32,19 @@ class QmpClientTests(unittest.TestCase):
                     except Exception as error:
                         failures.append(error)
                 thread = threading.Thread(target=serve)
-                thread.start()
-                result = subprocess.run(
+                self.client = subprocess.Popen(
                     [XSH, str(ROOT / "tests/system/fixtures/qmp-client.xsh"), str(path), kind],
                     env={**os.environ, "XSH_MODULE_PATH": str(ROOT), "XSH_LINUX_REAL": "1", "XSH_UNIX_REAL": "1"},
-                    capture_output=True, text=True, timeout=5,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 )
+                thread.start()
+                try:
+                    stdout, stderr = self.client.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.client.kill()
+                    self.client.communicate()
+                    raise
+                result = subprocess.CompletedProcess(self.client.args, self.client.returncode, stdout, stderr)
                 thread.join(4)
             self.assertFalse(thread.is_alive())
             self.assertEqual(failures, [])
@@ -60,6 +68,20 @@ class QmpClientTests(unittest.TestCase):
         result = self.exchange(peer)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ok", result.stdout)
+
+    def test_buffered_event_flood_cannot_outlive_session_deadline(self):
+        def peer(conn, stream):
+            request = self.negotiate(conn, stream)
+            threading.Event().wait(0.02)
+            os.kill(self.client.pid, signal.SIGSTOP)
+            try:
+                conn.sendall(b'{"event":"X"}\n' * 100 + json.dumps({"return": {}, "id": request["id"]}).encode() + b'\n')
+                threading.Event().wait(0.25)
+            finally:
+                os.kill(self.client.pid, signal.SIGCONT)
+        result = self.exchange(peer, "flood")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("deadline expired", result.stderr)
 
     def test_multiple_commands_share_connection_and_use_unique_ids(self):
         def peer(conn, stream):
