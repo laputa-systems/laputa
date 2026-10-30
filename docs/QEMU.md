@@ -366,7 +366,9 @@ On 2026-10-30, a Linux x86_64/KVM run re-proved the clean boot with the
 DHCP service back on notify readiness (XSH `6d992dd`, containing the `b6b5e5a1d`
 readiness-pipe repair). The guest reported `dhcp-eth0` running with a bound
 lease and a managed resolver, and the boot-marker log counted two across the
-PID-1 reboot. All owned QEMU PIDs were reaped.
+PID-1 reboot. The fallback drill re-proved with the same image: two power cuts
+on pending B, logs naming failed B with `dhcp-eth0` running in its service
+history, and the record resting on A with pending cleared. All owned QEMU PIDs were reaped.
 
 On 2026-10-30, a Linux x86_64/KVM run exercised v4 host admission with v2 image
 receipts. B panicked twice. Before fallback, host policy revision 2 revoked B
