@@ -458,18 +458,16 @@ proc ensure_account(rootfs: FsRoot, name: Str) {
   ensure_line(rootfs, p"etc/shells", operator_shell)
 }
 
-proc require_identity(rootfs: FsRoot, identity: BootIdentity) {
-  let present = rootfs.exists(host_key_path)?
-
+proc identity_ok(key_present: Bool, identity: BootIdentity) {
   match identity {
     New => {}
     Restore => {
-      guard present else {
+      guard key_present else {
         fail "restore requires the dropbear host key"
       }
     }
     Clone => {
-      guard ! present else {
+      guard ! key_present else {
         fail "clone refuses an existing dropbear host key"
       }
     }
@@ -487,7 +485,6 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   ensure_dir(rootfs, home, 0o755)
   ensure_dir(rootfs, ssh, 0o700)
   write_text(rootfs, p"etc/hostname", f"{config.hostname}\n", 0o644)
-  write_text(rootfs, p"etc/laputa/first-boot/applied", record_text(config), 0o644)
   write_text(rootfs, p"etc/laputa/first-boot/network", network_text(config.network), 0o644)
   let tailscale = if config.tailscale { "yes" } else { "no" }
   write_text(rootfs, p"etc/laputa/first-boot/tailscale", f"{tailscale}\n", 0o644)
@@ -498,12 +495,46 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   if config.trust_key != null {
     write_bytes(rootfs, p"etc/laputa/trust-update-key", config.trust_key, 0o444)
   }
+
+  write_text(rootfs, p"etc/laputa/first-boot/applied", record_text(config), 0o644)
 }
 
-## Validate the document, then write only the non-secret operator files under `root`.
-export proc apply(root: Path, document: Str) [fs, error] -> Result[Unit, Error] {
+## Validate the document, then stage a complete replacement tree and publish
+## it with one atomic rename. A writer killed before publication leaves the
+## live root untouched; only uniquely named staging siblings are abandoned.
+## Passing "stage" as `crash_at` fails after staging but before publication
+## to exercise that path; production callers omit it.
+export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> Result[Unit, Error] {
   let config = parse(document)?
-  let rootfs = fs.open_root(root)?
-  require_identity(rootfs, config.identity)
-  write_tree(rootfs, config)
+  let live_present = root.exists()?
+  let key_present = if live_present {
+    let live = fs.open_root(root)?
+    live.exists(host_key_path)?
+  } else {
+    false
+  }
+
+  identity_ok(key_present, config.identity)
+
+  let staging = fs.temp_sibling(root)?
+  defer staging.remove(missing_ok: true)
+  if live_present {
+    let _ = fs.copy_tree(root, staging)?
+  } else {
+    staging.mkdir()
+  }
+  let staged = fs.open_root(staging)?
+  write_tree(staged, config)
+  fs.fsync(staging)?
+
+  if crash_at == "stage" {
+    fail "injected first-boot crash before publication"
+  }
+
+  if live_present {
+    fs.rename_exchange(staging, root)?
+  } else {
+    staging.rename(to: root)?
+  }
+  fs.fsync(root.parent)?
 }

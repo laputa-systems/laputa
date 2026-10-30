@@ -302,3 +302,23 @@ test test_firewall_fails_closed_without_a_ruleset [fs, error] {
   assert ! ("dport 23" in ruleset)
   assert "etc/nftables.conf" in recipe
 }
+
+test test_killed_writer_before_publish_leaves_no_partial_tree [fs, error] { |ctx|
+  let root = prepare(ctx, name: "killed-writer")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\n")
+  let before = snapshot(root)?
+  match first_boot.apply(root, base("new"), "stage") {
+    Ok(_) => assert false
+    Err(_) => {}
+  }
+  assert snapshot(root)? == before
+  assert ! fp"{root}/etc/laputa/first-boot/applied".exists()?
+  first_boot.apply(root, base("new"))
+  assert fp"{root}/etc/hostname".read_text()? == "laputa-host\n"
+  assert fp"{root}/etc/laputa/first-boot/applied".read_text()? != ""
+  assert fp"{root}/sentinel".read_text()? == "keep\n"
+  let after = snapshot(root)?
+  first_boot.apply(root, base("new"))
+  assert snapshot(root)? == after
+}
