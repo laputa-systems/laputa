@@ -148,6 +148,16 @@ under `linux.*`, whose implementation rejects other platforms. `unix.open_fd`
 opens files and does not connect to socket paths. LAP-35 therefore still needs
 a portable, bounded Unix-stream connection boundary to preserve the macOS path.
 
+The experimental `system/qmp.xsh` client supports one command per Linux Unix
+socket connection. It bounds frames to 1 MiB, matches response IDs, skips
+events, and reports a lost mutation response as indeterminate. The production
+supervisor still uses the Python helper on both platforms. The XSH client has
+not yet covered the full input, screenshot, or visual proof workflow.
+
+Run `XSH=/path/to/xsh python3 tests/system/qmp_client.py` for its local peer
+checks. The client needs a portable Unix-stream connection operation before it
+can replace the helper on macOS.
+
 ## Maintained VM activation
 
 The x86_64 `qemu-maintained` overlay starts one `xinit scan boot` under PID 1
