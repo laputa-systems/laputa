@@ -156,12 +156,40 @@ test test_qmp_retry_type_rejects_input_dispatch [fs, process, error] { |ctx|
   let module_source = p"system/qemu.xsh".read_text()?
   let invalid_dispatch = module_source + """
 proc qmp_retry_input(value: QemuConfig, socket: Path) -> Result[Unit] {
-  qemu_qmp_retry(value, QmpInput, socket)
+  qemu_qmp_retry(value, QmpInput, socket, 1)
 }
 """
   let result = test.run_script(ctx, invalid_dispatch)?
   assert result.status != 0, "QMP input unexpectedly type-checked as retryable"
   assert "QmpRetryOperation" in result.stderr, result.stderr
+}
+
+test test_qmp_retry_spends_the_shared_deadline_in_helper [fs, process, net, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qmp-deadline")?
+  let helper = fp"{root}/slow-helper"
+  helper.write_lines(["#!/bin/sh", "exec sleep 3"])
+  helper.chmod(0o755)
+  let source = p"system/qemu.xsh".read_text()? + """
+proc probe() -> Result[Unit, Error] {
+  let target = qemu_target("Linux", "x86_64")?
+  let config = QemuConfig(qemu: p"unused", qmp_transport: QemuQmpLegacy(p"FAKE_PATH", p"unused"), target:)
+  let started = time.monotonic()?
+  match qemu_qmp_retry(config, QmpRetryReady, p"unused", started + 200000000) {
+    Ok(_) => fail "accepted a silent QMP helper"
+    Err(_) => {}
+  }
+  assert time.monotonic()? - started < 1500000000, "QMP helper exceeded the supervisor deadline"
+  let input_deadline = time.monotonic()? + 200000000
+  match qemu_qmp(config, QmpInput, p"unused", input_deadline) {
+    Err(QmpFailure.OutcomeIndeterminate {operation: _}) => {}
+    Err(problem) => fail f"input timeout lost its indeterminate outcome: {problem.message}"
+    Ok(_) => fail "accepted a silent input helper"
+  }
+}
+probe()?
+""".replace("FAKE_PATH", with: helper.display())
+  let result = test.run_script(ctx, source)?
+  assert result.success, result.stderr
 }
 
 proc supervisor_fixture(

@@ -8,6 +8,6 @@ proc main(...args: List[Str]) [process, net, time, error] {
     [qmp.QmpExecute("query-status", "{}", kind)]
   }
   let timeout = if args[1] == "flood" { 200 } else { 2000 }
-  qmp.qmp_linux_run(Path(args[0]), steps, timeout)?
+  qmp.qmp_linux_run_until(Path(args[0]), steps, time.monotonic()? + timeout * 1000000)?
   print "ok"
 }

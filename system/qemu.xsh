@@ -250,10 +250,13 @@ proc qmp_linux_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error
   }
 }
 
-proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) {
+proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path, deadline: Int) {
+  let now = time.monotonic()?
+  if now >= deadline { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
+  let limit = if deadline < now + 60000000000 { deadline } else { now + 60000000000 }
   match value.qmp_transport {
     QemuQmpLinux => {
-      match qmp.qmp_linux_run(socket, qmp_linux_steps(operation)?, 60000) {
+      match qmp.qmp_linux_run_until(socket, qmp_linux_steps(operation)?, limit) {
         Ok(_) => Ok(),
         Err(qmp.QmpError.Indeterminate {operation: _}) => Err(QmpFailure.OutcomeIndeterminate(operation)),
         Err(problem) => Err(problem),
@@ -263,7 +266,16 @@ proc qemu_qmp(value: QemuConfig, operation: QmpOperation, socket: Path) {
       var argv = [python.display(), helper.display(), qmp_mode(operation), socket.display()]
       if let QmpScreenshot(output) = operation { argv += [output.display()] }
       if let QmpVtSwitch(vt) = operation { argv += [f"{vt}"] }
-      let status = process.run(process.command_argv(python, argv))?
+      let remaining_ms = (limit - time.monotonic()?) / 1000000
+      if remaining_ms <= 0 { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
+      let status = match process.run(process.command_argv(python, argv, timeout: time.millis(remaining_ms))) {
+        Ok(status) => status,
+        Err(ProcessError.Timeout {message: _}) => {
+          if operation is QmpInput or operation is QmpVtSwitch(_) { return Err(QmpFailure.OutcomeIndeterminate(operation)) }
+          return Err(types.LaputaError.Docker("QMP helper timed out"))
+        },
+        Err(problem) => { return Err(problem) },
+      }
       return Err(QmpFailure.OutcomeIndeterminate(operation)) when status.exited_with(75)
       return Err(types.LaputaError.Docker(f"QMP {qmp_mode(operation)} helper failed")) unless status.ok
       Ok()
@@ -287,15 +299,18 @@ export proc qemu_control(value: QemuConfig, socket: Path, control: QemuControl) 
   }
 }
 
-proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path) {
+proc qemu_qmp_retry(value: QemuConfig, operation: QmpRetryOperation, socket: Path, deadline: Int) {
   let qmp_operation = qmp_retry_operation(operation)
   var attempt = 0
   while attempt < 20 {
-    match qemu_qmp(value, qmp_operation, socket) {
+    match qemu_qmp(value, qmp_operation, socket, deadline) {
       Ok(_) => return
       Err(QmpFailure.OutcomeIndeterminate {operation: detail}) => return Err(QmpFailure.OutcomeIndeterminate(detail))
       Err(_) => {
-        time.sleep(250ms)
+        let remaining_ms = (deadline - time.monotonic()?) / 1000000
+        if remaining_ms <= 0 { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
+        let pause_ms = if remaining_ms < 250 { remaining_ms } else { 250 }
+        time.sleep(time.millis(pause_ms))?
         attempt += 1
       }
     }
@@ -391,13 +406,16 @@ export proc run_test(
   )
   let launched = spawn command?
   defer qemu_stop(launched)
-  var elapsed = 0
+  let deadline = time.monotonic()? + 180000000000
   var injected = false
   var vt_away = false
   var vt_back = false
   var screenshot_taken = false
 
   while qemu_process_live(launched.pid) {
+    if time.monotonic()? >= deadline {
+      return Err(types.LaputaError.Profile(f"timed out waiting for {profile.name} proof; inspect {qemu_output_locations(outputs)}"))
+    }
     let log_text = qemu_log_text(outputs.console_log, outputs.qemu_log)?
     let failed = proof.failure_marker(profile.proof, log_text)
     if failed != "" {
@@ -407,24 +425,24 @@ export proc run_test(
     }
 
     if !vt_away and profile.proof.vt_away_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_away_marker in log_text {
-      qemu_qmp(value, QmpVtSwitch(2), outputs.qmp_socket)
+      qemu_qmp(value, QmpVtSwitch(2), outputs.qmp_socket, deadline)
       vt_away = true
     }
 
     if !vt_back and profile.proof.vt_back_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_back_marker in log_text {
-      qemu_qmp(value, QmpVtSwitch(1), outputs.qmp_socket)
+      qemu_qmp(value, QmpVtSwitch(1), outputs.qmp_socket, deadline)
       vt_back = true
     }
 
     if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {
-      qemu_qmp_retry(value, QmpRetryReady, outputs.qmp_socket)
-      qemu_qmp(value, QmpInput, outputs.qmp_socket)
+      qemu_qmp_retry(value, QmpRetryReady, outputs.qmp_socket, deadline)
+      qemu_qmp(value, QmpInput, outputs.qmp_socket, deadline)
       injected = true
     }
 
     if proof.succeeded(profile.proof, log_text) {
       if ! screenshot_taken {
-        qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket)
+        qemu_qmp_retry(value, QmpRetryScreenshot(outputs.screenshot), outputs.qmp_socket, deadline)
         if ! screenshot_is_valid(outputs.screenshot) {
           return Err(
             types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
@@ -441,6 +459,9 @@ export proc run_test(
         screenshot_taken = true
       }
 
+      if time.monotonic()? >= deadline {
+        return Err(types.LaputaError.Profile(f"timed out waiting for {profile.name} proof; inspect {qemu_output_locations(outputs)}"))
+      }
       qemu_stop(launched)
       let final_log = qemu_log_text(outputs.console_log, outputs.qemu_log)?
       proof.verify_console(profile.proof, final_log)
@@ -449,14 +470,15 @@ export proc run_test(
       return
     }
 
-    if elapsed >= 180 {
+    let remaining_ms = (deadline - time.monotonic()?) / 1000000
+    if remaining_ms <= 0 {
       return Err(
         types.LaputaError.Profile(f"timed out waiting for {profile.name} proof; inspect {qemu_output_locations(outputs)}"),
       )
     }
 
-    time.sleep(1s)
-    elapsed += 1
+    let pause_ms = if remaining_ms < 1000 { remaining_ms } else { 1000 }
+    time.sleep(time.millis(pause_ms))?
   }
 
   let _ = wait launched?

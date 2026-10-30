@@ -104,7 +104,8 @@ visual VM qualification remains open until the graphical artifact builds.
 
 Readiness and screenshot retry up to 20 times with 250 ms between attempts.
 The supervisor owns the 180 s proof timeout, TERM/KILL escalation, final
-console-marker scan, and screenshot check. The supervisor reports an early
+console-marker scan, and screenshot check. QMP attempts and retry delays share
+the proof deadline. The supervisor reports an early
 QEMU exit as an error. The profile overlay digest is bound into the generated
 image so a guest proof cannot validate a different root generation.
 
