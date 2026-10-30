@@ -213,6 +213,7 @@ export proc load_verified_remote_index(
 
   let rows: List[Record] = json.decode(index_bytes as Str)?.require()?
   let items = decode_remote_index(rows)?
+  repo_snapshot.snapshot_validate_index(items)
   repo_snapshot.snapshot_persist_accepted(state, verified, now_epoch_seconds)
   out.mkdir()
   util.remote_index_cache_path(out).write_atomic(index_bytes)

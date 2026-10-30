@@ -1,5 +1,6 @@
 ##! Versioned signed repository snapshots binding the exact published index.
 use pm.types
+use pm.util
 
 ## A parsed repository snapshot: the exact index bytes clients may plan from.
 export type RepoSnapshotMetadata = {generation: Str, expires_at: Int, index_sha256: Str}
@@ -56,6 +57,26 @@ export pure snapshot_u64_is_greater(left: Str, right: Str) -> Bool {
 
 pure snapshot_sha256_is_valid(value: Str) -> Bool {
   value.byte_len() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
+}
+
+## Signed indexes must bind every referenced artifact to a digest and a repository-relative path.
+export proc snapshot_validate_index(items: List[types.RemotePackage]) [error] {
+  var identities: List[Str] = []
+  for item in items {
+    let identity = f"{item.arch}/{item.name}"
+    snapshot_require(identity not in identities, f"signed repository index repeats {identity}")
+    identities += [identity]
+    snapshot_require(item.metadata != "" and snapshot_sha256_is_valid(item.metadata_sha256), f"signed repository package {identity} needs an exact metadata digest")
+    let _ = util.ensure_relative_path(fp"{item.metadata}", f"signed metadata for {identity}")?
+    if ! item.metapackage {
+      snapshot_require(item.tarball != "" and snapshot_sha256_is_valid(item.sha256) and item.size >= 0, f"signed repository package {identity} needs an exact payload digest")
+      let _ = util.ensure_relative_path(fp"{item.tarball}", f"signed payload for {identity}")?
+    }
+    if item.proof != "" or item.proof_receipt_sha256 != "" {
+      snapshot_require(item.proof != "" and snapshot_sha256_is_valid(item.proof_receipt_sha256), f"signed repository package {identity} needs an exact proof digest")
+      let _ = util.ensure_relative_path(fp"{item.proof}", f"signed proof for {identity}")?
+    }
+  }
 }
 
 ## Renders the exact bytes an offline signing ceremony signs for one snapshot.

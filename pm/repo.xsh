@@ -328,18 +328,15 @@ export proc publish_snapshot(
   guard index_bytes.sha256().hex() == parsed.index_sha256 else {
     return Err(types.PmError.RemoteIndex("repository snapshot index digest does not match the published index; re-issue the snapshot after publication"))
   }
+  let rows: List[Record] = json.decode(index_bytes as Str)?.require()?
+  repo_snapshot.snapshot_validate_index(remote.decode_remote_index(rows)?)
 
   let prior_dest = fp"{index_work}/prior-snapshot.json"
   let prior_failure = remote.try_fetch_repo_file(remote_repo, util.remote_snapshot_rel(), prior_dest)?
 
   if prior_failure == "" {
     let prior = repo_snapshot.snapshot_parse_metadata(prior_dest.read_bytes()?)?
-    guard repo_snapshot.snapshot_u64_is_greater(parsed.generation, prior.generation) else {
-      if parsed.generation == prior.generation and parsed.index_sha256 == prior.index_sha256 {
-        print "snapshot" $parsed.generation "already-published"
-        return
-      }
-
+    if ! repo_snapshot.snapshot_u64_is_greater(parsed.generation, prior.generation) and metadata != prior_dest.read_bytes()? {
       return Err(
         types.PmError.PackageContract(f"repository snapshot generation {parsed.generation} does not advance the published generation {prior.generation}"),
       )

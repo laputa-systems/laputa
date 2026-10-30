@@ -384,11 +384,16 @@ and the digest against the fetched index bytes. Any failure fails closed:
 planning from a production repository without provisioned keys, or with a
 bad snapshot, is an error, never a silent fallback to the unsigned index.
 
-This follows TUF's snapshot role in miniature: one role binds the full file
-set (here the index digest transitively binds every referenced
-content-addressed object, the way a TUF snapshot binds targets metadata),
-with monotonic versions against rollback and expiries against freeze
-attacks. There is no root/threshold delegation. Rotation is a key-set file
+Compared with [TUF's role separation](https://theupdateframework.github.io/specification/latest/),
+this boundary combines snapshot and target authorization in one offline-signed
+index. It retains monotonic versions against rollback and expiry against freeze,
+but does not provide TUF's delegated root updates, threshold compromise resistance,
+or independently refreshed timestamps. A full TUF deployment would add role and
+metadata management beyond this single-repository, out-of-band key ceremony.
+The index must include exact metadata and payload digests, plus a proof digest
+for any referenced proof. Missing digests and escaping paths are rejected before
+acceptance; legacy indexes that discover metadata hashes from the remote cannot
+be signed and admitted through this boundary. Rotation is a key-set file
 of concatenated raw 32-byte public keys named by `XSH_PM_REPO_KEY_FILE`:
 listing the current and next key opens a rotation window, removing a key
 revokes it. Snapshots themselves never carry keys.
@@ -403,8 +408,10 @@ re-provisioning keys out of band and re-issuing snapshots; there is no
 in-band recovery. `repo publish-snapshot` pre-verifies the signature, the
 digest against the live remote index, and the generation advance before
 uploading, then uploads `snapshot.json` before `snapshot.sig`, so the
-signature is the linearization point: readers that race publication see a
-digest mismatch and fail closed. `repo publish` still writes objects first
+signature completes publication: readers that race publication can see a
+digest mismatch and fail closed. Interrupted publication may be retried with
+the identical signed metadata to restore a missing or stale signature. A
+same-generation change to the signed metadata is refused. `repo publish` still writes objects first
 and `index.json` last; the snapshot covers the index that publication
 produced.
 
@@ -434,9 +441,12 @@ contention fails explicitly and process death releases the lock. Planning also
 locks its index cache until the selected index digest and package coordinates
 are captured, so concurrent planners cannot mix cache identities.
 
-Remaining: provisioned-key distribution is manual (no package-seeded key
-yet); threshold or
-multi-signer snapshots; and guest proof of the production fetch path.
+Linux x86_64/KVM `tests/system/repo_snapshot_guest.xsh` exercises the real
+HTTP fetch boundary, rejects index tampering, and retains generation 2 across
+reboot before rejecting generation 1 from the same URL. This tests the fetch
+API with provisioned fixture keys and time, not a production publisher or guest
+CLI installation. Production key distribution remains manual; there is no
+package-seeded repository key or threshold/multi-signer authorization.
 
 ## Root composition
 

@@ -568,3 +568,33 @@ test test_persist_accepted_refuses_a_concurrent_writer [fs, error] { |ctx|
   }
   assert ! paths.accepted.exists()?
 }
+
+test test_signed_index_requires_digests_for_every_referenced_artifact [fs, error] { |_|
+  let item = remote.decode_remote_index(json.read(fixture("index.json"))?.require(List[Record])?)?[0]
+  for invalid in [
+    {...item, metadata_sha256: ""},
+    {...item, sha256: ""},
+    {...item, proof_receipt_sha256: ""},
+    {...item, metadata: "../outside.json"},
+    {...item, tarball: "/outside.tar.gz"},
+    {...item, proof: "../outside-proof.json"},
+  ] {
+    match repo_snapshot.snapshot_validate_index([invalid]) {
+      Ok(_) => test.fail("signed index accepted an unauthenticated artifact reference"),
+      Err(_) => {},
+    }
+  }
+}
+
+test test_snapshot_publication_retry_repairs_missing_commit_signature [fs, net, env, time, error] { |ctx|
+  let root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let release = stage_snapshot_dir(ctx, "retry-release", "snapshot-gen1")?
+  let work = test.temp_dir(ctx, name: "retry-work")?
+  let url = f"file://{root}"
+  let keys = [key_bytes("signing-key")?]
+  repo.publish_snapshot(url, "", work, release, keys)
+  fp"{root}/snapshot.sig".remove()
+  repo.publish_snapshot(url, "", work, release, keys)
+  assert fp"{root}/snapshot.sig".exists()?
+  assert fp"{root}/snapshot.sig".read_bytes()? == snapshot_bytes("snapshot-gen1", "metadata.sig")?
+}
