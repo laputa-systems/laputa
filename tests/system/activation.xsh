@@ -17,6 +17,25 @@ proc record_text(state: Path) -> Result[Str, Error] {
   fp"{state}/{activation.ACTIVATION_RECORD_NAME}".read_text()
 }
 
+proc prepare_image(state: Path, receipt: activation.GenerationReceipt) {
+  let kernel = fp"{state}/inputs/{receipt.id}/kernel"
+  let disk = fp"{state}/inputs/{receipt.id}/disk"
+  kernel.parent.mkdir()
+  kernel.write(f"kernel-{receipt.id}")
+  disk.write(f"disk-{receipt.id}")
+  activation.activation_publish_image(state, receipt, kernel, disk)
+}
+
+proc install(state: Path, receipt: activation.GenerationReceipt) {
+  prepare_image(state, receipt)
+  activation.activation_install(state, receipt)
+}
+
+proc stage(state: Path, receipt: activation.GenerationReceipt) {
+  prepare_image(state, receipt)
+  activation.activation_stage(state, receipt)
+}
+
 proc assert_pending(record: activation.ActivationRecord, id: Str) {
   if record.pending == null {
     assert false, "missing pending generation"
@@ -31,8 +50,8 @@ proc health_services(names: List[Str], state: Str) -> List[activation.ServiceHea
 
 test test_guest_health_requires_current_boot_identity_and_critical_services [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-guest-health")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear", "firewall"], "running"))
   let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "dropbear"])
@@ -59,8 +78,8 @@ test test_guest_health_requires_current_boot_identity_and_critical_services [fs,
 
 test test_a_later_boot_rejects_a_delayed_health_report [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-delayed-health")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let _ = activation.activation_begin_boot(state)?
   let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
@@ -71,8 +90,8 @@ test test_a_later_boot_rejects_a_delayed_health_report [fs, time, error] { |ctx|
 
 test test_a_failed_attempt_cannot_confirm_a_delayed_health_report [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-failed-health")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
   activation.activation_boot_failed(state)
@@ -81,10 +100,51 @@ test test_a_failed_attempt_cannot_confirm_a_delayed_health_report [fs, time, err
   assert record_text(state)? == before
 }
 
+test test_gc_preserves_current_fallback_and_pending_images [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-gc")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_confirm_health(state, "b")
+  stage(state, generation("c"))
+  prepare_image(state, generation("orphan"))
+  let before = record_text(state)?
+  assert activation.activation_collect_images(state)? == ["orphan"]
+  assert record_text(state)? == before
+  for id in ["a", "b", "c"] {
+    let _ = activation.activation_verify_image(state, generation(id))?
+  }
+  assert activation.activation_collect_images(state)?.is_empty()
+  assert ! fp"{state}/images/orphan".exists()?
+}
+
+test test_gc_before_staging_cannot_leave_a_missing_pending_image [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-gc-stage")?
+  install(state, generation("a"))
+  prepare_image(state, generation("b"))
+  let before = record_text(state)?
+  assert activation.activation_collect_images(state)? == ["b"]
+  assert activation.activation_stage(state, generation("b")) is Err(_)
+  assert record_text(state)? == before
+}
+
+test test_old_writer_record_format_is_rejected_without_mutation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-old-format")?
+  install(state, generation("a"))
+  let target = fp"{state}/{activation.ACTIVATION_RECORD_NAME}"
+  let record = activation.activation_status(state)?
+  let legacy = json.encode({...record, format: "laputa-activation-2"})?
+  target.write(legacy)
+  let before = target.read_text()?
+  assert activation.activation_status(state) is Err(_)
+  assert activation.activation_stage(state, generation("b")) is Err(_)
+  assert target.read_text()? == before
+}
+
 test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-confirm")?
   let installed = generation("a")
-  activation.activation_install(state, installed)
+  install(state, installed)
   let before_boot = record_text(state)?
   match activation.activation_begin_boot(state) {
     Ok(_) => assert false
@@ -92,7 +152,7 @@ test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx
   }
   assert record_text(state)? == before_boot
 
-  activation.activation_stage(state, generation("b"))
+  stage(state, generation("b"))
   let staged = activation.activation_status(state)?
   assert staged.current.id == "a"
   assert staged.fallback.id == "a"
@@ -128,8 +188,8 @@ test test_stage_boot_and_confirm_moves_fallback_forward [fs, time, error] { |ctx
 
 test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-unbootable")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let staged = record_text(state)?
   match activation.activation_boot_failed(state) {
     Ok(_) => assert false
@@ -161,7 +221,7 @@ test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
   assert restored.boot_attempts == 2
   assert restored.last_operation == "fell-back"
 
-  activation.activation_stage(state, generation("c"))
+  stage(state, generation("c"))
   let restaged = activation.activation_status(state)?
   assert restaged.current.id == "a"
   assert restaged.fallback.id == "a"
@@ -171,8 +231,8 @@ test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
 
 test test_begin_boot_falls_back_when_another_attempt_would_exceed_max [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-attempt-cap")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let _ = activation.activation_begin_boot(state)?
   let at_max = activation.activation_status(state)?
@@ -198,8 +258,8 @@ test test_begin_boot_falls_back_when_another_attempt_would_exceed_max [fs, time,
 
 test test_stage_is_not_reapplied_after_disconnect_or_while_pending [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-disconnect")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let staged = activation.activation_status(state)?
   assert staged.current.id == "a"
   assert_pending(staged, "b")
@@ -219,8 +279,8 @@ test test_stage_is_not_reapplied_after_disconnect_or_while_pending [fs, time, er
 
 test test_confirm_rejects_the_wrong_id_and_a_boot_that_has_not_started [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-confirm-reject")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let staged = record_text(state)?
   match activation.activation_confirm_health(state, "b") {
     Ok(_) => assert false
@@ -249,8 +309,8 @@ test test_confirm_rejects_the_wrong_id_and_a_boot_that_has_not_started [fs, time
 
 test test_tampered_pending_digest_does_not_confirm [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-tamper")?
-  activation.activation_install(state, generation("a"))
-  activation.activation_stage(state, generation("b"))
+  install(state, generation("a"))
+  stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let record_file = fp"{state}/{activation.ACTIVATION_RECORD_NAME}"
   let broken = record_file.read_text()?.replace(sha256_text("b"), with: "not-a-digest")
@@ -270,51 +330,34 @@ test test_tampered_pending_digest_does_not_confirm [fs, time, error] { |ctx|
   }
   assert record_file.read_text()? == tampered
   assert "\"a\"" in tampered
-  assert ! fp"{state}/{activation.ACTIVATION_LOCK_NAME}".exists()?
+  let released = fs.lock(fp"{state}/{activation.ACTIVATION_LOCK_NAME}", false, true)?
+  fs.unlock(released)
 }
 
-test test_abandoned_lock_fails_closed_until_release [fs, time, error] { |ctx|
-  let state = state_dir(ctx, "activation-lock")?
-  activation.activation_install(state, generation("a"))
-  let lock = fp"{state}/{activation.ACTIVATION_LOCK_NAME}"
-  fs.mknod(lock, "file", 0o600)
+test test_live_os_lock_is_not_stolen [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-lock-held")?
+  install(state, generation("a"))
+  let lock_file = fp"{state}/{activation.ACTIVATION_LOCK_NAME}"
+  let lock = fs.lock(lock_file, false, true)?
   let before = record_text(state)?
   match activation.activation_stage(state, generation("b")) {
     Ok(_) => assert false
-    Err(error) => assert "lock is held" in error.message
+    Err(problem) => assert "lock is held" in problem.message
   }
-  assert lock.exists()?
   assert record_text(state)? == before
-  lock.unlink()
-  activation.activation_stage(state, generation("b"))
+  fs.unlock(lock)
+  stage(state, generation("b"))
   assert_pending(activation.activation_status(state)?, "b")
-  assert ! lock.exists()?
+  assert lock_file.exists()?
 }
 
-test test_fresh_lock_is_not_stolen_and_a_stale_lock_expires [fs, time, error] { |ctx|
-  let fresh = state_dir(ctx, "activation-lock-fresh")?
-  activation.activation_install(fresh, generation("a"))
-  let fresh_lock = fp"{fresh}/{activation.ACTIVATION_LOCK_NAME}"
-  fs.mknod(fresh_lock, "file", 0o600)
-  let before = record_text(fresh)?
-  match activation.activation_stage(fresh, generation("b"), 1s) {
-    Ok(_) => assert false
-    Err(error) => assert "lock is held" in error.message
-  }
-  assert fresh_lock.exists()?
-  assert record_text(fresh)? == before
-
-  let stale = state_dir(ctx, "activation-lock-stale")?
-  activation.activation_install(stale, generation("a"))
-  let stale_lock = fp"{stale}/{activation.ACTIVATION_LOCK_NAME}"
-  fs.mknod(stale_lock, "file", 0o600)
-  fs.set_times(stale_lock, mtime_ns: 0)
-  activation.activation_stage(stale, generation("b"), 1s)
-  let status = activation.activation_status(stale)?
-  assert status.current.id == "a"
-  assert_pending(status, "b")
-  assert status.last_operation == "staged"
-  assert ! stale_lock.exists()?
+test test_unowned_lock_file_does_not_block_activation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-lock-abandoned")?
+  install(state, generation("a"))
+  let lock_file = fp"{state}/{activation.ACTIVATION_LOCK_NAME}"
+  assert lock_file.exists()?
+  stage(state, generation("b"))
+  assert_pending(activation.activation_status(state)?, "b")
 }
 
 test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |ctx|
@@ -325,7 +368,7 @@ test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |c
   }
   assert ! fp"{state}/{activation.ACTIVATION_RECORD_NAME}".exists()?
 
-  activation.activation_install(state, generation("a"))
+  install(state, generation("a"))
   let installed = record_text(state)?
   match activation.activation_stage(state, {id: "b", kernel: "boot/vmlinuz-b", root_digest: "zz"}) {
     Ok(_) => assert false
@@ -348,7 +391,8 @@ test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |c
 
 test test_unwritable_state_directory_leaves_the_record [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-unwritable")?
-  activation.activation_install(state, generation("a"))
+  install(state, generation("a"))
+  prepare_image(state, generation("b"))
   let before = record_text(state)?
   state.chmod(0o555)
   defer state.chmod(0o755)

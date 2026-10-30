@@ -1,15 +1,6 @@
 ##! Host selection of the generation a direct-kernel boot runs.
 use system.activation
 
-const generation_id_re = rx"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-
-type ImageReceipt = {
-  format: Str,
-  generation: activation.GenerationReceipt,
-  kernel_sha256: Str,
-  disk_sha256: Str,
-}
-
 ## Host files for one generation id. The activation receipt stays the identity.
 export type LauncherImage = {
   boot_serial: Int,
@@ -18,42 +9,8 @@ export type LauncherImage = {
   disk_file: Path,
 }
 
-## Publish already verified inputs under a new id without replacing retained images.
-export proc launcher_publish_image(state_dir: Path, receipt: activation.GenerationReceipt, kernel: Path, disk: Path) [fs, error] {
-  guard generation_id_ok(receipt.id) else { fail "generation id is not a single path segment" }
-  let images = fp"{state_dir}/images"
-  images.mkdir()
-  fs.fsync(state_dir)
-  let temporary = fs.tempdir_in(images)?
-  let bundle = fp"{temporary.host_path()?}/bundle"
-  bundle.mkdir()
-  kernel.copy(to: fp"{bundle}/kernel")
-  disk.copy(to: fp"{bundle}/disk")
-  let metadata = ImageReceipt(
-    format: "laputa-activation-image-1",
-    generation: receipt,
-    kernel_sha256: hash.sha256(fp"{bundle}/kernel")?.hex(),
-    disk_sha256: hash.sha256(fp"{bundle}/disk")?.hex(),
-  )
-  fp"{bundle}/receipt.json".write(json.encode(metadata)? + "\n")
-  for item in [p"kernel", p"disk", p"receipt.json"] { fs.fsync(fp"{bundle}/{item}") }
-  fs.fsync(bundle)
-  bundle.rename(to: fp"{images}/{receipt.id}", overwrite: false)
-  fs.fsync(images)
-}
-
-proc verify_image(image: LauncherImage, receipt: activation.GenerationReceipt) {
-  let metadata = json.read(fp"{image.kernel_file.parent}/receipt.json")?.require_exact(ImageReceipt)?
-  guard metadata.format == "laputa-activation-image-1" and metadata.generation == receipt else {
-    fail "generation image receipt differs"
-  }
-  guard hash.sha256(image.kernel_file)?.hex() == metadata.kernel_sha256 and hash.sha256(image.disk_file)?.hex() == metadata.disk_sha256 else {
-    fail "generation image digest differs"
-  }
-}
-
-proc generation_id_ok(id: Str) -> Bool {
-  generation_id_re.matches(id)
+pure selected_image(image: activation.GenerationImage, serial: Int) -> LauncherImage {
+  {id: image.id, kernel_file: image.kernel_file, disk_file: image.disk_file, boot_serial: serial}
 }
 
 pure drive_text(file: Path) -> Result[Str, Error] {
@@ -64,22 +21,6 @@ pure drive_text(file: Path) -> Result[Str, Error] {
   }
 
   text
-}
-
-## Image paths for a generation id under the activation state directory.
-export proc launcher_image_files(state_dir: Path, id: Str) [fs, error] -> Result[LauncherImage, Error] {
-  guard generation_id_ok(id) else {
-    fail "generation id is not a single path segment"
-  }
-
-  let kernel_file = fp"{state_dir}/images/{id}/kernel"
-  let disk_file = fp"{state_dir}/images/{id}/disk"
-
-  guard kernel_file.exists() and disk_file.exists() else {
-    fail "generation image is missing"
-  }
-
-  {id, kernel_file, disk_file, boot_serial: 0}
 }
 
 ## The state directory when this profile output root has an activation record.
@@ -98,9 +39,8 @@ export proc launcher_select(state_dir: Path) [fs, time, error] -> Result[Launche
   let record = activation.activation_status(state_dir)?
 
   if record.pending == null {
-    let current = launcher_image_files(state_dir, record.current.id)?
-    verify_image(current, record.current)
-    return {...current, boot_serial: record.boot_serial}
+    let current = activation.activation_verify_image(state_dir, record.current)?
+    return selected_image(current, record.boot_serial)
   }
 
   let anticipated = if record.boot_attempts >= activation.ACTIVATION_MAX_BOOT_ATTEMPTS {
@@ -108,8 +48,7 @@ export proc launcher_select(state_dir: Path) [fs, time, error] -> Result[Launche
   } else {
     record.pending
   }
-  let image = launcher_image_files(state_dir, anticipated.id)?
-  verify_image(image, anticipated)
+  let image = activation.activation_verify_image(state_dir, anticipated)?
   let choice = activation.activation_begin_boot(state_dir)?
   let selected = match choice {
     activation.PendingBoot(id) => id
@@ -120,7 +59,7 @@ export proc launcher_select(state_dir: Path) [fs, time, error] -> Result[Launche
     fail "activation selection changed"
   }
 
-  {...image, boot_serial: selected.serial}
+  selected_image(image, selected.serial)
 }
 
 pure rewrite_kernel(argv: List[Str], kernel: Str) -> Result[List[Str], Error] {

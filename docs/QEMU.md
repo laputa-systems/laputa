@@ -173,7 +173,7 @@ service states. The full generation identity includes the profile overlay.
 `root_digest` in an activation receipt denotes this publisher identity, never
 the disk-file SHA-256.
 
-`launcher_publish_image` accepts already verified local inputs. It copies kernel
+`activation_publish_image` accepts already verified local inputs. It copies kernel
 and disk into a private staging directory, writes `receipt.json`, fsyncs the
 files and directory, and publishes the bundle without replacing an existing id.
 The receipt format is `laputa-activation-image-1`. It binds the activation receipt
@@ -182,8 +182,8 @@ before counting an attempt. Missing metadata or changed image bytes fail closed.
 These local checks do not authenticate a downloaded release or defend against an
 administrator who can rewrite both image and receipt.
 
-Activation records use `laputa-activation-2` and include `boot_serial`. Old
-unversioned records are rejected, with no silent migration. Every pending boot
+Activation records use `laputa-activation-3` and include `boot_serial`. Older
+records are rejected, with no silent migration. Every pending boot
 increments the sequence, including retries after restaging. The QEMU command line
 carries the selected id and sequence. `activation_confirm_guest_health` checks the
 report against the pending receipt, sequence, and a host-owned critical-service
@@ -191,6 +191,21 @@ policy while holding the activation lock. A missing, duplicated, unhealthy, or
 stale required-service observation prevents confirmation. The caller must obtain
 a fresh report through its trusted guest channel. The lower-level
 `activation_confirm_health` remains an explicitly trusted manual transition.
+
+Activation mutations and `activation_collect_images` share the OS-backed
+`activation.flock` writer lock. Process death releases the lock automatically;
+its file stays in place and must not be unlinked while writers can run.
+Install and stage verify a published image under that lock before recording it.
+Collection retains current, fallback, and pending images. A candidate collected
+before staging is rejected without changing the record and must be republished.
+Publication and verification belong to `system/activation.xsh`; the launcher
+consumes verified images for boot selection.
+
+Run `python3 tests/integration/activation_recovery.py` on Linux with `strace`
+installed to kill writers or inject ENOSPC at each record fsync boundary during
+staging, selection, and confirmation, then verify recovery and concurrent staging.
+These checks establish process-death recovery and reported sync-error handling;
+they do not simulate power loss or filesystem write reordering.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the

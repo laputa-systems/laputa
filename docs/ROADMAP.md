@@ -447,9 +447,10 @@ a macOS aarch64 host via Docker.
 
 `system/activation.xsh` records install, stage, pending boot, guest health
 confirmation, and fallback after two attempts. Versioned activation records bind
-health reports to a persistent pending-boot sequence. `system/launcher.xsh`
+health reports to a persistent pending-boot sequence. `system/activation.xsh`
 publishes complete kernel/disk bundles atomically and verifies their receipts and
-hashes before consuming an attempt. The maintained guest keeps `/etc`, `/home`,
+hashes before admission; the launcher verifies them before consuming an attempt.
+The maintained guest keeps `/etc`, `/home`,
 and `/var` on a separate private state disk and captures its immutable running
 receipt before mounting that state.
 

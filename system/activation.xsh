@@ -6,13 +6,11 @@ export error ActivationError = Rejected(message: Str)
 ## Persisted activation record file name.
 export const ACTIVATION_RECORD_NAME = "activation.json"
 ## Exclusive activation lock file name.
-export const ACTIVATION_LOCK_NAME = "activation.lock"
+export const ACTIVATION_LOCK_NAME = "activation.flock"
 ## Boot attempts allowed before the launcher selects the fallback.
 export const ACTIVATION_MAX_BOOT_ATTEMPTS = 2
-## Age after which an abandoned activation lock may be replaced.
-export const ACTIVATION_LOCK_DEADLINE = 24h
-
-const ACTIVATION_EEXIST = 17
+## Activation record version paired with the OS-backed writer lock.
+export const ACTIVATION_FORMAT = "laputa-activation-3"
 
 ## One installed generation the launcher can select.
 export type GenerationReceipt = {
@@ -20,6 +18,11 @@ export type GenerationReceipt = {
   kernel: Str,
   root_digest: Str,
 }
+
+type ImageReceipt = {format: Str, generation: GenerationReceipt, kernel_sha256: Str, disk_sha256: Str}
+
+## Verified files for one published activation generation.
+export type GenerationImage = {id: Str, kernel_file: Path, disk_file: Path}
 
 ## Durable current, fallback, and pending generation selection.
 export type ActivationRecord = {
@@ -70,8 +73,16 @@ pure activation_digest_ok(digest: Str) -> Bool {
   true
 }
 
+pure generation_id_ok(id: Str) -> Bool {
+  return false when id == "" or id.byte_len() > 128 or id.starts_with(".") or id.starts_with("-") or id.starts_with("_")
+  for character in id {
+    return false when "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-".find(character) == null
+  }
+  true
+}
+
 pure activation_receipt_ok(receipt: GenerationReceipt) -> Bool {
-  receipt.id != "" and receipt.kernel != "" and activation_digest_ok(receipt.root_digest)
+  generation_id_ok(receipt.id) and receipt.kernel != "" and activation_digest_ok(receipt.root_digest)
 }
 
 pure activation_pending_ok(pending: GenerationReceipt?) -> Bool {
@@ -83,7 +94,43 @@ pure activation_pending_ok(pending: GenerationReceipt?) -> Bool {
 }
 
 pure activation_record_ok(record: ActivationRecord) -> Bool {
-  record.format == "laputa-activation-2" and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+  record.format == ACTIVATION_FORMAT and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+}
+
+## Publish already verified inputs under a new id without replacing retained images.
+export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt, kernel: Path, disk: Path) [fs, error] {
+  guard activation_receipt_ok(receipt) else { fail "generation receipt is invalid" }
+  let images = fp"{state_dir}/images"
+  images.mkdir()
+  fs.fsync(state_dir)
+  let temporary = fs.tempdir_in(images)?
+  let bundle = fp"{temporary.host_path()?}/bundle"
+  bundle.mkdir()
+  kernel.copy(to: fp"{bundle}/kernel")
+  disk.copy(to: fp"{bundle}/disk")
+  let metadata = ImageReceipt(
+    format: "laputa-activation-image-1",
+    generation: receipt,
+    kernel_sha256: hash.sha256(fp"{bundle}/kernel")?.hex(),
+    disk_sha256: hash.sha256(fp"{bundle}/disk")?.hex(),
+  )
+  fp"{bundle}/receipt.json".write(json.encode(metadata)? + "\n")
+  for item in [p"kernel", p"disk", p"receipt.json"] { fs.fsync(fp"{bundle}/{item}") }
+  fs.fsync(bundle)
+  bundle.rename(to: fp"{images}/{receipt.id}", overwrite: false)
+  fs.fsync(images)
+}
+
+## Verify a published bundle against its activation receipt before admission or boot.
+export proc activation_verify_image(state_dir: Path, receipt: GenerationReceipt) [fs, error] -> Result[GenerationImage, Error] {
+  guard activation_receipt_ok(receipt) else { fail "generation receipt is invalid" }
+  let bundle = fp"{state_dir}/images/{receipt.id}"
+  let image = GenerationImage(id: receipt.id, kernel_file: fp"{bundle}/kernel", disk_file: fp"{bundle}/disk")
+  guard image.kernel_file.exists() and image.disk_file.exists() else { fail "generation image is missing" }
+  let metadata = json.read(fp"{bundle}/receipt.json")?.require_exact(ImageReceipt)?
+  guard metadata.format == "laputa-activation-image-1" and metadata.generation == receipt else { fail "generation image receipt differs" }
+  guard hash.sha256(image.kernel_file)?.hex() == metadata.kernel_sha256 and hash.sha256(image.disk_file)?.hex() == metadata.disk_sha256 else { fail "generation image digest differs" }
+  image
 }
 
 proc activation_record_path(state_dir: Path) -> Path {
@@ -94,33 +141,16 @@ proc activation_lock_path(state_dir: Path) -> Path {
   fp"{state_dir}/{ACTIVATION_LOCK_NAME}"
 }
 
-proc activation_try_lock(lock_file: Path) -> Result[Bool, Error] {
-  match fs.mknod(lock_file, "file", 0o600) {
-    Ok(_) => true
+proc activation_acquire_lock(state_dir: Path) -> Result[FsLock, Error] {
+  match fs.lock(activation_lock_path(state_dir), false, true) {
+    Ok(lock) => lock
     Err(failure) => {
-      return Err(failure) when failure.errno != ACTIVATION_EEXIST
-      false
+      if failure.errno == 11 or failure.errno == 35 {
+        return Err(activation_reject("activation lock is held"))
+      }
+      Err(failure)
     }
   }
-}
-
-proc activation_lock_expired(lock_file: Path, deadline: Duration) -> Result[Bool, Error] {
-  let age_ns = time.now() - fs.stat(lock_file)?.mtime_ns
-  let limit_ns = deadline / 1ms * 1000000
-  age_ns > limit_ns
-}
-
-proc activation_acquire_lock(state_dir: Path, deadline: Duration) -> Result[Path, Error] {
-  let lock_file = activation_lock_path(state_dir)
-  return lock_file when activation_try_lock(lock_file)
-  guard activation_lock_expired(lock_file, deadline) else {
-    return Err(activation_reject("activation lock is held"))
-  }
-  lock_file.unlink()
-  guard activation_try_lock(lock_file) else {
-    return Err(activation_reject("activation lock is held"))
-  }
-  lock_file
 }
 
 ## Read the activation record without changing it.
@@ -146,7 +176,9 @@ export proc activation_status(state_dir: Path) [fs, error] -> Result[ActivationR
 
 proc activation_write(state_dir: Path, record: ActivationRecord) {
   let target = activation_record_path(state_dir)
-  let sibling = fs.temp_sibling(target)?
+  let sibling = fp"{state_dir}/activation.next"
+  sibling.remove()
+  fs.mknod(sibling, "file", 0o600)
   errdefer sibling.remove()
   sibling.write(json.encode(record)? + "\n", mode: 0o644)
   fs.fsync(sibling)
@@ -166,18 +198,17 @@ proc activation_require_pending(record: ActivationRecord) -> Result[GenerationRe
 export proc activation_install(
   state_dir: Path,
   receipt: GenerationReceipt,
-  lock_deadline = ACTIVATION_LOCK_DEADLINE,
 ) [fs, time, error] -> Result[Unit, Error] {
   guard activation_receipt_ok(receipt) else {
     return Err(activation_reject("generation receipt is invalid"))
   }
-  let lock = activation_acquire_lock(state_dir, lock_deadline)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   guard ! activation_record_path(state_dir).exists() else {
     return Err(activation_reject("activation record already exists"))
   }
+  let _ = activation_verify_image(state_dir, receipt)?
   activation_write(state_dir, {
-    format: "laputa-activation-2",
+    format: ACTIVATION_FORMAT,
     boot_serial: 0,
     current: receipt,
     fallback: receipt,
@@ -192,13 +223,11 @@ export proc activation_install(
 export proc activation_stage(
   state_dir: Path,
   candidate: GenerationReceipt,
-  lock_deadline = ACTIVATION_LOCK_DEADLINE,
 ) [fs, time, error] -> Result[Unit, Error] {
   guard activation_receipt_ok(candidate) else {
     return Err(activation_reject("generation receipt is invalid"))
   }
-  let lock = activation_acquire_lock(state_dir, lock_deadline)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   guard candidate.id != record.current.id else {
     return Err(activation_reject("refusing to stage the current generation"))
@@ -206,16 +235,15 @@ export proc activation_stage(
   guard record.pending == null else {
     return Err(activation_reject("a generation is already pending"))
   }
+  let _ = activation_verify_image(state_dir, candidate)?
   activation_write(state_dir, {...record, pending: candidate, boot_attempts: 0, last_operation: "staged"})
 }
 
 ## Count one boot of the pending generation, or select the fallback when another attempt would pass the cap.
 export proc activation_begin_boot(
   state_dir: Path,
-  lock_deadline = ACTIVATION_LOCK_DEADLINE,
 ) [fs, time, error] -> Result[ActivationBoot, Error] {
-  let lock = activation_acquire_lock(state_dir, lock_deadline)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   let pending = activation_require_pending(record)?
   if record.boot_attempts >= ACTIVATION_MAX_BOOT_ATTEMPTS {
@@ -240,10 +268,8 @@ export proc activation_begin_boot(
 export proc activation_confirm_health(
   state_dir: Path,
   id: Str,
-  lock_deadline = ACTIVATION_LOCK_DEADLINE,
 ) [fs, time, error] -> Result[Unit, Error] {
-  let lock = activation_acquire_lock(state_dir, lock_deadline)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   let pending = activation_require_pending(record)?
   guard pending.id == id else {
@@ -270,8 +296,7 @@ export proc activation_confirm_guest_health(
   report: GuestHealthReport,
   policy: HealthPolicy,
 ) [fs, time, error] -> Result[Unit, Error] {
-  let lock = activation_acquire_lock(state_dir, ACTIVATION_LOCK_DEADLINE)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   let pending = activation_require_pending(record)?
   guard report.format == "laputa-guest-health-1" and report.generation_id == pending.id and report.root_digest == pending.root_digest and report.profile == policy.profile else {
@@ -299,10 +324,8 @@ export proc activation_confirm_guest_health(
 ## Record a failed boot, selecting the fallback once the attempt cap is met.
 export proc activation_boot_failed(
   state_dir: Path,
-  lock_deadline = ACTIVATION_LOCK_DEADLINE,
 ) [fs, time, error] -> Result[Unit, Error] {
-  let lock = activation_acquire_lock(state_dir, lock_deadline)?
-  defer lock.unlink()
+  let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
   let _ = activation_require_pending(record)?
   guard record.boot_attempts >= 1 else {
@@ -319,3 +342,22 @@ export proc activation_boot_failed(
   })
 }
 
+
+## Collect only complete image ids outside current, fallback, and pending under the writer lock.
+export proc activation_collect_images(state_dir: Path) [fs, error] -> Result[List[Str], Error] {
+  let lock = activation_acquire_lock(state_dir)?
+  let record = activation_status(state_dir)?
+  var retained = [record.current.id, record.fallback.id]
+  if record.pending != null { retained += [record.pending.id] }
+  var removed: List[Str] = []
+  let images = fp"{state_dir}/images"
+  for candidate in fs.children(images)? {
+    let id = candidate.name
+    if generation_id_ok(id) and ! (id in retained) {
+      candidate.path.remove()
+      removed += [id]
+    }
+  }
+  if ! removed.is_empty() { fs.fsync(images) }
+  removed
+}
