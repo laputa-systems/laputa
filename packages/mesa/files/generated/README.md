@@ -67,6 +67,6 @@ open(f"{top}.tar.xz", "wb").write(lzma.compress(buf.getvalue(), preset=9 | lzma.
 ```
 
 The current archive was generated with meson 1.12.1, Mako 1.4.3,
-PyYAML 6.0.3, packaging 26.3, Python 3.12, GNU bison 3.8.2, and flex 2.6.4.
+PyYAML 6.0.3, packaging 26.3, Python 3.14, GNU bison 3.8.2, and flex 2.6.4.
 muon 0.5.0 configured from the recipe-patched tree produces byte-identical
 outputs. Then update the archive's sha256 in `PKGBUILD.xsh`.

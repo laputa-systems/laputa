@@ -27,6 +27,9 @@ src/compiler/spirv/spirv_info.c
 src/compiler/spirv/spirv_info.h
 src/compiler/spirv/vtn_gather_types.c
 src/compiler/spirv/vtn_generator_ids.h
+src/egl/egl.def
+src/egl/g_egldispatchstubs.c
+src/egl/g_egldispatchstubs.h
 src/gallium/auxiliary/draw_nir_lower_opcodes.c
 src/gallium/auxiliary/tr_util.c
 src/gallium/auxiliary/tr_util.h
@@ -39,6 +42,7 @@ src/mesa/format_fallback.c
 src/mesa/format_info.h
 src/mesa/get_hash.h
 src/mesa/glapi/es2api/es2_glapi_mapi_tmp.h
+src/mesa/glapi/es2api/gles2.def
 src/mesa/glapi/glapi/gen/api_beginend_init.h
 src/mesa/glapi/glapi/gen/api_exec_decl.h
 src/mesa/glapi/glapi/gen/api_exec_init.c
@@ -48,6 +52,13 @@ src/mesa/glapi/glapi/gen/api_save_init.h
 src/mesa/glapi/glapi/gen/api_trace.c
 src/mesa/glapi/glapi/gen/dispatch.h
 src/mesa/glapi/glapi/gen/enums.c
+src/mesa/glapi/glapi/gen/glapi_gentable.c
+src/mesa/glapi/glapi/gen/glapi_mapi_tmp.h
+src/mesa/glapi/glapi/gen/indirect.c
+src/mesa/glapi/glapi/gen/indirect.h
+src/mesa/glapi/glapi/gen/indirect_init.c
+src/mesa/glapi/glapi/gen/indirect_size.c
+src/mesa/glapi/glapi/gen/indirect_size.h
 src/mesa/glapi/glapi/gen/marshal_generated.h
 src/mesa/glapi/glapi/gen/marshal_generated0.c
 src/mesa/glapi/glapi/gen/marshal_generated1.c

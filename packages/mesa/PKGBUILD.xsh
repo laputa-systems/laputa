@@ -12,7 +12,7 @@ export const package_kind = "payload"
 export const ver = "26.2.4"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl", "libdrm", "wayland-libs-client"]
@@ -57,7 +57,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "48e216f3247792cd4215ad1841ea839c8920dae6348c592b555d7d49e02c8930",
+        sha256: "9938c1ac0d0ec28863b8e4ed09bc538207ffaafef6ba23cd44794bb3883bad6b",
       },
     ],
   },
@@ -83,6 +83,18 @@ export const filetree = [
   },
   {
     path: p"usr/include/EGL/eglplatform.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/GL/gl.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/GL/glcorearb.h",
+    kind: "file",
+  },
+  {
+    path: p"usr/include/GL/glext.h",
     kind: "file",
   },
   {
@@ -190,15 +202,21 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/lib/pkgconfig/gl.pc",
+    kind: "file",
+  },
+  {
     path: p"usr/lib/pkgconfig/glesv2.pc",
     kind: "file",
   },
 ]
 
-# The smallest real Mesa: EGL (wayland, surfaceless, and drm platforms), GBM,
-# and GLES 2/3 on the softpipe and virgl gallium drivers, with no LLVM, no
-# Vulkan, no X11, and no desktop GL. The vendored generated sources match
-# exactly this option set; changing it means regenerating them.
+# Mesa with EGL (wayland, surfaceless, and drm platforms), GBM, GLES 2/3,
+# and desktop GL on the softpipe and virgl gallium drivers, with no LLVM, no
+# Vulkan, and no X11. Desktop GL is required by the Ghostty renderer
+# (OpenGL 4.3 core); softpipe's actual desktop version is probed by the
+# proof. The vendored generated sources match exactly this option set;
+# changing it means regenerating them.
 const mesa_options = [
   "-Dbuildtype=release",
   "-Dplatforms=wayland",
@@ -208,7 +226,7 @@ const mesa_options = [
   "-Dgbm=enabled",
   "-Dgles2=enabled",
   "-Dgles1=disabled",
-  "-Dopengl=false",
+  "-Dopengl=true",
   "-Dllvm=disabled",
   "-Dglx=disabled",
   "-Dxlib-lease=disabled",
@@ -564,6 +582,21 @@ Name: glesv2
 Description: Mesa OpenGL ES 2.0 library
 Version: {ver}
 Libs: -L\${{libdir}} -lGLESv2
+Libs.private: -lpthread -pthread -lm
+Cflags: -I\${{includedir}}
+""",
+  )
+
+  # Desktop GL ships headers and a pkg-config file but no libGL: there is no
+  # GLX (no X11 in Laputa), and desktop contexts are created through EGL,
+  # which is also how the Ghostty renderer consumes them.
+  fp"{dir}/gl.pc".write(
+    f"""{header}
+Name: gl
+Description: Mesa OpenGL library
+Version: {ver}
+Requires.private: libdrm >= 2.4.75
+Libs: -L\${{libdir}} -lGL
 Libs.private: -lpthread -pthread -lm
 Cflags: -I\${{includedir}}
 """,

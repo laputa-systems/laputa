@@ -117,6 +117,40 @@ int main(void)
                 right[1], right[2]);
         return 9;
     }
+
+    /* Desktop OpenGL probe on the same surfaceless display: create the
+    highest-version context the driver offers (NULL attribs), report it,
+    then clear an FBO to green and verify the readback. */
+    eglBindAPI(EGL_OPENGL_API);
+    EGLContext desktop = eglCreateContext(dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, NULL);
+    if (desktop == EGL_NO_CONTEXT || !eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, desktop)) {
+        fprintf(stderr, "desktop GL context failed: 0x%x\\n", eglGetError());
+        return 10;
+    }
+    printf("DESKTOP_GL_RENDERER=%s\\nDESKTOP_GL_VERSION=%s\\n", glGetString(GL_RENDERER),
+           glGetString(GL_VERSION));
+    GLuint drb, dfb;
+    glGenRenderbuffers(1, &drb);
+    glBindRenderbuffer(GL_RENDERBUFFER, drb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4, 8, 8);
+    glGenFramebuffers(1, &dfb);
+    glBindFramebuffer(GL_FRAMEBUFFER, dfb);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, drb);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        fprintf(stderr, "desktop framebuffer incomplete\\n");
+        return 11;
+    }
+    unsigned char dpx[8 * 8 * 4];
+    glViewport(0, 0, 8, 8);
+    glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glReadPixels(0, 0, 8, 8, GL_RGBA, GL_UNSIGNED_BYTE, dpx);
+    const unsigned char *middle = &dpx[(4 * 8 + 4) * 4];
+    if (glGetError() != GL_NO_ERROR || middle[0] != 0 || middle[1] != 255 || middle[2] != 0) {
+        fprintf(stderr, "unexpected desktop pixels: %u,%u,%u\\n", middle[0], middle[1], middle[2]);
+        return 12;
+    }
+    puts("desktop-rendered");
     eglTerminate(dpy);
     puts("rendered");
     return 0;
@@ -180,6 +214,13 @@ proc main(root = /rootfs) [fs, process, env, error] {
       proof.ensure("GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected renderer: {out}")
       proof.ensure("OpenGL ES 3.1 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")
       proof.ensure("rendered" in out, "proof-mesa", f"render check failed: {out}")
+      proof.ensure("DESKTOP_GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected desktop renderer: {out}")
+      # Measured ceiling, 2026-10-31: softpipe exposes desktop 3.3 compat,
+      # below the 4.3 core Ghostty requires (see its renderer/OpenGL.zig
+      # MIN_VERSION_MAJOR/MINOR). The llvmpipe/virgl decision is recorded in
+      # tinyland/docs/opengl-probe.md; changing this ceiling needs that proof.
+      proof.ensure("DESKTOP_GL_VERSION=3.3 (Compatibility Profile) Mesa" in out, "proof-mesa", f"unexpected desktop ceiling: {out}")
+      proof.ensure("desktop-rendered" in out, "proof-mesa", f"desktop render check failed: {out}")
       print f"mesa ok: {out.trim().split("\n").join("; ")}"
     }
   }
