@@ -35,6 +35,16 @@ proc path_summary() -> Result[Str] {
   marks.join(" ")
 }
 
+proc lease_summary() -> Result[Str] {
+  let status = p"/run/dhcpc/eth0.status"
+  return "absent" unless status.exists()?
+  let report = json.decode(status.read_text()?)?.require(Record)?
+  let state = report.get("state")?.require(Str)?
+  let trouble = report.get("trouble")?.require(Str)?
+  let counters = json.encode(report.get("counters")?)?
+  f"state={state} trouble={trouble} counters={counters}"
+}
+
 proc wait_state(name: Str, want: Str) {
   var waited = 0
   while waited < 30 {
@@ -46,6 +56,7 @@ proc wait_state(name: Str, want: Str) {
   }
   p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS units: {unit_summary()?}\n")
   p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS paths: {path_summary()?}\n")
+  p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS lease: {lease_summary()?}\n")
   fail f"{name} never reached {want}"
 }
 
