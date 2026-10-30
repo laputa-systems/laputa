@@ -9,7 +9,7 @@ export const package_kind = "payload"
 export const ver = "0.412"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -45,6 +45,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/share/hwdata/usb.ids",
+    kind: "file",
+  },
+  {
     path: p"usr/share/pkgconfig/hwdata.pc",
     kind: "file",
   },
@@ -55,6 +59,7 @@ export proc build(dest: Path) [fs, error] {
   fp"{dest}/usr/share/hwdata".mkdir()
   fs.install(p"pnp.ids", fp"{dest}/usr/share/hwdata/pnp.ids", 0o644, parents: true, overwrite: true)
   fs.install(p"pci.ids", fp"{dest}/usr/share/hwdata/pci.ids", 0o644, parents: true, overwrite: true)
+  fs.install(p"usb.ids", fp"{dest}/usr/share/hwdata/usb.ids", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/share/pkgconfig".mkdir()
 
   fp"{dest}/usr/share/pkgconfig/hwdata.pc".write(
