@@ -117,7 +117,7 @@ owners, not a new message bus or resident fleet-management service.
 | Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
 | Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, Dropbear, Tailscale, and nftables foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
-| Trust | Signed repository snapshots plus signed certificate releases and system distrust policy | Provision repository verification keys and durable accepted state; prove the production guest fetch path and consumer-specific enforcement. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
+| Trust | Signed repository snapshots with mandatory durable acceptance, guest HTTP/reboot proof, signed certificate releases and system distrust policy | Provision production repository keys through image/first boot; uv and Tailscale still lack intermediate distrust. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
 | Self-hosting | Bounded in-guest XSH rebuild and A-to-B successor workflow | Turn the existing development proof into the normal installed build/stage/boot path without overstating bootstrap closure or production admission. See [self-hosting](SELF-HOSTING.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
 
@@ -371,7 +371,9 @@ or describe production clients as simply trusting an unsigned index.
 Finish operational integration: provision the verification-key set through a
 trusted image/first-boot channel, retain accepted generation/time state across
 reboots, exercise rotation/revocation, and qualify the production fetch path
-inside the installed guest. Keep parser/size limits, expiry, rollback/freeze
+inside the installed guest. The fetch API now has a real Linux x86_64/KVM
+HTTP/reboot proof with fixture keys; production image provisioning and guest CLI
+integration remain separate. Keep parser/size limits, expiry, rollback/freeze
 handling, and publication consistency explicit. Existing metadata is not a claim
 of full TUF role/threshold support; evaluate any extension against established
 update-metadata designs rather than adding ad-hoc cryptography.
@@ -387,10 +389,12 @@ Coordinate expiry with R2's time policy and R6's durable provisioning.
 The signed certificate-release path already includes the production key
 provisioning ceremony, `--from`/`--url` acquisition, immutable candidate
 composition, atomic activation with journal recovery, and installer seeding,
-with guest evidence in [certificate trust](CERTIFICATE-TRUST.md). Remaining:
-exercise a key rotation end to end and track each TLS consumer's actual
-enforcement; sharing a root file does not prove support for XSH's intermediate-key
-blocklist. Keep trust policy semantics in that topic document.
+with guest evidence in [certificate trust](CERTIFICATE-TRUST.md). A package-only
+fixture key rotation now passes end to end. Real TLS tests prove XSH enforces
+the intermediate-key policy; packaged uv and Tailscale accept the blocked
+cross-signed intermediate. Their enforcement mechanism remains open. Sharing a
+root file does not establish that mechanism. Keep trust policy semantics in
+the owning topic document.
 
 **Acceptance:** tampered objects/indexes, stale/replayed metadata, interrupted
 publication, and missing/incorrect clocks fail according to the explicit policy

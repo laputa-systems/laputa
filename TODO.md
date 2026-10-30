@@ -40,7 +40,7 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `system/qemu.xsh:263`, `guest/qemu-dwl-foot-proof.xsh:70`
 - **Problem:** The host takes its screenshot after the success marker. The foot reader writes its input and exits before that marker, so screenshot presence does not prove visible terminal content.
 - **Recommendation:** Keep the terminal alive until the host captures and checks its visual marker.
-- **Progress:** The reader now waits after recording input, and the host requires a magenta marker before QEMU cleanup. A regression fails the old nonempty-screenshot acceptance and passes the repair; all 13 supervisor tests pass. Actual visual VM qualification remains blocked by the graphical package closure's Muon shell-execution boundary (LAP-14).
+- **Progress:** The reader waits after recording input, and the host requires the magenta marker before QEMU cleanup. Seventeen supervisor tests pass. At `e105c09`, the integrated `make profile-test XSH_ROOT=../xsh XSH_BIN_DIR=.out/host/x86_64` passes on Linux x86_64/KVM with the rebuilt graphical closure and native XSH QMP. A nonempty screenshot without the live marker still fails. No aarch64 or macOS visual proof is claimed.
 - **Fix with:** lifecycle-concurrency
 - **Effort:** S (hours)
 
@@ -62,17 +62,16 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `packages/muon/PKGBUILD.xsh:51`, `packages/foot-minimal/PKGBUILD.xsh:152`, `packages/libinput/PKGBUILD.xsh:389`
 - **Problem:** Recipes still replace find_library calls for musl aliases after muon gained linking by library name.
 - **Recommendation:** Remove redundant replacements and rebuild the affected packages to check their links and DT_NEEDED entries.
-- **Blocked:** The actual pinned Muon 0.7.0 rebuild routes embedded Samurai commands through `/bin/sh -c`. Removing the shell fails before affected package linkage can be qualified. Preserve the patches until the embedded executor carries structured argv without a POSIX shell; replacing it with a shell alias would violate the package-build contract.
+- **Progress:** Muon emits structured argv for compiler, linker, archiver, regeneration and custom edges; embedded Samurai executes it directly and rejects missing or malformed metadata. Removed the redundant foot/libinput library replacements. Muon and the affected 41-artifact x86_64 closure build with `/bin/sh` removed from the disposable container. ELF dependencies use normal library names, with no build-root paths. Native scanner substitutions and libinput's builtins ordering update both representations; helper changes invalidate every consuming recipe. Five helper tests and independent compiler/archive/capture/environment/incremental/regeneration comparisons pass. Actual aarch64 linkage remains unverified. See [Muon build commands](docs/DEVELOPMENT.md#muon-build-commands).
 - **Fix with:** delete
 - **Effort:** M (days)
 
 ### LAP-15 · P3 · Ship USB IDs used by libudev-zero
-
-- **Deferred:** Real-hardware work is outside the roadmap. Retain this finding, but exclude it from active backlog runs until the owner reopens it.
 - **Area:** Dependencies
 - **Where:** `packages/libudev-zero/PKGBUILD.xsh:76`, `packages/hwdata/PKGBUILD.xsh:39`
 - **Problem:** libudev-zero looks for `/usr/share/hwdata/usb.ids`, but hwdata installs PCI and PNP databases only. USB vendor and product names remain unset.
 - **Recommendation:** Package the USB database and declare the runtime dependency that supplies it.
+- **Progress:** hwdata installs `usb.ids` and libudev-zero depends on hwdata. Package proofs check vendor/product data in the composed runtime closure; removing the dependency fails the proof. The x86_64 package rebuild passes. This packages identification data without enabling physical hardware.
 - **Fix with:** single-source-of-truth
 - **Effort:** S (hours)
 
@@ -115,7 +114,8 @@ and real-hardware enablement remain outside that scope.
 - **Problem:** QMP readiness/input/screenshot operations rely on a small Python helper. Translating it without a shared bounded protocol contract would only change the implementation language.
 - **Recommendation:** Build a narrow XSH QMP library over XSH-39's qualified Unix-stream operations. Own greeting/capability negotiation, bounded JSON framing, request IDs, unsolicited events, deadlines and cleanup in XSH. Integrate the three current operations and delete the helper/dependency only after parity. Preserve LAP-21's non-retryable mutation boundary and the current Linux/macOS launch paths.
 - **Acceptance:** Fragmented/coalesced messages, interleaved events, command errors, EOF and disconnect-after-send are deterministic local fixtures. Actual VM readiness/input/screenshot proofs pass without the Python helper. Unknown mutation outcomes are reported, not retried; retain LAP-7's independent visual-content requirement. No QMP-specific Rust intrinsic or new VM orchestration framework.
-- **Blocked:** The supplied fixed XSH supports bounded fd I/O, polling and monotonic deadlines but lacks portable AF_UNIX connection setup. Existing socket/connect operations are Linux-only, so replacing the helper now would break the supported macOS path. See [QMP baseline](docs/QEMU.md#qmp-replacement-baseline).
+- **Progress:** Linux uses `system/qmp.xsh` for readiness, input, VT switching, screenshots and pause/resume, with bounded frames, response IDs, event handling, explicit uncertain outcomes and a shared monotonic supervisor deadline. Twelve native peer tests and seventeen supervisor tests pass. Screenshot filenames are structured arguments. The integrated x86_64/KVM graphical proof passes at `e105c09` without the Python QMP helper.
+- **Blocked:** Complete helper removal still needs portable AF_UNIX connection setup in XSH. Existing socket/connect operations reject non-Linux hosts; macOS retains the explicit legacy Python transport. No macOS or aarch64 runtime qualification is claimed. See [QMP baseline](docs/QEMU.md#qmp-replacement-baseline).
 - **Fix with:** deduplicate
 - **Effort:** M (days)
 
@@ -159,7 +159,7 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `trust/`, `packages/ca-certificates/`, `docs/CERTIFICATE-TRUST.md`
 - **Problem:** The key ceremony documents rotation through an OS package update, but no test ships a new key plus new seeds, re-issues a release under it, and verifies the update path accepts the rotation while rejecting the old key's releases.
 - **Recommendation:** Stage a rotated fixture key as a second package input, compose a release under it, and prove `trust update` converges while the superseded key's releases fail closed. Keep the rotation package-only; releases still carry no keys.
-- **Progress:** `trust_update_rotates_keys_package_only` builds the rotated key and generation-4 seeds through `packages/ca-certificates` `build`, installs that payload, and shows `trust update` converge to generation 4 while releases signed by the superseded key fail closed. The release directory still has no key. Production `proof.xsh` still pins the shipped 118-certificate seed; the rotated seeds are fixture inputs, not a second production proof target.
+- **Progress:** `trust_update_rotates_keys_package_only` builds the rotated key and generation-4 seeds through `packages/ca-certificates` `build`, installs that payload, and shows `trust update` converge to generation 4 while releases signed by the superseded key fail closed. All 36 trust-update cases pass. The release directory still has no key. Production `proof.xsh` still pins the shipped 118-certificate seed; the rotated seeds are fixture inputs, not a second production proof target.
 - **Fix with:** reference-parity
 - **Effort:** S (hours)
 
@@ -169,17 +169,17 @@ and real-hardware enablement remain outside that scope.
 - **Where:** `docs/CERTIFICATE-TRUST.md`, `packages/uv/`, `packages/tailscale/`
 - **Problem:** Sharing the canonical bundle does not prove a consumer enforces the intermediate-key blocklist. uv and Go-based Tailscale each carry their own verifier with distinct distrust behavior.
 - **Recommendation:** Qualify each named consumer against the cross-signed fixture pair: blocked intermediate fails, unblocked control succeeds. Record the actual enforcement per consumer instead of assuming file sharing is proof.
-- **Progress:** `tests/pm/trust_consumers.xsh` qualifies packaged uv 0.13.4 and tailscaled 1.104.2: control succeeds and the omitted-root chain fails, but the blocked-intermediate chain is accepted by both because neither reads the trust policy. Recorded in [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement). Open: an enforcement mechanism (consumer patch, pinning, or removing the retained cross-signed root) is an owner decision.
+- **Progress:** `tests/pm/trust_consumers.xsh` characterizes packaged uv 0.13.4 and tailscaled 1.104.2: control succeeds and the omitted-root chain fails, but both accept the blocked intermediate because neither reads the policy. `tests/pm/trust_xsh_policy.xsh` proves the shipped XSH rejects both cross-signed forms with a fixture policy, including with ordinary verification disabled, while the unblocked control connects. The real TLS test runs in disposable containers without changing host trust. Recorded in [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement). Open: enforcing intermediate distrust in uv/Tailscale still requires a consumer patch, pinning, or a decision to remove retained roots.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-43 · P3 · Authenticate the package repository index
+### LAP-43 · P0 · Authenticate the package repository index
 
 - **Area:** Repository trust
 - **Where:** `pm/remote.xsh`, `docs/ROADMAP.md` (R4)
 - **Problem:** Artifact hashes and mirror publisher authentication do not authenticate the mutable `index.json` to a client. The trust-release path signs trust inputs; repository metadata has no equivalent versioned, signed snapshot boundary.
 - **Recommendation:** Add a versioned, signed release/snapshot boundary binding the exact index and referenced artifacts, with key provisioning, rotation/revocation, expiry, rollback/freeze handling, parser/size limits, and atomic publication. Compare an established update-metadata design before inventing a cryptographic protocol.
-- **Progress:** `pm/repo_snapshot.xsh` adds the `laputa-repo-snapshot-v1` boundary reusing the trust-release verification shape (pinned key set with rotation window, 90-day expiry, accepted generation floor); `repo plan` from production remotes requires `XSH_PM_REPO_KEY_FILE` and fails closed, `repo publish-snapshot` publishes the offline-signed snapshot with the signature as linearization point. `file://` and loopback repositories are verified whenever `XSH_PM_REPO_KEY_FILE` is set, and accepted state is persisted atomically with fsync and refuses generation rollback. 19 snapshot tests plus the surrounding pm publish/plan/cli/graph suites pass. Remaining: manual key distribution (no package-seeded repo key), durable accepted state via `XSH_PM_REPO_STATE_DIR`, threshold/multi-signer snapshots, and guest proof of the production fetch path. See [PM snapshot authentication](docs/PM.md#snapshot-authentication).
+- **Progress:** Production planning requires `XSH_PM_REPO_KEY_FILE`; every signed fetch also requires durable `XSH_PM_REPO_STATE_DIR`. Signatures bind exact index bytes and referenced artifact digests. Accepted generation and clock floors are rechecked under an OS writer lock before packages are returned; planning holds its cache identity stable. Identical publication retries repair an interrupted signature write. All 23 snapshot cases and 80 surrounding publication/plan/CLI/graph cases pass. A real x86_64/KVM guest fetches over HTTP, rejects tampering, reboots with persistent state and rejects an older signed generation at the same URL. Manual key provisioning and rotation remain explicit operational responsibilities; there is no package-seeded repository key, TUF role delegation or threshold authorization. See [PM snapshot authentication](docs/PM.md#snapshot-authentication).
 - **Fix with:** architect
 - **Effort:** L (weeks)
 

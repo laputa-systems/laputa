@@ -99,8 +99,10 @@ Python helper, which reports an indeterminate outcome with exit status 75.
 The terminal reader prints and flushes its visual marker, records the injected
 input, then waits for another terminal read. The host captures and checks the
 marker before stopping QEMU. A nonempty screenshot without the marker fails.
-The supervisor regression proves this ordering against a fake peer. Actual
-visual VM qualification remains open until the graphical artifact builds.
+The supervisor regression proves this ordering against a fake peer. At
+`e105c09`, `make profile-test XSH_ROOT=../xsh XSH_BIN_DIR=.out/host/x86_64`
+passes on Linux x86_64/KVM with the canonical graphical closure and native XSH
+QMP. The host captures the terminal marker before stopping the guest.
 
 Readiness and screenshot retry up to 20 times with 250 ms between attempts.
 The supervisor owns the 180 s proof timeout, TERM/KILL escalation, final
@@ -120,8 +122,8 @@ five-second budget. The commands control the disposable VM and are never retried
 
 ## QMP replacement baseline
 
-Before LAP-35, QMP has the following boundary. LAP-39's final comparison remains
-open until a replacement passes the same behavior checks.
+At `55b9f68`, before the native Linux client, QMP has the following boundary.
+The cross-host replacement remains incomplete while macOS retains the helper.
 
 | Responsibility | Current owner and cost |
 |---|---|
@@ -131,8 +133,8 @@ open until a replacement passes the same behavior checks.
 | Protocol ownership | Python reads the greeting and negotiates capabilities on each connection. It skips events while waiting for a command response. |
 | Input mutation | Seven key presses plus Ctrl-D produce 18 input requests. A VT switch is three keys down and up. A lost response stops the operation with exit 75. |
 | Error ownership | Python distinguishes rejection from an unknown mutation outcome. XSH owns typed status mapping, read-only retries, and QEMU cleanup. |
-| Source and dependencies | The helper is 160 lines and requires host Python. The complete supervisor module is 405 lines, including launch and visual checks outside QMP. QEMU remains external. |
-| Missing protocol guarantees | No request IDs, bounded frame size, or socket deadline. The supervisor's process timeout does not establish those guarantees. |
+| Source and dependencies | The helper is 184 lines and requires host Python. The supervisor module is 461 lines, including launch and visual checks outside QMP. QEMU remains external. |
+| Missing protocol guarantees | No request IDs or frame-size bound. The per-socket timeout does not bound the complete operation and retry sequence. |
 | Verification | Fourteen native supervisor tests (including the visual-marker regression and the VT-switch ordering test) and three local peer tests covering input disconnect and one-shot pause dispatch/errors. A replacement also needs fragmented frames, interleaved events, errors, EOF, and actual VM proofs. |
 
 This baseline measures responsibilities and crossings, not a runtime speedup.
@@ -149,9 +151,23 @@ a portable, bounded Unix-stream connection boundary to preserve the macOS path.
 The Linux supervisor uses `system/qmp.xsh` for readiness, input, VT switches,
 screenshots, and the test-only pause and resume commands. Each session bounds
 frames to 1 MiB, matches response IDs, skips events, and applies a deadline.
-The local peer tests cover multi-command sessions and indeterminate mutation
-outcomes. Full graphical VM qualification remains open. A portable Unix-stream
-connection operation is still needed to replace the helper on macOS.
+Twelve local peer tests cover framing, multi-command sessions, errors and
+indeterminate mutations. Seventeen supervisor cases cover dispatch, retry,
+visual content and the shared deadline. The integrated Linux x86_64/KVM
+graphical proof passes with the native client.
+
+| Boundary | Linux after replacement |
+|---|---|
+| Host entry points | The same readiness, input, VT, screenshot, pause and resume operations. |
+| QMP subprocesses | None; requests stay in the host XSH process. |
+| Argument conversion | Native JSON encoding and decoding replace the XSH-to-Python argv crossing. Screenshot filenames use structured QMP arguments. |
+| Lifetime | One bounded connection per operation, with ordered input steps, response IDs and an absolute deadline shared with the supervisor. |
+| Source and dependencies | `system/qmp.xsh` is 112 lines and the supervisor is 544 lines. No new runtime dependency; Linux drops Python for QMP. |
+| Remaining cross-host cost | The 184-line Python helper remains for macOS, leaving two protocol implementations and more total source. No overall simplification or speedup is claimed. |
+
+A portable Unix-stream connection operation is still needed to remove the
+helper and its macOS dependency. macOS and aarch64 runtime qualification remain
+separate from the Linux x86_64 evidence.
 
 ## Maintained VM activation
 
