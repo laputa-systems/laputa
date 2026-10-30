@@ -261,6 +261,11 @@ them and must be recorded here.
   rejection, pinned-snapshot poison requiring client recreation, and an
   unblocked control pair — all against fixture PKI, never touching host
   trust.
+- `tests/pm/trust_xsh_policy.xsh`: the shipped XSH binary in disposable
+  Docker containers accepts both cross-signed fixture chains without the
+  fixture policy, rejects both with it even when ordinary TLS verification
+  is disabled, and accepts the unblocked control. It uses the local
+  `debian:stable-slim` image and leaves host trust unchanged.
 - `tests/pm/ca_certificates_recipe.xsh`: layout, seed, provisioned-key, and
   seeded-store proof checks.
 - `tests/system/trust_guest.xsh`: real KVM guests boot from the host kernel
