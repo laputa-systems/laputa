@@ -349,9 +349,12 @@ and metadata after recoverable cases. Boot the rescue environment independently
 and restore an unusable virtual disk. Journaling is not a backup policy.
 
 `e2fsprogs` builds `e2fsck` without a shell, and `system/rescue.xsh` classifies
-a detached repair. The launch fragment attaches the rescue image and the disk
-with no network. It does not boot a rescue image, and a dirty-disk restore has
-not been run.
+a detached repair. A Linux x86_64/KVM rescue guest boots with a read-only root
+and no network, repairs controlled free-block accounting damage, and verifies
+the recovered payload hash. The rescue guest also works after both installed
+generation images fail to execute PID 1. Dirty shutdown, filesystem-full
+recovery, and arbitrary-damage restore acceptance remain open. See the
+[detached rescue proof](INSTALLER.md#detached-rescue-guest-proof).
 
 ## R4: Authenticate repository and trust delivery
 
@@ -458,8 +461,12 @@ Linux x86_64/KVM evidence now includes a distinct A-to-B root transition, a
 PID-1-requested reboot, a matching running-generation/critical-service report,
 and a host health commit of B with A retained. Identity survives on the separate
 state disk. An earlier guest proof exercised two actual unbootable-B panics and
-launcher fallback to healthy A. These proofs do not close the full fault,
-concurrency, GC, trust-policy, migration, or remote-disconnect acceptance above.
+launcher fallback to healthy A. Host tests additionally cover termination at
+both record fsync boundaries, concurrent staging and collection, full-filesystem
+recovery, and reconciliation after losing a reply. Independent rescue boots
+even when both generation images lack PID 1. These proofs do not establish
+power-loss durability, native SSH disconnect behavior, trust-policy enforcement
+across rollback, or state migration acceptance.
 See [maintained activation](QEMU.md#maintained-vm-activation) for the contracts.
 
 ## R6: Separate disposable development from long-lived VM policy

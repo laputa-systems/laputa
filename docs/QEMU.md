@@ -183,7 +183,11 @@ These local checks do not authenticate a downloaded release or defend against an
 administrator who can rewrite both image and receipt.
 
 Activation records use `laputa-activation-3` and include `boot_serial`. Older
-records are rejected, with no silent migration. Every pending boot
+records are rejected, with no silent migration. Before first installation,
+stop every pre-v3 writer and use one writer version per state directory.
+The earlier writer uses `activation.lock`; it cannot coordinate with
+`activation.flock`. Format rejection protects an existing record but does not
+serialize first installation by mixed writer versions. Every pending boot
 increments the sequence, including retries after restaging. The QEMU command line
 carries the selected id and sequence. `activation_confirm_guest_health` checks the
 report against the pending receipt, sequence, and a host-owned critical-service

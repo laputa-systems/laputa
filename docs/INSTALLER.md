@@ -146,3 +146,13 @@ The fixture payload is exactly `laputa rescue payload` followed by a newline.
 No writable-mounted filesystem was repaired. The owned QEMU process was reaped.
 This proves the detached rescue path for these fixtures, not arbitrary damage
 recovery or the R3 acceptance milestone as a whole.
+
+On 2026-10-30, a separate Linux x86_64/KVM proof published two verified
+generation bundles whose disks deliberately lacked `/init`. The launcher
+selected B twice and then fallback A. Each kernel mounted its root and panicked
+because the requested PID 1 was absent. The independent rescue image still
+booted with a read-only root and no network. Fresh detached fixtures returned
+0, 1, and 8, and the repaired payload hash matched the value above. All four
+owned QEMU processes were reaped. This demonstrates that rescue does not require
+either installed generation's userspace to work. It does not restore missing
+generation files or prove recovery from arbitrary disk damage.
