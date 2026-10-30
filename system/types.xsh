@@ -19,6 +19,11 @@ export type ProofMarkers = {
   vt_back_marker: Str,
 }
 
+## The guest GPU a profile requires. `Virtio2d` is a 2D virtio-gpu scanout.
+## `Virgl` is virtio-gpu with virgl 3D acceleration, which the host QEMU
+## renders on a host GPU through virglrenderer and a GL-capable display.
+export enum QemuGpu { Virtio2d, Virgl }
+
 ## The data-only description of a supported Laputa system profile. The
 ## QEMU machine, CPU, and accelerator belong to the host (`system.qemu`).
 export type SystemProfile = {
@@ -33,11 +38,20 @@ export type SystemProfile = {
   forbidden_packages: List[Str],
   forbidden_sonames: List[Str],
   proof: ProofMarkers,
+  qemu_gpu: QemuGpu,
   development: Bool,
 }
 
 ## Errors raised when a profile or system command violates its declared contract.
 export error LaputaError = Usage : Usage | Profile : InvalidData | Docker : ProcessFailure | Incomplete : Unsupported
+
+## Render a guest GPU for diagnostics and the profile digest.
+export pure qemu_gpu_text(gpu: QemuGpu) -> Str {
+  match gpu {
+    Virtio2d => "virtio-2d"
+    Virgl => "virgl"
+  }
+}
 
 ## Render a QEMU execution mode for diagnostics and persisted command records.
 export pure qemu_mode_text(mode: QemuMode) -> Str {

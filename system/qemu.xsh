@@ -9,7 +9,7 @@ use system.types
 ## The host half of a QEMU invocation, which the profile does not choose: the
 ## guest machine with its hardware accelerator and board options, the CPU
 ## model, the serial console arguments, the root disk transport, and the
-## interactive display.
+## interactive displays for 2D and virgl guests.
 export type QemuTarget = {
   arch: Str,
   qemu_name: Str,
@@ -19,6 +19,7 @@ export type QemuTarget = {
   console: Str,
   block_device: Str,
   interactive_display: List[Str],
+  gl_interactive_display: List[Str],
 }
 
 ## The host executable and target used by a QEMU invocation.
@@ -43,6 +44,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
       console: arm_console,
       block_device: "virtio-blk-device",
       interactive_display: ["-display", "cocoa,zoom-to-fit=on,show-cursor=on"],
+      gl_interactive_display: ["-display", "cocoa,zoom-to-fit=on,show-cursor=on"],
     }
   }
 
@@ -56,6 +58,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
       console: arm_console,
       block_device: "virtio-blk-device",
       interactive_display: [],
+      gl_interactive_display: ["-display", "gtk,gl=on"],
     }
   }
 
@@ -69,6 +72,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
       console: "earlyprintk=serial console=ttyS0",
       block_device: "virtio-blk-pci",
       interactive_display: [],
+      gl_interactive_display: ["-display", "gtk,gl=on"],
     }
   }
 
@@ -120,7 +124,14 @@ export pure qemu_command_argv(
   mode: types.QemuMode,
 ) -> List[Str] {
   let target = value.target
-  let display = if mode == .Test { ["-display", "none"] } else { target.interactive_display }
+  let display: List[Str] = match profile.qemu_gpu {
+    types.Virtio2d => if mode == .Test { ["-display", "none"] } else { target.interactive_display }
+    types.Virgl => if mode == .Test { ["-display", "egl-headless"] } else { target.gl_interactive_display }
+  }
+  let gpu_device: Str = match profile.qemu_gpu {
+    types.Virtio2d => "virtio-gpu-pci"
+    types.Virgl => "virtio-gpu-gl-pci"
+  }
   let state_drive = if profile.development { [] } else {
     ["-drive", f"if=none,id=state,format=raw,file={outputs.root}/state.ext4", "-device", f"{target.block_device},drive=state"]
   }
@@ -150,7 +161,7 @@ export pure qemu_command_argv(
     "-device",
     "virtio-net-pci,netdev=net0",
     "-device",
-    f"virtio-gpu-pci,xres={profile.qemu_width},yres={profile.qemu_height}",
+    f"{gpu_device},xres={profile.qemu_width},yres={profile.qemu_height}",
     "-device",
     "virtio-keyboard-pci",
     "-device",

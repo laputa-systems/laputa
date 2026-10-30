@@ -51,5 +51,6 @@ export let profile: types.SystemProfile = types.SystemProfile(
     vt_away_marker: "",
     vt_back_marker: "",
   },
+  qemu_gpu: types.Virtio2d,
   development: true,
 )

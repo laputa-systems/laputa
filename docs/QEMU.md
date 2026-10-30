@@ -24,6 +24,12 @@ console.
 - KVM on Linux: `/dev/kvm` must be usable by your user.
 - QEMU's virtio GPU PCI device; on Alpine install
   `qemu-hw-display-virtio-gpu` and `qemu-hw-display-virtio-gpu-pci`.
+- Profiles with `qemu_gpu: Virgl` also need virgl and a host GPU render
+  node: on Alpine `qemu-hw-display-virtio-gpu-gl`,
+  `qemu-hw-display-virtio-gpu-pci-gl`, `qemu-ui-egl-headless`,
+  `qemu-ui-opengl`, and `virglrenderer`. `test` renders through
+  `-display egl-headless`; `boot` uses `gtk,gl=on` on Linux, which also needs
+  `qemu-ui-gtk`.
 - `make seed` done for the host arch. The profile build needs no mirror.
 
 ## Commands and outputs

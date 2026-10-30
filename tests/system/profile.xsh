@@ -96,6 +96,7 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       vt_away_marker: "",
       vt_back_marker: "",
     },
+    qemu_gpu: types.Virtio2d,
     development: true,
   )
   profile.validate_system_profile(valid)
@@ -134,6 +135,7 @@ test test_profile_digest_is_deterministic [fs, error] {
   let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
   assert profile.digest(value)? == profile.digest(value)?
   assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
+  assert profile.digest(value)? != profile.digest({...value, qemu_gpu: types.Virgl})?
 }
 
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {

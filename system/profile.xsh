@@ -126,6 +126,7 @@ smp\t{value.qemu_smp}
 memory\t{value.qemu_memory}
 width\t{value.qemu_width}
 height\t{value.qemu_height}
+gpu\t{types.qemu_gpu_text(value.qemu_gpu)}
 forbidden-packages\t{value.forbidden_packages.join(",")}
 forbidden-sonames\t{value.forbidden_sonames.join(",")}
 proof-flag\t{value.proof.cmdline_flag}

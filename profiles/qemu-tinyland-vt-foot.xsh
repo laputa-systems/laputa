@@ -62,5 +62,6 @@ export let profile: types.SystemProfile = types.SystemProfile(
     vt_away_marker: "LAPUTA_TINYLAND_VT_SWITCH_AWAY",
     vt_back_marker: "LAPUTA_TINYLAND_VT_SWITCH_BACK",
   },
+  qemu_gpu: types.Virtio2d,
   development: true,
 )

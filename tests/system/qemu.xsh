@@ -40,6 +40,7 @@ pure fixture_profile() -> types.SystemProfile {
     forbidden_packages: [],
     forbidden_sonames: [],
     proof: fixture_proof(),
+    qemu_gpu: types.Virtio2d,
     development: true,
   }
 }
@@ -108,6 +109,33 @@ test test_qemu_command_on_linux_x86_64_is_q35_under_kvm [error] {
 
   assert "none" in pair[0], "headless test"
   assert ! ("cocoa,zoom-to-fit=on,show-cursor=on" in pair[1]), "no cocoa on Linux"
+}
+
+pure display_of(argv: List[Str]) -> Str {
+  for index in range(argv.len() - 1) {
+    return argv[index + 1] when argv[index] == "-display"
+  }
+  ""
+}
+
+test test_virgl_profile_selects_the_gl_device_and_a_gl_display [error] {
+  let outputs = build.outputs(p"target/laputa/qemu-dwl-foot")
+  let virgl = {...fixture_profile(), qemu_gpu: types.Virgl}
+
+  for host in [["Linux", "x86_64"], ["Linux", "aarch64"], ["Darwin", "aarch64"]] {
+    let config = fixture_qemu(host[0], host[1])?
+    let test_argv = qemu.qemu_command_argv(config, virgl, outputs, types.Test)
+    let interactive_argv = qemu.qemu_command_argv(config, virgl, outputs, types.Interactive)
+
+    for argv in [test_argv, interactive_argv] {
+      assert "virtio-gpu-gl-pci,xres=1280,yres=800" in argv, "virgl gpu"
+      assert ! ("virtio-gpu-pci,xres=1280,yres=800" in argv), "no 2D gpu"
+    }
+
+    assert display_of(test_argv) == "egl-headless", "headless GL test display"
+    assert display_of(interactive_argv) != "", "interactive GL display"
+    assert display_of(interactive_argv) != "egl-headless", "interactive display is visible"
+  }
 }
 
 test test_qemu_target_runs_on_linux_aarch64_under_kvm_and_rejects_other_hosts [error] {
