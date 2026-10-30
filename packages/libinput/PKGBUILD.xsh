@@ -414,6 +414,16 @@ endif
   meson.write(text)
 }
 
+proc encoded_link_argument(value: Str) -> Str {
+  let hex = "0123456789abcdef"
+  let parts = collect {
+    for byte in bytes.from_text(value) {
+      yield hex.byte_slice(byte / 16, 1) + hex.byte_slice(byte % 16, 1)
+    }
+  }
+  "x" + parts.join("")
+}
+
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
@@ -438,7 +448,18 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if target_root != "" and target_root != "/" {
       let ninja = p"build/build.ninja"
-      ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", with: f" -Wl,--end-group {builtins}"))
+      let command = " -Wl,--end-group"
+      let encoded = " x2d576c2c2d2d656e642d67726f7570"
+      let text = ninja.read_text()?
+      if command not in text or encoded not in text {
+        return Err(error.failure("libinput linker group is missing from generated commands"))?
+      }
+      ninja.write(
+        text.replace(command, with: f"{command} {builtins}").replace(
+          encoded,
+          with: f"{encoded} {encoded_link_argument(builtins)}",
+        ),
+      )
     }
 
     run $muon "-C" "build" samu $jobs_flag
