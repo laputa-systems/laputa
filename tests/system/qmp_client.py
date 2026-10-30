@@ -77,6 +77,16 @@ class QmpClientTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Indeterminate", result.stderr)
 
+    def test_disconnect_at_mutation_send_is_indeterminate(self):
+        def peer(conn, stream):
+            conn.sendall(b'{"QMP":{}}\n')
+            capability = json.loads(stream.readline())
+            conn.sendall(json.dumps({"return": {}, "id": capability["id"]}).encode() + b'\n')
+            conn.shutdown(socket.SHUT_RDWR)
+        result = self.exchange(peer, "mutation")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Indeterminate", result.stderr)
+
     def test_wrong_response_id_is_rejected(self):
         def peer(conn, stream):
             request = self.negotiate(conn, stream)
