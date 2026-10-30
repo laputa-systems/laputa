@@ -242,8 +242,10 @@ def fallback_mode():
                 pass
         print(f"PASS fallback: power cut during pending boot {attempt}")
     record = json.loads(drill("status", generations))
-    assert record["pending"] is None and record["current"] == "a" and record["last"] == "fell-back", record
+    assert record["pending"] == "b" and record["attempts"] == 2 and record["serial"] == 2, record
     argv = json.loads(drill("argv", generations))["argv"]
+    # The third selection exhausts the attempt cap and falls back; the
+    # guest command line now names the failed generation.
     console = outputs / "maintained-fallback-3.log"
     guest, err = launch(argv, console, outputs / "maintained-fallback-3.qemu.log")
     try:
