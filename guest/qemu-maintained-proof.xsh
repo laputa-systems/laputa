@@ -12,9 +12,46 @@ proc service_state(name: Str) -> Result[Str] {
   json.get(json.read(status)?, ["state"], "").require(Str)?
 }
 
+proc unit_summary() -> Result[Str] {
+  var parts: List[Str] = []
+  for item in g"/run/xinit/*.json" {
+    let value = json.read(item)?
+    let name = json.get(value, ["name"], "").require(Str)?
+    if name != "" {
+      let state = json.get(value, ["state"], "").require(Str)?
+      let restarts = json.get(value, ["restarts"], 0).require(Int)?
+      parts += [f"{name}={state}/{restarts}"]
+    }
+  }
+  parts.join(" ")
+}
+
+proc path_summary() -> Result[Str] {
+  var marks: List[Str] = []
+  for item in [p"/var/lib/dhcpc", p"/run/dhcpc", p"/run/dhcpc/eth0.status", p"/etc/resolv.conf", p"/usr/bin/dhcpc", p"/usr/bin/syslogd"] {
+    let present = item.exists()?
+    marks += [f"{item.display()}={present}"]
+  }
+  marks.join(" ")
+}
+
+proc wait_state(name: Str, want: Str) {
+  var waited = 0
+  while waited < 30 {
+    if service_state(name)? == want {
+      return
+    }
+    time.sleep(1s)?
+    waited += 1
+  }
+  p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS units: {unit_summary()?}\n")
+  p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS paths: {path_summary()?}\n")
+  fail f"{name} never reached {want}"
+}
+
 proc supervised_network() -> Result[Str] {
-  wait until service_state("logger")? == "running" within 30s every 100ms
-  wait until service_state("dhcp-eth0")? == "running" within 30s every 100ms
+  wait_state("logger", "running")
+  wait_state("dhcp-eth0", "running")
   let lease = p"/run/dhcpc/eth0.status"
   wait until lease.exists()? within 30s every 100ms
   let state = json.get(json.read(lease)?, ["state"], "").require(Str)?

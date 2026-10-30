@@ -252,10 +252,11 @@ reopens the file). The reference modules [syslog-service.xsh](syslog-service.xsh
 `max_size: 0` disables rotation. Rotation runs before each start and, under a
 scanner, each pass by copy-truncate, so a write between copy and truncate may
 be lost. There is no compression or timestamping. A failed rotation degrades
-instead of failing its caller: the current file stays in place, a service
+instead of failing its caller: the current file stays in place, a partial copy is removed, a service
 still starts, and the scanner stays alive to retry on the next pass. Log
 pressure itself stays visible at the writers (a syslog receiver counts its
 blocked and failed sinks) rather than in the supervisor.
+`tests/integration/log_pressure.py` proves this on Linux with an unprivileged user namespace: it fills a tmpfs log volume, shows the service starting degraded with the log intact, kills the writer so scanner passes re-enforce the cap, and shows rotation resuming after space is freed.
 
 ### Resources
 

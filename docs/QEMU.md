@@ -199,9 +199,13 @@ lease) remains a KVM-gated step and is not claimed here.
 
 The launcher requires a separate, owner-private `{output}/state.ext4` containing
 `etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
-by a newline. Initialize those directories from the selected image, apply the
-first-boot document with `system.first_boot.apply`, and format the state tree as
-ext4. Keep the state image at mode 0600. The guest mounts this disk on virtio vdb
+by a newline. Initialize those directories from the selected image (including the
+image's static `/etc` files, the maintained inittab, the packaged nftables
+ruleset, and the loopback-only interfaces file), create the service-owned
+`/var/lib/dhcpc` (mode 0700) and `/var/log` staging directories the image never
+contains, apply the first-boot document with `system.first_boot.apply`, and
+format the state tree as ext4. The DHCP client creates only its own leaf
+directory, so provisioning owns the parents. Keep the state image at mode 0600. The guest mounts this disk on virtio vdb
 and binds the three directories before starting services. Configuration belongs
 to this shared state. There is no automatic configuration merge or state migration.
 A candidate requiring incompatible state must not be admitted for automatic rollback.

@@ -82,4 +82,8 @@ proc main() {
   let _ = try {
     append_boot_marker(p"/var/log/boot-markers.log", marker)
   }
+  if p"/var/log/boot-markers.log".exists() {
+    let marker_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+    p"/dev/console".write(f"LAPUTA_BOOT_MARKER_COUNT {marker_lines.len()}\n")
+  }
 }
