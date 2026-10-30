@@ -14,6 +14,14 @@ proc generation(id: Str) -> activation.GenerationReceipt {
   {id: id, kernel: f"boot/vmlinuz-{id}", root_digest: sha256_text(id)}
 }
 
+proc image_admission(id: Str) -> activation.ImageAdmission {
+  {generation: generation(id), state_format: activation.ACTIVATION_STATE_FORMAT, kernel_sha256: sha256_text(f"kernel-{id}\n"), disk_sha256: sha256_text(f"disk-{id}\n")}
+}
+
+proc admission_policy() -> activation.AdmissionPolicy {
+  {revision: 1, images: [image_admission(id) for id in ["a", "b", "c", "orphan"]]}
+}
+
 proc state_dir(ctx: TestContext, name: Str) -> Result[Path, Error] {
   test.temp_dir(ctx, name:)
 }
@@ -24,12 +32,12 @@ proc write_image(state: Path, id: Str) {
   kernel.parent.mkdir()
   kernel.write(f"kernel-{id}\n")
   disk.write(f"disk-{id}\n")
-  activation.activation_publish_image(state, generation(id), kernel, disk)
+  let _ = activation.activation_publish_image(state, generation(id), kernel, disk, activation.ACTIVATION_STATE_FORMAT)?
 }
 
 proc install_a(state: Path) {
   write_image(state, "a")
-  activation.activation_install(state, generation("a"))
+  activation.activation_install(state, generation("a"), admission_policy())
 }
 
 proc stage_b(state: Path) {
@@ -55,7 +63,7 @@ test test_image_publication_never_replaces_a_retained_generation [fs, time, erro
   write_image(state, "a")
   let before = fp"{state}/images/a/kernel".read_text()?
   fp"{state}/inputs/a/kernel".write("replacement")
-  match activation.activation_publish_image(state, generation("a"), fp"{state}/inputs/a/kernel", fp"{state}/inputs/a/disk") {
+  match activation.activation_publish_image(state, generation("a"), fp"{state}/inputs/a/kernel", fp"{state}/inputs/a/disk", activation.ACTIVATION_STATE_FORMAT) {
     Ok(_) => assert false, "retained generation replaced"
     Err(_) => {}
   }
@@ -91,7 +99,7 @@ test test_incomplete_publication_does_not_install_an_image [fs, error] { |ctx|
   let state = state_dir(ctx, "launcher-incomplete")?
   let source = fp"{state}/kernel"
   source.write("kernel")
-  match activation.activation_publish_image(state, generation("a"), source, fp"{state}/missing") {
+  match activation.activation_publish_image(state, generation("a"), source, fp"{state}/missing", activation.ACTIVATION_STATE_FORMAT) {
     Ok(_) => assert false
     Err(_) => {}
   }

@@ -470,8 +470,12 @@ launcher fallback to healthy A. Host tests additionally cover termination at
 both record fsync boundaries, concurrent staging and collection, full-filesystem
 recovery, and reconciliation after losing a reply. Independent rescue boots
 even when both generation images lack PID 1. These proofs do not establish
-power-loss durability, native SSH disconnect behavior, trust-policy enforcement
-across rollback, or state migration acceptance.
+power-loss durability or native SSH disconnect behavior. Host admission policy
+now pins complete generation identities, image hashes, and the supported shared
+state contract. Its revision survives confirmation and fallback; revoked inputs
+cannot be selected or confirmed. Incompatible state declarations are refused,
+with no automatic migrations. Signed input delivery and TLS consumer distrust
+remain the separate R4 boundaries.
 See [maintained activation](QEMU.md#maintained-vm-activation) for the contracts.
 
 ## R6: Separate disposable development from long-lived VM policy

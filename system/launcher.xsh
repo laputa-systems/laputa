@@ -36,30 +36,8 @@ export proc launcher_state(output_root: Path) [fs, error] -> Result[Path?, Error
 
 ## Boot the current generation, or count one pending attempt and boot that receipt.
 export proc launcher_select(state_dir: Path) [fs, time, error] -> Result[LauncherImage, Error] {
-  let record = activation.activation_status(state_dir)?
-
-  if record.pending == null {
-    let current = activation.activation_verify_image(state_dir, record.current)?
-    return selected_image(current, record.boot_serial)
-  }
-
-  let anticipated = if record.boot_attempts >= activation.ACTIVATION_MAX_BOOT_ATTEMPTS {
-    record.fallback
-  } else {
-    record.pending
-  }
-  let image = activation.activation_verify_image(state_dir, anticipated)?
-  let choice = activation.activation_begin_boot(state_dir)?
-  let selected = match choice {
-    activation.PendingBoot(id) => id
-    activation.FellBack(id) => id
-  }
-
-  guard selected.id == image.id else {
-    fail "activation selection changed"
-  }
-
-  selected_image(image, selected.serial)
+  let selected = activation.activation_select_image(state_dir)?
+  selected_image(selected.image, selected.boot_serial)
 }
 
 pure rewrite_kernel(argv: List[Str], kernel: Str) -> Result[List[Str], Error] {

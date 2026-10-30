@@ -9,6 +9,14 @@ proc generation(id: Str) -> activation.GenerationReceipt {
   {id: id, kernel: f"boot/vmlinuz-{id}", root_digest: sha256_text(id)}
 }
 
+proc image_admission(id: Str) -> activation.ImageAdmission {
+  {generation: generation(id), state_format: activation.ACTIVATION_STATE_FORMAT, kernel_sha256: sha256_text(f"kernel-{id}"), disk_sha256: sha256_text(f"disk-{id}")}
+}
+
+proc admission_policy() -> activation.AdmissionPolicy {
+  {revision: 1, images: [image_admission(id) for id in ["a", "b", "c", "orphan"]]}
+}
+
 proc state_dir(ctx: TestContext, name: Str) -> Result[Path, Error] {
   test.temp_dir(ctx, name:)
 }
@@ -23,12 +31,12 @@ proc prepare_image(state: Path, receipt: activation.GenerationReceipt) {
   kernel.parent.mkdir()
   kernel.write(f"kernel-{receipt.id}")
   disk.write(f"disk-{receipt.id}")
-  activation.activation_publish_image(state, receipt, kernel, disk)
+  let _ = activation.activation_publish_image(state, receipt, kernel, disk, activation.ACTIVATION_STATE_FORMAT)?
 }
 
 proc install(state: Path, receipt: activation.GenerationReceipt) {
   prepare_image(state, receipt)
-  activation.activation_install(state, receipt)
+  activation.activation_install(state, receipt, admission_policy())
 }
 
 proc stage(state: Path, receipt: activation.GenerationReceipt) {
@@ -109,9 +117,10 @@ test test_gc_preserves_current_fallback_and_pending_images [fs, time, error] { |
   stage(state, generation("c"))
   prepare_image(state, generation("orphan"))
   let before = record_text(state)?
-  assert activation.activation_collect_images(state)? == ["orphan"]
+  let removed = activation.activation_collect_images(state)?
+  assert removed.len() == 2 and "a" in removed and "orphan" in removed
   assert record_text(state)? == before
-  for id in ["a", "b", "c"] {
+  for id in ["b", "c"] {
     let _ = activation.activation_verify_image(state, generation(id))?
   }
   assert activation.activation_collect_images(state)?.is_empty()
@@ -362,7 +371,7 @@ test test_unowned_lock_file_does_not_block_activation [fs, time, error] { |ctx|
 
 test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-invalid")?
-  match activation.activation_install(state, {id: "a", kernel: "boot/vmlinuz-a", root_digest: "abcd"}) {
+  match activation.activation_install(state, {id: "a", kernel: "boot/vmlinuz-a", root_digest: "abcd"}, admission_policy()) {
     Ok(_) => assert false
     Err(error) => assert "invalid" in error.message
   }
@@ -382,7 +391,7 @@ test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |c
     Ok(_) => assert false
     Err(error) => assert "current generation" in error.message
   }
-  match activation.activation_install(state, generation("c")) {
+  match activation.activation_install(state, generation("c"), admission_policy()) {
     Ok(_) => assert false
     Err(_) => {}
   }
@@ -406,4 +415,116 @@ test test_unwritable_state_directory_leaves_the_record [fs, time, error] { |ctx|
   assert status.current.id == "a"
   assert status.pending == null
   assert status.last_operation == "installed"
+}
+
+test test_revoked_images_cannot_boot_confirm_or_restore_the_policy [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-revocation")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let original = activation.activation_status(state)?.admission_policy
+  activation.activation_update_policy(state, {revision: 2, images: [image_admission("a")]})
+  let before = record_text(state)?
+  assert activation.activation_begin_boot(state) is Err(_)
+  assert activation.activation_confirm_health(state, "b") is Err(_)
+  assert activation.activation_update_policy(state, original) is Err(_)
+  assert record_text(state)? == before
+  activation.activation_update_policy(state, {revision: 3, images: []})
+  assert activation.activation_select_image(state) is Err(_)
+  assert activation.activation_status(state)?.admission_policy.revision == 3
+}
+
+test test_revoked_fallback_requires_rescue_and_rejects_delayed_health [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-revoked-fallback")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_update_policy(state, {revision: 2, images: [image_admission("b")]})
+  assert activation.activation_boot_failed(state) is Err(_)
+  assert activation.activation_status(state)?.last_operation == "boot-failed"
+  assert activation.activation_select_image(state) is Err(_)
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+}
+
+test test_policy_pins_bytes_and_rejects_incompatible_state [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-policy-pins")?
+  install(state, generation("a"))
+  let before = record_text(state)?
+  let incompatible = {...image_admission("b"), state_format: "laputa-maintained-state-2"}
+  assert activation.activation_update_policy(state, {revision: 2, images: [incompatible]}) is Err(_)
+  assert activation.activation_update_policy(state, {revision: 2, images: [image_admission("a"), image_admission("a")]}) is Err(_)
+  assert record_text(state)? == before
+  prepare_image(state, generation("b"))
+  let file = fp"{state}/images/b/disk"
+  file.write("malicious")
+  let receipt = fp"{state}/images/b/receipt.json"
+  let metadata = receipt.read_text()?
+  receipt.write(metadata.replace(sha256_text("disk-b"), with: sha256_text("malicious")))
+  assert activation.activation_stage(state, generation("b")) is Err(_)
+  assert record_text(state)? == before
+}
+
+test test_host_and_guest_use_the_same_state_contract [fs, error] { |ctx|
+  let hook = p"profiles/qemu-maintained/usr/lib/init/rc.early.d/00-maintained-state.boot".read_text()?
+  assert f"\"{activation.ACTIVATION_STATE_FORMAT}\\n\"" in hook
+}
+
+test test_confirmation_and_fallback_preserve_policy_and_current_revocation [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-policy-survives-boot")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_update_policy(state, {revision: 2, images: [image_admission("a"), image_admission("b")]})
+  activation.activation_confirm_health(state, "b")
+  assert activation.activation_status(state)?.admission_policy.revision == 2
+  activation.activation_update_policy(state, {revision: 3, images: [image_admission("a")]})
+  let before = record_text(state)?
+  assert activation.activation_select_image(state) is Err(_)
+  assert record_text(state)? == before
+  activation.activation_update_policy(state, {revision: 4, images: [image_admission("b"), image_admission("c")]})
+  stage(state, generation("c"))
+  let _ = activation.activation_begin_boot(state)?
+  let _ = activation.activation_begin_boot(state)?
+  let _ = activation.activation_begin_boot(state)?
+  let record = activation.activation_status(state)?
+  assert record.current.id == "b"
+  assert record.admission_policy.revision == 4
+  assert record.admission_policy.images == [image_admission("b"), image_admission("c")]
+}
+
+test test_blocked_fallback_selection_closes_the_last_health_window [fs, time, error] { |ctx|
+  for operation in ["select", "begin"] {
+    let state = state_dir(ctx, f"activation-blocked-fallback-{operation}")?
+    install(state, generation("a"))
+    stage(state, generation("b"))
+    let _ = activation.activation_begin_boot(state)?
+    let _ = activation.activation_begin_boot(state)?
+    activation.activation_update_policy(state, {revision: 2, images: [image_admission("b")]})
+    if operation == "select" {
+      assert activation.activation_select_image(state) is Err(_)
+    } else {
+      assert activation.activation_begin_boot(state) is Err(_)
+    }
+    assert activation.activation_status(state)?.last_operation == "boot-failed"
+    assert activation.activation_confirm_health(state, "b") is Err(_)
+    let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+    assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  }
+}
+
+test test_operator_rollback_uses_retained_pins_without_lowering_policy [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-operator-rollback")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_confirm_health(state, "b")
+  activation.activation_update_policy(state, {revision: 2, images: [image_admission("a"), image_admission("b")]})
+  activation.activation_stage(state, generation("a"))
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_confirm_health(state, "a")
+  let record = activation.activation_status(state)?
+  assert record.current.id == "a" and record.fallback.id == "b"
+  assert record.admission_policy.revision == 2
 }

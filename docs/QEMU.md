@@ -163,6 +163,10 @@ ext4. Keep the state image at mode 0600. The guest mounts this disk on virtio vd
 and binds the three directories before starting services. Configuration belongs
 to this shared state. There is no automatic configuration merge or state migration.
 A candidate requiring incompatible state must not be admitted for automatic rollback.
+Host admission currently supports only `laputa-maintained-state-1`. It rejects
+different state declarations rather than migrating the shared disk. Publishers
+must attest that admitted code preserves this contract, including application
+data schemas; a matching string alone cannot prove semantic compatibility.
 
 Before binding persistent `/var`, the boot hook captures the immutable generation
 receipt in `/run/laputa-running-generation.json`. The guest health reporter writes
@@ -176,13 +180,13 @@ the disk-file SHA-256.
 `activation_publish_image` accepts already verified local inputs. It copies kernel
 and disk into a private staging directory, writes `receipt.json`, fsyncs the
 files and directory, and publishes the bundle without replacing an existing id.
-The receipt format is `laputa-activation-image-1`. It binds the activation receipt
-to separate kernel and disk hashes. Selection checks both hashes and the receipt
+The receipt format is `laputa-activation-image-2`. It binds the activation receipt
+to separate kernel and disk hashes and the shared-state format. Selection checks both hashes and the receipt
 before counting an attempt. Missing metadata or changed image bytes fail closed.
 These local checks do not authenticate a downloaded release or defend against an
 administrator who can rewrite both image and receipt.
 
-Activation records use `laputa-activation-3` and include `boot_serial`. Older
+Activation records use `laputa-activation-4` and include `boot_serial`. Older
 records are rejected, with no silent migration. Before first installation,
 stop every pre-v3 writer and use one writer version per state directory.
 The earlier writer uses `activation.lock`; it cannot coordinate with
@@ -195,6 +199,49 @@ policy while holding the activation lock. A missing, duplicated, unhealthy, or
 stale required-service observation prevents confirmation. The caller must obtain
 a fresh report through its trusted guest channel. The lower-level
 `activation_confirm_health` remains an explicitly trusted manual transition.
+Both confirmation APIs require an active pending boot and recheck host admission.
+After exhausting attempts, an inadmissible fallback closes that boot's health
+window and returns an error requiring independent recovery.
+
+`AdmissionPolicy` lives in the host activation record, outside immutable guest
+images and the guest state disk. It has a strictly increasing revision and an
+explicit list of `ImageAdmission` pins. Each pin binds the complete generation
+receipt, kernel hash, disk hash, and state format. `activation_install` requires
+an initial policy. `activation_update_policy` replaces the pins under the writer
+lock and refuses a repeated or lower revision. An empty pin set blocks every
+normal boot. Updates apply to subsequent admission, selection, and confirmation;
+they do not terminate an already running guest.
+
+`activation_publish_image` returns an `ImageAdmission`, but publication does not
+authorize it. A trusted host operator must add the pin explicitly. For production
+inputs, verify the authenticated release through its existing delivery boundary
+before authorizing the exact artifacts. Do not copy authorization from untrusted
+image metadata. Host pins are an operator authorization mechanism, not a substitute
+for signed repository metadata or TLS distrust enforcement.
+
+Staging retains the current healthy generation as fallback. Confirmation and
+fallback preserve the latest host policy. Revoked content remains inadmissible
+even if its files are retained; changing guest generations never restores old
+pins. If current selection or fallback is inadmissible, use independent rescue
+to inspect state and authorize verified replacement inputs. There is no automatic
+unsigned exception, policy rollback, or shared-state migration.
+
+For trusted local build inputs, initial installation is explicit:
+
+```xsh
+let admitted = activation.activation_publish_image(
+  state, receipt, kernel, disk, activation.ACTIVATION_STATE_FORMAT,
+)?
+activation.activation_install(state, receipt, {revision: 1, images: [admitted]})
+```
+
+Adding a candidate requires publishing it, authorizing its returned pin through
+`activation_update_policy` at a higher revision, and then calling
+`activation_stage`. A stale policy-update request fails instead of overwriting
+a newer revision. After losing a reply, read status and reconcile its revision.
+An operator can stage an already retained, still-admitted generation through
+the same API to request rollback. This preserves the current policy revision
+and does not authorize replaying stale remote repository metadata.
 
 Activation mutations and `activation_collect_images` share the OS-backed
 `activation.flock` writer lock. Process death releases the lock automatically;
@@ -208,7 +255,7 @@ consumes verified images for boot selection.
 Run `python3 tests/integration/activation_recovery.py` on Linux with `strace`,
 `unshare`, `mount`, and `umount` installed and unprivileged user namespaces enabled.
 The test kills writers or injects ENOSPC at each record fsync boundary during
-staging, selection, and confirmation. It also exercises concurrent staging and
+staging, selection, confirmation, and policy updates. It also exercises concurrent staging and
 collection, closes reply pipes before acknowledgments, and fills an isolated
 1 MiB tmpfs until writes return ENOSPC. Full-filesystem failures preserve the
 record; freeing space permits retry. Reply loss is reconciled by reading status.
@@ -235,8 +282,17 @@ On 2026-10-29, Linux x86_64/KVM proofs established:
 All owned QEMU PIDs were reaped. The initial writable-generation reboot proof was
 superseded by the separate-state proof. The firewall fixtures and initial fallback
 proof predate the new bundle metadata contract. Remote XSH transport, DHCP lease
-lifecycle, first-boot crash atomicity, configuration migrations, and security-policy
-admission across rollback remain separate obligations.
+lifecycle, first-boot crash atomicity, automatic configuration migrations, signed
+production image delivery, and TLS consumer distrust remain separate obligations.
+
+On 2026-10-30, a Linux x86_64/KVM run exercised v4 host admission with v2 image
+receipts. B panicked twice. Before fallback, host policy revision 2 revoked B
+while retaining A. The launcher selected A, its guest identity proof passed,
+and revision 2 remained in the host record. Revision 3 then revoked every image;
+normal selection was refused. The independent, network-free rescue guest still
+returned clean/repaired/unrecoverable statuses 0/1/8 and verified the repaired
+payload hash. All four QEMU PIDs were reaped. This qualifies host artifact pins
+across fallback, not production signing-key distribution or TLS consumer distrust.
 
 The maintained state mount is an early boot hook under
 `/usr/lib/init/rc.early.d`, after `/proc`, `/sys`, `/dev`, and `/run` are mounted

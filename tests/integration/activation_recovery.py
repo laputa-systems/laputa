@@ -34,7 +34,7 @@ def filesystem_full():
         volume = pathlib.Path(temporary)
         subprocess.run(["mount", "-t", "tmpfs", "-o", "size=1m", "tmpfs", str(volume)], check=True)
         try:
-            for operation in ("b", "select", "confirm"):
+            for operation in ("b", "select", "confirm", "revoke"):
                 state = volume / operation
                 run("prepare", state)
                 if operation != "b":
@@ -69,7 +69,7 @@ if "--filesystem-full" in sys.argv:
 
 with tempfile.TemporaryDirectory(prefix="activation-recovery-", dir=scratch) as temporary:
     base = pathlib.Path(temporary)
-    for operation in ("b", "select", "confirm"):
+    for operation in ("b", "select", "confirm", "revoke"):
         for boundary in (1, 2):
             for fault in ("signal=SIGKILL", "error=ENOSPC"):
                 state = base / f"{operation}-{boundary}-{fault}"
@@ -121,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix="activation-recovery-", dir=scratch) as 
         run("status", state)
         print(f"PASS concurrent {operations}: retained images satisfy the record")
 
-    for operation in ("b", "select", "confirm"):
+    for operation in ("b", "select", "confirm", "revoke"):
         states = [base / f"disconnect-{operation}-{name}" for name in ("reference", "lost")]
         for state in states:
             run("prepare", state)

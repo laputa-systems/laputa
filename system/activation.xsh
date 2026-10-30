@@ -9,8 +9,10 @@ export const ACTIVATION_RECORD_NAME = "activation.json"
 export const ACTIVATION_LOCK_NAME = "activation.flock"
 ## Boot attempts allowed before the launcher selects the fallback.
 export const ACTIVATION_MAX_BOOT_ATTEMPTS = 2
-## Activation record version paired with the OS-backed writer lock.
-export const ACTIVATION_FORMAT = "laputa-activation-3"
+## Activation record version containing host admission policy.
+export const ACTIVATION_FORMAT = "laputa-activation-4"
+## Shared state format accepted for every admitted generation; migrations are refused.
+export const ACTIVATION_STATE_FORMAT = "laputa-maintained-state-1"
 
 ## One installed generation the launcher can select.
 export type GenerationReceipt = {
@@ -19,14 +21,21 @@ export type GenerationReceipt = {
   root_digest: Str,
 }
 
-type ImageReceipt = {format: Str, generation: GenerationReceipt, kernel_sha256: Str, disk_sha256: Str}
+## Host-authorized artifact hashes and the shared state contract for one generation.
+export type ImageAdmission = {generation: GenerationReceipt, state_format: Str, kernel_sha256: Str, disk_sha256: Str}
+## Monotonic host policy; an empty image set requires independent rescue.
+export type AdmissionPolicy = {revision: Int, images: List[ImageAdmission]}
+type ImageReceipt = {format: Str, admission: ImageAdmission}
 
 ## Verified files for one published activation generation.
 export type GenerationImage = {id: Str, kernel_file: Path, disk_file: Path}
+## Verified and admitted boot image with its durable boot sequence.
+export type ActivationLaunch = {image: GenerationImage, boot_serial: Int}
 
 ## Durable current, fallback, and pending generation selection.
 export type ActivationRecord = {
   format: Str,
+  admission_policy: AdmissionPolicy,
   boot_serial: Int,
   current: GenerationReceipt,
   fallback: GenerationReceipt,
@@ -94,12 +103,23 @@ pure activation_pending_ok(pending: GenerationReceipt?) -> Bool {
 }
 
 pure activation_record_ok(record: ActivationRecord) -> Bool {
-  record.format == ACTIVATION_FORMAT and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+  record.format == ACTIVATION_FORMAT and activation_policy_ok(record.admission_policy) and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+}
+
+pure activation_policy_ok(policy: AdmissionPolicy) -> Bool {
+  return false when policy.revision < 1
+  var ids: List[Str] = []
+  for image in policy.images {
+    return false when ! activation_receipt_ok(image.generation) or image.state_format != ACTIVATION_STATE_FORMAT or ! activation_digest_ok(image.kernel_sha256) or ! activation_digest_ok(image.disk_sha256) or image.generation.id in ids
+    ids += [image.generation.id]
+  }
+  true
 }
 
 ## Publish already verified inputs under a new id without replacing retained images.
-export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt, kernel: Path, disk: Path) [fs, error] {
+export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt, kernel: Path, disk: Path, state_format: Str) [fs, error] -> Result[ImageAdmission, Error] {
   guard activation_receipt_ok(receipt) else { fail "generation receipt is invalid" }
+  guard state_format != "" else { fail "generation state format is missing" }
   let images = fp"{state_dir}/images"
   images.mkdir()
   fs.fsync(state_dir)
@@ -108,17 +128,19 @@ export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt
   bundle.mkdir()
   kernel.copy(to: fp"{bundle}/kernel")
   disk.copy(to: fp"{bundle}/disk")
-  let metadata = ImageReceipt(
-    format: "laputa-activation-image-1",
+  let admission = ImageAdmission(
     generation: receipt,
+    state_format: state_format,
     kernel_sha256: hash.sha256(fp"{bundle}/kernel")?.hex(),
     disk_sha256: hash.sha256(fp"{bundle}/disk")?.hex(),
   )
+  let metadata = ImageReceipt(format: "laputa-activation-image-2", admission: admission)
   fp"{bundle}/receipt.json".write(json.encode(metadata)? + "\n")
   for item in [p"kernel", p"disk", p"receipt.json"] { fs.fsync(fp"{bundle}/{item}") }
   fs.fsync(bundle)
   bundle.rename(to: fp"{images}/{receipt.id}", overwrite: false)
   fs.fsync(images)
+  admission
 }
 
 ## Verify a published bundle against its activation receipt before admission or boot.
@@ -128,9 +150,26 @@ export proc activation_verify_image(state_dir: Path, receipt: GenerationReceipt)
   let image = GenerationImage(id: receipt.id, kernel_file: fp"{bundle}/kernel", disk_file: fp"{bundle}/disk")
   guard image.kernel_file.exists() and image.disk_file.exists() else { fail "generation image is missing" }
   let metadata = json.read(fp"{bundle}/receipt.json")?.require_exact(ImageReceipt)?
-  guard metadata.format == "laputa-activation-image-1" and metadata.generation == receipt else { fail "generation image receipt differs" }
-  guard hash.sha256(image.kernel_file)?.hex() == metadata.kernel_sha256 and hash.sha256(image.disk_file)?.hex() == metadata.disk_sha256 else { fail "generation image digest differs" }
+  guard metadata.format == "laputa-activation-image-2" and metadata.admission.generation == receipt else { fail "generation image receipt differs" }
+  guard hash.sha256(image.kernel_file)?.hex() == metadata.admission.kernel_sha256 and hash.sha256(image.disk_file)?.hex() == metadata.admission.disk_sha256 else { fail "generation image digest differs" }
   image
+}
+
+proc activation_admitted_image(state_dir: Path, policy: AdmissionPolicy, receipt: GenerationReceipt) -> Result[GenerationImage, Error] {
+  let metadata = json.read(fp"{state_dir}/images/{receipt.id}/receipt.json")?.require_exact(ImageReceipt)?
+  guard metadata.format == "laputa-activation-image-2" and metadata.admission.state_format == ACTIVATION_STATE_FORMAT and metadata.admission in policy.images else {
+    fail "generation is not admitted by the current host policy; independent rescue may be required"
+  }
+  activation_verify_image(state_dir, receipt)?
+}
+
+## Replace host admission pins at a strictly greater revision without changing boot selection.
+export proc activation_update_policy(state_dir: Path, policy: AdmissionPolicy) [fs, error] -> Result[Unit, Error] {
+  guard activation_policy_ok(policy) else { fail "activation admission policy is invalid or requires incompatible state" }
+  let lock = activation_acquire_lock(state_dir)?
+  let record = activation_status(state_dir)?
+  guard policy.revision > record.admission_policy.revision else { fail "activation admission policy revision must increase" }
+  activation_write(state_dir, {...record, admission_policy: policy})
 }
 
 proc activation_record_path(state_dir: Path) -> Path {
@@ -198,6 +237,7 @@ proc activation_require_pending(record: ActivationRecord) -> Result[GenerationRe
 export proc activation_install(
   state_dir: Path,
   receipt: GenerationReceipt,
+  policy: AdmissionPolicy,
 ) [fs, time, error] -> Result[Unit, Error] {
   guard activation_receipt_ok(receipt) else {
     return Err(activation_reject("generation receipt is invalid"))
@@ -206,9 +246,11 @@ export proc activation_install(
   guard ! activation_record_path(state_dir).exists() else {
     return Err(activation_reject("activation record already exists"))
   }
-  let _ = activation_verify_image(state_dir, receipt)?
+  guard activation_policy_ok(policy) else { fail "activation admission policy is invalid or requires incompatible state" }
+  let _ = activation_admitted_image(state_dir, policy, receipt)?
   activation_write(state_dir, {
     format: ACTIVATION_FORMAT,
+    admission_policy: policy,
     boot_serial: 0,
     current: receipt,
     fallback: receipt,
@@ -235,8 +277,8 @@ export proc activation_stage(
   guard record.pending == null else {
     return Err(activation_reject("a generation is already pending"))
   }
-  let _ = activation_verify_image(state_dir, candidate)?
-  activation_write(state_dir, {...record, pending: candidate, boot_attempts: 0, last_operation: "staged"})
+  let _ = activation_admitted_image(state_dir, record.admission_policy, candidate)?
+  activation_write(state_dir, {...record, fallback: record.current, pending: candidate, boot_attempts: 0, last_operation: "staged"})
 }
 
 ## Count one boot of the pending generation, or select the fallback when another attempt would pass the cap.
@@ -245,6 +287,41 @@ export proc activation_begin_boot(
 ) [fs, time, error] -> Result[ActivationBoot, Error] {
   let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
+  let _ = activation_admitted_selection(state_dir, record)?
+  activation_begin_boot_record(state_dir, record)?
+}
+
+pure activation_next_receipt(record: ActivationRecord) -> GenerationReceipt {
+  if record.pending == null { record.current } else if record.boot_attempts >= ACTIVATION_MAX_BOOT_ATTEMPTS { record.fallback } else { record.pending }
+}
+
+proc activation_admitted_selection(state_dir: Path, record: ActivationRecord) -> Result[GenerationImage, Error] {
+  match activation_admitted_image(state_dir, record.admission_policy, activation_next_receipt(record)) {
+    Ok(image) => image
+    Err(problem) => {
+      if record.pending != null and record.boot_attempts >= ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != "boot-failed" {
+        activation_write(state_dir, {...record, last_operation: "boot-failed"})
+      }
+      Err(problem)
+    }
+  }
+}
+
+## Check current policy and image bytes under the writer lock before counting a boot.
+export proc activation_select_image(state_dir: Path) [fs, time, error] -> Result[ActivationLaunch, Error] {
+  let lock = activation_acquire_lock(state_dir)?
+  let record = activation_status(state_dir)?
+  let image = activation_admitted_selection(state_dir, record)?
+  return {image, boot_serial: record.boot_serial} when record.pending == null
+  let selection = activation_begin_boot_record(state_dir, record)?
+  let serial = match selection {
+    PendingBoot(boot) => boot.serial
+    FellBack(boot) => boot.serial
+  }
+  {image, boot_serial: serial}
+}
+
+proc activation_begin_boot_record(state_dir: Path, record: ActivationRecord) -> Result[ActivationBoot, Error] {
   let pending = activation_require_pending(record)?
   if record.boot_attempts >= ACTIVATION_MAX_BOOT_ATTEMPTS {
     activation_write(state_dir, {
@@ -278,8 +355,13 @@ export proc activation_confirm_health(
   guard record.boot_attempts >= 1 else {
     return Err(activation_reject("generation has not booted"))
   }
+  guard record.last_operation == "pending-boot" else {
+    return Err(activation_reject("generation boot is no longer confirmable"))
+  }
+  let _ = activation_admitted_image(state_dir, record.admission_policy, pending)?
   activation_write(state_dir, {
     format: record.format,
+    admission_policy: record.admission_policy,
     boot_serial: record.boot_serial,
     current: pending,
     fallback: record.current,
@@ -306,6 +388,7 @@ export proc activation_confirm_guest_health(
     fail "guest health report is stale"
   }
   guard ! policy.critical_services.is_empty() else { fail "critical service health policy is empty" }
+  let _ = activation_admitted_image(state_dir, record.admission_policy, pending)?
   for name in policy.critical_services {
     let matches = report.services |> where .name == name |> collect
     guard matches.len() == 1 else { fail f"critical service observation is missing or duplicated: {name}" }
@@ -333,6 +416,13 @@ export proc activation_boot_failed(
   }
   if record.boot_attempts < record.max_boot_attempts {
     return activation_write(state_dir, {...record, last_operation: "boot-failed"})
+  }
+  match activation_admitted_image(state_dir, record.admission_policy, record.fallback) {
+    Ok(_) => {}
+    Err(problem) => {
+      activation_write(state_dir, {...record, last_operation: "boot-failed"})
+      return Err(problem)
+    }
   }
   activation_write(state_dir, {
     ...record,
