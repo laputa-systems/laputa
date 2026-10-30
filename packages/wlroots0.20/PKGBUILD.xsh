@@ -1,5 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
+use pm.muon as pm_muon
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -12,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "0.20.2"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = [
@@ -66,6 +67,12 @@ export const upstream_sources = [
         sha256: "972c7ac44b17828f4702bfae7cd8347346a3fb5b2c1076cfa2c3fcedac5ec343",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -736,6 +743,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../root/usr/bin/wayland-scanner", scanner_text)?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../build-root/usr/bin/wayland-scanner", scanner_text)?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)

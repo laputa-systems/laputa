@@ -1,4 +1,5 @@
 ##! Package recipe metadata and build operations.
+use pm.muon as pm_muon
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -11,7 +12,7 @@ export const package_kind = "payload"
 export const ver = "0.7.0"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -33,6 +34,18 @@ export const upstream_sources = [
         sha256: "e7095741dc11338f5ed8e0aa02e993fc34df4295dad4296127bbb212bcf56e07",
       },
     ],
+  },
+  {
+    source: p"patches/structured-argv.patch",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "ab2539444b8232f1bdddaade5afac2136ea35d29e943700f6de3f48414600a94"}],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -84,6 +97,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     host_ld_library_path = f"{build_root}/usr/lib:{build_root}/usr/lib/llvm23/lib"
   }
 
+  let _ = patch.apply(p".", p"structured-argv.patch".read_text()?, 1)?
   patch_system_library_links()
   p"build".mkdir()
 
@@ -134,6 +148,24 @@ export proc build(dest: Path) [fs, process, env, error] {
  command = cc""",
         with: f"""rule muon_build_c_compiler
  command = {bootstrap_cc}""",
+      )
+
+      let encoded_bootstrap_cc = pm_muon.muon_encoded_argument(bootstrap_cc.display())
+      patched_ninja = patched_ninja.replace(
+        """rule muon_build_c_linker
+ command = """ + bootstrap_cc.display() + """
+ argv = x6363""",
+        with: """rule muon_build_c_linker
+ command = """ + bootstrap_cc.display() + f"""
+ argv = {encoded_bootstrap_cc}""",
+      )
+      patched_ninja = patched_ninja.replace(
+        """rule muon_build_c_compiler
+ command = """ + bootstrap_cc.display() + """
+ argv = x6363""",
+        with: """rule muon_build_c_compiler
+ command = """ + bootstrap_cc.display() + f"""
+ argv = {encoded_bootstrap_cc}""",
       )
 
       build_ninja.write(patched_ninja)

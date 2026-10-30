@@ -1,5 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.env as pm_env
+use pm.muon as pm_muon
 use pm.make
 use pm.util as pm_util
 
@@ -13,7 +14,7 @@ export const package_kind = "payload"
 export const ver = "1.28.0"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
 export const deps = [
@@ -117,6 +118,12 @@ export const upstream_sources = [
       },
     ],
   },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
+  },
 ]
 
 ## Exported declaration `filetree`.
@@ -149,8 +156,6 @@ proc patch_generated_inputs() {
   write_version_header()
   let meson = p"meson.build"
   var text = meson.read_text()?
-  text = text.replace("math = cc.find_library('m')", with: "math = declare_dependency(link_args: ['-lm'])")
-
   text = text.replace(
     "threads = [dependency('threads'), cc.find_library('stdthreads', required: false)]",
     with: "threads = [declare_dependency(), cc.find_library('stdthreads', required: false)]",
@@ -282,6 +287,8 @@ export proc build(dest: Path) [fs, process, env, error] {
       let ninja = p"build/build.ninja"
       let scanner_text = fp"{build_root}/usr/bin/wayland-scanner".display()
       var ninja_text = ninja.read_text()?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../root/usr/bin/wayland-scanner", scanner_text)?
+      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "../../../../build-root/usr/bin/wayland-scanner", scanner_text)?
       ninja_text = ninja_text.replace("../../../../root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace("../../../../build-root/usr/bin/wayland-scanner", with: scanner_text)
       ninja_text = ninja_text.replace(f"{build_root}/usr/bin/wayland-scanner", with: scanner_text)

@@ -1,4 +1,5 @@
 ##! XSH module `PKGBUILD` package and build operations.
+use pm.muon as pm_muon
 use pm.env as pm_env
 use pm.util as pm_util
 
@@ -12,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.32.0"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
 export const deps = ["musl", "libudev-zero", "libevdev", "mtdev"]
@@ -43,6 +44,12 @@ export const upstream_sources = [
         sha256: "7dd6c1ca964c86eb6810ccd6639cda634e68bdca43bf3afec39e94e942fac8d4",
       },
     ],
+  },
+  {
+    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
   },
 ]
 
@@ -349,16 +356,6 @@ export const filetree = [
 proc patch_python_tools() {
   let meson = p"meson.build"
   var text = meson.read_text()?
-  let target_root = e"LAPUTA_ROOT" ?? "/"
-  let target_arch = pm_util.target_arch()?
-  let builtins = f"{target_root}/usr/lib/libclang_rt.builtins-{target_arch}.a"
-
-  let compiler_rt_dep = if target_root != "" and target_root != "/" {
-    f"declare_dependency(link_args: ['{builtins}'])"
-  } else {
-    "declare_dependency()"
-  }
-
   text = text.replace(
     """src_python_tools = files(
 	'tools/libinput-analyze-buttons.py',
@@ -383,19 +380,6 @@ foreach t : src_python_tools
 endforeach
 """,
     with: "",
-  )
-
-  text = text.replace(
-    "dep_lm = cc.find_library('m', required : false)",
-    with: """# musl packages libm as a libc symlink; link by name instead of recording the build-env path.
-dep_lm = declare_dependency(link_args: ['-lm'])""",
-  )
-
-  text = text.replace(
-    "dep_rt = cc.find_library('rt', required : false)",
-    with: f"""# musl provides realtime interfaces in libc; avoid recording the build-env librt.
-dep_rt = declare_dependency()
-dep_compiler_rt = {compiler_rt_dep}""",
   )
 
   text = text.replace(
@@ -438,7 +422,20 @@ export proc build(dest: Path) [fs, process, env, error] {
 
     if target_root != "" and target_root != "/" {
       let ninja = p"build/build.ninja"
-      ninja.write(ninja.read_text()?.replace(" -Wl,--end-group", with: f" -Wl,--end-group {builtins}"))
+      let command = " -Wl,--end-group"
+      let encoded = " x2d576c2c2d2d656e642d67726f7570"
+      let text = ninja.read_text()?
+      let commands = text.split(command).len() - 1
+      let arguments = text.split(encoded).len() - 1
+      if commands == 0 or commands != arguments {
+        return Err(error.failure("libinput linker groups differ from structured arguments"))?
+      }
+      ninja.write(
+        text.replace(command, with: f"{command} {builtins}").replace(
+          encoded,
+          with: f"{encoded} {pm_muon.muon_encoded_argument(builtins)}",
+        ),
+      )
     }
 
     run $muon "-C" "build" samu $jobs_flag

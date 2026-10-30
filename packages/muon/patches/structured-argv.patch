@@ -1,0 +1,369 @@
+--- a/include/args.h
++++ b/include/args.h
+@@ -12,6 +12,9 @@
+ void shell_escape_posix(struct workspace *wk, struct tstr *sb, const char *str);
+ void shell_escape_cmd(struct workspace *wk, struct tstr *sb, const char *str);
+ void ninja_escape(struct workspace *wk, struct tstr *sb, const char *str);
++void argv_hex(struct workspace *wk, struct tstr *sb, const char *str);
++obj join_args_argv(struct workspace *wk, obj arr);
++obj join_template_argv(struct workspace *wk, obj arr, obj rule_args, obj encoded_rule_args);
+ void pkgconf_escape(struct workspace *wk, struct tstr *sb, const char *str);
+ 
+ void push_args_null_terminated(struct workspace *wk, obj arr, char *const *argv);
+--- a/src/args.c
++++ b/src/args.c
+@@ -189,6 +189,50 @@
+ }
+ 
+ void
++argv_hex(struct workspace *wk, struct tstr *sb, const char *str)
++{
++	static const char hex[] = "0123456789abcdef";
++	for (const unsigned char *s = (const unsigned char *)str; *s; ++s) {
++		tstr_push(wk, sb, hex[*s >> 4]);
++		tstr_push(wk, sb, hex[*s & 15]);
++	}
++}
++
++obj
++join_args_argv(struct workspace *wk, obj arr)
++{
++	TSTR(res);
++	obj val;
++	obj_array_for_(wk, arr, val, iter) {
++		if (iter.i) tstr_push(wk, &res, ' ');
++		tstr_push(wk, &res, 'x');
++		argv_hex(wk, &res, get_cstr(wk, val));
++	}
++	return tstr_into_str(wk, &res);
++}
++
++obj
++join_template_argv(struct workspace *wk, obj arr, obj rule_args, obj encoded_rule_args)
++{
++	TSTR(res);
++	obj val;
++	obj_array_for_(wk, arr, val, iter) {
++		const char *s = get_cstr(wk, val);
++		if (iter.i) tstr_push(wk, &res, ' ');
++		if (rule_args && val == rule_args && encoded_rule_args) {
++			tstr_pushs(wk, &res, get_cstr(wk, encoded_rule_args));
++		} else if (!strcmp(s, "$ARGS")) tstr_pushs(wk, &res, "$ARGV_ARGS");
++		else if (!strcmp(s, "$LINK_ARGS")) tstr_pushs(wk, &res, "$ARGV_LINK_ARGS");
++		else if (!strcmp(s, "$LINK_EARLY_ARGS")) tstr_pushs(wk, &res, "$ARGV_LINK_EARLY_ARGS");
++		else if (!strcmp(s, "$in")) tstr_pushs(wk, &res, "$in_argv");
++		else if (!strcmp(s, "$out")) tstr_pushs(wk, &res, "$out_argv");
++		else if (!strcmp(s, "${out}.d")) tstr_pushs(wk, &res, "x${out_hex}2e64");
++		else { tstr_push(wk, &res, 'x'); argv_hex(wk, &res, s); }
++	}
++	return tstr_into_str(wk, &res);
++}
++
++void
+ pkgconf_escape(struct workspace *wk, struct tstr *sb, const char *str)
+ {
+ 	simple_escape(wk, sb, str, " ", '\\');
+--- a/src/backend/ninja/rules.c
++++ b/src/backend/ninja/rules.c
+@@ -23,6 +23,7 @@
+ 	struct project *proj;
+ 	struct obj_build_target *tgt;
+ 	obj args[machine_kind_count];
++	obj raw_args[machine_kind_count];
+ };
+ 
+ static void
+@@ -92,6 +93,7 @@
+ 	fprintf(out,
+ 		"rule %s_%s_%s_linker\n"
+ 		" command = %s\n"
++		" argv = %s\n"
+ 		" description = linking $out\n"
+ 		"%s"
+ 		"\n",
+@@ -99,6 +101,7 @@
+ 		machine_kind_to_s(machine),
+ 		compiler_language_to_s(l),
+ 		get_cstr(wk, link_command),
++		get_cstr(wk, join_template_argv(wk, args, 0, 0)),
+ 		linker_pool);
+ }
+ 
+@@ -141,19 +144,27 @@
+ 		obj_array_extend(wk, static_link_args, toolchain_archiver_base(wk, comp_id));
+ 		obj_array_extend(wk, static_link_args, toolchain_archiver_input_output(wk, comp_id, "$in", "$out"));
+ 
++		obj encoded_static_args;
++		obj_array_dup(wk, static_link_args, &encoded_static_args);
++		if (toolchain_archiver_needs_wipe(wk, comp_id)) {
++			obj_array_set(wk, encoded_static_args, 0, make_str(wk, wk->argv0));
++		}
++
+ 		fprintf(out,
+ 			"rule %s_%s_archiver\n"
+ 			" command = %s\n"
++			" argv = %s\n"
+ 			" description = linking static $out\n"
+ 			"\n",
+ 			get_cstr(wk, proj->rule_prefix),
+ 			machine_kind_to_s(machine),
+-			get_cstr(wk, join_args_plain(wk, static_link_args)));
++			get_cstr(wk, join_args_plain(wk, static_link_args)),
++			get_cstr(wk, join_template_argv(wk, encoded_static_args, 0, 0)));
+ 	}
+ }
+ 
+ static void
+-write_compiler_rule(struct workspace *wk, FILE *out, obj rule_args, obj rule_name, enum compiler_language l, obj comp_id)
++write_compiler_rule(struct workspace *wk, FILE *out, obj rule_args, obj encoded_rule_args, obj rule_name, enum compiler_language l, obj comp_id)
+ {
+ 	struct obj_compiler *comp = get_obj_compiler(wk, comp_id);
+ 
+@@ -178,9 +189,11 @@
+ 
+ 	fprintf(out,
+ 		"rule %s\n"
+-		" command = %s\n",
++		" command = %s\n"
++		" argv = %s\n",
+ 		get_cstr(wk, rule_name),
+-		get_cstr(wk, compile_command));
++		get_cstr(wk, compile_command),
++		get_cstr(wk, join_template_argv(wk, args, rule_args, encoded_rule_args)));
+ 	if (deps) {
+ 		fprintf(out,
+ 			" deps = %s\n"
+@@ -217,7 +230,9 @@
+ 		UNREACHABLE;
+ 	}
+ 
+-	write_compiler_rule(wk, ctx->out, rule_args, rule_name, l, comp_id);
++	obj raw_args;
++	if (!obj_dict_geti(wk, ctx->raw_args[ctx->tgt->machine], l, &raw_args)) UNREACHABLE;
++	write_compiler_rule(wk, ctx->out, rule_args, join_args_argv(wk, raw_args), rule_name, l, comp_id);
+ 	return ir_cont;
+ }
+ 
+@@ -237,6 +252,7 @@
+ 	ctx->tgt = get_obj_build_target(wk, tgt_id);
+ 
+ 	ctx->args[ctx->tgt->machine] = ca_build_target_joined_args(wk, ctx->tgt->processed_args);
++	ctx->raw_args[ctx->tgt->machine] = ctx->tgt->processed_args;
+ 
+ 	if (!obj_dict_foreach(wk, ctx->proj->toolchains[ctx->tgt->machine], ctx, write_compiler_rule_iter)) {
+ 		goto ret;
+@@ -274,12 +290,15 @@
+ 	}
+ 
+ 	{ // Build file regeneration
+-		obj regen_cmd = join_args_shell(wk, ca_regenerate_build_command(wk, false));
++		obj regen_args = ca_regenerate_build_command(wk, false);
++		obj regen_cmd = join_args_shell(wk, regen_args);
+ 
+ 		fprintf(out,
+ 			"rule REGENERATE_BUILD\n"
+-			" command = %s",
+-			get_cstr(wk, regen_cmd));
++			" command = %s\n"
++			" argv = %s",
++			get_cstr(wk, regen_cmd),
++			get_cstr(wk, join_args_argv(wk, regen_args)));
+ 
+ 		fputs("\n description = Regenerating build files.\n"
+ 		      " generator = 1\n"
+@@ -319,11 +338,13 @@
+ 	fprintf(out,
+ 		"rule CUSTOM_COMMAND\n"
+ 		" command = $COMMAND\n"
++		" argv = $ARGV_COMMAND\n"
+ 		" description = $DESC\n"
+ 		" restat = 1\n"
+ 		"\n"
+ 		"rule CUSTOM_COMMAND_DEP\n"
+ 		" command = $COMMAND\n"
++		" argv = $ARGV_COMMAND\n"
+ 		" description = $DESC\n"
+ 		" deps = gcc\n"
+ 		" depfile = $DEPFILE\n"
+@@ -443,7 +464,7 @@
+ 						obj rule_name;
+ 						if (obj_dict_geti(wk, proj->generic_rules[machine], l, &rule_name)) {
+ 							write_compiler_rule(
+-								wk, out, make_str(wk, "$ARGS"), rule_name, l, comp_id);
++								wk, out, make_str(wk, "$ARGS"), 0, rule_name, l, comp_id);
+ 						}
+ 					}
+ 				}
+--- a/src/backend/ninja/custom_target.c
++++ b/src/backend/ninja/custom_target.c
+@@ -168,6 +168,7 @@
+ 	obj depends = join_args_ninja(wk, depends_rel);
+ 	outputs = join_args_ninja(wk, outputs);
+ 	inputs = inputs ? join_args_ninja(wk, inputs) : make_str(wk, "");
++	obj argv_command = join_args_argv(wk, cmdline);
+ 	cmdline = join_args_shell_ninja(wk, cmdline);
+ 
+ 	const char *rule;
+@@ -179,12 +180,14 @@
+ 
+ 	fprintf(ctx->out,
+ 		"build %s: %s %s | %s\n"
+-		" COMMAND = %s\n",
++		" COMMAND = %s\n"
++		" ARGV_COMMAND = %s\n",
+ 		get_cstr(wk, outputs),
+ 		rule,
+ 		get_cstr(wk, inputs),
+ 		get_cstr(wk, depends),
+-		get_cstr(wk, cmdline));
++		get_cstr(wk, cmdline),
++		get_cstr(wk, argv_command));
+ 
+ 	if (tgt->depfile) {
+ 		obj depfile_rel;
+--- a/src/backend/ninja/build_target.c
++++ b/src/backend/ninja/build_target.c
+@@ -245,7 +245,9 @@
+ 			goto done;
+ 		}
+ 
+-		fprintf(ctx->out, " ARGS = %s\n", get_cstr(wk, args));
++		obj raw_args;
++		if (!obj_dict_geti(wk, processed_args, lang, &raw_args)) goto done;
++		fprintf(ctx->out, " ARGS = %s\n ARGV_ARGS = %s\n", get_cstr(wk, args), get_cstr(wk, join_args_argv(wk, raw_args)));
+ 	}
+ 
+ 	dest_res = dest;
+@@ -423,10 +425,10 @@
+ 		fputs(get_cstr(wk, ctx.order_deps), wctx->out);
+ 	}
+ 	if (link_early_args) {
+-		fprintf(wctx->out, "\n LINK_EARLY_ARGS = %s", link_early_args);
++		fprintf(wctx->out, "\n LINK_EARLY_ARGS = %s\n ARGV_LINK_EARLY_ARGS = %s", link_early_args, get_cstr(wk, join_args_argv(wk, ctx.args.link_early_args)));
+ 	}
+ 	if (link_args) {
+-		fprintf(wctx->out, "\n LINK_ARGS = %s", link_args);
++		fprintf(wctx->out, "\n LINK_ARGS = %s\n ARGV_LINK_ARGS = %s", link_args, get_cstr(wk, join_args_argv(wk, ctx.args.link_args)));
+ 	}
+ 
+ 	if (tgt->flags & build_tgt_flag_build_by_default) {
+--- a/src/external/samurai/env.c
++++ b/src/external/samurai/env.c
+@@ -9,6 +9,7 @@
+ #include <string.h>
+ 
+ #include "external/samurai/ctx.h"
++#include "args.h"
+ 
+ #include "external/samurai/env.h"
+ #include "external/samurai/graph.h"
+@@ -196,6 +197,23 @@
+ 	struct samu_treenode *n;
+ 	size_t len;
+ 
++	if (strcmp(var, "in_argv") == 0 || strcmp(var, "out_argv") == 0 || strcmp(var, "out_hex") == 0) {
++		bool input = strcmp(var, "in_argv") == 0;
++		bool bare = strcmp(var, "out_hex") == 0;
++		struct samu_node **nodes = input ? e->in : e->out;
++		size_t count = input ? e->inimpidx : e->outimpidx;
++		if (bare && count != 1) samu_fatal("out_hex requires one output");
++		TSTR(buf);
++		for (size_t i = 0; i < count; ++i) {
++			if (i) tstr_push(ctx->wk, &buf, ' ');
++			if (!bare) tstr_push(ctx->wk, &buf, 'x');
++			argv_hex(ctx->wk, &buf, nodes[i]->path->s);
++		}
++		struct samu_string *result = samu_mkstr(ctx->a, buf.len);
++		if (buf.len) memcpy(result->s, buf.buf, buf.len);
++		result->s[buf.len] = 0;
++		return result;
++	}
+ 	if (strcmp(var, "in") == 0)
+ 		return samu_pathlist(ctx, e->in, e->inimpidx, ' ', escape);
+ 	if (strcmp(var, "in_newline") == 0)
+--- a/src/external/samurai/graph.c
++++ b/src/external/samurai/graph.c
+@@ -145,6 +145,8 @@
+ 	cmd = samu_edgevar(ctx, e, "command", true);
+ 	if (!cmd)
+ 		samu_fatal("rule '%s' has no command", e->rule->name);
++	struct samu_string *argv = samu_edgevar(ctx, e, "argv", false);
++	if (argv) cmd = argv;
+ 	rsp = samu_edgevar(ctx, e, "rspfile_content", true);
+ 	if (rsp && rsp->n > 0) {
+ 		s = samu_mkstr(ctx->a, cmd->n + sizeof(sep) - 1 + rsp->n);
+--- a/src/external/samurai/build.c
++++ b/src/external/samurai/build.c
+@@ -7,6 +7,8 @@
+ #include "compat.h"
+ 
+ #include <inttypes.h>
++#include <stdlib.h>
++#include <string.h>
+ 
+ #include "external/samurai/ctx.h"
+ #include "log.h"
+@@ -256,6 +258,48 @@
+ 	samu_puts(ctx, description->s);
+ }
+ 
++static int
++samu_hexval(char c)
++{
++	if (c >= '0' && c <= '9') return c - '0';
++	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
++	return -1;
++}
++
++static bool
++samu_run_argv(struct samu_ctx *ctx, struct run_cmd_ctx *run, struct samu_string *encoded)
++{
++	if (!encoded) { samu_warn("edge lacks structured argv"); return false; }
++	char *data = malloc(encoded->n + 1);
++	char **argv = calloc(encoded->n + 2, sizeof(*argv));
++	if (!data || !argv) samu_fatal("out of memory");
++	const char *p = encoded->s;
++	char *out = data;
++	size_t argc = 0;
++	while (*p) {
++		while (*p == ' ') ++p;
++		if (!*p) break;
++		if (*p++ != 'x') goto invalid;
++		argv[argc++] = out;
++		while (*p && *p != ' ') {
++			int hi = samu_hexval(*p++);
++			if (hi < 0 || !*p) goto invalid;
++			int lo = samu_hexval(*p++);
++			if (lo < 0 || !(hi | lo)) goto invalid;
++			*out++ = (char)((hi << 4) | lo);
++		}
++		*out++ = 0;
++	}
++	if (!argc || !argv[0][0]) goto invalid;
++	bool started = run_cmd_argv(ctx->wk, run, argv, 0, 0);
++	free(argv); free(data);
++	return started;
++invalid:
++	samu_warn("invalid structured argv");
++	free(argv); free(data);
++	return false;
++}
++
+ static bool
+ samu_jobstart(struct samu_ctx *ctx, struct samu_job *j, struct samu_edge *e)
+ {
+@@ -296,12 +340,11 @@
+ 	if (build_machine.is_windows) {
+ 		cmd_started = run_cmd_unsplit(ctx->wk, &j->cmd_ctx, j->cmd->s, 0, 0);
+ 	} else {
+-		char *argv[] = { "/bin/sh", "-c", j->cmd->s, NULL };
+-		cmd_started = run_cmd_argv(ctx->wk, &j->cmd_ctx, argv, 0, 0);
++		cmd_started = samu_run_argv(ctx, &j->cmd_ctx, samu_edgevar(ctx, e, "argv", false));
+ 	}
+ 
+ 	if (!cmd_started) {
+-		samu_warn("failed to start job: %s", j->cmd_ctx.err_msg);
++		samu_warn("failed to start job: %s", j->cmd_ctx.err_msg ? j->cmd_ctx.err_msg : "invalid structured argv");
+ 		j->failed = true;
+ 		return false;
+ 	}
