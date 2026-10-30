@@ -201,11 +201,16 @@ before staging is rejected without changing the record and must be republished.
 Publication and verification belong to `system/activation.xsh`; the launcher
 consumes verified images for boot selection.
 
-Run `python3 tests/integration/activation_recovery.py` on Linux with `strace`
-installed to kill writers or inject ENOSPC at each record fsync boundary during
-staging, selection, and confirmation, then verify recovery and concurrent staging.
-These checks establish process-death recovery and reported sync-error handling;
-they do not simulate power loss or filesystem write reordering.
+Run `python3 tests/integration/activation_recovery.py` on Linux with `strace`,
+`unshare`, `mount`, and `umount` installed and unprivileged user namespaces enabled.
+The test kills writers or injects ENOSPC at each record fsync boundary during
+staging, selection, and confirmation. It also exercises concurrent staging and
+collection, closes reply pipes before acknowledgments, and fills an isolated
+1 MiB tmpfs until writes return ENOSPC. Full-filesystem failures preserve the
+record; freeing space permits retry. Reply loss is reconciled by reading status.
+These checks establish process-death recovery, local reply-loss handling, and
+full-filesystem behavior. They do not simulate power loss, filesystem write
+reordering, or an SSH transport disconnect.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the

@@ -34,4 +34,5 @@ proc main(operation: Str, directory: Str) {
   } else {
     fail "unknown recovery operation"
   }
+  print "acknowledged"
 }
