@@ -38,11 +38,14 @@ proc path_summary() -> Result[Str] {
 proc lease_summary() -> Result[Str] {
   let status = p"/run/dhcpc/eth0.status"
   return "absent" unless status.exists()?
-  let report = json.decode(status.read_text()?)?.require(Record)?
-  let state = report.get("state")?.require(Str)?
-  let trouble = report.get("trouble")?.require(Str)?
-  let counters = json.encode(report.get("counters")?)?
-  f"state={state} trouble={trouble} counters={counters}"
+  let text = status.read_text()?.trim()
+  if text == "" {
+    return "empty"
+  }
+  if text.byte_len() > 500 {
+    return text[..500]
+  }
+  text
 }
 
 proc wait_state(name: Str, want: Str) {
