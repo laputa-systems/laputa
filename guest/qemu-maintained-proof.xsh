@@ -68,14 +68,23 @@ proc supervised_network() -> Result[Str] {
   wait_state("dhcp-eth0", "running")
   let lease = p"/run/dhcpc/eth0.status"
   wait until lease.exists()? within 30s every 100ms
-  let state = json.get(json.read(lease)?, ["state"], "").require(Str)?
-  guard state == "bound" else { fail f"dhcp lease is {state}, not bound" }
+  var leased = ""
+  var waited = 0
+  while waited < 60 {
+    leased = json.get(json.read(lease)?, ["state"], "").require(Str)?
+    if leased == "bound" {
+      break
+    }
+    time.sleep(1s)?
+    waited += 1
+  }
+  guard leased == "bound" else { fail f"dhcp lease is {leased}, not bound" }
   let resolv = p"/etc/resolv.conf".read_text()?
   guard "# Managed by dhcpc" in resolv else { fail "resolv.conf is not owned by dhcpc" }
   guard "nameserver" in resolv else { fail "resolv.conf names no server" }
   p"/dev/console".write("LAPUTA_MAINTAINED_LOGGER_OK supervised syslog is running\n")
-  p"/dev/console".write(f"LAPUTA_MAINTAINED_DHCP_OK lease is {state} with a managed resolver\n")
-  f"logger=running dhcp-eth0=running lease={state}\n"
+  p"/dev/console".write(f"LAPUTA_MAINTAINED_DHCP_OK lease is {leased} with a managed resolver\n")
+  f"logger=running dhcp-eth0=running lease={leased}\n"
 }
 
 proc run_proof() {
