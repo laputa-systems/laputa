@@ -186,7 +186,11 @@ copy-truncate rotation. The `dhcp-eth0` service runs the supervised DHCPv4
 client with its lease directory in `/var/lib/dhcpc` on the state disk, run
 state in `/run/dhcpc`, and the resolver composed into `/etc`; the operator
 static file at `/etc/dhcpc/resolv.static` is read-only input, so dhcpc is the
-single owner of `resolv.conf`. Neither service blocks boot, rescue, or login:
+single owner of `resolv.conf`. The DHCP service keeps default readiness
+rather than notify: the XSH client mistakes the supervisor-side
+`unix.notify_ready` read for the service-side write, so a notify pipe kills
+it before its loop starts. The syslog receiver writes its readiness byte
+directly and keeps notify. Neither service blocks boot, rescue, or login:
 dependents use `after` at most, and Dropbear's `need` set stays
 `firewall`, `dropbear-keygen`, and `net`. The loopback-only `net` oneshot is
 unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no

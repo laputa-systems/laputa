@@ -77,6 +77,7 @@ def ensure_state_image():
     # needs /var/log (the health reporter also creates it, belt and braces).
     (staging / "var/lib/dhcpc").mkdir(parents=True)
     (staging / "var/lib/dhcpc").chmod(0o700)
+    (staging / "var/lib/laputa").mkdir(parents=True, exist_ok=True)
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
     run_xsh(str(apply_fixture), "--", str(staging))
