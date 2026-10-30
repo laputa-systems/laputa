@@ -11,8 +11,9 @@ proc ready() -> Result[Bool] {
 proc boot_failed_id(words: List[Str]) -> Result[Str, Error] {
   var found = ""
   for word in words {
-    if word.starts_with("LAPUTA_FAILED_GENERATION=") and found == "" {
-      found = word.replace("LAPUTA_FAILED_GENERATION=", with: "")
+    let trimmed = word.trim()
+    if trimmed.starts_with("LAPUTA_FAILED_GENERATION=") and found == "" {
+      found = trimmed.replace("LAPUTA_FAILED_GENERATION=", with: "")
     }
   }
   found
