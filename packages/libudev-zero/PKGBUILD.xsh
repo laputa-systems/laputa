@@ -12,10 +12,10 @@ export const package_kind = "payload"
 export const ver = "1.0.5"
 
 ## Exported declaration `rel`.
-export const rel = "1"
+export const rel = "2"
 
 ## Exported declaration `deps`.
-export const deps = ["musl"]
+export const deps = ["musl", "hwdata"]
 
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain", "linux-headers"]
