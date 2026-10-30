@@ -132,8 +132,13 @@ proc run_proof() {
   let hashes = [hash.sha256(item)?.hex() for item in files].join("\n") + "\n" + supervised_network()?
   let baseline = p"/var/lib/laputa/maintained-proof-before-reboot"
   if baseline.exists()? {
-    guard baseline.read_text()? == hashes else { fail "identity changed across reboot" }
-    p"/dev/console".write("LAPUTA_MAINTAINED_PROOF_OK identity survived guest reboot\n")
+    let prior = baseline.read_text()?
+    if prior == hashes {
+      p"/dev/console".write("LAPUTA_MAINTAINED_PROOF_OK identity survived guest reboot\n")
+    } else {
+      p"/dev/console".write(f"LAPUTA_MAINTAINED_BASELINE_MISMATCH prior={prior} current={hashes}\n")
+      fail "identity changed across reboot"
+    }
   } else {
     baseline.write(hashes)
     fs.fsync(baseline)
