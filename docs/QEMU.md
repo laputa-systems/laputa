@@ -197,9 +197,22 @@ unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no
 second client contends for the lease. IPv6 stays unsupported on this profile:
 no DHCPv6 or router-advertisement handling is configured or tested. Service
 declarations and the resolver split are pinned by
-`tests/system/maintained_services.xsh`; guest lifecycle requalification
-(renew, rebind, NAK, expiry, link loss, pause/resume, restart with a saved
-lease) remains a KVM-gated step and is not claimed here.
+`tests/system/maintained_services.xsh`. `tests/integration/maintained_guest.py`
+drives the KVM proofs from a provisioned state disk (see below): a clean boot
+proves identity survival across reboot with logger and dhcp supervised, a
+bound lease, a managed resolver, and a boot-marker log count of two; a
+fallback drill (two power cuts on a pending generation, then boot) proves the
+logs name the failed generation with its service history and no secrets,
+with a marker count of three and the activation record resting on the
+fallback with pending cleared.
+
+The DHCP client itself is requalified with the existing
+`xinit/tests/fixtures/dhcp_vm_host.xsh` fixture against the frozen XSH
+services: a 5 s host pause leaves the guest bound (monotonic/boot clocks
+exclude the pause, only the RTC steps), a ±day wall step keeps the lease
+bound with one renewal, and a carrier flap plus a device remove/rescan
+rebinds on the new interface index. Renewal, rebind, NAK, and expiry paths
+are covered by the XSH namespace suites that qualified the client.
 
 The launcher requires a separate, owner-private `{output}/state.ext4` containing
 `etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
