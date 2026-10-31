@@ -1,5 +1,6 @@
 ##! Integration dispatcher.
 
+use integration.cli_remote as cli_remote_case
 use integration.commands as commands_case
 use integration.dirs as dirs_case
 use integration.example as example_case
@@ -18,6 +19,13 @@ use integration.transport as transport_case
 use integration.users as users_case
 
 cli main(case: Str = "all") [fs, process, env, time, error, io] {
+  if case == "cli-remote" or case == "all" {
+    match cli_remote_case.check_cli_remote() {
+      Ok(_) => {}
+      Err(error) => fail error.message
+    }
+  }
+
   if case == "example" or case == "all" {
     match example_case.check_example() {
       Ok(_) => {}
@@ -133,6 +141,7 @@ cli main(case: Str = "all") [fs, process, env, time, error, io] {
 
   let known = [
     "all",
+    "cli-remote",
     "example",
     "hostile",
     "large-binary",

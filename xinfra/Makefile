@@ -45,7 +45,7 @@ differential: oracle
 	XINFRA_PYINFRA=$(PYINFRA) $(XSH) dev/fixtures.xsh exec --cwd $(CURDIR) -- $(XSH) dev/differential.xsh
 
 integration:
-	$(XSH) dev/fixtures.xsh exec --cwd $(CURDIR) -- $(XSH) dev/integration.xsh --case all
+	XINFRA_XSH="$(abspath $(XSH))" $(XSH) dev/fixtures.xsh exec --cwd $(CURDIR) -- $(XSH) dev/integration.xsh --case all
 
 package:
 	$(XSH) dev/package.xsh
