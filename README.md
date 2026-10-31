@@ -27,17 +27,20 @@ The harness boots the kernel directly; standalone firmware boot of the ISO is
 not supported. See the [installer guide](docs/INSTALLER.md) for host requirements and boot
 limitations.
 
-For a dwl desktop with the foot terminal, after preparing the seed run:
+For the canonical Tinyland kiosk with Ghostty, on a host with a virgl-capable
+QEMU and GPU render node, after preparing the seed run:
 
 ```sh
 make profile-boot
 ```
 
-This builds and boots the `qemu-dwl-foot` profile for the host architecture.
-It uses KVM on Linux or HVF on Apple Silicon macOS and stores the system under
-`target/laputa/qemu-dwl-foot/`. The [QEMU guide](docs/QEMU.md) covers requirements
-and outputs. A headless Asterinas/Firecracker guest is also available on
-x86_64 Linux; see [Asterinas](docs/ASTERINAS.md).
+This builds and boots the `qemu-tinyland-ghostty` profile for the host
+architecture. It uses KVM on Linux or HVF on Apple Silicon macOS and stores the
+system under `target/laputa/qemu-tinyland-ghostty/`. The dwl/foot profiles stay
+available as rollbacks through their `profile-dwl-*` and `profile-tinyland-*`
+targets. The [QEMU guide](docs/QEMU.md) covers requirements and outputs. A
+headless Asterinas/Firecracker guest is also available on x86_64 Linux; see
+[Asterinas](docs/ASTERINAS.md).
 
 ## Packages and services
 

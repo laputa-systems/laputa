@@ -2,8 +2,8 @@
 
 `qemu-tinyland-foot` uses an unbound seat. `qemu-tinyland-vt-foot` uses a
 VT-bound seat. Both run unprivileged tinyland and Laputa foot through Rust
-seat and device brokers. `qemu-dwl-foot` remains the canonical reference.
-Promotion requires an explicit owner decision after current qualification.
+seat and device brokers. `qemu-tinyland-ghostty` is the canonical profile;
+the foot profiles and `qemu-dwl-foot` remain rollbacks.
 
 ## Source and artifact contract
 
@@ -130,13 +130,14 @@ closures and overlays, beyond the selected packages above:
 
 | Profile | Generation SHA-256 |
 |---|---|
+| qemu-tinyland-ghostty | `0b168a30fa4c9b1ab3b7d064864a6526368465101271f029bf46935bdc8e10b2` |
 | qemu-dwl-foot | `e40c101617c6462741f3a0111de59e64ffbdfa7bc493f82e092d7c1c8cfc0b27` |
 | qemu-tinyland-foot | `88f29d08b6cc17c82b5022dbaced1b5c8f7b324ae4e34ce4d0c4d5cf6056696c` |
 | qemu-tinyland-vt-foot | `5df73e3be34354813b30e168e1d9647c4e96b329ac9da8dba3c6e4b529a7e8a9` |
 
-Linux aarch64 and macOS host execution remain unverified. The x86_64 Tinyland
-profiles are functional promotion candidates; keep dwl canonical until the
-owner selects the supported promotion scope. No release was published.
+Linux aarch64 and macOS host execution remain unverified. The owner selected
+the x86_64 Tinyland Ghostty profile as canonical; the foot and dwl profiles
+remain rollbacks. The Ghostty package is published separately.
 
 The root gate also exposed and repaired seed acceptance being persisted after
 activation. A separate interruption during seed copying can still leave an
@@ -161,5 +162,6 @@ broker recovery. They establish historical rendering and input behavior,
 not the stronger mediation and supervisor claims under review now.
 
 Pointer support, multiwindow operation, GPU composition, and real hardware
-remain outside this integration campaign. Do not publish releases or change
-the canonical profile as part of qualification.
+remain outside this integration campaign. The owner promoted the Ghostty
+profile separately in the Ghostty campaign; qualification itself changes no
+profile.

@@ -7,7 +7,8 @@ Laputa builds on Linux aarch64 and x86_64 hosts and on Apple Silicon macOS.
 `ARCH` (the seed and package target) defaults to the host's architecture, and
 every container runs on the host's native Docker platform (`linux/arm64` or
 `linux/amd64`). There is no cross-architecture build. The only supported
-system profile is `qemu-dwl-foot`.
+system profile is `qemu-tinyland-ghostty`; the dwl and foot profiles remain as
+rollbacks.
 
 ## Host requirements
 
@@ -283,7 +284,7 @@ Their build-root PATH prefix is not confinement. The cohort does not prove
 production per-package isolation, a self-hosted compiler, resource isolation,
 or protection against a compromised kernel or Docker daemon.
 
-## The qemu-dwl-foot profile
+## The canonical profile
 
 ```bash
 make profile-plan
@@ -332,7 +333,7 @@ Mount the profile output at `/profile` the same way and run
 
 ```bash
 docker run --rm --network none --platform "$PLATFORM" \
-  --mount type=bind,src="$PWD/target/laputa/qemu-dwl-foot",dst=/profile,readonly \
+  --mount type=bind,src="$PWD/target/laputa/qemu-tinyland-ghostty",dst=/profile,readonly \
   --mount type=bind,src="$PWD",dst=/src/laputa,readonly \
   --mount type=bind,src="$PWD/.out/seed/$ARCH/xsh",dst=/bin/xsh,readonly \
   --mount type=bind,src="$PWD/.out/seed/$ARCH/core",dst=/usr/lib/xsh/core,readonly \
@@ -342,7 +343,7 @@ docker run --rm --network none --platform "$PLATFORM" \
   /bin/xsh /src/laputa/pm.xsh -- root inspect /profile/current/generation.json
 ```
 
-`profiles/qemu-dwl-foot.xsh` owns `package_roots`, `forbidden_packages`, and
+`profiles/qemu-tinyland-ghostty.xsh` owns `package_roots`, `forbidden_packages`, and
 `forbidden_sonames`. The profile build checks the runtime closure against
 these exclusions before execution and checks sonames in the composed files.
 `profiles/qemu-maintained.xsh` is the long-lived profile and sets `development`

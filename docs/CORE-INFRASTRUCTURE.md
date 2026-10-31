@@ -11,7 +11,7 @@ macOS, KVM on Linux).
 |---|---|
 | `pm.xsh`, `pm/` | package manager CLI and modules |
 | `packages/<name>/` | recipes (`PKGBUILD.xsh`), package proofs, package files |
-| `system/`, `laputa.xsh` | typed `qemu-dwl-foot` profile CLI: Docker adapter, image construction, QEMU proof |
+| `system/`, `laputa.xsh` | typed profile CLI: Docker adapter, image construction, QEMU proof |
 | `profiles/`, `guest/`, `boot/` | profile data, guest proof payload, QMP helper |
 | `infra/asterinas/`, `guest/asterinas/` | pinned Asterinas/Firecracker backend, Laputa guest proof, and serial shell |
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 and x86_64 installer image and its QEMU harness (separate from the profile CLI) |
@@ -28,7 +28,7 @@ PM (`pm.xsh`, `pm/`, `packages/`) owns recipes, the typed `PackageCatalog`,
 graph resolution, the `BuildPlan`, artifact storage, root composition, and
 publication; [PM](PM.md) is its contract. `seed/` owns the local XSH seed, the
 two Docker images, and the package world behind `make plan/build/publish/root`.
-`system/` and `laputa.xsh` own the typed `SystemProfile` for `qemu-dwl-foot`;
+`system/` and `laputa.xsh` own the typed `SystemProfile` for `qemu-tinyland-ghostty`;
 `system/qemu.xsh` picks the QEMU target for the host. The installer composes its
 roots from the local mirror; see [installer](INSTALLER.md).
 

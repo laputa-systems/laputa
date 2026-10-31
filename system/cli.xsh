@@ -35,9 +35,9 @@ export pure usage() -> Str {
 
 Build and test one reference system natively for this host:
 aarch64 under HVF on macOS, aarch64 or x86_64 under KVM on Linux.
-Profiles: qemu-dwl-foot (canonical), qemu-tinyland-foot (opt-in kiosk),
-qemu-tinyland-vt-foot (opt-in VT-bound kiosk), qemu-tinyland-ghostty
-(opt-in Ghostty kiosk on virgl).
+Profiles: qemu-tinyland-ghostty (canonical kiosk on virgl),
+qemu-tinyland-foot (rollback kiosk), qemu-tinyland-vt-foot (rollback
+VT-bound kiosk), qemu-dwl-foot (rollback reference).
 """
 }
 

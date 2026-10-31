@@ -1,11 +1,12 @@
 # QEMU Proof
 
-`qemu-dwl-foot` is the canonical reference profile. `qemu-tinyland-foot`
-is the opt-in kiosk profile: unprivileged tinyland through seatd-mediated
-devices and Laputa foot, without dwl, wlroots, libinput, libdrm, Mesa, or
-wayland-libs-server in the runtime closure. Each profile's acceptance test
-boots the immutable image built by `laputa build`; it does not assemble a
-filesystem from a handwritten package list.
+`qemu-tinyland-ghostty` is the canonical profile: unprivileged tinyland
+through seatd-mediated devices and Ghostty Custom rendering on virgl, without
+dwl, wlroots, libinput, LLVM, or wayland-libs-server in the runtime closure.
+`qemu-tinyland-foot` and `qemu-tinyland-vt-foot` are the rollback kiosks with
+Laputa foot, and `qemu-dwl-foot` is the rollback dwl desktop. Each profile's
+acceptance test boots the immutable image built by `laputa build`; it does not
+assemble a filesystem from a handwritten package list.
 
 ## Host targets
 
@@ -41,29 +42,23 @@ split keeps both the guest's OpenGL 4.3 context and the host pixel proof.
 ## Commands and outputs
 
 ```bash
-make profile-build    # laputa.xsh -- build qemu-dwl-foot
-make profile-test     # laputa.xsh -- test qemu-dwl-foot
-make profile-boot     # laputa.xsh -- boot qemu-dwl-foot
-make profile-plan     # laputa.xsh -- plan qemu-dwl-foot
-make profile-clean    # laputa.xsh -- clean qemu-dwl-foot
+make profile-build    # laputa.xsh -- build qemu-tinyland-ghostty
+make profile-test     # laputa.xsh -- test qemu-tinyland-ghostty
+make profile-boot     # laputa.xsh -- boot qemu-tinyland-ghostty
+make profile-plan     # laputa.xsh -- plan qemu-tinyland-ghostty
+make profile-clean    # laputa.xsh -- clean qemu-tinyland-ghostty
 ```
 
-The `qemu-tinyland-foot` profile has the same verbs under
-`make profile-tinyland-build`, `profile-tinyland-test`,
-`profile-tinyland-boot`, `profile-tinyland-plan`, and
-`profile-tinyland-clean`.
-
-`qemu-tinyland-ghostty` replaces foot with Ghostty Custom rendering
-through Mesa's virgl driver (`qemu_gpu: Virgl`) under
-`make profile-tinyland-ghostty-*`. Its guest proof requires Ghostty's
-OpenGL 4.3 renderer in every session and the same lifecycle matrix as
-`qemu-tinyland-foot`. Its input step currently fails: the packaged
-Ghostty creates no `wl_keyboard` (see `tinyland/docs/opengl-probe.md`).
+The canonical profile is also reachable explicitly under
+`make profile-tinyland-ghostty-*`. The rollbacks keep their own targets:
+`make profile-tinyland-*` for `qemu-tinyland-foot`, `make
+profile-tinyland-vt-*` for the VT-bound variant, and `make profile-dwl-*`
+for `qemu-dwl-foot`.
 
 `laputa.xsh` also takes `--jobs N` (`$XSH_HOST laputa.xsh -- build
-qemu-dwl-foot --jobs 4`).
+qemu-tinyland-ghostty --jobs 4`).
 
-- `plan` writes `target/laputa/qemu-dwl-foot/build-plan.json`. Two runs from
+- `plan` writes `target/laputa/qemu-tinyland-ghostty/build-plan.json`. Two runs from
   clean profile output produce byte-identical plans.
 - `build` resolves or builds exact package artifacts in the shared store
   `.out/artifacts/<arch>`, composes an immutable generation, and atomically
@@ -72,13 +67,14 @@ qemu-dwl-foot --jobs 4`).
   root filesystem, and disk image are all verified. A warm run reuses matching
   artifacts and keeps the plan digest, generation digest, and image hash.
 - `test` and `boot` first build or refresh `current`. `test` is
-  deterministic: it starts QEMU without a display, uses QMP to inject `laputa`
-  followed by EOF exactly once, waits for the bounded guest proof, and saves a
-  screenshot. Success prints exactly `laputa test qemu-dwl-foot: ok`.
-- `boot` opens QEMU's interactive display with the normal dwl and foot
-  session. It is a diagnostic path, not the acceptance test.
-- `clean` removes only `target/laputa/qemu-dwl-foot`, never the artifact
-  store. `make clean` removes all derived state.
+  deterministic: it starts QEMU without a display, uses QMP to inject the
+  profile's line exactly once, waits for the bounded guest proof, and saves a
+  screenshot. Success prints exactly
+  `laputa test qemu-tinyland-ghostty: ok`.
+- `boot` opens QEMU's interactive display with the profile's session. It is a
+  diagnostic path, not the acceptance test.
+- `clean` removes only `target/laputa/qemu-tinyland-ghostty`, never the
+  artifact store. `make clean` removes all derived state.
 
 Each bundle `builds/<system-key>/` contains `build-plan.json`,
 `generation.json`, `disk.img`, `rootfs.ext4`, and `vmlinuz`. `current` is an
@@ -89,9 +85,9 @@ complete verified bundle is copied atomically to the host output mount.
 
 ## Proof contract
 
-The guest coldplugs devices, starts seatd, the profile compositor, and foot,
-and emits its `*_PROOF_OK` marker only after foot launches, then keeps the
-compositor running until the host stops the guest. A passing test requires
+The guest coldplugs devices, starts seatd, the profile compositor, and its
+terminal, and emits its `*_PROOF_OK` marker only after the terminal launches,
+then keeps the compositor running until the host stops the guest. A passing test requires
 that marker and a screenshot containing the terminal's magenta visual marker.
 It rejects `Kernel panic`, `not syncing`, and the profile's `*_PROOF_FAILED`
 marker; inspect `console.log` and `qemu.log` first when it fails.

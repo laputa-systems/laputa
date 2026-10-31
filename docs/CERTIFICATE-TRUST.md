@@ -233,7 +233,7 @@ An explicitly trusted leaf remains a valid trust anchor.
 
 Both packages depend on `ca-certificates`. Go's Linux verifier reads the
 canonical bundle and certificate files in `/etc/ssl/certs`. Laputa installs
-only the canonical bundle there. The `qemu-dwl-foot` profile includes
+only the canonical bundle there. The `qemu-tinyland-ghostty` profile includes
 `ca-certificates` directly. These changes retain the remaining root bundle.
 
 ### Per-consumer distrust enforcement

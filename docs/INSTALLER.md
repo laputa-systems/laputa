@@ -3,7 +3,7 @@
 A compact aarch64 or x86_64 hybrid ISO, written directly by XSH, that installs
 a barebones Laputa system and is exercised under QEMU. Package roots come from
 the local mirror, like `make root`'s, so build and publish the world first
-(`make build`, `make mirror`, `make publish`). The `qemu-dwl-foot` profile
+(`make build`, `make mirror`, `make publish`). The canonical `qemu-tinyland-ghostty` profile
 ([QEMU](QEMU.md)) shares none of this: not the package roots, not the image
 policy.
 

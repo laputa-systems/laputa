@@ -167,9 +167,9 @@ test-linux: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test packages/linux-headers/tests
 
 # The whole host proof from `make clean`: host tools, fetch, seed, the world,
-# publish, root, the installer image and its QEMU proof, the qemu-dwl-foot
-# proof, check, the native suites, mirror-test, and a no-op rebuild, one step
-# at a time. Logs and the timing table go to .out/verify/.
+# publish, root, the installer image and its QEMU proof, the canonical
+# profile proof, check, the native suites, mirror-test, and a no-op rebuild,
+# one step at a time. Logs and the timing table go to .out/verify/.
 VERIFY_HOST_TOOLS := $(if $(filter $(HOST_TOOLS_DIR),$(XSH_BIN_DIR)),host-xsh)
 verify: $(VERIFY_HOST_TOOLS)
 	@$(MAKE) --no-print-directory need-xsh
@@ -349,23 +349,32 @@ fetch-mirror: fetch-seed
 fetch-seed: need-xsh
 	$(SEED) fetch $(SEED_ARGS)
 
-# The typed profile CLI is the sole core-system orchestration surface.
-profile-plan:
+# The typed profile CLI is the sole core-system orchestration surface. The
+# canonical profile is the Tinyland Ghostty kiosk; its explicit targets below
+# own the recipes.
+profile-plan: profile-tinyland-ghostty-plan
+profile-build: profile-tinyland-ghostty-build
+profile-test: profile-tinyland-ghostty-test
+profile-boot: profile-tinyland-ghostty-boot
+profile-clean: profile-tinyland-ghostty-clean
+
+# Rollback reference profile: dwl with foot.
+profile-dwl-plan:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-dwl-foot
 
-profile-build:
+profile-dwl-build:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-dwl-foot
 
-profile-test:
+profile-dwl-test:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-dwl-foot
 
-profile-boot:
+profile-dwl-boot:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-dwl-foot
 
-profile-clean:
+profile-dwl-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
 
-# Opt-in kiosk profile: unprivileged tinyland through seatd mediation.
+# Rollback kiosk profile: unprivileged tinyland through seatd mediation.
 profile-tinyland-plan:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-foot
 
@@ -473,7 +482,7 @@ test-pm-docker: need-xsh
 update-checksums: need-xsh
 	@printf '%s\n' $(PKGDIRS) | xargs -n 1 -P $(UPDATE_CHECKSUM_JOBS) sh -c 'pkg="$$1"; name="$${pkg#packages/}"; XSH_MODULE_PATH="$(CURDIR)" $(XSH) pm.xsh -- repo update-checksums --repo . "$$name"' sh
 
-# Installer workflows are not part of the qemu-dwl-foot profile lifecycle.
+# Installer workflows are not part of the canonical profile lifecycle.
 # Both import ARCH's installer roots from the local mirror, so they need
 # `make mirror` running and `make publish` done; the QEMU proof builds its own
 # smoke-mode image, then installs and boots it (KVM on x86_64).
