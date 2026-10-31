@@ -545,8 +545,8 @@ impl<Storage: KalmanStorageInternal<C>, C: Clock<TAI>> KalmanControllerState<Sto
             let offset = offset_estimate.value;
             let offset_uncertainty = offset_estimate.uncertainty();
 
-            if offset > clock_info.config.jump_threshold.as_seconds()
-                && offset > clock_info.config.jump_certainty_threshold * offset_uncertainty
+            if offset.abs() > clock_info.config.jump_threshold.as_seconds()
+                && offset.abs() > clock_info.config.jump_certainty_threshold * offset_uncertainty
             {
                 let step = Duration::from_f64_seconds(-offset);
                 clock_info.check_jump(step)?;
@@ -601,7 +601,7 @@ impl<Storage: KalmanStorageInternal<C>, C: Clock<TAI>> KalmanControllerState<Sto
                 clock_info.clock.leap_update(leap_status)?;
             }
             clock_info.clock.synchronization_update(
-                offset < clock_info.config.synchronized_threshold.as_seconds()
+                offset.abs() < clock_info.config.synchronized_threshold.as_seconds()
                     && offset_uncertainty < clock_info.config.synchronized_threshold.as_seconds(),
             )?;
             clock_info.clock.error_estimate_update(

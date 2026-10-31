@@ -49,7 +49,8 @@ validation, and daemon repairs recorded in git history. Remaining daemon gaps ar
   `SynchronizationSettings::clock_config` turns its step limits into the
   `statime_algo::ClockConfig` jump abort thresholds, and
   `minimum-agreeing-sources`, `local-stratum`, and `reference-id` reach the
-  controller and `NtpManager`. `Config::check` fails when fewer sources are
+  controller and `NtpManager`. Step and synchronization thresholds compare the
+  magnitude of the estimated offset in both directions. `Config::check` fails when fewer sources are
   configured than `minimum-agreeing-sources`. `NtpServerConfig` has no
   fields, and the run loop does not bind servers. The run loop binds
   `observation-path` before it reports readiness and exits if it cannot,
