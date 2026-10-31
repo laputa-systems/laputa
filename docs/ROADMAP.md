@@ -111,7 +111,7 @@ owners, not a new message bus or resident fleet-management service.
 
 | Area | Existing foundation | Remaining boundary |
 |---|---|---|
-| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs; all but ntpd-rs have package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
+| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs have package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
 | Packages and images | Typed plans, immutable artifacts, runtime-only generations, atomic publication of host-side system bundles | Installed-system activation, boot success, rollback, and state ownership are not the same as composing a generation. See [PM](PM.md) and [core infrastructure](CORE-INFRASTRUCTURE.md). |
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
@@ -297,9 +297,10 @@ unsupported modes explicitly.
 
 ### Time discipline and bootstrap
 
-Integrate the in-tree `ntpd-rs` (imported from the `laputa-systems/ntpd-rs`
-fork) as a package and xinit service. Its Graviola work lives in `ntpd-rs/`;
-this roadmap does not claim the port or Laputa integration is complete. Check
+The in-tree `ntpd-rs` has a Graviola/rustcrypto musl package and xinit service.
+It runs as reserved UID/GID 123 with only `CAP_SYS_TIME`; initialization readiness
+does not imply synchronization. No shipped profile enables it. Existing systems
+must provision the reserved identity before enabling it. Check
 the selected provider/features, musl targets, and required virtual CPU features
 rather than assuming every VM CPU model can execute the binary.
 
@@ -312,6 +313,13 @@ steps, and the daemon exits instead of exceeding them. Prove actual guest-clock 
 startup or an NTS handshake. Never grant a test access to alter the build host's
 clock; use disposable guests for clock-changing tests.
 
+Disposable x86_64/KVM guests prove startup convergence from both clock directions,
+the privilege boundary and supervised restart. External-backstep and QMP
+pause/resume cases prove restart/source reselection; the backstep case does not
+prove convergence, and the loopback oracle pauses with the guest. Authenticated
+NTS discipline, the chrony oracle and drift persistence remain open. See the
+[retained guest checks](TESTING.md#run-the-disposable-ntp-guest).
+
 Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
 separate supervisor deadlines from wall timestamps with explicit units/origins;
 a mechanical `time.now()` to `time.monotonic()` replacement is not sufficient.
@@ -322,6 +330,9 @@ assume an already trustworthy wall clock. Document initial clock assumptions,
 any persisted lower bound, cold-boot/offline behavior, and explicit operator
 recovery. An unauthenticated NTP result or a virtual RTC is not authenticated
 time; do not silently disable TLS verification or accept expired metadata.
+The current snapshot acceptance path persists its supplied current time as a
+lower bound after signature verification. It does not establish time-source
+trust. Settle that policy before activating unauthenticated NTP in a profile.
 Persisted guest state alone cannot prevent a hostile hypervisor from rolling
 back both clock and disk; do not promise that threat model is covered.
 
@@ -581,8 +592,17 @@ The SSH client remains XSH-55.
 
 ## R7: Backups, timers, and persistent diagnostics
 
-**Backups.** Select an established versioned backup tool; `rustic` is a candidate
-to qualify, not an already-approved default. The existing `laputa-systems/fs`
+**Backups.** `packages/rustic` pins v0.11.4. The retained manual restore drill
+backs up `/etc /home /var`, reconstructs static state from the maintained image,
+restores a blank disk and checks identity, supervised networking, repository
+integrity and re-backup differences. It removes the first repository key and
+proves that its password fails while the second key and exported masterkey each
+recover access. A fresh receipt-bound guest passed this drill with a previously
+extracted packaged rustic binary and restic 0.18.1; fresh rustic artifact metadata
+was unavailable, so this does not establish a fresh package provenance check.
+Five harness regressions cover stale and interleaved console output and missing
+or failed proof markers. Scheduling, retention, remote backends and a packaged
+restic remain open. The existing `laputa-systems/fs`
 copy/sync utility is not a substitute for retained backups. Define encryption-key
 recovery, retention, repository checking, application quiescence, and which state
 is restored versus reconstructed from package generations. Distinguish restoring

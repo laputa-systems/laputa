@@ -23,6 +23,9 @@ disks and native build hosts remain in scope. Existing paused campaigns are not 
 runnable entries using the supplied fixed XSH snapshot. External XSH repairs
 and real-hardware enablement remain outside that scope.
 
+All performance work is deferred by the owner, including readiness checks and
+time, memory, binary-size and scaling measurements. Functional work continues.
+
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
 
 - **Area:** Tests
@@ -193,21 +196,12 @@ and real-hardware enablement remain outside that scope.
 - **Fix with:** durable-state
 - **Effort:** M (days)
 
-### LAP-47 · P2 · ntpd-rs fork is not yet a shippable clock service
+### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
 
 - **Area:** Time discipline
 - **Where:** `ntpd-rs/`, imported from the `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
-- **Problem:** The fork is fetchable and musl-clean with a Graviola TLS provider, but its daemon was not operational; the remaining work is packaging and qualification.
-- **Recommendation:** Do not package this as the R2 clock service. Fix the daemon in `ntpd-rs/`, then package the Graviola profile (`--no-default-features --features graviola,rustcrypto`, musl targets, `ntp-daemon`/`ntp-ctl`/`ntp-metrics-exporter` plus a pool-only config and an xinit service retaining `CAP_SYS_TIME`) only after `daemon::run` and the `[synchronization]` table are reconnected. Clock tests stay in disposable guests, never on the host.
+- **Problem:** The packaged service is operational, but authenticated NTS discipline, comparison with the chrony oracle, persistent drift/state and authenticated clock bootstrap remain unproven. `pm/repo_snapshot.xsh::snapshot_persist_accepted` persists the supplied current time after signature validation without establishing its time-source trust; unauthenticated NTP must not silently become an authenticated floor.
+- **Recommendation:** Qualify the remaining cases in disposable guests and settle the clock-floor policy before enabling the service in a shipped profile. Never alter the host clock. Define cold-boot and offline recovery without weakening TLS or snapshot expiry verification.
+- **Progress:** The Graviola/rustcrypto musl package installs the daemon, ctl and exporter. Its wrapper drops to UID/GID 123 with only `CAP_SYS_TIME`; readiness means initialization, not synchronization. Real guest clocks converge from both positive and negative startup offsets. Forced restart, external-backstep restart/reselection and QMP pause/resume reselection pass. The loopback oracle pauses with the guest, and the external-backstep case does not prove convergence. No shipped profile enables the service. Existing installations must provision the reserved identity before enabling it. See [time discipline](docs/ROADMAP.md#time-discipline-and-bootstrap) and [guest checks](docs/TESTING.md#run-the-disposable-ntp-guest).
 - **Fix with:** reference-parity
 - **Effort:** M (days)
-
-### LAP-48 · P1 · Prove a manual rustic restore onto a blank disk
-
-- **Area:** Backups
-- **Where:** R7/G2 step 6; no Laputa package yet
-- **Problem:** No retained backup exists and no restore has been shown. Upstream `rustic` v0.11.4 is the candidate: musl is a CI-tested shipped target, no openssl/libfuse hard deps, restic-format compatible (independent reader), offline password-file key management with a second key and exportable masterkey.
-- **Recommendation:** Pin `rustic` v0.11.4. Its lockfile carries no git sources (`rustic_backend` 0.7.0 and `rustic_core` 0.13.0 both come from crates.io), so the standard `cargo-vendor` recipe path applies with no PM extension. Then back up state dirs only (never generations), reinstall the base from trusted artifacts alone, `check` the repo, restore onto the blank disk, and confirm `diff`/re-backup cleanliness, with a one-off `restic check` cross-read. Key loss (no second key plus exported masterkey in trusted artifacts) fails the drill.
-- **Progress:** `packages/rustic` pins v0.11.4 with a local roundtrip proof. `tests/integration/restore_drill.py` drives the full manual drill on Linux x86_64/KVM against the maintained image: the guest backs up exactly `/etc /home /var` (snapshot paths asserted, no generation named) from steady state (Dropbear listening, lease bound, managed resolver) to a repo on attached operator media holding the packaged rustic binary, a restic 0.18.1 cross-reader, staged libgcc_s, both passwords, and the exported masterkey; the original VM is then gone. A skeleton state rebuilt from image static files alone restores the latest snapshot onto a blank disk with byte-identical identity files, the drill seeds the maintained proof baseline, and the restored boot passes the standard identity proof with logger and dhcp supervised, a bound lease, a managed resolver, and a boot-marker count of two. `rustic check` and `restic check` both pass with no errors and restic lists the rustic snapshot; the re-backup diff touches only the drill-seeded proof baseline (allowlisted, proof-gated), the boot-marker log, and rotated logger outputs. A wrong password cannot open the repo while the second key can. All QEMU PIDs were reaped. Scheduling, retention, remote backends, and a packaged restic remain open, as does recovery with a truly lost first key (the drill proves the second key opens the repo, not removal of the first).
-- **Fix with:** durable-state
-- **Effort:** L (weeks)
