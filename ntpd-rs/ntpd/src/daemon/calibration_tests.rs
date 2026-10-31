@@ -89,15 +89,26 @@ fn rejects_corrupt_unknown_and_out_of_bounds_state() {
 }
 
 #[test]
+fn failed_replace_child() {
+    let Some(path) = std::env::var_os("NTPD_FAILED_WRITE_CHILD") else { return; };
+    let store = CalibrationStore::open(&PathBuf::from(path), 0.0005).unwrap();
+    assert!(store.save(Calibration { correction: 0.000_03, uncertainty: 0.000_001 }).is_err());
+}
+
+#[test]
 fn failed_replace_keeps_last_complete_calibration() {
     let dir = TestDirectory::new();
     let store = CalibrationStore::open(&dir.path(), 0.0005).unwrap();
     let original = Calibration { correction: 0.000_02, uncertainty: 0.000_001 };
     store.save(original).unwrap();
-    fs::set_permissions(&dir.0, fs::Permissions::from_mode(0o500)).unwrap();
-    let result = store.save(Calibration { correction: 0.000_03, uncertainty: 0.000_001 });
-    fs::set_permissions(&dir.0, fs::Permissions::from_mode(0o700)).unwrap();
-    assert!(result.is_err());
+    drop(store);
+    let status = std::process::Command::new("/bin/sh")
+        .args(["-c", "ulimit -f 0; trap '' XFSZ; exec \"$@\"", "limited"])
+        .arg(std::env::current_exe().unwrap())
+        .args(["--exact", "daemon::calibration_tests::failed_replace_child"])
+        .env("NTPD_FAILED_WRITE_CHILD", dir.path()).status().unwrap();
+    assert!(status.success());
+    let store = CalibrationStore::open(&dir.path(), 0.0005).unwrap();
     assert_eq!(store.load().unwrap(), Some(original));
 }
 
