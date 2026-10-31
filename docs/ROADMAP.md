@@ -322,7 +322,15 @@ converges against the raw-clock oracle and restarts under supervision. Its
 standalone runner passes end to end. Test-only chrony 4.9 agrees on startup
 stepping in both offset directions and readiness before synchronization.
 This does not establish slew, NTS interoperability or reboot-policy parity.
-External NTS deployment and drift persistence remain open. See the
+The package now persists a bounded steady frequency correction and uncertainty,
+excluding phase slew. A controlled 100 ppm source proves learning and restoration
+across daemon restart and a fresh kernel boot on the same state disk. Restoration
+is checked against the kernel frequency before any peer is available and while
+stratum remains 16. The final artifact also passes the authenticated NTS control.
+The private state directory must belong to UID/GID 123 with mode 0700; invalid
+state or a conflicting writer stops the daemon. This is oscillator calibration,
+not a UTC floor or a power-loss durability proof.
+External NTS deployment and aarch64 runtime qualification remain open. See the
 [retained guest checks](TESTING.md#run-the-disposable-ntp-guest).
 
 Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
@@ -502,8 +510,11 @@ state disk. An earlier guest proof exercised two actual unbootable-B panics and
 launcher fallback to healthy A. Host tests additionally cover termination at
 both record fsync boundaries, concurrent staging and collection, full-filesystem
 recovery, and reconciliation after losing a reply. Independent rescue boots
-even when both generation images lack PID 1. These proofs do not establish
-power-loss durability or native SSH disconnect behavior. Host admission policy
+even when both generation images lack PID 1. A maintained guest additionally
+stages B through host APIs over pinned native SSH, loses the reply after commit,
+and reconnects to verify state, hashes, duplicate-stage rejection and launcher
+selection. This does not establish disconnect-during-write or physical power-loss
+behavior, and it does not add an installed activation command. Host admission policy
 now pins complete generation identities, image hashes, and the supported shared
 state contract. Its revision survives confirmation and fallback; revoked inputs
 cannot be selected or confirmed. Incompatible state declarations are refused,
