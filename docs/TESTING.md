@@ -129,6 +129,16 @@ build needs the locked Rust dependencies available offline. These cases do not
 qualify external sources or the authenticated clock-floor policy. The bundled
 NTS test certificate expires on 27 February 2027.
 
+To renew the test-only localhost certificate, run from the repository root:
+
+```bash
+mkdir -p .work/tmp
+work=$(mktemp -d "$PWD/.work/tmp/nts-cert.XXXXXXXX")
+cp ntpd-rs/ntp-proto/test-keys/{gen-cert.sh,testca.pem,testca.key} "$work/"
+(cd "$work" && sh gen-cert.sh localhost testca end)
+cp "$work"/{end.key,end.pem,end.fullchain.pem} ntpd-rs/ntp-proto/test-keys/
+```
+
 ### Use the fixed xinit tool snapshot
 
 The independent checks use frozen `bin/{xsh,xshi,xsht}` and matching `core/`
