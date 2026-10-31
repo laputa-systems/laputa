@@ -14,7 +14,7 @@ export const xsh_seed_build_image = "xsh-test"
 
 const xsh_seed_manifest_format = "laputa-xsh-seed-1"
 
-const xsh_seed_features = "xsh/net xsh/tools xsht/native-tests"
+const xsh_seed_features = "xsh/net xsh/ssh xsh/tools xsht/native-tests"
 const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
 
 ## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
