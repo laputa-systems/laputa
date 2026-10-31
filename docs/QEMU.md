@@ -110,7 +110,10 @@ never retried.
 
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed
-to the retry path. If an input event loses its response, the supervisor reports an indeterminate
+to the retry path. The profile's `proof.input_mode` selects the keys:
+`ProofPlain` types the lowercase line the foot readers consume, and
+`ProofModifiers` drives Caps Lock, Shift, and a bare modifier press and
+expects `LAPUTA!` from the reader. If an input event loses its response, the supervisor reports an indeterminate
 outcome and does not retry. Both supported host platforms use `system/qmp.xsh`
 over `unix.connect_stream`; QMP control requires no Python process.
 
