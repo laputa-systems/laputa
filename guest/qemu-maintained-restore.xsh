@@ -171,13 +171,14 @@ proc phase_backup() {
   let repo = fp"{backup_mount}/repo"
   guard ! repo.exists()? else { fail "backup repo already exists" }
   let _ = rustic(["init"], pw1)?
+  let keys = fs.files(fp"{repo}/keys", hidden: true)? |> collect
+  guard keys.len() == 1 else { fail "expected exactly one initial repository key" }
+  let first_key = keys[0].path.name()
   let _ = rustic(["key", "add", "--new-password-file", pw2.display()], pw1)?
-  let exported = rustic(["key", "export"], pw1)?
-  guard exported.trim() != "" else { fail "masterkey export is empty" }
-  fp"{backup_mount}/tools/masterkey.export".write(exported)
-  let _ = try {
-    process.run(process.command_argv(/usr/bin/chmod, ["chmod", "600", fp"{backup_mount}/tools/masterkey.export".display()], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.out"))?
-  }
+  let masterkey = fp"{backup_mount}/keys/masterkey.export"
+  let _ = rustic(["key", "export", masterkey.display()], pw1)?
+  let mode = process.run(process.command_argv(/usr/bin/chmod, ["chmod", "600", masterkey.display()], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err"))?
+  guard mode.ok else { fail "cannot protect exported masterkey" }
   let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw1)?
   let listed = rustic(["snapshots", "--json"], pw1)?
   let ids = snapshot_ids(listed)?
@@ -190,6 +191,16 @@ proc phase_backup() {
   fp"{backup_mount}/snap1.id".write(ids[0] + "\n")
   let manifest = hash_manifest(identity_files()?)?
   fp"{backup_mount}/hashes-before.txt".write(manifest)
+  let _ = rustic(["key", "remove", first_key], pw2)?
+  let denied = process.run(
+    process.command_argv(
+      fp"{backup_mount}/tools/rustic", ["rustic", "--no-cache", "snapshots"],
+      p"/", tool_env(pw1)?, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err",
+    ),
+  )?
+  guard ! denied.ok else { fail "removed first key still opens the repo" }
+  pw1.remove()?
+  guard ! pw1.exists()? else { fail "first password survived loss" }
   linux.umount(backup_mount)?
   console(f"RESTORE_BACKUP_OK snapshot={ids[0]}")
 }
@@ -198,10 +209,11 @@ proc phase_restore() {
   mount_backup()
   blank_mount.mkdir()
   linux.mount(blank_dev, blank_mount, fstype: "ext4", options: ["nosuid", "nodev"])
-  let pw1 = password("password1")?
+  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
+  let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   guard snap1 != "" else { fail "snap1.id is missing" }
-  let _ = rustic(["restore", "latest", blank_mount.display()], pw1)?
+  let _ = rustic(["restore", "latest", blank_mount.display()], pw2)?
   let before = fp"{backup_mount}/hashes-before.txt".read_text()?.lines() |> where .trim() != "" |> collect
   guard before.len() > 0 else { fail "hash manifest is empty" }
   var bare: List[Str] = []
@@ -266,25 +278,25 @@ proc diff_paths(text: Str) -> Result[List[Str]] {
 
 proc phase_verify() {
   mount_backup()
-  let pw1 = password("password1")?
+  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
   let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
-  let _ = rustic(["check"], pw1)?
+  let _ = rustic(["check"], pw2)?
   console("RESTORE_CHECK_OK rustic check passed")
-  let cross = restic(["check"], pw1)?
+  let cross = restic(["check"], pw2)?
   guard "no errors" in cross else { fail "restic cross-read check reported errors" }
-  let seen = restic(["snapshots"], pw1)?
+  let seen = restic(["snapshots"], pw2)?
   guard snap1[..8] in seen else { fail "restic cross-read does not list the rustic snapshot" }
   console("RESTORE_RESTIC_OK independent reader lists the snapshot with no errors")
-  let snap1_listing = rustic(["find", snap1, "--path", "/etc/passwd"], pw1)?
+  let snap1_listing = rustic(["find", snap1, "--path", "/etc/passwd"], pw2)?
   console(f"RESTORE_SNAP1_BEGIN\n{snap1_listing}RESTORE_SNAP1_END")
-  let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw1)?
-  let listed = rustic(["snapshots", "--json"], pw1)?
+  let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw2)?
+  let listed = rustic(["snapshots", "--json"], pw2)?
   let ids = snapshot_ids(listed)?
   guard snap1 in ids else { fail "the backup snapshot is gone from the repo" }
   guard ids.len() >= 2 else { fail "re-backup produced no new snapshot" }
   let snap2 = [id for id in ids if id != snap1][-1]
-  let diffed = rustic(["diff", snap1, snap2], pw1)?
+  let diffed = rustic(["diff", snap1, snap2], pw2)?
   console(f"RESTORE_DIFF_BEGIN\n{diffed}RESTORE_DIFF_END")
   for changed_path in diff_paths(diffed)? {
     var allowed = changed_path in expected_additions()
@@ -314,6 +326,22 @@ proc phase_verify() {
   let listed2 = rustic(["snapshots", "--json"], pw2)?
   guard snap1 in listed2 else { fail "second key cannot list the repo snapshots" }
   console("RESTORE_SECOND_KEY_OK second key opens the repo")
+  let masterkey = fp"{backup_mount}/keys/masterkey.export"
+  guard masterkey.exists()? else { fail "exported masterkey is missing" }
+  let master_env = {
+    RUSTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
+    RUSTIC_KEY_FILE: masterkey.display(),
+    RUSTIC_NO_CACHE: "true",
+    LD_LIBRARY_PATH: fp"{backup_mount}/tools/lib".display(),
+    HOME: fp"{backup_mount}/home".display(),
+  }
+  let master = process.run(process.command_argv(
+    fp"{backup_mount}/tools/rustic", ["rustic", "--no-cache", "snapshots", "--json"],
+    p"/", master_env, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err",
+  ))?
+  guard master.ok else { fail "exported masterkey cannot open the repo" }
+  guard snap1 in fp"{backup_mount}/tool.out".read_text()? else { fail "masterkey cannot list the original snapshot" }
+  console("RESTORE_MASTERKEY_OK exported masterkey opens the repo")
   linux.umount(backup_mount)?
   console("RESTORE_VERIFY_OK")
 }

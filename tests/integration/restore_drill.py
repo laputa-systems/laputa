@@ -122,7 +122,7 @@ def stage_backup_disk(tools_dir, image, pw1, pw2, size="512M"):
             assert reader is not None
             (lib / pathlib.Path(member).name).write_bytes(reader.read())
     keys = staging / "keys"
-    keys.mkdir(parents=True)
+    keys.mkdir(parents=True, mode=0o700)
     (keys / "password1").write_bytes(pw1)
     (keys / "password1").chmod(0o600)
     (keys / "password2").write_bytes(pw2)
@@ -264,12 +264,6 @@ def setup():
     shutil.copy(str(provision_restic()), str(tools_dir / "restic"))
     pw1 = ("test-only-restore1-" + secrets.token_hex(8) + "\n").encode()
     pw2 = ("test-only-restore2-" + secrets.token_hex(8) + "\n").encode()
-    keys = drill / "keys"
-    keys.mkdir()
-    (keys / "password1").write_bytes(pw1)
-    (keys / "password1").chmod(0o600)
-    (keys / "password2").write_bytes(pw2)
-    (keys / "password2").chmod(0o600)
     staging = drill / "boot1-staging"
     subprocess.run(["rm", "-rf", str(staging)], check=True)
     stage_base(staging)
@@ -343,7 +337,7 @@ def phase_verify():
         assert f"{MARKER_COUNT} 2" in text, "boot marker log did not count the restore boot"
         for marker in ("RESTORE_CHECK_OK", "RESTORE_RESTIC_OK",
                        "RESTORE_REBACKUP_OK", "RESTORE_KEYLOSS_OK",
-                       "RESTORE_SECOND_KEY_OK"):
+                       "RESTORE_SECOND_KEY_OK", "RESTORE_MASTERKEY_OK"):
             assert marker in text, f"missing {marker} after restore"
         print("PASS verify: identity survived the restore with logger and dhcp supervised")
     finally:
