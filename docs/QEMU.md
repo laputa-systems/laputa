@@ -17,6 +17,12 @@ holds only system intent. On x86_64 `-vga none` makes the virtio GPU the only
 display, so QMP's screendump captures the compositor and not q35's VGA text
 console.
 
+A virgl profile carries two GPU devices: a 2D `virtio-gpu-pci` first, so it
+becomes card0 and the compositor scans out through a host-readable surface,
+then `virtio-gpu-gl-pci` as the render device. QEMU's `screendump` returns
+`no surface` for a GL scanout because those frames stay GL textures, so this
+split keeps both the guest's OpenGL 4.3 context and the host pixel proof.
+
 ## Host requirements
 
 - `qemu-system-<arch>` for the host's architecture on `PATH`, or named by

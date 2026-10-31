@@ -116,6 +116,21 @@ export proc qemu_config(target: QemuTarget) [process, env, error] -> Result[Qemu
   {qemu, target}
 }
 
+# A virgl profile gets a 2D scanout device first so card0 stays host-readable:
+# QEMU cannot screendump the GL device's scanout, which travels as GL textures,
+# so the compositor scans out on card0 while OpenGL clients use the virgl
+# device's render node.
+pure gpu_args(profile: types.SystemProfile) -> List[Str] {
+  let resolution = f"xres={profile.qemu_width},yres={profile.qemu_height}"
+  match profile.qemu_gpu {
+    types.Virtio2d => ["-device", f"virtio-gpu-pci,{resolution}"]
+    types.Virgl => [
+      "-device", f"virtio-gpu-pci,{resolution}",
+      "-device", f"virtio-gpu-gl-pci,{resolution}",
+    ]
+  }
+}
+
 ## Construct an exact QEMU argv without a shell command boundary.
 export pure qemu_command_argv(
   value: QemuConfig,
@@ -127,10 +142,6 @@ export pure qemu_command_argv(
   let display: List[Str] = match profile.qemu_gpu {
     types.Virtio2d => if mode == .Test { ["-display", "none"] } else { target.interactive_display }
     types.Virgl => if mode == .Test { ["-display", "egl-headless"] } else { target.gl_interactive_display }
-  }
-  let gpu_device: Str = match profile.qemu_gpu {
-    types.Virtio2d => "virtio-gpu-pci"
-    types.Virgl => "virtio-gpu-gl-pci"
   }
   let state_drive = if profile.development { [] } else {
     ["-drive", f"if=none,id=state,format=raw,file={outputs.root}/state.ext4", "-device", f"{target.block_device},drive=state"]
@@ -160,8 +171,7 @@ export pure qemu_command_argv(
     "user,id=net0",
     "-device",
     "virtio-net-pci,netdev=net0",
-    "-device",
-    f"{gpu_device},xres={profile.qemu_width},yres={profile.qemu_height}",
+    @gpu_args(profile),
     "-device",
     "virtio-keyboard-pci",
     "-device",

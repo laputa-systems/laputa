@@ -128,8 +128,14 @@ test test_virgl_profile_selects_the_gl_device_and_a_gl_display [error] {
     let interactive_argv = qemu.qemu_command_argv(config, virgl, outputs, types.Interactive)
 
     for argv in [test_argv, interactive_argv] {
-      assert "virtio-gpu-gl-pci,xres=1280,yres=800" in argv, "virgl gpu"
-      assert ! ("virtio-gpu-pci,xres=1280,yres=800" in argv), "no 2D gpu"
+      var scanout = -1
+      var render = -1
+      for index in range(argv.len()) {
+        if argv[index] == "virtio-gpu-pci,xres=1280,yres=800" { scanout = index }
+        if argv[index] == "virtio-gpu-gl-pci,xres=1280,yres=800" { render = index }
+      }
+      assert scanout >= 0, "2D scanout gpu"
+      assert render > scanout, "scanout gpu is card0 and precedes the virgl gpu"
     }
 
     assert display_of(test_argv) == "egl-headless", "headless GL test display"
