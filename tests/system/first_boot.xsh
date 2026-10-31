@@ -62,7 +62,7 @@ test test_dhcp_apply_is_idempotent [fs, error] { |ctx|
   let passwd = fp"{root}/etc/passwd".read_text()?
   let users = passwd.lines() |> where .starts_with("pazu:") |> collect
   assert users.len() == 1
-  assert users[0] == "pazu:x:1000:1000::/home/pazu:/usr/bin/xsh"
+  assert users[0] == "pazu:x:1000:1000::/home/pazu:/usr/bin/xsh-login"
   assert passwd.starts_with("root:x:0:0:root:/root:/bin/xshi\n")
   let keys = fp"{root}/home/pazu/.ssh/authorized_keys".read_text()?
   assert keys.lines().len() == 2
@@ -266,11 +266,11 @@ test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
   let passwd = fp"{root}/etc/passwd".read_text()?
-  assert "pazu:x:1001:1001::/home/pazu:/usr/bin/xsh" in passwd.lines()
+  assert "pazu:x:1001:1001::/home/pazu:/usr/bin/xsh-login" in passwd.lines()
   assert "laputa:x:1000:1000:Laputa User:/home/laputa:/bin/xshi" in passwd.lines()
   assert "pazu:x:1001:" in fp"{root}/etc/group".read_lines()?
   assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
-  assert "/usr/bin/xsh" in fp"{root}/etc/shells".read_lines()?
+  assert "/usr/bin/xsh-login" in fp"{root}/etc/shells".read_lines()?
   let after = snapshot(root)?
   first_boot.apply(root, base("new"))
   assert snapshot(root)? == after

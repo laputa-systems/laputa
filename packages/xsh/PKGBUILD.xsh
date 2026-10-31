@@ -11,7 +11,7 @@ export const package_kind = "payload"
 export const ver = "0.0.0"
 
 ## Package recipe export.
-export const rel = "18"
+export const rel = "19"
 
 ## Package recipe export.
 export let deps = []
@@ -26,6 +26,12 @@ export let mkdeps_host = []
 ## package's build key for that target only; the build verifies each product
 ## against the manifest.
 export const upstream_sources = [
+  {
+    source: p"xsh-login.xsh",
+    kind: "auto",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
+  },
   {
     source: p"repository/.out/seed/ARCH => seed",
     kind: "auto",
@@ -139,6 +145,7 @@ export const filetree = [
   {path: p"usr/bin/who", kind: "symlink"},
   {path: p"usr/bin/whoami", kind: "symlink"},
   {path: p"usr/bin/yes", kind: "symlink"},
+  {path: p"usr/bin/xsh-login", kind: "file"},
   {path: p"usr/bin/xsh", kind: "binary"},
   {path: p"usr/bin/xshi", kind: "binary"},
   {path: p"usr/bin/xsht", kind: "binary"},
@@ -179,6 +186,8 @@ export proc build(dest: Path) [fs, env, error] {
   for product in ["xsh", "xshi", "xsht"] {
     fs.install(fp"{seed}/{product}", fp"{dest}/usr/bin/{product}", 0o755, parents: true, overwrite: true)
   }
+
+  fs.install(p"xsh-login.xsh", fp"{dest}/usr/bin/xsh-login", 0o755, parents: true, overwrite: true)
 
   let shell = fp"{dest}/usr/bin/sh"
   shell.remove()

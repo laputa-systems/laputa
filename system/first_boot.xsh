@@ -3,7 +3,7 @@ const hostname_re = rx"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 const operator_re = rx"^[a-z_][a-z0-9_-]{0,31}$"
 const digits_re = rx"^[0-9]+$"
 const host_key_path: RelPath = p"etc/dropbear/dropbear_ed25519_host_key"
-const operator_shell = "/usr/bin/xsh"
+const operator_shell = "/usr/bin/xsh-login"
 const first_account_id = 1000
 const account_id_limit = 60000
 
@@ -476,14 +476,14 @@ proc identity_ok(key_present: Bool, identity: BootIdentity) {
 
 proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   let home: RelPath = fp"home/{config.operator}".require()?
-  let ssh: RelPath = fp"home/{config.operator}/.ssh".require()?
+  let ssh_dir: RelPath = fp"home/{config.operator}/.ssh".require()?
   let authorized: RelPath = fp"home/{config.operator}/.ssh/authorized_keys".require()?
   ensure_dir(rootfs, p"etc", 0o755)
   ensure_dir(rootfs, p"etc/laputa", 0o755)
   ensure_dir(rootfs, p"etc/laputa/first-boot", 0o755)
   ensure_dir(rootfs, p"home", 0o755)
   ensure_dir(rootfs, home, 0o755)
-  ensure_dir(rootfs, ssh, 0o700)
+  ensure_dir(rootfs, ssh_dir, 0o700)
   write_text(rootfs, p"etc/hostname", f"{config.hostname}\n", 0o644)
   write_text(rootfs, p"etc/laputa/first-boot/network", network_text(config.network), 0o644)
   let tailscale = if config.tailscale { "yes" } else { "no" }

@@ -47,7 +47,7 @@ manual harness is aarch64-only and receives `MIRROR_URL` as
   the target root, waits for `LAPUTA_INSTALLER_CI_OK`, then boots the installed
   disk with a QEMU-only Dropbear and key overlay. The host SSHes as `pazu`
   through user-mode port forwarding, checks `xinit status dropbear`, and runs
-  `xsh --help`. Installed accounts log in through `/usr/bin/xsh-login`, which
+  `xsh --help`. The `xsh` package supplies `/usr/bin/xsh-login`, which
   runs `-c SOURCE` with `xsh`; the default seed's `xshi` is the documented
   stub, so there is no interactive login shell. x86_64 runs under KVM. Logs:
   `target/laputa-installer-ARCH-qemu/qemu-installer.log` and `qemu-target.log`.
