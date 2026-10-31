@@ -36,8 +36,8 @@ test test_muon_helper_changes_invalidate_each_consumer [fs, env, error] { |ctx|
   let helper = fp"{root}/pm/muon.xsh"
   helper.write("first\n")?
   let names = [
-    "muon", "libinput", "foot-minimal", "wayland-dev", "wayland-libs-client", "wayland-libs-server",
-    "wayland-libs-cursor", "wlroots0.20", "wl-clipboard", "libva",
+    "muon", "wayland-dev", "wayland-libs-client", "wayland-libs-server",
+    "wayland-libs-cursor", "wl-clipboard", "libva",
   ]
   let checkout = fs.cwd()?
   let packages = [recipe.load_package(fp"{checkout}/packages/{name}")? for name in names]

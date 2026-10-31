@@ -34,16 +34,6 @@ and real-hardware enablement remain outside that scope.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-7 · P2 · Capture foot while its proof window is alive
-
-- **Area:** Tests
-- **Where:** `system/qemu.xsh:263`, `guest/qemu-dwl-foot-proof.xsh:70`
-- **Problem:** The host takes its screenshot after the success marker. The foot reader writes its input and exits before that marker, so screenshot presence does not prove visible terminal content.
-- **Recommendation:** Keep the terminal alive until the host captures and checks its visual marker.
-- **Progress:** The reader waits after recording input, and the host requires the magenta marker before QEMU cleanup. Seventeen supervisor tests pass. At `e105c09`, the integrated `make profile-test XSH_ROOT=../xsh XSH_BIN_DIR=.out/host/x86_64` passes on Linux x86_64/KVM with the rebuilt graphical closure and native XSH QMP. A nonempty screenshot without the live marker still fails. No aarch64 or macOS visual proof is claimed.
-- **Fix with:** lifecycle-concurrency
-- **Effort:** S (hours)
-
 ### LAP-33 · P2 · Qualify one confined extraction and publication path
 
 - **Area:** Privileged filesystem boundaries
@@ -54,16 +44,6 @@ and real-hardware enablement remain outside that scope.
 - **Blocked:** Frozen XSH exposes only Path-based archive extraction, no-replace rename and fsync. Scratch replacement probes still show loss of opened-root authority on extraction/publication; the cleanup case now fails closed on current XSH (close errors "moved or replaced; left in place", both trees retained) instead of deleting the replacement, so the fixture as written no longer demonstrates silent deletion and needs updating to assert the fail-closed outcome before it can serve as a regression probe. No power-loss durability is established.
 - **Coordination:** Roadmap R4/R5; XSH-37 owns reusable host operations, not package policy.
 - **Fix with:** isolate-effects
-- **Effort:** M (days)
-
-### LAP-14 · P3 · Remove redundant muon library lookup patches
-
-- **Area:** Build
-- **Where:** `packages/muon/PKGBUILD.xsh:51`, `packages/foot-minimal/PKGBUILD.xsh:152`, `packages/libinput/PKGBUILD.xsh:389`
-- **Problem:** Recipes still replace find_library calls for musl aliases after muon gained linking by library name.
-- **Recommendation:** Remove redundant replacements and rebuild the affected packages to check their links and DT_NEEDED entries.
-- **Progress:** Muon emits structured argv for compiler, linker, archiver, regeneration and custom edges; embedded Samurai executes it directly and rejects missing or malformed metadata. Removed the redundant foot/libinput library replacements. Muon and the affected 41-artifact x86_64 closure build with `/bin/sh` removed from the disposable container. ELF dependencies use normal library names, with no build-root paths. Native scanner substitutions and libinput's builtins ordering update both representations; helper changes invalidate every consuming recipe. Five helper tests and independent compiler/archive/capture/environment/incremental/regeneration comparisons pass. Actual aarch64 linkage remains unverified. See [Muon build commands](docs/DEVELOPMENT.md#muon-build-commands).
-- **Fix with:** delete
 - **Effort:** M (days)
 
 ### LAP-15 · P3 · Ship USB IDs used by libudev-zero

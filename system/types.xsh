@@ -12,16 +12,11 @@ export enum ProofInputMode { ProofPlain, ProofModifiers }
 ## ready marker when its session accepts input, the success marker only
 ## after it consumes the injected input, and the failure marker on any
 ## proof failure; the kernel command line selects the proof with the flag.
-## The VT markers are optional: when set, the supervisor sends a VT switch
-## through QMP once each marker appears, and the guest proves the seat
-## suspends and resumes around the switches before printing readiness.
 export type ProofMarkers = {
   cmdline_flag: Str,
   ready_marker: Str,
   success_marker: Str,
   failure_marker: Str,
-  vt_away_marker: Str,
-  vt_back_marker: Str,
   input_mode: ProofInputMode,
 }
 

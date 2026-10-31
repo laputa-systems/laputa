@@ -25,7 +25,7 @@ export type QemuTarget = {
 ## The host executable and target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, target: QemuTarget}
 
-enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpVtSwitch(Int), QmpScreenshot(Path) }
+enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
 error QmpFailure = OutcomeIndeterminate(operation: QmpOperation)
 
@@ -214,7 +214,6 @@ pure qmp_mode(operation: QmpOperation) -> Str {
     QmpReady => "ready"
     QmpInput => "input"
     QmpInputModified => "input"
-    QmpVtSwitch(_) => "vt-switch"
     QmpScreenshot(_) => "screenshot"
   }
 }
@@ -242,11 +241,6 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
   match operation {
     QmpReady => Ok([]),
     QmpScreenshot(output) => Ok([qmp.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
-    QmpVtSwitch(vt) => Ok([
-      qmp_key_step(["ctrl", "alt", f"f{vt}"], true)?,
-      qmp.QmpDelay(500),
-      qmp_key_step([f"f{vt}", "alt", "ctrl"], false)?,
-    ]),
     QmpInput => {
       var steps: List[qmp.QmpStep] = []
       for key in ["l", "a", "p", "u", "t", "a", "ret"] {
@@ -403,8 +397,6 @@ export proc run_test(
   defer qemu_stop(launched)
   let deadline = time.monotonic()? + 180000000000
   var injected = false
-  var vt_away = false
-  var vt_back = false
   var screenshot_taken = false
 
   while qemu_process_live(launched.pid) {
@@ -417,16 +409,6 @@ export proc run_test(
       return Err(
         types.LaputaError.Profile(f"QEMU proof failed with {failed}; inspect {qemu_output_locations(outputs)}"),
       )
-    }
-
-    if !vt_away and profile.proof.vt_away_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_away_marker in log_text {
-      qemu_qmp(QmpVtSwitch(2), outputs.qmp_socket, deadline)
-      vt_away = true
-    }
-
-    if !vt_back and profile.proof.vt_back_marker != "" and outputs.qmp_socket.exists() and profile.proof.vt_back_marker in log_text {
-      qemu_qmp(QmpVtSwitch(1), outputs.qmp_socket, deadline)
-      vt_back = true
     }
 
     if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {

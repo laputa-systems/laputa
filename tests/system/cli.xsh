@@ -7,21 +7,21 @@ test test_laputa_cli_exports_the_closed_command_type [error] {
 }
 
 test test_laputa_cli_parses_only_typed_public_commands [error] {
-  let planned = laputa_cli.parse(["plan", "qemu-dwl-foot"])?
+  let planned = laputa_cli.parse(["plan", "qemu-tinyland-ghostty"])?
   assert laputa_cli.command_text(planned.command) == "plan"
-  assert planned.profile_name == "qemu-dwl-foot"
+  assert planned.profile_name == "qemu-tinyland-ghostty"
 
-  let built = laputa_cli.parse(["build", "qemu-dwl-foot", "--jobs", "3"])?
+  let built = laputa_cli.parse(["build", "qemu-tinyland-ghostty", "--jobs", "3"])?
   assert laputa_cli.command_text(built.command) == "build"
   assert built.jobs == 3
 
   for command in ["test", "boot"] {
-    let ensured = laputa_cli.parse([command, "qemu-dwl-foot", "--jobs", "2"])?
+    let ensured = laputa_cli.parse([command, "qemu-tinyland-ghostty", "--jobs", "2"])?
     assert ensured.jobs == 2
   }
 
   for command in ["test", "boot", "clean"] {
-    assert laputa_cli.command_text(laputa_cli.parse([command, "qemu-dwl-foot"])?.command) == command
+    assert laputa_cli.command_text(laputa_cli.parse([command, "qemu-tinyland-ghostty"])?.command) == command
   }
 }
 
@@ -29,20 +29,20 @@ test test_laputa_cli_rejects_ambiguous_or_invalid_arguments [error] {
   for argv in [
     [
       "world-plan",
-      "qemu-dwl-foot",
+      "qemu-tinyland-ghostty",
     ],
     [
       "plan",
     ],
     [
       "plan",
-      "qemu-dwl-foot",
+      "qemu-tinyland-ghostty",
       "--jobs",
       "2",
     ],
     [
       "build",
-      "qemu-dwl-foot",
+      "qemu-tinyland-ghostty",
       "--jobs",
       "0",
     ],

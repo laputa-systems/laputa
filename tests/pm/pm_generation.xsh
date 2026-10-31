@@ -221,7 +221,7 @@ test test_generation_plan_json_round_trips_and_rejects_changed_identity [fs, pro
   let planned = generation.plan_profile(
     build_value,
     ["app"],
-    {name: "qemu-dwl-foot", overlay_sha256: generation.overlay_digest(overlay)?, replacements: []},
+    {name: "qemu-tinyland-ghostty", overlay_sha256: generation.overlay_digest(overlay)?, replacements: []},
   )?
   let path_value = test.temp_path(ctx, name: "generation-plan.json")
   generation.write_generation_plan(path_value, planned)
@@ -269,13 +269,13 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, proc
   fp"{overlay}/etc/profile".write("profile configuration\n")
   json.write(
     fp"{overlay}/overlay.json",
-    {format: "laputa-generation-overlay-1", profile: "qemu-dwl-foot", replacements: []},
+    {format: "laputa-generation-overlay-1", profile: "qemu-tinyland-ghostty", replacements: []},
   )
   let profile = generation.overlay_profile(overlay)?
   let value = generation.plan_profile(build_value, ["app"], profile)?
   let output = fp"{test.temp_dir(ctx, name: "generation-overlay-output")?}/root"
   let receipt = generation.compose(value, store_root, output, overlay)?
-  assert receipt.profile.name == "qemu-dwl-foot"
+  assert receipt.profile.name == "qemu-tinyland-ghostty"
   assert fp"{output}/etc/profile".read_text()? == "profile configuration\n"
   assert fp"{output}/overlay.json".exists()? == false
 
@@ -295,7 +295,7 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, proc
     fp"{conflict_overlay}/overlay.json",
     {
       format: "laputa-generation-overlay-1",
-      profile: "qemu-dwl-foot",
+      profile: "qemu-tinyland-ghostty",
       replacements: ["usr/share/app"],
     },
   )

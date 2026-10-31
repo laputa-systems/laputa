@@ -1,5 +1,0 @@
-::sysinit:/usr/lib/init/rc.boot
-::respawn:/usr/bin/xinit scan boot
-::once:/usr/bin/xsh /usr/lib/laputa/tinyland-proof-launch.xsh
-::restart:/usr/bin/xinit /etc/inittab
-::shutdown:/usr/lib/init/rc.shutdown

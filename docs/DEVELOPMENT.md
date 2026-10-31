@@ -7,8 +7,7 @@ Laputa builds on Linux aarch64 and x86_64 hosts and on Apple Silicon macOS.
 `ARCH` (the seed and package target) defaults to the host's architecture, and
 every container runs on the host's native Docker platform (`linux/arm64` or
 `linux/amd64`). There is no cross-architecture build. The only supported
-system profile is `qemu-tinyland-ghostty`; the dwl and foot profiles remain as
-rollbacks.
+system profile is `qemu-tinyland-ghostty`.
 
 ## Host requirements
 

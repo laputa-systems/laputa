@@ -63,10 +63,8 @@ suites. The package-lock test uses isolated fixture inputs without a cached gues
 disposable Docker containers on Linux x86_64. Other hosts fail with an explicit
 coverage-unavailable message. The ordinary Cargo run reports these cases as ignored.
 `make test-components-integration` runs `make test`, the privileged component
-cases, then the canonical Ghostty profile and the foot and VT-bound foot rollbacks in
-sequence.
-The profiles need the infrastructure described in [QEMU](QEMU.md) and
-[Tinyland](TINYLAND.md). This explicit integration gate is separate from
+cases, then the canonical Ghostty profile. The profile needs the infrastructure
+described in [QEMU](QEMU.md) and [Tinyland](TINYLAND.md). This explicit integration gate is separate from
 `make verify`.
 
 Use `cargo -j 4` for Rust checks. `make mirror-test` checks the mirror and its

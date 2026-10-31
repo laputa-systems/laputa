@@ -16,8 +16,7 @@ trace = root / "native-events"
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
     server.bind(socket_path)
     server.listen(8)
-    print("LAPUTA_VT_SWITCH_AWAY\nLAPUTA_VT_SWITCH_BACK\nLAPUTA_DWL_FOOT_PROOF_READY", flush=True)
-    vt_number = 2
+    print("LAPUTA_FIXTURE_PROOF_READY", flush=True)
     while True:
         conn, _ = server.accept()
         with conn, conn.makefile("rb") as stream:
@@ -61,14 +60,8 @@ with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
                 if (root / "disconnect-input").exists() and received and received[-1] == [("l", True)]:
                     break
                 conn.sendall(json.dumps({"return": {}, "id": request["id"]}).encode() + b"\n")
-            if len(received) == 2:
-                assert received == [
-                    [("ctrl", True), ("alt", True), (f"f{vt_number}", True)],
-                    [(f"f{vt_number}", False), ("alt", False), ("ctrl", False)],
-                ]
-                vt_number -= 1
             if len(received) == 18:
                 expected = [[(key, down)] for key in ["l", "a", "p", "u", "t", "a", "ret"] for down in [True, False]]
                 expected += [[("ctrl", True)], [("d", True)], [("d", False)], [("ctrl", False)]]
                 assert received == expected
-                print("LAPUTA_DWL_FOOT_PROOF_OK", flush=True)
+                print("LAPUTA_FIXTURE_PROOF_OK", flush=True)

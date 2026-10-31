@@ -47,7 +47,7 @@ Measured on Linux x86_64/KVM with the fixed Ghostty build described under
 | 4 profile | landed | `qemu-tinyland-ghostty`; `LAPUTA_TINYLAND_GHOSTTY_GL43` |
 | 5 end-to-end | complete | `make profile-test` from `ghostty-custom-1.4.1-2` |
 | 6 size/performance | complete | table below |
-| 7 promotion | complete | canonical profile and rollback targets |
+| 7 promotion | complete | canonical profile; rollback stack deleted by owner |
 
 ### Phase 5 proof
 
@@ -90,26 +90,26 @@ client never creates a keyboard (see `tinyland/docs/opengl-probe.md`).
 | `tinyland` DT_NEEDED | `libseat.so.1`, `libc.so`, `libgcc_s.so` | `readelf -d` |
 | `ghostty-custom` binary | 30,586,216 bytes; payload archive 18,516,608 bytes | `ghostty-custom-1.4.1-2` payload |
 | `ghostty-custom` DT_NEEDED | `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, `libc.so` | package proof |
-| `qemu-tinyland-ghostty` closure | 38 plan nodes (foot 41, dwl-foot 48) | `target/laputa/qemu-tinyland-ghostty/build-plan.json` |
-| Image size | disk 308M, rootfs 276M (foot 288M/256M) | `du` on `current/` |
-| Cold start to first frame | session ready with a 4.3 context at 13.93 s guest uptime (proof start 10.39 s); prior runs measured 10.51-13.82 s | `LAPUTA_TINYLAND_T session-ready` |
-| Idle RSS after input | tinyland 7,176 KB; Ghostty 41,352 KB | `LAPUTA_TINYLAND_RSS` |
-| Generation SHA-256 | `a772427bbd31516d32a7009821b05e09bb451b9ec8d217736512ed88918482b7` | `current/generation.json` |
+| `qemu-tinyland-ghostty` closure | 38 plan nodes | `target/laputa/qemu-tinyland-ghostty/build-plan.json` |
+| Image size | disk 308M, rootfs 276M | `du` on `current/` |
+| Cold start to first frame | session ready with a 4.3 context at 16.74 s guest uptime (proof start 14.26 s); prior runs measured 10.51-13.93 s | `LAPUTA_TINYLAND_T session-ready` |
+| Idle RSS after input | tinyland 7,156 KB; Ghostty 41,416 KB | `LAPUTA_TINYLAND_RSS` |
+| Generation SHA-256 | `a4d7a77fc96ac1ab029e79558715298525a0bfaab4deb6cef44fbcd3243efba1` | `current/generation.json` |
 | Renderer | virgl, OpenGL 4.3 core | `LAPUTA_TINYLAND_GHOSTTY_GL43` |
 
 ### Promotion
 
-`make profile-*` now builds, tests, and boots `qemu-tinyland-ghostty`. The
-dwl and foot profiles keep `make profile-dwl-*`, `make profile-tinyland-*`,
-and `make profile-tinyland-vt-*` as rollbacks, and the docs name the new
-canonical profile. The canonical test needs a host virgl render node; the
-foot rollbacks remain the path for hosts without one.
+`make profile-*` now builds, tests, and boots `qemu-tinyland-ghostty`. After
+promotion the owner directed complete removal of the dwl and foot profiles,
+their guests, their packages, and the QMP VT-switch proof surface; only the
+canonical profile remains. The canonical test needs a host virgl render
+node.
 
 ## Reuse / change / new map
 
 - Reuse: `tinyland/` poll loop, seat lifecycle, VT switching, DRM
-  presentation proofs; `profiles/qemu-tinyland-foot.xsh` session model;
-  `packages/terminfo` + XSH `tic`; `packages/mesa` deterministic generated
+  presentation proofs; `profiles/qemu-tinyland-ghostty.xsh` session model;
+  XSH `tic`; `packages/mesa` deterministic generated
   workflow; `docs/TINYLAND.md`, `docs/QEMU.md` proof contracts.
 - Change: `tinyland/src/input.rs` (+KBVM backend, `xkbcommon` crate out of
   runtime deps); `packages/mesa/PKGBUILD.xsh` only if the OpenGL 4.3 probe
@@ -127,9 +127,8 @@ foot rollbacks remain the path for hosts without one.
    shows no `libxkbcommon`, `cargo tree` shows no C XKB binding.
    Proof: `cargo test --locked` green; differential tests vs libxkbcommon
    oracle green (oracle test-only); `make smoke wayland-pixels drm-proof
-   drm-parity negative` green; foot client unchanged and QMP-typed input
-   reaches its PTY with correct modifiers (existing `qemu-tinyland-foot`
-   proof unmodified and passing).
+   drm-parity negative` green; QMP-typed input reaches the canonical
+   profile's Ghostty PTY with correct modifiers.
 3. **Ghostty Custom package**: arch-pinned tarballs with recorded SHA-256
    (no `SKIP`), `/usr/bin/ghostty-custom`, `xterm-ghostty` terminfo
    present and readable, `--version`/`+show-config` green in the proof
@@ -157,9 +156,9 @@ foot rollbacks remain the path for hosts without one.
    sizes, cold-start-to-first-frame, idle RSS, selected renderer. Large
    regressions are investigated decisions, not auto-failures.
 7. **Promotion (only after 1–6)**: canonical default switched, docs and
-   profile assertions updated, dwl/foot retained as rollback profiles.
-   Proof: default `make profile-*` targets exercise the new stack while
-   every old profile still passes.
+   profile assertions updated. The owner then directed removal of the dwl
+   and foot profiles and packages. Proof: default `make profile-*` targets
+   exercise the new stack.
 
 ## Sequence
 
@@ -169,8 +168,8 @@ parallel: disjoint trees (`tinyland/` vs `packages/ghostty-custom/`),
 shared nothing except the Phase 0 report. Phase 3 (Mesa/OpenGL probe)
 needs the Phase 2 binary; Phase 4 (profile) needs Phase 1 + the Phase 3
 renderer verdict; Phase 5 (end-to-end) needs Phase 4; Phase 6
-(size/performance) needs Phases 1-5; Phase 7 (promotion) needs Phase 6
-plus the Phase 0 rollback profiles. No
+(size/performance) needs Phases 1-5; Phase 7 (promotion) needs Phase 6,
+after which the owner directed removal of the rollback stack. No
 lane invents XKB, Wayland, renderer, PM, or compositor machinery; blocked
 integration lands the independently proven half and documents the exact
 blocker with its reproducer.
@@ -190,7 +189,7 @@ aarch64 qualification); aarch64 work is compile/package proof only.
 ## Verdict: ready
 
 No owner questions remain: the mission already decides direct commits, no
-PR ceremony, rollback retention, and the failure-handling rule (prove
+PR ceremony, the owner's stack deletion, and the failure-handling rule (prove
 halves independently, never claim completion without guest evidence).
 Prescribed decisions the owner may overrule: (a) virgl preferred over
 llvmpipe unless the Phase 3 probe proves otherwise with numbers; (b)

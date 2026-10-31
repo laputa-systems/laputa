@@ -95,7 +95,7 @@ test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ct
   let value = plan_for(
     catalog.load_for_target(root, types.target_aarch64())?,
     types.target_aarch64(),
-    ["foot-minimal", "laputa-net", "tailscale"],
+    ["tinyland", "laputa-net", "tailscale"],
   )?
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?
 
@@ -107,5 +107,5 @@ test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ct
     assert name in network
   }
 
-  assert "font-ttf-hack" in generation_names(generation.plan(value, ["foot-minimal"], overlay)?)
+  assert "xkeyboard-config" in generation_names(generation.plan(value, ["tinyland"], overlay)?)
 }

@@ -147,8 +147,6 @@ test-components-integration:
 	$(MAKE) test
 	$(MAKE) test-components-privileged
 	$(MAKE) profile-test
-	$(MAKE) profile-tinyland-test
-	$(MAKE) profile-tinyland-vt-test
 
 test-pm: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/pm
@@ -350,78 +348,21 @@ fetch-seed: need-xsh
 	$(SEED) fetch $(SEED_ARGS)
 
 # The typed profile CLI is the sole core-system orchestration surface. The
-# canonical profile is the Tinyland Ghostty kiosk; its explicit targets below
-# own the recipes.
-profile-plan: profile-tinyland-ghostty-plan
-profile-build: profile-tinyland-ghostty-build
-profile-test: profile-tinyland-ghostty-test
-profile-boot: profile-tinyland-ghostty-boot
-profile-clean: profile-tinyland-ghostty-clean
-
-# Rollback reference profile: dwl with foot.
-profile-dwl-plan:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-dwl-foot
-
-profile-dwl-build:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-dwl-foot
-
-profile-dwl-test:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-dwl-foot
-
-profile-dwl-boot:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-dwl-foot
-
-profile-dwl-clean:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-dwl-foot
-
-# Rollback kiosk profile: unprivileged tinyland through seatd mediation.
-profile-tinyland-plan:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-foot
-
-profile-tinyland-build:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-foot
-
-profile-tinyland-test:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-foot
-
-profile-tinyland-boot:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-foot
-
-profile-tinyland-clean:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-foot
-
-# VT-bound kiosk profile: the same tinyland/foot stack behind a VT-bound
-# seatd session, with switch/resume proven in the guest.
-profile-tinyland-vt-plan:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-vt-foot
-
-profile-tinyland-vt-build:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-vt-foot
-
-profile-tinyland-vt-test:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-vt-foot
-
-profile-tinyland-vt-boot:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-vt-foot
-
-profile-tinyland-vt-clean:
-	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-vt-foot
-
-# Ghostty kiosk profile: tinyland with Ghostty rendering on virgl; needs a
-# virgl-capable host QEMU and GPU render node (docs/QEMU.md).
-profile-tinyland-ghostty-plan:
+# canonical profile is the Tinyland Ghostty kiosk; it needs a virgl-capable
+# host QEMU and GPU render node (docs/QEMU.md).
+profile-plan:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-ghostty
 
-profile-tinyland-ghostty-build:
+profile-build:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-ghostty
 
-profile-tinyland-ghostty-test:
+profile-test:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-ghostty
 
-profile-tinyland-ghostty-boot:
+profile-boot:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-ghostty
 
-profile-tinyland-ghostty-clean:
+profile-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-ghostty
 
 # Install Firecracker locally, build the pinned Asterinas PVH kernel, and boot

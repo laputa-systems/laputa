@@ -1,4 +1,4 @@
-##! Behavior coverage for loading and validating the qemu-dwl-foot profile.
+##! Behavior coverage for loading and validating the qemu-tinyland-ghostty profile.
 use system.profile
 use system.types
 
@@ -6,18 +6,19 @@ pure profiles_root() -> Path {
   p"profiles"
 }
 
-test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
+test test_qemu_tinyland_ghostty_profile_has_exact_runtime_intent [fs, error] {
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", profiles_root())?
   assert value.package_roots == [
     "baselayout",
     "ca-certificates",
     "xsh",
     "laputa-pm",
     "xinit",
-    "mdevd",
-    "seatd",
-    "dwl-minimal",
-    "foot-minimal",
+    "mdevd-rs",
+    "seatd-rs",
+    "doas-rs",
+    "tinyland",
+    "ghostty-custom",
   ]
   assert value.kernel_package == "linux"
   assert ! (value.kernel_package in value.package_roots)
@@ -32,6 +33,8 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "cmake",
     "muon",
     "samurai",
+    "seatd",
+    "mdevd",
     "m4",
     "flex",
     "bison",
@@ -46,6 +49,10 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "pipewire",
     "pulseaudio",
     "python",
+    "dwl-minimal",
+    "wlroots0.20",
+    "libinput",
+    "wayland-libs-server",
   ]
   assert value.forbidden_sonames == [
     "libLLVM",
@@ -55,7 +62,10 @@ test test_qemu_dwl_foot_profile_has_exact_runtime_intent [fs, error] {
     "libpango",
     "libpipewire",
     "libpulse",
+    "libwlroots",
+    "libinput",
   ]
+  assert value.qemu_gpu == types.Virgl
   assert value.development
 }
 
@@ -65,12 +75,12 @@ test test_profile_load_rejects_unknown_and_path_names [fs, error] {
     Err(_) => {}
   }
 
-  match profile.load_system_profile("../qemu-dwl-foot", profiles_root()) {
+  match profile.load_system_profile("../qemu-tinyland-ghostty", profiles_root()) {
     Ok(_) => assert false
     Err(_) => {}
   }
 
-  match profile.load_system_profile("qemu-dwl-foot.xsh", profiles_root()) {
+  match profile.load_system_profile("qemu-tinyland-ghostty.xsh", profiles_root()) {
     Ok(_) => assert false
     Err(_) => {}
   }
@@ -93,8 +103,6 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       ready_marker: "VALID_PROOF_READY",
       success_marker: "VALID_PROOF_OK",
       failure_marker: "VALID_PROOF_FAILED",
-      vt_away_marker: "",
-      vt_back_marker: "",
     input_mode: types.ProofPlain,
     },
     qemu_gpu: types.Virtio2d,
@@ -133,20 +141,21 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
 }
 
 test test_profile_digest_is_deterministic [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", profiles_root())?
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", profiles_root())?
   assert profile.digest(value)? == profile.digest(value)?
   assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
-  assert profile.digest(value)? != profile.digest({...value, qemu_gpu: types.Virgl})?
+  assert profile.digest(value)? != profile.digest({...value, qemu_gpu: types.Virtio2d})?
 }
 
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
-  assert profile.forbidden_runtime_packages(value, ["baselayout", "foot-minimal", "musl"]) == []
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", p"profiles")?
+  assert profile.forbidden_runtime_packages(value, ["baselayout", "musl"]) == []
+  assert profile.forbidden_runtime_packages(value, ["baselayout", "dwl-minimal", "musl"]) == ["dwl-minimal"]
   assert profile.forbidden_runtime_packages(value, ["baselayout", "llvm-toolchain", "pkgconf"]) == ["llvm-toolchain", "pkgconf"]
 }
 
 test test_forbidden_soname_entries_match_versioned_sonames [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", p"profiles")?
 
   for soname in ["libLLVM.so.23", "libLLVM-23.so", "libLLVM.so", "libclang-cpp.so.23", "libpython3.13.so.1.0"] {
     assert profile.soname_is_forbidden(value, soname), soname
@@ -164,7 +173,7 @@ test test_qemu_maintained_profile_is_not_a_development_image [fs, error] {
   assert "nftables" in value.package_roots
   assert "laputa-net" in value.package_roots
   assert "laputa-syslog" in value.package_roots
-  assert ! ("dwl-minimal" in value.package_roots)
+  assert ! ("ghostty-custom" in value.package_roots)
   assert value.kernel_package == "linux"
   assert value.kernel_path == p"boot/vmlinuz"
   assert value.qemu_smp == 2

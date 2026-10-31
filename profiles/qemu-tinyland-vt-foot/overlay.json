@@ -1,5 +1,0 @@
-{
-  "format": "laputa-generation-overlay-1",
-  "profile": "qemu-tinyland-vt-foot",
-  "replacements": ["etc/inittab", "usr/lib/xinit/services/mdevd.xsh", "usr/lib/xinit/services/seatd.xsh"]
-}

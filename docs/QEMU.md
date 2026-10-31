@@ -1,12 +1,9 @@
 # QEMU Proof
 
 `qemu-tinyland-ghostty` is the canonical profile: unprivileged tinyland
-through seatd-mediated devices and Ghostty Custom rendering on virgl, without
-dwl, wlroots, libinput, LLVM, or wayland-libs-server in the runtime closure.
-`qemu-tinyland-foot` and `qemu-tinyland-vt-foot` are the rollback kiosks with
-Laputa foot, and `qemu-dwl-foot` is the rollback dwl desktop. Each profile's
-acceptance test boots the immutable image built by `laputa build`; it does not
-assemble a filesystem from a handwritten package list.
+through seatd-mediated devices and Ghostty Custom rendering on virgl. Each
+profile's acceptance test boots the immutable image built by `laputa build`;
+it does not assemble a filesystem from a handwritten package list.
 
 ## Host targets
 
@@ -48,12 +45,6 @@ make profile-boot     # laputa.xsh -- boot qemu-tinyland-ghostty
 make profile-plan     # laputa.xsh -- plan qemu-tinyland-ghostty
 make profile-clean    # laputa.xsh -- clean qemu-tinyland-ghostty
 ```
-
-The canonical profile is also reachable explicitly under
-`make profile-tinyland-ghostty-*`. The rollbacks keep their own targets:
-`make profile-tinyland-*` for `qemu-tinyland-foot`, `make
-profile-tinyland-vt-*` for the VT-bound variant, and `make profile-dwl-*`
-for `qemu-dwl-foot`.
 
 `laputa.xsh` also takes `--jobs N` (`$XSH_HOST laputa.xsh -- build
 qemu-tinyland-ghostty --jobs 4`).
@@ -97,19 +88,11 @@ unprivileged opens of the DRM and evdev nodes must fail while the brokered
 session succeeds. Its proof also covers lifecycle behind pre-readiness
 markers: compositor crash reclaim and broker-loss fail-closed restart.
 
-The `qemu-tinyland-vt-foot` variant proves the same stack behind a
-VT-bound seatd session: the guest switches away and back across virtual
-terminals, and the compositor must suspend (devices revoked) and resume
-(reopened input, no stuck modifiers) before the host injects input. VT
-switches are one-shot QMP key operations like input injection and are
-never retried.
-
 QMP retries use a closed operation type that admits readiness and screenshot
 requests. Input injection is a separate one-shot operation and cannot be passed
 to the retry path. The profile's `proof.input_mode` selects the keys:
-`ProofPlain` types the lowercase line the foot readers consume, and
-`ProofModifiers` drives Caps Lock, Shift, and a bare modifier press and
-expects `LAPUTA!` from the reader. If an input event loses its response, the supervisor reports an indeterminate
+`ProofPlain` types a lowercase line, and `ProofModifiers` drives Caps Lock,
+Shift, and a bare modifier press and expects `LAPUTA!` from the reader. If an input event loses its response, the supervisor reports an indeterminate
 outcome and does not retry. Both supported host platforms use `system/qmp.xsh`
 over `unix.connect_stream`; QMP control requires no Python process.
 

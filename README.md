@@ -36,9 +36,8 @@ make profile-boot
 
 This builds and boots the `qemu-tinyland-ghostty` profile for the host
 architecture. It uses KVM on Linux or HVF on Apple Silicon macOS and stores the
-system under `target/laputa/qemu-tinyland-ghostty/`. The dwl/foot profiles stay
-available as rollbacks through their `profile-dwl-*` and `profile-tinyland-*`
-targets. The [QEMU guide](docs/QEMU.md) covers requirements and outputs. A
+system under `target/laputa/qemu-tinyland-ghostty/`. The
+[QEMU guide](docs/QEMU.md) covers requirements and outputs. A
 headless Asterinas/Firecracker guest is also available on x86_64 Linux; see
 [Asterinas](docs/ASTERINAS.md).
 

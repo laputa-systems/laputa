@@ -17,11 +17,11 @@ test test_elfdeps_rejects_a_needed_build_time_path [error] { |_|
 
 test test_elfdeps_accepts_names_its_dependencies_provide [error] { |_|
   let failures = elfdeps.missing_elf_runtime_dependencies(
-    "libinput",
-    ["musl", "libevdev"],
-    ["libc.so", "libm.so", "libevdev.so.2"],
+    "ghostty-custom",
+    ["musl", "mesa"],
+    ["libc.so", "libEGL.so.1"],
     "",
-    {"libc.so": "musl", "libm.so": "musl", "libevdev.so.2": "libevdev"},
+    {"libc.so": "musl", "libEGL.so.1": "mesa"},
   )
 
   assert failures == []

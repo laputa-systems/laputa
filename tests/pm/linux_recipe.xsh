@@ -295,52 +295,6 @@ test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, proces
   }
 }
 
-test test_wlroots_declares_the_runtime_seatd_provider [fs, env, error] { |_|
-  let pkg = recipe.load_package(p"packages/wlroots0.20")?
-  assert "seatd" in pkg.deps
-}
-
-proc repository_with_fixture_seed(ctx: TestContext) -> Result[Path] {
-  let checkout = fs.cwd()?
-  let root = test.temp_dir(ctx, name: "repository-with-seed")?
-
-  for name in ["packages", "pm", "pm.xsh", "trust", "trust.xsh", "xinit", "doas-rs", "mdevd-rs", "seatd-rs", "tinyland"] {
-    fp"{root}/{name}".symlink(to: fp"{checkout}/{name}")
-  }
-
-  let seed = fp"{root}/.out/seed/aarch64"
-  seed.mkdir()
-
-  for name in ["xsh", "xshi", "xsht", "core.tar.xz", "manifest.json"] {
-    fp"{seed}/{name}".write(f"fixture {name}\n")
-  }
-
-  root
-}
-
-test test_wlroots_plan_carries_seatd_as_a_runtime_edge [fs, env, error] { |ctx|
-  let catalog_value = catalog.load(repository_with_fixture_seed(ctx)?)?
-  let plan_value = plan.resolve(
-    catalog_value,
-    {target: types.target_aarch64(), index_sha256: "linux-recipe-empty-remote", packages: []},
-    policy.aarch64_docker(),
-    ["wlroots0.20"],
-    false,
-  )?
-  var found = false
-  for node in plan_value.nodes {
-    continue unless node.name == "wlroots0.20"
-    for dependency in node.dependencies {
-      if dependency.name == "seatd" {
-        assert dependency.kind == types.dependency_runtime()
-        found = true
-      }
-    }
-  }
-
-  assert found
-}
-
 test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_missing [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-config-resolve")?
   let source = fp"{root}/source"

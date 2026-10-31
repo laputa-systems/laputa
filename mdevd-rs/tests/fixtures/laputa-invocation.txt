@@ -1,7 +1,7 @@
 # Provenance (read-only, 2026-10-28):
-# - Laputa xinit service: laputa/packages/mdevd/service.xsh
-# - Laputa qemu-dwl-foot boot hook: laputa/profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot
-# Canonical daemon invocation under test:
+# - Laputa canonical service: profiles/qemu-tinyland-ghostty/usr/lib/xinit/services/mdevd.xsh
+# - Laputa canonical launcher: profiles/qemu-tinyland-ghostty/usr/lib/laputa/mdevd-launch.xsh
+# Compatibility daemon invocation under test (the launcher adds the readiness fd):
 #   mdevd -O 4 -f /etc/mdev.conf -C
 # with PATH=/usr/local/bin:/usr/bin:/bin, restart always.
 # Serial coldplug step after daemon start:

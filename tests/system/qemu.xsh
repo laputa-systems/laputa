@@ -12,23 +12,17 @@ type SupervisorFixture = {
 
 pure fixture_proof() -> types.ProofMarkers {
   {
-    cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF",
-    ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY",
-    success_marker: "LAPUTA_DWL_FOOT_PROOF_OK",
-    failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
-    vt_away_marker: "",
-    vt_back_marker: "",
+    cmdline_flag: "LAPUTA_QEMU_FIXTURE_PROOF",
+    ready_marker: "LAPUTA_FIXTURE_PROOF_READY",
+    success_marker: "LAPUTA_FIXTURE_PROOF_OK",
+    failure_marker: "LAPUTA_FIXTURE_PROOF_FAILED",
     input_mode: types.ProofPlain,
   }
 }
 
-pure fixture_vt_proof() -> types.ProofMarkers {
-  {...fixture_proof(), vt_away_marker: "LAPUTA_VT_SWITCH_AWAY", vt_back_marker: "LAPUTA_VT_SWITCH_BACK"}
-}
-
 pure fixture_profile() -> types.SystemProfile {
   {
-    name: "qemu-dwl-foot",
+    name: "qemu-fixture",
     package_roots: [
       "baselayout",
     ],
@@ -46,17 +40,13 @@ pure fixture_profile() -> types.SystemProfile {
   }
 }
 
-pure fixture_vt_profile() -> types.SystemProfile {
-  {...fixture_profile(), proof: fixture_vt_proof()}
-}
-
 proc fixture_qemu(os: Str, arch: Str) -> Result[qemu.QemuConfig] {
   let target = qemu.qemu_target(os, arch)?
   {qemu: fp"{target.qemu_name}", target}
 }
 
 proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
-  let outputs = build.outputs(p"target/laputa/qemu-dwl-foot")
+  let outputs = build.outputs(p"target/laputa/qemu-fixture")
   [
     qemu.qemu_command_argv(config, fixture_profile(), outputs, types.Test),
     qemu.qemu_command_argv(config, fixture_profile(), outputs, types.Interactive),
@@ -87,8 +77,8 @@ test test_qemu_command_on_macos_is_aarch64_under_hvf [error] {
     assert_profile_devices(argv)
   }
 
-  assert "LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test, fixture_proof()), "test proof flag"
-  assert ! ("LAPUTA_QEMU_DWL_FOOT_PROOF=1" in qemu.kernel_cmdline(config.target, types.Interactive, fixture_proof())), "interactive omits proof flag"
+  assert "LAPUTA_QEMU_FIXTURE_PROOF=1" in qemu.kernel_cmdline(config.target, types.Test, fixture_proof()), "test proof flag"
+  assert ! ("LAPUTA_QEMU_FIXTURE_PROOF=1" in qemu.kernel_cmdline(config.target, types.Interactive, fixture_proof())), "interactive omits proof flag"
   assert "none" in pair[0], "headless test"
   assert "cocoa,zoom-to-fit=on,show-cursor=on" in pair[1], "cocoa interactive"
 }
@@ -120,7 +110,7 @@ pure display_of(argv: List[Str]) -> Str {
 }
 
 test test_virgl_profile_selects_the_gl_device_and_a_gl_display [error] {
-  let outputs = build.outputs(p"target/laputa/qemu-dwl-foot")
+  let outputs = build.outputs(p"target/laputa/qemu-fixture")
   let virgl = {...fixture_profile(), qemu_gpu: types.Virgl}
 
   for host in [["Linux", "x86_64"], ["Linux", "aarch64"], ["Darwin", "aarch64"]] {
@@ -165,10 +155,10 @@ test test_console_markers_fail_before_success [error] {
     assert proof.failure_marker(markers, f"before {marker} after") == marker
   }
 
-  assert proof.failure_marker(markers, "LAPUTA_DWL_FOOT_PROOF_FAILED input") == "LAPUTA_DWL_FOOT_PROOF_FAILED"
+  assert proof.failure_marker(markers, "LAPUTA_FIXTURE_PROOF_FAILED input") == "LAPUTA_FIXTURE_PROOF_FAILED"
   assert ! proof.succeeded(markers, "booting")
   assert proof.succeeded(markers, markers.success_marker)
-  match proof.verify_console(markers, "LAPUTA_DWL_FOOT_PROOF_FAILED input") {
+  match proof.verify_console(markers, "LAPUTA_FIXTURE_PROOF_FAILED input") {
     Ok(_) => assert false
     Err(_) => {}
   }
@@ -266,17 +256,6 @@ test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, proc
   assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
 }
 
-test test_qemu_supervisor_switches_vt_once_each_way [fs, process, net, time, error] { |ctx|
-  let fixture = supervisor_fixture(ctx)?
-  qemu.run_test(fixture.config, fixture_vt_profile(), fixture.outputs)?
-  let events = fp"{fixture.outputs.root}/native-events".read_lines()?
-  assert events.len() == 22
-  assert "f2" in events[0] and "f1" in events[2]
-  assert "ctrl" in events[0] and "alt" in events[0]
-  assert "l" in events[4] and "ret" in events[16]
-  assert qemu.screenshot_is_valid(fixture.outputs.screenshot)?
-}
-
 test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect [fs, process, net, time, error] { |ctx|
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/disconnect-input".write("")
@@ -312,31 +291,26 @@ test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, 
 }
 
 test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
-  let hook_metadata = p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot".metadata()?
-  let hook = p"profiles/qemu-dwl-foot/usr/lib/init/rc.d/laputa-qemu-dwl-foot.boot".read_text()?
+  let hook_metadata = p"profiles/qemu-tinyland-ghostty/usr/lib/init/rc.d/laputa-qemu-tinyland-ghostty.boot".metadata()?
+  let hook = p"profiles/qemu-tinyland-ghostty/usr/lib/init/rc.d/laputa-qemu-tinyland-ghostty.boot".read_text()?
   let builder = p"system/container_build.xsh".read_text()?
-  let guest = p"guest/qemu-dwl-foot-proof.xsh".read_text()?
+  let guest = p"guest/qemu-tinyland-ghostty-proof.xsh".read_text()?
+  let session = p"profiles/qemu-tinyland-ghostty/usr/lib/laputa/tinyland-session.xsh".read_text()?
   assert hook_metadata.mode % 4096 == 0o755
-  assert "/usr/lib/laputa/qemu-dwl-foot-proof.xsh" in hook
+  assert "tinyland-runtime-setup.xsh" in hook
   assert guest.starts_with("""#!/bin/xsh
 """)
-  assert "fs.install(source, target, 0o755" in hook
   assert "container_prepare_overlay" in builder
   assert "fs.install(guest_proof" in builder
   assert ! ("process.which(" in guest)
-  assert "/usr/bin/mdevd," in guest
-  assert "/usr/bin/mdevd-coldplug" in guest
-  assert "/usr/bin/seatd" in guest
-  assert "SEATD_VTBOUND: \"0\"" in guest
-  assert "SEATD_VTBOUND: \"0\"" in hook
-  assert "/usr/bin/dwl," in guest
-  assert "/usr/bin/foot -- /bin/xsh" in guest
-  assert "io.stdin_text()?" in guest
-  assert ! ("io.stdin().read_to_end()" in guest)
-  assert "mdevd-coldplug" in guest
-  assert "seatd" in guest and "dwl" in guest and "foot" in guest
-  assert "guest_wait_for(/run/laputa-foot-read-ready, \"foot\", 30)" in guest
-  assert "guest_console(\"LAPUTA_DWL_FOOT_PROOF_READY\")" in guest
+  assert "/usr/bin/su" in guest
+  assert "process.kill(seatd_pid" in guest
+  assert "/sys/bus/pci/devices/{virtio_pci}/remove" in guest
+  assert "loaded OpenGL 4.3" in guest
+  assert "LAPUTA_TINYLAND_GHOSTTY_PROOF_OK" in guest
+  assert "/usr/bin/tinyland" in session
+  assert "/usr/bin/ghostty-custom" in session
+  assert "/usr/lib/laputa/tinyland-ghostty-read.xsh" in session
 }
 
 test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, net, time, error] { |ctx|
@@ -345,13 +319,13 @@ test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, net, 
 
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
     Ok(_) => test.fail("supervisor accepted a QEMU that exited at startup")
-    Err(problem) => assert "QEMU exited before qemu-dwl-foot proof" in problem.message, problem.message
+    Err(problem) => assert "QEMU exited before qemu-fixture proof" in problem.message, problem.message
   }
 }
 
 test test_qmp_socket_fits_a_unix_socket_path_from_any_checkout_depth [error] {
-  let deep = fp"/{["very-long-directory-name" for _ in range(12)].join("/")}/target/laputa/qemu-dwl-foot"
+  let deep = fp"/{["very-long-directory-name" for _ in range(12)].join("/")}/target/laputa/qemu-fixture"
   let socket = build.outputs(deep).qmp_socket.display()
   assert socket.byte_len() < 108, socket
-  assert build.outputs(deep).qmp_socket != build.outputs(/other/target/laputa/qemu-dwl-foot).qmp_socket
+  assert build.outputs(deep).qmp_socket != build.outputs(/other/target/laputa/qemu-fixture).qmp_socket
 }

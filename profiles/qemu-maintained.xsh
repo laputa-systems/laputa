@@ -40,8 +40,6 @@ export let profile: types.SystemProfile = types.SystemProfile(
     ready_marker: "LAPUTA_MAINTAINED_PROOF_READY",
     success_marker: "LAPUTA_MAINTAINED_PROOF_OK",
     failure_marker: "LAPUTA_MAINTAINED_PROOF_FAILED",
-    vt_away_marker: "",
-    vt_back_marker: "",
     input_mode: types.ProofPlain,
   },
   qemu_gpu: types.Virtio2d,

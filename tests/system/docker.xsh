@@ -9,7 +9,7 @@ pure fixture_config() -> docker.DockerConfig {
     platform: "linux/arm64",
     laputa_root: /work/laputa,
     seed: /work/laputa/.out/seed/aarch64,
-    output_root: /work/laputa/target/laputa/qemu-dwl-foot,
+    output_root: /work/laputa/target/laputa/qemu-tinyland-ghostty,
     artifact_root: docker.artifact_store_root(/work/laputa, "aarch64"),
     image: "laputa-package-tools:aarch64-test",
     repo_url: "",
@@ -18,7 +18,7 @@ pure fixture_config() -> docker.DockerConfig {
 }
 
 test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", p"profiles")?
   assert docker.docker_pm_plan_argv(value, "x86_64") == [
     "/bin/xsh",
     "/src/laputa/pm.xsh",
@@ -38,13 +38,15 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
     "--root",
     "xinit",
     "--root",
-    "mdevd",
+    "mdevd-rs",
     "--root",
-    "seatd",
+    "seatd-rs",
     "--root",
-    "dwl-minimal",
+    "doas-rs",
     "--root",
-    "foot-minimal",
+    "tinyland",
+    "--root",
+    "ghostty-custom",
     "--root",
     "linux",
     "--target",
@@ -87,7 +89,7 @@ test test_native_docker_command_mounts_only_declared_inputs [error] {
   assert "linux/arm64" in argv
   assert argv |> any "/src/laputa,readonly" in .
   assert ! (argv |> any "/src/packages" in .)
-  assert "type=bind,src=/work/laputa/target/laputa/qemu-dwl-foot,dst=/output" in argv
+  assert "type=bind,src=/work/laputa/target/laputa/qemu-tinyland-ghostty,dst=/output" in argv
   assert "type=bind,src=/work/laputa/.out/artifacts/aarch64,dst=/artifacts" in argv
   assert "type=bind,src=/work/laputa/.out/cache/linux-kbuild,dst=/var/cache/laputa/linux-kbuild" in argv
   assert ! (argv |> any "type=volume" in .)
@@ -115,13 +117,13 @@ test test_container_xsh_and_core_come_from_one_seed [error] {
 }
 
 test test_generation_projection_and_build_use_the_single_container_adapter [fs, error] {
-  let value = profile.load_system_profile("qemu-dwl-foot", p"profiles")?
+  let value = profile.load_system_profile("qemu-tinyland-ghostty", p"profiles")?
   assert docker.docker_generation_plan_argv(value) == [
     "/bin/xsh",
     "/src/laputa/system/container_build.xsh",
     "--",
     "plan",
-    "qemu-dwl-foot",
+    "qemu-tinyland-ghostty",
     "1",
   ]
   assert docker.docker_profile_build_argv(value, 3) == [
@@ -129,7 +131,7 @@ test test_generation_projection_and_build_use_the_single_container_adapter [fs, 
     "/src/laputa/system/container_build.xsh",
     "--",
     "build",
-    "qemu-dwl-foot",
+    "qemu-tinyland-ghostty",
     "3",
   ]
 }

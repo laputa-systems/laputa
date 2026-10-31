@@ -60,7 +60,7 @@ test typed_target_rejects_reserved_and_unknown_targets [env, error] {
 test actual_recipes_reject_unsupported_target_before_building [fs, process, env, error] { |ctx|
   let dest = test.temp_dir(ctx, name: "unsupported-recipe-target")?
   let root = fs.cwd()?
-  for name in ["bison", "libffi", "pixman", "musl", "perf", "strace"] {
+  for name in ["bison", "libffi", "musl", "perf", "strace"] {
     let dir = fp"{root}/packages/{name}"
     let pkg = recipe.load_package_for_target(dir, types.target_aarch64())?
     env ({XSH_PM_TARGET_ARCH: "riscv64"}) {
