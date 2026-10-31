@@ -59,6 +59,17 @@ That gap is `TODO.md` NTPD-1.
 - `UnixClock::now` calls `adjtimex` and, on failure, `clock_gettime`.
   Later steering still needs `CAP_SYS_TIME`.
 
+## Readiness
+
+- The run loop reports readiness after the configuration is loaded, the
+  observation socket is bound, and the spawners are registered, never after
+  synchronization. With `NOTIFY_FD` set it writes one byte to that
+  descriptor (`ntpd/src/notify.rs`), reopened through `/proc/self/fd`
+  because the crate forbids unsafe code; a failed write ends the daemon.
+  `NOTIFY_SOCKET` (systemd) is still honored best-effort.
+- Synchronization is separate: `ntp-ctl status` reports stratum 16 until a
+  source is in use.
+
 ## Build and prereleases
 
 - MSRV is Rust 1.95 (`Cargo.toml` `rust-version`). The release compiler

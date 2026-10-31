@@ -42,7 +42,7 @@ use crate::daemon::spawn::pool::PoolSpawner;
 use crate::daemon::spawn::standard::StandardSpawner;
 use crate::daemon::system::{System, SystemConfig};
 use crate::daemon::tracing::LogReloadTaskStarter;
-use crate::notify::notify_ready;
+use crate::notify::{notify_fd_ready, notify_ready};
 
 use self::tracing::LogLevel;
 
@@ -249,6 +249,7 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
             )
         });
 
+        notify_fd_ready()?;
         let _ = notify_ready().await;
 
         let observer_exit = async {
