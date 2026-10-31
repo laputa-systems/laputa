@@ -316,8 +316,11 @@ clock; use disposable guests for clock-changing tests.
 Disposable x86_64/KVM guests prove startup convergence from both clock directions,
 the privilege boundary and supervised restart. External-backstep and QMP
 pause/resume cases prove restart/source reselection; the backstep case does not
-prove convergence, and the loopback oracle pauses with the guest. Authenticated
-NTS discipline, the chrony oracle and drift persistence remain open. See the
+prove convergence, and the loopback oracle pauses with the guest. A controlled
+NTS guest verifies CA/name and `ntske/1`, rejects forged unauthenticated replies,
+converges against the raw-clock oracle and restarts under supervision. Its
+standalone runner passes end to end. External NTS deployment, the chrony oracle
+and drift persistence remain open. See the
 [retained guest checks](TESTING.md#run-the-disposable-ntp-guest).
 
 Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
@@ -330,9 +333,14 @@ assume an already trustworthy wall clock. Document initial clock assumptions,
 any persisted lower bound, cold-boot/offline behavior, and explicit operator
 recovery. An unauthenticated NTP result or a virtual RTC is not authenticated
 time; do not silently disable TLS verification or accept expired metadata.
-The current snapshot acceptance path persists its supplied current time as a
-lower bound after signature verification. It does not establish time-source
-trust. Settle that policy before activating unauthenticated NTP in a profile.
+Repository snapshots and trust releases require v2 signed `issued-at` metadata.
+Their durable floors retain the greatest authenticated publication time, never
+a local wall-clock observation. Verification still requires trustworthy current
+time from an RTC or operator at bootstrap; the update path never sets the clock.
+Legacy metadata and observed-clock state fail closed and require trusted
+reprovisioning that preserves generation floors. See [snapshot policy](PM.md)
+and [trust policy](CERTIFICATE-TRUST.md). The packaged unauthenticated pool is
+not an authenticated time source and remains disabled in shipped profiles.
 Persisted guest state alone cannot prevent a hostile hypervisor from rolling
 back both clock and disk; do not promise that threat model is covered.
 
