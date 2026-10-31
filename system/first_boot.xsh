@@ -557,12 +557,14 @@ export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwn
     }
     guard fields[5] == f"/home/{config.operator}" else { fail "operator home does not match the applied document" }
     let home = f"home/{config.operator}"
-    for entry in ["home", home, f"{home}/.ssh", f"{home}/.ssh/authorized_keys"] {
+    let ssh_dir = f"{home}/.ssh"
+    let authorized = f"{ssh_dir}/authorized_keys"
+    for entry in ["home", home, ssh_dir, authorized] {
       let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
-      let expected = if entry.ends_with("authorized_keys") { "file" } else { "dir" }
+      let expected = if entry == authorized { "file" } else { "dir" }
       guard info.kind == expected else { fail f"operator state path is not a {expected}: {entry}" }
-      if entry.ends_with("/.ssh") { guard info.mode.bit_and(0o7777) == 0o700 else { fail "operator SSH directory mode must be 0700" } }
-      if entry.ends_with("authorized_keys") { guard info.mode.bit_and(0o7777) == 0o600 else { fail "operator authorized keys mode must be 0600" } }
+      if entry == ssh_dir { guard info.mode.bit_and(0o7777) == 0o700 else { fail "operator SSH directory mode must be 0700" } }
+      if entry == authorized { guard info.mode.bit_and(0o7777) == 0o600 else { fail "operator authorized keys mode must be 0600" } }
     }
     [
       {path: home, uid, gid},

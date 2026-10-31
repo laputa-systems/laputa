@@ -368,3 +368,16 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
   assert !process.run(process.command_argv(xsh, argv))?.ok
   assert image.read_text()? == "previous"
 }
+
+test test_state_image_ownership_accepts_authorized_keys_as_operator [fs, error] { |ctx|
+  let root = prepare(ctx, name: "state-operator-authorized-keys")?
+  let document = base("new").replace("operator pazu", with: "operator authorized_keys")
+  first_boot.apply(root, document)?
+  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  let owners = first_boot.state_ownership(root)?
+  assert owners == [
+    {path: "home/authorized_keys", uid: 1000, gid: 1000},
+    {path: "home/authorized_keys/.ssh", uid: 1000, gid: 1000},
+    {path: "home/authorized_keys/.ssh/authorized_keys", uid: 1000, gid: 1000},
+  ]
+}
