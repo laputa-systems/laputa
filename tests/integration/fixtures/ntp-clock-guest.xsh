@@ -69,7 +69,8 @@ certificate-authority = "{root}/inputs/testca.pem"
 address = "127.0.0.1:32123"
 """
   }
-  p"/etc/ntpd-rs/ntp.toml".write("""[observability]
+  p"/etc/ntpd-rs/ntp.toml".write("""frequency-calibration-path = "/var/lib/ntpd-rs/frequency.json"
+[observability]
 log-level = "trace"
 observation-path = "/run/ntpd-rs/observe"
 observation-permissions = 0o644

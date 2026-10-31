@@ -19,8 +19,9 @@ fn raw_ms() -> io::Result<u64> {
     Ok(value.seconds as u64 * 1000 + value.nanoseconds as u64 / 1_000_000)
 }
 
-fn timestamp(base_ms: u64, origin_raw_ms: u64) -> io::Result<[u8; 8]> {
-    let millis = base_ms + raw_ms()? - origin_raw_ms;
+fn timestamp(base_ms: u64, origin_raw_ms: u64, rate_ppm: i64) -> io::Result<[u8; 8]> {
+    let elapsed = raw_ms()? - origin_raw_ms;
+    let millis = (base_ms + elapsed).checked_add_signed((elapsed as i64) * rate_ppm / 1_000_000).ok_or_else(|| io::Error::other("oracle time out of range"))?;
     let seconds = (millis / 1000 + 2_208_988_800) as u32;
     let fraction = (((millis % 1000) << 32) / 1000) as u32;
     let mut out = [0; 8];
@@ -39,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let base_ms: u64 = first.parse()?;
     let origin_raw_ms: u64 = args.next().ok_or("missing raw origin")?.parse()?;
     let ready = args.next().ok_or("missing readiness path")?;
+    let rate_ppm: i64 = args.next().map_or(Ok(0), |value| value.parse())?;
     let socket = UdpSocket::bind("127.0.0.1:32123")?;
     fs::write(ready, b"ready\n")?;
     let mut request = [0; 1024];
@@ -50,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if len < 48 || request[0] & 7 != 3 {
             continue;
         }
-        let time = timestamp(base_ms, origin_raw_ms)?;
+        let time = timestamp(base_ms, origin_raw_ms, rate_ppm)?;
         let mut response = [0; 48];
         response[0] = 0x24;
         response[1] = 1;

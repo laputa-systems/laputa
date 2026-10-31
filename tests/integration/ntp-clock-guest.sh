@@ -2,12 +2,12 @@
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
-mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [CHRONYD CHRONYC]}
+mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|frequency|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [CHRONYD CHRONYC]}
 xsh=$(realpath "${2:?host xsh}")
 seed=$(realpath "${3:?seed directory}")
 artifacts=$(realpath "${4:?artifact store}")
 image=${5:?package-tools image}
-case "$mode" in behind|ahead|jump|pause|nts|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
+case "$mode" in behind|ahead|jump|pause|nts|frequency|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
 git -C "$repo" check-ignore -q .work/
 mkdir -p "$repo/.work/tmp"
 work=$(mktemp -d "$repo/.work/tmp/ntp-guest.XXXXXXXX")
@@ -38,6 +38,11 @@ TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
   -C linker=mold -C linker-flavor=ld \
   "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
 cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
+if test "$mode" = frequency; then
+  cc -dumpmachine | rg -q 'musl$'
+  cc -static -fuse-ld=mold "$snapshot/tests/integration/fixtures/ntp-frequency-check.c" -o "$input/inputs/ntp-frequency-check"
+  cp "$snapshot/tests/integration/fixtures/ntp-frequency-guest.xsh" "$input/inputs/entry.xsh"
+fi
 if test "$mode" = chrony-behind || test "$mode" = chrony-ahead; then
   cp "${6:?chronyd binary}" "$input/inputs/chronyd"
   cp "${7:?chronyc binary}" "$input/inputs/chronyc"
@@ -62,3 +67,8 @@ truncate -s 64M "$output/output.ext4"
 /sbin/mkfs.ext4 -q -F "$output/output.ext4"
 XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
   "$snapshot" "$output" "$repo/.work/ntp-$$.sock"
+if test "$mode" = frequency; then
+  cp "$output/console.log" "$output/frequency-first-boot.log"
+  XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
+    "$snapshot" "$output" "$repo/.work/ntp-$$.sock"
+fi

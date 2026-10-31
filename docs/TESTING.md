@@ -114,6 +114,7 @@ bash tests/integration/ntp-clock-guest.sh ahead /absolute/path/to/xsh /absolute/
 bash tests/integration/ntp-clock-guest.sh jump /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 bash tests/integration/ntp-clock-guest.sh pause /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 bash tests/integration/ntp-clock-guest.sh nts /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+bash tests/integration/ntp-clock-guest.sh frequency /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 ```
 
 The runner needs writable KVM, host Rust and kache, `jaq`, and `mkfs.ext4`. It
@@ -128,6 +129,15 @@ replies, and then requires authenticated clock convergence. The NTS fixture buil
 needs the locked Rust dependencies available offline. These cases do not
 qualify external sources or the authenticated clock-floor policy. The bundled
 NTS test certificate expires on 27 February 2027.
+
+The frequency case uses a controlled source with a 100 ppm rate bias. It
+requires a learned nonzero calibration, stops the source, and checks the
+kernel frequency after a supervised restart. It then starts a fresh guest with
+the same state disk, verifies that the kernel starts without the saved
+correction, and checks restoration while unsynchronized before reselecting the
+source. The frequency case also needs Linux musl GCC and mold for its read-only
+kernel frequency probe. This checks a cold boot, not physical power-loss
+durability or hardware-specific oscillator stability.
 
 For the optional chrony comparison, build the official chrony 4.9 source in
 scratch using GCC targeting Linux musl, mold, and GNU make. The command below
