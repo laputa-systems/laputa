@@ -33,6 +33,75 @@ unexplained regression. KBVM 0.2.0 MSRV (1.95) vs the pinned nightly is
 unverified — Phase 0 settles it by compiling, not by reading version
 strings.
 
+## Status (2026-10-31)
+
+Measured on Linux x86_64/KVM with the fixed Ghostty build described under
+"Blocking release".
+
+| Phase | State | Evidence |
+|---|---|---|
+| 0 inventory | landed | baseline table; `tinyland/docs/opengl-probe.md` |
+| 1 KBVM | landed | `tinyland` DT_NEEDED has no libxkbcommon; `tinyland/tests/kbvm_oracle.rs` |
+| 2 Ghostty package | landed | `ghostty-custom` proof; four declared DT_NEEDED entries |
+| 3 OpenGL probe | landed | guest virgl reports 4.3 core; softpipe ceiling is 3.3 |
+| 4 profile | landed | `qemu-tinyland-ghostty`; `LAPUTA_TINYLAND_GHOSTTY_GL43` |
+| 5 end-to-end | green with fixed client, release pending | `laputa test qemu-tinyland-ghostty` |
+| 6 size/performance | measured | table below |
+| 7 promotion | blocked | needs the release named under Phase 5 |
+
+### Phase 5 proof
+
+Against a local build of the fixed Ghostty client (see "Blocking
+release"), `laputa build qemu-tinyland-ghostty` then
+`laputa test qemu-tinyland-ghostty` passes. The guest proof covers the
+lifecycle matrix (compositor crash, broker loss, single keyboard unplug,
+application exit, scanner shutdown with ownership reclamation),
+unprivileged DRM and evdev denial, Ghostty on a 4.3 core context, and ends
+with `LAPUTA_TINYLAND_GHOSTTY_PROOF_OK`. The host screenshot is 1280x800
+with 0.61% magenta pixels from the terminal marker.
+
+Input covers a Caps Lock round-trip, Shift+1, a bare Shift press/release
+between keys, and Return; the reader receives `LAPUTA!`. Two proof defects
+were found and fixed:
+
+- The reader waited for `io.stdin_text()` EOF. The injected Ctrl+D races
+  the line it follows on a canonical tty: the line is still queued, so the
+  EOF character is discarded and the reader blocks forever. The proof
+  injects a line, so the reader now uses `io.stdin_line()`.
+- QEMU answers `screendump` with `no surface` once the guest scans out
+  through a GL device, because the frames stay GL textures. Virgl profiles
+  now carry a 2D `virtio-gpu-pci` first as card0 for scanout and
+  `virtio-gpu-gl-pci` as the render device, so tinyland scans out through a
+  host-readable surface while Ghostty renders on the virgl render node.
+
+### Blocking release
+
+The published `release-354a4e32…` tarball binds `wl_seat` before its
+listener exists, so the client never creates a keyboard (see
+`tinyland/docs/opengl-probe.md`). The fix is committed in the Ghostty fork
+at `15e551072`: create the seat at registry-bind time and replace the yield
+loop with a poll on the display fd. The proof above ran against a local
+build of that commit. `packages/ghostty-custom` stays pinned to the
+published release until a new release is cut, so the profile test is red
+until then; Phases 5 and 7 close with that release. Cut
+`release-<full commit>` from the fork branch, then update the source tag
+and both checksums in `packages/ghostty-custom/PKGBUILD.xsh` and rerun
+`laputa build` and `laputa test`.
+
+### Phase 6 numbers
+
+| Item | Value | Source |
+|---|---|---|
+| `tinyland` binary | 3,015,600 bytes (baseline 2,117,480) | `tinyland-0.1.0-1` payload |
+| `tinyland` DT_NEEDED | `libseat.so.1`, `libc.so`, `libgcc_s.so` | `readelf -d` |
+| `ghostty-custom` binary | 30,586,216 bytes; payload archive 18,516,605 bytes | `ghostty-custom-1.4.1-1` payload |
+| `ghostty-custom` DT_NEEDED | `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, `libc.so` | package proof |
+| `qemu-tinyland-ghostty` closure | 38 plan nodes (foot 41, dwl-foot 48) | `target/laputa/qemu-tinyland-ghostty/build-plan.json` |
+| Image size | disk 308M, rootfs 276M (foot 288M/256M) | `du` on `current/` |
+| Cold start to first frame | session ready with a 4.3 context at 10.51 s guest uptime (proof start 8.09 s) | `LAPUTA_TINYLAND_T session-ready` |
+| Idle RSS after input | tinyland 7,196 KB; Ghostty 41,416 KB | `LAPUTA_TINYLAND_RSS` |
+| Renderer | virgl, OpenGL 4.3 core | `LAPUTA_TINYLAND_GHOSTTY_GL43` |
+
 ## Reuse / change / new map
 
 - Reuse: `tinyland/` poll loop, seat lifecycle, VT switching, DRM
