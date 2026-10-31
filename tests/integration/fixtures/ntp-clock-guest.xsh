@@ -138,16 +138,16 @@ minimum-agreeing-sources = 1
     let reject_deadline = now_ms()? + 45000
     var rejected = false
     while now_ms()? < reject_deadline {
-      let count = p"/run/nts-oracle-forged"
-      if count.exists()? and count.read_text()?.parse_int_decimal()? >= 3 {
-        assert stratum()? == 16, "unauthenticated replies synchronized an NTS source"
+      let log = p"/run/ntp-proof-logs/ntpd-rs/current"
+      if log.exists()? and log.read_text()?.split("received invalid packet: Failed to decrypt NTS extension fields").len() >= 4 {
+        assert stratum()? == 16, "tampered replies synchronized an NTS source"
         rejected = true
         break
       }
       time.sleep(100ms)
     }
-    assert rejected, "NTS server did not receive authenticated requests"
-    print "NTS_REJECTED_UNAUTHENTICATED_REPLIES"
+    assert rejected, "NTS client did not reject three tampered responses"
+    print "NTS_REJECTED_TAMPERED_REPLIES"
     p"/run/nts-oracle-authenticate".write("enabled")?
   }
   let deadline = now_ms()? + 120000

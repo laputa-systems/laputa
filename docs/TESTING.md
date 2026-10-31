@@ -123,9 +123,9 @@ whose time comes from `CLOCK_MONOTONIC_RAW`. The startup case requires a clock
 step and supervisor restart. The jump case checks restart and source reselection;
 it does not establish convergence after the jump. The pause case checks source
 reselection after QMP stop and resume; its loopback source pauses with the guest.
-The NTS case uses a test CA and local NTS-KE server, rejects unauthenticated
-replies, and then requires authenticated clock convergence. The NTS fixture
-build needs the locked Rust dependencies available offline. These cases do not
+The NTS case uses a test CA and local NTS-KE server, rejects tampered NTS
+replies, and then requires authenticated clock convergence. The NTS fixture build
+needs the locked Rust dependencies available offline. These cases do not
 qualify external sources or the authenticated clock-floor policy. The bundled
 NTS test certificate expires on 27 February 2027.
 

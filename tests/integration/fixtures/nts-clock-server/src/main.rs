@@ -82,22 +82,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let (len, peer) = udp.recv_from(&mut input).await?;
         if let ServerAction::Respond { message } = ntp.handle(peer.ip(), clock.now()?, &input[..len], &mut output, &mut stats) {
             if !std::path::Path::new("/run/nts-oracle-authenticate").exists() && stats.accepted > 0 {
-                let millis = clock.base_ms + raw_ms()? - clock.origin_ms;
-                let seconds = (millis / 1000 + 2_208_988_800) as u32;
-                let fraction = (((millis % 1000) << 32) / 1000) as u32;
-                let mut forged = [0_u8; 48];
-                forged[0] = 0x24;
-                forged[1] = 1;
-                forged[2] = input[2];
-                forged[3] = (-20_i8) as u8;
-                forged[12..16].copy_from_slice(b"LOCL");
-                forged[24..32].copy_from_slice(&input[40..48]);
-                for offset in [16, 32, 40] {
-                    forged[offset..offset + 4].copy_from_slice(&seconds.to_be_bytes());
-                    forged[offset + 4..offset + 8].copy_from_slice(&fraction.to_be_bytes());
-                }
-                udp.send_to(&forged, peer).await?;
-                fs::write("/run/nts-oracle-forged", stats.accepted.to_string())?;
+                let mut tampered = message.to_vec();
+                tampered[11] ^= 1;
+                udp.send_to(&tampered, peer).await?;
             } else {
                 udp.send_to(message, peer).await?;
             }
