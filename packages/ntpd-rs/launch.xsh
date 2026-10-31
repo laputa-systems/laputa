@@ -24,6 +24,8 @@ proc main() [fs, process, env, error] {
     state_dir.chmod(0o700)?
     fs.chown(state_dir, owner)?
     fs.chgrp(state_dir, owning_group)?
+    fs.fsync(state_dir)?
+    fs.fsync(state_dir.parent)?
   }
   let state = fs.stat(state_dir, follow_symlinks: false)?
   if state.kind != "dir" or state.uid != ntp_id or state.gid != ntp_id or state.mode % 4096 != 0o700 {

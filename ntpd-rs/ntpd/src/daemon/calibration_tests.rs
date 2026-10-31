@@ -156,3 +156,38 @@ fn killed_writer_preserves_previous_calibration() {
     assert_eq!(store.load().unwrap(), Some(value));
     store.save(value).unwrap();
 }
+
+#[test]
+fn restrictive_umask_child() {
+    let Some(path) = std::env::var_os("NTPD_UMASK_CHILD") else { return; };
+    let store = CalibrationStore::open(&PathBuf::from(path), 0.0005).unwrap();
+    let value = Calibration { correction: 0.000_02, uncertainty: 0.000_001 };
+    store.save(value).unwrap();
+    assert_eq!(store.load().unwrap(), Some(value));
+}
+
+#[test]
+fn restrictive_umask_preserves_private_readable_state() {
+    for existing_lock in [false, true] {
+        let dir = TestDirectory::new();
+        if existing_lock { drop(CalibrationStore::open(&dir.path(), 0.0005).unwrap()); }
+        let status = std::process::Command::new("sh")
+            .args(["-c", "umask 0200; exec \"$@\"", "sh"])
+            .arg(std::env::current_exe().unwrap())
+            .args(["--exact", "daemon::calibration_tests::restrictive_umask_child"])
+            .env("NTPD_UMASK_CHILD", dir.path()).status().unwrap();
+        assert!(status.success(), "calibration failed with restrictive umask; existing_lock={existing_lock}");
+        let store = CalibrationStore::open(&dir.path(), 0.0005).unwrap();
+        assert!(store.load().unwrap().is_some());
+    }
+}
+
+#[test]
+fn incompatible_existing_lock_is_not_repaired() {
+    let dir = TestDirectory::new();
+    let lock = dir.0.join(".frequency.lock");
+    fs::write(&lock, "").unwrap();
+    fs::set_permissions(&lock, fs::Permissions::from_mode(0o400)).unwrap();
+    assert!(CalibrationStore::open(&dir.path(), 0.0005).is_err());
+    assert_eq!(fs::metadata(lock).unwrap().permissions().mode() & 0o777, 0o400);
+}

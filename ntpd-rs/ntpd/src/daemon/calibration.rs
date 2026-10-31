@@ -2,7 +2,7 @@ use std::{
     ffi::OsStr,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    os::{fd::AsRawFd, unix::fs::{MetadataExt, OpenOptionsExt}},
+    os::{fd::AsRawFd, unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt}},
     path::{Path, PathBuf},
 };
 use serde::{Deserialize, Serialize};
@@ -56,7 +56,15 @@ impl CalibrationStore {
             return Err(invalid("calibration directory must be private and owned by the daemon"));
         }
         let base = PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd()));
-        let lock = OpenOptions::new().read(true).write(true).create(true).mode(0o600).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC).open(base.join(".frequency.lock"))?;
+        let lock_path = base.join(".frequency.lock");
+        let lock = match OpenOptions::new().read(true).write(true).create_new(true).mode(0o600).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC).open(&lock_path) {
+            Ok(file) => {
+                file.set_permissions(fs::Permissions::from_mode(0o600))?;
+                file
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => OpenOptions::new().read(true).write(true).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC).open(&lock_path)?,
+            Err(error) => return Err(error),
+        };
         Self::check_file(&lock, owner)?;
         lock.try_lock().map_err(io::Error::other)?;
         Ok(Self { directory, lock, filename: name.into(), limit, owner })
@@ -106,6 +114,7 @@ impl CalibrationStore {
         }
         let result = (|| {
             let mut file = OpenOptions::new().write(true).create_new(true).mode(0o600).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC).open(&temp)?;
+            file.set_permissions(fs::Permissions::from_mode(0o600))?;
             file.write_all(&data)?;
             file.sync_all()?;
             fs::rename(&temp, self.base().join(&self.filename))?;
