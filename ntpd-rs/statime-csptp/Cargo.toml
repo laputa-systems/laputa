@@ -1,0 +1,23 @@
+[package]
+name = "statime-csptp"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["statime-wire/std"]
+
+[dependencies]
+statime-wire = { workspace = true }
+statime-base = { workspace = true }
+rand = { workspace = true, default-features = false }

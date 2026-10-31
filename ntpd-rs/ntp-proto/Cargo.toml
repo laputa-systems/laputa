@@ -1,0 +1,52 @@
+[package]
+name = "ntp-proto"
+description = "ntpd-rs packet parsing and algorithms"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints]
+workspace = true
+
+[features]
+default = ["aws-lc", "rustcrypto"]
+aws-lc = ["rustls23/aws-lc-rs", "rustls23/prefer-post-quantum"] # the latter also turns on aws-lc-rs
+rustcrypto = ["dep:md-5", "dep:aead", "dep:aes-siv"]
+openssl = ["dep:rustls-openssl", "dep:openssl"]
+openssl-vendored = ["openssl", "rustls-openssl/vendored", "openssl/vendored"]
+graviola = ["dep:rustls-graviola"]
+__internal-fuzz = ["arbitrary", "__internal-api"]
+__internal-test = ["__internal-api"]
+__internal-api = []
+
+[dependencies]
+arbitrary = { workspace = true, optional = true }
+rand = { workspace = true, features = ["std", "std_rng"] }
+rustls23.workspace = true
+rustls-graviola = { workspace = true, optional = true }
+rustls-openssl = { workspace = true, optional = true }
+rustls-platform-verifier.workspace = true
+serde.workspace = true
+statime-base = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["io-util", "time"] }
+tokio-rustls.workspace = true
+tracing.workspace = true
+zeroize.workspace = true
+
+# crypto
+# Note: md5 is needed to calculate ReferenceIDs for IPv6 addresses per RFC5905
+md-5 = { workspace = true, optional = true }
+aead = { workspace = true, optional = true }
+aes-siv = { workspace = true, optional = true }
+openssl = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

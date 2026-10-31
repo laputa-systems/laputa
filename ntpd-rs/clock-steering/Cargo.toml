@@ -1,0 +1,23 @@
+[package]
+name = "clock-steering"
+description = "Functionality for manual clock steering"
+version = "0.3.0"
+edition = "2021"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints]
+workspace = true
+
+[[example]]
+name = "basic"
+required-features = []
+
+[dependencies]
+libc.workspace = true
+statime-base = { workspace = true, features = ["std"] }

@@ -1,0 +1,298 @@
+name: prerelease
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  preflight:
+    name: Validate release ref
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      default_branch: ${{ steps.ref.outputs.default_branch }}
+    steps:
+      - name: Require the default branch
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" ]]; then
+            echo "Release dispatch rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: preflight
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            target: aarch64-apple-darwin
+            docker_platform: ''
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            docker_platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            docker_platform: linux/arm64
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: matrix.docker_platform != ''
+      - name: Build Linux release image
+        if: matrix.docker_platform != ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.docker_platform }}
+          load: true
+          tags: ntpd-rs:${{ matrix.target }}
+          cache-from: type=gha,scope=ntpd-rs-${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=ntpd-rs-${{ matrix.target }}
+      - name: Determine used Rust toolchain versions
+        run: ./.rust-toolchain/set-rust-versions.sh
+      - name: Install Rust toolchain
+        if: matrix.docker_platform == ''
+        run: |
+          rustup toolchain install "$STABLE_RUST_VERSION" --profile minimal --component rust-src
+          rustup default "$STABLE_RUST_VERSION"
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: matrix.docker_platform == ''
+        with:
+          key: ${{ matrix.runner }}-${{ matrix.target }}
+      - name: Build and verify macOS release
+        if: matrix.docker_platform == ''
+        run: |
+          cargo build --locked --release -p ntpd \
+            --target "${{ matrix.target }}" \
+            --no-default-features --features graviola,rustcrypto
+          bindir="target/${{ matrix.target }}/release"
+          for bin in ntp-daemon ntp-ctl ntp-metrics-exporter; do
+            test -x "$bindir/$bin"
+            file "$bindir/$bin" | grep -q 'Mach-O 64-bit executable arm64'
+          done
+          mkdir -p "out/ntpd-rs-${{ matrix.target }}"
+          cp "$bindir/ntp-daemon" "$bindir/ntp-ctl" "$bindir/ntp-metrics-exporter" \
+            "out/ntpd-rs-${{ matrix.target }}/"
+          (
+            cd "out/ntpd-rs-${{ matrix.target }}" && \
+            zip -9 --junk-paths \
+              "ntpd-rs-${{ matrix.target }}.zip" \
+              ntp-daemon ntp-ctl ntp-metrics-exporter
+          )
+      - name: Run macOS tests
+        if: matrix.docker_platform == ''
+        run: |
+          cargo test --locked -p ntp-proto -p ntpd \
+            --target "${{ matrix.target }}" \
+            --no-default-features --features graviola,rustcrypto
+      - name: Build and verify Linux releases
+        if: matrix.docker_platform != ''
+        run: |
+          docker run --rm --init \
+            --platform "${{ matrix.docker_platform }}" \
+            -e CI \
+            -e NTPD_RS_GIT_REV=$GITHUB_SHA \
+            -e CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=cc \
+            -e CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=cc \
+            -v "$GITHUB_WORKSPACE:/ntpd-rs" \
+            -w /ntpd-rs \
+            ntpd-rs:${{ matrix.target }} \
+            sh -ec '
+              cargo test --locked -p ntp-proto -p ntpd \
+                --target ${{ matrix.target }} \
+                --no-default-features --features graviola,rustcrypto
+              cargo build --locked --release -p ntpd \
+                --target ${{ matrix.target }} \
+                --no-default-features --features graviola,rustcrypto
+              for bin in ntp-daemon ntp-ctl ntp-metrics-exporter; do
+                f="target/${{ matrix.target }}/release/$bin"
+                test -x "$f"
+                file "$f" | grep -Eq "statically linked|static-pie linked"
+                ! readelf -l "$f" | grep -q INTERP
+                ! readelf -d "$f" | grep -q NEEDED
+              done
+              mkdir -p "out/ntpd-rs-${{ matrix.target }}"
+              cp "target/${{ matrix.target }}/release/ntp-daemon" \
+                "target/${{ matrix.target }}/release/ntp-ctl" \
+                "target/${{ matrix.target }}/release/ntp-metrics-exporter" \
+                "out/ntpd-rs-${{ matrix.target }}/"
+              (
+                cd "out/ntpd-rs-${{ matrix.target }}" && \
+                zip -9 --junk-paths \
+                  "ntpd-rs-${{ matrix.target }}.zip" \
+                  ntp-daemon ntp-ctl ntp-metrics-exporter && \
+                rm ntp-ctl ntp-metrics-exporter
+              )
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ntpd-rs-${{ matrix.target }}
+          path: out/ntpd-rs-${{ matrix.target }}
+
+  release:
+    name: Create pre-release
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Recheck release ref and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ needs.preflight.outputs.default_branch }}
+          RELEASE_TAG: release-${{ github.sha }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" || "$DEFAULT_BRANCH" != "$default_branch" ]]; then
+            echo "Release publication rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          if response=$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" 2>&1); then
+            echo "Release publication rejected: tag $RELEASE_TAG already exists; inspect it before proceeding" >&2
+            exit 1
+          else
+            if [[ "$response" != *"HTTP 404"* ]]; then
+              printf 'Could not verify that tag %s is absent: %s\n' "$RELEASE_TAG" "$response" >&2
+              exit 1
+            fi
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ntpd-rs-*
+          path: dist
+      - name: Verify Linux ELF artifacts are fully static
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          command -v readelf >/dev/null
+          X86_64_COUNT=0
+          AARCH64_COUNT=0
+          for binary in dist/**/*; do
+            [[ -f "$binary" ]] || continue
+            if ! readelf -h "$binary" >/dev/null 2>&1; then
+              continue
+            fi
+            machine=$(readelf -h "$binary" | sed -n 's/^[[:space:]]*Machine:[[:space:]]*//p')
+            case "$machine" in
+              "Advanced Micro Devices X86-64") X86_64_COUNT=$((X86_64_COUNT + 1)) ;;
+              AArch64) AARCH64_COUNT=$((AARCH64_COUNT + 1)) ;;
+              *) printf '%s has unsupported ELF machine %s\n' "$binary" "$machine" >&2; exit 1 ;;
+            esac
+            program_headers=$(readelf -lW "$binary")
+            if [[ "$program_headers" == *INTERP* ]]; then
+              printf '%s has a dynamic ELF interpreter\n' "$binary" >&2
+              exit 1
+            fi
+            dynamic_section=$(readelf -dW "$binary")
+            if [[ "$dynamic_section" == *NEEDED* ]]; then
+              printf '%s has a dynamic library dependency\n' "$binary" >&2
+              exit 1
+            fi
+          done
+          if [[ "$X86_64_COUNT" -ne 1 || "$AARCH64_COUNT" -ne 1 ]]; then
+            printf 'Expected one x86_64 and one aarch64 Linux ELF artifact, found x86_64=%s aarch64=%s\n' "$X86_64_COUNT" "$AARCH64_COUNT" >&2
+            exit 1
+          fi
+      - name: Validate and package release artifacts
+        run: |
+          expected_artifacts=$'ntpd-rs-aarch64-apple-darwin\nntpd-rs-aarch64-unknown-linux-musl\nntpd-rs-x86_64-unknown-linux-musl'
+          actual_artifacts=$(find dist -mindepth 1 -maxdepth 1 -print | sed 's|.*/||' | LC_ALL=C sort)
+          if [[ "$actual_artifacts" != "$expected_artifacts" ]]; then
+            echo "Unexpected release artifact directories:" >&2
+            printf '%s\n' "$actual_artifacts" >&2
+            exit 1
+          fi
+          expected_mac=$'ntp-ctl\nntp-daemon\nntp-metrics-exporter\nntpd-rs-aarch64-apple-darwin.zip'
+          expected_linux=$'ntp-daemon\nPLACEHOLDER.zip'
+          for spec in \
+            "$expected_mac:ntpd-rs-aarch64-apple-darwin" \
+            "$expected_linux:ntpd-rs-aarch64-unknown-linux-musl" \
+            "$expected_linux:ntpd-rs-x86_64-unknown-linux-musl"; do
+            expected=${spec%%:*}
+            artifact=${spec#*:}
+            expected=${expected//PLACEHOLDER/$artifact}
+            actual=$(find "dist/$artifact" -type f -print | sed 's|.*/||' | LC_ALL=C sort)
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Unexpected files in artifact $artifact:" >&2
+              printf '%s\n' "$actual" >&2
+              exit 1
+            fi
+          done
+          cd dist
+          sha256sum ntpd-rs-aarch64-apple-darwin/ntpd-rs-aarch64-apple-darwin.zip \
+            ntpd-rs-aarch64-unknown-linux-musl/ntpd-rs-aarch64-unknown-linux-musl.zip \
+            ntpd-rs-x86_64-unknown-linux-musl/ntpd-rs-x86_64-unknown-linux-musl.zip \
+            | LC_ALL=C sort -k2 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Create release tag at triggering SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: release-${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ needs.preflight.outputs.default_branch }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" || "$DEFAULT_BRANCH" != "$default_branch" ]]; then
+            echo "Release publication rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          if response=$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" 2>&1); then
+            echo "Release publication rejected: tag $RELEASE_TAG already exists; inspect it before proceeding" >&2
+            exit 1
+          elif [[ "$response" != *"HTTP 404"* ]]; then
+            printf 'Could not verify that tag %s is absent: %s\n' "$RELEASE_TAG" "$response" >&2
+            exit 1
+          fi
+          if response=$(gh api "repos/$REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$GITHUB_SHA" 2>&1); then
+            echo "Created $RELEASE_TAG at $GITHUB_SHA"
+          else
+            printf 'Could not create release tag %s at %s: %s\n' "$RELEASE_TAG" "$GITHUB_SHA" "$response" >&2
+            exit 1
+          fi
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: release-${{ github.sha }}
+        run: gh release create "$RELEASE_TAG" dist/ntpd-rs-*/ntpd-rs-*.zip dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --prerelease --verify-tag --title "$RELEASE_TAG"

@@ -1,0 +1,262 @@
+// TODO: Eliminate allow.
+#![allow(unused)]
+
+mod clock;
+pub mod config;
+#[cfg(target_os = "linux")]
+mod csptp_server;
+#[cfg(target_os = "linux")]
+mod csptp_source;
+mod dns;
+pub mod keyexchange;
+mod local_ip_provider;
+mod ntp_source;
+pub mod nts_key_provider;
+pub mod observer;
+#[cfg(feature = "pps")]
+mod pps_source;
+mod server;
+mod sock_source;
+pub mod sockets;
+pub mod spawn;
+mod system;
+pub mod tracing;
+
+use std::sync::Arc;
+use std::{error::Error, io::IsTerminal, path::Path};
+
+use ::tracing::info;
+pub use config::Config;
+use ntp_proto::{SourceConfig, SynchronizationConfig};
+pub use observer::ObservableState;
+use statime_algo::{ClockConfig, ControllerConfig, StdKalmanStorage};
+use tokio::runtime::Builder;
+use tracing_subscriber::util::SubscriberInitExt;
+
+use config::NtpDaemonOptions;
+
+use crate::daemon::clock::NtpClockWrapper;
+use crate::daemon::nts_key_provider::KeysetConfig;
+use crate::daemon::spawn::pool::PoolSpawner;
+use crate::daemon::spawn::standard::StandardSpawner;
+use crate::daemon::system::{System, SystemConfig};
+use crate::daemon::tracing::LogReloadTaskStarter;
+use crate::notify::notify_ready;
+
+use self::tracing::LogLevel;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub fn main() -> Result<(), Box<dyn Error>> {
+    let options = NtpDaemonOptions::try_parse_from(std::env::args())?;
+
+    #[cfg(feature = "openssl")]
+    rustls_openssl::default_provider()
+        .install_default()
+        .expect("Failed to use rustls_openssl");
+
+    match options.action {
+        config::NtpDaemonAction::Help => {
+            println!("{}", config::long_help_message());
+        }
+        config::NtpDaemonAction::Version => {
+            eprintln!("ntp-daemon {VERSION}");
+        }
+        config::NtpDaemonAction::Run => run(&options).map_err(|e| e as Box<dyn Error>)?,
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Application {
+    Deamon,
+    MetricsExporter,
+    #[expect(unused)]
+    Ctl,
+}
+
+// initializes the logger so that logs during config parsing are reported. Then it overrides the
+// log level based on the config if required.
+pub(crate) fn initialize_logging_parse_config(
+    initial_log_level: Option<LogLevel>,
+    config_path: Option<&Path>,
+    app: Application,
+) -> (Config, Option<LogReloadTaskStarter>) {
+    let mut log_level = initial_log_level.unwrap_or_default();
+
+    let (config_tracing, _) = crate::daemon::tracing::tracing_init(log_level, None, true);
+    let (config, tracing_inst, task_starter) =
+        ::tracing::subscriber::with_default(config_tracing, || {
+            let config = match Config::from_args(config_path.as_ref(), vec![], vec![]) {
+                Ok(c) => c,
+                Err(e) => {
+                    // print to stderr because tracing is not yet setup
+                    eprintln!("There was an error loading the config: {e}");
+                    std::process::exit(exitcode::CONFIG);
+                }
+            };
+
+            if let Some(config_log_level) = config.observability.log_level
+                && initial_log_level.is_none()
+            {
+                log_level = config_log_level;
+            }
+
+            let log_path = match app {
+                Application::Deamon => config.observability.log_path.clone(),
+                Application::MetricsExporter => {
+                    config.observability.log_path_metrics_exporter.clone()
+                }
+                Application::Ctl => None,
+            };
+
+            let ansi_colors = config
+                .observability
+                .ansi_colors
+                .unwrap_or_else(|| log_path.is_none() && std::io::stdout().is_terminal());
+
+            // set a default global subscriber from now on
+            let (tracing_inst, task_starter) =
+                self::tracing::tracing_init(log_level, log_path, ansi_colors);
+            (config, tracing_inst, task_starter)
+        });
+    tracing_inst.init();
+
+    (config, task_starter)
+}
+
+fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "seccomp")]
+    statime_seccomp::Log.enable()?;
+
+    let (config, task_starter) = initialize_logging_parse_config(
+        options.log_level,
+        options.config.as_deref(),
+        Application::Deamon,
+    );
+
+    let runtime = if config.servers.is_empty() {
+        Builder::new_current_thread().enable_all().build()?
+    } else {
+        Builder::new_multi_thread().enable_all().build()?
+    };
+
+    let result = runtime.block_on(async move {
+        if let Some(task_starter) = task_starter {
+            task_starter.start();
+        }
+
+        // give the user a warning that we use the command line option
+        if config.observability.log_level.is_some() && options.log_level.is_some() {
+            info!("Log level override from command line arguments is active");
+        }
+
+        // Warn/error if the config is unreasonable. We do this after finishing
+        // tracing setup to ensure logging is fully configured.
+        config.check();
+
+        // we always generate the keyset (even if NTS is not used)
+        // FIXME: set up configuration of keyset.
+        let keyset = nts_key_provider::spawn(KeysetConfig::default()).await;
+
+        ::tracing::debug!("Configuration loaded, spawning daemon jobs");
+        let clock = NtpClockWrapper::default();
+        // FIXME: Implement proper configuration of controllers.
+        let (controller, system_clock_id) =
+            statime_algo::KalmanController::<StdKalmanStorage<_>, _>::new(
+                clock,
+                ClockConfig::default(),
+                ControllerConfig {
+                    minimum_agreeing_sources: 3.min(config.sources.len()),
+                    select_offset_uncertainty_window: 1.0,
+                    select_link_uncertainty_window: 2.0,
+                    select_delay_uncertainty_window: 0.5,
+                    select_max_window_size: 0.5,
+                },
+            )
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?;
+        let system = Arc::new(System::new(
+            clock,
+            controller,
+            system_clock_id,
+            SystemConfig {
+                minimum_retry_timeout: std::time::Duration::from_secs(1),
+                maximum_retry_timeout: std::time::Duration::from_mins(10),
+            },
+            // FIXME: Add ntp configuration back in.
+            SynchronizationConfig::default(),
+            #[cfg(target_os = "linux")]
+            // FIXME: Add csptp configuration back in.
+            statime_csptp::CsptpConfig::default(),
+        ));
+
+        let system_clone = system.clone();
+        let main_loop_handle = tokio::spawn(async move { system_clone.run().await });
+
+        for source in config.sources {
+            match source {
+                config::NtpSourceConfig::Standard(flattened_pair) => {
+                    system.add_spawner(Box::new(StandardSpawner::new(
+                        flattened_pair.first,
+                        flattened_pair.second.with_defaults(SourceConfig::default()),
+                    )));
+                }
+                config::NtpSourceConfig::Nts(flattened_pair) => todo!(),
+                config::NtpSourceConfig::Pool(flattened_pair) => {
+                    system.add_spawner(Box::new(PoolSpawner::new(
+                        flattened_pair.first,
+                        flattened_pair.second.with_defaults(SourceConfig::default()),
+                    )));
+                }
+                config::NtpSourceConfig::NtsPool(flattened_pair) => todo!(),
+                config::NtpSourceConfig::Sock(sock_source_config) => todo!(),
+                #[cfg(feature = "pps")]
+                config::NtpSourceConfig::Pps(pps_source_config) => todo!(),
+                #[cfg(target_os = "linux")]
+                config::NtpSourceConfig::Csptp(csptp_source_config) => todo!(),
+            }
+        }
+
+        // FIXME: Replace with nts ke server code once present.
+        /*for nts_ke_config in config.nts_ke {
+            let _join_handle = keyexchange::spawn(nts_ke_config, keyset.clone());
+        }*/
+
+        // FIXME: Replace with proper new observer code once available.
+        /*observer::spawn(
+            &config.observability,
+            channels.source_snapshots,
+            channels.server_data_receiver,
+            channels.system_snapshot_receiver,
+            clock,
+        );*/
+
+        let _ = notify_ready().await;
+
+        main_loop_handle
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn Error>)?
+            .map_err(|e| e as Box<dyn Error>)
+    });
+
+    runtime.shutdown_background();
+
+    result
+}
+
+pub(crate) mod exitcode {
+    /// An internal software error has been detected.  This
+    /// should be limited to non-operating system related
+    /// errors as possible.
+    pub const SOFTWARE: i32 = 70;
+
+    /// You did not have sufficient permission to perform
+    /// the operation.  This is not intended for file system
+    /// problems, which should use `NOINPUT` or `CANTCREAT`,
+    /// but rather for higher level permissions.
+    pub const NOPERM: i32 = 77;
+
+    /// Something was found in an unconfigured or misconfigured state.
+    pub const CONFIG: i32 = 78;
+}

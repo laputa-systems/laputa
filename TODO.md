@@ -196,9 +196,9 @@ and real-hardware enablement remain outside that scope.
 ### LAP-47 · P2 · ntpd-rs fork is not yet a shippable clock service
 
 - **Area:** Time discipline
-- **Where:** `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
+- **Where:** `ntpd-rs/`, imported from the `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
 - **Problem:** The fork is fetchable and musl-clean with a Graviola TLS provider, but its daemon is not operational: NTS/NTS-pool/sock/pps/csptp source arms are `todo!()` in `ntpd/src/daemon/mod.rs`, the observer spawn is commented out, `force_sync` prints "Disabled for now", `ntp-ctl validate` succeeds without reading the file, and the daemon `Config` carries no `[synchronization]` table while `SynchronizationConfig::default()` is hardcoded at two call sites, so step-limit policy is unreachable from any config that parses. The shipped sample config is rejected by the fork's own schema.
-- **Recommendation:** Do not package this as the R2 clock service. Re-pin and package the Graviola profile (`--no-default-features --features graviola,rustcrypto`, musl targets, `ntp-daemon`/`ntp-ctl`/`ntp-metrics-exporter` plus a pool-only config and an xinit service retaining `CAP_SYS_TIME`) only after upstream reconnects `daemon::run` and the `[synchronization]` table. Graviola work belongs upstream in that repository. Clock tests stay in disposable guests, never on the host.
+- **Recommendation:** Do not package this as the R2 clock service. Fix the daemon in `ntpd-rs/`, then package the Graviola profile (`--no-default-features --features graviola,rustcrypto`, musl targets, `ntp-daemon`/`ntp-ctl`/`ntp-metrics-exporter` plus a pool-only config and an xinit service retaining `CAP_SYS_TIME`) only after `daemon::run` and the `[synchronization]` table are reconnected. Clock tests stay in disposable guests, never on the host.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 

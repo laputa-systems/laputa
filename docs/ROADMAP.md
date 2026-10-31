@@ -4,7 +4,7 @@ Make Laputa a small, reproducible, XSH-managed operating system that can remain
 useful unattended: a VM should survive service crashes, network loss, interrupted
 updates, and virtual-disk damage, with an inspectable recovery path.
 
-After the in-tree tinyland, mdevd-rs, seatd-rs, and doas-rs integration is
+After the in-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs integration is
 qualified, the next step change is the [remotely maintainable VM](#g2-the-remotely-maintainable-vm):
 install, administer, update, recover, and eventually rebuild Laputa through XSH.
 SSH is the control path connecting those workflows, not an isolated additional
@@ -111,7 +111,7 @@ owners, not a new message bus or resident fleet-management service.
 
 | Area | Existing foundation | Remaining boundary |
 |---|---|---|
-| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, and doas-rs with package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
+| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs; all but ntpd-rs have package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
 | Packages and images | Typed plans, immutable artifacts, runtime-only generations, atomic publication of host-side system bundles | Installed-system activation, boot success, rollback, and state ownership are not the same as composing a generation. See [PM](PM.md) and [core infrastructure](CORE-INFRASTRUCTURE.md). |
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
@@ -297,8 +297,8 @@ unsupported modes explicitly.
 
 ### Time discipline and bootstrap
 
-Integrate the separately developed `laputa-systems/ntpd-rs` fork as a pinned
-package and xinit service. Its Graviola work belongs upstream in that repository;
+Integrate the in-tree `ntpd-rs` (imported from the `laputa-systems/ntpd-rs`
+fork) as a package and xinit service. Its Graviola work lives in `ntpd-rs/`;
 this roadmap does not claim the port or Laputa integration is complete. Check
 the selected provider/features, musl targets, and required virtual CPU features
 rather than assuming every VM CPU model can execute the binary.

@@ -57,6 +57,7 @@ Host-tool setup, the full target reference, and cleanup are in
 | Mirror host/Cloudflare operations and rollback | [Mirror deployment](docs/MIRROR-DEPLOYMENT.md) |
 | Mirror invocation, publishing, client settings | [Mirror usage](mirror/README.md) |
 | xinfra Alpine host configuration management (standalone; own Makefile) | [xinfra](xinfra/AGENTS.md) |
+| ntpd-rs clock service (Graviola profile, in-tree) | [ntpd-rs](ntpd-rs/AGENTS.md) |
 | xinit command line | [xinit](xinit/README.md) |
 | PID 1, inittab, service fields and commands | [xinit contract](xinit/docs/INIT.md) |
 | Scanner, readiness, status, control plane | [xinit supervision](xinit/docs/SUPERVISION.md) |

@@ -1,0 +1,82 @@
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.tooltips
+    - content.code.copy
+    - content.code.select
+    - navigation.sections
+docs_dir: docs
+site_name: ntpd-rs documentation
+site_dir: target/docs/site
+site_url: 'https://docs.ntpd-rs.pendulum-project.org/'
+exclude_docs: |
+  /precompiled  # Precompiled assets
+  /includes     # Only included indirectly
+markdown_extensions:
+  - def_list
+  - abbr
+  - attr_list
+  - admonition
+  - pymdownx.snippets:
+      auto_append: [./docs/includes/glossary.md]
+  - pymdownx.escapeall:
+      hardbreak: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.superfences
+plugins:
+  - mike:
+      alias_type: symlink
+      deploy_prefix: ''
+      canonical_version: 'latest'
+      version_selector: true
+      css_dir: css
+      javascript_dir: js
+extra:
+  version:
+    provider: mike
+nav:
+  - Home: index.md
+  - Guide:
+    - guide/installation.md
+    - guide/getting-started.md
+    - guide/server-setup.md
+    - guide/gps-pps.md
+    - guide/exporting-metrics.md
+    - guide/nts.md
+    - guide/nts-pool.md
+    - guide/ntpv5.md
+    - guide/migrating-chrony.md
+    - guide/migrating-ntpd.md
+    - guide/migrating-ntpsec.md
+    - guide/security-guidance.md
+  - Man Pages:
+    - ntp-daemon(8): man/ntp-daemon.8.md
+    - ntp.toml(5): man/ntp.toml.5.md
+    - ntp-ctl(8): man/ntp-ctl.8.md
+    - ntp-metrics-exporter(8): man/ntp-metrics-exporter.8.md
+  - Development:
+    - development/code-structure.md
+    - development/threat-model.md
+    - development/ca.md
+    - development/audits.md
+    - development/further-reading.md
