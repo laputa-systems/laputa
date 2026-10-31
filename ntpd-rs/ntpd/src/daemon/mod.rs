@@ -27,9 +27,9 @@ use std::{error::Error, io::IsTerminal, path::Path};
 
 use ::tracing::info;
 pub use config::Config;
-use ntp_proto::{SourceConfig, SynchronizationConfig};
+use ntp_proto::SourceConfig;
 pub use observer::ObservableState;
-use statime_algo::{ClockConfig, ControllerConfig, StdKalmanStorage};
+use statime_algo::{ControllerConfig, StdKalmanStorage};
 use tokio::runtime::Builder;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -166,9 +166,9 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
         let (controller, system_clock_id) =
             statime_algo::KalmanController::<StdKalmanStorage<_>, _>::new(
                 clock,
-                ClockConfig::default(),
+                config.synchronization.clock_config(),
                 ControllerConfig {
-                    minimum_agreeing_sources: 3.min(config.sources.len()),
+                    minimum_agreeing_sources: config.synchronization.minimum_agreeing_sources(),
                     select_offset_uncertainty_window: 1.0,
                     select_link_uncertainty_window: 2.0,
                     select_delay_uncertainty_window: 0.5,
@@ -184,8 +184,7 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
                 minimum_retry_timeout: std::time::Duration::from_secs(1),
                 maximum_retry_timeout: std::time::Duration::from_mins(10),
             },
-            // FIXME: Add ntp configuration back in.
-            SynchronizationConfig::default(),
+            config.synchronization.0,
             #[cfg(target_os = "linux")]
             // FIXME: Add csptp configuration back in.
             statime_csptp::CsptpConfig::default(),

@@ -305,7 +305,10 @@ rather than assuming every VM CPU model can execute the binary.
 
 Define service identity and minimum required privileges, persistent drift/state,
 status reporting, initial step versus later slew policy, and recovery after VM
-pause or clock jumps. Prove actual guest-clock discipline, not just daemon
+pause or clock jumps. The step policy is the `[synchronization]` table of
+`ntp.toml`: `startup-step-panic-threshold` bounds the first step,
+`single-step-panic-threshold` and `accumulated-step-panic-threshold` bound later
+steps, and the daemon exits instead of exceeding them. Prove actual guest-clock discipline, not just daemon
 startup or an NTS handshake. Never grant a test access to alter the build host's
 clock; use disposable guests for clock-changing tests.
 

@@ -1,8 +1,9 @@
 use std::fmt;
 
 use serde::{
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{self, MapAccess, Unexpected, Visitor},
+    ser::SerializeMap,
 };
 
 use crate::time_types::{NtpDuration, PollInterval, PollIntervalLimits};
@@ -21,7 +22,7 @@ where
     })
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct ReferenceIdConfig {
     id: u32,
 }
@@ -29,6 +30,18 @@ pub struct ReferenceIdConfig {
 impl ReferenceIdConfig {
     pub(crate) fn to_reference_id(self) -> crate::ReferenceId {
         crate::ReferenceId::from_int(self.id)
+    }
+}
+
+impl Serialize for ReferenceIdConfig {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let text: String = self
+            .id
+            .to_be_bytes()
+            .iter()
+            .map(|&byte| char::from(byte))
+            .collect();
+        serializer.serialize_str(text.trim_end_matches(' '))
     }
 }
 
@@ -71,7 +84,7 @@ impl<'de> Deserialize<'de> for ReferenceIdConfig {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct StepThreshold {
     pub forward: Option<NtpDuration>,
     pub backward: Option<NtpDuration>,
@@ -83,8 +96,34 @@ impl StepThreshold {
     }
 }
 
+impl Serialize for StepThreshold {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match (self.forward, self.backward) {
+            (None, None) => serializer.serialize_str("inf"),
+            (Some(forward), Some(backward)) if forward == backward => {
+                forward.serialize(serializer)
+            }
+            (forward, backward) => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("forward", &ThresholdPart(forward))?;
+                map.serialize_entry("backward", &ThresholdPart(backward))?;
+                map.end()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 struct ThresholdPart(Option<NtpDuration>);
+
+impl Serialize for ThresholdPart {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0 {
+            Some(duration) => duration.serialize(serializer),
+            None => serializer.serialize_str("inf"),
+        }
+    }
+}
 
 impl<'de> Deserialize<'de> for ThresholdPart {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -269,7 +308,7 @@ fn default_initial_poll_interval() -> PollInterval {
     PollIntervalLimits::default().min
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SynchronizationConfig {
     /// Minimum number of survivors needed to be able to discipline the system clock.
@@ -303,6 +342,7 @@ pub struct SynchronizationConfig {
     /// daemon is allowed to step the system clock.
     #[serde(
         deserialize_with = "deserialize_option_accumulated_step_panic_threshold",
+        skip_serializing_if = "Option::is_none",
         default
     )]
     pub accumulated_step_panic_threshold: Option<NtpDuration>,

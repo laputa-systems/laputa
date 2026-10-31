@@ -32,14 +32,16 @@ That gap is `TODO.md` NTPD-1.
   `mode = "nts"`, `nts-pool`, `sock`, `pps`, and `csptp` hit `todo!()`.
   `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs`) is not called.
 - `Config` (`ntpd/src/daemon/config/mod.rs`) has `use-system-config`,
-  `source`, `server`, and `observability`. A `[synchronization]` table is
-  rejected. `NtpServerConfig` has no fields, and the run loop does not bind
+  `source`, `server`, `observability`, and `synchronization`. The
+  `[synchronization]` table is `ntp_proto::SynchronizationConfig`:
+  `SynchronizationSettings::clock_config` turns its step limits into the
+  `statime_algo::ClockConfig` jump abort thresholds, and
+  `minimum-agreeing-sources`, `local-stratum`, and `reference-id` reach the
+  controller and `NtpManager`. `Config::check` fails when fewer sources are
+  configured than `minimum-agreeing-sources`. `NtpServerConfig` has no fields, and the run loop does not bind
   servers. The observer spawn is commented out, so `ntp-ctl status` has no
   socket. `ntp-ctl validate` returns success without reading the file
   (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` prints `Disabled for now`.
-- The run loop passes `ClockConfig::default()` and
-  `SynchronizationConfig::default()`. The sample file's step limits are not
-  applied. The default clock config sets no step abort threshold.
 - `UnixClock::now` calls `adjtimex` and, on failure, `clock_gettime`.
   Later steering still needs `CAP_SYS_TIME`.
 
