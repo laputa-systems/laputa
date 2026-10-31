@@ -29,7 +29,6 @@ compile_error!(
 
 mod ctl;
 mod daemon;
-mod force_sync;
 mod metrics;
 mod notify;
 

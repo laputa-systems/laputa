@@ -197,7 +197,7 @@ and real-hardware enablement remain outside that scope.
 
 - **Area:** Time discipline
 - **Where:** `ntpd-rs/`, imported from the `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
-- **Problem:** The fork is fetchable and musl-clean with a Graviola TLS provider, but its daemon is not operational: `force_sync` prints "Disabled for now".
+- **Problem:** The fork is fetchable and musl-clean with a Graviola TLS provider, but its daemon was not operational; the remaining work is packaging and qualification.
 - **Recommendation:** Do not package this as the R2 clock service. Fix the daemon in `ntpd-rs/`, then package the Graviola profile (`--no-default-features --features graviola,rustcrypto`, musl targets, `ntp-daemon`/`ntp-ctl`/`ntp-metrics-exporter` plus a pool-only config and an xinit service retaining `CAP_SYS_TIME`) only after `daemon::run` and the `[synchronization]` table are reconnected. Clock tests stay in disposable guests, never on the host.
 - **Fix with:** reference-parity
 - **Effort:** M (days)

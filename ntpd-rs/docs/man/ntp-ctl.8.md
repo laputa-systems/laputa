@@ -10,7 +10,6 @@ title: NTP-CTL(8) ntpd-rs 2.0.0-alpha.20260715 | ntpd-rs
 
 `ntp-ctl` validate [`-c` *path*] \
 `ntp-ctl` status [`-f` *format*] [`-c` *path*] \
-`ntp-ctl` force-sync [`-c` *path*] \
 `ntp-ctl` `-h` \
 `ntp-ctl` `-v`
 
@@ -48,12 +47,6 @@ with the daemon.
 `status`
 :   Returns status information about the current state of the ntp-daemon that
     the client connects to.
-
-`force-sync`
-:   Interactively run a single synchronization of your clock. This command can
-    be used to do a one-off synchronization to the time sources configured in
-    your configuration file. This command should never be used without any
-    validation by a human operator.
 
 # SEE ALSO
 

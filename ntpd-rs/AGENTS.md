@@ -53,8 +53,9 @@ That gap is `TODO.md` NTPD-1.
   its source through `SourceObserver` and withdraws it when it ends.
   `ntp-ctl status` prints no per-source offset. `ntp-ctl validate`
   loads the file through `Config::from_args` and exits 1 on any load error
-  or failed `Config::check` (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` prints
-  `Disabled for now`.
+  or failed `Config::check` (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` is
+  removed; recovering from a clock beyond the startup limits means setting
+  the clock by hand before starting the daemon.
 - `UnixClock::now` calls `adjtimex` and, on failure, `clock_gettime`.
   Later steering still needs `CAP_SYS_TIME`.
 

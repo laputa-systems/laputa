@@ -3,17 +3,13 @@ use std::{
     process::ExitCode,
 };
 
-use crate::{
-    daemon::{Config, ObservableState, config::CliArg, tracing::LogLevel},
-    force_sync,
-};
+use crate::daemon::{Config, ObservableState, config::CliArg, tracing::LogLevel};
 use tokio::runtime::Builder;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const USAGE_MSG: &str = "\
 usage: ntp-ctl validate [-c PATH]
        ntp-ctl status [-f FORMAT] [-c PATH]
-       ntp-ctl force-sync [-c PATH]
        ntp-ctl -h | ntp-ctl -v";
 
 const DESCRIPTOR: &str = "ntp-ctl - ntp-daemon monitoring";
@@ -42,7 +38,6 @@ pub enum NtpCtlAction {
     Version,
     Validate,
     Status,
-    ForceSync,
 }
 
 #[derive(Debug, Default)]
@@ -53,7 +48,6 @@ pub(crate) struct NtpCtlOptions {
     version: bool,
     validate: bool,
     status: bool,
-    force_sync: bool,
     action: NtpCtlAction,
 }
 
@@ -114,9 +108,6 @@ impl NtpCtlOptions {
                             "status" => {
                                 options.status = true;
                             }
-                            "force-sync" => {
-                                options.force_sync = true;
-                            }
                             unknown => {
                                 eprintln!("Warning: Unknown command {unknown}");
                             }
@@ -142,8 +133,6 @@ impl NtpCtlOptions {
             self.action = NtpCtlAction::Validate;
         } else if self.status {
             self.action = NtpCtlAction::Status;
-        } else if self.force_sync {
-            self.action = NtpCtlAction::ForceSync;
         } else {
             self.action = NtpCtlAction::Help;
         }
@@ -189,7 +178,6 @@ pub fn main() -> std::io::Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         NtpCtlAction::Validate => Ok(validate(options.config.as_deref())),
-        NtpCtlAction::ForceSync => Ok(force_sync::force_sync(options.config.as_deref())),
         NtpCtlAction::Status => {
             let config = Config::from_args(options.config.as_ref(), vec![], vec![]);
 

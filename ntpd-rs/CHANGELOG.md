@@ -12,7 +12,7 @@
 - Updated dependencies.
 
 ### Removed
-- Because of the refactorings, the force-sync command is temporarily disabled.
+- The force-sync command of ntp-ctl is removed; it was disabled by the refactorings and the new controller has no equivalent.
 
 ## [1.9.0]
 
