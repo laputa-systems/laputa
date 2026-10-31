@@ -323,19 +323,27 @@ mod tests {
         assert!(<NtsSpawner as Spawner<TestController>>::needs_spawn(&spawner));
     }
 
+    #[cfg(target_os = "linux")]
     #[tokio::test(start_paused = true)]
-    async fn deadline_covers_all_spawn_stages() {
-        let attempt = tokio::spawn(super::timeout_spawn(async {
-            tokio::time::sleep(Duration::from_secs(4)).await;
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            Ok::<_, SpawnFailureReason>(())
-        }));
-        tokio::task::yield_now().await;
-        tokio::time::advance(Duration::from_secs(4)).await;
-        tokio::task::yield_now().await;
-        assert!(!attempt.is_finished());
-        tokio::time::advance(Duration::from_secs(1)).await;
-        assert_eq!(attempt.await.unwrap(), Err(SpawnFailureReason::RetryableFailure));
+    async fn stalled_tcp_connect_obeys_the_spawn_deadline() {
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let listener = socket.listen(1).unwrap();
+        let address = listener.local_addr().unwrap();
+        let _first = std::net::TcpStream::connect(address).unwrap();
+        let _second = std::net::TcpStream::connect(address).unwrap();
+        let mut config = nts_source(address.port(), trusting_test_ca());
+        config.address = NtsKeAddress(NormalizedAddress::new_from_parts("127.0.0.1", address.port()));
+        let mut spawner = NtsSpawner::new(config, SourceConfig::default()).unwrap();
+        let mut attempt = Box::into_pin(<NtsSpawner as Spawner<TestController>>::try_spawn(&mut spawner));
+        tokio::select! {
+            biased;
+            _ = &mut attempt => panic!("the TCP backlog did not stall the connection"),
+            _ = tokio::task::yield_now() => {}
+        }
+        tokio::time::advance(super::super::NTS_TIMEOUT).await;
+        let result = tokio::time::timeout(Duration::from_secs(1), attempt).await;
+        assert!(matches!(result, Ok(Err(SpawnFailureReason::RetryableFailure))));
     }
 
     #[tokio::test]
