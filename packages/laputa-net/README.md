@@ -179,21 +179,20 @@ Successful execution emits bounded `NETWORK_FAILURE_CAPTURE` and
 `NETWORK_ADMISSION_CAPTURE` JSON records, then `NETWORK_IPV4_FAILURE_REPLAY_OK`.
 That marker establishes the bounded failure and replay checks, not convergence.
 
-The previous driver using `linux.netlink_request` passed in the pinned Linux
-7.2.9 x86_64 KVM `qemu-self-hosting` guest
-with the supplied XSH and matching installed core. `network-policy-vm-failure.json`
-is the resulting 1006-byte failure record. The exclusive `198.18.1.3/24` addition
-remained after the kernel rejected gateway `192.0.2.1` with errno 101. The foreign
-`198.18.0.2/24` address survived. Selected default routes were absent before and
-after the requests, so no default of any TOS is hidden in this case.
+The acknowledged-request driver passed in a Linux 7.2.9 x86_64 KVM
+`qemu-self-hosting` guest with a seed built from clean XSH revision `8dfb48d07`.
+The address request returned an acknowledgement with errno 0. The kernel rejected
+the invalid gateway with errno 101 as acknowledgement data. The added
+`198.18.1.3/24` and foreign `198.18.0.2/24` addresses remained, and selected default
+routes were absent before and after the requests. The guest run did not induce a
+transport failure; the driver propagates such errors separately from ACK data.
 
-The offline regression reconstructs `Precondition`, `Applied(0)`, and `Failed(1)`
-from that capture. It reproduces the same plan and re-observation error twice,
-checks the retained partial state, and rejects implicit ownership of the observed
-address. This qualifies LAP-37's bounded VM-to-native failure replay for that
-previous driver. The acknowledged-request driver still needs a guest run with a
-rebuilt XSH seed; source checking and offline replay do not transfer the earlier
-guest result to this transport.
+`network-policy-vm-failure.json` is a failure record from the previous driver
+using `linux.netlink_request`. The offline regression reconstructs `Precondition`,
+`Applied(0)`, and `Failed(1)` from that record. It reproduces the plan and
+re-observation error twice, checks retained partial state, and rejects implicit
+ownership of the observed address. The new guest run qualifies the bounded replay
+with the acknowledged-request transport; it does not establish convergence.
 
 The fixture establishes ownership through two fresh link indices and reciprocal
 peer links. The supplied `lib.nettools_fixture.link_add_veth` encodes nested
