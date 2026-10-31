@@ -27,5 +27,31 @@ class ConsoleReplayTest(unittest.TestCase):
             drill.wait_for(console, drill.VERIFY_OK, 1)
 
 
+class VerifyOutputTest(unittest.TestCase):
+    def setUp(self):
+        self.valid = "\n".join([
+            drill.PROOF_OK, drill.VERIFY_OK, f"{drill.MARKER_COUNT} 2",
+            "RESTORE_CHECK_OK", "RESTORE_RESTIC_OK", "RESTORE_REBACKUP_OK",
+            "RESTORE_KEYLOSS_OK", "RESTORE_SECOND_KEY_OK", "RESTORE_MASTERKEY_OK",
+        ])
+
+    def test_kernel_message_can_split_intermediate_dhcp_diagnostic(self):
+        text = self.valid + "\nLAPUTAclocksource: Watchdog remote CPU 1 read timed out\n_MAINTAINED_DHCP_OK lease is bound with a managed resolver\n"
+        drill.validate_verify_output(text)
+
+    def test_missing_authoritative_proof_fails(self):
+        with self.assertRaises(AssertionError):
+            drill.validate_verify_output(self.valid.replace(drill.PROOF_OK, ""))
+
+    def test_failure_marker_fails(self):
+        for failure in (drill.FAILED, "RESTORE_FAILED", "Kernel panic", "not syncing"):
+            with self.subTest(failure=failure), self.assertRaises(AssertionError):
+                drill.validate_verify_output(self.valid + "\n" + failure)
+
+    def test_missing_restore_marker_fails(self):
+        with self.assertRaises(AssertionError):
+            drill.validate_verify_output(self.valid.replace("RESTORE_MASTERKEY_OK", ""))
+
+
 if __name__ == "__main__":
     unittest.main()

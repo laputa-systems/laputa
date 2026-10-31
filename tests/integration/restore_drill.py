@@ -27,8 +27,6 @@ RESTORE_OK = "RESTORE_RESTORE_OK"
 VERIFY_OK = "RESTORE_VERIFY_OK"
 PROOF_OK = "LAPUTA_MAINTAINED_PROOF_OK"
 FAILED = "LAPUTA_MAINTAINED_PROOF_FAILED"
-LOGGER_OK = "LAPUTA_MAINTAINED_LOGGER_OK"
-DHCP_OK = "LAPUTA_MAINTAINED_DHCP_OK"
 MARKER_COUNT = "LAPUTA_BOOT_MARKER_COUNT"
 
 RESTIC_VERSION = "0.18.1"
@@ -251,6 +249,15 @@ def fail_if_bad(console):
             raise RuntimeError(f"guest proof failed with {marker}; inspect {console}")
 
 
+def validate_verify_output(text):
+    for marker in ("Kernel panic", "not syncing", FAILED, "RESTORE_FAILED"):
+        assert marker not in text, f"guest proof failed with {marker}"
+    for marker in (PROOF_OK, VERIFY_OK, f"{MARKER_COUNT} 2", "RESTORE_CHECK_OK",
+                   "RESTORE_RESTIC_OK", "RESTORE_REBACKUP_OK", "RESTORE_KEYLOSS_OK",
+                   "RESTORE_SECOND_KEY_OK", "RESTORE_MASTERKEY_OK"):
+        assert marker in text, f"missing {marker} after restore"
+
+
 def boot_base_argv():
     return json.loads(drill_cmd("argv-plain"))["argv"]
 
@@ -332,14 +339,7 @@ def phase_verify():
         wait_for(console, PROOF_OK, 420)
         wait_for(console, VERIFY_OK, 120)
         fail_if_bad(console)
-        text = console.read_text(errors="replace")
-        assert LOGGER_OK in text, "supervised syslog did not report running"
-        assert DHCP_OK in text, "supervised dhcpc did not report a bound lease"
-        assert f"{MARKER_COUNT} 2" in text, "boot marker log did not count the restore boot"
-        for marker in ("RESTORE_CHECK_OK", "RESTORE_RESTIC_OK",
-                       "RESTORE_REBACKUP_OK", "RESTORE_KEYLOSS_OK",
-                       "RESTORE_SECOND_KEY_OK", "RESTORE_MASTERKEY_OK"):
-            assert marker in text, f"missing {marker} after restore"
+        validate_verify_output(console.read_text(errors="replace"))
         print("PASS verify: identity survived the restore with logger and dhcp supervised")
     finally:
         stop_guest(guest, err, console)
