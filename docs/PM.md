@@ -370,16 +370,17 @@ trust-release verification shape instead of inventing a cryptographic
 protocol:
 
 ```text
-laputa-repo-snapshot-v1
+laputa-repo-snapshot-v2
 generation <canonical u64, strictly increasing>
+issued-at <positive canonical unix seconds>
 expires-at <unix seconds>
 index-sha256 <hex of the exact published index.json bytes>
 ```
 
 `snapshot.sig` is the raw 64-byte Ed25519 signature over those bytes.
 Verification (`remote.load_verified_remote_index`) checks the signature
-against the provisioned key set, the expiry against wall-clock time within a
-90-day validity limit, the generation against the persisted accepted floor,
+against the provisioned key set, `issued-at <= now < expires-at`, a positive
+signed lifetime no longer than 90 days, the generation against the persisted accepted floor,
 and the digest against the fetched index bytes. Any failure fails closed:
 planning from a production repository without provisioned keys, or with a
 bad snapshot, is an error, never a silent fallback to the unsigned index.
@@ -401,8 +402,9 @@ revokes it. Snapshots themselves never carry keys.
 The key ceremony mirrors the trust-update ceremony: generate the pair
 offline (`openssl genpkey -algorithm ed25519`), install only the raw
 32-byte public key on publishers and verifiers, compose `snapshot.json`
-with `repo_snapshot.snapshot_metadata_text` (generation = previous + 1,
-`expires-at` = now + at most 90 days), and sign it offline
+with `repo_snapshot.snapshot_metadata_text({generation, issued_at, expires_at, index_sha256})`
+(generation = previous + 1, `issued-at` = publication time,
+`expires-at` = publication time + at most 90 days), and sign it offline
 (`openssl pkeyutl -sign -rawin`). Losing the signing key means
 re-provisioning keys out of band and re-issuing snapshots; there is no
 in-band recovery. `repo publish-snapshot` pre-verifies the signature, the
@@ -415,19 +417,38 @@ same-generation change to the signed metadata is refused. `repo publish` still w
 and `index.json` last; the snapshot covers the index that publication
 produced.
 
+An existing v1 publication also fails closed at the publisher: `repo publish-snapshot`
+will not overwrite it through a compatibility reader. Provision the first v2
+metadata and signature out of band with trusted publisher tooling, keeping the
+signature-last replacement order. Its generation must exceed the highest v1
+generation verified with the provisioned signing keys. Preserve that generation
+floor in client state when reprovisioning; do not reset rollback protection.
+
 Expiry coordinates with the R2 time-bootstrap policy: verification takes
-wall-clock `now`, refuses a clock behind the persisted lower bound, and
-rejects expired or over-long snapshots. The bound lives in per-repository
-accepted state under `XSH_PM_REPO_STATE_DIR` (generation, index digest,
-and highest observed time). Every signed fetch requires this directory and
+wall-clock `now`, refuses a clock behind the persisted signed publication-time
+floor, and rejects future-issued, expired or over-long snapshots. The floor
+is the greatest authenticated `issued-at` accepted so far, never an observation
+of the local clock. A newer generation with an older publication timestamp
+does not lower it. Persistence rechecks the verification clock against the
+latest floor while holding the accepted-state lock.
+
+Accepted state under `XSH_PM_REPO_STATE_DIR` contains `version: 2`, generation,
+index digest and `time_floor`. Required fields are validated; unknown fields
+are ignored. Version 1 metadata and legacy observed-clock state are rejected.
+There is no automatic migration or reset: an operator must reprovision trusted
+signed state while preserving the accepted generation. Every signed fetch requires this directory and
 fails before returning packages if accepted-state persistence fails. Keep it
-outside disposable caches and OS-generation rollback. Without disciplined time,
-expiry cannot tell a freeze from a slow clock. `file://` trees and the loopback local mirror
+outside disposable caches and OS-generation rollback. A signed floor is rollback
+evidence, not authenticated current time. Bootstrap requires a trustworthy RTC
+or operator-set time; verification does not adjust the clock or weaken TLS.
+Without trustworthy current time, expiry cannot prove freshness. Restoring both
+the clock and durable state from an older VM snapshot is outside this guarantee.
+`file://` trees and the loopback local mirror
 stay explicit local workflows and bypass verification: possession of the
 tree is the trust assumption there.
 
 Parser and size limits: snapshot metadata is LF-terminated UTF-8 of exactly
-four lines at most 4 KiB; signatures are exactly 64 bytes; provisioned keys
+five lines at most 4 KiB; signatures are exactly 64 bytes; provisioned keys
 are non-empty multiples of 32 bytes; fetched indexes stay bounded at
 10 MiB. Oversize, malformed, or mismatched snapshot inputs fail closed.
 

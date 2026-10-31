@@ -3,7 +3,7 @@ use pm.types
 use pm.util
 
 ## A parsed repository snapshot: the exact index bytes clients may plan from.
-export type RepoSnapshotMetadata = {generation: Str, expires_at: Int, index_sha256: Str}
+export type RepoSnapshotMetadata = {generation: Str, issued_at: Int, expires_at: Int, index_sha256: Str}
 
 ## The exact inputs one snapshot verification consumes.
 export type SnapshotVerifyInput = {
@@ -16,11 +16,11 @@ export type SnapshotVerifyInput = {
 }
 
 ## The last snapshot a client accepted from one repository: the rollback floor
-## and the lowest wall-clock time that verification has observed.
-export type SnapshotAccepted = {generation: Str, index_sha256: Str, lower_bound: Int}
+## and the greatest authenticated publication time.
+export type SnapshotAccepted = {generation: Str, index_sha256: Str, time_floor: Int}
 
-## A verified snapshot: the generation and index digest the caller may use.
-export type VerifiedRepoSnapshot = {generation: Str, expires_at: Int, index_sha256: Str}
+## A verified snapshot and the clock value used to authorize its validity.
+export type VerifiedRepoSnapshot = {generation: Str, issued_at: Int, expires_at: Int, index_sha256: Str, verified_at: Int}
 
 ## Durable accepted-snapshot state for one repository.
 export type SnapshotStatePaths = {accepted: Path}
@@ -29,6 +29,7 @@ const MAX_SNAPSHOT_METADATA_BYTES = 4096
 const MAX_SNAPSHOT_SIGNATURE_BYTES = 64
 const MAX_SNAPSHOT_INDEX_BYTES = 10485760
 const MAX_SNAPSHOT_VALIDITY_SECONDS = 7776000
+const ACCEPTED_SNAPSHOT_VERSION = 2
 
 pure snapshot_fail(message: Str) -> Error {
   types.PmError.RemoteIndex(message)
@@ -80,8 +81,8 @@ export proc snapshot_validate_index(items: List[types.RemotePackage]) [error] {
 }
 
 ## Renders the exact bytes an offline signing ceremony signs for one snapshot.
-export pure snapshot_metadata_text(generation: Str, expires_at: Int, index_sha256: Str) -> Str {
-  f"laputa-repo-snapshot-v1\ngeneration {generation}\nexpires-at {expires_at}\nindex-sha256 {index_sha256}\n"
+export pure snapshot_metadata_text(metadata: RepoSnapshotMetadata) -> Str {
+  f"laputa-repo-snapshot-v2\ngeneration {metadata.generation}\nissued-at {metadata.issued_at}\nexpires-at {metadata.expires_at}\nindex-sha256 {metadata.index_sha256}\n"
 }
 
 ## Parses one exact signed-snapshot metadata document.
@@ -90,7 +91,7 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
   let text = message as Str
   snapshot_require(text.ends_with("\n") and "\r" not in text, "signed snapshot metadata must use LF-terminated UTF-8 lines")
   let lines = text.byte_slice(0, text.byte_len() - 1).split("\n")
-  snapshot_require(lines.len() == 4 and lines[0] == "laputa-repo-snapshot-v1", "signed snapshot metadata header or field count is invalid")
+  snapshot_require(lines.len() == 5 and lines[0] == "laputa-repo-snapshot-v2", "signed snapshot metadata header or field count is invalid")
 
   let generation_fields = lines[1].split(" ")
   snapshot_require(
@@ -98,7 +99,16 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
     "signed snapshot metadata generation is invalid",
   )
 
-  let expiry_fields = lines[2].split(" ")
+  let issuance_fields = lines[2].split(" ")
+  snapshot_require(issuance_fields.len() == 2 and issuance_fields[0] == "issued-at", "signed snapshot metadata issuance field is invalid")
+  let issued_at = if let Ok(found) = issuance_fields[1].parse_int_decimal() {
+    found
+  } else {
+    return Err(snapshot_fail("signed snapshot metadata issuance is invalid"))
+  }
+  snapshot_require(issued_at > 0 and f"{issued_at}" == issuance_fields[1], "signed snapshot metadata issuance is invalid")
+
+  let expiry_fields = lines[3].split(" ")
   snapshot_require(expiry_fields.len() == 2 and expiry_fields[0] == "expires-at", "signed snapshot metadata expiry field is invalid")
   let expires_at = if let Ok(found) = expiry_fields[1].parse_int_decimal() {
     found
@@ -106,8 +116,10 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
     return Err(snapshot_fail("signed snapshot metadata expiry is invalid"))
   }
   snapshot_require(expires_at > 0 and f"{expires_at}" == expiry_fields[1], "signed snapshot metadata expiry is invalid")
+  snapshot_require(expires_at > issued_at, "signed snapshot metadata expiry must follow issuance")
+  snapshot_require(expires_at - issued_at <= MAX_SNAPSHOT_VALIDITY_SECONDS, "repository snapshot expiry exceeds the 90-day validity limit")
 
-  let digest_fields = lines[3].split(" ")
+  let digest_fields = lines[4].split(" ")
   snapshot_require(
     digest_fields.len() == 2 and digest_fields[0] == "index-sha256" and snapshot_sha256_is_valid(digest_fields[1]),
     "signed snapshot metadata index digest is invalid",
@@ -115,6 +127,7 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
 
   {
     generation: generation_fields[1],
+    issued_at,
     expires_at,
     index_sha256: digest_fields[1],
   }
@@ -148,11 +161,8 @@ export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[Verifi
 
   let snapshot = snapshot_parse_metadata(input.metadata)?
   snapshot_require(input.now_epoch_seconds >= 0, "current UTC time is invalid")
+  snapshot_require(input.now_epoch_seconds >= snapshot.issued_at, "repository snapshot was issued after the current UTC time")
   snapshot_require(snapshot.expires_at > input.now_epoch_seconds, "repository snapshot has expired")
-  snapshot_require(
-    snapshot.expires_at - input.now_epoch_seconds <= MAX_SNAPSHOT_VALIDITY_SECONDS,
-    "repository snapshot expiry exceeds the 90-day validity limit",
-  )
   snapshot_require(
     input.index_bytes.sha256().hex() == snapshot.index_sha256,
     "repository index digest does not match signed snapshot metadata",
@@ -161,7 +171,7 @@ export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[Verifi
   let accepted_snapshot = input.accepted
 
   if accepted_snapshot != null {
-    snapshot_require(input.now_epoch_seconds >= accepted_snapshot.lower_bound, "system clock reads behind the last observed repository snapshot time; refusing to validate expiry")
+    snapshot_require(input.now_epoch_seconds >= accepted_snapshot.time_floor, "system clock reads behind the authenticated repository publication time; refusing to validate expiry")
     snapshot_require(
       snapshot.index_sha256 == accepted_snapshot.index_sha256 or snapshot_u64_is_greater(snapshot.generation, accepted_snapshot.generation),
       "repository snapshot generation does not advance the accepted snapshot",
@@ -172,7 +182,7 @@ export proc snapshot_verify(input: SnapshotVerifyInput) [error] -> Result[Verifi
     )
   }
 
-  {generation: snapshot.generation, expires_at: snapshot.expires_at, index_sha256: snapshot.index_sha256}
+  {generation: snapshot.generation, issued_at: snapshot.issued_at, expires_at: snapshot.expires_at, index_sha256: snapshot.index_sha256, verified_at: input.now_epoch_seconds}
 }
 
 ## Loads provisioned snapshot keys: one file of concatenated raw 32-byte
@@ -201,9 +211,9 @@ export pure snapshot_state_paths(state_dir: Path, repo: Str) -> SnapshotStatePat
 proc snapshot_accepted_from_record(raw: Record) -> Result[SnapshotAccepted, Error] {
   let generation: Str = raw.get("generation")?.require()?
   let index_sha256: Str = raw.get("index_sha256")?.require()?
-  let lower_bound: Int = raw.get("lower_bound")?.require()?
+  let time_floor: Int = raw.get("time_floor")?.require()?
 
-  {generation, index_sha256, lower_bound}
+  {generation, index_sha256, time_floor}
 }
 
 ## Reads the accepted snapshot floor, or null when no snapshot was accepted yet.
@@ -224,13 +234,22 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
     return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
+  let format_error = "accepted repository snapshot state is corrupt or uses an unsupported format; reprovision signed state without resetting its accepted generation"
+  snapshot_require("version" in raw_record, format_error)
+  let version = if let Ok(found) = raw_record.get("version")?.require(Int) {
+    found
+  } else {
+    return Err(snapshot_fail(format_error))
+  }
+  snapshot_require(version == ACCEPTED_SNAPSHOT_VERSION, format_error)
+
   let decoded = if let Ok(found) = snapshot_accepted_from_record(raw_record) {
     found
   } else {
     return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
-  guard snapshot_u64_text_is_valid(decoded.generation) and snapshot_sha256_is_valid(decoded.index_sha256) and decoded.lower_bound >= 0 else {
+  guard snapshot_u64_text_is_valid(decoded.generation) and snapshot_sha256_is_valid(decoded.index_sha256) and decoded.time_floor > 0 else {
     return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
@@ -238,18 +257,19 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
 }
 
 ## Persists the accepted snapshot floor after successful verification.
-export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: VerifiedRepoSnapshot, now_epoch_seconds: Int) [fs, error] {
+export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: VerifiedRepoSnapshot) [fs, error] {
   paths.accepted.parent.mkdir()
   let held = fs.lock(fp"{paths.accepted}.lock", shared: false, nonblocking: true)?
   defer fs.unlock(held)
   snapshot_require(
-    snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and now_epoch_seconds >= 0,
+    snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and verified.issued_at > 0 and verified.expires_at > verified.issued_at and verified.expires_at - verified.issued_at <= MAX_SNAPSHOT_VALIDITY_SECONDS,
     "refusing to persist an invalid accepted repository snapshot",
   )
-  let lower_bound = now_epoch_seconds
+  snapshot_require(verified.verified_at >= verified.issued_at and verified.verified_at < verified.expires_at, "refusing to persist a snapshot outside its verified validity window")
   let prior = snapshot_read_accepted(paths)?
 
   if prior != null {
+    snapshot_require(verified.verified_at >= prior.time_floor, "system clock reads behind the authenticated repository publication time; refusing to commit acceptance")
     snapshot_require(
       verified.generation == prior.generation or snapshot_u64_is_greater(verified.generation, prior.generation),
       "repository snapshot generation rolls back the accepted snapshot",
@@ -258,15 +278,12 @@ export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: Verif
       verified.index_sha256 == prior.index_sha256 or snapshot_u64_is_greater(verified.generation, prior.generation),
       "repository snapshot generation does not advance the accepted snapshot",
     )
-    snapshot_require(
-      now_epoch_seconds >= prior.lower_bound,
-      "system clock reads behind the last observed repository snapshot time; refusing to commit acceptance",
-    )
   }
 
+  let time_floor = if prior != null and prior.time_floor > verified.issued_at { prior.time_floor } else { verified.issued_at }
   let sibling = fs.temp_sibling(paths.accepted)?
   defer sibling.remove()
-  json.write(sibling, {generation: verified.generation, index_sha256: verified.index_sha256, lower_bound})
+  json.write(sibling, {version: ACCEPTED_SNAPSHOT_VERSION, generation: verified.generation, index_sha256: verified.index_sha256, time_floor})
   fs.fsync(sibling)
   sibling.rename(to: paths.accepted, overwrite: true)
   fs.fsync(paths.accepted)

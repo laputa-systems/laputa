@@ -7,7 +7,7 @@ EXCLUDE=$(git -C "$REPOSITORY" rev-parse --path-format=absolute --git-path info/
 rg -q '^\.work/$' "$EXCLUDE" || printf '\n.work/\n' >> "$EXCLUDE"
 mkdir -p "$REPOSITORY/.work/tmp"
 WORK=$(mktemp -d "$REPOSITORY/.work/tmp/repo-snapshot.XXXXXX")
-trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+trap 'rm -r "$WORK"' EXIT HUP INT TERM
 mkdir -p "$ROOT/keys"
 
 for key in signing-key next-key wrong-key; do
@@ -24,13 +24,22 @@ sign_snapshot() {
   generation=$2
   index=$3
   key=$4
+  issued=$5
+  expires=$6
   mkdir -p "$ROOT/$directory"
   digest=$(openssl dgst -sha256 -r "$ROOT/$index" | cut -d ' ' -f 1)
-  printf 'laputa-repo-snapshot-v1\ngeneration %s\nexpires-at 2000000000\nindex-sha256 %s\n' "$generation" "$digest" > "$ROOT/$directory/metadata"
+  printf 'laputa-repo-snapshot-v2\ngeneration %s\nissued-at %s\nexpires-at %s\nindex-sha256 %s\n' "$generation" "$issued" "$expires" "$digest" > "$ROOT/$directory/metadata"
   openssl pkeyutl -sign -inkey "$WORK/$key.private" -rawin -in "$ROOT/$directory/metadata" -out "$ROOT/$directory/metadata.sig"
 }
 
-sign_snapshot snapshot-gen1 1 index.json signing-key
-sign_snapshot snapshot-gen2 2 index.json next-key
-sign_snapshot snapshot-gen2b 2 index2.json next-key
-sign_snapshot snapshot-gen1-wrongsigned 1 index.json wrong-key
+sign_snapshot snapshot-gen1 1 index.json signing-key 1994999000 2000000000
+sign_snapshot snapshot-gen2 2 index.json next-key 1994999500 2000000000
+sign_snapshot snapshot-gen2b 2 index2.json next-key 1994999500 2000000000
+sign_snapshot snapshot-gen1-wrongsigned 1 index.json wrong-key 1994999000 2000000000
+sign_snapshot snapshot-overlong 3 index.json signing-key 1994999000 2002775001
+sign_snapshot snapshot-gen3-backdated 3 index.json next-key 1994998000 2000000000
+mkdir -p "$ROOT/snapshot-v1"
+cp "$ROOT/keys/signing-key.public.base64" "$ROOT/keys/legacy-key.public.base64"
+digest=$(openssl dgst -sha256 -r "$ROOT/index.json" | cut -d ' ' -f 1)
+printf 'laputa-repo-snapshot-v1\ngeneration 1\nexpires-at 2000000000\nindex-sha256 %s\n' "$digest" > "$ROOT/snapshot-v1/metadata"
+openssl pkeyutl -sign -inkey "$WORK/signing-key.private" -rawin -in "$ROOT/snapshot-v1/metadata" -out "$ROOT/snapshot-v1/metadata.sig"
