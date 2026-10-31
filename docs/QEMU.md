@@ -47,6 +47,13 @@ The `qemu-tinyland-foot` profile has the same verbs under
 `profile-tinyland-boot`, `profile-tinyland-plan`, and
 `profile-tinyland-clean`.
 
+`qemu-tinyland-ghostty` replaces foot with Ghostty Custom rendering
+through Mesa's virgl driver (`qemu_gpu: Virgl`) under
+`make profile-tinyland-ghostty-*`. Its guest proof requires Ghostty's
+OpenGL 4.3 renderer in every session and the same lifecycle matrix as
+`qemu-tinyland-foot`. Its input step currently fails: the packaged
+Ghostty creates no `wl_keyboard` (see `tinyland/docs/opengl-probe.md`).
+
 `laputa.xsh` also takes `--jobs N` (`$XSH_HOST laputa.xsh -- build
 qemu-dwl-foot --jobs 4`).
 

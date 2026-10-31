@@ -398,6 +398,23 @@ profile-tinyland-vt-boot:
 profile-tinyland-vt-clean:
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-vt-foot
 
+# Ghostty kiosk profile: tinyland with Ghostty rendering on virgl; needs a
+# virgl-capable host QEMU and GPU render node (docs/QEMU.md).
+profile-tinyland-ghostty-plan:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-ghostty
+
+profile-tinyland-ghostty-build:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-ghostty
+
+profile-tinyland-ghostty-test:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-ghostty
+
+profile-tinyland-ghostty-boot:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-ghostty
+
+profile-tinyland-ghostty-clean:
+	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- clean qemu-tinyland-ghostty
+
 # Install Firecracker locally, build the pinned Asterinas PVH kernel, and boot
 # a small serial smoke initramfs under KVM.
 asterinas-setup:

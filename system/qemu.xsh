@@ -323,7 +323,7 @@ pure ppm_data_offset(image: Bytes) -> Int {
   -1
 }
 
-pure ppm_has_foot_marker(image: Bytes) -> Bool {
+pure ppm_has_visual_marker(image: Bytes) -> Bool {
   let pixel_offset = ppm_data_offset(image)
   return false when pixel_offset < 0
 
@@ -346,8 +346,8 @@ pure ppm_has_foot_marker(image: Bytes) -> Bool {
   false
 }
 
-proc screenshot_has_foot_marker(path_value: Path) -> Result[Bool, Error] {
-  ppm_has_foot_marker(path_value.read_bytes()?)
+proc screenshot_has_visual_marker(path_value: Path) -> Result[Bool, Error] {
+  ppm_has_visual_marker(path_value.read_bytes()?)
 }
 
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
@@ -418,10 +418,10 @@ export proc run_test(
             types.LaputaError.Profile(f"QMP did not create a nonempty screenshot; inspect {qemu_output_locations(outputs)}"),
           )
         }
-        if ! screenshot_has_foot_marker(outputs.screenshot) {
+        if ! screenshot_has_visual_marker(outputs.screenshot) {
           return Err(
             types.LaputaError.Profile(
-              f"QMP screenshot does not contain the foot visual marker; inspect {qemu_output_locations(outputs)}",
+              f"QMP screenshot does not contain the terminal visual marker; inspect {qemu_output_locations(outputs)}",
             ),
           )
         }
