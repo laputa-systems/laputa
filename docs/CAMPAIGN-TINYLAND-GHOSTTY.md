@@ -1,12 +1,12 @@
 # Campaign: Tinyland + Ghostty graphical stack
 
-Planning doc for the migration of Laputa's canonical graphical stack from
-`dwl + foot` to Rust Tinyland (KBVM keyboard engine) + Ghostty Custom
+Campaign record for the migration of Laputa's canonical graphical stack
+from `dwl + foot` to Rust Tinyland (KBVM keyboard engine) + Ghostty Custom
 terminal. The owner's mission text is the goal spec: implement, do not
 merely roadmap; minimal closure; reuse working implementations and proof
 infrastructure; deterministic offline packaging. This doc turns that goal
-into sequenced deliverables with runnable proofs. No implementation starts
-here.
+into sequenced deliverables with runnable proofs. The status section
+records what landed; the sequence remains the plan of record.
 
 There are no prior `docs/CAMPAIGN-*.md` or `DECISIONS.md` in this repo; this
 is the first campaign doc. It follows the owning topic docs' style: claims
@@ -45,15 +45,14 @@ Measured on Linux x86_64/KVM with the fixed Ghostty build described under
 | 2 Ghostty package | landed | `ghostty-custom` proof; four declared DT_NEEDED entries |
 | 3 OpenGL probe | landed | guest virgl reports 4.3 core; softpipe ceiling is 3.3 |
 | 4 profile | landed | `qemu-tinyland-ghostty`; `LAPUTA_TINYLAND_GHOSTTY_GL43` |
-| 5 end-to-end | green with fixed client, release pending | `laputa test qemu-tinyland-ghostty` |
-| 6 size/performance | measured | table below |
-| 7 promotion | blocked | needs the release named under Phase 5 |
+| 5 end-to-end | complete | `make profile-test` from `ghostty-custom-1.4.1-2` |
+| 6 size/performance | complete | table below |
+| 7 promotion | complete | canonical profile and rollback targets |
 
 ### Phase 5 proof
 
-Against a local build of the fixed Ghostty client (see "Blocking
-release"), `laputa build qemu-tinyland-ghostty` then
-`laputa test qemu-tinyland-ghostty` passes. The guest proof covers the
+From the published `release-15e551072…` package,
+`make profile-build` then `make profile-test` passes. The guest proof covers the
 lifecycle matrix (compositor crash, broker loss, single keyboard unplug,
 application exit, scanner shutdown with ownership reclamation),
 unprivileged DRM and evdev denial, Ghostty on a 4.3 core context, and ends
@@ -74,19 +73,14 @@ were found and fixed:
   `virtio-gpu-gl-pci` as the render device, so tinyland scans out through a
   host-readable surface while Ghostty renders on the virgl render node.
 
-### Blocking release
+### Release
 
-The published `release-354a4e32…` tarball binds `wl_seat` before its
-listener exists, so the client never creates a keyboard (see
-`tinyland/docs/opengl-probe.md`). The fix is committed in the Ghostty fork
-at `15e551072`: create the seat at registry-bind time and replace the yield
-loop with a poll on the display fd. The proof above ran against a local
-build of that commit. `packages/ghostty-custom` stays pinned to the
-published release until a new release is cut, so the profile test is red
-until then; Phases 5 and 7 close with that release. Cut
-`release-<full commit>` from the fork branch, then update the source tag
-and both checksums in `packages/ghostty-custom/PKGBUILD.xsh` and rerun
-`laputa build` and `laputa test`.
+`release-15e55107259d2118c0061100ec0a9d2167f72ae4` publishes the fork fix:
+create the seat at registry-bind time and replace the yield loop with a poll
+on the display fd. The recipe pins x86_64 `9b56d0b8…` and aarch64
+`110f7f08…` as `ghostty-custom-1.4.1-2`. The earlier release
+`release-354a4e32…` binds `wl_seat` before its listener exists, so the
+client never creates a keyboard (see `tinyland/docs/opengl-probe.md`).
 
 ### Phase 6 numbers
 
@@ -94,13 +88,22 @@ and both checksums in `packages/ghostty-custom/PKGBUILD.xsh` and rerun
 |---|---|---|
 | `tinyland` binary | 3,015,600 bytes (baseline 2,117,480) | `tinyland-0.1.0-1` payload |
 | `tinyland` DT_NEEDED | `libseat.so.1`, `libc.so`, `libgcc_s.so` | `readelf -d` |
-| `ghostty-custom` binary | 30,586,216 bytes; payload archive 18,516,605 bytes | `ghostty-custom-1.4.1-1` payload |
+| `ghostty-custom` binary | 30,586,216 bytes; payload archive 18,516,608 bytes | `ghostty-custom-1.4.1-2` payload |
 | `ghostty-custom` DT_NEEDED | `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, `libc.so` | package proof |
 | `qemu-tinyland-ghostty` closure | 38 plan nodes (foot 41, dwl-foot 48) | `target/laputa/qemu-tinyland-ghostty/build-plan.json` |
 | Image size | disk 308M, rootfs 276M (foot 288M/256M) | `du` on `current/` |
-| Cold start to first frame | session ready with a 4.3 context at 10.51 s guest uptime (proof start 8.09 s) | `LAPUTA_TINYLAND_T session-ready` |
-| Idle RSS after input | tinyland 7,196 KB; Ghostty 41,416 KB | `LAPUTA_TINYLAND_RSS` |
+| Cold start to first frame | session ready with a 4.3 context at 13.93 s guest uptime (proof start 10.39 s); prior runs measured 10.51-13.82 s | `LAPUTA_TINYLAND_T session-ready` |
+| Idle RSS after input | tinyland 7,176 KB; Ghostty 41,352 KB | `LAPUTA_TINYLAND_RSS` |
+| Generation SHA-256 | `a772427bbd31516d32a7009821b05e09bb451b9ec8d217736512ed88918482b7` | `current/generation.json` |
 | Renderer | virgl, OpenGL 4.3 core | `LAPUTA_TINYLAND_GHOSTTY_GL43` |
+
+### Promotion
+
+`make profile-*` now builds, tests, and boots `qemu-tinyland-ghostty`. The
+dwl and foot profiles keep `make profile-dwl-*`, `make profile-tinyland-*`,
+and `make profile-tinyland-vt-*` as rollbacks, and the docs name the new
+canonical profile. The canonical test needs a host virgl render node; the
+foot rollbacks remain the path for hosts without one.
 
 ## Reuse / change / new map
 
@@ -166,7 +169,8 @@ parallel: disjoint trees (`tinyland/` vs `packages/ghostty-custom/`),
 shared nothing except the Phase 0 report. Phase 3 (Mesa/OpenGL probe)
 needs the Phase 2 binary; Phase 4 (profile) needs Phase 1 + the Phase 3
 renderer verdict; Phase 5 (end-to-end) needs Phase 4; Phase 6
-(promotion) needs Phase 5 green plus the Phase 0 rollback profiles. No
+(size/performance) needs Phases 1-5; Phase 7 (promotion) needs Phase 6
+plus the Phase 0 rollback profiles. No
 lane invents XKB, Wayland, renderer, PM, or compositor machinery; blocked
 integration lands the independently proven half and documents the exact
 blocker with its reproducer.

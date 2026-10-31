@@ -130,7 +130,7 @@ closures and overlays, beyond the selected packages above:
 
 | Profile | Generation SHA-256 |
 |---|---|
-| qemu-tinyland-ghostty | `0b168a30fa4c9b1ab3b7d064864a6526368465101271f029bf46935bdc8e10b2` |
+| qemu-tinyland-ghostty | `a772427bbd31516d32a7009821b05e09bb451b9ec8d217736512ed88918482b7` |
 | qemu-dwl-foot | `e40c101617c6462741f3a0111de59e64ffbdfa7bc493f82e092d7c1c8cfc0b27` |
 | qemu-tinyland-foot | `88f29d08b6cc17c82b5022dbaced1b5c8f7b324ae4e34ce4d0c4d5cf6056696c` |
 | qemu-tinyland-vt-foot | `5df73e3be34354813b30e168e1d9647c4e96b329ac9da8dba3c6e4b529a7e8a9` |
