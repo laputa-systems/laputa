@@ -49,4 +49,4 @@ openssl = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
-tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+tokio = { workspace = true, features = ["rt", "macros", "net", "test-util"] }

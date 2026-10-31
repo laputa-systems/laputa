@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{future::Future, sync::{Arc, Mutex}};
 
 use ntp_proto::{KeyExchangeClient, NtsClientConfig, NtsError, SourceConfig};
 use statime_base::{Link, SourceType, StdController};
@@ -96,6 +96,16 @@ async fn resolve_and_connect(config: &NtsSourceConfig) -> Option<(TcpStream, Str
     }
 }
 
+async fn timeout_spawn<T>(attempt: impl Future<Output = Result<T, SpawnFailureReason>>) -> Result<T, SpawnFailureReason> {
+    match tokio::time::timeout(super::NTS_TIMEOUT, attempt).await {
+        Ok(result) => result,
+        Err(_) => {
+            warn!("timeout while establishing an NTS source");
+            Err(SpawnFailureReason::RetryableFailure)
+        }
+    }
+}
+
 impl<TimeController: StdController> Spawner<TimeController> for NtsSpawner
 where
     TimeController::LinkConfig: From<statime_algo::LinkConfig>,
@@ -109,41 +119,30 @@ where
         let key_exchange_client = self.key_exchange_client.clone();
 
         Box::new(async move {
-            let Some((io, name)) = resolve_and_connect(&config).await else {
-                return Err(SpawnFailureReason::RetryableFailure);
-            };
-
-            let key_exchange = match tokio::time::timeout(
-                super::NTS_TIMEOUT,
-                key_exchange_client.exchange_keys(io, name, []),
-            )
-            .await
-            {
-                Ok(Ok(key_exchange)) => key_exchange,
-                Ok(Err(e)) => {
-                    warn!(error = ?e, "error while attempting key exchange");
+            let (addr, protocol_version, nts) = timeout_spawn(async {
+                let Some((io, name)) = resolve_and_connect(&config).await else {
                     return Err(SpawnFailureReason::RetryableFailure);
-                }
-                Err(_) => {
-                    warn!("timeout while attempting key exchange");
+                };
+
+                let key_exchange = match key_exchange_client.exchange_keys(io, name, []).await {
+                    Ok(key_exchange) => key_exchange,
+                    Err(e) => {
+                        warn!(error = ?e, "error while attempting key exchange");
+                        return Err(SpawnFailureReason::RetryableFailure);
+                    }
+                };
+
+                let Some(addr) = resolve_single_ntp_server(NtpAddress(
+                    NormalizedAddress::new_from_parts(
+                        key_exchange.remote.as_str(),
+                        key_exchange.port,
+                    ),
+                )).await else {
                     return Err(SpawnFailureReason::RetryableFailure);
-                }
-            };
-
-            let Some(addr) = resolve_single_ntp_server(NtpAddress(
-                NormalizedAddress::new_from_parts(
-                    key_exchange.remote.as_str(),
-                    key_exchange.port,
-                ),
-            ))
-            .await
-            else {
-                return Err(SpawnFailureReason::RetryableFailure);
-            };
-
+                };
+                Ok((addr, key_exchange.protocol_version, key_exchange.nts))
+            }).await?;
             let (link_config, tracked_link_config) = ntp_link_configs();
-            let protocol_version = key_exchange.protocol_version;
-            let nts = key_exchange.nts;
 
             Ok(CreationParameters {
                 stype: SourceType::Ntp,
@@ -322,6 +321,21 @@ mod tests {
 
         assert_eq!(result.err(), Some(SpawnFailureReason::RetryableFailure));
         assert!(<NtsSpawner as Spawner<TestController>>::needs_spawn(&spawner));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn deadline_covers_all_spawn_stages() {
+        let attempt = tokio::spawn(super::timeout_spawn(async {
+            tokio::time::sleep(Duration::from_secs(4)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            Ok::<_, SpawnFailureReason>(())
+        }));
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(4)).await;
+        tokio::task::yield_now().await;
+        assert!(!attempt.is_finished());
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(attempt.await.unwrap(), Err(SpawnFailureReason::RetryableFailure));
     }
 
     #[tokio::test]

@@ -40,8 +40,9 @@ pub(crate) async fn resolve_ke(
     addr: &NormalizedAddress,
 ) -> Result<Vec<KeResolutionResult>, std::io::Error> {
     let addr = addr.clone();
-    tokio::spawn(async move { resolve_ke_with_srv(&addr).await })
-        .await
+    let mut tasks = tokio::task::JoinSet::new();
+    tasks.spawn(async move { resolve_ke_with_srv(&addr).await });
+    tasks.join_next().await.expect("resolver task exists")
         .map_err(std::io::Error::other)?
 }
 

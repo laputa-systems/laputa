@@ -378,6 +378,10 @@ impl KeyExchangeClient {
             .connect(ServerName::try_from(server_name.clone())?, io)
             .await?;
 
+        if io.get_ref().1.alpn_protocol() != Some(b"ntske/1") {
+            return Err(NtsError::Tls(tls_utils::Error::NoApplicationProtocol));
+        }
+
         // Serialize request first to a buffer to ensure it is most likely to be sent as a
         // single packet, which ntpsec needs.
         let mut req_buf = vec![];
@@ -938,6 +942,46 @@ mod tests {
             count += 1;
         }
         assert_eq!(count, 8);
+    }
+
+    #[tokio::test]
+    async fn test_keyexchange_rejects_server_without_alpn() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let certificate_chain = tls_utils::pemfile::certs(
+            &mut include_bytes!("../../test-keys/end.fullchain.pem").as_slice(),
+        ).collect::<Result<Vec<_>, _>>().unwrap();
+        let private_key = tls_utils::pemfile::private_key(
+            &mut include_bytes!("../../test-keys/end.key").as_slice(),
+        ).unwrap();
+        let server_config = tls_utils::server_config_builder_with_protocol_versions(&[&TLS13])
+            .with_no_client_auth()
+            .with_single_cert(certificate_chain.clone(), private_key.clone_key())
+            .unwrap();
+        let mut server = KeyExchangeServer::new(NtsServerConfig {
+            certificate_chain,
+            private_key,
+            accepted_versions: vec![NtpVersion::V4],
+            server: None,
+            port: None,
+            pool_authentication_tokens: vec![],
+        }).unwrap();
+        server.acceptor = TlsAcceptor::from(Arc::new(server_config));
+        let server_task = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            server.handle_connection(socket, &KeySet::new(), || None::<()>).await
+        });
+        let certificates = tls_utils::pemfile::certs(
+            &mut include_bytes!("../../test-keys/testca.pem").as_slice(),
+        ).collect::<Result<Arc<_>, _>>().unwrap();
+        let client = KeyExchangeClient::new(&NtsClientConfig {
+            certificates,
+            protocol_version: ProtocolVersion::V4,
+        }).unwrap();
+        let socket = tokio::net::TcpStream::connect(address).await.unwrap();
+        let result = client.exchange_keys(socket, "localhost".into(), []).await;
+        let _ = server_task.await.unwrap();
+        assert!(matches!(result, Err(NtsError::Tls(tls_utils::Error::NoApplicationProtocol))));
     }
 
     #[tokio::test]

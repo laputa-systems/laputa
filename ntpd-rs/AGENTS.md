@@ -4,8 +4,8 @@ Maintained here, in the Laputa monorepo, and nowhere else. It descends from
 [pendulum-project/ntpd-rs](https://github.com/pendulum-project/ntpd-rs)
 through the `laputa-systems/ntpd-rs` GitHub fork, now archived; this tree was
 imported from fork commit `910ecd02` (`2.0.0-alpha.20260715`).
-NTP and NTS code matches upstream except the Graviola TLS provider below and
-the daemon repairs recorded in git history. Remaining daemon gaps are in
+NTP and NTS code follows upstream with the Graviola TLS provider, NTS-KE ALPN
+validation, and daemon repairs recorded in git history. Remaining daemon gaps are in
 `TODO.md`.
 
 ## Graviola TLS provider
@@ -33,8 +33,11 @@ the daemon repairs recorded in git history. Remaining daemon gaps are in
 - `ntpd/src/daemon/mod.rs` starts standard, pool, and NTS sources.
   `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs`) runs one key exchange per
   spawn with the provider-backed `KeyExchangeClient`; `certificate-authority`
-  adds roots to the platform verifier, and the retry backoff in `System`
-  covers a failed handshake, including one caused by a wrong clock.
+  adds roots to the platform verifier. The client requires `ntske/1` ALPN.
+  One five-second deadline covers resolution, connect, key exchange, and NTP
+  address resolution; failures enter the `System` retry backoff, including a
+  handshake failure caused by a wrong clock. Direct system DNS uses Tokio
+  blocking resolver workers, which can outlive a cancelled attempt.
   `nts-pool`, `sock`, `pps`, and `csptp` have no spawner, so
   `Config::from_args` rejects them with `ConfigLoadError::UnsupportedSource`
   and `run` returns the same error. The old-trait `nts_pool.rs`, `sock.rs`,
