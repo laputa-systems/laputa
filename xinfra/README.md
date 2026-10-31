@@ -113,7 +113,7 @@ the report schema and exit codes.
 
 ## Help
 
-Report problems at <https://github.com/laputa-systems/xinfra/issues>.
+Report problems at <https://github.com/laputa-systems/laputa/issues>.
 
 ## License
 
