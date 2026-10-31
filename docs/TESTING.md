@@ -129,6 +129,24 @@ needs the locked Rust dependencies available offline. These cases do not
 qualify external sources or the authenticated clock-floor policy. The bundled
 NTS test certificate expires on 27 February 2027.
 
+For the optional chrony comparison, build the official chrony 4.9 source in
+scratch using a Linux musl compiler and GNU make. This test-only build disables
+features outside the controlled NTP comparison:
+
+```bash
+mkdir -p .work/tmp/chrony-oracle
+curl -fsSL https://chrony-project.org/releases/chrony-4.9.tar.gz -o .work/tmp/chrony-oracle/chrony-4.9.tar.gz
+printf '%s  %s\n' 4924c6f530105bcd5b9e9e33c48a2ae1bfd889222c8480bc41601110efc864d0 .work/tmp/chrony-oracle/chrony-4.9.tar.gz | sha256sum -c -
+tar -xf .work/tmp/chrony-oracle/chrony-4.9.tar.gz -C .work/tmp/chrony-oracle
+(cd .work/tmp/chrony-oracle/chrony-4.9 && LDFLAGS=-static ./configure --disable-readline --disable-sechash --disable-nts --disable-refclock --disable-rtc --disable-privdrop --disable-timestamping --with-user=root && make -j2 chronyd chronyc)
+bash tests/integration/ntp-clock-guest.sh chrony-behind /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE .work/tmp/chrony-oracle/chrony-4.9/chronyd .work/tmp/chrony-oracle/chrony-4.9/chronyc
+bash tests/integration/ntp-clock-guest.sh chrony-ahead /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE .work/tmp/chrony-oracle/chrony-4.9/chronyd .work/tmp/chrony-oracle/chrony-4.9/chronyc
+```
+
+Chrony uses `makestep 1.0 3` and the controlled source's two-second polling
+interval. Each case checks readiness while unsynchronized, a clock step, and
+convergence against `CLOCK_MONOTONIC_RAW`; it does not use chrony in a profile.
+
 To renew the test-only localhost certificate, run from the repository root:
 
 ```bash

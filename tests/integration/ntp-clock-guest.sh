@@ -2,12 +2,12 @@
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
-mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts HOST_XSH SEED ARTIFACTS IMAGE}
+mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [CHRONYD CHRONYC]}
 xsh=$(realpath "${2:?host xsh}")
 seed=$(realpath "${3:?seed directory}")
 artifacts=$(realpath "${4:?artifact store}")
 image=${5:?package-tools image}
-case "$mode" in behind|ahead|jump|pause|nts) ;; *) exit 2 ;; esac
+case "$mode" in behind|ahead|jump|pause|nts|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
 git -C "$repo" check-ignore -q .work/
 mkdir -p "$repo/.work/tmp"
 work=$(mktemp -d "$repo/.work/tmp/ntp-guest.XXXXXXXX")
@@ -38,6 +38,13 @@ TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
   -C linker=mold -C linker-flavor=ld \
   "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
 cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
+if test "$mode" = chrony-behind || test "$mode" = chrony-ahead; then
+  cp "${6:?chronyd binary}" "$input/inputs/chronyd"
+  cp "${7:?chronyc binary}" "$input/inputs/chronyc"
+  cp "$snapshot/tests/integration/fixtures/chrony-oracle-guest.xsh" "$input/inputs/entry.xsh"
+  cp "$snapshot/tests/integration/fixtures/chrony-oracle-service.xsh" "$input/inputs/chrony-oracle.xsh"
+  cp "$snapshot/tests/integration/fixtures/chrony-oracle-launch.xsh" "$input/inputs/chrony-launch.xsh"
+fi
 if test "$mode" = nts; then
   TMPDIR="$snapshot/.work/tmp" CARGO_TARGET_DIR="$work/nts-target" RUSTC_WRAPPER=kache \
     RUSTFLAGS='-C linker=mold -C linker-flavor=ld' cargo "+$channel" build --locked --offline -j 2 \
@@ -47,7 +54,7 @@ if test "$mode" = nts; then
   touch "$input/inputs/nts-mode"
 fi
 if test "$mode" = jump; then touch "$input/inputs/jump-mode"; fi
-if test "$mode" = ahead; then touch "$input/inputs/ahead-mode"; fi
+if test "$mode" = ahead || test "$mode" = chrony-ahead; then touch "$input/inputs/ahead-mode"; fi
 if test "$mode" = pause; then touch "$input/inputs/pause-mode"; fi
 truncate -s 128M "$output/inputs.ext4"
 truncate -s 64M "$output/output.ext4"
