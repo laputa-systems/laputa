@@ -14,16 +14,22 @@ compiler class, and records the Laputa side of the frozen 1,040 checkpoint.
 | XSH compiler and applied-view decision | `24de61dd0522083645d8e88fd00a8d9d49ac965a`, tree `66e264fea43b0868a6687439a7bd1b242b6e30c2` |
 | Built `xsh` | sha256 `ad0c36cdba0f7f06e79b44b134b4911e019ab23c0352046136962ee7f008d8fa` |
 | Built `xsht` | sha256 `82273eb615d9a7f3382e7cb9cabd5599b26f831444bcbe642bebf8f2103d0869` |
-| Fixed-compiler candidate | `732664cd19a01a69548ef6fd263f19d472f7d045`, tree `94303d7fd428e927c2cf8582fb1f1639e003c7c2`; unmerged `inference/map-key` |
-| Fixed-compiler products | `xsh` sha256 `0159739a539c17f07135391e897a2e129a2a0a213184eb877d69c013e8238869`; `xsht` sha256 `67c7e678454644a2c6ed9a0a6ca737c20abe234c7357e996a811f97d92fe5928` |
+| Map-key fix commit | `732664cd19a01a69548ef6fd263f19d472f7d045`, tree `94303d7fd428e927c2cf8582fb1f1639e003c7c2`; merged through `ef91a48ef` |
+| Final merged XSH master | `ef91a48efdc7a64348b658ec753b28cedf177e43`, tree `8fb143f0270af2162bc03b8c3a496694cd781dd9` |
+| Final merged products | `xsh` sha256 `6c99dd41aa93baeae99e9278438b60fa4dafd98c0442035db3f8debca5fc53a9`; `xsht` sha256 `6359ddbe395c05278026615ed755cc3e604ae4594ca6835156b3c91a3e15c872` |
 | Laputa practical root | `pm/generation.xsh` |
 | Parameter sites | 57: 38 private and 19 exported |
-| Applied view | 37 private parameter sites at `24de61dd0` (12 `pure`, 25 `proc`); 38 at fixed candidate `732664cd1` |
+| Applied view | 38 private parameter sites at merged `ef91a48ef` (12 `pure`, 26 `proc`); 37 at the `24de61dd0` decision |
 
 The applied-view decision is XSH `24de61dd0`: private `pure` and private `proc`
 parameters are eligible. Exported parameters, private `proc` returns, effect
 clauses, and `Map`/`.require()` locals remain retained. The earlier 12-site
 private-`pure` view is superseded.
+
+XSH master advanced to `4204c990ed2aca1635b71e0c797b5bfc5b86c120` with a
+campaign-documentation change after the measurement. Its compiler source is
+unchanged from `ef91a48ef`; the final view remains pinned to the measured
+`ef91a48ef` compiler.
 
 The only Laputa root in the practical inventory is `pm/generation.xsh`. Laputa
 `pm/plan_json.xsh` belongs to the frozen 1,040 view and was not touched by the
@@ -45,9 +51,13 @@ bash dev/performance/corpus/inventory.sh \
 
 The inventory holds 724 spans: 668 annotations and 56 effect clauses. The
 Laputa slice holds 57 parameter sites: 38 private and 19 exported. Its sha256 is
-`15184bb86416df93a3a271e3978db8fd77a4b5fb882d4cbb967e6317180ba05d`;
-the 37-site selector list has sha256
-`6ee26c9772b39a01bd5d0d29e3d735b4ac1290764659f2de652cdfa0aab8d5b2`.
+`15184bb86416df93a3a271e3978db8fd77a4b5fb882d4cbb967e6317180ba05d`.
+The 37-site decision selector list has sha256
+`6ee26c9772b39a01bd5d0d29e3d735b4ac1290764659f2de652cdfa0aab8d5b2`;
+the final 38-site list has sha256
+`e471f680d296a75f3495ebcb492bc6175b891bc3e0b10e1dbaee8fe3529936dc`.
+The merged-master re-run regenerated the same 724-row inventory with the same
+sha256.
 
 Erasure used the built `xsht` and a `git archive` export of `d1fda6c`:
 
@@ -83,16 +93,17 @@ joint erasure of every site that passed alone:
   laputa/pm/generation.xsh: 37 sites, pass
 ```
 
-The 37 sites that pass alone and jointly are the applied view. Site 32 is the
-only private parameter outside it. The four private `GenerationPlan value`
-sites and the exported `compose.value` site are in the 55-site all-parameter
-joint, but that joint is exported-inclusive; see below.
+At the `24de61dd0` decision compiler, the 37 sites that pass alone and jointly
+are the applied view. Site 32 is the only private parameter outside it. The
+four private `GenerationPlan value` sites and the exported `compose.value` site
+are in the 55-site all-parameter joint, but that joint is exported-inclusive;
+see below.
 
-### Fixed-compiler re-run
+### Merged-compiler re-run
 
-XSH `732664cd1` on `inference/map-key` fixes the site 32
-`check.map-key-type` class. It is not merged into `master`. With the same
-inventory and Laputa tree, the fixed compiler produces:
+XSH master `ef91a48ef` contains `732664cd1`, which fixes the site 32
+`check.map-key-type` class, and only campaign documentation after it. At the
+merged compiler, the same inventory and Laputa tree produce:
 
 ```text
 single-site erasure: 38/38 pass
@@ -117,53 +128,52 @@ joint erasure of every site that passed alone:
 
 Only site 54 remains a single-site failure. The 56-site joint still fails on
 the exported-inclusive five-site set because `compose.value` stays retained.
-The 38-site applied view, the 37 selectors plus site 32, prepares at
-`732664cd1`; its root checks, six exact selectors, and behavior pass. Its
-interface gate reports one more private generalization,
+The 38-site applied view, the 37 decision selectors plus site 32, is the final
+view. It prepares at merged master; its root checks, six exact selectors, and
+behavior pass. Its interface gate reports one more private generalization,
 `generation_runtime_artifacts`, for 18 private helpers total. Its reduced
 Laputa digest is
 `bef6ef28f4e16ca699a6304d1896f48551e5192dc445678fe962667e35dfab0b`
 over 1,670 entries; the original remains
 `2972c5870784cdb55d32bc5001fefcdc3dc8f914d41d3b1fd6338dac47414aee`.
-When `732664cd1` is merged, `SITE_IDS` becomes 38 and site 32 leaves the G4
-table.
+`SITE_IDS` is 38 and site 32 leaves the G4 table.
 
 ## Applied view
 
-At the pinned `24de61dd0` compiler, `SITE_IDS` is the following 37 exact
-`project|path|kind|line|owner` selectors, 12 `pure` and 25 private `proc`
-parameters. It excludes site 32, `generation_runtime_artifacts.value`, which is
-the G4 `check.map-key-type` item at that compiler. The fixed candidate adds it
+The final merged view at `ef91a48ef` has 38 selectors. The following block is
+the 37-site `24de61dd0` decision view: 12 `pure` and 25 private `proc`
+parameters, excluding site 32, `generation_runtime_artifacts.value`, which was
+the G4 `check.map-key-type` item at that compiler. The merged view adds site 32
 for 38.
 
 ```text
 laputa|pm/generation.xsh|parameter|48|pure generation_overlay_config_path parameter overlay_root,laputa|pm/generation.xsh|parameter|52|pure generation_receipt_path parameter output_root,laputa|pm/generation.xsh|parameter|60|pure generation_sha256_text_is_valid parameter value,laputa|pm/generation.xsh|parameter|64|proc generation_require_sha256 parameter value,laputa|pm/generation.xsh|parameter|64|proc generation_require_sha256 parameter label,laputa|pm/generation.xsh|parameter|70|pure generation_canonical_field parameter value,laputa|pm/generation.xsh|parameter|74|pure generation_sorted_unique parameter values,laputa|pm/generation.xsh|parameter|89|proc generation_require_profile_name parameter value,laputa|pm/generation.xsh|parameter|95|proc generation_require_overlay_path parameter value,laputa|pm/generation.xsh|parameter|95|proc generation_require_overlay_path parameter label,laputa|pm/generation.xsh|parameter|107|proc generation_validate_symlink_target parameter path_value,laputa|pm/generation.xsh|parameter|107|proc generation_validate_symlink_target parameter target,laputa|pm/generation.xsh|parameter|133|proc generation_validate_profile parameter value,laputa|pm/generation.xsh|parameter|151|proc generation_digest parameter value,laputa|pm/generation.xsh|parameter|178|proc generation_validate_plan parameter value,laputa|pm/generation.xsh|parameter|233|proc generation_runtime_artifacts parameter runtime_roots,laputa|pm/generation.xsh|parameter|308|pure generation_plan_dto parameter value,laputa|pm/generation.xsh|parameter|322|proc generation_plan_from_dto parameter value,laputa|pm/generation.xsh|parameter|412|proc generation_overlay_entries parameter overlay_root,laputa|pm/generation.xsh|parameter|454|pure generation_same_directory_metadata parameter entry,laputa|pm/generation.xsh|parameter|454|pure generation_same_directory_metadata parameter package_entry,laputa|pm/generation.xsh|parameter|463|pure generation_replacement_preserves_file_metadata parameter entry,laputa|pm/generation.xsh|parameter|464|pure generation_replacement_preserves_file_metadata parameter package_entry,laputa|pm/generation.xsh|parameter|476|proc generation_preflight_overlay parameter entries,laputa|pm/generation.xsh|parameter|477|proc generation_preflight_overlay parameter root_plan,laputa|pm/generation.xsh|parameter|478|proc generation_preflight_overlay parameter profile,laputa|pm/generation.xsh|parameter|535|proc generation_store_artifacts parameter value,laputa|pm/generation.xsh|parameter|535|proc generation_store_artifacts parameter store_root,laputa|pm/generation.xsh|parameter|568|proc generation_apply_overlay parameter output_root,laputa|pm/generation.xsh|parameter|568|proc generation_apply_overlay parameter entries,laputa|pm/generation.xsh|parameter|603|pure generation_artifact_dto parameter value,laputa|pm/generation.xsh|parameter|607|pure generation_receipt_dto parameter value,laputa|pm/generation.xsh|parameter|622|proc generation_artifact_from_dto parameter value,laputa|pm/generation.xsh|parameter|626|proc generation_receipt_from_dto parameter value,laputa|pm/generation.xsh|parameter|639|proc generation_validate_receipt parameter value,laputa|pm/generation.xsh|parameter|659|proc generation_receipt_for parameter value,laputa|pm/generation.xsh|parameter|660|proc generation_receipt_for parameter root_receipt
 ```
 
-The fixed-compiler candidate adds one selector:
+The merged master adds one selector for 38 total:
 
 ```text
 laputa|pm/generation.xsh|parameter|232|proc generation_runtime_artifacts parameter value
 ```
 
-`prepare_views.sh` rebuilt the original and reduced trees from `24de61dd0` and
-`d1fda6c` and applied exactly these 37 Laputa spans. The XSH files are
-unchanged. The reduced Laputa view digest is
+For the `24de61dd0` decision view, `prepare_views.sh` rebuilt the original and
+reduced trees from `24de61dd0` and `d1fda6c` and applied exactly these 37
+Laputa spans. The XSH files are unchanged. The reduced Laputa view digest is
 `40b4d00500d1c38a9cb178e25de100fe0287b4ba4abcdaa53f31a1018e786e9e`
 over 1,670 entries; the original is
 `2972c5870784cdb55d32bc5001fefcdc3dc8f914d41d3b1fd6338dac47414aee`.
 The old 12-Laputa-site view is superseded.
 
-The applied-view receipt commands were:
+The final applied-view receipt commands were:
 
 ```sh
 bash dev/performance/corpus/prepare_views.sh \
-  "$XSH_ROOT" 24de61dd0522083645d8e88fd00a8d9d49ac965a \
+  "$XSH_ROOT" ef91a48efdc7a64348b658ec753b28cedf177e43 \
   "$LAPUTA_ROOT" d1fda6c722a2532184cf02edf07df1885d610c12 \
   "$INVENTORY" "$SITE_IDS" "$VIEWS"
 bash dev/performance/corpus/check_views.sh \
-  "$XSH_ROOT" 24de61dd0522083645d8e88fd00a8d9d49ac965a \
-  "$XSH_ROOT" 24de61dd0522083645d8e88fd00a8d9d49ac965a \
+  "$XSH_ROOT" ef91a48efdc7a64348b658ec753b28cedf177e43 \
+  "$XSH_ROOT" ef91a48efdc7a64348b658ec753b28cedf177e43 \
   "$LAPUTA_ROOT" d1fda6c722a2532184cf02edf07df1885d610c12 \
   "$XSH" "$XSHT" "$XSH_SHA256" "$XSHT_SHA256" \
   "$INVENTORY" "$SITE_IDS" "$VIEWS"
@@ -173,6 +183,8 @@ bash dev/performance/corpus/check_views.sh \
 Laputa roots and the six exact behavior selectors in both views. Those root and
 behavior checks passed. The Laputa interface gate then failed on private-helper
 contract generalization and returned 2; that difference is recorded below.
+The 37-site `24de61dd0` decision view produced the same root and behavior
+results before the map-key fix merged.
 
 ## Applied-view interface difference
 
@@ -200,8 +212,8 @@ generation_validate_receipt
 ```
 
 Every candidate is a `forall` generalization of the original closed schema.
-At the fixed-compiler candidate the list adds `generation_runtime_artifacts`,
-for 18 private helpers total. No exported callable is in the mismatch set:
+At merged `ef91a48ef` the list adds `generation_runtime_artifacts`, for 18
+private helpers total. No exported callable is in the mismatch set:
 `compose`, `write_generation_plan`, `read_generation_plan`,
 `read_generation_receipt`, and `read_generation_receipt_file` keep their
 contracts. The XSH interface qualification passed. This is a private-helper
@@ -211,8 +223,8 @@ current `check_views.sh` gate therefore exits 2 for the applied view.
 This difference is accepted. The generalized declarations are private helpers,
 and the runtime behavior and exported contracts are unchanged. The interface
 gate is recorded as a tool limitation, not a reason to retain the private
-`proc` parameters. The pinned `24de61dd0` applied view stays at 37 sites; the
-fixed-compiler view is 38.
+`proc` parameters. The `24de61dd0` decision view was 37 sites; the merged
+`ef91a48ef` view is 38.
 
 The six callable probes tell the same story. The four XSH probes still reveal
 `Pure`. Two Laputa private helpers change from `Pure` to generic callable
@@ -229,7 +241,7 @@ helpers whose parameters are erased.
 
 ## Practical behavior
 
-The reduced view was checked directly with the same products:
+The final 38-site reduced view was checked directly with the merged products:
 
 ```sh
 xsht check pm/plan_json.xsh pm/generation.xsh pm/generation_adapter.xsh
@@ -241,10 +253,13 @@ Results:
 
 ```text
 xsht check: 3 files, check and lower pass
-test_generation_plan_and_receipt_are_deterministic_for_root_order_and_duplicates ... ok 142ms
-test_generation_plan_json_round_trips_and_rejects_changed_identity ... ok 56ms
+test_generation_plan_and_receipt_are_deterministic_for_root_order_and_duplicates ... ok 92ms
+test_generation_plan_json_round_trips_and_rejects_changed_identity ... ok 35ms
 test result: ok. 1 passed; 0 failed; 0 skipped
 ```
+
+The 37-site `24de61dd0` decision view passed the same checks before the map-key
+fix merged.
 
 No runtime behavior difference was observed. The two selectors exercise the
 exported `compose` and `write_generation_plan` API, including the
@@ -266,14 +281,16 @@ err[check.map-key-type]: Map comprehension keys require an ordered scalar key
 Site 32, line 232, `proc generation_runtime_artifacts` parameter
 `value: types.BuildPlan`. Minimal erased set: site 32 alone.
 
-Classification: missing inference and a G4 item. The local `Map[types.PlanNode]`
-is `Map[Str, types.PlanNode]`, and the key expression is the `Str` field
-`node.name`. With `value: types.BuildPlan` the comprehension item is a
-`PlanNode`. Without it, `value.nodes` is unresolved, so the field read has no
-resolved key type and the checker rejects the unresolved key instead of
-deriving `Str`. This is a private helper that reads only `value.nodes`; no
-public contract requires the annotation. After XSH fixes this class, re-run the
-erasure: expect 38/38 private parameter sites and add site 32 to `SITE_IDS`.
+Classification: missing inference, fixed by `732664cd1` in merged
+`ef91a48ef`. The local `Map[types.PlanNode]` is `Map[Str, types.PlanNode]`, and
+the key expression is the `Str` field `node.name`. With
+`value: types.BuildPlan` the comprehension item is a `PlanNode`. Without it,
+`value.nodes` is unresolved, so the field read has no resolved key type and the
+checker rejects the unresolved key instead of deriving `Str`. This is a private
+helper that reads only `value.nodes`; no public contract requires the
+annotation. At the `24de61dd0` decision compiler it was the applied-view
+blocker; the merged view has 38/38 private parameter sites and site 32 is
+applied.
 
 Runnable witness:
 
@@ -346,8 +363,8 @@ an exported contract and stays retained; `xsht check --compare-with` reports
 `compose: contract mismatch` and `checked body contract mismatch` when it is
 erased. Because it stays, the five-site joint is outside the applied view. The
 four private members, sites 26, 29, 80, and 97, pass alone and in the 37-site
-private joint and are in the applied view. The joint failure is not an
-applied-view failure.
+decision joint and 38-site merged joint, and are in the applied view. The joint
+failure is not an applied-view failure.
 
 Runnable witness for the lowering class:
 
@@ -382,7 +399,7 @@ The checker reaches the same `pm/generation.xsh:725:3` diagnostic.
 
 | Site | Line | Parameter | Visibility | Alone | Applied view | Classification | Reason |
 | ---: | ---: | --- | --- | --- | --- | --- | --- |
-| 32 | 232 | `generation_runtime_artifacts.value: types.BuildPlan` | private | fail at `24de61dd0`; pass at `732664cd1` | excluded at `24de61dd0`; included at `732664cd1` | fixed G4 `check.map-key-type` candidate | unresolved map comprehension key; add when `732664cd1` merges |
+| 32 | 232 | `generation_runtime_artifacts.value: types.BuildPlan` | private | fail at `24de61dd0`; pass at merged `ef91a48ef` | excluded at `24de61dd0`; included at merged `ef91a48ef` | applied after the map-key fix | `check.map-key-type` fixed by `732664cd1` and merged at `ef91a48ef` |
 | 54 | 335 | `write_generation_plan.path_value: Path` | exported | fail | excluded | retained exported contract | exported path parameter; `.parent`/write gap is secondary |
 | 26 | 151 | `generation_digest.value: types.GenerationPlan` | private | pass | included | applied | no contract; joint only with exported `compose.value` |
 | 29 | 178 | `generation_validate_plan.value: types.GenerationPlan` | private | pass | included | applied | no contract; joint only with exported `compose.value` |
@@ -391,19 +408,19 @@ The checker reaches the same `pm/generation.xsh:725:3` diagnostic.
 | 106 | 696 | `compose.value: types.GenerationPlan` | exported | pass | excluded | retained exported contract | exported API; interface comparison fails when erased |
 
 All 19 exported parameter annotations are retained as API contracts; sites 54
-and 106 are the two with compiler witnesses. At the pinned `24de61dd0` compiler
-the other 37 parameter sites are the applied private set above, and site 32 is
-the only private parameter outside it. At the fixed-compiler candidate
-`732664cd1`, site 32 passes alone and in the 38-site joint; it joins the
-applied view when that commit is merged. Private `proc` returns, effect
-clauses, and `Map`/`.require()` locals are retained by the same decision but
-are outside this parameter table. No other parameter annotation is retained.
+and 106 are the two with compiler witnesses. At the `24de61dd0` decision
+compiler the other 37 parameter sites are the applied private set, and site 32
+was the only private parameter outside it. At merged `ef91a48ef`, site 32
+passes alone and in the 38-site joint and is in the final applied view. Private
+`proc` returns, effect clauses, and `Map`/`.require()` locals are retained by
+the same decision but are outside this parameter table. No other parameter
+annotation is retained.
 
 ## XSH G4 handoff
 
 | Missing-inference class | Witness | First diagnostic | Laputa set |
 | --- | --- | --- | --- |
-| Map comprehension key from an unresolved field read | `pure f(value) { {node.name: node for node in value.nodes} }` | `check.map-key-type` | 32, fixed by unmerged `732664cd1`; 38/38 at that commit, add on merge |
+| Map comprehension key from an unresolved field read | `pure f(value) { {node.name: node for node in value.nodes} }` | `check.map-key-type` | 32, fixed by `732664cd1` in merged `ef91a48ef`; 38/38 and applied |
 | Receiver grounding through `.parent` before a write | `proc f(p) [fs, error] { p.parent.mkdir(); p.write_atomic("") }` | `check.type-mismatch` | 54, exported contract; secondary gap, no erasure |
 | `with` in a generic procedure | `proc f(value) [fs, error] { with t = fs.tempdir()? { value }? }` | `compact.indexed-build` | 26, 29, 80, 97, 106, exported-inclusive joint; outside the applied view because `compose.value` is retained |
 
@@ -411,9 +428,9 @@ Retain the exported `write_generation_plan.path_value: Path` and
 `compose.value: types.GenerationPlan` annotations as contracts. The applied
 private parameters remain in the applied view even though their helper
 contracts generalize; the four private `GenerationPlan value` annotations are
-not retained once `compose.value` stays. Merge `732664cd1` and pin the merged
-XSH `master`, at which point `SITE_IDS` becomes 38. Re-run after the current
-`rm` slice and each later compiler slice; the `rm` slice is gated now.
+not retained once `compose.value` stays. Merged `ef91a48ef` includes the
+map-key fix, so `SITE_IDS` is 38. Re-run after the current `rm` slice and each
+later compiler slice; the `rm` slice is gated now.
 
 ## Frozen 1,040 view
 
@@ -487,9 +504,9 @@ behavior selectors above, not full runtime or installer coverage. It covers the
 practical erasure root only. No XSH edit and no push were made. The frozen
 denominator and retained table were not changed.
 
-The `check.map-key-type` fix is verified at unmerged `732664cd1`; merge it and
-pin the merged XSH `master` to make `SITE_IDS` 38. The current `rm` slice and
-each later compiler slice remain gated re-runs. Keep the
+The final view is pinned to merged XSH `master` `ef91a48ef`, which includes the
+`732664cd1` map-key fix; `SITE_IDS` is 38. The current `rm` slice and each later
+compiler slice remain gated re-runs. Keep the
 `write_generation_plan.path_value` `.parent` witness and the `compose.value`
 `--compare-with` evidence as exported-contract and secondary compiler gaps; do
 not erase them. The applied view's private-helper contract generalization is an
