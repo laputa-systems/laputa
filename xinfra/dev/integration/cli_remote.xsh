@@ -44,16 +44,16 @@ proc coordinate(a: transport.Session, b: transport.Session, barrier_dir: Str, jo
     wait_for(b, f"{barrier_dir}/started")?
     require(remote(a, ["test", "-d", "/run/xinfra.lock"])? == 0, "first lock missing during apply")?
     require(remote(b, ["test", "-d", "/run/xinfra.lock"])? == 0, "second lock missing during apply")?
-    let _ = remote(b, ["touch", f"{barrier_dir}/release"])?
+    require(remote(b, ["touch", f"{barrier_dir}/release"])? == 0, "cannot release second host")?
   } else {
     for _ in range(10) {
       require(remote(b, ["test", "-f", f"{barrier_dir}/started"])? != 0, "second host started before first was released")?
     }
   }
-  let _ = remote(a, ["touch", f"{barrier_dir}/release"])?
+  require(remote(a, ["touch", f"{barrier_dir}/release"])? == 0, "cannot release first host")?
   if jobs == 1 {
     wait_for(b, f"{barrier_dir}/started")?
-    let _ = remote(b, ["touch", f"{barrier_dir}/release"])?
+    require(remote(b, ["touch", f"{barrier_dir}/release"])? == 0, "cannot release second host")?
   }
   Ok()
 }
@@ -95,44 +95,46 @@ export proc check_cli_remote() [fs, process, env, time, error, io] -> Result[Uni
   let b = fixture("B")?
   let root = fs.gitroot()?
   let xsh = fp"{env.get("XINFRA_XSH")?}"
-  let dir = fp"{root}/.work/tmp/cli-remote-{time.now()}"
-  dir.mkdir(parents: true)?
-  defer { let _ = dir.remove(missing_ok: true) }
-  let key = fp"{dir}/key"
-  a.key.copy(to: key, overwrite: true)?
-  key.chmod(0o600)?
-  let inventory = fp"{dir}/inventory.toml"
-  inventory.write(f"""groups = ["test"]
-[[hosts]]
-name = "xinfra-a"
-groups = ["test"]
-address = "{a.host}"
-port = {a.port}
-user = "{a.user}"
-key = "key"
-host_key = "{a.pin}"
-[[hosts]]
-name = "xinfra-b"
-groups = ["test"]
-address = "{b.host}"
-port = {b.port}
-user = "{b.user}"
-key = "key"
-host_key = "{b.pin}"
-""")?
-  with first = connect(a)? {
-    with second = connect(b)? {
-      for jobs in [2, 1] {
-        let barrier_dir = f"/tmp/xinfra-cli-{time.now()}-{jobs}"
-        let deployment = fp"{dir}/deploy.xsh"
-        deployment.write(f"""##! CLI integration deployment.
-use xinfra.model
-## Returns resources.
-export pure resources() -> List[model.Resource] {{
-  [model.CommandResource(model.CommandSpec(id: "barrier", shell: "touch {barrier_dir}/started; n=0; while [ ! -f {barrier_dir}/release ]; do n=$((n+1)); [ $n -lt 60 ] || exit 1; sleep 1; done", always_run: true))]
-}}
-""")?
-        run_case(xsh, inventory, deployment, first, second, barrier_dir, jobs)?
+  let scratch_parent = fp"{root}/.work/tmp"
+  scratch_parent.mkdir(parents: true)?
+  with scratch = fs.tempdir_in(scratch_parent)? {
+    let dir = scratch.host_path()?
+    let key = fp"{dir}/key"
+    a.key.copy(to: key, overwrite: true)?
+    key.chmod(0o600)?
+    let inventory = fp"{dir}/inventory.toml"
+    inventory.write(f"""groups = ["test"]
+  [[hosts]]
+  name = "xinfra-a"
+  groups = ["test"]
+  address = "{a.host}"
+  port = {a.port}
+  user = "{a.user}"
+  key = "key"
+  host_key = "{a.pin}"
+  [[hosts]]
+  name = "xinfra-b"
+  groups = ["test"]
+  address = "{b.host}"
+  port = {b.port}
+  user = "{b.user}"
+  key = "key"
+  host_key = "{b.pin}"
+  """)?
+    with first = connect(a)? {
+      with second = connect(b)? {
+        for jobs in [2, 1] {
+          let barrier_dir = f"/tmp/xinfra-cli-{time.now()}-{jobs}"
+          let deployment = fp"{dir}/deploy.xsh"
+          deployment.write(f"""##! CLI integration deployment.
+  use xinfra.model
+  ## Returns resources.
+  export pure resources() -> List[model.Resource] {{
+    [model.CommandResource(model.CommandSpec(id: "barrier", shell: "touch {barrier_dir}/started; n=0; while [ ! -f {barrier_dir}/release ]; do n=$((n+1)); [ $n -lt 60 ] || exit 1; sleep 1; done", always_run: true))]
+  }}
+  """)?
+          run_case(xsh, inventory, deployment, first, second, barrier_dir, jobs)?
+        }
       }
     }
   }
