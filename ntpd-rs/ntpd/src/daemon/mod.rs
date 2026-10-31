@@ -33,7 +33,7 @@ use statime_algo::{ControllerConfig, StdKalmanStorage};
 use tokio::runtime::Builder;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use config::NtpDaemonOptions;
+use config::{ConfigLoadError, NtpDaemonOptions, UnsupportedSourceMode};
 
 use crate::daemon::clock::NtpClockWrapper;
 use crate::daemon::nts_key_provider::KeysetConfig;
@@ -193,7 +193,7 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
         let system_clone = system.clone();
         let main_loop_handle = tokio::spawn(async move { system_clone.run().await });
 
-        for source in config.sources {
+        for (position, source) in config.sources.into_iter().enumerate() {
             match source {
                 config::NtpSourceConfig::Standard(flattened_pair) => {
                     system.add_spawner(Box::new(StandardSpawner::new(
@@ -209,11 +209,17 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
                     )));
                 }
                 config::NtpSourceConfig::NtsPool(flattened_pair) => todo!(),
-                config::NtpSourceConfig::Sock(sock_source_config) => todo!(),
+                config::NtpSourceConfig::Sock(_) => {
+                    return Err(unsupported_source(position, UnsupportedSourceMode::Sock));
+                }
                 #[cfg(feature = "pps")]
-                config::NtpSourceConfig::Pps(pps_source_config) => todo!(),
+                config::NtpSourceConfig::Pps(_) => {
+                    return Err(unsupported_source(position, UnsupportedSourceMode::Pps));
+                }
                 #[cfg(target_os = "linux")]
-                config::NtpSourceConfig::Csptp(csptp_source_config) => todo!(),
+                config::NtpSourceConfig::Csptp(_) => {
+                    return Err(unsupported_source(position, UnsupportedSourceMode::Csptp));
+                }
             }
         }
 
@@ -242,6 +248,10 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
     runtime.shutdown_background();
 
     result
+}
+
+fn unsupported_source(position: usize, mode: UnsupportedSourceMode) -> Box<dyn Error> {
+    Box::new(ConfigLoadError::UnsupportedSource { position, mode })
 }
 
 pub(crate) mod exitcode {

@@ -29,7 +29,9 @@ That gap is `TODO.md` NTPD-1.
 ## Daemon in this checkout
 
 - `ntpd/src/daemon/mod.rs` starts standard and pool sources only.
-  `mode = "nts"`, `nts-pool`, `sock`, `pps`, and `csptp` hit `todo!()`.
+  `mode = "nts"` and `nts-pool` hit `todo!()`. `sock`, `pps`, and `csptp`
+  have no spawner, so `Config::from_args` rejects them with
+  `ConfigLoadError::UnsupportedSource` and `run` returns the same error.
   `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs`) is not called.
 - `Config` (`ntpd/src/daemon/config/mod.rs`) has `use-system-config`,
   `source`, `server`, `observability`, and `synchronization`. The

@@ -155,6 +155,81 @@ impl RootConfig for Config {
     }
 }
 
+/// A source mode that parses but that this daemon has no spawner for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsupportedSourceMode {
+    Sock,
+    #[cfg(feature = "pps")]
+    Pps,
+    #[cfg(target_os = "linux")]
+    Csptp,
+}
+
+impl UnsupportedSourceMode {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Sock => "sock",
+            #[cfg(feature = "pps")]
+            Self::Pps => "pps",
+            #[cfg(target_os = "linux")]
+            Self::Csptp => "csptp",
+        }
+    }
+}
+
+impl NtpSourceConfig {
+    pub fn unsupported_mode(&self) -> Option<UnsupportedSourceMode> {
+        match self {
+            Self::Standard(_) | Self::Nts(_) | Self::Pool(_) | Self::NtsPool(_) => None,
+            Self::Sock(_) => Some(UnsupportedSourceMode::Sock),
+            #[cfg(feature = "pps")]
+            Self::Pps(_) => Some(UnsupportedSourceMode::Pps),
+            #[cfg(target_os = "linux")]
+            Self::Csptp(_) => Some(UnsupportedSourceMode::Csptp),
+        }
+    }
+}
+
+/// Everything that can make the daemon refuse a configuration before it runs.
+#[derive(Debug)]
+pub enum ConfigLoadError {
+    Config(ConfigError),
+    UnsupportedSource {
+        /// Zero-based position among the configured `[[source]]` entries.
+        position: usize,
+        mode: UnsupportedSourceMode,
+    },
+}
+
+impl Display for ConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Config(error) => error.fmt(f),
+            Self::UnsupportedSource { position, mode } => write!(
+                f,
+                "`[[source]]` number {} uses mode \"{}\", which this daemon does not support",
+                position + 1,
+                mode.name()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ConfigLoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Config(error) => Some(error),
+            Self::UnsupportedSource { .. } => None,
+        }
+    }
+}
+
+impl From<ConfigError> for ConfigLoadError {
+    fn from(error: ConfigError) -> Self {
+        Self::Config(error)
+    }
+}
+
 impl Config {
     fn from_first_file(file: Option<impl AsRef<Path>>) -> Result<Config, ConfigError> {
         // if an explicit file is given, always use that one
@@ -182,7 +257,7 @@ impl Config {
         file: Option<&impl AsRef<Path>>,
         sources: Vec<NtpSourceConfig>,
         servers: Vec<NtpServerConfig>,
-    ) -> Result<Config, ConfigError> {
+    ) -> Result<Config, ConfigLoadError> {
         let mut config = Config::from_first_file(file.as_ref())?;
 
         if !sources.is_empty() {
@@ -199,7 +274,21 @@ impl Config {
             config.servers = servers;
         }
 
+        config.reject_unsupported_sources()?;
+
         Ok(config)
+    }
+
+    fn reject_unsupported_sources(&self) -> Result<(), ConfigLoadError> {
+        match self
+            .sources
+            .iter()
+            .enumerate()
+            .find_map(|(position, source)| Some((position, source.unsupported_mode()?)))
+        {
+            Some((position, mode)) => Err(ConfigLoadError::UnsupportedSource { position, mode }),
+            None => Ok(()),
+        }
     }
 
     /// Count potential number of sources in configuration
@@ -364,6 +453,32 @@ minimum-agreeing-sources = 1
                 .unwrap()
                 .check()
         );
+    }
+
+    #[test]
+    fn unsupported_source_modes_fail_at_load() {
+        let path = std::env::temp_dir().join(format!(
+            "ntp-config-unsupported-{}.toml",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "[[source]]\nmode = \"pool\"\naddress = \"pool.example\"\n\n[[source]]\nmode = \"sock\"\npath = \"/run/gpsd.sock\"\nprecision = 1e-3\naccuracy = 1e-3\n",
+        )
+        .unwrap();
+
+        let error = Config::from_args(Some(&path), vec![], vec![]).unwrap_err();
+        std::fs::remove_file(&path).unwrap();
+
+        assert!(matches!(
+            error,
+            ConfigLoadError::UnsupportedSource {
+                position: 1,
+                mode: UnsupportedSourceMode::Sock
+            }
+        ));
+        assert!(error.to_string().contains("number 2"), "{error}");
+        assert!(error.to_string().contains("\"sock\""), "{error}");
     }
 
     #[test]
