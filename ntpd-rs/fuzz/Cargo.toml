@@ -1,0 +1,106 @@
+[package]
+name = "ntp-proto-fuzz"
+version = "0.0.0"
+edition = "2018"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+rand = "0.8.8"
+tokio = { version = "1.32", features = ["full"] }
+
+[dependencies.libfuzzer-sys]
+version = "0.4"
+features = ["arbitrary-derive"]
+
+[dependencies.ntp-proto]
+path = "../ntp-proto"
+features = ["__internal-fuzz"]
+
+[dependencies.statime-wire]
+path = "../statime-wire"
+
+[dependencies.statime-base]
+path = "../statime-base"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "packet_parsing_sound"
+path = "fuzz_targets/packet_parsing_sound.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "cookie_parsing_sound"
+path = "fuzz_targets/cookie_parsing_sound.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "packet_keyset"
+path = "fuzz_targets/packet_keyset.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "encrypted_server_parsing"
+path = "fuzz_targets/encrypted_server_parsing.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "duration_from_float"
+path = "fuzz_targets/duration_from_float.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "handle"
+path = "fuzz_targets/handle.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ipfilter"
+path = "fuzz_targets/ipfilter.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ptp_message_parsing"
+path = "fuzz_targets/ptp_message_parsing.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "record_encode_decode"
+path = "fuzz_targets/record_encode_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "key_exchange_request_parsing"
+path = "fuzz_targets/key_exchange_request_parsing.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "key_exchange_response_parsing"
+path = "fuzz_targets/key_exchange_response_parsing.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "encrypted_client_parsing"
+path = "fuzz_targets/encrypted_client_parsing.rs"
+test = false
+doc = false
+
+[patch.crates-io]
+rand = { path = "./fuzz_rand_shim" }
+rand_core = { git = "https://github.com/rust-random/rand.git", tag = "0.8.8" }

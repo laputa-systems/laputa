@@ -27,3 +27,4 @@ nogroup:x:99:
 users:x:100:
 laputa:x:1000:
 xbuilder:x:101:
+ntpd-rs:x:123:

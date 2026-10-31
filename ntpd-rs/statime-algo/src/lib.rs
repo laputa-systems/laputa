@@ -1,0 +1,747 @@
+//! General datastructures as defined by the ptp spec
+#![no_std]
+
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(test)]
+macro_rules! assert_almost_eq {
+    ($left:expr, $right:expr) => {
+        match (&$left, &$right) {
+            (left_val, right_val) => {
+                assert!(
+                    (*left_val - *right_val).abs() <= 1e-6 * right_val.abs(),
+                    "Floating point values not almost equal.\nLeft={left_val}\nRight={right_val}"
+                )
+            }
+        }
+    };
+}
+
+#[cfg(test)]
+macro_rules! assert_uv_almost_eq {
+    ($left:expr, $right:expr) => {
+        match (&$left, &$right) {
+            (left_val, right_val) => {
+                assert!((left_val.value - right_val.value).abs() <= 1e-6*right_val.value.abs(),
+                    "Floating point values not almost equal.\nLeft={left_val:?}\nRight={right_val:?}");
+                assert!((left_val.variance - right_val.variance).abs() <= 1e-6*right_val.variance.abs(),
+                    "Floating point uncertainty not almost equal.\nLeft={left_val:?}\nRight={right_val:?}");
+            }
+        }
+    };
+}
+
+mod estimator;
+mod filter;
+#[cfg(not(feature = "std"))]
+mod float_polyfill;
+mod link_noise;
+mod matrix;
+mod ringbuffer;
+mod storage;
+
+use core::marker::PhantomData;
+use statime_base::{
+    Clock, ClockError, ClockId, Controller, DirectedLinkId, Direction, Duration, LeapStatus, Link,
+    LinkId, Measurement, TAI, TimeSnapshot, Timestamp,
+};
+
+use crate::{
+    estimator::UncertainValue,
+    filter::LinkFilter,
+    matrix::MatrixError,
+    storage::{KalmanStorageInternal, StateMutex, SteeredClockStorage},
+};
+
+#[cfg(not(feature = "std"))]
+use crate::float_polyfill::FloatPolyfill;
+
+#[cfg(feature = "std")]
+pub use storage::StdKalmanStorage;
+pub use {
+    filter::ControllerConfig, filter::LinkConfig, filter::TrackedLinkConfig,
+    storage::KalmanStorage, storage::NoAllocKalmanStorage,
+};
+
+/// An error that occured in the kalman controller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlgoError {
+    /// Clock was not known to the controller
+    UnknownClock(ClockId),
+    /// Clock already exists in the estimator or filter state
+    ClockAlreadyExists(ClockId),
+    /// Clock needed a jump beyond the configured limits.
+    JumpAbortLimitExceeded(ClockId),
+    /// Link not found in the estimator or filter state
+    UnknownLink(LinkId),
+    /// Link already exists in the estimator or filter state
+    LinkAlreadyExists(LinkId),
+    /// The link does not contain an external clock
+    LinkNotExternal(LinkId),
+    /// Measurements or links cannot be between two external clocks
+    BothClocksExternal(ClockId, ClockId),
+    /// Got an external clock id in a place where we didn't expect that
+    UnexpectedExternalClock(ClockId),
+    /// Measurements or links between a clock and itself are not allowed
+    ClocksEqual(ClockId),
+    /// Time moved backwards, which is not allowed
+    NonMonotonicTimeProgression {
+        /// The time as was currently known to the algorithm
+        from: Timestamp<TAI>,
+        /// The new time the algorithm was supposed to progress to
+        to: Timestamp<TAI>,
+    },
+    /// Tried to remove the system clock.
+    CannotRemoveSystemClock(ClockId),
+    /// Error from the underlying matrix library
+    MatrixError(MatrixError),
+    /// Error from the underlying clock
+    ClockError(ClockError),
+    /// There are insufficient measurements to provide estimates.
+    NotEnoughMeasurements(LinkId),
+    /// Clock is in use in the given link and cannot be removed
+    ClockInUse(ClockId, LinkId),
+    /// Something went wrong with the calculations in the filter.
+    InternalError,
+}
+
+impl From<MatrixError> for AlgoError {
+    fn from(err: MatrixError) -> Self {
+        AlgoError::MatrixError(err)
+    }
+}
+
+impl From<ClockError> for AlgoError {
+    fn from(err: ClockError) -> Self {
+        AlgoError::ClockError(err)
+    }
+}
+
+/// Threshold set for jumps during clock steering.
+#[derive(Debug, Clone, Default)]
+pub struct JumpThreshold {
+    /// Maximum backwards time jump allowed (must be a positive duration).
+    pub backwards: Option<Duration>,
+    /// Maximum forwards time jump allowed (must be a positive duration).
+    pub forwards: Option<Duration>,
+}
+
+impl JumpThreshold {
+    fn is_within(&self, duration: Duration) -> bool {
+        self.forwards.is_none_or(|v| duration < v) && self.backwards.is_none_or(|v| duration > -v)
+    }
+}
+
+/// Configuration for an internal, steered clock
+#[derive(Debug, Clone)]
+pub struct ClockConfig {
+    /// Threshold for a step at startup to trigger a warning.
+    pub startup_jump_warning_threshold: JumpThreshold,
+    /// Threshold for a step at startup to trigger an abort.
+    pub startup_jump_abort_threshold: JumpThreshold,
+    /// Threshold for a single step during normal operation to trigger a warning.
+    pub single_jump_warning_threshold: JumpThreshold,
+    /// Threshold for a single step during normal operation to trigger an abort.
+    pub single_jump_abort_threshold: JumpThreshold,
+    /// Threshold for accumulated steps to trigger a warning.
+    pub accumulated_jump_warning_threshold: Option<Duration>,
+    /// Threshold for accumulated steps to trigger an abort.
+    pub accumulated_jump_abort_threshold: Option<Duration>,
+    /// Threshold on offset uncertainty after which a clock is considered out of startup
+    pub startup_end_threshold: Duration,
+    /// How large does the offset need to be before we do a jump?
+    pub jump_threshold: Duration,
+    /// How large does a jump need to be to happen, relative to the uncertainty
+    /// of currently observed offset.
+    pub jump_certainty_threshold: f64,
+    /// Amount of time to spread slewing over. This gives a typical time scale
+    /// to reduce the offset error by about two thirds using slews.
+    pub slew_time_constant: Duration,
+    /// Offset and offset uncertainty below which we consider the clock synchronized.
+    pub synchronized_threshold: Duration,
+    /// Initial estimate of the wander of the clock, as fractions of a second per second.
+    pub initial_wander: f64,
+}
+
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self {
+            startup_jump_warning_threshold: JumpThreshold::default(),
+            startup_jump_abort_threshold: JumpThreshold::default(),
+            single_jump_warning_threshold: JumpThreshold::default(),
+            single_jump_abort_threshold: JumpThreshold::default(),
+            accumulated_jump_warning_threshold: None,
+            accumulated_jump_abort_threshold: None,
+            startup_end_threshold: Duration::from_seconds_nanos(1, 0),
+            jump_threshold: Duration::from_seconds_nanos(10, 0),
+            jump_certainty_threshold: 5.0,
+            slew_time_constant: Duration::from_seconds_nanos(8, 0),
+            synchronized_threshold: Duration::from_seconds_nanos(1, 0),
+            initial_wander: 1e-8,
+        }
+    }
+}
+
+mod hidden {
+    use statime_base::{Clock, ClockId, Duration, LeapStatus, TAI};
+
+    use crate::{
+        ClockConfig,
+        filter::{ControllerConfig, LinkFilter},
+        storage::KalmanStorageInternal,
+    };
+
+    pub struct ClockInfo<C> {
+        pub(crate) id: ClockId,
+        pub(crate) clock: C,
+        pub(crate) config: ClockConfig,
+        pub(crate) in_startup: bool,
+        pub(crate) accumulated_steps: Duration,
+    }
+
+    /// The main controller struct.
+    pub struct KalmanControllerState<Storage: KalmanStorageInternal<C>, C: Clock<TAI>> {
+        pub(crate) clocks: Storage::SteeredClockStorage,
+        pub(crate) filter: LinkFilter<Storage>,
+        pub(crate) filter_config: ControllerConfig,
+        pub(crate) root_delay: Duration,
+        pub(crate) leap_status: Option<LeapStatus>,
+    }
+}
+pub(crate) use hidden::{ClockInfo, KalmanControllerState};
+
+/// Controller for clocks using a kalman filter as its state estimation mechanism.
+pub struct KalmanController<Storage: KalmanStorage<C>, C: Clock<TAI>> {
+    state: Storage::StateMutex,
+}
+
+impl<Storage: KalmanStorage<C>, C: Clock<TAI>> Controller for KalmanController<Storage, C> {
+    type Clock = C;
+    type Link<ControllerRef: AsRef<Self>> = KalmanLink<ControllerRef, Storage, C>;
+    type Error = AlgoError;
+    type ClockConfig = ClockConfig;
+    type LinkConfig = LinkConfig;
+    type TrackedLinkConfig = TrackedLinkConfig;
+
+    /// Add an internal clock to the controller.
+    ///
+    /// # Errors
+    /// Fails if there is insufficient storage available for the new clock.
+    fn add_clock(&self, clock: C, config: ClockConfig) -> Result<ClockId, AlgoError> {
+        self.state.with_mut(|state| {
+            let (filter, id) = state.filter.clone().add_clock(
+                UncertainValue {
+                    value: 0.0,
+                    variance: 1e18,
+                },
+                UncertainValue {
+                    value: 0.0,
+                    variance: clock.max_frequency()?.powi(2),
+                },
+                config.initial_wander,
+            )?;
+            state.filter = filter;
+            state.clocks.push(ClockInfo {
+                id,
+                clock,
+                config,
+                in_startup: true,
+                accumulated_steps: Duration::ZERO,
+            });
+            log::debug!("Created new clock with id {id:?}");
+            Ok(id)
+        })
+    }
+
+    /// Remove a clock from the controller
+    ///
+    /// # Errors
+    /// Fails if the clock is not known to the controller, if the clock is the
+    /// system clock or if the clock is in use in a link.
+    fn remove_clock(&self, clock_id: ClockId) -> Result<(), AlgoError> {
+        self.state.with_mut(|state| {
+            if state.clocks[0].id == clock_id {
+                return Err(AlgoError::CannotRemoveSystemClock(clock_id));
+            }
+
+            let Some(index) = state.clocks.iter().position(|info| info.id == clock_id) else {
+                return Err(AlgoError::UnknownClock(clock_id));
+            };
+            state.filter = state.filter.clone().remove_clock(clock_id)?;
+            state.clocks.remove(index);
+            log::debug!("Removed clock {clock_id:?}");
+            Ok(())
+        })
+    }
+
+    /// Create a measurement link between clocks where the delay and noise from
+    /// the link itself are automatically determined.
+    ///
+    /// The resulting link will need measurements in both directions to succesfully
+    /// work.
+    ///
+    /// This is an associated function instead of a method to allow links to store
+    /// references to the controller in a manner most convenient for the user.
+    ///
+    /// # Errors
+    /// Fails if the clocks are not known to the controller, both external, or
+    /// when they are the same.
+    fn create_tracked_link<ControllerRef: AsRef<KalmanController<Storage, C>>>(
+        // We can't have a normal self parameter here as we want a generic
+        // reference-like thing for the link to store, and we can't use other
+        // types as self. See the comments on KalmanLink for the motivation for
+        // generic reference-like things.
+        this: ControllerRef,
+        clock_a: ClockId,
+        clock_b: Option<ClockId>,
+        config: LinkConfig,
+        tracked_config: TrackedLinkConfig,
+    ) -> Result<KalmanLink<ControllerRef, Storage, C>, AlgoError> {
+        let link_id = this.as_ref().state.with_mut(|state| {
+            let (filter, id) =
+                state
+                    .filter
+                    .clone()
+                    .add_tracked_link(clock_a, clock_b, config, tracked_config)?;
+            state.filter = filter;
+
+            Ok::<_, AlgoError>(id)
+        })?;
+
+        log::debug!("Created tracked link: {link_id:?}");
+
+        Ok(KalmanLink {
+            link_id,
+            controller: this,
+            phantomdata: PhantomData,
+        })
+    }
+
+    /// Create a measurement link between clocks without delay estimation.
+    ///
+    /// This is an associated function instead of a method to allow links to store
+    /// references to the controller in a manner most convenient for the user.
+    ///
+    /// # Errors
+    /// Fails if the clocks are not known to the controller, both external, or
+    /// when they are the same.
+    fn create_untracked_link<ControllerRef: AsRef<KalmanController<Storage, C>>>(
+        // We can't have a normal self parameter here as we want a generic
+        // reference-like thing for the link to store, and we can't use other
+        // types as self. See the comments on KalmanLink for the motivation for
+        // generic reference-like things.
+        this: ControllerRef,
+        clock_a: ClockId,
+        clock_b: Option<ClockId>,
+        config: LinkConfig,
+    ) -> Result<KalmanLink<ControllerRef, Storage, C>, AlgoError> {
+        let link_id = this.as_ref().state.with_mut(|state| {
+            let (filter, id) = state
+                .filter
+                .clone()
+                .add_untracked_link(clock_a, clock_b, config)?;
+            state.filter = filter;
+
+            Ok::<_, AlgoError>(id)
+        })?;
+
+        log::debug!("Created untracked link: {link_id:?}");
+
+        Ok(KalmanLink {
+            link_id,
+            controller: this,
+            phantomdata: PhantomData,
+        })
+    }
+
+    fn clock_snapshot(&self, clock: ClockId) -> Result<statime_base::TimeSnapshot, Self::Error> {
+        self.state.with_ref(|state| {
+            Ok(TimeSnapshot {
+                // FIXME: Augment with jump status once that is available.
+                root_delay: state.root_delay,
+                leap_indicator: state.leap_status,
+                ..state.filter.clock_snapshot(clock)?
+            })
+        })
+    }
+
+    async fn run<Fut: Future<Output = ()> + Send, F: Send + Fn(core::time::Duration) -> Fut>(
+        this: impl AsRef<Self> + Send,
+        sleep: F,
+    ) -> Result<(), Self::Error> {
+        loop {
+            this.as_ref()
+                .state
+                .with_mut(KalmanControllerState::steer_clocks)?;
+            sleep(core::time::Duration::from_secs(1)).await;
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<Storage: KalmanStorage<C>, C: Clock<TAI>> statime_base::StdController
+    for KalmanController<Storage, C>
+{
+    fn active_links(&self) -> std::vec::Vec<statime_base::ActiveLinkData> {
+        self.state.with_ref(|state| state.filter.active_links())
+    }
+}
+
+impl<Storage: KalmanStorage<C>, C: Clock<TAI>> KalmanController<Storage, C> {
+    /// Create a new clock controller
+    ///
+    /// # Errors
+    /// Fails if the provided system clock is not readable.
+    pub fn new(
+        system_clock: C,
+        system_clock_config: ClockConfig,
+        filter_config: ControllerConfig,
+    ) -> Result<(Self, ClockId), AlgoError> {
+        let start_time = system_clock.now()?;
+        let (filter, id) = LinkFilter::empty(start_time).add_clock(
+            UncertainValue {
+                value: 0.0,
+                variance: 1e18,
+            },
+            UncertainValue {
+                value: 0.0,
+                variance: system_clock.max_frequency()?.powi(2),
+            },
+            system_clock_config.initial_wander,
+        )?;
+        let mut clocks = Storage::SteeredClockStorage::new();
+        clocks.push(ClockInfo {
+            id,
+            clock: system_clock,
+            config: system_clock_config,
+            in_startup: true,
+            accumulated_steps: Duration::ZERO,
+        });
+        log::debug!("New controller with system clock {id:?}");
+        Ok((
+            Self {
+                state: Storage::StateMutex::new(KalmanControllerState {
+                    clocks,
+                    filter,
+                    filter_config,
+                    root_delay: Duration::ZERO,
+                    leap_status: None,
+                }),
+            },
+            id,
+        ))
+    }
+
+    /// Get the current offset of a clock.
+    ///
+    /// # Errors
+    /// Fails when the clock is not known to the filter.
+    pub fn clock_offset(&self, clock_id: ClockId) -> Result<UncertainValue, AlgoError> {
+        self.state
+            .with_ref(|state| state.filter.clock_offset(clock_id))
+    }
+
+    /// Get the current frequency offset of a clock.
+    ///
+    /// # Errors
+    /// Fails when the clock is not known to the filter.
+    pub fn clock_frequency(&self, clock_id: ClockId) -> Result<UncertainValue, AlgoError> {
+        self.state
+            .with_ref(|state| state.filter.clock_frequency(clock_id))
+    }
+}
+
+impl<C> ClockInfo<C> {
+    fn check_jump(&mut self, step: Duration) -> Result<(), AlgoError> {
+        if self.in_startup {
+            let warn = !self.config.startup_jump_warning_threshold.is_within(step);
+            let abort = !self.config.startup_jump_abort_threshold.is_within(step);
+
+            if abort {
+                log::error!(
+                    "Jump on clock {clock:?} during startup too big: {step}, aborting.",
+                    clock = self.id
+                );
+                return Err(AlgoError::JumpAbortLimitExceeded(self.id));
+            } else if warn {
+                log::warn!(
+                    "Large jump on clock {clock:?} during startup: {step}.",
+                    clock = self.id
+                );
+            }
+        } else {
+            let warn_instant = !self.config.single_jump_warning_threshold.is_within(step);
+            let abort_instant = !self.config.single_jump_abort_threshold.is_within(step);
+
+            let old_accumulated_steps = self.accumulated_steps;
+            self.accumulated_steps += step.abs();
+
+            let warn_accumulated =
+                self.config
+                    .accumulated_jump_warning_threshold
+                    .is_some_and(|threshold| {
+                        old_accumulated_steps < threshold && self.accumulated_steps >= threshold
+                    });
+            let abort_accumulated = self
+                .config
+                .accumulated_jump_abort_threshold
+                .is_some_and(|threshold| self.accumulated_steps >= threshold);
+
+            if abort_instant {
+                log::error!(
+                    "Jump on clock {clock:?} too big: {step}, aborting.",
+                    clock = self.id
+                );
+                return Err(AlgoError::JumpAbortLimitExceeded(self.id));
+            } else if abort_accumulated {
+                log::error!(
+                    "Total amount jumped on clock {clock:?} too big: {total_steps}, aborting.",
+                    clock = self.id,
+                    total_steps = self.accumulated_steps
+                );
+                return Err(AlgoError::JumpAbortLimitExceeded(self.id));
+            } else if warn_instant {
+                log::warn!("Large jump on clock {clock:?}: {step}.", clock = self.id);
+            } else if warn_accumulated {
+                if self.config.accumulated_jump_abort_threshold.is_some() {
+                    log::warn!(
+                        "Large total amount of jumping on clock {clock:?}: {total_steps}, an abort can occur if jumping continues.",
+                        clock = self.id,
+                        total_steps = self.accumulated_steps
+                    );
+                } else {
+                    log::warn!(
+                        "Large total amount of jumping on clock {clock:?}: {total_steps}. (Note: this warning can trigger multiple times, the amount jumped is reset after each warning)",
+                        clock = self.id,
+                        total_steps = self.accumulated_steps,
+                    );
+                    self.accumulated_steps = Duration::ZERO;
+                }
+            }
+        }
+
+        // We have jumped, and so definitionally are out of startup.
+        self.in_startup = false;
+
+        Ok(())
+    }
+}
+
+impl<Storage: KalmanStorageInternal<C>, C: Clock<TAI>> KalmanControllerState<Storage, C> {
+    fn steer_clocks(&mut self) -> Result<(), AlgoError> {
+        let mut filter = self
+            .filter
+            .clone()
+            .progress_time(self.clocks[0].clock.now()?)?;
+
+        self.leap_status = self.filter.leap_vote(&self.filter_config);
+        if let Some(root_delay) = self.filter.local_root_delay(&self.filter_config) {
+            self.root_delay = Duration::from_f64_seconds(root_delay);
+        }
+
+        for (index, clock_info) in self.clocks.iter_mut().enumerate() {
+            let offset_estimate = self.filter.clock_offset(clock_info.id)?;
+            let offset = offset_estimate.value;
+            let offset_uncertainty = offset_estimate.uncertainty();
+
+            if offset > clock_info.config.jump_threshold.as_seconds()
+                && offset > clock_info.config.jump_certainty_threshold * offset_uncertainty
+            {
+                let step = Duration::from_f64_seconds(-offset);
+                clock_info.check_jump(step)?;
+                log::trace!(
+                    "Clock {:?}: {offset} +- {offset_uncertainty} (jumping {step})",
+                    clock_info.id
+                );
+                clock_info.clock.step_clock(step)?;
+                if index == 0 {
+                    filter = filter.absorb_system_clock_offset_change(
+                        clock_info.id,
+                        Duration::from_f64_seconds(-offset),
+                    )?;
+                } else {
+                    filter = filter.absorb_offset_change(clock_info.id, -offset)?;
+                }
+            } else {
+                let frequence_data = self.filter.clock_frequency(clock_info.id)?;
+                let frequency = frequence_data.value;
+
+                let cur_frequency_steer = clock_info.clock.get_frequency()?;
+                let max_frequency_steer = clock_info.clock.max_frequency()?;
+
+                let wanted_frequency_steer = cur_frequency_steer
+                    - frequency
+                    - offset / clock_info.config.slew_time_constant.as_seconds();
+
+                let actual_frequency_steer =
+                    wanted_frequency_steer.clamp(-max_frequency_steer, max_frequency_steer);
+                // FIXME: Warn here on repeated clamping.
+
+                log::trace!(
+                    "Clock {:?}: {offset} +- {offset_uncertainty} ({frequency} +- {} s/s, steer: {actual_frequency_steer}, wants {wanted_frequency_steer})",
+                    clock_info.id,
+                    frequence_data.uncertainty()
+                );
+
+                clock_info.clock.set_frequency(actual_frequency_steer)?;
+                filter = filter.absorb_frequency_steer(
+                    clock_info.id,
+                    actual_frequency_steer - cur_frequency_steer,
+                )?;
+            }
+
+            if clock_info.in_startup
+                && offset_uncertainty < clock_info.config.startup_end_threshold.as_seconds()
+            {
+                clock_info.in_startup = false;
+            }
+
+            if let Some(leap_status) = self.leap_status {
+                clock_info.clock.leap_update(leap_status)?;
+            }
+            clock_info.clock.synchronization_update(
+                offset < clock_info.config.synchronized_threshold.as_seconds()
+                    && offset_uncertainty < clock_info.config.synchronized_threshold.as_seconds(),
+            )?;
+            clock_info.clock.error_estimate_update(
+                Duration::from_f64_seconds(offset_uncertainty),
+                self.root_delay,
+            )?;
+        }
+
+        self.filter = filter;
+
+        Ok(())
+    }
+}
+
+/// A measurement link between two clocks, managed by a `KalmanController`.
+pub struct KalmanLink<
+    ControllerRef: AsRef<KalmanController<Storage, C>>,
+    Storage: KalmanStorage<C>,
+    C: Clock<TAI>,
+> {
+    link_id: LinkId,
+    // We use a generic reference to the kalman controller here to avoid
+    // forced inclusions of lifetimes in this type. This allows a link to
+    // be based on for example an Arc<KalmanController<M>> when std is
+    // available, whilst keeping &KalmanController<M> available as option
+    // for embedded platforms where things like arc don't exist.
+    controller: ControllerRef,
+    phantomdata: PhantomData<(Storage, C)>,
+}
+
+impl<ControllerRef: AsRef<KalmanController<Storage, C>>, Storage: KalmanStorage<C>, C: Clock<TAI>>
+    Drop for KalmanLink<ControllerRef, Storage, C>
+{
+    fn drop(&mut self) {
+        self.controller.as_ref().state.with_mut(|state| {
+            match state.filter.clone().remove_link(self.link_id) {
+                Ok(filter) => state.filter = filter,
+                Err(error) => {
+                    log::warn!("Internal error, please open a bug report: Could not properly dispose of link: {error:?}");
+                }
+            }
+        });
+    }
+}
+
+impl<ControllerRef: AsRef<KalmanController<Storage, C>>, Storage: KalmanStorage<C>, C: Clock<TAI>>
+    Link for KalmanLink<ControllerRef, Storage, C>
+{
+    type Error = AlgoError;
+
+    /// Process a measurement on a connection.
+    ///
+    /// # Errors
+    /// Fails if there are any issues processing the measurement, mostly resulting
+    /// from unexpected behavior of the underlying clock.
+    fn measurement(&self, measurement: Measurement, direction: Direction) -> Result<(), AlgoError> {
+        self.controller.as_ref().state.with_mut(|state| {
+            log::debug!(
+                "New measurement on link {:?} {direction:?}: {measurement:?}",
+                self.link_id
+            );
+
+            state.filter = state
+                .filter
+                .clone()
+                .progress_time(state.clocks[0].clock.now()?)?;
+
+            state.filter = state.filter.clone().measurement(
+                &state.filter_config,
+                DirectedLinkId::new(self.link_id, direction),
+                UncertainValue {
+                    value: (measurement.recv_timestamp - measurement.send_timestamp).as_seconds(),
+                    variance: measurement.uncertainty.as_seconds().powi(2),
+                },
+                state.clocks[0].id,
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Update additional time keeping information provided by the remote for this link.
+    ///
+    /// # Errors
+    /// Fails if the link does not contain an external clock.
+    fn external_data_update(
+        &self,
+        root_delay: Duration,
+        leap_status: Option<LeapStatus>,
+        usable: bool,
+    ) -> Result<(), AlgoError> {
+        self.controller.as_ref().state.with_mut(|state| {
+            state.filter = state.filter.clone().external_data_update(
+                self.link_id,
+                root_delay.as_seconds(),
+                leap_status,
+                usable,
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Returns whether the link actively contributed to the current time estimates on
+    /// the last measurement.
+    ///
+    /// # Errors
+    /// Fails only when something is bugged in the library.
+    fn active(&self) -> Result<bool, AlgoError> {
+        self.controller
+            .as_ref()
+            .state
+            .with_ref(|state| state.filter.link_active(self.link_id))
+    }
+
+    /// Returns the poll rate needed to get the desired accuracy from this link.
+    ///
+    /// # Errors
+    /// Fails only when something is bugged in the library.
+    fn desired_poll_interval(&self) -> Result<Duration, AlgoError> {
+        self.controller
+            .as_ref()
+            .state
+            .with_ref(|state| state.filter.link_desired_poll_interval(self.link_id))
+    }
+
+    /// Importance of the links contribution to the phase of the system clock, assuming it
+    /// is an external clock. This is the same number provided in
+    /// [`StdController::active_links`], which has arbitrary units and shouldn't be
+    /// assumed to be of a certain order of magnitude. A link with twice the importance will
+    /// have roughly twice as much impact on the phase of the system clock.
+    ///
+    /// # Errors
+    /// May fail when the link is not external
+    fn importance(&self) -> Result<Option<f64>, Self::Error> {
+        self.controller
+            .as_ref()
+            .state
+            .with_ref(|state| state.filter.link_importance(self.link_id))
+    }
+
+    fn id(&self) -> LinkId {
+        self.link_id
+    }
+}

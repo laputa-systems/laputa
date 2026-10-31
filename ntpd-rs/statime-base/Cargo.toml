@@ -1,0 +1,27 @@
+[package]
+name = "statime-base"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = []
+serde = ["std", "dep:serde"]
+
+[dependencies]
+libm.workspace = true
+serde = { workspace = true, optional = true }
+
+# Ignore unused libm, as it is needed for polyfilling when std is not used.
+[package.metadata.cargo-udeps]
+ignore = [["libm"]]

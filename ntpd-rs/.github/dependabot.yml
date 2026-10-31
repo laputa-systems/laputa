@@ -1,0 +1,33 @@
+version: 2
+updates:
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: weekly
+  groups:
+    github-actions:
+      patterns: ["*"]
+  cooldown:
+    default-days: 7
+
+- package-ecosystem: cargo
+  directories: ["/", "/fuzz/"]
+  allow:
+    - dependency-type: all
+  schedule:
+    interval: weekly
+  versioning-strategy: lockfile-only
+  groups:
+    cargo:
+      patterns: ["*"]
+  cooldown:
+    default-days: 7
+- package-ecosystem: "rust-toolchain"
+  directories: ["/", "/.rust-toolchain/stable/", "/.rust-toolchain/beta/", "/.rust-toolchain/nightly/"]
+  schedule:
+    interval: "weekly"
+  cooldown:
+    default-days: 5
+  groups:
+    rust-toolchain:
+      patterns: ["*"]

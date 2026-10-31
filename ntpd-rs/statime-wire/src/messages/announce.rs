@@ -1,0 +1,114 @@
+use crate::{
+    Error,
+    common::{ClockIdentity, ClockQuality, TimeSource, Timestamp},
+};
+
+/// The body of an announce message
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnnounceMessage {
+    /// Timestamp this announce was generated on the remote.
+    pub origin_timestamp: Timestamp,
+    /// Current offset between UTC and TAI.
+    pub current_utc_offset: i16,
+    /// Grandmaster priority 1 as used in the BMCA.
+    pub grandmaster_priority_1: u8,
+    /// Quality of the grandmaster clock.
+    pub grandmaster_clock_quality: ClockQuality,
+    /// Grandmaster priority 2 as used in the BMCA.
+    pub grandmaster_priority_2: u8,
+    /// Identity of the Grandmaster clock
+    pub grandmaster_identity: ClockIdentity,
+    /// Number of steps in the synchronization graph between sender
+    /// of the announce message and the Grandmaster clock.
+    pub steps_removed: u16,
+    /// Type of time source used by the grandmaster clock.
+    pub time_source: TimeSource,
+}
+
+impl AnnounceMessage {
+    pub(crate) fn content_size(&self) -> usize {
+        30
+    }
+
+    pub(crate) fn serialize_content(&self, buffer: &mut [u8]) -> Result<(), Error> {
+        if buffer.len() < 30 {
+            return Err(Error::BufferTooShort);
+        }
+
+        self.origin_timestamp.serialize(&mut buffer[0..10])?;
+        buffer[10..12].copy_from_slice(&self.current_utc_offset.to_be_bytes());
+        buffer[13] = self.grandmaster_priority_1;
+        self.grandmaster_clock_quality
+            .serialize(&mut buffer[14..18])?;
+        buffer[18] = self.grandmaster_priority_2;
+        self.grandmaster_identity.serialize(&mut buffer[19..27])?;
+        buffer[27..29].copy_from_slice(&self.steps_removed.to_be_bytes());
+        buffer[29] = self.time_source.to_primitive();
+
+        Ok(())
+    }
+
+    pub(crate) fn deserialize_content(buffer: &[u8]) -> Result<Self, Error> {
+        if buffer.len() < 30 {
+            return Err(Error::BufferTooShort);
+        }
+
+        Ok(Self {
+            origin_timestamp: Timestamp::deserialize(&buffer[0..10])?,
+            current_utc_offset: i16::from_be_bytes(buffer[10..12].try_into().unwrap()),
+            grandmaster_priority_1: buffer[13],
+            grandmaster_clock_quality: ClockQuality::deserialize(&buffer[14..18])?,
+            grandmaster_priority_2: buffer[18],
+            grandmaster_identity: ClockIdentity::deserialize(&buffer[19..27])?,
+            steps_removed: u16::from_be_bytes(buffer[27..29].try_into().unwrap()),
+            time_source: TimeSource::from_primitive(buffer[29]),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::ClockAccuracy;
+
+    #[test]
+    fn announce_wireformat() {
+        let representations = [(
+            [
+                0x00, 0x00, 0x45, 0xb1, 0x11, 0x5a, 0x0a, 0x73, 0x46, 0x60, 0x00, 0x00, 0x00, 0x60,
+                0x00, 0x00, 0x00, 0x80, 0x63, 0xff, 0xff, 0x00, 0x09, 0xba, 0xf8, 0x21, 0x00, 0x00,
+                0x80, 0x80,
+            ],
+            AnnounceMessage {
+                origin_timestamp: Timestamp::new(1_169_232_218, 175_326_816).unwrap(),
+                current_utc_offset: 0,
+                grandmaster_priority_1: 96,
+                grandmaster_clock_quality: ClockQuality {
+                    clock_class: 0,
+                    clock_accuracy: ClockAccuracy::Reserved,
+                    offset_scaled_log_variance: 128,
+                },
+                grandmaster_priority_2: 99,
+                grandmaster_identity: ClockIdentity([
+                    0xff, 0xff, 0x00, 0x09, 0xba, 0xf8, 0x21, 0x00,
+                ]),
+                steps_removed: 128,
+                time_source: TimeSource::Reserved(0x80),
+            },
+        )];
+
+        for (byte_representation, object_representation) in representations {
+            // Test the serialization output
+            let mut serialization_buffer = [0; 30];
+            object_representation
+                .serialize_content(&mut serialization_buffer)
+                .unwrap();
+            assert_eq!(serialization_buffer, byte_representation);
+
+            // Test the deserialization output
+            let deserialized_data =
+                AnnounceMessage::deserialize_content(&byte_representation).unwrap();
+            assert_eq!(deserialized_data, object_representation);
+        }
+    }
+}

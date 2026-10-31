@@ -1,0 +1,44 @@
+name: nightly
+
+permissions: {}
+
+on:
+  push:
+    branches:
+      - 'release/**'
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  test-freebsd:
+    # see https://github.com/actions/runner/issues/385
+    # use https://github.com/vmactions/freebsd-vm for now
+    name: test on freebsd
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: test on freebsd
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc
+        with:
+          usesh: true
+          mem: 4096
+          copyback: false
+          prepare: |
+            pkg install -y curl cmake llvm-devel
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            rustup component add clippy
+            echo "~~~~ rustc --version ~~~~"
+            rustc --version
+            echo "~~~~ freebsd-version ~~~~"
+            freebsd-version
+          run: |
+            . "$HOME/.cargo/env"
+            cargo clippy --workspace --all-targets -- -D warnings &&
+            cargo build --all-targets &&
+            cargo test

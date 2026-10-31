@@ -1,0 +1,156 @@
+use std::path::PathBuf;
+
+use crate::{
+    ConfigError,
+    tree::{
+        merge::{Merge, MergeContext, MergePolicy, Origin, ProvenanceTracker},
+        partial_value::PartialValue,
+        path::ConfigPath,
+    },
+};
+
+/// Combines the configuration layers into one configuration.
+#[derive(Debug)]
+pub struct ConfigMerger<T> {
+    effective: T,
+    provenance: ProvenanceTracker,
+}
+
+impl<T> ConfigMerger<T>
+where
+    T: Default + Merge + PartialValue,
+{
+    pub fn new() -> Self {
+        Self {
+            effective: T::default(),
+            provenance: ProvenanceTracker::new(),
+        }
+    }
+
+    /// Add a system configuration fragment, where settings are not allowed to
+    /// overlap with other system configuration fragments.
+    pub fn add_system(&mut self, path: PathBuf, partial: T) -> Result<(), ConfigError> {
+        self.add(
+            Origin::SystemConfig(path),
+            partial,
+            MergePolicy::RejectOverlap,
+        )
+    }
+
+    /// Add the main configuration, which amends and overrides the system configuration (if any).
+    pub fn add_main(&mut self, path: PathBuf, partial: T) -> Result<(), ConfigError> {
+        self.add(Origin::MainConfig(path), partial, MergePolicy::Override)
+    }
+
+    fn add(
+        &mut self,
+        origin: Origin,
+        mut partial: T,
+        policy: MergePolicy,
+    ) -> Result<(), ConfigError> {
+        partial.attribute(self.provenance.track(origin));
+        self.effective
+            .merge(partial, &mut MergeContext::new(policy, &self.provenance))
+    }
+
+    /// Fill in the built-in defaults of everything no document supplied.
+    pub fn apply_defaults(&mut self) {
+        self.effective.apply_defaults();
+    }
+
+    /// Try to produce the final configuration. Fails if any required values are missing.
+    pub fn finish(self) -> Result<(T::Resolved, ProvenanceTracker), ConfigError> {
+        let Self {
+            effective,
+            provenance,
+        } = self;
+
+        let resolved = effective.resolve(&mut ConfigPath::root())?;
+
+        Ok((resolved, provenance))
+    }
+}
+
+impl<T> Default for ConfigMerger<T>
+where
+    T: Default + Merge + PartialValue,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixture::{Level, PartialFixture};
+
+    fn document(contents: &str) -> PartialFixture {
+        toml::from_str(contents).unwrap()
+    }
+
+    #[test]
+    fn the_main_config_overrides_a_fragment() {
+        let mut merger = ConfigMerger::new();
+        merger
+            .add_system(
+                "/etc/system.d/a.toml".into(),
+                document("logging.level = 'warn'"),
+            )
+            .unwrap();
+        merger
+            .add_main("/etc/main.toml".into(), document("logging.level = 'debug'"))
+            .unwrap();
+        merger.apply_defaults();
+
+        let (config, _) = merger.finish().unwrap();
+
+        assert_eq!(config.logging.level, Level::Debug);
+        // untouched by either document, so it comes from the defaults
+        assert_eq!(config.sources, vec![]);
+    }
+
+    /// Two fragments both setting `logging.level`, which they may not.
+    fn conflicting_fragments() -> Result<(), ConfigError> {
+        let mut merger = ConfigMerger::<PartialFixture>::new();
+        merger.add_system(
+            "/etc/system.d/a.toml".into(),
+            document("logging.level = 'warn'"),
+        )?;
+        merger.add_system(
+            "/etc/system.d/b.toml".into(),
+            document("logging.level = 'error'"),
+        )
+    }
+
+    #[test]
+    fn two_fragments_may_not_define_the_same_setting() {
+        let error = conflicting_fragments().unwrap_err();
+
+        let ConfigError::OverwriteNotAllowed {
+            position,
+            current_origin,
+            incoming_origin,
+        } = error
+        else {
+            panic!("expected an overwrite conflict, got {error:?}");
+        };
+        assert_eq!(position.to_string(), "logging.level");
+        assert_eq!(
+            current_origin,
+            Some(Origin::SystemConfig("/etc/system.d/a.toml".into()))
+        );
+        assert_eq!(
+            incoming_origin,
+            Some(Origin::SystemConfig("/etc/system.d/b.toml".into()))
+        );
+    }
+
+    #[test]
+    fn a_conflict_names_both_documents() {
+        assert_eq!(
+            conflicting_fragments().unwrap_err().to_string(),
+            "`logging.level` is set by both `/etc/system.d/a.toml` and `/etc/system.d/b.toml`"
+        );
+    }
+}
