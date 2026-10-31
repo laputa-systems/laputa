@@ -9,14 +9,8 @@ proc observed(intent: policy.NetworkIntent, sequence: Int) [process, error] -> R
   kernel.network_project_dump(linux.network_dump()?, intent, sequence)
 }
 
-proc request(value: kernel.NetworkKernelRequest) [process, net, error] {
-  let c = linux.net_constants()
-  let channel = linux.netlink_open(c.NETLINK_ROUTE)?
-  defer unix.close_fd(channel)
-  linux.set_socket_timeout(channel, c.SO_RCVTIMEO, 1000)
-  linux.set_socket_timeout(channel, c.SO_SNDTIMEO, 1000)
-  let replies = linux.netlink_request(channel, value.message_type, value.flags, value.payload, 0, 1000)?
-  if !replies.is_empty() { return Err(NetworkGuestError.Failed("fixture request returned unexpected data")) }
+proc request(value: kernel.NetworkKernelRequest) [process, error] -> Result[LinuxNetlinkAck, Error] {
+  linux.netlink_route_request(value.message_type, value.flags, value.payload, 1000)
 }
 
 proc main(scope: Str) [fs, process, net, error] {
@@ -68,33 +62,37 @@ proc main(scope: Str) [fs, process, net, error] {
   let add_route = kernel.network_encode_operation(plan, 1)?
   assert add_address.message_type == linux.net_constants().RTM_NEWADDR
   assert add_route.message_type == linux.net_constants().RTM_NEWROUTE
-  request(add_address)
+  let address_ack = request(add_address)?
+  if address_ack.errno != 0 {
+    return Err(NetworkGuestError.Failed(f"address addition was refused with errno {address_ack.errno}"))
+  }
   let after_address = observed(intent, 2)?
   assert intent.address in after_address.addresses
   assert {local: "198.18.0.2", prefix: 24} in after_address.addresses
   assert after_address.routes.is_empty()
-  match request(add_route) {
-    Ok(_) => return Err(NetworkGuestError.Failed("invalid gateway unexpectedly admitted a route"))
-    Err(problem) => {
-      if problem.errno != 22 and problem.errno != 101 { return Err(problem) }
-      let after_failure = observed(intent, 3)?
-      assert after_failure.addresses == after_address.addresses
-      assert after_failure.routes.is_empty()
-      let events = [policy.NetworkPrecondition(before), policy.NetworkApplied(0), policy.NetworkFailed(1)]
-      assert policy.network_replay(plan, events) == policy.NetworkReobserve("operation 1 failed; partial state requires observation")
-      assert policy.network_replay(plan, events) == policy.network_replay(plan, events)
-      let capture = json.encode({kind: "network-operation-failure", input: {intent, owned, observed: before}, completed: 1, errno: problem.errno, error: problem.message, observed: after_failure})?
-      assert capture.byte_len() <= policy.network_input_limit
-      print f"NETWORK_FAILURE_CAPTURE {capture}"
-      match policy.network_plan(intent, owned, after_failure) {
-        Ok(_) => return Err(NetworkGuestError.Failed("observed address was silently adopted without ownership"))
-        Err(conflict) => {
-          assert conflict.message == "desired address is foreign; ownership cannot be inferred"
-          let admission = json.encode({input: {intent, owned, observed: after_failure}, error: conflict.message})?
-          assert admission.byte_len() <= policy.network_input_limit
-          print f"NETWORK_ADMISSION_CAPTURE {admission}"
-        }
-      }
+  let route_ack = request(add_route)?
+  if route_ack.errno == 0 {
+    return Err(NetworkGuestError.Failed("invalid gateway unexpectedly admitted a route"))
+  }
+  if route_ack.errno != 22 and route_ack.errno != 101 {
+    return Err(NetworkGuestError.Failed(f"route addition was refused with unexpected errno {route_ack.errno}"))
+  }
+  let after_failure = observed(intent, 3)?
+  assert after_failure.addresses == after_address.addresses
+  assert after_failure.routes.is_empty()
+  let events = [policy.NetworkPrecondition(before), policy.NetworkApplied(0), policy.NetworkFailed(1)]
+  assert policy.network_replay(plan, events) == policy.NetworkReobserve("operation 1 failed; partial state requires observation")
+  assert policy.network_replay(plan, events) == policy.network_replay(plan, events)
+  let capture = json.encode({kind: "network-operation-failure", input: {intent, owned, observed: before}, completed: 1, errno: route_ack.errno, error: f"route addition was refused with errno {route_ack.errno}", observed: after_failure})?
+  assert capture.byte_len() <= policy.network_input_limit
+  print f"NETWORK_FAILURE_CAPTURE {capture}"
+  match policy.network_plan(intent, owned, after_failure) {
+    Ok(_) => return Err(NetworkGuestError.Failed("observed address was silently adopted without ownership"))
+    Err(conflict) => {
+      assert conflict.message == "desired address is foreign; ownership cannot be inferred"
+      let admission = json.encode({input: {intent, owned, observed: after_failure}, error: conflict.message})?
+      assert admission.byte_len() <= policy.network_input_limit
+      print f"NETWORK_ADMISSION_CAPTURE {admission}"
     }
   }
   print "NETWORK_IPV4_FAILURE_REPLAY_OK"

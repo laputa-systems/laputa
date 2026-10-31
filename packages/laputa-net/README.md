@@ -99,9 +99,10 @@ four dumps are still taken one after another, with no kernel generation shared
 between them. `network_project_stable_dumps` projects two consecutive complete
 dumps only when they are identical and otherwise reports that the observation
 changed. This narrows cross-dump skew but cannot rule out a change that reverts
-between the two observations. The mutation-acknowledgement collector used for
-live requests is separate and remains unqualified, so live application stays
-withheld.
+between the two observations. XSH now provides `linux.netlink_route_request`
+with sequence/port validation, a deadline, and rejection of malformed or multipart
+replies. The failure-replay driver uses it; general live application stays
+withheld pending the remaining shared-boundary and convergence qualification.
 
 The projection checks all IPv4 preferred-source dependencies on selected
 addresses, including routes through another interface. Its address-derived
@@ -168,14 +169,18 @@ addition and an invalid-gateway route addition. It checks the real error number,
 retention of the added and foreign addresses, and continued default-route absence.
 It replays the failed operation sequence and the resulting foreign-address
 admission conflict. It performs no address deletion, recovery, or general apply.
-Each request owns a fresh socket with one-second send and receive timeouts and a
-one-second reply deadline. Every return closes the socket.
+Each request uses `linux.netlink_route_request` with a one-second exchange
+deadline and an owned socket that closes on every path. Kernel refusals are
+acknowledgement data: address addition must return errno 0, and the invalid
+gateway must return errno 22 or 101. Transport or protocol errors abort the
+fixture without retrying an operation whose outcome is unknown.
 
 Successful execution emits bounded `NETWORK_FAILURE_CAPTURE` and
 `NETWORK_ADMISSION_CAPTURE` JSON records, then `NETWORK_IPV4_FAILURE_REPLAY_OK`.
 That marker establishes the bounded failure and replay checks, not convergence.
 
-The driver passed in the pinned Linux 7.2.9 x86_64 KVM `qemu-self-hosting` guest
+The previous driver using `linux.netlink_request` passed in the pinned Linux
+7.2.9 x86_64 KVM `qemu-self-hosting` guest
 with the supplied XSH and matching installed core. `network-policy-vm-failure.json`
 is the resulting 1006-byte failure record. The exclusive `198.18.1.3/24` addition
 remained after the kernel rejected gateway `192.0.2.1` with errno 101. The foreign
@@ -185,7 +190,10 @@ after the requests, so no default of any TOS is hidden in this case.
 The offline regression reconstructs `Precondition`, `Applied(0)`, and `Failed(1)`
 from that capture. It reproduces the same plan and re-observation error twice,
 checks the retained partial state, and rejects implicit ownership of the observed
-address. This qualifies LAP-37's bounded VM-to-native failure replay.
+address. This qualifies LAP-37's bounded VM-to-native failure replay for that
+previous driver. The acknowledged-request driver still needs a guest run with a
+rebuilt XSH seed; source checking and offline replay do not transfer the earlier
+guest result to this transport.
 
 The fixture establishes ownership through two fresh link indices and reciprocal
 peer links. The supplied `lib.nettools_fixture.link_add_veth` encodes nested
@@ -212,7 +220,7 @@ XSH_MODULE_PATH=/mnt/self-hosting/inputs/laputa:/usr/lib/xsh/core \
 
 This slice adds no dependencies and changes no installed payload. It does not
 persist ownership or supervise networking. LAP-32 remains blocked: address
-withdrawal and general live application require the strict collector's
-completion guarantees; TOS is now observed and projected. XSH-38 and XSH-45 shared-boundary
+withdrawal and general live application require qualification beyond the bounded
+failure-replay driver; TOS is now observed and projected. XSH-38 and XSH-45 shared-boundary
 qualification, concurrent-writer behaviour, IPv6, Linux aarch64, and Asterinas
 remain unverified. The VM failure replay does not establish network convergence.
