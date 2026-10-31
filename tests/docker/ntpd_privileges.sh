@@ -18,6 +18,11 @@ cat > "$scratch/ctl" <<'CTL'
 printf 'no stratum\n'
 CTL
 chmod 755 "$scratch/ctl"
+cat > "$scratch/notify" <<'NOTIFY'
+#!/bin/sh
+printf x > "/proc/self/fd/$NOTIFY_FD"
+NOTIFY
+chmod 755 "$scratch/notify"
 printf 'root:x:0:0:root:/root:/bin/sh\nintruder:x:123:123:Other:/var/empty:/bin/false\n' > "$scratch/bad-passwd"
 common=(--rm --network none
   --mount "type=bind,src=$seed/xsh,dst=/bin/xsh,readonly"
@@ -39,6 +44,22 @@ docker run "${common[@]}" --mount "type=bind,src=$scratch/bad-passwd,dst=/etc/pa
   chmod 0711 /run/ntpd-rs
   if /bin/xsh /launch.xsh; then exit 1; fi
   test "$(stat -c "%u:%g %a" /run/ntpd-rs)" = "0:0 711"
+'
+ready=$(docker run "${common[@]}" --cap-add SYS_TIME \
+  --mount "type=bind,src=$repo/packages/baselayout/files/rootfs/etc/passwd,dst=/etc/passwd,readonly" \
+  --mount "type=bind,src=$scratch/notify,dst=/usr/bin/ntp-daemon,readonly" \
+  "$image" /bin/sh -c 'set -o pipefail; (NOTIFY_FD=3 /bin/xsh /launch.xsh 3>&1 1>&2) | cat')
+test "$ready" = x
+docker run "${common[@]}" \
+  --mount "type=bind,src=$repo/packages/baselayout/files/rootfs/etc/passwd,dst=/etc/passwd,readonly" \
+  "$image" /bin/sh -c '
+  exec 3> /tmp/not-a-pipe
+  if NOTIFY_FD=3 /bin/xsh /launch.xsh; then exit 1; fi
+  test "$(stat -c "%u:%g" /tmp/not-a-pipe)" = "0:0"
+  mkfifo /tmp/named-pipe
+  exec 4<> /tmp/named-pipe
+  if NOTIFY_FD=4 /bin/xsh /launch.xsh; then exit 1; fi
+  test "$(stat -c "%u:%g" /tmp/named-pipe)" = "0:0"
 '
 docker run "${common[@]}" \
   --mount "type=bind,src=$repo/packages/ntpd-rs/service.xsh,dst=/service.xsh,readonly" \

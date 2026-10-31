@@ -25,6 +25,20 @@ proc main() [fs, process, env, error] {
   fs.chown(runtime_dir, owner)?
   fs.chgrp(runtime_dir, owning_group)?
 
+  let notify = e"NOTIFY_FD" ?? ""
+  if notify != "" {
+    let number = notify.parse_int_decimal()?
+    if number < 3 {
+      return Err(NtpdLaunchError.IdentityMismatch(kind: "ntpd-rs-notify", message: "NOTIFY_FD must name an inherited pipe"))
+    }
+    let pipe = fp"/proc/self/fd/{number}"
+    let metadata = fs.stat(pipe, follow_symlinks: true)?
+    if ! pipe.readlink()?.display().starts_with("pipe:[") or metadata.kind != "fifo" or metadata.uid != 0 or metadata.mode % 4096 != 0o600 {
+      return Err(NtpdLaunchError.IdentityMismatch(kind: "ntpd-rs-notify", message: "NOTIFY_FD must name an inherited pipe"))
+    }
+    fs.chown(pipe, owner, follow_symlinks: true)?
+  }
+
   let privileges = linux.privileges()?
   for capability in range(privileges.last_capability + 1) {
     if capability != cap_sys_time {
