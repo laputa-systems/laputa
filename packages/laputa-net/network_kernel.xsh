@@ -131,6 +131,14 @@ export pure network_project_dump(dump: LinuxNetworkDump, intent: policy.NetworkI
   Ok(ordered(projected))
 }
 
+## Project only when two consecutive complete dumps are identical, since one observation spans four separate kernel dumps.
+export pure network_project_stable_dumps(first: LinuxNetworkDump, second: LinuxNetworkDump, intent: policy.NetworkIntent, sequence: Int) -> Result[policy.NetworkSnapshot, Error] {
+  let snapshot = network_project_dump(first, intent, sequence)?
+  let _ = network_project_dump(second, intent, sequence)?
+  if first != second { return Err(NetworkKernelError.Conflict("network observation changed between consecutive dumps")) }
+  Ok(snapshot)
+}
+
 pure attribute(kind: Int, data: Bytes) -> Result[Bytes, Error] {
   let length = data.len() + 4
   Ok(bytes.concat([bytes.pack_le(length, 2)?, bytes.pack_le(kind, 2)?, data, bytes.zero((4 - length % 4) % 4)?]))

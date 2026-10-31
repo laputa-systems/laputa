@@ -182,3 +182,23 @@ test test_same_prefix_addition_is_rejected_before_any_request [fs, error] {
     Ok(_) => assert false
   }
 }
+
+test test_consecutive_dumps_must_agree_before_projection [fs, error] {
+  let plan = fixture_plan()?
+  var first = primary_dump()
+  first.routes = [ordinary_default()]
+  let snapshot = kernel.network_project_stable_dumps(first, first, plan.intent, 1)?
+  assert snapshot.routes.len() == 1
+  var changed = first
+  changed.routes = [{...ordinary_default(), priority: 200, attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 5, data: b"\xc0\x00\x02\x01"}, {kind: 4, data: b"\x07\x00\x00\x00"}, {kind: 6, data: b"\xc8\x00\x00\x00"}]}]
+  match kernel.network_project_stable_dumps(first, changed, plan.intent, 1) {
+    Err(problem) => assert problem.message == "network observation changed between consecutive dumps"
+    Ok(_) => assert false
+  }
+  var incomplete = first
+  incomplete.state = "partial"
+  match kernel.network_project_stable_dumps(incomplete, incomplete, plan.intent, 1) {
+    Err(problem) => assert problem.message == "complete issue-free network observation required"
+    Ok(_) => assert false
+  }
+}

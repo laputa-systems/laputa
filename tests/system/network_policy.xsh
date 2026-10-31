@@ -160,3 +160,20 @@ test test_vm_capture_replays_partial_failure_without_rollback_or_foreign_adoptio
     Ok(_) => assert false
   }
 }
+
+pure docker_dump(tos: Int) -> LinuxNetworkDump {
+  let link: LinuxNetworkLink = {address: null, attributes: [], broadcast: null, flags: 1, hardware_type: 1, ifindex: 2, kind: "veth", lower_ifindex: null, master_ifindex: null, mtu: 1500, name: "eth0", name_bytes: null, operstate: 6, rx_bytes: 0, tx_bytes: 0}
+  let address: LinuxNetworkAddress = {address: "172.17.0.2", attributes: [], broadcast: "172.17.255.255", family: "inet", flags: 0, ifindex: 2, label: null, local: "172.17.0.2", preferred_lifetime_seconds: null, prefix_length: 16, scope: 0, valid_lifetime_seconds: null}
+  let route: LinuxNetworkRoute = {attributes: [], destination: null, destination_prefix_length: 0, family: "inet", flags: 0, gateway: "172.17.0.1", input_ifindex: null, nexthops: [], output_ifindex: 2, preferred_source: null, priority: null, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos}
+  {state: "complete", enumeration_succeeded: true, issues: [], links: [link], addresses: [address], routes: [route], rules: []}
+}
+
+test test_capture_selection_accepts_ordinary_default_and_refuses_tos_specific_default [error] {
+  let record = capture.select_capture(docker_dump(0))?
+  assert record.error == "desired address is foreign; ownership cannot be inferred"
+  assert record.input.observed.routes == [{gateway: "172.17.0.1", metric: 0}]
+  match capture.select_capture(docker_dump(8)) {
+    Err(problem) => assert problem.message == "selected route is outside the supported main-table unicast cohort"
+    Ok(_) => assert false
+  }
+}

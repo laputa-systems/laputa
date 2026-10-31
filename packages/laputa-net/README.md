@@ -92,9 +92,16 @@ TOS-specific default on the selected link is refused as `selected default route
 is TOS-specific and cannot converge with ordinary traffic`, even beside an
 ordinary default; other unsupported shapes are refused as outside the supported
 cohort or as carrying unsupported attributes. Defaults on other interfaces are
-not projected. The generic request collector still discards dump completion and
-interruption details, so live application remains withheld until the strict
-collector's completion guarantees are qualified.
+not projected. `linux.network_dump` already requires `NLMSG_DONE` per dump, retries and then
+reports `NLM_F_DUMP_INTR`, and reports overrun, truncation and kernel errors as
+issues, so `state` is `complete` only when all four dumps finished cleanly. The
+four dumps are still taken one after another, with no kernel generation shared
+between them. `network_project_stable_dumps` projects two consecutive complete
+dumps only when they are identical and otherwise reports that the observation
+changed. This narrows cross-dump skew but cannot rule out a change that reverts
+between the two observations. The mutation-acknowledgement collector used for
+live requests is separate and remains unqualified, so live application stays
+withheld.
 
 The projection checks all IPv4 preferred-source dependencies on selected
 addresses, including routes through another interface. Its address-derived

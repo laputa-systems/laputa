@@ -12,8 +12,8 @@ pure conflict(input: policy.NetworkPlanInput) -> Result[Str, Error] {
   }
 }
 
-proc capture() [process, error] -> Result[NetworkConflictCapture, Error] {
-  let dump = linux.network_dump()?
+## Select the single Docker veth, address and ordinary default route from a complete dump.
+export pure select_capture(dump: LinuxNetworkDump) -> Result[NetworkConflictCapture, Error] {
   if !dump.enumeration_succeeded or dump.state != "complete" or !dump.issues.is_empty() {
     return Err(NetworkCaptureError.Failed("network dump is incomplete or contains field issues"))
   }
@@ -48,6 +48,10 @@ proc capture() [process, error] -> Result[NetworkConflictCapture, Error] {
     return Err(NetworkCaptureError.Failed(f"unexpected ownership conflict: {problem}"))
   }
   Ok({input, error: problem})
+}
+
+proc capture() [process, error] -> Result[NetworkConflictCapture, Error] {
+  select_capture(linux.network_dump()?)
 }
 
 proc main(...argv: List[Str]) [fs, process, error] {
