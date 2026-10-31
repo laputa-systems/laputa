@@ -233,7 +233,7 @@ impl SystemManagers {
 impl<TimeController: StdController + Sync + Send> System<TimeController> {
     pub fn new(
         system_clock: NtpClockWrapper,
-        controller: TimeController,
+        controller: Arc<TimeController>,
         system_clock_id: ClockId,
         system_config: SystemConfig,
         ntp_config: SynchronizationConfig,
@@ -256,7 +256,7 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
                 #[cfg(target_os = "linux")]
                 csptp_manager,
             },
-            controller: Arc::new(controller),
+            controller,
             system_clock,
             system_clock_id,
             config: system_config,

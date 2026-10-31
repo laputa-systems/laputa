@@ -123,6 +123,8 @@ fn jump_threshold(threshold: StepThreshold) -> JumpThreshold {
 
 #[derive(Debug, Default, Configurable)]
 pub struct Config {
+    #[config(default)]
+    pub frequency_calibration_path: Option<PathBuf>,
     #[config(rename = "use-system-config", default)]
     #[allow(clippy::struct_field_names)]
     pub use_system_config: UseSystemConfig,
@@ -395,6 +397,13 @@ mod tests {
 
         assert_eq!(config.synchronization, SynchronizationSettings::default());
         assert_eq!(config.synchronization.minimum_agreeing_sources(), 3);
+    }
+
+    #[test]
+    fn frequency_calibration_path_is_optional_and_loads_explicitly() {
+        assert_eq!(load_text("").unwrap().frequency_calibration_path, None);
+        let config = load_text("frequency-calibration-path = \"/var/lib/ntpd-rs/frequency.json\"\n").unwrap();
+        assert_eq!(config.frequency_calibration_path.as_deref(), Some(Path::new("/var/lib/ntpd-rs/frequency.json")));
     }
 
     #[test]

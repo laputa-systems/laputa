@@ -415,7 +415,7 @@ impl<Storage: KalmanStorage<C>, C: Clock<TAI>> KalmanController<Storage, C> {
         self.state.with_ref(|state| {
             let clock = state.clocks.iter().find(|clock| clock.id == clock_id)
                 .ok_or(AlgoError::UnknownClock(clock_id))?;
-            if state.filter.active_links().is_empty() {
+            if !state.filter.active_links().iter().any(|link| link.id.contains_clock(clock_id)) {
                 return Ok(None);
             }
             let estimate = state.filter.clock_frequency(clock_id)?;

@@ -39,6 +39,15 @@ for field in CapInh CapPrm CapEff CapBnd CapAmb; do
 done
 printf '%s\n' "$output" | rg -q '^Groups:[[:space:]]*$'
 printf '%s\n' "$output" | rg -q '^NoNewPrivs:[[:space:]]+1$'
+docker run "${common[@]}" --cap-add SYS_TIME \
+  --mount "type=bind,src=$repo/packages/baselayout/files/rootfs/etc/passwd,dst=/etc/passwd,readonly" \
+  --mount "type=bind,src=$scratch/daemon,dst=/usr/bin/ntp-daemon,readonly" \
+  "$image" /bin/sh -c '
+  mkdir -p /var/lib/ntpd-rs
+  chmod 0755 /var/lib/ntpd-rs
+  if /bin/xsh /launch.xsh; then exit 1; fi
+  test "$(stat -c "%u:%g %a" /var/lib/ntpd-rs)" = "0:0 755"
+'
 docker run "${common[@]}" --mount "type=bind,src=$scratch/bad-passwd,dst=/etc/passwd,readonly" "$image" /bin/sh -c '
   mkdir /run/ntpd-rs
   chmod 0711 /run/ntpd-rs

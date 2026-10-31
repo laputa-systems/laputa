@@ -2,6 +2,10 @@
 #![allow(unused)]
 
 mod clock;
+#[cfg(target_os = "linux")]
+mod calibration;
+#[cfg(all(test, target_os = "linux"))]
+mod calibration_tests;
 pub mod config;
 #[cfg(target_os = "linux")]
 mod csptp_server;
@@ -28,6 +32,7 @@ use std::{error::Error, io::IsTerminal, path::Path};
 use ::tracing::info;
 pub use config::Config;
 use ntp_proto::SourceConfig;
+use statime_base::Clock;
 pub use observer::ObservableState;
 use statime_algo::{ControllerConfig, StdKalmanStorage};
 use tokio::runtime::Builder;
@@ -159,12 +164,28 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
 
         let observation_listener = observer::bind(&config.observability)?;
 
+        let clock = NtpClockWrapper::default();
+        #[cfg(target_os = "linux")]
+        let calibration_store = match &config.frequency_calibration_path {
+            Some(path) => {
+                let store = Arc::new(calibration::CalibrationStore::open(path, clock.max_frequency()?)?);
+                if calibration::restore(&store, &clock)? {
+                    info!("restored clock frequency calibration");
+                }
+                Some(store)
+            }
+            None => None,
+        };
+        #[cfg(not(target_os = "linux"))]
+        if config.frequency_calibration_path.is_some() {
+            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Unsupported, "frequency calibration requires Linux")) as Box<dyn Error>);
+        }
+
         // we always generate the keyset (even if NTS is not used)
         // FIXME: set up configuration of keyset.
         let keyset = nts_key_provider::spawn(KeysetConfig::default()).await;
 
         ::tracing::debug!("Configuration loaded, spawning daemon jobs");
-        let clock = NtpClockWrapper::default();
         // FIXME: Implement proper configuration of controllers.
         let (controller, system_clock_id) =
             statime_algo::KalmanController::<StdKalmanStorage<_>, _>::new(
@@ -179,9 +200,10 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
                 },
             )
             .map_err(|error| controller_error(error) as Box<dyn Error>)?;
+        let controller = Arc::new(controller);
         let system = Arc::new(System::new(
             clock,
-            controller,
+            controller.clone(),
             system_clock_id,
             SystemConfig {
                 minimum_retry_timeout: std::time::Duration::from_secs(1),
@@ -266,11 +288,30 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
             }
         };
 
+        #[cfg(target_os = "linux")]
+        let calibration_writer = async {
+            let Some(store) = calibration_store else {
+                return std::future::pending::<Result<(), Box<dyn Error>>>().await;
+            };
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                if let Some(value) = controller.frequency_calibration(system_clock_id).map_err(|error| controller_error(error) as Box<dyn Error>)? {
+                    let store = store.clone();
+                    tokio::task::spawn_blocking(move || store.save(calibration::Calibration {
+                        correction: value.correction(), uncertainty: value.uncertainty(),
+                    })).await??;
+                }
+            }
+        };
+        #[cfg(not(target_os = "linux"))]
+        let calibration_writer = std::future::pending::<Result<(), Box<dyn Error>>>();
+
         tokio::select! {
             result = main_loop_handle => result
                 .map_err(|e| Box::new(e) as Box<dyn Error>)?
                 .map_err(|e| e as Box<dyn Error>),
             result = observer_exit => result,
+            result = calibration_writer => result,
         }
     });
 

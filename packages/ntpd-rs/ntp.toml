@@ -1,3 +1,5 @@
+frequency-calibration-path = "/var/lib/ntpd-rs/frequency.json"
+
 [observability]
 log-level = "info"
 observation-path = "/run/ntpd-rs/observe"
