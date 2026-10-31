@@ -91,6 +91,17 @@ host sentinels survive, the checkout mount rejects writes, and `/output` remains
 writable. It does not qualify C, Rust, or XSH package builds or a per-package
 input closure. The default native suites do not require Docker for this check.
 
+The clock-service privilege boundary can be checked without changing the host
+clock. This uses a fake daemon in a disposable Docker container and requires
+Docker to grant `CAP_SYS_TIME`:
+
+```bash
+bash tests/docker/ntpd_privileges.sh laputa-package-tools:TAG "$PWD/.out/seed/x86_64"
+```
+
+It checks the launched identity and capability sets and refuses a conflicting
+UID before changing the runtime directory. It does not qualify clock steering.
+
 ### Use the fixed xinit tool snapshot
 
 The independent checks use frozen `bin/{xsh,xshi,xsht}` and matching `core/`

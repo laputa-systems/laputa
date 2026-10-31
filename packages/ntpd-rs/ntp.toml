@@ -1,0 +1,15 @@
+[observability]
+log-level = "info"
+observation-path = "/run/ntpd-rs/observe"
+observation-permissions = 0o644
+
+[[source]]
+mode = "pool"
+address = "pool.ntp.org"
+count = 4
+
+[synchronization]
+minimum-agreeing-sources = 3
+single-step-panic-threshold = 1000
+startup-step-panic-threshold = { forward = "inf", backward = 86400 }
+warn-on-jump = true
