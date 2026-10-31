@@ -147,6 +147,8 @@ order is not the execution sequence below.
 | R8 | P2, deferred expansion | A qualified opt-in Linux OCI execution profile, after the operational baseline |
 | R9 | P2, consumer-driven | Selective existing tools, not additional ports or catalog growth for its own sake |
 | R10 | P1, later routine workflow | Connect the existing self-hosted successor proof to normal activation |
+| R11 | Deferred to the end | Typed on-demand activation and per-user agents in xinit |
+| R12 | Deferred to the end | A complete Wayland desktop on one reference laptop |
 
 The owner-selected work order is:
 
@@ -161,13 +163,16 @@ The owner-selected work order is:
    the final restore test must not be postponed behind a scheduler.
 5. Make the existing in-guest XSH/cohort rebuild and successor boot a routine
    development workflow through the same activation path (R10).
+6. Only after G2 and G4: typed activation (R11), then the reference-laptop
+   desktop (R12).
 
 Bounded slices can overlap. Design R4 alongside R2's clock-bootstrap policy;
 R5 depends on R3's rescue path and R4's authenticated inputs. R10 can continue
 independently, but must not delay a useful remote/operational baseline or be
 presented as a substitute for production trust, state ownership, and fallback.
 Defer broad OCI work, desktop protocol expansion, additional utility ports,
-and firmware-boot work unless a concrete G2 workflow requires them.
+and firmware-boot work unless a concrete G2 workflow requires them. The desktop
+(R11/R12) is last; it starts only after G2 and G4 pass.
 
 ## G2: The remotely maintainable VM
 
@@ -674,6 +679,57 @@ remaining bootstrap inputs. Keep local development admission distinct from
 production R4/R5 trust. Linux and Asterinas require separate evidence; Linux
 aarch64 remains deferred pending a macOS aarch64 host via Docker.
 
+## R11: Typed activation and per-user agents
+
+Deferred until G2 and G4 pass. Earlier, a single trigger is admitted only when a
+concrete G2 workflow needs it.
+
+xinit already owns supervision, readiness, and restart. R11 adds the event side
+of the launchd model to the same typed service model, not a second manager:
+
+- **Socket activation:** xinit holds the listening socket and passes it to the
+  service on first connection, so idle services need not run at boot.
+- **Path, timer, and device triggers:** start a service when a path changes, a
+  calendar or monotonic deadline passes, or mdevd reports a device.
+- **Per-user agents:** a user's own services, declared in their home directory
+  and supervised without root, as systemd user units and launchd agents are.
+- **Process-tree ownership:** cgroup v2 groups instead of process groups, so
+  stopping a service stops every descendant and resource limits apply to the
+  whole tree.
+
+Service descriptions stay ordinary typed XSH. A malformed trigger is a
+`xsht check` failure, not a boot-time surprise. Each trigger needs one XSH
+substrate primitive (descriptor passing, inotify, timerfd, pidfd, cgroup v2
+control); add each primitive with its consumer, never as a speculative
+collection. Checked effects remain distinct from OS authority enforcement.
+
+**Acceptance:** an idle socket-activated service is absent until its first
+connection and then serves it without a lost request; a timer and a device
+trigger fire exactly once per event across an xinit restart; killing a service
+stops all of its descendants; a user agent starts and stops without root.
+
+## R12: A complete Wayland desktop on one reference laptop
+
+Deferred until R11 passes. Name one reference laptop; do not target laptops in
+general. Real-hardware enablement stays out of scope until the owner admits
+this track.
+
+A desktop is mostly hardware and compatibility work, not service glue: GPU/KMS
+and Mesa, Wi-Fi firmware, suspend and resume, ACPI battery, backlight and lid
+events, PipeWire audio, Bluetooth, and display hotplug. Applications also
+assume a D-Bus session and system bus and logind-shaped session and power
+interfaces (portals, notifications, inhibitors); seatd covers only seat access.
+Keep that compatibility surface as small as the reference applications need,
+and put it behind typed XSH interfaces so each owner stays separate rather than
+absorbed into one project. Memory-pressure handling uses PSI and cgroup policy;
+Linux applications cannot be assumed to cooperate the way macOS applications
+do.
+
+**Acceptance:** on the reference laptop, the installed system boots to the
+in-tree compositor, joins Wi-Fi, suspends and resumes repeatedly without losing
+the session, reports battery and controls backlight, plays audio, runs a
+browser with working portals, and rolls back a bad update through R5.
+
 ## Delivery gates and evidence
 
 | Gate | Required result |
@@ -683,6 +739,7 @@ aarch64 remains deferred pending a macOS aarch64 host via Docker.
 | G2: Remotely maintainable VM | Pass the integrated provision/SSH/inspect/stage/fail-B/recover-A/confirm/blank-disk-restore scenario above using R4-R7 and the G1 foundation. |
 | G3: Optional expansion | R8/R9 are admitted only with a concrete workload, bounded runtime cost, and their own proof; they do not hold G1/G2 hostage. |
 | G4: Self-hosted feedback loop | R10 connects the existing cohort/replacement-XSH/successor proof to normal activation on a named target; it can advance independently of optional expansion and does not waive G1/G2. |
+| G5: Reference-laptop desktop | Last. R11 and then R12 pass their acceptance after G2 and G4; neither delays an earlier gate. |
 
 Use focused tests first and the existing [testing](TESTING.md) and
 [development](DEVELOPMENT.md) entry points. Reserve `make verify` for an explicitly
