@@ -1,0 +1,10 @@
+groups = ["web"]
+
+[[hosts]]
+name = "web-1"
+groups = ["web"]
+address = "192.0.2.10"
+port = 22
+user = "xinfra"
+key = "keys/xinfra_ed25519"
+host_key = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
