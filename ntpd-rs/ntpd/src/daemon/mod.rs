@@ -156,6 +156,8 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
         // tracing setup to ensure logging is fully configured.
         config.check();
 
+        let observation_listener = observer::bind(&config.observability)?;
+
         // we always generate the keyset (even if NTS is not used)
         // FIXME: set up configuration of keyset.
         let keyset = nts_key_provider::spawn(KeysetConfig::default()).await;
@@ -228,21 +230,39 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
             let _join_handle = keyexchange::spawn(nts_ke_config, keyset.clone());
         }*/
 
-        // FIXME: Replace with proper new observer code once available.
-        /*observer::spawn(
-            &config.observability,
-            channels.source_snapshots,
-            channels.server_data_receiver,
-            channels.system_snapshot_receiver,
-            clock,
-        );*/
+        let observer_handle = observation_listener.map(|listener| {
+            let (_server_sender, server_reader) = tokio::sync::watch::channel(Vec::new());
+            observer::spawn(
+                listener,
+                system.observed_sources(),
+                server_reader,
+                system.system_snapshots(),
+                clock,
+            )
+        });
 
         let _ = notify_ready().await;
 
-        main_loop_handle
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn Error>)?
-            .map_err(|e| e as Box<dyn Error>)
+        let observer_exit = async {
+            match observer_handle {
+                Some(handle) => {
+                    let error = match handle.await {
+                        Ok(Err(error)) => error,
+                        Ok(Ok(())) => std::io::Error::other("the state observer stopped"),
+                        Err(error) => std::io::Error::other(error),
+                    };
+                    Err(Box::new(error) as Box<dyn Error>)
+                }
+                None => std::future::pending().await,
+            }
+        };
+
+        tokio::select! {
+            result = main_loop_handle => result
+                .map_err(|e| Box::new(e) as Box<dyn Error>)?
+                .map_err(|e| e as Box<dyn Error>),
+            result = observer_exit => result,
+        }
     });
 
     runtime.shutdown_background();

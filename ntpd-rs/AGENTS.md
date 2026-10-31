@@ -41,8 +41,12 @@ That gap is `TODO.md` NTPD-1.
   `minimum-agreeing-sources`, `local-stratum`, and `reference-id` reach the
   controller and `NtpManager`. `Config::check` fails when fewer sources are
   configured than `minimum-agreeing-sources`. `NtpServerConfig` has no
-  fields, and the run loop does not bind servers. The observer spawn is
-  commented out, so `ntp-ctl status` has no socket. `ntp-ctl validate`
+  fields, and the run loop does not bind servers. The run loop binds
+  `observation-path` before it reports readiness and exits if it cannot,
+  then serves `ObservableState`: the system snapshot comes from the
+  one-second timer loop in `System::run`, and each `SourceTask` publishes
+  its source through `SourceObserver` and withdraws it when it ends.
+  `ntp-ctl status` prints no per-source offset. `ntp-ctl validate`
   loads the file through `Config::from_args` and exits 1 on any load error
   or failed `Config::check` (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` prints
   `Disabled for now`.

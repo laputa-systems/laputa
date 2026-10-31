@@ -120,6 +120,7 @@ where
                             clock,
                             source,
                             initial_actions,
+                            managers.source_observer(),
                         )
                     },
                 ),

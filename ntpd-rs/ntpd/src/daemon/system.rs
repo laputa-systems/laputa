@@ -11,17 +11,20 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use ntp_proto::{NtpManager, SynchronizationConfig};
+use ntp_proto::{NtpManager, SynchronizationConfig, SystemSnapshot};
 use statime_base::{ActiveLinkData, ClockId, Link, LinkId, SourceType, StdController};
 #[cfg(target_os = "linux")]
 use statime_csptp::CsptpConfig;
 use tokio::{
+    sync::watch,
     task::JoinHandle,
     time::{Instant, Sleep},
 };
 
 use crate::daemon::{
     clock::NtpClockWrapper,
+    ntp_source::SourceObserver,
+    observer::ObservedSources,
     spawn::{
         CreationParameters, LinkTerminationReason, SpawnFailureReason, Spawner, SpawnerId,
         TrySpawnFuture,
@@ -48,6 +51,7 @@ pub struct System<TimeController: StdController> {
     )]
     system_clock: NtpClockWrapper,
     config: SystemConfig,
+    system_snapshot: watch::Sender<SystemSnapshot>,
 }
 
 struct SystemState<TimeController: StdController> {
@@ -149,6 +153,7 @@ impl<TimeController: StdController> SpawnerData<TimeController> {
 
 pub struct SystemManagers {
     ntp_manager: Arc<NtpManager>,
+    observed_sources: ObservedSources,
     // FIXME: switch to oncecells once https://github.com/rust-lang/rust/issues/109737 is resolved.
     #[cfg(target_os = "linux")]
     ptp_networking_ipv4: Mutex<Option<statime_netptp::NetworkManager<Ipv4Addr>>>,
@@ -167,6 +172,7 @@ impl SystemManagers {
                 SynchronizationConfig::default(),
                 Arc::default(),
             )),
+            observed_sources: Arc::default(),
             #[cfg(target_os = "linux")]
             ptp_networking_ipv4: Mutex::new(None),
             #[cfg(target_os = "linux")]
@@ -180,6 +186,10 @@ impl SystemManagers {
 
     pub fn ntp_manager(&self) -> Arc<NtpManager> {
         self.ntp_manager.clone()
+    }
+
+    pub fn source_observer(&self) -> SourceObserver {
+        SourceObserver::new(self.observed_sources.clone())
     }
 
     #[cfg(target_os = "linux")]
@@ -234,6 +244,7 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
             state: RwLock::default(),
             managers: SystemManagers {
                 ntp_manager,
+                observed_sources: Arc::default(),
                 #[cfg(target_os = "linux")]
                 ptp_networking_ipv4: Mutex::new(None),
                 #[cfg(target_os = "linux")]
@@ -245,7 +256,16 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
             system_clock,
             system_clock_id,
             config: system_config,
+            system_snapshot: watch::channel(SystemSnapshot::default()).0,
         }
+    }
+
+    pub fn observed_sources(&self) -> ObservedSources {
+        self.managers.observed_sources.clone()
+    }
+
+    pub fn system_snapshots(&self) -> watch::Receiver<SystemSnapshot> {
+        self.system_snapshot.subscribe()
     }
 
     fn run_self(&self) -> impl Future<Output = Result<(), Box<dyn std::error::Error + Send>>> {
@@ -303,7 +323,12 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
                         };
                         let link = match link {
                             Ok(link) => link,
-                            Err(error) => todo!(),
+                            Err(error) => {
+                                return Poll::Ready(Err(Box::new(std::io::Error::other(format!(
+                                    "could not create a link for a new source: {error:?}"
+                                )))
+                                    as Box<dyn std::error::Error + Send>));
+                            }
                         };
                         let link_id = link.id();
                         let driven_link =
@@ -359,6 +384,10 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
                             .managers
                             .ntp_manager
                             .update_used_sources(used_sources.into_iter());
+                        self.system_snapshot.send_replace(SystemSnapshot {
+                            time_snapshot,
+                            ntp_snapshot,
+                        });
                     }
                 }
 

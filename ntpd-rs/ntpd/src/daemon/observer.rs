@@ -72,41 +72,17 @@ impl From<&ServerData> for ObservableServerState {
     }
 }
 
-#[instrument(level = tracing::Level::ERROR, skip_all, name = "Observer", fields(path = debug(config.observation_path.clone())))]
-pub fn spawn<C: 'static + Clock<TAI> + Send>(
+pub type ObservedSources = Arc<std::sync::RwLock<HashMap<ClockId, ObservableSourceState>>>;
+
+/// Binds the observation socket named by the configuration, if any.
+///
+/// Binding is separate from serving so that a daemon can fail at startup,
+/// before it reports readiness, when the socket cannot be created.
+pub fn bind(
     config: &super::config::ObservabilityConfig,
-    sources_reader: Arc<std::sync::RwLock<HashMap<ClockId, ObservableSourceState>>>,
-    server_reader: tokio::sync::watch::Receiver<Vec<ServerData>>,
-    system_reader: tokio::sync::watch::Receiver<SystemSnapshot>,
-    clock: C,
-) -> JoinHandle<std::io::Result<()>> {
-    let config = config.clone();
-    tokio::spawn(
-        (async move {
-            let result =
-                observer(config, sources_reader, server_reader, system_reader, clock).await;
-            if let Err(ref e) = result {
-                warn!("Abnormal termination of the state observer: {e}");
-                warn!("The state observer will not be available");
-            }
-            result
-        })
-        .instrument(Span::current()),
-    )
-}
-
-async fn observer<C: 'static + Clock<TAI> + Send>(
-    config: super::config::ObservabilityConfig,
-    sources_reader: Arc<std::sync::RwLock<HashMap<ClockId, ObservableSourceState>>>,
-    server_reader: tokio::sync::watch::Receiver<Vec<ServerData>>,
-    system_reader: tokio::sync::watch::Receiver<SystemSnapshot>,
-    clock: C,
-) -> std::io::Result<()> {
-    let start_time = Instant::now();
-    let timeout = std::time::Duration::from_millis(500);
-
-    let Some(path) = config.observation_path else {
-        return Ok(());
+) -> std::io::Result<Option<tokio::net::UnixListener>> {
+    let Some(path) = &config.observation_path else {
+        return Ok(None);
     };
 
     // this binary needs to run as root to be able to adjust the system clock.
@@ -115,7 +91,46 @@ async fn observer<C: 'static + Clock<TAI> + Send>(
     let permissions: std::fs::Permissions =
         PermissionsExt::from_mode(config.observation_permissions);
 
-    let observe_listener = create_unix_socket_with_permissions(&path, permissions)?;
+    create_unix_socket_with_permissions(path, permissions).map(Some)
+}
+
+#[instrument(level = tracing::Level::ERROR, skip_all, name = "Observer")]
+pub fn spawn<C: 'static + Clock<TAI> + Send>(
+    listener: tokio::net::UnixListener,
+    sources_reader: ObservedSources,
+    server_reader: tokio::sync::watch::Receiver<Vec<ServerData>>,
+    system_reader: tokio::sync::watch::Receiver<SystemSnapshot>,
+    clock: C,
+) -> JoinHandle<std::io::Result<()>> {
+    tokio::spawn(
+        (async move {
+            let result = serve(
+                listener,
+                sources_reader,
+                server_reader,
+                system_reader,
+                clock,
+            )
+            .await;
+            if let Err(ref e) = result {
+                warn!("Abnormal termination of the state observer: {e}");
+            }
+            result
+        })
+        .instrument(Span::current()),
+    )
+}
+
+async fn serve<C: 'static + Clock<TAI> + Send>(
+    observe_listener: tokio::net::UnixListener,
+    sources_reader: ObservedSources,
+    server_reader: tokio::sync::watch::Receiver<Vec<ServerData>>,
+    system_reader: tokio::sync::watch::Receiver<SystemSnapshot>,
+    clock: C,
+) -> std::io::Result<()> {
+    let start_time = Instant::now();
+    let timeout = std::time::Duration::from_millis(500);
+
     let observe_permits = Arc::new(tokio::sync::Semaphore::new(8));
 
     loop {
@@ -305,9 +320,10 @@ mod tests {
             },
         });
 
+        let listener = bind(&config).unwrap().unwrap();
         let handle = tokio::spawn(async move {
-            observer(
-                config,
+            serve(
+                listener,
                 source_snapshots,
                 servers_reader,
                 system_reader,
@@ -381,9 +397,10 @@ mod tests {
             },
         });
 
+        let listener = bind(&config).unwrap().unwrap();
         let handle = tokio::spawn(async move {
-            observer(
-                config,
+            serve(
+                listener,
                 source_snapshots,
                 servers_reader,
                 system_reader,

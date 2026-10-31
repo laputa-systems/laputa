@@ -77,7 +77,7 @@ where
                 state.known_ips.is_empty()
             };
 
-            if std::dbg!(need_addresses) {
+            if need_addresses {
                 match config.addr.lookup_host().await {
                     Ok(addresses) => {
                         let mut state = state.lock().unwrap();
@@ -90,8 +90,6 @@ where
                             !state.current_sources.iter().any(|p| p.addr == *ip)
                                 && !config.ignore.iter().any(|ign| *ign == ip.ip())
                         });
-
-                        std::dbg!(&state.known_ips);
                     }
                     Err(e) => {
                         warn!(error = ?e, "error while resolving source address, retrying");
@@ -146,6 +144,7 @@ where
                                 clock,
                                 source,
                                 initial_actions,
+                                managers.source_observer(),
                             )
                         },
                     ),

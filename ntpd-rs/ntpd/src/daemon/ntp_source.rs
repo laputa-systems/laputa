@@ -14,7 +14,7 @@ use tracing::{Instrument, Span, debug, error, instrument, warn};
 
 use tokio::time::{Instant, Sleep};
 
-use crate::daemon::spawn::LinkTerminationReason;
+use crate::daemon::{observer::ObservedSources, spawn::LinkTerminationReason};
 
 use super::exitcode;
 
@@ -45,8 +45,40 @@ pub struct SourceChannels {
     pub source_snapshots: Arc<std::sync::RwLock<HashMap<ClockId, ObservableSourceState>>>,
 }
 
+/// Publishes what a running source knows about itself to the observer, and
+/// withdraws it when the source task ends.
+pub(crate) struct SourceObserver {
+    sources: ObservedSources,
+    id: ClockId,
+}
+
+impl SourceObserver {
+    pub(crate) fn new(sources: ObservedSources) -> Self {
+        Self {
+            sources,
+            id: ClockId::new(),
+        }
+    }
+
+    fn publish<Controller: Link>(&self, name: &str, source: &NtpSource<Controller>) {
+        self.sources
+            .write()
+            .expect("Unexpected poisoned mutex")
+            .insert(self.id, source.observe(name.to_owned(), self.id));
+    }
+}
+
+impl Drop for SourceObserver {
+    fn drop(&mut self) {
+        if let Ok(mut sources) = self.sources.write() {
+            sources.remove(&self.id);
+        }
+    }
+}
+
 pub(crate) struct SourceTask<C: 'static + Clock<TAI> + Send, Controller: Link, T: Wait> {
     _wait: PhantomData<T>,
+    observer: SourceObserver,
     link_id: LinkId,
     clock: C,
     name: String,
@@ -95,6 +127,7 @@ where
     }
 
     async fn run(&mut self, mut poll_wait: Pin<&mut T>) -> LinkTerminationReason {
+        self.observer.publish(&self.name, &self.source);
         loop {
             enum SelectResult {
                 Timer,
@@ -194,6 +227,8 @@ where
                     }
                 }
             }
+
+            self.observer.publish(&self.name, &self.source);
         }
     }
 }
@@ -202,7 +237,7 @@ impl<C, Controller: Link + Send + 'static> SourceTask<C, Controller, Sleep>
 where
     C: 'static + Clock<TAI> + Send + Sync,
 {
-    #[instrument(level = tracing::Level::ERROR, name = "Ntp Source", skip(clock, source, initial_actions))]
+    #[instrument(level = tracing::Level::ERROR, name = "Ntp Source", skip(clock, source, initial_actions, observer))]
     pub fn spawn(
         link_id: LinkId,
         name: String,
@@ -210,6 +245,7 @@ where
         clock: C,
         source: NtpSource<Controller>,
         initial_actions: NtpSourceActionIterator,
+        observer: SourceObserver,
     ) -> tokio::task::JoinHandle<LinkTerminationReason> {
         tokio::spawn(
             (async move {
@@ -235,6 +271,7 @@ where
 
                 let mut process = SourceTask {
                     _wait: PhantomData,
+                    observer,
                     link_id,
                     name,
                     clock,
@@ -518,6 +555,7 @@ mod tests {
 
         let process = SourceTask {
             _wait: PhantomData,
+            observer: SourceObserver::new(Arc::default()),
             link_id,
             name: "test".into(),
             clock: TestClock {},
@@ -549,6 +587,38 @@ mod tests {
         assert_eq!(network.bytes_read, 48);
 
         handle.abort();
+    }
+
+    #[tokio::test]
+    async fn test_observer_publishes_while_running_and_withdraws_after() {
+        let (mut process, mut socket) = test_startup();
+        let sources: ObservedSources = Arc::default();
+        process.observer = SourceObserver::new(sources.clone());
+        process.name = "time.example:123".into();
+
+        let (poll_wait, poll_send) = TestWait::new();
+
+        let handle = tokio::spawn(async move {
+            tokio::pin!(poll_wait);
+            process.run(poll_wait).await
+        });
+
+        poll_send.notify();
+        let mut buf = [0; 48];
+        socket.recv(&mut buf).await.unwrap();
+
+        let observed: Vec<_> = sources.read().unwrap().values().cloned().collect();
+        assert_eq!(observed.len(), 1);
+        assert_eq!(observed[0].name, "time.example:123");
+        assert_eq!(observed[0].address, process_address(&socket));
+
+        handle.abort();
+        let _ = handle.await;
+        assert!(sources.read().unwrap().is_empty());
+    }
+
+    fn process_address(socket: &Socket<SocketAddr, Open>) -> String {
+        socket.local_addr().to_string()
     }
 
     fn serialize_packet_unencrypted(send_packet: &NtpPacket) -> [u8; 48] {
@@ -636,7 +706,7 @@ mod tests {
             let serialized = serialize_packet_unencrypted(&send_packet);
 
             socket
-                .send_to(&serialized, std::dbg!(remote_addr))
+                .send_to(&serialized, remote_addr)
                 .await
                 .unwrap();
 
