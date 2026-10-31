@@ -33,8 +33,12 @@ fn reopen_after_release(path: &std::path::Path) -> CalibrationStore {
     loop {
         match CalibrationStore::open(path, 0.0005) {
             Ok(store) => return store,
-            Err(error) if std::time::Instant::now() >= deadline => panic!("lock was not released: {error}"),
-            Err(_) => std::thread::yield_now(),
+            Err(error) => {
+                let busy = error.get_ref().and_then(|cause| cause.downcast_ref::<std::fs::TryLockError>())
+                    .is_some_and(|cause| matches!(cause, std::fs::TryLockError::WouldBlock));
+                if !busy || std::time::Instant::now() >= deadline { panic!("cannot reopen calibration: {error}"); }
+                std::thread::yield_now();
+            }
         }
     }
 }
