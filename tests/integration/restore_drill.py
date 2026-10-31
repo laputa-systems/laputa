@@ -213,6 +213,7 @@ def launch(argv, console, errlog, extra_cmdline="", extra_drives=(),
         pathlib.Path(socket).unlink(missing_ok=True)
     except (ValueError, IndexError):
         pass
+    console.unlink(missing_ok=True)
     err = open(errlog, "wb")
     child = subprocess.Popen(fixed, stdout=subprocess.DEVNULL, stderr=err, cwd=root)
     return child, err
