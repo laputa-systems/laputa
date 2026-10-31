@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo=$(git rev-parse --show-toplevel)
+mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause HOST_XSH SEED ARTIFACTS IMAGE}
+xsh=$(realpath "${2:?host xsh}")
+seed=$(realpath "${3:?seed directory}")
+artifacts=$(realpath "${4:?artifact store}")
+image=${5:?package-tools image}
+case "$mode" in behind|ahead|jump|pause) ;; *) exit 2 ;; esac
+git -C "$repo" check-ignore -q .work/
+mkdir -p "$repo/.work/tmp"
+work=$(mktemp -d "$repo/.work/tmp/ntp-guest.XXXXXXXX")
+trap 'printf "guest evidence: %s\n" "$work"' EXIT
+snapshot="$work/repository"
+output="$snapshot/.work/output"
+input="$snapshot/.work/input-root"
+mkdir -p "$snapshot" "$output" "$input/inputs" "$snapshot/.out/seed" "$snapshot/.out/artifacts" "$snapshot/.out/cache/linux-kbuild"
+git -C "$repo" archive HEAD | tar -xf - -C "$snapshot"
+cp -a --reflink=auto "$seed" "$snapshot/.out/seed/x86_64"
+cp -a --reflink=auto "$artifacts" "$snapshot/.out/artifacts/x86_64"
+python3 - "$snapshot/profiles/qemu-self-hosting.xsh" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+old = '["baselayout", "xsh", "laputa-pm", "xinit"]'
+assert text.count(old) == 1 and text.count('qemu_memory: "12G"') == 1
+text = text.replace(old, '["baselayout", "xsh", "laputa-pm", "xinit", "ntpd-rs", "ca-certificates"]')
+path.write_text(text.replace('qemu_memory: "12G"', 'qemu_memory: "4G"'))
+PY
+mkdir -p "$snapshot/.work/tmp"
+TMPDIR="$snapshot/.work/tmp" XSH_MODULE_PATH="$snapshot" XSH_HOST="$xsh" "$xsh" "$snapshot/seed/self_hosting_profile.xsh" -- \
+  "$snapshot" "$snapshot/.out/artifacts/x86_64" "$output" "$image"
+channel=$(jaq --from toml -r '.toolchain.channel' "$snapshot/ntpd-rs/rust-toolchain.toml")
+rustc=$(rustup which rustc --toolchain "$channel")
+TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
+  "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
+cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
+if test "$mode" = jump; then touch "$input/inputs/jump-mode"; fi
+if test "$mode" = ahead; then touch "$input/inputs/ahead-mode"; fi
+if test "$mode" = pause; then touch "$input/inputs/pause-mode"; fi
+truncate -s 128M "$output/inputs.ext4"
+truncate -s 64M "$output/output.ext4"
+/sbin/mkfs.ext4 -q -F -d "$input" "$output/inputs.ext4"
+/sbin/mkfs.ext4 -q -F "$output/output.ext4"
+XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
+  "$snapshot" "$output" "$repo/.work/ntp-$$.sock"

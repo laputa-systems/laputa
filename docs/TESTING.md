@@ -102,6 +102,29 @@ bash tests/docker/ntpd_privileges.sh laputa-package-tools:TAG "$PWD/.out/seed/x8
 It checks the launched identity and capability sets and refuses a conflicting
 UID before changing the runtime directory. It does not qualify clock steering.
 
+### Run the disposable NTP guest
+
+With the x86_64 seed, package-tools image and artifact closure already built,
+run the controlled startup cases in both directions and the external-backstep
+case separately:
+
+```bash
+bash tests/integration/ntp-clock-guest.sh behind /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+bash tests/integration/ntp-clock-guest.sh ahead /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+bash tests/integration/ntp-clock-guest.sh jump /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+bash tests/integration/ntp-clock-guest.sh pause /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+```
+
+The runner needs writable KVM, host Rust and kache, `jaq`, and `mkfs.ext4`. It
+builds a receipt-bound disposable profile under `.work/`, with two vCPUs and
+4 GiB; it does not modify a shipped profile. The source uses a loopback server
+whose time comes from `CLOCK_MONOTONIC_RAW`. The startup case requires a clock
+step and supervisor restart. The jump case checks restart and source reselection;
+it does not establish convergence after the jump. The pause case checks source
+reselection after QMP stop and resume; its loopback source pauses with the guest.
+These cases do not qualify NTS, external sources, or the authenticated
+clock-floor policy.
+
 ### Use the fixed xinit tool snapshot
 
 The independent checks use frozen `bin/{xsh,xshi,xsht}` and matching `core/`
