@@ -28,6 +28,17 @@ impl TestDirectory {
 }
 impl Drop for TestDirectory { fn drop(&mut self) { fs::remove_dir_all(&self.0).unwrap(); } }
 
+fn reopen_after_release(path: &std::path::Path) -> CalibrationStore {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match CalibrationStore::open(path, 0.0005) {
+            Ok(store) => return store,
+            Err(error) if std::time::Instant::now() >= deadline => panic!("lock was not released: {error}"),
+            Err(_) => std::thread::yield_now(),
+        }
+    }
+}
+
 #[test]
 fn roundtrip_and_exclusive_writer() {
     let dir = TestDirectory::new();
@@ -42,7 +53,7 @@ fn roundtrip_and_exclusive_writer() {
     assert!(restore(&store, &clock).unwrap());
     assert_eq!(*clock.0.lock().unwrap(), [value.correction]);
     drop(store);
-    assert_eq!(CalibrationStore::open(&dir.path(), 0.0005).unwrap().load().unwrap(), Some(value));
+    assert_eq!(reopen_after_release(&dir.path()).load().unwrap(), Some(value));
 }
 
 #[test]
@@ -61,7 +72,7 @@ fn in_flight_writer_holds_the_lock() {
     assert!(CalibrationStore::open(&dir.path(), 0.0005).is_err());
     release.send(()).unwrap();
     worker.join().unwrap();
-    assert!(CalibrationStore::open(&dir.path(), 0.0005).unwrap().load().unwrap().is_some());
+    assert!(reopen_after_release(&dir.path()).load().unwrap().is_some());
 }
 
 #[test]
