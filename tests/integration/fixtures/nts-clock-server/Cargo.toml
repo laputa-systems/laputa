@@ -1,0 +1,13 @@
+[package]
+name = "nts-clock-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+ntp-proto = { path = "../../../../ntpd-rs/ntp-proto", default-features = false, features = ["graviola", "rustcrypto", "__internal-api"] }
+statime-base = { path = "../../../../ntpd-rs/statime-base" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+libc = "0.2"

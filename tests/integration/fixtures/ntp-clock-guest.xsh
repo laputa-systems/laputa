@@ -58,13 +58,23 @@ proc main(root: Path) [fs, process, env, time, io, error] {
     assert found, f"guest CPU lacks {feature}"
   }
   p"/etc/ntpd-rs".mkdir(true)?
+  let nts_case = fp"{root}/inputs/nts-mode".exists()?
+  let source = if nts_case {
+    f"""mode = "nts"
+address = "localhost:32460"
+certificate-authority = "{root}/inputs/testca.pem"
+"""
+  } else {
+    """mode = "server"
+address = "127.0.0.1:32123"
+"""
+  }
   p"/etc/ntpd-rs/ntp.toml".write("""[observability]
 log-level = "trace"
 observation-path = "/run/ntpd-rs/observe"
 observation-permissions = 0o644
 [[source]]
-mode = "server"
-address = "127.0.0.1:32123"
+""" + source + """
 initial-poll-interval = 1
 poll-interval-limits = { min = 1, max = 1 }
 [synchronization]
@@ -117,11 +127,29 @@ minimum-agreeing-sources = 1
     print "NTP_JUMP_RESTART_READY"
   }
   let ready = p"/run/ntp-oracle-ready"
-  let server = unix.spawn_process_group(process.command_argv(server_path, [server_path.display(), f"{original}", f"{raw_origin}", ready.display()], stdout: /run/ntp-oracle.log, stderr: /run/ntp-oracle.log))?
+  let oracle = if nts_case { fp"{root}/inputs/nts-clock-server" } else { server_path }
+  let args = if nts_case { [oracle.display(), f"{original}", f"{raw_origin}", ready.display(), fp"{root}/inputs".display()] } else { [oracle.display(), f"{original}", f"{raw_origin}", ready.display()] }
+  let server = unix.spawn_process_group(process.command_argv(oracle, args, stdout: /run/ntp-oracle.log, stderr: /run/ntp-oracle.log))?
   groups += [server.pid]
   let server_deadline = now_ms()? + 10000
   while ! ready.exists()? and now_ms()? < server_deadline { time.sleep(50ms) }
   assert ready.exists()?, "controlled NTP server did not bind"
+  if nts_case {
+    let reject_deadline = now_ms()? + 45000
+    var rejected = false
+    while now_ms()? < reject_deadline {
+      let count = p"/run/nts-oracle-forged"
+      if count.exists()? and count.read_text()?.parse_int_decimal()? >= 3 {
+        assert stratum()? == 16, "unauthenticated replies synchronized an NTS source"
+        rejected = true
+        break
+      }
+      time.sleep(100ms)
+    }
+    assert rejected, "NTS server did not receive authenticated requests"
+    print "NTS_REJECTED_UNAUTHENTICATED_REPLIES"
+    p"/run/nts-oracle-authenticate".write("enabled")?
+  }
   let deadline = now_ms()? + 120000
   var synced = false
   var report_at = now_ms()? + 10000

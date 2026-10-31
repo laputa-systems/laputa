@@ -113,6 +113,7 @@ bash tests/integration/ntp-clock-guest.sh behind /absolute/path/to/xsh /absolute
 bash tests/integration/ntp-clock-guest.sh ahead /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 bash tests/integration/ntp-clock-guest.sh jump /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 bash tests/integration/ntp-clock-guest.sh pause /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
+bash tests/integration/ntp-clock-guest.sh nts /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
 ```
 
 The runner needs writable KVM, host Rust and kache, `jaq`, and `mkfs.ext4`. It
@@ -122,8 +123,11 @@ whose time comes from `CLOCK_MONOTONIC_RAW`. The startup case requires a clock
 step and supervisor restart. The jump case checks restart and source reselection;
 it does not establish convergence after the jump. The pause case checks source
 reselection after QMP stop and resume; its loopback source pauses with the guest.
-These cases do not qualify NTS, external sources, or the authenticated
-clock-floor policy.
+The NTS case uses a test CA and local NTS-KE server, rejects unauthenticated
+replies, and then requires authenticated clock convergence. The NTS fixture
+build needs the locked Rust dependencies available offline. These cases do not
+qualify external sources or the authenticated clock-floor policy. The bundled
+NTS test certificate expires on 27 February 2027.
 
 ### Use the fixed xinit tool snapshot
 
