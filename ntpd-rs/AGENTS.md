@@ -40,10 +40,12 @@ That gap is `TODO.md` NTPD-1.
   `statime_algo::ClockConfig` jump abort thresholds, and
   `minimum-agreeing-sources`, `local-stratum`, and `reference-id` reach the
   controller and `NtpManager`. `Config::check` fails when fewer sources are
-  configured than `minimum-agreeing-sources`. `NtpServerConfig` has no fields, and the run loop does not bind
-  servers. The observer spawn is commented out, so `ntp-ctl status` has no
-  socket. `ntp-ctl validate` returns success without reading the file
-  (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` prints `Disabled for now`.
+  configured than `minimum-agreeing-sources`. `NtpServerConfig` has no
+  fields, and the run loop does not bind servers. The observer spawn is
+  commented out, so `ntp-ctl status` has no socket. `ntp-ctl validate`
+  loads the file through `Config::from_args` and exits 1 on any load error
+  or failed `Config::check` (`ntpd/src/ctl.rs`). `ntp-ctl force-sync` prints
+  `Disabled for now`.
 - `UnixClock::now` calls `adjtimex` and, on failure, `clock_gettime`.
   Later steering still needs `CAP_SYS_TIME`.
 
