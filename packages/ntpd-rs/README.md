@@ -39,7 +39,10 @@ startup convergence in both directions, readiness distinct from synchronization,
 the UID/capability boundary and supervised restart. QMP pause/resume and an
 external backstep prove restart/source reselection, not convergence against an
 external source after either event. A controlled local NTS peer also proves
-certificate-verified key exchange and authenticated clock convergence.
+certificate-verified key exchange, rejection of tampered replies and authenticated
+clock convergence. A test-only chrony 4.9 comparison confirms startup stepping in
+both offset directions and readiness before synchronization; it does not establish
+slew, NTS interoperability or reboot-policy parity.
 See [guest checks](../../docs/TESTING.md#run-the-disposable-ntp-guest).
-External NTS deployment, chrony comparison, drift persistence and aarch64
+External NTS deployment, drift persistence and aarch64
 runtime qualification remain open. No shipped profile enables the service.

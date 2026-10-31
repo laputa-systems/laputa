@@ -317,10 +317,12 @@ Disposable x86_64/KVM guests prove startup convergence from both clock direction
 the privilege boundary and supervised restart. External-backstep and QMP
 pause/resume cases prove restart/source reselection; the backstep case does not
 prove convergence, and the loopback oracle pauses with the guest. A controlled
-NTS guest verifies CA/name and `ntske/1`, rejects forged unauthenticated replies,
+NTS guest verifies CA/name and `ntske/1`, records rejection of tampered replies,
 converges against the raw-clock oracle and restarts under supervision. Its
-standalone runner passes end to end. External NTS deployment, the chrony oracle
-and drift persistence remain open. See the
+standalone runner passes end to end. Test-only chrony 4.9 agrees on startup
+stepping in both offset directions and readiness before synchronization.
+This does not establish slew, NTS interoperability or reboot-policy parity.
+External NTS deployment and drift persistence remain open. See the
 [retained guest checks](TESTING.md#run-the-disposable-ntp-guest).
 
 Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
