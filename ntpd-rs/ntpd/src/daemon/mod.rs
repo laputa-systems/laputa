@@ -178,7 +178,7 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
                     select_max_window_size: 0.5,
                 },
             )
-            .map_err(|error| std::io::Error::other(format!("{error:?}")))?;
+            .map_err(|error| controller_error(error) as Box<dyn Error>)?;
         let system = Arc::new(System::new(
             clock,
             controller,
@@ -281,6 +281,32 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
 
 fn unsupported_source(position: usize, mode: UnsupportedSourceMode) -> Box<dyn Error> {
     Box::new(ConfigLoadError::UnsupportedSource { position, mode })
+}
+
+fn controller_error(error: statime_algo::AlgoError) -> Box<dyn Error + Send> {
+    match error {
+        statime_algo::AlgoError::ClockError(error) => Box::new(error),
+        error => Box::new(std::io::Error::other(format!("{error:?}"))),
+    }
+}
+
+#[cfg(test)]
+mod controller_error_tests {
+    use super::*;
+
+    #[test]
+    fn preserves_clock_cause_and_other_controller_diagnostics() {
+        let error = controller_error(statime_algo::AlgoError::ClockError(
+            statime_base::ClockError::PermissionDenied,
+        ));
+        assert_eq!(
+            error.downcast_ref::<statime_base::ClockError>(),
+            Some(&statime_base::ClockError::PermissionDenied)
+        );
+
+        let error = controller_error(statime_algo::AlgoError::InternalError);
+        assert_eq!(error.to_string(), "InternalError");
+    }
 }
 
 pub(crate) mod exitcode {

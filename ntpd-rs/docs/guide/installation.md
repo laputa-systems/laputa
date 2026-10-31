@@ -60,6 +60,9 @@ Below are configurations for Linux (using `SystemD`) and FreeBSD (using a .rc fi
 
 #### Linux + SystemD
 
+Clock operations require `CAP_SYS_TIME`. If the kernel denies a clock operation,
+the daemon names this capability and exits with status 77.
+
 This is the SystemD configuration used by the ntpd-rs Linux installer.
 ```ini
 [Unit]

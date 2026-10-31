@@ -356,7 +356,10 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
         })
     }
 
-    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error + Send>> {
+    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error + Send>>
+    where
+        TimeController: StdController<Error = statime_algo::AlgoError>,
+    {
         let timer_loop = async move {
             loop {
                 // Scope is needed to keep the future send.
@@ -404,10 +407,7 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
 
         let controller_run = TimeController::run(self.controller.clone(), tokio::time::sleep);
         let controller_run = async {
-            controller_run.await.map_err(|e| {
-                Box::new(std::io::Error::other(format!("{e:?}")))
-                    as Box<dyn std::error::Error + Send>
-            })
+            controller_run.await.map_err(super::controller_error)
         };
 
         let self_run = self.run_self();
