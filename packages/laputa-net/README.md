@@ -83,23 +83,18 @@ selected independent virtual Ethernet interface. It rejects selected secondary
 IPv4 addresses and nonempty selected default-route cohorts. An empty projected
 route list therefore follows observed absence, never a fallback.
 
-The fixed XSH observer omits the route header's TOS byte. An ordinary default
-and a TOS-specific default can otherwise have identical typed records. Those
-records cannot establish an ordinary-traffic default or safe address withdrawal.
-The generic request collector discards dump completion and interruption details.
-A second unqualified dump with matching counts cannot recover that missing proof.
-LAP-32 live application remains blocked on a qualified route-header observation
-that preserves TOS and the strict collector's completion guarantees.
-
-For the XSH repair, compare route headers `02 18 00 00 fe 02 fd 01 00 00 00 00`
-and `02 18 00 08 fe 02 fd 01 00 00 00 00 00` with identical table, destination,
-preferred-source, and output-interface attributes. The pinned decoder's
-`src/modules/linux/real/netlink.rs::parse_route` reads header offsets 0, 1, 2,
-and 4 onward, omitting offset 3. Both messages therefore become the same typed
-route despite different traffic selectors. Repeat with destination length zero
-to cover false default-route convergence. The repair needs a typed TOS field
-and decoder tests distinguishing both pairs; malformed and interrupted dump
-rejection must remain intact.
+The supplied XSH observer exposes the route header's TOS byte as typed integer
+`tos`. `network_project_dump` projects a selected default route only when it is
+an ordinary-traffic main-table unicast route with TOS 0, boot protocol, universe
+scope, one gateway, no multipath, source or input selectors, and only the
+interface, gateway, metric and table attributes the encoder itself writes. A
+TOS-specific default on the selected link is refused as `selected default route
+is TOS-specific and cannot converge with ordinary traffic`, even beside an
+ordinary default; other unsupported shapes are refused as outside the supported
+cohort or as carrying unsupported attributes. Defaults on other interfaces are
+not projected. The generic request collector still discards dump completion and
+interruption details, so live application remains withheld until the strict
+collector's completion guarantees are qualified.
 
 The projection checks all IPv4 preferred-source dependencies on selected
 addresses, including routes through another interface. Its address-derived
@@ -139,7 +134,7 @@ The intent matches those existing resources, and explicit ownership is empty.
 The real policy failure is `desired address is foreign; ownership cannot be inferred`.
 This is an ownership admission failure, not a captured kernel mutation failure.
 The error concerns the foreign address. The captured default-route fields omit
-TOS and do not establish route identity or convergence.
+TOS and predate the typed `tos` field; they do not establish route identity or convergence.
 
 `network-policy-capture.xsh` obtains a complete typed `linux.network_dump` and
 rejects field issues, ambiguous addresses, and unsupported default routes.
@@ -159,7 +154,7 @@ Missing capture files and malformed JSON fail without acquiring host observation
 Before creating its own veth pair, it requires the exact `LAPUTA_SELF_HOSTING=1`
 kernel token and a validated `qemu-self-hosting` generation receipt through the
 existing PM reader. It requires observed absence of every selected default route
-before and after its requests, so missing TOS cannot hide a selected default.
+before and after its requests, so no selected default of any TOS is hidden.
 
 The driver issues only two controlled requests under test: an exclusive address
 addition and an invalid-gateway route addition. It checks the real error number,
@@ -178,7 +173,7 @@ with the supplied XSH and matching installed core. `network-policy-vm-failure.js
 is the resulting 1006-byte failure record. The exclusive `198.18.1.3/24` addition
 remained after the kernel rejected gateway `192.0.2.1` with errno 101. The foreign
 `198.18.0.2/24` address survived. Selected default routes were absent before and
-after the requests, so the missing TOS field cannot hide a default in this case.
+after the requests, so no default of any TOS is hidden in this case.
 
 The offline regression reconstructs `Precondition`, `Applied(0)`, and `Failed(1)`
 from that capture. It reproduces the same plan and re-observation error twice,
@@ -210,7 +205,7 @@ XSH_MODULE_PATH=/mnt/self-hosting/inputs/laputa:/usr/lib/xsh/core \
 
 This slice adds no dependencies and changes no installed payload. It does not
 persist ownership or supervise networking. LAP-32 remains blocked: address
-withdrawal, default-route identity, and general live application require the
-qualified TOS observation described above. XSH-38 and XSH-45 shared-boundary
+withdrawal and general live application require the strict collector's
+completion guarantees; TOS is now observed and projected. XSH-38 and XSH-45 shared-boundary
 qualification, concurrent-writer behaviour, IPv6, Linux aarch64, and Asterinas
 remain unverified. The VM failure replay does not establish network convergence.

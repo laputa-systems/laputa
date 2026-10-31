@@ -118,16 +118,59 @@ test test_customized_kernel_routes_are_never_exempted_as_address_derived [fs, er
   }
 }
 
-test test_selected_default_routes_require_an_observable_tos_header [fs, error] {
-  let plan = fixture_plan()?
+pure ordinary_default() -> LinuxNetworkRoute {
+  {attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 5, data: b"\xc0\x00\x02\x01"}, {kind: 4, data: b"\x07\x00\x00\x00"}, {kind: 6, data: b"\x64\x00\x00\x00"}], destination: null, destination_prefix_length: 0, family: "inet", flags: 0, gateway: "192.0.2.1", input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: null, priority: 100, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos: 0}
+}
+
+proc rejects_default(plan: policy.NetworkPlan, routes: List[LinuxNetworkRoute], message: Str) {
   var dump = primary_dump()
-  dump.routes = [{attributes: [], destination: null, destination_prefix_length: 0, family: "inet", flags: 0, gateway: "192.0.2.1", input_ifindex: null, nexthops: [], output_ifindex: 7, preferred_source: null, priority: 100, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos: 0}]
+  dump.routes = routes
   match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "selected default routes require qualified TOS observations"
-    Ok(_) => assert false, "a TOS-specific default cannot establish an ordinary-traffic default"
+    Err(problem) => assert problem.message == message
+    Ok(_) => assert false, message
   }
 }
 
+test test_ordinary_selected_default_route_projects_with_exact_gateway_and_metric [fs, error] {
+  let plan = fixture_plan()?
+  var dump = primary_dump()
+  dump.routes = [ordinary_default()]
+  let snapshot = kernel.network_project_dump(dump, plan.intent, 1)?
+  assert snapshot.routes == [{gateway: "192.0.2.1", metric: 100}]
+}
+
+test test_tos_specific_default_never_converges_with_an_ordinary_default [fs, error] {
+  let plan = fixture_plan()?
+  var specific = ordinary_default()
+  specific.tos = 8
+  let message = "selected default route is TOS-specific and cannot converge with ordinary traffic"
+  rejects_default(plan, [specific], message)
+  rejects_default(plan, [ordinary_default(), specific], message)
+}
+
+test test_default_routes_on_other_interfaces_are_not_projected [fs, error] {
+  let plan = fixture_plan()?
+  var foreign = ordinary_default()
+  foreign.output_ifindex = 9
+  foreign.tos = 8
+  var dump = primary_dump()
+  dump.routes = [foreign]
+  let snapshot = kernel.network_project_dump(dump, plan.intent, 1)?
+  assert snapshot.routes.is_empty()
+}
+
+test test_customized_selected_default_routes_are_refused [fs, error] {
+  let plan = fixture_plan()?
+  var protocol = ordinary_default()
+  protocol.protocol = 4
+  rejects_default(plan, [protocol], "selected default route is outside the supported main-table unicast cohort")
+  var table = ordinary_default()
+  table.table = 100
+  rejects_default(plan, [table], "selected default route is outside the supported main-table unicast cohort")
+  var mtu = ordinary_default()
+  mtu.attributes += [{kind: 8, data: b"\x00\x00\x00\x00"}]
+  rejects_default(plan, [mtu], "selected default route carries unsupported attributes")
+}
 
 test test_same_prefix_addition_is_rejected_before_any_request [fs, error] {
   let original = fixture_plan()?

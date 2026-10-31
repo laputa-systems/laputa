@@ -32,7 +32,7 @@ proc capture() [process, error] -> Result[NetworkConflictCapture, Error] {
   let routes = [route for route in dump.routes if route.output_ifindex == link.ifindex and route.family == "inet" and route.destination_prefix_length == 0]
   if routes.len() != 1 { return Err(NetworkCaptureError.Failed("capture requires exactly one selected IPv4 default route")) }
   let route = routes[0]
-  if route.table != 254 or route.route_type != 1 or route.source_prefix_length != 0 or route.gateway == null or !route.nexthops.is_empty() {
+  if route.tos != 0 or route.table != 254 or route.route_type != 1 or route.source_prefix_length != 0 or route.gateway == null or !route.nexthops.is_empty() {
     return Err(NetworkCaptureError.Failed("selected route is outside the supported main-table unicast cohort"))
   }
   let metric = if route.priority == null { 0 } else { route.priority }

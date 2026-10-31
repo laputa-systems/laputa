@@ -60,6 +60,30 @@ pure address_derived_route(route: LinuxNetworkRoute, address: LinuxNetworkAddres
   Ok(false)
 }
 
+pure selected_default_route(route: LinuxNetworkRoute, ifindex: Int) -> Result[policy.NetworkDefaultRoute, Error] {
+  if route.tos != 0 {
+    return Err(NetworkKernelError.Conflict("selected default route is TOS-specific and cannot converge with ordinary traffic"))
+  }
+  if route.table != 254 or route.route_type != 1 or route.scope != 0 or route.protocol != 3 or route.flags != 0 or route.gateway == null or route.destination != null or route.source != null or route.preferred_source != null or route.source_prefix_length != 0 or route.input_ifindex != null or !route.nexthops.is_empty() {
+    return Err(NetworkKernelError.Conflict("selected default route is outside the supported main-table unicast cohort"))
+  }
+  let metric = if route.priority == null { 0 } else { route.priority }
+  var seen: List[Int] = []
+  for item in route.attributes {
+    if item.kind in seen { return Err(NetworkKernelError.Conflict("selected default route repeats an attribute")) }
+    seen += [item.kind]
+    let supported = match item.kind {
+      4 => item.data == bytes.pack_le(ifindex, 4)?
+      5 => item.data == ipv4_bytes(route.gateway)?
+      6 => item.data == bytes.pack_le(metric, 4)?
+      15 => item.data == bytes.pack_le(254, 4)?
+      else => false
+    }
+    if !supported { return Err(NetworkKernelError.Conflict("selected default route carries unsupported attributes")) }
+  }
+  Ok({gateway: route.gateway, metric})
+}
+
 ## Project a complete dump without silently accepting unsupported selected resources.
 export pure network_project_dump(dump: LinuxNetworkDump, intent: policy.NetworkIntent, sequence: Int) -> Result[policy.NetworkSnapshot, Error] {
   if !dump.enumeration_succeeded or dump.state != "complete" or !dump.issues.is_empty() {
@@ -82,6 +106,7 @@ export pure network_project_dump(dump: LinuxNetworkDump, intent: policy.NetworkI
     }
     addresses += [{local: address.local, prefix: address.prefix_length}]
   }
+  var routes: List[policy.NetworkDefaultRoute] = []
   for route in dump.routes {
     continue when route.family != "inet"
     if route.preferred_source != null {
@@ -94,15 +119,14 @@ export pure network_project_dump(dump: LinuxNetworkDump, intent: policy.NetworkI
     }
     continue when route.destination_prefix_length != 0
     for hop in route.nexthops {
-      if hop.ifindex == intent.ifindex { return Err(NetworkKernelError.Conflict("selected default routes require qualified TOS observations")) }
+      if hop.ifindex == intent.ifindex { return Err(NetworkKernelError.Conflict("selected default route is outside the supported main-table unicast cohort")) }
     }
-    if route.output_ifindex == intent.ifindex {
-      return Err(NetworkKernelError.Conflict("selected default routes require qualified TOS observations"))
-    }
+    continue when route.output_ifindex != intent.ifindex
+    routes += [selected_default_route(route, intent.ifindex)?]
   }
   let projected: policy.NetworkSnapshot = {
     sequence, ifindex: link.ifindex, name: intent.name, kind: link.kind,
-    up: link.flags.bit_and(1) != 0, addresses, routes: [],
+    up: link.flags.bit_and(1) != 0, addresses, routes,
   }
   Ok(ordered(projected))
 }
