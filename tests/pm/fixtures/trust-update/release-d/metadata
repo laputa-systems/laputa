@@ -1,5 +1,6 @@
-laputa-trust-release-v1
+laputa-trust-release-v2
 generation 4
-expires-at 1800043634
-root-bundle-sha256 4c17c840fc73b8467ae8f8142875c2d247c4192ef7de1582b4b62d244d93eaa9
-trust-policy-sha256 d1d334d3795fc8595df0a3921e8b7395e8bab7de1ea2cd8473a06ff26291c51a
+issued-at 1793480751
+expires-at 1800392751
+root-bundle-sha256 8fea7ca39ff453383023fbf7a9c0124353c798edadfd4c010113058f13e707d9
+trust-policy-sha256 15562f5271c03aa1ab1d688a69913335f3b94d5108545d01ccd63f5f7a0aa267

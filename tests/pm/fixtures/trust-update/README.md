@@ -17,6 +17,8 @@ trusted by production: production trusts only the provisioned key at
   rotated key plus these bytes as new seeds, then `trust update` converges
   to generation 4. Releases carry no keys: exactly four files with the same
   metadata, signature, bundle, and policy shape as every other release.
+- `release-expired/`, `release-too-far/`, `release-future/`, and
+  `release-boundary/` exercise signed validity interval boundaries.
 - `release-b-wrongsigned/` — release B metadata signed by the wrong key.
 - `release-a-stale/` — signed generation-1 re-statement for replay tests.
 - `tls/` — disposable TLS PKI for fixture HTTPS servers (test CAs, server

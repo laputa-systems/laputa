@@ -39,10 +39,12 @@ roots so unrelated sites remain trusted.
 Signed releases are the only trust mutations. A release is exactly four
 files: `metadata`, `metadata.sig` (raw 64-byte Ed25519), `ca-certificates.crt`
 (≤ 4 MiB), `trust-policy` (≤ 1 MiB). Metadata is ≤ 4 KiB of LF-terminated
-UTF-8 with exactly five ordered lines: `laputa-trust-release-v1`,
-`generation`, `expires-at`, `root-bundle-sha256`, and `trust-policy-sha256`.
-Releases expire within 90 days of signing. The policy generation must equal
-the signed generation and advance the installed-policy snapshot. There is no
+UTF-8 with exactly six ordered lines: `laputa-trust-release-v2`,
+`generation`, `issued-at`, `expires-at`, `root-bundle-sha256`, and
+`trust-policy-sha256`. Both times are positive canonical Unix seconds. The
+signed interval must be positive and no longer than 90 days. The host wall
+clock must satisfy `issued-at <= now < expires-at`. Version 1 is rejected.
+The policy generation must equal the signed generation and advance the installed-policy snapshot. There is no
 empty-state or test-key default; every check takes the provisioned key and
 `now_epoch_seconds` from the host wall clock.
 
@@ -84,9 +86,9 @@ symlink onto `generations/<N>`. Around it:
   enforced) before flipping; an already-flipped generation rolls forward
   with bookkeeping verification (signature and digests, no expiry — an
   expired but correctly activated generation is reconciled, never
-  re-authorized, and new candidates still require fresh expiry). Every
-  recovery step persists the accepted generation and the time lower bound
-  before clearing the journal. Unreadable or unknown journals,
+  re-authorized, and new candidates still require fresh expiry). Recovery of
+  a committed or active release persists the accepted generation and signed
+  publication-time floor before clearing the journal. Unreadable or unknown journals,
   active/journal disagreements, and staging/commitment collisions fail
   closed for manual inspection.
 - Atomic visibility and power-loss durability are separate claims. The
@@ -100,8 +102,16 @@ symlink onto `generations/<N>`. Around it:
 - `accepted` is a high-water mark that never rolls back distrust: updates
   must advance it, and a store whose accepted generation is ahead of active
   refuses to proceed.
-- The persisted time lower bound advances on every activation and rejects
-  releases the local clock reads as expired relative to it.
+- The versioned `laputa-trust-signed-floor-v1` state records the greatest
+  authenticated `issued-at` from activated releases. The file contains the
+  version line and the positive canonical Unix seconds on separate LF-terminated
+  lines. A wall clock behind it fails closed. The floor is rollback evidence, not an authenticated current
+  time. Bootstrap requires a trustworthy RTC or operator-supplied time. The
+  update never adjusts the clock, and HTTPS certificate checks remain enabled.
+  NTS qualification is separate. Legacy numeric floors record unauthenticated
+  wall time and fail closed; they are not migrated or deleted automatically.
+  Resolving a legacy floor requires operator investigation and trusted
+  reprovisioning before updates can proceed.
 - After the flip, activation re-reads the canonical paths until they agree
   with the activated digests, so `status` never reports a half-visible
   generation.

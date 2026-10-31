@@ -16,6 +16,10 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 OUT=$ROOT
+SCRATCH_ROOT=$ROOT/../../../../.work/tmp
+mkdir -p "$SCRATCH_ROOT"
+SCRATCH=$(mktemp -d "$SCRATCH_ROOT/trust-fixtures.XXXXXXXX")
+trap 'rm -rf "$SCRATCH"' EXIT HUP INT TERM
 KEYS=$OUT/keys
 REL_B=$OUT/release-b
 REL_C=$OUT/release-c
@@ -37,21 +41,21 @@ sha256hex() { python3 -c 'import hashlib,sys; sys.stdout.write(hashlib.sha256(sy
 # S (rotated package key for the LAP-41 rotation proof).
 # Fresh on every run: private halves are never committed, so regeneration
 # rotates every fixture consistently.
-openssl genpkey -algorithm ed25519 -out "$ROOT/.q.priv"
-openssl pkey -in "$ROOT/.q.priv" -pubout -outform DER -out "$ROOT/.q.spki.der"
-tail -c 32 "$ROOT/.q.spki.der" | b64 > "$KEYS/signing-key.public.base64"
-cp "$ROOT/.q.priv" "$KEYS/.signing-key.private.tmp"
-rm "$ROOT/.q.priv" "$ROOT/.q.spki.der"
-openssl genpkey -algorithm ed25519 -out "$ROOT/.r.priv"
-openssl pkey -in "$ROOT/.r.priv" -pubout -outform DER -out "$ROOT/.r.spki.der"
-tail -c 32 "$ROOT/.r.spki.der" | b64 > "$KEYS/wrong-key.public.base64"
-cp "$ROOT/.r.priv" "$ROOT/.rkey.tmp"
-rm "$ROOT/.r.priv" "$ROOT/.r.spki.der"
-openssl genpkey -algorithm ed25519 -out "$ROOT/.s.priv"
-openssl pkey -in "$ROOT/.s.priv" -pubout -outform DER -out "$ROOT/.s.spki.der"
-tail -c 32 "$ROOT/.s.spki.der" | b64 > "$KEYS/rotation-key.public.base64"
-cp "$ROOT/.s.priv" "$ROOT/.skey.tmp"
-rm "$ROOT/.s.priv" "$ROOT/.s.spki.der"
+openssl genpkey -algorithm ed25519 -out "$SCRATCH/q.priv"
+openssl pkey -in "$SCRATCH/q.priv" -pubout -outform DER -out "$SCRATCH/q.spki.der"
+tail -c 32 "$SCRATCH/q.spki.der" | b64 > "$KEYS/signing-key.public.base64"
+cp "$SCRATCH/q.priv" "$SCRATCH/signing-key.private.tmp"
+rm "$SCRATCH/q.priv" "$SCRATCH/q.spki.der"
+openssl genpkey -algorithm ed25519 -out "$SCRATCH/r.priv"
+openssl pkey -in "$SCRATCH/r.priv" -pubout -outform DER -out "$SCRATCH/r.spki.der"
+tail -c 32 "$SCRATCH/r.spki.der" | b64 > "$KEYS/wrong-key.public.base64"
+cp "$SCRATCH/r.priv" "$SCRATCH/rkey.tmp"
+rm "$SCRATCH/r.priv" "$SCRATCH/r.spki.der"
+openssl genpkey -algorithm ed25519 -out "$SCRATCH/s.priv"
+openssl pkey -in "$SCRATCH/s.priv" -pubout -outform DER -out "$SCRATCH/s.spki.der"
+tail -c 32 "$SCRATCH/s.spki.der" | b64 > "$KEYS/rotation-key.public.base64"
+cp "$SCRATCH/s.priv" "$SCRATCH/skey.tmp"
+rm "$SCRATCH/s.priv" "$SCRATCH/s.spki.der"
 echo "fixture signing keys ready (private halves are NOT committed)"
 
 # Test TLS PKI: roots A and B, servers, and a cross-signed intermediate pair.
@@ -152,19 +156,20 @@ cat "$TLS/ca-a.crt" >> "$REL_B/ca-certificates.crt"
 {
   echo "laputa-trust-policy-v1"
   echo "generation 2"
-  grep "^blocked-spki-sha256" "$SEED_POLICY"
+  rg "^blocked-spki-sha256" "$SEED_POLICY"
   echo "blocked-spki-sha256 $BLOCKED_X"
 } > "$REL_B/trust-policy"
 BUNDLE_B_HEX=$(sha256hex < "$REL_B/ca-certificates.crt")
 POLICY_B_HEX=$(sha256hex < "$REL_B/trust-policy")
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 2"
+  echo "issued-at $NOW"
   echo "expires-at $EXPIRES"
   echo "root-bundle-sha256 $BUNDLE_B_HEX"
   echo "trust-policy-sha256 $POLICY_B_HEX"
 } > "$REL_B/metadata"
-openssl pkeyutl -sign -inkey "$KEYS/.signing-key.private.tmp" -rawin -in "$REL_B/metadata" -out "$REL_B/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$REL_B/metadata" -out "$REL_B/metadata.sig"
 [ "$(wc -c < "$REL_B/metadata.sig")" = "64" ] || { echo "bad signature length" >&2; exit 1; }
 
 # Release C (generation 3): seed bundle plus test root B (root A removed).
@@ -173,36 +178,38 @@ cat "$TLS/ca-b.crt" >> "$REL_C/ca-certificates.crt"
 {
   echo "laputa-trust-policy-v1"
   echo "generation 3"
-  grep "^blocked-spki-sha256" "$SEED_POLICY"
+  rg "^blocked-spki-sha256" "$SEED_POLICY"
   echo "blocked-spki-sha256 $BLOCKED_X"
 } > "$REL_C/trust-policy"
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 3"
+  echo "issued-at $NOW"
   echo "expires-at $EXPIRES"
   echo "root-bundle-sha256 $(sha256hex < "$REL_C/ca-certificates.crt")"
   echo "trust-policy-sha256 $(sha256hex < "$REL_C/trust-policy")"
 } > "$REL_C/metadata"
-openssl pkeyutl -sign -inkey "$KEYS/.signing-key.private.tmp" -rawin -in "$REL_C/metadata" -out "$REL_C/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$REL_C/metadata" -out "$REL_C/metadata.sig"
 
 # Stale generation-1 re-statement (same bytes as the pinned seeds).
 cp "$SEED_BUNDLE" "$REL_A/ca-certificates.crt"
 cp "$SEED_POLICY" "$REL_A/trust-policy"
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 1"
+  echo "issued-at $NOW"
   echo "expires-at $EXPIRES"
   echo "root-bundle-sha256 $(sha256hex < "$REL_A/ca-certificates.crt")"
   echo "trust-policy-sha256 $(sha256hex < "$REL_A/trust-policy")"
 } > "$REL_A/metadata"
-openssl pkeyutl -sign -inkey "$KEYS/.signing-key.private.tmp" -rawin -in "$REL_A/metadata" -out "$REL_A/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$REL_A/metadata" -out "$REL_A/metadata.sig"
 
 # Wrong-signer variant: B metadata signed by the wrong key.
 cp "$REL_B/metadata" "$REL_WRONG/metadata"
 cp "$REL_B/ca-certificates.crt" "$REL_WRONG/ca-certificates.crt"
 cp "$REL_B/trust-policy" "$REL_WRONG/trust-policy"
-openssl pkeyutl -sign -inkey "$ROOT/.rkey.tmp" -rawin -in "$REL_WRONG/metadata" -out "$REL_WRONG/metadata.sig"
-rm -f "$ROOT/.rkey.tmp"
+openssl pkeyutl -sign -inkey "$SCRATCH/rkey.tmp" -rawin -in "$REL_WRONG/metadata" -out "$REL_WRONG/metadata.sig"
+rm -f "$SCRATCH/rkey.tmp"
 
 # Rotation generation 4: seed bundle plus both test roots, signed by the
 # rotated package key S. The package update ships S plus these bytes as new
@@ -213,19 +220,20 @@ cat "$TLS/ca-b.crt" >> "$REL_D/ca-certificates.crt"
 {
   echo "laputa-trust-policy-v1"
   echo "generation 4"
-  grep "^blocked-spki-sha256" "$SEED_POLICY"
+  rg "^blocked-spki-sha256" "$SEED_POLICY"
   echo "blocked-spki-sha256 $BLOCKED_X"
 } > "$REL_D/trust-policy"
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 4"
+  echo "issued-at $NOW"
   echo "expires-at $EXPIRES"
   echo "root-bundle-sha256 $(sha256hex < "$REL_D/ca-certificates.crt")"
   echo "trust-policy-sha256 $(sha256hex < "$REL_D/trust-policy")"
 } > "$REL_D/metadata"
-openssl pkeyutl -sign -inkey "$ROOT/.skey.tmp" -rawin -in "$REL_D/metadata" -out "$REL_D/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/skey.tmp" -rawin -in "$REL_D/metadata" -out "$REL_D/metadata.sig"
 [ "$(wc -c < "$REL_D/metadata.sig")" = "64" ] || { echo "bad signature length" >&2; exit 1; }
-rm -f "$ROOT/.skey.tmp"
+rm -f "$SCRATCH/skey.tmp"
 
 # Expiry boundary variants over release B bytes (signed by Q).
 REL_EXP=$OUT/release-expired
@@ -234,25 +242,51 @@ mkdir -p "$REL_EXP" "$REL_FAR"
 BUNDLE_HEX=$(sha256hex < "$REL_B/ca-certificates.crt")
 POLICY_HEX=$(sha256hex < "$REL_B/trust-policy")
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 2"
+  echo "issued-at $((NOW - 2 * 86400))"
   echo "expires-at $((NOW - 86400))"
   echo "root-bundle-sha256 $BUNDLE_HEX"
   echo "trust-policy-sha256 $POLICY_HEX"
 } > "$REL_EXP/metadata"
 cp "$REL_B/ca-certificates.crt" "$REL_EXP/ca-certificates.crt"
 cp "$REL_B/trust-policy" "$REL_EXP/trust-policy"
-openssl pkeyutl -sign -inkey "$KEYS/.signing-key.private.tmp" -rawin -in "$REL_EXP/metadata" -out "$REL_EXP/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$REL_EXP/metadata" -out "$REL_EXP/metadata.sig"
 {
-  echo "laputa-trust-release-v1"
+  echo "laputa-trust-release-v2"
   echo "generation 2"
+  echo "issued-at $NOW"
   echo "expires-at $((NOW + 91 * 86400))"
   echo "root-bundle-sha256 $BUNDLE_HEX"
   echo "trust-policy-sha256 $POLICY_HEX"
 } > "$REL_FAR/metadata"
 cp "$REL_B/ca-certificates.crt" "$REL_FAR/ca-certificates.crt"
 cp "$REL_B/trust-policy" "$REL_FAR/trust-policy"
-openssl pkeyutl -sign -inkey "$KEYS/.signing-key.private.tmp" -rawin -in "$REL_FAR/metadata" -out "$REL_FAR/metadata.sig"
+openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$REL_FAR/metadata" -out "$REL_FAR/metadata.sig"
 
-rm -f "$KEYS/.signing-key.private.tmp"
+REL_FUTURE=$OUT/release-future
+REL_BOUNDARY=$OUT/release-boundary
+mkdir -p "$REL_FUTURE" "$REL_BOUNDARY"
+for variant in future boundary; do
+  if [ "$variant" = future ]; then
+    issue=$((NOW + 365 * 86400))
+    expires=$((NOW + 366 * 86400))
+    target=$REL_FUTURE
+  else
+    issue=$NOW
+    expires=$((NOW + 90 * 86400))
+    target=$REL_BOUNDARY
+  fi
+  {
+    echo "laputa-trust-release-v2"
+    echo "generation 2"
+    echo "issued-at $issue"
+    echo "expires-at $expires"
+    echo "root-bundle-sha256 $BUNDLE_HEX"
+    echo "trust-policy-sha256 $POLICY_HEX"
+  } > "$target/metadata"
+  openssl pkeyutl -sign -inkey "$SCRATCH/signing-key.private.tmp" -rawin -in "$target/metadata" -out "$target/metadata.sig"
+done
+
+rm -f "$SCRATCH/signing-key.private.tmp"
 echo "fixtures generated under tests/pm/fixtures/trust-update; private keys were not committed"

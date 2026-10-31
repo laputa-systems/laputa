@@ -20,10 +20,12 @@ export error ReleaseError = InvalidData(message: Str)
 export type VerifiedTrustRelease = {
   root_bundle: Bytes,
   trust_policy: Bytes,
+  issued_at: Int,
 }
 
 type ReleaseMetadata = {
   generation: Str,
+  issued_at: Int,
   expires_at: Int,
   root_bundle_sha256: Str,
   trust_policy_sha256: Str,
@@ -53,7 +55,7 @@ export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMeta
   let text = message.utf8()?
   release_require(text.ends_with("\n") and "\r" not in text, "signed metadata must use LF-terminated UTF-8 lines")
   let lines = text.byte_slice(0, text.byte_len() - 1).split("\n")
-  release_require(lines.len() == 5 and lines[0] == "laputa-trust-release-v1", "signed metadata header or field count is invalid")
+  release_require(lines.len() == 6 and lines[0] == "laputa-trust-release-v2", "signed metadata header or field count is invalid")
 
   let generation_fields = lines[1].split(" ")
   release_require(
@@ -61,18 +63,25 @@ export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMeta
     "signed metadata generation is invalid",
   )
 
-  let expiry_fields = lines[2].split(" ")
+  let issued_fields = lines[2].split(" ")
+  release_require(issued_fields.len() == 2 and issued_fields[0] == "issued-at", "signed metadata issued-at field is invalid")
+  let issued_at = issued_fields[1].parse_int_decimal()?
+  release_require(issued_at > 0 and f"{issued_at}" == issued_fields[1], "signed metadata issued-at is invalid")
+
+  let expiry_fields = lines[3].split(" ")
   release_require(expiry_fields.len() == 2 and expiry_fields[0] == "expires-at", "signed metadata expiry field is invalid")
   let expires_at = expiry_fields[1].parse_int_decimal()?
   release_require(expires_at > 0 and f"{expires_at}" == expiry_fields[1], "signed metadata expiry is invalid")
 
-  let root_digest_fields = lines[3].split(" ")
+  release_require(expires_at > issued_at and expires_at - issued_at <= MAX_RELEASE_VALIDITY_SECONDS, "trust release lifetime exceeds the 90-day validity limit or is invalid")
+
+  let root_digest_fields = lines[4].split(" ")
   release_require(
     root_digest_fields.len() == 2 and root_digest_fields[0] == "root-bundle-sha256" and release_sha256_is_valid(root_digest_fields[1]),
     "signed metadata root bundle digest is invalid",
   )
 
-  let policy_digest_fields = lines[4].split(" ")
+  let policy_digest_fields = lines[5].split(" ")
   release_require(
     policy_digest_fields.len() == 2 and policy_digest_fields[0] == "trust-policy-sha256" and release_sha256_is_valid(policy_digest_fields[1]),
     "signed metadata trust policy digest is invalid",
@@ -80,6 +89,7 @@ export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMeta
 
   {
     generation: generation_fields[1],
+    issued_at,
     expires_at,
     root_bundle_sha256: root_digest_fields[1],
     trust_policy_sha256: policy_digest_fields[1],
@@ -99,11 +109,8 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
 
   let release = release_parse_metadata(input.metadata)?
   release_require(input.now_epoch_seconds >= 0, "current UTC time is invalid")
+  release_require(release.issued_at <= input.now_epoch_seconds, "trust release issued-at is in the future")
   release_require(release.expires_at > input.now_epoch_seconds, "trust release has expired")
-  release_require(
-    release.expires_at - input.now_epoch_seconds <= MAX_RELEASE_VALIDITY_SECONDS,
-    "trust release expiry exceeds the 90-day validity limit",
-  )
 
   let installed_policy = policy.parse(input.installed_policy_snapshot)?
   let next_policy = policy.parse(input.next_policy)?
@@ -125,5 +132,6 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
   {
     root_bundle: input.root_bundle,
     trust_policy: input.next_policy,
+    issued_at: release.issued_at,
   }
 }

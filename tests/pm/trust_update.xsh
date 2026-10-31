@@ -224,7 +224,7 @@ test trust_update_rejects_expired_and_overlong_releases [fs, process, time, erro
 
   let far = fixture("release-too-far")
   let metadata = fp"{far}/metadata".read_bytes()?
-  let expiry = trust_release.release_parse_metadata(metadata)?.expires_at
+  let expiry = metadata.utf8()?.split("\n")[3].split(" ")[1].parse_int_decimal()?
   let input = {
     metadata,
     signature: fp"{far}/metadata.sig".read_bytes()?,
@@ -238,7 +238,26 @@ test trust_update_rejects_expired_and_overlong_releases [fs, process, time, erro
     Ok(_) => test.fail("overlong signed release was accepted"),
     Err(problem) => assert "90-day" in problem.message
   }
-  let _ = trust_release.release_verify({...input, now_epoch_seconds: expiry - 7776000})?
+  let boundary = fixture("release-boundary")
+  let boundary_metadata = fp"{boundary}/metadata".read_bytes()?
+  let issued = trust_release.release_parse_metadata(boundary_metadata)?.issued_at
+  let boundary_verified = trust_release.release_verify({
+    ...input,
+    metadata: boundary_metadata,
+    signature: fp"{boundary}/metadata.sig".read_bytes()?,
+    now_epoch_seconds: issued + 7775999,
+  })?
+  assert boundary_verified.issued_at == issued
+  let future = fixture("release-future")
+  match trust_release.release_verify({
+    ...input,
+    metadata: fp"{future}/metadata".read_bytes()?,
+    signature: fp"{future}/metadata.sig".read_bytes()?,
+    now_epoch_seconds: issued,
+  }) {
+    Ok(_) => test.fail("future-issued trust release was accepted"),
+    Err(problem) => assert "future" in problem.message
+  }
 }
 
 test trust_update_rejects_unparseable_seed_bundle [fs, process, time, error] { |ctx|
@@ -384,7 +403,7 @@ test trust_update_rejects_releases_behind_the_time_lower_bound [fs, process, tim
   let _ = trust_update.trust_update_from_dir(root, source)?
 
   let paths = trust_store.trust_store_paths(root)
-  trust_store.trust_store_persist_lower_bound(paths, time.now() / 1000 + 100000)?
+  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("trust update accepted a release behind the persisted time bound"),
     Err(problem) => assert "system clock reads behind" in problem.message
@@ -399,12 +418,13 @@ test trust_update_persists_a_monotonic_time_lower_bound [fs, process, time, erro
   let _ = trust_update.trust_update_from_dir(root, source)?
 
   let paths = trust_store.trust_store_paths(root)
-  let first = trust_store.trust_store_read_lower_bound(paths)?
-  assert first > 0
+  let first = trust_store.trust_store_read_signed_floor(paths)?
+  let issued = fixture("release-b/metadata").read_text()?.split("\n")[2].split(" ")[1].parse_int_decimal()?
+  assert first == issued
 
   let _ = trust_update.trust_update_from_dir(root, source)?
-  let second = trust_store.trust_store_read_lower_bound(paths)?
-  assert second >= first
+  let second = trust_store.trust_store_read_signed_floor(paths)?
+  assert second == first
 }
 
 test trust_update_recovers_interrupted_staging [fs, process, time, error] { |ctx|
@@ -616,7 +636,7 @@ test trust_update_rolls_forward_expired_active_without_bricking [fs, process, ti
   let applied = trust_update.trust_update_from_dir(root, source)?
   assert applied.generation == "3"
   assert trust_store.trust_store_read_accepted(paths)? == "3"
-  assert trust_store.trust_store_read_lower_bound(paths)? > 0
+  assert trust_store.trust_store_read_signed_floor(paths)? > 0
   let journal = trust_store.trust_store_read_journal(paths)?
   assert journal.present == false
 }
@@ -667,7 +687,7 @@ test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |c
 
   let release_text = fixture("release-d/metadata").read_text()?
   assert release_text.ends_with("\n") and "\r" not in release_text
-  assert release_text.byte_slice(0, release_text.byte_len() - 1).split("\n").len() == 5
+  assert release_text.byte_slice(0, release_text.byte_len() - 1).split("\n").len() == 6
   assert "generation 4" in release_text
 
   let early_rotated = stage_release(ctx, "trust-update-rotation-early", "release-d")?
@@ -880,4 +900,78 @@ test trust_update_refuses_torn_journal_write_without_mutation [fs, process, time
   assert trust_store.trust_store_read_accepted(paths)? == "2"
   assert active_bundle(root)? == fixture("release-b/ca-certificates.crt").read_bytes()?
   assert paths.journal.read_bytes()? == torn
+}
+
+test trust_update_rejects_legacy_wall_clock_floor [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-legacy-floor", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  let paths = trust_store.trust_store_paths(root)
+  paths.lower_bound.write(bytes.from_text("1234567890\n"))?
+  let source = stage_release(ctx, "trust-update-legacy-floor-source", "release-b")?
+  match trust_update.trust_update_from_dir(root, source) {
+    Ok(_) => test.fail("legacy wall-clock floor was accepted"),
+    Err(problem) => assert "signed" in problem.message
+  }
+  assert paths.lower_bound.read_text()? == "1234567890\n"
+  assert trust_store.trust_store_read_active(paths)? == "1"
+}
+
+test trust_update_recovery_persists_signed_time_for_expired_active_release [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-signed-recovery", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  let paths = trust_store.trust_store_paths(root)
+  let metadata = fixture("release-expired/metadata").read_bytes()?
+  let issued = trust_release.release_parse_metadata(metadata)?.issued_at
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "2",
+    fixture("release-expired/ca-certificates.crt").read_bytes()?,
+    fixture("release-expired/trust-policy").read_bytes()?,
+    metadata,
+    fixture("release-expired/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  trust_store.trust_store_flip_active(paths, "2")?
+  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)?
+  let source = stage_release(ctx, "trust-update-signed-recovery-source", "release-expired")?
+  match trust_update.trust_update_from_dir(root, source) {
+    Ok(_) => test.fail("expired active release was reauthorized"),
+    Err(problem) => assert "expired" in problem.message
+  }
+  assert trust_store.trust_store_read_accepted(paths)? == "2"
+  assert trust_store.trust_store_read_signed_floor(paths)? == issued
+  assert issued < time.now() / 1000
+}
+
+test trust_release_rejects_legacy_v1_metadata [fs, error] { |_ctx|
+  let legacy = p"tests/fixtures/trust-release/valid.metadata".read_bytes()?
+  match trust_release.release_parse_metadata(legacy) {
+    Ok(_) => test.fail("legacy trust release metadata was accepted"),
+    Err(problem) => assert "field count" in problem.message
+  }
+}
+
+
+test trust_update_rejects_future_issued_staged_adoption [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-future-adoption", "signing-key")?
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  let paths = trust_store.trust_store_paths(root)
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "2",
+    fixture("release-b/ca-certificates.crt").read_bytes()?,
+    fixture("release-b/trust-policy").read_bytes()?,
+    fixture("release-future/metadata").read_bytes()?,
+    fixture("release-future/metadata.sig").read_bytes()?,
+  )?
+  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  let source = stage_release(ctx, "trust-update-future-adoption-source", "release-b")?
+  match trust_update.trust_update_from_dir(root, source) {
+    Ok(_) => test.fail("future-issued staged release was activated"),
+    Err(problem) => assert "future" in problem.message
+  }
+  assert trust_store.trust_store_read_active(paths)? == "1"
+  assert trust_store.trust_store_read_accepted(paths)? == "1"
+  assert trust_store.trust_store_read_signed_floor(paths)? == 0
 }

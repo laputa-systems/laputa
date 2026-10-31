@@ -16,6 +16,7 @@ export type TrustReleaseBytes = {metadata: Bytes, signature: Bytes, bundle: Byte
 ## TrustVerifiedRelease.
 export type TrustVerifiedRelease = {
   generation: Str,
+  issued_at: Int,
   expires_at: Int,
   bundle: Bytes,
   policy: Bytes,
@@ -40,20 +41,16 @@ pure update_fail(message: Str) -> Error {
 
 proc trust_effective_now_seconds(paths: trust_store.TrustStorePaths) [fs, time, error] -> Result[Int, Error] {
   let wall = time.now() / 1000
-  let floor = trust_store.trust_store_read_lower_bound(paths)?
+  let floor = trust_store.trust_store_read_signed_floor(paths)?
   guard floor <= 0 or wall >= floor else {
     return Err(
       update_fail(
-        "system clock reads behind the last observed trust time; refusing to validate expiry (possible snapshot rollback)",
+        "system clock reads behind the last signed trust publication time; refusing to validate expiry (possible snapshot rollback)",
       ),
     )
   }
 
-  if wall > floor {
-    wall
-  } else {
-    floor
-  }
+  wall
 }
 
 proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) [fs, error] -> Result[Bytes, Error] {
@@ -151,6 +148,7 @@ proc trust_verify_candidate(
   let parsed = trust_release.release_parse_metadata(release.metadata)?
   {
     generation: parsed.generation,
+    issued_at: verified.issued_at,
     expires_at: parsed.expires_at,
     bundle: verified.root_bundle,
     policy: verified.trust_policy,
@@ -166,6 +164,9 @@ proc trust_verify_active_release(
   now_epoch_seconds: Int,
 ) [fs, error] -> Result[TrustVerifiedRelease, Error] {
   let verified = trust_verify_committed_bookkeeping(paths, key, generation)?
+  guard verified.issued_at <= now_epoch_seconds else {
+    return Err(update_fail(f"active trust release issued-at is in the future: generation {generation}"))
+  }
   guard verified.expires_at > now_epoch_seconds else {
     return Err(update_fail(f"active trust release has expired: generation {generation}"))
   }
@@ -211,6 +212,7 @@ proc trust_verify_committed_bookkeeping(
 
   {
     generation,
+    issued_at: parsed.issued_at,
     expires_at: parsed.expires_at,
     bundle,
     policy,
@@ -353,9 +355,7 @@ export proc trust_update_from_dir(
   source: Path,
 ) [fs, process, time, error] -> Result[Record, Error] {
   let release = trust_read_source_dir(source)?
-  let paths = trust_store.trust_store_paths(system_root)
-  let now = trust_effective_now_seconds(paths)?
-  trust_apply_release(system_root, release, now)?
+  trust_apply_release(system_root, release)?
 }
 
 ## Updates from a release published over HTTPS. Transport only; the detached
@@ -367,9 +367,7 @@ export proc trust_update_from_url(
   let work = fs.tempdir()?
   let work_path = work.host_path()?
   let release = trust_acquire_from_url(base_url, work_path)?
-  let paths = trust_store.trust_store_paths(system_root)
-  let now = trust_effective_now_seconds(paths)?
-  trust_apply_release(system_root, release, now)?
+  trust_apply_release(system_root, release)?
 }
 
 proc trust_download_one(
@@ -475,16 +473,19 @@ proc trust_recover(
         Err(_) => false,
       }
       if ! already_active {
-        guard verified.expires_at > now_epoch_seconds else {
+        if verified.issued_at > now_epoch_seconds or verified.expires_at <= now_epoch_seconds {
           trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
           trust_store.trust_store_clear_journal(paths)?
+          if verified.issued_at > now_epoch_seconds {
+            return Err(update_fail(f"staged trust release issued-at is in the future: generation {journal.generation}"))
+          }
           return Err(update_fail(f"staged trust release has expired: generation {journal.generation}"))
         }
       }
 
       trust_store.trust_store_flip_active(paths, journal.generation)?
       trust_store.trust_store_persist_accepted(paths, journal.generation)?
-      trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+      trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
       trust_store.trust_store_clear_journal(paths)?
       return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
     }
@@ -510,7 +511,7 @@ proc trust_recover(
       let verified = trust_verify_committed_bookkeeping(paths, key, journal.generation)?
       trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
       trust_store.trust_store_persist_accepted(paths, journal.generation)?
-      trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+      trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
       trust_store.trust_store_clear_journal(paths)?
       return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
     }
@@ -549,7 +550,7 @@ proc trust_recover(
     }
     trust_store.trust_store_flip_active(paths, journal.generation)?
     trust_store.trust_store_persist_accepted(paths, journal.generation)?
-    trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+    trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
     trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)?
     trust_store.trust_store_clear_journal(paths)?
     return Ok({recovered: true, phase: journal.phase, generation: verified.generation})
@@ -566,7 +567,7 @@ proc trust_recover(
 
   let verified = trust_verify_committed_bookkeeping(paths, key, active)?
   trust_store.trust_store_persist_accepted(paths, active)?
-  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+  trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
   trust_store.trust_store_clear_journal(paths)?
   Ok({recovered: true, phase: journal.phase, generation: verified.generation})
 }
@@ -574,7 +575,6 @@ proc trust_recover(
 proc trust_reconcile_accepted(
   paths: trust_store.TrustStorePaths,
   key: Bytes,
-  now_epoch_seconds: Int,
 ) [fs, time, error] -> Result[Str, Error] {
   let active = trust_store.trust_store_read_active(paths)?
   let accepted = trust_store.trust_store_read_accepted(paths)?
@@ -590,9 +590,9 @@ proc trust_reconcile_accepted(
     return accepted
   }
 
-  let _ = trust_verify_committed_bookkeeping(paths, key, active)?
+  let verified = trust_verify_committed_bookkeeping(paths, key, active)?
   trust_store.trust_store_persist_accepted(paths, active)?
-  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+  trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
   active
 }
 
@@ -601,7 +601,6 @@ proc trust_activate_release(
   verified: TrustVerifiedRelease,
   metadata: Bytes,
   signature: Bytes,
-  now_epoch_seconds: Int,
 ) [fs, process, time, error] -> Result[Record, Error] {
   let generation = verified.generation
   let staged = trust_store.trust_store_stage_candidate(
@@ -638,7 +637,7 @@ proc trust_activate_release(
   trust_store.trust_store_write_journal(paths, "activated", generation, "", staged.token)?
 
   trust_store.trust_store_persist_accepted(paths, generation)?
-  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+  trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
   trust_store.trust_store_write_journal(paths, "persisted", generation, "", staged.token)?
 
   let effective = trust_store.trust_store_reobserve(
@@ -684,7 +683,7 @@ proc trust_resume_active_release(
   }
 
   trust_store.trust_store_persist_accepted(paths, active)?
-  trust_store.trust_store_persist_lower_bound(paths, now_epoch_seconds)?
+  trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
   let effective = trust_store.trust_store_reobserve(
     paths,
     active,
@@ -753,14 +752,15 @@ proc trust_repair_active_pointer(
 proc trust_apply_release(
   system_root: Path,
   release: TrustReleaseBytes,
-  now_epoch_seconds: Int,
 ) [fs, process, time, error] -> Result[Record, Error] {
   let key = trust_key.trust_key_load(system_root)?
   let paths = trust_store.trust_store_paths(system_root)
   let lock = trust_store.trust_store_take_lock(paths)?
   defer fs.unlock(lock)
 
-  let _ = trust_recover(paths, key, now_epoch_seconds)?
+  let recovery_now = trust_effective_now_seconds(paths)?
+  let _ = trust_recover(paths, key, recovery_now)?
+  let _ = trust_effective_now_seconds(paths)?
 
   match trust_store.trust_store_read_active(paths) {
     Ok(_) => {},
@@ -780,7 +780,8 @@ proc trust_apply_release(
     },
   }
 
-  let accepted = trust_reconcile_accepted(paths, key, now_epoch_seconds)?
+  let accepted = trust_reconcile_accepted(paths, key)?
+  let now_epoch_seconds = trust_effective_now_seconds(paths)?
   let parsed = trust_release.release_parse_metadata(release.metadata)?
   let active = trust_store.trust_store_read_active(paths)?
   if parsed.generation == accepted and parsed.generation == active {
@@ -796,5 +797,5 @@ proc trust_apply_release(
   }
 
   let verified = trust_verify_candidate(paths, key, release, now_epoch_seconds)?
-  trust_activate_release(paths, verified, release.metadata, release.signature, now_epoch_seconds)?
+  trust_activate_release(paths, verified, release.metadata, release.signature)?
 }

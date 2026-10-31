@@ -206,31 +206,31 @@ export proc trust_store_persist_accepted(paths: TrustStorePaths, generation: Str
   trust_store_write_line_durable(paths.accepted, f"{generation}\n")
 }
 
-## trust_store_read_lower_bound.
-export proc trust_store_read_lower_bound(paths: TrustStorePaths) [fs, error] -> Result[Int, Error] {
+## Reads the signed publication-time floor.
+export proc trust_store_read_signed_floor(paths: TrustStorePaths) [fs, error] -> Result[Int, Error] {
   guard paths.lower_bound.exists() else {
     return Ok(0)
   }
-
-  let text = paths.lower_bound.read_text()?.trim()
-  let seconds = text.parse_int_decimal()?
-  guard seconds >= 0 and f"{seconds}" == text else {
-    return Err(trust_store_fail("persisted trust time lower bound is corrupt; refusing to proceed"))
+  let text = paths.lower_bound.read_text()?
+  let fields = text.split("\n")
+  guard fields.len() == 3 and fields[0] == "laputa-trust-signed-floor-v1" and fields[2] == "" else {
+    return Err(trust_store_fail("persisted trust signed floor is invalid or legacy; refusing to proceed"))
   }
-
+  let seconds = fields[1].parse_int_decimal()?
+  guard seconds > 0 and f"{seconds}" == fields[1] else {
+    return Err(trust_store_fail("persisted trust signed floor is corrupt; refusing to proceed"))
+  }
   seconds
 }
 
-## trust_store_persist_lower_bound.
-export proc trust_store_persist_lower_bound(paths: TrustStorePaths, seconds: Int) [fs, error] -> Result[Unit, Error] {
-  guard seconds >= 0 else {
-    return Err(trust_store_fail("refusing to persist a negative trust time lower bound"))
+## Persists an authenticated signed publication-time floor.
+export proc trust_store_persist_signed_floor(paths: TrustStorePaths, issued_at: Int) [fs, error] -> Result[Unit, Error] {
+  guard issued_at > 0 else {
+    return Err(trust_store_fail("refusing to persist an invalid trust signed floor"))
   }
-
-  let current = trust_store_read_lower_bound(paths)?
-  return when seconds <= current
-
-  trust_store_write_line_durable(paths.lower_bound, f"{seconds}\n")
+  let current = trust_store_read_signed_floor(paths)?
+  return when issued_at <= current
+  trust_store_write_line_durable(paths.lower_bound, f"laputa-trust-signed-floor-v1\n{issued_at}\n")
 }
 
 ## Recovery journal state.
