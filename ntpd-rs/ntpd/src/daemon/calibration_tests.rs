@@ -65,6 +65,14 @@ fn in_flight_writer_holds_the_lock() {
 }
 
 #[test]
+fn rejects_fifo_state_without_waiting_for_a_writer() {
+    let dir = TestDirectory::new();
+    let store = CalibrationStore::open(&dir.path(), 0.0005).unwrap();
+    assert!(std::process::Command::new("mkfifo").arg(dir.path()).status().unwrap().success());
+    assert!(store.load().is_err());
+}
+
+#[test]
 fn rejects_corrupt_unknown_and_out_of_bounds_state() {
     let dir = TestDirectory::new();
     let store = CalibrationStore::open(&dir.path(), 0.0005).unwrap();
