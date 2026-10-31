@@ -505,12 +505,12 @@ or power-loss durability. Archive extraction and publication still use ambient
 The supplied XSH snapshot has no rooted extraction, no-replace rename, or fsync
 operations that retain the opened root through the entire path.
 
-A scratch-only Linux probe also demonstrated a cleanup ownership defect in
-that snapshot. Rename an owned temporary directory, create a replacement tree
-at its saved pathname, and close the handle. On current XSH the close fails
-with "temporary root was moved or replaced; its directory was left in place"
-and retains both trees instead of removing the replacement, so the fixture
-exits 3 at close instead of reaching its assertions. The reproducer is
+A scratch-only Linux probe covers cleanup ownership. It renames an owned
+temporary directory, creates a replacement tree at its saved pathname, and
+closes the handle. On the supplied XSH the close fails with "temporary root was
+moved or replaced; its directory was left in place" and retains both trees
+instead of removing the replacement, and the fixture asserts exactly that
+fail-closed outcome. The reproducer is
 `tests/system/fixtures/fsroot-cleanup-identity.xsh`. Run it with `TMPDIR` inside
 an ignored `.work/tmp`; it changes only its own temporary tree:
 
