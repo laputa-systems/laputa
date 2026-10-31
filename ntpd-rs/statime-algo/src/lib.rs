@@ -216,6 +216,23 @@ pub struct KalmanController<Storage: KalmanStorage<C>, C: Clock<TAI>> {
     state: Storage::StateMutex,
 }
 
+/// A steady clock frequency correction and its estimated uncertainty, in seconds per second.
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FrequencyCalibration {
+    correction: f64,
+    uncertainty: f64,
+}
+
+#[cfg(feature = "std")]
+impl FrequencyCalibration {
+    /// The frequency correction without phase slew.
+    pub fn correction(self) -> f64 { self.correction }
+
+    /// The standard uncertainty of the correction.
+    pub fn uncertainty(self) -> f64 { self.uncertainty }
+}
+
 impl<Storage: KalmanStorage<C>, C: Clock<TAI>> Controller for KalmanController<Storage, C> {
     type Clock = C;
     type Link<ControllerRef: AsRef<Self>> = KalmanLink<ControllerRef, Storage, C>;
@@ -389,6 +406,32 @@ impl<Storage: KalmanStorage<C>, C: Clock<TAI>> statime_base::StdController
 }
 
 impl<Storage: KalmanStorage<C>, C: Clock<TAI>> KalmanController<Storage, C> {
+    /// Return a physically bounded steady correction when an active source has constrained it.
+    ///
+    /// # Errors
+    /// Fails if the clock is unknown or its frequency cannot be read.
+    #[cfg(feature = "std")]
+    pub fn frequency_calibration(&self, clock_id: ClockId) -> Result<Option<FrequencyCalibration>, AlgoError> {
+        self.state.with_ref(|state| {
+            let clock = state.clocks.iter().find(|clock| clock.id == clock_id)
+                .ok_or(AlgoError::UnknownClock(clock_id))?;
+            if state.filter.active_links().is_empty() {
+                return Ok(None);
+            }
+            let estimate = state.filter.clock_frequency(clock_id)?;
+            let correction = clock.clock.get_frequency()? - estimate.value;
+            let uncertainty = estimate.variance.sqrt();
+            let limit = clock.clock.max_frequency()?;
+            if !correction.is_finite() || !uncertainty.is_finite() || !limit.is_finite() || limit <= 0.0 {
+                return Err(AlgoError::InternalError);
+            }
+            if correction.abs() + uncertainty >= limit {
+                return Ok(None);
+            }
+            Ok(Some(FrequencyCalibration { correction, uncertainty }))
+        })
+    }
+
     /// Create a new clock controller
     ///
     /// # Errors
