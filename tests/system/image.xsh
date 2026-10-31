@@ -45,7 +45,7 @@ test test_gpt_partuuid_matches_the_qemu_kernel_command_line [error] {
   assert f"root=PARTUUID={image.image_root_partuuid()}" in qemu.kernel_cmdline(
     qemu.qemu_target("Linux", "x86_64")?,
     types.Test,
-    {cmdline_flag: "IMAGE_PROOF", ready_marker: "", success_marker: "", failure_marker: "", vt_away_marker: "", vt_back_marker: ""},
+    {cmdline_flag: "IMAGE_PROOF", ready_marker: "", success_marker: "", failure_marker: "", vt_away_marker: "", vt_back_marker: "", input_mode: types.ProofPlain},
   )
 }
 

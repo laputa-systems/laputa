@@ -274,7 +274,7 @@ test test_qemu_boot_command_selects_pending_generation [fs, time, error] { |ctx|
     name: "qemu-dwl-foot", package_roots: ["baselayout"], kernel_package: "linux", kernel_path: p"boot/vmlinuz",
     qemu_smp: 2, qemu_memory: "1536M", qemu_width: 1280, qemu_height: 800,
     forbidden_packages: [], forbidden_sonames: [], qemu_gpu: types.Virtio2d, development: true,
-    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: ""},
+    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: "", input_mode: types.ProofPlain},
   )
   let outputs = build.outputs(p"target/laputa/launcher-fixture")
   assert qemu.boot_command_argv(config, profile, outputs, types.Test, null)? == qemu.qemu_command_argv(config, profile, outputs, types.Test)
@@ -298,7 +298,7 @@ test test_qemu_boot_command_names_the_failed_generation [fs, time, error] { |ctx
     name: "qemu-dwl-foot", package_roots: ["baselayout"], kernel_package: "linux", kernel_path: p"boot/vmlinuz",
     qemu_smp: 2, qemu_memory: "1536M", qemu_width: 1280, qemu_height: 800,
     forbidden_packages: [], forbidden_sonames: [], qemu_gpu: types.Virtio2d, development: true,
-    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: ""},
+    proof: {cmdline_flag: "LAPUTA_QEMU_DWL_FOOT_PROOF", ready_marker: "LAPUTA_DWL_FOOT_PROOF_READY", success_marker: "LAPUTA_DWL_FOOT_PROOF_OK", failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED", vt_away_marker: "", vt_back_marker: "", input_mode: types.ProofPlain},
   )
   let outputs = build.outputs(p"target/laputa/launcher-fixture-failed")
   let argv = qemu.boot_command_argv(config, profile, outputs, types.Test, state)?

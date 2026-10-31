@@ -201,6 +201,16 @@ proc guest_run_required(command: Command, phase: Str) {
   }
 }
 
+proc guest_rss_kb(pid: Int) [fs, error] -> Result[Int, Error] {
+  let status = fp"/proc/{pid}/status".read_text()?
+  for line in status.split("\n") {
+    if line.starts_with("VmRSS:") {
+      return line.split(":")[1].trim().split(" ")[0].parse_int()?
+    }
+  }
+  0
+}
+
 proc guest_granted_device_control(runtime: Path) [fs, process, error] {
   let device = p"/dev/dri/card0"
   let original = fs.stat(device, follow_symlinks: false)?.mode % 4096
@@ -346,14 +356,24 @@ proc main() [fs, process, time, error] {
   while ! fp"{runtime}/laputa-ghostty-input.txt".exists() {
     if waited >= 90 {
       if p"/var/log/tinyland/current".exists() { guest_console(p"/var/log/tinyland/current".read_text()?) }
+      for name in ["laputa-ghostty-read-started", "laputa-ghostty-read-ready", "laputa-session-id"] {
+        let marker = fp"{runtime}/{name}"
+        if marker.exists() { guest_console(f"LAPUTA_TINYLAND_READER {name} {marker.read_text()?.trim()}") }
+      }
       guest_fail("input", f"missing {runtime}/laputa-ghostty-input.txt")
     }
     time.sleep(1s)
     waited += 1
   }
   let input = fp"{runtime}/laputa-ghostty-input.txt".read_text()?.trim()
-  if input != "laputa" {
-    guest_fail("input", f"expected laputa, got {input}")
+  if input != "LAPUTA!" {
+    guest_fail("input", f"expected LAPUTA!, got {input}")
+  }
+
+  let idle_tinyland = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let idle_ghostty = [entry.pid for entry in process.list()? if entry.command == "ghostty-custom"]
+  if idle_ghostty.len() == 1 {
+    guest_console(f"LAPUTA_TINYLAND_RSS tinyland_kb={guest_rss_kb(idle_tinyland)?} ghostty_kb={guest_rss_kb(idle_ghostty[0])?}")?
   }
 
   guest_console("LAPUTA_TINYLAND_GHOSTTY_PROOF_OK")

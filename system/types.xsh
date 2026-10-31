@@ -3,6 +3,11 @@
 ## The execution mode selected for the reference QEMU system.
 export enum QemuMode { Test, Interactive }
 
+## The keys the host injects when a profile's ready marker appears:
+## `ProofPlain` types a lowercase line; `ProofModifiers` drives Caps Lock and
+## Shift and expects an uppercase line with punctuation.
+export enum ProofInputMode { ProofPlain, ProofModifiers }
+
 ## The guest proof markers owned by one system profile. The guest emits the
 ## ready marker when its session accepts input, the success marker only
 ## after it consumes the injected input, and the failure marker on any
@@ -17,6 +22,7 @@ export type ProofMarkers = {
   failure_marker: Str,
   vt_away_marker: Str,
   vt_back_marker: Str,
+  input_mode: ProofInputMode,
 }
 
 ## The guest GPU a profile requires. `Virtio2d` is a 2D virtio-gpu scanout.

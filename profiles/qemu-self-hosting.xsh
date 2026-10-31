@@ -20,6 +20,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     failure_marker: "LAPUTA_SELF_HOSTING_FAILED",
     vt_away_marker: "",
     vt_back_marker: "",
+    input_mode: types.ProofPlain,
   },
   qemu_gpu: types.Virtio2d,
   development: true,

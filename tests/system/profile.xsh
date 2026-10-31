@@ -95,6 +95,7 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       failure_marker: "VALID_PROOF_FAILED",
       vt_away_marker: "",
       vt_back_marker: "",
+    input_mode: types.ProofPlain,
     },
     qemu_gpu: types.Virtio2d,
     development: true,

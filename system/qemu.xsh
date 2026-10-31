@@ -25,7 +25,7 @@ export type QemuTarget = {
 ## The host executable and target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, target: QemuTarget}
 
-enum QmpOperation { QmpReady, QmpInput, QmpVtSwitch(Int), QmpScreenshot(Path) }
+enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpVtSwitch(Int), QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
 error QmpFailure = OutcomeIndeterminate(operation: QmpOperation)
 
@@ -213,6 +213,7 @@ pure qmp_mode(operation: QmpOperation) -> Str {
   match operation {
     QmpReady => "ready"
     QmpInput => "input"
+    QmpInputModified => "input"
     QmpVtSwitch(_) => "vt-switch"
     QmpScreenshot(_) => "screenshot"
   }
@@ -254,6 +255,20 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
       for pair in [{key: "ctrl", down: true}, {key: "d", down: true}, {key: "d", down: false}, {key: "ctrl", down: false}] {
         steps += [qmp_key_step([pair.key], pair.down)?]
       }
+      Ok(steps)
+    },
+    QmpInputModified => {
+      var steps: List[qmp.QmpStep] = []
+      for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
+        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
+      }
+      for pair in [{key: "shift", down: true}, {key: "1", down: true}, {key: "1", down: false}, {key: "shift", down: false}] {
+        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
+      }
+      for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
+        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
+      }
+      steps += [qmp_key_step(["ret"], true)?, qmp.QmpDelay(40), qmp_key_step(["ret"], false)?]
       Ok(steps)
     },
   }
@@ -416,7 +431,11 @@ export proc run_test(
 
     if ! injected and outputs.qmp_socket.exists() and profile.proof.ready_marker in log_text {
       qemu_qmp_retry(QmpRetryReady, outputs.qmp_socket, deadline)
-      qemu_qmp(QmpInput, outputs.qmp_socket, deadline)
+      let input_operation = match profile.proof.input_mode {
+        types.ProofPlain => QmpInput
+        types.ProofModifiers => QmpInputModified
+      }
+      qemu_qmp(input_operation, outputs.qmp_socket, deadline)
       injected = true
     }
 

@@ -6,11 +6,7 @@ let runtime = fp"/run/user/{account.uid}"
 fp"{runtime}/laputa-ghostty-read-ready".write(env.get("LAPUTA_SESSION_ID")?)?
 print "\x1b[48;2;255;0;255m     LAPUTA_TINYLAND_GHOSTTY_VISUAL     \x1b[0m"
 io.flush_stdout()?
-var chunk = io.stdin_read(64)?
-while chunk.len() > 0 {
-  p"/dev/console".write(f"GHOSTTY_READ_CHUNK {chunk.hex()}\n")?
-  chunk = io.stdin_read(64)?
-}
-let input = "laputa"
+fp"{runtime}/laputa-ghostty-read-started".write("started\n")?
+let input = io.stdin_line()?
 fp"{runtime}/laputa-ghostty-input.txt".write(input)?
 let _ = io.stdin_text()?

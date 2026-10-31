@@ -61,6 +61,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     failure_marker: "LAPUTA_TINYLAND_VT_FOOT_PROOF_FAILED",
     vt_away_marker: "LAPUTA_TINYLAND_VT_SWITCH_AWAY",
     vt_back_marker: "LAPUTA_TINYLAND_VT_SWITCH_BACK",
+    input_mode: types.ProofPlain,
   },
   qemu_gpu: types.Virtio2d,
   development: true,

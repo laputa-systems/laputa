@@ -18,6 +18,7 @@ pure fixture_proof() -> types.ProofMarkers {
     failure_marker: "LAPUTA_DWL_FOOT_PROOF_FAILED",
     vt_away_marker: "",
     vt_back_marker: "",
+    input_mode: types.ProofPlain,
   }
 }
 
