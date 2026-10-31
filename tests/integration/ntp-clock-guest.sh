@@ -35,6 +35,7 @@ TMPDIR="$snapshot/.work/tmp" XSH_MODULE_PATH="$snapshot" XSH_HOST="$xsh" "$xsh" 
 channel=$(jaq --from toml -r '.toolchain.channel' "$snapshot/ntpd-rs/rust-toolchain.toml")
 rustc=$(rustup which rustc --toolchain "$channel")
 TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
+  -C linker=mold -C linker-flavor=ld \
   "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
 cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
 if test "$mode" = jump; then touch "$input/inputs/jump-mode"; fi
