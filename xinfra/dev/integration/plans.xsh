@@ -1,86 +1,66 @@
 ##! Saved-plan artifact and stale-observation matrix.
 
+use xinfra.model
+use xinfra.plan
 use xinfra.plan_artifact as artifact
+use xinfra.validate
 
 proc require(condition: Bool, message: Str) -> Result[Unit, Error] {
   if condition { Ok() } else { Err(error.failure(message)) }
 }
 
-pure test_case(label: Str) -> Str {
-  f"ok {label}"
+pure rejected(result: Result[Unit, model.Problem]) -> Bool {
+  match result { Ok(_) => false, Err(_) => true }
 }
 
 ## Executes the saved-plan matrix.
-export proc check_plans() [fs, error] -> Result[Unit, Error] {
-  let root = match fs.tempdir() {
-    Ok(value) => value,
-    Err(error) => { return Err(error) },
-  }
+export proc check_plans() [fs, env, error] -> Result[Unit, Error] {
+  let root = fs.tempdir()?
   let target = fp"{root.host_path()?}/plan.json"
-  let observations = [artifact.Observation(key: "xinfra-a/file", value: "digest-one")]
-  let actions = [
-    artifact.Entry(id: "file", host: "xinfra-a", operation: "ensure_file", observed: "digest-one"),
-  ]
-  let built = artifact.build(
-    "run-1",
-    "deployment-one",
-    "inventory-one",
-    "source-one",
-    "pin-one",
-    observations,
-    actions,
-  )
-  artifact.save(target, built)?
-  let loaded = artifact.load(target)?
-  require(loaded.run_id == "run-1", "run id did not round-trip")?
-  require(loaded.deployment_digest == "deployment-one", "deployment digest did not round-trip")?
-  require(loaded.actions == actions, "actions did not round-trip")?
-  require(loaded.observations == observations, "observations did not round-trip")?
-  print test_case("save and load round-trip")
-
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-one", "source-one", "pin-one", observations, actions) == null,
-    "matching artifact was stale",
-  )?
-  require(
-    artifact.stale(loaded, "deployment-two", "inventory-one", "source-one", "pin-one", observations, actions) == "deployment",
-    "deployment digest was not checked",
-  )?
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-two", "source-one", "pin-one", observations, actions) == "inventory",
-    "inventory digest was not checked",
-  )?
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-one", "source-two", "pin-one", observations, actions) == "source",
-    "source digest was not checked",
-  )?
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-one", "source-one", "pin-two", observations, actions) == "pin",
-    "pin was not checked",
-  )?
-  let changed_observations = [artifact.Observation(key: "xinfra-a/file", value: "digest-two")]
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-one", "source-one", "pin-one", changed_observations, actions) == "observations",
-    "observations were not checked",
-  )?
-  let changed_actions = [
-    artifact.Entry(id: "file", host: "xinfra-a", operation: "ensure_file", observed: "digest-two"),
-    artifact.Entry(id: "extra", host: "xinfra-a", operation: "ensure_file"),
-  ]
-  require(
-    artifact.stale(loaded, "deployment-one", "inventory-one", "source-one", "pin-one", observations, changed_actions) == "actions",
-    "a stale approval was allowed to grow",
-  )?
-  print test_case("stale deployment, inventory, source, pin, observations, and actions")
-
-  require(artifact.allows_save(actions), "valid actions were refused")?
-  require(! artifact.allows_save([artifact.Entry(id: "x", host: "xinfra-a", operation: "unknown")]), "unknown action was savable")?
-  require(! artifact.allows_save([artifact.Entry(id: "x", host: "xinfra-a", operation: "conditional")]), "conditional action was savable")?
-  print test_case("conditional and unknown actions cannot be saved")
-
-  let text_value = target.read_text()?
-  require(! artifact.contains_secret(text_value, "canary-value"), "saved plan contains a canary")?
-  print test_case("saved plan carries no secret")
-
+  let deployment_file = fp"{root.host_path()?}/deploy.xsh"
+  let inventory_file = fp"{root.host_path()?}/inventory.toml"
+  deployment_file.write("deployment")?
+  inventory_file.write("inventory")?
+  let sources: Map[Str, validate.PreparedSource] = map.empty()
+    .set("file", validate.Content(validate.ContentSource(text: "canary-value", digest: "digest-one")))
+    .set("secret", validate.Secret(model.FromEnv("PLAN_SECRET")))
+  let deployment = validate.Deployment(file: deployment_file, root: root.host_path()?, resources: [], sources: sources)
+  let facts = plan.Facts(hosts: [plan.HostFacts(name: "xinfra-a", observed: map.empty().set("file", plan.Absent))])
+  let action = plan.Action(id: "file", host: "xinfra-a", resource: model.Directory(model.DirectorySpec(id: "file", path: p"/file")), operation: plan.EnsureDirectory, prediction: plan.Changed)
+  let actions = [action]
+  env XSH_PIN="pin-one" PLAN_SECRET="canary-value" {
+    match artifact.save_plan(target, "run-1", deployment_file, inventory_file, deployment, facts, actions) {
+      Ok(_) => {}, Err(failure) => { return Err(error.failure(failure.message)) },
+    }
+    let loaded = match artifact.load_plan(target) {
+      Ok(value) => value, Err(failure) => { return Err(error.failure(failure.message)) },
+    }
+    require(loaded.run_id == "run-1" and loaded.actions.len() == 1, "artifact did not round-trip")?
+    require("canary-value" not in target.read_text()?, "saved plan contains a canary")?
+    require(! rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, facts, actions, "pin-one")), "matching artifact was stale")?
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, facts, actions, "pin-two")), "pin was not checked")?
+    let changed_facts = plan.Facts(hosts: [plan.HostFacts(name: "xinfra-a", observed: map.empty().set("file", plan.Unknown))])
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, changed_facts, actions, "pin-one")), "observations were not checked")?
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, facts, [], "pin-one")), "actions were not checked")?
+    let changed_sources = sources.set("file", validate.Content(validate.ContentSource(text: "changed", digest: "digest-two")))
+    let changed_deployment = {...deployment, sources: changed_sources}
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, changed_deployment, facts, actions, "pin-one")), "source was not checked")?
+    require(rejected(artifact.check_plan({...loaded, version: "other"}, deployment_file, inventory_file, deployment, facts, actions, "pin-one")), "version was not checked")?
+    inventory_file.write("changed")?
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, facts, actions, "pin-one")), "inventory was not checked")?
+    inventory_file.write("inventory")?
+    deployment_file.write("changed")?
+    require(rejected(artifact.check_plan(loaded, deployment_file, inventory_file, deployment, facts, actions, "pin-one")), "deployment was not checked")?
+    let serialized = target.read_text()?
+    target.write(serialized.replace("\"schema_version\": 1", with: "\"schema_version\": 2"))?
+    require(match artifact.load_plan(target) { Ok(_) => false, Err(_) => true }, "unsupported version was accepted")?
+    target.write(serialized.replace("\"kind\": \"plan\"", with: "\"kind\": \"other\""))?
+    require(match artifact.load_plan(target) { Ok(_) => false, Err(_) => true }, "unsupported kind was accepted")?
+    target.write(serialized.replace("\"kind\": \"plan\"", with: "\"extra\": 1, \"kind\": \"plan\""))?
+    require(match artifact.load_plan(target) { Ok(_) => false, Err(_) => true }, "extra field was accepted")?
+    target.write("{}")?
+    require(match artifact.load_plan(target) { Ok(_) => false, Err(_) => true }, "invalid schema was accepted")?
+  }
+  print "ok saved-plan round-trip and stale checks"
   Ok()
 }

@@ -57,6 +57,11 @@ path and digest, inventory path and digest, xinfra version, `XSH_PIN` value,
 each prepared source digest, each observed precondition, and the ordered action
 IDs, hosts, and operations. Secrets and secret values are absent.
 
+The CLI and saved-plan integration checks use `xinfra.plan_artifact` for the
+schema, persistence, and stale checks. Module callers use its `PlanArtifact`,
+`save_plan`, `load_plan`, and `check_plan` exports; the saved JSON format remains
+version 1.
+
 Set `XSH_PIN` to the XSH commit or another build identifier before saving.
 `apply --plan` must run with the same value; an empty pin matches only an empty
 pin. The command also rejects a changed deployment, inventory, source,

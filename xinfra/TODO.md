@@ -3,15 +3,6 @@
 Prefix: XIN
 Next: 10
 
-### XIN-8 · P3 · Saved-plan artifacts have two schema implementations
-
-- **Area:** Types
-- **Where:** `lib/xinfra/plan_artifact.xsh:15`, `lib/xinfra/cli.xsh:82`, `dev/integration/plans.xsh:3`
-- **Problem:** The CLI defines `PlanArtifact` and its save/load/stale checks in `cli.xsh`, while `plan_artifact.xsh` defines a second `Artifact` with different fields and is used only by the saved-plan integration case. The schemas can drift, and the CLI artifact is the one users see.
-- **Recommendation:** Keep one artifact module, move the CLI save/load/stale checks onto it, and point the integration case at the same code.
-- **Fix with:** `deduplicate`
-- **Effort:** M
-
 ### XIN-9 · P3 · CLI remote apply is not covered by the integration suite
 
 - **Area:** Testing
