@@ -22,7 +22,7 @@ pub(crate) struct KeResolutionResult {
 #[cfg(not(feature = "srv"))]
 pub(crate) async fn resolve_ke(
     addr: &NormalizedAddress,
-) -> Result<impl Iterator<Item = KeResolutionResult>, std::io::Error> {
+) -> Result<Vec<KeResolutionResult>, std::io::Error> {
     let lookup_result = lookup_host((addr.server_name.as_str(), addr.port))
         .await?
         .map(|addr| KeResolutionResult {
@@ -30,32 +30,25 @@ pub(crate) async fn resolve_ke(
             srv_record_name: None,
         });
 
-    Ok(lookup_result)
+    Ok(lookup_result.collect())
 }
 
+/// The hickory lookup future is not `Sync`, which spawners need of the futures they return, so
+/// the lookup runs as its own task.
 #[cfg(feature = "srv")]
 pub(crate) async fn resolve_ke(
     addr: &NormalizedAddress,
-) -> Result<impl Iterator<Item = KeResolutionResult>, std::io::Error> {
-    // Kludge allowing us to return two types of iterator.
-    enum Either<A, B> {
-        A(A),
-        B(B),
-    }
+) -> Result<Vec<KeResolutionResult>, std::io::Error> {
+    let addr = addr.clone();
+    tokio::spawn(async move { resolve_ke_with_srv(&addr).await })
+        .await
+        .map_err(std::io::Error::other)?
+}
 
-    impl<A: Iterator<Item = KeResolutionResult>, B: Iterator<Item = KeResolutionResult>> Iterator
-        for Either<A, B>
-    {
-        type Item = KeResolutionResult;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            match self {
-                Either::A(a) => a.next(),
-                Either::B(b) => b.next(),
-            }
-        }
-    }
-
+#[cfg(feature = "srv")]
+async fn resolve_ke_with_srv(
+    addr: &NormalizedAddress,
+) -> Result<Vec<KeResolutionResult>, std::io::Error> {
     // First try looking up SRV records
     if let Ok(srv_names) = resolve_srv(format!("_ntske._tcp.{}", addr.server_name)).await {
         let mut result = vec![];
@@ -68,19 +61,18 @@ pub(crate) async fn resolve_ke(
             }
         }
         if !result.is_empty() {
-            return Ok(Either::A(result.into_iter()));
+            return Ok(result);
         }
     }
 
     // Otherwise do a direct name lookup
-    let lookup_result = lookup_host((addr.server_name.as_str(), addr.port))
+    Ok(lookup_host((addr.server_name.as_str(), addr.port))
         .await?
         .map(|addr| KeResolutionResult {
             addr,
             srv_record_name: None,
-        });
-
-    Ok(Either::B(lookup_result))
+        })
+        .collect())
 }
 
 #[cfg(feature = "srv")]
@@ -174,11 +166,9 @@ mod direct_tests {
 
     #[tokio::test]
     async fn no_srv_profile_resolves_direct_hostnames() {
-        let resolved: Vec<KeResolutionResult> =
-            resolve_ke(&NormalizedAddress::new_from_parts("127.0.0.1", 4460))
-                .await
-                .unwrap()
-                .collect();
+        let resolved = resolve_ke(&NormalizedAddress::new_from_parts("127.0.0.1", 4460))
+            .await
+            .unwrap();
 
         assert_eq!(resolved.len(), 1);
         assert_eq!(

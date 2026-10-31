@@ -27,7 +27,7 @@ use super::config::NormalizedAddress;
 
 //#[cfg(target_os = "linux")]
 //pub mod csptp;
-//pub mod nts;
+pub mod nts;
 //pub mod nts_pool;
 pub mod pool;
 //#[cfg(feature = "pps")]
@@ -99,6 +99,19 @@ pub trait Spawner<TimeController: StdController> {
     fn try_spawn(&mut self) -> TrySpawnFuture<TimeController>;
     fn needs_spawn(&self) -> bool;
     fn source_terminated(&mut self, id: LinkId, reason: LinkTerminationReason);
+}
+
+pub(super) fn ntp_link_configs() -> (statime_algo::LinkConfig, statime_algo::TrackedLinkConfig) {
+    (
+        statime_algo::LinkConfig {
+            desired_error_bound: statime_base::Duration::from_seconds_nanos(0, 1_000_000),
+            period: None,
+        },
+        statime_algo::TrackedLinkConfig {
+            decay_rate: 1. / 86400f64.sqrt(),
+            longest_interval_for_delay_estimation: statime_base::Duration::from_seconds_nanos(1, 0),
+        },
+    )
 }
 
 pub(super) async fn resolve_single_ntp_server(address: NtpAddress) -> Option<SocketAddr> {

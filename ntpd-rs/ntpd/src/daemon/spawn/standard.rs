@@ -83,21 +83,12 @@ where
                 return Err(SpawnFailureReason::RetryableFailure);
             };
 
+            let (link_config, tracked_link_config) = super::ntp_link_configs();
+
             Ok(CreationParameters {
                 stype: SourceType::Ntp,
-                link_config: LinkConfig {
-                    desired_error_bound: statime_base::Duration::from_seconds_nanos(0, 1_000_000),
-                    period: None,
-                }
-                .into(),
-                tracked_link_config: Some(
-                    statime_algo::TrackedLinkConfig {
-                        decay_rate: 1. / 86400f64.sqrt(),
-                        longest_interval_for_delay_estimation:
-                            statime_base::Duration::from_seconds_nanos(1, 0),
-                    }
-                    .into(),
-                ),
+                link_config: link_config.into(),
+                tracked_link_config: Some(tracked_link_config.into()),
                 creator: Box::new(
                     move |controller: TimeController::Link<Arc<TimeController>>,
                           clock,

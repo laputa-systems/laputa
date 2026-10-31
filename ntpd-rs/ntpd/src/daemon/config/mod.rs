@@ -158,6 +158,7 @@ impl RootConfig for Config {
 /// A source mode that parses but that this daemon has no spawner for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnsupportedSourceMode {
+    NtsPool,
     Sock,
     #[cfg(feature = "pps")]
     Pps,
@@ -168,6 +169,7 @@ pub enum UnsupportedSourceMode {
 impl UnsupportedSourceMode {
     pub fn name(self) -> &'static str {
         match self {
+            Self::NtsPool => "nts-pool",
             Self::Sock => "sock",
             #[cfg(feature = "pps")]
             Self::Pps => "pps",
@@ -180,7 +182,8 @@ impl UnsupportedSourceMode {
 impl NtpSourceConfig {
     pub fn unsupported_mode(&self) -> Option<UnsupportedSourceMode> {
         match self {
-            Self::Standard(_) | Self::Nts(_) | Self::Pool(_) | Self::NtsPool(_) => None,
+            Self::Standard(_) | Self::Nts(_) | Self::Pool(_) => None,
+            Self::NtsPool(_) => Some(UnsupportedSourceMode::NtsPool),
             Self::Sock(_) => Some(UnsupportedSourceMode::Sock),
             #[cfg(feature = "pps")]
             Self::Pps(_) => Some(UnsupportedSourceMode::Pps),
@@ -453,6 +456,14 @@ minimum-agreeing-sources = 1
                 .unwrap()
                 .check()
         );
+    }
+
+    #[test]
+    fn nts_source_mode_loads() {
+        let config = load_text("[[source]]\nmode = \"nts\"\naddress = \"nts.example\"\n").unwrap();
+
+        assert!(matches!(config.sources[0], NtpSourceConfig::Nts(_)));
+        assert_eq!(config.sources[0].unsupported_mode(), None);
     }
 
     #[test]

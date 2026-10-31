@@ -37,6 +37,7 @@ use config::{ConfigLoadError, NtpDaemonOptions, UnsupportedSourceMode};
 
 use crate::daemon::clock::NtpClockWrapper;
 use crate::daemon::nts_key_provider::KeysetConfig;
+use crate::daemon::spawn::nts::NtsSpawner;
 use crate::daemon::spawn::pool::PoolSpawner;
 use crate::daemon::spawn::standard::StandardSpawner;
 use crate::daemon::system::{System, SystemConfig};
@@ -203,14 +204,21 @@ fn run(options: &NtpDaemonOptions) -> Result<(), Box<dyn Error>> {
                         flattened_pair.second.with_defaults(SourceConfig::default()),
                     )));
                 }
-                config::NtpSourceConfig::Nts(flattened_pair) => todo!(),
+                config::NtpSourceConfig::Nts(flattened_pair) => {
+                    system.add_spawner(Box::new(NtsSpawner::new(
+                        flattened_pair.first,
+                        flattened_pair.second.with_defaults(SourceConfig::default()),
+                    )?));
+                }
                 config::NtpSourceConfig::Pool(flattened_pair) => {
                     system.add_spawner(Box::new(PoolSpawner::new(
                         flattened_pair.first,
                         flattened_pair.second.with_defaults(SourceConfig::default()),
                     )));
                 }
-                config::NtpSourceConfig::NtsPool(flattened_pair) => todo!(),
+                config::NtpSourceConfig::NtsPool(_) => {
+                    return Err(unsupported_source(position, UnsupportedSourceMode::NtsPool));
+                }
                 config::NtpSourceConfig::Sock(_) => {
                     return Err(unsupported_source(position, UnsupportedSourceMode::Sock));
                 }

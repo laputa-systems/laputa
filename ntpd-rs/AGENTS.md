@@ -28,11 +28,16 @@ That gap is `TODO.md` NTPD-1.
 
 ## Daemon in this checkout
 
-- `ntpd/src/daemon/mod.rs` starts standard and pool sources only.
-  `mode = "nts"` and `nts-pool` hit `todo!()`. `sock`, `pps`, and `csptp`
-  have no spawner, so `Config::from_args` rejects them with
-  `ConfigLoadError::UnsupportedSource` and `run` returns the same error.
-  `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs`) is not called.
+- `ntpd/src/daemon/mod.rs` starts standard, pool, and NTS sources.
+  `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs`) runs one key exchange per
+  spawn with the provider-backed `KeyExchangeClient`; `certificate-authority`
+  adds roots to the platform verifier, and the retry backoff in `System`
+  covers a failed handshake, including one caused by a wrong clock.
+  `nts-pool`, `sock`, `pps`, and `csptp` have no spawner, so
+  `Config::from_args` rejects them with `ConfigLoadError::UnsupportedSource`
+  and `run` returns the same error. The old-trait `nts_pool.rs`, `sock.rs`,
+  `pps.rs`, and `csptp.rs` spawners stay out of the module tree until they
+  are ported.
 - `Config` (`ntpd/src/daemon/config/mod.rs`) has `use-system-config`,
   `source`, `server`, `observability`, and `synchronization`. The
   `[synchronization]` table is `ntp_proto::SynchronizationConfig`:

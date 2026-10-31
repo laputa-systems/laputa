@@ -188,6 +188,10 @@ impl SystemManagers {
         self.ntp_manager.clone()
     }
 
+    pub fn observed_sources(&self) -> ObservedSources {
+        self.observed_sources.clone()
+    }
+
     pub fn source_observer(&self) -> SourceObserver {
         SourceObserver::new(self.observed_sources.clone())
     }
@@ -261,7 +265,7 @@ impl<TimeController: StdController + Sync + Send> System<TimeController> {
     }
 
     pub fn observed_sources(&self) -> ObservedSources {
-        self.managers.observed_sources.clone()
+        self.managers.observed_sources()
     }
 
     pub fn system_snapshots(&self) -> watch::Receiver<SystemSnapshot> {
