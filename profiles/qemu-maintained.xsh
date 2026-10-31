@@ -14,6 +14,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "nftables",
     "laputa-net",
     "laputa-syslog",
+    "xinfra",
   ],
   kernel_package: "linux",
   kernel_path: p"boot/vmlinuz",

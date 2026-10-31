@@ -173,6 +173,7 @@ test test_qemu_maintained_profile_is_not_a_development_image [fs, error] {
   assert "nftables" in value.package_roots
   assert "laputa-net" in value.package_roots
   assert "laputa-syslog" in value.package_roots
+  assert "xinfra" in value.package_roots
   assert ! ("ghostty-custom" in value.package_roots)
   assert value.kernel_package == "linux"
   assert value.kernel_path == p"boot/vmlinuz"
