@@ -1,13 +1,29 @@
 Prefix: NTPD
-Next: 3
+Next: 5
 
-### NTPD-1 · P1 · prerelease daemon panics on NTS and rejects its sample config
+### NTPD-2 · P2 · server, keyset, and NTS key-exchange server sections are not wired
 
 - **Area:** Operability
-- **Where:** `ntpd/src/daemon/mod.rs:197`, `ntpd/src/daemon/config/mod.rs:78`, `ntpd/src/daemon/config/server.rs:13`, `ntpd/src/ctl.rs:152`, `ntpd/src/force_sync/mod.rs:176`, `statime-algo/src/lib.rs:167`, `docs/examples/conf/ntp.toml.default:41`, `ntp.toml:22`
-- **Problem:** The fork publishes Graviola prerelease binaries (`.github/workflows/prerelease.yml`) of a daemon whose run loop does not implement NTS. `daemon::run` spawns standard and pool sources, then `todo!()` on `mode = "nts"`, `nts-pool`, `sock`, `pps`, and `csptp`. `NtsSpawner` (`ntpd/src/daemon/spawn/nts.rs:46`) is never called. A config with only an NTS source parses and then panics. `Config` has no `[synchronization]` field, and the generated partial denies unknown fields (`statime-config-derive/src/lib.rs:143`), so `ntp.toml` and `docs/examples/conf/ntp.toml.default` do not load. `[[server]]` is an empty struct and is never bound. The observer spawn is commented out, so `ntp-ctl status` has no socket. `ntp-ctl validate` returns success without reading the path. `ntp-ctl force-sync` prints `Disabled for now`. A config that does parse is steered with `ClockConfig::default()`, whose jump abort thresholds are `None`, so `ClockInfo::check_jump` does not abort a step. The library NTS tests do not start `ntp-daemon`.
-- **Recommendation:** Stop treating the prerelease zips as a clock service until `daemon::run` calls `NtsSpawner` for `mode = "nts"` and `Config` loads `docs/examples/conf/ntp.toml.default`, including its step limits. Keep `ntp-ctl validate` failing on a file the daemon would reject. Do not grow a second config schema in the fork. See the RFC.
-- **Fix with:** none
+- **Where:** `ntpd/src/daemon/config/server.rs`, `ntpd/src/daemon/server.rs`, `ntpd/src/daemon/keyexchange.rs`, `ntp.server.toml`
+- **Problem:** `[[server]]` is an empty struct and `[keyset]` and `[[nts-ke-server]]` are not in `Config`, so the daemon cannot serve NTP or NTS key exchange and rejects `ntp.server.toml`. The server, key-exchange, and keyset code compiles but has no caller in the run loop.
+- **Recommendation:** Add the sections to `Config` and start the server and key-exchange tasks from the run loop, publishing server statistics to the observer.
+- **Fix with:** reference-parity
 - **Effort:** M
-- **Design:** `docs/rfc/NTPD-1-daemon-not-operational.md`
 
+### NTPD-3 · P3 · nts-pool, sock, pps, and csptp sources have no spawner
+
+- **Area:** Operability
+- **Where:** `ntpd/src/daemon/mod.rs`, `ntpd/src/daemon/spawn/{nts_pool,sock,pps,csptp}.rs`
+- **Problem:** These spawners implement the spawner trait from before the controller rewrite and are outside the module tree, so `Config::from_args` rejects the modes with `ConfigLoadError::UnsupportedSource`.
+- **Recommendation:** Port each spawner to the current trait as its source mode is needed.
+- **Fix with:** reference-parity
+- **Effort:** M
+
+### NTPD-4 · P3 · a missing CAP_SYS_TIME ends the daemon with an opaque error
+
+- **Area:** Operability
+- **Where:** `ntpd/src/daemon/system.rs`
+- **Problem:** When the controller is denied a clock operation the daemon exits through `main` printing `ClockError(PermissionDenied)` with exit status 1, which does not say that the capability is missing.
+- **Recommendation:** Map the denial to a message naming `CAP_SYS_TIME` and the `NOPERM` exit code.
+- **Fix with:** none
+- **Effort:** S

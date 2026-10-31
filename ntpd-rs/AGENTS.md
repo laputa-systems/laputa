@@ -1,10 +1,12 @@
-# ntpd-rs (laputa-systems fork)
+# ntpd-rs (Laputa)
 
-Fork of [pendulum-project/ntpd-rs](https://github.com/pendulum-project/ntpd-rs).
-NTP and NTS code matches upstream except the Graviola TLS provider below.
-This checkout's `ntp-daemon` does not implement the configuration in
-`docs/man/ntp.toml.5.md` or `docs/examples/conf/ntp.toml.default`.
-That gap is `TODO.md` NTPD-1.
+Maintained here, in the Laputa monorepo, and nowhere else. It descends from
+[pendulum-project/ntpd-rs](https://github.com/pendulum-project/ntpd-rs)
+through the `laputa-systems/ntpd-rs` GitHub fork, now archived; this tree was
+imported from fork commit `910ecd02` (`2.0.0-alpha.20260715`).
+NTP and NTS code matches upstream except the Graviola TLS provider below and
+the daemon repairs recorded in git history. Remaining daemon gaps are in
+`TODO.md`.
 
 ## Graviola TLS provider
 
@@ -72,6 +74,10 @@ That gap is `TODO.md` NTPD-1.
 
 ## Build and prereleases
 
+The fork's `.github/` workflows, `Dockerfile`, and `Cross.toml` came across
+with the import. They cannot run from this subdirectory; Laputa builds the
+package from `packages/ntpd-rs`.
+
 - MSRV is Rust 1.95 (`Cargo.toml` `rust-version`). The release compiler
   channel lives only in `.rust-toolchain/stable/rust-toolchain.toml`.
   `rust-toolchain.toml` is a symlink to it, the macOS prerelease job reads
@@ -80,18 +86,14 @@ That gap is `TODO.md` NTPD-1.
 - CI rejects `aws-lc-rs`, `aws-lc-sys`, `ring`, `openssl`, and `openssl-sys`
   on the Graviola musl graph (`.github/workflows/checks.yaml`). Locally:
   `cargo tree --locked --prefix none -p ntpd --target x86_64-unknown-linux-musl --no-default-features --features graviola,rustcrypto --edges normal,build`.
-- Prereleases are manual: `gh workflow run prerelease.yml --ref main`.
-  The workflow accepts only the default branch, builds
-  `aarch64-apple-darwin` and both musl targets with the Graviola profile,
-  checks that the Linux binaries have no dynamic interpreter, and publishes
-  zips plus `SHA256SUMS` on tag `release-<sha>`.
 - Linux builds use the root `Dockerfile` (pinned Alpine, verified rustup
   1.29.2, musl LLVM). The workflow runs `cargo` with the image `cc` linker.
   `musl-cargo` is in the image. The workflow does not invoke it.
-- Repomod catalog entry: `laputa-systems/ntpd-rs = ["tool", "rust", "fork"]`.
 
 ## Docs
 
-- `docs/guide/` and `docs/man/` describe Pendulum ntpd-rs. They do not match
-  this checkout's `Config`.
+- `docs/guide/` and `docs/man/` describe Pendulum ntpd-rs. They match this
+  checkout's `Config` except for `[[server]]`, `[keyset]`,
+  `[[nts-ke-server]]`, `[source-defaults]`, and `[synchronization.algorithm]`,
+  which the daemon rejects as unknown fields.
 - `docs/guide/installation.md` has the Graviola cargo command.
