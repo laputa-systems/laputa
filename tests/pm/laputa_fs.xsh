@@ -82,3 +82,43 @@ test test_ext4_rejects_a_final_group_too_small_for_metadata [fs, process, env, e
   assert ! status.ok
   assert "last ext4 block group is too small for its metadata" in stderr.read_text()?
 }
+
+test test_ext4_applies_explicit_inode_owners_and_rejects_invalid_paths [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "laputa-fs-owners")?
+  let source = fp"{root}/source"
+  let image = fp"{root}/state.ext4"
+  let owners = fp"{root}/owners.json"
+  source.mkdir()?
+  fp"{source}/a".write("private")?
+  fp"{source}/a".chmod(0o600)?
+  fp"{source}/b".write("root")?
+  image.write(b"")?
+  image.truncate(8MiB)?
+  json.write(owners, [{path: "a", uid: 1001, gid: 1002}])?
+  let xsh = runner()?
+  let args = [xsh.display(), "packages/laputa-fs/files/mkfs.ext4.xsh", "--", "-d", source.display(), "--inode-owners", owners.display(), image.display()]
+  assert process.run(process.command_argv(xsh, args))?.ok
+  let a = inode_offset(11)
+  let b = inode_offset(12)
+  assert bytes.unpack_le(bytes.read_at(image, a, 2)?, 2)?.bit_and(0o777) == 0o600
+  assert bytes.unpack_le(bytes.read_at(image, a + 2, 2)?, 2)? == 1001
+  assert bytes.unpack_le(bytes.read_at(image, a + 24, 2)?, 2)? == 1002
+  assert bytes.unpack_le(bytes.read_at(image, b + 2, 2)?, 2)? == 0
+  assert bytes.unpack_le(bytes.read_at(image, b + 24, 2)?, 2)? == 0
+  let before = hash.sha256(image)?.hex()
+  for bad in [
+    [{path: "a", uid: 1001, gid: 1002}, {path: "a", uid: 1001, gid: 1002}],
+    [{path: "missing", uid: 1001, gid: 1002}],
+    [{path: "../escape", uid: 1001, gid: 1002}],
+    [{path: "/a", uid: 1001, gid: 1002}],
+    [{path: "a", uid: 65536, gid: 1002}],
+  ] {
+    json.write(owners, bad)?
+    assert !process.run(process.command_argv(xsh, args))?.ok
+    assert hash.sha256(image)?.hex() == before
+  }
+  fp"{source}/link".symlink(to: p"a")?
+  json.write(owners, [{path: "link", uid: 1001, gid: 1002}])?
+  assert !process.run(process.command_argv(xsh, args))?.ok
+  assert hash.sha256(image)?.hex() == before
+}

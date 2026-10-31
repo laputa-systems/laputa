@@ -538,3 +538,36 @@ export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> 
   }
   fs.fsync(root.parent)?
 }
+
+## One explicit inode owner for a maintained state image.
+export type StateInodeOwner = {path: Str, uid: Int, gid: Int}
+
+## Derive the operator's state-image ownership from the applied document and account.
+export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwner], Error] {
+  with tree = fs.open_root(root)? {
+    guard tree.read_text(p"format")? == "laputa-maintained-state-1\n" else { fail "unsupported maintained state format" }
+    let config = parse(tree.read_text(p"etc/laputa/first-boot/applied")?)?
+    let accounts = [line.split(":") for line in tree.read_text(p"etc/passwd")?.lines() if line.starts_with(f"{config.operator}:")]
+    guard accounts.len() == 1 and accounts[0].len() == 7 else { fail "operator account is missing or ambiguous" }
+    let fields = accounts[0]
+    let uid = decimal(fields[2])?
+    let gid = decimal(fields[3])?
+    guard uid > 0 and uid <= 65535 and gid >= 0 and gid <= 65535 else {
+      fail "operator account ids are outside the supported range"
+    }
+    guard fields[5] == f"/home/{config.operator}" else { fail "operator home does not match the applied document" }
+    let home = f"home/{config.operator}"
+    for entry in ["home", home, f"{home}/.ssh", f"{home}/.ssh/authorized_keys"] {
+      let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
+      let expected = if entry.ends_with("authorized_keys") { "file" } else { "dir" }
+      guard info.kind == expected else { fail f"operator state path is not a {expected}: {entry}" }
+      if entry.ends_with("/.ssh") { guard info.mode.bit_and(0o7777) == 0o700 else { fail "operator SSH directory mode must be 0700" } }
+      if entry.ends_with("authorized_keys") { guard info.mode.bit_and(0o7777) == 0o600 else { fail "operator authorized keys mode must be 0600" } }
+    }
+    [
+      {path: home, uid, gid},
+      {path: f"{home}/.ssh", uid, gid},
+      {path: f"{home}/.ssh/authorized_keys", uid, gid},
+    ]
+  }
+}

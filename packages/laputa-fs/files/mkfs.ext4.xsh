@@ -24,6 +24,8 @@ type ExtEntry = {
   inode: Int,
 }
 
+type InodeOwner = {path: Str, uid: Int, gid: Int}
+
 type ExtAlloc = {
   first: Int,
   count: Int,
@@ -140,6 +142,32 @@ proc collect_entries(root: Path, dir: Path, entries: List[ExtEntry]) -> Result[L
   }
 
   out
+}
+
+proc apply_inode_owners(entries: List[ExtEntry], owners: List[InodeOwner]) -> Result[List[ExtEntry]] {
+  guard owners.len() <= 3 else { fail "too many inode owners" }
+  var seen: Set[Str] = set.empty()
+  var result = entries
+  for owner in owners {
+    guard owner.uid >= 0 and owner.uid <= 65535 and owner.gid >= 0 and owner.gid <= 65535 else {
+      fail "inode owner id is outside the ext4 supported range"
+    }
+    guard !owner.path.is_empty() and "\\" not in owner.path and owner.path not in seen else { fail "inode owner path is empty or duplicated" }
+    for part in owner.path.split("/") {
+      guard part != "" and part != "." and part != ".." else { fail "inode owner path is unsafe" }
+    }
+    seen = seen.add(owner.path)
+    var found = false
+    for index in range(result.len()) {
+      if result[index].rel == owner.path {
+        guard result[index].kind != "symlink" else { fail "inode owner path is a symlink" }
+        result[index] = {...result[index], uid: owner.uid, gid: owner.gid}
+        found = true
+      }
+    }
+    guard found else { fail f"inode owner path is missing: {owner.path}" }
+  }
+  result
 }
 
 proc assign_inodes(entries: List[ExtEntry]) -> List[ExtEntry] {
@@ -774,7 +802,7 @@ proc image_size(image: Path) -> Result[Int] {
   size
 }
 
-proc format_ext_image(image: Path, source_root_path: Path, label: Str) {
+proc format_ext_image(image: Path, source_root_path: Path, label: Str, owners: List[InodeOwner]) {
   let size = image_size(image)?
 
   if size < 8MiB {
@@ -802,7 +830,7 @@ proc format_ext_image(image: Path, source_root_path: Path, label: Str) {
   var next = 4 + INODE_TABLE_BLOCKS
   let source_root = source_root_path.resolve()?
   let collected = collect_entries(source_root, source_root, [])?
-  let entries = assign_inodes(collected)
+  let entries = assign_inodes(apply_inode_owners(collected, owners)?)
   zero_image(image, size)
   let root_data = dir_data(entries, "", 2, 2)?
   var result = allocate_bytes(image, used, next, total_blocks, root_data)?
@@ -887,7 +915,7 @@ proc format_ext_image(image: Path, source_root_path: Path, label: Str) {
   write_headers(image, entries, next, groups, total_blocks, label)
 }
 
-type MkfsExt4Options = {label: Str, source_root: Str, features: Str, image: List[Str]}
+type MkfsExt4Options = {label: Str, source_root: Str, features: Str, inode_owners: Str, image: List[Str]}
 
 proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
   let opts: MkfsExt4Options = cli.applet(
@@ -899,6 +927,10 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
       },
       source_root: {
         form: "-d ROOT",
+        default: "",
+      },
+      inode_owners: {
+        form: "--inode-owners PATH",
         default: "",
       },
       features: {
@@ -937,5 +969,6 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
     source_root = empty_dir
   }
 
-  format_ext_image(fp"{image}", source_root, label)
+  let owners: List[InodeOwner] = if opts.inode_owners == "" { [] } else { json.read(fp"{opts.inode_owners}")?.require_exact(List[InodeOwner])? }
+  format_ext_image(fp"{image}", source_root, label, owners)
 }

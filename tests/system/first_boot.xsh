@@ -322,3 +322,49 @@ test test_killed_writer_before_publish_leaves_no_partial_tree [fs, error] { |ctx
   first_boot.apply(root, base("new"))
   assert snapshot(root)? == after
 }
+
+test test_state_image_ownership_uses_allocated_operator_identity [fs, error] { |ctx|
+  let root = prepare(ctx, name: "state-owner")?
+  fp"{root}/etc".mkdir()?
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\noccupied:x:1000:1000::/home/occupied:/bin/false\n")?
+  first_boot.apply(root, base("new"))?
+  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  let owners = first_boot.state_ownership(root)?
+  assert owners == [
+    {path: "home/pazu", uid: 1001, gid: 1001},
+    {path: "home/pazu/.ssh", uid: 1001, gid: 1001},
+    {path: "home/pazu/.ssh/authorized_keys", uid: 1001, gid: 1001},
+  ]
+  fp"{root}/home/pazu/.ssh/authorized_keys".remove()?
+  fp"{root}/home/pazu/.ssh/authorized_keys".symlink(to: p"/etc/passwd")?
+  assert first_boot.state_ownership(root) is Err(_)
+}
+
+test test_state_image_uses_existing_account_primary_group [fs, error] { |ctx|
+  let root = prepare(ctx, name: "state-existing-account")?
+  fp"{root}/etc".mkdir()?
+  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\n")?
+  first_boot.apply(root, base("new"))?
+  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  let owners = first_boot.state_ownership(root)?
+  assert owners |> all { |owner| owner.uid == 1001 and owner.gid == 100 }
+  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\npazu:x:1002:100::/home/pazu:/bin/false\n")?
+  assert first_boot.state_ownership(root) is Err(_)
+}
+
+test test_state_image_publication_preserves_old_output_on_invalid_state [fs, process, env, error] { |ctx|
+  let root = prepare(ctx, name: "state-publish")?
+  let source = fp"{root}/state"
+  let image = fp"{root}/state.ext4"
+  first_boot.apply(source, base("new"))?
+  fp"{source}/format".write("laputa-maintained-state-1\n")?
+  let xsh = Path(e"XSH_HOST" ?? "xsh")
+  let argv = [xsh.display(), "system/maintained_state_image.xsh", "--", source.display(), image.display(), "8388608", "packages/laputa-fs/files/mkfs.ext4.xsh", xsh.display()]
+  assert process.run(process.command_argv(xsh, argv))?.ok
+  assert image.metadata()?.mode.bit_and(0o777) == 0o600
+  assert image.metadata()?.size == 8MiB
+  image.write("previous")?
+  fp"{source}/format".write("wrong\n")?
+  assert !process.run(process.command_argv(xsh, argv))?.ok
+  assert image.read_text()? == "previous"
+}

@@ -9,7 +9,7 @@ export const package_kind = "payload"
 export const ver = "1"
 
 ## Exported declaration `rel`.
-export const rel = "10"
+export const rel = "11"
 
 ## Exported declaration `deps`.
 export let deps = []

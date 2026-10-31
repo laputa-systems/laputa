@@ -223,13 +223,25 @@ image's static `/etc` files, the maintained inittab, the packaged nftables
 ruleset, and the loopback-only interfaces file), create the service-owned
 `/var/lib/dhcpc` (mode 0700) and `/var/log` staging directories the image never
 contains, apply the first-boot document with `system.first_boot.apply`, and
-format the state tree as ext4. First boot assigns new operators `/usr/bin/xsh-login`,
-which accepts remote `-c` commands as XSH source. The standard seed does not provide
-an interactive login shell. Existing operator accounts keep their configured shell.
-The DHCP client creates only its own leaf
-directory, so provisioning owns the parents. Keep the state image at mode 0600. The guest mounts this disk on virtio vdb
-and binds the three directories before starting services. Configuration belongs
-to this shared state. There is no automatic configuration merge or state migration.
+format the state tree with `system/maintained_state_image.xsh`. Pass the staged
+root, output path, size in bytes, native ext4 formatter path, and XSH binary path:
+
+```sh
+XSH_MODULE_PATH="$PWD" xsh system/maintained_state_image.xsh -- \
+  STATE_ROOT state.ext4 268435456 packages/laputa-fs/files/mkfs.ext4.xsh /path/to/xsh
+```
+
+The entry validates the applied document, account IDs, and private SSH paths, then
+assigns the operator's UID and GID to the home, `.ssh`, and `authorized_keys`
+inodes. Other image entries use root ownership. Staging itself does not change
+host ownership. The output image is private and atomically published.
+First boot assigns new operators `/usr/bin/xsh-login`, which accepts remote `-c`
+commands as XSH source. The standard seed does not provide an interactive login
+shell. Existing operator accounts keep their configured shell. The DHCP client
+creates only its own leaf directory, so provisioning owns the parents. The guest
+mounts the state image on virtio vdb and binds the three directories before
+starting services. Configuration belongs to this shared state. There is no
+automatic configuration merge or state migration.
 A candidate requiring incompatible state must not be admitted for automatic rollback.
 Host admission currently supports only `laputa-maintained-state-1`. It rejects
 different state declarations rather than migrating the shared disk. Publishers
@@ -341,8 +353,20 @@ collection, closes reply pipes before acknowledgments, and fills an isolated
 1 MiB tmpfs until writes return ENOSPC. Full-filesystem failures preserve the
 record; freeing space permits retry. Reply loss is reconciled by reading status.
 These checks establish process-death recovery, local reply-loss handling, and
-full-filesystem behavior. They do not simulate power loss, filesystem write
-reordering, or an SSH transport disconnect.
+full-filesystem behavior. They do not simulate power loss or filesystem write
+reordering.
+
+`tests/integration/activation_ssh.py XSH PORT KEY PIN` exercises the activation
+host APIs over native SSH against a disposable maintained guest with a provisioned
+`probe` account and the `LAPUTA_ACTIVATION_SSH_FIXTURE=1` kernel token. It
+requires the maintained generation receipt. It uses trusted local fixture inputs
+and production admission checks. The test drops the SSH client after staging commits and before its reply,
+reconnects to verify the record and image hashes, rejects duplicate staging, and
+selects the candidate through the typed launcher. It checks SSH stdin and status,
+operator home access, root ownership of `/etc`, and the remote child exit. This is
+a lost reply after commit, not an interruption during a write or proof of physical
+power-loss behavior. The fixture invokes host APIs over SSH; there is no installed
+activation CLI.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the
