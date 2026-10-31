@@ -478,7 +478,9 @@ receipt format; package artifact receipts and root plans retain their formats.
 PM behavior is covered by the modules under `tests/pm/`; `tests/pm/fixtures/`
 holds staged inputs. Run the module for the contract you are changing, for
 example `$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`. Suites and wider
-runs are in [Testing](TESTING.md). Ordinary Make targets build the local `XSH_ROOT` checkout. Independent
+runs are in [Testing](TESTING.md). Parameter-annotation erasure evidence for
+the practical root is in [Inference erasure](INFERENCE-ERASURE.md). Ordinary
+Make targets build the local `XSH_ROOT` checkout. Independent
 qualification uses the explicitly supplied frozen tool snapshot described in
 [Testing](TESTING.md#use-the-fixed-xinit-tool-snapshot). There is no implicit
 published runner pin.
