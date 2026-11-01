@@ -1,6 +1,7 @@
 ##! Behavior coverage for first-boot identity, Dropbear argv, and the firewall plan.
 use packages.dropbear.service as dropbear_service
 use packages.nftables.service as firewall_service
+use pm.repo_snapshot
 use system.first_boot
 
 const ed25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
@@ -222,6 +223,86 @@ identity new
   let applied = fp"{root}/etc/laputa/first-boot/applied".read_text()?
   assert raw.base64() in applied
   assert ! ("0123456789abcdef0123456789abcdef" in applied)
+}
+
+pure snapshot_fixture(name: Str) -> Path {
+  fp"tests/pm/fixtures/repo-snapshot/{name}"
+}
+
+proc snapshot_key(name: Str) -> Result[Bytes] {
+  snapshot_fixture(f"keys/{name}.public.base64").read_text()?.trim().base64_decode()?
+}
+
+pure repo_key_document(keys: List[Bytes]) -> Str {
+  let lines = [f"repo-key {key.base64()}" for key in keys]
+  base("new") + "\n" + lines.join("\n") + "\n"
+}
+
+proc snapshot_input(which: Str, keys: List[Bytes]) -> Result[repo_snapshot.SnapshotVerifyInput] {
+  {
+    metadata: snapshot_fixture(f"{which}/metadata").read_bytes()?,
+    signature: snapshot_fixture(f"{which}/metadata.sig").read_bytes()?,
+    keys,
+    index_bytes: snapshot_fixture("index.json").read_bytes()?,
+    accepted: null,
+    now_epoch_seconds: 1995000000,
+  }
+}
+
+proc snapshot_accepted(which: Str, keys: List[Bytes]) -> Result[Bool] {
+  match repo_snapshot.snapshot_verify(snapshot_input(which, keys)?) {
+    Ok(_) => true
+    Err(_) => false
+  }
+}
+
+test test_repo_keys_provision_the_snapshot_key_set_and_rotate_by_reapplication [fs, error] { |ctx|
+  let current = snapshot_key("signing-key")?
+  let next = snapshot_key("next-key")?
+  let root = prepare(ctx, name: "repo-keys")?
+  first_boot.apply(root, repo_key_document([current]))
+  let installed = fp"{root}/etc/laputa/repo-snapshot-keys"
+  assert installed.read_bytes()? == current
+  assert installed.metadata()?.mode % 4096 == 0o444
+  assert snapshot_accepted("snapshot-gen1", repo_snapshot.snapshot_load_keys(installed)?)?
+  assert ! snapshot_accepted("snapshot-gen2", repo_snapshot.snapshot_load_keys(installed)?)?
+
+  first_boot.apply(root, repo_key_document([current, next]))
+  let window = repo_snapshot.snapshot_load_keys(installed)?
+  assert window == [current, next]
+  assert snapshot_accepted("snapshot-gen1", window)?
+  assert snapshot_accepted("snapshot-gen2", window)?
+
+  first_boot.apply(root, repo_key_document([next]))
+  let revoked = repo_snapshot.snapshot_load_keys(installed)?
+  assert revoked == [next]
+  assert ! snapshot_accepted("snapshot-gen1", revoked)?
+  assert snapshot_accepted("snapshot-gen2", revoked)?
+
+  let applied = fp"{root}/etc/laputa/first-boot/applied".read_text()?
+  assert f"repo-key {next.base64()}" in applied
+  assert ! (f"repo-key {current.base64()}" in applied)
+  let after = snapshot(root)?
+  first_boot.apply(root, repo_key_document([next]))
+  assert snapshot(root)? == after
+}
+
+test test_repo_keys_are_exact_distinct_and_bounded [fs, error] { |ctx|
+  let short = b"0123456789abcdef0123456789abcde"
+  reject(ctx, "repo-short", repo_key_document([short]))
+  let key = snapshot_key("signing-key")?
+  reject(ctx, "repo-duplicate", repo_key_document([key, key]))
+  let keys = [snapshot_key("signing-key")?, snapshot_key("next-key")?, snapshot_key("wrong-key")?, snapshot_key("legacy-key")?]
+  let root = prepare(ctx, name: "repo-limit")?
+  first_boot.apply(root, repo_key_document(keys))
+  assert fp"{root}/etc/laputa/repo-snapshot-keys".read_bytes()?.len() == 128
+  reject(ctx, "repo-excess", repo_key_document(keys.extend([b"0123456789abcdef0123456789abcdef"])))
+}
+
+test test_a_document_without_repo_keys_leaves_no_snapshot_key_set [fs, error] { |ctx|
+  let root = prepare(ctx, name: "repo-absent")?
+  first_boot.apply(root, base("new"))
+  assert ! fp"{root}/etc/laputa/repo-snapshot-keys".exists()?
 }
 
 test test_tailscale_yes_writes_no_auth_key [fs, error] { |ctx|

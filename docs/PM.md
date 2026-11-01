@@ -399,6 +399,16 @@ of concatenated raw 32-byte public keys named by `XSH_PM_REPO_KEY_FILE`:
 listing the current and next key opens a rotation window, removing a key
 revokes it. Snapshots themselves never carry keys.
 
+A first-boot document provisions the verification set through the trusted
+state channel: up to four distinct `repo-key <base64 of 32 raw bytes>` lines
+are written as the concatenated key file `/etc/laputa/repo-snapshot-keys` at
+mode 0444, and the applied record keeps them. Point `XSH_PM_REPO_KEY_FILE` at
+that file; PM does not guess a default. Re-applying a document with a different
+set replaces the file, so opening a rotation window lists both keys and
+revoking lists only the survivor. A document with no `repo-key` line leaves an
+existing file alone. First-boot application cannot reach a running consumer's
+accepted state, so it never resets the generation floor.
+
 The key ceremony mirrors the trust-update ceremony: generate the pair
 offline (`openssl genpkey -algorithm ed25519`), install only the raw
 32-byte public key on publishers and verifiers, compose `snapshot.json`

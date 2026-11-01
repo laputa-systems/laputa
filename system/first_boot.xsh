@@ -6,6 +6,7 @@ const host_key_path: RelPath = p"etc/dropbear/dropbear_ed25519_host_key"
 const operator_shell = "/usr/bin/xsh-login"
 const first_account_id = 1000
 const account_id_limit = 60000
+const repo_key_limit = 4
 
 ## How the operator wants the Dropbear host key to be treated. Apply never generates one.
 export enum BootIdentity { New, Restore, Clone }
@@ -17,6 +18,8 @@ export enum BootNetwork { Dhcp, Static(Str, Str) }
 export type AuthorizedKey = {material: Str, comment: Str}
 
 ## The validated document. `trust_key` is the raw 32-byte public key, or null.
+## `repo_keys` is the repository snapshot verification key set, empty when the
+## document provisions none.
 export type FirstBoot = {
   hostname: Str,
   operator: Str,
@@ -24,6 +27,7 @@ export type FirstBoot = {
   network: BootNetwork,
   trust_key: Bytes?,
   trust_text: Str,
+  repo_keys: List[Bytes],
   tailscale: Bool,
   identity: BootIdentity,
 }
@@ -115,11 +119,11 @@ proc authorized_key(value: Str) -> Result[AuthorizedKey] {
   {material, comment: comment.join(" ")}
 }
 
-proc trust_bytes(value: Str) -> Result[Bytes] {
+proc ed25519_public_key(value: Str, field: Str) -> Result[Bytes] {
   let raw = value.base64_decode()?
 
   guard raw.len() == 32 else {
-    fail "trust-key must decode to 32 bytes"
+    fail f"{field} must decode to 32 bytes"
   }
 
   raw
@@ -144,6 +148,7 @@ export proc parse(document: Str) [error] -> Result[FirstBoot, Error] {
   var trust_text = ""
   var tailscale = ""
   var identity = ""
+  var repo_keys: List[Bytes] = []
   var seen: Map[Bool] = {}
   let key_lines = collect {
     for line in document.lines() {
@@ -177,8 +182,20 @@ export proc parse(document: Str) [error] -> Result[FirstBoot, Error] {
           gateway = value
         } else if name == "trust-key" {
           seen = take_field(seen, name)?
-          trust = trust_bytes(value)?
+          trust = ed25519_public_key(value, "trust-key")?
           trust_text = value
+        } else if name == "repo-key" {
+          let key = ed25519_public_key(value, "repo-key")?
+
+          guard key not in repo_keys else {
+            fail "duplicate repo-key"
+          }
+
+          guard repo_keys.len() < repo_key_limit else {
+            fail f"at most {repo_key_limit} repo-key fields are allowed"
+          }
+
+          repo_keys += [key]
         } else if name == "tailscale" {
           seen = take_field(seen, name)?
           tailscale = value
@@ -261,6 +278,7 @@ export proc parse(document: Str) [error] -> Result[FirstBoot, Error] {
     network: parsed_network,
     trust_key: trust,
     trust_text,
+    repo_keys,
     tailscale: tailscale == "yes",
     identity: parsed_identity,
   }
@@ -304,6 +322,10 @@ pure record_text(config: FirstBoot) -> Str {
 
   if config.trust_text != "" {
     lines += [f"trust-key {config.trust_text}"]
+  }
+
+  for key in config.repo_keys {
+    lines += [f"repo-key {key.base64()}"]
   }
 
   lines += [f"tailscale {tailscale}", f"identity {identity_text(config.identity)}"]
@@ -494,6 +516,10 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
 
   if config.trust_key != null {
     write_bytes(rootfs, p"etc/laputa/trust-update-key", config.trust_key, 0o444)
+  }
+
+  if ! config.repo_keys.is_empty() {
+    write_bytes(rootfs, p"etc/laputa/repo-snapshot-keys", bytes.concat(config.repo_keys), 0o444)
   }
 
   write_text(rootfs, p"etc/laputa/first-boot/applied", record_text(config), 0o644)
