@@ -5,6 +5,7 @@ use std::io::{BufReader, BufWriter, Write};
 use serde::{Deserialize, Serialize};
 
 use crate::auth;
+use crate::db;
 use crate::s3;
 use crate::{Access, AppState, AuthState};
 
@@ -284,6 +285,11 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
     let Some(key) = publishable_object_key(path) else {
         return Response::not_found();
     };
+    if let Some(digest) = key.strip_prefix("indexes/").and_then(|name| name.strip_suffix(".json")) {
+        if body.len() > MAX_SIGNED_INDEX_BYTES || db::sha256_hex(body) != digest {
+            return Response::bad_request("signed index bytes do not match their digest name");
+        }
+    }
     // `If-None-Match: *` publishes an immutable object only if it is absent.
     if headers.get("if-none-match").is_some_and(|value| value.trim() == "*") {
         match state.storage.object_size(&key) {
@@ -360,6 +366,9 @@ fn complete_chunked_upload(
     let Some(key) = publishable_object_key(&rel_path) else {
         return Response::bad_request("invalid upload path");
     };
+    if key.starts_with("indexes/") {
+        return Response::bad_request("signed indexes are uploaded directly");
+    }
 
     let dir = state.upload_dir.join(upload_id);
     let assembled = dir.join("assembled-object");
@@ -724,7 +733,20 @@ fn object_key(path: &str) -> Option<String> {
         .or_else(|| source_key(path))
         .or_else(|| metadata_key(path))
         .or_else(|| proof_key(path))
+        .or_else(|| signed_index_key(path))
 }
+
+/// `indexes/<sha256>.json`: the immutable copy of the exact index bytes a
+/// signed snapshot binds, named by their SHA-256.
+fn signed_index_key(path: &str) -> Option<String> {
+    let digest = path
+        .strip_prefix("/indexes/")?
+        .strip_suffix(".json")
+        .filter(|digest| valid_lower_sha256(digest))?;
+    Some(format!("indexes/{digest}.json"))
+}
+
+const MAX_SIGNED_INDEX_BYTES: usize = 10 * 1024 * 1024;
 
 /// The object paths a write may create. Package payloads, metadata and
 /// proofs are content-addressed (`<name>-<ver>-<rel>-<artifact12>.tar.gz`,
@@ -741,6 +763,7 @@ fn publishable_object_key(path: &str) -> Option<String> {
             .strip_suffix(".json")
             .is_some_and(|stem| is_content_addressed(name, stem, 2)),
         ["sources", ..] => true,
+        ["indexes", _] => true,
         _ => false,
     };
     content_addressed.then_some(key)
@@ -945,7 +968,7 @@ fn valid_pkg_name(name: &str) -> bool {
 }
 
 fn content_type_for(key: &str) -> &'static str {
-    if key == "index.json" || key.starts_with("metadata/") || key.starts_with("proofs/") {
+    if key == "index.json" || key.starts_with("indexes/") || key.starts_with("metadata/") || key.starts_with("proofs/") {
         "application/json"
     } else {
         "application/octet-stream"

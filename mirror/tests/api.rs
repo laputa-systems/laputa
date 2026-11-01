@@ -998,3 +998,55 @@ fn local_mode_stores_snapshot_objects_as_plain_files() {
     assert_eq!(std::fs::read(state.tmp.path().join("data/snapshot.json")).unwrap(), SNAPSHOT_METADATA);
     assert_eq!(body_bytes(get(&state, "/snapshot.sig")), SNAPSHOT_SIGNATURE);
 }
+
+fn signed_index_path(body: &[u8]) -> String {
+    format!("/indexes/{}.json", db::sha256_hex(body))
+}
+
+#[test]
+fn signed_index_copies_are_named_by_their_digest_and_served_verbatim() {
+    let state = make_state();
+    let body = b"[\n  {\"exact\": \"bytes\"}\n]\n";
+    let path = signed_index_path(body);
+    assert_eq!(get(&state, &path).status, 404);
+    assert_eq!(packages::route("PUT", &path, &headers(&[]), body, &state).status, 401);
+    assert_eq!(packages::route("PUT", &path, &auth_headers(), body, &state).status, 201);
+    let resp = get(&state, &path);
+    assert_eq!(resp.status, 200);
+    assert_eq!(body_bytes(resp), body);
+}
+
+#[test]
+fn signed_index_copies_reject_bytes_that_do_not_match_their_name() {
+    let state = make_state();
+    let path = signed_index_path(b"claimed");
+    assert_eq!(packages::route("PUT", &path, &auth_headers(), b"substituted", &state).status, 400);
+    assert_eq!(get(&state, &path).status, 404);
+    let upper = format!("/indexes/{}.json", db::sha256_hex(b"x").to_uppercase());
+    assert_eq!(packages::route("PUT", &upper, &auth_headers(), b"x", &state).status, 404);
+    assert_eq!(packages::route("PUT", "/indexes/index.json", &auth_headers(), b"x", &state).status, 404);
+}
+
+#[test]
+fn signed_index_copies_are_immutable_and_never_assembled_from_chunks() {
+    let state = make_state();
+    let body = b"[]\n";
+    let path = signed_index_path(body);
+    let create_only = headers(&[
+        ("authorization", &format!("Bearer {TEST_TOKEN}")),
+        ("if-none-match", "*"),
+    ]);
+    assert_eq!(packages::route("PUT", &path, &create_only, body, &state).status, 201);
+    assert_eq!(packages::route("PUT", &path, &create_only, body, &state).status, 412);
+
+    let rel = path.trim_start_matches('/');
+    let complete = serde_json::to_vec(&serde_json::json!({"rel": rel, "chunks": 1})).unwrap();
+    assert_eq!(
+        packages::route("PUT", "/_uploads/idx/00000000", &auth_headers(), body, &state).status,
+        201
+    );
+    assert_eq!(
+        packages::route("POST", "/_uploads/idx/complete", &auth_headers(), &complete, &state).status,
+        400
+    );
+}

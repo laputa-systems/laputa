@@ -355,14 +355,22 @@ artifact moves the row to content-addressed names.
 
 ### Snapshot authentication
 
-`index.json` stays the only mutable package pointer, but production clients
-never plan from its raw bytes. `repo publish-snapshot --from DIR` publishes
-two further mutable objects after the index:
+`index.json` stays the publishers' mutable working index, but production
+clients never read it. `repo publish-snapshot --from DIR` publishes one
+immutable object and the two mutable objects that point at it:
 
 ```text
+indexes/<index-sha256>.json
 snapshot.json
 snapshot.sig
 ```
+
+`indexes/<index-sha256>.json` is a copy of the exact signed index bytes, named
+by their SHA-256. Clients fetch the snapshot pair, then only that digest-named
+object, mirroring the consistent-snapshot filenames of TUF. Publishing a newer
+`index.json` with `repo publish` therefore leaves signed clients on the prior
+snapshot until the operator signs and publishes the next one; they no longer
+fail closed for the whole signing ceremony.
 
 `snapshot.json` is a versioned signed-release boundary
 (`pm/repo_snapshot.xsh`) over the exact index bytes. It mirrors the
@@ -419,9 +427,10 @@ with `repo_snapshot.snapshot_metadata_text({generation, issued_at, expires_at, i
 re-provisioning keys out of band and re-issuing snapshots; there is no
 in-band recovery. `repo publish-snapshot` pre-verifies the signature, the
 digest against the live remote index, and the generation advance before
-uploading, then uploads `snapshot.json` before `snapshot.sig`, so the
-signature completes publication: readers that race publication can see a
-digest mismatch and fail closed. Interrupted publication may be retried with
+uploading, then uploads the immutable index copy, `snapshot.json` and
+`snapshot.sig` in that order. The signature completes publication: a reader
+between the last two uploads sees a metadata and signature that do not match
+and fails closed for those seconds. Interrupted publication may be retried with
 the identical signed metadata to restore a missing or stale signature. A
 same-generation change to the signed metadata is refused. `repo publish` still writes objects first
 and `index.json` last; the snapshot covers the index that publication

@@ -182,9 +182,9 @@ proc fetch_snapshot_bytes(repo: Str, rel: Path, bound: Int, label: Str) -> Resul
   response.body
 }
 
-## Fetches the signed snapshot and the exact index it binds, verifies the
-## snapshot against the provisioned keys and the accepted floor, and caches
-## the verified index bytes. Supports both network and file:// repositories
+## Fetches the signed snapshot and the digest-named immutable index it binds,
+## verifies the snapshot against the provisioned keys and the accepted floor,
+## and caches the verified index bytes. Supports both network and file:// repositories
 ## when verification keys are configured. Any verification failure fails
 ## closed without falling back to unsigned content.
 export proc load_verified_remote_index(
@@ -199,7 +199,10 @@ export proc load_verified_remote_index(
   }
   let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192, f"repository snapshot {util.remote_snapshot_rel()}")?
   let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256, f"repository snapshot {util.remote_snapshot_signature_rel()}")?
-  let index_bytes = fetch_snapshot_bytes(repo, p"index.json", 10485760, "remote index")?
+  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)?
+  let signed = repo_snapshot.snapshot_parse_metadata(metadata)?
+  let index_rel = util.remote_signed_index_rel(signed.index_sha256)
+  let index_bytes = fetch_snapshot_bytes(repo, index_rel, 10485760, f"signed repository index {index_rel}")?
   let state = repo_snapshot.snapshot_state_paths(fp"{state_dir}", repo)
   let accepted = repo_snapshot.snapshot_read_accepted(state)?
   let verified = repo_snapshot.snapshot_verify({

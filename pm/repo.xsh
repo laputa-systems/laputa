@@ -279,7 +279,8 @@ export proc publish(
 ## Publishes an offline-signed repository snapshot. The snapshot files are
 ## composed and signed outside PM (see docs/PM.md); this verifies the
 ## signature, binds the snapshot to the exact current remote index, requires
-## a generation advance over any published snapshot, and uploads the metadata
+## a generation advance over any published snapshot, publishes the signed
+## index bytes as an immutable digest-named object, and uploads the metadata
 ## before the signature so the signature is the linearization point.
 export proc publish_snapshot(
   remote_repo: Str,
@@ -342,6 +343,8 @@ export proc publish_snapshot(
       )
     }
   }
+
+  repo_publish_immutable_object(remote_repo, util.remote_signed_index_rel(parsed.index_sha256), index_dest, token, work)
 
   if util.is_file_url(remote_repo) {
     let metadata_dest = util.repo_file_path(remote_repo, util.remote_snapshot_rel())?

@@ -4,7 +4,7 @@
 bucket and exposes authenticated `PUT` publishing for:
 
 - `index.json`
-- `snapshot.json` and `snapshot.sig`
+- `snapshot.json`, `snapshot.sig` and `indexes/<index-sha256>.json`
 - `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`
 - `metadata/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
 - `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
@@ -20,7 +20,10 @@ the other mutable objects: the offline-signed snapshot metadata and its raw
 Ed25519 signature. The mirror holds no verification key. It stores and serves
 both byte for byte with `Cache-Control: no-store`, never redirects them to an
 object cache, and refuses writes over 8192 bytes (metadata) or 256 bytes
-(signature); clients authenticate the pair. Legacy object names remain readable, but
+(signature); clients authenticate the pair. `indexes/<index-sha256>.json` is
+the immutable copy of the signed index bytes: the mirror refuses a body whose
+SHA-256 differs from its name, a replacement of an existing object under
+`If-None-Match: *`, and chunked assembly. Legacy object names remain readable, but
 writes accept only content-addressed names. Source mirrors are
 target-architecture-specific and their paths are derived from the package
 index entry.

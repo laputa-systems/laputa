@@ -83,6 +83,13 @@ export pure remote_snapshot_signature_rel() -> Path {
   p"snapshot.sig"
 }
 
+## Immutable copy of the exact index bytes one signed snapshot binds.
+## Signed clients read the index only through this digest-named object, so
+## publishing a newer `index.json` never disturbs them before its snapshot.
+export pure remote_signed_index_rel(index_sha256: Str) -> Path {
+  fp"indexes/{index_sha256}.json"
+}
+
 ## Exported PM declaration `ensure_relative_path`.
 export pure ensure_relative_path(path_value: Path, label: Str) -> Result[Path, Error] {
   let normalized = path_value.normalize()

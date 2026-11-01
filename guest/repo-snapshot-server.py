@@ -1,9 +1,11 @@
+import hashlib
 import http.server
 import pathlib
 import sys
 
 root = pathlib.Path(sys.argv[1])
 port_file = pathlib.Path(sys.argv[2])
+index_path = 'indexes/' + hashlib.sha256((root / 'index.json').read_bytes()).hexdigest() + '.json'
 
 class Handler(http.server.BaseHTTPRequestHandler):
     generation = 0
@@ -19,13 +21,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path = 'snapshot-gen1/metadata'
         elif path == 'tampered/snapshot.sig':
             path = 'snapshot-gen1/metadata.sig'
-        elif path == 'tampered/index.json':
+        elif path == 'tampered/' + index_path:
             body = (root / 'index.json').read_bytes().replace(b'fixture-payload', b'tampered-payload')
             self.send_response(200)
             self.end_headers()
             self.wfile.write(body)
             return
-        if path not in {'snapshot-gen1/metadata', 'snapshot-gen1/metadata.sig', 'snapshot-gen2/metadata', 'snapshot-gen2/metadata.sig', 'index.json'}:
+        if path == index_path:
+            path = 'index.json'
+        elif path not in {'snapshot-gen1/metadata', 'snapshot-gen1/metadata.sig', 'snapshot-gen2/metadata', 'snapshot-gen2/metadata.sig'}:
             self.send_error(404)
             return
         body = (root / path).read_bytes()

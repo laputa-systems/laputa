@@ -22,6 +22,10 @@ pure reference_expires() -> Int {
   2000000000
 }
 
+proc signed_index_rel() -> Result[Path] {
+  pm_util.remote_signed_index_rel(fixture("index.json").read_bytes()?.sha256().hex())
+}
+
 pure reference_digest() -> Str {
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 }
@@ -300,6 +304,7 @@ test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time,
 
   assert fp"{remote_root}/snapshot.json".read_bytes()? == snapshot_bytes("snapshot-gen1", "metadata")?
   assert fp"{remote_root}/snapshot.sig".read_bytes()? == snapshot_bytes("snapshot-gen1", "metadata.sig")?
+  assert fp"{remote_root}/{signed_index_rel()?}".read_bytes()? == fixture("index.json").read_bytes()?
 
   repo.publish_snapshot(remote_url, "", work, stage_snapshot_dir(ctx, "snapshot-gen1-replay-dir", "snapshot-gen1")?, both_keys)
 
@@ -348,6 +353,7 @@ test test_publish_snapshot_rejects_unbound_and_incomplete_inputs [fs, net, env, 
   }
 
   assert ! fp"{remote_root}/snapshot.json".exists()?
+  assert ! fp"{remote_root}/indexes".exists()?
 }
 
 test test_publish_snapshot_refuses_to_replace_a_legacy_publication [fs, net, env, time, error] { |ctx|
@@ -382,7 +388,7 @@ test test_verified_fetch_accepts_signed_index_and_caches_exact_bytes [fs, net, e
   let index_text = fixture("index.json").read_text()?
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.json"}, Ok(snapshot_response(f"{repo}/snapshot.json", snapshot_bytes("snapshot-gen1", "metadata")?)), 2)
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.sig"}, Ok(snapshot_response(f"{repo}/snapshot.sig", snapshot_bytes("snapshot-gen1", "metadata.sig")?)), 2)
-  test.mock(ctx, "net.request", {url: f"{repo}/index.json"}, Ok(snapshot_response(f"{repo}/index.json", bytes.from_text(index_text))), 2)
+  test.mock(ctx, "net.request", {url: f"{repo}/{signed_index_rel()?}"}, Ok(snapshot_response(f"{repo}/{signed_index_rel()?}", bytes.from_text(index_text))), 2)
 
   let out = test.temp_dir(ctx, name: "verified-fetch-out")?
   let state = test.temp_dir(ctx, name: "verified-fetch-state")?
@@ -429,7 +435,7 @@ test test_verified_fetch_rejects_tampered_index [fs, net, env, time, error] { |c
   let tampered = bytes.from_text(index_text.replace("fixture-payload", with: "tampered-payload"))
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.json"}, Ok(snapshot_response(f"{repo}/snapshot.json", snapshot_bytes("snapshot-gen1", "metadata")?)))
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.sig"}, Ok(snapshot_response(f"{repo}/snapshot.sig", snapshot_bytes("snapshot-gen1", "metadata.sig")?)))
-  test.mock(ctx, "net.request", {url: f"{repo}/index.json"}, Ok(snapshot_response(f"{repo}/index.json", tampered)))
+  test.mock(ctx, "net.request", {url: f"{repo}/{signed_index_rel()?}"}, Ok(snapshot_response(f"{repo}/{signed_index_rel()?}", tampered)))
 
   let out = test.temp_dir(ctx, name: "verified-fetch-tampered-out")?
 
@@ -446,7 +452,7 @@ test test_verified_fetch_rejects_wrong_signer [fs, net, env, time, error] { |ctx
   let index_text = fixture("index.json").read_text()?
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.json"}, Ok(snapshot_response(f"{repo}/snapshot.json", snapshot_bytes("snapshot-gen1", "metadata")?)))
   test.mock(ctx, "net.request", {url: f"{repo}/snapshot.sig"}, Ok(snapshot_response(f"{repo}/snapshot.sig", snapshot_bytes("snapshot-gen1-wrongsigned", "metadata.sig")?)))
-  test.mock(ctx, "net.request", {url: f"{repo}/index.json"}, Ok(snapshot_response(f"{repo}/index.json", bytes.from_text(index_text))))
+  test.mock(ctx, "net.request", {url: f"{repo}/{signed_index_rel()?}"}, Ok(snapshot_response(f"{repo}/{signed_index_rel()?}", bytes.from_text(index_text))))
 
   match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-fetch-wrong-out")?, [key_bytes("signing-key")?], reference_now(), test.temp_dir(ctx, name: "verified-state")?.display()) {
     Ok(_) => test.fail("a wrongly signed snapshot was accepted"),
@@ -473,6 +479,8 @@ test test_production_plan_without_provisioned_keys_fails_closed [fs, process, en
 proc stage_signed_file_repository(ctx: TestContext, name: Str, which: Str) -> Result[Path] {
   let root = test.temp_dir(ctx, name:)?
   fixture("index.json").copy(to: fp"{root}/index.json")
+  fp"{root}/indexes".mkdir()
+  fixture("index.json").copy(to: fp"{root}/{signed_index_rel()?}")
   fixture(f"{which}/metadata").copy(to: fp"{root}/snapshot.json")
   fixture(f"{which}/metadata.sig").copy(to: fp"{root}/snapshot.sig")
   root
@@ -496,7 +504,7 @@ test test_verified_fetch_accepts_signed_file_repository_and_rejects_tampering [f
     assert accepted.generation == "1"
   }
 
-  fp"{root}/index.json".write(fixture("index.json").read_text()?.replace("fixture-payload", with: "tampered-payload"))
+  fp"{root}/{signed_index_rel()?}".write(fixture("index.json").read_text()?.replace("fixture-payload", with: "tampered-payload"))
   match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-tampered-out")?, keys, reference_now(), state.display()) {
     Ok(_) => test.fail("a tampered file repository index was accepted"),
     Err(problem) => assert "does not match signed snapshot metadata" in problem.message
@@ -506,6 +514,23 @@ test test_verified_fetch_accepts_signed_file_repository_and_rejects_tampering [f
   match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-missing-out")?, keys, reference_now(), state.display()) {
     Ok(_) => test.fail("a file repository without a snapshot was accepted"),
     Err(problem) => assert "snapshot.json" in problem.message
+  }
+}
+
+test test_newer_unsigned_index_does_not_disturb_signed_clients_before_its_snapshot [fs, net, env, time, error] { |ctx|
+  let root = stage_signed_file_repository(ctx, "verified-file-unsigned-successor", "snapshot-gen1")?
+  let repo = f"file://{root}"
+  let keys = [key_bytes("signing-key")?]
+  fixture("index2.json").copy(to: fp"{root}/index.json", overwrite: true)
+
+  let index = remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-successor-out")?, keys, reference_now(), test.temp_dir(ctx, name: "verified-file-successor-state")?.display())?
+  assert index.len() == 1
+  assert index[0].name == "fixture"
+
+  fp"{root}/{signed_index_rel()?}".remove()
+  match remote.load_verified_remote_index(repo, test.temp_dir(ctx, name: "verified-file-noindex-out")?, keys, reference_now(), test.temp_dir(ctx, name: "verified-file-noindex-state")?.display()) {
+    Ok(_) => test.fail("a signed snapshot without its immutable index was accepted"),
+    Err(problem) => assert "signed repository index" in problem.message
   }
 }
 
