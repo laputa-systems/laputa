@@ -77,7 +77,35 @@ pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
   true
 }
 
-proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
+proc declared_local_source_lines(pkg: types.Package, target: types.Target) -> Result[List[Str]] {
+  let arch = types.pm_target_arch(target)
+  let lines: List[Str] = collect {
+    for source in pkg.upstream_sources {
+      continue unless arch in source.architectures or "all" in source.architectures
+      let parsed = util.parse_source_line(source.source)?
+      let expanded = util.expand_source(parsed.source, pkg, arch, arch)
+
+      continue when util.is_url_source(expanded) or expanded.starts_with("repository/") or expanded.starts_with("/")
+
+      let relative = util.ensure_relative_path(fp"{expanded}", f"{pkg.name} local source {expanded}")?
+      let input = fp"{pkg.dir}/{relative}"
+
+      continue unless input.exists()
+
+      let paths = if input.is_dir() { [entry.path for entry in fs.walk(input) |> sort-by .path if entry.kind != "dir"] } else { [input] }
+
+      for item in paths {
+        let rel = item.strip_prefix(pkg.dir)?
+        yield tree_entry_line(pkg.dir, item, "package-file")? unless ignored_tree_path(rel) or package_input_path(rel)
+      }
+    }
+  }
+
+  lines
+}
+
+proc package_source_lines(pkg: types.Package, target: types.Target) -> Result[List[Str]] {
+  let declared = declared_local_source_lines(pkg, target)?
   let lines: List[Str] = collect {
     for entry in fs.walk(pkg.dir) |> sort-by .path {
       let rel = entry.path.strip_prefix(pkg.dir)?
@@ -97,7 +125,7 @@ proc package_source_lines(pkg: types.Package) -> Result[List[Str]] {
     }
   }
 
-  lines
+  lines.extend(declared)
 }
 
 proc repository_input_lines(repo_root: Path, pkg: types.Package, target: types.Target) -> Result[List[Str]] {
@@ -183,7 +211,7 @@ export proc package_build_input(
     lines += [f"filetree\t{canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}"]
   }
 
-  lines += package_source_lines(pkg)?
+  lines += package_source_lines(pkg, target)?
   lines += repository_input_lines(repo_root, pkg, target)?
   digest_lines(lines)?
 }

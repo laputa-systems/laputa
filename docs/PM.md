@@ -246,8 +246,9 @@ write or a setgid inherited from a parent directory, are host noise, so the
 same checkout gets the same keys and payload modes on every host.
 
 An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
-package id, the recipe input digest (recipe files except `proof.xsh` and
-`proof_deps.xsh`, source records and checksums, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
+package id, the recipe input digest (recipe `.xsh` files, `files/` and `patches/` except `proof.xsh` and
+`proof_deps.xsh`, source records and checksums, local files and directories the
+recipe declares as sources, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
 and the key of every direct `deps` and `mkdeps_*` dependency. Each of those is
 installed into the build root with its runtime closure, because recipes link
 against libraries they declare only in `deps`; each dependency key covers that

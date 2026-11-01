@@ -89,6 +89,24 @@ test test_package_build_fingerprint_changes_for_files_tree [fs, env, error] { |c
   assert build_input(pkg)? == first == false
 }
 
+test test_package_build_fingerprint_covers_declared_local_sources [fs, env, error] { |ctx|
+  let pkg = copied_package(ctx, "fingerprint-local-source")?
+  fp"{pkg.dir}/settings.toml".write("first\n")
+  fp"{pkg.dir}/notes.txt".write("first\n")
+  let declared = {
+    ...pkg.upstream_sources[0],
+    source: p"settings.toml",
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: "SKIP"}],
+  }
+  let selected = {...pkg, upstream_sources: pkg.upstream_sources.push(declared)}
+  let first = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
+  fp"{pkg.dir}/notes.txt".write("changed\n")
+  assert fingerprint.package_build_input(p".", selected, types.target_x86_64())? == first
+  fp"{pkg.dir}/settings.toml".write("changed\n")
+  assert fingerprint.package_build_input(p".", selected, types.target_x86_64())? != first
+}
+
 test test_package_build_fingerprint_changes_for_service [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "fingerprint-service")?
   let first = build_input(pkg)?
