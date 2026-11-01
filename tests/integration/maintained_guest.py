@@ -292,9 +292,8 @@ def firewall_mode():
             fail_if_bad(console)
             text = console.read_text(errors="replace")
             assert OK not in text and READY not in text, "a guest without a loadable ruleset reached the identity proof"
-            guest.send_signal(signal.SIGKILL)
-            wait_exit(guest, 60)
-            print(f"PASS firewall: {ruleset} ruleset left the firewall failed and dropbear down")
+            wait_exit(guest, 120)
+            print(f"PASS firewall: {ruleset} ruleset left the firewall failed and dropbear down, then the guest powered itself off")
         finally:
             err.close()
             if guest.poll() is None:
