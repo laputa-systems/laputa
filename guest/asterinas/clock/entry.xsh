@@ -7,6 +7,7 @@ type NtpStatus = {state: Str, pid: Int, ready: Bool, restarts: Int}
 
 const case_dir = p"/usr/lib/asterinas/case"
 const source_rate_ppm = 100
+const startup_offset_ms = 10100
 const boot_clock_floor = 1000000000000
 const fixture_epoch_ms = 1793000000000
 
@@ -89,7 +90,7 @@ minimum-agreeing-sources = 1
   }
 
   if mode != "frequency" {
-    let offset = if mode == "ahead" { 10000 } else { -10000 }
+    let offset = if mode == "ahead" { startup_offset_ms } else { -startup_offset_ms }
     linux.set_system_clock(original + offset)?
   }
   let run_dir = p"/run/ntp-proof"

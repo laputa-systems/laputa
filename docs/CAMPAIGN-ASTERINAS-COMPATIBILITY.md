@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is blocked on IPv4 socket ancillary data (below).
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is next.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -118,27 +118,28 @@
   where Linux accepts them; absolute realtime timers are not re-armed by a step;
   `settimeofday` is still missing; while a frequency correction is active the
   vDSO reads through the system call.
-- A3 disciplined clock consumer: blocked, not accepted. The case
-  `guest/asterinas/clock` (modes `behind`, `ahead`, `frequency`) runs the
-  packaged ntpd-rs under `xinit supervise` as UID/GID 123 with only CAP_SYS_TIME
-  against a controlled in-guest source, and checks readiness is not
-  synchronization, five consecutive samples within 100 ms, a 100 ppm source
-  learned within 20 ppm, and a restart that restores the saved frequency. All
-  three modes pass on the Linux reference. On Asterinas the daemon starts with
-  the exact identity and capability set (after `/proc/PID/status` gained
-  `NoNewPrivs`), reports readiness unsynchronized, and never selects its
-  source: IPv4 datagram sockets have no ancillary data at all, so
-  `setsockopt(IP_PKTINFO)` fails with `ENOPROTOOPT` ("No connection possible to
-  127.0.0.1"). ntpd-rs also asks for `SO_TIMESTAMPING` with receive and transmit
-  software timestamps, which needs `SCM_TIMESTAMPING` control messages on receive
-  and a `MSG_ERRQUEUE` timestamp queue on transmit. Unblocking A3 needs IPv4
-  datagram control messages (`IP_PKTINFO`, `SCM_TIMESTAMPING`), the socket error
-  queue and `SO_TIMESTAMPING`; that work belongs with the A4/A5 socket changes.
-  Also open: the pause and resume case needs the Firecracker API and a peer
-  outside the guest, which needs the A4 virtual network; and the Firecracker
-  guest has no RTC, so its clock starts at 1970-01-01 (the case sets a fixture
-  epoch in that situation).
-- Red boundary: the pinned kernel is 9 local commits beyond the advertised
+- A3 disciplined clock consumer: accepted for the loopback fixture. The case
+  `guest/asterinas/clock` runs the packaged ntpd-rs under `xinit supervise` as
+  UID/GID 123 with only CAP_SYS_TIME against a controlled in-guest source. `behind`
+  and `ahead` start 10.1 s off, require a startup step, and then five consecutive
+  one-second samples within 100 ms; `frequency` runs a 100 ppm source and requires
+  the saved correction within 20 ppm of it; every mode kills the daemon and
+  requires a restart that reports unsynchronized (and, for `frequency`, restores
+  the saved correction) without a source. Readiness is checked not to mean
+  synchronization. All three pass on Asterinas and on the Linux reference.
+  Unblocking it took IPv4 datagram ancillary data: `IP_PKTINFO`, `SO_TIMESTAMP`,
+  `SO_TIMESTAMPNS`, `SO_TIMESTAMPING` software receive and transmit timestamps
+  with the `MSG_ERRQUEUE` queue and poll error events, and a fix so that an
+  unprivileged program may bind or connect port 0. The `network/udp_ancillary`
+  witness passes on both kernels. The earlier Linux `behind` flake was not source
+  latency: 10 s is the daemon's own step threshold, so a start exactly 10 s off
+  steps or slews at 500 ppm depending on sub-millisecond noise. The fixture now
+  starts 10.1 s off; the acceptance bounds are unchanged. Open A3 obligations: the
+  pause and resume case needs the Firecracker API and a peer outside the guest,
+  which needs the A4 virtual network; transmit timestamps without `OPT_TSONLY`
+  and hardware timestamping are unsupported; and the Firecracker guest has no
+  RTC, so its clock starts at 1970-01-01 (the case sets a fixture epoch then).
+- Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
   runs panic-bounded batches on either backend, and `account-native.sh` counts

@@ -85,8 +85,9 @@ To run a guest case (a script and its helper programs) on either backend, run
 The runner compiles each `.c` file in the case directory, places the files under
 `/usr/lib/asterinas/case`, and requires the guest's case start and finish
 markers. `ASTERINAS_EXTRA_PACKAGES="ntpd-rs"` adds packages to the generation
-for a build; `ntpd-rs` also needs the operator-provisioned
-`packages/ca-certificates/files/trust-update-key`.
+for a build. `ntpd-rs` also needs the operator-provisioned, git-ignored
+`packages/ca-certificates/files/trust-update-key`; a worktree build must copy it
+from the main checkout, because worktrees do not carry ignored files.
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`

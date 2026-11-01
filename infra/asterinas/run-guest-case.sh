@@ -36,9 +36,11 @@ done
 basename "$case_dir" > "$staged/name"
 printf '%s\n' "$mode" > "$staged/mode"
 
+firecracker_config="$bundle/firecracker.json"
 if [[ "$backend" == asterinas ]]; then
-    root="$(jaq -r '.drives[0].path_on_host' "$bundle/firecracker.json")"
-    mkdir -p "$(dirname "$root")"
+    root="$result_dir/root.ext2"
+    firecracker_config="$result_dir/firecracker.json"
+    jaq --arg root "$root" '.drives[0].path_on_host = $root' "$bundle/firecracker.json" > "$firecracker_config"
 else
     root="$result_dir/root.ext2"
     bash "$repo_root/infra/asterinas/linux-reference.sh" \
@@ -54,7 +56,7 @@ console="$result_dir/console.log"
 status=0
 timeout_seconds="${LAPUTA_CASE_TIMEOUT:-600}"
 if [[ "$backend" == asterinas ]]; then
-    bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$bundle/firecracker.json" \
+    bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$firecracker_config" \
         "$console" "$console.firecracker" '' "$(( timeout_seconds * 5 ))" > "$result_dir/command.log" 2>&1 || status=$?
 else
     XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
