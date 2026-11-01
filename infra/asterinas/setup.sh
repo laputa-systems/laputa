@@ -347,7 +347,7 @@ if [[ ! -f "$output_initramfs" || "$(sha256sum "$output_initramfs" | awk '{print
     mv -f "$output_initramfs.tmp" "$output_initramfs"
 fi
 
-kernel_build_config='target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev source_mount=/src/asterinas'
+kernel_build_config='target=x86_64 boot=vmm-direct feature=pvh_boot profile=dev source_mount=/src/asterinas kache_path_normalize=0'
 kernel_key="$(printf '%s\n' \
     "$asterinas_commit" \
     "$source_snapshot_hash" \
@@ -393,10 +393,12 @@ else
         --network none \
         --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
         --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --mount "type=bind,src=$source_dir/.cargo/config.toml,dst=/work/asterinas/cargo/config.toml,readonly" \
         --workdir /src/asterinas/kernel \
         --env CARGO_HOME=/work/asterinas/cargo \
         --env CARGO_TARGET_DIR=/work/asterinas/target \
         --env CARGO_NET_OFFLINE=true \
+        --env KACHE_RUSTC_PATH_NORMALIZE=0 \
         --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
         --env VDSO_LIBRARY_DIR=/root/linux_vdso \
         --entrypoint "/work/asterinas/osdk/$osdk_key/bin/cargo-osdk" "$dev_image_id" \
