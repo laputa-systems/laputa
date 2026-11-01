@@ -166,11 +166,11 @@ proc main() [fs, process, env, time, net, error] {
     eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
     let test_run = cd (source_root) {
       if test_selection == "all" {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture
       } else if "::" in test_selection {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection
       } else {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/xsh/core:/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection
+        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection
       }
     }?
     eprint --flush $test_run.stdout

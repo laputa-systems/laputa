@@ -12,8 +12,12 @@
   The `numeric` case passed five tests on each backend with the same PM root.
   The single-VM full run stopped after 30 passed, one failed, and four skipped.
   The failure was `core/tests/test-awk.xsh::test_awk_matrix_arithmetic_and_bit_functions_shard_004`:
-  `status was not an exit`. The guest discovered 15,220 cases, while host
-  discovery found 15,255. The missing identities and later cases remain open.
+  `status was not an exit`. Of 15,255 host-discovered identities, 15,220 have
+  no result. Guest discovery reported 15,220 entries: it replaced 37 tests in
+  `core/tests/test-dhcp-client.xsh` and `core/tests/test-dhcp-net.xsh` with two
+  invalid-module entries. The test environment loaded duplicate module roots;
+  one previously invalid DHCP test passes with the source root alone. Rerun
+  full discovery and accounting with that environment.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Next: finish A0's maintained paired runner, negative result checks, and native
