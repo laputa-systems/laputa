@@ -814,7 +814,7 @@ Prefer failures that become small counterexamples: LAP-34 and XSH-40 connect one
 real service lifecycle failure to a hermetic native replay before generalizing.
 Missing observations must not fall through to the host. Process kills do not
 simulate loss/reordering of storage writes; storage crash claims need separate
-fault injection. LAP-35 replaces the QMP helper only through a reusable bounded
+fault injection. The QMP helper was replaced only through a reusable bounded
 XSH client with parity, not a language-only translation or a new VM framework.
 LAP-33/XSH-37 qualify confined extraction/publication without equating lexical
 path safety with authority. Existing production/test boundaries remain binding.

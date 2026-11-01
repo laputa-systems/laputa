@@ -82,17 +82,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Fix with:** single-source-of-truth
 - **Effort:** L (weeks)
 
-### LAP-35 · P3 · Replace the QMP proof helper with a reusable XSH client
-
-- **Area:** VM control
-- **Where:** `system/qmp.xsh`, `system/qemu.xsh`, `tests/system/`, `docs/QEMU.md`
-- **Problem:** QMP readiness/input/screenshot operations rely on a small Python helper. Translating it without a shared bounded protocol contract would only change the implementation language.
-- **Recommendation:** Build a narrow XSH QMP library over XSH-39's qualified Unix-stream operations. Own greeting/capability negotiation, bounded JSON framing, request IDs, unsolicited events, deadlines and cleanup in XSH. Integrate the three current operations and delete the helper/dependency only after parity. Preserve LAP-21's non-retryable mutation boundary and the current Linux/macOS launch paths.
-- **Acceptance:** Fragmented/coalesced messages, interleaved events, command errors, EOF and disconnect-after-send are deterministic local fixtures. Actual VM readiness/input/screenshot proofs pass without the Python helper. Unknown mutation outcomes are reported, not retried; retain LAP-7's independent visual-content requirement. No QMP-specific Rust intrinsic or new VM orchestration framework.
-- **Progress:** Both supported host paths use `system/qmp.xsh` over portable `unix.connect_stream` for readiness, input, VT switching, screenshots and pause/resume. The client bounds frames, matches response IDs, handles events, reports uncertain outcomes and shares the supervisor's monotonic deadline. The Python helper and transport selector are deleted. Fifteen native peer cases, fourteen supervisor cases and the final Linux x86_64/KVM graphical proof pass with the qualified static SDK. On 2026-11-01 the native cases still pass (15 peer, 18 qemu), but `laputa test qemu-tinyland-ghostty` fails in three runs at the guest device-loss phase before the host drives input, so the graphical readiness, input and screenshot proofs were not re-exercised; see LAP-50. No macOS or aarch64 runtime qualification is claimed. See [QMP baseline](docs/QEMU.md#qmp-replacement-baseline).
-- **Fix with:** deduplicate
-- **Effort:** M (days)
-
 ### LAP-20 · P4 · Remove the libgcc_s compatibility name
 
 - **Area:** Dependencies
@@ -102,18 +91,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Blocked:** The declared prebuilt Rust standard library still requires the compatibility name. A replacement SDK and its Cargo/package consumers need qualification before removal.
 - **Fix with:** dead-code-archaeology
 - **Effort:** L (weeks)
-
-### LAP-39 · P4 · Measure the complexity delta of one removed glue boundary
-
-- **Area:** Design economy
-- **Where:** `docs/ROADMAP.md`, `docs/DEVELOPMENT.md`, `system/qmp.xsh`, `system/qemu.xsh`, `tests/system/`
-- **Problem:** The roadmap already prescribes architectural subtraction, but no selected change measures first-party glue and invariants removed versus new dependencies and host boundaries created. A source-line quota or replacement of mature libraries would be counterproductive.
-- **Recommendation:** Use LAP-35's Python QMP-helper replacement as one bounded case after its behavior proof. Record before/after entry points, argument/JSON round-trips, subprocesses, duplicate error rules, protocol ownership, first-party source, dependencies and verification cost. Relate the result to startup/binary measurements where XSH itself changes. Keep a compact evidence table in the owning docs, not a permanent scoring service or blanket LOC limit.
-- **Acceptance:** A reviewer can trace every retired responsibility to an actual removal and every retained contract to tests; the new XSH QMP client passes the same fragmented-input and lifecycle cases. If replacement increases obligations without a demonstrated gain, retain or redesign it rather than claim simplification from language choice alone.
-- **Progress:** The [QMP baseline](docs/QEMU.md#qmp-replacement-baseline) compares the retired helper with the native client: no QMP subprocesses or argv crossing, one protocol owner, explicit reusable socket substrate cost, and preserved failure and visual-proof contracts. Laputa client/supervisor source is 615 lines versus 645 before replacement. Closure waits on LAP-35's graphical proof (LAP-50). This excludes XSH's added socket implementation and makes no global source-size or speed claim.
-- **Coordination:** XSH-49 owns substrate-complexity accounting; LAP-35 owns the actual QMP implementation and evidence.
-- **Fix with:** ultratriage
-- **Effort:** S (hours)
 
 ### LAP-40 · P4 · Pilot one trusted external CLI signature in Laputa recipes
 
@@ -145,13 +122,4 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Recommendation:** Qualify the remaining cases in disposable guests before enabling an authenticated production configuration. Never alter the host clock. Cold boot requires trustworthy RTC or operator-set time; preserve TLS and snapshot expiry verification.
 - **Progress:** The Graviola/rustcrypto musl package installs the daemon, ctl and exporter. Its wrapper drops to UID/GID 123 with only `CAP_SYS_TIME`; readiness means initialization, not synchronization. Real guest clocks converge from both positive and negative startup offsets. Forced restart, external-backstep restart/reselection and QMP pause/resume reselection pass. The loopback oracle pauses with the guest, and the external-backstep case does not prove convergence. An x86_64/KVM guest selected the authenticated external `time.cloudflare.com` NTS source before and after supervised restart; this does not independently measure clock accuracy. A controlled NTS guest verifies CA/name and `ntske/1`, records three authentication failures on tampered NTS replies before enabling valid replies, converges against the raw-clock oracle and restarts under supervision; its standalone runner passes end to end. Test-only chrony 4.9 confirms readiness while unsynchronized and startup stepping for both 20-second offset directions; its ahead runner also passes end to end. The package now persists steady frequency calibration without phase slew in a private UID/GID 123 directory. Twelve calibration tests pass on the host and in a root container. A controlled 100 ppm source proves learning and actual kernel frequency restoration after supervised restart and a fresh-kernel boot on the same state disk, before source selection and while unsynchronized. The exact final package also passes the NTS control with calibration enabled. The retained frequency shell runner also passes end to end on x86_64/KVM with the current ntpd-rs artifact closure, including both boots. This does not prove physical power-loss durability or hardware oscillator stability. Repository and trust-release v2 metadata now carry signed `issued-at`, and durable floors retain the greatest authenticated publication time rather than local wall observations. Legacy metadata/state require trusted reprovisioning that preserves generation floors. Existing installations must provision the reserved identity before enabling the service. On current master (2026-11-01) the behind, ahead, jump, pause, frequency, controlled NTS and external NTS (`time.cloudflare.com`) runners each pass on x86_64/KVM guests, and a new `slew` runner shows ntpd-rs correcting an 80 ms offset at about 0.5 ms per second without a step (converged in about four minutes) while chrony 4.9 also avoids a step but corrects about 32 ms in one sample, so the daemons agree on the no-step outcome and differ in slew rate. The `qemu-maintained` profile now runs ntpd-rs with an NTS-only configuration (`time.cloudflare.com`, `nts.netnod.se`, `nts.time.nl`; two must agree) and `tests/integration/maintained_ntp.py` qualifies it on the real network: readiness at stratum 16, synchronization to all three operators, supervised restart and reboot resynchronization, and a one-millisecond clock change over two minutes with NTS egress cut. PTB, the owner's third choice, completed NTS-KE but never answered NTS polls, so `nts.time.nl` replaced it. aarch64 remains deferred. See [time discipline](docs/ROADMAP.md#time-discipline-and-bootstrap), [guest checks](docs/TESTING.md#run-the-disposable-ntp-guest), [snapshot policy](docs/PM.md) and [trust policy](docs/CERTIFICATE-TRUST.md).
 - **Fix with:** reference-parity
-- **Effort:** M (days)
-
-### LAP-50 · P2 · Stop Ghostty crash-looping against the Tinyland compositor
-
-- **Area:** Graphical kiosk
-- **Where:** `tinyland/src/server/dispatch_impl.rs`, `profiles/qemu-tinyland-ghostty/`, `packages/ghostty-custom/`, `packages/mesa/`
-- **Problem:** On 2026-11-01 `laputa test qemu-tinyland-ghostty` fails at `device-loss: compositor died on single keyboard loss` in three consecutive runs, on the pre-existing and a rebuilt kernel. The session log shows the cause: the compositor disconnects Ghostty with `wl_shm_pool` error 0, `only ARGB8888/XRGB8888 supported, got Abgr8888`, Ghostty segfaults at a null write inside `libwayland-client.so.0.26.0` while handling the error, and the compositor exits because its child exited. The seat log records seven session restarts in one boot. The first session reaches OpenGL 4.3 and the crash-recovery step; the loop starts after the compositor is killed.
-- **Recommendation:** Establish why a client picks ABGR8888 when the compositor advertises only ARGB8888 and XRGB8888 (Mesa EGL configuration under the current host virglrenderer and QEMU 11.1.2 is the first suspect), then either fix the format choice or advertise and render ABGR8888 and XBGR8888 in the compositor. Keep the protocol-error path from taking the compositor down if the client may legitimately fail.
-- **Fix with:** root-cause
 - **Effort:** M (days)
