@@ -13,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.4.1"
 
 ## Package recipe export.
-export const rel = "3"
+export const rel = "4"
 
 ## Runtime link inputs matching the tarball DT_NEEDED: libEGL (mesa),
 ## libwayland-client, libxkbcommon, plus musl. Fontconfig is statically
@@ -30,10 +30,10 @@ export const mkdeps_host = ["tic"]
 ## pinned commit; arch-pinned with recorded SHA-256, no SKIP. Built with
 ## `zig build -Dapp-runtime=wayland` (no GTK/Adwaita/X11); Linux binaries are
 ## mostly-static musl with dynamic libEGL, libwayland-client, libxkbcommon only.
-## SHA256SUMS at the release: x86_64 b42ce833..., aarch64 de7b3621....
+## SHA256SUMS at the release: x86_64 2a4a933d..., aarch64 4931dc30....
 export const upstream_sources = [
   {
-    source: p"https://github.com/joshuarli/ghostty/releases/download/release-62aeb1e168edde541befa7c4949b58ef7fe28b59/ghostty-custom-ARCH-linux-musl.tar.gz => ghostty",
+    source: p"https://github.com/joshuarli/ghostty/releases/download/release-f2024d5d2f65352530e0d4f0b108556726c63156/ghostty-custom-ARCH-linux-musl.tar.gz => ghostty",
     kind: "file",
     architectures: [
       "all",
@@ -41,11 +41,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "b42ce8331fae4d0a1285f0b9e97fe57682b1b51e8862996067e100739319549e",
+        sha256: "2a4a933d42495cebc816e77ddeff95c0dc6cd8f4a845af092c624d3401603721",
       },
       {
         arch: "aarch64",
-        sha256: "de7b362196b2e4aa1e848ac193352721837bee3d014828afecb3edc4638c1fd8",
+        sha256: "4931dc3003939ef9ff8d7d16ec707d3b847f1e5ed2aa0b9a22f91982e22a3a52",
       },
     ],
   },

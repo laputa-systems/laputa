@@ -82,6 +82,15 @@ on the display fd. The recipe pins x86_64 `9b56d0b8…` and aarch64
 `release-354a4e32…` binds `wl_seat` before its listener exists, so the
 client never creates a keyboard (see `tinyland/docs/opengl-probe.md`).
 
+`release-f2024d5d2f65352530e0d4f0b108556726c63156` (`ghostty-custom-1.4.1-4`,
+x86_64 `2a4a933d…`, aarch64 `4931dc30…`) adds two Wayland fixes: the `wl_shm`
+format is chosen from the compositor's advertised set (ARGB8888 fallback with
+an R/B swap, a clear error when nothing usable is advertised), and rendering
+follows the compositor scale (fractional via viewporter, integer via
+`preferred_buffer_scale` or output scale with `set_buffer_scale`). Tinyland's
+ABGR8888/XBGR8888 support stays, since it is correct protocol-wise, but
+Ghostty no longer depends on it.
+
 ### Phase 6 numbers
 
 | Item | Value | Source |
