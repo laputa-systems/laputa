@@ -25,6 +25,10 @@
   `core/tests/test-bb-awk.xsh::test_bb_awk_awk_do_not_allow_str_724d0fde`
   reported `timeout: process timed out`; that module stopped after 18 passes,
   leaving 30 of its 49 cases unexecuted. Its cause is not established.
+- A later follow-up module stopped at
+  `core/tests/test-bb-cp.xsh::test_bb_cp_cp_does_not_copy_unreadable_file_b036d15e`:
+  the test expected failure but copying returned status zero. It had 16 passes
+  and six unexecuted cases. The cause and matching Linux result are unknown.
 - The awk failure is parked pending a smaller reproducer or new page-fault
   evidence. Full discovery followed by the initial prefix produced SIGSEGV
   in an awk child on Asterinas. Linux passed the same instrumented prefix.
