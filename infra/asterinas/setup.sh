@@ -184,20 +184,13 @@ if [[ "$mode" == fetch || "$mode" == setup ]]; then
         --entrypoint /usr/bin/env "$dev_image_id" \
         cargo fetch --locked --manifest-path osdk/Cargo.toml
     docker run --rm --platform linux/amd64 \
+        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
         --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --workdir /src/asterinas \
         --env CARGO_HOME=/work/asterinas/cargo \
         --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
         --entrypoint /usr/bin/env "$dev_image_id" \
         cargo fetch --locked --manifest-path "$sysroot_manifest"
-    docker run --rm --platform linux/amd64 --network none \
-        --mount "type=bind,src=$repo_root,dst=/src/laputa,readonly" \
-        --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
-        --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
-        --workdir /src/laputa \
-        --env CARGO_HOME=/work/asterinas/cargo \
-        --entrypoint /usr/bin/env "$dev_image_id" \
-        bash infra/asterinas/seed-cargo-git-tags.sh \
-        /src/asterinas/Cargo.lock /src/asterinas/osdk/Cargo.lock
     printf '%s\n' "$cargo_lock_hash" > "$cargo_lock_stamp.tmp"
     mv -f "$cargo_lock_stamp.tmp" "$cargo_lock_stamp"
 elif [[ "$(cat "$cargo_lock_stamp" 2>/dev/null || true)" != "$cargo_lock_hash" ]]; then
