@@ -225,6 +225,16 @@ proc main() [fs, process, env, time, net, error] {
     eprint --flush "LAPUTA_ASTERINAS_WITNESS_OK"
   }
 
+  let case_entry = p"/usr/lib/asterinas/case/entry.xsh"
+
+  if case_entry.exists() {
+    let case_name = p"/usr/lib/asterinas/case/name".read_text()?.trim()
+    eprint --flush f"LAPUTA_ASTERINAS_CASE_START {case_name}"
+    let case_status = run.status /usr/bin/xsh /usr/lib/asterinas/case/entry.xsh
+    require(case_status.exited_with(0), "case", f"guest case {case_name} failed")
+    eprint --flush "LAPUTA_ASTERINAS_CASE_OK"
+  }
+
   let test_selection_path = p"/usr/lib/asterinas/xsh-test.selection"
 
   if test_selection_path.exists() {

@@ -80,6 +80,14 @@ Run the kernel unit tests of one pinned-source crate with
 the OSDK test kernel in QEMU with KVM and two CPUs, and fails unless every test
 passes. It needs a prior `make asterinas-build` for the OSDK install.
 
+To run a guest case (a script and its helper programs) on either backend, run
+`bash infra/asterinas/run-guest-case.sh asterinas|linux CASE_DIR MODE RESULT_DIR`.
+The runner compiles each `.c` file in the case directory, places the files under
+`/usr/lib/asterinas/case`, and requires the guest's case start and finish
+markers. `ASTERINAS_EXTRA_PACKAGES="ntpd-rs"` adds packages to the generation
+for a build; `ntpd-rs` also needs the operator-provisioned
+`packages/ca-certificates/files/trust-update-key`.
+
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
 (or `linux`) on a list of test modules, then

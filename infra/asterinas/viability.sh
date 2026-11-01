@@ -149,6 +149,9 @@ else
     run_make seed
 fi
 packages=(baselayout xsh laputa-pm xinit mdevd-rs)
+read -r -a extra_packages <<< "${ASTERINAS_EXTRA_PACKAGES:-}"
+packages+=("${extra_packages[@]}")
+printf '%s\n' "${extra_packages[@]}" > "$output_dir/extra-packages"
 package_selection="${packages[*]}"
 run_make plan "PKGS=$package_selection"
 plan_path="$repo_root/.out/world/x86_64/plan.json"

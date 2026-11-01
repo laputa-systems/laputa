@@ -39,5 +39,10 @@ export pure guest_missing_success_markers(output: Str) -> List[Str] {
   } else {
     required
   }
-  [marker for marker in required_with_witness if !(marker in output)]
+  let required_with_case = if "LAPUTA_ASTERINAS_CASE_START " in output {
+    [@required_with_witness, "LAPUTA_ASTERINAS_CASE_OK"]
+  } else {
+    required_with_witness
+  }
+  [marker for marker in required_with_case if !(marker in output)]
 }

@@ -23,6 +23,13 @@ test test_guest_protocol_requires_a_started_witness_to_finish {
   assert guest_protocol.guest_missing_success_markers(f"{started}\nLAPUTA_ASTERINAS_WITNESS_OK") == []
 }
 
+test test_guest_protocol_requires_a_started_case_to_finish {
+  let base_output = guest_protocol.guest_success_markers.join("\n")
+  let started = f"{base_output}\nLAPUTA_ASTERINAS_CASE_START clock"
+  assert guest_protocol.guest_missing_success_markers(started) == ["LAPUTA_ASTERINAS_CASE_OK"]
+  assert guest_protocol.guest_missing_success_markers(f"{started}\nLAPUTA_ASTERINAS_CASE_OK") == []
+}
+
 test test_guest_protocol_reports_each_missing_marker_in_protocol_order {
   var output = ""
   for marker in guest_protocol.guest_success_markers {

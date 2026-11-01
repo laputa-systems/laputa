@@ -1,0 +1,1 @@
+../../../tests/integration/fixtures/ntp-frequency-check.c

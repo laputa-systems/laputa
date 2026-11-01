@@ -17,7 +17,7 @@ guest_name="$(basename "$guest_path")"
 
 commands="$(mktemp -d)"
 trap 'rm -rf -- "$commands"' EXIT
-printf 'cd %s\nwrite /injected %s\n' "$guest_directory" "$guest_name" > "$commands/write"
+printf 'mkdir %s\ncd %s\nwrite /injected %s\n' "$guest_directory" "$guest_directory" "$guest_name" > "$commands/write"
 
 debugfs() {
     docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /sbin/debugfs \

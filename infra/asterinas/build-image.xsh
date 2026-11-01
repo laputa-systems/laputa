@@ -3,7 +3,7 @@ use hash
 use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
 
-const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd-rs"]
+const base_runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd-rs"]
 
 error AsterinasImageError = Failed
 
@@ -26,6 +26,8 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   }
   let build_plan = pm_plan_json.read(plan_path)?
   let profile = pm_generation.overlay_profile(overlay)?
+  let extra_roots = [name for name in p"/output/extra-packages".read_text()?.lines() if name.trim() != ""]
+  let runtime_roots = base_runtime_roots + extra_roots
   let generation_plan = pm_generation.plan_profile(build_plan, runtime_roots, profile)?
   let generation_root = fp"/output/generations/{generation_plan.generation_sha256}"
   run mkdir -p /output/generations

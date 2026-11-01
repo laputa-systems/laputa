@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is next.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is blocked on IPv4 socket ancillary data (below).
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -118,7 +118,27 @@
   where Linux accepts them; absolute realtime timers are not re-armed by a step;
   `settimeofday` is still missing; while a frequency correction is active the
   vDSO reads through the system call.
-- Red boundary: the pinned kernel is six local commits beyond the advertised
+- A3 disciplined clock consumer: blocked, not accepted. The case
+  `guest/asterinas/clock` (modes `behind`, `ahead`, `frequency`) runs the
+  packaged ntpd-rs under `xinit supervise` as UID/GID 123 with only CAP_SYS_TIME
+  against a controlled in-guest source, and checks readiness is not
+  synchronization, five consecutive samples within 100 ms, a 100 ppm source
+  learned within 20 ppm, and a restart that restores the saved frequency. All
+  three modes pass on the Linux reference. On Asterinas the daemon starts with
+  the exact identity and capability set (after `/proc/PID/status` gained
+  `NoNewPrivs`), reports readiness unsynchronized, and never selects its
+  source: IPv4 datagram sockets have no ancillary data at all, so
+  `setsockopt(IP_PKTINFO)` fails with `ENOPROTOOPT` ("No connection possible to
+  127.0.0.1"). ntpd-rs also asks for `SO_TIMESTAMPING` with receive and transmit
+  software timestamps, which needs `SCM_TIMESTAMPING` control messages on receive
+  and a `MSG_ERRQUEUE` timestamp queue on transmit. Unblocking A3 needs IPv4
+  datagram control messages (`IP_PKTINFO`, `SCM_TIMESTAMPING`), the socket error
+  queue and `SO_TIMESTAMPING`; that work belongs with the A4/A5 socket changes.
+  Also open: the pause and resume case needs the Firecracker API and a peer
+  outside the guest, which needs the A4 virtual network; and the Firecracker
+  guest has no RTC, so its clock starts at 1970-01-01 (the case sets a fixture
+  epoch in that situation).
+- Red boundary: the pinned kernel is 9 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
   runs panic-bounded batches on either backend, and `account-native.sh` counts
