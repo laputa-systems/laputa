@@ -92,8 +92,11 @@ done
 [[ "$complete" == true ]] || fail 'timed out waiting for the Laputa guest completion marker'
 
 if [[ -n "$test_selection" ]]; then
-    grep -Fq "LAPUTA_ASTERINAS_XSH_TEST_START $test_selection" "$console_log" || \
-        fail "guest did not start the requested XSH test selection: $test_selection"
+    read -r -a requested_selections <<< "$test_selection"
+    for requested_selection in "${requested_selections[@]}"; do
+        grep -Fq "LAPUTA_ASTERINAS_XSH_TEST_START $requested_selection" "$console_log" || \
+            fail "guest did not start the requested XSH test selection: $requested_selection"
+    done
     grep -Fq LAPUTA_ASTERINAS_XSH_TEST_OK "$console_log" || \
         fail 'guest did not report the selected XSH test module passing'
 fi

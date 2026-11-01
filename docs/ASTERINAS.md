@@ -50,14 +50,19 @@ to the XSH repository root) inside the guest with
 `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. A module under `core/tests`,
 `dev/tests`, or `showcase/tests` can be selected the same way. Use
 `XSH_TEST=core/tests/test-awk.xsh::test_awk_matrix_arrays_and_functions` to
-run one exact test. Use `XSH_TEST=all` to run the full
+run one exact test. Separate several selections with spaces to run them in
+one guest, for example `XSH_TEST="core/tests/test-b2sum.xsh core/tests/test-base32.xsh"`;
+the run budget is 300 s per selection, up to the 3000 s full-suite budget. Use `XSH_TEST=all` to run the full
 native suite in a 2-vCPU guest configured by the pinned `xsht-config.ini`, including `core/tests`,
 `dev/tests`, `tests`, and `showcase/tests`. The test source tree is staged from
 the locked Git archive through a PM generation overlay; its digest is included
-in the immutable bundle manifest. Guest test runs use 4 GiB of memory; the
-base viability proof uses 1 GiB. The selected tests run under the packaged
-`xsht` and stream their results to the guest console. The host requires their
-guest success marker. To test a different
+in the immutable bundle manifest. The selection is not part of the generation or
+bundle: the host writes it into the disposable root copy before boot, so
+changing the selection reuses the built bundle. Guest test runs use 4 GiB of
+memory; the base viability proof uses 1 GiB. The selected tests run under the
+packaged `xsht` without fail-fast, so one failure does not hide later cases, and
+stream their results to the guest console. A failed selection is reported after
+every selection has run. The host requires the guest success marker. To test a different
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
 

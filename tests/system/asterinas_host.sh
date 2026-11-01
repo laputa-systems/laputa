@@ -148,7 +148,7 @@ initial_test_sha256="$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum 
 [[ -f "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/docs/SPEC.md" ]]
 [[ ! -e "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/.git" ]]
 grep -Fq 'profile": "asterinas-viability-xsh-test"' "$xsh_output/xsh-test-overlay/overlay.json"
-[[ "$(cat "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == tests/xsh/stdlib/fs.xsh ]]
+[[ "$(cat "$xsh_output/xsh-test.selection")" == tests/xsh/stdlib/fs.xsh ]]
 printf 'test selected_module { assert 42 == 42 }\n' > "$xsh_root/tests/xsh/stdlib/fs.xsh"
 git -C "$xsh_root" add tests/xsh/stdlib/fs.xsh
 git -C "$xsh_root" commit -qm 'change selected XSH test'
@@ -171,11 +171,18 @@ readarray -t staged_exact_xsh_test < <(
         "$xsh_root" core/tests/test-core.xsh::core_suite_fixture "$xsh_output"
 )
 [[ "${staged_exact_xsh_test[1]}" == core/tests/test-core.xsh::core_suite_fixture ]]
-[[ "$(cat "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == core/tests/test-core.xsh::core_suite_fixture ]]
+[[ "$(cat "$xsh_output/xsh-test.selection")" == core/tests/test-core.xsh::core_suite_fixture ]]
+[[ ! -e "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection" ]]
+readarray -t staged_batch < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+        "$xsh_root" "core/tests/test-core.xsh  tests/xsh/stdlib/fs.xsh" "$xsh_output"
+)
+[[ "${staged_batch[1]}" == 'core/tests/test-core.xsh tests/xsh/stdlib/fs.xsh' ]]
+[[ "$(cat "$xsh_output/xsh-test.selection")" == $'core/tests/test-core.xsh\ntests/xsh/stdlib/fs.xsh' ]]
 
 ln -s "$scratch/outside-test.xsh" "$xsh_root/tests/xsh/stdlib/escape.xsh"
 printf 'outside\n' > "$scratch/outside-test.xsh"
-before_invalid_stage="$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")"
+before_invalid_stage="$(sha256_file "$xsh_output/xsh-test.selection")"
 assert_xsh_test_rejected() {
     local module="$1"
     local log="$scratch/xsh-stage-rejected.log"
@@ -185,12 +192,15 @@ assert_xsh_test_rejected() {
         exit 1
     fi
     [[ -s "$log" ]]
-    [[ "$(sha256_file "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection")" == "$before_invalid_stage" ]]
+    [[ "$(sha256_file "$xsh_output/xsh-test.selection")" == "$before_invalid_stage" ]]
 }
 assert_xsh_test_rejected ../tests/xsh/stdlib/fs.xsh
 assert_xsh_test_rejected core/tests/../../tests/xsh/stdlib/fs.xsh
 assert_xsh_test_rejected tests/xsh/stdlib/escape.xsh
 assert_xsh_test_rejected tests/xsh/stdlib/missing.xsh
+assert_xsh_test_rejected 'core/tests/test-core.xsh tests/xsh/stdlib/missing.xsh'
+assert_xsh_test_rejected 'all core/tests/test-core.xsh'
+assert_xsh_test_rejected ''
 
 readarray -t staged_full_xsh_suite < <(
     bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
@@ -256,6 +266,14 @@ case "$FAKE_FIRECRACKER_MODE" in
             LAPUTA_ASTERINAS_TEST_OK
         exec /bin/sleep 30
         ;;
+    batch-success)
+        printf '%s\n' \
+            'LAPUTA_ASTERINAS_XSH_TEST_START core/tests/test-core.xsh' \
+            'LAPUTA_ASTERINAS_XSH_TEST_START tests/xsh/stdlib/fs.xsh' \
+            LAPUTA_ASTERINAS_XSH_TEST_OK \
+            LAPUTA_ASTERINAS_TEST_OK
+        exec /bin/sleep 30
+        ;;
     failed)
         printf '%s\n' 'LAPUTA_ASTERINAS_TEST_FAILED proof: expected failure'
         exec /bin/sleep 30
@@ -313,6 +331,8 @@ assert_vm_case base '' 2 0
 assert_vm_case success tests/xsh/stdlib/numeric.xsh 2 0
 assert_vm_case full-success all 2 0
 assert_vm_case exact-success core/tests/test-core.xsh::core_suite_fixture 2 0
+assert_vm_case batch-success 'core/tests/test-core.xsh tests/xsh/stdlib/fs.xsh' 2 0
+assert_vm_case batch-success 'core/tests/test-core.xsh tests/xsh/stdlib/numeric.xsh' 2 1
 assert_vm_case base tests/xsh/stdlib/numeric.xsh 2 1
 assert_vm_case base all 2 1
 assert_vm_case failed '' 2 1

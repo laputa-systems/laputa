@@ -26,11 +26,11 @@ proc report_xsh_tests(rows: Stream[Str]) [process, error] -> Result[Bool, Error]
 proc stream_xsh_tests(source_root: Path, test_selection: Str) [process, env, error] -> Result[Bool, Error] {
   cd (source_root) {
     if test_selection == "all" {
-      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture ?)?
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --nocapture ?)?
     } else if "::" in test_selection {
-      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection ?)?
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --nocapture --exact $test_selection ?)?
     } else {
-      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection ?)?
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --nocapture $test_selection ?)?
     }
   }?
 }
@@ -185,16 +185,29 @@ proc main() [fs, process, env, time, net, error] {
     let source_root = p"/usr/lib/asterinas/xsh-source"
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir()
-    let test_selection = test_selection_path.read_text()?.trim()
-    eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
-    let test_run = try { stream_xsh_tests(source_root, test_selection)? }
-    match test_run {
-      Ok(passed) => require(passed, "xsh-test", f"XSH test selection failed or discovered no tests: {test_selection}"),
-      Err(problem) => {
-        eprint --flush f"LAPUTA_ASTERINAS_TEST_FAILED xsh-test: XSH test selection failed: {test_selection}"
-        return Err(problem)
-      },
+    var failed_selections = []
+
+    for test_selection in test_selection_path.read_text()?.lines() {
+      if test_selection.trim() == "" { continue }
+      eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
+      let test_run = try { stream_xsh_tests(source_root, test_selection)? }
+      match test_run {
+        Ok(passed) => {
+          if ! passed { failed_selections += [test_selection] }
+        },
+        Err(problem) => {
+          eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
+          failed_selections += [test_selection]
+        },
+      }
     }
+
+    if ! failed_selections.is_empty() {
+      let failed_text = failed_selections.join(" ")
+      eprint --flush f"LAPUTA_ASTERINAS_TEST_FAILED xsh-test: XSH test selection failed or discovered no tests: {failed_text}"
+      return Err(AsterinasProofError.Failed(phase: "xsh-test", message: failed_text))
+    }
+
     eprint --flush "LAPUTA_ASTERINAS_XSH_TEST_OK"
   }
 

@@ -12,7 +12,12 @@ cli main(kernel: Path, initramfs: Path, disk: Path, console: Path, qemu_log: Pat
   let missing = guest_protocol.guest_missing_success_markers(output)
   guard missing.is_empty() else { fail f"guest proof is missing: {missing.join(", ")}" }
   if selection != "" {
-    guard f"LAPUTA_ASTERINAS_XSH_TEST_START {selection}" in output and "LAPUTA_ASTERINAS_XSH_TEST_OK" in output else {
+    for requested in selection.split(" ") {
+      guard f"LAPUTA_ASTERINAS_XSH_TEST_START {requested}" in output else {
+        fail f"guest did not start the requested XSH test selection: {requested}"
+      }
+    }
+    guard "LAPUTA_ASTERINAS_XSH_TEST_OK" in output else {
       fail "guest did not complete the requested XSH test selection"
     }
     guard "running " in output and !("running 0 tests" in output) and "test result: ok." in output else {

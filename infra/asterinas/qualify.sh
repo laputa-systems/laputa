@@ -51,6 +51,11 @@ for case_name in "${cases[@]}"; do
         cp "$bundle/laputa-root.ext2" "$work/linux-root.ext2"
         chmod u+w "$work/linux-root.ext2"
         cmp "$bundle/laputa-root.ext2" "$work/linux-root.ext2"
+        if [[ -n "$selection" ]]; then
+            bash "$repo_root/infra/asterinas/inject-xsh-test-selection.sh" \
+                "$work/linux-root.ext2" "$output/xsh-test.selection" \
+                "$(docker image inspect --format '{{.Id}}' "asterinas/dev:$(cat "$repo_root/asterinas/DOCKER_IMAGE_VERSION")")"
+        fi
         timeout_seconds=60
         [[ -z "$selection" ]] || timeout_seconds=300
         XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \

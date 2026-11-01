@@ -24,28 +24,36 @@ snapshot="$(realpath "$1")" || fail "could not resolve XSH snapshot: $1"
 test_selection="$2"
 output_dir="$3"
 
-[[ "$test_selection" == all || \
-   ( "$test_selection" != *$'\n'* && \
-     ( "${test_selection%%::*}" == tests/xsh/*.xsh || "${test_selection%%::*}" == core/tests/*.xsh || \
-       "${test_selection%%::*}" == dev/tests/*.xsh || "${test_selection%%::*}" == showcase/tests/*.xsh ) ) ]] || \
-    fail 'XSH_TEST must be all or select a module from one of the native test roots'
-if [[ "$test_selection" != all ]]; then
-    test_module="${test_selection%%::*}"
-    exact_test_name=""
-    if [[ "$test_selection" == *::* ]]; then
-        exact_test_name="${test_selection#*::}"
-        [[ "$exact_test_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "$exact_test_name" != *::* ]] || \
-            fail 'XSH_TEST exact selection must end with one native test name'
-    fi
-    IFS=/ read -r -a module_components <<< "$test_module"
-    for component in "${module_components[@]}"; do
-        [[ "$component" != . && "$component" != .. ]] || fail 'XSH_TEST must use a normalized relative path'
+read -r -a selections <<< "$test_selection"
+[[ ${#selections[@]} -ge 1 && "$test_selection" != *$'\n'* ]] || fail 'XSH_TEST must name at least one selection on one line'
+if [[ ${#selections[@]} -gt 1 ]]; then
+    for selection in "${selections[@]}"; do
+        [[ "$selection" != all ]] || fail 'XSH_TEST all cannot be combined with other selections'
     done
-
-    test_path="$(realpath "$snapshot/$test_module")" || fail "XSH test module does not exist in the pinned checkout: $test_module"
-    [[ "$test_path" == "$snapshot/$test_module" && -f "$test_path" ]] || \
-        fail 'XSH_TEST must resolve to a regular file inside a native test root'
 fi
+test_selection="${selections[*]}"
+for selection in "${selections[@]}"; do
+    [[ "$selection" == all || \
+       ( "${selection%%::*}" == tests/xsh/*.xsh || "${selection%%::*}" == core/tests/*.xsh || \
+         "${selection%%::*}" == dev/tests/*.xsh || "${selection%%::*}" == showcase/tests/*.xsh ) ]] || \
+        fail 'XSH_TEST must be all or select a module from one of the native test roots'
+    if [[ "$selection" != all ]]; then
+        test_module="${selection%%::*}"
+        if [[ "$selection" == *::* ]]; then
+            exact_test_name="${selection#*::}"
+            [[ "$exact_test_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "$exact_test_name" != *::* ]] || \
+                fail 'XSH_TEST exact selection must end with one native test name'
+        fi
+        IFS=/ read -r -a module_components <<< "$test_module"
+        for component in "${module_components[@]}"; do
+            [[ "$component" != . && "$component" != .. ]] || fail 'XSH_TEST must use a normalized relative path'
+        done
+
+        test_path="$(realpath "$snapshot/$test_module")" || fail "XSH test module does not exist in the pinned checkout: $test_module"
+        [[ "$test_path" == "$snapshot/$test_module" && -f "$test_path" ]] || \
+            fail 'XSH_TEST must resolve to a regular file inside a native test root'
+    fi
+done
 
 [[ -d "$snapshot/tests/xsh" && -f "$snapshot/docs/SPEC.md" && -f "$snapshot/xsht-config.ini" ]] || \
     fail "XSH snapshot is missing native tests or project configuration: $snapshot"
@@ -76,9 +84,10 @@ rm -f "$source_archive"
 # The repository's environment activation script is unrelated to the test
 # corpus and can change the behavior of child shells launched by tests.
 rm -f "$source_root/.envrc"
-printf '%s\n' "$test_selection" > "$stage/usr/lib/asterinas/xsh-test.selection"
 
 mkdir -p "$output_dir"
+printf '%s\n' "${selections[@]}" > "$output_dir/.xsh-test.selection.tmp.$$"
+mv -f "$output_dir/.xsh-test.selection.tmp.$$" "$output_dir/xsh-test.selection"
 if [[ -e "$overlay" ]]; then
     chmod -R u+w "$overlay"
     rm -rf -- "$overlay"
