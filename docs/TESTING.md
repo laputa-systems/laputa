@@ -154,8 +154,10 @@ an independent oracle. The endpoint receives real NTS and NTP requests.
 bash tests/integration/ntp-clock-guest.sh external-nts /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE nts.example.org
 ```
 
-The endpoint may include a port as `hostname:port`. The default controlled NTS
-case remains network-restricted and uses its test CA.
+The endpoint may include a port as `hostname:port`. On 2026-11-01, the x86_64
+KVM guest selected `time.cloudflare.com` with NTS and stratum 4 before and after
+supervised restart. The default controlled NTS case remains network-restricted
+and uses its test CA.
 
 For the optional chrony comparison, build the official chrony 4.9 source in
 scratch using GCC targeting Linux musl, mold, and GNU make. The command below
@@ -185,6 +187,27 @@ cp ntpd-rs/ntp-proto/test-keys/{gen-cert.sh,testca.pem,testca.key} "$work/"
 (cd "$work" && sh gen-cert.sh localhost testca end)
 cp "$work"/{end.key,end.pem,end.fullchain.pem} ntpd-rs/ntp-proto/test-keys/
 ```
+
+### Run the VM storage publication fault cases
+
+Use a built x86_64 self-hosting kernel and root disk with writable KVM on a
+Linux x86_64 host. The runner needs `qemu-system-x86_64`, `mkfs.ext4`, and a
+musl-linked `/sbin/e2fsck` with `libext2fs.so.2`, `libcom_err.so.2`,
+`libblkid.so.1`, `libuuid.so.1`, `libe2p.so.2`, and `libeconf.so.0` in
+`/usr/lib`. It copies the checker and libraries into the disposable input disk.
+
+```bash
+python3 tests/integration/storage_fault.py /absolute/path/to/vmlinuz /absolute/path/to/disk.img
+```
+
+The runner kills each owned QEMU after a selected publication point and boots
+again to run `e2fsck` and read the record from the detached ext4 disk. The
+x86_64/KVM run recovered `old` after staging, `old` after rename without a
+directory fsync, and `new` after directory fsync. The unsynced rename accepts
+either complete record. The recovery checker returned 1 in all three cases.
+This fixture models a file publication; it does not call the activation API or
+simulate loss of the host storage cache. See [QEMU activation](QEMU.md#maintained-vm-activation)
+for the activation-specific fault and SSH checks.
 
 ### Use the fixed xinit tool snapshot
 

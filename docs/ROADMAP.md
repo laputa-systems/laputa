@@ -321,7 +321,7 @@ NTS guest verifies CA/name and `ntske/1`, records rejection of tampered replies,
 converges against the raw-clock oracle and restarts under supervision. Its
 standalone runner passes end to end. Test-only chrony 4.9 agrees on startup
 stepping in both offset directions and readiness before synchronization.
-This does not establish slew, NTS interoperability or reboot-policy parity.
+This comparison does not establish slew, NTS interoperability or reboot-policy parity.
 The package now persists a bounded steady frequency correction and uncertainty,
 excluding phase slew. A controlled 100 ppm source proves learning and restoration
 across daemon restart and a fresh kernel boot on the same state disk. Restoration
@@ -331,7 +331,7 @@ The final artifact also passes the authenticated NTS control.
 The private state directory must belong to UID/GID 123 with mode 0700; invalid
 state or a conflicting writer stops the daemon. This is oscillator calibration,
 not a UTC floor or a power-loss durability proof.
-External NTS deployment and aarch64 runtime qualification remain open. See the
+An x86_64/KVM guest also selected the authenticated external `time.cloudflare.com` NTS source before and after supervised restart. This does not independently measure clock accuracy. aarch64 runtime qualification remains open. See the
 [retained guest checks](TESTING.md#run-the-disposable-ntp-guest).
 
 Qualify elapsed-time consumers alongside clock discipline. LAP-27 and XSH-35
@@ -395,7 +395,11 @@ SIGKILL of QEMU during writes and after filesystem exhaustion. Offline journal
 replay preserves the synced payload and permissions in both cases. Independent
 rescue also restores a known missing `/init` symlink on a disposable copy; the
 host publishes it as a new generation and proves a healthy boot and fallback.
-Host-storage power loss and independent Asterinas qualification remain unproved.
+A separate raw ext4 publication fixture recovers the old record after a staged
+write, an old complete record after an unsynced rename, and the new record after
+a directory fsync. QEMU is killed at each point before a recovery boot. These VM
+checks do not establish physical host-storage power-loss durability. Independent
+Asterinas qualification remains unproved.
 See the
 [detached rescue proof](INSTALLER.md#detached-rescue-guest-proof).
 
@@ -511,11 +515,11 @@ state disk. An earlier guest proof exercised two actual unbootable-B panics and
 launcher fallback to healthy A. Host tests additionally cover termination at
 both record fsync boundaries, concurrent staging and collection, full-filesystem
 recovery, and reconciliation after losing a reply. Independent rescue boots
-even when both generation images lack PID 1. A maintained guest additionally
-stages B through host APIs over pinned native SSH, loses the reply after commit,
-and reconnects to verify state, hashes, duplicate-stage rejection and launcher
-selection. This does not establish disconnect-during-write or physical power-loss
-behavior, and it does not add an installed activation command. Host admission policy
+even when both generation images lack PID 1. A maintained guest additionally stages B through host APIs over pinned native
+SSH. The client disconnects while the `activation.next` fsync is delayed, and
+reconnect verifies state, hashes, duplicate-stage rejection and launcher selection.
+The fixture rejects existing activation state and clears stale markers. This does
+not establish physical power-loss behavior or add an installed activation command. Host admission policy
 now pins complete generation identities, image hashes, and the supported shared
 state contract. Its revision survives confirmation and fallback; revoked inputs
 cannot be selected or confirmed. Incompatible state declarations are refused,

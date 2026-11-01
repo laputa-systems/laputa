@@ -356,17 +356,27 @@ These checks establish process-death recovery, local reply-loss handling, and
 full-filesystem behavior. They do not simulate power loss or filesystem write
 reordering.
 
-`tests/integration/activation_ssh.py XSH PORT KEY PIN` exercises the activation
-host APIs over native SSH against a disposable maintained guest with a provisioned
-`probe` account and the `LAPUTA_ACTIVATION_SSH_FIXTURE=1` kernel token. It
-requires the maintained generation receipt. It uses trusted local fixture inputs
-and production admission checks. The test drops the SSH client after staging commits and before its reply,
-reconnects to verify the record and image hashes, rejects duplicate staging, and
-selects the candidate through the typed launcher. It checks SSH stdin and status,
-operator home access, root ownership of `/etc`, and the remote child exit. This is
-a lost reply after commit, not an interruption during a write or proof of physical
-power-loss behavior. The fixture invokes host APIs over SSH; there is no installed
-activation CLI.
+Run `python3 tests/integration/activation_ssh.py XSH PORT KEY PIN` against a
+disposable maintained guest with a `probe` account, a maintained generation
+receipt, and `LAPUTA_ACTIVATION_SSH_FIXTURE=1` on its kernel command line.
+Forward the guest SSH port to localhost and supply the client key and pinned
+host key. Place a guest-compatible `strace` in
+`/home/probe/ssh-proof/tools/strace` and its shared libraries in the same
+directory. For the tested Alpine musl binary the libraries are `libdw.so.1`,
+`libelf.so.1`, `libz.so.1`, `libfts.so.0`, `libzstd.so.1`, `liblzma.so.5`,
+and `libbz2.so.1`. The guest must allow the probe account to trace its own
+child. Use a fresh activation directory; preparation removes stale trace,
+commit and release markers and rejects existing activation state.
+
+The fixture delays the first fsync after writing `activation.next`. A second
+SSH connection observes the unfinished fsync before the test kills the first
+client. After the writer continues, reconnect verifies current, fallback and
+pending records and image hashes, rejects duplicate staging, and selects B
+through the launcher. The run with deliberately stale markers also passed.
+The fixture invokes production host APIs over SSH, not an installed activation
+CLI. This covers one disconnect during staging and does not establish physical
+power-loss behavior. [Testing](TESTING.md#run-the-vm-storage-publication-fault-cases)
+records separate VM filesystem publication cases.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the
