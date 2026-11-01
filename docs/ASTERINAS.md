@@ -85,7 +85,9 @@ To run a guest case (a script and its helper programs) on either backend, run
 The runner compiles each `.c` file in the case directory, places the files under
 `/usr/lib/asterinas/case`, and requires the guest's case start and finish
 markers. `ASTERINAS_EXTRA_PACKAGES="ntpd-rs"` adds packages to the generation
-for a build. `ntpd-rs` also needs the operator-provisioned, git-ignored
+for a build. With `LAPUTA_GUEST_NETWORK=tap` an Asterinas case runs inside a disposable
+container network namespace with an owned TAP device `tap0` (192.0.2.1/24) wired to a
+virtio-net device `eth0`; nothing on the host network changes. `ntpd-rs` also needs the operator-provisioned, git-ignored
 `packages/ca-certificates/files/trust-update-key`; a worktree build must copy it
 from the main checkout, because worktrees do not carry ignored files.
 

@@ -139,6 +139,18 @@
   which needs the A4 virtual network; transmit timestamps without `OPT_TSONLY`
   and hardware timestamping are unsupported; and the Firecracker guest has no
   RTC, so its clock starts at 1970-01-01 (the case sets a fixture epoch then).
+- A4 IPv4 state operations: surveyed, not started. With
+  `LAPUTA_GUEST_NETWORK=tap bash infra/asterinas/run-guest-case.sh asterinas
+  guest/asterinas/network-survey survey DIR`, Firecracker's virtio-net device
+  appears as `eth0` (MTU 1514, up) next to `lo`, and XSH's `linux.network_dump()`
+  works for links and addresses. The kernel hard-codes `10.0.2.15/24` on `eth0`
+  (it is the address a DHCP client would have to replace or leave as a foreign
+  address). `RTM_GETROUTE` and `RTM_GETRULE` fail with `EOPNOTSUPP`, so the route
+  and rule enumerations report issues. Still to build: route and rule dumps,
+  `RTM_NEWADDR`, `RTM_DELADDR`, `RTM_NEWROUTE`, `RTM_DELROUTE`, link flag changes
+  (`link_up` and `link_down`), ACK and error semantics, multipart completion,
+  notifications, and a Linux reference guest with a TAP device (QEMU in the same
+  container namespace) for the paired comparison.
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`

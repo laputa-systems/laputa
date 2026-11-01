@@ -41,6 +41,10 @@ if [[ "$backend" == asterinas ]]; then
     root="$result_dir/root.ext2"
     firecracker_config="$result_dir/firecracker.json"
     jaq --arg root "$root" '.drives[0].path_on_host = $root' "$bundle/firecracker.json" > "$firecracker_config"
+    if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
+        jaq '.["network-interfaces"] = [{iface_id: "eth0", host_dev_name: "tap0", guest_mac: "AA:FC:00:00:00:01"}]' \
+            "$firecracker_config" > "$firecracker_config.tmp" && mv "$firecracker_config.tmp" "$firecracker_config"
+    fi
 else
     root="$result_dir/root.ext2"
     bash "$repo_root/infra/asterinas/linux-reference.sh" \
@@ -56,8 +60,17 @@ console="$result_dir/console.log"
 status=0
 timeout_seconds="${LAPUTA_CASE_TIMEOUT:-600}"
 if [[ "$backend" == asterinas ]]; then
-    bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$firecracker_config" \
-        "$console" "$console.firecracker" '' "$(( timeout_seconds * 5 ))" > "$result_dir/command.log" 2>&1 || status=$?
+    vm_command=(bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$firecracker_config"
+        "$console" "$console.firecracker" '' "$(( timeout_seconds * 5 ))")
+    if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
+        vm_command=(docker run --rm --init --pull never --platform linux/amd64 --network none
+            --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
+            --mount "type=bind,src=$repo_root,dst=$repo_root"
+            --workdir "$repo_root" --entrypoint /bin/bash "$dev_image" -c
+            'ip tuntap add dev tap0 mode tap && ip addr add 192.0.2.1/24 dev tap0 && ip link set tap0 up && exec "$@"'
+            _ "${vm_command[@]}")
+    fi
+    "${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
 else
     XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
         "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz" \
