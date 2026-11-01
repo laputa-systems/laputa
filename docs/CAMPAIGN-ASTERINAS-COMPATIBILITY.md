@@ -5,7 +5,7 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  the next slice is A1. No compatibility item (A1 to A6) is accepted.
+  A1 (device coldplug) is accepted for the fixture below. A2 clock ABI is next.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -81,7 +81,26 @@
   batch-level panics were not reproduced on demand (a rerun of the first batch
   passed), so the whole-corpus effect is unmeasured until the fan-out is rerun.
   The awk hangs are not shown to share this cause.
-- Red boundary: the pinned kernel is four local commits beyond the advertised
+- A1 device coldplug: the packaged `mdevd` and `mdevd-coldplug` (the `mdevd-rs`
+  package, now part of the Asterinas generation) run in the guest and the
+  explicit coldplug bypass is gone. The kernel publishes block devices in a
+  `block` class (`/sys/class/block`, `/sys/dev/block`, the `/dev` node, all from
+  the device model), gives every device a `uevent` attribute (read: MAJOR, MINOR,
+  DEVNAME, DEVTYPE; write `add`: a kernel uevent to group 1, EINVAL for an
+  unknown action), and lets a uevent socket with CAP_NET_ADMIN send to groups,
+  which is how mdevd answers the coldplug sync. The guest proof coldplugs at
+  boot, then three times with the node removed (the node returns with the
+  sysfs device number, mode 0660, group disk), then with the daemon killed
+  (coldplug without a daemon fails within 3 s and creates no node), then with a
+  restarted daemon. The identical payload passes on the Linux reference.
+  `device/block_uevent` is the kernel witness: it passes on this kernel and on
+  Linux. Partial against D2: only the virtio disk is a fixture device; partitions
+  are not nested below their disk, `DEVPATH` is `/devices/virtual/block/vda`
+  rather than a PCI or MMIO path, and automatic add events at device registration
+  and hotplug are not emitted. The kernel crate's own unit tests do not build in
+  the OSDK harness here (they stop at a grub video-mode error); the device model
+  tests (17) pass.
+- Red boundary: the pinned kernel is five local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
   runs panic-bounded batches on either backend, and `account-native.sh` counts

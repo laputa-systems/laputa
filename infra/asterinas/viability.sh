@@ -148,12 +148,12 @@ if [[ "$mode" == shell || -n "$requested_xsh_test" ]]; then
 else
     run_make seed
 fi
-packages=(baselayout xsh laputa-pm xinit)
+packages=(baselayout xsh laputa-pm xinit mdevd-rs)
 package_selection="${packages[*]}"
 run_make plan "PKGS=$package_selection"
 plan_path="$repo_root/.out/world/x86_64/plan.json"
 [[ -f "$plan_path" ]] || fail "PM did not write its plan: $plan_path"
-"$host_xsh" "$repo_root/infra/asterinas/fetch-plan-sources.xsh" -- "$plan_path"
+XSH_PM_REPOSITORY_ROOT="$repo_root" "$host_xsh" "$repo_root/infra/asterinas/fetch-plan-sources.xsh" -- "$plan_path"
 run_make build "PKGS=$package_selection"
 
 if [[ "$use_asterinas_xshi_seed" == true ]]; then

@@ -3,7 +3,7 @@ use hash
 use pm.generation as pm_generation
 use pm.plan_json as pm_plan_json
 
-const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit"]
+const runtime_roots = ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd-rs"]
 
 error AsterinasImageError = Failed
 
@@ -19,6 +19,11 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   boot_setup.parent.mkdir()
   common_boot_setup.copy(to: boot_setup)
   boot_setup.chmod(0o755)
+  for script in ["mdevd-launch.xsh", "device-coldplug.xsh"] {
+    let installed = fp"{overlay}/usr/lib/asterinas/{script}"
+    fp"/src/laputa/guest/asterinas/common/{script}".copy(to: installed)
+    installed.chmod(0o755)
+  }
   let build_plan = pm_plan_json.read(plan_path)?
   let profile = pm_generation.overlay_profile(overlay)?
   let generation_plan = pm_generation.plan_profile(build_plan, runtime_roots, profile)?

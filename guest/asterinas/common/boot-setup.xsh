@@ -8,7 +8,7 @@ proc require(condition: Bool, phase: Str, message: Str) {
   }
 }
 
-proc main() [fs, process, error] {
+proc main() [fs, process, env, error] {
   eprint --flush "LAPUTA_ASTERINAS_BOOT_SETUP_START"
   require(linux.is_mountpoint(/proc)?, "proc", "initramfs proc mount was not moved into the root")
   require(linux.is_mountpoint(/sys)?, "sysfs", "initramfs sysfs mount was not moved into the root")
@@ -40,8 +40,9 @@ proc main() [fs, process, error] {
     p"/dev/stderr".symlink(to: p"fd/2")
   }
 
-  # Asterinas does not publish the per-device uevent file that Laputa's Linux
-  # mdev scan requires, so this profile prepares the mounted filesystems directly.
+  let coldplug = process.run(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
+  require(coldplug.ok, "coldplug", "starting mdevd and running coldplug failed")
+  eprint --flush "LAPUTA_ASTERINAS_COLDPLUG_OK"
   eprint --flush "LAPUTA_ASTERINAS_BOOT_SETUP_OK"
 }
 

@@ -117,7 +117,7 @@ proc main() [fs, process, env, time, net, error] {
 
   let generation = p"/var/lib/laputa/generation.json".read_text()?
 
-  for package in ["baselayout", "xsh", "laputa-pm", "xinit"] {
+  for package in ["baselayout", "xsh", "laputa-pm", "xinit", "mdevd-rs"] {
     require(package in generation, "generation", f"runtime generation is missing {package}")
   }
 
@@ -178,6 +178,42 @@ proc main() [fs, process, env, time, net, error] {
     "ext2",
     "the ext2 root did not preserve an XSH write",
   )
+
+  let block_numbers = p"/sys/class/block/vda/dev".read_text()?.trim().split(":")
+  let expected_rdev = block_numbers[0].parse_int()? * 256 + block_numbers[1].parse_int()?
+
+  for round in range(3) {
+    if round > 0 {
+      p"/dev/vda".remove()
+      require(! p"/dev/vda".exists()?, "coldplug", "the block node was not removed")
+      let repeat = process.run(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]))?
+      require(repeat.ok, "coldplug", f"repeated coldplug {round} failed")
+    }
+    let node = fs.stat(p"/dev/vda")?
+    require(node.kind == "block", "coldplug", "/dev/vda is not a block device")
+    require(node.rdev == expected_rdev, "coldplug", f"/dev/vda has device number {node.rdev}, expected {expected_rdev}")
+    require(node.mode % 4096 == 0o660, "coldplug", f"/dev/vda has mode {node.mode % 4096}, expected the disk rule 0660")
+    require(node.gid == 9, "coldplug", f"/dev/vda has group {node.gid}, expected the disk group 9")
+  }
+
+  let stopped = unix.kill_all("mdevd", "TERM")?
+  require(stopped.matched >= 1, "coldplug", "no running mdevd to restart")
+  time.sleep(1s)?
+  p"/dev/vda".remove()
+  let unanswered = process.run(
+    process.command_argv(
+      /usr/bin/mdevd-coldplug,
+      ["mdevd-coldplug", "-O", "4"],
+      env: {PATH: "/usr/bin:/bin", MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS: "3"},
+    ),
+  )?
+  require(! unanswered.ok, "coldplug", "coldplug reported success with no mdevd to answer it")
+  require(! p"/dev/vda".exists()?, "coldplug", "the node came back without a running mdevd")
+  let restarted = process.run(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
+  require(restarted.ok, "coldplug", "coldplug after an mdevd restart failed")
+  let restored = fs.stat(p"/dev/vda")?
+  require(restored.rdev == expected_rdev and restored.mode % 4096 == 0o660, "coldplug", "the node was not restored after an mdevd restart")
+  eprint --flush "LAPUTA_ASTERINAS_COLDPLUG_PROOF_OK"
 
   let witness_path = p"/usr/lib/asterinas/witness"
 
