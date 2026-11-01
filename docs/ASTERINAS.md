@@ -60,6 +60,21 @@ base viability proof uses 1 GiB. The selected tests run under the packaged
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
 
+For the paired boot and numeric pilot, provide a Laputa x86_64 Linux package
+archive with built-in virtio and ext2 support:
+
+```bash
+LAPUTA_LINUX_KERNEL_PACKAGE=/absolute/path/to/linux-package.tar.gz \
+  bash infra/asterinas/qualify.sh baseline --backend both
+```
+
+The runner copies the same verified PM root to each guest. Linux uses a
+disposable initramfs that initializes loopback. `--backend linux` or
+`--backend asterinas` selects one guest. `--case boot` or `--case numeric`
+selects one case. The default Linux package path is
+`.out/asterinas-firecracker/linux-package.tar.gz`. The pilot does not account
+for the full native suite or qualify device, clock, or network compatibility.
+
 Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
 which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing
 syscalls required by Laputa, XSH, or a selected guest test belong in that fork

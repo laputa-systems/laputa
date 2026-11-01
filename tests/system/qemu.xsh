@@ -53,6 +53,60 @@ proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
   ]
 }
 
+test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
+  let config = fixture_qemu("Linux", "x86_64")?
+  let input = qemu.QemuAsterinasReference(
+    kernel: /tmp/kernel,
+    initramfs: /tmp/initramfs,
+    disk: /tmp/root,
+    memory_mib: 4096,
+  )
+  let argv = qemu.qemu_asterinas_reference_argv(config, input)?
+  assert "q35,accel=kvm" in argv
+  assert "4096" in argv
+  assert "/tmp/kernel" in argv
+  assert "/tmp/initramfs" in argv
+  assert "if=none,id=root,format=raw,file=/tmp/root" in argv
+  assert "virtio-blk-pci,drive=root" in argv
+  assert !("-netdev" in argv)
+  let unsupported = fixture_qemu("Linux", "aarch64")?
+  match qemu.qemu_asterinas_reference_argv(unsupported, input) {
+    Ok(_) => fail "accepted an unsupported qualification target"
+    Err(_) => {}
+  }
+}
+
+test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-qualification")?
+  let fake = fp"{root}/qemu"
+  fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n")
+  fake.chmod(0o755)
+  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024)
+  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
+    Ok(_) => fail "accepted a guest without its completion marker"
+    Err(_) => {}
+  }
+}
+
+test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-qualification-failure")?
+  let fake = fp"{root}/qemu"
+  let pid_file = fp"{root}/pid"
+  fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n")
+  fake.chmod(0o755)
+  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024)
+  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
+    Ok(_) => fail "accepted a failed guest"
+    Err(_) => {}
+  }
+  let pid = pid_file.read_text()?.parse_int()?
+  for entry in process.list()? {
+    assert entry.pid != pid, f"qualification guest {pid} remained after failure"
+  }
+}
+
 proc assert_profile_devices(argv: List[Str]) {
   assert "virtio-net-pci,netdev=net0" in argv, "network"
   assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"

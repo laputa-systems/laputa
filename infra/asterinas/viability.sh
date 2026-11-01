@@ -10,8 +10,8 @@ case "$requested_mode" in
     *) printf 'usage: %s [build|test|boot]\n' "$0" >&2; exit 2 ;;
 esac
 requested_xsh_test="${XSH_TEST:-}"
-if [[ -n "$requested_xsh_test" && ( "$action" != test || "$mode" != viability ) ]]; then
-    printf 'asterinas-%s: XSH_TEST is supported only with the automated viability test\n' "$action" >&2
+if [[ -n "$requested_xsh_test" && "$mode" != viability ]]; then
+    printf 'asterinas-%s: XSH_TEST is supported only with the automated viability profile\n' "$action" >&2
     exit 2
 fi
 # Native suite runs create many short-lived processes; 1 GiB exhausted kernel

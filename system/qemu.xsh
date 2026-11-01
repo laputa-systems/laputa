@@ -25,6 +25,28 @@ export type QemuTarget = {
 ## The host executable and target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, target: QemuTarget}
 
+## Inputs for a disposable initramfs and raw ext2 guest.
+export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int}
+
+## Construct the headless qualification guest without host networking.
+export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterinasReference) -> Result[List[Str], Error] {
+  let target = value.target
+  guard target.arch == "x86_64" and target.machine == "q35,accel=kvm" and (input.memory_mib == 1024 or input.memory_mib == 4096) else {
+    return Err(types.LaputaError.Profile("qualification guest requires Linux x86_64 KVM and 1024 or 4096 MiB"))
+  }
+  guard !("," in input.disk.display()) else {
+    return Err(types.LaputaError.Profile("qualification disk path cannot contain a comma"))
+  }
+  [
+    value.qemu.display(), "-machine", target.machine, "-cpu", target.cpu,
+    "-smp", "2", "-m", f"{input.memory_mib}", "-nographic", "-no-reboot",
+    "-nodefaults", "-serial", "stdio", "-kernel", input.kernel.display(),
+    "-initrd", input.initramfs.display(), "-append", "console=ttyS0 rdinit=/init",
+    "-drive", f"if=none,id=root,format=raw,file={input.disk}",
+    "-device", f"{target.block_device},drive=root",
+  ]
+}
+
 enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpScreenshot(Path) }
 enum QmpRetryOperation { QmpRetryReady, QmpRetryScreenshot(Path) }
 error QmpFailure = OutcomeIndeterminate(operation: QmpOperation)
@@ -207,6 +229,34 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   }
 
   false
+}
+
+## Run the disposable qualification guest until its completion marker or deadline.
+export proc qemu_run_asterinas_reference(
+  value: QemuConfig,
+  input: QemuAsterinasReference,
+  console_log: Path,
+  qemu_log: Path,
+  timeout_seconds: Int,
+) [fs, process, time, error] {
+  guard timeout_seconds > 0 and timeout_seconds <= 3000 else { fail "qualification timeout must be between 1 and 3000 seconds" }
+  let argv = qemu_asterinas_reference_argv(value, input)?
+  console_log.remove()
+  qemu_log.remove()
+  let launched = spawn process.command_argv(value.qemu, argv, stdout: console_log, stderr: qemu_log)?
+  defer qemu_stop(launched)
+  let deadline = time.monotonic()? + timeout_seconds * 1000000000
+  while qemu_process_live(launched.pid)? {
+    let output = qemu_log_text(console_log, qemu_log)?
+    if "LAPUTA_ASTERINAS_TEST_FAILED" in output or "Kernel panic" in output or "Uncaught panic" in output {
+      fail "qualification guest reported failure"
+    }
+    if "LAPUTA_ASTERINAS_TEST_OK" in output { return }
+    if time.monotonic()? >= deadline { fail "qualification guest timed out" }
+    time.sleep(200ms)?
+  }
+  let _ = wait launched?
+  fail "qualification guest exited before its completion marker"
 }
 
 pure qmp_mode(operation: QmpOperation) -> Str {

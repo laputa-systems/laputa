@@ -339,6 +339,31 @@ if kill -0 "$guest_pid" 2>/dev/null; then
     printf 'cancelled VM runner left its Firecracker running\n' >&2
     exit 1
 fi
+cat > "$vm_test_root/qemu-cancel" <<'QEMU'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$QEMU_CANCEL_PID"
+exec sleep 30
+QEMU
+chmod 755 "$vm_test_root/qemu-cancel"
+QEMU_SYSTEM_X86_64="$vm_test_root/qemu-cancel" QEMU_CANCEL_PID="$vm_test_root/qemu-cancel.pid" \
+XSH_MODULE_PATH="$repo_root" xsh "$repo_root/infra/asterinas/run-linux.xsh" -- \
+    "$vm_test_root/kernel" "$vm_test_root/initramfs" "$vm_test_root/root" \
+    "$vm_test_root/qemu-cancel-console" "$vm_test_root/qemu-cancel-log" '' 60 \
+    > "$vm_test_root/qemu-cancel-run.log" 2>&1 &
+runner_pid=$!
+for _ in {1..100}; do
+    [[ -s "$vm_test_root/qemu-cancel.pid" ]] && break
+    sleep 0.05
+done
+[[ -s "$vm_test_root/qemu-cancel.pid" ]] || { kill "$runner_pid" 2>/dev/null || true; wait "$runner_pid" || true; exit 1; }
+guest_pid="$(cat "$vm_test_root/qemu-cancel.pid")"
+kill -TERM "$runner_pid"
+wait "$runner_pid" || true
+if kill -0 "$guest_pid" 2>/dev/null; then
+    kill -TERM "$guest_pid" 2>/dev/null || true
+    printf 'cancelled Linux runner left its QEMU child running\n' >&2
+    exit 1
+fi
 if bash "$repo_root/infra/asterinas/run-test-vm.sh" \
     "$vm_test_root/missing-firecracker" "$vm_test_root/config.json" \
     "$vm_test_root/missing-console.log" "$vm_test_root/missing-firecracker.log" '' 2 \
@@ -347,4 +372,14 @@ if bash "$repo_root/infra/asterinas/run-test-vm.sh" \
     exit 1
 fi
 grep -Fq 'Firecracker is not executable' "$vm_test_root/missing-firecracker-run.log"
+if bash "$repo_root/infra/asterinas/qualify.sh" baseline --backend both --case unknown > "$scratch/unknown-case.log" 2>&1; then
+    printf 'qualification unexpectedly accepted an unknown case\n' >&2
+    exit 1
+fi
+rg -q 'unknown baseline case' "$scratch/unknown-case.log"
+if bash "$repo_root/infra/asterinas/qualify.sh" baseline --backend unknown > "$scratch/unknown-backend.log" 2>&1; then
+    printf 'qualification unexpectedly accepted an unknown backend\n' >&2
+    exit 1
+fi
+rg -q 'select --backend' "$scratch/unknown-backend.log"
 printf 'Asterinas host checks passed.\n'

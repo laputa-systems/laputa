@@ -109,11 +109,32 @@ static void require_path(const char *phase, const char *path) {
   }
 }
 
+#ifdef LAPUTA_LINUX_REFERENCE
+static void configure_loopback(void) {
+  struct {
+    char name[16];
+    unsigned short family;
+    unsigned short port;
+    unsigned int address;
+    char padding[16];
+  } request = {"lo", 2, 0, 0x0100007f, {0}};
+  SysResult socket = syscall3(41, 2, 2, 0);
+  require_success("loopback-socket", socket);
+  require_success("loopback-address", syscall3(16, socket, 0x8916, (long)&request));
+  request.family = 1;
+  require_success("loopback-up", syscall3(16, socket, 0x8914, (long)&request));
+  require_success("loopback-close", syscall2(3, socket, 0));
+}
+#endif
+
 void _start(void) {
   char *const argv[] = {"/init", 0};
   char *const envp[] = {"PATH=/usr/bin:/bin",
                        "XSH_MODULE_PATH=/usr/lib/xsh/core", 0};
 
+#ifdef LAPUTA_LINUX_REFERENCE
+  configure_loopback();
+#endif
   write_text("LAPUTA_ASTERINAS_INITRAMFS_START\n");
   require_success("mount-dev", syscall5(165, (long)"devtmpfs", (long)"/dev",
                                        (long)"devtmpfs", 0, 0));
