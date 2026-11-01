@@ -252,6 +252,9 @@ fn get(path: &str, headers: &HashMap<String, String>, state: &AppState) -> Respo
     if path == "/index.json" {
         return get_index(state);
     }
+    if let Some(object) = SnapshotObject::at(path) {
+        return get_snapshot_object(object, state);
+    }
     if let Some(hash) = cached_source_hash(path) {
         return get_cached_source(hash, state);
     }
@@ -268,6 +271,10 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
 
     if path == "/index.json" {
         return put_index(body, state);
+    }
+
+    if let Some(object) = SnapshotObject::at(path) {
+        return put_snapshot_object(object, body, state);
     }
 
     if path.starts_with("/_uploads/") {
@@ -409,6 +416,78 @@ fn valid_upload_id(upload_id: &str) -> bool {
         && upload_id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// The two mutable objects of an offline-signed repository snapshot. The
+/// mirror stores and serves them verbatim and holds no verification key:
+/// clients authenticate the pair, so the mirror only bounds their size.
+#[derive(Clone, Copy)]
+enum SnapshotObject {
+    Metadata,
+    Signature,
+}
+
+impl SnapshotObject {
+    fn at(path: &str) -> Option<Self> {
+        match path {
+            "/snapshot.json" => Some(Self::Metadata),
+            "/snapshot.sig" => Some(Self::Signature),
+            _ => None,
+        }
+    }
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::Metadata => "snapshot.json",
+            Self::Signature => "snapshot.sig",
+        }
+    }
+
+    fn content_type(self) -> &'static str {
+        match self {
+            Self::Metadata => "application/json",
+            Self::Signature => "application/octet-stream",
+        }
+    }
+
+    fn max_bytes(self) -> usize {
+        match self {
+            Self::Metadata => 8192,
+            Self::Signature => 256,
+        }
+    }
+}
+
+fn get_snapshot_object(object: SnapshotObject, state: &AppState) -> Response {
+    match state.storage.get(object.key()) {
+        Ok(Some(bytes)) => Response {
+            status: 200,
+            content_type: object.content_type(),
+            body: Body::Bytes(bytes),
+            extra_headers: vec![("Cache-Control", "no-store".to_string())],
+        },
+        Ok(None) => Response::not_found(),
+        Err(error) => {
+            tracing::error!("snapshot read failed for {}: {error}", object.key());
+            Response::error("snapshot read failed")
+        }
+    }
+}
+
+fn put_snapshot_object(object: SnapshotObject, body: &[u8], state: &AppState) -> Response {
+    if body.is_empty() || body.len() > object.max_bytes() {
+        return Response::bad_request("snapshot object size is out of bounds");
+    }
+    match state
+        .storage
+        .put(object.key(), body.to_vec(), object.content_type())
+    {
+        Ok(()) => Response::json(201, r#"{"ok":true}"#),
+        Err(error) => {
+            tracing::error!("snapshot upload failed for {}: {error}", object.key());
+            Response::error("snapshot upload failed")
+        }
+    }
 }
 
 fn get_index(state: &AppState) -> Response {

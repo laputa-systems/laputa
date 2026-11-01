@@ -4,6 +4,7 @@
 bucket and exposes authenticated `PUT` publishing for:
 
 - `index.json`
+- `snapshot.json` and `snapshot.sig`
 - `packages/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>.tar.gz`
 - `metadata/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
 - `proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json`
@@ -14,7 +15,12 @@ first twelve hex digits of the row's `artifact_key` and `proof_key`. A rebuild
 under the same ver-rel uploads new objects and replaces only its `index.json`
 row, which is the sole mutable pointer; PM uploads objects with
 `If-None-Match: *`. An index row that names any content-addressed object must
-name exactly the objects of its keys. Legacy object names remain readable, but
+name exactly the objects of its keys. `snapshot.json` and `snapshot.sig` are
+the other mutable objects: the offline-signed snapshot metadata and its raw
+Ed25519 signature. The mirror holds no verification key. It stores and serves
+both byte for byte with `Cache-Control: no-store`, never redirects them to an
+object cache, and refuses writes over 8192 bytes (metadata) or 256 bytes
+(signature); clients authenticate the pair. Legacy object names remain readable, but
 writes accept only content-addressed names. Source mirrors are
 target-architecture-specific and their paths are derived from the package
 index entry.

@@ -447,6 +447,11 @@ the clock and durable state from an older VM snapshot is outside this guarantee.
 stay explicit local workflows and bypass verification: possession of the
 tree is the trust assumption there.
 
+The laputa mirror serves and accepts `snapshot.json` and `snapshot.sig` verbatim
+(see [mirror usage](../mirror/README.md)), so `repo publish-snapshot` and the
+signed fetch run against the loopback and production mirrors, not only
+`file://` trees.
+
 Parser and size limits: snapshot metadata is LF-terminated UTF-8 of exactly
 five lines at most 4 KiB; signatures are exactly 64 bytes; provisioned keys
 are non-empty multiples of 32 bytes; fetched indexes stay bounded at

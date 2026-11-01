@@ -930,3 +930,71 @@ fn a_rebuild_under_the_same_release_replaces_the_row_not_the_objects() {
     assert_eq!(body_bytes(get(&state, &format!("/{PACKAGE}"))), b"first");
     assert_eq!(body_bytes(get(&state, &format!("/{rebuilt_package}"))), b"second");
 }
+
+const SNAPSHOT_METADATA: &[u8] = b"laputa-repo-snapshot-v2\ngeneration 1\n";
+const SNAPSHOT_SIGNATURE: [u8; 64] = [7; 64];
+
+fn put_snapshot(state: &AppState, path: &str, body: &[u8], auth: bool) -> packages::Response {
+    let headers = if auth { auth_headers() } else { headers(&[]) };
+    packages::route("PUT", path, &headers, body, state)
+}
+
+fn header<'a>(resp: &'a packages::Response, name: &str) -> Option<&'a str> {
+    resp.extra_headers
+        .iter()
+        .find(|(k, _)| *k == name)
+        .map(|(_, v)| v.as_str())
+}
+
+#[test]
+fn snapshot_objects_round_trip_verbatim_and_replace_in_place() {
+    let state = make_state();
+    assert_eq!(get(&state, "/snapshot.json").status, 404);
+    assert_eq!(get(&state, "/snapshot.sig").status, 404);
+
+    assert_eq!(put_snapshot(&state, "/snapshot.json", SNAPSHOT_METADATA, true).status, 201);
+    assert_eq!(put_snapshot(&state, "/snapshot.sig", &SNAPSHOT_SIGNATURE, true).status, 201);
+
+    let metadata = get(&state, "/snapshot.json");
+    assert_eq!(metadata.status, 200);
+    assert_eq!(header(&metadata, "Cache-Control"), Some("no-store"));
+    assert_eq!(body_bytes(metadata), SNAPSHOT_METADATA);
+    let signature = get(&state, "/snapshot.sig");
+    assert_eq!(signature.status, 200);
+    assert_eq!(body_bytes(signature), SNAPSHOT_SIGNATURE);
+
+    assert_eq!(put_snapshot(&state, "/snapshot.json", b"next\n", true).status, 201);
+    assert_eq!(body_bytes(get(&state, "/snapshot.json")), b"next\n");
+}
+
+#[test]
+fn snapshot_objects_need_authentication_and_bounded_bodies() {
+    let state = make_state();
+    assert_eq!(put_snapshot(&state, "/snapshot.json", SNAPSHOT_METADATA, false).status, 401);
+    assert_eq!(put_snapshot(&state, "/snapshot.sig", &SNAPSHOT_SIGNATURE, false).status, 401);
+    assert_eq!(put_snapshot(&state, "/snapshot.json", b"", true).status, 400);
+    assert_eq!(put_snapshot(&state, "/snapshot.json", &vec![b'x'; 8193], true).status, 400);
+    assert_eq!(put_snapshot(&state, "/snapshot.sig", &vec![0; 257], true).status, 400);
+    assert_eq!(get(&state, "/snapshot.json").status, 404);
+    assert_eq!(get(&state, "/snapshot.sig").status, 404);
+}
+
+#[test]
+fn snapshot_objects_are_served_by_the_mirror_not_redirected_to_a_cache() {
+    let mut state = make_state();
+    state.r2_public_url = Some("https://pub.example".to_string());
+    assert_eq!(put_snapshot(&state, "/snapshot.json", SNAPSHOT_METADATA, true).status, 201);
+
+    let resp = get(&state, "/snapshot.json");
+    assert_eq!(resp.status, 200);
+    assert_eq!(body_bytes(resp), SNAPSHOT_METADATA);
+}
+
+#[test]
+fn local_mode_stores_snapshot_objects_as_plain_files() {
+    let state = make_local_state();
+    assert_eq!(put_snapshot(&state, "/snapshot.json", SNAPSHOT_METADATA, false).status, 201);
+    assert_eq!(put_snapshot(&state, "/snapshot.sig", &SNAPSHOT_SIGNATURE, false).status, 201);
+    assert_eq!(std::fs::read(state.tmp.path().join("data/snapshot.json")).unwrap(), SNAPSHOT_METADATA);
+    assert_eq!(body_bytes(get(&state, "/snapshot.sig")), SNAPSHOT_SIGNATURE);
+}
