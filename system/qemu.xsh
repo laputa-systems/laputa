@@ -25,8 +25,12 @@ export type QemuTarget = {
 ## The host executable and target used by a QEMU invocation.
 export type QemuConfig = {qemu: Path, target: QemuTarget}
 
+## Whether a disposable qualification guest has a virtio network device and
+## which existing host TAP device it uses.
+export enum QemuReferenceNetwork { NoNetwork, Tap(Str) }
+
 ## Inputs for a disposable initramfs and raw ext2 guest.
-export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int}
+export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int, network: QemuReferenceNetwork}
 
 ## Construct the headless qualification guest without host networking.
 export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterinasReference) -> Result[List[Str], Error] {
@@ -37,6 +41,14 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
   guard !("," in input.disk.display()) else {
     return Err(types.LaputaError.Profile("qualification disk path cannot contain a comma"))
   }
+  let network = match input.network {
+    NoNetwork => Ok([]),
+    Tap(interface) => if interface == "" or "," in interface {
+      Err(types.LaputaError.Profile("qualification TAP name must be nonempty and cannot contain a comma"))
+    } else {
+      Ok(["-netdev", f"tap,id=net0,ifname={interface},script=no,downscript=no", "-device", "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01"])
+    },
+  }?
   [
     value.qemu.display(), "-machine", target.machine, "-cpu", target.cpu,
     "-smp", "2", "-m", f"{input.memory_mib}", "-nographic", "-no-reboot",
@@ -44,7 +56,7 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
     "-initrd", input.initramfs.display(), "-append", "console=ttyS0 rdinit=/init",
     "-drive", f"if=none,id=root,format=raw,file={input.disk}",
     "-device", f"{target.block_device},drive=root",
-  ]
+  ].extend(network)
 }
 
 enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpScreenshot(Path) }

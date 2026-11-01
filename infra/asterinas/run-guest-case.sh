@@ -62,20 +62,24 @@ timeout_seconds="${LAPUTA_CASE_TIMEOUT:-600}"
 if [[ "$backend" == asterinas ]]; then
     vm_command=(bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$firecracker_config"
         "$console" "$console.firecracker" '' "$(( timeout_seconds * 5 ))")
-    if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
-        vm_command=(docker run --rm --init --pull never --platform linux/amd64 --network none
-            --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
-            --mount "type=bind,src=$repo_root,dst=$repo_root"
-            --workdir "$repo_root" --entrypoint /bin/bash "$dev_image" -c
-            'ip tuntap add dev tap0 mode tap && ip addr add 192.0.2.1/24 dev tap0 && ip link set tap0 up && exec "$@"'
-            _ "${vm_command[@]}")
-    fi
-    "${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
 else
-    XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
-        "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz" \
-        "$root" "$console" "$console.qemu" '' "$timeout_seconds" "$memory_mib" > "$result_dir/command.log" 2>&1 || status=$?
+    vm_command=("$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" --
+        "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz"
+        "$root" "$console" "$console.qemu" '' "$timeout_seconds" "$memory_mib")
 fi
+if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
+    [[ "$backend" == asterinas ]] || vm_command+=(--tap tap0)
+    vm_command=(docker run --rm --init --pull never --platform linux/amd64 --network none
+        --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
+        --mount "type=bind,src=$repo_root,dst=$repo_root"
+        --env "XSH_MODULE_PATH=$repo_root" --env QEMU_SYSTEM_X86_64=/usr/local/qemu/bin/qemu-system-x86_64
+        --workdir "$repo_root" --entrypoint /bin/bash "$dev_image" -c
+        'ip tuntap add dev tap0 mode tap && ip addr add 192.0.2.1/24 dev tap0 && ip link set tap0 up && exec "$@"'
+        _ "${vm_command[@]}")
+else
+    [[ "$backend" == asterinas ]] || vm_command=(env "XSH_MODULE_PATH=$repo_root" "${vm_command[@]}")
+fi
+"${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
 sed 's/\x1b\[[0-9;]*m//g' "$console" | tr -d '\r' | rg 'CASE_|NTP_|FREQUENCY_|panic' | head -40 || true
 if (( status == 0 )) && rg -q 'LAPUTA_ASTERINAS_CASE_OK' "$console"; then
     printf 'run-guest-case: %s %s passed on %s\n' "$(basename "$case_dir")" "$mode" "$backend"
