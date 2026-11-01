@@ -291,13 +291,7 @@ if [[ "$mode" == shell ]]; then
     [[ -t 0 ]] || fail 'make asterinas-boot needs an interactive terminal'
     "$firecracker_bin" --no-api --config-file "$firecracker_config" \
         </dev/tty > >(tee -a "$console_log") 2>"$firecracker_log" &
-else
-    "$firecracker_bin" --no-api --config-file "$firecracker_config" \
-        </dev/null >"$console_log" 2>"$firecracker_log" &
-fi
-firecracker_pid=$!
-
-if [[ "$mode" == shell ]]; then
+    firecracker_pid=$!
     ready=false
     for _ in {1..600}; do
         if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then

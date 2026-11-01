@@ -319,6 +319,26 @@ assert_vm_case failed '' 2 1
 assert_vm_case panic '' 2 1
 assert_vm_case early '' 2 1
 assert_vm_case timeout '' 3 1
+FAKE_FIRECRACKER_MODE=timeout \
+FAKE_FIRECRACKER_PID_FILE="$vm_test_root/cancel.pid" \
+    bash "$repo_root/infra/asterinas/run-test-vm.sh" \
+        "$fake_firecracker" "$vm_test_root/config.json" "$vm_test_root/cancel-console.log" \
+        "$vm_test_root/cancel-firecracker.log" '' 1500 > "$vm_test_root/cancel-run.log" 2>&1 &
+runner_pid=$!
+for _ in {1..100}; do
+    [[ -s "$vm_test_root/cancel.pid" ]] && break
+    sleep 0.05
+done
+[[ -s "$vm_test_root/cancel.pid" ]] || { kill "$runner_pid" 2>/dev/null || true; wait "$runner_pid" || true; exit 1; }
+guest_pid="$(cat "$vm_test_root/cancel.pid")"
+kill -TERM "$runner_pid"
+status=0
+wait "$runner_pid" || status=$?
+[[ "$status" == 143 ]] || { printf 'cancelled VM runner returned %s\n' "$status" >&2; exit 1; }
+if kill -0 "$guest_pid" 2>/dev/null; then
+    printf 'cancelled VM runner left its Firecracker running\n' >&2
+    exit 1
+fi
 if bash "$repo_root/infra/asterinas/run-test-vm.sh" \
     "$vm_test_root/missing-firecracker" "$vm_test_root/config.json" \
     "$vm_test_root/missing-console.log" "$vm_test_root/missing-firecracker.log" '' 2 \
