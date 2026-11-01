@@ -211,7 +211,7 @@ need-xsh:
 # It is networked only while the image or XSH_ROOT's crates are missing; the
 # registry stamp is the one `make fetch` writes.
 XSH_TEST_IMAGE := xsh-test
-XSH_SEED_FEATURES := xsh/net xsh/tools xsht/native-tests
+XSH_SEED_FEATURES := xsh/net xsh/ssh xsh/tools xsht/native-tests
 CARGO_REGISTRY := $(CURDIR)/.cache/cargo/registry
 CARGO_GIT := $(CURDIR)/.cache/cargo/git
 CARGO_REGISTRY_STAMP := $(CURDIR)/.cache/cargo/Cargo.lock.sha256
