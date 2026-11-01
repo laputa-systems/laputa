@@ -26,7 +26,8 @@ proc main(root: Path) [fs, process, env, time, io, error] {
     if completed { print "LAPUTA_NTP_GUEST_OK" }
   }
   let ahead = fp"{root}/inputs/ahead-mode".exists()?
-  linux.set_system_clock(if ahead { original + 20000 } else { original - 20000 })?
+  let slew_case = fp"{root}/inputs/slew-mode".exists()?
+  linux.set_system_clock(if slew_case { original - 80 } else if ahead { original + 20000 } else { original - 20000 })?
   p"/run/chrony-oracle.conf".write("""server 127.0.0.1 port 32123 minpoll 1 maxpoll 1 iburst
 makestep 1.0 3
 port 0
@@ -64,21 +65,33 @@ pidfile /run/chrony-oracle.pid
   let server_ready = p"/run/ntp-oracle-ready"
   let server = unix.spawn_process_group(process.command_argv(oracle, [oracle.display(), f"{original}", f"{raw_origin}", server_ready.display()], stdout: /run/ntp-oracle.log, stderr: /run/ntp-oracle.log))?
   groups += [server.pid]
-  let deadline = now_ms()? + 120000
+  let deadline = now_ms()? + (if slew_case { 300000 } else { 120000 })
   var synced = false
+  var previous_delta = -80
+  var largest_change = 0
   while now_ms()? < deadline {
     let raw_now = (run.text $oracle "--raw").trim().parse_int_decimal()?
     let delta = time.now() - original - raw_now + raw_origin
     let tracking = run.text $client "-h" "127.0.0.1" "-p" "32461" "tracking"
-    if "Leap status     : Normal" in tracking and delta > -1500 and delta < 1500 {
+    let change = if delta > previous_delta { delta - previous_delta } else { previous_delta - delta }
+    if change > largest_change { largest_change = change }
+    previous_delta = delta
+    let window = if slew_case { 15 } else { 1500 }
+    if "Leap status     : Normal" in tracking and delta > -window and delta < window {
       synced = true
       break
     }
     time.sleep(500ms)
   }
   assert synced, "chrony did not converge to the controlled NTP source"
-  assert "System clock was stepped by" in p"/run/chrony-oracle-logs/chrony-oracle/current".read_text()?, "chrony did not step the clock"
-  print "CHRONY_CLOCK_SYNCED"
+  let stepped = "System clock was stepped by" in p"/run/chrony-oracle-logs/chrony-oracle/current".read_text()?
+  if slew_case {
+    assert ! stepped, "chrony stepped a sub-second offset"
+    print f"CHRONY_SLEW_CONVERGED largest_sample_change_ms={largest_change}"
+  } else {
+    assert stepped, "chrony did not step the clock"
+    print "CHRONY_CLOCK_SYNCED"
+  }
   completed = true
 }
 

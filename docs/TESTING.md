@@ -105,8 +105,8 @@ UID before changing the runtime directory. It does not qualify clock steering.
 ### Run the disposable NTP guest
 
 With the x86_64 seed, package-tools image and artifact closure already built,
-run the controlled startup cases in both directions and the external-backstep
-case separately:
+run the controlled startup cases in both directions, the sub-second `slew` case and the
+external-backstep case separately:
 
 ```bash
 bash tests/integration/ntp-clock-guest.sh behind /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE
@@ -129,6 +129,15 @@ replies, and then requires authenticated clock convergence. The NTS fixture buil
 needs the locked Rust dependencies available offline. These cases do not
 qualify external sources or the authenticated clock-floor policy. The bundled
 NTS test certificate expires on 27 February 2027.
+
+The slew case starts the guest clock 80 ms behind the controlled source, below the
+step threshold, and requires convergence within 15 ms inside five minutes without
+the daemon logging a jump and without any one 500 ms sample changing the offset by
+30 ms or more. ntpd-rs corrects at roughly half a millisecond per second and
+converged in about four minutes on 2026-11-01. The matching `chrony-slew` runner
+(build chrony as described below) also converges without stepping the clock, but
+corrects about 32 ms in a single sample; its rate is recorded and not bounded, so
+the two daemons agree on the no-step outcome and differ in slew rate.
 
 The frequency case uses a controlled source with a 100 ppm rate bias. It
 requires a learned nonzero calibration, stops the source, and checks the
@@ -172,6 +181,7 @@ tar -xf .work/tmp/chrony-oracle/chrony-4.9.tar.gz -C .work/tmp/chrony-oracle
 (cd .work/tmp/chrony-oracle/chrony-4.9 && CC='gcc -fuse-ld=mold' LDFLAGS=-static ./configure --disable-readline --disable-sechash --disable-nts --disable-refclock --disable-rtc --disable-privdrop --disable-timestamping --with-user=root && make -j2 chronyd chronyc)
 bash tests/integration/ntp-clock-guest.sh chrony-behind /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE .work/tmp/chrony-oracle/chrony-4.9/chronyd .work/tmp/chrony-oracle/chrony-4.9/chronyc
 bash tests/integration/ntp-clock-guest.sh chrony-ahead /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE .work/tmp/chrony-oracle/chrony-4.9/chronyd .work/tmp/chrony-oracle/chrony-4.9/chronyc
+bash tests/integration/ntp-clock-guest.sh chrony-slew /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE .work/tmp/chrony-oracle/chrony-4.9/chronyd .work/tmp/chrony-oracle/chrony-4.9/chronyc
 ```
 
 Chrony uses `makestep 1.0 3` and the controlled source's two-second polling

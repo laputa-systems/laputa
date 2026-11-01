@@ -2,12 +2,12 @@
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
-mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [ENDPOINT | CHRONYD CHRONYC]}
+mode=${1:?usage: ntp-clock-guest.sh behind|ahead|slew|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead|chrony-slew HOST_XSH SEED ARTIFACTS IMAGE [ENDPOINT | CHRONYD CHRONYC]}
 xsh=$(realpath "${2:?host xsh}")
 seed=$(realpath "${3:?seed directory}")
 artifacts=$(realpath "${4:?artifact store}")
 image=${5:?package-tools image}
-case "$mode" in behind|ahead|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
+case "$mode" in behind|ahead|slew|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead|chrony-slew) ;; *) exit 2 ;; esac
 if test "$mode" = external-nts; then
   endpoint=${6:?external NTS hostname or hostname:port}
   if [[ ! "$endpoint" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*(:[0-9]{1,5})?$ ]]; then
@@ -54,7 +54,7 @@ if test "$mode" = frequency; then
   cc -static -fuse-ld=mold "$snapshot/tests/integration/fixtures/ntp-frequency-check.c" -o "$input/inputs/ntp-frequency-check"
   cp "$snapshot/tests/integration/fixtures/ntp-frequency-guest.xsh" "$input/inputs/entry.xsh"
 fi
-if test "$mode" = chrony-behind || test "$mode" = chrony-ahead; then
+if test "$mode" = chrony-behind || test "$mode" = chrony-ahead || test "$mode" = chrony-slew; then
   cp "${6:?chronyd binary}" "$input/inputs/chronyd"
   cp "${7:?chronyc binary}" "$input/inputs/chronyc"
   cp "$snapshot/tests/integration/fixtures/chrony-oracle-guest.xsh" "$input/inputs/entry.xsh"
@@ -70,6 +70,7 @@ if test "$mode" = nts; then
   touch "$input/inputs/nts-mode"
 fi
 if test "$mode" = jump; then touch "$input/inputs/jump-mode"; fi
+if test "$mode" = slew || test "$mode" = chrony-slew; then touch "$input/inputs/slew-mode"; fi
 if test "$mode" = ahead || test "$mode" = chrony-ahead; then touch "$input/inputs/ahead-mode"; fi
 if test "$mode" = pause; then touch "$input/inputs/pause-mode"; fi
 truncate -s 128M "$output/inputs.ext4"

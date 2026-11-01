@@ -24,7 +24,7 @@ proc main(repository: Path, output: Path, socket: Path, mode: Str) [fs, process,
   argv += qemu.qemu_self_hosting_disks_argv(config.target, fp"{output}/inputs.ext4", fp"{output}/output.ext4")
   let child = spawn process.command_argv(config.qemu, argv, output, env: {TMPDIR: output.display()}, stdout: paths.console_log, stderr: paths.qemu_log)?
   defer child.cancel(signal: "TERM", kill_after: 5s)
-  let deadline_seconds = if mode == "external-nts" { 360 } else { 180 }
+  let deadline_seconds = if mode == "external-nts" { 360 } else if mode == "slew" or mode == "chrony-slew" { 420 } else { 180 }
   let start = time.monotonic()?
   var paused = false
   while true {

@@ -100,7 +100,10 @@ minimum-agreeing-sources = 1
   }
   let jump_case = fp"{root}/inputs/jump-mode".exists()?
   let pause_case = fp"{root}/inputs/pause-mode".exists()?
-  if ! jump_case {
+  let slew_case = fp"{root}/inputs/slew-mode".exists()?
+  if slew_case {
+    linux.set_system_clock(original - 80)?
+  } else if ! jump_case {
     let initial = if fp"{root}/inputs/ahead-mode".exists()? { original + 20000 } else { original - 20000 }
     linux.set_system_clock(initial)?
   }
@@ -151,16 +154,22 @@ minimum-agreeing-sources = 1
     print "NTS_REJECTED_TAMPERED_REPLIES"
     p"/run/nts-oracle-authenticate".write("enabled")?
   }
-  let deadline = now_ms()? + 120000
+  let deadline = now_ms()? + (if slew_case { 300000 } else { 120000 })
   var synced = false
   var report_at = now_ms()? + 10000
+  var previous_delta = -80
+  var largest_change = 0
   while now_ms()? < deadline {
     let raw_now_output = run.text $server_path "--raw"
     let raw_now = raw_now_output.trim().parse_int_decimal()?
     let expected = original + raw_now - raw_origin
     let delta = time.now() - expected
     let current_stratum = stratum()?
-    if current_stratum < 16 and (jump_case or (delta > -1500 and delta < 1500)) {
+    let change = if delta > previous_delta { delta - previous_delta } else { previous_delta - delta }
+    if change > largest_change { largest_change = change }
+    previous_delta = delta
+    let window = if slew_case { 15 } else { 1500 }
+    if current_stratum < 16 and (jump_case or (delta > -window and delta < window)) {
       synced = true
       break
     }
@@ -180,7 +189,11 @@ minimum-agreeing-sources = 1
     print f"NTP_CLOCK_DELTA_MS={difference}"
   }
   assert synced, "guest clock did not converge to the controlled NTP source"
-  if jump_case {
+  if slew_case {
+    assert ! ("jumping" in p"/run/ntp-proof-logs/ntpd-rs/current".read_text()?), "a sub-second offset was stepped"
+    assert largest_change < 30, f"clock changed by {largest_change} ms between samples"
+    print f"NTP_SLEW_CONVERGED largest_sample_change_ms={largest_change}"
+  } else if jump_case {
     print "NTP_SOURCE_REACQUIRED"
   } else {
     assert "jumping" in p"/run/ntp-proof-logs/ntpd-rs/current".read_text()?, "expected a controlled clock step"
