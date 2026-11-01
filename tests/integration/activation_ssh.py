@@ -42,19 +42,20 @@ for operation, source in (
 ):
     call(operation, source)
 assert call("prepare") == "acknowledged"
-stage = subprocess.Popen([*base, "stage"], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+stage = subprocess.Popen([*base, "trace-stage"], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 try:
-    wait_for("poll", "true", 60)
+    wait_for("writing", "true", 30)
     if stage.poll() is not None:
-        raise RuntimeError("stage returned before the reply was dropped")
+        raise RuntimeError("stage returned before the write was interrupted")
     stage.kill()
     output, error = stage.communicate(timeout=10)
     if output:
         raise RuntimeError(f"stage replied before disconnect: {output}")
+    wait_for("poll", "true", 60)
     assert call("inspect") == "acknowledged"
     call("release")
     wait_for("reaped", "true", 30)
-    print("PASS: stage committed before SSH reply loss; reconnect verified state and selected the candidate")
+    print("PASS: SSH disconnected during activation.next fsync; reconnect verified state and selected the candidate")
 finally:
     try:
         call("release")

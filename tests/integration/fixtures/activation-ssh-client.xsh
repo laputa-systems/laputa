@@ -13,6 +13,8 @@ proc main(...argv: List[Str]) [fs, process, net, env, time, error, io] {
     "activation" => f"p\"{root}/system/activation.xsh\".write(io.stdin_bytes()?)?",
     "launcher" => f"p\"{root}/system/launcher.xsh\".write(io.stdin_bytes()?)?",
     "fixture" => f"p\"{root}/activation-ssh-guest.xsh\".write(io.stdin_bytes()?)?",
+    "writing" => f"let f = p\"{root}/trace\"; var blocked = false; if f.exists()? {{ for line in f.read_text()?.lines() {{ if \"fsync(\" in line and \"activation.next>\" in line and \" = \" not in line {{ blocked = true }} }} }}; print $blocked",
+    "trace-stage" => f"let s = process.run(process.command_argv(p\"{root}/tools/strace\", [\"strace\", \"-f\", \"-yy\", \"-o\", \"{root}/trace\", \"-e\", \"trace=write,fsync\", \"-e\", \"inject=fsync:delay_enter=45s:when=1\", \"/usr/bin/xsh\", \"{root}/activation-ssh-guest.xsh\", \"--\", \"stage\", \"{root}\"], /home/probe, {{XSH_MODULE_PATH: \"{root}\", LD_LIBRARY_PATH: \"{root}/tools\"}}))?; exit s.exit_code()?",
     "poll" => f"print p\"{root}/committed\".exists()?",
     "release" => f"p\"{root}/release\".write(\"\")?",
     "reaped" => f"let pid = p\"{root}/committed\".read_text()?; let gone = !fp\"/proc/{{pid}}\".exists()?; print $gone",
