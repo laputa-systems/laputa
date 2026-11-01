@@ -5,13 +5,11 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 in progress. No compatibility slice is accepted.
-- Verdict: both guests passed an exploratory boot and the same five numeric
-  tests. The maintained paired runner and full native-suite accounting remain open.
+- Verdict: the Linux exploratory boot and five numeric tests passed. Earlier
+  Asterinas results are invalid because two guests shared one writable disk.
 - Survey revision: Laputa `aee5090ea11188dc853ec38297c03ade620f359c`.
-- `make asterinas-test` passed the boot proof and
-  `XSH_TEST=tests/xsh/stdlib/numeric.xsh make asterinas-test` passed five cases.
-  A Linux/QEMU probe used the same PM root and test payload. Its initramfs
-  configured loopback before executing the same guest init.
+- A Linux/QEMU probe used the PM root and test payload. Its initramfs configured
+  loopback before executing the guest init. Asterinas must rerun with one owned VM.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Next: finish A0's maintained paired runner, negative result checks, and native
