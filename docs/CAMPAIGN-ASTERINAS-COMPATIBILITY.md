@@ -4,10 +4,12 @@
 
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
-- State: A0 in progress; native accounting is partial (see below). No compatibility
-  slice is accepted.
-- Verdict: the paired boot and numeric cases pass. A0 remains open because
-  full native-suite accounting is incomplete.
+- State: A0 accepted as a baseline. No compatibility slice is accepted. The next
+  slice is the guest `NoMemory` panic, then A1.
+- Verdict: the paired boot and numeric cases pass on both backends. Native
+  accounting closes on the two-hour fan-out budget with every remaining case
+  retained as unexecuted; the campaign does not promise full native-suite
+  compatibility. The Asterinas-only failures below are debt, not passes.
 - Survey revision: Laputa `aee5090ea11188dc853ec38297c03ade620f359c`.
 - `bash infra/asterinas/qualify.sh baseline --backend both --case boot` passed.
   The `numeric` case passed five tests on each backend with the same PM root.
@@ -32,16 +34,17 @@
   also stopped using `--fail-fast`, so one failure no longer hides later cases.
 - Batched native accounting, Asterinas, four 50-module batches (200 of 1,015
   modules attempted, 133 started, 882 unstarted). Of the 15,255 host
-  identities: 1,279 passed, 71 failed, 65 skipped, 13,840 unexecuted. Three
+  identities: 1,281 passed, 71 failed, 65 skipped, 13,838 unexecuted. Three
   batches ended in a kernel panic, `spawn task failed: NoMemory` or a
   ring-buffer `NoMemory` unwrap, after about 10 to 13 minutes in a 4 GiB guest.
   The module in flight at each panic (`test-bb-md5sum`, `test-bb-sha256sum`,
   `test-diff`; 26 observed cases) is counted unexecuted. Failures recorded in
   the three panicking batches are not confirmed in a fresh guest. The third
   batch ran all 50 modules. The fan-out budget (two hours) was spent: 66 minutes
-  in the superseded one-module loop and 54 minutes in batches. Completing the
-  corpus at about one case per second and one panic-bounded batch per 13 minutes
-  needs roughly four to five more hours; extending the budget needs the owner.
+  in the superseded one-module loop and 54 minutes in batches. The owner
+  declined to extend the budget. The remaining 13,838 cases stay unexecuted
+  baseline debt; completing them would need roughly four to five more hours at
+  about one case per second.
 - Paired Linux/QEMU run of the same corpus for the 61 modules that contain the
   Asterinas failures plus the clean batch: 700 cases, 649 passed, 42 failed,
   9 skipped, no unexecuted case. Of the 700, Asterinas failed 32 that Linux
@@ -58,9 +61,25 @@
   memory exhaustion that bounds guest lifetime.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
-- Next: decide the fan-out budget, then diagnose the guest `NoMemory` panic, which
-  bounds every long guest run; finish A0's maintained paired runner, negative
-  result checks, and native suite accounting. Fresh public-source reproduction and performance remain open.
+- Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
+  runs panic-bounded batches on either backend, and `account-native.sh` counts
+  passed, failed, skipped, unexecuted and unknown cases, and rejects an empty
+  result, an undiscovered case, or a case that passed at a given baseline and no
+  longer does. The host fixtures exercise a red-to-green change, a regression,
+  persistent debt, a missing result and an in-flight module. A three-module run
+  through both backends gave identical results, and the paired boot and numeric
+  cases still pass after the refactor (unchanged Linux consumer). No real
+  Asterinas failure has gone red-to-green yet; the first kernel fix will be that
+  check.
+- Cold setup, from file times: fetching and building Firecracker, the initramfs
+  and the kernel took about 28 minutes (08:46 to 09:13). Warm kernel rebuild
+  21.6 s. Warm native run: see the loop repair above.
+- Steering checkpoint after A0: landed behavior is a measured, repaired
+  qualification loop and an explicit baseline, not compatibility. The limiting
+  factor is guest memory exhaustion, which stops every run after ten to thirteen
+  minutes and plausibly causes the awk hangs. Continue serialized: kernel
+  `NoMemory` diagnosis first, then A1. Fresh public-source reproduction and
+  performance remain open.
 - Launch prompt: `Execute docs/CAMPAIGN-ASTERINAS-COMPATIBILITY.md within its local execution boundary; do not push.`
 
 ## Charter

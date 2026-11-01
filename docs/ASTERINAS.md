@@ -66,6 +66,17 @@ every selection has run. The host requires the guest success marker. To test a d
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
 
+To account for many modules, run
+`bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
+(or `linux`) on a list of test modules, then
+`bash infra/asterinas/account-native.sh DISCOVERED_IDS.json DIR [--baseline ACCOUNTING.json]`.
+Each batch boots one guest from the built bundle. A guest that dies mid-batch
+returns its in-flight module to the pending list once and records it as
+interrupted if it dies alone. Modules left when the budget ends are written to
+`unstarted.txt`; the accounting counts their cases and those of interrupted
+modules as unexecuted. The accounting exits nonzero when it finds no results, a
+result for an undiscovered case, or a baseline case that no longer passes.
+
 For the paired boot and numeric pilot, provide a Laputa x86_64 Linux package
 archive with built-in virtio and ext2 support:
 

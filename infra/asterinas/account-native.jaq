@@ -1,0 +1,22 @@
+def outcome:
+  if startswith("ok ") then "passed"
+  elif startswith("skipped") then "skipped"
+  elif startswith("FAILED") then "failed"
+  else empty end;
+
+($ids[0]) as $discovered
+| ($interrupted | split("\n") | map(select(. != ""))) as $interrupted_modules
+| (split("\n")
+   | map(select(contains(" ... ")) | split(" ... ") | select(.[0] | test("(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+$")) | {id: (.[0] | capture("(?<id>(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+)$").id), outcome: (.[1] | outcome)})
+   | reduce .[] as $row ({}; .[$row.id] = $row.outcome)) as $observed
+| ($observed | to_entries | map(select((.key | split("::")[0]) as $module | ($interrupted_modules | index($module)) == null))) as $accepted
+| ($observed | keys) as $observed_ids
+| {
+    discovered: ($discovered | length),
+    passed: [$accepted[] | select(.value == "passed") | .key] | sort,
+    failed: [$accepted[] | select(.value == "failed") | .key] | sort,
+    skipped: [$accepted[] | select(.value == "skipped") | .key] | sort,
+    unknown: ($observed_ids - $discovered | sort),
+    unexecuted: ($discovered - [$accepted[].key] | sort),
+    interrupted_modules: $interrupted_modules
+  }
