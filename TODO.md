@@ -176,16 +176,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Fix with:** security
 - **Effort:** M (days)
 
-### LAP-45 · P1 · Restore a detached disk from an independent rescue boot
-
-- **Area:** Storage repair
-- **Where:** `packages/e2fsprogs/`, `system/rescue.xsh`, `docs/INSTALLER.md`
-- **Problem:** Classification and a launch fragment do not show that a broken guest can be repaired without its own network, package manager, or XSH.
-- **Recommendation:** Build a rescue image that contains `e2fsck`, attach a disposable dirty ext disk, and boot it with serial and no network. Record clean, repaired, and unrecoverable results, including file hashes after a repair.
-- **Progress:** `e2fsprogs` 1.47.2 installs only `usr/bin/e2fsck` for x86_64, built with the package task graph and no shell. The package build printed `e2fsprogs ok: e2fsck -V`. `fsck.ext4` stays the superblock checker. `rescue_repair_argv` is `e2fsck -f -p` for an unmounted or read-only device and errors for a writable mount. Exit 0 is clean, 1 and 2 are repaired, 4 and 8 are unrecoverable, and any other status is failed. `rescue_plan` attaches a read-only rescue image and the detached disk on virtio with serial and no network; a comma or whitespace in either path is rejected. Four rescue tests pass. A Linux x86_64/KVM rescue guest built from the maintained image plus packaged e2fsck boots with a read-only root, serial, and no network. Three detached ext fixtures produce clean (0), repaired free-block accounting (1), and unrecoverable destroyed-superblock (8) results. The repaired payload SHA-256 is unchanged. These synthetic fixtures do not establish recovery from arbitrary disk damage.
-- **Fix with:** reference-parity
-- **Effort:** M (days)
-
 ### LAP-46 · P1 · Select the fallback generation from the host launcher
 
 - **Area:** Activation

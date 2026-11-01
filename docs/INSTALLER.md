@@ -134,8 +134,21 @@ detected memory and fails if the disk is too small.
 
 ## Detached rescue guest proof
 
+`tests/integration/rescue_guest.py` retains the proof. After `make build PKGS=e2fsprogs`,
+it composes a rescue root from the packaged `baselayout`, `musl`, `xsh`, `xinit` and
+`e2fsprogs` payloads and `guest/rescue-proof.xsh`, with no maintained-generation userspace.
+It boots the maintained kernel three times with `system.rescue.rescue_plan`'s drives:
+the read-only root image, one detached 32-MiB ext4 fixture, and no network device.
+The guest checks that its root is read-only and that no network device exists before
+it runs `e2fsck -f -p`. Status 0 (clean), 1 (a superblock free-block count made wrong, now
+restored on disk) and 8 (zeroed superblock magic, left unchanged) are classified through
+`rescue_classify`, and the clean and repaired payloads must hash to the value below. Set
+`LAPUTA_ARTIFACT_STORE` to the artifact `sha256` directory when it is not under the
+checkout's `.out`. The fixtures are synthetic.
+
 On 2026-10-29, a disposable Linux x86_64/KVM rescue image composed from the
-maintained system image and packaged e2fsprogs ran `guest/rescue-proof.xsh`.
+maintained system image and packaged e2fsprogs ran an earlier three-disk version of
+`guest/rescue-proof.xsh`.
 Its root was read-only, its console was serial, and QEMU had no network device.
 Three detached 32-MiB ext filesystems returned 0 (clean), 1 (a deliberately
 incorrect superblock free-block count repaired), and 8 (destroyed superblock
