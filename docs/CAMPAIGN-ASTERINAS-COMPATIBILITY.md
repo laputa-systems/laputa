@@ -4,7 +4,8 @@
 
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
-- State: A0 in progress. No compatibility slice is accepted.
+- State: A0 in progress; native accounting is partial (see below). No compatibility
+  slice is accepted.
 - Verdict: the paired boot and numeric cases pass. A0 remains open because
   full native-suite accounting is incomplete.
 - Survey revision: Laputa `aee5090ea11188dc853ec38297c03ade620f359c`.
@@ -21,26 +22,45 @@
   15,064 cases were unexecuted. Its last passed case was
   `core/tests/test-awk.xsh::test_awk_matrix_printf_shard_005`.
   Separately selected Asterinas modules remain open.
-- The first six Asterinas follow-up modules added 62 passes and one failure.
-  `core/tests/test-bb-awk.xsh::test_bb_awk_awk_do_not_allow_str_724d0fde`
-  reported `timeout: process timed out`; that module stopped after 18 passes,
-  leaving 30 of its 49 cases unexecuted. Its cause is not established.
-- A later follow-up module stopped at
-  `core/tests/test-bb-cp.xsh::test_bb_cp_cp_does_not_copy_unreadable_file_b036d15e`:
-  the test expected failure but copying returned status zero. It had 16 passes
-  and six unexecuted cases. The test sets mode `0222` without dropping
-  credentials, and the guest launch path shows no credential change. A root
-  fixture mismatch is plausible; guest credentials and the matching Linux
-  result have not been measured, so the failure's cause remains unknown.
-- The awk failure is parked pending a smaller reproducer or new page-fault
-  evidence. Full discovery followed by the initial prefix produced SIGSEGV
-  in an awk child on Asterinas. Linux passed the same instrumented prefix.
-  A 35-case selection also passed the awk cases on Asterinas. A later signal
-  occurred with roughly 2.5 GiB available according to guest `/proc/meminfo`.
+- Loop repair: a warm one-module run took 4 to 8 minutes because the selection
+  sat in the PM generation overlay, so each module rebuilt the generation, the
+  512 MiB ext2 image, the bundle and a runtime copy (compose alone 5m44s, about
+  1.5 GiB of disk per module). The selection is now a run input written into the
+  disposable root copy, and `XSH_TEST` takes several selections for one guest.
+  A cached-bundle two-module run took 3m57s at the same host load; a batch run
+  with a cached bundle and root copy is about 40 s plus test time. The guest
+  also stopped using `--fail-fast`, so one failure no longer hides later cases.
+- Batched native accounting, Asterinas, four 50-module batches (200 of 1,015
+  modules attempted, 133 started, 882 unstarted). Of the 15,255 host
+  identities: 1,279 passed, 71 failed, 65 skipped, 13,840 unexecuted. Three
+  batches ended in a kernel panic, `spawn task failed: NoMemory` or a
+  ring-buffer `NoMemory` unwrap, after about 10 to 13 minutes in a 4 GiB guest.
+  The module in flight at each panic (`test-bb-md5sum`, `test-bb-sha256sum`,
+  `test-diff`; 26 observed cases) is counted unexecuted. Failures recorded in
+  the three panicking batches are not confirmed in a fresh guest. The third
+  batch ran all 50 modules. The fan-out budget (two hours) was spent: 66 minutes
+  in the superseded one-module loop and 54 minutes in batches. Completing the
+  corpus at about one case per second and one panic-bounded batch per 13 minutes
+  needs roughly four to five more hours; extending the budget needs the owner.
+- Paired Linux/QEMU run of the same corpus for the 61 modules that contain the
+  Asterinas failures plus the clean batch: 700 cases, 649 passed, 42 failed,
+  9 skipped, no unexecuted case. Of the 700, Asterinas failed 32 that Linux
+  passed (listed below) and Linux failed 3 that Asterinas passed
+  (`test-bb-awk` assign_while_test, two `test-cp` ACL/xattr cases). The remaining
+  failures occur on both and are environment debt, including
+  `test_bb_cp_cp_does_not_copy_unreadable_file`: the guest runs as root on both
+  sides, so that case is a fixture mismatch, not an Asterinas defect.
+- The awk failure is no longer parked on a missing reproducer. In a fresh guest
+  `core/tests/test-bb-awk.xsh` passes 16 cases and then 33 cases hit
+  `process timed out` while Linux passes 38 of 49; chrt, sparse `dd` and
+  `cpio`/`date` differences are listed below. The cause of the awk hangs is not
+  established, and the `NoMemory` panics are a separate, unexplained kernel
+  memory exhaustion that bounds guest lifetime.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
-- Next: finish A0's maintained paired runner, negative result checks, and native
-  suite accounting. Fresh public-source reproduction and performance remain open.
+- Next: decide the fan-out budget, then diagnose the guest `NoMemory` panic, which
+  bounds every long guest run; finish A0's maintained paired runner, negative
+  result checks, and native suite accounting. Fresh public-source reproduction and performance remain open.
 - Launch prompt: `Execute docs/CAMPAIGN-ASTERINAS-COMPATIBILITY.md within its local execution boundary; do not push.`
 
 ## Charter
@@ -127,6 +147,46 @@ ROUTE and KOBJECT_UEVENT and rejects other standard families, including NETFILTE
 Ext2 inode sync reaches block-device flush and propagates failure, which does not
 establish crash durability. The Firecracker configuration attaches one writable
 root disk and no network device. Its TCP check is loopback only.
+
+### A0 Asterinas-only native failures
+
+Cases that failed on Asterinas and passed on the paired Linux run, with the
+Asterinas failures confirmed only where the batch did not end in a panic:
+
+```text
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_F_case_7_f0745f82
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_F_handles_escapes_547f57da
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_NF_in_BEGIN_77c25514
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_backslash_newline_eaten_with_no_trace_68a9ed7c
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_cmd_getline_6bdf67c7
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_delete_a_v_evaluates_v_once_5f6b7a5d
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_do_not_allow_str_724d0fde
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_exit_N_propagates_through_END_s_exit_30365011
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_f_and_ARGC_005000c7
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_floating_const_with_leading_zeroes_74725453
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_handles_empty_function_f_360001dc
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_handles_empty_function_f_arg_9bb5221b
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_handles_whitespace_before_array_subscript_eb5ef338
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_hex_const_1_5430ac3b
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_hex_const_2_ee9196a0
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_if_length_0_dd284655
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_if_operator_3df55f1c
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_if_operator_de706398
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_if_operator_eb575c43
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_if_string_2a35cfdb
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_input_is_never_oct_308726e9
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_length_array_3f6ea1ee
+core/tests/test-bb-awk.xsh::test_bb_awk_awk_printf_prints_one_e1cb147b
+core/tests/test-btop-cli.xsh::test_btop_live_source_syscall_trace_has_no_child_process
+core/tests/test-chrt.xsh::test_chrt_changes_the_policy_of_another_process
+core/tests/test-chrt.xsh::test_chrt_runs_a_command_under_the_policy
+core/tests/test-chrt.xsh::test_chrt_time_slice_reaches_the_fair_policies
+core/tests/test-cp.xsh::test_cp_debug_reports_copy_policy_statuses
+core/tests/test-cpio.xsh::test_cpio_sparse_extraction_and_symlink_targets
+core/tests/test-date.xsh::test_date_format_modifiers_and_width_bounds
+core/tests/test-dd.xsh::test_dd_sparse_copy_preserves_zero_file_as_a_hole
+core/tests/test-dd.xsh::test_dd_sparse_copy_writes_data_after_a_hole_at_the_right_offset
+```
 
 ### Foundation proof
 
