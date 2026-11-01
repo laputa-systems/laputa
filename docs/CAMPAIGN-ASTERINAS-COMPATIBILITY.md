@@ -14,8 +14,10 @@
   single-VM full run discovered all 15,255 host identities, then stopped after
   26 passed, one failed, and four skipped. The failing case was
   `core/tests/test-awk.xsh::test_awk_matrix_arithmetic_and_bit_functions_shard_000`:
-  `status was not an exit`. The other 15,224 cases have no result. Linux full
-  accounting and separately selected Asterinas modules remain open.
+  `status was not an exit`. The other 15,224 cases have no result. The Linux
+  full run reached its 3,000-second limit without releasing buffered output,
+  so its individual outcomes are unknown. Separately selected Asterinas
+  modules and Linux full accounting remain open.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Next: finish A0's maintained paired runner, negative result checks, and native

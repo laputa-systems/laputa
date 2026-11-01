@@ -12,6 +12,29 @@ pure doubled(value: Int) -> Int {
   value * 2
 }
 
+proc report_xsh_tests(rows: Stream[Str]) [process, error] -> Result[Bool, Error] {
+  var nonempty = false
+  var passed = false
+  for row in rows {
+    eprint --flush $row
+    if row.starts_with("running ") and row != "running 0 tests" { nonempty = true }
+    if row.starts_with("test result: ok.") { passed = true }
+  }
+  Ok(nonempty and passed)
+}
+
+proc stream_xsh_tests(source_root: Path, test_selection: Str) [process, env, error] -> Result[Bool, Error] {
+  cd (source_root) {
+    if test_selection == "all" {
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture ?)?
+    } else if "::" in test_selection {
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection ?)?
+    } else {
+      report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection ?)?
+    }
+  }?
+}
+
 proc main() [fs, process, env, time, net, error] {
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_START"
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_OK"
@@ -164,24 +187,14 @@ proc main() [fs, process, env, time, net, error] {
     git_marker.mkdir()
     let test_selection = test_selection_path.read_text()?.trim()
     eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
-    let test_run = cd (source_root) {
-      if test_selection == "all" {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture
-      } else if "::" in test_selection {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture --exact $test_selection
-      } else {
-        run.capture --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --fail-fast --nocapture $test_selection
-      }
-    }?
-    eprint --flush $test_run.stdout
-    eprint --flush $test_run.stderr
-    require(
-      test_run.status.exited_with(0)
-        and "test result: ok." in test_run.stdout
-        and ! ("test result: ok. 0 passed; 0 failed; 0 skipped" in test_run.stdout),
-      "xsh-test",
-      f"XSH test selection failed or discovered no tests: {test_selection}",
-    )
+    let test_run = try { stream_xsh_tests(source_root, test_selection)? }
+    match test_run {
+      Ok(passed) => require(passed, "xsh-test", f"XSH test selection failed or discovered no tests: {test_selection}"),
+      Err(problem) => {
+        eprint --flush f"LAPUTA_ASTERINAS_TEST_FAILED xsh-test: XSH test selection failed: {test_selection}"
+        return Err(problem)
+      },
+    }
     eprint --flush "LAPUTA_ASTERINAS_XSH_TEST_OK"
   }
 

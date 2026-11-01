@@ -56,7 +56,8 @@ native suite in a 2-vCPU guest configured by the pinned `xsht-config.ini`, inclu
 the locked Git archive through a PM generation overlay; its digest is included
 in the immutable bundle manifest. Guest test runs use 4 GiB of memory; the
 base viability proof uses 1 GiB. The selected tests run under the packaged
-`xsht`, and the host requires their guest success marker. To test a different
+`xsht` and stream their results to the guest console. The host requires their
+guest success marker. To test a different
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
 
