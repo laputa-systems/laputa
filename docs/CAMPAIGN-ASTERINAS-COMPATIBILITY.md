@@ -18,6 +18,11 @@
   full run reached its 3,000-second limit without releasing buffered output,
   so its individual outcomes are unknown. Separately selected Asterinas
   modules and Linux full accounting remain open.
+- The awk failure is parked pending a smaller reproducer or new page-fault
+  evidence. Full discovery followed by the initial prefix produced SIGSEGV
+  in an awk child on Asterinas. Linux passed the same instrumented prefix.
+  A 35-case selection also passed the awk cases on Asterinas. A later signal
+  occurred with roughly 2.5 GiB available according to guest `/proc/meminfo`.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Next: finish A0's maintained paired runner, negative result checks, and native
