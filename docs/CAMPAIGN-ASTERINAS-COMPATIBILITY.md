@@ -4,15 +4,18 @@
 
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
-- State: preflighted plan, execution not started. No implementation slice is accepted.
-- Verdict: ready for local execution. Fresh public-source reproduction remains blocked.
+- State: A0 in progress. No compatibility slice is accepted.
+- Verdict: both guests passed an exploratory boot and the same five numeric
+  tests. The maintained paired runner and full native-suite accounting remain open.
 - Survey revision: Laputa `aee5090ea11188dc853ec38297c03ade620f359c`.
-- Accepted planning evidence: host checks pass; guest-protocol tests pass 4/4.
-  Guest behavior and the full native XSH suite remain unverified here.
+- `make asterinas-test` passed the boot proof and
+  `XSH_TEST=tests/xsh/stdlib/numeric.xsh make asterinas-test` passed five cases.
+  A Linux/QEMU probe used the same PM root and test payload. Its initramfs
+  configured loopback before executing the same guest init.
 - Red boundary: the pinned kernel is three local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
-- Next: A0, one matched Linux/Asterinas baseline pilot. Start with
-  `make asterinas-preflight`.
+- Next: finish A0's maintained paired runner, negative result checks, and native
+  suite accounting. Fresh public-source reproduction and performance remain open.
 - Launch prompt: `Execute docs/CAMPAIGN-ASTERINAS-COMPATIBILITY.md within its local execution boundary; do not push.`
 
 ## Charter
