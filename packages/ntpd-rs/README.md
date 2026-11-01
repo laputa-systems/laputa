@@ -12,7 +12,9 @@ The launcher reads `/etc/ntpd-rs/ntp.toml` when present and otherwise uses
 `/usr/share/ntpd-rs/ntp.toml`. The packaged configuration uses three NTS
 sources (`time.cloudflare.com`, `nts.netnod.se` and `nts.time.nl`, one operator each,
 NTS-KE on TCP 4460) and requires two agreeing sources, so one operator alone cannot
-steer the clock. An NTS-KE server names its own NTP port; Netnod answers on UDP 4123.
+steer the clock. An NTS-KE server names its own NTP port; Netnod answers on UDP 4123. The maintained
+nftables output chain therefore drops TCP 4460 and UDP 123 for every user except UID 123 but
+does not restrict the daemon's own egress: allowing only 123 would break Netnod.
 It permits an unlimited initial
 forward step, limits the initial backward step to one day, and limits a later
 single step to 1000 seconds; exceeding a configured limit stops the daemon.
