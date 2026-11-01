@@ -2,10 +2,9 @@
 use infra.asterinas.guest_protocol
 use system.qemu
 
-cli main(kernel: Path, initramfs: Path, disk: Path, console: Path, qemu_log: Path, selection: Str, timeout_seconds: Int) [fs, process, env, time, error] {
+cli main(kernel: Path, initramfs: Path, disk: Path, console: Path, qemu_log: Path, selection: Str, timeout_seconds: Int, memory_mib: Int) [fs, process, env, time, error] {
   let target = qemu.host_qemu_target()?
   let config = qemu.qemu_config(target)?
-  let memory_mib = if selection == "" { 1024 } else { 4096 }
   let input = qemu.QemuAsterinasReference(kernel:, initramfs:, disk:, memory_mib:)
   qemu.qemu_run_asterinas_reference(config, input, console, qemu_log, timeout_seconds)
   let output = qemu.qemu_log_text(console, qemu_log)?

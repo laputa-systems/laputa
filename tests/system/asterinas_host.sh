@@ -368,7 +368,7 @@ chmod 755 "$vm_test_root/qemu-cancel"
 QEMU_SYSTEM_X86_64="$vm_test_root/qemu-cancel" QEMU_CANCEL_PID="$vm_test_root/qemu-cancel.pid" \
 XSH_MODULE_PATH="$repo_root" xsh "$repo_root/infra/asterinas/run-linux.xsh" -- \
     "$vm_test_root/kernel" "$vm_test_root/initramfs" "$vm_test_root/root" \
-    "$vm_test_root/qemu-cancel-console" "$vm_test_root/qemu-cancel-log" '' 60 \
+    "$vm_test_root/qemu-cancel-console" "$vm_test_root/qemu-cancel-log" '' 60 1024 \
     > "$vm_test_root/qemu-cancel-run.log" 2>&1 &
 runner_pid=$!
 for _ in {1..100}; do
@@ -459,6 +459,14 @@ fi
 : > "$scratch/native-empty.txt"
 if bash "$repo_root/infra/asterinas/native-batches.sh" asterinas "$scratch/native-empty.txt" 5 60 "$scratch/native-result" > /dev/null 2>&1; then
     printf 'native batches accepted an empty module list\n' >&2
+    exit 1
+fi
+if bash "$repo_root/infra/asterinas/run-witness.sh" unknown "$repo_root/infra/asterinas/inputs.lock" "$scratch/witness" > /dev/null 2>&1; then
+    printf 'witness runner accepted an unknown backend\n' >&2
+    exit 1
+fi
+if bash "$repo_root/infra/asterinas/run-witness.sh" asterinas "$repo_root/infra/asterinas/run-witness.sh" "$scratch/witness" > /dev/null 2>&1; then
+    printf 'witness runner accepted a source outside the regression tree\n' >&2
     exit 1
 fi
 printf 'Asterinas host checks passed.\n'

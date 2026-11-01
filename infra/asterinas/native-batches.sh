@@ -21,10 +21,15 @@ mkdir -p "$TMPDIR" "$result_dir"
 result_dir="$(realpath "$result_dir")"
 [[ ! -e "$result_dir/batches.tsv" ]] || { printf 'native-batches: result directory already holds a run: %s\n' "$result_dir" >&2; exit 2; }
 bundle="$(realpath "$output/current")"
+jaq -e '.guest_tests.xsh_corpus != null' "$bundle/manifest.json" > /dev/null || {
+    printf 'native-batches: the current bundle has no XSH test corpus; run XSH_TEST=MODULE make asterinas-build first\n' >&2
+    exit 1
+}
 dev_image="$(docker image inspect --format '{{.Id}}' "asterinas/dev:$(cat "$repo_root/asterinas/DOCKER_IMAGE_VERSION")")"
 runtime_root="$result_dir/root.ext2"
 if [[ "$backend" == asterinas ]]; then
     runtime_root="$(jaq -r '.drives[0].path_on_host' "$bundle/firecracker.json")"
+    mkdir -p "$(dirname "$runtime_root")"
 else
     bash "$repo_root/infra/asterinas/linux-reference.sh" \
         "${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}" "$result_dir/linux-reference"
@@ -47,7 +52,7 @@ while (( ${#pending[@]} > 0 )); do
     console="$result_dir/$batch.console.log"
     cp "$bundle/laputa-root.ext2" "$runtime_root"
     chmod u+w "$runtime_root"
-    bash "$repo_root/infra/asterinas/inject-xsh-test-selection.sh" "$runtime_root" "$result_dir/$batch.modules" "$dev_image" > /dev/null
+    bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$runtime_root" "$result_dir/$batch.modules" usr/lib/asterinas/xsh-test.selection "$dev_image" > /dev/null
     started_at=$(date +%s)
     status=0
     if [[ "$backend" == asterinas ]]; then
@@ -58,7 +63,7 @@ while (( ${#pending[@]} > 0 )); do
     else
         XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
             "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz" \
-            "$runtime_root" "$console" "$console.qemu" "$selection" 3000 > "$console.command" 2>&1 || status=$?
+            "$runtime_root" "$console" "$console.qemu" "$selection" 3000 4096 > "$console.command" 2>&1 || status=$?
     fi
     printf '%s\t%s\t%s\t%s\n' "$batch" "$take" "$status" "$(( $(date +%s) - started_at ))" >> "$result_dir/batches.tsv"
     sed 's/\x1b\[[0-9;]*m//g' "$console" | tr -d '\r' > "$console.plain"

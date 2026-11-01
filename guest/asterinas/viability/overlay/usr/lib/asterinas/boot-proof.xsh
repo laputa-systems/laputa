@@ -179,6 +179,16 @@ proc main() [fs, process, env, time, net, error] {
     "the ext2 root did not preserve an XSH write",
   )
 
+  let witness_path = p"/usr/lib/asterinas/witness"
+
+  if witness_path.exists() {
+    let witness_name = p"/usr/lib/asterinas/witness.name".read_text()?.trim()
+    eprint --flush f"LAPUTA_ASTERINAS_WITNESS_START {witness_name}"
+    let witness_status = run.status /usr/lib/asterinas/witness
+    require(witness_status.exited_with(0), "witness", f"kernel witness {witness_name} failed")
+    eprint --flush "LAPUTA_ASTERINAS_WITNESS_OK"
+  }
+
   let test_selection_path = p"/usr/lib/asterinas/xsh-test.selection"
 
   if test_selection_path.exists() {

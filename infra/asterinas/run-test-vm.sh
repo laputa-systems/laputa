@@ -73,7 +73,7 @@ for ((attempt = 0; attempt < max_polls; attempt++)); do
     if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
         fail 'guest reported a failed Laputa proof'
     fi
-    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|failed to run the init process' "$console_log"; then
+    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|failed to run the init process|Heap allocation error' "$console_log"; then
         fail 'Asterinas reported a kernel or init failure'
     fi
     if grep -Fq LAPUTA_ASTERINAS_TEST_OK "$console_log"; then

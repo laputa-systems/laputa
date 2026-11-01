@@ -66,6 +66,14 @@ every selection has run. The host requires the guest success marker. To test a d
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
 
+To run a kernel regression witness against the built bundle and against the
+Linux reference with the same memory, run
+`bash infra/asterinas/run-witness.sh asterinas|linux SOURCE.c DIR` on a C file
+under `asterinas/test/initramfs/src/regression`. The runner compiles it
+statically in the pinned development image, places it in the disposable root
+copy, and requires the guest's witness start and finish markers. A kernel panic,
+heap allocation error, or nonzero witness exit fails the run.
+
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
 (or `linux`) on a list of test modules, then

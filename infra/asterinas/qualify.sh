@@ -46,8 +46,8 @@ for case_name in "${cases[@]}"; do
         chmod u+w "$work/linux-root.ext2"
         cmp "$bundle/laputa-root.ext2" "$work/linux-root.ext2"
         if [[ -n "$selection" ]]; then
-            bash "$repo_root/infra/asterinas/inject-xsh-test-selection.sh" \
-                "$work/linux-root.ext2" "$output/xsh-test.selection" \
+            bash "$repo_root/infra/asterinas/inject-guest-file.sh" \
+                "$work/linux-root.ext2" "$output/xsh-test.selection" usr/lib/asterinas/xsh-test.selection \
                 "$(docker image inspect --format '{{.Id}}' "asterinas/dev:$(cat "$repo_root/asterinas/DOCKER_IMAGE_VERSION")")"
         fi
         timeout_seconds=60
@@ -55,7 +55,7 @@ for case_name in "${cases[@]}"; do
         XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
             "$work/linux-kernel" "$work/linux-initramfs.cpio.gz" "$work/linux-root.ext2" \
             "$output/qualification-linux-$case_name.log" "$output/qualification-linux-$case_name-qemu.log" \
-            "$selection" "$timeout_seconds"
+            "$selection" "$timeout_seconds" "$([[ -z "$selection" ]] && echo 1024 || echo 4096)"
         if [[ -n "$selection" && "$backend" == both ]]; then
             rg '^tests/xsh/stdlib/numeric\.xsh::' "$output/qualification-linux-$case_name.log" | sed 's/ \.\.\. .*//' > "$work/linux-ids"
             cmp "$work/asterinas-ids" "$work/linux-ids" || { printf 'qualification: selected test identities differ\n' >&2; exit 1; }

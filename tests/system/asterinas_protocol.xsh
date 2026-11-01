@@ -16,6 +16,13 @@ test test_guest_protocol_requires_the_selected_xsh_test_marker {
   assert guest_protocol.guest_missing_success_markers(selected_output) == []
 }
 
+test test_guest_protocol_requires_a_started_witness_to_finish {
+  let base_output = guest_protocol.guest_success_markers.join("\n")
+  let started = f"{base_output}\nLAPUTA_ASTERINAS_WITNESS_START stack_fragmentation"
+  assert guest_protocol.guest_missing_success_markers(started) == ["LAPUTA_ASTERINAS_WITNESS_OK"]
+  assert guest_protocol.guest_missing_success_markers(f"{started}\nLAPUTA_ASTERINAS_WITNESS_OK") == []
+}
+
 test test_guest_protocol_reports_each_missing_marker_in_protocol_order {
   var output = ""
   for marker in guest_protocol.guest_success_markers {

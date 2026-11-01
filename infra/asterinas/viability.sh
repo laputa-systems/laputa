@@ -287,8 +287,8 @@ chmod u+w "$runtime_root"
 [[ "$(sha256sum "$runtime_root" | awk '{print $1}')" == "$(sha256sum "$bundle_dir/laputa-root.ext2" | awk '{print $1}')" ]] || \
     fail 'writable Firecracker root copy does not match the verified bundle image'
 if [[ -n "$xsh_test_selection" ]]; then
-    bash "$repo_root/infra/asterinas/inject-xsh-test-selection.sh" \
-        "$runtime_root" "$output_dir/xsh-test.selection" "$dev_image_id" || \
+    bash "$repo_root/infra/asterinas/inject-guest-file.sh" \
+        "$runtime_root" "$output_dir/xsh-test.selection" usr/lib/asterinas/xsh-test.selection "$dev_image_id" || \
         fail 'could not place the XSH test selection in the writable root copy'
 fi
 

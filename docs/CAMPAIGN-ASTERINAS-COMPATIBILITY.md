@@ -4,8 +4,8 @@
 
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
-- State: A0 accepted as a baseline. No compatibility slice is accepted. The next
-  slice is the guest `NoMemory` panic, then A1.
+- State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
+  the next slice is A1. No compatibility item (A1 to A6) is accepted.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -59,7 +59,23 @@
   `cpio`/`date` differences are listed below. The cause of the awk hangs is not
   established, and the `NoMemory` panics are a separate, unexplained kernel
   memory exhaustion that bounds guest lifetime.
-- Red boundary: the pinned kernel is three local commits beyond the advertised
+- Guest `NoMemory`: a fresh-guest batch panicked as `spawn task failed: NoMemory`
+  or a ring-buffer `NoMemory` unwrap with gigabytes reported free. An
+  instrumented run showed 703 MB free while this CPU's local pool and the global
+  pool held 9 MB; the rest sat in the other CPU's local pool. Fixing that exposed
+  three more defects in turn: a frame-cache refill that demanded eight
+  contiguous frames, a pool balancer that recursed exponentially once only small
+  chunks remained, and a 128-frame contiguous kernel stack. The kernel commit
+  fixes all four and adds
+  `process/pthread/pthread_create_fragmented_memory`, which fails on the
+  unfixed kernel and passes on the fixed kernel and on Linux
+  (`bash infra/asterinas/run-witness.sh asterinas|linux SOURCE.c DIR`). Pipe
+  ring buffers and large kernel heap allocations still need contiguous frames
+  and fail the same way under extreme fragmentation; that is open. The
+  batch-level panics were not reproduced on demand (a rerun of the first batch
+  passed), so the whole-corpus effect is unmeasured until the fan-out is rerun.
+  The awk hangs are not shown to share this cause.
+- Red boundary: the pinned kernel is four local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
   runs panic-bounded batches on either backend, and `account-native.sh` counts
