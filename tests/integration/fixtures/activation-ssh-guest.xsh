@@ -10,6 +10,11 @@ proc main(operation: Str, root: Path) [fs, process, time, error] {
   guard root == p"/home/probe/ssh-proof" and "LAPUTA_ACTIVATION_SSH_FIXTURE=1" in p"/proc/cmdline".read_text()?.trim().split(" ") else { fail "activation drill requires its disposable guest" }
   let state = fp"{root}/activation"
   if operation == "prepare" {
+    guard !state.exists()? else { fail "activation drill requires fresh state" }
+    for name in ["trace", "committed", "release"] {
+      let marker = fp"{root}/{name}"
+      if marker.exists()? { marker.remove()? }
+    }
     state.mkdir()?
     let kernel = fp"{state}/kernel"
     let disk = fp"{state}/disk"
