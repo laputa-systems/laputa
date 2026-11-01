@@ -17,6 +17,10 @@ build inputs. `asterinas-build` builds or reuses the Asterinas PVH kernel and
 the Laputa generation, then publishes a content-addressed bundle. Changes in
 the sibling XSH working tree do not affect this pinned build.
 
+The Asterinas Cargo configuration uses the mycrates archive and native
+registry. Its cached dependency set is bound to that configuration as well as
+the kernel and toolchain lockfiles.
+
 The kernel, verified bundles, runtime disk copies, Firecracker configuration,
 and logs live under `.out/asterinas-firecracker/`; fetched Asterinas and XSH
 repositories under `.cache/asterinas/`. `asterinas-clean` runs `make distclean`
