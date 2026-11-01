@@ -112,6 +112,7 @@ def boot(repository, expect, serial):
     extra = (f" LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL={serial} XSH_MODULE_PATH=/usr/lib/pm"
              f" LAPUTA_REPO_DRILL={expect} LAPUTA_REPO_URL={qemu_port_url}")
     console = outputs / f"repo-installed-{serial}.log"
+    console.unlink(missing_ok=True)
     child, err = guest.launch(argv, console, outputs / f"repo-installed-{serial}.qemu.log", extra)
     try:
         deadline = time.time() + 300
