@@ -490,8 +490,25 @@ Linux x86_64/KVM `tests/system/repo_snapshot_guest.xsh` exercises the real
 HTTP fetch boundary, rejects index tampering, and retains generation 2 across
 reboot before rejecting generation 1 from the same URL. This tests the fetch
 API with provisioned fixture keys and time, not a production publisher or guest
-CLI installation. Production key distribution remains manual; there is no
-package-seeded repository key or threshold/multi-signer authorization.
+CLI installation.
+
+`tests/integration/repo_snapshot_installed.py` runs the same fetch inside the
+installed maintained image (the image's own `laputa-pm`, `guest/qemu-maintained-repo.xsh`
+selected by the `LAPUTA_REPO_DRILL` kernel token). A real `laputa-mirror` serves
+the repository on the host. The key set comes from a first-boot `repo-key` line
+and the accepted state lives on the maintained state disk, so five boots cover:
+accept generation 1, accept it again while a newer unsigned `index.json` is
+already published, accept generation 2, reject a tampered `indexes/<sha256>.json`,
+and reject a validly signed generation-1 pair after a reboot. Each outcome is
+checked against the persisted accepted generation. It does not exercise a
+`pm repo plan` invocation in the guest (the image carries no package catalog),
+rotation in the guest, or real time sources.
+
+The trust root is the first-boot-provisioned key set (at most four keys; rotation
+and revocation by re-application). A package-seeded repository key and
+TUF-style delegation or threshold signing are deliberately deferred. Reopen when
+more than one independent signer must authorize a snapshot, or when installs
+must proceed unattended without a first-boot document.
 
 ## Root composition
 

@@ -12,7 +12,8 @@ tailscale no
 identity new
 """
 
-proc main(root: Str) {
-  first_boot.apply(Path(root), document)
+proc main(root: Str, repo_key: Str = "") {
+  let provisioned = if repo_key == "" { document } else { document + f"\nrepo-key {repo_key}\n" }
+  first_boot.apply(Path(root), provisioned)
   print "applied"
 }

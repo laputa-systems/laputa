@@ -413,9 +413,10 @@ or describe production clients as simply trusting an unsigned index.
 Finish operational integration: provision the verification-key set through a
 trusted image/first-boot channel, retain accepted generation/time state across
 reboots, exercise rotation/revocation, and qualify the production fetch path
-inside the installed guest. The fetch API now has a real Linux x86_64/KVM
-HTTP/reboot proof with fixture keys; production image provisioning and guest CLI
-integration remain separate. Keep parser/size limits, expiry, rollback/freeze
+inside the installed guest. The fetch has a real Linux x86_64/KVM HTTP/reboot
+proof with fixture keys, and the installed maintained image fetches, rejects
+tampering and rejects rollback across reboots with first-boot-provisioned keys
+(`tests/integration/repo_snapshot_installed.py`). Keep parser/size limits, expiry, rollback/freeze
 handling, and publication consistency explicit. Existing metadata is not a claim
 of full TUF role/threshold support; evaluate any extension against established
 update-metadata designs rather than adding ad-hoc cryptography.

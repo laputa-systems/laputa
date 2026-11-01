@@ -47,7 +47,7 @@ INVALID_RULESET = "table inet laputa {\n  chain input {\n    this is not nftable
 FIREWALL_OK = "LAPUTA_FIREWALL_FAILURE_PROOF_OK"
 
 
-def ensure_state_image(ruleset="packaged"):
+def ensure_state_image(ruleset="packaged", apply_args=()):
     if state_image.exists():
         return
     staging = outputs / "state-staging"
@@ -89,7 +89,7 @@ def ensure_state_image(ruleset="packaged"):
     (staging / "var/lib/laputa").mkdir(parents=True, exist_ok=True)
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
-    run_xsh(str(apply_fixture), "--", str(staging))
+    run_xsh(str(apply_fixture), "--", str(staging), *apply_args)
     subprocess.run(
         ["/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
         check=True,
@@ -305,11 +305,12 @@ def firewall_mode():
                     pass
 
 
-if "--proof" in sys.argv:
-    proof_mode()
-elif "--fallback" in sys.argv:
-    fallback_mode()
-elif "--firewall" in sys.argv:
-    firewall_mode()
-else:
-    raise SystemExit("usage: maintained_guest.py --proof | --fallback | --firewall")
+if __name__ == "__main__":
+    if "--proof" in sys.argv:
+        proof_mode()
+    elif "--fallback" in sys.argv:
+        fallback_mode()
+    elif "--firewall" in sys.argv:
+        firewall_mode()
+    else:
+        raise SystemExit("usage: maintained_guest.py --proof | --fallback | --firewall")

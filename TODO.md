@@ -156,16 +156,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-43 · P0 · Authenticate the package repository index
-
-- **Area:** Repository trust
-- **Where:** `pm/remote.xsh`, `docs/ROADMAP.md` (R4)
-- **Problem:** Artifact hashes and mirror publisher authentication do not authenticate the mutable `index.json` to a client. The trust-release path signs trust inputs; repository metadata has no equivalent versioned, signed snapshot boundary.
-- **Recommendation:** Add a versioned, signed release/snapshot boundary binding the exact index and referenced artifacts, with key provisioning, rotation/revocation, expiry, rollback/freeze handling, parser/size limits, and atomic publication. Compare an established update-metadata design before inventing a cryptographic protocol.
-- **Progress:** Production planning requires `XSH_PM_REPO_KEY_FILE`; every signed fetch also requires durable `XSH_PM_REPO_STATE_DIR`. Signatures bind exact index bytes and referenced artifact digests. Accepted generation and clock floors are rechecked under an OS writer lock before packages are returned; planning holds its cache identity stable. Identical publication retries repair an interrupted signature write. All 30 snapshot cases and 80 surrounding publication/plan/CLI/graph cases pass. A real x86_64/KVM guest fetches over HTTP, rejects tampering, reboots with persistent state and rejects an older signed generation at the same URL. The laputa mirror previously answered 404 for `snapshot.json` and `snapshot.sig`, so signed publication and fetch worked only over `file://` and a test server; it now stores and serves both verbatim without redirecting them to an object cache, and a real loopback mirror passes `repo publish-snapshot` plus a verified fetch (four mirror API cases). Signed clients now read the index only through an immutable digest-named copy (`indexes/<sha256>.json`, published with the snapshot), so a newer `index.json` no longer breaks them until its snapshot is signed; the mirror enforces the digest name; the guest HTTP proof still passes. First-boot documents now provision the verification set (up to four `repo-key` lines to `/etc/laputa/repo-snapshot-keys`, mode 0444); tests rotate and revoke through re-application and check the installed file against the verifier. Rotation still requires an operator to re-apply; the signing key ceremony remains manual; there is no package-seeded repository key, TUF role delegation or threshold authorization. Parked: a package-seeded repository key and TUF-style role delegation or threshold signing need an owner key-ceremony decision, not code; qualifying the new `indexes/` fetch from the installed maintained guest needs a rebuilt `laputa-pm` in the maintained image (its current image predates the protocol); retry after the next maintained image build. See [PM snapshot authentication](docs/PM.md#snapshot-authentication).
-- **Fix with:** architect
-- **Effort:** L (weeks)
-
 ### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
 
 - **Area:** Time discipline
