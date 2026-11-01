@@ -205,7 +205,10 @@ bound lease, a managed resolver, and a boot-marker log count of two; a
 fallback drill (two power cuts on a pending generation, then boot) proves the
 logs name the failed generation with its service history and no secrets,
 with a marker count of three and the activation record resting on the
-fallback with pending cleared.
+fallback with pending cleared. `maintained_guest.py --firewall` boots fresh
+state disks whose `/etc/nftables.conf` is absent or not valid nftables syntax:
+the firewall oneshot must fail without becoming `running`, Dropbear must have no
+process and no ready listener, and the guest must not reach the identity proof.
 
 The DHCP client itself is requalified with the existing
 `xinit/tests/fixtures/dhcp_vm_host.xsh` fixture against the fixed XSH

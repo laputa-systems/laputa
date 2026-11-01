@@ -43,7 +43,11 @@ def drill(op, *args):
     return run_xsh(str(fixture), "--", op, *[str(a) for a in args])
 
 
-def ensure_state_image():
+INVALID_RULESET = "table inet laputa {\n  chain input {\n    this is not nftables syntax\n  }\n}\n"
+FIREWALL_OK = "LAPUTA_FIREWALL_FAILURE_PROOF_OK"
+
+
+def ensure_state_image(ruleset="packaged"):
     if state_image.exists():
         return
     staging = outputs / "state-staging"
@@ -68,7 +72,12 @@ def ensure_state_image():
         elif entry.is_dir():
             subprocess.run(["cp", "-a", str(entry), str(staging / "etc")], check=True)
     subprocess.run(["cp", str(root / "profiles/qemu-maintained/etc/inittab"), str(staging / "etc/inittab")], check=True)
-    subprocess.run(["cp", str(root / "packages/nftables/nftables.conf"), str(staging / "etc/nftables.conf")], check=True)
+    if ruleset == "packaged":
+        subprocess.run(["cp", str(root / "packages/nftables/nftables.conf"), str(staging / "etc/nftables.conf")], check=True)
+    elif ruleset == "invalid":
+        (staging / "etc/nftables.conf").write_text(INVALID_RULESET)
+    else:
+        assert ruleset == "missing", ruleset
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     subprocess.run(["cp", str(root / "packages/laputa-net/interfaces"), str(staging / "etc/network/interfaces")], check=True)
     # Provisioning also creates the service-owned state subdirectories the
@@ -270,9 +279,37 @@ def fallback_mode():
     print(f"PASS fallback: activation record rests on a with pending cleared: {final}")
 
 
+def firewall_mode():
+    for ruleset in ("missing", "invalid"):
+        for path in (state_image, outputs / "generations"):
+            subprocess.run(["rm", "-rf", str(path)], check=True)
+        ensure_state_image(ruleset)
+        console = outputs / f"maintained-firewall-{ruleset}.log"
+        argv = boot_argv(False)
+        guest, err = launch(argv, console, outputs / f"maintained-firewall-{ruleset}.qemu.log", " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1 LAPUTA_FIREWALL_FAILURE_PROOF=1")
+        try:
+            wait_for(console, FIREWALL_OK, 420)
+            fail_if_bad(console)
+            text = console.read_text(errors="replace")
+            assert OK not in text and READY not in text, "a guest without a loadable ruleset reached the identity proof"
+            guest.send_signal(signal.SIGKILL)
+            wait_exit(guest, 60)
+            print(f"PASS firewall: {ruleset} ruleset left the firewall failed and dropbear down")
+        finally:
+            err.close()
+            if guest.poll() is None:
+                guest.terminate()
+                try:
+                    wait_exit(guest, 60)
+                except RuntimeError:
+                    pass
+
+
 if "--proof" in sys.argv:
     proof_mode()
 elif "--fallback" in sys.argv:
     fallback_mode()
+elif "--firewall" in sys.argv:
+    firewall_mode()
 else:
-    raise SystemExit("usage: maintained_guest.py --proof | --fallback")
+    raise SystemExit("usage: maintained_guest.py --proof | --fallback | --firewall")
