@@ -2,12 +2,19 @@
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
-mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|frequency|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [CHRONYD CHRONYC]}
+mode=${1:?usage: ntp-clock-guest.sh behind|ahead|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead HOST_XSH SEED ARTIFACTS IMAGE [ENDPOINT | CHRONYD CHRONYC]}
 xsh=$(realpath "${2:?host xsh}")
 seed=$(realpath "${3:?seed directory}")
 artifacts=$(realpath "${4:?artifact store}")
 image=${5:?package-tools image}
-case "$mode" in behind|ahead|jump|pause|nts|frequency|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
+case "$mode" in behind|ahead|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead) ;; *) exit 2 ;; esac
+if test "$mode" = external-nts; then
+  endpoint=${6:?external NTS hostname or hostname:port}
+  if [[ ! "$endpoint" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*(:[0-9]{1,5})?$ ]]; then
+    printf 'invalid NTS endpoint: expected a hostname or hostname:port\n' >&2
+    exit 2
+  fi
+fi
 git -C "$repo" check-ignore -q .work/
 mkdir -p "$repo/.work/tmp"
 work=$(mktemp -d "$repo/.work/tmp/ntp-guest.XXXXXXXX")
@@ -38,6 +45,10 @@ TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
   -C linker=mold -C linker-flavor=ld \
   "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
 cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
+if test "$mode" = external-nts; then
+  printf '%s\n' "$endpoint" > "$input/inputs/nts-endpoint"
+  cp "$snapshot/tests/integration/fixtures/ntp-external-nts-guest.xsh" "$input/inputs/entry.xsh"
+fi
 if test "$mode" = frequency; then
   cc -dumpmachine | rg -q 'musl$'
   cc -static -fuse-ld=mold "$snapshot/tests/integration/fixtures/ntp-frequency-check.c" -o "$input/inputs/ntp-frequency-check"
@@ -66,9 +77,9 @@ truncate -s 64M "$output/output.ext4"
 /sbin/mkfs.ext4 -q -F -d "$input" "$output/inputs.ext4"
 /sbin/mkfs.ext4 -q -F "$output/output.ext4"
 XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
-  "$snapshot" "$output" "$repo/.work/ntp-$$.sock"
+  "$snapshot" "$output" "$repo/.work/ntp-$$.sock" "$mode"
 if test "$mode" = frequency; then
   cp "$output/console.log" "$output/frequency-first-boot.log"
   XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
-    "$snapshot" "$output" "$repo/.work/ntp-$$.sock"
+    "$snapshot" "$output" "$repo/.work/ntp-$$.sock" "$mode"
 fi

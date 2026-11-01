@@ -3,7 +3,7 @@ use system.profile
 use system.qemu
 use system.types
 
-proc main(repository: Path, output: Path, socket: Path) [fs, process, net, env, time, error] {
+proc main(repository: Path, output: Path, socket: Path, mode: Str) [fs, process, net, env, time, error] {
   assert output.normalize().starts_with(fp"{repository}/.work".normalize())
   assert "/.work/" in socket.normalize().display()
   let intent = profile.load_system_profile("qemu-self-hosting", fp"{repository}/profiles")?
@@ -17,11 +17,14 @@ proc main(repository: Path, output: Path, socket: Path) [fs, process, net, env, 
   var argv = qemu.qemu_command_argv(config, intent, paths, types.Test)
   for index in range(argv.len()) {
     if argv[index] == "-append" { argv[index + 1] += " LAPUTA_SELF_HOSTING=1" }
-    if argv[index] == "-netdev" { argv[index + 1] = "user,id=net0,restrict=on" }
+    if argv[index] == "-netdev" {
+      argv[index + 1] = if mode == "external-nts" { "user,id=net0" } else { "user,id=net0,restrict=on" }
+    }
   }
   argv += qemu.qemu_self_hosting_disks_argv(config.target, fp"{output}/inputs.ext4", fp"{output}/output.ext4")
   let child = spawn process.command_argv(config.qemu, argv, output, env: {TMPDIR: output.display()}, stdout: paths.console_log, stderr: paths.qemu_log)?
   defer child.cancel(signal: "TERM", kill_after: 5s)
+  let deadline_seconds = if mode == "external-nts" { 360 } else { 180 }
   let start = time.monotonic()?
   var paused = false
   while true {
@@ -40,7 +43,7 @@ proc main(repository: Path, output: Path, socket: Path) [fs, process, net, env, 
       print "in-guest NTP proof completed"
       return
     }
-    fail f"guest deadline exceeded; inspect {paths.console_log}" when time.monotonic()? - start >= 180 * 1000 * 1000 * 1000
+    fail f"guest deadline exceeded; inspect {paths.console_log}" when time.monotonic()? - start >= deadline_seconds * 1000 * 1000 * 1000
   }
 }
 

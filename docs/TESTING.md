@@ -142,6 +142,21 @@ runner passed both boots on x86_64/KVM on 2026-11-01. Supply an artifact closure
 that includes the current ntpd-rs package; the runner does not copy the host
 source cache into its exported checkout.
 
+To qualify a separately operated NTS server, use a hostname whose certificate
+chains to the guest system trust store. The guest needs a plausible initial clock
+for certificate validation and outbound DNS, TCP NTS-KE and UDP NTP access.
+The external mode uses QEMU user networking and leaves the host clock untouched.
+It requires synchronization with an NTS source, restarts the supervised daemon,
+and requires NTS synchronization again. It does not compare clock accuracy to
+an independent oracle. The endpoint receives real NTS and NTP requests.
+
+```bash
+bash tests/integration/ntp-clock-guest.sh external-nts /absolute/path/to/xsh /absolute/path/to/seed /absolute/path/to/artifacts PACKAGE_TOOLS_IMAGE nts.example.org
+```
+
+The endpoint may include a port as `hostname:port`. The default controlled NTS
+case remains network-restricted and uses its test CA.
+
 For the optional chrony comparison, build the official chrony 4.9 source in
 scratch using GCC targeting Linux musl, mold, and GNU make. The command below
 uses the Alpine musl GCC toolchain and disables features outside the controlled
