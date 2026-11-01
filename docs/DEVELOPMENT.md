@@ -61,7 +61,13 @@ Containers run the local XSH seed, never a published release. `make fetch`
 does the networked part once: every pinned source (the LLVM seed included)
 into `.cache/sources/sha256/`, XSH's crates into `.cache/cargo/`, XSH's
 `xsh-test` image, and the `laputa-host-tools` base (pinned Alpine plus apk
-packages), saved to `.cache/images/`. Then, offline:
+packages), saved to `.cache/images/`.
+
+Cargo uses the mycrates archive for crates.io packages and the native mycrates
+registry for selected dependencies. Publish newly locked upstream versions to
+the archive before fetching an updated lockfile.
+
+Then, offline:
 
 ```bash
 make seed        # static musl xsh/xshi/xsht + core.tar.xz under .out/seed/<arch>/, then the image

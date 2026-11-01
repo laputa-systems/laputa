@@ -397,6 +397,10 @@ pure crate_set_package(lock_url: Str, lock_sha256: Str) -> types.Package {
   }
 }
 
+test test_mirror_registry_config_matches_repository [fs, error] {
+  assert p"mirror/.cargo/config.toml".read_text()? == p".cargo/config.toml".read_text()?
+}
+
 test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
   let crates = [
     {

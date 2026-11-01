@@ -322,7 +322,8 @@ dependencies = [
 [[package]]
 name = "h12tiny-client-normalize"
 version = "0.6.0"
-source = "git+https://github.com/laputa-systems/h12tiny?rev=421940c7b96a97884a450a6f5050ad040d978889#421940c7b96a97884a450a6f5050ad040d978889"
+source = "sparse+https://crates.17166969.xyz/current/registry/"
+checksum = "8d20166a88fa4b6b4f301c9faae5790b4cc7d8e4cabfbd22d7cdb4935c4048ba"
 dependencies = [
  "http",
 ]
@@ -330,7 +331,8 @@ dependencies = [
 [[package]]
 name = "h12tiny-client-sync"
 version = "0.6.0"
-source = "git+https://github.com/laputa-systems/h12tiny?rev=421940c7b96a97884a450a6f5050ad040d978889#421940c7b96a97884a450a6f5050ad040d978889"
+source = "sparse+https://crates.17166969.xyz/current/registry/"
+checksum = "05c53fc176ee890496de24df8c20c4f040afc9a5a151df52d290946cb6854d57"
 dependencies = [
  "h12tiny-client-normalize",
  "h12tiny-tls-system",
@@ -343,7 +345,8 @@ dependencies = [
 [[package]]
 name = "h12tiny-tls-system"
 version = "0.6.0"
-source = "git+https://github.com/laputa-systems/h12tiny?rev=421940c7b96a97884a450a6f5050ad040d978889#421940c7b96a97884a450a6f5050ad040d978889"
+source = "sparse+https://crates.17166969.xyz/current/registry/"
+checksum = "e83f47eaf57b4c7f29a0fc6c9feb7039693fd01fbc6693f196102e7217995d91"
 dependencies = [
  "base64 0.22.1",
  "openssl-probe",
@@ -799,9 +802,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.45"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "once_cell",
  "rustls-pki-types",

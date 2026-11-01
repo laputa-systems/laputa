@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM alpine:3.24.1 AS builder
 
-# git resolves the pinned h12tiny revision; ca-certificates lets cargo and
-# rustup verify TLS when fetching registries and toolchains.
-RUN apk add --no-cache musl-dev libgcc git ca-certificates
+RUN apk add --no-cache musl-dev libgcc ca-certificates
 
 ADD https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz /tmp/llvm.tar.xz
 RUN mkdir -p /opt/llvm-musl \
