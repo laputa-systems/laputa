@@ -137,7 +137,10 @@ the same state disk, verifies that the kernel starts without the saved
 correction, and checks restoration while unsynchronized before reselecting the
 source. The frequency case also needs Linux musl GCC and mold for its read-only
 kernel frequency probe. This checks a cold boot, not physical power-loss
-durability or hardware-specific oscillator stability.
+durability or hardware-specific oscillator stability. The complete frequency
+runner passed both boots on x86_64/KVM on 2026-11-01. Supply an artifact closure
+that includes the current ntpd-rs package; the runner does not copy the host
+source cache into its exported checkout.
 
 For the optional chrony comparison, build the official chrony 4.9 source in
 scratch using GCC targeting Linux musl, mold, and GNU make. The command below

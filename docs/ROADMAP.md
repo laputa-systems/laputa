@@ -326,7 +326,8 @@ The package now persists a bounded steady frequency correction and uncertainty,
 excluding phase slew. A controlled 100 ppm source proves learning and restoration
 across daemon restart and a fresh kernel boot on the same state disk. Restoration
 is checked against the kernel frequency before any peer is available and while
-stratum remains 16. The final artifact also passes the authenticated NTS control.
+stratum remains 16. The retained frequency shell runner passes both boots end to end on x86_64/KVM.
+The final artifact also passes the authenticated NTS control.
 The private state directory must belong to UID/GID 123 with mode 0700; invalid
 state or a conflicting writer stops the daemon. This is oscillator calibration,
 not a UTC floor or a power-loss durability proof.
