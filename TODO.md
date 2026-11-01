@@ -49,15 +49,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Fix with:** isolate-effects
 - **Effort:** M (days)
 
-### LAP-15 · P3 · Ship USB IDs used by libudev-zero
-- **Area:** Dependencies
-- **Where:** `packages/libudev-zero/PKGBUILD.xsh:76`, `packages/hwdata/PKGBUILD.xsh:39`
-- **Problem:** libudev-zero looks for `/usr/share/hwdata/usb.ids`, but hwdata installs PCI and PNP databases only. USB vendor and product names remain unset.
-- **Recommendation:** Package the USB database and declare the runtime dependency that supplies it.
-- **Progress:** hwdata installs `usb.ids` and libudev-zero depends on hwdata. Package proofs check vendor/product data in the composed runtime closure; removing the dependency fails the proof. The x86_64 package rebuild passes. This packages identification data without enabling physical hardware.
-- **Fix with:** single-source-of-truth
-- **Effort:** S (hours)
-
 ### LAP-16 · P3 · Exercise sound and wireless device support
 
 - **Deferred:** Wireless and physical-device enablement are out of scope. Any separately selected virtio-audio proof must remain VM-only and must not enable physical drivers or firmware as a side effect. This item is not permission to widen hardware scope.
@@ -133,16 +124,6 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Acceptance:** A controlled misspelling is caught without launching any process; correct recipe invocations check and build unchanged. Version mismatches or unverified subcommands produce advisory diagnostics, never false hard errors. Report the actual maintenance/compile-time cost and drop the pilot if not worth it; CLI flags do not establish process effects.
 - **Blocked:** The supplied fixed xsht has no opt-in external CLI signature checker; fixture research cannot establish the requested static diagnostic.
 - **Coordination:** XSH-46 owns the optional tooling feature and signature trust policy.
-- **Fix with:** reference-parity
-- **Effort:** S (hours)
-
-### LAP-41 · P3 · Prove a trust-update key rotation end to end
-
-- **Area:** Trust recovery
-- **Where:** `trust/`, `packages/ca-certificates/`, `docs/CERTIFICATE-TRUST.md`
-- **Problem:** The key ceremony documents rotation through an OS package update, but no test ships a new key plus new seeds, re-issues a release under it, and verifies the update path accepts the rotation while rejecting the old key's releases.
-- **Recommendation:** Stage a rotated fixture key as a second package input, compose a release under it, and prove `trust update` converges while the superseded key's releases fail closed. Keep the rotation package-only; releases still carry no keys.
-- **Progress:** `trust_update_rotates_keys_package_only` builds the rotated key and generation-4 seeds through `packages/ca-certificates` `build`, installs that payload, and shows `trust update` converge to generation 4 while releases signed by the superseded key fail closed. All 36 trust-update cases pass. The release directory still has no key. Production `proof.xsh` still pins the shipped 118-certificate seed; the rotated seeds are fixture inputs, not a second production proof target.
 - **Fix with:** reference-parity
 - **Effort:** S (hours)
 
