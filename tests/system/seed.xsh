@@ -47,6 +47,25 @@ test test_xshi_asterinas_feature_is_opt_in [error] {
   assert "xshi/laputa-asterinas" in argv.join(" ")
 }
 
+test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "seed-registry-source")?
+  let xsh_root = fp"{root}/xsh"
+  fp"{xsh_root}/core".mkdir()
+  fp"{xsh_root}/.cargo".mkdir()
+  fp"{xsh_root}/Cargo.lock".write("locked dependencies")
+  fp"{xsh_root}/Dockerfile.test".write("image")
+  let config = fp"{xsh_root}/.cargo/config.toml"
+  config.write("first source")
+  let arch = xsh_seed.xsh_seed_arch("x86_64")?
+  xsh_seed.xsh_seed_fetch(/bin/true, root, xsh_root, arch)?
+  config.write("different source")
+
+  match xsh_seed.xsh_seed_build(/bin/true, root, xsh_root, arch, 1, false) {
+    Ok(_) => test.fail("a cache for a different Cargo source was accepted")
+    Err(problem) => assert "cached crate registry" in problem.message
+  }
+}
+
 test test_seed_core_layout_matches_xsh_release_packaging [error] {
   assert xsh_seed.xsh_seed_core_install_path(p"ls.xsh") == p"core/ls"
   assert xsh_seed.xsh_seed_core_install_path(p"system-report.xsh") == p"core/system-report"

@@ -56,6 +56,12 @@ pure xsh_seed_registry_stamp(laputa_root: Path) -> Path {
   fp"{laputa_root}/.cache/cargo/Cargo.lock.sha256"
 }
 
+proc xsh_seed_registry_key(xsh_root: Path) -> Result[Str] {
+  let lock = hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex()
+  let config = hash.sha256(fp"{xsh_root}/.cargo/config.toml")?.hex()
+  f"{lock}:{config}"
+}
+
 ## The Rust flags XSH's Linux test path sets for a static musl target.
 ## These mirror XSH's `dev/targets.xsh::docker_test_env`; the `__isoc23_*`
 ## aliases match the CRT objects in the `xsh-test` image.
@@ -174,7 +180,7 @@ proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] 
 }
 
 proc xsh_seed_require_checkout(xsh_root: Path) {
-  for required in [fp"{xsh_root}/Cargo.lock", fp"{xsh_root}/Dockerfile.test", fp"{xsh_root}/core"] {
+  for required in [fp"{xsh_root}/Cargo.lock", fp"{xsh_root}/.cargo/config.toml", fp"{xsh_root}/Dockerfile.test", fp"{xsh_root}/core"] {
     guard required.exists() else {
       return Err(SeedError.Missing(f"XSH_ROOT is not an XSH checkout: {required} is missing"))
     }
@@ -211,7 +217,7 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
     laputa_root,
     "fetching XSH crates",
   )
-  xsh_seed_registry_stamp(laputa_root).write_atomic(hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex())
+  xsh_seed_registry_stamp(laputa_root).write_atomic(xsh_seed_registry_key(xsh_root)?)
 }
 
 proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
@@ -220,10 +226,10 @@ proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
   }
 
   let stamp = xsh_seed_registry_stamp(laputa_root)
-  let lock = hash.sha256(fp"{xsh_root}/Cargo.lock")?.hex()
+  let lock = xsh_seed_registry_key(xsh_root)?
 
   if ! stamp.exists() or stamp.read_text()?.trim() != lock {
-    return Err(SeedError.Missing(f"the cached crate registry does not match {xsh_root}/Cargo.lock; run `make fetch`"))
+    return Err(SeedError.Missing(f"the cached crate registry does not match {xsh_root}'s Cargo lock and configuration; run `make fetch`"))
   }
 }
 

@@ -65,7 +65,8 @@ packages), saved to `.cache/images/`.
 
 Cargo uses the mycrates archive for crates.io packages and the native mycrates
 registry for selected dependencies. Publish newly locked upstream versions to
-the archive before fetching an updated lockfile.
+the archive before fetching an updated lockfile. The seed cache tracks both
+XSH's lockfile and its Cargo source configuration.
 
 Then, offline:
 

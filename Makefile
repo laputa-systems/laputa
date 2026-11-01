@@ -238,12 +238,12 @@ HOST_CARGO_BUILD = $(HOST_DOCKER_RUN) --network none \
 host-xsh:
 	@case "$(HOST_OS)/$(HOST_ARCH)" in Linux/aarch64|Linux/x86_64|Darwin/aarch64) ;; \
 	    *) echo "make host-xsh: unsupported host $(HOST_OS)/$(HOST_ARCH)" >&2; exit 1 ;; esac
-	@test -f "$(XSH_ROOT_ABS)/Dockerfile.test" -a -f "$(XSH_ROOT_ABS)/Cargo.lock" || \
+	@test -f "$(XSH_ROOT_ABS)/Dockerfile.test" -a -f "$(XSH_ROOT_ABS)/Cargo.lock" -a -f "$(XSH_ROOT_ABS)/.cargo/config.toml" || \
 	    { echo "make host-xsh: XSH_ROOT=$(XSH_ROOT_ABS) is not an XSH checkout" >&2; exit 1; }
 	docker image inspect $(XSH_TEST_IMAGE) >/dev/null 2>&1 || \
 	    docker build --platform $(HOST_DOCKER_PLATFORM) --tag $(XSH_TEST_IMAGE) --file "$(XSH_ROOT_ABS)/Dockerfile.test" "$(XSH_ROOT_ABS)"
 	mkdir -p "$(CARGO_REGISTRY)" "$(CARGO_GIT)" "$(XSH_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
-	@lock="$$($(SHA256) "$(XSH_ROOT_ABS)/Cargo.lock" | cut -d ' ' -f 1)"; \
+	@lock="$$($(SHA256) "$(XSH_ROOT_ABS)/Cargo.lock" | cut -d ' ' -f 1):$$($(SHA256) "$(XSH_ROOT_ABS)/.cargo/config.toml" | cut -d ' ' -f 1)"; \
 	    if [ "$$(cat "$(CARGO_REGISTRY_STAMP)" 2>/dev/null)" != "$$lock" ]; then \
 	        echo "fetching XSH crates for $(XSH_ROOT_ABS)/Cargo.lock"; \
 	        $(HOST_CARGO_FETCH) --mount type=bind,src=$(XSH_ROOT_ABS),dst=/work,readonly \
