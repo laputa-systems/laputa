@@ -225,7 +225,7 @@ The launcher requires a separate, owner-private `{output}/state.ext4` containing
 `etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
 by a newline. Initialize those directories from the selected image (including the
 image's static `/etc` files, the maintained inittab, the packaged nftables
-ruleset, and the loopback-only interfaces file), create the service-owned
+ruleset, the ca-certificates trust store that `ntpd-rs` needs for NTS, and the loopback-only interfaces file), create the service-owned
 `/var/lib/dhcpc` (mode 0700) and `/var/log` staging directories the image never
 contains, apply the first-boot document with `system.first_boot.apply`, and
 format the state tree with `system/maintained_state_image.xsh`. Pass the staged

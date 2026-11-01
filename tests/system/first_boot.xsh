@@ -381,6 +381,10 @@ test test_firewall_fails_closed_without_a_ruleset [fs, error] {
   assert "iif lo accept" in ruleset
   assert "ct state established,related accept" in ruleset
   assert ! ("dport 23" in ruleset)
+  assert "meta skuid 123 tcp dport 4460 accept" in ruleset
+  assert "meta skuid 123 udp dport 123 accept" in ruleset
+  assert "\ttcp dport 4460 drop" in ruleset
+  assert "\tudp dport 123 drop" in ruleset
   assert "etc/nftables.conf" in recipe
 }
 

@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import shutil
 import signal
 import subprocess
 import sys
@@ -47,7 +48,23 @@ INVALID_RULESET = "table inet laputa {\n  chain input {\n    this is not nftable
 FIREWALL_OK = "LAPUTA_FIREWALL_FAILURE_PROOF_OK"
 
 
-def ensure_state_image(ruleset="packaged", apply_args=()):
+def seed_trust_store(staging):
+    files = root / "packages/ca-certificates/files"
+    generation = staging / "var/lib/laputa/trust/generations/1"
+    generation.mkdir(parents=True)
+    shutil.copy(files / "cacert.pem", generation / "ca-certificates.crt")
+    shutil.copy(files / "trust-policy", generation / "trust-policy")
+    (generation / "owner").write_text("package-seed\n")
+    (staging / "var/lib/laputa/trust/accepted").write_text("1\n")
+    (staging / "var/lib/laputa/trust/active").symlink_to("generations/1")
+    (staging / "etc/laputa").mkdir(parents=True, exist_ok=True)
+    (staging / "etc/laputa/trust-policy").symlink_to("../../var/lib/laputa/trust/active/trust-policy")
+    (staging / "etc/ssl/certs").mkdir(parents=True, exist_ok=True)
+    (staging / "etc/ssl/cert.pem").symlink_to("certs/ca-certificates.crt")
+    (staging / "etc/ssl/certs/ca-certificates.crt").symlink_to("../../../var/lib/laputa/trust/active/ca-certificates.crt")
+
+
+def ensure_state_image(ruleset="packaged", apply_args=(), trust_store=False):
     if state_image.exists():
         return
     staging = outputs / "state-staging"
@@ -89,6 +106,8 @@ def ensure_state_image(ruleset="packaged", apply_args=()):
     (staging / "var/lib/laputa").mkdir(parents=True, exist_ok=True)
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
+    if trust_store:
+        seed_trust_store(staging)
     run_xsh(str(apply_fixture), "--", str(staging), *apply_args)
     subprocess.run(
         ["/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],

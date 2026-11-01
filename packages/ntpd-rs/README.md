@@ -9,8 +9,11 @@ mismatched account or group before changing ownership. Existing installations
 must provision it before enabling the service. The daemon needs procfs mounted for the readiness pipe.
 
 The launcher reads `/etc/ntpd-rs/ntp.toml` when present and otherwise uses
-`/usr/share/ntpd-rs/ntp.toml`. The packaged configuration uses four pool
-sources and requires three agreeing sources. It permits an unlimited initial
+`/usr/share/ntpd-rs/ntp.toml`. The packaged configuration uses three NTS
+sources (`time.cloudflare.com`, `nts.netnod.se` and `nts.time.nl`, one operator each,
+NTS-KE on TCP 4460) and requires two agreeing sources, so one operator alone cannot
+steer the clock. An NTS-KE server names its own NTP port; Netnod answers on UDP 4123.
+It permits an unlimited initial
 forward step, limits the initial backward step to one day, and limits a later
 single step to 1000 seconds; exceeding a configured limit stops the daemon.
 Readiness means configuration and observation socket initialization, not clock
@@ -28,7 +31,12 @@ atomically and synced with its directory. Administrators who replace the
 packaged configuration must set `frequency-calibration-path` to retain this
 behavior and provision a private daemon-owned parent directory.
 
-The default pool is unauthenticated NTP and cannot establish authenticated time.
+The packaged sources are authenticated, but the daemon trusts the system roots
+and a clock close enough to validate their certificates. PTB (`ptbtime1.ptb.de`) was
+the third operator the owner chose; its NTS-KE succeeds but its NTP server never
+answered ntpd-rs's NTS polls in a guest (eight missed polls on two hosts) although it
+answers plain NTP, so `nts.time.nl` replaced it. Repeat the maintained clock drill
+before restoring PTB.
 Repository snapshots and trust releases use v2 signed `issued-at` metadata.
 Their durable time floors retain the greatest authenticated publication time,
 never an observed wall clock. Legacy observed-clock state fails closed and
@@ -55,5 +63,6 @@ clock convergence. A test-only chrony 4.9 comparison confirms startup stepping i
 both offset directions and readiness before synchronization; it does not establish
 slew, NTS interoperability or reboot-policy parity.
 See [guest checks](../../docs/TESTING.md#run-the-disposable-ntp-guest).
-External NTS deployment and aarch64
-runtime qualification remain open. No shipped profile enables the service.
+The `qemu-maintained` profile enables the service with the packaged configuration;
+`tests/integration/maintained_ntp.py` qualifies it (see [guest checks](../../docs/TESTING.md#run-the-disposable-ntp-guest)).
+aarch64 runtime qualification remains open.

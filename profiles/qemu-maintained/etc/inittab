@@ -4,5 +4,6 @@ ttyS0::respawn:/usr/bin/xinit scan boot
 ::once:/usr/bin/xsh /usr/lib/laputa/qemu-maintained-proof.xsh
 ::once:/usr/bin/xsh /usr/lib/laputa/qemu-maintained-restore.xsh
 ::once:/usr/bin/xsh /usr/lib/laputa/qemu-maintained-repo.xsh
+::once:/usr/bin/xsh /usr/lib/laputa/qemu-maintained-ntp.xsh
 ::restart:/usr/bin/xinit /etc/inittab
 ::shutdown:/usr/lib/init/rc.shutdown

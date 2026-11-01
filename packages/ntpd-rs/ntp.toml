@@ -6,12 +6,19 @@ observation-path = "/run/ntpd-rs/observe"
 observation-permissions = 0o644
 
 [[source]]
-mode = "pool"
-address = "pool.ntp.org"
-count = 4
+mode = "nts"
+address = "time.cloudflare.com"
+
+[[source]]
+mode = "nts"
+address = "nts.netnod.se"
+
+[[source]]
+mode = "nts"
+address = "nts.time.nl"
 
 [synchronization]
-minimum-agreeing-sources = 3
+minimum-agreeing-sources = 2
 single-step-panic-threshold = 1000
 startup-step-panic-threshold = { forward = "inf", backward = 86400 }
 warn-on-jump = true

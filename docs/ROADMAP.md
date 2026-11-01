@@ -299,7 +299,7 @@ unsupported modes explicitly.
 
 The in-tree `ntpd-rs` has a Graviola/rustcrypto musl package and xinit service.
 It runs as reserved UID/GID 123 with only `CAP_SYS_TIME`; initialization readiness
-does not imply synchronization. No shipped profile enables it. Existing systems
+does not imply synchronization. The `qemu-maintained` profile enables it with an authenticated NTS-only configuration. Existing systems
 must provision the reserved identity before enabling it. Check
 the selected provider/features, musl targets, and required virtual CPU features
 rather than assuming every VM CPU model can execute the binary.
@@ -351,7 +351,15 @@ time from an RTC or operator at bootstrap; the update path never sets the clock.
 Legacy metadata and observed-clock state fail closed and require trusted
 reprovisioning that preserves generation floors. See [snapshot policy](PM.md)
 and [trust policy](CERTIFICATE-TRUST.md). The packaged unauthenticated pool is
-not an authenticated time source and remains disabled in shipped profiles.
+not an authenticated time source; the packaged default is now NTS-only.
+The maintained profile runs `ntpd-rs` against `time.cloudflare.com`, `nts.netnod.se`
+and `nts.time.nl` (three independent operators; two must agree). The owner asked for
+PTB as the third operator, but a guest saw its NTS-KE succeed and every NTS poll go
+unanswered, so NLnet Labs' `nts.time.nl` took its place. The cold-boot policy is
+unchanged: a trustworthy RTC or operator-set time is still required, and the daemon
+does not weaken TLS verification. The nftables output chain drops TCP 4460 and UDP 123
+from every user except UID 123; it does not restrict the daemon's own egress, because
+an NTS-KE server may name another NTP port.
 Persisted guest state alone cannot prevent a hostile hypervisor from rolling
 back both clock and disk; do not promise that threat model is covered.
 

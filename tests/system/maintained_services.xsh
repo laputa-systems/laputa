@@ -3,6 +3,8 @@ use packages.dropbear.service as dropbear_service
 use packages.laputa-net.dhcp-eth0 as dhcp_service
 use packages.laputa-net.service as net_service
 use packages.laputa-syslog.service as logger_service
+use packages.ntpd-rs.service as ntp_service
+use profiles.qemu-maintained as maintained
 
 test test_dhcp_service_is_a_boot_longrun_with_notify [error] {
   let service = dhcp_service.service
@@ -51,4 +53,21 @@ test test_loopback_config_claims_no_other_writer [fs, error] {
   assert oneshot.name == "net"
   assert oneshot.kind == "oneshot"
   assert oneshot.targets == ["boot"]
+}
+
+test test_maintained_clock_is_authenticated_majority_of_three_operators [fs, error] {
+  assert "ntpd-rs" in maintained.profile.package_roots
+  assert "ca-certificates" in maintained.profile.package_roots
+  assert ntp_service.service.name == "ntpd-rs"
+  assert ntp_service.service.targets == ["boot"]
+  assert ntp_service.service.readiness == "notify"
+  let config = p"packages/ntpd-rs/ntp.toml".read_text()?
+  let modes = config.lines() |> where .starts_with("mode = ") |> collect
+  assert modes == ["mode = \"nts\"", "mode = \"nts\"", "mode = \"nts\""]
+  for operator in ["time.cloudflare.com", "nts.netnod.se", "nts.time.nl"] {
+    assert f"address = \"{operator}\"" in config
+  }
+  assert "minimum-agreeing-sources = 2" in config
+  assert "pool" not in config
+  assert "frequency-calibration-path = \"/var/lib/ntpd-rs/frequency.json\"" in config
 }

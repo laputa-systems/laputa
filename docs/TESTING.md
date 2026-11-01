@@ -102,6 +102,20 @@ bash tests/docker/ntpd_privileges.sh laputa-package-tools:TAG "$PWD/.out/seed/x8
 It checks the launched identity and capability sets and refuses a conflicting
 UID before changing the runtime directory. It does not qualify clock steering.
 
+### Run the maintained clock drill
+
+`python3 tests/integration/maintained_ntp.py` needs the built `qemu-maintained` image,
+KVM and outbound network access from the guest, and it never touches the host clock. The
+state disk is seeded with the ca-certificates trust store (the image's `/etc` and `/var`
+live on the state disk, so NTS has no roots without it). Boot one (`LAPUTA_NTP_DRILL=sync`)
+checks that readiness reports stratum 16, that all three NTS operators answer with no
+missed polls, that a SIGKILLed daemon restarts and resynchronizes, then reboots through PID 1.
+Boot two (`offline`) resynchronizes after the reboot, inserts an nftables rule that drops
+UDP 123 and TCP 4460, and requires the daemon to stay alive and the wall clock minus the
+monotonic clock to move less than 20 ms in 120 seconds with no logged jump. On 2026-11-01
+the sync boot reached stratum 2 and the offline boot saw a one-millisecond change. The
+drill uses real operators, so a failure can be an operator outage; rerun before concluding.
+
 ### Run the disposable NTP guest
 
 With the x86_64 seed, package-tools image and artifact closure already built,

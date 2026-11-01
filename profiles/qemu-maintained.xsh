@@ -13,6 +13,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "dropbear",
     "nftables",
     "laputa-net",
+    "ntpd-rs",
     "laputa-syslog",
     "xinfra",
   ],
