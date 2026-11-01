@@ -21,6 +21,10 @@
   15,064 cases were unexecuted. Its last passed case was
   `core/tests/test-awk.xsh::test_awk_matrix_printf_shard_005`.
   Separately selected Asterinas modules remain open.
+- The first six Asterinas follow-up modules added 62 passes and one failure.
+  `core/tests/test-bb-awk.xsh::test_bb_awk_awk_do_not_allow_str_724d0fde`
+  reported `timeout: process timed out`; that module stopped after 18 passes,
+  leaving 30 of its 49 cases unexecuted. Its cause is not established.
 - The awk failure is parked pending a smaller reproducer or new page-fault
   evidence. Full discovery followed by the initial prefix produced SIGSEGV
   in an awk child on Asterinas. Linux passed the same instrumented prefix.
