@@ -16,7 +16,7 @@ serde_json = "1"
 tiny_http = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-h12tiny-client-sync = { version = "=0.6.0", registry = "mycrates", features = ["tls"] }
+h12tiny-client-sync = { version = "=0.7.0", registry = "mycrates", features = ["tls"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
@@ -25,8 +25,8 @@ rustls = { version = "0.23", default-features = false, features = ["std", "tls12
 rustls-graviola = "0.4"
 
 [patch.crates-io]
-h12tiny-client-normalize = { version = "=0.6.0", registry = "mycrates" }
-h12tiny-tls-system = { version = "=0.6.0", registry = "mycrates" }
+h12tiny-client-normalize = { version = "=0.7.0", registry = "mycrates" }
+h12tiny-tls-system = { version = "=0.7.0", registry = "mycrates" }
 
 [profile.dev]
 debug = "line-tables-only"

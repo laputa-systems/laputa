@@ -41,8 +41,8 @@ keeping the verifier patched are independent layers.
 
 Resolved production TLS closure (from `cargo tree -e normal` on `mirror`):
 
-- `h12tiny-client-sync 0.5.0` (pinned h12tiny revision, `tls` feature)
-- `h12tiny-tls-system 0.5.0`, `h12tiny-client-normalize 0.5.0`
+- `h12tiny-client-sync 0.7.0` (`tls` feature)
+- `h12tiny-tls-system 0.7.0`, `h12tiny-client-normalize 0.7.0`
 - `rustls 0.23.45` with the explicit Graviola provider; no OpenSSL,
   native-tls, ring, or AWS-LC backend
 - `rustls-webpki 0.103.16`, `rustls-native-certs 0.8.5`,

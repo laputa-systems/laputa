@@ -82,12 +82,6 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
-
-[[package]]
-name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
@@ -321,18 +315,18 @@ dependencies = [
 
 [[package]]
 name = "h12tiny-client-normalize"
-version = "0.6.0"
+version = "0.7.0"
 source = "sparse+https://crates.17166969.xyz/current/registry/"
-checksum = "8d20166a88fa4b6b4f301c9faae5790b4cc7d8e4cabfbd22d7cdb4935c4048ba"
+checksum = "726288f88917e16eb154bdbda5034bdabbe73aee8b7526513a3b21d599b1c0d2"
 dependencies = [
  "http",
 ]
 
 [[package]]
 name = "h12tiny-client-sync"
-version = "0.6.0"
+version = "0.7.0"
 source = "sparse+https://crates.17166969.xyz/current/registry/"
-checksum = "05c53fc176ee890496de24df8c20c4f040afc9a5a151df52d290946cb6854d57"
+checksum = "4ef7862202992a23100a6347155bda3cab6a237cd161a4d3998ccdaebbb65207"
 dependencies = [
  "h12tiny-client-normalize",
  "h12tiny-tls-system",
@@ -344,11 +338,11 @@ dependencies = [
 
 [[package]]
 name = "h12tiny-tls-system"
-version = "0.6.0"
+version = "0.7.0"
 source = "sparse+https://crates.17166969.xyz/current/registry/"
-checksum = "e83f47eaf57b4c7f29a0fc6c9feb7039693fd01fbc6693f196102e7217995d91"
+checksum = "e9415c66396cb636154e2132bbcde156cabce260bbd7ca06a76c6ec25c095c59"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "openssl-probe",
  "rustls",
  "rustls-native-certs",
@@ -661,7 +655,7 @@ version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d354a98a3d1251555de99e8fdd8afda05573c31b82f59063a7b0a29b5527f120"
 dependencies = [
- "base64 0.23.1",
+ "base64",
  "serde_core",
 ]
 
