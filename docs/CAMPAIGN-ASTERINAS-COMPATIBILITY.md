@@ -69,9 +69,15 @@
   fixes all four and adds
   `process/pthread/pthread_create_fragmented_memory`, which fails on the
   unfixed kernel and passes on the fixed kernel and on Linux
-  (`bash infra/asterinas/run-witness.sh asterinas|linux SOURCE.c DIR`). Pipe
-  ring buffers and large kernel heap allocations still need contiguous frames
-  and fail the same way under extreme fragmentation; that is open. The
+  (`bash infra/asterinas/run-witness.sh asterinas|linux SOURCE.c DIR`). Known
+  remaining limit: pipe ring buffers and large kernel heap allocations still
+  need contiguous frames and fail the same way under extreme fragmentation. It
+  becomes a slice only if a required case hits it. The existing 9 frame-allocator
+  and 221 OSTD kernel tests pass on the fixed kernel, and three new frame
+  allocator tests cover cross-CPU reclaim and bounded balancing
+  (`bash infra/asterinas/run-ktest.sh osdk/deps/frame-allocator`); the
+  single-segment refill fallback and per-frame kernel stacks are covered only by
+  the witness. The
   batch-level panics were not reproduced on demand (a rerun of the first batch
   passed), so the whole-corpus effect is unmeasured until the fan-out is rerun.
   The awk hangs are not shown to share this cause.

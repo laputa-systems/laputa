@@ -74,6 +74,12 @@ statically in the pinned development image, places it in the disposable root
 copy, and requires the guest's witness start and finish markers. A kernel panic,
 heap allocation error, or nonzero witness exit fails the run.
 
+Run the kernel unit tests of one pinned-source crate with
+`bash infra/asterinas/run-ktest.sh ostd` or
+`bash infra/asterinas/run-ktest.sh osdk/deps/frame-allocator`. The runner boots
+the OSDK test kernel in QEMU with KVM and two CPUs, and fails unless every test
+passes. It needs a prior `make asterinas-build` for the OSDK install.
+
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
 (or `linux`) on a list of test modules, then
