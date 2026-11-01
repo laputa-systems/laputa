@@ -103,4 +103,4 @@ doc = false
 
 [patch.crates-io]
 rand = { path = "./fuzz_rand_shim" }
-rand_core = { git = "https://github.com/rust-random/rand.git", tag = "0.8.8" }
+rand_core = { version = "=0.6.4", registry = "mycrates" }

@@ -12,4 +12,4 @@ std = []
 std_rng = []
 
 [dependencies]
-real_rand = { git = "https://github.com/rust-random/rand.git", tag="0.8.8", package="rand" }
+real_rand = { version = "=0.8.8", registry = "mycrates", package="rand" }
