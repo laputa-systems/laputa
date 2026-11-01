@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI is next.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is next.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -103,7 +103,22 @@
   unit tests do not build in the OSDK harness here (they stop at a grub
   video-mode error), so the kernel-level uevent code has no unit test beyond the
   17 device model tests and the `device/block_uevent` witness.
-- Red boundary: the pinned kernel is five local commits beyond the advertised
+- A2 clock ABI: `clock_settime`, `adjtimex` and `clock_adjtime` exist and
+  CLOCK_REALTIME is a settable, steerable function of the monotonic clock. The
+  `time/clock_adjust` witness and 10 `aster-time` kernel tests cover readback,
+  positive and negative nanosecond and microsecond steps, frequency sign and
+  size (±200 ppm measured against CLOCK_MONOTONIC_RAW), vDSO and system call
+  agreement, `EINVAL` for invalid times, steps and clocks, `EOPNOTSUPP` for other
+  clocks, and `EPERM` without CAP_SYS_TIME while reading stays open. The witness
+  passes on this kernel and on Linux. Open A2 obligations, not delivered: the
+  frequency correction does not slew CLOCK_MONOTONIC or CLOCK_BOOTTIME (Linux
+  slews both), so the daemon's monotonic measurements differ from Linux by the
+  correction; leap seconds are not applied, and ADJ_OFFSET, ADJ_TICK, the adjtime
+  modes, STA_PLL, STA_FLL, STA_INS, STA_DEL and STA_FREQHOLD fail with `EINVAL`
+  where Linux accepts them; absolute realtime timers are not re-armed by a step;
+  `settimeofday` is still missing; while a frequency correction is active the
+  vDSO reads through the system call.
+- Red boundary: the pinned kernel is six local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
   runs panic-bounded batches on either backend, and `account-native.sh` counts

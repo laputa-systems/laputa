@@ -28,7 +28,7 @@ memory_mib="$(jaq -r '."machine-config".mem_size_mib' "$bundle/firecracker.json"
 docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/gcc \
     --mount "type=bind,src=$regression_root,dst=/regression,readonly" \
     --mount "type=bind,src=$result_dir,dst=/out" \
-    "$dev_image" -Wall -Werror -static -pthread -o /out/witness "/regression/${source_file#"$regression_root"/}"
+    "$dev_image" -Wall -Werror -static -pthread $([[ "$backend" != asterinas ]] || printf %s -D__asterinas__) -o /out/witness "/regression/${source_file#"$regression_root"/}"
 printf '%s\n' "$name" > "$result_dir/witness.name"
 
 if [[ "$backend" == asterinas ]]; then
