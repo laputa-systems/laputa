@@ -16,8 +16,11 @@
   `core/tests/test-awk.xsh::test_awk_matrix_arithmetic_and_bit_functions_shard_000`:
   `status was not an exit`. The other 15,224 cases have no result. The Linux
   full run reached its 3,000-second limit without releasing buffered output,
-  so its individual outcomes are unknown. Separately selected Asterinas
-  modules and Linux full accounting remain open.
+  so its individual outcomes are unknown. A later streamed Linux run reached
+  the same limit after 187 passed and four skipped, with no reported failure;
+  15,064 cases were unexecuted. Its last passed case was
+  `core/tests/test-awk.xsh::test_awk_matrix_printf_shard_005`.
+  Separately selected Asterinas modules remain open.
 - The awk failure is parked pending a smaller reproducer or new page-fault
   evidence. Full discovery followed by the initial prefix produced SIGSEGV
   in an awk child on Asterinas. Linux passed the same instrumented prefix.
