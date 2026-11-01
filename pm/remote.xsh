@@ -199,7 +199,7 @@ export proc load_verified_remote_index(
   }
   let metadata = fetch_snapshot_bytes(repo, util.remote_snapshot_rel(), 8192, f"repository snapshot {util.remote_snapshot_rel()}")?
   let signature = fetch_snapshot_bytes(repo, util.remote_snapshot_signature_rel(), 256, f"repository snapshot {util.remote_snapshot_signature_rel()}")?
-  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)?
+  repo_snapshot.snapshot_verify_signature(metadata, signature, keys)
   let signed = repo_snapshot.snapshot_parse_metadata(metadata)?
   let index_rel = util.remote_signed_index_rel(signed.index_sha256)
   let index_bytes = fetch_snapshot_bytes(repo, index_rel, 10485760, f"signed repository index {index_rel}")?

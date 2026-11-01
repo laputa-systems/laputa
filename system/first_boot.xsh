@@ -148,7 +148,7 @@ export proc parse(document: Str) [error] -> Result[FirstBoot, Error] {
   var trust_text = ""
   var tailscale = ""
   var identity = ""
-  var repo_keys: List[Bytes] = []
+  var repo_keys = []
   var seen: Map[Bool] = {}
   let key_lines = collect {
     for line in document.lines() {
