@@ -613,8 +613,12 @@ development profile remains convenient and visibly distinct.
 `qemu-maintained` sets `development` false; the other profiles set it true and
 keep their roots. First boot is validated before any write, Dropbear keeps one
 ed25519 host key, and the nftables package installs the filter ruleset whose
-oneshot fails closed when the file is absent. No fresh VM boot has been run.
-The SSH client remains XSH-55.
+oneshot fails closed when the file is absent. Linux x86_64/KVM guests boot and
+reboot with stable operator files and host identity; missing or rejected
+firewall rules keep Dropbear down. New operators use `/usr/bin/xsh-login`.
+Native SSH also passes the interrupted activation-stage recovery drill described
+in [maintained VM activation](QEMU.md#maintained-vm-activation). These checks do
+not qualify macOS or aarch64 clients. XSH-55 owns the SSH client's wider matrix.
 
 ## R7: Backups, timers, and persistent diagnostics
 
