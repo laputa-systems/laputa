@@ -5,7 +5,8 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  A1 (device coldplug) is accepted for the fixture below. A2 clock ABI is next.
+  A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
+  obligations below). A2 clock ABI is next.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -94,12 +95,14 @@
   (coldplug without a daemon fails within 3 s and creates no node), then with a
   restarted daemon. The identical payload passes on the Linux reference.
   `device/block_uevent` is the kernel witness: it passes on this kernel and on
-  Linux. Partial against D2: only the virtio disk is a fixture device; partitions
-  are not nested below their disk, `DEVPATH` is `/devices/virtual/block/vda`
-  rather than a PCI or MMIO path, and automatic add events at device registration
-  and hotplug are not emitted. The kernel crate's own unit tests do not build in
-  the OSDK harness here (they stop at a grub video-mode error); the device model
-  tests (17) pass.
+  Linux. D2 is not delivered. Open D2 obligations:
+  `DEVPATH` is `/devices/virtual/block/vda`, not a PCI or MMIO path, so it does
+  not match Linux; partitions are not nested below their disk; no add event is
+  emitted at device registration or hotplug; only the virtio disk is a fixture
+  device, and ownership and mode are checked for it only; the kernel crate's
+  unit tests do not build in the OSDK harness here (they stop at a grub
+  video-mode error), so the kernel-level uevent code has no unit test beyond the
+  17 device model tests and the `device/block_uevent` witness.
 - Red boundary: the pinned kernel is five local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
