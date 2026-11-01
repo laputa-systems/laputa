@@ -10,7 +10,7 @@ cleanup() {
         kill -TERM "$runner" 2>/dev/null || true
         wait "$runner" 2>/dev/null || true
     fi
-    rm -rf -- "$work"
+    rm -r -- "$work"
 }
 trap cleanup EXIT
 cat > "$work/xsht" <<'XSH_TEST'
