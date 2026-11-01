@@ -279,9 +279,9 @@ export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedC
   crates
 }
 
-## The crates.io download of one locked crate.
+## The archived download of one locked crate.
 export pure crate_download_url(item: LockedCrate) -> Str {
-  f"https://static.crates.io/crates/{item.name}/{item.name}-{item.version}.crate"
+  f"https://crates.17166969.xyz/blobs/{item.checksum}.crate"
 }
 
 proc resolve_locked_crates(

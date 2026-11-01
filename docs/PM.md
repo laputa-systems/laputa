@@ -201,7 +201,7 @@ content-addressed crate set: each record's `checksum` is the sha256 crates.io
 serves `NAME-VERSION.crate` under, so the lockfile's own pin covers every
 crate and the artifact key needs nothing more. `pm sources fetch` caches the
 lockfile with the other URL sources, then reads it from the cache and fetches
-each `.crate` from `static.crates.io` into the same `sha256/<hash>` layout. A
+each `.crate` from the mycrates archive into the same `sha256/<hash>` layout. A
 build resolves every crate like any URL source before staging anything, then
 extracts each into `DEST/NAME-VERSION/` with the `.cargo-checksum.json`
 cargo's directory sources need, so a recipe builds with `--offline --locked`

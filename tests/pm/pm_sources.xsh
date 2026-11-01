@@ -414,7 +414,7 @@ test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
   lockfile.write(crate_set_lock(crates))
 
   assert sources.cargo_lock_crates(lockfile)? == crates
-  assert sources.crate_download_url(crates[1]) == "https://static.crates.io/crates/zstd-sys/zstd-sys-2.0.15+zstd.1.5.7.crate"
+  assert sources.crate_download_url(crates[1]) == "https://crates.17166969.xyz/blobs/2222222222222222222222222222222222222222222222222222222222222222.crate"
 }
 
 test test_cargo_lock_rejects_crates_without_a_content_address [fs, error] { |ctx|
