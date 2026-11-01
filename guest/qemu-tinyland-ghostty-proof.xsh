@@ -308,6 +308,9 @@ proc main() [fs, process, time, error] {
   let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
 
   if !guest_process_alive(survivor_pid)? {
+    for log in [/var/log/tinyland/current, /var/log/seatd/current] {
+      if log.exists() { guest_console(log.read_text()?) }
+    }
     guest_fail("device-loss", "compositor died on single keyboard loss")
   }
 
