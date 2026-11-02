@@ -310,7 +310,7 @@ test test_linux_config_resolves_staged_fragment_from_isolated_cwd_and_rejects_mi
     XSH_PM_SOURCE_DIR: source.display(),
     XSH_PM_RECIPE_DIR: recipe_root.display(),
   }) {
-    cd unrelated {
+    cd (unrelated) {
       let resolved = linux_config.resolve_config_fragments([p"files/config/aarch64/base-aarch64.fragment"])?
       assert resolved == [staged]
     }
@@ -355,7 +355,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
     XSH_PM_RECIPE_DIR: recipe_root.display(),
     XSH_LINUX_KBUILD_DISCOVER_JOBS: "2",
   }) {
-    cd source {
+    cd (source) {
       let plan = linux_shared.discover_package_plan("arm64")?
       assert p"one.o" in plan.objects
       assert p"sub/two.o" in plan.objects
@@ -363,7 +363,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
     }
   }?
   env ({XSH_PM_RECIPE_DIR: recipe_root.display(), XSH_LINUX_KBUILD_DISCOVER_JOBS: "1", TMPDIR: ""}) {
-    cd source {
+    cd (source) {
       match linux_shared.discover_package_plan("arm64") {
         Ok(_) => test.fail("empty TMPDIR unexpectedly accepted")
         Err(problem) => assert problem.message == "TMPDIR must not be empty"
@@ -397,7 +397,7 @@ test test_linux_plan_cache_rejects_inputs_changed_after_worker_scan [fs, process
     XSH_LINUX_KBUILD_FORCE_DISCOVER: "0",
     XSH_LINUX_KBUILD_LOCAL_RECORD_CACHE: "0",
   }) {
-    cd source {
+    cd (source) {
       let first = linux_shared.cached_package_plan("arm64")?
       assert p"before.o" in first.objects
       let second = linux_shared.cached_package_plan("arm64")?

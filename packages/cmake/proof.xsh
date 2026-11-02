@@ -54,7 +54,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
 
     fp"{tmp}/build".mkdir()
 
-    cd fp"{tmp}/build" {
+    cd (fp"{tmp}/build") {
       let cmake_args = [
         cmake.display(),
         "..",

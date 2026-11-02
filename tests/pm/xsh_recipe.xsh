@@ -21,7 +21,7 @@ test xsh_seed_installs_declared_applet_links_and_keeps_libraries_private [fs, en
   json.write(fp"{seed}/manifest.json", {files})
   let dest = fp"{workspace}/dest"
 
-  cd $workspace {
+  cd (workspace) {
     xsh_recipe.build(dest)
   }
 

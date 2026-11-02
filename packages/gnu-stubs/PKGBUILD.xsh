@@ -137,7 +137,7 @@ __gttf2
   }) {
     run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o"
     run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o"
-    cd builtins_dir {
+    cd (builtins_dir) {
       run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" \
         "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o"
     }

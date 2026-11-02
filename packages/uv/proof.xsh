@@ -56,11 +56,11 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       UV_OFFLINE: "1",
       UV_PYTHON_DOWNLOADS: "never",
     }) {
-      cd $tmp {
+      cd (tmp) {
         run $uv "init" "--bare" "--no-workspace" "--vcs" "none" "--name" "laputa-proof" "--python" "3.13" $project
       }
 
-      cd $project {
+      cd (project) {
         let current = run.text $uv "version"
         proof.ensure(
           current.trim() == "laputa-proof 0.1.0",

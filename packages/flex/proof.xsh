@@ -57,7 +57,7 @@ proc prove_scanner(rootfs: Path, flex: Path) {
     let stderr = fp"{tmp}/flex.stderr"
 
     env ({M4: fp"{rootfs}/usr/bin/m4".display()}) {
-      cd $tmp {
+      cd (tmp) {
         let status = process.run(
           process.command_argv(flex, [flex, "--header-file=words.h", "-o", "words.c", "words.l"], stderr:),
         )?

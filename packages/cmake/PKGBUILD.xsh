@@ -904,7 +904,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
   env ({
     LD_LIBRARY_PATH: bootstrap_ld_library_path,
   }) {
-    cd cmake-build {
+    cd (p"cmake-build") {
       let bc = fp"../Bootstrap.cmk/cmake"
       let init_cache = fp"../Bootstrap.cmk/InitialCacheFlags.cmake"
 

@@ -259,7 +259,7 @@ proc prove_grammars(rootfs: Path, bison: Path) {
       for grammar in grammars {
         fp"{tmp}/{grammar.file}".write(grammar_text(grammar.file))
 
-        cd $tmp {
+        cd (tmp) {
           let status = process.run(process.command_argv(bison, [bison.display()].extend(grammar.argv), stderr:))?
           let diagnostics = stderr.read_text()?
 

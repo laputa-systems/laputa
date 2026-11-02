@@ -28,7 +28,7 @@ export proc check_plans() [fs, env, error] -> Result[Unit, Error] {
   let facts = plan.Facts(hosts: [plan.HostFacts(name: "xinfra-a", observed: map.empty().set("file", plan.Absent))])
   let action = plan.Action(id: "file", host: "xinfra-a", resource: model.Directory(model.DirectorySpec(id: "file", path: p"/file")), operation: plan.EnsureDirectory, prediction: plan.Changed)
   let actions = [action]
-  env XSH_PIN="pin-one" PLAN_SECRET="canary-value" {
+  env ({XSH_PIN: "pin-one", PLAN_SECRET: "canary-value"}) {
     match artifact.save_plan(target, "run-1", deployment_file, inventory_file, deployment, facts, actions) {
       Ok(_) => {}, Err(failure) => { return Err(error.failure(failure.message)) },
     }

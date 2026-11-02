@@ -15,7 +15,7 @@ proc main() [fs, process, env, time, error] {
     XSH_PM_RECIPE_DIR: recipe.display(),
     XSH_LINUX_KBUILD_DISCOVER_JOBS: "1",
   }) {
-    cd source {
+    cd (source) {
       let plan = linux_shared.discover_package_plan("arm64")?
       if p"one.o" not in plan.objects {
         return error.fail("published staged Kbuild worker did not return the Kconfig object")

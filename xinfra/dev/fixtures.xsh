@@ -360,7 +360,7 @@ cli main up() [fs, process, env, error, io] {
   let home = lima_home(root)?
   home.mkdir(parents: true)?
   let _ = ensure_key(root)?
-  env LIMA_HOME=$home {
+  env ({LIMA_HOME: home}) {
     for name in FIXTURES {
       let state = guest_state(name)?
       print f"fixture {name}: {state}"
@@ -376,7 +376,7 @@ cli main up() [fs, process, env, error, io] {
 cli main verify() [fs, process, env, error, io] {
   let root = repo_root()?
   let home = lima_home(root)?
-  env LIMA_HOME=$home {
+  env ({LIMA_HOME: home}) {
     var failures = []
     for name in FIXTURES {
       ensure_running(root, name)?
@@ -403,7 +403,7 @@ cli main exec(cwd: Path = p".", ...command: List[Str]) [fs, process, env, error,
   let root = repo_root()?
   let home = lima_home(root)?
   let pyinfra = env.get("XINFRA_PYINFRA") ?? f"{root}/.work/oracle/venv/bin/pyinfra"
-  env LIMA_HOME=$home {
+  env ({LIMA_HOME: home}) {
     for name in FIXTURES {
       ensure_running(root, name)?
     }
@@ -447,7 +447,7 @@ cli main exec(cwd: Path = p".", ...command: List[Str]) [fs, process, env, error,
 cli main down() [process, env, error, io] {
   let root = repo_root()?
   let home = lima_home(root)?
-  env LIMA_HOME=$home {
+  env ({LIMA_HOME: home}) {
     let listed = run_checked(["limactl", "list", "--quiet"])?
     for name in listed.lines() {
       let fixture = name.trim()

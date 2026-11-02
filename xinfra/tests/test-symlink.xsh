@@ -21,7 +21,7 @@ proc link_spec(id: Str, target: Path, destination: Path, replace: Bool = false) 
 
 test test_first_apply_then_unchanged { |ctx|
   let root = test.temp_dir(ctx, "link-first")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -38,7 +38,7 @@ test test_first_apply_then_unchanged { |ctx|
 
 test test_target_drift_requires_explicit_replacement { |ctx|
   let root = test.temp_dir(ctx, "link-drift")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -58,7 +58,7 @@ test test_target_drift_requires_explicit_replacement { |ctx|
 
 test test_file_conflicts_are_explicit { |ctx|
   let root = test.temp_dir(ctx, "link-file")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -76,7 +76,7 @@ test test_file_conflicts_are_explicit { |ctx|
 
 test test_directory_conflicts_are_explicit { |ctx|
   let root = test.temp_dir(ctx, "link-dir")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -89,7 +89,7 @@ test test_directory_conflicts_are_explicit { |ctx|
 
 test test_absence_removes_only_symlinks { |ctx|
   let root = test.temp_dir(ctx, "link-absent")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -120,11 +120,11 @@ test test_absence_removes_only_symlinks { |ctx|
 
 test test_untrusted_parent_is_blocked { |ctx|
   let root = test.temp_dir(ctx, "link-parent")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
-    env XINFRA_FAKE_INSECURE_PARENT="1" {
+    env ({XINFRA_FAKE_INSECURE_PARENT: "1"}) {
       expect_status(symlink.apply(ops, link_spec("motd-link", p"/etc/motd", p"/etc/link")), host.Blocked)
     }
     test.ok(! host_path(root, p"/etc/link")?.exists()?)?

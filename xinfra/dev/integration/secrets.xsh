@@ -73,7 +73,7 @@ export proc check_secrets() [fs, process, env, error, io] -> Result[Unit, Error]
     let _ = execute(session, ["rm", "-rf", base.display()])?
     let _ = execute(session, ["mkdir", "-p", base.display()])?
 
-    env XINFRA_SECRET=$canary {
+    env ({XINFRA_SECRET: canary}) {
       let secret_path = fp"{base}/secret"
       let validator = model.Validation(argv: ["sh", "-c", r"""test "$(stat -c %a "$0")" = 600"""])
       let spec = model.FileSpec(id: "secret", path: secret_path, mode: 0o600, validate: validator)

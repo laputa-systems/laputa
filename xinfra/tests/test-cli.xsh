@@ -297,7 +297,7 @@ test test_check_exit_codes_and_no_mutation { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-check-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let ops = fake.host()
     let args = [
@@ -364,7 +364,7 @@ test test_apply_is_idempotent_and_uses_fake_ops { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-apply-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let ops = fake.host()
     let args = [
@@ -404,7 +404,7 @@ test test_apply_failures_are_data_and_policy_isolates { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-fail-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let result = invoke(
       [
@@ -445,7 +445,7 @@ test test_apply_abort_and_continue_policies { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-policy-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let abort = invoke(
       [
@@ -505,7 +505,7 @@ test test_blocked_dependencies_do_not_run { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-dependency-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let result = invoke(
       [
@@ -546,7 +546,7 @@ test test_saved_plan_round_trip_and_stale_rejection { |ctx|
   )?
   let fake_root = test.temp_dir(ctx, "cli-save-root")?
   let plan_file = fp"{fake_root}/saved-plan.json"
-  env XINFRA_FAKE_ROOT=f"{fake_root}" XSH_PIN="pin-a" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}", XSH_PIN: "pin-a"}) {
     fake.reset()?
     let ops = fake.host()
     let saved = invoke(
@@ -589,7 +589,7 @@ test test_saved_plan_round_trip_and_stale_rejection { |ctx|
     test.eq(applied.exit, 0, "plan-apply: " + applied.stderr)?
     test.eq((decoded_report(applied)?).summary.changed, 1)?
 
-    env XSH_PIN="pin-b" {
+    env ({XSH_PIN: "pin-b"}) {
       let pinned = invoke(
         [
           "apply",
@@ -712,7 +712,7 @@ test test_jsonl_emits_results_then_summary { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-jsonl-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let result = invoke(
       [
@@ -752,7 +752,7 @@ test test_redaction_is_applied_to_cli_output { |ctx|
 ]""",
   )?
   let fake_root = test.temp_dir(ctx, "cli-redact-root")?
-  env XINFRA_FAKE_ROOT=f"{fake_root}" {
+  env ({XINFRA_FAKE_ROOT: f"{fake_root}"}) {
     fake.reset()?
     let result = command_line.execute(
       [

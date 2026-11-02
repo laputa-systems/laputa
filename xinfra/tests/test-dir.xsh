@@ -41,7 +41,7 @@ proc directory(id: Str, target: Path) -> model.Resource {
 
 test test_first_apply_then_unchanged { |ctx|
   let root = test.temp_dir(ctx, "dir-first")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     expect_status(dir.apply(ops, model.DirectorySpec(id: "srv", path: p"/srv")), host.Changed)
@@ -62,7 +62,7 @@ test test_first_apply_then_unchanged { |ctx|
 
 test test_drift_is_detected_and_repaired { |ctx|
   let root = test.temp_dir(ctx, "dir-drift")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     expect_status(dir.apply(ops, model.DirectorySpec(id: "srv", path: p"/srv")), host.Changed)
@@ -84,7 +84,7 @@ test test_drift_is_detected_and_repaired { |ctx|
 
 test test_plan_and_check_perform_no_write { |ctx|
   let root = test.temp_dir(ctx, "dir-plan")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     expect_status(dir.apply(ops, model.DirectorySpec(id: "srv", path: p"/srv")), host.Changed)
@@ -102,7 +102,7 @@ test test_plan_and_check_perform_no_write { |ctx|
 
 test test_noop_leaves_mtime_alone { |ctx|
   let root = test.temp_dir(ctx, "dir-mtime")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     expect_status(dir.apply(ops, model.DirectorySpec(id: "srv", path: p"/srv")), host.Changed)
@@ -116,7 +116,7 @@ test test_noop_leaves_mtime_alone { |ctx|
 
 test test_absence_is_one_level { |ctx|
   let root = test.temp_dir(ctx, "dir-absent")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     expect_status(dir.apply(ops, model.DirectorySpec(id: "srv", path: p"/srv")), host.Changed)
@@ -136,7 +136,7 @@ test test_absence_is_one_level { |ctx|
 
 test test_file_and_directory_conflicts_are_explicit { |ctx|
   let root = test.temp_dir(ctx, "dir-conflict")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
     host_path(root, p"/etc")?.mkdir()?
@@ -153,10 +153,10 @@ test test_file_and_directory_conflicts_are_explicit { |ctx|
 
 test test_untrusted_parent_is_blocked { |ctx|
   let root = test.temp_dir(ctx, "dir-parent")?
-  env XINFRA_FAKE_ROOT=f"{root}" {
+  env ({XINFRA_FAKE_ROOT: f"{root}"}) {
     fake.reset()?
     let ops = fake.host()
-    env XINFRA_FAKE_INSECURE_PARENT="1" {
+    env ({XINFRA_FAKE_INSECURE_PARENT: "1"}) {
       let result = dir.apply(ops, model.DirectorySpec(id: "app", path: p"/srv/app"))
       expect_status(result, host.Blocked)
       test.ok(! host_path(root, p"/srv/app")?.exists()?)?

@@ -308,7 +308,7 @@ test test_repo_checksum_reads_upstream_and_caches_the_new_pin [fs, process, env,
   let entrypoint = fp"{modules}/pm.xsh"
   var output = ""
 
-  cd $cwd {
+  cd (cwd) {
     output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache XSH_PM_TARGET_ARCH=aarch64 $xsh $entrypoint \
       -- repo checksum --repo $repository fetchdemo
   }

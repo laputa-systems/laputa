@@ -320,7 +320,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   env ({
     DESTDIR: dest,
   }) {
-    cd build {
+    cd (p"build") {
       run $cmake "-P" "cmake_install.cmake"
     }
   }?

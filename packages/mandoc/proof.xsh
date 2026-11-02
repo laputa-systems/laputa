@@ -140,7 +140,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
     fp"{tmp}/top.man".write(".SH INCLUDED\n.so part.man\n.SH AFTER\n")
     fp"{tmp}/part.man".write("from the part\n")
 
-    cd $tmp {
+    cd (tmp) {
       let inlined = run.text $loader fp"{bin}/soelim" "top.man"
       proof.ensure(
         inlined == ".SH INCLUDED\nfrom the part\n.SH AFTER\n",
