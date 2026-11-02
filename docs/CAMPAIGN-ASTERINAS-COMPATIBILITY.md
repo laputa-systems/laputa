@@ -471,8 +471,8 @@
   `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` hangs, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
   smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch), and Linux fails 24 cases
-  that Asterinas did not fail. 9,617 cases remain unexecuted baseline debt. Time gates: none run, perf gate deferred: host
-  busy (the host load average stayed above the limit during these runs), so performance qualification stays open for A7.
+  that Asterinas did not fail. 9,617 cases remain unexecuted baseline debt. No time gate was run in A6, so performance
+  qualification stays open for A7.
   Contract changes: `qualify.sh` takes the cohorts `device`, `clock-abi`, `clock`, `recovery` and `all` and exports
   `ASTERINAS_EXTRA_PACKAGES=ntpd-rs` unless the caller sets it; `qualify-network-cohort.sh` became `qualify-cohort.sh`;
   `run-guest-case.sh` and `run-witness.sh` require the full guest marker set on both backends; the guest containers are
