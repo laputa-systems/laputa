@@ -4,7 +4,7 @@ proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let expected = generation.read_generation_receipt_file(fp"{root}/inputs/generation-B.json")?
   let previous = generation.read_generation_receipt_file(fp"{root}/inputs/generation-A.json")?
-  let actual = generation.read_generation_receipt(/)?
+  let actual = generation.read_generation_receipt(p"/")?
   assert actual == expected
   assert actual.generation_sha256 != previous.generation_sha256
   assert actual.profile.name == "qemu-self-hosting"

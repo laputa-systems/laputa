@@ -29,7 +29,7 @@ proc stratum() -> Result[Int] {
 
 proc main(root: Path) [fs, process, env, time, io, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
-  assert generation.read_generation_receipt(/)?.profile.name == "qemu-self-hosting"
+  assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   let output = p"/run/frequency-output"
   output.mkdir(true)?
   linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["nosuid", "nodev"])?
@@ -41,7 +41,7 @@ proc main(root: Path) [fs, process, env, time, io, error] {
     fs.chgrp(saved_dir, group.by_gid(123)?)?
   }
   p"/var/lib/ntpd-rs".mkdir(true)?
-  linux.mount(bytes.from_text(saved_dir.display()), /var/lib/ntpd-rs, options: ["bind"])?
+  linux.mount(bytes.from_text(saved_dir.display()), p"/var/lib/ntpd-rs", options: ["bind"])?
   let saved = p"/var/lib/ntpd-rs/frequency.json"
   let second_boot = fp"{output}/first-boot-complete".exists()?
   p"/etc/ntpd-rs".mkdir(true)?
@@ -80,7 +80,7 @@ minimum-agreeing-sources = 1
   }
   let run_dir = p"/run/frequency-proof"
   run_dir.mkdir(true)?
-  let scanner = unix.spawn_process_group(process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
+  let scanner = unix.spawn_process_group(process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services", XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: "/run/frequency-logs",
   }))?
   groups += [scanner.pid]
@@ -96,7 +96,7 @@ minimum-agreeing-sources = 1
     print "FREQUENCY_FIRST_BOOT_UNSYNCED"
   }
   let ready = p"/run/frequency-oracle-ready"
-  let server = unix.spawn_process_group(process.command_argv(oracle, [oracle.display(), f"{original}", f"{raw_origin}", ready.display(), "100"], stdout: /run/frequency-oracle.log, stderr: /run/frequency-oracle.log))?
+  let server = unix.spawn_process_group(process.command_argv(oracle, [oracle.display(), f"{original}", f"{raw_origin}", ready.display(), "100"], stdout: p"/run/frequency-oracle.log", stderr: p"/run/frequency-oracle.log"))?
   groups += [server.pid]
   let deadline = now_ms()? + 170000
   var learned = false

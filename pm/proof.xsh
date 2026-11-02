@@ -105,8 +105,8 @@ export pure elf_machine_name(arch: Str) -> Str {
 
 ## Exported PM declaration `readelf_tool`.
 export proc readelf_tool() [fs, process, env, error] -> Result[Path, Error] {
-  let host_readelf = /usr/bin/readelf
-  let host_llvm_readelf = /usr/bin/llvm-readelf
+  let host_readelf = p"/usr/bin/readelf"
+  let host_llvm_readelf = p"/usr/bin/llvm-readelf"
 
   return host_readelf when host_readelf.exists()
 
@@ -138,7 +138,7 @@ proc proof_xsh_runner() -> Result[Path] {
     return selected when selected.exists()
   }
 
-  return /bin/xsh when p"/bin/xsh".exists()
+  return p"/bin/xsh" when p"/bin/xsh".exists()
 
   process.which("xsh")?
 }

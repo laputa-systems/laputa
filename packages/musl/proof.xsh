@@ -61,7 +61,7 @@ proc compile_hello(
   }?
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] -> Result[Unit, Error] {
   let target = pm_target.recipe_target()?
   let arch = types.pm_target_arch(target)
   let build_arch = types.pm_target_arch(pm_target.build_target()?)

@@ -77,9 +77,9 @@ proc main(...argv: List[Str]) [process, env, error] {
   let forwarded = ["/bin/xsh", "/usr/lib/laputa-installer/setup-laputa.xsh", "--"].extend(argv)
   let status = process.run(
     process.command_argv(
-      /bin/xsh,
+      p"/bin/xsh",
       forwarded,
-      /,
+      p"/",
       {XSH_MODULE_PATH: "/usr/lib/pm"},
     ),
   )?

@@ -2,7 +2,7 @@ use pm.generation
 use pm.util
 
 proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
-  assert generation.read_generation_receipt(/)?.profile.name == "qemu-self-hosting"
+  assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
   output.mkdir()?
@@ -53,7 +53,7 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
     linux.mount(bytes.from_text(pair.source.display()), pair.destination, options: ["bind"])?
   }
   linux.mount(b"", fp"{root}/src/laputa", options: ["remount", "bind", "ro"])?
-  let command = process.command_argv(/bin/xsh, ["/bin/xsh", "/src/laputa/guest/self-hosting-compose-inner.xsh"], env: {
+  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/src/laputa/guest/self-hosting-compose-inner.xsh"], env: {
     PATH: "/bin:/usr/lib/xsh/core:/usr/bin", XSH_MODULE_PATH: "/src/laputa", HOME: "/scratch/home",
     TMPDIR: "/output/tmp", LANG: "C", LC_ALL: "C", TZ: "UTC",
     LAPUTA_SOURCE_CACHE: "/inputs/source-cache", XSH_PM_TARGET_ARCH: "x86_64",

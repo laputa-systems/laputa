@@ -105,7 +105,7 @@ int main(void) {
 }
 """
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "libmnl")
   proof.ensure(fp"{root}/usr/include/libmnl/libmnl.h".exists()?, "libmnl", "missing libmnl.h")
   proof.ensure(fp"{root}/usr/lib/pkgconfig/libmnl.pc".exists()?, "libmnl", "missing libmnl.pc")

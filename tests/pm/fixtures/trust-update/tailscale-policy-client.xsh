@@ -19,9 +19,9 @@ proc run_client(port: Int, root: Str, expected: Str) [fs, process, time, error] 
   let socket = p"/work/daemon.sock"
   let child_env = {SSL_CERT_FILE: f"/fixtures/tls/{root}.crt", HOME: "/work", PATH: "/usr/bin:/bin"}
   let daemon = process.command_argv(
-    /package/usr/bin/tailscaled,
+    p"/package/usr/bin/tailscaled",
     ["/package/usr/bin/tailscaled", "--tun=userspace-networking", "--state=/work/state", "--socket=/work/daemon.sock", "--no-logs-no-support", "--port=0"],
-    /work,
+    p"/work",
     child_env,
     stdout: log,
     stderr: log,
@@ -30,9 +30,9 @@ proc run_client(port: Int, root: Str, expected: Str) [fs, process, time, error] 
   defer stop_daemon(launched)
   wait_for_socket(socket)?
   let up = process.command_argv(
-    /package/usr/bin/tailscale,
+    p"/package/usr/bin/tailscale",
     ["/package/usr/bin/tailscale", "--socket=/work/daemon.sock", "up", f"--login-server=https://127.0.0.1:{port}", "--timeout=3s"],
-    /work,
+    p"/work",
     child_env,
     timeout: 20s,
   )

@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "xsh")
   proof.ensure(fp"{root}/usr/bin/sh".exists()?, "proof-xsh", "missing sh runner")
   proof.ensure(fp"{root}/usr/bin/xsh".exists()?, "proof-xsh", "missing xsh runner")

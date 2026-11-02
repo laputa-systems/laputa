@@ -34,16 +34,16 @@ proc run_proof() {
   guard network_free()? else { fail "rescue guest has a network device" }
   p"/dev/console".write("LAPUTA_RESCUE_ISOLATED read-only root, no network\n")
   wait until p"/dev/vdb".exists()? within 30s every 100ms
-  let status = process.run(process.command_argv(/usr/bin/e2fsck, ["e2fsck", "-f", "-p", "/dev/vdb"]))?
+  let status = process.run(process.command_argv(p"/usr/bin/e2fsck", ["e2fsck", "-f", "-p", "/dev/vdb"]))?
   let code = status.shell_code()?
   p"/dev/console".write(f"LAPUTA_RESCUE_RESULT {code}\n")
   guard code == expected else { fail f"expected e2fsck status {expected}, got {code}" }
   if code == 0 or code == 1 or code == 2 {
     p"/run/repaired".mkdir()
-    linux.mount(b"/dev/vdb", /run/repaired, fstype: "ext4", options: ["ro"])?
+    linux.mount(b"/dev/vdb", p"/run/repaired", fstype: "ext4", options: ["ro"])?
     let actual = hash.sha256(p"/run/repaired/payload")?.hex()
     p"/dev/console".write(f"LAPUTA_RESCUE_PAYLOAD {actual}\n")
-    linux.umount(/run/repaired)?
+    linux.umount(p"/run/repaired")?
   }
   p"/dev/console".write(f"LAPUTA_RESCUE_PROOF_OK status {code}\n")
 }

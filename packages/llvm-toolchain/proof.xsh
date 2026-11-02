@@ -253,7 +253,7 @@ proc prove_target_tools(root: Path, target: types.Target) {
   }
 }
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   let target = pm_target.recipe_target()?
   let build_target = pm_target.build_target()?
   let db = fp"{root}/var/lib/xsh-pm/packages/llvm-toolchain/metadata.json"

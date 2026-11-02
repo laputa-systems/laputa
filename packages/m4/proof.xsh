@@ -105,7 +105,7 @@ proc expect_text(label: Str, actual: Str, expected: Str) {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, process, error] -> Result[Unit, Error] {
+proc main(rootfs = p"/rootfs") [fs, process, error] -> Result[Unit, Error] {
   tempdir tmp at fp"{rootfs}/var/tmp/proof-m4" {
     let m4 = fp"{rootfs}/usr/bin/m4"
 

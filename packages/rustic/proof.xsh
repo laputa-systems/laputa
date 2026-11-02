@@ -4,7 +4,7 @@ use pm.proof
 ## A local backup roundtrip through the packaged binary: init a repository
 ## with a password file, back up one tree, restore it elsewhere, and compare.
 ## This exercises the manual-restore path, not scheduling or remote backends.
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "rustic")
   proof.ensure(fp"{root}/usr/bin/rustic".exists()?, "rustic", "missing rustic binary")
   let tmp = fp"{root}/var/tmp/proof-rustic"

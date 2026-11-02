@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "wayland-protocols")
   let pc = fp"{root}/usr/share/pkgconfig/wayland-protocols.pc".read_text()?
   proof.ensure("Version: 1.49" in pc, "proof-wayland-protocols", "wayland-protocols.pc has the wrong version")

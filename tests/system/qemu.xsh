@@ -56,9 +56,9 @@ proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
 test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   let config = fixture_qemu("Linux", "x86_64")?
   let input = qemu.QemuAsterinasReference(
-    kernel: /tmp/kernel,
-    initramfs: /tmp/initramfs,
-    disk: /tmp/root,
+    kernel: p"/tmp/kernel",
+    initramfs: p"/tmp/initramfs",
+    disk: p"/tmp/root",
     memory_mib: 4096,
     network: qemu.NoNetwork,
     control: qemu.NoControl,
@@ -72,7 +72,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   assert "virtio-blk-pci,drive=root" in argv
   assert !("-netdev" in argv)
   assert !("-qmp" in argv)
-  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: qemu.QmpSocket(/run/vmm.sock)})?
+  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: qemu.QmpSocket(p"/run/vmm.sock")})?
   assert "unix:/run/vmm.sock,server=on,wait=off" in controlled
   let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0")})?
   assert "tap,id=net0,ifname=tap0,script=no,downscript=no" in networked
@@ -393,5 +393,5 @@ test test_qmp_socket_fits_a_unix_socket_path_from_any_checkout_depth [error] {
   let deep = fp"/{["very-long-directory-name" for _ in range(12)].join("/")}/target/laputa/qemu-fixture"
   let socket = build.outputs(deep).qmp_socket.display()
   assert socket.byte_len() < 108, socket
-  assert build.outputs(deep).qmp_socket != build.outputs(/other/target/laputa/qemu-fixture).qmp_socket
+  assert build.outputs(deep).qmp_socket != build.outputs(p"/other/target/laputa/qemu-fixture").qmp_socket
 }

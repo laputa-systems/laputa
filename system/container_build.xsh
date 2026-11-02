@@ -12,7 +12,7 @@ use system.types
 error ContainerBuildError = Failed : InvalidData
 
 pure container_output_root() -> Path {
-  /output
+  p"/output"
 }
 
 pure container_build_plan_path() -> Path {
@@ -32,11 +32,11 @@ pure container_guest_proof_source(profile: types.SystemProfile) -> Path {
 }
 
 pure container_store_root() -> Path {
-  /artifacts
+  p"/artifacts"
 }
 
 pure container_repo_root() -> Path {
-  /src/laputa
+  p"/src/laputa"
 }
 
 # `/output` is a host bind mount and may be case-folding (notably on macOS),
@@ -64,7 +64,7 @@ pure container_work_disk(work: Path) -> Path {
 }
 
 proc container_load_profile(name: Str) -> Result[types.SystemProfile] {
-  system_profile.load_system_profile(name, /src/laputa/profiles)?
+  system_profile.load_system_profile(name, p"/src/laputa/profiles")?
 }
 
 proc container_prepare_overlay(profile: types.SystemProfile, work: Path) -> Result[Path] {
@@ -162,7 +162,7 @@ pure container_pm_argv(args: List[Str]) -> List[Str] {
 proc container_pm(args: List[Str]) [fs, process, error] {
   let status = process.run(
     process.command_argv(
-      /bin/xsh,
+      p"/bin/xsh",
       container_pm_argv(args),
       container_repo_root(),
     ),
@@ -227,7 +227,7 @@ proc container_extract_kernel(build_plan: Path, profile: types.SystemProfile, ou
 }
 
 proc container_build_images(root: Path, rootfs: Path, disk: Path) {
-  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, rootfs)
+  image.image_write_rootfs(root, p"/src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh", rootfs)
   image.write_disk(rootfs, disk)
   image.verify_disk(disk, rootfs.metadata()?.size)
 }

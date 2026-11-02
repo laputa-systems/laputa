@@ -69,5 +69,5 @@ proc main() [fs, process, env, error] {
   linux.set_no_new_privs()?
 
   let config = config_path(administered_config.exists()?)
-  unix.exec(process.command_argv(/usr/bin/ntp-daemon, ["ntp-daemon", "-c", f"{config}"]))?
+  unix.exec(process.command_argv(p"/usr/bin/ntp-daemon", ["ntp-daemon", "-c", f"{config}"]))?
 }

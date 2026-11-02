@@ -7,10 +7,10 @@ pure fixture_config() -> docker.DockerConfig {
     docker: p"docker",
     arch: "aarch64",
     platform: "linux/arm64",
-    laputa_root: /work/laputa,
-    seed: /work/laputa/.out/seed/aarch64,
-    output_root: /work/laputa/target/laputa/qemu-tinyland-ghostty,
-    artifact_root: docker.artifact_store_root(/work/laputa, "aarch64"),
+    laputa_root: p"/work/laputa",
+    seed: p"/work/laputa/.out/seed/aarch64",
+    output_root: p"/work/laputa/target/laputa/qemu-tinyland-ghostty",
+    artifact_root: docker.artifact_store_root(p"/work/laputa", "aarch64"),
     image: "laputa-package-tools:aarch64-test",
     repo_url: "",
     owner: {uid: 1000, gid: 1000},
@@ -141,8 +141,8 @@ test test_x86_64_docker_command_uses_the_amd64_platform_and_store [error] {
     ...fixture_config(),
     arch: "x86_64",
     platform: "linux/amd64",
-    seed: /work/laputa/.out/seed/x86_64,
-    artifact_root: docker.artifact_store_root(/work/laputa, "x86_64"),
+    seed: p"/work/laputa/.out/seed/x86_64",
+    artifact_root: docker.artifact_store_root(p"/work/laputa", "x86_64"),
   }
   let argv = docker.docker_command_argv(config, ["/bin/xsh", "--help"])
   assert "linux/amd64" in argv

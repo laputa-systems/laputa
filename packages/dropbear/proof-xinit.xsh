@@ -185,7 +185,7 @@ proc print_direct_dropbear_probe(rootfs: Path, chroot: Path, port: Int, label: S
   }
 }
 
-proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
+proc main(rootfs = p"/rootfs", port = 22222) [fs, process, env, time, error] {
   let os = system.uname()?
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{os.machine}.so.1"
   let dbclient = fp"{rootfs}/usr/bin/dbclient"
@@ -193,7 +193,7 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   let log_dir = fp"{rootfs}/var/log/dropbear"
   let chroot = process.which("chroot")?
   let timeout_bin = process.which("timeout")?
-  let tmp = /tmp/dropbear-proof-xinit
+  let tmp = p"/tmp/dropbear-proof-xinit"
   tmp.mkdir()
   ensure(fp"{rootfs}/bin/xsh".exists()?, "xinit-control", "rootfs is missing /bin/xsh for service scripts")
   ensure(fp"{rootfs}/usr/bin/xinit".exists()?, "xinit-control", "rootfs is missing /usr/bin/xinit")
@@ -219,7 +219,7 @@ proc main(rootfs = /rootfs, port = 22222) [fs, process, env, time, error] {
   print_direct_dropbear_probe(rootfs, chroot, port + 1, "default-keys", [])
   print_direct_dropbear_probe(rootfs, chroot, port + 2, "ed25519", ["-r", "/tmp/dropbear_host_ed25519"])
   print_direct_dropbear_probe(rootfs, chroot, port + 3, "rsa", ["-r", "/tmp/dropbear_host_rsa"])
-  xinit_start(rootfs, chroot, port, /tmp/dropbear_host_ed25519)
+  xinit_start(rootfs, chroot, port, p"/tmp/dropbear_host_ed25519")
   let running = run.text $chroot $rootfs "/usr/bin/xinit" status dropbear
 
   ensure(

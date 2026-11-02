@@ -27,7 +27,7 @@ export pure syslogd_argv() -> List[Str] {
 export let service = {
   name: "logger",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/syslogd, syslogd_argv()),
+  command: process.command_argv(p"/usr/bin/syslogd", syslogd_argv()),
   targets: [
     "boot",
   ],

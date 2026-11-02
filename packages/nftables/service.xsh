@@ -22,7 +22,7 @@ export proc firewall_result(exit_code: Int) [error] -> Result[Unit, Error] {
 export let service = {
   name: "firewall",
   kind: "oneshot",
-  command: process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/lib/xinit/services/firewall.xsh"]),
+  command: process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xinit/services/firewall.xsh"]),
   targets: [
     "boot",
   ],

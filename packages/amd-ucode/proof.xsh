@@ -20,7 +20,7 @@ proc ensure_sha256(file: Path, expected: Str) {
   proof.ensure(actual == expected, "amd-ucode", f"{file} has sha256 {actual}, expected {expected}")
 }
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "amd-ucode")
   let concatenated: List[Bytes] = collect {
     for container in containers {

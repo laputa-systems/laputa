@@ -15,7 +15,7 @@ proc ensure_file(path_value: Path, label: Str) {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] {
   ensure_executable(fp"{rootfs}/usr/bin/tailscale", "tailscale")
   ensure_executable(fp"{rootfs}/usr/bin/tailscaled", "tailscaled")
   ensure_file(fp"{rootfs}/usr/lib/xinit/services/tailscaled.xsh", "tailscaled service")

@@ -2,7 +2,7 @@
 use pm.generation
 
 proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
-  let receipt = generation.read_generation_receipt(/)?
+  let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   linux.mount(b"/dev/vdc", fp"{root}/output", fstype: "ext4", options: ["nosuid", "nodev"])?
@@ -17,10 +17,10 @@ proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
     print "LAPUTA_SEED_INPUT" $name $value.kind $value.mode $value.size
   }
   fp"{root}/scratch/seed-version.xsh".write("run /bin/kache \"--version\"\nrun /seed/rust/bin/rustc \"-vV\"\n")?
-  let diagnostic = process.command_argv(/bin/xsh, ["/bin/xsh", "/scratch/seed-version.xsh"])
+  let diagnostic = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/scratch/seed-version.xsh"])
   let diagnostic_status = linux.run_in_namespaces(diagnostic, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fail "guest kache seed diagnostic failed" unless diagnostic_status.ok
-  let command = process.command_argv(/bin/xsh, ["/bin/xsh", "/inputs/build.xsh", "--", "debug"])
+  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/inputs/build.xsh", "--", "debug"])
   let status = linux.run_in_namespaces(command, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fs.sync()?
   fail "in-guest source build failed" unless status.ok

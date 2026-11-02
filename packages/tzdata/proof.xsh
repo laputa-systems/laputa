@@ -41,7 +41,7 @@ const expected = [
 
 const tables = ["iso3166.tab", "leap-seconds.list", "leapseconds", "zone.tab", "zone1970.tab", "zonenow.tab"]
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "tzdata")
   let zoneinfo = fp"{root}/usr/share/zoneinfo"
 

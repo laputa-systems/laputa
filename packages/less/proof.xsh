@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(rootfs, "less")
   proof.target_elf(rootfs, p"usr/bin/less", "less")
 

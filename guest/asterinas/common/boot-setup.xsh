@@ -10,25 +10,25 @@ proc require(condition: Bool, phase: Str, message: Str) {
 
 proc main() [fs, process, env, error] {
   eprint --flush "LAPUTA_ASTERINAS_BOOT_SETUP_START"
-  require(linux.is_mountpoint(/proc)?, "proc", "initramfs proc mount was not moved into the root")
-  require(linux.is_mountpoint(/sys)?, "sysfs", "initramfs sysfs mount was not moved into the root")
-  require(linux.is_mountpoint(/dev)?, "dev", "initramfs devtmpfs mount was not moved into the root")
+  require(linux.is_mountpoint(p"/proc")?, "proc", "initramfs proc mount was not moved into the root")
+  require(linux.is_mountpoint(p"/sys")?, "sysfs", "initramfs sysfs mount was not moved into the root")
+  require(linux.is_mountpoint(p"/dev")?, "dev", "initramfs devtmpfs mount was not moved into the root")
   require(p"/proc/1/cmdline".exists()?, "proc", "PID 1 command line is unavailable")
 
-  for dir in [/dev/pts, /dev/shm, /run, /tmp] {
+  for dir in [p"/dev/pts", p"/dev/shm", p"/run", p"/tmp"] {
     dir.mkdir()
   }
 
-  linux.mount(bytes.from_text("run"), /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
-  linux.mount(bytes.from_text("devpts"), /dev/pts, fstype: "devpts", options: ["mode=0620", "gid=5", "ptmxmode=0666", "nosuid", "noexec"])
-  linux.mount(bytes.from_text("shm"), /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
+  linux.mount(bytes.from_text("run"), p"/run", fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
+  linux.mount(bytes.from_text("devpts"), p"/dev/pts", fstype: "devpts", options: ["mode=0620", "gid=5", "ptmxmode=0666", "nosuid", "noexec"])
+  linux.mount(bytes.from_text("shm"), p"/dev/shm", fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
   linux.mount_all()
 
   if p"/dev/pts/ptmx".exists() and ! p"/dev/ptmx".exists() {
     p"/dev/ptmx".symlink(to: p"pts/ptmx")
   }
   if ! p"/dev/fd".exists() {
-    p"/dev/fd".symlink(to: /proc/self/fd)
+    p"/dev/fd".symlink(to: p"/proc/self/fd")
   }
   if ! p"/dev/stdin".exists() {
     p"/dev/stdin".symlink(to: p"fd/0")
@@ -40,7 +40,7 @@ proc main() [fs, process, env, error] {
     p"/dev/stderr".symlink(to: p"fd/2")
   }
 
-  let coldplug = process.run(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
+  let coldplug = process.run(process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
   require(coldplug.ok, "coldplug", "starting mdevd and running coldplug failed")
   eprint --flush "LAPUTA_ASTERINAS_COLDPLUG_OK"
   eprint --flush "LAPUTA_ASTERINAS_BOOT_SETUP_OK"

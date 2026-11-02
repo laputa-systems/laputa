@@ -1,6 +1,6 @@
 error ProofError = Failed(kind: Str, message: Str)
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   let cat = fp"{root}/usr/bin/cat"
 
   if ! cat.exists()? {

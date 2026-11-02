@@ -4,7 +4,7 @@
 proc give_tree(root: Path, uid: Int, gid: Int) {
   return unless root.exists()
 
-  let owner = {uid, gid, name: "", home: /, shell: ""}
+  let owner = {uid, gid, name: "", home: p"/", shell: ""}
   let owning_group = {gid, members: [], name: ""}
   fs.chown(root, owner, false)
   fs.chgrp(root, owning_group, false)

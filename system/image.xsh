@@ -98,7 +98,7 @@ export proc image_write_rootfs(generation_root: Path, formatter: Path, output: P
     temporary.write(b"")
     temporary.truncate(target_size)
 
-    let xsh = /bin/xsh
+    let xsh = p"/bin/xsh"
     let status = process.run(
       process.command_argv(
         xsh,

@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "hwdata")
   let share = fp"{root}/usr/share/hwdata"
 

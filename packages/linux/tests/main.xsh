@@ -564,7 +564,7 @@ test test_kbuild_constructs_builtin_archive_tasks [fs, process, env, time, error
     let archive_plan = test_builtin_archive_plan(
       cache,
       plan,
-      /usr/bin/cc,
+      p"/usr/bin/cc",
       "aarch64-linux-gnu",
       ["-D__KERNEL__", "-O2", "-mgeneral-regs-only", "-mbranch-protection=pac-ret"],
       [],
@@ -656,7 +656,7 @@ test test_kbuild_plans_pi_relacheck_after_objcopy [fs, process, env, time, error
     let archive_plan = test_builtin_archive_plan(
       cache,
       plan,
-      /usr/bin/cc,
+      p"/usr/bin/cc",
       "aarch64-linux-gnu",
       ["-fno-function-sections", "-fno-data-sections"],
       [],
@@ -837,9 +837,9 @@ test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |c
   )
   env ({XSH_PM_RECIPE_DIR: recipe.display()}) {
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     assert archive_plan.missing_sources == [p"drivers/firmware/efi/libstub/missing.stub.o"]
-    let parallel = test_builtin_archive_plan_with_workers(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
+    let parallel = test_builtin_archive_plan_with_workers(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
     assert parallel.missing_sources == archive_plan.missing_sources
     assert parallel.task_count == archive_plan.task_count
     assert parallel.link_inputs == archive_plan.link_inputs
@@ -849,12 +849,12 @@ test test_kbuild_plans_x86_efi_stub_objects [fs, process, env, time, error] { |c
       assert make.argv_text(parallel.tasks[index].argv)? == make.argv_text(archive_plan.tasks[index].argv)?
     }
     env ({XSH_LINUX_KBUILD_ARCHIVE_ONLY: "1"}) {
-      let compact = test_builtin_archive_plan_with_workers(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
+      let compact = test_builtin_archive_plan_with_workers(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [], 2, xsh_bin, worker)?
       assert compact.task_count == archive_plan.task_count
       assert compact.link_inputs == archive_plan.link_inputs
       assert compact.missing_sources == archive_plan.missing_sources
     }
-    let other_arch = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    let other_arch = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "aarch64-linux-gnu", [], [], [])?
     assert other_arch.missing_sources == plan.lib_objects
     for stem in ["gop", "lib-ctype"] {
       let base = f".xsh-kbuild/obj/drivers/firmware/efi/libstub/{stem}.o"
@@ -912,7 +912,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
     XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS: "1", XSH_LINUX_KBUILD_FORCE_ARCHIVES: "0",
     PATH: f"{fake}:{e"PATH" ?? ""}"}) {
     cd root {
-      let first = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let first = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert first.missing_sources.is_empty()
       let base = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.o"
       let output = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.stub.o"
@@ -927,7 +927,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       let before = fingerprint.read_text()?
       helper.write(helper.read_text()? + "\n")
       fs.set_times(helper, mtime_sec: 1000000000)?
-      let second = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let second = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert second.missing_sources.is_empty()
       assert fingerprint.read_text()? != before
       let changed_copies = [task for task in second.tasks if task.name == output.display()]
@@ -935,7 +935,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       make.run_tasks([{...changed_copies[0], deps: []}], 1)
       assert fp"{fake}/calls".read_text()? == "xx"
       helper.remove(missing_ok: false)
-      match linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], []) {
+      match linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], []) {
         Ok(_) => test.fail("missing EFI stub helper unexpectedly reused a cached plan")
         Err(kbuild.ScriptError.Failed {kind, ..}) => assert kind == "linux-recipe-helper"
         Err(problem) => test.fail(f"unexpected helper error: {problem.message}")
@@ -968,7 +968,7 @@ test test_kbuild_reports_missing_builtin_archive_sources [fs, process, env, time
   )
 
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "aarch64-linux-gnu", [], [], [])?
     assert archive_plan.missing_sources.len() == 1
     assert archive_plan.generated_objects.is_empty()
     assert contains_path(archive_plan.missing_sources, "missing.o")
@@ -1070,11 +1070,11 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
   )
 
   cd root {
-    let serial = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+    let serial = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "aarch64-linux-gnu", [], [], [])?
     let parallel = test_builtin_archive_plan_with_workers(
       cache,
       plan,
-      /usr/bin/cc,
+      p"/usr/bin/cc",
       "aarch64-linux-gnu",
       [],
       [],
@@ -1098,11 +1098,11 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
     env ({
       XSH_LINUX_KBUILD_ARCHIVE_ONLY: "1",
     }) {
-      let compact_serial = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "aarch64-linux-gnu", [], [], [])?
+      let compact_serial = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "aarch64-linux-gnu", [], [], [])?
       let compact_parallel = test_builtin_archive_plan_with_workers(
         cache,
         plan,
-        /usr/bin/cc,
+        p"/usr/bin/cc",
         "aarch64-linux-gnu",
         [],
         [],
@@ -1128,7 +1128,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       p"Kbuild".write("CFLAGS_first.o := -DCHANGED\n")
       p".config".write("# CONFIG_JUMP_LABEL is not set\n")
       let captured = kbuild.plan_builtin_archives_with_analysis_workers(
-        prepared, /usr/bin/cc, [], [], [], 2, xsh_bin, worker,
+        prepared, p"/usr/bin/cc", [], [], [], 2, xsh_bin, worker,
       )?
       let tasks = [task for task in captured.tasks if task.name == ".xsh-kbuild/obj/first.o"]
       assert tasks.len() == 1
@@ -1172,7 +1172,7 @@ int mmu(void) { return 0; }
   )
 
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     var saw_mmu = false
 
     for task in archive_plan.tasks {
@@ -1230,7 +1230,7 @@ CFLAGS_intel.o := -I$(src)
   )
 
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     var saw_controller = false
     var saw_intel = false
 
@@ -1271,7 +1271,7 @@ CFLAGS_foo.o += -DVALUE=$(empty-y)
     dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let tasks = [task for task in archive_plan.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert tasks.len() == 1
     assert "-DVALUE=" in tasks[0].argv
@@ -1324,7 +1324,7 @@ test test_kbuild_rejects_unexpanded_compile_arguments [fs, process, env, time, e
     dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
   cd root {
-    match test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], []) {
+    match test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], []) {
       Ok(_) => test.fail("planning accepted an unexpanded compile argument")
       Err(kbuild.ScriptError.Failed {kind, message}) => {
         assert kind == "kbuild-unexpanded-flag"
@@ -1347,7 +1347,7 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, process, env, time, er
     dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
   cd root {
-    let _ = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let _ = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let local = p".xsh-kbuild-compile-flags.json"
     let stable = fp"{cache}/linux-x86.compile-flags.json"
     for cache_file in [local, stable] {
@@ -1356,7 +1356,7 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, process, env, time, er
       assert stale != original
       cache_file.write(stale)
     }
-    let refreshed = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let refreshed = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let tasks = [task for task in refreshed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert tasks.len() == 1
     assert "-DVALID" in tasks[0].argv
@@ -1365,13 +1365,13 @@ test test_kbuild_rebuilds_legacy_compile_flags_cache [fs, process, env, time, er
     for cache_file in [local, stable] {
       cache_file.write(cache_file.read_text()?.replace("-DVALID", with: "-DSTALE"))
     }
-    let repaired = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let repaired = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let repaired_tasks = [task for task in repaired.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert repaired_tasks.len() == 1
     assert "-DVALID" in repaired_tasks[0].argv
     assert "-DSTALE" not in repaired_tasks[0].argv
     p"flags.include".write("CFLAGS_foo.o := -DUPDATED\n")
-    let updated = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let updated = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let updated_tasks = [task for task in updated.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert updated_tasks.len() == 1
     assert "-DUPDATED" in updated_tasks[0].argv
@@ -1390,7 +1390,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
   replacement.write("CFLAGS_foo.o := -DNEW\n")
   fs.mkfifo(included, 0o600)?
   let command = process.command_argv(
-    /bin/sh,
+    p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
   )
   let writer = spawn command?
@@ -1399,10 +1399,10 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
     dirs: [p"."], objects: [p"foo.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
   cd root {
-    let _ = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let _ = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     assert (wait writer?).ok
     included.write("CFLAGS_foo.o := -DOLD\n")
-    let refreshed = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let refreshed = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     let tasks = [task for task in refreshed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert tasks.len() == 1
     assert "-DOLD" in tasks[0].argv
@@ -1412,7 +1412,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
     replacement.write("CFLAGS_foo.o := -DNEW\n")
     let second_writer = spawn command?
     defer second_writer.cancel(kill_after: 0ms)
-    let reused = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let reused = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     assert (wait second_writer?).ok
     let reused_tasks = [task for task in reused.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
     assert reused_tasks.len() == 1
@@ -1434,7 +1434,7 @@ test test_kbuild_archive_plan_cache_binds_parsed_compile_flags [fs, process, env
   replacement.write("CFLAGS_foo.o := -DNEW\n")
   fs.mkfifo(included, 0o600)?
   let command = process.command_argv(
-    /bin/sh,
+    p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
   )
   let writer = spawn command?
@@ -1450,13 +1450,13 @@ test test_kbuild_archive_plan_cache_binds_parsed_compile_flags [fs, process, env
     XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS: "1",
   }) {
     cd root {
-      let first = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let first = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert (wait writer?).ok
       let first_tasks = [task for task in first.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert first_tasks.len() == 1
       assert "-DNEW" in first_tasks[0].argv
       included.write("CFLAGS_foo.o := -DOLD\n")
-      let refreshed = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let refreshed = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       let tasks = [task for task in refreshed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert tasks.len() == 1
       assert "-DOLD" in tasks[0].argv
@@ -1483,7 +1483,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
     XSH_LINUX_KBUILD_ARCHIVE_ANALYSIS_JOBS: "1",
   }) {
     cd root {
-      let first = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let first = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" in first.missing_sources
       for fingerprint in [p".xsh-kbuild-archive-plan.fingerprint", fp"{cache}/linux-x86.archive-plan.fingerprint"] {
         let current = fingerprint.read_text()?
@@ -1491,14 +1491,14 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         assert legacy != current
         fingerprint.write(legacy)
       }
-      let rebuilt = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let rebuilt = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" in rebuilt.missing_sources
       assert "linux-archive-plan-cache-v4" in p".xsh-kbuild-archive-plan.fingerprint".read_text()?
       p"foo.c".write("int foo(void) { return 0; }\n")
-      let second = linux_shared.cached_archive_plan(plan, /usr/bin/cc, "x86", "x86_64-linux-gnu", [], [])?
+      let second = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" not in second.missing_sources
       assert [task for task in second.tasks if task.name == ".xsh-kbuild/obj/foo.o"].len() == 1
-      let alternate = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let alternate = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       let alternate_tasks = [task for task in alternate.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert alternate_tasks.len() == 1
       assert "/usr/bin/false" in alternate_tasks[0].argv
@@ -1508,7 +1508,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         assert changed != original
         report.write(changed)
       }
-      let repaired = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let repaired = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       let repaired_tasks = [task for task in repaired.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert repaired_tasks.len() == 1
       assert "/usr/bin/false" in repaired_tasks[0].argv
@@ -1521,20 +1521,20 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       report.remove(missing_ok: false)
       fs.mkfifo(report, 0o600)?
       let replace_report = process.command_argv(
-        /bin/sh,
+        p"/bin/sh",
         ["/bin/sh", "-c", "exec 3>\"$1\"; cat \"$2\" >&3; mv \"$3\" \"$1\"; exec 3>&-", "fixture", report, original_report, changed_report],
       )
       let report_writer = spawn replace_report?
       defer report_writer.cancel(kill_after: 0ms)
-      let observed = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let observed = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       assert (wait report_writer?).ok
       let observed_tasks = [task for task in observed.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert observed_tasks.len() == 1
       assert "/usr/bin/false" in observed_tasks[0].argv
-      let repaired_again = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let repaired_again = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       assert repaired_again.task_count == repaired.task_count
       env ({XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
-        let reused = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+        let reused = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert reused.task_count == repaired.task_count
       }?
       for report in [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"] {
@@ -1543,37 +1543,37 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         json.write(summary, {...stored, task_count: repaired.task_count + 1})
       }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan"}) {
-        let repaired_summary = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+        let repaired_summary = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert repaired_summary.task_count == repaired.task_count
       }?
       let reports = [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"]
       for report in reports { report.chmod(0o000)? }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
-        let summary_only = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+        let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
       }?
       for report in reports { report.chmod(0o644)? }
       let report_texts = [report.read_text()? for report in reports]
       for report in reports { report.remove(missing_ok: false) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
-        let summary_only = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+        let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
       }?
       for index in range(reports.len()) { reports[index].write(report_texts[index]) }
       p"foo.S".write(".text\n")
       p"foo.c".remove(missing_ok: false)
-      let assembly = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let assembly = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       let assembly_tasks = [task for task in assembly.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert assembly_tasks.len() == 1
       assert "foo.S" in assembly_tasks[0].argv
       p"foo.S".remove(missing_ok: false)
-      let missing = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", [], [])?
+      let missing = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
       assert p"foo.o" in missing.missing_sources
       p"foo.c".write("int foo(void) { return 0; }\n")
-      let joined = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", ["-DLEFT\n-DRIGHT"], [])?
+      let joined = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", ["-DLEFT\n-DRIGHT"], [])?
       let joined_tasks = [task for task in joined.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert "-DLEFT\n-DRIGHT" in joined_tasks[0].argv
-      let split = linux_shared.cached_archive_plan(plan, /usr/bin/false, "x86", "x86_64-linux-gnu", ["-DLEFT", "-DRIGHT"], [])?
+      let split = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", ["-DLEFT", "-DRIGHT"], [])?
       let split_tasks = [task for task in split.tasks if task.name == ".xsh-kbuild/obj/foo.o"]
       assert "-DLEFT" in split_tasks[0].argv
       assert "-DRIGHT" in split_tasks[0].argv
@@ -1609,7 +1609,7 @@ CFLAGS_x86/avx.o += -DXOR_MEMBER_FLAG
   )
 
   cd root {
-    let archive_plan = test_builtin_archive_plan(cache, plan, /usr/bin/cc, "x86_64-linux-gnu", [], [], [])?
+    let archive_plan = test_builtin_archive_plan(cache, plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
     var saw_member = false
 
     for task in archive_plan.tasks {
@@ -1731,9 +1731,9 @@ test test_kbuild_x86_vmlinux_archive_leaves_out_efi_stub [error] {
 
 test test_kbuild_models_final_link_tasks [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "linux-link-tasks")?
-  let ar = /usr/bin/ar
-  let ld = /usr/bin/ld
-  let objcopy = /usr/bin/objcopy
+  let ar = p"/usr/bin/ar"
+  let ld = p"/usr/bin/ld"
+  let objcopy = p"/usr/bin/objcopy"
   let built_in = fp"{root}/built-in.a"
   let arch_lib = fp"{root}/arch/arm64/lib/lib.a"
   let efi_lib = fp"{root}/drivers/firmware/efi/libstub/lib.a"

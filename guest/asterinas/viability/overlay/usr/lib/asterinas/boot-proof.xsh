@@ -39,9 +39,9 @@ proc main() [fs, process, env, time, net, error] {
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_START"
   eprint --flush "LAPUTA_ASTERINAS_XINIT_PID1_OK"
 
-  require(linux.is_mountpoint(/proc)?, "proc", "/proc is not mounted")
-  require(linux.is_mountpoint(/sys)?, "sysfs", "/sys is not mounted")
-  require(linux.is_mountpoint(/dev)?, "dev", "/dev is not mounted")
+  require(linux.is_mountpoint(p"/proc")?, "proc", "/proc is not mounted")
+  require(linux.is_mountpoint(p"/sys")?, "sysfs", "/sys is not mounted")
+  require(linux.is_mountpoint(p"/dev")?, "dev", "/dev is not mounted")
 
   let os_release = p"/etc/os-release".read_text()?
   require("NAME=\"Laputa Linux\"" in os_release, "rootfs", "Laputa os-release is missing")
@@ -186,7 +186,7 @@ proc main() [fs, process, env, time, net, error] {
     if round > 0 {
       p"/dev/vda".remove()
       require(! p"/dev/vda".exists()?, "coldplug", "the block node was not removed")
-      let repeat = process.run(process.command_argv(/usr/bin/mdevd-coldplug, ["mdevd-coldplug", "-O", "4"]))?
+      let repeat = process.run(process.command_argv(p"/usr/bin/mdevd-coldplug", ["mdevd-coldplug", "-O", "4"]))?
       require(repeat.ok, "coldplug", f"repeated coldplug {round} failed")
     }
     let node = fs.stat(p"/dev/vda")?
@@ -202,14 +202,14 @@ proc main() [fs, process, env, time, net, error] {
   p"/dev/vda".remove()
   let unanswered = process.run(
     process.command_argv(
-      /usr/bin/mdevd-coldplug,
+      p"/usr/bin/mdevd-coldplug",
       ["mdevd-coldplug", "-O", "4"],
       env: {PATH: "/usr/bin:/bin", MDEVD_COLDPLUG_SYNC_TIMEOUT_SECS: "3"},
     ),
   )?
   require(! unanswered.ok, "coldplug", "coldplug reported success with no mdevd to answer it")
   require(! p"/dev/vda".exists()?, "coldplug", "the node came back without a running mdevd")
-  let restarted = process.run(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
+  let restarted = process.run(process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/asterinas/device-coldplug.xsh"]))?
   require(restarted.ok, "coldplug", "coldplug after an mdevd restart failed")
   let restored = fs.stat(p"/dev/vda")?
   require(restored.rdev == expected_rdev and restored.mode % 4096 == 0o660, "coldplug", "the node was not restored after an mdevd restart")

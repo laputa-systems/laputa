@@ -3,7 +3,7 @@
 export let service = {
   name: "demo",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/demo, ["demo", "--foreground"]),
+  command: process.command_argv(p"/usr/bin/demo", ["demo", "--foreground"]),
   targets: [
     "boot",
   ],

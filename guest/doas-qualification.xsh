@@ -45,15 +45,15 @@ proc qualification_laputa(terminal: Bool) [fs, process, error] {
   }
   let marker = if terminal { "terminal" } else { "detached" }
   let status = process.run(process.command_argv(
-    /usr/bin/doas,
+    p"/usr/bin/doas",
     ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", marker],
   ))?
   assert status.ok
   let check = process.run(process.command_argv(
-    /usr/bin/doas,
+    p"/usr/bin/doas",
     ["doas", "-C", "/run/doas-qualification/private.conf"],
-    stdout: /dev/null,
-    stderr: /dev/null,
+    stdout: p"/dev/null",
+    stderr: p"/dev/null",
   ))?
   assert ! check.ok
 }
@@ -67,10 +67,10 @@ proc qualification_nobody() [fs, process, error] {
   assert identity.supplementary.len() == groups.len()
   for gid in groups { assert gid in identity.supplementary }
   let status = process.run(process.command_argv(
-    /usr/bin/doas,
+    p"/usr/bin/doas",
     ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", "unauthorized"],
-    stdout: /dev/null,
-    stderr: /dev/null,
+    stdout: p"/dev/null",
+    stderr: p"/dev/null",
   ))?
   assert ! status.ok
 }
@@ -81,9 +81,9 @@ proc qualification_denied_command() [fs, process, error] {
   assert identity.uid == laputa.uid and identity.euid == laputa.uid
   assert identity.gid == laputa.gid and identity.egid == laputa.gid
   let status = process.run(process.command_argv(
-    /usr/bin/doas,
+    p"/usr/bin/doas",
     ["doas", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "payload", "unauthorized-command"],
-    stdout: /dev/null, stderr: /dev/null,
+    stdout: p"/dev/null", stderr: p"/dev/null",
   ))?
   assert ! status.ok
 }
@@ -94,9 +94,9 @@ proc qualification_restricted_policy() [fs, process, time, error] {
   defer config.write(original)?
   config.write(f"{original}\ndeny laputa cmd /usr/bin/xsh args /usr/lib/laputa/doas-qualification.xsh payload unauthorized-command\n")?
   let status = qualification_detached(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "denied-command"],
-    stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
+    stdin: p"/dev/null", stdout: p"/dev/null", stderr: p"/dev/null", new_session: true,
   ))?
   assert status.ok
   assert ! p"/run/doas-qualification/unauthorized-command".exists()?
@@ -128,9 +128,9 @@ proc qualification_run() [fs, process, time, net, error] {
   p"/run/doas-qualification/private.conf".write("permit nopass root\n")?
   p"/run/doas-qualification/private.conf".chmod(0o600)?
   let detached = qualification_detached(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "detached"],
-    stdin: /dev/null, stdout: /run/doas-qualification/detached.log, stderr: /run/doas-qualification/detached.log, new_session: true,
+    stdin: p"/dev/null", stdout: p"/run/doas-qualification/detached.log", stderr: p"/run/doas-qualification/detached.log", new_session: true,
   ))?
   if ! detached.ok {
     p"/dev/console".write(p"/run/doas-qualification/detached.log".read_text()?)?
@@ -138,15 +138,15 @@ proc qualification_run() [fs, process, time, net, error] {
   assert detached.ok
   assert p"/run/doas-qualification/detached".read_text()? == "executed\n"
   let denied = qualification_detached(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "nobody"],
-    stdin: /dev/null, stdout: /dev/null, stderr: /dev/null, new_session: true,
+    stdin: p"/dev/null", stdout: p"/dev/null", stderr: p"/dev/null", new_session: true,
   ))?
   assert denied.ok
   assert ! p"/run/doas-qualification/unauthorized".exists()?
   let pty = unix.open_pty()?
   let child = unix.spawn_with_tty(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "terminal"],
   ), tty: pty.name)?
   var events: List[ChildEvent] = []

@@ -142,7 +142,7 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
     time.sleep(1s)
     elapsed += 1
   }
-  for log in [/var/log/tinyland/current, /var/log/seatd/current] {
+  for log in [p"/var/log/tinyland/current", p"/var/log/seatd/current"] {
     if log.exists() { guest_console(log.read_text()?) }
   }
   guest_fail("session", "replacement session did not become ready")
@@ -219,7 +219,7 @@ proc guest_granted_device_control(runtime: Path) [fs, process, error] {
   defer device.chmod(original)
   device.chmod(0o666)?
   let result = process.run(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 10s,
@@ -239,18 +239,18 @@ proc main() [fs, process, time, error] {
   let seatd_pid = guest_wait_unit("seatd", -1, true)?
   guest_require_broker_census(mdevd_pid, seatd_pid)?
   guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")?
-  guest_run_required(process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/doas-qualification.xsh"], stdout: /dev/console, stderr: /dev/console), "doas-qualification")
+  guest_run_required(process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/laputa/doas-qualification.xsh"], stdout: p"/dev/console", stderr: p"/dev/console"), "doas-qualification")
 
-  guest_wait_for(/dev/dri/card0, "drm-device", 20)
+  guest_wait_for(p"/dev/dri/card0", "drm-device", 20)
 
-  for device in [/dev/input/event0, /dev/input/event1] {
+  for device in [p"/dev/input/event0", p"/dev/input/event1"] {
     guest_wait_for(device, "input-devices", 20)
   }
 
   # Device nodes are owned by mdev rules (see baselayout mdev.conf); log the
   # effective modes before the unprivileged session needs them. The mdevd
   # catch-all would set root:root 0660 here, which the session cannot use.
-  for node in [/dev/ptmx, /dev/console] {
+  for node in [p"/dev/ptmx", p"/dev/console"] {
     match node.metadata() {
       Ok(meta) => {
         guest_console(f"LAPUTA_TINYLAND_NODE {node.display()} mode={meta.mode % 4096}")
@@ -275,9 +275,9 @@ proc main() [fs, process, time, error] {
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
   guest_run_required(process.command_argv(
-    /usr/bin/su,
+    p"/usr/bin/su",
     ["su", "nobody", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-runtime-attack.xsh"],
-    stdout: /dev/console, stderr: /dev/console,
+    stdout: p"/dev/console", stderr: p"/dev/console",
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 10s,
   ), "runtime-attack")
@@ -308,7 +308,7 @@ proc main() [fs, process, time, error] {
   let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
 
   if !guest_process_alive(survivor_pid)? {
-    for log in [/var/log/tinyland/current, /var/log/seatd/current] {
+    for log in [p"/var/log/tinyland/current", p"/var/log/seatd/current"] {
       if log.exists() { guest_console(log.read_text()?) }
     }
     guest_fail("device-loss", "compositor died on single keyboard loss")

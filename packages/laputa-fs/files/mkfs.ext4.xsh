@@ -964,7 +964,7 @@ proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
   var source_root = if opts.source_root == "" { p"" } else { fp"{opts.source_root}" }
 
   if source_root == "" {
-    let empty_dir = /tmp/mkfs-ext4-empty
+    let empty_dir = p"/tmp/mkfs-ext4-empty"
     empty_dir.mkdir()
     source_root = empty_dir
   }

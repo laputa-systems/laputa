@@ -532,7 +532,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     ),
     cwd: root,
     env: {},
-    stderr: /dev/null,
+    stderr: p"/dev/null",
   )?
 
   defer terminate_if_live(installer.pid)
@@ -556,7 +556,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     qemu_target_args(arch, qemu_name, installer_kernel, target_cmdline, target_image, target_log, target_ssh_port),
     cwd: root,
     env: {},
-    stderr: /dev/null,
+    stderr: p"/dev/null",
   )?
 
   defer terminate_if_live(target.pid)

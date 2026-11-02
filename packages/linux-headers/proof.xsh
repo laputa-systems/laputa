@@ -9,7 +9,7 @@ proc require(condition: Bool, message: Str) {
   }
 }
 
-proc main(root = /rootfs) [fs, env, error] {
+proc main(root = p"/rootfs") [fs, env, error] {
   let target = pm_target.recipe_target()?
   proof.package_metadata(root, "linux-headers")
   let include = fp"{root}/usr/include"

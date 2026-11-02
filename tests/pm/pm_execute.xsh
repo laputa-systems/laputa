@@ -138,7 +138,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   fp"{package}/proof.xsh".write(r"""
 error ProofError = MissingPayload
 
-proc main(root: Path = /rootfs) [fs, error] {
+proc main(root: Path = p"/rootfs") [fs, error] {
   if ! fp"{root}/usr/share/execute-leaf.txt".exists()? {
     return Err(ProofError.MissingPayload)
   }
@@ -193,7 +193,7 @@ export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
   fp"{package}/proof.xsh".write(r"""
 error ProofError = Failed(message: Str)
 
-proc main(root: Path = /rootfs) [fs, error] {
+proc main(root: Path = p"/rootfs") [fs, error] {
   if ! fp"{root}/usr/share/execute-service.txt".exists()? {
     return Err(ProofError.Failed("missing execute-service payload"))
   }
@@ -432,8 +432,8 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
   let proof = fp"{repo_root}/packages/execute-app/proof.xsh"
   proof.write(
     proof.read_text()?.replace(
-      "proc main(root: Path = /rootfs) [fs, error] {",
-      with: "proc main(root: Path = /rootfs) [fs, env, error] {\n  if env(\"XSH_PM_TARGET_ARCH\")? != \"x86_64\" {\n    return Err(ProofError.Failed(\"proof ran under the wrong target\"))\n  }",
+      "proc main(root: Path = p\"/rootfs\") [fs, error] {",
+      with: "proc main(root: Path = p\"/rootfs\") [fs, env, error] {\n  if env(\"XSH_PM_TARGET_ARCH\")? != \"x86_64\" {\n    return Err(ProofError.Failed(\"proof ran under the wrong target\"))\n  }",
     ),
   )
   let value = plan.resolve(
@@ -600,7 +600,7 @@ test test_execute_cached_reproof_failure_reports_context_and_corrupt_final_never
   proof_path.write(
     """error ProofError = Failed(message: Str)
 
-proc main(root: Path = /rootfs) [error] {
+proc main(root: Path = p"/rootfs") [error] {
   return Err(ProofError.Failed(\"intentional proof failure\"))
 }
 
@@ -817,7 +817,7 @@ test test_execute_composes_proof_tools_without_build_or_generation_leakage_and_r
   recipe_path.write(recipe_path.read_text()?.replace("export let runtime_only_deps = [\"execute-dep\"]", with: "export let runtime_only_deps = []"))
   fp"{package}/proof_deps.xsh".write("##! Proof dependency fixture.\n## Declared proof tool.\nexport let proof_deps = [\"execute-dep\"]\n")
   let proof_path = fp"{package}/proof.xsh"
-  proof_path.write(proof_path.read_text()?.replace("proc main(root: Path = /rootfs) [fs, error] {", with: "proc main(root: Path = /rootfs) [fs, error] {\n  if ! fp\"{root}/usr/share/execute-dep.txt\".exists()? { return Err(ProofError.Failed(\"missing declared proof tool\")) }"))
+  proof_path.write(proof_path.read_text()?.replace("proc main(root: Path = p\"/rootfs\") [fs, error] {", with: "proc main(root: Path = p\"/rootfs\") [fs, error] {\n  if ! fp\"{root}/usr/share/execute-dep.txt\".exists()? { return Err(ProofError.Failed(\"missing declared proof tool\")) }"))
   let value = resolve_execute_plan_for_roots(repo_root, ["execute-service"])?
   let service_node = node_named(value, "execute-service")?
   assert node_named(value, "execute-dep")?.level < service_node.level

@@ -1,6 +1,6 @@
 use pm.proof
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "xkeyboard-config")
   let xkb = fp"{root}/usr/share/X11/xkb"
 

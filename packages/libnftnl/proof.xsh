@@ -119,7 +119,7 @@ int main(void) {
 }
 """
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "libnftnl")
   proof.ensure(fp"{root}/usr/include/libnftnl/rule.h".exists()?, "libnftnl", "missing libnftnl/rule.h")
   proof.ensure(fp"{root}/usr/lib/pkgconfig/libnftnl.pc".exists()?, "libnftnl", "missing libnftnl.pc")

@@ -91,7 +91,7 @@ proc main() [fs, process, env, error] {
     SEATD_SOCK: "/run/seatd.sock",
   }) {
     let session = spawn process.command_argv(
-      /usr/bin/tinyland,
+      p"/usr/bin/tinyland",
       ["tinyland", "--seat", "--", "/usr/bin/ghostty-custom", "-e", "/bin/xsh", "/usr/lib/laputa/tinyland-ghostty-read.xsh"],
     )?
     let leader = session.pid

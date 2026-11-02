@@ -195,7 +195,7 @@ test test_package_fingerprint_refuses_symlinks_leaving_the_recipe [fs, env, erro
   fp"{pkg.dir}/files/inside.txt".symlink(to: p"input.txt")
   assert build_input(pkg)? == first == false
 
-  for target in [../../pm, /etc, p"files/../../outside.xsh"] {
+  for target in [p"../../pm", p"/etc", p"files/../../outside.xsh"] {
     let link = fp"{pkg.dir}/escape"
     link.remove()
     link.symlink(to: target)

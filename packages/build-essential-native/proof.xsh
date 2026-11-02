@@ -43,7 +43,7 @@ proc ensure_runtime_artifacts(root: Path, packages: List[Str]) {
   }
 }
 
-proc main(root = /rootfs) [fs, env, error] {
+proc main(root = p"/rootfs") [fs, env, error] {
   for tool in [
     "cc",
     "c++",

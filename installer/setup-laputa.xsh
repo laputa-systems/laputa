@@ -95,7 +95,7 @@ proc require_file(path_value: Path) {
 }
 
 proc run_argv(target: Path, argv: List[Str]) [fs, process, error] {
-  let status = process.run(process.command_argv(target, argv, /, {}))?
+  let status = process.run(process.command_argv(target, argv, p"/", {}))?
 
   return when status.ok
 
@@ -425,7 +425,7 @@ tty1::respawn:/usr/bin/login -f pazu
     )
 
     fs.install(
-      /usr/lib/init/rc.d/laputa-ci-smoke.boot,
+      p"/usr/lib/init/rc.d/laputa-ci-smoke.boot",
       fp"{root}/usr/lib/init/rc.d/laputa-ci-smoke.boot",
       0o755,
       parents: true,
@@ -435,7 +435,7 @@ tty1::respawn:/usr/bin/login -f pazu
 }
 
 proc configured_ci_esp_bytes() -> Result[Int] {
-  let path_value = /etc/laputa-installer/target-esp-mb
+  let path_value = p"/etc/laputa-installer/target-esp-mb"
 
   return 16MiB unless path_value.exists()
 
@@ -483,19 +483,19 @@ proc wipe_and_partition(disk: Path, ci: Bool) -> Result[DiskParts] {
 }
 
 proc install_to_disk(disk: Path, ci: Bool) {
-  require_file(/usr/bin/mkfs.ext4)
-  require_file(/usr/bin/mkfs.vfat)
-  require_file(/usr/share/laputa-installer/target-root.tar.gz)
+  require_file(p"/usr/bin/mkfs.ext4")
+  require_file(p"/usr/bin/mkfs.vfat")
+  require_file(p"/usr/share/laputa-installer/target-root.tar.gz")
   let network_method = prompt_network_method(ci)?
   write_stdout_line(f"Installing Laputa to {disk}")
   let parts = wipe_and_partition(disk, ci)?
   wait_for(parts.esp)
   wait_for(parts.swap)
   wait_for(parts.root)
-  run_argv(/usr/bin/mkfs.vfat, ["mkfs.vfat", "-n", "LAPUTA_ESP", parts.esp.display()])
+  run_argv(p"/usr/bin/mkfs.vfat", ["mkfs.vfat", "-n", "LAPUTA_ESP", parts.esp.display()])
 
   run_argv(
-    /usr/bin/mkfs.ext4,
+    p"/usr/bin/mkfs.ext4",
     [
       "mkfs.ext4",
       "-q",
@@ -511,16 +511,16 @@ proc install_to_disk(disk: Path, ci: Bool) {
 
   linux.mkswap(parts.swap)
   p"/mnt/target".mkdir()
-  linux.mount(parts.root.bytes(), /mnt/target, fstype: "ext4")
-  archive.extract(/usr/share/laputa-installer/target-root.tar.gz, /mnt/target, .Tar, collision: .Replace, modes: .Exact, special: .Create)
-  normalize_target_ownership(/mnt/target)
+  linux.mount(parts.root.bytes(), p"/mnt/target", fstype: "ext4")
+  archive.extract(p"/usr/share/laputa-installer/target-root.tar.gz", p"/mnt/target", .Tar, collision: .Replace, modes: .Exact, special: .Create)
+  normalize_target_ownership(p"/mnt/target")
   p"/mnt/target/boot".mkdir()
-  linux.mount(parts.esp.bytes(), /mnt/target/boot, fstype: "vfat")
+  linux.mount(parts.esp.bytes(), p"/mnt/target/boot", fstype: "vfat")
 
   if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI".exists() {
     fs.install(
-      /usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI,
-      /mnt/target/boot/EFI/BOOT/BOOTAA64.EFI,
+      p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTAA64.EFI",
+      p"/mnt/target/boot/EFI/BOOT/BOOTAA64.EFI",
       0o644,
       parents: true,
       overwrite: true,
@@ -529,16 +529,16 @@ proc install_to_disk(disk: Path, ci: Bool) {
 
   if p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI".exists() {
     fs.install(
-      /usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI,
-      /mnt/target/boot/EFI/BOOT/BOOTX64.EFI,
+      p"/usr/share/laputa-installer/esp/EFI/BOOT/BOOTX64.EFI",
+      p"/mnt/target/boot/EFI/BOOT/BOOTX64.EFI",
       0o644,
       parents: true,
       overwrite: true,
     )
   }
 
-  write_target_config(/mnt/target, parts.esp, parts.swap, parts.root, ci, network_method)
-  seed_target_trust_store(/mnt/target)
+  write_target_config(p"/mnt/target", parts.esp, parts.swap, parts.root, ci, network_method)
+  seed_target_trust_store(p"/mnt/target")
   linux.umount_all(["vfat", "ext4"])
   write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")
 }
@@ -591,7 +591,7 @@ proc run_installer(argv: List[Str]) {
 
   print_disks(disks)
 
-  if ci and disk_text == "" and disk_selection.ci_target_installed(/sys/block, disks, TARGET_ROOT_PARTUUID) {
+  if ci and disk_text == "" and disk_selection.ci_target_installed(p"/sys/block", disks, TARGET_ROOT_PARTUUID) {
     write_stdout_line("Laputa CI target already installed.")
     return
   }

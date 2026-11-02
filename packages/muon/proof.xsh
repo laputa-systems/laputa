@@ -4,7 +4,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs = /rootfs) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] -> Result[Unit, Error] {
   let muon = fp"{rootfs}/usr/bin/muon"
 
   if ! muon.exists() {

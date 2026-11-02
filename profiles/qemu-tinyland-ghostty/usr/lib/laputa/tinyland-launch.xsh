@@ -15,6 +15,6 @@ proc main() [fs, process, env, time, error] {
     }
   }
   let session = if proof { "/usr/lib/laputa/tinyland-session.xsh" } else { "/usr/lib/laputa/tinyland-interactive.xsh" }
-  unix.exec(process.command_argv(/usr/bin/su, ["su", "-p", "laputa", "-s", "/usr/bin/xsh", session], env: {PATH: "/usr/local/bin:/usr/bin:/bin", XDG_RUNTIME_DIR: runtime.display(), LIBSEAT_BACKEND: "seatd", SEATD_SOCK: "/run/seatd.sock"}))?
+  unix.exec(process.command_argv(p"/usr/bin/su", ["su", "-p", "laputa", "-s", "/usr/bin/xsh", session], env: {PATH: "/usr/local/bin:/usr/bin:/bin", XDG_RUNTIME_DIR: runtime.display(), LIBSEAT_BACKEND: "seatd", SEATD_SOCK: "/run/seatd.sock"}))?
 }
 main()

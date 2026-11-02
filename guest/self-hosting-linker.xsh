@@ -3,7 +3,7 @@ error SelfHostingLinkerError = ExecutionFailed(message: Str, status: Status)
 
 proc main(...linker_args: List[Str]) [process, env, error] -> Result[Unit, Error] {
   let command = process.command_argv(
-    /usr/bin/clang,
+    p"/usr/bin/clang",
     [
       "/usr/bin/clang",
       @linker_args,

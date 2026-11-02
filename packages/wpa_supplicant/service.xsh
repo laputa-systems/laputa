@@ -4,7 +4,7 @@ export let service = {
   name: "wpa_supplicant",
   kind: "longrun",
   command: process.command_argv(
-    /usr/bin/wpa_supplicant,
+    p"/usr/bin/wpa_supplicant",
     [
       "/usr/bin/wpa_supplicant",
       "-B",

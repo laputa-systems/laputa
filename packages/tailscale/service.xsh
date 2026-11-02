@@ -23,7 +23,7 @@ pure tailscale_service(state: Path, socket: Path, userspace_networking: Bool) ->
   {
     name: "tailscaled",
     command: process.command_argv(
-      /usr/bin/tailscaled,
+      p"/usr/bin/tailscaled",
       tailscaled_argv(state, socket, userspace_networking),
       env: {
         PATH: "/usr/local/bin:/usr/bin:/bin",
@@ -33,8 +33,8 @@ pure tailscale_service(state: Path, socket: Path, userspace_networking: Bool) ->
   }
 }
 
-let state = env.path("XINIT_TAILSCALE_STATE", /var/lib/tailscale/tailscaled.state)?
-let socket = env.path("XINIT_TAILSCALE_SOCKET", /run/tailscale/tailscaled.sock)?
+let state = env.path("XINIT_TAILSCALE_STATE", p"/var/lib/tailscale/tailscaled.state")?
+let socket = env.path("XINIT_TAILSCALE_SOCKET", p"/run/tailscale/tailscaled.sock")?
 let userspace_networking = env.bool("XINIT_TAILSCALE_USERSPACE_NETWORKING", false)?
 let service_record = tailscale_service(state, socket, userspace_networking)
 

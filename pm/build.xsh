@@ -16,7 +16,7 @@ export proc pm_source_root() [fs, env, error] -> Result[Path, Error] {
 
   return path.absolute(p".")? when p"pm.xsh".exists() and p"pm".exists()
 
-  /usr/lib/pm
+  p"/usr/lib/pm"
 }
 
 pure seeded_shell_script() -> Str {
@@ -74,7 +74,7 @@ proc xsh_runner() -> Result[Path] {
     return host_path when host_path.exists()
   }
 
-  return /bin/xsh when p"/bin/xsh".exists()
+  return p"/bin/xsh" when p"/bin/xsh".exists()
 
   process.which("xsh")?
 }
@@ -89,7 +89,7 @@ proc regular_xsh_source(xsh: Path) -> Result[Path] {
     return source when metadata.kind != "symlink"
 
     let target = source.readlink()?
-    source = if target.starts_with(/) { target } else { fp"{source.parent}/{target}" }
+    source = if target.starts_with(p"/") { target } else { fp"{source.parent}/{target}" }
     depth += 1
   }
 
@@ -126,7 +126,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
   seed_xsh_runners(root, xsh)
 
   if p"/usr/lib/xsh".exists() {
-    let _ = fs.copy_tree(/usr/lib/xsh, fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
+    let _ = fs.copy_tree(p"/usr/lib/xsh", fp"{root}/usr/lib/xsh", parents: true, overwrite: true)?
   }
 
   let pm_root = pm_source_root()?
@@ -179,7 +179,7 @@ export proc seed_executor_substrate(root: Path) [fs, process, env, error] {
 ## installs, as artifact provenance. Builds compute this once per execution.
 export proc executor_provenance() [fs, process, env, error] -> Result[types.ExecutorProvenance, Error] {
   let xsh = xsh_runner()?
-  let core = /usr/lib/xsh
+  let core = p"/usr/lib/xsh"
   {
     format: "laputa-executor-provenance-1",
     xsh_sha256: hash.sha256(direct_xsh_source(xsh, "xsh")?)?.hex(),
@@ -196,7 +196,7 @@ proc xsht_runner() -> Result[Path] {
 
   return sibling when sibling.exists()
 
-  return /bin/xsht when p"/bin/xsht".exists()
+  return p"/bin/xsht" when p"/bin/xsht".exists()
 
   process.which("xsht")?
 }

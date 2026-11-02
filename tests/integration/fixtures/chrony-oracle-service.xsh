@@ -3,7 +3,7 @@
 export let service = {
   name: "chrony-oracle",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/mnt/self-hosting/inputs/chrony-launch.xsh"]),
+  command: process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/mnt/self-hosting/inputs/chrony-launch.xsh"]),
   readiness: "notify",
   ready_timeout_ms: 5000,
   stop_timeout_ms: 2000,

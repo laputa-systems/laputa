@@ -141,7 +141,7 @@ minimum-agreeing-sources = 1
   }
   let run_dir = p"/run/ntp-proof"
   run_dir.mkdir(true)?
-  let supervisor = process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
+  let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
     XINIT_RUN_DIR: run_dir.display(),
     XINIT_LOG_ROOT: "/run/ntp-proof-logs",
@@ -255,7 +255,7 @@ minimum-agreeing-sources = 1
   }
   let run_dir = p"/run/ntp-proof"
   run_dir.mkdir(true)?
-  let supervisor = process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
+  let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
     XINIT_RUN_DIR: run_dir.display(),
     XINIT_LOG_ROOT: "/run/ntp-proof-logs",
@@ -274,7 +274,7 @@ minimum-agreeing-sources = 1
   } else {
     [oracle.display(), f"{original}", f"{raw_origin}", ready.display()]
   }
-  let server = unix.spawn_process_group(process.command_argv(oracle, oracle_args, stdout: /run/ntp-oracle.log, stderr: /run/ntp-oracle.log))?
+  let server = unix.spawn_process_group(process.command_argv(oracle, oracle_args, stdout: p"/run/ntp-oracle.log", stderr: p"/run/ntp-oracle.log"))?
   groups += [server.pid]
   let server_deadline = now_ms()? + 10000
   while ! ready.exists()? and now_ms()? < server_deadline { time.sleep(50ms) }

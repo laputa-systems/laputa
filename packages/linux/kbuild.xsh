@@ -6439,7 +6439,7 @@ proc probe_compiler_options(
 
       if let probe = compiler_option_probe(flag) {
         let argv = [cc.display(), "-target", triple, "-Werror", @cflags, @defs, probe.tested, "-c", "-x", "c", "/dev/null", "-o", "/dev/null"]
-        let status = process.run(process.command_argv(argv[0], argv, stdout: /dev/null, stderr: /dev/null))?
+        let status = process.run(process.command_argv(argv[0], argv, stdout: p"/dev/null", stderr: p"/dev/null"))?
         verdicts[flag] = if status.ok { probe.accepted } else { probe.rejected }
       }
     }

@@ -3,7 +3,7 @@
 export let service = {
   name: "seatd",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/xsh, ["xsh", "/usr/lib/laputa/seatd-launch.xsh"]),
+  command: process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/laputa/seatd-launch.xsh"]),
   dependencies: {need: ["coldplug"]},
   targets: ["boot"],
   readiness: "notify",

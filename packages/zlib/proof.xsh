@@ -9,7 +9,7 @@ proc check(condition: Bool, kind: Str, message: Str) {
   }
 }
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   let cc = process.which("cc")?
   tempdir tmp at fp"{root}/var/tmp/proof-zlib" {
     fp"{tmp}/proof-zlib.c".write(

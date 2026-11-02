@@ -10,7 +10,7 @@ proc main() [fs, process, env, error] {
 
   let success = process.run(
     process.command_argv(
-      /xsh-release/bin/xsh,
+      p"/xsh-release/bin/xsh",
       [
         "/xsh-release/bin/xsh",
         "/src/packages/bison/files/bison.xsh",
@@ -32,7 +32,7 @@ proc main() [fs, process, env, error] {
 
   let missing = process.run(
     process.command_argv(
-      /xsh-release/bin/xsh,
+      p"/xsh-release/bin/xsh",
       [
         "/xsh-release/bin/xsh",
         "/src/packages/bison/files/bison.xsh",

@@ -3,8 +3,8 @@ use system.container_output as container_output
 use system.image as image
 
 proc main() [fs, process, error] {
-  let workspace = /tmp/laputa-container-local-staging
-  let output = /output/container-local-staging
+  let workspace = p"/tmp/laputa-container-local-staging"
+  let output = p"/output/container-local-staging"
   workspace.remove(missing_ok: true)?
   output.remove(missing_ok: true)?
   defer workspace.remove(missing_ok: true)?
@@ -30,7 +30,7 @@ proc main() [fs, process, error] {
   }
 
   let staged_rootfs = fp"{workspace}/rootfs.ext4"
-  image.image_write_rootfs(root, /src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh, staged_rootfs)?
+  image.image_write_rootfs(root, p"/src/laputa/packages/laputa-fs/files/mkfs.ext4.xsh", staged_rootfs)?
 
   if ! staged_rootfs.exists()? or staged_rootfs.metadata()?.size <= 0 {
     return error.fail("container-local image was not produced from the staged generation")

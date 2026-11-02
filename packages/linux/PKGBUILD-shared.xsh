@@ -317,7 +317,7 @@ export proc cached_archive_plan(
     [],
     includes,
     analysis_jobs,
-    /bin/xsh,
+    p"/bin/xsh",
     worker,
   )?
 

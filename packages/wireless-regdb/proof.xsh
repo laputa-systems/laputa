@@ -8,7 +8,7 @@ proc ensure_sha256(root: Path, rel: Path, expected: Str) {
   proof.ensure(actual == expected, "wireless-regdb", f"{rel} has sha256 {actual}, expected {expected}")
 }
 
-proc main(root = /rootfs) [fs, error] {
+proc main(root = p"/rootfs") [fs, error] {
   proof.package_metadata(root, "wireless-regdb")
 
   ensure_sha256(

@@ -8,7 +8,7 @@ export let service = {
   name: "seatd",
   kind: "longrun",
   command: process.command_argv(
-    /usr/bin/seatd,
+    p"/usr/bin/seatd",
     [
       "seatd",
       "-g",

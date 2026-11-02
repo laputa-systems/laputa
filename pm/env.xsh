@@ -10,13 +10,13 @@ export type PkgConfigContext = {
 }
 
 ## Exported PM declaration `prefix`.
-export const prefix = /usr
+export const prefix = p"/usr"
 
 ## Exported PM declaration `sysconfdir`.
-export const sysconfdir = /etc
+export const sysconfdir = p"/etc"
 
 ## Exported PM declaration `localstatedir`.
-export const localstatedir = /var
+export const localstatedir = p"/var"
 
 ## Exported PM declaration `libdir_name`.
 export const libdir_name = "lib"
@@ -25,16 +25,16 @@ export const libdir_name = "lib"
 export const libexecdir_name = "libexec"
 
 ## Exported PM declaration `bindir`.
-export const bindir = /usr/bin
+export const bindir = p"/usr/bin"
 
 ## Exported PM declaration `includedir`.
-export const includedir = /usr/include
+export const includedir = p"/usr/include"
 
 ## Exported PM declaration `libdir`.
-export const libdir = /usr/lib
+export const libdir = p"/usr/lib"
 
 ## Exported PM declaration `mandir`.
-export const mandir = /usr/share/man
+export const mandir = p"/usr/share/man"
 
 ## Exported PM declaration `meson_prefix_arg`.
 export pure meson_prefix_arg() -> Str {
@@ -71,7 +71,7 @@ pure root_is_empty(root: Path) -> Bool {
 }
 
 pure root_is_system(root: Path) -> Bool {
-  root == /
+  root == p"/"
 }
 
 pure rooted(root: Path, rel: Str) -> Str {

@@ -5,7 +5,7 @@ const host_key = p"/etc/dropbear/dropbear_ed25519_host_key"
 export let service = {
   name: "dropbear-keygen",
   kind: "oneshot",
-  command: process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/lib/xinit/services/dropbear-keygen.xsh"]),
+  command: process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xinit/services/dropbear-keygen.xsh"]),
   targets: [
     "boot",
   ],

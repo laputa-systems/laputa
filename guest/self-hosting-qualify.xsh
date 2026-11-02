@@ -1,7 +1,7 @@
 use pm.generation
 
 proc run_closed(root: Path, script: Str, arguments: List[Str]) [process, error] -> Result[Unit, Error] {
-  let command = process.command_argv(/bin/xsh, ["/bin/xsh", script, @arguments], env: {
+  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", script, @arguments], env: {
     PATH: "/bin:/usr/lib/xsh/core:/usr/bin",
     XSH_MODULE_PATH: "/pm",
     HOME: "/scratch/home",
@@ -19,7 +19,7 @@ proc run_closed(root: Path, script: Str, arguments: List[Str]) [process, error] 
 }
 
 proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
-  let receipt = generation.read_generation_receipt(/)?
+  let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
@@ -51,8 +51,8 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
   for name in ["cohort-c", "cohort-rust", "cohort-xsh"] {
     var first: Record = {}
     var second: Record = {}
-    var first_payload: Path = /
-    var second_payload: Path = /
+    var first_payload: Path = p"/"
+    var second_payload: Path = p"/"
     for pass in ["baseline", "replacement"] {
       for entry in fs.walk(fp"{output}/{pass}/store", hidden: true)? {
         continue unless entry.kind == "file" and entry.path.name == "artifact.json"

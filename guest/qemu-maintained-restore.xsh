@@ -177,7 +177,7 @@ proc phase_backup() {
   let _ = rustic(["key", "add", "--new-password-file", pw2.display()], pw1)?
   let masterkey = fp"{backup_mount}/keys/masterkey.export"
   let _ = rustic(["key", "export", masterkey.display()], pw1)?
-  let mode = process.run(process.command_argv(/usr/bin/chmod, ["chmod", "600", masterkey.display()], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err"))?
+  let mode = process.run(process.command_argv(p"/usr/bin/chmod", ["chmod", "600", masterkey.display()], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err"))?
   guard mode.ok else { fail "cannot protect exported masterkey" }
   let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw1)?
   let listed = rustic(["snapshots", "--json"], pw1)?

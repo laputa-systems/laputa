@@ -66,7 +66,7 @@ proc verify_distrust_policy(rootfs: Path) [fs, error] {
   }
 }
 
-proc main(rootfs = /rootfs) [fs, error] {
+proc main(rootfs = p"/rootfs") [fs, error] {
   verify_managed_symlinks(rootfs)?
   verify_provisioned_key(rootfs)?
   verify_package_metadata(rootfs)?

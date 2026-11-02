@@ -4,7 +4,7 @@ use pm.util as pm_util
 
 error ScriptError = Failed(kind: Str, message: Str)
 
-proc main(rootfs = /rootfs) [fs, process, env, time, error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, time, error] {
   proof.target_elf(rootfs, p"usr/bin/dropbear", "dropbear")
   proof.target_elf(rootfs, p"usr/bin/dropbearkey", "dropbear")
   proof.target_elf(rootfs, p"usr/bin/dbclient", "dropbear")
@@ -20,7 +20,7 @@ proc main(rootfs = /rootfs) [fs, process, env, time, error] {
   let arch = os.machine
   let dynlinker = fp"{rootfs}/usr/lib/ld-musl-{arch}.so.1"
   let dropbearkey = fp"{rootfs}/usr/bin/dropbearkey"
-  let tmp = /tmp/dropbear-proof
+  let tmp = p"/tmp/dropbear-proof"
   tmp.mkdir()
 
   let rsa_key = fp"{tmp}/host_rsa"

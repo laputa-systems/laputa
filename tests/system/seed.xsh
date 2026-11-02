@@ -23,7 +23,7 @@ test test_seed_arch_names_each_tool_target [error] {
 
 test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
-  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", /work/laputa, /work/xsh, value, 4, false)?
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", p"/work/laputa", p"/work/xsh", value, 4, false)?
   assert xsh_seed.xsh_seed_build_image in argv
   assert "--network" in argv and "none" in argv
   assert "--locked" in argv and "--offline" in argv and "--release" in argv
@@ -43,7 +43,7 @@ test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
 
 test test_xshi_asterinas_feature_is_opt_in [error] {
   let value = xsh_seed.xsh_seed_arch("x86_64")?
-  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", /work/laputa, /work/xsh, value, 4, true)?
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", p"/work/laputa", p"/work/xsh", value, 4, true)?
   assert "xshi/laputa-asterinas" in argv.join(" ")
 }
 
@@ -57,10 +57,10 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
   let config = fp"{xsh_root}/.cargo/config.toml"
   config.write("first source")
   let arch = xsh_seed.xsh_seed_arch("x86_64")?
-  xsh_seed.xsh_seed_fetch(/bin/true, root, xsh_root, arch)?
+  xsh_seed.xsh_seed_fetch(p"/bin/true", root, xsh_root, arch)?
   config.write("different source")
 
-  match xsh_seed.xsh_seed_build(/bin/true, root, xsh_root, arch, 1, false) {
+  match xsh_seed.xsh_seed_build(p"/bin/true", root, xsh_root, arch, 1, false) {
     Ok(_) => test.fail("a cache for a different Cargo source was accepted")
     Err(problem) => assert "cached crate registry" in problem.message
   }
@@ -112,7 +112,7 @@ test test_seed_require_rejects_a_product_that_differs_from_its_manifest [fs, err
 }
 
 test test_seed_mounts_binaries_and_core_from_one_directory [error] {
-  let argv = xsh_seed.xsh_seed_mount_argv(/s)
+  let argv = xsh_seed.xsh_seed_mount_argv(p"/s")
   assert argv == [
     "--mount",
     "type=bind,src=/s/xsh,dst=/bin/xsh,readonly",
@@ -174,11 +174,11 @@ test test_package_tools_build_is_offline_and_native [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
   let argv = images.package_tools_build_argv(
     p"docker",
-    /work/laputa,
+    p"/work/laputa",
     value,
     "laputa-host-tools:aarch64-a",
     "laputa-package-tools:aarch64-b",
-    /work/laputa/.out/package-tools/aarch64/sources,
+    p"/work/laputa/.out/package-tools/aarch64/sources",
   )
   assert "--network" in argv and "none" in argv
   assert "linux/arm64" in argv
@@ -255,12 +255,12 @@ test test_world_containers_are_offline_with_a_read_only_checkout [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
   let argv = world.world_container_argv(
     p"docker",
-    /work/laputa,
-    /s,
+    p"/work/laputa",
+    p"/s",
     value,
     "laputa-package-tools:aarch64-b",
-    /work/laputa/.out/world/aarch64,
-    /work/laputa/.out/artifacts/aarch64,
+    p"/work/laputa/.out/world/aarch64",
+    p"/work/laputa/.out/artifacts/aarch64",
     {uid: 1000, gid: 1000},
     ["/bin/xsh", "pm.xsh"],
   )
@@ -312,7 +312,7 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
     let seed_argv = xsh_seed.xsh_seed_cargo_build_argv(
       p"docker",
       laputa_root,
-      /work/xsh,
+      p"/work/xsh",
       xsh_seed.xsh_seed_arch(arch)?,
       4,
       false,

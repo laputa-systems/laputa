@@ -79,7 +79,7 @@ proc check_rendering(root: Path, version: Str) [fs, process, env, error] {
   }
 }
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "man-pages")
   let mandir = fp"{root}/usr/share/man"
   let installed = fs.children(mandir)? |> map .name |> sort

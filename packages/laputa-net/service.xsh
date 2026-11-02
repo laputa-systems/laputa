@@ -3,7 +3,7 @@
 export let service = {
   name: "net",
   kind: "oneshot",
-  command: process.command_argv(/usr/bin/ifup, ["ifup", "-a"], env: {PATH: "/usr/local/bin:/usr/bin:/bin"}),
+  command: process.command_argv(p"/usr/bin/ifup", ["ifup", "-a"], env: {PATH: "/usr/local/bin:/usr/bin:/bin"}),
   targets: [
     "boot",
   ],

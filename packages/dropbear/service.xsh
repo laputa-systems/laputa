@@ -27,7 +27,7 @@ let argv = dropbear_argv(bind, port, host_key, ephemeral)
 export let service = {
   name: "dropbear",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/dropbear, argv),
+  command: process.command_argv(p"/usr/bin/dropbear", argv),
   targets: [
     "boot",
   ],

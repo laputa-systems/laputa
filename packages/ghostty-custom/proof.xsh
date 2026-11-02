@@ -20,7 +20,7 @@ pure c_string(data: Bytes, at: Int) -> Bytes {
   data[at..end]
 }
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "ghostty-custom")
   let bin = fp"{root}/usr/bin/ghostty-custom"
   proof.target_elf(root, p"usr/bin/ghostty-custom", "ghostty-custom")

@@ -546,19 +546,19 @@ proc install_prebuilt_tree(dest: Path) {
 
 ## Install target-specific compiler wrapper links.
 export proc install_wrappers(dest: Path) [fs, error] {
-  write_wrapper(dest, "cc", /usr/lib/llvm23/bin/clang, clang: true)
-  write_wrapper(dest, "clang", /usr/lib/llvm23/bin/clang, clang: true)
-  write_wrapper(dest, "c++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)
-  write_wrapper(dest, "clang++", /usr/lib/llvm23/bin/clang++, clang: true, cxx: true)
-  write_wrapper(dest, "ld", /usr/lib/llvm23/bin/ld.lld)
-  write_wrapper(dest, "ld.lld", /usr/lib/llvm23/bin/ld.lld)
-  write_wrapper(dest, "ar", /usr/lib/llvm23/bin/llvm-ar)
-  write_wrapper(dest, "ranlib", /usr/lib/llvm23/bin/llvm-ranlib)
-  write_wrapper(dest, "nm", /usr/lib/llvm23/bin/llvm-nm)
-  write_wrapper(dest, "objcopy", /usr/lib/llvm23/bin/llvm-objcopy)
-  write_wrapper(dest, "objdump", /usr/lib/llvm23/bin/llvm-objdump)
-  write_wrapper(dest, "readelf", /usr/lib/llvm23/bin/llvm-readelf)
-  write_wrapper(dest, "strip", /usr/lib/llvm23/bin/llvm-strip)
+  write_wrapper(dest, "cc", p"/usr/lib/llvm23/bin/clang", clang: true)
+  write_wrapper(dest, "clang", p"/usr/lib/llvm23/bin/clang", clang: true)
+  write_wrapper(dest, "c++", p"/usr/lib/llvm23/bin/clang++", clang: true, cxx: true)
+  write_wrapper(dest, "clang++", p"/usr/lib/llvm23/bin/clang++", clang: true, cxx: true)
+  write_wrapper(dest, "ld", p"/usr/lib/llvm23/bin/ld.lld")
+  write_wrapper(dest, "ld.lld", p"/usr/lib/llvm23/bin/ld.lld")
+  write_wrapper(dest, "ar", p"/usr/lib/llvm23/bin/llvm-ar")
+  write_wrapper(dest, "ranlib", p"/usr/lib/llvm23/bin/llvm-ranlib")
+  write_wrapper(dest, "nm", p"/usr/lib/llvm23/bin/llvm-nm")
+  write_wrapper(dest, "objcopy", p"/usr/lib/llvm23/bin/llvm-objcopy")
+  write_wrapper(dest, "objdump", p"/usr/lib/llvm23/bin/llvm-objdump")
+  write_wrapper(dest, "readelf", p"/usr/lib/llvm23/bin/llvm-readelf")
+  write_wrapper(dest, "strip", p"/usr/lib/llvm23/bin/llvm-strip")
 
   for tool in ["ar", "ranlib", "nm", "objcopy", "objdump", "readelf", "strip"] {
     write_wrapper(dest, f"llvm-{tool}", fp"/usr/lib/llvm23/bin/llvm-{tool}")

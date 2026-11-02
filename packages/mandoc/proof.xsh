@@ -81,7 +81,7 @@ Laputa                   2026-10-04         LAPUTA-ISLAND(7)
 # character leaves the plain text.
 const overstrike = rx".\x08"
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "mandoc")
 
   for program in ["mandoc", "demandoc", "soelim"] {

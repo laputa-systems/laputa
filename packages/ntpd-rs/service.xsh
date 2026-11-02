@@ -9,7 +9,7 @@ pure restart_policy() -> Record {
 export let service = {
   name: "ntpd-rs",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/lib/ntpd-rs/launch.xsh"]),
+  command: process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/ntpd-rs/launch.xsh"]),
   targets: [
     "boot",
   ],

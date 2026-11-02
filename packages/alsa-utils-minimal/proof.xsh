@@ -39,7 +39,7 @@ proc expect_failure(root: Path, name: Str, args: List[Str], code: Int, message: 
   proof.ensure(result.stderr.trim() == message, kind, f"{name} {args.join(" ")} reported: {result.stderr.trim()}")
 }
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "alsa-utils-minimal")
 
   for name in ["aplay", "amixer", "alsactl", "alsaucm", "speaker-test"] {

@@ -33,7 +33,7 @@ test test_kernel_manifest_path_is_relative_existing_and_nonempty [fs, error] { |
   fp"{root}/boot/vmlinuz".write("kernel")
   assert image.image_kernel_source(root, p"boot/vmlinuz")? == fp"{root}/boot/vmlinuz"
 
-  for path_value in [p"boot/missing", /boot/vmlinuz, ../boot/vmlinuz] {
+  for path_value in [p"boot/missing", p"/boot/vmlinuz", p"../boot/vmlinuz"] {
     match image.image_kernel_source(root, path_value) {
       Ok(_) => assert false
       Err(_) => {}

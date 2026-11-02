@@ -3,7 +3,7 @@ use pm.proof
 use pm.util as pm_util
 use pm.target as pm_target
 
-proc main(rootfs = /rootfs) [fs, process, env, error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/cargo", "cargo")
   proof.target_elf(rootfs, p"usr/bin/rustc", "rustc")
   let target_arch = pm_util.target_arch()?

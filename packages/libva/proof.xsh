@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "libva")
   let readelf = proof.readelf_tool()?
 

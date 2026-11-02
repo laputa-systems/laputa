@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "tinyland")
   let tinyland = fp"{root}/usr/bin/tinyland"
   proof.target_elf(root, p"usr/bin/tinyland", "tinyland")

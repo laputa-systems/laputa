@@ -37,7 +37,7 @@ proc wait_sync() [fs, process, time, error] -> Result[Bool, Error] {
 
 proc main(root: Path) [fs, process, net, env, time, io, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
-  assert generation.read_generation_receipt(/)?.profile.name == "qemu-self-hosting"
+  assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   let endpoint = fp"{root}/inputs/nts-endpoint".read_text()?.trim()
   var iface = ""
   for entry in linux.interfaces()? { if entry.name != "lo" and iface == "" { iface = entry.name } }
@@ -68,7 +68,7 @@ minimum-agreeing-sources = 1
     assert cleanup.remaining.is_empty(), "NTP proof retained process groups"
     if completed { print "LAPUTA_NTP_GUEST_OK" }
   }
-  let command = process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
+  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
     XINIT_RUN_DIR: run_dir.display(),
     XINIT_LOG_ROOT: "/run/ntp-proof-logs",

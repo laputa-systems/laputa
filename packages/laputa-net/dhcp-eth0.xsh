@@ -37,7 +37,7 @@ export pure dhcp_argv() -> List[Str] {
 export let service = {
   name: f"dhcp-{interface}",
   kind: "longrun",
-  command: process.command_argv(/usr/bin/dhcpc, dhcp_argv()),
+  command: process.command_argv(p"/usr/bin/dhcpc", dhcp_argv()),
   targets: [
     "boot",
   ],

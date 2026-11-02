@@ -2,7 +2,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "ntpd-rs")
   for binary in ["ntp-daemon", "ntp-ctl", "ntp-metrics-exporter"] {
     proof.target_elf(root, fp"usr/bin/{binary}", "ntpd-rs")

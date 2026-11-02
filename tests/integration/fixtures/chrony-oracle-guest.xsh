@@ -9,7 +9,7 @@ proc now_ms() -> Result[Int] {
 
 proc main(root: Path) [fs, process, env, time, io, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
-  assert generation.read_generation_receipt(/)?.profile.name == "qemu-self-hosting"
+  assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   let oracle = fp"{root}/inputs/ntp-clock-server"
   let client = fp"{root}/inputs/chronyc"
   let raw_origin = (run.text $oracle "--raw").trim().parse_int_decimal()?
@@ -37,7 +37,7 @@ pidfile /run/chrony-oracle.pid
 """)?
   let run_dir = p"/run/chrony-oracle"
   run_dir.mkdir(true)?
-  let command = process.command_argv(/usr/bin/xsh, ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "chrony-oracle"], env: {
+  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "chrony-oracle"], env: {
     XINIT_SERVICE_DIR: fp"{root}/inputs".display(),
     XINIT_RUN_DIR: run_dir.display(),
     XINIT_LOG_ROOT: "/run/chrony-oracle-logs",
@@ -63,7 +63,7 @@ pidfile /run/chrony-oracle.pid
   assert "Not synchronised" in before, "chrony readiness was confused with synchronization"
   print "CHRONY_READY_UNSYNCED"
   let server_ready = p"/run/ntp-oracle-ready"
-  let server = unix.spawn_process_group(process.command_argv(oracle, [oracle.display(), f"{original}", f"{raw_origin}", server_ready.display()], stdout: /run/ntp-oracle.log, stderr: /run/ntp-oracle.log))?
+  let server = unix.spawn_process_group(process.command_argv(oracle, [oracle.display(), f"{original}", f"{raw_origin}", server_ready.display()], stdout: p"/run/ntp-oracle.log", stderr: p"/run/ntp-oracle.log"))?
   groups += [server.pid]
   let deadline = now_ms()? + (if slew_case { 300000 } else { 120000 })
   var synced = false

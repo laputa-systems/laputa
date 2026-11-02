@@ -10,7 +10,7 @@ export proc bison_tool() [env, error] -> Result[Path, Error] {
 
   return fp"{root}/usr/lib/pm/repo/bison/files/bison.xsh" when root != ""
 
-  /usr/lib/pm/repo/bison/files/bison.xsh
+  p"/usr/lib/pm/repo/bison/files/bison.xsh"
 }
 
 ## Exported declaration `flex_tool`.
@@ -19,7 +19,7 @@ export proc flex_tool() [env, error] -> Result[Path, Error] {
 
   return fp"{root}/usr/lib/pm/repo/flex/files/flex.xsh" when root != ""
 
-  /usr/lib/pm/repo/flex/files/flex.xsh
+  p"/usr/lib/pm/repo/flex/files/flex.xsh"
 }
 
 ## Exported declaration `parser_generators`.
@@ -109,7 +109,7 @@ export proc remove_outputs(spec: ParserGen) [fs, error] {
 ## Exported declaration `run_generator`.
 export proc run_generator(spec: ParserGen) [fs, process, error] {
   let command = process.command_argv(
-    /bin/xsh,
+    p"/bin/xsh",
     ["/bin/xsh", spec.tool.display(), "--"].extend(spec.argv),
     cwd: fs.cwd()?,
     env: {XSH_BISON_NO_UPSTREAM: "1", XSH_FLEX_NO_UPSTREAM: "1"},

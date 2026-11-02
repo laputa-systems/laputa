@@ -135,7 +135,7 @@ proc offline_phase() {
   let pid = service_pid(0)?
   let level = wait_synchronized()?
   console(f"LAPUTA_NTP_DRILL_RESYNCHRONIZED stratum={level}")
-  let nft = process.run(process.command_argv(/usr/bin/nft, ["nft", "insert", "rule", "inet", "filter", "output", "meta", "l4proto", "{", "tcp,", "udp", "}", "th", "dport", "{", "123,", "4460", "}", "drop"]))?
+  let nft = process.run(process.command_argv(p"/usr/bin/nft", ["nft", "insert", "rule", "inet", "filter", "output", "meta", "l4proto", "{", "tcp,", "udp", "}", "th", "dport", "{", "123,", "4460", "}", "drop"]))?
   guard nft.shell_code()? == 0 else { fail "could not cut NTS reachability" }
   console("LAPUTA_NTP_DRILL_EGRESS_CUT")
   let baseline = wall_minus_monotonic()?

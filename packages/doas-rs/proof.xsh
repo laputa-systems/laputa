@@ -4,7 +4,7 @@ use pm.util as pm_util
 
 error DoasRsProofError = Failed(kind: Str, message: Str)
 
-proc main(root = /rootfs) [fs, process, env, error] {
+proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "doas-rs")
   proof.target_elf(root, p"usr/bin/doas", "doas-rs")
 
