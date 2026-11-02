@@ -62,7 +62,7 @@ test test_file_defaults_and_variants { |ctx|
     model.FileSpec(
       id: "nginx-conf",
       path: p"/etc/nginx/nginx.conf",
-      source: model.Templated(model.Template(path: p"templates/nginx.conf", vars: {"name": "web"})),
+      source: model.Templated(model.Template(path: p"templates/nginx.conf", vars: {name: "web"})),
       validate: model.Validation(argv: ["nginx", "-t", "-c"]),
     ),
   )
@@ -329,7 +329,7 @@ test test_rejects_invalid_commands { |ctx|
           id: "run",
           argv: ["true"],
           unless_argv: ["test", "-e", "/tmp/done"],
-          env: {"MODE": "test"},
+          env: {MODE: "test"},
           stdin_secret: model.FromEnv("TOKEN"),
           timeout: 5s,
         ),

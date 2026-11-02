@@ -408,11 +408,11 @@ test test_dependencies_block_dependents { |ctx|
     file: p"/repo/deploy.xsh",
     root: p"/repo",
     resources: sorted([dependent, prerequisite])?,
-    sources: {"dependent": content_source("x")},
+    sources: {dependent: content_source("x")},
   )
   let observed_map: Map[Str, plan.Observed] = {
-    "prerequisite": blocked,
-    "dependent": plan.Absent,
+    prerequisite: blocked,
+    dependent: plan.Absent,
   }
   let facts = plan.Facts(hosts: [plan.HostFacts(name: "web-1", observed: observed_map)])
   let actions = plan.plan(deployment, host_inventory(), facts)
@@ -440,15 +440,15 @@ test test_prerequisite_must_be_selected_for_the_host { |ctx|
     file: p"/repo/deploy.xsh",
     root: p"/repo",
     resources: sorted([dependent, prerequisite])?,
-    sources: {"dependent": content_source("x")},
+    sources: {dependent: content_source("x")},
   )
   let facts = plan.Facts(
     hosts: [
       plan.HostFacts(
         name: "web-1",
         observed: {
-          "dependent": plan.Absent,
-          "prerequisite": plan.Absent,
+          dependent: plan.Absent,
+          prerequisite: plan.Absent,
         },
       ),
     ],

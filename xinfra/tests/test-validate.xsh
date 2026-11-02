@@ -262,7 +262,7 @@ test test_rejects_a_rendered_template_over_the_bound { |ctx|
       path: p"/etc/large-render",
       source: model.Templated(model.Template(
         path: p"templates/render-large.tmpl",
-        vars: {"v": "xxxxxxx"},
+        vars: {v: "xxxxxxx"},
       )),
     ),
   ),

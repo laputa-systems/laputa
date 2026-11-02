@@ -9,7 +9,7 @@ pure fact(kind: Str, fields: Map[Str, Str]) -> Fact {
 
 ## A fact that a probe could not establish.
 export pure unknown(detail: Str) -> Fact {
-  fact("unknown", {"detail": detail})
+  fact("unknown", {detail: detail})
 }
 
 ## A fact for a missing object.
@@ -25,12 +25,12 @@ export pure file_stat(text: Str) -> Fact {
   }
 
   fact("present", {
-    "type": parts[0],
-    "mode": parts[1],
-    "uid": parts[2],
-    "gid": parts[3],
-    "size": parts[4],
-    "mtime": parts[5],
+    type: parts[0],
+    mode: parts[1],
+    uid: parts[2],
+    gid: parts[3],
+    size: parts[4],
+    mtime: parts[5],
   })
 }
 
@@ -43,11 +43,11 @@ export pure passwd_row(text: Str) -> Fact {
   }
 
   fact("present", {
-    "name": parts[0],
-    "uid": parts[2],
-    "gid": parts[3],
-    "home": parts[5],
-    "shell": parts[6],
+    name: parts[0],
+    uid: parts[2],
+    gid: parts[3],
+    home: parts[5],
+    shell: parts[6],
   })
 }
 
@@ -60,9 +60,9 @@ export pure group_row(text: Str) -> Fact {
   }
 
   fact("present", {
-    "name": parts[0],
-    "gid": parts[2],
-    "members": parts[3],
+    name: parts[0],
+    gid: parts[2],
+    members: parts[3],
   })
 }
 
@@ -73,8 +73,8 @@ export pure package(text: Str, name: Str) -> Fact {
     let token = line.fields().get(0) ?? ""
     if token.starts_with(prefix) {
       return fact("present", {
-        "name": name,
-        "version": token.byte_slice(prefix.byte_len()),
+        name: name,
+        version: token.byte_slice(prefix.byte_len()),
       })
     }
   }
@@ -84,11 +84,11 @@ export pure package(text: Str, name: Str) -> Fact {
 ## Map an OpenRC status exit code to a fact.
 export pure service_status(code: Int) -> Fact {
   if code == 0 {
-    return fact("present", {"status": "started"})
+    return fact("present", {status: "started"})
   }
 
   if code == 3 {
-    return fact("present", {"status": "stopped"})
+    return fact("present", {status: "stopped"})
   }
 
   fact("unknown", map.empty())
@@ -99,8 +99,8 @@ export pure rc_update(text: Str, name: Str) -> Fact {
   for line in text.lines() {
     let words = line.words()
     if ! words.is_empty() and words[0] == name {
-      return fact("present", {"enabled": "yes"})
+      return fact("present", {enabled: "yes"})
     }
   }
-  fact("present", {"enabled": "no"})
+  fact("present", {enabled: "no"})
 }

@@ -83,7 +83,7 @@ export proc service_fact(session: transport.Session, name: Str) -> Result[parse.
   let current = status_fact.fields.get("status") ?? "unknown"
   let enabled = update_fact.fields.get("enabled") ?? "no"
   return Ok(parse.unknown(current)) when current == "unknown"
-  Ok({kind: "present", fields: {"status": current, "enabled": enabled}})
+  Ok({kind: "present", fields: {status: current, enabled: enabled}})
 }
 
 ## Read one query, dispatching by kind.

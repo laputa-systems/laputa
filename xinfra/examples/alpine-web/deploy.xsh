@@ -46,8 +46,8 @@ export pure resources() -> List[model.Resource] {
           model.Template(
             path: p"templates/nginx.conf.tmpl",
             vars: {
-              "server_name": "alpine-web",
-              "root": "/var/www/localhost/htdocs",
+              server_name: "alpine-web",
+              root: "/var/www/localhost/htdocs",
             },
           ),
         ),
