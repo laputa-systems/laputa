@@ -111,8 +111,12 @@ TAP-backed `eth0`. The container end of the TAP runs the XSH pin's scripted DHCP
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
 The remaining cohorts run the same way. `device` runs the baseline boot proof, whose
-guest coldplugs three times and after a daemon restart, and the `device/block_uevent`
-witness. `clock-abi` runs the `time/clock_adjust` witness. `clock` runs the
+guest coldplugs three times and after a daemon restart, the `device/block_uevent` witness and
+the modes of `guest/asterinas/device`: `sysfs`, `add` and `nodes` compare the device paths,
+uevent data, synthetic add events and coldplugged node ownership of two disks, their partitions
+and the memory devices with the Linux reference (the case ships `data-disk.sh`, which makes the
+second disk both guests attach), and `missing` is a negative control that must fail with a
+missing add event on both backends. `clock-abi` runs the `time/clock_adjust` witness. `clock` runs the
 `network/udp_ancillary` witness and the `guest/asterinas/clock` case in the modes
 `behind`, `ahead`, `frequency`, `pause` and `jump` (the last two on a TAP-backed network
 with an outside peer). `recovery` repeats the boot proof and the DHCP `restart` and
@@ -130,8 +134,10 @@ wait for the guest to exit, so a guest that prints the markers and then stalls i
 guest that stalls before the marker is rejected after its timeout. SIGTERM or SIGINT to a
 runner, to `qualify-cohort.sh` or to `qualify.sh`, including one nested inside another,
 stops the owned guests, removes the owned container (named `laputa-asterinas-case-PID`, with
-its TAP and peer processes) and removes the cohort's results. A cohort runs its backends one
-after the other.
+its TAP and peer processes) and removes the cohort's results. A runner gives its child
+`LAPUTA_CANCEL_GRACE_SECONDS` (20 by default) to stop after SIGTERM before it kills it, and
+passes three seconds less to the child's own runners, so an outer runner never kills one that is
+still cleaning up. A cohort runs its backends one after the other.
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
@@ -165,7 +171,7 @@ disposable initramfs that initializes loopback. `--backend linux` or
 `--backend asterinas` selects one guest. `--case boot` or `--case numeric`
 selects one case. The default Linux package path is
 `.out/asterinas-firecracker/linux-package.tar.gz`. The pilot does not account
-for the full native suite; the other cohorts above qualify device, clock, and network compatibility.
+for the full native suite; the cohorts above each qualify only the cases they list.
 
 Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
 which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing

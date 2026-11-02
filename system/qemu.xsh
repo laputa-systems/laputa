@@ -32,8 +32,11 @@ export enum QemuReferenceNetwork { NoNetwork, Tap(Str) }
 ## Whether the host can pause the disposable qualification guest through a QMP socket.
 export enum QemuReferenceControl { NoControl, QmpSocket(Path) }
 
+## Whether a disposable qualification guest has a second raw disk.
+export enum QemuReferenceDataDisk { NoDataDisk, DataDisk(Path) }
+
 ## Inputs for a disposable initramfs and raw ext2 guest.
-export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int, network: QemuReferenceNetwork, control: QemuReferenceControl}
+export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int, data_disk: QemuReferenceDataDisk, network: QemuReferenceNetwork, control: QemuReferenceControl}
 
 ## Construct the headless qualification guest without host networking.
 export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterinasReference) -> Result[List[Str], Error] {
@@ -44,6 +47,14 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
   guard !("," in input.disk.display()) else {
     return Err(types.LaputaError.Profile("qualification disk path cannot contain a comma"))
   }
+  let data_disk = match input.data_disk {
+    NoDataDisk => Ok([]),
+    DataDisk(image) => if "," in image.display() {
+      Err(types.LaputaError.Profile("qualification data disk path cannot contain a comma"))
+    } else {
+      Ok(["-drive", f"if=none,id=data,format=raw,file={image}", "-device", f"{target.block_device},drive=data"])
+    },
+  }?
   let network = match input.network {
     NoNetwork => Ok([]),
     Tap(interface) => if interface == "" or "," in interface {
@@ -67,7 +78,7 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
     "-initrd", input.initramfs.display(), "-append", "console=ttyS0 rdinit=/init",
     "-drive", f"if=none,id=root,format=raw,file={input.disk}",
     "-device", f"{target.block_device},drive=root",
-  ].extend(network).extend(control)
+  ].extend(data_disk).extend(network).extend(control)
 }
 
 enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpScreenshot(Path) }

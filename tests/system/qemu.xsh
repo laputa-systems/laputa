@@ -60,6 +60,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
     initramfs: p"/tmp/initramfs",
     disk: p"/tmp/root",
     memory_mib: 4096,
+    data_disk: qemu.NoDataDisk,
     network: qemu.NoNetwork,
     control: qemu.NoControl,
   )
@@ -68,6 +69,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   assert "4096" in argv
   assert "/tmp/kernel" in argv
   assert "/tmp/initramfs" in argv
+  assert !("if=none,id=data,format=raw,file=/tmp/data" in argv)
   assert "if=none,id=root,format=raw,file=/tmp/root" in argv
   assert "virtio-blk-pci,drive=root" in argv
   assert !("-netdev" in argv)
@@ -88,13 +90,40 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   }
 }
 
+pure position(items: List[Str], wanted: Str) -> Int {
+  for index in range(items.len()) {
+    if items[index] == wanted { return index }
+  }
+  -1
+}
+
+test test_qemu_qualification_attaches_a_second_disk_after_the_root_disk [error] {
+  let config = fixture_qemu("Linux", "x86_64")?
+  let input = qemu.QemuAsterinasReference(
+    kernel: p"/tmp/kernel",
+    initramfs: p"/tmp/initramfs",
+    disk: p"/tmp/root",
+    memory_mib: 1024,
+    data_disk: qemu.DataDisk(p"/tmp/data"),
+    network: qemu.Tap("tap0"),
+    control: qemu.NoControl,
+  )
+  let argv = qemu.qemu_asterinas_reference_argv(config, input)?
+  let root = position(argv, "if=none,id=root,format=raw,file=/tmp/root")
+  let data = position(argv, "if=none,id=data,format=raw,file=/tmp/data")
+  assert root < data
+  assert argv[data + 1] == "-device"
+  assert argv[data + 2] == "virtio-blk-pci,drive=data"
+  assert data < position(argv, "tap,id=net0,ifname=tap0,script=no,downscript=no")
+}
+
 test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-qualification")?
   let fake = fp"{root}/qemu"
   fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n")
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
-  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork, control: qemu.NoControl)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
     Ok(_) => fail "accepted a guest without its completion marker"
     Err(_) => {}
@@ -108,7 +137,7 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
   fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n")
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
-  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork, control: qemu.NoControl)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
     Ok(_) => fail "accepted a failed guest"
     Err(_) => {}

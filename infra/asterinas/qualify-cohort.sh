@@ -13,10 +13,17 @@ witnesses=()
 case_dir=""
 modes=()
 tap_modes=()
+failing_modes=()
 compare_transcripts=0
+transcript_prefix='NET_'
 case "$cohort" in
     device)
         witnesses=(device/block_uevent)
+        case_dir=device
+        modes=(sysfs add nodes missing)
+        failing_modes=(missing)
+        compare_transcripts=1
+        transcript_prefix='DEV_'
         ;;
     clock-abi)
         witnesses=(time/clock_adjust)
@@ -75,6 +82,26 @@ run_backends() {
     return $(( 1 - ok ))
 }
 
+run_expecting_failure() {
+    local label="$1" argv_builder="$2" marker="$3"; shift 3
+    local side ok=1
+    for side in "${backends[@]}"; do
+        mkdir -p "$work/$label-$side"
+        "$argv_builder" "$side" "$work/$label-$side" "$@"
+        if run_cancellable "" "${job_argv[@]}" > "$work/$label-$side.log" 2>&1; then
+            failed=1
+            ok=0
+            printf 'qualification: %s passed on %s but must fail\n' "$label" "$side" >&2
+        elif ! rg -q "$marker" "$work/$label-$side/console.log"; then
+            failed=1
+            ok=0
+            printf 'qualification: %s failed on %s without reporting %s\n' "$label" "$side" "$marker" >&2
+            tail -n 20 "$work/$label-$side.log" >&2
+        fi
+    done
+    return $(( 1 - ok ))
+}
+
 witness_argv() { job_argv=(bash "$repo_root/infra/asterinas/run-witness.sh" "$1" "$regression/$3.c" "$2"); }
 guest_mode_argv() {
     local network="" tapped
@@ -83,7 +110,7 @@ guest_mode_argv() {
 }
 
 transcript() {
-    sed 's/\x1b\[[0-9;]*m//g' "$1/console.log" | tr -d '\r' | rg '^NET_' | rg -v '^NET_[A-Za-z0-9_]*_(ADDR|ROUTE|RULE) (\S+ )?inet6 ' || true
+    sed 's/\x1b\[[0-9;]*m//g' "$1/console.log" | tr -d '\r' | rg "^$transcript_prefix" | rg -v '^NET_[A-Za-z0-9_]*_(ADDR|ROUTE|RULE) (\S+ )?inet6 ' || true
 }
 
 for path in "${witnesses[@]}"; do
@@ -97,6 +124,13 @@ done
 
 for mode in "${modes[@]}"; do
     [[ -z "$selected" || "$selected" == "$mode" ]] || continue
+    if [[ " ${failing_modes[*]} " == *" $mode "* ]]; then
+        if run_expecting_failure "mode-$mode" guest_mode_argv 'DEV_EVENT_MISSING' "$mode"; then
+            passed_cases=$((passed_cases + 1))
+            printf 'qualification: %s case %s failed as required for %s\n' "$cohort" "$mode" "$backend"
+        fi
+        continue
+    fi
     run_backends "mode-$mode" guest_mode_argv "$mode" || continue
     if (( compare_transcripts )) && [[ "$backend" == both ]]; then
         transcript "$work/mode-$mode-linux" > "$work/mode-$mode-linux.transcript"

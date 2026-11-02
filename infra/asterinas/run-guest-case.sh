@@ -37,11 +37,21 @@ done
 basename "$case_dir" > "$staged/name"
 printf '%s\n' "$mode" > "$staged/mode"
 
+data_disk=""
+if [[ -x "$case_dir/data-disk.sh" ]]; then
+    data_disk="$result_dir/data.img"
+    bash "$case_dir/data-disk.sh" "$data_disk"
+fi
+
 firecracker_config="$bundle/firecracker.json"
 if [[ "$backend" == asterinas ]]; then
     root="$result_dir/root.ext2"
     firecracker_config="$result_dir/firecracker.json"
     jaq --arg root "$root" '.drives[0].path_on_host = $root' "$bundle/firecracker.json" > "$firecracker_config"
+    if [[ -n "$data_disk" ]]; then
+        jaq --arg data "$data_disk" '.drives += [{drive_id: "laputa-data", path_on_host: $data, is_root_device: false, is_read_only: false}]' \
+            "$firecracker_config" > "$firecracker_config.tmp" && mv "$firecracker_config.tmp" "$firecracker_config"
+    fi
     if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
         jaq '.["network-interfaces"] = [{iface_id: "eth0", host_dev_name: "tap0", guest_mac: "AA:FC:00:00:00:01"}]' \
             "$firecracker_config" > "$firecracker_config.tmp" && mv "$firecracker_config.tmp" "$firecracker_config"
@@ -69,6 +79,7 @@ else
         "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz"
         "$root" "$console" "$console.qemu" '' "$timeout_seconds" "$memory_mib")
 fi
+[[ -z "$data_disk" || "$backend" == asterinas ]] || vm_command+=(--data-disk "$data_disk")
 if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
     [[ "$backend" == asterinas ]] || vm_command+=(--tap tap0)
     control_environment=()

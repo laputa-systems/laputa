@@ -5,8 +5,7 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks and the independent review's findings are resolved, but it needs D2 (device compatibility) delivered and A0's no-new-failure rule to hold, and 14 `test-bb-awk` cases that passed at A0 time out at A6 (the awk lane owns that cause).
+  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks, the independent review's findings are resolved and D2 is delivered, but A0's no-new-failure rule does not hold: 14 `test-bb-awk` cases that passed at A0 time out at A6 (the awk lane owns that cause), and the full `qualify.sh all` run must be repeated on the final kernel.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -95,14 +94,42 @@
   (coldplug without a daemon fails within 3 s and creates no node), then with a
   restarted daemon. The identical payload passes on the Linux reference.
   `device/block_uevent` is the kernel witness: it passes on this kernel and on
-  Linux. D2 is not delivered. Open D2 obligations:
-  `DEVPATH` is `/devices/virtual/block/vda`, not a PCI or MMIO path, so it does
-  not match Linux; partitions are not nested below their disk; no add event is
-  emitted at device registration or hotplug; only the virtio disk is a fixture
-  device, and ownership and mode are checked for it only; the kernel crate's
-  unit tests do not build in the OSDK harness here (they stop at a grub
-  video-mode error), so the kernel-level uevent code has no unit test beyond the
-  17 device model tests and the `device/block_uevent` witness.
+  Linux.
+- D2 device compatibility, delivered by the independent review's follow-up.
+  `bash infra/asterinas/qualify.sh device --backend both` runs the boot proof, the
+  `device/block_uevent` witness and the four modes of `guest/asterinas/device` on both
+  backends. The fixture is the root disk `vda`, a second disk `vdb` whose MBR holds two
+  partitions (`vdb1`, `vdb2`; `data-disk.sh` writes the image, Firecracker gets a second drive and
+  the Linux reference a second `virtio-blk-pci`), and the memory devices `null`, `zero`, `full`,
+  `random` and `urandom`. `sysfs` compares the class link, the `/sys/dev` link, the `subsystem`
+  links, the nesting (disk below a `virtioN` device on the `virtio` bus, partition inside its
+  disk), the device number, the `dev` attribute against the node, and the whole `uevent` file;
+  `add` writes `add` to each device's `uevent` attribute and compares the event that reaches a
+  kernel uevent socket (ACTION, DEVPATH, SUBSYSTEM, MAJOR, MINOR, DEVNAME, DEVTYPE,
+  SYNTH_UUID, SEQNUM present and increasing); `nodes` removes the block nodes, makes the memory
+  nodes mode 0600 and runs the packaged `mdevd-coldplug`, then requires `root:disk 0660` for
+  the disks and partitions and `root:root 0666` for the memory devices; `missing` expects an
+  add event nobody triggered and passes the gate only if the check reports it missing on both
+  backends (the gate fails when the event arrives: tried by making the mode trigger it). The
+  transcripts of `sysfs`, `add` and `nodes` are identical on both backends after one
+  normalization: the transport segment of the device path, which the VMMs expose differently
+  (`pci0000:00/0000:00:SS.F` on QEMU, `virtio-mmio-cmdline/virtio-mmio.N` on Firecracker).
+  Everything else is compared as is: the first virtio disk is 254:0, `vdb` is 254:16 and its
+  partitions 254:17 and 254:18, and DISKSEQ, PARTN, PARTUUID and DEVMODE agree.
+  Kernel fixes the comparison found: block devices sit at `/devices/virtual/block/vda`
+  (now below `virtioN` below the transport, with the partitions inside their disk); the
+  second MMIO disk became `vda` and the network device `virtio0` because the MMIO transports
+  were initialised last-in first-out; the NVMe driver took major 254 without a controller, so
+  virtio disks were 253; uevents lacked DISKSEQ, PARTN, PARTUUID and DEVMODE and a partition
+  had no `partition` attribute; registering a device sent no add uevent. The witness gained the
+  device path checks (it fails on the previous kernel). Kernel tests: 4 announcement tests and the
+  class-environment expectations in `aster-device` (21 pass), 2 partition UUID tests in
+  `aster-block`. Not covered: the registration-time add event reaches no listener in a guest
+  (nobody can listen before the kernel registers the boot disk, and Firecracker has no hotplug),
+  so it is proven by the kernel tests only; the kernel crate's own tests still do not build in
+  the OSDK harness here, so the netlink message built for it is not unit tested; disk attributes
+  such as `size` and `ro`, the `driver` and `modalias` entries, bridged PCI buses, and
+  network devices are not compared (D4 and D5 cover the network).
 - A2 clock ABI: `clock_settime`, `adjtimex` and `clock_adjtime` exist and
   CLOCK_REALTIME is a settable, steerable function of the monotonic clock. The
   `time/clock_adjust` witness and 10 `aster-time` kernel tests cover readback,
@@ -440,7 +467,7 @@
   `NoMemory` diagnosis first, then A1. Fresh public-source reproduction and
   performance remain open.
 - A6 integrate and harden, run on kernel `006f33dbc`. `bash infra/asterinas/qualify.sh all --backend both` now exists
-  and runs, serially, `baseline` (boot, numeric), `device` (boot proof and the `device/block_uevent` witness),
+  and runs, serially, `baseline` (boot, numeric), `device` (boot proof, the `device/block_uevent` witness and the `sysfs`, `add`, `nodes` and `missing` modes of `guest/asterinas/device`),
   `clock-abi`, `clock` (the `udp_ancillary` witness and the modes behind, ahead, frequency, pause, jump),
   `network-state` (10 witnesses, 6 modes), `network` (2 witnesses, 8 modes) and `recovery` (the boot proof and the
   DHCP `restart` and `carrier` modes, 10 rounds). The final run exited 0 on both backends with no failed, skipped or
