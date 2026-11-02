@@ -5,7 +5,7 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks, the independent review's findings are resolved and D2 is delivered, but A0's no-new-failure rule is unproven: the 14 `test-bb-awk` cases that passed at A0 and timed out at A6 are host-load flakes of a 5 s limit, and the rule for timing-bound cases (Acceptance) needs the A0 pass-set accounting on a quiet host under `perf-gate-ready`.
+  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks, the independent review's findings are resolved and D2 is delivered, but A0's no-new-failure rule is unproven: the A0 pass-set accounting under `perf-gate-ready` (Acceptance) lost 1 of the 1,281 A0 passes, `test_bb_awk_awk_gsub_falls_back_to_non_extended_regex_563659b0`, a 5.1 s timeout, so by the rule for timing-bound cases it is a real regression until a later gated run shows otherwise.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -536,8 +536,13 @@
   allocator changes touch only the failure and balancing paths and not this path. The timeout stays 5 s. Consequently the 14
   are recorded as host-load flakes: the A0 pass-set rerun (125 modules with A0 passes, 3 batches, 907 s, host load 5 to 20)
   passes 1,313 cases and loses 1 of the 1,281 A0 passes, `test_bb_awk_awk_length_0`, a 5.1 s timeout in a module that
-  passed 48 of 49 at that load; no other module lost a case. The accounting rule needs a stability criterion for
-  timing-bound cases; that choice is open. Paired Linux run of the 131 modules with Asterinas failures plus
+  passed 48 of 49 at that load; no other module lost a case. The accounting rule for timing-bound cases is in Acceptance.
+  Gated A0 pass-set run on the final kernel `093b5270b` (the 125 modules with A0 passes, 3 batches, 1,099 s, `perf-gate-ready`
+  exited 0 before and `perf-gate-ready -1` exited 0 after; the host load average at the start was 5.9): 1,312 passed, 36
+  failed, 49 skipped, 0 unknown, and 1 A0 pass lost: `test-bb-awk` `gsub_falls_back_to_non_extended_regex_563659b0` failed after 5.1 s.
+  The 49 cases of that module took a median 2.5 s (1.8 to 5.1 s), with several at 4.4 to 4.7 s, so the gate passing did not make
+  the module quiet. The result is not retried until green; under the rule it is a regression, and A6 stays unaccepted until a
+  later gated run on a quiet host shows 1,281 of 1,281. Paired Linux run of the 131 modules with Asterinas failures plus
   `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` timeouts, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
   smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch) and 2 are skipped on
