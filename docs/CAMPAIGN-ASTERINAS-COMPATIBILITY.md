@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is accepted except notifications.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is accepted.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -202,10 +202,27 @@
   datagram get one reply each in order, and a dump ends with a multipart `NLMSG_DONE`
   and is never acknowledged. Deliberate difference: Linux ignores a malformed trailing
   attribute and Asterinas rejects it with `EINVAL`; error replies carry the request
-  header but not its payload. Still to build: notifications to the link, address
-  and route groups (needing `Clone` messages and a diff of the derived routes),
-  and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink link changes have
-  no consumer yet). Open obligations: the `IFLA_CARRIER` and carrier-change events
+  header but not its payload. Notifications: `SIOCSIFFLAGS`,
+  `RTM_NEWADDR`, `RTM_DELADDR`, `RTM_NEWROUTE` and `RTM_DELROUTE` publish to the link, IPv4 address and
+  IPv4 route groups, in order and under the lock that orders the changes. The order and content
+  follow Linux, checked by the `network/rtnl_notify` witness on `lo` (one message per datagram, the
+  requester sees notifications before its acknowledgement, `NETLINK_ADD_MEMBERSHIP` by group number,
+  one `ENOBUFS` then the queued messages on overflow) and by the `events` mode of the
+  `network-state` case on the TAP-backed `eth0`, whose 65-line transcript is identical to Linux. An
+  address message comes first, then its routes (added: local, assigned broadcast, connected, subnet
+  broadcast; removed: connected, broadcast, local); a secondary address goes before its primary;
+  address and user-route messages echo the request's sequence and port, derived routes carry
+  neither; link up announces the routes that return; link down and removal of the last address flush
+  routes without announcing them; a down interface gains only its own address routes. Contract
+  changes: route netlink sends notifications; `NETLINK_ADD_MEMBERSHIP` and `NETLINK_DROP_MEMBERSHIP`
+  take a group number (they were a bit mask), a successful acknowledgement carries `NLM_F_CAPPED`,
+  and a down interface no longer gains its connected route on the loopback device. Deliberate
+  difference: Linux reports the operational state of a link as a second, delayed message (change
+  mask 0, at most one per second); Asterinas has no deferred link watch, so its single message
+  carries the final flags, and the `events` transcript drops the change-0 message and does not
+  compare the link flags. `MSG_DONTWAIT` is still ignored by netlink receive (use a non-blocking
+  socket). Still to build: `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink link changes have
+  no consumer yet). Open obligations: the `IFLA_CARRIER` attribute and carrier-change events
   needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT` (used by `ifconfig` and
   `route`, not by the maintained DHCP path), address expiry, and route lookup
   (`RTM_GETROUTE` without `NLM_F_DUMP`, which fails with `EOPNOTSUPP` where Linux
@@ -214,9 +231,9 @@
   at the XSH pin): it sends and receives DHCP and ARP frames through `AF_PACKET`
   sockets bound to the interface and listens on a route-netlink socket joined to the
   link, address and route groups, treating `ENOBUFS` as a lost notification. The
-  kernel has neither: `AF_PACKET` is only a constant (`socket(2)` fails with
-  `EAFNOSUPPORT`) and route netlink sends no notifications. Both are therefore the
-  first A5 slices, ahead of the lease, renewal and carrier cases, and the A3
+  kernel lacked both: `AF_PACKET` is only a constant (`socket(2)` fails with
+  `EAFNOSUPPORT`); route netlink notifications now exist (see A4). `AF_PACKET` is therefore the
+  first A5 slice, ahead of the lease, renewal and carrier cases, and the A3
   pause and resume case still waits for an outside peer program in the container
   namespace.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
@@ -226,6 +243,11 @@
   numeric cases intact after every slice. The limiting factor is no longer
   state but delivery: notifications and `AF_PACKET`. Continue serialized with
   notifications, then `AF_PACKET`, then the DHCP cohort.
+- Steering checkpoint after A4 notifications: landed behavior is Linux-identical change delivery on
+  the link, address and route groups (loopback witness and eth0 transcript), with the clock cases
+  (behind, ahead, frequency) and the paired boot and numeric cases intact. The limiting factor is
+  now the packet path: the DHCP client cannot open its sockets. Continue serialized with
+  `AF_PACKET` (create and bind, receive, send, options), then the DHCP cohort.
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`

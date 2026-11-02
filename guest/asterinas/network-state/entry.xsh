@@ -145,6 +145,80 @@ proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, tim
   report(label, "", true)
 }
 
+pure attributes_of(payload: Bytes, start: Int) -> List[Attribute] {
+  var offset = start
+  let found: List[Attribute] = collect {
+    while offset + 4 <= payload.len() {
+      let length = bytes.unpack_le(payload, 2, offset) ?? 0
+      let kind = bytes.unpack_le(payload, 2, offset + 2) ?? 0
+      break when length < 4 or offset + length > payload.len()
+      yield {kind: kind.bit_and(16383), data: payload[offset + 4..offset + length]}
+      offset += (length + 3) / 4 * 4
+    }
+  }
+  found
+}
+
+pure attribute_of(attributes: List[Attribute], kind: Int) -> Bytes? {
+  for attribute in attributes { return attribute.data when attribute.kind == kind }
+  null
+}
+
+pure address_of(attributes: List[Attribute], kind: Int) -> Str {
+  if let data = attribute_of(attributes, kind) {
+    if data.len() == 4 { return f"{data.byte_at(0) ?? 0}.{data.byte_at(1) ?? 0}.{data.byte_at(2) ?? 0}.{data.byte_at(3) ?? 0}" }
+  }
+  "-"
+}
+
+pure number_of(attributes: List[Attribute], kind: Int, width: Int) -> Int {
+  if let data = attribute_of(attributes, kind) { return bytes.unpack_le(data, width) ?? 0 }
+  0
+}
+
+pure origin_of(message: Bytes) -> Result[Str, Error] {
+  let seq = bytes.unpack_le(message, 4, 8)?
+  let pid = bytes.unpack_le(message, 4, 12)?
+  Ok(f"seq={if seq == 0 { "0" } else { "request" }} pid={if pid == 0 { "0" } else { "request" }} hdr={bytes.unpack_le(message, 2, 6)?}")
+}
+
+pure describe_event(message: Bytes, names: Map[Int, Str]) -> Result[Str, Error] {
+  let kind = bytes.unpack_le(message, 2, 4)?
+  let origin = origin_of(message)?
+  if kind == 16 {
+    let attributes = attributes_of(message, 32)
+    let index = bytes.unpack_le(message, 4, 20)?
+    return Ok(f"NEWLINK {names.get(index) ?? "?"} up={bytes.unpack_le(message, 4, 24)?.bit_and(1)} change={bytes.unpack_le(message, 4, 28)?} mtu={number_of(attributes, 4, 4)} {origin}")
+  }
+  if kind == 20 or kind == 21 {
+    let attributes = attributes_of(message, 24)
+    let index = bytes.unpack_le(message, 4, 20)?
+    let name = if kind == 20 { "NEWADDR" } else { "DELADDR" }
+    return Ok(f"{name} {names.get(index) ?? "?"} {address_of(attributes, 2)}/{message.byte_at(17) ?? 0} flags={message.byte_at(18) ?? 0} scope={message.byte_at(19) ?? 0} brd={address_of(attributes, 4)} {origin}")
+  }
+  if kind == 24 or kind == 25 {
+    let attributes = attributes_of(message, 28)
+    let name = if kind == 24 { "NEWROUTE" } else { "DELROUTE" }
+    let device = names.get(number_of(attributes, 4, 4)) ?? "?"
+    return Ok(f"{name} {address_of(attributes, 1)}/{message.byte_at(17) ?? 0} table={number_of(attributes, 15, 4)} proto={message.byte_at(21) ?? 0} scope={message.byte_at(22) ?? 0} type={message.byte_at(23) ?? 0} dev={device} via={address_of(attributes, 5)} src={address_of(attributes, 7)} prio={number_of(attributes, 6, 4)} {origin}")
+  }
+  Ok(f"TYPE {kind}")
+}
+
+proc drain_events(label: Str, listener: Int) [fs, process, env, time, net, error] {
+  var names: Map[Int, Str] = {}
+  for link in linux.network_dump()?.links { names[link.ifindex] = link.name ?? "-" }
+  while unix.poll_fd(listener, ["readable"], 300)? == ["readable"] {
+    match unix.read_fd(listener, 65536) {
+      Ok(message) => {
+        let late_link_state = bytes.unpack_le(message, 2, 4)? == 16 and bytes.unpack_le(message, 4, 28)? == 0
+        if !late_link_state { eprint --flush f"NET_{label}_EVENT {describe_event(message, names)?}" }
+      }
+      Err(error) => eprint --flush f"NET_{label}_EVENT_ERR {error.errno ?? 0}"
+    }
+  }
+}
+
 proc main() [fs, process, env, time, net, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
@@ -213,6 +287,60 @@ proc main() [fs, process, env, time, net, error] {
       delete_address("delete_address_keeps_routes", "eth0", address)?
       delete_route("delete_slower_default", "eth0", slower)?
       add_route("add_without_address", "eth0", default)?
+    }
+    "events" => {
+      let c = linux.net_constants()
+      let listener = linux.netlink_open(c.NETLINK_ROUTE, c.RTMGRP_LINK.bit_or(c.RTMGRP_IPV4_IFADDR).bit_or(c.RTMGRP_IPV4_ROUTE))?
+      defer unix.close_fd(listener)
+      let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
+      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
+      let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
+      let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
+      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
+      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
+      let index = ifindex_of("eth0")?
+      linux.link_up("eth0")?
+      drain_events("up", listener)?
+      linux.link_up("eth0")?
+      drain_events("up_again", listener)?
+      send_request("add_primary", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
+      drain_events("add_primary", listener)?
+      send_request("add_second", c.RTM_NEWADDR, flags, address_payload(index, second, c.RT_SCOPE_UNIVERSE, true)?)
+      drain_events("add_second", listener)?
+      send_request("add_host", c.RTM_NEWADDR, flags, address_payload(index, host, c.RT_SCOPE_UNIVERSE, true)?)
+      drain_events("add_host", listener)?
+      send_request("add_default", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
+      drain_events("add_default", listener)?
+      send_request("add_default_again", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
+      drain_events("add_default_again", listener)?
+      send_request("add_direct", c.RTM_NEWROUTE, flags, route_payload(index, direct, true)?)
+      drain_events("add_direct", listener)?
+      send_request("delete_direct", c.RTM_DELROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), route_payload(index, direct, false)?)
+      drain_events("delete_direct", listener)?
+      send_request("delete_second", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, second, c.RT_SCOPE_UNIVERSE, false)?)
+      drain_events("delete_second", listener)?
+      linux.link_down("eth0")?
+      drain_events("down", listener)?
+      linux.link_up("eth0")?
+      drain_events("up_with_addresses", listener)?
+      send_request("add_default_again_after_up", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
+      drain_events("add_default_again_after_up", listener)?
+      send_request("delete_primary", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, primary, c.RT_SCOPE_UNIVERSE, false)?)
+      drain_events("delete_primary", listener)?
+      send_request("delete_last_address", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, host, c.RT_SCOPE_UNIVERSE, false)?)
+      drain_events("delete_last_address", listener)?
+      report("after_last_address", "eth0", false)?
+      send_request("add_primary_for_promotion", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
+      send_request("add_second_for_promotion", c.RTM_NEWADDR, flags, address_payload(index, second, c.RT_SCOPE_UNIVERSE, true)?)
+      drain_events("add_for_promotion", listener)?
+      send_request("delete_primary_with_secondary", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, primary, c.RT_SCOPE_UNIVERSE, false)?)
+      drain_events("delete_primary_with_secondary", listener)?
+      linux.link_down("eth0")?
+      drain_events("down_without_addresses", listener)?
+      send_request("add_primary_while_down", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
+      drain_events("add_primary_while_down", listener)?
+      linux.link_up("eth0")?
+      drain_events("up_last", listener)?
     }
     other => fail f"unknown network-state mode {other}"
   }

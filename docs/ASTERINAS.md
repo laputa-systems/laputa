@@ -96,7 +96,7 @@ from the main checkout, because worktrees do not carry ignored files.
 Run the IPv4 state operations cohort with
 `bash infra/asterinas/qualify.sh network-state --backend both [--case NAME]`.
 It builds and runs each netlink witness of the cohort on both backends, then runs
-the `guest/asterinas/network-state` case in each mode against a TAP-backed `eth0`
+the `guest/asterinas/network-state` case in each mode (including `events`, which compares the route-netlink notifications) against a TAP-backed `eth0`
 and requires the two `NET_` transcripts to be identical. Two normalizations apply:
 the Linux reference has a `sit0` link, which the case omits, and IPv6 is outside the
 cohort (the reference kernel has no IPv6 policy routing and adds link-local addresses),
