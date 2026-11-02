@@ -182,14 +182,6 @@ proc await_file(file: Path, timeout_ms: Int) [fs, time, error] -> Result[Bool] {
   Ok(false)
 }
 
-proc resolve_server_neighbor() [process, net, time, error] {
-  let c = linux.net_constants()
-  let socket = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
-  defer unix.close_fd(socket)
-  let _ = linux.sendto(socket, b"x", {family: "inet", address: "192.0.2.1", port: 9})?
-  time.sleep(500ms)
-}
-
 pure static_route(destination: Str, prefix: Int, gateway: Str, metric: Int) -> Result[network.Route, Error] {
   guard let destination_address = wire.ip_parse(destination) else { fail f"bad route destination {destination}" }
   guard let gateway_address = wire.ip_parse(gateway) else { fail f"bad route gateway {gateway}" }
@@ -264,7 +256,6 @@ proc main() [fs, process, env, time, net, io, error] {
     }
     "lifecycle" => {
       await_state("bound", "bound", 30000)?
-      resolve_server_neighbor()?
       let _ = snapshot("bound")?
       watch_states("lease", 24000)?
       messages("lease", capture)?
@@ -272,14 +263,12 @@ proc main() [fs, process, env, time, net, io, error] {
     }
     "renewal" => {
       await_state("bound", "bound", 30000)?
-      resolve_server_neighbor()?
       time.sleep(24s)
       messages("renewed", capture)?
       let _ = snapshot("renewed")?
     }
     "reconfigure" => {
       await_state("bound", "bound", 30000)?
-      resolve_server_neighbor()?
       add_foreign_routes()?
       let first = snapshot("bound")?
       require_state(
@@ -321,7 +310,6 @@ proc main() [fs, process, env, time, net, io, error] {
     }
     "nak" => {
       await_state("bound", "bound", 30000)?
-      resolve_server_neighbor()?
       time.sleep(24s)
       messages("nak", capture)?
       let _ = snapshot("after_nak")?

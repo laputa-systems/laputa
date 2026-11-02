@@ -373,10 +373,7 @@
   receive honours `MSG_DONTWAIT`; a packet send reports and clears the pending
   error. Deliberate differences: binding the unspecified address without a device
   still fails `EADDRNOTAVAIL` (Linux binds every interface) and a bound socket
-  cannot change its device (`EOPNOTSUPP`); the first UDP datagram to a neighbor
-  that is not resolved yet is dropped while ARP runs (Linux queues it), so the
-  modes with unicast renewals resolve the server neighbor first or the T1 renewal
-  is lost and the T2 rebinding recovers; every interface has carrier, because
+  cannot change its device (`EOPNOTSUPP`); every interface has carrier, because
   Firecracker's virtio-net has no link status, so the case drives carrier loss and
   return with administrative link down and up (QEMU's `set_link` would move the
   Linux side only), which on both kernels clears `IFF_LOWER_UP` and
@@ -393,8 +390,22 @@
   resolver line only. A5 acceptance (the A5 row and D5) needs nothing more. The remaining A5
   obligations are successor debt that no capability claims: the syslog consumer (no case runs
   it; the maintained-VM successor owns persistent diagnostics), foreign routes of types other
-  than unicast (`EOPNOTSUPP`), `IFLA_CARRIER_CHANGES` and the carrier counters, and the
-  unresolved-neighbor queue (the cases resolve the neighbor first).
+  than unicast (`EOPNOTSUPP`) and `IFLA_CARRIER_CHANGES` and the carrier counters. Unresolved
+  neighbors: the first datagram to a neighbor whose Ethernet address is unknown used to be
+  dropped while ARP ran (Linux queues it), and the renewal modes worked around that by
+  resolving the server first. The review rejected the workaround. The kernel now keeps a
+  bounded queue per unresolved neighbor (212992 bytes, oldest dropped first, 128 neighbors),
+  sends the ARP request with the first packet and repeats it twice a second apart, sends the
+  queue in order on the reply, and drops it after three unanswered requests or when the link
+  goes down; the cases no longer resolve the neighbor. With the workaround removed, the
+  `renewal` transcript on the previous kernel gained a lost-renewal rebinding broadcast
+  (`request broadcast ciaddr=192.0.2.100`) that Linux does not show; on the new kernel the
+  `renewal`, `lifecycle`, `reconfigure` and `nak` transcripts equal Linux. Not done: Linux
+  reports the failure to the sending socket (host unreachable on a connected UDP socket,
+  with `IP_RECVERR` on others), and this kernel delivers no ICMP or asynchronous socket error
+  to any socket, so the dropped queue is silent, as it is for an unconnected Linux UDP
+  socket. That needs ICMP receive handling in bigtcp, a way for a queued packet to name its
+  socket, and a pending-error slot in the datagram socket: about 300 lines in 6 files.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four
