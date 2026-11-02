@@ -288,6 +288,23 @@
   sends a frame without a header); loopback carries only IPv4 and IPv6 frames
   (`EOPNOTSUPP` otherwise) and does not keep the link-layer addresses of a frame.
   Contract changes: packet sockets send; `Iface::send_link_frame` exists.
+  The `packet` transcript leaves out the peer's neighbor checks (its unicast ARP
+  requests and the guest's answers), because the peer's kernel sends them five
+  seconds after it last used the entry, which a loaded host reaches.
+  Options: `SOL_SOCKET` options work on a packet socket (`SO_TYPE`, `SO_ERROR`
+  reads and clears the `ENETDOWN` that poll reports, `SO_RCVBUF` sets the queue
+  size in bytes with a 212992 default, `SO_RCVTIMEO` bounds a blocking receive),
+  and `SOL_PACKET` has `PACKET_IGNORE_OUTGOING` (get and set) and
+  `PACKET_STATISTICS` (frames that matched, including the dropped ones, and the
+  frames that did not fit; read once, then reset). Every other `SOL_PACKET`
+  option fails with `ENOPROTOOPT`, including `PACKET_AUXDATA`, membership, rings,
+  fanout and filters, which no maintained consumer uses. Deliberate difference:
+  `SO_RCVBUF` is not doubled and counts frame bytes, where Linux doubles it and
+  counts buffer memory. `network/packet_options` and the additions to
+  `network/packet_send` (ignore-outgoing, a flooded queue with its statistics)
+  pass on both kernels. Contract change: the `SOL_PACKET` option level exists.
+  AF_PACKET is complete for the DHCP client's use; `SO_BINDTODEVICE` for its UDP
+  socket and the carrier attribute remain with the lease slice.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four

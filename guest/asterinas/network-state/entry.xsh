@@ -227,6 +227,11 @@ pure describe_frame(frame: Bytes) -> Result[Str?, Error] {
   let ethertype = bytes.unpack_be(frame, 2, 12)?
   let destination = if frame[0..6] == b"\xff\xff\xff\xff\xff\xff" { "broadcast" } else { "unicast" }
   if ethertype == 2054 {
+    let operation = bytes.unpack_be(frame, 2, 20)?
+    let sender = ip_text(frame, 28)
+    let peer_checks_neighbor = operation == 1 and sender == "192.0.2.1"
+    let answer_to_peer_check = operation == 2 and sender == "192.0.2.10" and destination == "unicast"
+    if peer_checks_neighbor or answer_to_peer_check { return Ok(null) }
     return Ok(f"ARP op={bytes.unpack_be(frame, 2, 20)?} {ip_text(frame, 28)}>{ip_text(frame, 38)} dst={destination} len={frame.len()}")
   }
   if ethertype == 2048 {
@@ -418,8 +423,8 @@ proc main() [fs, process, env, time, net, error] {
       for link in linux.network_dump()?.links { if link.name == "eth0" { mac = link.address ?? b"" } }
       let broadcast = b"\xff\xff\xff\xff\xff\xff"
       let _ = linux.sendto(arp, arp_request(mac, [192, 0, 2, 10], [192, 0, 2, 1])?, packet_address(index, c.ETH_P_ARP, broadcast)?)?
-      let _ = linux.sendto(ip, broadcast_udp(mac)?, packet_address(index, c.ETH_P_IP, broadcast)?)?
       drain_packets("arp_after_send", arp)?
+      let _ = linux.sendto(ip, broadcast_udp(mac)?, packet_address(index, c.ETH_P_IP, broadcast)?)?
       drain_packets("ip_after_send", ip)?
       drain_packets("everything_after_send", everything)?
       drain_packets("anywhere_after_send", anywhere)?
