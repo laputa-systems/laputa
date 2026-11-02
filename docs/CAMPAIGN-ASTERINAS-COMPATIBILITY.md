@@ -235,7 +235,20 @@
   `EAFNOSUPPORT`); route netlink notifications now exist (see A4). `AF_PACKET` is therefore the
   first A5 slice, ahead of the lease, renewal and carrier cases, and the A3
   pause and resume case still waits for an outside peer program in the container
-  namespace.
+  namespace. The same client's UDP socket also sets `SO_BINDTODEVICE`, which the
+  kernel does not have (`setsockopt` fails with `ENOPROTOOPT`); it belongs to the
+  A5 lease slice. `AF_PACKET` is delivered in four slices. Create and bind: a
+  packet socket needs `CAP_NET_RAW` (`EPERM`), takes `SOCK_RAW` or `SOCK_DGRAM`
+  (other types fail with `ESOCKTNOSUPPORT`), keeps the EtherType given to
+  `socket(2)`, binds with `struct sockaddr_ll` (`EINVAL` for a short or foreign
+  address, `ENODEV` for an unknown index, protocol zero keeps the protocol) and
+  reports protocol, index, hardware type and link-layer address from
+  `getsockname(2)` with the Linux length; connect, listen, accept, shutdown and
+  getpeername fail with `EOPNOTSUPP`, as do send and receive until their slices.
+  `network/packet_bind` passes on both kernels (its first run caught the protocol
+  kept in network byte order); the network-state cohort, the A3 clock cases and
+  the paired boot and numeric cases pass. Contract change: `socket(AF_PACKET)`
+  exists, and the socket address layer has a packet variant.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four

@@ -7,7 +7,7 @@ backend="$1"
 selected="$2"
 
 regression="$repo_root/asterinas/test/initramfs/src/regression/network"
-witnesses=(rtnl_route_dump link_state addr_config route_config rtnl_ack rtnl_notify)
+witnesses=(rtnl_route_dump link_state addr_config route_config rtnl_ack rtnl_notify packet_bind)
 modes=(loopback link address route events)
 
 if [[ -n "$selected" ]]; then
