@@ -125,10 +125,13 @@ and fails when it ran none.
 
 `run-guest-case.sh` and `run-witness.sh` accept a run only when the case or witness marker
 is present, the exit status is zero and the complete guest marker set is present, on both
-backends. A guest that prints the success markers and then hangs is rejected. SIGTERM or
-SIGINT to any runner or to `qualify.sh` stops the owned guests, removes the owned container
-(named `laputa-asterinas-case-PID`, with its TAP and peer processes) and removes the
-cohort's results.
+backends. A runner returns as soon as the guest prints its completion marker and does not
+wait for the guest to exit, so a guest that prints the markers and then stalls is accepted; a
+guest that stalls before the marker is rejected after its timeout. SIGTERM or SIGINT to a
+runner, to `qualify-cohort.sh` or to `qualify.sh`, including one nested inside another,
+stops the owned guests, removes the owned container (named `laputa-asterinas-case-PID`, with
+its TAP and peer processes) and removes the cohort's results. A cohort runs its backends one
+after the other.
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`

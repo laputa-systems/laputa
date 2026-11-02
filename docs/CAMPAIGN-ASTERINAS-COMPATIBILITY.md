@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below) and A6 has run its integration, cancellation and native-accounting checks; it awaits the independent completion review.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks and the independent review's findings are resolved, but it needs D2 (device compatibility) delivered and A0's no-new-failure rule to hold, and 14 `test-bb-awk` cases that passed at A0 time out at A6 (the awk lane owns that cause).
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -437,19 +437,29 @@
   `parse-int: invalid integer -12`: the case parsed the probe's signed offset with `parse_int_decimal`, which rejects a
   sign, so any negative sample failed it (fixed with `parse_int`; the Linux side was exposed to the same bug). Cleanup:
   SIGTERM or SIGINT to `run-guest-case.sh`, `run-witness.sh`, `native-batches.sh`, `qualify-cohort.sh` or `qualify.sh`
-  (also nested inside `recovery`) leaves no owned VMM, container, peer or TAP; before the change SIGTERM left the container,
-  Firecracker and the peer running (container `laputa-asterinas-case-PID`, TAP inside its namespace). Bad guest output:
-  a case that fails, a case that prints the success markers and then fails, and a case that hangs are all rejected on both
-  backends; a case that printed `LAPUTA_ASTERINAS_CASE_OK` and `TEST_OK` and then hung was accepted on Asterinas (only the
-  Linux path checked the full marker set) and both runners now check it. Deliberate limit: the markers are plain text on
-  the console, so a guest that prints all of them still passes; the guest is trusted harness code. Linux profile: the only
+  leaves no owned VMM, container, peer or TAP; before the change SIGTERM left the container,
+  Firecracker and the peer running (container `laputa-asterinas-case-PID`, TAP inside its namespace). The independent
+  review found that an interrupt sent to a nested runner was ignored (bash starts background children with SIGINT
+  ignored), that a signal between starting a child and recording its pid left the child running, that the container could
+  be removed before it existed, that the 10 s escalation could kill `qualify-cohort.sh` before it removed its results, and
+  that the two backends ran in parallel although the cases are timing sensitive. The runners now start children with
+  SIGINT at its default, record a signal that arrives while a child starts, stop the child before removing its named
+  container (and remove it again after a normal exit), run every docker step through the same cancellable path, and give
+  each nesting level three seconds less to stop its child than its parent has, so a parent never kills a runner that is
+  still cleaning up. The backends run one after the other, and `tests/system/asterinas_runners.sh` keeps these cases.
+  Bad guest output: a case that fails, a case that prints the success markers and then fails, and a case that never
+  completes are all rejected on both backends; a case that printed only `LAPUTA_ASTERINAS_CASE_OK` and `TEST_OK` was
+  accepted on Asterinas (only the Linux path checked the full marker set) and both runners now check it. Deliberate
+  limits: a runner accepts as soon as the completion marker appears, so a guest that prints the markers and then stalls
+  is accepted (the guest does not power off), and the markers are plain text on the console, so a guest that prints all
+  of them passes; the guest is trusted harness code. Linux profile: the only
   shared QEMU change since A0 is additive and used only by the disposable qualification guest (`QemuReferenceNetwork`,
   `QemuReferenceControl`, the `control` and `network` fields of `QemuAsterinasReference`, `run-linux.xsh --tap/--qmp`); no
   function that builds a profile's QEMU command line changed, `tests/system/qemu.xsh` passes 18 tests, and the Linux side
   of every cohort passed. Firecracker gets an API socket only when `LAPUTA_VMM_CONTROL` is set. No obsolete bypass code
   remains: the coldplug bypass went with A1 and a search of `guest/`, `infra/asterinas` and the docs finds no other. Host
   fixtures `tests/system/asterinas_host.sh` and `asterinas_protocol.xsh` pass.
-- A6 native accounting, same method as A0 (15,255 identities, the A0 module order, 50-module batches, two-hour budget).
+- A6 native accounting, same method as A0 (15,255 identities, the A0 module order, 50-module batches, two-hour budget). The batched run used kernel `8708e64dc`, before the page-rounding fix; only the `test-gnu-cp` rerun used the final kernel `006f33dbc`.
   Full single-VM run (`XSH_TEST=all make asterinas-test`, 3000 s): the first run (kernel `69a647fc1`) ended after 1117 s with
   `Failed to allocate a large slot` for a 32 KiB kernel heap allocation (86 passed, 4 skipped); the guest reported 3.8 GB free
   throughout an instrumented rerun of the awk module (1734 s, no failure), so memory was not exhausted. Contiguous frame
@@ -457,8 +467,10 @@
   the global pool. The kernel now drains every CPU's pool (kernel test `reclaim_moves_chunks_cached_by_the_current_cpu_into_the_global_pool`
   fails without it). That this was the cause of the observed failure is not proven by a reproducer. The second full run
   (kernel `8708e64dc`) passed 108 cases, skipped 4 and met the 3000 s budget with no panic. Batched run, 10 batches
-  (420 of 1,015 modules attempted, 595 unstarted, versus 200 attempted at A0): 4,847 passed, 534 failed, 257 skipped,
-  9,617 unexecuted, 0 unknown (A0: 1,281, 71, 65, 13,838). Batches 4 and 5 ended in a kernel panic
+  (420 of 1,015 modules attempted, 595 unstarted): 4,847 passed, 534 failed, 257 skipped,
+  9,617 unexecuted, 0 unknown (A0: 1,281, 71, 65, 13,838 with 200 modules attempted). The attempted counts are not like for
+  like: the ten batches took 7,737 s (the budget limits when a batch may start, so the last one ended after it), where the
+  A0 batches took 54 minutes, and A0's guests panicked after 10 to 13 minutes. Batches 4 and 5 ended in a kernel panic
   (`attempt to subtract with overflow`, frame allocator `chunk.rs:31`) in `test_gnu_cp_sparse_perf_log`, which copies a 1 TiB
   sparse file: with the global pool almost exhausted the pool balancer rounded the amount to move to zero pages. The kernel now
   moves nothing below a page (kernel test `plan_moves_nothing_when_the_global_pool_is_almost_exhausted` fails without it);
@@ -490,8 +502,12 @@
   timing-bound cases; that choice is open. Paired Linux run of the 131 modules with Asterinas failures plus
   `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` timeouts, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
-  smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch), and Linux fails 24 cases
-  that Asterinas did not fail. 9,617 cases remain unexecuted baseline debt. No time gate was run in A6, so performance
+  smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch) and 2 are skipped on
+  Linux (534 = 171 + 361 + 2). Linux fails 24 cases that Asterinas did not fail: 19 of them are `test-gnu-cp` cases that
+  Asterinas never ran in this accounting (its two batches ended in the panic), and 5 are xattr and ACL cases in
+  `test-cp`, `test-uu-cp-4` and `test-setfacl`. The `test-gnu-cp` rerun on the final kernel ran all 59 cases and failed
+  22: 19 fail on Linux too and 3 fail only on Asterinas (`cp_i`, `preserve_link`, `sparse_perf`), so
+  `sparse_perf` is not the only Asterinas-only `test-gnu-cp` failure. 9,617 cases remain unexecuted baseline debt. No time gate was run in A6, so performance
   qualification stays open for A7.
   Contract changes: `qualify.sh` takes the cohorts `device`, `clock-abi`, `clock`, `recovery` and `all` and exports
   `ASTERINAS_EXTRA_PACKAGES=ntpd-rs` unless the caller sets it; `qualify-network-cohort.sh` became `qualify-cohort.sh`;
