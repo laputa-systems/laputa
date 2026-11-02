@@ -87,9 +87,20 @@ The runner compiles each `.c` file in the case directory, places the files under
 markers. `ASTERINAS_EXTRA_PACKAGES="ntpd-rs"` adds packages to the generation
 for a build. With `LAPUTA_GUEST_NETWORK=tap` an Asterinas case runs inside a disposable
 container network namespace with an owned TAP device `tap0` (192.0.2.1/24) wired to a
-virtio-net device `eth0`; nothing on the host network changes. `ntpd-rs` also needs the operator-provisioned, git-ignored
+virtio-net device `eth0`; nothing on the host network changes. The Linux reference
+guest gets the same TAP and a `virtio-net-pci` device when `LAPUTA_GUEST_NETWORK=tap`
+(QEMU runs in an equivalent container). `ntpd-rs` also needs the operator-provisioned, git-ignored
 `packages/ca-certificates/files/trust-update-key`; a worktree build must copy it
 from the main checkout, because worktrees do not carry ignored files.
+
+Run the IPv4 state operations cohort with
+`bash infra/asterinas/qualify.sh network-state --backend both [--case NAME]`.
+It builds and runs each netlink witness of the cohort on both backends, then runs
+the `guest/asterinas/network-state` case in each mode against a TAP-backed `eth0`
+and requires the two `NET_` transcripts to be identical. Two normalizations apply:
+the Linux reference has a `sit0` link, which the case omits, and the reference
+kernel has no IPv6 policy routing, so IPv6 route and rule lines are not compared.
+The cohort uses whichever bundle `make asterinas-build` last selected.
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`

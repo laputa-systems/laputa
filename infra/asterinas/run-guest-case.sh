@@ -80,7 +80,7 @@ else
     [[ "$backend" == asterinas ]] || vm_command=(env "XSH_MODULE_PATH=$repo_root" "${vm_command[@]}")
 fi
 "${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
-sed 's/\x1b\[[0-9;]*m//g' "$console" | tr -d '\r' | rg 'CASE_|NTP_|FREQUENCY_|panic' | head -40 || true
+sed 's/\x1b\[[0-9;]*m//g' "$console" | tr -d '\r' | rg 'CASE_|NTP_|FREQUENCY_|NET_|panic' | head -40 || true
 if (( status == 0 )) && rg -q 'LAPUTA_ASTERINAS_CASE_OK' "$console"; then
     printf 'run-guest-case: %s %s passed on %s\n' "$(basename "$case_dir")" "$mode" "$backend"
 else
