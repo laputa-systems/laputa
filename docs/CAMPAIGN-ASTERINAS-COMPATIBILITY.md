@@ -4,8 +4,8 @@
 
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
-- State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is accepted. It ran its integration, cancellation and native-accounting checks, the independent review's findings are resolved, D2 is delivered, and the gated A0 pass-set accounting on kernel `a01314f96` loses no A0 pass (details in the A6 native accounting entry). Open items it hands to A7 are in the A7 row.
+- State: closed. A7 is accepted and the campaign is closed at Laputa `5061c03` plus the A7 commits and kernel `a01314f96`; the closing account is the A7 entry below, and everything the campaign did not deliver is successor debt listed there. A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
+  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is accepted. It ran its integration, cancellation and native-accounting checks, the independent review's findings are resolved, D2 is delivered, and the gated A0 pass-set accounting on kernel `a01314f96` loses no A0 pass (details in the A6 native accounting entry). The items it handed to A7 are resolved in the A7 entry.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -570,13 +570,88 @@
   Asterinas never ran in this accounting (its two batches ended in the panic), and 5 are xattr and ACL cases in
   `test-cp`, `test-uu-cp-4` and `test-setfacl`. The `test-gnu-cp` rerun on the final kernel ran all 59 cases and failed
   22: 19 fail on Linux too and 3 fail only on Asterinas (`cp_i`, `preserve_link`, `sparse_perf`), so
-  `sparse_perf` is not the only Asterinas-only `test-gnu-cp` failure. 9,617 cases remain unexecuted baseline debt. No time gate was run in A6, so performance
-  qualification stays open for A7.
+  `sparse_perf` is not the only Asterinas-only `test-gnu-cp` failure. 9,617 cases remain unexecuted baseline debt.
   Contract changes: `qualify.sh` takes the cohorts `device`, `clock-abi`, `clock`, `recovery` and `all` and exports
   `ASTERINAS_EXTRA_PACKAGES=ntpd-rs` unless the caller sets it; `qualify-network-cohort.sh` became `qualify-cohort.sh`;
   `run-guest-case.sh` and `run-witness.sh` require the full guest marker set on both backends; the guest containers are
   named `laputa-asterinas-case-PID`. Kernel: the frame allocator reclaims the allocating CPU's pool and does not balance by
   less than a page. Not done: the independent completion review under `ultrareview`, which the coordinator runs next.
+- A7 resources and close, run on kernel `a01314f96` (the kernel is unchanged by A7; the submodule `main` and the gitlink already point at it).
+  Re-qualification after the fault-around change: the first `bash infra/asterinas/qualify.sh all --backend both` on `a01314f96`
+  passed every cohort and all ten recovery rounds, and exited 1 only because the baseline step's script was edited while it
+  ran (`unexpected EOF` at `qualify.sh` line 113 after `baseline numeric passed for both`). The unchanged tree was then run
+  again from the start: exit 0, `qualification: all passed for both`, 63 minutes (`baseline` boot and numeric; `device` 5
+  cases with `missing` failing as required; `clock-abi`; `clock` 6 cases; `network-state`; `network`; ten recovery rounds of
+  boot, DHCP `restart` and `carrier`). No kernel change was needed, so A6 stays accepted.
+  Resources: `bash infra/asterinas/qualify.sh resources --backend both` is new (`infra/asterinas/resources.sh`) and
+  `tests/system/asterinas_runners.sh` keeps its deferral and record format. Measured on the passing artifacts, with the host
+  at load average 2.8 to 7 (32 cores) and `perf-gate-ready` exiting 0 before and `perf-gate-ready -1` exiting 0 after every
+  run; no run overlapped load and none was discarded or repeated:
+
+  | Backend, case | Kernel | Initramfs | Root image | Configured memory | Peak VMM RSS | VMM CPU (user, system) |
+  |---|---|---|---|---|---|---|
+  | Asterinas, boot | 177,509,584 B | 1,706 B | 536,870,912 B | 1,024 MiB | 307,860 KiB | 5.50 s, 1.24 s |
+  | Asterinas, numeric | 177,509,584 B | 1,706 B | 536,870,912 B | 4,096 MiB | 520,856 KiB | 9.12 s, 2.69 s |
+  | Linux reference, boot | 9,716,736 B | 1,852 B | 536,870,912 B | 1,024 MiB | 1,095,172 KiB | 2.98 s, 0.12 s |
+  | Linux reference, numeric | 9,716,736 B | 1,852 B | 536,870,912 B | 4,096 MiB | 4,241,060 KiB | 3.15 s, 0.32 s |
+
+  The Asterinas kernel is the dev-profile ELF the Firecracker bundle boots, not a product size (RELENG owns those); the Linux
+  kernel is `boot/vmlinuz` of the reference package. The root is the same ext2 image on both sides, 512 MiB apparent and fully
+  allocated (536,875,008 B on disk). Memory is read from the VMM's own configuration (`mem_size_mib`) or command line (`-m`).
+  Peak RSS is the VMM process's `VmHWM`, sampled every 50 ms and kept as a maximum. CPU is the VMM's user plus system time over
+  all threads, so it includes the guest's execution, up to the guest completion marker; the cause of Asterinas using more
+  VMM CPU than Linux for the same selection (idle vCPU polling or guest work) was not examined. A second boot run gave the
+  same Asterinas peak RSS (307,860 KiB) and CPU 5.16 s and 1.18 s, and Linux 2.98 s and 0.14 s; the numeric rows are single
+  runs, so their spread is unknown. The Linux guest's peak RSS is the whole guest memory and Asterinas touches less, which is
+  recorded, not explained. No dependency was added, guest memory stays within 4 GiB and no runner deadline changed. Product
+  speed is not claimed. No time gate is deferred: `perf gate deferred: host busy` did not occur.
+  Deferred gates: none. Performance qualification of the compatibility cases is complete for this campaign; the optimisation
+  below is not started.
+  Page-fault cost, successor debt, not optimised (the owner deferred all performance work): after the fault-around change an
+  anonymous fault costs 1.2 to 2.1 us per page against 0.4 to 0.5 us on the Linux reference (before it, 4.0 to 5.3 us against
+  0.44 to 0.60 us in the microbenchmark; 12.6k cycles per fault, of which the page table cursor was 4.6k, the frame allocation
+  2.2k and the mapping 2.2k). One awk invocation costs about 1.7 s of wall time on Asterinas and 1.5 to 1.9 s on Linux, and
+  `test-bb-awk` still sits within 0.5 s of its 5 s limit on a loaded host. Any later work starts from the fault path
+  (`memory/mmap/mmap_anonymous_fault_around` is the regression) and needs five interleaved baseline and candidate runs.
+  `MAP_POPULATE` is ignored. That is permitted: populate is advisory on Linux, a mapping behaves the same without it, and
+  no Laputa consumer or required case depends on prefaulting. It belongs to the same debt because honouring it is a way to
+  lower the fault cost for callers that ask.
+  Host-unreachable delivery for a dropped neighbor queue (`EHOSTUNREACH`), successor debt, not implemented. Finding: the only
+  Laputa code that reacts to the error on a socket is `ntpd-rs` (`ntpd/src/daemon/ntp_source.rs`: a failed poll send or a
+  failed receive with `EHOSTUNREACH`, `EHOSTDOWN`, `ENETDOWN` or `ENETUNREACH` ends the link as a network issue and the
+  source is set up again). The DHCP client at the XSH pin sends from unconnected UDP sockets, propagates a send error without
+  special handling and never reads the error queue, and Linux does not report an unresolved neighbor to an unconnected socket
+  without `IP_RECVERR`; `ping` only maps ICMP codes to text (`test_ping` checks the text, not a socket error). No required
+  case sends to a neighbor that never answers: the DHCP and clock peers answer ARP, the `carrier` mode drops queues on link
+  down (from reading the Linux neighbor code, which purges the queue without an error; not run here), and the no-source restart in `guest/asterinas/clock` points at a closed
+  loopback port, which would give `ECONNREFUSED` (not delivered either) and asserts only stratum 16. All of A6's required cases
+  pass without it, so it is not implemented. Scope, unchanged from the A5 estimate: ICMP receive in bigtcp, a queued packet
+  naming its socket, and a pending-error slot in the datagram socket, about 300 lines in 6 files, with a witness paired against
+  Linux on a connected UDP socket whose peer never answers ARP. Effect while open: `ntpd-rs` on Asterinas does not leave
+  an unreachable on-link source through the network-issue path; it keeps polling and loses the source through missing replies
+  only. Possibly related, not diagnosed: 11 `test-tracepath` and `test-traceroute` cases fail on Asterinas and pass on
+  Linux; the A6 console shows `tracepath: socket: Protocol not available` and, for `test-traceroute`, a skipped ICMP case
+  (`Address family not supported by protocol`) beside timeouts, which points at missing ICMP sockets and `IP_RECVERR`, the
+  same receive path.
+  Closure account against Acceptance. Required cases: D1 to D6 pass on both backends (`qualify.sh all`, above); D7 is the
+  resource table. Native-suite debt, explicit: 15,255 identified cases; the A6 batched run attempted 420 of 1,015 modules and left
+  9,617 cases unexecuted, with 4,847 passed, 534 failed and 257 skipped; of the 534 failures 171 pass on Linux (43 are
+  `test-bb-awk` timeouts that follow the host clock, the rest are the groups listed in the A6 entry, such as `test-uu-cp-3`,
+  `test-stty`, `test-ss`, `test-procps`, `test-traceroute`, `test-ionice`, `test-tracepath`) and 361 fail on Linux too
+  (environment debt, including the root-user fixture mismatch); `test-gnu-cp` fails 3 cases only on Asterinas (`cp_i`,
+  `preserve_link`, `sparse_perf`); the gated A0 pass-set run on `a01314f96` lost no A0 pass. Nothing was retried to reach a
+  green result, no timeout was changed. The A0 Asterinas-only failures and their current state are in the section after the
+  Baseline table. Successor blockers preserved, unchanged by A7: the public-source reproduction stays red (the fork's
+  `main` has 34 commits that the cached public `origin/main` lacks, `published-inputs` is not built and needs the owner's publication);
+  nftables compatibility, the ext4 state image, filesystem crash and recovery semantics and credential enforcement
+  (the maintained-VM entry gate); the open obligations of A2 (CLOCK_MONOTONIC slewing, leap seconds, the rejected `adjtimex`
+  modes, `settimeofday`, absolute timer re-arming, vDSO read-through during a correction), A3 (transmit timestamps without
+  `OPT_TSONLY`, hardware timestamps, no RTC on Firecracker, the 1000 s jump rejection), A4 (`RTM_NEWLINK`, IPv6 state,
+  `SIOCSIFADDR` and `SIOCADDRT`, address expiry, route lookup without a dump) and A5 (the syslog consumer, foreign routes
+  other than unicast, the carrier counters); the contiguous-frame limit of pipe ring buffers and large kernel heap
+  allocations; kernel crate tests that do not build in the OSDK harness; the page-fault and `EHOSTUNREACH` debts above;
+  external NTS interoperability and a long soak. Contract changes: `qualify.sh` takes the cohort `resources`
+  (`infra/asterinas/resources.sh`); no kernel, syscall, PM, xinit or profile contract changed in A7.
 - Launch prompt: `Execute docs/CAMPAIGN-ASTERINAS-COMPATIBILITY.md within its local execution boundary; do not push.`
 
 ## Charter
@@ -706,6 +781,19 @@ core/tests/test-dd.xsh::test_dd_sparse_copy_preserves_zero_file_as_a_hole
 core/tests/test-dd.xsh::test_dd_sparse_copy_writes_data_after_a_hole_at_the_right_offset
 ```
 
+Current state of these 32 (A7, kernel `a01314f96`, one guest, `perf-gate-ready` exiting 0 before and after): the 23
+`test-bb-awk` cases pass, each 1.6 to 1.8 s with no timeout, so they were host-load flakes and are closed. The other nine
+still fail and remain debt, with the first error line of each, causes not diagnosed:
+
+```text
+test-btop-cli  system-execution-units: host returned invalid page-size or clock-tick metadata
+test-chrt (3)  chrt: failed to set pid's policy: Invalid argument
+test-cp        copy policy line "reflink: Operation not supported" not found
+test-cpio      sparse extraction allocates 2056 blocks where under 100 are expected
+test-dd (2)    sparse copy leaves the zero blocks allocated
+test-date      xsh core/date.xsh exits 1 for '+%_3N|%-N|%-3N|%10N'
+```
+
 ### Foundation proof
 
 The plan relies on two narrow facts: source/test selection stays tied to its
@@ -746,7 +834,7 @@ and final-suite milestones may take longer and must declare their bounds.
 | A4 IPv4 state operations, M | A1. Kernel netlink route/link/address owners and regressions; qualification-only network fixtures and cohort. | `bash infra/asterinas/qualify.sh network-state --backend both`. Attach one virtio-net device to a disposable isolated network. Run actual XSH dumps and mutations, ACK/error, multipart completion, route/address deletion and re-observation. Preserve a deliberately foreign address/route. Reject stale preconditions. |
 | A5 DHCP and connection recovery, M | A4 and A2, then serialize with A3 when shared files overlap. Kernel network/socket owners and regressions; existing DHCP/syslog consumers, network fixtures/cohort. | `bash infra/asterinas/qualify.sh network --backend both --case lease-acquire`, then the complete `network` cohort at its milestone. Prove controlled DHCP acquire, renew/rebind, NAK/expiry cleanup, changed DNS/routes, daemon restart, carrier loss and return, plus TCP recovery. No second network manager. |
 | A6 integrate and harden, M | A1–A5. Coordinator owns shared runner, pins, topic docs, campaign status, and removal of obsolete bypass code. | `bash infra/asterinas/qualify.sh all --backend both`. Run all required cases serially with no new skips or failures. Repeat the complete native XSH accounting from A0. Verify cleanup on cancellation and bad guest output, and unchanged normal Linux profile behavior for any shared QEMU changes. Run independent completion review under `ultrareview`; resolve its supported P1/P2 findings before acceptance. |
-| A7 account for resources and close, S | A6. Coordinator: existing runtime result output and topic docs only. | `bash infra/asterinas/qualify.sh resources --backend both`. Record actual kernel/initramfs/root sizes, peak VMM RSS, configured memory, warm test CPU time, and any deferred time gates. No optimization before compatibility. Close with required cases green, remaining native-suite debt explicit, and successor blockers preserved. Open items carried here: the anonymous page-fault cost that A6's window mapping reduced but did not close (1.2 to 2.1 us per page against 0.4 to 0.5 us on the Linux reference, and `MAP_POPULATE` is still ignored), and delivery of the host-unreachable error to the socket whose queued packets are dropped when a neighbor never answers (the kernel delivers no ICMP or asynchronous error to any socket yet). |
+| A7 account for resources and close, S | A6. Coordinator: existing runtime result output and topic docs only. | `bash infra/asterinas/qualify.sh resources --backend both`. Record actual kernel/initramfs/root sizes, peak VMM RSS, configured memory, warm test CPU time, and any deferred time gates. No optimization before compatibility. Delivered: the A7 entry in Status holds the numbers and the closing account. Close with required cases green, remaining native-suite debt explicit, and successor blockers preserved. Open items carried here: the anonymous page-fault cost that A6's window mapping reduced but did not close (1.2 to 2.1 us per page against 0.4 to 0.5 us on the Linux reference, and `MAP_POPULATE` is still ignored), and delivery of the host-unreachable error to the socket whose queued packets are dropped when a neighbor never answers (the kernel delivers no ICMP or asynchronous error to any socket yet). |
 
 A0 must deliver one real end-to-end pilot before new harness cohorts. A1 must
 deliver the first actual kernel/userspace improvement before wider test tooling.
