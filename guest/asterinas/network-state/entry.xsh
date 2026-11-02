@@ -238,14 +238,23 @@ pure describe_frame(frame: Bytes) -> Result[Str?, Error] {
   Ok(null)
 }
 
-pure packet_address(ifindex: Int, protocol: Int) -> Result[Bytes, Error] {
-  bytes.concat([bytes.pack_le(17, 2)?, bytes.pack_be(protocol, 2)?, bytes.pack_le(ifindex, 4)?, bytes.zero(12)?])
+pure packet_address(ifindex: Int, protocol: Int, destination: Bytes) -> Result[Bytes, Error] {
+  bytes.concat([bytes.pack_le(17, 2)?, bytes.pack_be(protocol, 2)?, bytes.pack_le(ifindex, 4)?, bytes.pack_le(0, 2)?, bytes.from_ints([0, destination.len()])?, destination, bytes.zero(8 - destination.len())?])
+}
+
+pure arp_request(mac: Bytes, sender: List[Int], target: List[Int]) -> Result[Bytes, Error] {
+  bytes.concat([b"\xff\xff\xff\xff\xff\xff", mac, bytes.pack_be(2054, 2)?, bytes.pack_be(1, 2)?, bytes.pack_be(2048, 2)?, bytes.from_ints([6, 4])?, bytes.pack_be(1, 2)?, mac, bytes.from_ints(sender)?, bytes.zero(6)?, bytes.from_ints(target)?])
+}
+
+pure broadcast_udp(mac: Bytes) -> Result[Bytes, Error] {
+  let payload = b"\x01\x02\x03\x04"
+  bytes.concat([b"\xff\xff\xff\xff\xff\xff", mac, bytes.pack_be(2048, 2)?, bytes.from_ints([69, 0])?, bytes.pack_be(32, 2)?, bytes.zero(4)?, bytes.from_ints([64, 17])?, bytes.zero(2)?, bytes.zero(4)?, bytes.from_ints([255, 255, 255, 255])?, bytes.pack_be(68, 2)?, bytes.pack_be(67, 2)?, bytes.pack_be(12, 2)?, bytes.zero(2)?, payload])
 }
 
 proc open_packet_socket(protocol: Int, ifindex: Int) [process, net, error] -> Result[Int, Error] {
   let c = linux.net_constants()
   let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(protocol, 2)?, 2)?)?
-  if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol)?)? }
+  if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol, b"")?)? }
   Ok(socket)
 }
 
@@ -405,6 +414,15 @@ proc main() [fs, process, env, time, net, error] {
       drain_packets("arp", arp)?
       drain_packets("everything", everything)?
       drain_packets("anywhere", anywhere)?
+      var mac = b""
+      for link in linux.network_dump()?.links { if link.name == "eth0" { mac = link.address ?? b"" } }
+      let broadcast = b"\xff\xff\xff\xff\xff\xff"
+      let _ = linux.sendto(arp, arp_request(mac, [192, 0, 2, 10], [192, 0, 2, 1])?, packet_address(index, c.ETH_P_ARP, broadcast)?)?
+      let _ = linux.sendto(ip, broadcast_udp(mac)?, packet_address(index, c.ETH_P_IP, broadcast)?)?
+      drain_packets("arp_after_send", arp)?
+      drain_packets("ip_after_send", ip)?
+      drain_packets("everything_after_send", everything)?
+      drain_packets("anywhere_after_send", anywhere)?
       step("down", "eth0", false, 2)?
       drain_packets("ip_after_down", ip)?
       drain_packets("anywhere_after_down", anywhere)?

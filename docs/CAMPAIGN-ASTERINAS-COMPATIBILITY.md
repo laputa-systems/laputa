@@ -269,7 +269,25 @@
   visible to packet sockets (Linux shows it); frames injected through a packet
   socket do (slice 3). Known limit: the frame length of an ARP frame is compared,
   the length of a TCP segment is not (options differ). Contract changes: packet
-  sockets receive; `bigtcp` gains link-layer taps.
+  sockets receive; `bigtcp` gains link-layer taps. Send: `send`, `sendto` and
+  `sendmsg` put a frame on the interface. `SOCK_RAW` sends its bytes as a whole
+  frame (`EINVAL` below the 14-byte header, `EMSGSIZE` above MTU plus header);
+  `SOCK_DGRAM` adds the Ethernet header from the socket address and the interface
+  address (`EMSGSIZE` above the MTU). Without an address the socket uses its bound
+  interface, else `ENXIO`; an unknown interface is `ENXIO`, a down one
+  `ENETDOWN`, a link-layer address over eight bytes `EINVAL`, a busy device
+  `ENOBUFS`. The `ETH_P_ALL` taps see the frame as outgoing except the sender. An
+  interface without link framing (loopback) takes the payload and receives it
+  again, so an injected IP packet is processed by the stack and seen by receivers
+  as incoming. `network/packet_send` (on loopback with a local address, because a
+  loopback source address is martian for injected frames on Linux) checks the
+  delivery, the observers (outgoing, then host) and the errors against Linux, and
+  the `packet` mode sends a raw ARP request and a broadcast UDP frame through the
+  TAP-backed `eth0` with an identical transcript. Deliberate differences: a
+  cooked socket without a destination fails with `EINVAL` (Linux succeeds and
+  sends a frame without a header); loopback carries only IPv4 and IPv6 frames
+  (`EOPNOTSUPP` otherwise) and does not keep the link-layer addresses of a frame.
+  Contract changes: packet sockets send; `Iface::send_link_frame` exists.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four
