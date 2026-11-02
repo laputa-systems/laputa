@@ -150,17 +150,27 @@
   `RTM_GETRULE` with IPv4 before IPv6, table and address order, Linux attribute
   order, protocol, scope and type) and the network-layer link MTU (eth0 1500, lo
   65536); the loopback transcript matches Linux and `network/rtnl_route_dump`
-  passes on both kernels. Contract change: those two requests no longer fail with
-  `EOPNOTSUPP` and the two MTU values changed; a route request without
+  passes on both kernels. Interface state: `eth0` now starts down with no address
+  or route like a Linux Ethernet device (the hard-coded `10.0.2.15/24` and gateway
+  are gone), `SIOCSIFFLAGS` changes `IFF_UP` (`link_up` and `link_down`, with
+  `CAP_NET_ADMIN`; any other changeable flag fails with `EOPNOTSUPP`), a down
+  interface drops its traffic and reports `IFLA_OPERSTATE`, and the route managers
+  are mutable: down removes the connected, broadcast and user routes and keeps the
+  host's local routes, as the Linux reference does. Verified by
+  `network/rtnl_route_dump` and `network/link_state` on both kernels and by the
+  `loopback` and `link` transcripts of the cohort. Contract changes: the route and
+  rule dumps no longer fail with `EOPNOTSUPP`; the MTU values changed; `eth0`
+  starts down and unconfigured; `SIOCSIFFLAGS` exists. A route request without
   `NLM_F_DUMP` (route lookup) still fails with `EOPNOTSUPP`. The A3 clock case
-  (behind, ahead, frequency) and the paired boot and numeric cases still pass. Still
-  to build, in this order: the `eth0` initial state of Linux (down, no address, no
-  gateway; the kernel still hard-codes `10.0.2.15/24` with a gateway and an up link,
-  so the transcript compares only `lo` until then), mutable link flags with
-  operstate (`SIOCSIFFLAGS`, `RTM_NEWLINK`), `RTM_NEWADDR` and `RTM_DELADDR` with
-  several addresses per interface, `RTM_NEWROUTE` and `RTM_DELROUTE`, ACK and error
-  semantics with malformed-request witnesses, and notifications to the link,
-  address and route groups.
+  (behind, ahead, frequency) and the paired boot and numeric cases pass after each
+  slice. Still to build, in this order: `RTM_NEWADDR` and `RTM_DELADDR` with several
+  addresses per interface (Linux's secondary rule, local, connected and broadcast
+  routes), `RTM_NEWROUTE` and `RTM_DELROUTE`, ACK and error semantics with
+  malformed-request witnesses, notifications to the link, address and route groups,
+  and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink link changes have
+  no consumer yet). Open obligations: the `IFLA_CARRIER` and carrier-change events
+  needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT` (used by `ifconfig` and
+  `route`, not by the maintained DHCP path).
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`

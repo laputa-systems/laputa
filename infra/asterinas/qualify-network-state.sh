@@ -7,8 +7,8 @@ backend="$1"
 selected="$2"
 
 regression="$repo_root/asterinas/test/initramfs/src/regression/network"
-witnesses=(rtnl_route_dump)
-modes=(loopback)
+witnesses=(rtnl_route_dump link_state)
+modes=(loopback link)
 
 if [[ -n "$selected" ]]; then
     known=0
@@ -45,7 +45,7 @@ witness() { bash "$repo_root/infra/asterinas/run-witness.sh" "$2" "$regression/$
 guest_mode() { LAPUTA_GUEST_NETWORK=tap bash "$repo_root/infra/asterinas/run-guest-case.sh" "$2" "$repo_root/guest/asterinas/network-state" "$1" "$3"; }
 
 transcript() {
-    sed 's/\x1b\[[0-9;]*m//g' "$1/console.log" | tr -d '\r' | rg '^NET_' | rg -v '^NET_[a-z_]*_(ROUTE|RULE) inet6 ' || true
+    sed 's/\x1b\[[0-9;]*m//g' "$1/console.log" | tr -d '\r' | rg '^NET_' | rg -v '^NET_[A-Za-z0-9_]*_(ADDR|ROUTE|RULE) (\S+ )?inet6 ' || true
 }
 
 for name in "${witnesses[@]}"; do

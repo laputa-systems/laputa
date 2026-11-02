@@ -98,8 +98,9 @@ Run the IPv4 state operations cohort with
 It builds and runs each netlink witness of the cohort on both backends, then runs
 the `guest/asterinas/network-state` case in each mode against a TAP-backed `eth0`
 and requires the two `NET_` transcripts to be identical. Two normalizations apply:
-the Linux reference has a `sit0` link, which the case omits, and the reference
-kernel has no IPv6 policy routing, so IPv6 route and rule lines are not compared.
+the Linux reference has a `sit0` link, which the case omits, and IPv6 is outside the
+cohort (the reference kernel has no IPv6 policy routing and adds link-local addresses),
+so IPv6 address, route and rule lines are not compared.
 The cohort uses whichever bundle `make asterinas-build` last selected.
 
 To account for many modules, run
