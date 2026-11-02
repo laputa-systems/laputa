@@ -55,6 +55,8 @@ case "$1" in
         done
         if [[ -n "$name" && -n "${FAKE_DOCKER_CREATE_DELAY:-}" ]]; then
             ( sleep "$FAKE_DOCKER_CREATE_DELAY"; : > "$FAKE_DOCKER_STATE/$name" ) > /dev/null 2>&1 &
+        elif [[ -n "$name" ]]; then
+            : > "$FAKE_DOCKER_STATE/$name"
         fi
         if [[ -n "${FAKE_DOCKER_RUN_PID:-}" ]]; then
             printf '%s\n' "$$" > "$FAKE_DOCKER_RUN_PID"
@@ -269,5 +271,16 @@ for kind in CASE WITNESS; do
     FAKE_FIRECRACKER_EXITS=1 run_runner "$kind" 1 "a VMM that exits at once" "$scratch/$kind.silent"
 done
 run_runner CASE 1 "a guest that never completes" "$scratch/CASE.silent"
+
+rm -f "$docker_state"/* "$scratch/client.pid"
+FAKE_DOCKER_RUN_PID="$scratch/client.pid" LAPUTA_GUEST_NETWORK=tap start_harness bash "$runner_root/infra/asterinas/run-guest-case.sh" \
+    asterinas "$runner_root/guest/asterinas/fake" tapped "$scratch/result-tapped"
+case_runner=$harness_pid
+wait_for_file "$scratch/client.pid"
+[[ -e "$docker_state/laputa-asterinas-case-$case_runner" ]] || fail "the TAP case runner did not name its container laputa-asterinas-case-PID"
+kill -TERM "$case_runner"
+expect_status "$case_runner" 143 "a terminated TAP case runner"
+expect_gone "$(cat "$scratch/client.pid")" "the container client of a terminated TAP case runner"
+[[ ! -e "$docker_state/laputa-asterinas-case-$case_runner" ]] || fail "a terminated TAP case runner left its container"
 
 printf 'Asterinas runners clean up, run serially and reject incomplete guest output.\n'
