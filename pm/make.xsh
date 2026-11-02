@@ -2,15 +2,14 @@
 use pm.env as pm_env
 
 ## Exported PM declaration `MakeError`.
-export error MakeError {
-    InvalidJobs : InvalidData
-    InvalidTask : InvalidData
-    DuplicateTask : Conflict
-    DuplicateOutput : Conflict
-    MissingDependency : Dependency
-    DependencyCycle : Dependency
-    CommandFailed : ProcessFailure
-}
+export error MakeError =
+  InvalidJobs : InvalidData |
+  InvalidTask : InvalidData |
+  DuplicateTask : Conflict |
+  DuplicateOutput : Conflict |
+  MissingDependency : Dependency |
+  DependencyCycle : Dependency |
+  CommandFailed : ProcessFailure
 
 ## Exported PM declaration `MakeTask`.
 export type MakeTask = {
