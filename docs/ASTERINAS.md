@@ -127,6 +127,19 @@ unless the caller sets it, because the clock cases need the daemon in the genera
 bundle built without it would replace the current one. A cohort names each case it passes
 and fails when it ran none.
 
+Account for the cost of the paired boot and numeric guests with
+`bash infra/asterinas/qualify.sh resources --backend both [--case boot|numeric]`. It runs the
+baseline case on each backend while sampling the VMM process (`firecracker` or `qemu-system-x86_64`)
+every 50 ms, and prints one `resources:` line per backend and case: the kernel, initramfs and root
+image sizes in bytes (Asterinas from the selected bundle, the Linux reference from its package;
+the root is the same ext2 image, apparent and allocated), the guest memory read from the VMM's own
+command line or configuration, the VMM's peak resident set (`VmHWM`) and, between a successful
+`perf-gate-ready` and a successful `perf-gate-ready -1`, the VMM's user and system CPU time (all
+threads, including guest execution, up to the guest completion marker). Sizes and memory are
+measured on every run. When either gate check fails the CPU time is printed as `cpu=deferred`
+and the cohort ends with `perf gate deferred: host busy`; a run is never repeated until a gate
+passes. The cohort fails when it observes no VMM process.
+
 `run-guest-case.sh` and `run-witness.sh` accept a run only when the case or witness marker
 is present, the exit status is zero and the complete guest marker set is present, on both
 backends. A runner returns as soon as the guest prints its completion marker and does not

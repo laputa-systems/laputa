@@ -283,4 +283,38 @@ expect_status "$case_runner" 143 "a terminated TAP case runner"
 expect_gone "$(cat "$scratch/client.pid")" "the container client of a terminated TAP case runner"
 [[ ! -e "$docker_state/laputa-asterinas-case-$case_runner" ]] || fail "a terminated TAP case runner left its container"
 
+resources_root="$scratch/resources"
+bundle="$resources_root/.out/asterinas-firecracker/builds/fake"
+mkdir -p "$resources_root/infra/asterinas" "$resources_root/.work/tmp" "$bundle"
+cp "$infra/run-cancellable.sh" "$infra/resources.sh" "$resources_root/infra/asterinas/"
+ln -s builds/fake "$resources_root/.out/asterinas-firecracker/current"
+printf '{"machine-config":{"vcpu_count":2,"mem_size_mib":768}}\n' > "$bundle/firecracker.json"
+head -c 4096 /dev/zero > "$bundle/kernel.elf"
+head -c 100 /dev/zero > "$bundle/laputa-initramfs.cpio.gz"
+head -c 8192 /dev/zero > "$bundle/laputa-root.ext2"
+cat > "$scratch/firecracker" <<'VMM'
+#!/bin/bash
+sleep 1
+VMM
+chmod 755 "$scratch/firecracker"
+cat > "$resources_root/infra/asterinas/qualify.sh" <<QUALIFY
+#!/usr/bin/env bash
+"$scratch/firecracker" --config-file "$bundle/firecracker.json"
+QUALIFY
+for gate in 0 75; do
+    PERF_GATE_MAX_LOAD=$([[ "$gate" == 0 ]] && echo 1000000 || echo 0) bash "$resources_root/infra/asterinas/resources.sh" asterinas boot > "$scratch/resources-$gate.out" 2>&1 \
+        || { cat "$scratch/resources-$gate.out" >&2; fail "the resource measurement failed with gate status $gate"; }
+    rg -q 'backend=asterinas case=boot vmm=firecracker kernel_bytes=4096 initramfs_bytes=100 root_bytes=8192 .* memory_mib=768 peak_rss_kib=[1-9][0-9]*' "$scratch/resources-$gate.out" \
+        || { cat "$scratch/resources-$gate.out" >&2; fail "the resource record is wrong with gate status $gate"; }
+done
+expect_resources() {
+    local gate="$1" pattern="$2" what="$3"
+    rg -q -- "$pattern" "$scratch/resources-$gate.out" || { cat "$scratch/resources-$gate.out" >&2; fail "$what"; }
+}
+expect_resources 0 'cpu_user_ms=[0-9]+ cpu_sys_ms=[0-9]+' "a quiet host did not record the CPU time"
+expect_resources 75 'cpu=deferred' "a busy host did not defer the CPU time"
+expect_resources 75 'perf gate deferred: host busy' "a busy host did not report the deferred gate"
+! rg -q 'cpu_user_ms' "$scratch/resources-75.out" || fail "a busy host recorded a CPU time"
+! rg -q 'perf gate deferred' "$scratch/resources-0.out" || fail "a quiet host deferred the time gate"
+
 printf 'Asterinas runners clean up, run serially and reject incomplete guest output.\n'

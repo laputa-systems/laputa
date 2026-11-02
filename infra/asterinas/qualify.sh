@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "$repo_root/infra/asterinas/run-cancellable.sh"
 export ASTERINAS_EXTRA_PACKAGES="${ASTERINAS_EXTRA_PACKAGES-ntpd-rs}"
 cohort="${1:-}"
-case "$cohort" in baseline|device|clock-abi|clock|network-state|network|recovery|all) ;; *) printf 'qualification: unsupported cohort\n' >&2; exit 2 ;; esac
+case "$cohort" in baseline|device|clock-abi|clock|network-state|network|recovery|resources|all) ;; *) printf 'qualification: unsupported cohort\n' >&2; exit 2 ;; esac
 shift
 backend=""
 case_name=""
@@ -32,6 +32,10 @@ case "$cohort" in
         ;;
     clock-abi|clock|network-state|network)
         run_cancellable "" bash "$cohort_runner" "$cohort" "$backend" "$case_name"
+        exit $?
+        ;;
+    resources)
+        run_cancellable "" bash "$repo_root/infra/asterinas/resources.sh" "$backend" "$case_name"
         exit $?
         ;;
     recovery|all)
