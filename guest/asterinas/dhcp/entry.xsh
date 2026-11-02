@@ -1,10 +1,14 @@
 #!/bin/xsh --
+use lib.dhcp_apply as apply
+use lib.dhcp_net as network
+use lib.dhcp_wire as wire
 use lib.nettools_fixture as fixture
 
 const WORK = p"/run/dhcp-case"
 const POLL_MS = 20
 const FOREIGN = "198.51.100.5"
 const FOREIGN_RESOLVER = "10.0.0.53"
+const STATIC_ROUTE_PROTOCOL = 4
 const ETH_P_ALL = 3
 const ETH_P_IP = 2048
 const DHCP_SERVER_PORT = 67
@@ -186,6 +190,20 @@ proc resolve_server_neighbor() [process, net, time, error] {
   time.sleep(500ms)
 }
 
+pure static_route(destination: Str, prefix: Int, gateway: Str, metric: Int) -> Result[network.Route, Error] {
+  guard let destination_address = wire.ip_parse(destination) else { fail f"bad route destination {destination}" }
+  guard let gateway_address = wire.ip_parse(gateway) else { fail f"bad route gateway {gateway}" }
+  Ok({destination: destination_address, prefix: prefix, gateway: gateway_address, table: network.TABLE_MAIN, tos: 0, priority: metric, protocol: STATIC_ROUTE_PROTOCOL})
+}
+
+proc add_foreign_routes() [process, net, error] {
+  let ifindex = fixture.index_of("eth0")
+  let routes = [static_route("203.0.113.0", 24, "192.0.2.1", 50)?, static_route("0.0.0.0", 0, "192.0.2.254", 700)?]
+  for route in routes {
+    apply.mutate("eth0", ifindex, network.AddRoute(route))?
+  }
+}
+
 proc snapshot(label: Str) [fs, process, env, time, net, error] {
   let dump = linux.network_dump()?
   var eth0 = 0
@@ -239,6 +257,15 @@ proc main() [fs, process, env, time, net, io, error] {
       await_state("bound", "bound", 30000)?
       resolve_server_neighbor()?
       time.sleep(24s)
+      messages("renewed", capture)?
+      snapshot("renewed")?
+    }
+    "reconfigure" => {
+      await_state("bound", "bound", 30000)?
+      resolve_server_neighbor()?
+      add_foreign_routes()?
+      snapshot("bound")?
+      time.sleep(14s)
       messages("renewed", capture)?
       snapshot("renewed")?
     }

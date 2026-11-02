@@ -105,7 +105,7 @@ The cohort uses whichever bundle `make asterinas-build` last selected.
 
 Run the DHCP cohort with `bash infra/asterinas/qualify.sh network --backend both [--case NAME]`.
 It runs the `proc_boot_id` and `udp_device` witnesses, then each mode of `guest/asterinas/dhcp`
-(`lease-acquire`, `lifecycle`, `renewal`, `nak`, `restart`, `carrier`, `tcp`) against the same
+(`lease-acquire`, `lifecycle`, `renewal`, `reconfigure`, `nak`, `restart`, `carrier`, `tcp`) against the same
 TAP-backed `eth0`. The container end of the TAP runs the XSH pin's scripted DHCP server
 (and, for `tcp`, a C payload server) from the case's `peer.sh`; the guest runs the packaged `dhcpc`.
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.

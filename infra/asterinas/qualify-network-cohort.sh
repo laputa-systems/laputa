@@ -17,7 +17,7 @@ case "$cohort" in
     network)
         witnesses=(fs/procfs/proc_boot_id network/udp_device)
         case_dir=dhcp
-        modes=(lease-acquire lifecycle renewal nak restart carrier tcp)
+        modes=(lease-acquire lifecycle renewal reconfigure nak restart carrier tcp)
         ;;
     *) printf 'qualification: unknown network cohort: %s\n' "$cohort" >&2; exit 2 ;;
 esac

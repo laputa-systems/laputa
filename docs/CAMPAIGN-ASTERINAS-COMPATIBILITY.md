@@ -343,7 +343,7 @@
   AF_PACKET is complete for the DHCP client's use.
 - A5 DHCP cohort, delivered for the packaged `dhcpc` against a scripted server.
   `bash infra/asterinas/qualify.sh network --backend both [--case NAME]` runs two
-  kernel witnesses (`fs/procfs/proc_boot_id`, `network/udp_device`) and seven modes of
+  kernel witnesses (`fs/procfs/proc_boot_id`, `network/udp_device`) and eight modes of
   `guest/asterinas/dhcp` on both kernels, comparing the `NET_` transcripts. The peer is
   the XSH pin's scripted DHCP server (`core/tests/support/dhcp_server.xsh`) on the
   container end of the TAP, which `run-guest-case.sh` starts when the case has a
@@ -380,10 +380,21 @@
   Firecracker's virtio-net has no link status, so the case drives carrier loss and
   return with administrative link down and up (QEMU's `set_link` would move the
   Linux side only), which on both kernels clears `IFF_LOWER_UP` and
-  `IFLA_OPERSTATE` while `IFLA_CARRIER` stays 1. Open A5 obligations: a lease whose
-  DNS servers or routes change at renewal, the syslog consumer, a foreign route (route
-  types other than unicast are `EOPNOTSUPP`), `IFLA_CARRIER_CHANGES` and the
-  carrier counters, and the unresolved-neighbor queue.
+  `IFLA_OPERSTATE` while `IFLA_CARRIER` stays 1. The `reconfigure` mode covers a lease
+  whose DNS servers and routes change at renewal: the first acknowledgement carries the
+  server as router and resolver; the renewal carries two other resolvers and two RFC 3442
+  routes (one through the server, one on-link) and no router. The case first installs two
+  foreign unicast routes with the static protocol (a network route through the server and a
+  default route through another gateway at a worse metric). The transcript is identical to
+  Linux: the owned default route is withdrawn, the two classless routes appear with the DHCP
+  protocol, the resolver lines are replaced, and both foreign routes and the foreign resolver
+  line survive. A foreign route cannot survive lease expiry (the kernel drops the routes of an
+  interface that loses its last address), so expiry is checked with the foreign address and
+  resolver line only. A5 acceptance (the A5 row and D5) needs nothing more. The remaining A5
+  obligations are successor debt that no capability claims: the syslog consumer (no case runs
+  it; the maintained-VM successor owns persistent diagnostics), foreign routes of types other
+  than unicast (`EOPNOTSUPP`), `IFLA_CARRIER_CHANGES` and the carrier counters, and the
+  unresolved-neighbor queue (the cases resolve the neighbor first).
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four
