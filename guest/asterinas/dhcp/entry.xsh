@@ -204,29 +204,46 @@ proc add_foreign_routes() [process, net, error] {
   }
 }
 
-proc snapshot(label: Str) [fs, process, env, time, net, error] {
+proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   let dump = linux.network_dump()?
+  var lines: List[Str] = []
   var eth0 = 0
   var names: Map[Int, Str] = {}
   for link in dump.links {
     names[link.ifindex] = link.name ?? "-"
     if link.name == "eth0" { eth0 = link.ifindex }
   }
-  eprint --flush f"NET_DHCP_{label}_STATE {client_state()}"
+  lines += [f"STATE {client_state()}"]
   for address in dump.addresses {
     guard address.family == "inet" and (address.ifindex == eth0 or address.local == FOREIGN) else { continue }
-    eprint --flush f"NET_DHCP_{label}_ADDR {names.get(address.ifindex) ?? "-"} {address.local ?? "-"}/{address.prefix_length} brd={address.broadcast ?? "-"} scope={address.scope} label={address.label ?? "-"}"
+    lines += [f"ADDR {names.get(address.ifindex) ?? "-"} {address.local ?? "-"}/{address.prefix_length} brd={address.broadcast ?? "-"} scope={address.scope} label={address.label ?? "-"}"]
   }
   for route in dump.routes {
     guard route.family == "inet" and route.output_ifindex == eth0 else { continue }
-    eprint --flush f"NET_DHCP_{label}_ROUTE {route.destination ?? "default"}/{route.destination_prefix_length} via={route.gateway ?? "-"} table={route.table} proto={route.protocol} scope={route.scope} type={route.route_type} prio={route.priority ?? 0}"
+    lines += [f"ROUTE {route.destination ?? "default"}/{route.destination_prefix_length} via={route.gateway ?? "-"} table={route.table} proto={route.protocol} scope={route.scope} type={route.route_type} prio={route.priority ?? 0}"]
   }
   let resolv = fp"{WORK}/etc/resolv.conf"
   if resolv.exists()? {
     for line in resolv.read_text()?.lines() {
       guard line.starts_with("nameserver") else { continue }
-      eprint --flush f"NET_DHCP_{label}_RESOLV {line}"
+      lines += [f"RESOLV {line}"]
     }
+  }
+  Ok(lines)
+}
+
+proc snapshot(label: Str) [fs, process, env, time, net, error] -> Result[List[Str]] {
+  let lines = state_lines()?
+  for line in lines { eprint --flush f"NET_DHCP_{label}_{line}" }
+  Ok(lines)
+}
+
+proc require_state(label: Str, lines: List[Str], present: List[Str], absent: List[Str]) [error] {
+  for wanted in present {
+    guard wanted in lines else { fail f"NET_DHCP_{label}_ASSERT missing: {wanted}" }
+  }
+  for unwanted in absent {
+    guard !(unwanted in lines) else { fail f"NET_DHCP_{label}_ASSERT unexpected: {unwanted}" }
   }
 }
 
@@ -243,60 +260,93 @@ proc main() [fs, process, env, time, net, io, error] {
     "lease-acquire" => {
       await_state("bound", "bound", 30000)?
       messages("bound", capture)?
-      snapshot("bound")?
+      let _ = snapshot("bound")?
     }
     "lifecycle" => {
       await_state("bound", "bound", 30000)?
       resolve_server_neighbor()?
-      snapshot("bound")?
+      let _ = snapshot("bound")?
       watch_states("lease", 24000)?
       messages("lease", capture)?
-      snapshot("expired")?
+      let _ = snapshot("expired")?
     }
     "renewal" => {
       await_state("bound", "bound", 30000)?
       resolve_server_neighbor()?
       time.sleep(24s)
       messages("renewed", capture)?
-      snapshot("renewed")?
+      let _ = snapshot("renewed")?
     }
     "reconfigure" => {
       await_state("bound", "bound", 30000)?
       resolve_server_neighbor()?
       add_foreign_routes()?
-      snapshot("bound")?
+      let first = snapshot("bound")?
+      require_state(
+        "bound",
+        first,
+        [
+          "ADDR lo 198.51.100.5/32 brd=198.51.100.5 scope=0 label=lo",
+          "ROUTE default/0 via=192.0.2.1 table=254 proto=16 scope=0 type=1 prio=100",
+          "ROUTE default/0 via=192.0.2.254 table=254 proto=4 scope=0 type=1 prio=700",
+          "ROUTE 203.0.113.0/24 via=192.0.2.1 table=254 proto=4 scope=0 type=1 prio=50",
+          "RESOLV nameserver 10.0.0.53",
+          "RESOLV nameserver 192.0.2.1",
+        ],
+        [],
+      )?
       time.sleep(14s)
       messages("renewed", capture)?
-      snapshot("renewed")?
+      let renewed = snapshot("renewed")?
+      require_state(
+        "renewed",
+        renewed,
+        [
+          "STATE bound",
+          "ADDR lo 198.51.100.5/32 brd=198.51.100.5 scope=0 label=lo",
+          "ADDR eth0 192.0.2.100/24 brd=192.0.2.255 scope=0 label=eth0",
+          "ROUTE 198.18.0.0/24 via=192.0.2.1 table=254 proto=16 scope=0 type=1 prio=100",
+          "ROUTE 198.19.0.0/24 via=- table=254 proto=16 scope=253 type=1 prio=100",
+          "ROUTE default/0 via=192.0.2.254 table=254 proto=4 scope=0 type=1 prio=700",
+          "ROUTE 203.0.113.0/24 via=192.0.2.1 table=254 proto=4 scope=0 type=1 prio=50",
+          "RESOLV nameserver 10.0.0.53",
+          "RESOLV nameserver 192.0.2.53",
+          "RESOLV nameserver 192.0.2.54",
+        ],
+        [
+          "ROUTE default/0 via=192.0.2.1 table=254 proto=16 scope=0 type=1 prio=100",
+          "RESOLV nameserver 192.0.2.1",
+        ],
+      )?
     }
     "nak" => {
       await_state("bound", "bound", 30000)?
       resolve_server_neighbor()?
       time.sleep(24s)
       messages("nak", capture)?
-      snapshot("after_nak")?
+      let _ = snapshot("after_nak")?
     }
     "restart" => {
       await_state("bound", "bound", 30000)?
-      snapshot("bound")?
+      let _ = snapshot("bound")?
       crash_client(client)?
-      snapshot("crashed")?
+      let _ = snapshot("crashed")?
       client = start_client()?
       await_state("restarted", "bound", 30000)?
       messages("restarted", capture)?
-      snapshot("restarted")?
+      let _ = snapshot("restarted")?
     }
     "carrier" => {
       await_state("bound", "bound", 30000)?
-      snapshot("bound")?
+      let _ = snapshot("bound")?
       for cycle in [1, 2, 3] {
         fixture.link_down("eth0")?
         await_state(f"down{cycle}", "no_link", 15000)?
-        snapshot(f"down{cycle}")?
+        let _ = snapshot(f"down{cycle}")?
         fixture.link_up("eth0")?
         await_state(f"up{cycle}", "bound", 40000)?
         messages(f"up{cycle}", capture)?
-        snapshot(f"up{cycle}")?
+        let _ = snapshot(f"up{cycle}")?
       }
     }
     "tcp" => {
@@ -310,7 +360,7 @@ proc main() [fs, process, env, time, net, io, error] {
       fixture.link_up("eth0")?
       await_state("up", "bound", 40000)?
       time.sleep(500ms)
-      snapshot("rebound")?
+      let _ = snapshot("rebound")?
       fp"{WORK}/resume".write("x\n")?
       if !await_file(fp"{WORK}/tcp-done", 150000)? { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the transfer" }
       for line in fp"{WORK}/tcp-result".read_text()?.lines() {
