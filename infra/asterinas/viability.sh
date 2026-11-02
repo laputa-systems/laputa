@@ -190,7 +190,7 @@ init_source="$repo_root/guest/asterinas/initramfs/init.c"
 init_binary="$output_dir/initramfs-init"
 init_build_key_file="$output_dir/initramfs-init.key"
 init_source_hash="$(sha256sum "$init_source" | awk '{print $1}')"
-compiler_version="$(cc --version | head -n 1)"
+compiler_version="$(cc --version | sed -n 1p)"
 init_build_flags=(-ffreestanding -fno-builtin -fno-pie -fno-stack-protector -mno-sse -mno-mmx -nostdlib -static -no-pie -O2 -Wl,-e,_start -Wl,--build-id=none)
 init_build_key="$(printf '%s\n%s\n%s\n' "$init_source_hash" "$compiler_version" "${init_build_flags[*]}" | sha256sum | awk '{print $1}')"
 if [[ ! -f "$init_binary" || "$(cat "$init_build_key_file" 2>/dev/null || true)" != "$init_build_key" ]]; then

@@ -153,7 +153,7 @@ source_snapshot_hash="$(asterinas_source_hash)"
 [[ "$source_snapshot_hash" =~ ^[0-9a-f]{64}$ ]] || fail 'could not fingerprint Asterinas source'
 toolchain_cargo_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cargo --version)"
 toolchain_rustc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" rustc --version)"
-toolchain_gcc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gcc --version | head -n 1)"
+toolchain_gcc_version="$(docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gcc --version | sed -n 1p)"
 printf '%s\n%s\n%s\n' "$toolchain_cargo_version" "$toolchain_rustc_version" "$toolchain_gcc_version"
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" cpio --version
 docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/env "$dev_image_id" gzip --version
