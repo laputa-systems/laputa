@@ -141,6 +141,14 @@ interrupted if it dies alone. Modules left when the budget ends are written to
 modules as unexecuted. The accounting exits nonzero when it finds no results, a
 result for an undiscovered case, or a baseline case that no longer passes.
 
+Native cases carry fixed timeouts that the guest must meet on a shared host. The
+`test-bb-awk` cases need about 1.9 s on Asterinas and 1.5 s on the Linux reference
+against a 5 s limit, and a loaded host stretches both by 2 to 2.5 times, so a busy
+fan-out reports `process timed out` for cases that are not hung. Each batch console
+log prints the duration of every case: a run whose passing awk cases take more than
+about 3 s ran on a loaded host, and its timeouts are not evidence of a kernel
+defect.
+
 For the paired boot and numeric pilot, provide a Laputa x86_64 Linux package
 archive with built-in virtio and ext2 support:
 

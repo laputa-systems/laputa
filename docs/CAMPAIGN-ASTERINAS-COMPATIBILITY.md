@@ -54,12 +54,12 @@
   failures occur on both and are environment debt, including
   `test_bb_cp_cp_does_not_copy_unreadable_file`: the guest runs as root on both
   sides, so that case is a fixture mismatch, not an Asterinas defect.
-- The awk failure is no longer parked on a missing reproducer. In a fresh guest
+- The awk failures are not hangs: they are CPU-bound cases cut off by a fixed 5 s
+  limit on a loaded host (see the A6 native accounting). In a fresh guest
   `core/tests/test-bb-awk.xsh` passes 16 cases and then 33 cases hit
   `process timed out` while Linux passes 38 of 49; chrt, sparse `dd` and
-  `cpio`/`date` differences are listed below. The cause of the awk hangs is not
-  established, and the `NoMemory` panics are a separate, unexplained kernel
-  memory exhaustion that bounds guest lifetime.
+  `cpio`/`date` differences are listed below. The `NoMemory` panics are a
+  separate kernel memory exhaustion that bounds guest lifetime.
 - Guest `NoMemory`: a fresh-guest batch panicked as `spawn task failed: NoMemory`
   or a ring-buffer `NoMemory` unwrap with gigabytes reported free. An
   instrumented run showed 703 MB free while this CPU's local pool and the global
@@ -81,7 +81,7 @@
   the witness. The
   batch-level panics were not reproduced on demand (a rerun of the first batch
   passed), so the whole-corpus effect is unmeasured until the fan-out is rerun.
-  The awk hangs are not shown to share this cause.
+  The awk timeouts do not share this cause.
 - A1 device coldplug: the packaged `mdevd` and `mdevd-coldplug` (the `mdevd-rs`
   package, now part of the Asterinas generation) run in the guest and the
   explicit coldplug bypass is gone. The kernel publishes block devices in a
@@ -425,7 +425,7 @@
 - Steering checkpoint after A0: landed behavior is a measured, repaired
   qualification loop and an explicit baseline, not compatibility. The limiting
   factor is guest memory exhaustion, which stops every run after ten to thirteen
-  minutes and plausibly causes the awk hangs. Continue serialized: kernel
+  minutes. Continue serialized: kernel
   `NoMemory` diagnosis first, then A1. Fresh public-source reproduction and
   performance remain open.
 - A6 integrate and harden, run on kernel `006f33dbc`. `bash infra/asterinas/qualify.sh all --backend both` now exists
@@ -465,10 +465,30 @@
   `test-gnu-cp` then runs to completion on the final kernel (59 cases: 37 passed, 22 failed) and `sparse_perf` fails after
   20 s where Linux passes it. Those two batches' in-flight module is unexecuted. Comparison with A0: 1,267 of the 1,281 A0
   passes still pass. The 14 that do not are all `test-bb-awk` cases that fail with `process timed out` (5 s): the awk
-  population that hangs differs between runs (A0 33 cases, A6 43; 29 in both, 4 that hung only at A0, 14 only at A6), so the
-  cause is a nondeterministic hang that is still unexplained, as at A0. These 14 are a new-failure finding against the A6
-  rule, recorded as unexplained flaky debt and not as a pass. Paired Linux run of the 131 modules with Asterinas failures plus
-  `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` hangs, 24
+  population that times out differs between runs (A0 33 cases, A6 43; 29 in both, 4 only at A0, 14 only at A6).
+  Cause, established after A6: not a hang and not a kernel wait or wakeup defect. Each awk case starts the XSH interpreter on a
+  225 KB `awk.xsh`, which costs about 1.5 s of CPU on Linux (user 1.5 s, sys 0.03 s, 45,000 page faults) and about 1.9 s on
+  Asterinas (user 1.5 s, sys 0.2 to 0.3 s) against a literal `timeout: 5s` in the generated case. On this shared host the same
+  guest work stretches 2.1 to 2.5 times in bursts that last tens of seconds, on Linux as well as Asterinas, and the case
+  times out when the stretched time passes 5 s: Asterinas needs about a 2.5 times slowdown, Linux about 3.1 times.
+  Measured, per-case durations of the 49 cases: A0 fan-out median 5.0 s (min 4.0), A6 fan-out median 5.1 s (min 4.3), with the host load
+  not recorded; five later full-module runs on the unchanged kernel at lower load have medians 2.1
+  to 2.9 s and 11, 0, 0, 9 and 1 timeouts, and the A0 pass-set rerun has median 2.1 s and 1 timeout; four paired runs with the
+  Linux reference booted at the same time have Linux medians 1.6 to 1.9 s (max 3.9 s) and no timeout. Over the eight Asterinas
+  runs of the module (A0, A6, six later) one case never timed out, none timed out every time (at most 4 of 8 runs), and 48 timed out at least
+  once, so the failing cases follow the clock and not the case. Timelines of a paired run show Linux and Asterinas
+  slowing together (Linux 1.6 to 3.3 s, Asterinas 2.0 to 5.1 s). No invocation hung: 133 awk invocations in guests with the
+  same kernel all exited 0, the slowest after 18.0 s. With six busy loops pinned to the four cores that run the guests,
+  16-iteration medians were 4.4 s and 3.9 s on Asterinas against 3.4 s and 3.0 s on Linux (quiet: 2.3 s and 1.8 s against
+  1.8 s and 1.5 s), and Linux reached 6.9 s in one run. The kernel part is the anonymous
+  page-fault path: a fault costs 3.4 us in the guest against 0.37 us on the Linux reference (probably huge pages; not checked), and `MAP_POPULATE` is ignored,
+  which accounts for most of the 25 percent gap in the quiet case. The A6 frame
+  allocator changes touch only the failure and balancing paths and not this path. The timeout stays 5 s. Consequently the 14
+  are recorded as host-load flakes: the A0 pass-set rerun (125 modules with A0 passes, 3 batches, 907 s, host load 5 to 20)
+  passes 1,313 cases and loses 1 of the 1,281 A0 passes, `test_bb_awk_awk_length_0`, a 5.1 s timeout in a module that
+  passed 48 of 49 at that load; no other module lost a case. The accounting rule needs a stability criterion for
+  timing-bound cases; that choice is open. Paired Linux run of the 131 modules with Asterinas failures plus
+  `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` timeouts, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
   smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch), and Linux fails 24 cases
   that Asterinas did not fail. 9,617 cases remain unexecuted baseline debt. No time gate was run in A6, so performance
@@ -568,7 +588,9 @@ root disk and no network device. Its TCP check is loopback only.
 ### A0 Asterinas-only native failures
 
 Cases that failed on Asterinas and passed on the paired Linux run, with the
-Asterinas failures confirmed only where the batch did not end in a panic:
+Asterinas failures confirmed only where the batch did not end in a panic. The
+`test-bb-awk` entries are 5 s timeouts of CPU-bound cases whose set changes from
+run to run (A6 native accounting), not a defect of those cases:
 
 ```text
 core/tests/test-bb-awk.xsh::test_bb_awk_awk_F_case_7_f0745f82
