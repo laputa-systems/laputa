@@ -26,7 +26,7 @@ dev_image="$(docker image inspect --format '{{.Id}}' "asterinas/dev:$(cat "$repo
 name="$(basename "$source_file" .c)"
 memory_mib="$(jaq -r '."machine-config".mem_size_mib' "$bundle/firecracker.json")"
 
-docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/gcc \
+run_cancellable "" docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/gcc \
     --mount "type=bind,src=$regression_root,dst=/regression,readonly" \
     --mount "type=bind,src=$result_dir,dst=/out" \
     "$dev_image" -Wall -Werror -static -pthread $([[ "$backend" != asterinas ]] || printf %s -D__asterinas__) -o /out/witness "/regression/${source_file#"$regression_root"/}"
@@ -37,13 +37,13 @@ if [[ "$backend" == asterinas ]]; then
     mkdir -p "$(dirname "$root")"
 else
     root="$result_dir/root.ext2"
-    bash "$repo_root/infra/asterinas/linux-reference.sh" \
+    run_cancellable "" bash "$repo_root/infra/asterinas/linux-reference.sh" \
         "${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}" "$result_dir/linux-reference"
 fi
 cp "$bundle/laputa-root.ext2" "$root"
 chmod u+w "$root"
-bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$result_dir/witness" usr/lib/asterinas/witness "$dev_image" > /dev/null
-bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$result_dir/witness.name" usr/lib/asterinas/witness.name "$dev_image" > /dev/null
+run_cancellable "" bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$result_dir/witness" usr/lib/asterinas/witness "$dev_image" > /dev/null
+run_cancellable "" bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$result_dir/witness.name" usr/lib/asterinas/witness.name "$dev_image" > /dev/null
 
 console="$result_dir/console.log"
 status=0

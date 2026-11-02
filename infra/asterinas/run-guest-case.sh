@@ -29,7 +29,7 @@ memory_mib="$(jaq -r '."machine-config".mem_size_mib' "$bundle/firecracker.json"
 
 for source in "$staged"/*.c; do
     [[ -e "$source" ]] || continue
-    docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/gcc \
+    run_cancellable "" docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /usr/bin/gcc \
         --mount "type=bind,src=$staged,dst=/case" "$dev_image" \
         -Wall -O2 -static -o "/case/$(basename "$source" .c)" "/case/$(basename "$source")"
     rm -f "$source"
@@ -48,13 +48,13 @@ if [[ "$backend" == asterinas ]]; then
     fi
 else
     root="$result_dir/root.ext2"
-    bash "$repo_root/infra/asterinas/linux-reference.sh" \
+    run_cancellable "" bash "$repo_root/infra/asterinas/linux-reference.sh" \
         "${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}" "$result_dir/linux-reference"
 fi
 cp "$bundle/laputa-root.ext2" "$root"
 chmod u+w "$root"
 for file in "$staged"/*; do
-    bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$file" "usr/lib/asterinas/case/$(basename "$file")" "$dev_image" > /dev/null
+    run_cancellable "" bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$root" "$file" "usr/lib/asterinas/case/$(basename "$file")" "$dev_image" > /dev/null
 done
 
 console="$result_dir/console.log"

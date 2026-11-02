@@ -32,7 +32,7 @@ if [[ "$backend" == asterinas ]]; then
     runtime_root="$(jaq -r '.drives[0].path_on_host' "$bundle/firecracker.json")"
     mkdir -p "$(dirname "$runtime_root")"
 else
-    bash "$repo_root/infra/asterinas/linux-reference.sh" \
+    run_cancellable "" bash "$repo_root/infra/asterinas/linux-reference.sh" \
         "${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}" "$result_dir/linux-reference"
 fi
 
@@ -53,7 +53,7 @@ while (( ${#pending[@]} > 0 )); do
     console="$result_dir/$batch.console.log"
     cp "$bundle/laputa-root.ext2" "$runtime_root"
     chmod u+w "$runtime_root"
-    bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$runtime_root" "$result_dir/$batch.modules" usr/lib/asterinas/xsh-test.selection "$dev_image" > /dev/null
+    run_cancellable "" bash "$repo_root/infra/asterinas/inject-guest-file.sh" "$runtime_root" "$result_dir/$batch.modules" usr/lib/asterinas/xsh-test.selection "$dev_image" > /dev/null
     started_at=$(date +%s)
     status=0
     if [[ "$backend" == asterinas ]]; then

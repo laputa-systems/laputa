@@ -64,7 +64,7 @@ output="$repo_root/.out/asterinas-firecracker"
 mkdir -p "$repo_root/.work/tmp" "$output"
 export TMPDIR="$repo_root/.work/tmp"
 work="$(mktemp -d "$repo_root/.work/tmp/asterinas-qualification.XXXXXXXX")"
-trap 'rm -rf -- "$work"' EXIT
+trap 'cancellable_stop; rm -rf -- "$work"' EXIT
 linux_package="${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}"
 if [[ "$backend" != asterinas ]]; then
     run_cancellable "" bash "$repo_root/infra/asterinas/linux-reference.sh" "$linux_package" "$work"

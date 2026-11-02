@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/run-cancellable.sh"
 [[ $# == 4 ]] || {
     printf 'usage: inject-guest-file.sh ROOT_IMAGE HOST_FILE GUEST_PATH TOOLS_IMAGE\n' >&2
     exit 2
@@ -16,11 +18,11 @@ guest_name="$(basename "$guest_path")"
 [[ -s "$host_file" ]] || { printf 'inject-guest-file: file is empty: %s\n' "$host_file" >&2; exit 1; }
 
 commands="$(mktemp -d)"
-trap 'rm -rf -- "$commands"' EXIT
+trap 'cancellable_stop; rm -rf -- "$commands"' EXIT
 printf 'mkdir %s\ncd %s\nwrite /injected %s\n' "$guest_directory" "$guest_directory" "$guest_name" > "$commands/write"
 
 debugfs() {
-    docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /sbin/debugfs \
+    run_cancellable "" docker run --rm --pull never --platform linux/amd64 --network none --entrypoint /sbin/debugfs \
         --mount "type=bind,src=$(dirname "$root_image"),dst=/image" \
         --mount "type=bind,src=$host_file,dst=/injected,readonly" \
         --mount "type=bind,src=$commands,dst=/commands,readonly" \
@@ -28,7 +30,8 @@ debugfs() {
 }
 
 debugfs -w -f /commands/write > /dev/null
-debugfs -R "cat $guest_path" 2>/dev/null | cmp -s - "$host_file" || {
+debugfs -R "cat $guest_path" > "$commands/readback" 2>/dev/null || true
+cmp -s "$commands/readback" "$host_file" || {
     printf 'inject-guest-file: %s did not reach the root image\n' "$guest_path" >&2
     exit 1
 }

@@ -156,6 +156,7 @@ test-system: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/system
 	$(HOST_XSH_ENV) $(XSHT) test tests/integration
 	bash tests/system/asterinas_host.sh
+	bash tests/system/asterinas_runners.sh
 
 test-xinit: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests

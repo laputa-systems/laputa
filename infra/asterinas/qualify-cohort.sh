@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/run-cancellable.sh"
 [[ $# == 3 ]] || { printf 'usage: qualify-cohort.sh COHORT linux|asterinas|both CASE\n' >&2; exit 2; }
 cohort="$1"
 backend="$2"
@@ -55,46 +56,30 @@ export TMPDIR="$repo_root/.work/tmp"
 work="$(mktemp -d "$TMPDIR/$cohort.XXXXXXXX")"
 failed=0
 passed_cases=0
-job_pids=()
 
-cancel_jobs() {
-    local pid
-    for pid in "${job_pids[@]}"; do kill -TERM "$pid" 2>/dev/null || true; done
-    for pid in "${job_pids[@]}"; do wait "$pid" 2>/dev/null || true; done
-    job_pids=()
-}
-trap 'cancel_jobs; rm -rf -- "$work"; exit 143' TERM
-trap 'cancel_jobs; rm -rf -- "$work"; exit 130' INT
+cancellable_cancelled() { rm -rf -- "$work"; }
 
 run_backends() {
-    local label="$1"; shift
-    local side
-    job_pids=()
+    local label="$1" argv_builder="$2"; shift 2
+    local side ok=1
     for side in "${backends[@]}"; do
         mkdir -p "$work/$label-$side"
-        "$@" "$side" "$work/$label-$side" > "$work/$label-$side.log" 2>&1 &
-        job_pids+=("$!")
-    done
-    local index=0 ok=1
-    for side in "${backends[@]}"; do
-        if ! wait "${job_pids[$index]}"; then
+        "$argv_builder" "$side" "$work/$label-$side" "$@"
+        if ! run_cancellable "" "${job_argv[@]}" > "$work/$label-$side.log" 2>&1; then
             failed=1
             ok=0
             printf 'qualification: %s failed on %s\n' "$label" "$side" >&2
             tail -n 20 "$work/$label-$side.log" >&2
         fi
-        index=$((index + 1))
     done
-    job_pids=()
     return $(( 1 - ok ))
 }
 
-witness() { exec bash "$repo_root/infra/asterinas/run-witness.sh" "$2" "$regression/$1.c" "$3"; }
-guest_mode() {
-    local network=""
-    local tapped
-    for tapped in "${tap_modes[@]}"; do [[ "$tapped" != "$1" ]] || network=tap; done
-    LAPUTA_GUEST_NETWORK="$network" exec bash "$repo_root/infra/asterinas/run-guest-case.sh" "$2" "$repo_root/guest/asterinas/$case_dir" "$1" "$3"
+witness_argv() { job_argv=(bash "$repo_root/infra/asterinas/run-witness.sh" "$1" "$regression/$3.c" "$2"); }
+guest_mode_argv() {
+    local network="" tapped
+    for tapped in "${tap_modes[@]}"; do [[ "$tapped" != "$3" ]] || network=tap; done
+    job_argv=(env "LAPUTA_GUEST_NETWORK=$network" bash "$repo_root/infra/asterinas/run-guest-case.sh" "$1" "$repo_root/guest/asterinas/$case_dir" "$3" "$2")
 }
 
 transcript() {
@@ -104,7 +89,7 @@ transcript() {
 for path in "${witnesses[@]}"; do
     name="${path##*/}"
     [[ -z "$selected" || "$selected" == "$name" ]] || continue
-    if run_backends "witness-$name" witness "$path"; then
+    if run_backends "witness-$name" witness_argv "$path"; then
         passed_cases=$((passed_cases + 1))
         printf 'qualification: %s witness %s passed for %s\n' "$cohort" "$name" "$backend"
     fi
@@ -112,7 +97,7 @@ done
 
 for mode in "${modes[@]}"; do
     [[ -z "$selected" || "$selected" == "$mode" ]] || continue
-    run_backends "mode-$mode" guest_mode "$mode" || continue
+    run_backends "mode-$mode" guest_mode_argv "$mode" || continue
     if (( compare_transcripts )) && [[ "$backend" == both ]]; then
         transcript "$work/mode-$mode-linux" > "$work/mode-$mode-linux.transcript"
         transcript "$work/mode-$mode-asterinas" > "$work/mode-$mode-asterinas.transcript"
