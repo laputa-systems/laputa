@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/run-cancellable.sh"
 [[ $# == 5 ]] || {
     printf 'usage: native-batches.sh asterinas|linux MODULES_FILE BATCH_SIZE BUDGET_SECONDS RESULT_DIR\n' >&2
     exit 2
@@ -58,10 +59,10 @@ while (( ${#pending[@]} > 0 )); do
     if [[ "$backend" == asterinas ]]; then
         polls=$(( 1500 * take ))
         (( polls <= 15000 )) || polls=15000
-        bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$bundle/firecracker.json" \
+        run_cancellable "" bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$bundle/firecracker.json" \
             "$console" "$console.firecracker" "$selection" "$polls" > "$console.command" 2>&1 || status=$?
     else
-        XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
+        XSH_MODULE_PATH="$repo_root" run_cancellable "" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
             "$result_dir/linux-reference/linux-kernel" "$result_dir/linux-reference/linux-initramfs.cpio.gz" \
             "$runtime_root" "$console" "$console.qemu" "$selection" 3000 4096 > "$console.command" 2>&1 || status=$?
     fi

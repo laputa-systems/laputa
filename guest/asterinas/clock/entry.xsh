@@ -64,7 +64,7 @@ pure magnitude(value: Int) -> Int {
 
 pure probe_field(text: Str, name: Str) -> Result[Int, Error] {
   for part in text.trim().split(" ") {
-    if part.starts_with(f"{name}=") { return part.replace(f"{name}=", with: "").parse_int_decimal()? }
+    if part.starts_with(f"{name}=") { return part.replace(f"{name}=", with: "").parse_int()? }
   }
   Err(NtpCaseError.Failed(f"ntp-probe did not report {name}"))
 }
