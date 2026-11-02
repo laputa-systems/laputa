@@ -66,6 +66,16 @@ proc send_request(label: Str, kind: Int, flags: Int, payload: Bytes) [process, n
   }
 }
 
+proc probe(label: Str, host: Str) [process, net, error] {
+  let c = linux.net_constants()
+  let fd = linux.socket(c.AF_INET, c.SOCK_STREAM)?
+  linux.set_socket_timeout(fd, c.SO_SNDTIMEO, 3000)?
+  match linux.connect(fd, {family: "inet", address: host, port: 9}) {
+    Ok(_) => eprint --flush f"NET_{label}_PROBE connected"
+    Err(error) => eprint --flush f"NET_{label}_PROBE {error.message}"
+  }
+}
+
 proc ifindex_of(name: Str) [fs, process, env, time, net, error] -> Result[Int] {
   for link in linux.network_dump()?.links { if link.name == name { return link.ifindex } }
   Err(NetworkStateError.Failed(f"no link {name}"))
@@ -126,15 +136,19 @@ proc main() [fs, process, env, time, net, error] {
       let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
       let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
       let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
+      probe("before_address", "192.0.2.1")?
       add_address("add_primary", "eth0", primary)?
+      probe("with_address", "192.0.2.1")?
       add_address("add_primary_again", "eth0", primary)?
       add_address("add_second_in_subnet", "eth0", second)?
       add_address("add_host", "eth0", host)?
       delete_address("delete_second", "eth0", second)?
       delete_address("delete_second_again", "eth0", second)?
       step("down", "eth0", false, 2)?
+      probe("while_down", "192.0.2.1")?
       step("up_again", "eth0", true, 6)?
       delete_address("delete_primary", "eth0", primary)?
+      probe("after_delete", "192.0.2.1")?
       delete_address("delete_host", "eth0", host)?
       add_address("add_primary_for_promotion", "eth0", primary)?
       add_address("add_second_for_promotion", "eth0", second)?
