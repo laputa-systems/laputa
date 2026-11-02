@@ -20,7 +20,7 @@ pure subnet(address: policy.NetworkAddress) -> Result[NetworkSubnet, Error] {
   for octet in octets {
     let bits = if remaining > 8 { 8 } else { remaining }
     var span = 256
-    repeat bits times { span /= 2 }
+    for _ in range(bits) { span /= 2 }
     let base = octet / span * span
     network += [base]
     broadcast += [base + span - 1]
