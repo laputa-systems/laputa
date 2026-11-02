@@ -113,11 +113,11 @@ export proc apply_remote(
                 ))
               }
             }
-            _ => {}
+            else => {}
           }
         }
       }
-      _ => {}
+      else => {}
     }
     let removed = execute(session, [@elevate, "userdel", spec.name])?
     if removed.exit_code != 0 {
@@ -193,7 +193,7 @@ export proc apply_remote(
         }
       }
     }
-    _ => {}
+    else => {}
   }
 
   verify(session, host_name, spec)

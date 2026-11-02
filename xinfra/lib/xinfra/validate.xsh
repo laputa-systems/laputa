@@ -67,7 +67,7 @@ export pure text(source: PreparedSource) -> Str? {
   match source {
     Content(value) => value.text,
     Templated(value) => value.text,
-    _ => null,
+    else => null,
   }
 }
 
@@ -75,7 +75,7 @@ export pure text(source: PreparedSource) -> Str? {
 export pure local_path(source: PreparedSource) -> Path? {
   match source {
     Local(value) => value.path,
-    _ => null,
+    else => null,
   }
 }
 
@@ -83,7 +83,7 @@ export pure local_path(source: PreparedSource) -> Path? {
 export pure secret_reference(source: PreparedSource) -> model.SecretRef? {
   match source {
     Secret(reference) => reference,
-    _ => null,
+    else => null,
   }
 }
 
@@ -304,7 +304,7 @@ proc prepare_resources(
           sources = sources.set(spec.id, prepare_source(spec.id, base, root, source)?)
         }
       }
-      _ => {}
+      else => {}
     }
   }
 

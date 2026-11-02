@@ -183,7 +183,7 @@ pure directory_assessment(spec: model.DirectorySpec, observed: Observed) -> Asse
       operation: if spec.state == model.Absent { RemoveDirectory } else { EnsureDirectory },
       cause: "no observed state for the directory",
     ),
-    _ => Assessment(prediction: Blocked, operation: EnsureDirectory, cause: "observed facts do not describe a path"),
+    else => Assessment(prediction: Blocked, operation: EnsureDirectory, cause: "observed facts do not describe a path"),
   }
 }
 
@@ -246,7 +246,7 @@ pure file_assessment(
       operation: if spec.state == model.Absent { RemoveFile } else { EnsureFile },
       cause: "no observed state for the file",
     ),
-    _ => Assessment(prediction: Blocked, operation: EnsureFile, cause: "observed facts do not describe a path"),
+    else => Assessment(prediction: Blocked, operation: EnsureFile, cause: "observed facts do not describe a path"),
   }
 }
 
@@ -303,7 +303,7 @@ pure symlink_assessment(spec: model.SymlinkSpec, observed: Observed) -> Assessme
       operation: if spec.state == model.Absent { RemoveSymlink } else { EnsureSymlink },
       cause: "no observed state for the symbolic link",
     ),
-    _ => Assessment(
+    else => Assessment(
       prediction: Blocked,
       operation: EnsureSymlink,
       cause: "observed facts do not describe a symbolic link",
@@ -332,7 +332,7 @@ pure package_assessment(spec: model.PackageSpec, observed: Observed) -> Assessme
       match facts.satisfies {
         true => Assessment(prediction: Unchanged, operation: EnsurePackage),
         false => Assessment(prediction: Changed, operation: EnsurePackage),
-        _ => Assessment(
+        else => Assessment(
           prediction: Undetermined,
           operation: EnsurePackage,
           cause: "package constraint comparison is unavailable",
@@ -344,7 +344,7 @@ pure package_assessment(spec: model.PackageSpec, observed: Observed) -> Assessme
       operation: if spec.state == model.Absent { RemovePackage } else { EnsurePackage },
       cause: "no observed state for the package",
     ),
-    _ => Assessment(prediction: Blocked, operation: EnsurePackage, cause: "observed facts do not describe a package"),
+    else => Assessment(prediction: Blocked, operation: EnsurePackage, cause: "observed facts do not describe a package"),
   }
 }
 
@@ -413,7 +413,7 @@ pure user_assessment(spec: model.UserSpec, observed: Observed) -> Assessment {
       operation: if spec.state == model.Absent { RemoveUser } else { EnsureUser },
       cause: "no observed state for the user",
     ),
-    _ => Assessment(prediction: Blocked, operation: EnsureUser, cause: "observed facts do not describe a user"),
+    else => Assessment(prediction: Blocked, operation: EnsureUser, cause: "observed facts do not describe a user"),
   }
 }
 
@@ -446,7 +446,7 @@ pure group_assessment(spec: model.GroupSpec, observed: Observed) -> Assessment {
       operation: if spec.state == model.Absent { RemoveGroup } else { EnsureGroup },
       cause: "no observed state for the group",
     ),
-    _ => Assessment(prediction: Blocked, operation: EnsureGroup, cause: "observed facts do not describe a group"),
+    else => Assessment(prediction: Blocked, operation: EnsureGroup, cause: "observed facts do not describe a group"),
   }
 }
 
@@ -490,7 +490,7 @@ pure command_assessment(spec: model.CommandSpec, observed: Observed) -> Assessme
 
       Assessment(prediction: Changed, operation: operation)
     }
-    _ => Assessment(
+    else => Assessment(
       prediction: Undetermined,
       operation: operation,
       cause: "no observed guard result for the command",
@@ -534,7 +534,7 @@ pure service_assessment(spec: model.ServiceSpec, observed: Observed) -> Assessme
 
       Assessment(prediction: Changed, operation: operation)
     }
-    _ => Assessment(
+    else => Assessment(
       prediction: Undetermined,
       operation: ConfigureService,
       cause: "no observed service state",

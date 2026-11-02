@@ -169,7 +169,7 @@ proc apply_all(
             let _ = notification
           }
         }
-        _ => {}
+        else => {}
       }
     }
   }
@@ -254,7 +254,7 @@ export proc check_example() [fs, process, env, error, io] -> Result[Unit, Error]
     let running = service.fact(session, "nginx")?
     match running {
       plan.Running(facts) => require(facts.started and facts.enabled == true, "nginx is not started and enabled")?,
-      _ => return Err(error.failure("nginx service state is unknown")),
+      else => return Err(error.failure("nginx service state is unknown")),
     }
     print test_case("service stays started and enabled")
 

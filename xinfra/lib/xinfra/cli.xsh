@@ -89,7 +89,7 @@ pure command_named(text: Str) -> Subcommand? {
     "apply" => Apply,
     "check" => Check,
     "unlock" => Unlock,
-    _ => null,
+    else => null,
   }
 }
 
@@ -222,7 +222,7 @@ pure allows_inventory(command: Subcommand) -> Bool {
 pure allows_deploy(command: Subcommand) -> Bool {
   match command {
     Unlock => false,
-    _ => true,
+    else => true,
   }
 }
 
@@ -231,7 +231,7 @@ pure allows_selection(command: Subcommand) -> Bool {
     Plan => true,
     Apply => true,
     Check => true,
-    _ => false,
+    else => false,
   }
 }
 
@@ -511,7 +511,7 @@ proc observed_for(ops: host.HostOps, resource: model.Resource) [fs, env, error] 
         Err(_) => plan.Unknown,
       }
     }
-    _ => plan.Unknown,
+    else => plan.Unknown,
   }
 }
 
@@ -654,7 +654,7 @@ proc apply_resource(ops: host.HostOps, action: plan.Action) [fs, env, error] -> 
     model.Directory(spec) => dir.apply(ops, spec),
     model.File(spec) => file.apply(ops, spec, action.source),
     model.Symlink(spec) => symlink.apply(ops, spec),
-    _ => host.failed(ops, action.id, "resource kind is not available without a remote transport"),
+    else => host.failed(ops, action.id, "resource kind is not available without a remote transport"),
   }
 }
 
@@ -1166,7 +1166,7 @@ proc apply_actions_remote(
       model.ServiceResource(spec) => {
         service_status = service_status.set(f"{actions[index].host}:{spec.id}", applied[index].result.status)
       }
-      _ => {}
+      else => {}
     }
   }
 
@@ -1188,7 +1188,7 @@ proc apply_actions_remote(
           notifications = notifications.set(action_key(action), run_notification(action, spec, hosts, sessions))
         }
       }
-      _ => {}
+      else => {}
     }
   }
 

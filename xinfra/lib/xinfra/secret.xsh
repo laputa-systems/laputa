@@ -47,7 +47,7 @@ export proc redactor(deployment: validate.Deployment) [fs, env, error] -> redact
           Err(_) => {}
         }
       }
-      _ => {}
+      else => {}
     }
   }
   result
@@ -57,6 +57,6 @@ export proc redactor(deployment: validate.Deployment) [fs, env, error] -> redact
 export pure is_secret(source: validate.PreparedSource) -> Bool {
   match source {
     validate.Secret(_) => true,
-    _ => false,
+    else => false,
   }
 }

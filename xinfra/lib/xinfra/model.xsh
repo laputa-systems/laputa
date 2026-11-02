@@ -661,7 +661,7 @@ export pure notifications(resource: Resource) -> List[Str] {
 export pure is_service(resource: Resource) -> Bool {
   match resource {
     ServiceResource(_) => true,
-    _ => false,
+    else => false,
   }
 }
 
@@ -687,7 +687,7 @@ export pure privilege(resource: Resource) -> Privilege {
     UserResource(_) => AsRoot,
     GroupResource(_) => AsRoot,
     ServiceResource(_) => AsRoot,
-    _ => AsUser,
+    else => AsUser,
   }
 }
 

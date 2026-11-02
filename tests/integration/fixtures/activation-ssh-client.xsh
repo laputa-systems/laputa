@@ -19,7 +19,7 @@ proc main(...argv: List[Str]) [fs, process, net, env, time, error, io] {
     "release" => f"p\"{root}/release\".write(\"\")?",
     "reaped" => f"let pid = p\"{root}/committed\".read_text()?; let gone = !fp\"/proc/{{pid}}\".exists()?; print $gone",
     "prepare" | "stage" | "inspect" => f"let s = process.run(process.command_argv(/usr/bin/xsh, [\"/usr/bin/xsh\", \"{root}/activation-ssh-guest.xsh\", \"--\", \"{operation}\", \"{root}\"], /home/probe, {{XSH_MODULE_PATH: \"{root}\"}}))?; exit s.exit_code()?",
-    _ => { fail "unknown SSH drill operation" },
+    else => { fail "unknown SSH drill operation" },
   }
   let input = if operation == "probe" { b"ssh-stdin\n" } else if source == p"" { b"" } else { source.read_bytes()? }
   with session = ssh.connect({host: "127.0.0.1", port: port, user: "probe", key: key, host_key: host_key, timeout_ms: 5000})? {

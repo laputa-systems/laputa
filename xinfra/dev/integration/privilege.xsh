@@ -91,7 +91,7 @@ export proc check_privilege() [fs, process, env, error, io] -> Result[Unit, Erro
     require(failed_or_partial(user_result.status), f"failed user escalation reported {status_name(user_result.status)}")?
     match user_resource.fact(session, denied_user)? {
       plan.Absent => {}
-      _ => return Err(error.failure("failed user escalation created an account")),
+      else => return Err(error.failure("failed user escalation created an account")),
     }
     print test_case("user escalation failure is observed")
 
@@ -117,7 +117,7 @@ export proc check_privilege() [fs, process, env, error, io] -> Result[Unit, Erro
     require(failed_or_partial(package_result.status), f"failed package escalation reported {status_name(package_result.status)}")?
     match package.fact(session, package_spec)? {
       plan.Absent => {}
-      _ => return Err(error.failure("failed package escalation installed the package")),
+      else => return Err(error.failure("failed package escalation installed the package")),
     }
     print test_case("package escalation failure is observed")
 

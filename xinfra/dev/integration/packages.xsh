@@ -111,7 +111,7 @@ export proc check_packages() [fs, process, env, error, io] -> Result[Unit, Str] 
     require(!rejected.refreshed, "unsupported constraint refreshed the index")?
     match fact(session, plan_spec)? {
       plan.Absent => {}
-      _ => return Err("unsupported constraint installed the package"),
+      else => return Err("unsupported constraint installed the package"),
     }
     print test_case("unsupported constraint fails before mutation")
 
@@ -124,7 +124,7 @@ export proc check_packages() [fs, process, env, error, io] -> Result[Unit, Str] 
     let plus = model.PackageSpec(id: "stdcpp", name: "libstdc++")
     match fact(session, plus)? {
       plan.Installed(_) => {}
-      _ => { return Err("libstdc++ fact was not installed") },
+      else => { return Err("libstdc++ fact was not installed") },
     }
     let plus_result = apply(session, a.host, plus, elevate)?
     require(plus_result.result.status == host.Unchanged, "libstdc++ was not unchanged")?
@@ -132,7 +132,7 @@ export proc check_packages() [fs, process, env, error, io] -> Result[Unit, Str] 
 
     let version = match fact(session, plan_spec)? {
       plan.Installed(facts) => facts.version ?? "",
-      _ => { return Err("installed package is missing") },
+      else => { return Err("installed package is missing") },
     }
     let exact = model.PackageSpec(id: "tree", name: "tree", constraint: f"={version}")
     let exact_result = apply(session, a.host, exact, elevate)?
@@ -150,7 +150,7 @@ export proc check_packages() [fs, process, env, error, io] -> Result[Unit, Str] 
     require(removed.result.status == host.Changed and removed.result.verified, "package removal failed")?
     match fact(session, plan_spec)? {
       plan.Absent => {}
-      _ => return Err("removed package is still installed"),
+      else => return Err("removed package is still installed"),
     }
     let again = apply(session, a.host, absent, elevate)?
     require(again.result.status == host.Unchanged, "second removal was not unchanged")?

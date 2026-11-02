@@ -86,7 +86,7 @@ export proc apply_remote(
 
   let currently_enabled = match before {
     plan.Running(facts) => facts.enabled,
-    _ => null,
+    else => null,
   }
   if spec.enabled != null and currently_enabled != spec.enabled {
     let enable = if spec.enabled ?? false { "add" } else { "del" }

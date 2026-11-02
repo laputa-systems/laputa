@@ -38,7 +38,7 @@ test test_directory_defaults_and_privilege { |ctx|
       test.eq(spec.hosts, [])?
       test.eq(spec.privilege, null)?
     }
-    _ => test.fail("directory did not match its variant")?,
+    else => test.fail("directory did not match its variant")?,
   }
 
   test.eq(model.privilege(directory), model.AsUser)?
@@ -55,7 +55,7 @@ test test_file_defaults_and_variants { |ctx|
       test.eq(spec.mode, 0o644)?
       test.eq(spec.source, model.Content("hello\n"))?
     }
-    _ => test.fail("file did not match its variant")?,
+    else => test.fail("file did not match its variant")?,
   }
 
   let rendered_file = model.File(

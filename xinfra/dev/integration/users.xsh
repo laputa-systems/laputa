@@ -122,7 +122,7 @@ export proc check_users() [fs, process, env, error, io] -> Result[Unit, Str] {
     require(group_second.status == host.Unchanged, "second group apply was not unchanged")?
     match group_fact(session, test_group)? {
       plan.Role(facts) => require(facts.gid == 1500, "group gid was not applied")?,
-      _ => return Err("created group is missing"),
+      else => return Err("created group is missing"),
     }
     print test_case("group present and unchanged")
 
@@ -147,7 +147,7 @@ export proc check_users() [fs, process, env, error, io] -> Result[Unit, Str] {
         require(facts.shell == p"/bin/sh", "user shell was not applied")?
         require(test_group in facts.groups, "user group was not applied")?
       }
-      _ => return Err("created user is missing"),
+      else => return Err("created user is missing"),
     }
     print test_case("user present, ids, home, shell, groups")
 
@@ -172,7 +172,7 @@ export proc check_users() [fs, process, env, error, io] -> Result[Unit, Str] {
     require(kept_file.exit_code == 0, "non-empty home was deleted")?
     match user_fact(session, test_user)? {
       plan.Account(_) => {}
-      _ => return Err("blocked removal deleted the user"),
+      else => return Err("blocked removal deleted the user"),
     }
     print test_case("absent preserves non-empty home")
 
@@ -181,7 +181,7 @@ export proc check_users() [fs, process, env, error, io] -> Result[Unit, Str] {
     require(failed.status == host.Failed or failed.status == host.Partial, "failed escalation reported success")?
     match user_fact(session, failed_user)? {
       plan.Absent => {}
-      _ => return Err("failed escalation created the user"),
+      else => return Err("failed escalation created the user"),
     }
     print test_case("failed escalation is not success")
 

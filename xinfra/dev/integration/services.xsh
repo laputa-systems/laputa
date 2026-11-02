@@ -132,7 +132,7 @@ restart() { touch /run/xinfra-r5.started; echo restart >> /tmp/xinfra-r5.log; }
         require(facts.started, "service is not started")?
         require(facts.enabled == true, "service is not enabled")?
       }
-      _ => return Err("service fact is unknown"),
+      else => return Err("service fact is unknown"),
     }
     print test_case("service start, enable, and unchanged")
 
@@ -141,7 +141,7 @@ restart() { touch /run/xinfra-r5.started; echo restart >> /tmp/xinfra-r5.log; }
     require(stop_result.status == host.Changed, "service stop failed")?
     match fact(session, name)? {
       plan.Running(facts) => require(! facts.started and facts.enabled == false, "service did not stop and disable")?,
-      _ => return Err("stopped service fact is unknown"),
+      else => return Err("stopped service fact is unknown"),
     }
     print test_case("service stop and disable")
 

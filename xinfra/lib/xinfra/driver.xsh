@@ -270,7 +270,7 @@ export proc notify_on(session: transport.Session, entry: inventory.Host, spec: m
         )
       }
     }
-    _ => host.ApplyResult(
+    else => host.ApplyResult(
       id: action.id,
       host: action.host,
       status: host.Unknown,

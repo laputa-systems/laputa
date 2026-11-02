@@ -51,7 +51,7 @@ proc created(session: transport.Session, spec: model.CommandSpec, elevate: List[
   match remote.inspect_path(session, creates_path ?? p"/", elevate) {
     Ok(host.Found(_)) => Ok(true),
     Ok(host.Missing) => Ok(false),
-    _ => Ok(null),
+    else => Ok(null),
   }
 }
 
