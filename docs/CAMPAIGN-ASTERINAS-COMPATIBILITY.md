@@ -248,7 +248,28 @@
   `network/packet_bind` passes on both kernels (its first run caught the protocol
   kept in network byte order); the network-state cohort, the A3 clock cases and
   the paired boot and numeric cases pass. Contract change: `socket(AF_PACKET)`
-  exists, and the socket address layer has a packet variant.
+  exists, and the socket address layer has a packet variant. Receive: an
+  interface lets link-layer taps observe the frames it receives, and only the
+  taps that select every EtherType (`ETH_P_ALL`) the frames it sends, as Linux
+  does. A packet socket queues whole Ethernet frames (212992 bytes, then drops),
+  reports the frame kind (host, broadcast, multicast, other host, outgoing) and the
+  source address (reported with the full 20-byte `sockaddr_ll`, where
+  `getsockname` stops at the link-layer address), strips the header for
+  `SOCK_DGRAM`, honours `MSG_PEEK`, `MSG_TRUNC` and `MSG_DONTWAIT`, and polls
+  readable or in error. Like Linux, taking a selected interface down fails the
+  next receive once with `ENETDOWN` (and so does selecting a down interface with
+  a protocol), poll reports an error until that receive, and bringing the
+  interface up resumes reception. Taking an interface down now forgets its ARP
+  cache, as Linux does (the packet transcript found the second probe not asking
+  again). `network/packet_receive` checks that state machine against Linux; the
+  `packet` mode of the network-state case compares the frames a TAP-backed `eth0`
+  sees for an ARP exchange and a refused TCP connection, socket by socket,
+  between the kernels. Deliberate difference: frames between two local addresses
+  never reach a device in this stack, so loopback traffic of that kind is not
+  visible to packet sockets (Linux shows it); frames injected through a packet
+  socket do (slice 3). Known limit: the frame length of an ARP frame is compared,
+  the length of a TCP segment is not (options differ). Contract changes: packet
+  sockets receive; `bigtcp` gains link-layer taps.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four

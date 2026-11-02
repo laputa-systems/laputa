@@ -219,6 +219,54 @@ proc drain_events(label: Str, listener: Int) [fs, process, env, time, net, error
   }
 }
 
+pure ip_text(data: Bytes, offset: Int) -> Str {
+  f"{data.byte_at(offset) ?? 0}.{data.byte_at(offset + 1) ?? 0}.{data.byte_at(offset + 2) ?? 0}.{data.byte_at(offset + 3) ?? 0}"
+}
+
+pure describe_frame(frame: Bytes) -> Result[Str?, Error] {
+  let ethertype = bytes.unpack_be(frame, 2, 12)?
+  let destination = if frame[0..6] == b"\xff\xff\xff\xff\xff\xff" { "broadcast" } else { "unicast" }
+  if ethertype == 2054 {
+    return Ok(f"ARP op={bytes.unpack_be(frame, 2, 20)?} {ip_text(frame, 28)}>{ip_text(frame, 38)} dst={destination} len={frame.len()}")
+  }
+  if ethertype == 2048 {
+    let protocol = frame.byte_at(23) ?? 0
+    let header = (frame.byte_at(14) ?? 0).bit_and(15) * 4
+    let detail = if protocol == 6 { f" flags={(frame.byte_at(14 + header + 13) ?? 0).bit_and(23)}" } else { "" }
+    return Ok(f"IPV4 proto={protocol} {ip_text(frame, 26)}>{ip_text(frame, 30)} dst={destination}{detail}")
+  }
+  Ok(null)
+}
+
+pure packet_address(ifindex: Int, protocol: Int) -> Result[Bytes, Error] {
+  bytes.concat([bytes.pack_le(17, 2)?, bytes.pack_be(protocol, 2)?, bytes.pack_le(ifindex, 4)?, bytes.zero(12)?])
+}
+
+proc open_packet_socket(protocol: Int, ifindex: Int) [process, net, error] -> Result[Int, Error] {
+  let c = linux.net_constants()
+  let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(protocol, 2)?, 2)?)?
+  if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol)?)? }
+  Ok(socket)
+}
+
+proc drain_packets(label: Str, socket: Int) [fs, process, env, time, net, error] {
+  var quiet = false
+  while !quiet {
+    if unix.poll_fd(socket, ["readable"], 300)? == [] {
+      quiet = true
+    } else {
+      match unix.read_fd(socket, 2048) {
+        Ok(frame) => {
+          if let text = describe_frame(frame)? { eprint --flush f"NET_{label}_FRAME {text}" }
+        }
+        Err(error) => {
+          eprint --flush f"NET_{label}_RECV_ERR errno={error.errno ?? 0}"
+        }
+      }
+    }
+  }
+}
+
 proc main() [fs, process, env, time, net, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
@@ -341,6 +389,30 @@ proc main() [fs, process, env, time, net, error] {
       drain_events("add_primary_while_down", listener)?
       linux.link_up("eth0")?
       drain_events("up_last", listener)?
+    }
+    "packet" => {
+      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
+      step("up", "eth0", true, 6)?
+      add_address("address", "eth0", primary)?
+      let index = ifindex_of("eth0")?
+      let c = linux.net_constants()
+      let ip = open_packet_socket(c.ETH_P_IP, index)?
+      let arp = open_packet_socket(c.ETH_P_ARP, index)?
+      let everything = open_packet_socket(c.ETH_P_ALL, index)?
+      let anywhere = open_packet_socket(c.ETH_P_ARP, 0)?
+      probe("first", "192.0.2.1")?
+      drain_packets("ip", ip)?
+      drain_packets("arp", arp)?
+      drain_packets("everything", everything)?
+      drain_packets("anywhere", anywhere)?
+      step("down", "eth0", false, 2)?
+      drain_packets("ip_after_down", ip)?
+      drain_packets("anywhere_after_down", anywhere)?
+      step("up_again", "eth0", true, 6)?
+      probe("second", "192.0.2.1")?
+      drain_packets("ip_after_up", ip)?
+      drain_packets("anywhere_after_up", anywhere)?
+      for socket in [ip, arp, everything, anywhere] { let _ = unix.close_fd(socket) }
     }
     other => fail f"unknown network-state mode {other}"
   }
