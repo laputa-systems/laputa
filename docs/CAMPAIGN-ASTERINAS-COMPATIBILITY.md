@@ -537,12 +537,28 @@
   are recorded as host-load flakes: the A0 pass-set rerun (125 modules with A0 passes, 3 batches, 907 s, host load 5 to 20)
   passes 1,313 cases and loses 1 of the 1,281 A0 passes, `test_bb_awk_awk_length_0`, a 5.1 s timeout in a module that
   passed 48 of 49 at that load; no other module lost a case. The accounting rule for timing-bound cases is in Acceptance.
-  Gated A0 pass-set run on the final kernel `093b5270b` (the 125 modules with A0 passes, 3 batches, 1,099 s, `perf-gate-ready`
+  Gated A0 pass-set run on the kernel `093b5270b` (the 125 modules with A0 passes, 3 batches, 1,099 s, `perf-gate-ready`
   exited 0 before and `perf-gate-ready -1` exited 0 after; the host load average at the start was 5.9): 1,312 passed, 36
   failed, 49 skipped, 0 unknown, and 1 A0 pass lost: `test-bb-awk` `gsub_falls_back_to_non_extended_regex_563659b0` failed after 5.1 s.
   The 49 cases of that module took a median 2.5 s (1.8 to 5.1 s), with several at 4.4 to 4.7 s, so the gate passing did not make
   the module quiet. The result is not retried until green; under the rule it is a regression, and A6 stays unaccepted until a
-  later gated run on a quiet host shows 1,281 of 1,281. Paired Linux run of the 131 modules with Asterinas failures plus
+  later gated run on a quiet host shows 1,281 of 1,281.
+  Follow-up ruling: the loss counts as a regression and is not rerun to get a pass. Did A6 slow awk? One generated awk
+  invocation (the `gsub_falls_back` case: `xsh core/awk` on a one-line input, 16 per run) measured in the guest, 6 runs per
+  kernel interleaved, each run gated by `perf-gate-ready` before and `-1` after, runs that overlapped load discarded (none
+  were): the last kernel before A6 (`69a647fc1`) has wall median 1950 ms, p90 4226 ms, CPU median 1915 ms (user 1636, sys 279);
+  `093b5270b` has wall median 1939 ms, p90 2817 ms, CPU median 1894 ms (user 1656, sys 255). The per-run medians spread from
+  1.8 to 4.1 s on the first and 1.7 to 2.5 s on the second, ten times the 0.01 s difference, so A6 did not move awk timing and
+  no bisect applies. The case is slow because a generated awk case sits within 0.5 s of its 5 s limit (median 2.5 s in the
+  module, several at 4.4 to 4.7 s) and the page-fault cost is part of it, so the anonymous page-fault work moved from A7 to
+  A6 as its acceptance blocker. Timing the fault handler on the kernel before the fix: 12.6k cycles per anonymous fault, of
+  which the page table cursor is 4.6k, the frame allocation 2.2k and the mapping 2.2k (the microbenchmark touches a page in
+  4.0 to 5.3 us, the Linux reference in 0.44 to 0.60 us). The kernel now maps the missing pages of the 16-page window around an
+  anonymous fault under one cursor (`a01314f96`): 1.2 to 2.1 us per page, and with the same method (6 runs per kernel,
+  interleaved, gated, none discarded) one awk invocation has wall median 1863 ms to 1719 ms (CPU 1831 to 1680 ms, sys 242
+  to 161 ms), about 8 percent, in five of six pairs. That is a cost reduction, not a guarantee against a host that stretches
+  the case 2.5 times. The regression `memory/mmap/mmap_anonymous_fault_around` passes on this kernel and Linux, and its
+  RssAnon check (16 pages after one touch) fails on the previous kernel. Paired Linux run of the 131 modules with Asterinas failures plus
   `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` timeouts, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
   smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch) and 2 are skipped on
@@ -726,7 +742,7 @@ and final-suite milestones may take longer and must declare their bounds.
 | A4 IPv4 state operations, M | A1. Kernel netlink route/link/address owners and regressions; qualification-only network fixtures and cohort. | `bash infra/asterinas/qualify.sh network-state --backend both`. Attach one virtio-net device to a disposable isolated network. Run actual XSH dumps and mutations, ACK/error, multipart completion, route/address deletion and re-observation. Preserve a deliberately foreign address/route. Reject stale preconditions. |
 | A5 DHCP and connection recovery, M | A4 and A2, then serialize with A3 when shared files overlap. Kernel network/socket owners and regressions; existing DHCP/syslog consumers, network fixtures/cohort. | `bash infra/asterinas/qualify.sh network --backend both --case lease-acquire`, then the complete `network` cohort at its milestone. Prove controlled DHCP acquire, renew/rebind, NAK/expiry cleanup, changed DNS/routes, daemon restart, carrier loss and return, plus TCP recovery. No second network manager. |
 | A6 integrate and harden, M | A1–A5. Coordinator owns shared runner, pins, topic docs, campaign status, and removal of obsolete bypass code. | `bash infra/asterinas/qualify.sh all --backend both`. Run all required cases serially with no new skips or failures. Repeat the complete native XSH accounting from A0. Verify cleanup on cancellation and bad guest output, and unchanged normal Linux profile behavior for any shared QEMU changes. Run independent completion review under `ultrareview`; resolve its supported P1/P2 findings before acceptance. |
-| A7 account for resources and close, S | A6. Coordinator: existing runtime result output and topic docs only. | `bash infra/asterinas/qualify.sh resources --backend both`. Record actual kernel/initramfs/root sizes, peak VMM RSS, configured memory, warm test CPU time, and any deferred time gates. No optimization before compatibility. Close with required cases green, remaining native-suite debt explicit, and successor blockers preserved. Carry the anonymous page-fault cost into this row as performance debt, not an A6 defect: a fault costs 3.4 us in the Asterinas guest against 0.37 us on the Linux reference (probably huge pages, not checked) and `MAP_POPULATE` is ignored, which is most of the 25 percent CPU gap of the generated awk cases. |
+| A7 account for resources and close, S | A6. Coordinator: existing runtime result output and topic docs only. | `bash infra/asterinas/qualify.sh resources --backend both`. Record actual kernel/initramfs/root sizes, peak VMM RSS, configured memory, warm test CPU time, and any deferred time gates. No optimization before compatibility. Close with required cases green, remaining native-suite debt explicit, and successor blockers preserved. Open items carried here: the anonymous page-fault cost that A6's window mapping reduced but did not close (1.2 to 2.1 us per page against 0.4 to 0.5 us on the Linux reference, and `MAP_POPULATE` is still ignored), and delivery of the host-unreachable error to the socket whose queued packets are dropped when a neighbor never answers (the kernel delivers no ICMP or asynchronous error to any socket yet). |
 
 A0 must deliver one real end-to-end pilot before new harness cohorts. A1 must
 deliver the first actual kernel/userspace improvement before wider test tooling.
