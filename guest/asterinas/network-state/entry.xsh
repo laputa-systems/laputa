@@ -76,6 +76,34 @@ proc probe(label: Str, host: Str) [process, net, error] {
   }
 }
 
+type Route = {destination: Str, prefix: Int, gateway: Str?, priority: Int, protocol: Int}
+
+pure route_payload(ifindex: Int, item: Route, add: Bool) -> Result[Bytes, Error] {
+  let c = linux.net_constants()
+  let gateway = item.gateway ?? "0.0.0.0"
+  let scope = if ! add { c.RT_SCOPE_NOWHERE } else if item.gateway == null { c.RT_SCOPE_LINK } else { c.RT_SCOPE_UNIVERSE }
+  let kind = if add { c.RTN_UNICAST } else { 0 }
+  let header = bytes.concat([bytes.from_ints([c.AF_INET, item.prefix, 0, 0, c.RT_TABLE_MAIN, item.protocol, scope, kind])?, bytes.zero(4)?])
+  let destination = if item.prefix > 0 { attribute(c.RTA_DST, be32(ipv4(item.destination)?)?)? } else { b"" }
+  let via = if item.gateway != null { attribute(c.RTA_GATEWAY, be32(ipv4(gateway)?)?)? } else { b"" }
+  let device = attribute(c.RTA_OIF, bytes.pack_le(ifindex, 4)?)?
+  let priority = attribute(c.RTA_PRIORITY, bytes.pack_le(item.priority, 4)?)?
+  Ok(bytes.concat([header, destination, via, device, priority]))
+}
+
+proc add_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+  let c = linux.net_constants()
+  let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
+  send_request(label, c.RTM_NEWROUTE, flags, route_payload(ifindex_of(name)?, item, true)?)
+  report(label, "", false)?
+}
+
+proc delete_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+  let c = linux.net_constants()
+  send_request(label, c.RTM_DELROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), route_payload(ifindex_of(name)?, item, false)?)
+  report(label, "", false)?
+}
+
 proc ifindex_of(name: Str) [fs, process, env, time, net, error] -> Result[Int] {
   for link in linux.network_dump()?.links { if link.name == name { return link.ifindex } }
   Err(NetworkStateError.Failed(f"no link {name}"))
@@ -158,6 +186,33 @@ proc main() [fs, process, env, time, net, error] {
       send_request("missing_link", c.RTM_NEWADDR, flags, address_payload(4242, primary, c.RT_SCOPE_UNIVERSE, true)?)
       send_request("oversized_prefix", c.RTM_NEWADDR, flags, address_payload(ifindex_of("eth0")?, {...primary, prefix: 33}, c.RT_SCOPE_UNIVERSE, true)?)
       send_request("delete_missing_link", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(4242, primary, c.RT_SCOPE_UNIVERSE, false)?)
+    }
+    "route" => {
+      let c = linux.net_constants()
+      let address: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
+      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
+      let slower: Route = {...default, priority: 200}
+      let network: Route = {destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC}
+      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
+      step("up", "eth0", true, 6)?
+      add_address("address", "eth0", address)?
+      add_route("add_default", "eth0", default)?
+      add_route("add_default_again", "eth0", default)?
+      add_route("add_slower_default", "eth0", slower)?
+      add_route("add_network", "eth0", network)?
+      add_route("add_direct", "eth0", direct)?
+      add_route("add_unreachable_gateway", "eth0", {...network, destination: "10.99.0.0", gateway: "172.16.0.1"})?
+      add_route("add_host_bits", "eth0", {...network, destination: "10.20.0.5"})?
+      send_request("add_missing_link", c.RTM_NEWROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL), route_payload(4242, network, true)?)
+      delete_route("delete_default", "eth0", default)?
+      delete_route("delete_default_again", "eth0", default)?
+      delete_route("delete_network_by_destination", "eth0", {...network, priority: 0})?
+      step("down", "eth0", false, 2)?
+      step("up_again", "eth0", true, 6)?
+      add_route("add_while_down_default", "eth0", default)?
+      delete_address("delete_address_keeps_routes", "eth0", address)?
+      delete_route("delete_slower_default", "eth0", slower)?
+      add_route("add_without_address", "eth0", default)?
     }
     other => fail f"unknown network-state mode {other}"
   }

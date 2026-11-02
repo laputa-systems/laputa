@@ -179,13 +179,27 @@
   finite lifetimes, address flags other than permanent. Contract changes:
   `RTM_NEWADDR` and `RTM_DELADDR` exist; `RTM_GETADDR` reports the assigned
   broadcast and `IFA_CACHEINFO`; `SIOCGIFCONF` lists each address under its label;
-  `SIOCGIFBRDADDR` returns only an assigned broadcast. Still to build, in this order:
-  `RTM_NEWROUTE` and `RTM_DELROUTE`, ACK and error semantics with
-  malformed-request witnesses, notifications to the link, address and route groups,
-  and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink link changes have
-  no consumer yet). Open obligations: the `IFLA_CARRIER` and carrier-change events
-  needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT` (used by `ifconfig` and
-  `route`, not by the maintained DHCP path), address expiry.
+  `SIOCGIFBRDADDR` returns only an assigned broadcast. Routes: `RTM_NEWROUTE` and
+  `RTM_DELROUTE` install and remove unicast IPv4 routes with the Linux rules the
+  XSH DHCP consumer relies on (metric as identity, `EEXIST` for a duplicate,
+  `ESRCH` for a missing route, `ENETUNREACH` for a gateway off the connected
+  networks or an unknown interface with a gateway, `ENODEV` without one, `ENETDOWN`
+  on a down link, `EINVAL` for host bits or a prefix over 32; user routes leave
+  with a link-down and with the last address of their interface but survive the
+  removal of another address; removal filters match destination, metric, gateway,
+  interface, protocol, type and scope). Gateway routes in the main table also feed
+  the interface's next-hop selection. `network/route_config` passes on both kernels
+  and the `route` transcript is identical to Linux. Fail-loud gaps, all
+  `EOPNOTSUPP`: other route types, source, TOS, preferred source and flags,
+  replace and append, and removal of the routes the kernel derives from
+  addresses (Linux allows it). Still to build, in this order: ACK and error
+  semantics with malformed-request witnesses (truncated bodies and attributes,
+  unknown types, multipart completion), notifications to the link, address and
+  route groups, and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink
+  link changes have no consumer yet). Open obligations: the `IFLA_CARRIER` and
+  carrier-change events needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT`
+  (used by `ifconfig` and `route`, not by the maintained DHCP path), address
+  expiry, and route lookup (`RTM_GETROUTE` without `NLM_F_DUMP`).
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
