@@ -5,7 +5,7 @@
 - Goal: qualify the pinned x86_64 Asterinas/Firecracker baseline, then deliver
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
-  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is not accepted. It has run its integration, cancellation and native-accounting checks, the independent review's findings are resolved and D2 is delivered, but A0's no-new-failure rule is unproven: the A0 pass-set accounting under `perf-gate-ready` (Acceptance) lost 1 of the 1,281 A0 passes, `test_bb_awk_awk_gsub_falls_back_to_non_extended_regex_563659b0`, a 5.1 s timeout, so by the rule for timing-bound cases it is a real regression until a later gated run shows otherwise.
+  A1 (device coldplug) and D2 (device compatibility, below) are delivered. A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted, A5 is accepted for the packaged DHCP client (remaining obligations are successor debt, below). A6 is accepted. It ran its integration, cancellation and native-accounting checks, the independent review's findings are resolved, D2 is delivered, and the gated A0 pass-set accounting on kernel `a01314f96` loses no A0 pass (details in the A6 native accounting entry). Open items it hands to A7 are in the A7 row.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -558,7 +558,11 @@
   interleaved, gated, none discarded) one awk invocation has wall median 1863 ms to 1719 ms (CPU 1831 to 1680 ms, sys 242
   to 161 ms), about 8 percent, in five of six pairs. That is a cost reduction, not a guarantee against a host that stretches
   the case 2.5 times. The regression `memory/mmap/mmap_anonymous_fault_around` passes on this kernel and Linux, and its
-  RssAnon check (16 pages after one touch) fails on the previous kernel. Paired Linux run of the 131 modules with Asterinas failures plus
+  RssAnon check (16 pages after one touch) fails on the previous kernel.
+  Gated A0 pass-set run on kernel `a01314f96` (the 125 modules with A0 passes, 3 batches, 797 s; `perf-gate-ready` exited
+  0 before and `perf-gate-ready -1` exited 0 after; no run discarded): 1,314 passed, 34 failed, 49 skipped, 0 unknown, no A0 pass
+  lost and no `process timed out`. The 49 `test-bb-awk` cases took a median 1.7 s (1.6 to 3.9 s) against 2.5 s (1.8 to 5.1 s)
+  on `093b5270b`. By the Acceptance rule A0's no-new-failure rule holds and A6 is accepted. Paired Linux run of the 131 modules with Asterinas failures plus
   `test-gnu-cp` (5 batches, all executed): of the 534 Asterinas failures, 171 pass on Linux (43 `test-bb-awk` timeouts, 24
   `test-uu-cp-3`, 12 `test-stty`, 12 `test-ss`, 10 `test-procps`, 6 `test-traceroute`, 6 `test-ionice`, 5 `test-tracepath`, and
   smaller groups), 361 fail on both (environment debt, including the root-user fixture mismatch) and 2 are skipped on
