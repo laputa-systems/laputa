@@ -192,14 +192,24 @@
   and the `route` transcript is identical to Linux. Fail-loud gaps, all
   `EOPNOTSUPP`: other route types, source, TOS, preferred source and flags,
   replace and append, and removal of the routes the kernel derives from
-  addresses (Linux allows it). Still to build, in this order: ACK and error
-  semantics with malformed-request witnesses (truncated bodies and attributes,
-  unknown types, multipart completion), notifications to the link, address and
-  route groups, and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink
-  link changes have no consumer yet). Open obligations: the `IFLA_CARRIER` and
-  carrier-change events needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT`
-  (used by `ifconfig` and `route`, not by the maintained DHCP path), address
-  expiry, and route lookup (`RTM_GETROUTE` without `NLM_F_DUMP`).
+  addresses (Linux allows it). Acknowledgements and errors: `network/rtnl_ack`
+  passes on both kernels. An unknown message type fails with `EOPNOTSUPP`, a
+  request that changes state with a body shorter than the full one fails with
+  `EINVAL` (the witness found the first implementation reading the one-byte legacy
+  body of a delete as "remove the first address"; only reads accept it), an
+  acknowledgement carries `NLMSG_ERROR` with error 0 and the request header, a
+  failure carries its errno under the request's sequence, several requests in one
+  datagram get one reply each in order, and a dump ends with a multipart `NLMSG_DONE`
+  and is never acknowledged. Deliberate difference: Linux ignores a malformed trailing
+  attribute and Asterinas rejects it with `EINVAL`; error replies carry the request
+  header but not its payload. Still to build: notifications to the link, address
+  and route groups (needing `Clone` messages and a diff of the derived routes),
+  and `RTM_NEWLINK` (the XSH `link_up` uses the ioctl, so netlink link changes have
+  no consumer yet). Open obligations: the `IFLA_CARRIER` and carrier-change events
+  needed by A5, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT` (used by `ifconfig` and
+  `route`, not by the maintained DHCP path), address expiry, and route lookup
+  (`RTM_GETROUTE` without `NLM_F_DUMP`, which fails with `EOPNOTSUPP` where Linux
+  answers).
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
