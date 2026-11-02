@@ -69,6 +69,11 @@ else
 fi
 if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
     [[ "$backend" == asterinas ]] || vm_command+=(--tap tap0)
+    control_environment=()
+    if [[ -x "$case_dir/vmm-control.sh" ]]; then
+        [[ "$backend" == asterinas ]] || vm_command+=(--qmp /run/laputa-vmm.sock)
+        control_environment=(--env LAPUTA_VMM_CONTROL=/run/laputa-vmm.sock --env "LAPUTA_PEER_BACKEND=$backend" --env "LAPUTA_PEER_REPO=$repo_root")
+    fi
     peer_command=:
     peer_environment=()
     if [[ -x "$case_dir/peer.sh" ]]; then
@@ -83,7 +88,7 @@ if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
         --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
         --mount "type=bind,src=$repo_root,dst=$repo_root"
         --env "XSH_MODULE_PATH=$repo_root" --env QEMU_SYSTEM_X86_64=/usr/local/qemu/bin/qemu-system-x86_64
-        "${peer_environment[@]}"
+        "${peer_environment[@]}" "${control_environment[@]}"
         --workdir "$repo_root" --entrypoint /bin/bash "$dev_image" -c
         "set -e
 ip tuntap add dev tap0 mode tap

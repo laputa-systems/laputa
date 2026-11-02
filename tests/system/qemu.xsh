@@ -61,6 +61,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
     disk: /tmp/root,
     memory_mib: 4096,
     network: qemu.NoNetwork,
+    control: qemu.NoControl,
   )
   let argv = qemu.qemu_asterinas_reference_argv(config, input)?
   assert "q35,accel=kvm" in argv
@@ -70,6 +71,9 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   assert "if=none,id=root,format=raw,file=/tmp/root" in argv
   assert "virtio-blk-pci,drive=root" in argv
   assert !("-netdev" in argv)
+  assert !("-qmp" in argv)
+  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: qemu.QmpSocket(/run/vmm.sock)})?
+  assert "unix:/run/vmm.sock,server=on,wait=off" in controlled
   let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0")})?
   assert "tap,id=net0,ifname=tap0,script=no,downscript=no" in networked
   assert "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01" in networked
@@ -90,7 +94,7 @@ test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, ti
   fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n")
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
-  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
     Ok(_) => fail "accepted a guest without its completion marker"
     Err(_) => {}
@@ -104,7 +108,7 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
   fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n")
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
-  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork)
+  let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
     Ok(_) => fail "accepted a failed guest"
     Err(_) => {}

@@ -64,7 +64,9 @@ trap 'exit 143' TERM
 
 : > "$console_log"
 : > "$firecracker_log"
-"$firecracker_bin" --no-api --config-file "$firecracker_config" \
+api_arguments=(--no-api)
+[[ -z "${LAPUTA_VMM_CONTROL:-}" ]] || api_arguments=(--api-sock "$LAPUTA_VMM_CONTROL")
+"$firecracker_bin" "${api_arguments[@]}" --config-file "$firecracker_config" \
     </dev/null >"$console_log" 2>"$firecracker_log" &
 firecracker_pid=$!
 

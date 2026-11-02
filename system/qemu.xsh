@@ -29,8 +29,11 @@ export type QemuConfig = {qemu: Path, target: QemuTarget}
 ## which existing host TAP device it uses.
 export enum QemuReferenceNetwork { NoNetwork, Tap(Str) }
 
+## Whether the host can pause the disposable qualification guest through a QMP socket.
+export enum QemuReferenceControl { NoControl, QmpSocket(Path) }
+
 ## Inputs for a disposable initramfs and raw ext2 guest.
-export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int, network: QemuReferenceNetwork}
+export type QemuAsterinasReference = {kernel: Path, initramfs: Path, disk: Path, memory_mib: Int, network: QemuReferenceNetwork, control: QemuReferenceControl}
 
 ## Construct the headless qualification guest without host networking.
 export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterinasReference) -> Result[List[Str], Error] {
@@ -49,6 +52,14 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
       Ok(["-netdev", f"tap,id=net0,ifname={interface},script=no,downscript=no", "-device", "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01"])
     },
   }?
+  let control = match input.control {
+    NoControl => Ok([]),
+    QmpSocket(socket) => if "," in socket.display() {
+      Err(types.LaputaError.Profile("qualification control socket path cannot contain a comma"))
+    } else {
+      Ok(["-qmp", f"unix:{socket},server=on,wait=off"])
+    },
+  }?
   [
     value.qemu.display(), "-machine", target.machine, "-cpu", target.cpu,
     "-smp", "2", "-m", f"{input.memory_mib}", "-nographic", "-no-reboot",
@@ -56,7 +67,7 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
     "-initrd", input.initramfs.display(), "-append", "console=ttyS0 rdinit=/init",
     "-drive", f"if=none,id=root,format=raw,file={input.disk}",
     "-device", f"{target.block_device},drive=root",
-  ].extend(network)
+  ].extend(network).extend(control)
 }
 
 enum QmpOperation { QmpReady, QmpInput, QmpInputModified, QmpScreenshot(Path) }

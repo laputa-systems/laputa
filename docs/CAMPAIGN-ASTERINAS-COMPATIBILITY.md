@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture, A4 is accepted and A5 runs the packaged DHCP client (open obligations below).
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and for pause and resume against an outside peer, A4 is accepted and A5 runs the packaged DHCP client (open obligations below).
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -134,11 +134,48 @@
   witness passes on both kernels. The earlier Linux `behind` flake was not source
   latency: 10 s is the daemon's own step threshold, so a start exactly 10 s off
   steps or slews at 500 ppm depending on sub-millisecond noise. The fixture now
-  starts 10.1 s off; the acceptance bounds are unchanged. Open A3 obligations: the
-  pause and resume case needs the Firecracker API and a peer outside the guest,
-  which needs the A4 virtual network; transmit timestamps without `OPT_TSONLY`
-  and hardware timestamping are unsupported; and the Firecracker guest has no
-  RTC, so its clock starts at 1970-01-01 (the case sets a fixture epoch then).
+  starts 10.1 s off; the acceptance bounds are unchanged. Open A3 obligations:
+  transmit timestamps without `OPT_TSONLY` and hardware timestamping are
+  unsupported; and the Firecracker guest has no RTC, so its clock starts at
+  1970-01-01 (the case sets a fixture epoch then, except in `pause` and `jump`,
+  which align the clock with the peer first).
+- A3 pause and resume, accepted: `LAPUTA_GUEST_NETWORK=tap bash
+  infra/asterinas/run-guest-case.sh asterinas|linux guest/asterinas/clock pause|jump DIR`.
+  The NTP peer is a C server on the container end of the TAP (`192.0.2.1:123`, the
+  container's wall clock, which the case never changes); the packaged ntpd-rs runs
+  under `xinit supervise` as UID/GID 123 with only CAP_SYS_TIME and polls it. A
+  case that ships `vmm-control.sh` gets a VMM control socket: the Firecracker API
+  socket (`--api-sock`, `PATCH /vm` `Paused` and `Resumed`) on Asterinas and a QMP
+  socket (`stop`, `cont`, through `system.qemu`) on the Linux reference. The guest
+  asks the peer for a pause over UDP and the peer, which keeps serving time,
+  pauses the VMM for 5 s and answers after the resume, so the trigger needs no
+  console polling. An independent SNTP probe in the guest measures the offset to the
+  peer and the guest's `CLOCK_REALTIME`, `CLOCK_MONOTONIC` and `CLOCK_BOOTTIME` across
+  the pause, separately from the daemon. Asterinas on Firecracker: all three guest
+  clocks advance by the pause (5.03 to 5.06 s against 5.03 to 5.06 s held), the
+  offset to the peer after resume is 0.2 ms, the daemon never restarts or leaves
+  the ready state, and five consecutive samples are within 100 ms at once (the
+  gate is five samples within 120 s). Deliberate difference: on the Linux
+  reference QEMU's `stop` and `cont` freeze the guest clocks, so the guest loses
+  the pause (about 1 s of the 6.9 s the peer held it passes) and its wall clock
+  lags the peer by 5.9 s. That is below the daemon's step threshold, so ntpd-rs slews
+  at about 500 ppm and cannot meet the 120 s recovery bound (the Linux reference
+  fails the bound as written); the case therefore branches on the measured loss
+  and, for a VMM that hides the pause, requires the guest clocks to agree with each
+  other, the offset to equal the loss within 0.5 s, the daemon to remain
+  uninterrupted and the offset to shrink. The Asterinas gate is the strict
+  branch. The wall step that the campaign's pause criterion presumes therefore
+  never reaches the Asterinas guest through a Firecracker pause; it is reached by the
+  `jump` mode instead. `jump` steps the running guest's clock back 5 s: on both
+  kernels the daemon rejects the external jump and exits, `xinit` restarts it
+  (identity and capabilities rechecked, restart count raised), the restarted daemon
+  selects the peer and steers toward it (5.001 s to 4.995 s in 10 s); 5 s is below
+  the step threshold so no recovery bound applies. Rejection of a jump above the
+  single-step panic threshold (1000 s) is not exercised. Contract changes: the
+  Linux reference guest may expose a QMP control socket
+  (`QemuReferenceControl`, `run-linux.xsh --qmp`), and `run-test-vm.sh` starts
+  Firecracker with an API socket when `LAPUTA_VMM_CONTROL` is set. No kernel change
+  was needed.
 - A4 IPv4 state operations, in progress. Method: the Linux reference guest and the
   Asterinas guest each get a virtio-net `eth0` wired to an owned TAP in a disposable
   container namespace (`LAPUTA_GUEST_NETWORK=tap`), and
@@ -234,8 +271,8 @@
   kernel lacked both: `AF_PACKET` is only a constant (`socket(2)` fails with
   `EAFNOSUPPORT`); route netlink notifications now exist (see A4). `AF_PACKET` is therefore the
   first A5 slice, ahead of the lease, renewal and carrier cases, and the A3
-  pause and resume case still waits for an outside peer program in the container
-  namespace. The same client's UDP socket also sets `SO_BINDTODEVICE`, which the
+  pause and resume case needed an outside peer program in the container
+  namespace (now delivered, see A3). The same client's UDP socket also sets `SO_BINDTODEVICE`, which the
   kernel does not have (`setsockopt` fails with `ENOPROTOOPT`); it belongs to the
   A5 lease slice. `AF_PACKET` is delivered in four slices. Create and bind: a
   packet socket needs `CAP_NET_RAW` (`EPERM`), takes `SOCK_RAW` or `SOCK_DGRAM`
