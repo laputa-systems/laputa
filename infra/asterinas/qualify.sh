@@ -2,8 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/run-cancellable.sh"
+export ASTERINAS_EXTRA_PACKAGES="${ASTERINAS_EXTRA_PACKAGES-ntpd-rs}"
 cohort="${1:-}"
-[[ "$cohort" == baseline || "$cohort" == network-state || "$cohort" == network ]] || { printf 'qualification: unsupported cohort\n' >&2; exit 2; }
+case "$cohort" in baseline|device|clock-abi|clock|network-state|network|recovery|all) ;; *) printf 'qualification: unsupported cohort\n' >&2; exit 2 ;; esac
 shift
 backend=""
 case_name=""
@@ -15,9 +17,47 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 case "$backend" in linux|asterinas|both) ;; *) printf 'qualification: select --backend linux, asterinas, or both\n' >&2; exit 2 ;; esac
-if [[ "$cohort" == network-state || "$cohort" == network ]]; then
-    exec bash "$repo_root/infra/asterinas/qualify-network-cohort.sh" "$cohort" "$backend" "$case_name"
-fi
+self="$repo_root/infra/asterinas/qualify.sh"
+cohort_runner="$repo_root/infra/asterinas/qualify-cohort.sh"
+
+case "$cohort" in
+    device)
+        case "$case_name" in
+            '') run_cancellable "" bash "$self" baseline --backend "$backend" --case boot
+                run_cancellable "" bash "$cohort_runner" device "$backend" '' ;;
+            boot) run_cancellable "" bash "$self" baseline --backend "$backend" --case boot ;;
+            *) run_cancellable "" bash "$cohort_runner" device "$backend" "$case_name" ;;
+        esac
+        exit 0
+        ;;
+    clock-abi|clock|network-state|network)
+        run_cancellable "" bash "$cohort_runner" "$cohort" "$backend" "$case_name"
+        exit $?
+        ;;
+    recovery|all)
+        [[ -z "$case_name" ]] || { printf 'qualification: %s takes no --case\n' "$cohort" >&2; exit 2; }
+        repeats="${LAPUTA_RECOVERY_REPEATS:-10}"
+        [[ "$repeats" =~ ^[1-9][0-9]*$ ]] || { printf 'qualification: invalid LAPUTA_RECOVERY_REPEATS: %s\n' "$repeats" >&2; exit 2; }
+        failures=()
+        if [[ "$cohort" == all ]]; then
+            for step in baseline device clock-abi clock network-state network; do
+                run_cancellable "" bash "$self" "$step" --backend "$backend" || failures+=("$step")
+            done
+        fi
+        for ((round = 1; round <= repeats; round++)); do
+            printf 'qualification: recovery round %s of %s\n' "$round" "$repeats"
+            run_cancellable "" bash "$self" baseline --backend "$backend" --case boot || failures+=("recovery-$round-boot")
+            run_cancellable "" bash "$cohort_runner" network "$backend" restart || failures+=("recovery-$round-restart")
+            run_cancellable "" bash "$cohort_runner" network "$backend" carrier || failures+=("recovery-$round-carrier")
+        done
+        if (( ${#failures[@]} )); then
+            printf 'qualification: %s failed: %s\n' "$cohort" "${failures[*]}" >&2
+            exit 1
+        fi
+        printf 'qualification: %s passed for %s\n' "$cohort" "$backend"
+        exit 0
+        ;;
+esac
 case "$case_name" in '') cases=(boot numeric) ;; boot|numeric) cases=("$case_name") ;; *) printf 'qualification: unknown baseline case: %s\n' "$case_name" >&2; exit 2 ;; esac
 
 output="$repo_root/.out/asterinas-firecracker"
@@ -27,16 +67,16 @@ work="$(mktemp -d "$repo_root/.work/tmp/asterinas-qualification.XXXXXXXX")"
 trap 'rm -rf -- "$work"' EXIT
 linux_package="${LAPUTA_LINUX_KERNEL_PACKAGE:-$output/linux-package.tar.gz}"
 if [[ "$backend" != asterinas ]]; then
-    bash "$repo_root/infra/asterinas/linux-reference.sh" "$linux_package" "$work"
+    run_cancellable "" bash "$repo_root/infra/asterinas/linux-reference.sh" "$linux_package" "$work"
 fi
 
 for case_name in "${cases[@]}"; do
     selection=""
     [[ "$case_name" != numeric ]] || selection=tests/xsh/stdlib/numeric.xsh
     if [[ "$backend" == linux ]]; then
-        XSH_TEST="$selection" make -C "$repo_root" asterinas-build
+        XSH_TEST="$selection" run_cancellable "" make -C "$repo_root" asterinas-build
     else
-        XSH_TEST="$selection" make -C "$repo_root" asterinas-test
+        XSH_TEST="$selection" run_cancellable "" make -C "$repo_root" asterinas-test
         cp "$output/test-console.log" "$output/qualification-asterinas-$case_name.log"
         if [[ -n "$selection" ]]; then
             rg -q '^running [1-9][0-9]* tests\r?$' "$output/test-console.log" || { printf 'qualification: empty XSH selection\n' >&2; exit 1; }
@@ -56,7 +96,7 @@ for case_name in "${cases[@]}"; do
         fi
         timeout_seconds=60
         [[ -z "$selection" ]] || timeout_seconds=300
-        XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
+        XSH_MODULE_PATH="$repo_root" run_cancellable "" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/run-linux.xsh" -- \
             "$work/linux-kernel" "$work/linux-initramfs.cpio.gz" "$work/linux-root.ext2" \
             "$output/qualification-linux-$case_name.log" "$output/qualification-linux-$case_name-qemu.log" \
             "$selection" "$timeout_seconds" "$([[ -z "$selection" ]] && echo 1024 || echo 4096)"

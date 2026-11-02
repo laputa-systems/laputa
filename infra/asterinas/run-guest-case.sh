@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/run-cancellable.sh"
 [[ $# == 4 ]] || {
     printf 'usage: run-guest-case.sh asterinas|linux CASE_DIR MODE RESULT_DIR\n' >&2
     exit 2
@@ -58,6 +59,7 @@ done
 
 console="$result_dir/console.log"
 status=0
+container_name=""
 timeout_seconds="${LAPUTA_CASE_TIMEOUT:-600}"
 if [[ "$backend" == asterinas ]]; then
     vm_command=(bash "$repo_root/infra/asterinas/run-test-vm.sh" "$output/bin/firecracker" "$firecracker_config"
@@ -84,7 +86,8 @@ if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
         peer_environment=(--env "LAPUTA_PEER_DIR=$staged" --env "LAPUTA_PEER_MODE=$mode"
             --env "LAPUTA_PEER_XSH=$repo_root/.out/host/x86_64/xsh" --env "LAPUTA_PEER_CORE=$snapshot/core")
     fi
-    vm_command=(docker run --rm --init --pull never --platform linux/amd64 --network none
+    container_name="laputa-asterinas-case-$$"
+    vm_command=(docker run --name "$container_name" --rm --init --pull never --platform linux/amd64 --network none
         --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
         --mount "type=bind,src=$repo_root,dst=$repo_root"
         --env "XSH_MODULE_PATH=$repo_root" --env QEMU_SYSTEM_X86_64=/usr/local/qemu/bin/qemu-system-x86_64
@@ -100,11 +103,12 @@ exec "$@"'
 else
     [[ "$backend" == asterinas ]] || vm_command=(env "XSH_MODULE_PATH=$repo_root" "${vm_command[@]}")
 fi
-"${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
+run_cancellable "$container_name" "${vm_command[@]}" > "$result_dir/command.log" 2>&1 || status=$?
 sed 's/\x1b\[[0-9;]*m//g' "$console" | tr -d '\r' | rg 'CASE_|NTP_|FREQUENCY_|NET_|panic' | head -40 || true
-if (( status == 0 )) && rg -q 'LAPUTA_ASTERINAS_CASE_OK' "$console"; then
+if (( status == 0 )) && rg -q 'LAPUTA_ASTERINAS_CASE_OK' "$console" \
+    && XSH_MODULE_PATH="$repo_root" "$repo_root/.out/host/x86_64/xsh" "$repo_root/infra/asterinas/check-guest-output.xsh" -- "$console" > "$result_dir/check.log" 2>&1; then
     printf 'run-guest-case: %s %s passed on %s\n' "$(basename "$case_dir")" "$mode" "$backend"
 else
-    printf 'run-guest-case: %s %s failed on %s; see %s\n' "$(basename "$case_dir")" "$mode" "$backend" "$result_dir/command.log" >&2
+    printf 'run-guest-case: %s %s failed on %s; see %s and %s\n' "$(basename "$case_dir")" "$mode" "$backend" "$result_dir/command.log" "$result_dir/check.log" >&2
     exit 1
 fi

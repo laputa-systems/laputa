@@ -110,6 +110,26 @@ TAP-backed `eth0`. The container end of the TAP runs the XSH pin's scripted DHCP
 (and, for `tcp`, a C payload server) from the case's `peer.sh`; the guest runs the packaged `dhcpc`.
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
+The remaining cohorts run the same way. `device` runs the baseline boot proof, whose
+guest coldplugs three times and after a daemon restart, and the `device/block_uevent`
+witness. `clock-abi` runs the `time/clock_adjust` witness. `clock` runs the
+`network/udp_ancillary` witness and the `guest/asterinas/clock` case in the modes
+`behind`, `ahead`, `frequency`, `pause` and `jump` (the last two on a TAP-backed network
+with an outside peer). `recovery` repeats the boot proof and the DHCP `restart` and
+`carrier` modes `LAPUTA_RECOVERY_REPEATS` times (10 by default). `all` runs `baseline`,
+`device`, `clock-abi`, `clock`, `network-state`, `network` and `recovery` serially and
+exits nonzero if any cohort failed. The wrapper exports `ASTERINAS_EXTRA_PACKAGES=ntpd-rs`
+unless the caller sets it, because the clock cases need the daemon in the generation and a
+bundle built without it would replace the current one. A cohort names each case it passes
+and fails when it ran none.
+
+`run-guest-case.sh` and `run-witness.sh` accept a run only when the case or witness marker
+is present, the exit status is zero and the complete guest marker set is present, on both
+backends. A guest that prints the success markers and then hangs is rejected. SIGTERM or
+SIGINT to any runner or to `qualify.sh` stops the owned guests, removes the owned container
+(named `laputa-asterinas-case-PID`, with its TAP and peer processes) and removes the
+cohort's results.
+
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
 (or `linux`) on a list of test modules, then
@@ -134,7 +154,7 @@ disposable initramfs that initializes loopback. `--backend linux` or
 `--backend asterinas` selects one guest. `--case boot` or `--case numeric`
 selects one case. The default Linux package path is
 `.out/asterinas-firecracker/linux-package.tar.gz`. The pilot does not account
-for the full native suite or qualify device, clock, or network compatibility.
+for the full native suite; the other cohorts above qualify device, clock, and network compatibility.
 
 Laputa keeps its Asterinas compatibility work in the `asterinas/` submodule,
 which points at the pinned fork in `infra/asterinas/inputs.lock`. Missing
