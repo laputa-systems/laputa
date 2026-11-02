@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cohort="${1:-}"
-[[ "$cohort" == baseline || "$cohort" == network-state ]] || { printf 'qualification: unsupported cohort\n' >&2; exit 2; }
+[[ "$cohort" == baseline || "$cohort" == network-state || "$cohort" == network ]] || { printf 'qualification: unsupported cohort\n' >&2; exit 2; }
 shift
 backend=""
 case_name=""
@@ -15,8 +15,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 case "$backend" in linux|asterinas|both) ;; *) printf 'qualification: select --backend linux, asterinas, or both\n' >&2; exit 2 ;; esac
-if [[ "$cohort" == network-state ]]; then
-    exec bash "$repo_root/infra/asterinas/qualify-network-state.sh" "$backend" "$case_name"
+if [[ "$cohort" == network-state || "$cohort" == network ]]; then
+    exec bash "$repo_root/infra/asterinas/qualify-network-cohort.sh" "$cohort" "$backend" "$case_name"
 fi
 case "$case_name" in '') cases=(boot numeric) ;; boot|numeric) cases=("$case_name") ;; *) printf 'qualification: unknown baseline case: %s\n' "$case_name" >&2; exit 2 ;; esac
 

@@ -69,12 +69,28 @@ else
 fi
 if [[ "${LAPUTA_GUEST_NETWORK:-}" == tap ]]; then
     [[ "$backend" == asterinas ]] || vm_command+=(--tap tap0)
+    peer_command=:
+    peer_environment=()
+    if [[ -x "$case_dir/peer.sh" ]]; then
+        snapshot_name="$(jaq -r '.xsh.commit + "-" + .xsh.build_inputs_sha256' "$bundle/manifest.json")"
+        snapshot="$output/xsh-snapshots/$snapshot_name"
+        [[ -d "$snapshot/core" ]] || { printf 'run-guest-case: no XSH snapshot %s\n' "$snapshot" >&2; exit 1; }
+        peer_command='bash "$LAPUTA_PEER_DIR/peer.sh" "$LAPUTA_PEER_MODE" "$LAPUTA_PEER_DIR" > "$LAPUTA_PEER_DIR/peer.log" 2>&1 &'
+        peer_environment=(--env "LAPUTA_PEER_DIR=$staged" --env "LAPUTA_PEER_MODE=$mode"
+            --env "LAPUTA_PEER_XSH=$repo_root/.out/host/x86_64/xsh" --env "LAPUTA_PEER_CORE=$snapshot/core")
+    fi
     vm_command=(docker run --rm --init --pull never --platform linux/amd64 --network none
         --cap-add NET_ADMIN --device /dev/net/tun --device /dev/kvm
         --mount "type=bind,src=$repo_root,dst=$repo_root"
         --env "XSH_MODULE_PATH=$repo_root" --env QEMU_SYSTEM_X86_64=/usr/local/qemu/bin/qemu-system-x86_64
+        "${peer_environment[@]}"
         --workdir "$repo_root" --entrypoint /bin/bash "$dev_image" -c
-        'ip tuntap add dev tap0 mode tap && ip addr add 192.0.2.1/24 dev tap0 && ip link set tap0 up && exec "$@"'
+        "set -e
+ip tuntap add dev tap0 mode tap
+ip addr add 192.0.2.1/24 dev tap0
+ip link set tap0 up
+$peer_command"'
+exec "$@"'
         _ "${vm_command[@]}")
 else
     [[ "$backend" == asterinas ]] || vm_command=(env "XSH_MODULE_PATH=$repo_root" "${vm_command[@]}")

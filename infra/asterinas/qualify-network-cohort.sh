@@ -2,24 +2,36 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-[[ $# == 2 ]] || { printf 'usage: qualify-network-state.sh linux|asterinas|both CASE\n' >&2; exit 2; }
-backend="$1"
-selected="$2"
+[[ $# == 3 ]] || { printf 'usage: qualify-network-cohort.sh network-state|network linux|asterinas|both CASE\n' >&2; exit 2; }
+cohort="$1"
+backend="$2"
+selected="$3"
 
-regression="$repo_root/asterinas/test/initramfs/src/regression/network"
-witnesses=(rtnl_route_dump link_state addr_config route_config rtnl_ack rtnl_notify packet_bind packet_receive packet_send packet_options)
-modes=(loopback link address route events packet)
+regression="$repo_root/asterinas/test/initramfs/src/regression"
+case "$cohort" in
+    network-state)
+        witnesses=(network/rtnl_route_dump network/link_state network/addr_config network/route_config network/rtnl_ack network/rtnl_notify network/packet_bind network/packet_receive network/packet_send network/packet_options)
+        case_dir=network-state
+        modes=(loopback link address route events packet)
+        ;;
+    network)
+        witnesses=(fs/procfs/proc_boot_id network/udp_device)
+        case_dir=dhcp
+        modes=(lease-acquire lifecycle renewal nak restart carrier tcp)
+        ;;
+    *) printf 'qualification: unknown network cohort: %s\n' "$cohort" >&2; exit 2 ;;
+esac
 
 if [[ -n "$selected" ]]; then
     known=0
-    for name in "${witnesses[@]}" "${modes[@]}"; do [[ "$name" != "$selected" ]] || known=1; done
+    for name in "${witnesses[@]##*/}" "${modes[@]}"; do [[ "$name" != "$selected" ]] || known=1; done
     (( known )) || { printf 'qualification: unknown network-state case: %s\n' "$selected" >&2; exit 2; }
 fi
 case "$backend" in linux) backends=(linux) ;; asterinas) backends=(asterinas) ;; both) backends=(linux asterinas) ;; *) exit 2 ;; esac
 
 mkdir -p "$repo_root/.work/tmp"
 export TMPDIR="$repo_root/.work/tmp"
-work="$(mktemp -d "$TMPDIR/network-state.XXXXXXXX")"
+work="$(mktemp -d "$TMPDIR/$cohort.XXXXXXXX")"
 failed=0
 
 run_backends() {
@@ -42,15 +54,16 @@ run_backends() {
 }
 
 witness() { bash "$repo_root/infra/asterinas/run-witness.sh" "$2" "$regression/$1.c" "$3"; }
-guest_mode() { LAPUTA_GUEST_NETWORK=tap bash "$repo_root/infra/asterinas/run-guest-case.sh" "$2" "$repo_root/guest/asterinas/network-state" "$1" "$3"; }
+guest_mode() { LAPUTA_GUEST_NETWORK=tap bash "$repo_root/infra/asterinas/run-guest-case.sh" "$2" "$repo_root/guest/asterinas/$case_dir" "$1" "$3"; }
 
 transcript() {
     sed 's/\x1b\[[0-9;]*m//g' "$1/console.log" | tr -d '\r' | rg '^NET_' | rg -v '^NET_[A-Za-z0-9_]*_(ADDR|ROUTE|RULE) (\S+ )?inet6 ' || true
 }
 
-for name in "${witnesses[@]}"; do
+for path in "${witnesses[@]}"; do
+    name="${path##*/}"
     [[ -z "$selected" || "$selected" == "$name" ]] || continue
-    run_backends "witness-$name" witness "$name"
+    run_backends "witness-$name" witness "$path"
 done
 
 for mode in "${modes[@]}"; do
@@ -68,8 +81,8 @@ for mode in "${modes[@]}"; do
 done
 
 if (( failed )); then
-    printf 'qualification: network-state failed; results kept in %s\n' "$work" >&2
+    printf 'qualification: %s failed; results kept in %s\n' "$cohort" "$work" >&2
     exit 1
 fi
 rm -rf -- "$work"
-printf 'qualification: network-state passed for %s\n' "$backend"
+printf 'qualification: %s passed for %s\n' "$cohort" "$backend"

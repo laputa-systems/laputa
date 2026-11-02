@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is accepted.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture, A4 is accepted and A5 runs the packaged DHCP client (open obligations below).
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -303,8 +303,50 @@
   counts buffer memory. `network/packet_options` and the additions to
   `network/packet_send` (ignore-outgoing, a flooded queue with its statistics)
   pass on both kernels. Contract change: the `SOL_PACKET` option level exists.
-  AF_PACKET is complete for the DHCP client's use; `SO_BINDTODEVICE` for its UDP
-  socket and the carrier attribute remain with the lease slice.
+  AF_PACKET is complete for the DHCP client's use.
+- A5 DHCP cohort, delivered for the packaged `dhcpc` against a scripted server.
+  `bash infra/asterinas/qualify.sh network --backend both [--case NAME]` runs two
+  kernel witnesses (`fs/procfs/proc_boot_id`, `network/udp_device`) and seven modes of
+  `guest/asterinas/dhcp` on both kernels, comparing the `NET_` transcripts. The peer is
+  the XSH pin's scripted DHCP server (`core/tests/support/dhcp_server.xsh`) on the
+  container end of the TAP, which `run-guest-case.sh` starts when the case has a
+  `peer.sh`; the `tcp` mode adds a C server for a deterministic 1 MiB payload. The
+  client runs unmodified in the guest and the case watches it with a capture socket:
+  `lease-acquire` (discover, request, address, default route and resolver, with a
+  foreign address on `lo` and a foreign resolver line surviving), `lifecycle` (20 s
+  lease; the renewal is unicast, the rebinding broadcast, and expiry withdraws the owned
+  address, route and resolver line), `renewal` (acknowledged renewals), `nak` (a NAK to
+  a renewal restarts acquisition and a new lease binds), `restart` (SIGKILL, then a
+  restart reuses the remembered lease with one request, one address, one route),
+  `carrier` (three link-down and link-up cycles: `no_link`, owned routes withdrawn,
+  bound again with one owner) and `tcp` (1 MiB verified before, across a link cycle
+  and after; on both kernels the connection survives, and the case would accept an
+  explicit failure followed by a new connection). Running the client found five
+  kernel gaps, each fixed with a witness that passes on Linux and on this kernel:
+  `/proc/sys/kernel/random/boot_id` was missing; `SO_BINDTODEVICE` failed with
+  `ENOPROTOOPT`; a UDP socket could not bind the unspecified address or receive on it
+  (bigtcp matched the destination address exactly, and smoltcp asserted on a wildcard
+  endpoint); a packet-socket send ignored the `ENETDOWN` that a link cycle leaves,
+  where Linux fails the next send with it, so the client never read again after
+  the first cycle (poll kept reporting the error); and netlink `recv` ignored
+  `MSG_DONTWAIT`. Link messages now carry `IFLA_CARRIER`. Contract changes:
+  `SO_BINDTODEVICE` exists for UDP sockets; a UDP socket with a device may bind the
+  unspecified address and receives for any address of that interface; the boot
+  identity file exists; link dumps and notifications carry `IFLA_CARRIER`; netlink
+  receive honours `MSG_DONTWAIT`; a packet send reports and clears the pending
+  error. Deliberate differences: binding the unspecified address without a device
+  still fails `EADDRNOTAVAIL` (Linux binds every interface) and a bound socket
+  cannot change its device (`EOPNOTSUPP`); the first UDP datagram to a neighbor
+  that is not resolved yet is dropped while ARP runs (Linux queues it), so the
+  modes with unicast renewals resolve the server neighbor first or the T1 renewal
+  is lost and the T2 rebinding recovers; every interface has carrier, because
+  Firecracker's virtio-net has no link status, so the case drives carrier loss and
+  return with administrative link down and up (QEMU's `set_link` would move the
+  Linux side only), which on both kernels clears `IFF_LOWER_UP` and
+  `IFLA_OPERSTATE` while `IFLA_CARRIER` stays 1. Open A5 obligations: a lease whose
+  DNS servers or routes change at renewal, the syslog consumer, a foreign route (route
+  types other than unicast are `EOPNOTSUPP`), `IFLA_CARRIER_CHANGES` and the
+  carrier counters, and the unresolved-neighbor queue.
 - Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
   IPv4 state operations (route and rule dumps, link up and down, addresses,
   routes, acknowledgements and errors) proven by five kernel witnesses and four
