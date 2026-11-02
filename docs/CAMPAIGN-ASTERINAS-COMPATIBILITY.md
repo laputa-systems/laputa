@@ -6,7 +6,7 @@
   device coldplug, clock discipline, and IPv4 network compatibility.
 - State: A0 accepted as a baseline. The guest `NoMemory` slice is delivered and
   A1 (device coldplug) delivers its consumer path, but D2 stays open (see the
-  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is in progress.
+  obligations below). A2 clock ABI exists with open obligations (below); A3 is accepted for the loopback fixture and A4 is accepted except notifications.
 - Verdict: the paired boot and numeric cases pass on both backends. Native
   accounting closes on the two-hour fan-out budget with every remaining case
   retained as unexecuted; the campaign does not promise full native-suite
@@ -210,6 +210,22 @@
   `route`, not by the maintained DHCP path), address expiry, and route lookup
   (`RTM_GETROUTE` without `NLM_F_DUMP`, which fails with `EOPNOTSUPP` where Linux
   answers).
+- A5 prerequisites, found by reading the packaged DHCP client (`core/lib/dhcp_live.xsh`
+  at the XSH pin): it sends and receives DHCP and ARP frames through `AF_PACKET`
+  sockets bound to the interface and listens on a route-netlink socket joined to the
+  link, address and route groups, treating `ENOBUFS` as a lost notification. The
+  kernel has neither: `AF_PACKET` is only a constant (`socket(2)` fails with
+  `EAFNOSUPPORT`) and route netlink sends no notifications. Both are therefore the
+  first A5 slices, ahead of the lease, renewal and carrier cases, and the A3
+  pause and resume case still waits for an outside peer program in the container
+  namespace.
+- Steering checkpoint after A4 slices 1 to 5: landed behavior is Linux-identical
+  IPv4 state operations (route and rule dumps, link up and down, addresses,
+  routes, acknowledgements and errors) proven by five kernel witnesses and four
+  transcripts on both kernels, with the A3 clock case and the paired boot and
+  numeric cases intact after every slice. The limiting factor is no longer
+  state but delivery: notifications and `AF_PACKET`. Continue serialized with
+  notifications, then `AF_PACKET`, then the DHCP cohort.
 - Red boundary: the pinned kernel is 10 local commits beyond the advertised
   fork branch. GitHub cannot resolve its SHA. Distributed reproduction is blocked.
 - Tooling: `infra/asterinas/native-batches.sh asterinas|linux MODULES BATCH BUDGET DIR`
