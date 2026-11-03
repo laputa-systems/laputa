@@ -39,6 +39,10 @@ same bytes reports `present`; one that holds different bytes is refused.
 
 ## Failures and unknown outcomes
 
+A returned `ssh.exec` result contains exit status, signal, missing-completion
+status and captured output. It carries no certainty field: the request was
+submitted. `remote.ExecResult` uses the same fields.
+
 `ssh.exec` reports an `SshError` whose `certainty` says whether the request may
 have reached the machine. After any failure the session is unusable. The library
 never retries and never reconnects. After a `submitted` failure, open a fresh

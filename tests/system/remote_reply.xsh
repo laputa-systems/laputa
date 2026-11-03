@@ -11,7 +11,6 @@ proc run_result(exit_code: Int, stdout: Str, stderr: Str) -> remote.ExecResult {
     missing: false,
     stdout: bytes.from_text(stdout),
     stderr: bytes.from_text(stderr),
-    certainty: "submitted",
   }
 }
 
