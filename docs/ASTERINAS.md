@@ -187,6 +187,8 @@ interrupted if it dies alone. Modules left when the budget ends are written to
 `unstarted.txt`; the accounting counts their cases and those of interrupted
 modules as unexecuted. The accounting exits nonzero when it finds no results, a
 result for an undiscovered case, or a baseline case that no longer passes.
+To compare against the original A0 pass set, use
+`bash infra/asterinas/account-native.sh DISCOVERED_IDS.json DIR --baseline infra/asterinas/a0-baseline.json`.
 
 Native cases carry fixed timeouts that the guest must meet on a shared host. The
 `test-bb-awk` cases need about 1.9 s on Asterinas and 1.5 s on the Linux reference
