@@ -18,7 +18,7 @@ compare_transcripts=0
 transcript_prefix='NET_'
 case "$cohort" in
     device)
-        witnesses=(device/block_uevent)
+        witnesses=(device/block_uevent fs/sync/writeback)
         case_dir=device
         modes=(sysfs add nodes missing)
         failing_modes=(missing)

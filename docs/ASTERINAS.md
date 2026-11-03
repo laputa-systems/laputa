@@ -119,7 +119,7 @@ TAP-backed `eth0`. The container end of the TAP runs the XSH pin's scripted DHCP
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
 The remaining cohorts run the same way. `device` runs the baseline boot proof, whose
-guest coldplugs three times and after a daemon restart, the `device/block_uevent` witness and
+guest coldplugs three times and after a daemon restart, the `device/block_uevent` and `fs/sync/writeback` witnesses and
 the modes of `guest/asterinas/device`: `sysfs`, `add` and `nodes` compare the device paths,
 uevent data, synthetic add events and coldplugged node ownership of two disks, their partitions
 and the memory devices with the Linux reference (the case ships `data-disk.sh`, which makes the
