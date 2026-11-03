@@ -58,11 +58,8 @@ python3 tests/integration/remote_admin.py --xsh PATH/TO/xsh --dropbearkey PATH/T
   [--bundle target/laputa/qemu-maintained/current]
 ```
 
-The xsh must be one that has the XSH-55 `ssh` module (`ssh.info`, `SshError`, `known_hosts`) and
-the opaque `SshSession` handle; an older host xsh cannot check `system/remote.xsh`. `RemoteSession`
-is that handle: it cannot be built from a record or shown, so a caller keeps the value
-`remote_connect` returns. Text from the guest (a failed program's stderr, a refusal's kind and
-message) reaches errors with its control and escape characters removed.
+The xsh must be one that has the XSH-55 `ssh` module (`ssh.info`, `SshError`, `known_hosts`); an
+older host xsh cannot check `system/remote.xsh`.
 
 The drill pins the host key provisioned for `identity restore`, refuses a wrong
 one before authentication, inspects the generation and services, runs an explicit

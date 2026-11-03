@@ -5,8 +5,8 @@
 ## The remote program refused a request or could not complete it.
 export error RemoteError = Refused(kind: Str, message: Str) | Malformed(message: Str) | Failed(exit_code: Int, message: Str)
 
-## The opaque SSH session handle returned by `ssh.connect`.
-export type RemoteSession = SshSession
+## The SSH session capability returned by `ssh.connect`.
+export type RemoteSession = {token: Str}
 
 ## How to reach one machine. `host_key` is the fingerprint provisioned out of band.
 export type RemoteTarget = {
@@ -33,8 +33,7 @@ export proc remote_connect(target: RemoteTarget) [net, error] -> Result[RemoteSe
   ssh.connect(target)?
 }
 
-## What `ssh.exec` reports for one remote program run.
-export type ExecResult = {
+type ExecResult = {
   exit_code: Int,
   signal: Str,
   missing: Bool,
@@ -43,20 +42,12 @@ export type ExecResult = {
   certainty: Str,
 }
 
-const CONTROL_CHARACTERS = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{b}\u{c}\u{d}\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f}\u{7f}"
-
-# Guest-supplied text with its control and escape characters removed, so it is safe to show.
-pure plain(text: Str) -> Str {
-  text.delete(CONTROL_CHARACTERS)
-}
-
-## Decodes one remote program run into its reply record or a typed refusal.
-export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Error] {
+proc decode_reply(result: ExecResult) [error] -> Result[Record, Error] {
   guard ! result.missing else {
     return Err(RemoteError.Malformed(message: "the remote program ended without a completion status"))
   }
   guard result.exit_code == 0 else {
-    return Err(RemoteError.Failed(exit_code: result.exit_code, message: plain(result.stderr.utf8()?.trim())))
+    return Err(RemoteError.Failed(exit_code: result.exit_code, message: result.stderr.utf8()?.trim()))
   }
   let text = result.stdout.utf8()?.trim()
   guard ! text.is_empty() and "\n" not in text else {
@@ -70,7 +61,7 @@ export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Er
     return json.get(reply, ["result"], {}).require(Record)?
   }
   let failure = json.get(reply, ["error"], {}).require(Record)?
-  Err(RemoteError.Refused(kind: plain(json.get(failure, ["kind"], "").require(Str)?), message: plain(json.get(failure, ["message"], "").require(Str)?)))
+  Err(RemoteError.Refused(kind: json.get(failure, ["kind"], "").require(Str)?, message: json.get(failure, ["message"], "").require(Str)?))
 }
 
 proc call(session: RemoteSession, program: Str, request: Any, payload: Path?, timeout_ms: Int) [fs, net, error] -> Result[Record, Error] {
@@ -80,7 +71,7 @@ proc call(session: RemoteSession, program: Str, request: Any, payload: Path?, ti
   } else {
     ssh.exec(session, program, {stdin: line, stdin_path: payload, timeout_ms: timeout_ms})?
   }
-  remote_decode_reply(result)?
+  decode_reply(result)?
 }
 
 ## One xinit service as the guest supervisor reports it.
