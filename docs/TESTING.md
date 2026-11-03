@@ -309,3 +309,30 @@ opt-in test without adding it to the default native suite. Supply a root contain
 The check composes two generations, queries original and overlaid manual pages,
 compares index bytes, detects alteration or deletion, and preserves the prior
 generation when index creation fails. It does not use host `makewhatis`.
+
+## Run bounded PM and kernel cases
+
+```bash
+$XSHT test --jobs 1 tests/pm/pyramid_cases.xsh
+$XSHT test --jobs 1 packages/linux/tests/pyramid.xsh
+```
+
+The PM cases resolve three fixture packages and check the exact node, action,
+and dependency inventory. The execution case prepares two dependencies in a
+disposable store, builds one fresh application, and reuses all three on rerun.
+Each fixture build fails if executed twice. Root composition checks the exact
+path owners, package manifests, symlink target, and runtime payloads.
+The executor requires sibling `xsh`, `xshi`, and `xsht` products.
+
+The kernel cases discover and plan one synthetic object without compiling it.
+`packages/linux/kbuild_verify.xsh::linux_kbuild_verify_stopped` accepts the
+recipe's `linux-kbuild-stopped` error only for the requested stage.
+Preparation requires nonempty `.config` and `include/generated/autoconf.h`.
+Discovery also requires a readable report with a root directory, selected
+objects, and no unsupported inputs. Planning also requires a complete,
+nonempty archive task report. Other error families retain their original cause.
+
+These commands do not run a world build, a real kernel build, or a VM.
+Real pinned discovery and planning require a separately selected scenario.
+Fresh world construction, full kernel compilation and linking, and VM proofs
+require an explicit manual request.
