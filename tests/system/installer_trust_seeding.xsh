@@ -37,9 +37,9 @@ test installer_seed_reports_functional_generation_one_status [fs, time, error] {
 
 test installer_wires_trust_seeding_after_target_config [fs, error] {
   let setup = p"installer/setup-laputa.xsh".read_text()?
-  assert "seed_target_trust_store(/mnt/target)" in setup
-  let after_config = setup.split("write_target_config(/mnt/target")[1]
-  assert "seed_target_trust_store(/mnt/target)" in after_config
+  assert "seed_target_trust_store(p\"/mnt/target\")" in setup
+  let after_config = setup.split("write_target_config(p\"/mnt/target\"")[1]
+  assert "seed_target_trust_store(p\"/mnt/target\")" in after_config
 }
 
 test installer_resolves_trust_modules_from_the_laputa_pm_library [fs, error] {
