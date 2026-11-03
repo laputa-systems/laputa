@@ -78,10 +78,15 @@ copy, and requires the guest's witness start and finish markers. A kernel panic,
 heap allocation error, or nonzero witness exit fails the run.
 
 Run the kernel unit tests of one pinned-source crate with
-`bash infra/asterinas/run-ktest.sh ostd` or
-`bash infra/asterinas/run-ktest.sh osdk/deps/frame-allocator`. The runner boots
-the OSDK test kernel in QEMU with KVM and two CPUs, and fails unless every test
-passes. It needs a prior `make asterinas-build` for the OSDK install.
+`bash infra/asterinas/run-ktest.sh ostd`,
+`bash infra/asterinas/run-ktest.sh osdk/deps/frame-allocator` or
+`bash infra/asterinas/run-ktest.sh kernel/core` (the kernel crate itself). The
+runner boots the OSDK test kernel in QEMU with KVM and two CPUs, and fails
+unless every test passes. It needs a prior `make asterinas-build` for the OSDK
+install. The kernel crate links `aster-cmdline`, which leaves the serial console
+off unless the command line has `earlycon`, so the workspace `OSDK.toml` passes
+`earlycon` to test kernels; without it the kernel crate's tests run silent and
+the runner rejects them.
 
 To run a guest case (a script and its helper programs) on either backend, run
 `bash infra/asterinas/run-guest-case.sh asterinas|linux CASE_DIR MODE RESULT_DIR`.

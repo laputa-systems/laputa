@@ -18,6 +18,8 @@ for image in ext2 exfat ltp_dev nvme0n1; do
     [[ -e "$source_dir/test/initramfs/build/$image.img" ]] || truncate -s 8M "$source_dir/test/initramfs/build/$image.img"
 done
 
+export TMPDIR="$repo_root/.work/tmp"
+mkdir -p "$TMPDIR"
 output="$(mktemp)"
 trap 'rm -f -- "$output"' EXIT
 status=0
@@ -33,7 +35,8 @@ docker run --rm --pull never --platform linux/amd64 --network none --device /dev
     --entrypoint "/work/asterinas/osdk/$(basename "$(dirname "$(dirname "$osdk_bin")")")/bin/cargo-osdk" "$dev_image" \
     osdk test --target-arch=x86_64 > "$output" 2>&1 || status=$?
 sed 's/\x1b\[[0-9;]*m//g' "$output" | tr -d '\r' | rg '^test |test result|ktest runner|panicked' || true
-if (( status != 0 )) || ! sed 's/\x1b\[[0-9;]*m//g' "$output" | rg -q '^test result: ok\. [1-9][0-9]* passed; 0 failed'; then
+plain="$(sed 's/\x1b\[[0-9;]*m//g' "$output")"
+if (( status != 0 )) || rg -q '^test result: FAILED' <<< "$plain" || ! rg -q '^test result: ok\. [1-9][0-9]* passed; 0 failed' <<< "$plain"; then
     printf 'run-ktest: %s kernel tests failed; tail follows\n' "$crate_dir" >&2
     tail -n 40 "$output" >&2
     exit 1
