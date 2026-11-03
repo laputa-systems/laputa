@@ -347,3 +347,42 @@ These commands do not run a world build, a real kernel build, or a VM.
 Real pinned discovery and planning require a separately selected scenario.
 Fresh world construction, full kernel compilation and linking, and VM proofs
 require an explicit manual request.
+
+## Run explicit pinned kernel discovery
+
+```bash
+xsh packages/linux/discover_case.xsh -- PREPARED_SOURCE
+```
+
+Run this explicit discovery command from the checkout root. `PREPARED_SOURCE`
+is a fresh source tree under this checkout's `.work/tmp`. Before preparing that
+tree, verify the recipe's archive pin and enforce a 256 MiB archive cap and a
+2 GiB expanded-source cap. Keep exclusive ownership of the prepared tree until
+the command returns. Source acquisition and extraction stay with the existing
+PM source and archive owners. This command accepts prepared inputs.
+It performs no fetch, extraction, host preparation, compilation, or linking.
+
+The command loads typed Linux metadata through `pm.recipe`, verifies the
+selected x86 configuration checksum, and rejects symlinked output paths before
+writing. It writes `.config`, generated configuration headers, and the existing
+`.xsh-kbuild-plan.json` inventory. Discovery uses one worker, no plan cache,
+and the exact `linux-kbuild-stopped` discovery oracle. The controller still
+owns source freshness, expected inventory, resource admission, and result binding.
+
+Run the focused preparation controls with matching compiler products:
+
+```bash
+$XSHT test --jobs 1 test_pyramid_prepared_discovery
+```
+
+These controls check the exact synthetic inventory, configuration checksum,
+output symlinks, source confinement, and restoration of the stop environment.
+Compiler preparation must succeed before a test body can establish behavior.
+A named stop, an arbitrary nonzero exit, or a report's presence cannot establish
+successful discovery.
+
+The command preserves the caller's source tree on failure. Configuration,
+headers, or a discovery report can remain for diagnosis. After consuming the
+result, remove the controller-owned tree and prepare a fresh tree for another
+run. Container and reservation cleanup remain with the controller. Functional
+discovery evidence does not establish P0 timing or qualify a kernel build.

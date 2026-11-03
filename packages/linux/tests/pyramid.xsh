@@ -1,5 +1,7 @@
 use packages.linux.kbuild
 use pm.make
+use pm.recipe
+use pm.types
 use packages.linux.kbuild_verify
 use packages.linux.PKGBUILD-shared as linux_shared
 
@@ -249,4 +251,97 @@ test test_pyramid_kernel_graph_small [fs, process, env, time, error] { |ctx|
 
 test test_pyramid_kernel_graph_medium [fs, process, env, time, error] { |ctx|
   pyramid_graph_behavior(ctx, 8, 4)
+}
+
+
+proc pyramid_discovery_source(ctx: TestContext) [fs, error] -> Result[Path] {
+  let source = test.temp_dir(ctx, name: "pyramid-prepared-discovery")?
+  fp"{source}/Kbuild".write("obj-y += main.o\n")
+  fp"{source}/main.c".write("int main(void) { return 0; }\n")
+  source
+}
+
+test test_pyramid_prepared_discovery_verifies_config_and_exact_inventory [fs, env, error] { |ctx|
+  let pkg = recipe.load_package_for_target(p"packages/linux", types.X86_64LinuxMusl)?
+  let source = pyramid_discovery_source(ctx)?
+  env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan"}) {
+    let plan = kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl)?
+    assert plan.dirs == [p"."]
+    assert plan.objects == [p"main.o"]
+    assert plan.lib_objects == []
+    assert plan.composites == []
+    assert plan.unsupported == []
+    assert fp"{source}/.config".read_text()? == p"packages/linux/files/config/x86_64/base-x86_64.fragment".read_text()?
+    assert kbuild.read_discovered_plan(fp"{source}/.xsh-kbuild-plan.json")? == plan
+    assert fp"{source}/main.o".exists()? == false
+    assert fp"{source}/.xsh-kbuild/obj/main.o".exists()? == false
+    assert e"XSH_LINUX_KBUILD_STOP_AFTER"? == "plan"
+  }
+}
+
+test test_pyramid_prepared_discovery_rejects_checksum_before_writes [fs, env, error] { |ctx|
+  let original = recipe.load_package_for_target(p"packages/linux", types.X86_64LinuxMusl)?
+  let pkg = {
+    ...original,
+    upstream_sources: [
+      {...input, checksums: [{arch: "all", sha256: "0000000000000000000000000000000000000000000000000000000000000000"}]}
+      for input in original.upstream_sources
+    ],
+  }
+  let source = pyramid_discovery_source(ctx)?
+  test.error_kind(kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl), "checksum-mismatch")?
+  assert fp"{source}/.config".exists()? == false
+  assert fp"{source}/include".exists()? == false
+  assert fp"{source}/.xsh-kbuild-plan.json".exists()? == false
+}
+
+test test_pyramid_prepared_discovery_rejects_output_symlink_before_writes [fs, env, error] { |ctx|
+  let pkg = recipe.load_package_for_target(p"packages/linux", types.X86_64LinuxMusl)?
+  for relative in [
+    p".config", p".xsh-kbuild-plan.json", p"include", p"include/generated",
+    p"include/generated/autoconf.h", p"include/config", p"include/config/auto.conf",
+  ] {
+    let source = pyramid_discovery_source(ctx)?
+    let sentinel = test.temp_path(ctx, name: "pyramid-discovery-sentinel")
+    sentinel.write("unchanged")
+    let output = fp"{source}/{relative}"
+    output.parent.mkdir()
+    output.symlink(to: sentinel)
+    match kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl) {
+      Ok(_) => test.fail("discovery followed an output symlink")
+      Err(kbuild.ScriptError.Failed {kind, message}) => {
+        assert kind == "linux-kbuild-case-input"
+        assert "discovery output is a symlink" in message
+      }
+      else => test.fail("discovery did not preserve its input error family")
+    }
+    assert sentinel.read_text()? == "unchanged"
+    if relative != p".config" { assert fp"{source}/.config".exists()? == false }
+    if relative != p".xsh-kbuild-plan.json" { assert fp"{source}/.xsh-kbuild-plan.json".exists()? == false }
+    assert fp"{source}/main.c".read_text()? == "int main(void) { return 0; }\n"
+  }
+}
+
+test test_pyramid_prepared_discovery_rejects_unowned_source_and_missing_config [fs, env, error] { |ctx|
+  let pkg = recipe.load_package_for_target(p"packages/linux", types.X86_64LinuxMusl)?
+  match kbuild_verify.linux_kbuild_discover_prepared(fs.cwd()?, pkg, types.X86_64LinuxMusl) {
+    Ok(_) => test.fail("discovery accepted a source outside owned scratch")
+    Err(kbuild.ScriptError.Failed {kind, message}) => {
+      assert kind == "linux-kbuild-case-input"
+      assert "owned directory under .work/tmp" in message
+    }
+    else => test.fail("discovery did not preserve its input error family")
+  }
+  let source = pyramid_discovery_source(ctx)?
+  match kbuild_verify.linux_kbuild_discover_prepared(source, {...pkg, upstream_sources: []}, types.X86_64LinuxMusl) {
+    Ok(_) => test.fail("discovery accepted an undeclared configuration")
+    Err(kbuild.ScriptError.Failed {kind, message}) => {
+      assert kind == "linux-kbuild-case-input"
+      assert "expected one declared" in message
+    }
+    else => test.fail("discovery did not preserve its input error family")
+  }
+  assert fp"{source}/.config".exists()? == false
+  assert fp"{source}/include".exists()? == false
+  assert fp"{source}/.xsh-kbuild-plan.json".exists()? == false
 }
