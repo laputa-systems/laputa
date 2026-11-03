@@ -170,6 +170,13 @@ its TAP and peer processes) and removes the cohort's results. A runner gives its
 passes three seconds less to the child's own runners, so an outer runner never kills one that is
 still cleaning up. A cohort runs its backends one after the other.
 
+Check that the pins are public with `bash infra/asterinas/qualify.sh published-inputs --backend asterinas`.
+It fetches the kernel commit and the XSH commit named in `infra/asterinas/inputs.lock` from the lock's
+repositories into fresh bare caches under `.work/tmp`, requires each fetch to return exactly the locked
+commit, and compares the kernel commit with the `asterinas` gitlink and the kernel's dev image version
+with the lock's. A repository that answers but does not hold the commit fails, so a kernel commit that
+exists only locally is red until the fork's `main` is published. The caches are removed on exit.
+
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
 (or `linux`) on a list of test modules, then

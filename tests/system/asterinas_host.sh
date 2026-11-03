@@ -297,6 +297,66 @@ if checkout_kernel > "$scratch/kernel-stray.log" 2>&1; then
 fi
 rg -q 'not a git checkout' "$scratch/kernel-stray.log"
 
+published_root="$scratch/published-fixture"
+published_kernel="$scratch/published-kernel"
+published_xsh="$scratch/published-xsh"
+mkdir -p "$published_root/infra/asterinas" "$published_kernel" "$published_xsh"
+cp "$repo_root/infra/asterinas/published-inputs.sh" "$published_root/infra/asterinas/"
+for published_origin in "$published_kernel" "$published_xsh"; do
+    git -C "$published_origin" init -q
+    git -C "$published_origin" config user.email asterinas-test@example.invalid
+    git -C "$published_origin" config user.name Asterinas
+done
+printf '1.2.3\n' > "$published_kernel/DOCKER_IMAGE_VERSION"
+git -C "$published_kernel" add DOCKER_IMAGE_VERSION
+git -C "$published_kernel" commit -qm kernel
+printf 'FROM scratch\n' > "$published_xsh/Dockerfile.test"
+git -C "$published_xsh" add Dockerfile.test
+git -C "$published_xsh" commit -qm xsh
+published_kernel_commit="$(git -C "$published_kernel" rev-parse HEAD)"
+published_xsh_commit="$(git -C "$published_xsh" rev-parse HEAD)"
+git -C "$published_root" init -q
+write_published_lock() {
+    printf 'ASTERINAS_REPOSITORY=%s\nASTERINAS_COMMIT=%s\nASTERINAS_DEV_IMAGE_VERSION=1.2.3\nXSH_REPOSITORY=%s\nXSH_COMMIT=%s\n' \
+        "$published_kernel" "$1" "$published_xsh" "$2" > "$published_root/infra/asterinas/inputs.lock"
+}
+write_published_lock "$published_kernel_commit" "$published_xsh_commit"
+git -C "$published_root" update-index --add --cacheinfo "160000,$published_kernel_commit,asterinas"
+run_published_inputs() { bash "$published_root/infra/asterinas/published-inputs.sh"; }
+run_published_inputs > "$scratch/published-ok.log" 2>&1 || { cat "$scratch/published-ok.log" >&2; printf 'published inputs rejected matching pins\n' >&2; exit 1; }
+rg -q "match the lock" "$scratch/published-ok.log"
+compgen -G "$published_root/.work/tmp/published-inputs.*" > /dev/null && { printf 'published inputs left its fresh caches\n' >&2; exit 1; }
+
+printf 'unpublished\n' > "$published_kernel/unpublished.txt"
+git -C "$published_kernel" add unpublished.txt
+git -C "$published_kernel" commit -qm unpublished
+unpublished_commit="$(git -C "$published_kernel" rev-parse HEAD)"
+git -C "$published_kernel" reset -q --hard "$published_kernel_commit"
+git -C "$published_kernel" reflog expire --expire=now --all
+git -C "$published_kernel" gc -q --prune=now
+write_published_lock "$unpublished_commit" "$published_xsh_commit"
+git -C "$published_root" update-index --cacheinfo "160000,$unpublished_commit,asterinas"
+if run_published_inputs > "$scratch/published-missing.log" 2>&1; then
+    printf 'published inputs accepted a kernel commit that the repository lacks\n' >&2
+    exit 1
+fi
+rg -q "is not published" "$scratch/published-missing.log"
+
+write_published_lock "$published_kernel_commit" "$published_xsh_commit"
+if run_published_inputs > "$scratch/published-gitlink.log" 2>&1; then
+    printf 'published inputs accepted a gitlink that differs from the lock\n' >&2
+    exit 1
+fi
+rg -q "gitlink" "$scratch/published-gitlink.log"
+
+git -C "$published_root" update-index --cacheinfo "160000,$published_kernel_commit,asterinas"
+write_published_lock "$published_kernel_commit" "0000000000000000000000000000000000000000"
+if run_published_inputs > "$scratch/published-xsh.log" 2>&1; then
+    printf 'published inputs accepted an XSH commit that the repository lacks\n' >&2
+    exit 1
+fi
+rg -q "xsh commit" "$scratch/published-xsh.log"
+
 vm_test_root="$scratch/vm-fixture"
 fake_firecracker="$vm_test_root/firecracker"
 mkdir -p "$vm_test_root"
@@ -480,6 +540,11 @@ if bash "$repo_root/infra/asterinas/qualify.sh" baseline --backend unknown > "$s
     exit 1
 fi
 rg -q 'select --backend' "$scratch/unknown-backend.log"
+if bash "$repo_root/infra/asterinas/qualify.sh" published-inputs --backend both > "$scratch/published-backend.log" 2>&1; then
+    printf 'qualification accepted published-inputs for a backend it does not use\n' >&2
+    exit 1
+fi
+rg -q 'published-inputs takes --backend asterinas' "$scratch/published-backend.log"
 account_root="$scratch/account"
 mkdir -p "$account_root"
 printf '%s\n' \
