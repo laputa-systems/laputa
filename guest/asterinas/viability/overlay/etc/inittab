@@ -1,2 +1,3 @@
 ::sysinit:/usr/bin/xsh /usr/lib/asterinas/boot-setup.xsh
-ttyS0::poweroff:/usr/bin/xsh /usr/lib/asterinas/boot-proof.xsh
+::sysinit:/usr/bin/xsh /usr/lib/asterinas/boot-proof.xsh
+::poweroff:/usr/bin/true

@@ -150,8 +150,12 @@ passes. The cohort fails when it observes no VMM process.
 
 `run-guest-case.sh` and `run-witness.sh` accept a run only when the case or witness marker
 is present, the exit status is zero, the complete guest marker set is present and the guest
-powers off, on both backends. The viability profile runs its boot proof as the `poweroff` entry
-of the inittab, so xinit powers the guest off when the proof ends. Linux does it through ACPI
+powers off, on both backends. The viability profile runs its boot proof as a `sysinit` entry and ends the
+inittab with a `poweroff` entry that exits at once, so xinit powers the guest off when the proof
+has finished. The proof keeps the console it inherits. As the `poweroff` entry it ran on its own terminal
+session, and one of 19 carrier runs on the Linux reference ended with the proof's output cut off mid-line and
+the guest powered off before the completion marker; the cause was not established, and the `sysinit` form
+is the one that every earlier run used. Linux powers off through ACPI
 (the reference kernel package must be built from a Linux recipe that keeps the legacy ACPI power
 path, or its guest halts with QEMU still running), and Asterinas writes QEMU's debug-exit device,
 then the ACPI soft-off of the q35 machine and then the keyboard controller's reset, which ends a
