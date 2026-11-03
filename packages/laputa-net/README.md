@@ -16,9 +16,16 @@ The output contains no lease contents, raw network attributes, or credentials.
 
 ## Input contract
 
-`NetworkPlanInput` contains `intent`, `owned`, and `observed`. Missing fields,
-malformed JSON, and inputs larger than 65536 bytes fail. Input files are trusted
-observations supplied by the caller. The command never falls back to the host.
+`NetworkPlanInput` contains `intent`, `owned`, and `observed`.
+`network_decode_input` decodes the JSON and validates it exactly with
+`require_exact`: unknown fields at any depth, duplicate keys, missing fields,
+`null` for a required field, integers beyond i64, and values of the wrong type
+fail with the field path before any planning. Nothing is coerced, so `"24"` and
+`24.5` are not a prefix. A document with the same fields from YAML or TOML
+validates to an equal value, and a lexical INI or CSV record reaches the schema
+only through `codec.decode_as`. Malformed JSON and inputs larger than 65536
+bytes fail. Input files are trusted observations supplied by the caller. The
+command never falls back to the host.
 
 The planner and capture replay share `network_read_input`. It resolves the
 selected path, opens its parent as an `FsRoot`, and reads at most 65537 bytes.

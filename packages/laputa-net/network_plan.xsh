@@ -242,9 +242,14 @@ pure operation_text(operation: NetworkOperation) -> Str {
   }
 }
 
+## Decode plan input as exact data: unknown, duplicate, missing, null and mistyped fields fail with their path before any planning.
+export pure network_decode_input(raw: Str) -> Result[NetworkPlanInput, Error] {
+  json.decode(raw)?.require_exact()
+}
+
 proc main(input: Path) [fs, error] {
   let raw = network_read_input(input)?
-  let data: NetworkPlanInput = json.decode(raw)?.require()?
+  let data = network_decode_input(raw)?
   let plan = network_plan(data.intent, data.owned, data.observed)?
   let operations = [operation_text(operation) for operation in plan.operations]
   print json.encode({ifindex: plan.intent.ifindex, name: plan.intent.name, sequence: plan.before.sequence, operations})?
