@@ -184,24 +184,35 @@ the debt it inherits. In order:
    make the cargo-input stamp independent of absolute paths, fetch the kernel
    without `git submodule`, and power the guest off so acceptance no longer
    trusts the completion marker alone.
-2. The nine Asterinas-only native failures (btop, chrt, cp, cpio, dd, date),
-   triaged by the syscalls they reach and fixed against the Linux reference;
-   `date` joins the open A2 clock obligations.
+2. **Accepted:** the nine Asterinas-only native failures (btop, chrt, cp,
+   cpio, dd, date) pass on kernel `d4c2e3877`. Linux-paired regressions cover
+   clock ticks, clock resolution, scheduler policy and execution, file-copy
+   behavior, and sparse-file accounting. The other A2 clock obligations remain
+   open.
 3. One ICMP error slice: ICMP receive, `IP_RECVERR`, and asynchronous socket
    errors, which together serve the Asterinas-only `tracepath` and
    `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
    matching A3/A5 debt.
+4. Linux page-fault cost and `MAP_POPULATE` are active performance work after
+   compatibility. Any improvement needs at least five interleaved baseline
+   and candidate runs, completed-work checks, and successful readiness checks.
 
-The harness slice passed `qualify.sh all --backend both` and retained all 1,281
-original A0 passes in quiet-host accounting. Across the selected modules, 1,314
-cases passed, 34 failed, 49 were skipped, and 13,858 of 15,255 discovered cases
-were unexecuted. All 34 observed failures also failed at A0. This establishes
-preservation of the A0 pass set, not a full native-suite pass. The published-inputs
-check passed after the kernel fork's `main` was published.
+The native slice passed `qualify.sh all --backend both`, including ten recovery
+rounds, at Laputa `819896e` and kernel `d4c2e3877`. All nine exact native cases
+also passed on that final kernel. Later build-job and kache plumbing preserves
+the qualified kernel product.
+
+Quiet-host accounting retained all 1,281 original A0 passes: 1,323 cases passed,
+25 failed, 49 were skipped, and 13,858 of 15,255 discovered cases were
+unexecuted. All 125 selected modules completed; a fail-dominant scan found no
+original pass failed, and every observed failure was already in A0's failed
+set. This establishes preservation of that pass set, not a full native-suite
+pass. The kernel fork's `main` is published at `d4c2e3877`; the fresh
+published-inputs check fetched that kernel and XSH `73f8be2a4` and matched the
+lock and gitlink.
 
 Each subsequent slice passes `qualify.sh all --backend both` and loses no A0 pass
-in a quiet-host accounting run. The page-fault cost and `MAP_POPULATE` wait for
-the deferred performance work.
+in a quiet-host accounting run.
 
 ## G2: The remotely maintainable VM
 
