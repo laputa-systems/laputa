@@ -180,7 +180,7 @@ needs quiet-host windows; the G2 tracks keep first claim on host capacity. The
 closed [compatibility campaign](CAMPAIGN-ASTERINAS-COMPATIBILITY.md) records
 the debt it inherits. In order:
 
-1. Harness and tooling: build the kernel crate's own unit tests on this host,
+1. **Accepted:** harness and tooling build the kernel crate's own unit tests on this host,
    make the cargo-input stamp independent of absolute paths, fetch the kernel
    without `git submodule`, and power the guest off so acceptance no longer
    trusts the completion marker alone.
@@ -192,10 +192,16 @@ the debt it inherits. In order:
    `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
    matching A3/A5 debt.
 
-Each slice passes `qualify.sh all --backend both` and loses no A0 pass in a
-quiet-host accounting run. The page-fault cost and `MAP_POPULATE` wait for the
-deferred performance work, and the public reproduction stays red until the
-owner publishes the kernel fork's `main`.
+The harness slice passed `qualify.sh all --backend both` and retained all 1,281
+original A0 passes in quiet-host accounting. Across the selected modules, 1,314
+cases passed, 34 failed, 49 were skipped, and 13,858 of 15,255 discovered cases
+were unexecuted. All 34 observed failures also failed at A0. This establishes
+preservation of the A0 pass set, not a full native-suite pass. The published-inputs
+check passed after the kernel fork's `main` was published.
+
+Each subsequent slice passes `qualify.sh all --backend both` and loses no A0 pass
+in a quiet-host accounting run. The page-fault cost and `MAP_POPULATE` wait for
+the deferred performance work.
 
 ## G2: The remotely maintainable VM
 
