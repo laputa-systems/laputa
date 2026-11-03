@@ -69,7 +69,6 @@ collects diagnostics naming the dead service. It does not cover macOS or
 aarch64 clients, reboot identity, network loss, privilege delegation or
 activation of the staged candidate.
 
-`mkfs.ext4 -d` keeps the builder's ownership, so the harness seeds the operator
-at the builder's uid; `first_boot.apply` allocates the next free id otherwise and
-Dropbear then refuses the account's `.ssh`. Giving first boot a boot-time ownership
-repair is open.
+The harness formats the state disk with `system/maintained_state_image.xsh`, so the
+operator keeps the id `first_boot.apply` allocates (1001 beside baselayout's `laputa`)
+and owns `home/admin`, `.ssh` and `authorized_keys` in the image.

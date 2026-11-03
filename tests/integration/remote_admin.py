@@ -13,6 +13,7 @@ import time
 root = pathlib.Path(__file__).resolve().parents[2]
 scratch_root = root / ".work/tmp"
 state_fixture = root / "tests/integration/fixtures/remote-admin-state.xsh"
+state_image_builder = root / "system/maintained_state_image.xsh"
 drill_fixture = root / "tests/integration/fixtures/remote-admin-drill.xsh"
 OPERATOR = "admin"
 
@@ -58,12 +59,6 @@ def provision(args, scratch):
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
 
-    uid, gid = os.getuid(), os.getgid()
-    with open(staging / "etc/passwd", "a") as passwd:
-        passwd.write(f"{OPERATOR}:x:{uid}:{gid}::/home/{OPERATOR}:/usr/bin/xsh-login\n")
-    with open(staging / "etc/group", "a") as group:
-        group.write(f"{OPERATOR}:x:{gid}:\n")
-
     host_key = staging / "etc/dropbear/dropbear_ed25519_host_key"
     host_key.parent.mkdir(parents=True)
     generated = run([args.dropbearkey, "-t", "ed25519", "-f", str(host_key)])
@@ -72,7 +67,10 @@ def provision(args, scratch):
     env = dict(os.environ, XSH_MODULE_PATH=str(root), TMPDIR=str(scratch_root))
     run([args.xsh, str(state_fixture), "--", str(staging), OPERATOR, public], env=env, cwd=root)
     state_image = scratch / "state.ext4"
-    run(["/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"])
+    run([
+        args.xsh, str(state_image_builder), "--", str(staging), str(state_image), str(256 * 1024 * 1024),
+        str(root / "packages/laputa-fs/files/mkfs.ext4.xsh"), args.xsh,
+    ], env=env, cwd=root)
     shutil.rmtree(staging)
     return client_key, fingerprint, state_image
 
