@@ -324,13 +324,24 @@ Each fixture build fails if executed twice. Root composition checks the exact
 path owners, package manifests, symlink target, and runtime payloads.
 The executor requires sibling `xsh`, `xshi`, and `xsht` products.
 
-The kernel cases discover and plan one synthetic object without compiling it.
+The kernel stop cases discover and plan one synthetic object without compiling it.
 `packages/linux/kbuild_verify.xsh::linux_kbuild_verify_stopped` accepts the
 recipe's `linux-kbuild-stopped` error only for the requested stage.
 Preparation requires nonempty `.config` and `include/generated/autoconf.h`.
 Discovery also requires a readable report with a root directory, selected
 objects, and no unsupported inputs. Planning also requires a complete,
 nonempty archive task report. Other error families retain their original cause.
+
+The kernel graph cases cover four objects in two directories and 32 objects
+in eight directories. Their exact graphs contain seven and 41 tasks.
+Each case first executes one archive closure, then the complete synthetic graph.
+A no-op rerun executes nothing. Changing one source executes its object task,
+its directory archive, and the root archive. Another no-op rerun executes nothing.
+XSH fixture commands replace compiler and archiver argv while preserving the
+Kbuild task inputs, outputs, dependencies, working directories, and stamps.
+The fixtures use explicit inputs without compiler depfiles and set deterministic
+file timestamps. They check scheduler work and output contents, without measuring
+compiler behavior or performance.
 
 These commands do not run a world build, a real kernel build, or a VM.
 Real pinned discovery and planning require a separately selected scenario.

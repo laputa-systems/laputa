@@ -1,4 +1,5 @@
 use packages.linux.kbuild
+use pm.make
 use packages.linux.kbuild_verify
 use packages.linux.PKGBUILD-shared as linux_shared
 
@@ -91,4 +92,161 @@ test test_pyramid_kernel_stop_preserves_mismatched_error_context_and_cause [fs, 
     let observed = kbuild_verify.linux_kbuild_verify_stopped(kbuild_verify.Prepare, original, p"missing-kernel-source")
     assert observed == original
   }
+}
+
+
+type PyramidKernelGraph = {source: Path, discovered: kbuild.KbuildPlan, directories: List[Str], objects: List[Path], objects_per_directory: Int}
+
+proc pyramid_kernel_graph(
+  ctx: TestContext,
+  group_count: Int,
+  objects_per_group: Int,
+) [fs, env, time, error] -> Result[PyramidKernelGraph] {
+  let source = test.temp_dir(ctx, name: f"pyramid-graph-{group_count}-{objects_per_group}")?
+  fp"{source}/.config".write("CONFIG_TEST=y\n")
+  let groups = [f"directory{index}" for index in range(group_count)]
+  fp"{source}/Kbuild".write("obj-y += " + [f"{directory}/" for directory in groups].join(" ") + "\n")
+  var objects: List[Path] = []
+  for directory in groups {
+    fp"{source}/{directory}".mkdir()
+    let names = [f"unit{index}" for index in range(objects_per_group)]
+    fp"{source}/{directory}/Kbuild".write("obj-y += " + [f"{name}.o" for name in names].join(" ") + "\n")
+    for name in names {
+      let input = fp"{source}/{directory}/{name}.c"
+      input.write(f"int {directory}_{name}(void) {{ return 0; }}\n")
+      fs.set_times(input, mtime_sec: 1)
+      objects += [fp"{directory}/{name}.o"]
+    }
+  }
+  let discovered = kbuild.discover_plan(source, kbuild.load_config(fp"{source}/.config")?, "x86")?
+  assert [dir.display() for dir in discovered.dirs] == [".", @groups]
+  assert discovered.objects == objects
+  assert discovered.lib_objects == []
+  assert discovered.composites == []
+  assert discovered.unsupported == []
+  {source, discovered, directories: groups, objects, objects_per_directory: objects_per_group}
+}
+
+proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+  let discovered = fixture.discovered
+  let groups = fixture.directories
+  let objects = fixture.objects
+  let objects_per_group = fixture.objects_per_directory
+  let planned = pyramid_plan_archives(discovered, cache)?
+  let archive_names = [p".xsh-kbuild/built-in.a", @[fp".xsh-kbuild/{directory}/built-in.a" for directory in groups]]
+  let object_names = [fp".xsh-kbuild/obj/{object}" for object in objects]
+  assert planned.archives == archive_names
+  assert planned.task_count == objects.len() + groups.len() + 1
+  assert planned.tasks.len() == planned.task_count
+  assert planned.missing_sources == []
+  assert planned.generated_objects == []
+  assert planned.duplicate_outputs == []
+  assert ([task.name for task in planned.tasks] |> sort) == ([item.display() for item in [@object_names, @archive_names]] |> sort)
+  for task in planned.tasks {
+    assert task.outputs == [fp"{task.name}"]
+    if task.name.ends_with(".o") {
+      assert task.deps == []
+      assert task.inputs == [fp"{task.name.replace(".xsh-kbuild/obj/", with: "").replace(".o", with: ".c")}"]
+    } else if task.name == ".xsh-kbuild/built-in.a" {
+      assert task.deps == [f".xsh-kbuild/{directory}/built-in.a" for directory in groups]
+      assert task.inputs == [fp".xsh-kbuild/{directory}/built-in.a" for directory in groups]
+    } else {
+      let directory = fp"{task.name}".parent.name
+      assert task.deps == [f".xsh-kbuild/obj/{directory}/unit{index}.o" for index in range(objects_per_group)]
+      assert task.inputs == [fp".xsh-kbuild/obj/{directory}/unit{index}.o" for index in range(objects_per_group)]
+    }
+  }
+  planned
+}
+
+proc pyramid_graph_runner(source: Path) [fs, error] -> Result[Path] {
+  let script = fp"{source}/synthetic-task.xsh"
+  script.write(r"""let counter = fp"{args[0]}"
+let output = fp"{args[1]}"
+var text = ""
+var latest = 0
+for index, value in args {
+  continue when index < 2
+  let input = fp"{value}"
+  text += input.read_text()?
+  let modified = fs.stat(input)?.mtime_ns
+  if modified > latest { latest = modified }
+}
+counter.parent.mkdir()?
+let previous = if counter.exists()? { counter.read_text()? } else { "" }
+counter.write(previous + "x")?
+output.parent.mkdir()?
+output.write(text)?
+fs.set_times(output, mtime_ns: latest + 1000000000)?
+""")
+  script
+}
+
+proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) [fs, error] -> Result[Map[Int]] {
+  var counts: Map[Int] = {}
+  for task in tasks {
+    let counter = fp"{source}/executions/{task.name}"
+    counts[task.name] = if counter.exists()? { counter.read_text()?.byte_len() } else { 0 }
+  }
+  counts
+}
+
+proc pyramid_graph_behavior(ctx: TestContext, groups: Int, objects: Int) [fs, process, env, time, error] {
+  let fixture = pyramid_kernel_graph(ctx, groups, objects)?
+  let source = fixture.source
+  let script = pyramid_graph_runner(source)?
+  let configured = e"XSH_HOST" ?? ""
+  let runner = if configured == "" { process.which("xsh")? } else { fp"{configured}" }
+  let cache = test.temp_dir(ctx, name: "pyramid-graph-cache")?
+  cd (source) {
+    let planned = pyramid_archive_graph(fixture, cache)?
+    let tasks: List[make.MakeTask] = [
+      {
+        ...task,
+        argv: [runner, script, "--", fp"{source}/executions/{task.name}", @task.outputs, @task.inputs],
+        depfile: p"",
+      }
+      for task in planned.tasks
+    ]
+    let selected_output = p".xsh-kbuild/directory0/built-in.a"
+    let selected = kbuild.select_archive_tasks_outputs(tasks, [selected_output])?
+    assert ([task.name for task in selected] |> sort) == ([".xsh-kbuild/directory0/built-in.a", @[f".xsh-kbuild/obj/directory0/unit{index}.o" for index in range(objects)]] |> sort)
+    match kbuild.select_archive_tasks_outputs(tasks, [p"missing-output"]) {
+      Ok(_) => test.fail("unknown kernel output selected an executable closure")
+      Err(problem) => assert "no archive-plan task produces" in problem.message
+    }
+    kbuild.run_archive_tasks_output(tasks, selected_output, 2)
+    let selected_counts = pyramid_graph_counts(source, tasks)?
+    for task in tasks {
+      assert selected_counts.get(task.name)? == (if task.name in [item.name for item in selected] { 1 } else { 0 })
+    }
+    assert p".xsh-kbuild/built-in.a".exists()? == false
+    assert selected_output.read_text()? == [fp"directory0/unit{index}.c".read_text()? for index in range(objects)].join("")
+    make.run_tasks(tasks, 2)
+    let fresh = pyramid_graph_counts(source, tasks)?
+    assert fresh.values() == [1 for _ in tasks]
+    let expected = [fp"directory{directory}/unit{index}.c".read_text()? for directory in range(groups) for index in range(objects)].join("")
+    assert p".xsh-kbuild/built-in.a".read_text()? == expected
+    make.run_tasks(tasks, 2)
+    assert pyramid_graph_counts(source, tasks)? == fresh
+    p"directory0/unit0.c".write("int directory0_unit0(void) { return 1; }\n")
+    fs.set_times(p"directory0/unit0.c", mtime_sec: 10)
+    make.run_tasks(tasks, 2)
+    let changed = pyramid_graph_counts(source, tasks)?
+    for task in tasks {
+      assert changed.get(task.name)? == (if task.name in [".xsh-kbuild/obj/directory0/unit0.o", ".xsh-kbuild/directory0/built-in.a", ".xsh-kbuild/built-in.a"] { 2 } else { 1 })
+    }
+    let changed_expected = [fp"directory{directory}/unit{index}.c".read_text()? for directory in range(groups) for index in range(objects)].join("")
+    assert p".xsh-kbuild/built-in.a".read_text()? == changed_expected
+    make.run_tasks(tasks, 2)
+    assert pyramid_graph_counts(source, tasks)? == changed
+  }
+}
+
+test test_pyramid_kernel_graph_small [fs, process, env, time, error] { |ctx|
+  pyramid_graph_behavior(ctx, 2, 2)
+}
+
+test test_pyramid_kernel_graph_medium [fs, process, env, time, error] { |ctx|
+  pyramid_graph_behavior(ctx, 8, 4)
 }
