@@ -70,7 +70,7 @@ proc main(...argv: List[Str]) [fs, process, net, env, time, error, io] {
     match remote.remote_stage(session, program, big, "interrupted.bin", big_digest, timeout_ms: 120) {
       Ok(_) => print "INFO the transfer finished inside the deadline"
       Err(SshError.Timeout {certainty, ..}) => {
-        check("a deadline mid-transfer reports a possibly-executed mutation", certainty == "submitted")?
+        check("a deadline mid-transfer reports a possibly-executed mutation", certainty == .Submitted)?
         interrupted = true
       }
       Err(other) => fail f"FAILED: unexpected {other.message}"
