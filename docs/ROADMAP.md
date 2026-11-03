@@ -603,8 +603,9 @@ The transport is XSH's native Graviola/OxiSH-backed client
 ([XSH-55](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-55-native-ssh-client.md)),
 which never invokes an external `ssh`. The OpenSSL-less client in
 [ssh-build](https://github.com/laputa-systems/ssh-build) is its test oracle, not
-a production fallback. XSH's roadmap schedules that client after its active
-campaigns close. The current OxiSH server is Git-only, not a general
+a production fallback. The client has landed in XSH (experimental) and
+[remote administration](REMOTE-ADMIN.md) uses it for one headless VM. The
+current OxiSH server is Git-only, not a general
 login/PTY/SFTP server. Keep Dropbear until a separately qualified server has a
 concrete benefit; a server rewrite is not a dependency of G2.
 
@@ -615,7 +616,9 @@ bring OpenRC into Laputa, and any Laputa service adapter it adds goes through
 the existing xinit contract.
 
 Use a fixed reviewed remote dispatcher with bounded versioned structured input,
-not request values interpolated into shell source. Preserve byte streams,
+not request values interpolated into shell source. `system/remote.xsh` and
+`system/remote_guest.xsh` implement it for one x86_64 VM; see
+[remote administration](REMOTE-ADMIN.md) for what the drill proves and omits. Preserve byte streams,
 explicit remote status, deadlines, backpressure, and cleanup. Keep file staging
 and digest verification separate from artifact authenticity. Unknown outcomes
 must be inspectable and reconciled, not automatically replayed. A closed SSH
