@@ -91,7 +91,7 @@ if [[ "$mode" == setup ]]; then
     [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] || fail '/dev/kvm must exist and be readable and writable by this user'
 fi
 
-for tool in awk cat chmod cp curl docker find git grep head mkdir mktemp mv ps readelf rm sha256sum sleep sort tail tar tee tr uname; do
+for tool in awk cat chmod cp curl docker find git grep head mkdir mktemp mv ps readelf realpath rm sha256sum sleep sort tail tar tee tr uname; do
     need_tool "$tool"
 done
 
@@ -370,6 +370,17 @@ if [[ "$(cat "$kernel_key_file" 2>/dev/null || true)" == "$kernel_key" && \
       -f "$kernel_output" && "$cached_kernel_hash" == "$(cat "$kernel_sha_file" 2>/dev/null || true)" ]]; then
     printf 'Asterinas PVH kernel for %s is unchanged.\n' "$asterinas_commit"
 else
+    host_kache="$(command -v kache || true)"
+    if [[ -z "$host_kache" ]]; then
+        host_kache="${CARGO_HOME:-$HOME/.cargo}/bin/kache"
+    fi
+    [[ -f "$host_kache" && -x "$host_kache" ]] || fail 'required host kache executable is missing'
+    host_kache="$(realpath "$host_kache")"
+    mkdir -p "$cache_dir/kache" "$repo_root/.work/tmp/asterinas-kache-runtime"
+    docker run --rm --pull never --platform linux/amd64 --network none \
+        --mount "type=bind,src=$host_kache,dst=/usr/local/bin/kache,readonly" \
+        --entrypoint /usr/local/bin/kache "$dev_image_id" --version >/dev/null || \
+        fail 'the host kache executable cannot run in the Asterinas dev image'
     osdk_key="$(printf '%s\n%s\n%s\n%s\n' \
         "$asterinas_commit" "$source_snapshot_hash" "$dev_image_id" "$toolchain_channel" | \
         sha256sum | awk '{print $1}')"
@@ -379,10 +390,17 @@ else
         docker run --rm --platform linux/amd64 --network none \
             --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
             --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+            --mount "type=bind,src=$host_kache,dst=/usr/local/bin/kache,readonly" \
+            --mount "type=bind,src=$repo_root/.work/tmp,dst=/work/laputa-tmp" \
             --workdir /src/asterinas \
             --env CARGO_HOME=/work/asterinas/cargo \
             --env CARGO_TARGET_DIR=/work/asterinas/target \
             --env CARGO_BUILD_JOBS \
+            --env RUSTC_WRAPPER=/usr/local/bin/kache \
+            --env KACHE_CACHE_DIR=/work/asterinas/kache \
+            --env KACHE_RUNTIME_DIR=/work/laputa-tmp/asterinas-kache-runtime \
+            --env KACHE_AUTO_GC=0 \
+            --env TMPDIR=/work/laputa-tmp \
             --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
             --env OSDK_LOCAL_DEV=1 \
             --env "OSDK_INSTALL_ROOT=/work/asterinas/osdk/$osdk_key" \
@@ -394,11 +412,18 @@ else
         --network none \
         --mount "type=bind,src=$source_dir,dst=/src/asterinas,readonly" \
         --mount "type=bind,src=$cache_dir,dst=/work/asterinas" \
+        --mount "type=bind,src=$host_kache,dst=/usr/local/bin/kache,readonly" \
+        --mount "type=bind,src=$repo_root/.work/tmp,dst=/work/laputa-tmp" \
         --mount "type=bind,src=$source_dir/.cargo/config.toml,dst=/work/asterinas/cargo/config.toml,readonly" \
         --workdir /src/asterinas/kernel \
         --env CARGO_HOME=/work/asterinas/cargo \
         --env CARGO_TARGET_DIR=/work/asterinas/target \
         --env CARGO_BUILD_JOBS \
+        --env RUSTC_WRAPPER=/usr/local/bin/kache \
+        --env KACHE_CACHE_DIR=/work/asterinas/kache \
+        --env KACHE_RUNTIME_DIR=/work/laputa-tmp/asterinas-kache-runtime \
+        --env KACHE_AUTO_GC=0 \
+        --env TMPDIR=/work/laputa-tmp \
         --env CARGO_NET_OFFLINE=true \
         --env KACHE_RUSTC_PATH_NORMALIZE=0 \
         --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
