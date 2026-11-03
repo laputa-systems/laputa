@@ -143,16 +143,22 @@ image sizes in bytes (Asterinas from the selected bundle, the Linux reference fr
 the root is the same ext2 image, apparent and allocated), the guest memory read from the VMM's own
 command line or configuration, the VMM's peak resident set (`VmHWM`) and, between a successful
 `perf-gate-ready` and a successful `perf-gate-ready -1`, the VMM's user and system CPU time (all
-threads, including guest execution, up to the guest completion marker). Sizes and memory are
+threads, including guest execution, until the VMM exits after the guest powers off). Sizes and memory are
 measured on every run. When either gate check fails the CPU time is printed as `cpu=deferred`
 and the cohort ends with `perf gate deferred: host busy`; a run is never repeated until a gate
 passes. The cohort fails when it observes no VMM process.
 
 `run-guest-case.sh` and `run-witness.sh` accept a run only when the case or witness marker
-is present, the exit status is zero and the complete guest marker set is present, on both
-backends. A runner returns as soon as the guest prints its completion marker and does not
-wait for the guest to exit, so a guest that prints the markers and then stalls is accepted; a
-guest that stalls before the marker is rejected after its timeout. SIGTERM or SIGINT to a
+is present, the exit status is zero, the complete guest marker set is present and the guest
+powers off, on both backends. The viability profile runs its boot proof as the `poweroff` entry
+of the inittab, so xinit powers the guest off when the proof ends. Linux does it through ACPI
+(the reference kernel package must be built from a Linux recipe that keeps the legacy ACPI power
+path, or its guest halts with QEMU still running), and Asterinas writes QEMU's debug-exit device,
+then the ACPI soft-off of the q35 machine and then the keyboard controller's reset, which ends a
+Firecracker VM. After the completion marker the runner gives the VMM `LAPUTA_POWEROFF_POLLS`
+polls of 0.2 s (300 by default) for Firecracker and 60 s for QEMU to exit with status zero, and
+rejects a VMM that stays up, exits with another status or reports a kernel failure meanwhile.
+A guest that stalls before the marker is rejected after its timeout. SIGTERM or SIGINT to a
 runner, to `qualify-cohort.sh` or to `qualify.sh`, including one nested inside another,
 stops the owned guests, removes the owned container (named `laputa-asterinas-case-PID`, with
 its TAP and peer processes) and removes the cohort's results. A runner gives its child

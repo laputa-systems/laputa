@@ -265,32 +265,49 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   false
 }
 
-## Run the disposable qualification guest until its completion marker or deadline.
+## Seconds a qualification guest has to power off after it prints its completion marker.
+export const guest_poweroff_timeout_seconds = 60
+
+## Run the disposable qualification guest until it powers off after its completion marker, or the deadline.
 export proc qemu_run_asterinas_reference(
   value: QemuConfig,
   input: QemuAsterinasReference,
   console_log: Path,
   qemu_log: Path,
   timeout_seconds: Int,
+  poweroff_timeout_seconds: Int,
 ) [fs, process, time, error] {
   guard timeout_seconds > 0 and timeout_seconds <= 3000 else { fail "qualification timeout must be between 1 and 3000 seconds" }
+  guard poweroff_timeout_seconds > 0 else { fail "qualification poweroff timeout must be positive" }
   let argv = qemu_asterinas_reference_argv(value, input)?
   console_log.remove()
   qemu_log.remove()
   let launched = spawn process.command_argv(value.qemu, argv, stdout: console_log, stderr: qemu_log)?
   defer qemu_stop(launched)
-  let deadline = time.monotonic()? + timeout_seconds * 1000000000
+  var deadline = time.monotonic()? + timeout_seconds * 1000000000
+  var completed = false
   while qemu_process_live(launched.pid)? {
     let output = qemu_log_text(console_log, qemu_log)?
     if "LAPUTA_ASTERINAS_TEST_FAILED" in output or "Kernel panic" in output or "Uncaught panic" in output {
       fail "qualification guest reported failure"
     }
-    if "LAPUTA_ASTERINAS_TEST_OK" in output { return }
-    if time.monotonic()? >= deadline { fail "qualification guest timed out" }
+    if "LAPUTA_ASTERINAS_TEST_OK" in output and !completed {
+      completed = true
+      deadline = time.monotonic()? + poweroff_timeout_seconds * 1000000000
+    }
+    if time.monotonic()? >= deadline {
+      if completed { fail "qualification guest did not power off after its completion marker" }
+      fail "qualification guest timed out"
+    }
     time.sleep(200ms)?
   }
-  let _ = wait launched?
-  fail "qualification guest exited before its completion marker"
+  let status = wait launched?
+  let output = qemu_log_text(console_log, qemu_log)?
+  if "LAPUTA_ASTERINAS_TEST_FAILED" in output or "Kernel panic" in output or "Uncaught panic" in output {
+    fail "qualification guest reported failure"
+  }
+  guard "LAPUTA_ASTERINAS_TEST_OK" in output else { fail "qualification guest exited before its completion marker" }
+  guard status.ok else { fail "qualification guest powered off with a failing QEMU status" }
 }
 
 pure qmp_mode(operation: QmpOperation) -> Str {

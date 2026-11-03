@@ -220,7 +220,8 @@ cat > "$runner_root/.out/asterinas-firecracker/bin/firecracker" <<'FIRECRACKER'
 #!/usr/bin/env bash
 [[ -z "${FAKE_FIRECRACKER_EXITS:-}" ]] || exit 0
 cat "$FAKE_CONSOLE"
-exec sleep 30
+[[ -z "${FAKE_FIRECRACKER_STALLS:-}" ]] || exec sleep 30
+exit "${FAKE_FIRECRACKER_STATUS:-0}"
 FIRECRACKER
 chmod 755 "$runner_root/.out/asterinas-firecracker/bin/firecracker"
 
@@ -269,6 +270,9 @@ for kind in CASE WITNESS; do
 
     : > "$scratch/$kind.silent"
     FAKE_FIRECRACKER_EXITS=1 run_runner "$kind" 1 "a VMM that exits at once" "$scratch/$kind.silent"
+
+    FAKE_FIRECRACKER_STALLS=1 LAPUTA_POWEROFF_POLLS=3 run_runner "$kind" 1 "a guest that never powers off" "$scratch/$kind.full"
+    FAKE_FIRECRACKER_STATUS=3 run_runner "$kind" 1 "a VMM that fails after the marker" "$scratch/$kind.full"
 done
 run_runner CASE 1 "a guest that never completes" "$scratch/CASE.silent"
 

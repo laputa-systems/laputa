@@ -304,7 +304,7 @@ cat > "$fake_firecracker" <<'FIRECRACKER'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FAKE_FIRECRACKER_PID_FILE"
 case "$FAKE_FIRECRACKER_MODE" in
-    base|success)
+    base|success|stalls|fails-after)
         printf '%s\n' \
             LAPUTA_ASTERINAS_EXT2_MOUNT_OK \
             LAPUTA_ASTERINAS_SWITCH_ROOT_START \
@@ -320,21 +320,25 @@ case "$FAKE_FIRECRACKER_MODE" in
                 LAPUTA_ASTERINAS_XSH_TEST_OK
         fi
         printf '%s\n' LAPUTA_ASTERINAS_TEST_OK
-        exec /bin/sleep 30
+        case "$FAKE_FIRECRACKER_MODE" in
+            stalls) exec /bin/sleep 30 ;;
+            fails-after) exit 3 ;;
+        esac
+        exit 0
         ;;
     full-success)
         printf '%s\n' \
             'LAPUTA_ASTERINAS_XSH_TEST_START all' \
             LAPUTA_ASTERINAS_XSH_TEST_OK \
             LAPUTA_ASTERINAS_TEST_OK
-        exec /bin/sleep 30
+        exit 0
         ;;
     exact-success)
         printf '%s\n' \
             'LAPUTA_ASTERINAS_XSH_TEST_START core/tests/test-core.xsh::core_suite_fixture' \
             LAPUTA_ASTERINAS_XSH_TEST_OK \
             LAPUTA_ASTERINAS_TEST_OK
-        exec /bin/sleep 30
+        exit 0
         ;;
     batch-success)
         printf '%s\n' \
@@ -342,7 +346,7 @@ case "$FAKE_FIRECRACKER_MODE" in
             'LAPUTA_ASTERINAS_XSH_TEST_START tests/xsh/stdlib/fs.xsh' \
             LAPUTA_ASTERINAS_XSH_TEST_OK \
             LAPUTA_ASTERINAS_TEST_OK
-        exec /bin/sleep 30
+        exit 0
         ;;
     failed)
         printf '%s\n' 'LAPUTA_ASTERINAS_TEST_FAILED proof: expected failure'
@@ -408,6 +412,10 @@ assert_vm_case base all 2 1
 assert_vm_case failed '' 2 1
 assert_vm_case panic '' 2 1
 assert_vm_case early '' 2 1
+LAPUTA_POWEROFF_POLLS=3 assert_vm_case stalls '' 2 1
+grep -Fq 'did not power off' "$vm_test_root/stalls-run.log"
+assert_vm_case fails-after '' 2 1
+grep -Fq 'exited with status 3 after the guest completion marker' "$vm_test_root/fails-after-run.log"
 assert_vm_case timeout '' 3 1
 FAKE_FIRECRACKER_MODE=timeout \
 FAKE_FIRECRACKER_PID_FILE="$vm_test_root/cancel.pid" \

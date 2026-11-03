@@ -124,7 +124,7 @@ test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, ti
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
-  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
+  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a guest without its completion marker"
     Err(_) => {}
   }
@@ -138,13 +138,53 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
   fake.chmod(0o755)
   let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
-  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5) {
+  match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a failed guest"
     Err(_) => {}
   }
   let pid = pid_file.read_text()?.parse_int()?
   for entry in process.list()? {
     assert entry.pid != pid, f"qualification guest {pid} remained after failure"
+  }
+}
+
+proc fake_qualification_qemu(root: Path, script: Str) [fs, process, error] -> Result[qemu.QemuConfig] {
+  let fake = fp"{root}/qemu"
+  fake.write(script)
+  fake.chmod(0o755)
+  qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+}
+
+pure qualification_input(root: Path) -> qemu.QemuAsterinasReference {
+  qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
+}
+
+test test_qemu_qualification_accepts_a_guest_that_powers_off_after_completion [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-qualification-poweroff")?
+  let config = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexit 0\n")?
+  qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2)?
+}
+
+test test_qemu_qualification_rejects_a_guest_that_stays_up_after_completion [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-qualification-stalled")?
+  let pid_file = fp"{root}/pid"
+  let config = fake_qualification_qemu(root, f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexec sleep 30\n")?
+  match qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 1) {
+    Ok(_) => fail "accepted a guest that never powered off"
+    Err(problem) => assert "did not power off" in problem.message
+  }
+  let pid = pid_file.read_text()?.parse_int()?
+  for entry in process.list()? {
+    assert entry.pid != pid, f"qualification guest {pid} remained after the poweroff deadline"
+  }
+}
+
+test test_qemu_qualification_rejects_a_guest_that_exits_with_failure_after_completion [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-qualification-status")?
+  let config = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexit 3\n")?
+  match qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
+    Ok(_) => fail "accepted a guest whose QEMU exited with a failure status"
+    Err(_) => {}
   }
 }
 

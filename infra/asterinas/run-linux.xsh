@@ -6,7 +6,7 @@ cli main(kernel: Path, initramfs: Path, disk: Path, console: Path, qemu_log: Pat
   let target = qemu.host_qemu_target()?
   let config = qemu.qemu_config(target)?
   let input = qemu.QemuAsterinasReference(kernel:, initramfs:, disk:, memory_mib:, data_disk: if data_disk == "" { qemu.NoDataDisk } else { qemu.DataDisk(fp"{data_disk}") }, network: if tap == "" { qemu.NoNetwork } else { qemu.Tap(tap) }, control: if qmp == "" { qemu.NoControl } else { qemu.QmpSocket(fp"{qmp}") })
-  qemu.qemu_run_asterinas_reference(config, input, console, qemu_log, timeout_seconds)
+  qemu.qemu_run_asterinas_reference(config, input, console, qemu_log, timeout_seconds, qemu.guest_poweroff_timeout_seconds)
   let output = qemu.qemu_log_text(console, qemu_log)?
   let missing = guest_protocol.guest_missing_success_markers(output)
   guard missing.is_empty() else { fail f"guest proof is missing: {missing.join(", ")}" }

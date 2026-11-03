@@ -13,6 +13,7 @@ firecracker_log="$4"
 test_selection="$5"
 max_polls="$6"
 firecracker_pid=""
+poweroff_polls="${LAPUTA_POWEROFF_POLLS:-300}"
 
 [[ -x "$firecracker_bin" ]] || {
     printf 'asterinas-test: Firecracker is not executable: %s\n' "$firecracker_bin" >&2
@@ -20,6 +21,10 @@ firecracker_pid=""
 }
 [[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || {
     printf 'asterinas-test: invalid guest completion poll count: %s\n' "$max_polls" >&2
+    exit 2
+}
+[[ "$poweroff_polls" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'asterinas-test: invalid guest poweroff poll count: %s\n' "$poweroff_polls" >&2
     exit 2
 }
 
@@ -72,6 +77,7 @@ firecracker_pid=$!
 
 complete=false
 for ((attempt = 0; attempt < max_polls; attempt++)); do
+    state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
     if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
         fail 'guest reported a failed Laputa proof'
     fi
@@ -82,7 +88,6 @@ for ((attempt = 0; attempt < max_polls; attempt++)); do
         complete=true
         break
     fi
-    state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
     if [[ -z "$state" || "$state" == Z* ]]; then
         vm_status=0
         wait "$firecracker_pid" || vm_status=$?
@@ -102,3 +107,19 @@ if [[ -n "$test_selection" ]]; then
     grep -Fq LAPUTA_ASTERINAS_XSH_TEST_OK "$console_log" || \
         fail 'guest did not report the selected XSH test module passing'
 fi
+
+for ((attempt = 0; attempt < poweroff_polls; attempt++)); do
+    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|Heap allocation error' "$console_log"; then
+        fail 'Asterinas reported a kernel failure while powering off'
+    fi
+    state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
+    if [[ -z "$state" || "$state" == Z* ]]; then
+        vm_status=0
+        wait "$firecracker_pid" || vm_status=$?
+        firecracker_pid=""
+        (( vm_status == 0 )) || fail "Firecracker exited with status $vm_status after the guest completion marker"
+        exit 0
+    fi
+    sleep 0.2
+done
+fail 'the guest did not power off after its completion marker'

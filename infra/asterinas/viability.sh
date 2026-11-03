@@ -381,7 +381,7 @@ Guest memory: $guest_memory_mib MiB
 Guest proofs: $guest_proofs
 XSH test selection: ${xsh_test_selection:-none}
 Selected XSH test SHA-256: ${xsh_test_sha256:-none}
-VM completion: Firecracker stopped by the host after all guest proof markers
+VM completion: the guest powered off after all guest proof markers
 Guest serial log: $console_log
 Firecracker log: $firecracker_log
 RESULT
