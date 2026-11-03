@@ -13,7 +13,10 @@ make asterinas-build
 
 `asterinas-preflight` only checks the host and input declarations.
 `asterinas-fetch` fetches the pinned Asterinas and XSH source and the declared
-build inputs. `asterinas-build` builds or reuses the Asterinas PVH kernel and
+build inputs. It checks the kernel out with plain `git clone` and `git
+checkout` (`infra/asterinas/checkout-kernel.sh`), so it does not need
+`git submodule`, and the stamp that records fetched Cargo inputs depends on the
+lock files' contents only, so a checkout elsewhere reuses a fetched cache. `asterinas-build` builds or reuses the Asterinas PVH kernel and
 the Laputa generation, then publishes a content-addressed bundle. Changes in
 the sibling XSH working tree do not affect this pinned build.
 

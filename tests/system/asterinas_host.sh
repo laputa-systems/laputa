@@ -228,6 +228,75 @@ readarray -t changed_full_xsh_suite < <(
 [[ "${changed_full_xsh_suite[2]}" == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
 [[ "${changed_full_xsh_suite[2]}" != "$initial_full_suite_sha256" ]]
 
+cargo_digest() { bash "$repo_root/infra/asterinas/cargo-input-digest.sh" "$1"; }
+for cargo_dir in "$scratch/cargo-first/kernel" "$scratch/cargo-second/another-name"; do
+    mkdir -p "$cargo_dir/osdk" "$cargo_dir/.cargo"
+    printf 'lock\n' > "$cargo_dir/Cargo.lock"
+    printf 'osdk lock\n' > "$cargo_dir/osdk/Cargo.lock"
+    printf 'registry\n' > "$cargo_dir/.cargo/config.toml"
+done
+[[ "$(cargo_digest "$scratch/cargo-first/kernel")" == "$(cargo_digest "$scratch/cargo-second/another-name")" ]] || {
+    printf 'the Cargo input digest depends on where the source is checked out\n' >&2
+    exit 1
+}
+for cargo_file in Cargo.lock osdk/Cargo.lock .cargo/config.toml; do
+    cp -r "$scratch/cargo-second/another-name" "$scratch/cargo-changed"
+    printf 'changed\n' >> "$scratch/cargo-changed/$cargo_file"
+    [[ "$(cargo_digest "$scratch/cargo-changed")" != "$(cargo_digest "$scratch/cargo-first/kernel")" ]] || {
+        printf 'the Cargo input digest ignores %s\n' "$cargo_file" >&2
+        exit 1
+    }
+    rm -rf "$scratch/cargo-changed"
+done
+
+kernel_origin="$scratch/kernel-origin"
+kernel_fixture="$scratch/kernel-fixture"
+real_git="$(command -v git)"
+no_submodule_bin="$scratch/no-submodule-bin"
+mkdir -p "$no_submodule_bin" "$kernel_origin" "$kernel_fixture/infra/asterinas"
+cat > "$no_submodule_bin/git" <<GIT
+#!/usr/bin/env bash
+for argument in "\$@"; do
+    [[ "\$argument" != submodule ]] || { printf "git: 'submodule' is not a git command\\n" >&2; exit 1; }
+done
+exec "$real_git" "\$@"
+GIT
+chmod 755 "$no_submodule_bin/git"
+cp "$repo_root/infra/asterinas/checkout-kernel.sh" "$kernel_fixture/infra/asterinas/"
+git -C "$kernel_origin" init -q
+git -C "$kernel_origin" config user.email asterinas-test@example.invalid
+git -C "$kernel_origin" config user.name Asterinas
+printf 'first\n' > "$kernel_origin/kernel.txt"
+git -C "$kernel_origin" add kernel.txt
+git -C "$kernel_origin" commit -qm first
+first_kernel="$(git -C "$kernel_origin" rev-parse HEAD)"
+git -C "$kernel_fixture" init -q
+printf '[submodule "asterinas"]\n\tpath = asterinas\n\turl = %s\n' "$kernel_origin" > "$kernel_fixture/.gitmodules"
+git -C "$kernel_fixture" update-index --add --cacheinfo "160000,$first_kernel,asterinas"
+checkout_kernel() { PATH="$no_submodule_bin:$PATH" bash "$kernel_fixture/infra/asterinas/checkout-kernel.sh"; }
+checkout_kernel
+[[ "$(git -C "$kernel_fixture/asterinas" rev-parse HEAD)" == "$first_kernel" ]]
+[[ -f "$kernel_fixture/asterinas/.git" ]]
+[[ "$(git -C "$kernel_fixture/asterinas" remote get-url origin)" == "$kernel_origin" ]]
+checkout_kernel
+printf 'second\n' > "$kernel_origin/kernel.txt"
+git -C "$kernel_origin" commit -qam second
+second_kernel="$(git -C "$kernel_origin" rev-parse HEAD)"
+git -C "$kernel_fixture" update-index --cacheinfo "160000,$second_kernel,asterinas"
+checkout_kernel
+[[ "$(git -C "$kernel_fixture/asterinas" rev-parse HEAD)" == "$second_kernel" ]]
+[[ "$(cat "$kernel_fixture/asterinas/kernel.txt")" == second ]]
+git -C "$kernel_fixture" update-index --force-remove asterinas
+rm -rf "$kernel_fixture/asterinas"
+mkdir "$kernel_fixture/asterinas"
+printf 'stray\n' > "$kernel_fixture/asterinas/stray.txt"
+git -C "$kernel_fixture" update-index --add --cacheinfo "160000,$second_kernel,asterinas"
+if checkout_kernel > "$scratch/kernel-stray.log" 2>&1; then
+    printf 'kernel checkout overwrote a directory that is not a checkout\n' >&2
+    exit 1
+fi
+rg -q 'not a git checkout' "$scratch/kernel-stray.log"
+
 vm_test_root="$scratch/vm-fixture"
 fake_firecracker="$vm_test_root/firecracker"
 mkdir -p "$vm_test_root"

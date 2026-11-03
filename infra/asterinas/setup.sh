@@ -163,7 +163,7 @@ docker run --rm --platform linux/amd64 --network none --entrypoint /usr/bin/test
 sysroot_lock_hash="$(docker run --rm --platform linux/amd64 --network none \
     --entrypoint /usr/bin/sha256sum "$dev_image_id" "$sysroot_lock" | awk '{print $1}')"
 cargo_lock_hash="$(printf '%s\n%s\n%s\n%s\n' \
-    "$(sha256sum "$source_dir/Cargo.lock" "$source_dir/osdk/Cargo.lock" "$source_dir/.cargo/config.toml" | sha256sum | awk '{print $1}')" \
+    "$(bash "$repo_root/infra/asterinas/cargo-input-digest.sh" "$source_dir")" \
     "$sysroot_lock_hash" "$toolchain_channel" "$dev_image_digest" | sha256sum | awk '{print $1}')"
 cargo_lock_stamp="$cache_dir/cargo.lock.sha256"
 mkdir -p "$cargo_home" "$target_dir" "$osdk_output_dir"
