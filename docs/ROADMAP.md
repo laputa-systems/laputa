@@ -174,6 +174,29 @@ Defer broad OCI work, desktop protocol expansion, additional utility ports,
 and firmware-boot work unless a concrete G2 workflow requires them. The desktop
 (R11/R12) is last; it starts only after G2 and G4 pass.
 
+Asterinas successor work runs as one serial lane alongside the G2 tracks,
+because every kernel slice moves the same submodule pin and its qualification
+needs quiet-host windows; the G2 tracks keep first claim on host capacity. The
+closed [compatibility campaign](CAMPAIGN-ASTERINAS-COMPATIBILITY.md) records
+the debt it inherits. In order:
+
+1. Harness and tooling: build the kernel crate's own unit tests on this host,
+   make the cargo-input stamp independent of absolute paths, fetch the kernel
+   without `git submodule`, and power the guest off so acceptance no longer
+   trusts the completion marker alone.
+2. The nine Asterinas-only native failures (btop, chrt, cp, cpio, dd, date),
+   triaged by the syscalls they reach and fixed against the Linux reference;
+   `date` joins the open A2 clock obligations.
+3. One ICMP error slice: ICMP receive, `IP_RECVERR`, and asynchronous socket
+   errors, which together serve the Asterinas-only `tracepath` and
+   `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
+   matching A3/A5 debt.
+
+Each slice passes `qualify.sh all --backend both` and loses no A0 pass in a
+quiet-host accounting run. The page-fault cost and `MAP_POPULATE` wait for the
+deferred performance work, and the public reproduction stays red until the
+owner publishes the kernel fork's `main`.
+
 ## G2: The remotely maintainable VM
 
 **Status: planned.** This is the organizing product milestone, not a new manager,
