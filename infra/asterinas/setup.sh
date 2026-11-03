@@ -382,6 +382,7 @@ else
             --workdir /src/asterinas \
             --env CARGO_HOME=/work/asterinas/cargo \
             --env CARGO_TARGET_DIR=/work/asterinas/target \
+            --env CARGO_BUILD_JOBS \
             --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
             --env OSDK_LOCAL_DEV=1 \
             --env "OSDK_INSTALL_ROOT=/work/asterinas/osdk/$osdk_key" \
@@ -397,6 +398,7 @@ else
         --workdir /src/asterinas/kernel \
         --env CARGO_HOME=/work/asterinas/cargo \
         --env CARGO_TARGET_DIR=/work/asterinas/target \
+        --env CARGO_BUILD_JOBS \
         --env CARGO_NET_OFFLINE=true \
         --env KACHE_RUSTC_PATH_NORMALIZE=0 \
         --env RUSTUP_TOOLCHAIN="$toolchain_channel" \
