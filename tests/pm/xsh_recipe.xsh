@@ -19,6 +19,7 @@ test xsh_seed_installs_declared_applet_links_and_keeps_libraries_private [fs, en
   }
   let files = {product: hash.sha256(fp"{seed}/{product}")?.hex() for product in ["xsh", "xshi", "xsht", "core.tar.xz"]}
   json.write(fp"{seed}/manifest.json", {files})
+  p"packages/xsh/xsh-login.xsh".copy(to: fp"{workspace}/xsh-login.xsh")?
   let dest = fp"{workspace}/dest"
 
   cd (workspace) {
