@@ -975,7 +975,7 @@ proc read_status(name: Str) -> Result[SavedStatus] {
 proc write_status(status: SavedStatus) [fs, process, env, error] {
   let dir = run_dir()?
   dir.mkdir()
-  json.write(state_path(status.name)?, status)
+  state_path(status.name)?.write_atomic(json.encode(status)?)
 }
 
 proc status_line(status: SavedStatus) [error] -> Str {
@@ -1748,7 +1748,7 @@ proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
 proc write_scanner_marker() {
   let dir = run_dir()?
   dir.mkdir()
-  json.write(scanner_marker_path()?, {pid: process.current_pid()?})
+  scanner_marker_path()?.write_atomic(json.encode({pid: process.current_pid()?})?)
 }
 
 proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit] {

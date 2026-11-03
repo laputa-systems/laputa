@@ -1429,6 +1429,35 @@ proc xinit_policy_source() -> Result[Str] {
   source.replace(entry, with: "proc xinit_cli(...argv: List[Str])")
 }
 
+test test_status_file_is_never_seen_half_written [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "status-atomic")?
+  let writer = fp"{root}/writer.xsh"
+  writer.write(xinit_policy_source()? + """
+let padding = collect { for _ in range(20000) { yield "0123456789abcdef" } }.join("")
+for round in range(300) {
+  write_status({name: "svc", desired: "up", state: "running", pid: round + 1, supervisor_pid: 1, log: padding, restarts: 0, ready: true, cgroup_path: "", start_time_ms: 0})
+}
+fp"{env_value("XINIT_RUN_DIR", "")}/done".write("")
+""")
+  let launched = process.spawn(process.command_argv(ctx.xsh_bin, [ctx.xsh_bin.display(), writer.display()], env: {XINIT_RUN_DIR: root.display()}))?
+  let status = fp"{root}/svc.json"
+  let done = fp"{root}/done"
+  let deadline = time.monotonic()? + 60000000000
+  var complete = 0
+  var torn = 0
+  while ! done.exists()? {
+    assert time.monotonic()? < deadline, "the status writer did not finish"
+    if status.exists()? {
+      match json.read(status) {
+        Ok(_) => complete += 1
+        Err(_) => torn += 1
+      }
+    }
+  }
+  assert torn == 0, f"{torn} reads saw a half-written status file ({complete} complete)"
+  assert complete > 0
+}
+
 test test_restart_delay_caps_before_multiplication [fs, process, error] { |ctx|
   let source = xinit_policy_source()? + """
 for item in [
