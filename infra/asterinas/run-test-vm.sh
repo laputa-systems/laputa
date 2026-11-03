@@ -41,6 +41,15 @@ fail() {
     exit 1
 }
 
+check_guest_failure() {
+    if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
+        fail 'guest reported a failed Laputa proof'
+    fi
+    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|failed to run the init process|Heap allocation error' "$console_log"; then
+        fail 'Asterinas reported a kernel or init failure'
+    fi
+}
+
 stop_firecracker() {
     [[ -n "$firecracker_pid" ]] || return 0
     if kill -0 "$firecracker_pid" 2>/dev/null; then
@@ -78,12 +87,7 @@ firecracker_pid=$!
 complete=false
 for ((attempt = 0; attempt < max_polls; attempt++)); do
     state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
-    if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
-        fail 'guest reported a failed Laputa proof'
-    fi
-    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|failed to run the init process|Heap allocation error' "$console_log"; then
-        fail 'Asterinas reported a kernel or init failure'
-    fi
+    check_guest_failure
     if grep -Fq LAPUTA_ASTERINAS_TEST_OK "$console_log"; then
         complete=true
         break
@@ -109,14 +113,13 @@ if [[ -n "$test_selection" ]]; then
 fi
 
 for ((attempt = 0; attempt < poweroff_polls; attempt++)); do
-    if grep -Eq 'Kernel panic|panicked at|Uncaught panic|Heap allocation error' "$console_log"; then
-        fail 'Asterinas reported a kernel failure while powering off'
-    fi
+    check_guest_failure
     state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
     if [[ -z "$state" || "$state" == Z* ]]; then
         vm_status=0
         wait "$firecracker_pid" || vm_status=$?
         firecracker_pid=""
+        check_guest_failure
         (( vm_status == 0 )) || fail "Firecracker exited with status $vm_status after the guest completion marker"
         exit 0
     fi

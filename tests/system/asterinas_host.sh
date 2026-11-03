@@ -364,7 +364,7 @@ cat > "$fake_firecracker" <<'FIRECRACKER'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FAKE_FIRECRACKER_PID_FILE"
 case "$FAKE_FIRECRACKER_MODE" in
-    base|success|stalls|fails-after)
+    base|success|stalls|fails-after|late-failure|late-panic)
         printf '%s\n' \
             LAPUTA_ASTERINAS_EXT2_MOUNT_OK \
             LAPUTA_ASTERINAS_SWITCH_ROOT_START \
@@ -383,6 +383,8 @@ case "$FAKE_FIRECRACKER_MODE" in
         case "$FAKE_FIRECRACKER_MODE" in
             stalls) exec /bin/sleep 30 ;;
             fails-after) exit 3 ;;
+            late-failure) sleep 1; printf '%s\n' 'LAPUTA_ASTERINAS_TEST_FAILED late' ;;
+            late-panic) sleep 1; printf '%s\n' 'Kernel panic: late' ;;
         esac
         exit 0
         ;;
@@ -476,6 +478,8 @@ LAPUTA_POWEROFF_POLLS=3 assert_vm_case stalls '' 2 1
 grep -Fq 'did not power off' "$vm_test_root/stalls-run.log"
 assert_vm_case fails-after '' 2 1
 grep -Fq 'exited with status 3 after the guest completion marker' "$vm_test_root/fails-after-run.log"
+assert_vm_case late-failure '' 2 1
+assert_vm_case late-panic '' 2 1
 assert_vm_case timeout '' 3 1
 FAKE_FIRECRACKER_MODE=timeout \
 FAKE_FIRECRACKER_PID_FILE="$vm_test_root/cancel.pid" \
