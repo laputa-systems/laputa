@@ -427,6 +427,11 @@ proc ensure_dir(rootfs: FsRoot, rel: RelPath, mode: Int) {
   }
 }
 
+proc withhold_group_and_world_write(rootfs: FsRoot, rel: RelPath) {
+  let mode = rootfs.stat(rel, follow_symlinks: false)?.mode.bit_and(0o7777)
+  rootfs.chmod(rel, mode.bit_and(0o7755))
+}
+
 proc write_text(rootfs: FsRoot, rel: RelPath, body: Str, mode: Int) {
   rootfs.write_atomic(rel, body)
   rootfs.chmod(rel, mode)
@@ -505,7 +510,9 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   ensure_dir(rootfs, p"etc/laputa/first-boot", 0o755)
   ensure_dir(rootfs, p"home", 0o755)
   ensure_dir(rootfs, home, 0o755)
+  withhold_group_and_world_write(rootfs, home)
   ensure_dir(rootfs, ssh_dir, 0o700)
+  rootfs.chmod(ssh_dir, 0o700)
   write_text(rootfs, p"etc/hostname", f"{config.hostname}\n", 0o644)
   write_text(rootfs, p"etc/laputa/first-boot/network", network_text(config.network), 0o644)
   let tailscale = if config.tailscale { "yes" } else { "no" }
@@ -589,6 +596,7 @@ export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwn
       let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
       let expected = if entry == authorized { "file" } else { "dir" }
       guard info.kind == expected else { fail f"operator state path is not a {expected}: {entry}" }
+      if entry == home { guard info.mode.bit_and(0o022) == 0 else { fail "operator home must not be group or world writable" } }
       if entry == ssh_dir { guard info.mode.bit_and(0o7777) == 0o700 else { fail "operator SSH directory mode must be 0700" } }
       if entry == authorized { guard info.mode.bit_and(0o7777) == 0o600 else { fail "operator authorized keys mode must be 0600" } }
     }

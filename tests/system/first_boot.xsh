@@ -454,6 +454,20 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
   assert image.read_text()? == "previous"
 }
 
+test test_apply_tightens_preexisting_operator_paths_to_dropbear_modes [fs, error] { |ctx|
+  let root = prepare(ctx, name: "dropbear-modes")?
+  fp"{root}/etc".mkdir()?
+  fp"{root}/home/pazu/.ssh".mkdir(parents: true)?
+  fp"{root}/home/pazu".chmod(0o777)?
+  fp"{root}/home/pazu/.ssh".chmod(0o755)?
+  fp"{root}/home/pazu/.ssh/authorized_keys".write("stale\n")?
+  fp"{root}/home/pazu/.ssh/authorized_keys".chmod(0o666)?
+  first_boot.apply(root, base("new"))?
+  assert fp"{root}/home/pazu".metadata()?.mode % 4096 == 0o755
+  assert fp"{root}/home/pazu/.ssh".metadata()?.mode % 4096 == 0o700
+  assert fp"{root}/home/pazu/.ssh/authorized_keys".metadata()?.mode % 4096 == 0o600
+}
+
 test test_state_image_ownership_accepts_authorized_keys_as_operator [fs, error] { |ctx|
   let root = prepare(ctx, name: "state-operator-authorized-keys")?
   let document = base("new").replace("operator pazu", with: "operator authorized_keys")
