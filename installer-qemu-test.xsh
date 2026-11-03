@@ -154,16 +154,16 @@ pure ssh_args(ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) 
   ]
 }
 
-proc ssh_guest(ssh: Path, ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) -> Result[Str] {
+proc ssh_guest(ssh_client: Path, ssh_key: Path, port: Int, known_hosts: Path, remote_command: Str) -> Result[Str] {
   let argv = ssh_args(ssh_key, port, known_hosts, remote_command)
-  return run.text $ssh @argv
+  return run.text $ssh_client @argv
 }
 
 proc wait_for_ssh(
   pid: Int,
   kill: Path,
   tail: Path,
-  ssh: Path,
+  ssh_client: Path,
   ssh_key: Path,
   port: Int,
   known_hosts: Path,
@@ -174,7 +174,7 @@ proc wait_for_ssh(
   var elapsed = 0
 
   while process_live(kill, pid, cwd) {
-    if let Ok(output) = ssh_guest(ssh, ssh_key, port, known_hosts, "print \"LAPUTA_SSH_OK\"") {
+    if let Ok(output) = ssh_guest(ssh_client, ssh_key, port, known_hosts, "print \"LAPUTA_SSH_OK\"") {
       return when output.trim() == "LAPUTA_SSH_OK"
     }
 
@@ -195,7 +195,7 @@ proc assert_ssh_smoke(
   pid: Int,
   kill: Path,
   tail: Path,
-  ssh: Path,
+  ssh_client: Path,
   ssh_key: Path,
   port: Int,
   known_hosts: Path,
@@ -203,18 +203,18 @@ proc assert_ssh_smoke(
   timeout_seconds: Int,
   cwd: Path,
 ) {
-  wait_for_ssh(pid, kill, tail, ssh, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
+  wait_for_ssh(pid, kill, tail, ssh_client, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
 
   # xinit status uses signal-0 liveness which gets EPERM across UIDs
   # (SSH user is pazu, dropbear runs as root). Use doas.
-  let status = ssh_guest(ssh, ssh_key, port, known_hosts, "run /usr/bin/doas /usr/bin/xinit status dropbear ?")?
+  let status = ssh_guest(ssh_client, ssh_key, port, known_hosts, "run /usr/bin/doas /usr/bin/xinit status dropbear ?")?
 
   if ! ("dropbear running" in status) {
     print $status
     return Err(InstallerQemuTestError.Failed(kind: "ssh-dropbear", message: "dropbear status assertion failed"))
   }
 
-  let result = ssh_guest(ssh, ssh_key, port, known_hosts, "run /bin/xsh --help ?")?
+  let result = ssh_guest(ssh_client, ssh_key, port, known_hosts, "run /bin/xsh --help ?")?
 
   if ! ("xsh 0.0.1" in result) {
     print $result
@@ -476,7 +476,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
   }
 
   let qemu = command_path(qemu_name)?
-  let ssh = host.installer_env_value("SSH", "ssh") |> command_path(_)?
+  let ssh_client = host.installer_env_value("SSH", "ssh") |> command_path(_)?
   let ssh_keygen = host.installer_env_value("SSH_KEYGEN", "ssh-keygen") |> command_path(_)?
   let kill = command_path("kill")?
   let tail = command_path("tail")?
@@ -577,7 +577,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     target.pid,
     kill,
     tail,
-    ssh,
+    ssh_client,
     ssh_key,
     target_ssh_port,
     ssh_known_hosts,

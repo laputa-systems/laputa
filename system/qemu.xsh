@@ -47,30 +47,30 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
   guard !("," in input.disk.display()) else {
     return Err(types.LaputaError.Profile("qualification disk path cannot contain a comma"))
   }
-  let data_disk = match input.data_disk {
+  let data_disk = (match input.data_disk {
     NoDataDisk => Ok([]),
     DataDisk(image) => if "," in image.display() {
       Err(types.LaputaError.Profile("qualification data disk path cannot contain a comma"))
     } else {
       Ok(["-drive", f"if=none,id=data,format=raw,file={image}", "-device", f"{target.block_device},drive=data"])
     },
-  }?
-  let network = match input.network {
+  })?
+  let network = (match input.network {
     NoNetwork => Ok([]),
     Tap(interface) => if interface == "" or "," in interface {
       Err(types.LaputaError.Profile("qualification TAP name must be nonempty and cannot contain a comma"))
     } else {
       Ok(["-netdev", f"tap,id=net0,ifname={interface},script=no,downscript=no", "-device", "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01"])
     },
-  }?
-  let control = match input.control {
+  })?
+  let control = (match input.control {
     NoControl => Ok([]),
     QmpSocket(socket) => if "," in socket.display() {
       Err(types.LaputaError.Profile("qualification control socket path cannot contain a comma"))
     } else {
       Ok(["-qmp", f"unix:{socket},server=on,wait=off"])
     },
-  }?
+  })?
   [
     value.qemu.display(), "-machine", target.machine, "-cpu", target.cpu,
     "-smp", "2", "-m", f"{input.memory_mib}", "-nographic", "-no-reboot",
