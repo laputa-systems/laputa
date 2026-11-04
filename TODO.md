@@ -85,14 +85,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** single-source-of-truth
 - **Effort:** L (weeks)
 
-### LAP-20 · P4 · Remove the libgcc_s compatibility name
+### LAP-20 · P3 · Fork the Rust toolchain build to retire gnu-stubs
 
 - **Area:** Dependencies
-- **Where:** `packages/gnu-stubs/PKGBUILD.xsh:83`
-- **Problem:** gnu-stubs supplies libgcc_s from LLVM libunwind because the prebuilt Rust standard library requests that name.
-- **Recommendation:** Retire the alias only with a Rust standard library built against LLVM libunwind and verified Rust package links.
-- **Blocked:** The declared prebuilt Rust standard library still requires the compatibility name. A replacement SDK and its Cargo/package consumers need qualification before removal.
-- **Fix with:** dead-code-archaeology
+- **Where:** `packages/gnu-stubs/PKGBUILD.xsh`, `packages/cargo/PKGBUILD.xsh`, `packages/play/PKGBUILD.xsh`
+- **Problem:** Laputa-built Rust packages no longer load libgcc_s.so.1: the cc wrapper links LLVM's static libunwind.a for `-static-libgcc`. Two consumers still need gnu-stubs at run time. The prebuilt upstream `cargo`, `rustc`, `rustdoc`, `rust-lld`, `rust-analyzer-proc-macro-srv` and `libstd-*.so` from static.rust-lang.org import `_Unwind_*` from libgcc_s.so.1, and Laputa cannot relink them. The `play` package installs the v0.42.1 release, which imports `__popcountdi2` and `_Unwind_*` from it; gnu-stubs exports `__popcountdi2` only for that binary. Builds also take gnu-stubs' empty crtbeginS.o and crtendS.o from cargo's closure.
+- **Recommendation:** Fork the Rust toolchain build under laputa-systems and build cargo, rustc and the musl std from source against Laputa's musl with the `llvm-libunwind` std feature, so nothing imports libgcc_s. Point the `play` recipe at the first Play release linked with GCC's static unwinder (Play `83070cc`), drop gnu-stubs from its deps, and remove the `__popcountdi2` export. Retire libgcc_s.so.1 and the crt stubs once no recipe or prebuilt input needs them.
+- **Acceptance:** No package's installed ELF files carry a libgcc_s NEEDED entry or a GCC runtime import, the PM ELF check reports no gnu-stubs provider, and Rust packages still build and pass their proofs with the source-built toolchain.
+- **Fix with:** reference-parity, dead-code-archaeology
 - **Effort:** L (weeks)
 
 ### LAP-40 · P4 · Pilot one trusted external CLI signature in Laputa recipes
