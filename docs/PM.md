@@ -312,10 +312,13 @@ root as both `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin`
 `PATH`, and `CC=cc` and `CXX=c++`, so tools that score every compiler they find
 (muon) take the build root's.
 
-Before a package's own proof runs, PM checks every ELF file it installs: a
-`DT_NEEDED` name another package in the proof root provides must come from the
-package's runtime closure, and no `DT_NEEDED` entry may be a path, which only
-a link against a SONAME-less library by its build-time path produces.
+Before a package's own proof runs, PM checks every ELF file it installs. Every
+`DT_NEEDED` name must be provided by the package itself or by its runtime
+closure. A provider is a library's SONAME, or a file or symlink name under
+`lib/` or `usr/lib/` that reaches a file in the root. Names musl's loader
+resolves to itself, such as `libc.musl-x86_64.so.1`, need only musl. No
+`DT_NEEDED` entry may be a path, which only a link against a SONAME-less
+library by its build-time path produces.
 
 ### Publication
 
