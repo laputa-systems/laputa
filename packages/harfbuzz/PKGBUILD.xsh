@@ -46,7 +46,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
     "-DBUILD_SHARED_LIBS=ON" "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON" \
-    "-DCMAKE_CXX_FLAGS_RELEASE=-Oz -DNDEBUG -DHB_MINI" "-DHB_HAVE_FREETYPE=ON" \
+    "-DCMAKE_C_FLAGS_RELEASE=-Oz -DNDEBUG" "-DCMAKE_CXX_FLAGS_RELEASE=-Oz -DNDEBUG -DHB_MINI" "-DHB_HAVE_FREETYPE=ON" \
     "-DHB_BUILD_SUBSET=OFF" "-DHB_BUILD_RASTER=OFF" "-DHB_BUILD_VECTOR=OFF" \
     "-DHB_BUILD_GPU=OFF" "-DHB_BUILD_UTILS=OFF" "-DHB_HAVE_GLIB=OFF" \
     "-DHB_HAVE_CAIRO=OFF" "-DHB_HAVE_ICU=OFF" "-DHB_HAVE_GRAPHITE2=OFF"
