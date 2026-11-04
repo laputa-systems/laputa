@@ -1,5 +1,13 @@
 # Asterinas and Firecracker
 
+The local successor candidate `2252e24b6` remains unpinned and unpublished at
+the owner's 2026-11-04 wind-down. Its paired baseline, device, clock, network
+state, and network cohorts passed. Five complete recovery rounds passed before
+round six was interrupted. The full ten-round gate and refreshed A0/resource
+qualification remain open. This does not replace the checked-in pin or the
+historical qualification below. The [campaign handoff](../../xsh/docs/CAMPAIGN-HANDOFF.md)
+records the retained kernel branch and resume inputs.
+
 The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
 versions recorded in `infra/asterinas/inputs.lock`. Start on an x86-64 Linux
 host with usable `/dev/kvm`; `infra/asterinas/preflight.sh` lists the required

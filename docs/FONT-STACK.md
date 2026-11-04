@@ -155,3 +155,17 @@ Arabic and Hebrew shaping, ligatures, combining marks, variable axes,
 Devanagari, Thai, a CJK collection, PNG color emoji, BDF, PCF, and Fontconfig
 discovery. Its loader resolved the shared libraries from the private root.
 This was not a native PM package build or an AArch64 Ghostty or guest proof.
+
+## Remaining qualification after wind-down
+
+The owner requested a wind-down on 2026-11-04. Repeated graphical startup and
+idle-memory measurements remain open. The queued measurement driver was
+stopped before collecting its final pairs. The current local graphical proof
+and package results above remain valid within their stated scope. No release
+was published and the production package pin remains unchanged.
+
+After this baseline and Play's SRT/Core Text migrations qualify, execute
+[LAP-52](rfc/LAP-52-rust-fontconfig.md) before the broader
+[C-free roadmap](rfc/LAP-51-c-free-userspace.md). The cross-repository
+[handoff](../../xsh/docs/CAMPAIGN-HANDOFF.md) records retained source and
+outstanding checks. macOS execution remains outside this Linux campaign.
