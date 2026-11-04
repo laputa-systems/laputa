@@ -9,7 +9,7 @@ export const package_kind = "payload"
 ## Upstream version.
 export const ver = "2.15.0"
 ## Package revision.
-export const rel = "2"
+export const rel = "3"
 ## Runtime dependencies.
 export const deps = ["musl", "zlib", "libpng"]
 ## Build dependencies.
@@ -48,6 +48,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs = make.jobs()?
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
+    "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON" \
     "-DBUILD_SHARED_LIBS=ON" "-DFT_REQUIRE_ZLIB=ON" "-DFT_REQUIRE_PNG=ON" \
     "-DFT_DISABLE_HARFBUZZ=ON" "-DFT_DISABLE_BZIP2=ON" "-DFT_DISABLE_BROTLI=ON"
   run $samu "-C" "build" f"-j{jobs}"
