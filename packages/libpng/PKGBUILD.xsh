@@ -7,7 +7,7 @@ export const name = "libpng"
 ## Package declaration.
 export const package_kind = "payload"
 ## Package declaration.
-export const ver = "1.6.50"
+export const ver = "1.6.59"
 ## Package declaration.
 export const rel = "1"
 ## Package declaration.
@@ -20,7 +20,7 @@ export const upstream_sources = [
     source: p"https://download.sourceforge.net/libpng/libpng-VERSION.tar.xz",
     kind: "auto",
     architectures: ["all"],
-    checksums: [{arch: "all", sha256: "4df396518620a7aa3651443e87d1b2862e4e88cad135a8b93423e01706232307"}],
+    checksums: [{arch: "all", sha256: "d80dd2a38a37f803cb9b6ac7b14bd6e74ddc3b654780a8380bdf93523fdb4389"}],
   },
 ]
 ## Package declaration.
@@ -34,7 +34,7 @@ export const filetree = [
   {path: p"usr/lib/libpng.so", kind: "symlink"},
   {path: p"usr/lib/libpng16.so", kind: "symlink"},
   {path: p"usr/lib/libpng16.so.16", kind: "symlink"},
-  {path: p"usr/lib/libpng16.so.16.50.0", kind: "binary"},
+  {path: p"usr/lib/libpng16.so.16.59.0", kind: "binary"},
   {path: p"usr/lib/pkgconfig/libpng.pc", kind: "symlink"},
   {path: p"usr/lib/pkgconfig/libpng16.pc", kind: "file"},
   {path: p"usr/share/man/man3/libpng.3", kind: "file"},
