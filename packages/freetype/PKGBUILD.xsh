@@ -7,7 +7,7 @@ export const name = "freetype"
 ## Package kind.
 export const package_kind = "payload"
 ## Upstream version.
-export const ver = "2.14.3"
+export const ver = "2.15.0"
 ## Package revision.
 export const rel = "1"
 ## Runtime dependencies.
@@ -20,7 +20,7 @@ export const upstream_sources = [
     source: p"https://download.savannah.gnu.org/releases/freetype/freetype-VERSION.tar.xz",
     kind: "auto",
     architectures: ["all"],
-    checksums: [{arch: "all", sha256: "36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f"}],
+    checksums: [{arch: "all", sha256: "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5"}],
   },
 ]
 ## Installed files.
@@ -29,7 +29,7 @@ export const filetree = [
   {path: p"usr/lib/cmake/freetype", kind: "tree"},
   {path: p"usr/lib/libfreetype.so", kind: "symlink"},
   {path: p"usr/lib/libfreetype.so.6", kind: "symlink"},
-  {path: p"usr/lib/libfreetype.so.6.20.6", kind: "binary"},
+  {path: p"usr/lib/libfreetype.so.6.20.7", kind: "binary"},
   {path: p"usr/lib/pkgconfig/freetype2.pc", kind: "file"},
 ]
 ## Build the shared library.

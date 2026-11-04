@@ -6,7 +6,7 @@ linker names and load the SONAMEs through the musl dynamic loader.
 
 | Package | Version | SONAME | Development interface |
 |---|---|---|---|
-| `freetype` | 2.14.3 | `libfreetype.so.6` | `freetype2.pc`, `usr/include/freetype2` |
+| `freetype` | 2.15.0 | `libfreetype.so.6` | `freetype2.pc`, `usr/include/freetype2` |
 | `harfbuzz` | 15.0.0 | `libharfbuzz.so.0` | `harfbuzz.pc`, `usr/include/harfbuzz` |
 | `fontconfig` | 2.18.3 | `libfontconfig.so.1` | `fontconfig.pc`, `usr/include/fontconfig` |
 | `libpng` | 1.6.59 | `libpng16.so.16` | `libpng.pc`, `libpng16.pc`, `usr/include/libpng16` |
