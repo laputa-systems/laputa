@@ -11,7 +11,7 @@ export const package_kind = "payload"
 export const ver = "23.1.0-rc2"
 
 ## Package release revision.
-export const rel = "14"
+export const rel = "15"
 
 ## Runtime package dependencies.
 export const deps = ["musl"]
@@ -430,7 +430,22 @@ env ({
     }
   }
 
-  exec_args = exec_args.extend(argv)
+  let static_unwinder = linking and "-static-libgcc" in argv and "-lgcc_s" in argv
+  var link_args: List[Str] = []
+
+  for arg in argv {
+    link_args = link_args.push(arg) unless static_unwinder and arg == "-lgcc_s"
+  }
+
+  exec_args = exec_args.extend(link_args)
+
+  if static_unwinder {
+    let unwind = rooted(sysroot, "usr/lib/llvm23/lib/libunwind.a")
+    guard unwind.exists()? else {
+      fail f"-static-libgcc needs the static unwinder {unwind}"
+    }
+    exec_args = exec_args.push(unwind.display())
+  }
 
   if linking and is_cxx and runtime {
     exec_args = exec_args.extend(["-lc++", "-lc++abi"])

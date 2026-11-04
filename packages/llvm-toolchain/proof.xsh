@@ -51,7 +51,6 @@ proc ensure_xsh_wrapper(path_value: Path, label: Str) {
   ensure_file(path_value, label)
   let text = path_value.read_text()?
   ensure(text.starts_with("#!/bin/xsh"), "proof-llvm-toolchain", f"{label} is not an XSH wrapper")
-  ensure(! ("libgcc" in text), "proof-llvm-toolchain", f"{label} mentions libgcc")
   ensure(! ("libstdc++" in text), "proof-llvm-toolchain", f"{label} mentions libstdc++")
 }
 
@@ -183,6 +182,36 @@ int main(void) {
   }
 }
 
+proc prove_static_unwinder_link(root: Path) [fs, process, env, error] {
+  let cc = process.which("cc")?
+  let readelf = process.which("llvm-readelf")?
+  tempdir tmp at fp"{root}/var/tmp/proof-llvm-toolchain-unwind" {
+    fp"{tmp}/backtrace.c".write(
+      """#include <unwind.h>
+
+static _Unwind_Reason_Code count(struct _Unwind_Context *context, void *frames) {
+  (void)context;
+  ++*(int *)frames;
+  return _URC_NO_REASON;
+}
+
+int main(void) {
+  int frames = 0;
+  _Unwind_Backtrace(count, &frames);
+  return frames > 0 ? 0 : 1;
+}
+""",
+    )
+
+    let exe = fp"{tmp}/backtrace"
+    run $cc fp"{tmp}/backtrace.c" "-static-libgcc" "-lgcc_s" "-o" $exe
+    run $exe
+    let dynamic = run.text $readelf "-d" $exe
+    ensure(! ("libgcc" in dynamic), "proof-llvm-toolchain", "-static-libgcc -lgcc_s still links libgcc_s")
+    ensure(! ("libunwind" in dynamic), "proof-llvm-toolchain", "-static-libgcc -lgcc_s links a shared unwinder")
+  }
+}
+
 proc prove_x86_64_v3(root: Path) {
   let cc = process.which("cc")?
   let objdump = process.which("llvm-objdump")?
@@ -275,6 +304,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
     prove_explicit_aarch64_target(root)
     prove_native_link(root)
     prove_native_cxx_link(root)
+    prove_static_unwinder_link(root)
   } else {
     prove_target_tools(root, target)
   }
