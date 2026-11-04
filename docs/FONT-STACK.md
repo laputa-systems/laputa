@@ -76,6 +76,15 @@ networkless composed root also ran the candidate and failed to load it when
 `libharfbuzz.so.0` was absent. An unprivileged Fontconfig consumer selected an
 Arabic fallback and populated its XDG cache with an unwritable system cache.
 
+For a composed candidate root, run
+`xsh qualification/ghostty-shared/closure.xsh -- /absolute/path/to/root`.
+The audit requires one independently owned provider for each font SONAME,
+checks loader symlinks, rejects private library search paths, and checks every
+ELF dependency against the installed provider and declared dependency closure.
+Musl library aliases resolve to their actual package owner. The current root
+passes with 19 packages and 26 ELF files. Negative checks reject an added
+duplicate FreeType provider and a removed FreeType dependency declaration.
+
 Fresh PM composition includes 13 runtime artifacts for the existing package and
 19 for the candidate with FreeType revision 3. Count each regular file once,
 including development interfaces and the generated root receipt. Symlinks do
