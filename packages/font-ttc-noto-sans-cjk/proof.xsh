@@ -2,9 +2,9 @@ use pm.proof
 use pm.util as pm_util
 
 proc main(root = p"/rootfs") [fs, process, env, error] {
-  proof.package_metadata(root, "font-otf-noto-sans-cjk-sc")
+  proof.package_metadata(root, "font-ttc-noto-sans-cjk")
   if pm_util.build_arch()? != pm_util.target_arch()? {
-    print "noto sans cjk sc ok: cross-built"
+    print "noto sans cjk ok: cross-built"
     return
   }
   let cc = process.which("cc")?
@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
   FT_Face face;
   if (argc != 2 || FT_Init_FreeType(&library)) return 1;
   if (FT_New_Face(library, argv[1], 0, &face)) return 2;
+  if (face->num_faces != 10) return 8;
   if (!FT_Get_Char_Index(face, 0x4e2d) || !FT_Get_Char_Index(face, 0x6587) || !FT_Get_Char_Index(face, 0x3042) || !FT_Get_Char_Index(face, 0xd55c)) return 3;
   if (FT_Set_Pixel_Sizes(face, 0, 24) || FT_Load_Char(face, 0x4e2d, FT_LOAD_RENDER)) return 4;
   if (!face->glyph->bitmap.width || !face->glyph->bitmap.rows) return 5;
@@ -35,6 +36,9 @@ int main(int argc, char **argv) {
   hb_buffer_destroy(buffer);
   hb_font_destroy(font);
   FT_Done_Face(face);
+  if (FT_New_Face(library, argv[1], 2, &face)) return 9;
+  if (!FT_Get_Char_Index(face, 0x4e2d)) return 10;
+  FT_Done_Face(face);
   FT_Done_FreeType(library);
   return 0;
 }
@@ -43,8 +47,8 @@ int main(int argc, char **argv) {
     let binary = fp"{tmp}/proof"
     run $cc fp"{tmp}/proof.c" f"-I{root}/usr/include/freetype2" f"-I{root}/usr/include/harfbuzz" f"-L{root}/usr/lib" "-lharfbuzz" "-lfreetype" "-o" $binary
     env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
-      run $binary fp"{root}/usr/share/fonts/OTF/NotoSansCJKsc-Regular.otf"
+      run $binary fp"{root}/usr/share/fonts/TTF/NotoSansCJK-Regular.ttc"
     }
   }
-  print "noto sans cjk sc ok: Han, kana and Hangul shaping and CFF rasterization"
+  print "noto sans cjk ok: collection faces, Han, kana and Hangul shaping and CFF rasterization"
 }

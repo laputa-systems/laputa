@@ -30,9 +30,9 @@ installed families when selected by a profile. DejaVu Sans provides Latin,
 Hebrew, and Arabic glyphs; it is not a complete Unicode font. Shaping support
 and glyph availability are separate: scripts need a font with the relevant
 glyphs and OpenType data. Optional packages provide Noto Sans Devanagari (641,944 bytes), Noto Sans Thai
-(218,652 bytes), Noto Sans CJK Simplified Chinese (16,437,364 bytes), and Noto
-Color Emoji (10,730,124 bytes). The CJK font covers Han, kana, and Hangul but
-uses Simplified Chinese glyph forms. Select these packages when needed; the
+(218,652 bytes), Noto Sans CJK (19,484,784 bytes), and Noto
+Color Emoji (10,730,124 bytes). The CJK collection covers Han, kana, and Hangul with Japanese, Korean,
+Simplified Chinese, Traditional Chinese, and Hong Kong faces. Select these packages when needed; the
 default profile does not include them.
 
 Fontconfig can use `/var/cache/fontconfig` and an XDG user cache. A writable
