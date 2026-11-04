@@ -107,12 +107,34 @@ The candidate closure includes these shared libraries:
 | Expat | 191,240 |
 | zlib | 104,544 |
 
-Before the LTO revision, one guest `smaps_rollup` observation at the profile's idle proof point gave
-41,760 KiB RSS, 41,244 KiB PSS, 41,048 KiB private, and 712 KiB shared for
-the existing package. The candidate gave 40,788 KiB RSS, 40,269 KiB PSS,
-40,068 KiB private, and 720 KiB shared. These single observations are not a
-statistical performance comparison. Graphical cold and warm startup and first
-presentation have not been timed.
+After the LTO revision, five alternating pairs booted the two PM-produced
+Tinyland profiles in fresh x86_64/KVM guests with two vCPUs, 1,536 MiB RAM,
+and virgl. Each accepted run passed readiness checks immediately before and
+after execution. The host page cache was warm. Each guest first launched
+Ghostty with an empty font cache, then launched it again with three generated
+cache files. The same terminal color marker had to become visible.
+
+The host measured a virtio-serial launch trigger through detection in a QMP
+screenshot. These are upper bounds that include dispatch, screenshot, and
+polling overhead, not isolated process initialization or GPU presentation times.
+The startup ranges overlap. This method demonstrates no speed difference;
+the limiting startup component has not been independently identified.
+
+| Measurement | Existing package median (range) | Shared-font candidate median (range) |
+|---|---:|---:|
+| Empty font cache startup upper bound, ms | 96.877 (84.852–119.302) | 109.891 (99.100–160.126) |
+| Populated font cache startup upper bound, ms | 82.463 (76.875–103.630) | 91.308 (78.234–105.627) |
+| Idle RSS, KiB | 41,560 (41,420–41,680) | 40,840 (40,736–40,924) |
+| Idle PSS, KiB | 41,041 (40,918–41,170) | 40,317 (40,223–40,427) |
+| Idle private memory, KiB | 40,840 (40,724–40,964) | 40,100 (40,032–40,232) |
+| Idle shared memory, KiB | 696 (692–724) | 716 (692–740) |
+
+The guest read Ghostty's `smaps_rollup` after two seconds at the same idle
+terminal proof point. Private and shared totals include their clean, dirty,
+and hugetlb fields. These observations cover one terminal per guest and do
+not measure deduplication across multiple applications. The shared design
+provides distribution ownership even when a single application's total closure
+grows or startup does not improve.
 
 Five alternating pairs per workload passed host readiness checks before and
 after the measurement session. A warm `ghostty --version` process had median wall times of
@@ -158,11 +180,11 @@ This was not a native PM package build or an AArch64 Ghostty or guest proof.
 
 ## Remaining qualification after wind-down
 
-The owner requested a wind-down on 2026-11-04. Repeated graphical startup and
-idle-memory measurements remain open. The queued measurement driver was
-stopped before collecting its final pairs. The current local graphical proof
-and package results above remain valid within their stated scope. No release
-was published and the production package pin remains unchanged.
+The owner resumed work after the 2026-11-04 wind-down. The repeated graphical
+startup and idle-memory observations above now cover the LTO package. The
+current local graphical proof and package results remain valid within their
+stated scope. Native ARM package and graphical qualification remain open.
+No release was published and the production package pin remains unchanged.
 
 After this baseline and Play's SRT/Core Text migrations qualify, execute
 [LAP-52](rfc/LAP-52-rust-fontconfig.md) before the broader
