@@ -837,17 +837,22 @@ browser with working portals, and rolls back a bad update through R5.
 
 ## Long-term: reduce C and C++ in the userspace
 
-After the active campaign, Play's SRT/Core Text migrations, and the
-[shared rust-fontconfig campaign](rfc/LAP-52-rust-fontconfig.md), pursue a predominantly Rust/Zig implementation of
-the userspace, with orchestration policy in XSH and the existing Linux ABI.
-Retain hardware acceleration and usable applications while reducing the native
-dependency closure. The [follow-on design](rfc/LAP-51-c-free-userspace.md)
-separates system services, desktop infrastructure, and whole-system research.
-It starts with a measured census, preserves the [shared font
-contract](FONT-STACK.md), and includes Play as a second application consumer.
-LAP-52 owns the preceding font-discovery migration. LAP-51 owns the first
-bounded census slice afterwards. This direction does not launch replacement
-work or change the current campaign's acceptance gates.
+After the active campaign, Play's SRT/Core Text migrations, and
+[shared rust-fontconfig adoption](rfc/LAP-52-rust-fontconfig.md), pursue a
+Rust/XSH/Zig-owned desktop and system layer. Start with a measured census and
+finish existing seatd-client, keyboard, and Wayland interfaces. Qualify the
+distribution compression providers and then HarfRust and Swash/Skrifa/Zeno
+against the working [shared font baseline](FONT-STACK.md). Existing OxiSH,
+KBVM, and XSH Rust compression backends are foundations, not new adoptions.
+
+Keep `ffmpeg-build` as the maintained native media dependency. FFmpeg and codec
+replacement are explicitly out of scope; Play subtitle, typography, OSD, and
+application work remain separate. Retain Mesa, musl, and Linux. Crabc evaluation
+or adoption, allocator work, runtime/kernel replacement, and GPU-driver rewrites
+are excluded. Hardware enablement stays deferred. The
+[follow-on design](rfc/LAP-51-c-free-userspace.md) records these boundaries and
+lower-confidence research. LAP-52 precedes LAP-51's bounded census. This
+direction launches no new pilot and changes no current acceptance gate.
 
 ## Delivery gates and evidence
 

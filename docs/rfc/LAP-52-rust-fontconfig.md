@@ -200,3 +200,8 @@ The owner authorized this campaign after the shared native stack and Play
 migrations. Record it before LAP-51. Start implementation only after those
 prerequisites pass, and retain the working native baseline until both consumers
 qualify. This document records no adoption or test success.
+
+The owner's later scope correction retains `ffmpeg-build`, musl, and Linux.
+FFmpeg/codec replacement, crabc evaluation or adoption, and allocator work are
+outside this campaign. Subtitle and typography work remain separate consumer
+requirements. No broader replacement is a prerequisite for discovery adoption.
