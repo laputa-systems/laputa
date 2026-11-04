@@ -174,6 +174,21 @@ int main(void) {
   if (!ok) return fail("an uncovered private-use codepoint resolved to a font");
   fc_font_chain_free(chain);
 
+  const FcUnicodeRange scripts[] = {{0x0e00, 0x0e7f}, {0x1f300, 0x1faff}};
+  trace = NULL;
+  trace_count = 0;
+  chain = fc_resolve_font_chain_with_scripts(cache, stack, 2, FC_WEIGHT_NORMAL, FC_MATCH_FALSE, FC_MATCH_FALSE, scripts, 2, &trace, &trace_count);
+  if (!chain) return fail("script chain resolution failed");
+  fc_trace_free(trace, trace_count);
+  run_count = 0;
+  runs = fc_chain_query_for_text(chain, cache, "\xe0\xb8\x81 \xf0\x9f\x98\x80", &run_count);
+  if (!runs || !run_count) return fail("script chain text query failed");
+  ok = run_has(cache, runs, run_count, "\xe0\xb8\x81", "/NotoSansThai.ttf") &&
+    run_has(cache, runs, run_count, "\xf0\x9f\x98\x80", "/NotoColorEmoji.ttf");
+  fc_resolved_runs_free(runs, run_count);
+  if (!ok) return fail("a script chain did not resolve Thai and emoji to their fonts");
+  fc_font_chain_free(chain);
+
   FcFontId unknown = {1, 2};
   if (fc_cache_get_font_path(cache, &unknown) != NULL) return fail("unknown font id resolved");
   fc_cache_free(cache);

@@ -45,6 +45,19 @@ export const upstream_sources = [
     ],
   },
   {
+    source: p"files/script-chain.patch",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "11bf93f9d0ba44cfb8ee33049337e05d4a41212b050b2239d2881ab9b4a555fe",
+      },
+    ],
+  },
+  {
     source: p"files/Cargo.lock => lock",
     kind: "auto",
     architectures: [
@@ -120,6 +133,7 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let root = fs.cwd()?
   let project = fp"{root}/source"
+  let _ = patch.apply(project, fp"{root}/script-chain.patch".read_text()?, 1)?
   let _ = fs.copy_tree(fp"{root}/vendor", fp"{project}/vendor", parents: true, overwrite: true)?
   fs.install(fp"{root}/lock/Cargo.lock", fp"{project}/Cargo.lock", 0o644, parents: true, overwrite: true)
 
