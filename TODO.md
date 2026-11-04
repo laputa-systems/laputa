@@ -23,8 +23,11 @@ disks and native build hosts remain in scope. Existing paused campaigns are not 
 runnable entries using the supplied fixed XSH snapshot. External XSH repairs
 and real-hardware enablement remain outside that scope.
 
-All performance work is deferred by the owner, including readiness checks and
-time, memory, binary-size and scaling measurements. Functional work continues.
+The current owner-directed campaign includes Linux performance qualification.
+Timing measurements require quiet-host readiness checks before and after each
+accepted window. macOS remains out of scope. Native aarch64 runtime
+qualification remains open; manual cross-build evidence is bounded in
+[the font contract](docs/FONT-STACK.md).
 
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
 

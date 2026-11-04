@@ -15,6 +15,8 @@ FreeType uses zlib and libpng, including PNG-compressed embedded color bitmaps.
 It enables TrueType and OpenType drivers, CFF, SFNT, the auto-hinter, and
 rasterizers. The package retains the PCF and BDF bitmap drivers used by Ghostty. It omits
 Type 1, CID Type 1, PFR, Type 42, and Windows FNT drivers. It does not link HarfBuzz, bzip2, or Brotli.
+Revision 3 enables CMake interprocedural optimization with the existing release
+optimization level. The resulting library preserves the same SONAME and dependencies.
 
 HarfBuzz uses FreeType for its FreeType integration. Its `HB_MINI` build keeps
 OpenType shaping and threading; it omits AAT and legacy shaping paths. The
@@ -74,21 +76,29 @@ networkless composed root also ran the candidate and failed to load it when
 `libharfbuzz.so.0` was absent. An unprivileged Fontconfig consumer selected an
 Arabic fallback and populated its XDG cache with an unwritable system cache.
 
-The unique regular-file sizes in the PM-composed `ghostty-custom` runtime
-closures were 172,916,318 bytes for the existing package and 175,795,479 bytes
-for the candidate. The corresponding stripped executables were 30,787,208 and
-27,179,848 bytes. The candidate closure included these shared libraries:
+Fresh PM composition includes 13 runtime artifacts for the existing package and
+19 for the candidate with FreeType revision 3. Count each regular file once,
+including development interfaces and the generated root receipt. Symlinks do
+not duplicate their targets. These are installed bytes, not archive sizes:
+
+| Measurement | Existing package | Shared-font candidate |
+|---|---:|---:|
+| Unique runtime closure | 172,913,946 | 175,776,899 |
+| Stripped Ghostty executable | 30,787,208 | 27,179,848 |
+| Additional installed bytes | — | 2,862,953 |
+
+The candidate closure includes these shared libraries:
 
 | Library | Bytes |
 |---|---:|
-| FreeType | 903,984 |
+| FreeType | 888,648 |
 | HarfBuzz | 754,280 |
 | Fontconfig | 481,784 |
 | libpng | 262,432 |
 | Expat | 191,240 |
 | zlib | 104,544 |
 
-One guest `smaps_rollup` observation at the profile's idle proof point gave
+Before the LTO revision, one guest `smaps_rollup` observation at the profile's idle proof point gave
 41,760 KiB RSS, 41,244 KiB PSS, 41,048 KiB private, and 712 KiB shared for
 the existing package. The candidate gave 40,788 KiB RSS, 40,269 KiB PSS,
 40,068 KiB private, and 720 KiB shared. These single observations are not a
@@ -101,11 +111,25 @@ after the measurement session. A warm `ghostty --version` process had median wal
 0.641–0.984) for the candidate. The ranges overlap. This measures CLI loading,
 not graphical startup.
 
-A separate process shaped and rasterized the same Arabic text 500 times with
-DejaVu Sans. The outputs matched. Median CPU time was 2.029 ms (range
-2.000–2.121) with the bundled libraries and 2.307 ms (range 2.233–2.338)
-with the shared libraries. The process initialization is included. This short
-microbenchmark does not establish application performance.
+A separate process shapes and rasterizes the same Arabic text 100,000 times
+with DejaVu Sans. Five rotating, readiness-qualified samples per configuration
+produce the same checked glyph-and-bitmap accumulator. Initialization is included:
+
+| Configuration | Median CPU, ms | Range, ms | FreeType bytes |
+|---|---:|---:|---:|
+| Previous bundled stack | 341.174 | 338.002–342.891 | Included in Ghostty |
+| Shared stack before LTO | 375.422 | 374.337–376.416 | 903,984 |
+| Shared stack with LTO | 362.177 | 360.130–369.719 | 888,648 |
+| Shared stack with LTO and `-Oz` | 402.755 | 400.531–405.887 | 580,616 |
+
+The production package selects LTO with the existing optimization level.
+Its library is byte-identical to the measured LTO variant. That variant reduces
+CPU cost against the same-version shared baseline, while `-Oz` regresses it.
+The previous bundled stack is still faster in this workload. It uses older
+FreeType and HarfBuzz versions, so this comparison cannot attribute the gap to
+dynamic linkage. An untimed million-iteration profile attributes about 74% of
+sampled CPU work to FreeType. The workload measures shaping and rasterization,
+not graphical startup or complete application performance.
 
 A Fontconfig process scanned one Hack font into a fresh cache for each run,
 with the operating system page cache warm. The selected font and cache creation
