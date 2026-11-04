@@ -3,8 +3,26 @@ use elf
 use local
 use util
 
+## Why the loader cannot satisfy a DT_NEEDED entry from the package's runtime
+## dependency closure: it names a build-time path, no installed package
+## provides it, or the providing package is not a runtime dependency.
+export enum ElfDependencyGap { BuildTimePath, Unprovided, Undeclared(Str) }
+
 ## Exported PM declaration `ElfDependencyFailure`.
-export type ElfDependencyFailure = {pkg: Str, file: Path, soname: Str, provider: Str}
+export type ElfDependencyFailure = {pkg: Str, file: Path, soname: Str, gap: ElfDependencyGap}
+
+const musl_loader_libraries = ["c", "pthread", "rt", "m", "dl", "util", "xnet"]
+
+# musl's dynamic linker (ldso/dynlink.c) resolves `lib<name>.<anything>` for
+# its reserved library names to itself, so `libc.musl-x86_64.so.1` and
+# `libm.so.6` need only musl.
+pure musl_loader_soname(soname: Str) -> Bool {
+  for name in musl_loader_libraries {
+    return true when soname.starts_with(f"lib{name}.")
+  }
+
+  false
+}
 
 pure path_basename_text(path_value: Path) -> Str {
   let text = path_value.display()
@@ -67,7 +85,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
   var failures: List[ElfDependencyFailure] = []
 
   if elf_info_mentions_musl(needed, interpreter) and pkg_name != "musl" and ! (allowed.get("musl") ?? false) {
-    failures += [{pkg: pkg_name, file: fp"", soname: "libc.so", provider: "musl"}]
+    failures += [{pkg: pkg_name, file: fp"", soname: "libc.so", gap: .Undeclared("musl")}]
   }
 
   for soname in needed {
@@ -75,19 +93,33 @@ export pure missing_elf_runtime_dependencies_with_allowed(
     # (one without a SONAME); the loader looks for that path, not a name, so
     # no runtime root satisfies it.
     if "/" in soname {
-      failures += [{pkg: pkg_name, file: fp"", soname, provider: ""}]
+      failures += [{pkg: pkg_name, file: fp"", soname, gap: .BuildTimePath}]
       continue
     }
 
-    continue unless soname in providers
-    let provider = providers.get(soname) ?? ""
+    guard let provider = providers.get(soname) else {
+      failures += [{pkg: pkg_name, file: fp"", soname, gap: .Unprovided}] unless musl_loader_soname(soname)
+      continue
+    }
 
     if provider != pkg_name and ! (allowed.get(provider) ?? false) {
-      failures += [{pkg: pkg_name, file: fp"", soname, provider}]
+      failures += [{pkg: pkg_name, file: fp"", soname, gap: .Undeclared(provider)}]
     }
   }
 
   failures
+}
+
+proc library_link_reaches_file(root: Path, link: Path) [fs, error] -> Result[Bool, Error] {
+  var current = link
+  for _ in range(8) {
+    return false unless current.exists()?
+    return current.is_file()? unless current.is_symlink()?
+    let target = current.readlink()?.display()
+    current = if target.starts_with("/") { fp"{root}{target}" } else { fp"{current.parent}/{target}" }
+  }
+
+  false
 }
 
 ## Exported PM declaration `collect_library_providers`.
@@ -106,6 +138,14 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
 
     for rel_path in manifest {
       let path_value = fp"{root}/{rel_path}"
+
+      if path_value.is_symlink()? {
+        if path_may_provide_library(rel_path) and library_link_reaches_file(root, path_value)? {
+          providers[path_basename_text(rel_path)] = entry.name
+        }
+        continue
+      }
+
       continue unless path_value.exists()
       continue unless path_value.is_file()
 
@@ -146,7 +186,7 @@ export proc installed_file_elf_dependency_failures(
     )
 
     failures = [
-      {pkg: failure.pkg, file: rel_path, soname: failure.soname, provider: failure.provider}
+      {pkg: failure.pkg, file: rel_path, soname: failure.soname, gap: failure.gap}
       for failure in failures
     ]
     failures

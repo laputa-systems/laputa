@@ -78,19 +78,13 @@ export proc verify_package_elf_dependencies(root: Path, name: Str) [fs, error] {
 
   if ! failures.is_empty() {
     let first = failures[0]
-
-    if first.provider == "" {
-      return Err(
-        ProofError.Failed(kind: f"proof-{name}", message: f"{first.file} needs {first.soname} by its build-time path"),
-      )
+    let message = match first.gap {
+      elfdeps.BuildTimePath => f"{first.file} needs {first.soname} by its build-time path"
+      elfdeps.Unprovided => f"{first.file} needs {first.soname}, which no installed package provides"
+      elfdeps.Undeclared(provider) => f"{first.file} needs {first.soname} from {provider} without a runtime dependency"
     }
 
-    return Err(
-      ProofError.Failed(
-        kind: f"proof-{name}",
-        message: f"{first.file} needs {first.soname} from {first.provider} without a runtime dependency",
-      ),
-    )
+    return Err(ProofError.Failed(kind: f"proof-{name}", message:))
   }
 }
 
