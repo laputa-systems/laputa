@@ -13,8 +13,8 @@ linker names and load the SONAMEs through the musl dynamic loader.
 
 FreeType uses zlib and libpng, including PNG-compressed embedded color bitmaps.
 It enables TrueType and OpenType drivers, CFF, SFNT, the auto-hinter, and
-rasterizers. The package omits Type 1, CID Type 1, PFR, Type 42, Windows FNT,
-PCF, and BDF drivers. It does not link HarfBuzz, bzip2, or Brotli.
+rasterizers. The package retains the PCF and BDF bitmap drivers used by Ghostty. It omits
+Type 1, CID Type 1, PFR, Type 42, and Windows FNT drivers. It does not link HarfBuzz, bzip2, or Brotli.
 
 HarfBuzz uses FreeType for its FreeType integration. Its `HB_MINI` build keeps
 OpenType shaping and threading; it omits AAT and legacy shaping paths. The

@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   FT_Face face;
   if (argc != 2 || FT_Init_FreeType(&library)) return 1;
   if (!FT_Get_Module(library, "truetype") || !FT_Get_Module(library, "cff")) return 2;
-  if (FT_Get_Module(library, "pcf") || FT_Get_Module(library, "type1")) return 3;
+  if (!FT_Get_Module(library, "pcf") || !FT_Get_Module(library, "bdf") || FT_Get_Module(library, "type1")) return 3;
   if (FT_New_Face(library, argv[1], 0, &face)) return 4;
   if (FT_Set_Pixel_Sizes(face, 0, 18)) return 5;
   if (FT_Load_Char(face, 'A', FT_LOAD_RENDER)) return 6;

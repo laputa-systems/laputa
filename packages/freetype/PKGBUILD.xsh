@@ -9,7 +9,7 @@ export const package_kind = "payload"
 ## Upstream version.
 export const ver = "2.15.0"
 ## Package revision.
-export const rel = "1"
+export const rel = "2"
 ## Runtime dependencies.
 export const deps = ["musl", "zlib", "libpng"]
 ## Build dependencies.
@@ -42,8 +42,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     .replace("FT_USE_MODULE( FT_Driver_ClassRec, pfr_driver_class )\n", with: "")
     .replace("FT_USE_MODULE( FT_Driver_ClassRec, t42_driver_class )\n", with: "")
     .replace("FT_USE_MODULE( FT_Driver_ClassRec, winfnt_driver_class )\n", with: "")
-    .replace("FT_USE_MODULE( FT_Driver_ClassRec, pcf_driver_class )\n", with: "")
-    .replace("FT_USE_MODULE( FT_Driver_ClassRec, bdf_driver_class )\n", with: ""))
+    )
   let cmake = process.which("cmake")?
   let samu = process.which("samu")?
   let jobs = make.jobs()?
