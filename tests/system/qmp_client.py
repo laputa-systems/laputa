@@ -1,8 +1,11 @@
 import json
+import time
 import os
+import platform
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import unittest
 from pathlib import Path
@@ -13,7 +16,7 @@ XSH = os.environ["XSH"]
 
 
 class QmpClientTests(unittest.TestCase):
-    def exchange(self, peer, kind="readonly"):
+    def exchange(self, peer, kind="readonly", hold_stdin=False):
         scratch = ROOT / ".work" / "tmp"
         scratch.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=scratch) as directory:
@@ -27,7 +30,7 @@ class QmpClientTests(unittest.TestCase):
                     try:
                         conn, _ = server.accept()
                         with conn, conn.makefile("rb") as stream:
-                            conn.settimeout(3)
+                            conn.settimeout(12 if kind == "backpressure" else 3)
                             peer(conn, stream)
                     except Exception as error:
                         failures.append(error)
@@ -35,11 +38,17 @@ class QmpClientTests(unittest.TestCase):
                 self.client = subprocess.Popen(
                     [XSH, str(ROOT / "tests/system/fixtures/qmp-client.xsh"), str(path), kind],
                     env={**os.environ, "XSH_MODULE_PATH": str(ROOT), "XSH_UNIX_REAL": "1"},
+                    stdin=subprocess.PIPE if hold_stdin else None,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 )
                 thread.start()
                 try:
-                    stdout, stderr = self.client.communicate(timeout=5)
+                    if hold_stdin:
+                        self.client.wait(timeout=5)
+                        if not self.client.stdin.closed:
+                            self.client.stdin.close()
+                        self.client.stdin = None
+                    stdout, stderr = self.client.communicate(timeout=15 if kind == "backpressure" else 5)
                 except subprocess.TimeoutExpired:
                     self.client.kill()
                     self.client.communicate()
@@ -47,7 +56,7 @@ class QmpClientTests(unittest.TestCase):
                 result = subprocess.CompletedProcess(self.client.args, self.client.returncode, stdout, stderr)
                 thread.join(4)
             self.assertFalse(thread.is_alive())
-            self.assertEqual(failures, [])
+            self.assertEqual(failures, [], result.stderr)
             return result
 
     def negotiate(self, conn, stream):
@@ -188,6 +197,56 @@ class QmpClientTests(unittest.TestCase):
         result = self.exchange(peer)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("timed out", result.stderr)
+
+    def test_large_request_retries_after_peer_drains(self):
+        poll_syscall = {"x86_64": "271", "aarch64": "73"}.get(platform.machine()) if sys.platform == "linux" else None
+        if poll_syscall is None:
+            self.skipTest("requires Linux ppoll observation")
+        def peer(conn, stream):
+            conn.sendall(b'{"QMP":{}}\n')
+            capability = json.loads(stream.readline())
+            conn.sendall(json.dumps({"return": {}, "id": capability["id"]}).encode() + b'\n')
+            self.assertTrue(conn.recv(1, socket.MSG_PEEK))
+            deadline = time.monotonic() + 8
+            waiting = False
+            while time.monotonic() < deadline and self.client.poll() is None:
+                for task in Path(f"/proc/{self.client.pid}/task").iterdir():
+                    try:
+                        syscall = (task / "syscall").read_text().split()[0]
+                    except (FileNotFoundError, ProcessLookupError):
+                        continue
+                    if syscall == poll_syscall:
+                        waiting = True
+                        break
+                if waiting:
+                    break
+                threading.Event().wait(0.005)
+            self.assertTrue(waiting, "client did not wait for a stalled peer")
+            request = json.loads(stream.readline())
+            self.assertEqual(request["execute"], "query-status")
+            self.assertEqual(request["arguments"]["payload"], "A" * 4194304)
+            conn.sendall(json.dumps({"return": {}, "id": request["id"]}).encode() + b'\n')
+            self.assertEqual(stream.read(1), b"")
+        result = self.exchange(peer, "backpressure")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "ok\n")
+
+    def test_error_and_timeout_close_socket_while_caller_stays_alive(self):
+        for kind in ("caught-error", "caught-timeout"):
+            with self.subTest(kind=kind):
+                def peer(conn, stream):
+                    if kind == "caught-error":
+                        conn.sendall(b'{"QMP":{}}\n')
+                        capability = json.loads(stream.readline())
+                        conn.sendall(json.dumps({"return": {}, "id": capability["id"] + 1}).encode() + b'\n')
+                    self.assertEqual(stream.read(1), b"")
+                    self.assertIsNone(self.client.poll(), "caller exited before socket closure")
+                    self.client.stdin.write("release\n")
+                    self.client.stdin.flush()
+                    self.client.stdin.close()
+                result = self.exchange(peer, kind, hold_stdin=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "caught\n")
 
     def test_partial_greeting_eof_fails(self):
         def peer(conn, stream):
