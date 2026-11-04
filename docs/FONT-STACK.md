@@ -56,9 +56,18 @@ The PM-stripped candidate binary SHA-256 was
 The checked-in package still uses the published artifact and its original
 checksum. The local archive is not a published release.
 
-A temporary package recipe declared the three font libraries as link
+To qualify another x86_64 archive on a Linux KVM host, run
+`qualification/ghostty-shared/run.sh /absolute/path/to/ghostty.tar.gz` from
+this checkout. Set `XSH_ROOT` if the XSH checkout is not the adjacent `xsh`
+directory. The command creates an isolated checkout under `.work/tmp`, hashes
+the supplied archive, applies the qualification recipe and proof, and runs
+`make profile-test`. It reuses the existing seed, source cache, and package
+artifact cache. The archive must contain the candidate executable named
+`ghostty`. The command does not publish or change the release package pin.
+
+The local qualification recipe declares the three font libraries as link
 dependencies and Hack and DejaVu Sans as runtime-only dependencies. Its
-package proof checked the font SONAMEs and absence of RPATH and RUNPATH. Both
+package proof checks the font SONAMEs and absence of RPATH and RUNPATH. Both
 that package and the existing package passed `make profile-test` with Linux,
 KVM, Tinyland, virgl, keyboard input, screenshot, and session recovery. A
 networkless composed root also ran the candidate and failed to load it when
@@ -83,8 +92,29 @@ One guest `smaps_rollup` observation at the profile's idle proof point gave
 41,760 KiB RSS, 41,244 KiB PSS, 41,048 KiB private, and 712 KiB shared for
 the existing package. The candidate gave 40,788 KiB RSS, 40,269 KiB PSS,
 40,068 KiB private, and 720 KiB shared. These single observations are not a
-statistical performance comparison. Cold and warm startup, shaping throughput,
-rasterization time, and Fontconfig cold-cache time have not been qualified.
+statistical performance comparison. Graphical cold and warm startup and first
+presentation have not been timed.
+
+Five alternating pairs per workload passed host readiness checks before and
+after the measurement session. A warm `ghostty --version` process had median wall times of
+0.785 ms (range 0.544–0.967) for the existing binary and 0.672 ms (range
+0.641–0.984) for the candidate. The ranges overlap. This measures CLI loading,
+not graphical startup.
+
+A separate process shaped and rasterized the same Arabic text 500 times with
+DejaVu Sans. The outputs matched. Median CPU time was 2.029 ms (range
+2.000–2.121) with the bundled libraries and 2.307 ms (range 2.233–2.338)
+with the shared libraries. The process initialization is included. This short
+microbenchmark does not establish application performance.
+
+A Fontconfig process scanned one Hack font into a fresh cache for each run,
+with the operating system page cache warm. The selected font and cache creation
+were checked. Median CPU time was 6.031 ms (range 5.949–6.492) with the
+bundled Fontconfig and 4.821 ms (range 4.637–4.970) with the shared package.
+These isolated measurements do not establish the cost of a real font directory
+or the contribution to graphical startup. Their limiting factors remain
+unverified.
+
 A manual AArch64 cross-build used the same font feature choices with Zig 0.17
 and ran under `qemu-aarch64` with a private Alpine musl loader. The ELF files
 had the expected SONAMEs and no RPATH or RUNPATH. A runtime consumer exercised
