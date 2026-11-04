@@ -12,6 +12,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
     fp"{tmp}/proof.c".write(
       """#include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_MULTIPLE_MASTERS_H
 #include <hb.h>
 #include <hb-ft.h>
 
@@ -21,6 +22,11 @@ int main(int argc, char **argv) {
   if (argc != 2 || FT_Init_FreeType(&library)) return 1;
   if (FT_New_Face(library, argv[1], 0, &face)) return 2;
   if (!FT_Get_Char_Index(face, 0x0915) || !FT_Get_Char_Index(face, 0x093f)) return 3;
+  FT_MM_Var *axes;
+  if (FT_Get_MM_Var(face, &axes) || !axes->num_axis) return 8;
+  FT_Fixed coordinate = axes->axis[0].maximum;
+  if (FT_Set_Var_Design_Coordinates(face, 1, &coordinate)) return 9;
+  FT_Done_MM_Var(library, axes);
   if (FT_Set_Pixel_Sizes(face, 0, 24)) return 4;
   hb_font_t *font = hb_ft_font_create_referenced(face);
   hb_buffer_t *buffer = hb_buffer_create();
@@ -46,5 +52,5 @@ int main(int argc, char **argv) {
       run $binary fp"{root}/usr/share/fonts/TTF/NotoSansDevanagari.ttf"
     }
   }
-  print "font-ttf-noto-sans-devanagari ok: pre-base vowel reordering"
+  print "font-ttf-noto-sans-devanagari ok: variable axis and pre-base vowel reordering"
 }
