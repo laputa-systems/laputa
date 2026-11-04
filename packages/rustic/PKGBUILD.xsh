@@ -16,11 +16,10 @@ export const package_kind = "payload"
 export const ver = "0.11.4"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
-## musl plus the GCC runtime the dynamic Rust link needs (see doas-rs).
-export const deps = ["musl", "gnu-stubs"]
+export const deps = ["musl"]
 
 ## Package recipe export.
 export const mkdeps_host = ["cargo", "llvm-toolchain"]

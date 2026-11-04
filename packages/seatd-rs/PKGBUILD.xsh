@@ -20,12 +20,11 @@ export const package_kind = "payload"
 export const ver = "0.9.3"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
-## musl plus the GCC runtime the dynamic Rust link needs. The client library
-## links libc only; the daemon links libc only (no libseat dependency).
-export const deps = ["musl", "gnu-stubs"]
+## The client library and the daemon link libc only (no libseat dependency).
+export const deps = ["musl"]
 
 ## Package recipe export.
 export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf"]

@@ -17,12 +17,12 @@ export const package_kind = "payload"
 export const ver = "0.1.0"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
-## musl plus the GCC runtime the dynamic Rust link needs. The binary links
-## libc only (the password check calls the system libcrypt in musl).
-export const deps = ["musl", "gnu-stubs"]
+## The binary links libc only (the password check calls the system libcrypt
+## in musl).
+export const deps = ["musl"]
 
 ## Package recipe export.
 export const mkdeps_host = ["cargo", "llvm-toolchain"]

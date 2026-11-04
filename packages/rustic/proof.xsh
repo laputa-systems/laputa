@@ -20,8 +20,8 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   let rustic = fp"{root}/usr/bin/rustic"
   let repo = fp"{tmp}/repo"
   let password_value = password.display()
-  # Resolve the proof root's own runtime libraries (the gnu-stubs libgcc_s)
-  # before any container path, exactly like the doas-rs proof does.
+  # Resolve the proof root's own runtime libraries before any container
+  # path, exactly like the doas-rs proof does.
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib", RUSTIC_PASSWORD_FILE: password_value, RUSTIC_REPOSITORY: repo.display()}) {
     run $rustic init
     run $rustic backup $source

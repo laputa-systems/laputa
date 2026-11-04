@@ -15,10 +15,10 @@ export const package_kind = "payload"
 export const ver = "2.0.0-alpha.20260715"
 
 ## Package declaration.
-export const rel = "1"
+export const rel = "2"
 
 ## Package declaration.
-export const deps = ["musl", "gnu-stubs"]
+export const deps = ["musl"]
 
 ## Package declaration.
 export const mkdeps_host = ["cargo", "llvm-toolchain"]

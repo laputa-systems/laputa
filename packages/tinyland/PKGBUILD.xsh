@@ -16,14 +16,13 @@ export const package_kind = "payload"
 export const ver = "0.1.0"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 ## musl and the shared client libraries tinyland links: the seatd-rs daemon
-## package ships the libseat client for the seatd-only broker session,
-## gnu-stubs for the CRT objects and libgcc_s the dynamic link needs.
+## package ships the libseat client for the seatd-only broker session.
 ## Keyboard maps are pure-Rust KBVM with XKB data lookups; no libxkbcommon link.
-export const deps = ["musl", "gnu-stubs", "seatd-rs"]
+export const deps = ["musl", "seatd-rs"]
 
 ## XKB data is a runtime lookup, not a link input.
 export const runtime_only_deps = ["xkeyboard-config"]
