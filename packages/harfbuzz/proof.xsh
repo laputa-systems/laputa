@@ -20,6 +20,19 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
 #include <hb.h>
 #include <hb-ft.h>
 
+static int shape(hb_font_t *font, const char *text, unsigned int expected) {
+  hb_buffer_t *buffer = hb_buffer_create();
+  hb_buffer_add_utf8(buffer, text, -1, 0, -1);
+  hb_buffer_guess_segment_properties(buffer);
+  hb_shape(font, buffer, NULL, 0);
+  unsigned int count;
+  hb_glyph_info_t *glyphs = hb_buffer_get_glyph_infos(buffer, &count);
+  int ok = count == expected;
+  for (unsigned int i = 0; i < count; i++) if (!glyphs[i].codepoint) ok = 0;
+  hb_buffer_destroy(buffer);
+  return ok;
+}
+
 int main(int argc, char **argv) {
   FT_Library library;
   FT_Face face;
@@ -37,6 +50,10 @@ int main(int argc, char **argv) {
   if (count != 3 || glyphs[0].codepoint != FT_Get_Char_Index(face, 'A')) return 4;
   if (positions[0].x_advance <= 0) return 5;
   hb_buffer_destroy(buffer);
+  if (!shape(font, "ffi", 1)) return 6;
+  if (!shape(font, "é", 1)) return 7;
+  if (!shape(font, "سلام", 3)) return 8;
+  if (!shape(font, "שלום", 4)) return 9;
   hb_font_destroy(font);
   FT_Done_Face(face);
   FT_Done_FreeType(library);
@@ -47,8 +64,8 @@ int main(int argc, char **argv) {
     let binary = fp"{tmp}/proof"
     run $cc fp"{tmp}/proof.c" f"-I{root}/usr/include/freetype2" f"-I{root}/usr/include/harfbuzz" f"-L{root}/usr/lib" "-lharfbuzz" "-lfreetype" "-o" $binary
     env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
-      run $binary fp"{root}/usr/share/fonts/TTF/Hack-Regular.ttf"
+      run $binary fp"{root}/usr/share/fonts/TTF/DejaVuSans.ttf"
     }
   }
-  print "harfbuzz ok: FreeType shaping"
+  print "harfbuzz ok: FreeType shaping, ligatures, combining marks, Arabic and Hebrew"
 }
