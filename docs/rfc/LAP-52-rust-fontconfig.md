@@ -308,13 +308,15 @@ configuration.
   `gnu-stubs` edge.
 - **Profile.** Fat LTO, one codegen unit, `opt-level=s`, unwinding panics, and
   the `-static-libgcc` link argument the other Rust recipes use.
-- **Script-aware chains.** The recipe carries `files/script-chain.patch`,
-  which adds `fc_resolve_font_chain_with_scripts`: `fc_resolve_font_chain`
-  plus an explicit `FcUnicodeRange` array passed to upstream's
-  `resolve_font_chain_with_scripts`. With it the proof resolves U+0E01 to
-  Noto Sans Thai and U+1F600 to Noto Color Emoji through a chain. The patch is
-  the proposed upstream change; drop it once a pinned release exports the
-  function. Submitting the upstream pull request is the owner's action.
+- **Fork.** Laputa builds `laputa-systems/rust-fontconfig` tag
+  `v5.0.2-laputa.1` (`b6a9abe`): upstream 5.0.2 plus
+  `fc_resolve_font_chain_with_scripts`, which passes an explicit
+  `FcUnicodeRange` array to upstream's `resolve_font_chain_with_scripts`.
+  The fork's test shows a Thai codepoint gets no font through the default
+  chain and gets one through a Thai-range chain; the package proof resolves
+  U+0E01 to Noto Sans Thai and U+1F600 to Noto Color Emoji. The addition is
+  additive, so the SONAME stays `librust_fontconfig.so.5.0.2`. Rebase the fork
+  onto each new upstream release before pinning it.
 - **Font configuration.** On removing C Fontconfig, Laputa ships its own
   minimal `fonts.conf` with the `<dir>` entries and aliases its policy needs,
   owned by the distribution rather than by either consumer. Until then the

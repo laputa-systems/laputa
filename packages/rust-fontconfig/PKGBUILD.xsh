@@ -16,7 +16,7 @@ export const package_kind = "payload"
 export const ver = "5.0.2"
 
 ## Package recipe export.
-export const rel = "1"
+export const rel = "2"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -32,7 +32,7 @@ export let mkdeps_target = []
 ## resolution and vendors every locked crate.
 export const upstream_sources = [
   {
-    source: p"https://github.com/fschutt/rust-fontconfig/archive/v5.0.2.tar.gz => source",
+    source: p"https://github.com/laputa-systems/rust-fontconfig/archive/refs/tags/v5.0.2-laputa.1.tar.gz => source",
     kind: "auto",
     architectures: [
       "all",
@@ -40,20 +40,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "63f533566b8bcba902a8005f6f5408a6c62cbe8b979da2bcbca4090a33b38a7b",
-      },
-    ],
-  },
-  {
-    source: p"files/script-chain.patch",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "11bf93f9d0ba44cfb8ee33049337e05d4a41212b050b2239d2881ab9b4a555fe",
+        sha256: "2cbbc3f8ef457252a5ba822de0b5ac99138a4defc2ea04affaecf7ac90a16ace",
       },
     ],
   },
@@ -133,7 +120,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let root = fs.cwd()?
   let project = fp"{root}/source"
-  let _ = patch.apply(project, fp"{root}/script-chain.patch".read_text()?, 1)?
   let _ = fs.copy_tree(fp"{root}/vendor", fp"{project}/vendor", parents: true, overwrite: true)?
   fs.install(fp"{root}/lock/Cargo.lock", fp"{project}/Cargo.lock", 0o644, parents: true, overwrite: true)
 
