@@ -30,7 +30,7 @@ export let mkdeps_target = []
 ## Exported declaration `upstream_sources`.
 ## Upstream ships no Cargo.lock; `files/Cargo.lock` pins the `ffi` feature's
 ## resolution and vendors every locked crate.
-export const upstream_sources = [
+export let upstream_sources = [
   {
     source: p"https://github.com/laputa-systems/rust-fontconfig/archive/refs/tags/v5.0.2-laputa.1.tar.gz => source",
     kind: "auto",
@@ -71,7 +71,7 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
+    source: fp"https://static.rust-lang.org/dist/{upstream_pins.rust_distribution_date}/rust-std-1.99.0-ARCH-unknown-linux-musl.tar.xz => rust-std",
     kind: "auto",
     architectures: [
       "all",
