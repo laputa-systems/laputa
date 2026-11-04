@@ -12,7 +12,7 @@ export const package_kind = "payload"
 export const ver = "23.1.0-rc2"
 
 ## Exported declaration `rel`.
-export const rel = "29"
+export const rel = "30"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -90,7 +90,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   #
   # libgcc_s.so / libgcc_s.so.1: built from libunwind.a and the compiler-rt
   # objects that provide the helpers required by the dynamically loaded
-  # rust-lld. Compiler-rt marks those helpers hidden, so make only these
+  # rust-lld and by GCC-built binaries such as Play's release, which imports
+  # __popcountdi2. Compiler-rt marks those helpers hidden, so make only these
   # required symbols default-visible before linking the shared object.
   let stub_src = fp"{dest}/.stub.c"
   let builtins_dir = fp"{dest}/.builtins"
@@ -106,6 +107,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let multf3 = fp"{builtins_dir}/multf3.c.o"
   let trunctfdf2 = fp"{builtins_dir}/trunctfdf2.c.o"
   let clear_cache = fp"{builtins_dir}/clear_cache.c.o"
+  let popcountdi2 = fp"{builtins_dir}/popcountdi2.c.o"
   stub_src.write("")
   visibility_map.write(
     """__floatunditf
@@ -119,6 +121,7 @@ __multf3
 __letf2
 __floatsitf
 __gttf2
+__popcountdi2
 """,
   )
   export_map.write(
@@ -139,7 +142,7 @@ __gttf2
     run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o"
     cd (builtins_dir) {
       run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" \
-        "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o"
+        "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o" "popcountdi2.c.o"
     }
     for object in [
       comparetf2,
@@ -150,6 +153,7 @@ __gttf2
       multf3,
       trunctfdf2,
       clear_cache,
+      popcountdi2,
     ] {
       let visible = fp"{object}.visible"
       run $llvm_objcopy f"--set-symbols-visibility={visibility_map}=default" $object $visible
@@ -160,8 +164,8 @@ __gttf2
     run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" \
       "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" \
       "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" \
-      "__gttf2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf \
-      $floatunditf $multf3 $trunctfdf2 $clear_cache
+      "__gttf2" "-u" "__popcountdi2" "--whole-archive" $libunwind "--no-whole-archive" $comparetf2 $divtf3 $extendsftf2 $floatsitf \
+      $floatunditf $multf3 $trunctfdf2 $clear_cache $popcountdi2
   }
 
   builtins_dir.remove(missing_ok: false)
