@@ -175,6 +175,140 @@ configuration, verification commands and results, installed footprint, measured
 tradeoffs, and any genuinely unavailable production qualification. Never claim
 an unpublished release or unexecuted guest pass.
 
+## Upstream evaluation
+
+Evaluated on 2026-11-04 against [fschutt/rust-fontconfig](https://github.com/fschutt/rust-fontconfig).
+Everything below was observed at the pinned revision unless marked unmeasured.
+
+### Pin
+
+- Release `v5.0.2`, commit `966dc9c8187601ec4ad206a095a5f48fbe490279`
+  (2026-10-29); crates.io and the GitHub release were published 2026-10-28.
+  The tag is lightweight and unsigned. It is the latest release and the
+  default branch head.
+- Source: the GitHub tag archive, sha256
+  `63f533566b8bcba902a8005f6f5408a6c62cbe8b979da2bcbca4090a33b38a7b`; its
+  tree equals a clone of the tag. The crates.io `.crate` (sha256
+  `ed5799956a5fa7abd968823c4d4876f2eb9301d5c02e2f53d0dc9471c001c782`) has the
+  same version.
+- Upstream commits no `Cargo.lock`. Laputa pins
+  `packages/rust-fontconfig/files/Cargo.lock`, generated against crates.io
+  with all optional features (69 crates, 14,193,845 bytes of `.crate` files,
+  all vendored by PM). The `ffi` closure is 43 crates including 6
+  proc-macro or macro-support crates.
+- Upstream tests at the pin: with `--no-default-features --features ffi`, the
+  library tests (33 pass, 1 ignored) and the integration tests `tests`,
+  `issue_26_unicode_fallback_ranking`, and `registry_completion` (21, 10, and
+  4 pass) pass on x86_64-linux-musl. `cargo test --features ffi` alone does
+  not compile because the `registry` example needs `cache`; the
+  `disk_cache_persistence` test needs `cache` and was not run.
+
+### Maintenance and license
+
+- One maintainer wrote 213 of the 237 commits since February 2021 (under
+  three author spellings); 12 more are an automated "PR Analysis" account. There were 137 commits in 2026: 34
+  in August, 14 in September, and 4 in October. Releases: 5.0.0 on
+  2026-09-03 (breaking: fallback chains and `resolve_char` changed, disk
+  manifest v3, `PatternMatch` discriminants pinned to the C header), 5.0.1 on
+  2026-10-06, 5.0.2 on 2026-10-28. Four issues are open, including #29
+  (the desktop's configured font passed in from outside) and #24
+  (libfontconfig compatibility).
+- The crate is MIT. The `ffi` closure is permissive: MIT, Apache-2.0, 0BSD,
+  Zlib, BSD-3-Clause (`brotli-decompressor`, `alloc-no-stdlib`,
+  `alloc-stdlib`, `glyph-names`, `encoding_rs` in part), Unicode-3.0
+  (`unicode-ident`). `allsorts-azul` (Apache-2.0) is the font parser. No
+  GPL or LGPL crate is in the closure. PM installs the upstream `LICENSE`
+  only; third-party notices for the statically linked crates are not
+  installed.
+- Release cadence is high and 5.0.0 changed behavior and the manifest
+  format, so each bump needs a re-run of the package proof and a decision on
+  the SONAME (below).
+
+### Feature graph
+
+`std` always on (`mmapio`); `parsing = [allsorts-azul, xmlparser, std]`;
+`async-registry = [std, parsing]`; `ffi = [parsing, std, async-registry]`;
+`multithreading = [rayon]`; `cache = [serde, bincode, dirs, std]`.
+
+- `ffi` enables the async registry and the only font parser. It does not
+  enable `multithreading` or `cache`.
+- XML parsing has no feature of its own: `xmlparser` (pure Rust, no
+  features) comes with `parsing`, so separating it from metadata parsing
+  needs an upstream change. Its share of the library size is unmeasured.
+- `cache` is unreachable from C: no export loads or saves a disk cache.
+  `multithreading` is reachable through `fc_cache_build`.
+- Selected: `--no-default-features --features ffi`.
+
+Measured with a stripped `cdylib` on x86_64-linux-musl (PM payload bytes,
+fat LTO, one codegen unit unless noted):
+
+| Configuration | Library bytes |
+|---|---:|
+| `ffi`, release defaults | 1,480,336 |
+| `ffi`, LTO, `opt-level=3` | 1,258,664 |
+| `ffi`, LTO, `opt-level=s` (selected) | 1,111,248 |
+| `ffi,multithreading`, LTO, `opt-level=3` | 1,328,928 |
+| `ffi,cache`, LTO, `opt-level=3` | 1,291,712 |
+
+`fc_cache_build` over the 9 font files (18 faces, 31.6 MB) of the proof set,
+15 interleaved runs on the busy build host (median CPU ms, median RSS kB):
+`ffi` `opt-level=3` 2.3 and 3,076; `ffi` `opt-level=s` 2.3 and 2,896;
+`ffi,multithreading` 10.3 (3.1 wall) and 3,792. Over 81 faces (those plus the
+host's `/usr/share/fonts`): 7.7, 8.1, and 84.5 CPU ms (10.1 wall) respectively.
+`multithreading` costs more CPU and wall time at these counts and is left
+off. Timings used no perf-gate window (`perf-gate-ready` reported a hot
+process tree); read them as relative.
+Package build time was 46 to 51 s wall at `-j 8` under load, for every
+configuration.
+
+### C interface
+
+- 52 exports, all `fc_*`. They equal the 52 functions `ffi/rust_fontconfig.h`
+  declares, and the 12 `#[repr(C)]` structs match the header's field names and
+  order. The package proof asserts the export set equals the header's set.
+- Every export runs in `catch_unwind` and returns null, false, or zero on a
+  panic. That requires `panic=unwind`; the recipe omits the `panic=abort` used
+  by the other Rust packages. The panic path itself is untested.
+- Returned objects have matching `*_free` functions. The proof exercises
+  them; no sanitizer or concurrent-use test has run.
+- There is no version function or macro, no `fc_*` entry to set scan
+  directories or an `FcFallbackConfig`, and no disk-cache entry.
+- On Linux `fc_cache_build` and the registry read `$FONTCONFIG_FILE` or
+  `/etc/fonts/fonts.conf` for `<dir>` entries and `<alias>` preferences. With
+  that file missing, or without `<dir>` entries, they scan **no fonts**; the
+  built-in directory list serves only the filename-only (non-`parsing`)
+  scan. Removing the Fontconfig package's `fonts.conf` therefore needs
+  either a Laputa-owned file or an upstream injection API.
+- `fc_resolve_font_chain` and `fc_registry_request_fonts` pass no script
+  hint, so a chain precomputes only the default blocks: Cyrillic, Arabic,
+  Devanagari, Hiragana, Katakana, CJK Unified Ideographs, and Hangul. With
+  all fonts installed, a `["Hack", "monospace"]` chain resolved Latin to Hack,
+  U+0633 to DejaVu Sans, U+0915 to Noto Sans Devanagari, and U+4E2D to
+  Noto Sans CJK, but returned no font for U+0E01 (Thai) and U+1F600 (emoji).
+  A coverage query (`fc_pattern_add_unicode_range` then `fc_cache_query`)
+  found Noto Sans Thai, Noto Color Emoji, and DejaVu Sans (U+05D0) correctly.
+  The Rust API has `resolve_font_chain_with_scripts`; the C API does not.
+  Hebrew and Greek through a chain were not tested.
+
+### Package decisions
+
+- **SONAME.** `librust_fontconfig.so.<upstream version>`, here
+  `librust_fontconfig.so.5.0.2`. Upstream documents no ABI promise and ships
+  no version symbol, so each upstream release is a new SONAME. The package
+  proof fails if the SONAME is not the recipe version, if an export is not in
+  the installed header, or if a header function is not exported; relaxing the
+  policy to a shared major SONAME requires a recorded ABI comparison.
+  The unversioned `librust_fontconfig.so` links to it for development.
+- **Headers.** `usr/include/rust-fontconfig/rust_fontconfig.h` and
+  `rust-fontconfig.pc` (`-I${includedir}`), because the header defines
+  `FcPattern`, `FcFontCache`, and other names that C Fontconfig also uses and
+  the two headers cannot share a translation unit.
+- **Closure.** Runtime `DT_NEEDED` is `libc.so` only; no `RPATH`,
+  `RUNPATH`, `libgcc_s`, Fontconfig, or Expat; the recipe adds no
+  `gnu-stubs` edge.
+- **Profile.** Fat LTO, one codegen unit, `opt-level=s`, unwinding panics, and
+  the `-static-libgcc` link argument the other Rust recipes use.
+
 ## Alternatives considered
 
 Retain C Fontconfig indefinitely. This preserves the baseline but does not meet
