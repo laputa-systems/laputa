@@ -192,7 +192,25 @@ library and its version policy.
 The pinned upstream evaluation must settle configuration injection, cache
 validation and generation compatibility, FFI ownership and panic behavior,
 feature costs, and the supported ABI policy. These are implementation findings,
-not reasons to replace upstream's engine. Current prerequisites remain open.
+not reasons to replace upstream's engine.
+
+## Prerequisite status
+
+Recorded on 2026-11-04; the owner then authorized the upstream evaluation.
+
+- **Shared native font stack:** qualified on x86_64 in
+  [the font contract](../FONT-STACK.md): package proofs, the composed-root
+  closure audit, Ghostty's font tests in the composed runtime (206 pass, 13
+  skip, zero fail), and the graphical startup and idle-memory pairs. aarch64
+  stays deferred with the rest of the campaign. Laputa's production Ghostty
+  package still pins the published bundled build `f2024d5d2`.
+- **Play SubRip migration:** Play `83070cc`, the source of release 0.42.2,
+  passes its full Linux suite in its pinned container: 362 passed, zero
+  failed, including SubRip loading, the native OSD and OSC, and gpu-next
+  rendering on lavapipe.
+- **Play Core Text migration:** macOS-only and outside this Linux campaign.
+  Play's 0.42.2 release workflow built and checked the macOS app in CI; no
+  owner-run macOS qualification is recorded here.
 
 ## Decision
 
