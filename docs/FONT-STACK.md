@@ -85,4 +85,10 @@ the existing package. The candidate gave 40,788 KiB RSS, 40,269 KiB PSS,
 40,068 KiB private, and 720 KiB shared. These single observations are not a
 statistical performance comparison. Cold and warm startup, shaping throughput,
 rasterization time, and Fontconfig cold-cache time have not been qualified.
-AArch64 runtime and package proofs also remain unverified.
+A manual AArch64 cross-build used the same font feature choices with Zig 0.17
+and ran under `qemu-aarch64` with a private Alpine musl loader. The ELF files
+had the expected SONAMEs and no RPATH or RUNPATH. A runtime consumer exercised
+Arabic and Hebrew shaping, ligatures, combining marks, variable axes,
+Devanagari, Thai, a CJK collection, PNG color emoji, BDF, PCF, and Fontconfig
+discovery. Its loader resolved the shared libraries from the private root.
+This was not a native PM package build or an AArch64 Ghostty or guest proof.
