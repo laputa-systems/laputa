@@ -5,8 +5,8 @@ use pm.types
 export const name = "font-ttf-noto-sans-thai"
 ## Package kind.
 export const package_kind = "payload"
-## Upstream snapshot.
-export const ver = "2026.11.04"
+## Upstream font version.
+export const ver = "2.002"
 ## Package revision.
 export const rel = "1"
 ## Runtime dependencies.

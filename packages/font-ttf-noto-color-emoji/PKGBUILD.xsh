@@ -5,8 +5,8 @@ use pm.types
 export const name = "font-ttf-noto-color-emoji"
 ## Package kind.
 export const package_kind = "payload"
-## Upstream release date.
-export const ver = "2026.09.24"
+## Upstream font version.
+export const ver = "2.057"
 ## Package revision.
 export const rel = "1"
 ## Runtime dependencies.
