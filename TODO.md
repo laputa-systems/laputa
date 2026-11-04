@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 51
+Next: 52
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -113,6 +113,17 @@ time, memory, binary-size and scaling measurements. Functional work continues.
 - **Progress:** Source-built Tailscale 1.104.2 enforces the canonical SPKI policy while retaining the root bundle. Real TLS fixtures reject both cross-signed forms and accept the unblocked control. XSH and Tailscale reject insecure incomplete-chain bypasses when policy is installed. Tailscale checks fresh and resumed handshakes, preserves system and extra control roots, and refuses policy deletion after observation. uv deliberately retains the checksum-pinned upstream prebuilt binary: it enforces root omission but accepts the blocked intermediate under a retained root. Its characterization remains in `tests/pm/trust_consumers.xsh`. See [per-consumer enforcement](docs/CERTIFICATE-TRUST.md#per-consumer-distrust-enforcement) for lifecycle limits and the remaining uv enforcement gap.
 - **Fix with:** reference-parity
 - **Effort:** M (days)
+
+### LAP-51 · P3 · Establish the native-code census and replacement gates
+
+- **Area:** Dependencies
+- **Where:** `pm/elfdeps.xsh`, `docs/FONT-STACK.md`, `profiles/qemu-tinyland-ghostty.xsh`, `packages/wayland-libs-client/PKGBUILD.xsh`, `../play/scripts/audit-linux.sh`
+- **Problem:** The ELF provider closure identifies libraries but does not account for statically incorporated C/C++ or establish that a Rust replacement preserves consumer contracts. The graphical profile and Play need a common, measured starting point before replacing libraries.
+- **Recommendation:** After the active campaign, extend existing PM and application audits into a per-profile census. Count unique installed files, static native code, runtime-loaded providers, and build-only inputs separately. Qualify zlib-rs first, then isolated firewall and Play media experiments. Preserve the shared font ABI until replacement compatibility is demonstrated.
+- **Acceptance:** Reproduce the census for the Tinyland/Ghostty profile and a separately identified Play build. Explain each native dependency and every unknown attribution. Establish differential correctness, failure, closure, and performance gates for each proposed replacement without changing production defaults.
+- **Fix with:** architect, reference-parity, benchmark-checklist
+- **Effort:** M (days)
+- **Design:** [C-free userspace direction](docs/rfc/LAP-51-c-free-userspace.md)
 
 ### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
 

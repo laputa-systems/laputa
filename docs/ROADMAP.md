@@ -835,6 +835,18 @@ in-tree compositor, joins Wi-Fi, suspends and resumes repeatedly without losing
 the session, reports battery and controls backlight, plays audio, runs a
 browser with working portals, and rolls back a bad update through R5.
 
+## Long-term: reduce C and C++ in the userspace
+
+After the active campaign, pursue a predominantly Rust/Zig implementation of
+the userspace, with orchestration policy in XSH and the existing Linux ABI.
+Retain hardware acceleration and usable applications while reducing the native
+dependency closure. The [follow-on design](rfc/LAP-51-c-free-userspace.md)
+separates system services, desktop infrastructure, and whole-system research.
+It starts with a measured census, preserves the [shared font
+contract](FONT-STACK.md), and includes Play as a second application consumer.
+LAP-51 owns the first bounded slice. This direction does not launch replacement
+work or change the current campaign's acceptance gates.
+
 ## Delivery gates and evidence
 
 | Gate | Required result |
