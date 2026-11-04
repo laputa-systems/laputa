@@ -26,7 +26,6 @@ export const upstream_sources = [
 ## Installed files.
 export const filetree = [
   {path: p"usr/include/harfbuzz", kind: "tree"},
-  {path: p"usr/lib/cmake/harfbuzz", kind: "tree"},
   {path: p"usr/lib/libharfbuzz.so", kind: "symlink"},
   {path: p"usr/lib/libharfbuzz.so.0", kind: "symlink"},
   {path: p"usr/lib/libharfbuzz.so.0.61500.0", kind: "binary"},
@@ -56,4 +55,5 @@ export proc build(dest: Path) [fs, process, env, error] {
       run $cmake "-P" "cmake_install.cmake"
     }
   }?
+  fp"{dest}/usr/lib/cmake/harfbuzz".remove()
 }

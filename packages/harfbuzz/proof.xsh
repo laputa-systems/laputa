@@ -62,7 +62,17 @@ int main(int argc, char **argv) {
 """,
     )
     let binary = fp"{tmp}/proof"
-    run $cc fp"{tmp}/proof.c" f"-I{root}/usr/include/freetype2" f"-I{root}/usr/include/harfbuzz" f"-L{root}/usr/lib" "-lharfbuzz" "-lfreetype" "-o" $binary
+    let machine = (system.uname()?).machine
+    let loader = fp"{root}/usr/lib/ld-musl-{machine}.so.1"
+    let pkg_config = fp"{root}/usr/bin/pkgconf"
+    let pc_dir = fp"{root}/usr/lib/pkgconfig".display()
+    var flags = ""
+    env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display(), PKG_CONFIG_LIBDIR: pc_dir, PKG_CONFIG_PATH: pc_dir, PKG_CONFIG_SYSROOT_DIR: root.display()}) {
+      flags = run.text $loader $pkg_config "--cflags" "--libs" "harfbuzz" "freetype2"
+    }
+    proof.ensure(f"{root}/usr/include/harfbuzz" in flags and f"{root}/usr/lib" in flags, "proof-harfbuzz", "pkg-config paths do not use the relocated root")
+    let args = flags.trim().split(" ")
+    run $cc fp"{tmp}/proof.c" @args "-o" $binary
     env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
       run $binary fp"{root}/usr/share/fonts/TTF/DejaVuSans.ttf"
     }
