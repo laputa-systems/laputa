@@ -85,6 +85,18 @@ Musl library aliases resolve to their actual package owner. The current root
 passes with 19 packages and 26 ELF files. Negative checks reject an added
 duplicate FreeType provider and a removed FreeType dependency declaration.
 
+Ghostty's existing font-filtered Zig tests also run against that composed
+runtime: 206 pass, 13 skip, and zero fail. The test executable imports the
+three font SONAMEs without RPATH or RUNPATH. A networkless namespace supplies
+only the composed root's libraries and fonts, the repository's read-only
+reference images, a minimal test-user identity, and writable test scratch.
+This covers font discovery, FreeType color and bitmap formats, ligatures,
+shaping, glyph caches, and reference-image comparisons. Six skips select other
+backends, three are pre-existing disabled complex-script cases, and four need
+specific uninstalled international font families. The package proofs exercise
+the separately packaged international corpus. Skipped Zig cases are not
+counted as passing, and no test was disabled for this qualification.
+
 Fresh PM composition includes 13 runtime artifacts for the existing package and
 19 for the candidate with FreeType revision 3. Count each regular file once,
 including development interfaces and the generated root receipt. Symlinks do
