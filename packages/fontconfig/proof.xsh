@@ -51,6 +51,9 @@ static int available(FcChar32 codepoint, const char *expected, int color) {
   FcDefaultSubstitute(pattern);
   FcResult result;
   FcFontSet *set = FcFontSort(NULL, pattern, FcFalse, NULL, &result);
+  FcCharSet *first_coverage;
+  if (!set || !set->nfont || FcPatternGetCharSet(set->fonts[0], FC_CHARSET, 0, &first_coverage) != FcResultMatch ||
+      !FcCharSetHasChar(first_coverage, codepoint)) return 1;
   int found = 0;
   if (set) for (int i = 0; i < set->nfont; i++) {
     FcChar8 *family;
