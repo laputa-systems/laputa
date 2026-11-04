@@ -40,9 +40,39 @@ static int match(const char *requested, const char *expected, FcChar32 codepoint
   return !ok;
 }
 
+static int available(FcChar32 codepoint, const char *expected, int color) {
+  FcPattern *pattern = FcPatternCreate();
+  FcCharSet *charset = FcCharSetCreate();
+  if (!pattern || !charset || !FcCharSetAddChar(charset, codepoint) ||
+      !FcPatternAddCharSet(pattern, FC_CHARSET, charset) ||
+      !FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)"monospace")) return 1;
+  FcCharSetDestroy(charset);
+  if (!FcConfigSubstitute(NULL, pattern, FcMatchPattern)) return 1;
+  FcDefaultSubstitute(pattern);
+  FcResult result;
+  FcFontSet *set = FcFontSort(NULL, pattern, FcFalse, NULL, &result);
+  int found = 0;
+  if (set) for (int i = 0; i < set->nfont; i++) {
+    FcChar8 *family;
+    FcCharSet *coverage;
+    FcBool is_color = FcFalse;
+    if (FcPatternGetString(set->fonts[i], FC_FAMILY, 0, &family) != FcResultMatch ||
+        FcPatternGetCharSet(set->fonts[i], FC_CHARSET, 0, &coverage) != FcResultMatch) continue;
+    FcPatternGetBool(set->fonts[i], FC_COLOR, 0, &is_color);
+    if (!strcmp((const char *)family, expected) && FcCharSetHasChar(coverage, codepoint) && (!color || is_color)) found = 1;
+  }
+  if (!found) fprintf(stderr, "no %s fallback for U+%x", expected, codepoint);
+  if (set) FcFontSetDestroy(set);
+  FcPatternDestroy(pattern);
+  return !found;
+}
+
 int main(void) {
   if (!FcInit()) return 1;
   int result = match("monospace", "Hack", 0) || match("sans-serif", "DejaVu Sans", 0) || match("sans", "DejaVu Sans", 0) || match("serif", "DejaVu Sans", 0) || match("monospace", "DejaVu Sans", 0x0633);
+  result = result || available(0x0915, "Noto Sans Devanagari", 0) ||
+    available(0x0e01, "Noto Sans Thai", 0) || available(0x4e2d, "Noto Sans CJK SC", 0) ||
+    available(0x1f600, "Noto Color Emoji", 1);
   FcFini();
   return result;
 }
@@ -54,5 +84,5 @@ int main(void) {
       run $binary
     }
   }
-  print "fontconfig ok: clean-root generic families and Arabic fallback"
+  print "fontconfig ok: clean-root generic families and multilingual fallback"
 }
