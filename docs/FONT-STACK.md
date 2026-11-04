@@ -41,3 +41,48 @@ is not writable. Fontconfig can still scan fonts when a cache is unavailable.
 The default Ghostty package remains pinned to its existing release until a
 shared-font binary is built and qualified; these packages do not change that
 pin by themselves.
+
+## Local x86_64 qualification
+
+The existing `ghostty-custom` package uses the published `f2024d5d2` artifact.
+A local candidate was built from Ghostty commit `6329a774e` with
+`-Dapp-runtime=wayland -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
+-Dstrip=true -Demit-themes=false -Di18n=false -Dcpu=baseline` and system
+integration enabled for FreeType, HarfBuzz, Fontconfig, libpng, and zlib.
+Its version string was `1.4.1-dev+000000`. The local archive SHA-256 was
+`a7245e40dc52777d3efa13b92577ee4c4dcc179d99da0fd0017620217d1d2595`.
+The PM-stripped candidate binary SHA-256 was
+`c77048530d640eabed027693d4e2c2b7a5401bff625d78d1f9189948cb2d1f87`.
+The checked-in package still uses the published artifact and its original
+checksum. The local archive is not a published release.
+
+A temporary package recipe declared the three font libraries as link
+dependencies and Hack and DejaVu Sans as runtime-only dependencies. Its
+package proof checked the font SONAMEs and absence of RPATH and RUNPATH. Both
+that package and the existing package passed `make profile-test` with Linux,
+KVM, Tinyland, virgl, keyboard input, screenshot, and session recovery. A
+networkless composed root also ran the candidate and failed to load it when
+`libharfbuzz.so.0` was absent. An unprivileged Fontconfig consumer selected an
+Arabic fallback and populated its XDG cache with an unwritable system cache.
+
+The unique regular-file sizes in the PM-composed `ghostty-custom` runtime
+closures were 172,916,318 bytes for the existing package and 175,795,479 bytes
+for the candidate. The corresponding stripped executables were 30,787,208 and
+27,179,848 bytes. The candidate closure included these shared libraries:
+
+| Library | Bytes |
+|---|---:|
+| FreeType | 903,984 |
+| HarfBuzz | 754,280 |
+| Fontconfig | 481,784 |
+| libpng | 262,432 |
+| Expat | 191,240 |
+| zlib | 104,544 |
+
+One guest `smaps_rollup` observation at the profile's idle proof point gave
+41,760 KiB RSS, 41,244 KiB PSS, 41,048 KiB private, and 712 KiB shared for
+the existing package. The candidate gave 40,788 KiB RSS, 40,269 KiB PSS,
+40,068 KiB private, and 720 KiB shared. These single observations are not a
+statistical performance comparison. Cold and warm startup, shaping throughput,
+rasterization time, and Fontconfig cold-cache time have not been qualified.
+AArch64 runtime and package proofs also remain unverified.
