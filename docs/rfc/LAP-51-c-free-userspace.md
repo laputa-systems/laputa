@@ -8,7 +8,8 @@ Pursue a usable, accelerated Linux distribution whose services and applications
 use predominantly Rust or Zig, with orchestration policy in XSH. Isolate the
 remaining C/C++ implementation dependencies behind documented interfaces.
 Keep Linux and musl while replacements earn adoption through actual consumer
-tests. Start this work after the active campaign.
+tests. Start this work after the active campaign and the
+[rust-fontconfig adoption](LAP-52-rust-fontconfig.md).
 
 Distinguish three milestones:
 
@@ -66,9 +67,10 @@ one dependency edge alone need not shrink the graphical closure.
 
 ### Qualify compatible replacements first
 
-The initial ordering is a census, a zlib-rs pilot, then independent firewall and
-media pilots. Font replacement follows qualification of the current shared
-stack. Candidate capabilities below are upstream claims or documented APIs,
+After LAP-52, the initial ordering is a census, a zlib-rs pilot, then independent
+firewall and media pilots. LAP-52 first qualifies shared rust-fontconfig for
+Ghostty and Play after the native font stack and Play migrations. Remaining
+font replacement follows that baseline. Candidate capabilities below are upstream claims or documented APIs,
 not Laputa qualification results.
 
 | Candidate | Proposed experiment | Required boundary |
@@ -77,7 +79,7 @@ not Laputa qualification results.
 | [crabtables](https://github.com/finnbear/crabtables) | Compare Laputa's actual firewall policy through direct netlink or `nfcrt` in disposable namespaces. | Check atomic failure, rollback, sets, counters, packet verdicts, permissions, and service recovery. Keep the host firewall untouched. |
 | [rav1d](https://github.com/memorysafety/rav1d) | Substitute the AV1 decoder in Play's pinned FFmpeg build. | Compare decoded frames, bit depths, malformed input, seek/flush, CPU, memory, and complete playback. Retain the existing decoder until qualified. |
 | [wayland-rs](https://github.com/Smithay/wayland-rs/tree/master/wayland-backend) and [KBVM](https://github.com/mahkoh/kbvm) | Audit remaining native protocol and keyboard consumers. | Preserve object identity, FD passing, input behavior, EGL/Vulkan integration, and broker security. |
-| [rust-fontconfig](https://github.com/fschutt/rust-fontconfig) | Compare discovery, configuration, matching, and fallback against the shared stack. | Its `ffi` feature exposes `librust_fontconfig` and `fc_*` calls. That is not evidence of the existing `Fc*` ABI. Enable real font-table parsing, not filename heuristics. |
+| [rust-fontconfig](https://github.com/fschutt/rust-fontconfig) | Complete [LAP-52](LAP-52-rust-fontconfig.md) before this roadmap begins. | Both consumers use one shared upstream library. Its C interface requires consumer adaptation rather than reproduction of the `Fc*` ABI. |
 | [HarfRust](https://github.com/harfbuzz/harfrust/tree/main/harfrust_capi) | Differential shaping with the installed international corpus. | Its C interface uses `hr_*`; compatibility headers provide source adaptation. Verify every consumer API, including Ghostty's FreeType integration, before replacing `libharfbuzz.so.0`. |
 | [Swash](https://github.com/dfrg/swash) | Compare rasterization, hinting, metrics, variations, and color glyphs. | A Rust font API does not establish FreeType ABI compatibility. Preserve glyph quality and application behavior. |
 | [rust-fs-ext4](https://github.com/antimatter-studios/rust-fs-ext4) | Compare formatting and checking disposable images against e2fsprogs and Linux. | Upstream describes its checker as a subset of e2fsck. Qualify supported features and crash recovery before using it for repair. |

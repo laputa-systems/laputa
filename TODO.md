@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 52
+Next: 53
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -122,11 +122,23 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Area:** Dependencies
 - **Where:** `pm/elfdeps.xsh`, `docs/FONT-STACK.md`, `profiles/qemu-tinyland-ghostty.xsh`, `packages/wayland-libs-client/PKGBUILD.xsh`, `../play/scripts/audit-linux.sh`
 - **Problem:** The ELF provider closure identifies libraries but does not account for statically incorporated C/C++ or establish that a Rust replacement preserves consumer contracts. The graphical profile and Play need a common, measured starting point before replacing libraries.
-- **Recommendation:** After the active campaign, extend existing PM and application audits into a per-profile census. Count unique installed files, static native code, runtime-loaded providers, and build-only inputs separately. Qualify zlib-rs first, then isolated firewall and Play media experiments. Preserve the shared font ABI until replacement compatibility is demonstrated.
+- **Recommendation:** After the active campaign, Play's SRT/Core Text migrations, and LAP-52, extend existing PM and application audits into a per-profile census. Count unique installed files, static native code, runtime-loaded providers, and build-only inputs separately. Qualify zlib-rs first, then isolated firewall and Play media experiments. Preserve the shared font contract throughout.
 - **Acceptance:** Reproduce the census for the Tinyland/Ghostty profile and a separately identified Play build. Explain each native dependency and every unknown attribution. Establish differential correctness, failure, closure, and performance gates for each proposed replacement without changing production defaults.
 - **Fix with:** architect, reference-parity, benchmark-checklist
 - **Effort:** M (days)
 - **Design:** [C-free userspace direction](docs/rfc/LAP-51-c-free-userspace.md)
+
+### LAP-52 · P3 · Share rust-fontconfig across Ghostty and Play
+
+- **Area:** Dependencies
+- **Where:** `packages/`, `docs/FONT-STACK.md`, `../ghostty/src/font/`, `../play/rust/player-overlay/src/text/linux.rs`
+- **Problem:** The canonical graphical stack still relies on C Fontconfig and Expat. Upstream rust-fontconfig has not been qualified as a shared discovery provider for both consumers.
+- **Recommendation:** After the shared native font stack and Play SRT/Core Text migrations pass, package pinned upstream rust-fontconfig as one versioned musl shared library. Adapt both consumers to its C API, retain shared FreeType and HarfBuzz, and qualify configuration, caching, fallback, rendered output, ABI, closure, and measured costs before removing the native provider.
+- **Acceptance:** Both applications dynamically resolve the same Laputa library. International discovery and cluster-safe fallback pass real rendering and guest proofs. Native Fontconfig and unused Expat leave the canonical graphical closure. Preserve macOS and existing security gates. Report exact upstream and repository revisions, SONAME, features, results, and installed footprint.
+- **Sequencing:** Owner-authorized campaign 3, before LAP-51. Prerequisite qualification remains open; this ticket records no adoption pass.
+- **Fix with:** architect, reference-parity, benchmark-checklist
+- **Effort:** L (weeks)
+- **Design:** [Shared upstream rust-fontconfig](docs/rfc/LAP-52-rust-fontconfig.md)
 
 ### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
 
