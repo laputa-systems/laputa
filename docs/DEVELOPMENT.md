@@ -112,7 +112,9 @@ the `tools` archive from a pinned
 `ffmpeg` and `ffprobe` with no network protocols or devices. ffmpeg-build owns
 the sources, components, and qualification. An update changes the release tag in
 the source URL and both target checksums. Its `play-sdk` archive is Play's
-build input and has no Laputa package. Tailscale uses its package-scoped
+build input and has no Laputa package. The play recipe installs Play's
+x86_64 musl release binary, which links that SDK statically and Laputa's
+shared libraries dynamically. Play publishes no aarch64 Linux build. Tailscale uses its package-scoped
 pinned Go distribution, offline vendor archive and distrust overlay. Its build
 and proof use the ordinary offline PM executor.
 
