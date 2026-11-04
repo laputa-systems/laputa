@@ -29,11 +29,14 @@ proc square_wave_wav(wav: Path) [fs, error] {
 proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "play")
   proof.target_elf(root, p"usr/bin/player", "play")
+  let needed = elf.inspect(fp"{root}/usr/bin/player")?.needed
+  let listed = needed.join(" ")
+  proof.ensure("libgcc_s.so.1" not in needed, "player-gnu-runtime", f"player still needs libgcc_s.so.1: {listed}")
 
   let player = fp"{root}/usr/bin/player"
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
     let version = run.text $player "--version"
-    proof.ensure(version.trim() == "player mpv-compatible 0.42.1", "player-version", f"unexpected player --version: {version.trim()}")
+    proof.ensure(version.trim() == "player mpv-compatible 0.42.2", "player-version", f"unexpected player --version: {version.trim()}")
 
     tempdir tmp at fp"{root}/var/tmp/proof-play" {
       let tone = fp"{tmp}/tone.wav"
@@ -42,5 +45,5 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       proof.ensure("duration=0.5\n" in played, "player-wav-playback", f"unexpected playback output:\n{played}")
     }
   }?
-  print "play ok: player 0.42.1 links Laputa's libraries and plays a WAV headlessly"
+  print "play ok: player 0.42.2 links Laputa's libraries and plays a WAV headlessly"
 }

@@ -6,7 +6,7 @@ export const name = "play"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.42.1"
+export const ver = "0.42.2"
 
 ## Package recipe export.
 export const rel = "1"
@@ -17,7 +17,6 @@ export const architectures = ["x86_64"]
 ## Runtime link inputs matching the release binary's DT_NEEDED entries.
 export const deps = [
   "musl",
-  "gnu-stubs",
   "alsa-lib",
   "fontconfig",
   "freetype",
@@ -44,7 +43,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "16df01a3c5738d6e9702e484d0730b9ad5644d9297bf648083bf96fd6d529b91",
+        sha256: "1fb16ed7e180ad8a3345ccce7183280c9998f7ddbae518211abfa9ffd2aefb70",
       },
     ],
   },
