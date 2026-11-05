@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "$repo_root/infra/asterinas/inputs.lock"
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/laputa-asterinas-host.XXXXXX")"
-trap 'rm -rf -- "$scratch"' EXIT
+trap 'chmod -R u+w -- "$scratch"; rm -rf -- "$scratch"' EXIT
 
 sha256_file() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -584,6 +584,46 @@ if run_published_inputs > "$scratch/published-xsh.log" 2>&1; then
     exit 1
 fi
 rg -q "xsh commit" "$scratch/published-xsh.log"
+
+prepare_root="$scratch/prepare-xsh-fixture"
+prepare_source="$scratch/prepare-xsh-source"
+mkdir -p "$prepare_root/infra/asterinas" \
+    "$prepare_source/tests/xsh" "$prepare_source/docs" \
+    "$prepare_source/core/tests/fixtures/util-linux/paths/bind/target"
+cp "$repo_root/infra/asterinas/prepare-xsh.sh" "$prepare_root/infra/asterinas/prepare-xsh.sh"
+printf 'target\n' > "$prepare_source/.gitignore"
+printf 'test xsh_fixture { assert true }\n' > "$prepare_source/tests/xsh/test.xsh"
+printf 'XSH specification fixture\n' > "$prepare_source/docs/SPEC.md"
+printf 'module_path = .\ntest_roots = core/tests\n  dev/tests\n  tests\n  showcase/tests\n' > "$prepare_source/xsht-config.ini"
+printf 'keep\n' > "$prepare_source/core/tests/fixtures/util-linux/paths/bind/target/sentinel"
+git -C "$prepare_source" init -q
+git -C "$prepare_source" config user.email asterinas-test@example.invalid
+git -C "$prepare_source" config user.name Asterinas
+git -C "$prepare_source" add --force --all
+git -C "$prepare_source" commit -qm 'pinned fixture source'
+prepare_commit="$(git -C "$prepare_source" rev-parse HEAD)"
+cat > "$prepare_root/infra/asterinas/inputs.lock" <<LOCK
+XSH_REPOSITORY=https://github.com/laputa-systems/xsh.git
+XSH_COMMIT=$prepare_commit
+LOCK
+mkdir -p "$prepare_root/.cache/asterinas"
+git init --bare -q "$prepare_root/.cache/asterinas/xsh.git"
+git --git-dir="$prepare_root/.cache/asterinas/xsh.git" \
+    fetch --quiet --no-tags --depth=1 "$prepare_source" "$prepare_commit"
+readarray -t prepared_xsh < <(bash "$prepare_root/infra/asterinas/prepare-xsh.sh")
+[[ ${#prepared_xsh[@]} == 2 ]]
+prepared_source="${prepared_xsh[0]}"
+prepared_tree="$(git -C "$prepared_source" rev-parse 'HEAD^{tree}')"
+source_tree="$(git -C "$prepare_source" rev-parse 'HEAD^{tree}')"
+[[ "$prepared_tree" == "$source_tree" ]] || {
+    printf 'XSH snapshot dropped tracked archive inputs\n' >&2
+    exit 1
+}
+readarray -t prepared_overlay < <(
+    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" "$prepared_source" all "$prepare_root/.out"
+)
+[[ ${#prepared_overlay[@]} == 3 ]]
+[[ "$(cat "${prepared_overlay[0]}/usr/lib/asterinas/xsh-source/core/tests/fixtures/util-linux/paths/bind/target/sentinel")" == keep ]]
 
 vm_test_root="$scratch/vm-fixture"
 fake_firecracker="$vm_test_root/firecracker"
