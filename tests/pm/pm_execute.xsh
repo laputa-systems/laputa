@@ -1,4 +1,5 @@
 ##! Behavior coverage for immutable BuildPlan execution through isolated artifact roots.
+use bytes
 use pm.catalog
 use pm.execute
 use pm.fingerprint
@@ -7,8 +8,11 @@ use pm.local
 use pm.plan
 use pm.plan_json
 use pm.policy
+use pm.remote as execute_remote
+use pm.repo as execute_repo
 use pm.store
 use pm.types
+use pm.util as execute_util
 
 pure fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/{name}"
@@ -49,6 +53,27 @@ proc receipt_named(value: types.BuildResult, name: Str) [error] -> Result[types.
   }
 
   Err(types.PmError.PackageContract(f"missing execute result artifact {name}"))
+}
+
+proc configured_executor_binary(name: Str) [fs, process, env, error] -> Result[Path] {
+  let configured = (e"XSH_HOST" ?? "").trim()
+  let runner = if configured != "" {
+    let selected = fp"{configured}"
+
+    if ! selected.exists()? {
+      return Err(types.PmError.PackageContract(f"configured XSH runner {selected} is missing"))
+    }
+
+    selected
+  } else if p"/bin/xsh".exists()? {
+    p"/bin/xsh"
+  } else {
+    process.which("xsh")?
+  }
+
+  return runner when name == "xsh"
+
+  fp"{runner.parent}/{name}"
 }
 
 proc execute_store(ctx: TestContext, name: Str) [fs, error] -> Result[Path] {
@@ -282,6 +307,80 @@ proc remote_snapshot_with_executor(
   }
 
   {...value, packages}
+}
+
+proc write_execute_generation_app(repo_root: Path) [fs, error] {
+  let package = fp"{repo_root}/packages/execute-app"
+  fp"{package}/PKGBUILD.xsh".write(
+    r"""
+##! Synthetic package for generation replacement and publication lifecycle coverage.
+## Package name.
+export let name = "execute-app"
+## Payload kind.
+export let package_kind = "payload"
+## Package version.
+export let ver = "1.0.0"
+## Package release.
+export let rel = "1"
+## Runtime dependency.
+export let deps = ["execute-dep"]
+## Build-host dependency.
+export let mkdeps_host = ["execute-tool"]
+## No build-target dependencies.
+export let mkdeps_target = []
+## No upstream source inputs.
+export let upstream_sources = []
+## Declared outputs.
+export let filetree = [
+  {path: p"bin/execute-app", kind: "symlink"},
+  {path: p"usr/bin/execute-app", kind: "file"},
+  {path: p"usr/share/execute-app-old.txt", kind: "file"},
+  {path: p"usr/share/execute-app.txt", kind: "file"},
+]
+
+## Builds the application after both dependency roots are available.
+export proc build(dest: Path) [fs, env, error] -> Result[Unit, Error] {
+  let root = env("LAPUTA_ROOT")?
+  let build_root = env("XSH_PM_BUILD_ROOT")?
+  let _ = fp"{root}/usr/share/execute-dep.txt".read_text()?
+  let _ = fp"{build_root}/usr/share/execute-tool.txt".read_text()?
+
+  let executable = fp"{dest}/usr/bin/execute-app"
+  executable.parent.mkdir()?
+  executable.write("application revision one\n", mode: 0o755)?
+
+  let alias = fp"{dest}/bin/execute-app"
+  alias.parent.mkdir()?
+  alias.symlink(to: p"../usr/bin/execute-app")?
+
+  let retired = fp"{dest}/usr/share/execute-app-old.txt"
+  retired.parent.mkdir()?
+  retired.write("retired payload\n")?
+
+  let data = fp"{dest}/usr/share/execute-app.txt"
+  data.write("data revision one\n", mode: 0o640)?
+}
+""",
+  )
+}
+
+proc write_execute_publish_worker(script: Path) [fs, error] {
+  script.write(
+    """use pm.plan_json
+use pm.repo as execute_repo
+
+proc main(...argv: List[Str]) [fs, net, time, error] {
+  let ready = fp"{argv[5]}"
+  ready.write("ready")
+  wait until fp"{argv[4]}".exists() within 10s every 10ms
+  let value = plan_json.read(fp"{argv[0]}")?
+  let snapshot = execute_repo.snapshot(value, fp"{argv[1]}")?
+  execute_repo.publish(snapshot, argv[2], "", fp"{argv[3]}")
+}
+
+main(@args)?
+""",
+  )
 }
 
 test test_execute_metadata_wire_schema_preserves_extensions_and_rejects_invalid_file_modes [fs, error] { |ctx|
@@ -528,6 +627,289 @@ test test_execute_rebuilds_changed_recipe_and_dependents [fs, net, process, env,
   assert receipt_named(result, "execute-app")?.key == changed_app.artifact_key
 }
 
+test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, net, process, env, time, error] { |ctx|
+  let repo_root = copied_execute_repository(ctx, "execute-generation-lifecycle-repo")?
+  write_execute_generation_app(repo_root)
+  let object_store = execute_store(ctx, "execute-generation-lifecycle-store")?
+  let first_plan = resolve_execute_plan(repo_root)?
+  let first_result = execute.build_plan(first_plan, repo_root, object_store, "", 1)?
+  let first_app = node_named(first_plan, "execute-app")?
+  let first_app_receipt = receipt_named(first_result, "execute-app")?
+  let first_metadata = json.read(fp"{first_app_receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+  assert [entry.path for entry in first_metadata.filetree] == [
+    "bin/execute-app",
+    "usr/bin/execute-app",
+    "usr/share/execute-app-old.txt",
+    "usr/share/execute-app.txt",
+  ]
+
+  let overlay = fp"{test.temp_dir(ctx, name: "execute-generation-lifecycle-overlay")?}/overlay"
+  overlay.mkdir()
+  let first_generation_plan = generation.plan(first_plan, ["execute-app"], generation.overlay_digest(overlay)?)?
+  assert [artifact.package_name for artifact in first_generation_plan.artifacts] == ["execute-app", "execute-dep"]
+  let first_root = fp"{test.temp_dir(ctx, name: "execute-generation-lifecycle-first")?}/root"
+  let first_generation = generation.compose(first_generation_plan, object_store, first_root, overlay)?
+  assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
+  assert fp"{first_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o755
+  assert fp"{first_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+  assert fp"{first_root}/usr/share/execute-app-old.txt".read_text()? == "retired payload\n"
+  assert fp"{first_root}/usr/share/execute-app.txt".read_text()? == "data revision one\n"
+  assert fp"{first_root}/usr/share/execute-app.txt".metadata()?.mode % 4096 == 0o640
+  assert fp"{first_root}/usr/share/execute-dep.txt".read_text()? == "dependency\n"
+  assert fp"{first_root}/usr/share/execute-tool.txt".exists()? == false
+
+  let remote_root = test.temp_dir(ctx, name: "execute-generation-lifecycle-remote")?
+  let remote_url = f"file://{remote_root}"
+  let publish_work = test.temp_dir(ctx, name: "execute-generation-lifecycle-publish")?
+  let first_snapshot = execute_repo.snapshot(first_plan, object_store)?
+  execute_repo.publish(first_snapshot, remote_url, "", publish_work)
+  let index_path = fp"{remote_root}/index.json"
+  let initial_index_text = index_path.read_text()?
+  let initial_index = execute_remote.load_remote_index_from(index_path)?
+  let initial_app_row = [row for row in initial_index if row.name == "execute-app"][0]
+  assert initial_app_row.artifact_key == first_app.artifact_key
+  let old_remote_tar = fp"{remote_root}/{initial_app_row.tarball}"
+  let old_remote_tar_sha256 = hash.sha256(old_remote_tar)?.hex()
+
+  let interrupted_source = test.temp_path(ctx, name: "execute-generation-lifecycle-interrupted-source")
+  interrupted_source.write("")?
+  interrupted_source.truncate(8192)?
+  let marker_before_limit = bytes.from_text("before-file-limit")
+  let marker_after_limit = bytes.from_text("after-file-limit")
+  assert bytes.write_at(interrupted_source, 4070, marker_before_limit)? == marker_before_limit.len()
+  assert bytes.write_at(interrupted_source, 4100, marker_after_limit)? == marker_after_limit.len()
+  assert interrupted_source.metadata()?.size == 8192
+  assert bytes.read_at(interrupted_source, 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
+  assert bytes.read_at(interrupted_source, 4100, marker_after_limit.len())?.utf8()? == "after-file-limit"
+  let interrupted_source_digest = hash.sha256(interrupted_source)?.hex()
+
+  let interruption_rel = p"interruptions/xfsz-copy.bin"
+  let interruption_destination = fp"{remote_root}/{interruption_rel}"
+  let interruption_temporary = fp"{interruption_destination.parent}/.{interruption_destination.name}.tmp"
+  let interruption_work = test.temp_dir(ctx, name: "execute-generation-lifecycle-interrupted-work")?
+  let interruption_worker = r"""use pm.remote as interrupted_remote
+
+proc main(...argv: List[Str]) [fs, net, process, error] -> Result[Unit] {
+  if argv[4] == "limited" {
+    let _ = process.set_signal_action("XFSZ", "default")?
+    let _ = process.set_rlimit("fsize", soft: 4096)?
+  }
+
+  let uploaded = interrupted_remote.upload_immutable_repo_file(
+    argv[0],
+    fp"{argv[1]}",
+    fp"{argv[2]}",
+    "",
+    fp"{argv[3]}",
+  )?
+  print ${uploaded}
+}
+
+main(@args)?
+"""
+  let interrupted_upload = test.run_script(
+    ctx,
+    interruption_worker,
+    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "limited"],
+  )?
+  assert interrupted_upload.status == 153, f"expected SIGXFSZ status 153, got {interrupted_upload.status}: {interrupted_upload.stderr}"
+  assert interrupted_upload.success == false
+  assert interruption_destination.exists()? == false
+  assert interruption_temporary.exists()?
+  assert interruption_temporary.metadata()?.size == 4096
+  assert bytes.read_at(interruption_temporary, 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
+  assert index_path.read_text()? == initial_index_text
+  generation.verify_generation(first_root, first_generation)
+  assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
+
+  let retried_upload = test.run_script(
+    ctx,
+    interruption_worker,
+    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "retry"],
+  )?
+  assert retried_upload.success, retried_upload.stderr
+  assert retried_upload.stdout == "true\n"
+  assert hash.sha256(interruption_destination)?.hex() == interrupted_source_digest
+  assert interruption_destination.metadata()?.size == interrupted_source.metadata()?.size
+  assert bytes.read_at(interruption_destination, 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
+  assert bytes.read_at(interruption_destination, 4100, marker_after_limit.len())?.utf8()? == "after-file-limit"
+  assert interruption_temporary.exists()? == false
+  assert index_path.read_text()? == initial_index_text
+  generation.verify_generation(first_root, first_generation)
+
+  let pkgbuild = fp"{repo_root}/packages/execute-app/PKGBUILD.xsh"
+  pkgbuild.write(
+    pkgbuild.read_text()?
+      .replace("usr/share/execute-app-old.txt", with: "usr/share/execute-app-new.txt")
+      .replace("application revision one", with: "application revision two")
+      .replace("data revision one", with: "data revision two")
+      .replace("mode: 0o755", with: "mode: 0o750")
+      .replace("mode: 0o640", with: "mode: 0o600"),
+  )
+  let second_plan = resolve_execute_plan(repo_root)?
+  let second_app = node_named(second_plan, "execute-app")?
+  assert second_app.artifact_key != first_app.artifact_key
+  let second_result = execute.build_plan(second_plan, repo_root, object_store, "", 1)?
+  let second_app_receipt = receipt_named(second_result, "execute-app")?
+  let second_metadata = json.read(fp"{second_app_receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
+  assert [entry.path for entry in second_metadata.filetree] == [
+    "bin/execute-app",
+    "usr/bin/execute-app",
+    "usr/share/execute-app-new.txt",
+    "usr/share/execute-app.txt",
+  ]
+
+  let second_generation_plan = generation.plan(second_plan, ["execute-app"], generation.overlay_digest(overlay)?)?
+  let second_root = fp"{test.temp_dir(ctx, name: "execute-generation-lifecycle-second")?}/root"
+  let second_generation = generation.compose(second_generation_plan, object_store, second_root, overlay)?
+  assert second_generation.generation_sha256 != first_generation.generation_sha256
+  assert fp"{second_root}/usr/bin/execute-app".read_text()? == "application revision two\n"
+  assert fp"{second_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o750
+  assert fp"{second_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+  assert fp"{second_root}/usr/share/execute-app-old.txt".exists()? == false
+  assert fp"{second_root}/usr/share/execute-app-new.txt".read_text()? == "retired payload\n"
+  assert fp"{second_root}/usr/share/execute-app.txt".read_text()? == "data revision two\n"
+  assert fp"{second_root}/usr/share/execute-app.txt".metadata()?.mode % 4096 == 0o600
+  assert fp"{second_root}/usr/share/execute-dep.txt".read_text()? == "dependency\n"
+  assert fp"{second_root}/usr/share/execute-tool.txt".exists()? == false
+  assert fp"{first_root}/usr/share/execute-app-old.txt".read_text()? == "retired payload\n"
+
+  let second_snapshot = execute_repo.snapshot(second_plan, object_store)?
+  let blocked_metadata_rel = execute_util.remote_metadata_rel(
+    "aarch64",
+    second_app.name,
+    second_app.ver,
+    second_app.rel,
+    second_app.artifact_key,
+    second_app.proof_key,
+  )
+  let blocked_metadata = fp"{remote_root}/{blocked_metadata_rel}"
+  blocked_metadata.parent.mkdir()
+  blocked_metadata.write("conflicting immutable metadata\n")
+  let second_tar_rel = execute_util.remote_binary_rel(
+    "aarch64",
+    second_app.name,
+    second_app.ver,
+    second_app.rel,
+    second_app.artifact_key,
+  )
+  let second_tar = fp"{remote_root}/{second_tar_rel}"
+
+  match execute_repo.publish(second_snapshot, remote_url, "", publish_work) {
+    Ok(_) => test.fail("publication replaced the index despite an immutable metadata conflict")
+    Err(problem) => assert "already exists with different bytes" in problem.message
+  }
+
+  assert index_path.read_text()? == initial_index_text
+  assert [row for row in execute_remote.load_remote_index_from(index_path)? if row.name == "execute-app"][0] == initial_app_row
+  assert hash.sha256(old_remote_tar)?.hex() == old_remote_tar_sha256
+  assert hash.sha256(second_tar)?.hex() == second_app_receipt.payload_sha256
+  assert blocked_metadata.read_text()? == "conflicting immutable metadata\n"
+  assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
+  assert fp"{first_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o755
+  assert fp"{first_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+  assert fp"{first_root}/usr/share/execute-app-old.txt".exists()?
+  assert fp"{second_root}/usr/bin/execute-app".read_text()? == "application revision two\n"
+  assert fp"{second_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o750
+  assert fp"{second_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+  assert fp"{second_root}/usr/share/execute-app-old.txt".exists()? == false
+  assert fp"{second_root}/usr/share/execute-app-new.txt".exists()?
+  assert fp"{second_root}/usr/share/execute-app.txt".metadata()?.mode % 4096 == 0o600
+
+  blocked_metadata.remove()
+  let retry_plan_path = test.temp_path(ctx, name: "execute-generation-lifecycle-retry-plan")
+  plan_json.write_plan(retry_plan_path, second_plan)
+  let retry_script = fp"{test.temp_dir(ctx, name: "execute-generation-lifecycle-retry-script")?}/publish.xsh"
+  write_execute_publish_worker(retry_script)
+  let retry_work_a = test.temp_dir(ctx, name: "execute-generation-lifecycle-retry-a")?
+  let retry_work_b = test.temp_dir(ctx, name: "execute-generation-lifecycle-retry-b")?
+  let retry_release = test.temp_path(ctx, name: "execute-generation-lifecycle-retry-release")
+  let retry_ready_a = test.temp_path(ctx, name: "execute-generation-lifecycle-retry-ready-a")
+  let retry_ready_b = test.temp_path(ctx, name: "execute-generation-lifecycle-retry-ready-b")
+  let runner = configured_executor_binary("xsh")?
+  let first_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_a} ${retry_release} ${retry_ready_a} ?
+  let second_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_b} ${retry_release} ${retry_ready_b} ?
+  wait until retry_ready_a.exists()? and retry_ready_b.exists()? within 10s every 10ms
+  retry_release.write("start")
+  let retry_statuses = wait [first_retry, second_retry]?
+  assert retry_statuses[0].ok
+  assert retry_statuses[1].ok
+
+  let second_index = execute_remote.load_remote_index_from(index_path)?
+  assert [row for row in second_index if row.name == "execute-app"][0].artifact_key == second_app.artifact_key
+  assert [row.name for row in second_index] == [row.name for row in initial_index]
+
+  for row in second_index {
+    if row.name != "execute-app" {
+      assert row == [previous for previous in initial_index if previous.name == row.name][0]
+    }
+  }
+
+  assert fp"{remote_root}/{initial_app_row.tarball}".exists()?
+  assert hash.sha256(old_remote_tar)?.hex() == old_remote_tar_sha256
+  assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
+  assert fp"{first_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o755
+  assert fp"{first_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+  assert fp"{second_root}/usr/bin/execute-app".read_text()? == "application revision two\n"
+  assert fp"{second_root}/usr/bin/execute-app".metadata()?.mode % 4096 == 0o750
+  assert fp"{second_root}/bin/execute-app".readlink()?.display() == "../usr/bin/execute-app"
+
+  for row in second_index {
+    let metadata = fp"{remote_root}/{row.metadata}"
+    let proof = fp"{remote_root}/{row.proof}"
+    assert hash.sha256(metadata)?.hex() == row.metadata_sha256
+    assert hash.sha256(proof)?.hex() == row.proof_receipt_sha256
+    assert fp"{metadata.parent}/.{metadata.name}.tmp".exists()? == false
+    assert fp"{proof.parent}/.{proof.name}.tmp".exists()? == false
+
+    if row.tarball != "" {
+      let tarball = fp"{remote_root}/{row.tarball}"
+      assert hash.sha256(tarball)?.hex() == row.sha256
+      assert tarball.metadata()?.size == row.size
+      assert fp"{tarball.parent}/.{tarball.name}.tmp".exists()? == false
+    }
+  }
+
+  let removal_plan = resolve_execute_plan_for_roots(repo_root, ["execute-dep"])?
+  assert [node.name for node in removal_plan.nodes] == ["execute-dep"]
+  let removal_generation_plan = generation.plan(
+    removal_plan,
+    ["execute-dep"],
+    generation.overlay_digest(overlay)?,
+  )?
+  assert [artifact.package_name for artifact in removal_generation_plan.artifacts] == ["execute-dep"]
+  let removal_root = fp"{test.temp_dir(ctx, name: "execute-generation-lifecycle-removed")?}/root"
+  let removal_generation = generation.compose(removal_generation_plan, object_store, removal_root, overlay)?
+  assert removal_generation.generation_sha256 != second_generation.generation_sha256
+  assert fp"{removal_root}/usr/share/execute-dep.txt".read_text()? == "dependency\n"
+  assert fp"{removal_root}/bin/execute-app".exists()? == false
+  assert fp"{removal_root}/usr/bin/execute-app".exists()? == false
+  assert fp"{removal_root}/usr/share/execute-app-old.txt".exists()? == false
+  assert fp"{removal_root}/usr/share/execute-app-new.txt".exists()? == false
+  assert fp"{removal_root}/usr/share/execute-app.txt".exists()? == false
+  assert fp"{removal_root}/usr/share/execute-tool.txt".exists()? == false
+
+  generation.verify_generation(second_root, second_generation)
+  assert fp"{second_root}/usr/bin/execute-app".read_text()? == "application revision two\n"
+  first_root.remove()
+  second_root.remove()
+  assert first_root.exists()? == false
+  assert second_root.exists()? == false
+  let second_tool = node_named(second_plan, "execute-tool")?
+  let kept_keys = [node.artifact_key for node in removal_plan.nodes]
+  let collected = store.gc(object_store, kept_keys)?
+  assert collected.artifacts == 3
+  assert collected.kept == removal_plan.nodes.len()
+  assert ! store.artifact_path(object_store, first_app.artifact_key).exists()?
+  assert ! store.artifact_path(object_store, second_app.artifact_key).exists()?
+  assert ! store.artifact_path(object_store, second_tool.artifact_key).exists()?
+  assert store.artifact_path(object_store, node_named(removal_plan, "execute-dep")?.artifact_key).exists()?
+  assert store.verify_all(object_store)?.len() == removal_plan.nodes.len()
+  generation.verify_generation(removal_root, removal_generation)
+  assert fp"{removal_root}/usr/share/execute-dep.txt".read_text()? == "dependency\n"
+  assert fp"{removal_root}/usr/bin/execute-app".exists()? == false
+}
+
 test test_execute_rebuilds_when_package_source_input_changes [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-source-change-repo")?
   let object_store = execute_store(ctx, "execute-source-change-store")?
@@ -672,10 +1054,18 @@ test test_execute_records_executor_provenance_outside_artifact_keys [fs, net, pr
   let repo_root = copied_execute_repository(ctx, "execute-provenance-repo")?
   let value = resolve_execute_plan(repo_root)?
   let result = execute.build_plan(value, repo_root, execute_store(ctx, "execute-provenance-store")?, "", 1)?
+  let expected = {
+    xsh: hash.sha256(configured_executor_binary("xsh")?)?.hex(),
+    xshi: hash.sha256(configured_executor_binary("xshi")?)?.hex(),
+    xsht: hash.sha256(configured_executor_binary("xsht")?)?.hex(),
+  }
 
   for receipt in result.artifacts {
     let executor = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(Record)?.get("executor")?.require(types.ExecutorProvenance)?
     assert executor.format == "laputa-executor-provenance-1"
+    assert executor.xsh_sha256 == expected.xsh
+    assert executor.xshi_sha256 == expected.xshi
+    assert executor.xsht_sha256 == expected.xsht
     assert receipt.executor_sha256 == fingerprint.executor_provenance_sha256(executor)?
   }
 }
