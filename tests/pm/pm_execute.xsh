@@ -227,8 +227,12 @@ proc exact_remote_snapshot(
         rel: node.rel,
         retrieval: {
           arch: "aarch64",
-          tarball: tarball.relative_to(remote_root).display(),
-          tarball_sha256: hash.sha256(tarball)?.hex(),
+          payload: types.RemoteArchive(
+            types.RemoteArchiveCoordinates(
+              tarball: tarball.relative_to(remote_root).display(),
+              sha256: hash.sha256(tarball)?.hex(),
+            ),
+          ),
           metadata: metadata.relative_to(remote_root).display(),
           metadata_sha256: hash.sha256(metadata)?.hex(),
         },
@@ -738,7 +742,7 @@ main(@args)?
         [plan_path.display(), repo_root.display(), object_store.display()],
         {XSH_MODULE_PATH: modules},
       )?
-      assert outcome.success
+      assert outcome.success, f"traced build exited {outcome.status}: {outcome.stderr}"
       yield sha256_calls_by_module(trace)?
     }
   }

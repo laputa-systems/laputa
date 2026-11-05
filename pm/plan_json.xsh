@@ -48,8 +48,8 @@ pure plan_json_write_dto(value: types.BuildPlan) -> Record {
     if retrieval != null {
       remote = {
         arch: retrieval.arch,
-        tarball: retrieval.tarball,
-        tarball_sha256: retrieval.tarball_sha256,
+        tarball: types.remote_payload_tarball(retrieval.payload),
+        tarball_sha256: types.remote_payload_sha256(retrieval.payload),
         metadata: retrieval.metadata,
         metadata_sha256: retrieval.metadata_sha256,
       }
@@ -104,10 +104,19 @@ proc plan_json_dependency(value: DependencyDto) -> Result[types.PlanDependency] 
 }
 
 proc plan_json_remote(value: RemoteDto) [error] -> Result[types.RemoteRetrieval] {
+  let payload: types.RemotePayload = if value.tarball == "" and value.tarball_sha256 == "" {
+    .MetadataOnly
+  } else if value.tarball != "" and value.tarball_sha256 != "" {
+    .RemoteArchive(
+      types.RemoteArchiveCoordinates(tarball: value.tarball, sha256: value.tarball_sha256),
+    )
+  } else {
+    return Err(types.PmError.PackageContract("remote archive path and SHA-256 must be declared together"))
+  }
+
   {
     arch: value.arch,
-    tarball: value.tarball,
-    tarball_sha256: value.tarball_sha256,
+    payload,
     metadata: value.metadata,
     metadata_sha256: value.metadata_sha256,
   }

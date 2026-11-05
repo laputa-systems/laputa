@@ -444,11 +444,20 @@ proc validate_retrieval(value: types.RemoteRetrieval, target: types.Target) {
     )
   }
 
-  let _ = util.ensure_relative_path(fp"{value.tarball}", "plan remote tarball")?
   let _ = util.ensure_relative_path(fp"{value.metadata}", "plan remote metadata")?
 
-  if value.tarball_sha256 == "" or value.metadata_sha256 == "" {
+  if value.metadata_sha256 == "" {
     return Err(types.PmError.PackageContract("remote retrieval hashes are required"))
+  }
+
+  if ! types.remote_payload_is_metadata_only(value.payload) {
+    let tarball = types.remote_payload_tarball(value.payload)
+    let sha256 = types.remote_payload_sha256(value.payload)
+    let _ = util.ensure_relative_path(fp"{tarball}", "plan remote tarball")?
+
+    if sha256 == "" {
+      return Err(types.PmError.PackageContract("remote retrieval hashes are required"))
+    }
   }
 }
 
@@ -627,7 +636,7 @@ proc fingerprint_unchecked(value: types.BuildPlan) -> Result[Str] {
 
     if retrieval != null {
       lines += [
-        f"remote\t{plan_canonical_field(node.name)}\t{plan_canonical_field(retrieval.arch)}\t{plan_canonical_field(retrieval.tarball)}\t{plan_canonical_field(retrieval.tarball_sha256)}\t{plan_canonical_field(retrieval.metadata)}\t{plan_canonical_field(retrieval.metadata_sha256)}",
+        f"remote\t{plan_canonical_field(node.name)}\t{plan_canonical_field(retrieval.arch)}\t{plan_canonical_field(types.remote_payload_tarball(retrieval.payload))}\t{plan_canonical_field(types.remote_payload_sha256(retrieval.payload))}\t{plan_canonical_field(retrieval.metadata)}\t{plan_canonical_field(retrieval.metadata_sha256)}",
       ]
     }
   }

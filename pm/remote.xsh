@@ -265,6 +265,19 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
     arch = util.normalize_arch(stored_arch)
   }
 
+  let sha256: Str = row.get("sha256")?.require()?
+  let tarball: Str = row.get("tarball")?.require()?
+  let size: Int = row.get("size")?.require()?
+  let metapackage: Bool = row.get("metapackage")?.require()?
+
+  if metapackage {
+    if tarball != "" or sha256 != "" or size != 0 {
+      return Err(types.PmError.PackageContract("remote metapackage must not declare an archive payload"))
+    }
+  } else if tarball.is_empty() != sha256.is_empty() {
+    return Err(types.PmError.PackageContract("remote archive path and SHA-256 must be declared together"))
+  }
+
   {
     arch,
     name: row.get("name")?.require()?,
@@ -274,9 +287,9 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
     runtime_only_deps: if "runtime_only_deps" in row { row.get("runtime_only_deps")?.require()? } else { empty_dependencies },
     mkdeps_host,
     mkdeps_target,
-    sha256: row.get("sha256")?.require()?,
-    size: row.get("size")?.require()?,
-    tarball: row.get("tarball")?.require()?,
+    sha256,
+    size,
+    tarball,
     metadata: if "metadata" in row { row.get("metadata")?.require()? } else { "" },
     metadata_sha256: if "metadata_sha256" in row { row.get("metadata_sha256")?.require()? } else { "" },
     artifact_key: if "artifact_key" in row { row.get("artifact_key")?.require()? } else { "" },
@@ -287,7 +300,7 @@ export proc decode_remote_package(row: Record) [error] -> Result[types.RemotePac
     proof: if "proof" in row { row.get("proof")?.require()? } else { "" },
     proof_receipt_sha256: if "proof_receipt_sha256" in row { row.get("proof_receipt_sha256")?.require()? } else { "" },
     source_sha256: row.get("source_sha256")?.require()?,
-    metapackage: row.get("metapackage")?.require()?,
+    metapackage,
   }
 }
 
@@ -382,10 +395,23 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
   }
 
   let fallback = legacy_snapshot_digest(value)
-  let tarball = if value.tarball == "" {
-    util.legacy_remote_binary_rel(value.arch, value.name, value.ver, value.rel).display()
+  let payload: types.RemotePayload = if value.metapackage {
+    if value.tarball != "" or value.sha256 != "" or value.size != 0 {
+      return Err(types.PmError.PackageContract("remote metapackage must not declare an archive payload"))
+    }
+
+    .MetadataOnly
+  } else if value.tarball == "" and value.sha256 == "" {
+    .RemoteArchive(
+      types.RemoteArchiveCoordinates(
+        tarball: util.legacy_remote_binary_rel(value.arch, value.name, value.ver, value.rel).display(),
+        sha256: fallback,
+      ),
+    )
+  } else if value.tarball != "" and value.sha256 != "" {
+    .RemoteArchive(types.RemoteArchiveCoordinates(tarball: value.tarball, sha256: value.sha256))
   } else {
-    value.tarball
+    return Err(types.PmError.PackageContract("remote archive path and SHA-256 must be declared together"))
   }
   let metadata = if value.metadata == "" {
     util.legacy_remote_metadata_rel(value.arch, value.name, value.ver, value.rel).display()
@@ -399,8 +425,7 @@ export proc plan_artifact_from_package(value: types.RemotePackage) [error] -> Re
     rel: value.rel,
     retrieval: {
       arch: value.arch,
-      tarball,
-      tarball_sha256: if value.sha256 == "" { fallback } else { value.sha256 },
+      payload,
       metadata,
       metadata_sha256: if value.metadata_sha256 == "" { fallback } else { value.metadata_sha256 },
     },

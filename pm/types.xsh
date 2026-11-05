@@ -67,6 +67,36 @@ export enum PlanAction { Build(Str), ReuseRemote(Str) }
 ## The immutable origin of one package artifact in the local store.
 export enum ArtifactOrigin { Built, Remote }
 
+## Immutable archive coordinates from a remote package index.
+export type RemoteArchiveCoordinates = {tarball: Str, sha256: Str}
+
+## The remote object strategy selected by a repository index row.
+export enum RemotePayload { RemoteArchive(RemoteArchiveCoordinates), MetadataOnly }
+
+## Return the archive path, or an empty string for a metadata-only payload.
+export pure remote_payload_tarball(payload: RemotePayload) -> Str {
+  match payload {
+    RemoteArchive(coordinates) => coordinates.tarball
+    MetadataOnly => ""
+  }
+}
+
+## Return the archive digest, or an empty string for a metadata-only payload.
+export pure remote_payload_sha256(payload: RemotePayload) -> Str {
+  match payload {
+    RemoteArchive(coordinates) => coordinates.sha256
+    MetadataOnly => ""
+  }
+}
+
+## Report whether a remote retrieval has no archive object.
+export pure remote_payload_is_metadata_only(payload: RemotePayload) -> Bool {
+  match payload {
+    RemoteArchive(_) => false
+    MetadataOnly => true
+  }
+}
+
 ## Return the aarch64 build target without a qualified union-tag expression.
 export pure target_aarch64() -> Target {
   Aarch64LinuxMusl
@@ -430,8 +460,7 @@ export type ExecutorProvenance = {
 ## Immutable retrieval coordinates for an artifact reused from a remote snapshot.
 export type RemoteRetrieval = {
   arch: Str,
-  tarball: Str,
-  tarball_sha256: Str,
+  payload: RemotePayload,
   metadata: Str,
   metadata_sha256: Str,
 }

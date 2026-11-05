@@ -4,6 +4,15 @@
 deterministic `BuildPlan`, executes only that plan through immutable artifacts,
 publishes verified snapshots, and composes runtime-only root generations.
 
+Repository index rows mark metadata-only packages with `metapackage: true` and
+empty `tarball` and `sha256` fields. Remote plans preserve that empty pair as a
+metadata-only retrieval; import verifies the metadata kind and empty payload
+inventory, then stages the same canonical marker used by local builds. Archive
+rows require both payload fields, while the legacy non-metadata empty-pair form
+continues to resolve to its historical archive path. Saved plans keep the same
+empty-pair encoding for a metadata-only retrieval and reject a half-declared
+archive pair.
+
 ## Package Contract
 
 Recipes live at `packages/<package>/PKGBUILD.xsh` and export:

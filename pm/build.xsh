@@ -210,7 +210,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
     dest.remove()
     dest.mkdir()
     tarball.parent.mkdir()
-    tarball.write("laputa metapackage payload marker\n")
+    tarball.write(local.metapackage_payload_marker())
     return
   }
 
