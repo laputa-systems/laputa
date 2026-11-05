@@ -177,8 +177,8 @@ and firmware-boot work unless a concrete G2 workflow requires them. The desktop
 Asterinas successor work runs as one serial lane alongside the G2 tracks,
 because every kernel slice moves the same submodule pin and its qualification
 needs quiet-host windows; the G2 tracks keep first claim on host capacity. The
-closed [compatibility campaign](CAMPAIGN-ASTERINAS-COMPATIBILITY.md) records
-the debt it inherits. In order:
+qualified surface and known limits are in [Asterinas](ASTERINAS.md); the
+remaining compatibility obligations are LAP-54 and LAP-55. In order:
 
 1. **Accepted:** harness and tooling build the kernel crate's own unit tests on this host,
    make the cargo-input stamp independent of absolute paths, fetch the kernel
@@ -192,7 +192,17 @@ the debt it inherits. In order:
 3. One ICMP error slice: ICMP receive, `IP_RECVERR`, and asynchronous socket
    errors, which together serve the Asterinas-only `tracepath` and
    `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
-   matching A3/A5 debt.
+   matching A3/A5 debt. Candidate kernel `2252e24b6` on `work/successor-icmp`
+   (local worktree `.work/wt/asterinas-icmp`, not integrated or pushed) stops
+   addressing limited-broadcast DHCP packets to a gateway after route
+   selection; `5da429919` replaces an obsolete Asterinas-only wildcard-bind
+   expectation with a paired UDP test. The unchanged
+   `qualify.sh all --backend both` gate on build 105 passed: baseline, device,
+   clock ABI, clock, all network-state and network cases, and ten of ten
+   recovery rounds. Remaining before integration: the A0 preservation
+   (quiet-host accounting) and resource checks against build 105; then
+   integrate the kernel, run public-input verification, and update Laputa's
+   lock and gitlink together. The checked-in pin remains `d4c2e3877`.
 4. Linux page-fault cost and `MAP_POPULATE` are active performance work after
    compatibility. Any improvement needs at least five interleaved baseline
    and candidate runs, completed-work checks, and successful readiness checks.

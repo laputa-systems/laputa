@@ -1,12 +1,37 @@
 # Asterinas and Firecracker
 
-The local successor candidate `2252e24b6` remains unpinned and unpublished at
-the owner's 2026-11-04 wind-down. Its paired baseline, device, clock, network
-state, and network cohorts passed. Five complete recovery rounds passed before
-round six was interrupted. The full ten-round gate and refreshed A0/resource
-qualification remain open. This does not replace the checked-in pin or the
-historical qualification below. The [campaign handoff](../../xsh/docs/CAMPAIGN-HANDOFF.md)
-records the retained kernel branch and resume inputs.
+The checked-in kernel pin is `d4c2e3877`, recorded with the other inputs in
+`infra/asterinas/inputs.lock`. It is qualified by
+`bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
+below on Asterinas/Firecracker and on the Linux reference and requires
+identical transcripts. The [roadmap](ROADMAP.md) owns the successor kernel
+slices and the [TODO queue](../TODO.md) owns the remaining compatibility
+obligations.
+
+## Qualified surface
+
+- Boot and numeric: the pinned PM root boots and passes the numeric native
+  tests on both backends.
+- Devices: block devices appear in the `block` class with `uevent`
+  attributes, partitions, and device numbers that match Linux; the packaged
+  `mdevd` and `mdevd-coldplug` coldplug at boot and after a daemon restart.
+- Clock: `clock_settime`, `adjtimex`, and `clock_adjtime` make CLOCK_REALTIME
+  settable and steerable; `ntpd-rs` converges from positive and negative
+  offsets, frequency error, pause and resume, and a jump.
+- IPv4 state: netlink addresses, routes, rules, and route-netlink
+  notifications, and the packaged `dhcpc` across acquire, renewal,
+  reconfigure, NAK, restart, and carrier loss against a scripted server.
+  Unresolved neighbors queue packets as Linux does.
+- Memory: allocation survives cross-CPU frame-pool fragmentation.
+- Native suite: not a full pass. The original 1,281 A0 passes are preserved
+  (`infra/asterinas/a0-baseline.json`) and most of the 15,255 discovered
+  cases remain unexecuted; a failure that Linux also shows is environment
+  debt, not an Asterinas defect.
+
+Known limits that no capability claims: `MAP_POPULATE` is ignored, which Linux
+permits; pipe ring buffers and large kernel heap allocations still need
+contiguous frames; anonymous page faults cost about three times the Linux
+reference.
 
 The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
 versions recorded in `infra/asterinas/inputs.lock`. Start on an x86-64 Linux

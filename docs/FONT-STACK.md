@@ -201,5 +201,5 @@ No release was published and the production package pin remains unchanged.
 After this baseline and Play's SRT/Core Text migrations qualify, execute
 [LAP-52](rfc/LAP-52-rust-fontconfig.md) before the broader
 [C-free roadmap](rfc/LAP-51-c-free-userspace.md). The cross-repository
-[handoff](../../xsh/docs/CAMPAIGN-HANDOFF.md) records retained source and
-outstanding checks. macOS execution remains outside this Linux campaign.
+[XSH queue](https://github.com/laputa-systems/xsh/blob/master/TODO.md)
+records retained source and outstanding checks. macOS execution remains outside this Linux campaign.

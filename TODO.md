@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 54
+Next: 56
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -160,3 +160,21 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Acceptance:** `vulkaninfo`-equivalent enumeration finds the driver; Play renders a fixture through `--vo=gpu-next --gpu-context=waylandvk` in a Tinyland guest; Ghostty's existing graphical proofs still pass on the rebuilt Mesa. Real-GPU drivers stay deferred with hardware.
 - **Fix with:** architect, reference-parity, benchmark-checklist
 - **Effort:** M (days)
+
+### LAP-54 · P3 · Close the Asterinas clock ABI and timestamp obligations
+
+- **Area:** Asterinas clock
+- **Where:** `asterinas/` (kernel `time` and `net` code), `infra/asterinas/`
+- **Problem:** The frequency correction does not slew CLOCK_MONOTONIC or CLOCK_BOOTTIME, so a daemon's monotonic measurements differ from Linux by the correction. Leap seconds are not applied. `ADJ_OFFSET`, `ADJ_TICK`, the adjtime modes, `STA_PLL`, `STA_FLL`, `STA_INS`, `STA_DEL`, and `STA_FREQHOLD` fail with `EINVAL` where Linux accepts them. Absolute realtime timers are not re-armed by a step, `settimeofday` is missing, and the vDSO reads through the system call while a correction is active. Transmit timestamps without `OPT_TSONLY` and hardware timestamps are missing, Firecracker has no RTC, and the 1000 s jump rejection is unexplored.
+- **Recommendation:** Take each obligation as a kernel change with a witness paired against Linux in `infra/asterinas/qualify.sh clock-abi` or `clock`, driven by a consumer that needs it. Do not claim an obligation without its paired witness.
+- **Fix with:** reference-parity
+- **Effort:** L (weeks)
+
+### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
+
+- **Area:** Asterinas networking
+- **Where:** `asterinas/` (kernel `net` code), `infra/asterinas/`
+- **Problem:** The `network-state` cohort omits `RTM_NEWLINK`, IPv6 state, `SIOCSIFADDR` and `SIOCADDRT`, address expiry, and route lookup without a dump. The DHCP cohort does not run the syslog consumer and does not cover foreign routes of types other than unicast (`EOPNOTSUPP`), `IFLA_CARRIER_CHANGES`, or the carrier counters. ICMP error delivery (roadmap Asterinas item 3) covers the unresolved-neighbor `EHOSTUNREACH` case; until then `ntpd-rs` does not leave an unreachable on-link source through its network-issue path.
+- **Recommendation:** Add each operation with a paired Linux transcript in the existing cohorts. Sequence it after the ICMP slice, and leave IPv6 out until a consumer needs it.
+- **Fix with:** reference-parity
+- **Effort:** L (weeks)

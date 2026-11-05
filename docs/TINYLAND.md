@@ -85,14 +85,49 @@ the installed doas and XSH su paths, permitted and denied identities, live
 TIOCSTI policy, runtime-directory attacks, the same-device access-granted
 negative control, compositor crash, single keyboard removal, broker loss,
 application exit, scanner shutdown, Ghostty on a 4.3 core context, and
-modifier input. Numbers, the release tag, and the generation hash are in
-[the Ghostty campaign](CAMPAIGN-TINYLAND-GHOSTTY.md).
+modifier input.
 
 Linux aarch64 and macOS host execution remain unverified. The root gate also
 exposed and repaired seed acceptance being persisted after activation. A
 separate interruption during seed copying can still leave an incomplete trust
 generation. That recovery gap and the development delegation policy prevent
 treating these graphical results as production qualification.
+
+## Ghostty stack decisions
+
+- Tinyland's keyboard engine is KBVM. The `tinyland` binary links only
+  `libseat.so.1`, `libgcc_s.so`, and `libc.so`. The `xkbcommon` crate is an
+  optional test oracle behind the `oracle` feature, so production test
+  commands stay free of C XKB.
+- `ghostty-custom` is a prebuilt musl release of the `joshuarli/ghostty` fork,
+  pinned per architecture with SHA-256 in `packages/ghostty-custom/`. Its
+  declared `DT_NEEDED` set is `libEGL.so.1`, `libwayland-client.so.0`,
+  `libxkbcommon.so.0`, and `libc.so`. The `xterm-ghostty` terminfo entry is
+  compiled with the XSH `tic` from a source-matched fixture; a cross-arch
+  binary is never executed to produce it.
+- Ghostty renders with virgl on an OpenGL 4.3 core context; softpipe tops out
+  at 3.3. QEMU cannot `screendump` a GL scanout, so virgl profiles attach a 2D
+  `virtio-gpu-pci` first as card0 for tinyland scanout and
+  `virtio-gpu-gl-pci` as the render device.
+- The fork binds `wl_seat` after its listener exists and polls the display fd
+  instead of spinning, picks the `wl_shm` format from the compositor's
+  advertised set, and follows the compositor scale. Earlier releases never
+  create a keyboard.
+- The keyboard proof injects a line, not Ctrl+D: on a canonical tty the EOF
+  character races the queued line and is discarded, so the reader uses
+  `io.stdin_line()`.
+- aarch64 is compile and package proof only.
+
+Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM):
+
+| Item | Value |
+|---|---|
+| `tinyland` binary | 3,015,600 bytes |
+| `ghostty-custom` binary | 30,586,216 bytes |
+| Closure | 38 plan nodes |
+| Image | disk 308M, rootfs 276M |
+| Session ready with a 4.3 context | 16.74 s guest uptime |
+| Idle RSS after input | tinyland 7,156 KB, Ghostty 41,416 KB |
 
 ## Historical graphical evidence
 
