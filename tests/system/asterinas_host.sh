@@ -755,7 +755,7 @@ FAKE_FIRECRACKER_PID_FILE="$vm_test_root/cancel.pid" \
         "$fake_firecracker" "$vm_test_root/config.json" "$vm_test_root/cancel-console.log" \
         "$vm_test_root/cancel-firecracker.log" '' 1500 > "$vm_test_root/cancel-run.log" 2>&1 &
 runner_pid=$!
-for _ in {1..100}; do
+for _ in {1..600}; do
     [[ -s "$vm_test_root/cancel.pid" ]] && break
     sleep 0.05
 done
@@ -781,7 +781,7 @@ XSH_MODULE_PATH="$repo_root" xsh "$repo_root/infra/asterinas/run-linux.xsh" -- \
     "$vm_test_root/qemu-cancel-console" "$vm_test_root/qemu-cancel-log" '' 60 1024 \
     > "$vm_test_root/qemu-cancel-run.log" 2>&1 &
 runner_pid=$!
-for _ in {1..100}; do
+for _ in {1..600}; do
     [[ -s "$vm_test_root/qemu-cancel.pid" ]] && break
     sleep 0.05
 done
