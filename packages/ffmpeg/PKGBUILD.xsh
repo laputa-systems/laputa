@@ -49,6 +49,11 @@ export const filetree = [
   {path: p"usr/lib/libavcodec.so.63.1.102", kind: "binary"},
   {path: p"usr/lib/pkgconfig/libavcodec.pc", kind: "file"},
   {path: p"usr/include/libavcodec", kind: "tree"},
+  {path: p"usr/lib/libavdevice.so", kind: "symlink"},
+  {path: p"usr/lib/libavdevice.so.63", kind: "symlink"},
+  {path: p"usr/lib/libavdevice.so.63.1.102", kind: "binary"},
+  {path: p"usr/lib/pkgconfig/libavdevice.pc", kind: "file"},
+  {path: p"usr/include/libavdevice", kind: "tree"},
   {path: p"usr/lib/libavformat.so", kind: "symlink"},
   {path: p"usr/lib/libavformat.so.63", kind: "symlink"},
   {path: p"usr/lib/libavformat.so.63.1.102", kind: "binary"},
@@ -74,6 +79,7 @@ export const filetree = [
   {path: p"usr/lib/libswscale.so.10.1.102", kind: "binary"},
   {path: p"usr/lib/pkgconfig/libswscale.pc", kind: "file"},
   {path: p"usr/include/libswscale", kind: "tree"},
+  {path: p"usr/share/licenses/ffmpeg/COPYING.GPLv2", kind: "file"},
   {path: p"usr/share/licenses/ffmpeg/COPYING.LGPLv2.1", kind: "file"},
   {path: p"usr/share/licenses/ffmpeg/CREDITS", kind: "file"},
   {path: p"usr/share/licenses/ffmpeg/LICENSE.md", kind: "file"},
@@ -83,6 +89,7 @@ export const filetree = [
 
 const libraries = [
   {name: "libavcodec", major: "63", version: "63.1.102"},
+  {name: "libavdevice", major: "63", version: "63.1.102"},
   {name: "libavformat", major: "63", version: "63.1.102"},
   {name: "libavfilter", major: "12", version: "12.1.102"},
   {name: "libavutil", major: "61", version: "61.1.102"},
@@ -104,7 +111,7 @@ export proc build(dest: Path) [fs, error] {
     let _ = fs.copy_tree(fp"include/{library.name}", fp"{dest}/usr/include/{library.name}", parents: true, overwrite: true)?
   }
   let licenses = fp"{dest}/usr/share/licenses/ffmpeg"
-  for file in ["COPYING.LGPLv2.1", "CREDITS", "LICENSE.md"] {
+  for file in ["COPYING.GPLv2", "COPYING.LGPLv2.1", "CREDITS", "LICENSE.md"] {
     fs.install(fp"share/licenses/ffmpeg/{file}", fp"{licenses}/{file}", 0o644, parents: true, overwrite: true)
   }
   fs.install(p"share/licenses/dav1d/COPYING", fp"{licenses}/dav1d/COPYING", 0o644, parents: true, overwrite: true)

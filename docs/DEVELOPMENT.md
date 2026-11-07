@@ -109,7 +109,7 @@ The uv recipe downloads pinned upstream musl binaries. It does not compile
 uv or carry a distribution verifier patch. The ffmpeg recipe likewise installs
 the `runtime` archive from a pinned
 [ffmpeg-build](https://github.com/laputa-systems/ffmpeg-build) release:
-`ffmpeg` and `ffprobe` with no network protocols or devices, the six shared
+`ffmpeg` and `ffprobe` with no network protocols or devices, the seven shared
 libav* libraries, their headers, and pkg-config files, which need `libva`.
 ffmpeg-build owns the sources, components, and qualification. An update changes
 the release tag in the source URL and both target checksums. The play recipe
