@@ -15,6 +15,9 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "ffmpeg")
   proof.target_elf(root, p"usr/bin/ffmpeg", "ffmpeg")
   proof.target_elf(root, p"usr/bin/ffprobe", "ffprobe")
+  for library in ["libavcodec.so.63.1.102", "libavformat.so.63.1.102", "libavfilter.so.12.1.102", "libavutil.so.61.1.102", "libswresample.so.7.1.102", "libswscale.so.10.1.102"] {
+    proof.target_elf(root, fp"usr/lib/{library}", library)
+  }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
     print f"ffmpeg ok: {pm_util.target_arch()?} binaries"

@@ -107,14 +107,14 @@ prebuilt inputs.
 
 The uv recipe downloads pinned upstream musl binaries. It does not compile
 uv or carry a distribution verifier patch. The ffmpeg recipe likewise installs
-the `tools` archive from a pinned
-[ffmpeg-build](https://github.com/laputa-systems/ffmpeg-build) release: static
-`ffmpeg` and `ffprobe` with no network protocols or devices. ffmpeg-build owns
-the sources, components, and qualification. An update changes the release tag in
-the source URL and both target checksums. Its `play-sdk` archive is Play's
-build input and has no Laputa package. The play recipe installs Play's
-x86_64 musl release binary, which links that SDK statically and Laputa's
-shared libraries dynamically. Play publishes no aarch64 Linux build. Tailscale uses its package-scoped
+the `runtime` archive from a pinned
+[ffmpeg-build](https://github.com/laputa-systems/ffmpeg-build) release:
+`ffmpeg` and `ffprobe` with no network protocols or devices, the six shared
+libav* libraries, their headers, and pkg-config files, which need `libva`.
+ffmpeg-build owns the sources, components, and qualification. An update changes
+the release tag in the source URL and both target checksums. The play recipe
+installs Play's x86_64 musl release binary and depends on the ffmpeg package.
+Play publishes no aarch64 Linux build. Tailscale uses its package-scoped
 pinned Go distribution, offline vendor archive and distrust overlay. Its build
 and proof use the ordinary offline PM executor.
 

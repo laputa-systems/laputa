@@ -18,6 +18,7 @@ export const architectures = ["x86_64"]
 export const deps = [
   "musl",
   "alsa-lib",
+  "ffmpeg",
   "fontconfig",
   "freetype",
   "harfbuzz",
