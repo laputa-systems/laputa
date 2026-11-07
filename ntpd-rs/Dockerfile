@@ -6,8 +6,8 @@
 FROM alpine:3.24.1
 
 ARG TARGETARCH
-ARG LLVM_VERSION=23.1.0-rc2
-ARG LLVM_RELEASE_SHA=6eb5fb9
+ARG LLVM_VERSION=23.1.5
+ARG LLVM_RELEASE_SHA=2f0b039
 ARG RUSTUP_VERSION=1.29.2
 ARG RUSTUP_X86_64_SHA256=2ba97d668c06dc4b1884f2a3fa6f4cf14b9bd0c1db379af7e4f87a705ff19edd
 ARG RUSTUP_AARCH64_SHA256=7fdbb23acf6495efee2e371580c52b365917551b4835090a225c44ac30915235
@@ -34,8 +34,8 @@ RUN ar rcs /usr/lib/libutil.a
 # same versioned object, fresh cache key. Checksums still pin every byte.
 # LLVM tools must be musl-linked to run in this Alpine image.
 RUN case "$TARGETARCH" in \
-        amd64) arch=x86_64; sum=36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b ;; \
-        arm64) arch=aarch64; sum=0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d ;; \
+        amd64) arch=x86_64; sum=baba8cf90dd957cf64fdca219f659ec6817b699037a15dfa97bb847a01a64219 ;; \
+        arm64) arch=aarch64; sum=48d1801c1ccc0197182231b7b465879cf7366336f282287bdd30aa7573725dda ;; \
         *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
     esac \
     && archive=/ntpd-rs/.work/tmp/llvm.tar.xz \
@@ -51,14 +51,6 @@ RUN case "$TARGETARCH" in \
     && tar xf "$archive" -C /opt/llvm-musl --strip-components=1 \
     && test -f /opt/llvm-musl/lib/libclang.so \
     && rm "$archive"
-
-RUN for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do \
-        stub_dir="/usr/lib/e-crt/$target"; \
-        mkdir -p "$stub_dir"; \
-        for obj in crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o; do \
-            /opt/llvm-musl/bin/clang --target="$target" -x c -c /dev/null -o "$stub_dir/$obj"; \
-        done; \
-    done
 
 RUN case "$TARGETARCH" in \
         amd64) arch=x86_64; sum=$RUSTUP_X86_64_SHA256 ;; \
@@ -99,10 +91,9 @@ RUN channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' /tmp/rust-toolchain.toml)" 
 # Host proc-macro links search rustc's target library directory for CRT
 # startup objects. Keep those objects available there without changing the
 # target's build-std Rust flags.
-RUN host_target="$(rustc -vV | awk '/^host:/ {print $2}')" \
-    && host_libdir="$(rustc --print target-libdir)" \
+RUN host_libdir="$(rustc --print target-libdir)" \
     && for obj in crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o; do \
-        ln -sf "/usr/lib/e-crt/$host_target/$obj" "$host_libdir/$obj"; \
+        ln -sf "/opt/llvm-musl/lib/clang/23/lib/linux/$obj" "$host_libdir/$obj"; \
     done
 
 # Alpine keeps these libraries outside the Rust musl target directory.
@@ -119,11 +110,9 @@ set -eu
 target=${MUSL_TARGET:?MUSL_TARGET is required}
 case "$target" in
     x86_64-unknown-linux-musl)
-        crt=/usr/lib/e-crt/x86_64-unknown-linux-musl
         loader=/lib/ld-musl-x86_64.so.1
         ;;
     aarch64-unknown-linux-musl)
-        crt=/usr/lib/e-crt/aarch64-unknown-linux-musl
         loader=/lib/ld-musl-aarch64.so.1
         ;;
     *)
@@ -132,7 +121,7 @@ case "$target" in
 esac
 
 mode=${MUSL_BUILD_MODE:-static}
-native="-L native=/usr/lib -Clink-arg=-B$crt"
+native="-L native=/usr/lib"
 release="-Cpanic=abort"
 case "$mode" in
     static|test|driver)
@@ -142,7 +131,7 @@ case "$mode" in
         flags="$native $release"
         ;;
     release-dynamic)
-        flags="$native $release -Ctarget-feature=-crt-static -Clink-arg=-B$crt -Clink-arg=-dynamic-linker=$loader"
+        flags="$native $release -Ctarget-feature=-crt-static -Clink-arg=-dynamic-linker=$loader"
         ;;
     *)
         echo "musl-cargo: unknown build mode: $mode" >&2
