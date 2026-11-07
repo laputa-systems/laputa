@@ -9,10 +9,10 @@ export const name = "gnu-stubs"
 export const package_kind = "payload"
 
 ## Exported declaration `ver`.
-export const ver = "23.1.0-rc2"
+export const ver = "23.1.5"
 
 ## Exported declaration `rel`.
-export const rel = "31"
+export const rel = "1"
 
 ## Exported declaration `deps`.
 export const deps = ["musl"]
@@ -40,14 +40,6 @@ export const upstream_sources = [
 ## Exported declaration `filetree`.
 export const filetree = [
   {
-    path: p"usr/lib/crtbeginS.o",
-    kind: "binary",
-  },
-  {
-    path: p"usr/lib/crtendS.o",
-    kind: "binary",
-  },
-  {
     path: p"usr/lib/libgcc_s.so",
     kind: "binary",
   },
@@ -70,29 +62,23 @@ export proc build(dest: Path) [fs, process, env, error] {
   let laputa_root = fp"{e"LAPUTA_ROOT" ?? ""}"
   let bootstrap_llvm = e"XSH_PM_BOOTSTRAP_LLVM_ROOT" ?? ""
   let llvm_root = if bootstrap_llvm == "" { fp"{laputa_root}/usr/lib/llvm23" } else { fp"{bootstrap_llvm}" }
-  let clang = fp"{llvm_root}/bin/clang"
   let lld = fp"{llvm_root}/bin/ld.lld"
   let llvm_ar = fp"{llvm_root}/bin/llvm-ar"
   let llvm_objcopy = fp"{llvm_root}/bin/llvm-objcopy"
   let libunwind = fp"{llvm_root}/lib/libunwind.a"
   let builtins = fp"{llvm_root}/lib/clang/23/lib/linux/libclang_rt.builtins-{target_arch}.a"
 
-  if ! clang.exists() or ! lld.exists() or ! llvm_ar.exists() or ! llvm_objcopy.exists() {
+  if ! lld.exists() or ! llvm_ar.exists() or ! llvm_objcopy.exists() {
     fail f"gnu-stubs bootstrap LLVM tools are missing from {llvm_root}"
   }
 
   # Rust's musl target hardcodes -lgcc_s, and the prebuilt cargo binary
-  # dynamically links libgcc_s.so.1 for unwinding. The prebuilt LLVM tree
-  # does not ship crtbeginS.o, crtendS.o, or libgcc_s.so.
-  #
-  # crtbeginS.o / crtendS.o: empty object files. The linker accepts them
-  # without symbols; they exist only to satisfy Cargo's link line.
+  # dynamically links libgcc_s.so.1 for unwinding.
   #
   # libgcc_s.so / libgcc_s.so.1: built from libunwind.a and the compiler-rt
   # objects that provide the helpers required by the dynamically loaded
   # rust-lld. Compiler-rt marks those helpers hidden, so make only these
   # required symbols default-visible before linking the shared object.
-  let stub_src = fp"{dest}/.stub.c"
   let builtins_dir = fp"{dest}/.builtins"
   let visibility_map = fp"{dest}/.libgcc.visibility"
   let export_map = fp"{dest}/.libgcc.exports"
@@ -106,7 +92,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   let multf3 = fp"{builtins_dir}/multf3.c.o"
   let trunctfdf2 = fp"{builtins_dir}/trunctfdf2.c.o"
   let clear_cache = fp"{builtins_dir}/clear_cache.c.o"
-  stub_src.write("")
   visibility_map.write(
     """__floatunditf
 __divtf3
@@ -135,8 +120,6 @@ __gttf2
   env ({
     LD_LIBRARY_PATH: f"{llvm_root}/lib:{e"LD_LIBRARY_PATH" ?? ""}",
   }) {
-    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtbeginS.o"
-    run $clang "-target" f"{target_arch}-linux-musl" "-c" $stub_src "-o" fp"{libdir}/crtendS.o"
     cd (builtins_dir) {
       run $llvm_ar "x" $builtins "comparetf2.c.o" "divtf3.c.o" "extendsftf2.c.o" "floatsitf.c.o" "floatunditf.c.o" \
         "multf3.c.o" "trunctfdf2.c.o" "clear_cache.c.o"
@@ -156,7 +139,6 @@ __gttf2
       visible.rename(to: object, overwrite: true)
     }
 
-    stub_src.remove(missing_ok: false)
     run $lld "-shared" "-o" $libgcc "-L" fp"{laputa_root}/usr/lib" "-ldl" "-lpthread" f"--version-script={export_map}" \
       "--no-gc-sections" "-u" "__floatunditf" "-u" "__divtf3" "-u" "__clear_cache" "-u" "__unordtf2" "-u" \
       "__extendsftf2" "-u" "__trunctfdf2" "-u" "__getf2" "-u" "__multf3" "-u" "__letf2" "-u" "__floatsitf" "-u" \

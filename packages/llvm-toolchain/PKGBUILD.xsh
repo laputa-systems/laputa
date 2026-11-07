@@ -8,10 +8,10 @@ export const name = "llvm-toolchain"
 export const package_kind = "payload"
 
 ## Upstream LLVM version.
-export const ver = "23.1.0-rc2"
+export const ver = "23.1.5"
 
 ## Package release revision.
-export const rel = "15"
+export const rel = "1"
 
 ## Runtime package dependencies.
 export const deps = ["musl"]
@@ -29,7 +29,7 @@ export const nostrip = true
 ## Upstream source archives and checksums.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-VERSION-6eb5fb9/clang+llvm-VERSION-ARCH-linux-musl.tar.xz => llvm-prebuilt",
+    source: p"https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-VERSION-2f0b039/clang+llvm-VERSION-ARCH-linux-musl.tar.xz => llvm-prebuilt",
     kind: "auto",
     architectures: [
       "all",
@@ -37,11 +37,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d",
+        sha256: "48d1801c1ccc0197182231b7b465879cf7366336f282287bdd30aa7573725dda",
       },
       {
         arch: "x86_64",
-        sha256: "36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b",
+        sha256: "baba8cf90dd957cf64fdca219f659ec6817b699037a15dfa97bb847a01a64219",
       },
     ],
   },
@@ -52,6 +52,14 @@ export const filetree = [
   {
     path: p"usr",
     kind: "tree",
+  },
+  {
+    path: p"usr/lib/crtbeginS.o",
+    kind: "symlink",
+  },
+  {
+    path: p"usr/lib/crtendS.o",
+    kind: "symlink",
   },
   {
     path: p"usr/lib/llvm23/bin/clang",
@@ -142,7 +150,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/llvm23/lib/libLTO.so.23.1-rc2",
+    path: p"usr/lib/llvm23/lib/libLTO.so.23.1",
     kind: "binary",
   },
   {
@@ -150,11 +158,11 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/llvm23/lib/libclang.so.23.1-rc2",
+    path: p"usr/lib/llvm23/lib/libclang.so.23.1",
     kind: "symlink",
   },
   {
-    path: p"usr/lib/llvm23/lib/libclang.so.23.1.0-rc2",
+    path: p"usr/lib/llvm23/lib/libclang.so.23.1.5",
     kind: "binary",
   },
 ]
@@ -557,6 +565,12 @@ proc install_prebuilt_tree(dest: Path) {
 
   require_file(fp"{target}/lib/clang/23/include/stddef.h", "Clang resource headers")
   require_file(fp"{target}/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")
+
+  for object in ["crtbeginS.o", "crtendS.o"] {
+    let resource_object = fp"llvm23/lib/clang/23/lib/linux/{object}"
+    require_file(fp"{dest}/usr/lib/{resource_object}", f"compiler-rt {object}")
+    fp"{dest}/usr/lib/{object}".symlink(to: resource_object)
+  }
 }
 
 ## Install target-specific compiler wrapper links.

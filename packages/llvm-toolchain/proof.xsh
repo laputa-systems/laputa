@@ -115,6 +115,10 @@ proc prove_public_surface(root: Path, arch: Str) {
 
   ensure_file(fp"{root}/usr/lib/llvm23/lib/clang/23/include/stddef.h", "Clang resource headers")
   ensure_file(fp"{root}/usr/lib/llvm23/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")
+
+  let crtbegin_symbols = run.text $readelf "-s" fp"{root}/usr/lib/crtbeginS.o"
+  ensure("__dso_handle" in crtbegin_symbols, "proof-llvm-toolchain", "usr/lib/crtbeginS.o is not compiler-rt's crtbegin")
+  ensure_file(fp"{root}/usr/lib/crtendS.o", "compiler-rt crtendS.o")
 }
 
 proc prove_default_compile(root: Path, target: types.Target) [fs, process, env, error] {

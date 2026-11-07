@@ -5,8 +5,6 @@ error ProofError = Failed(kind: Str, message: Str)
 
 proc main(rootfs = p"/rootfs") [fs, error] {
   for path_value in [
-    fp"{rootfs}/usr/lib/crtbeginS.o",
-    fp"{rootfs}/usr/lib/crtendS.o",
     fp"{rootfs}/usr/lib/libgcc_s.so",
     fp"{rootfs}/usr/lib/libgcc_s.so.1",
   ] {
