@@ -30,11 +30,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "UNPUBLISHED-RUNTIME-RELEASE-PIN-AARCH64",
+        sha256: "a90941ad4796207935d5aa2c176d38bb7906cdcbfecf4b5c265faf533b6c5f2c",
       },
       {
         arch: "x86_64",
-        sha256: "UNPUBLISHED-RUNTIME-RELEASE-PIN-X86_64",
+        sha256: "dbcb49886d4295f48f69132b2a111687155437a5d091f6b70d5e2286680a1998",
       },
     ],
   },

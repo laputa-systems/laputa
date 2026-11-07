@@ -25,6 +25,7 @@ export const deps = [
   "libva",
   "vulkan-loader",
   "wayland-libs-client",
+  "zlib",
 ]
 
 ## Subtitles and the on-screen controller look up a font at run time.
