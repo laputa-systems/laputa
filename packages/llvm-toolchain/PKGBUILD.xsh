@@ -146,6 +146,14 @@ export const filetree = [
     kind: "symlink",
   },
   {
+    path: p"usr/lib/llvm23/lib/clang/23/lib/linux/crtbeginS.o",
+    kind: "binary",
+  },
+  {
+    path: p"usr/lib/llvm23/lib/clang/23/lib/linux/crtendS.o",
+    kind: "binary",
+  },
+  {
     path: p"usr/lib/llvm23/lib/libLTO.so",
     kind: "symlink",
   },
@@ -542,7 +550,11 @@ proc install_prebuilt_tree(dest: Path) {
 
   target.remove()
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
+  fp"{target}/lib/musl".remove()
   let bin = fp"{target}/bin"
+  for config in ["clang.cfg", "clang++.cfg"] {
+    fp"{bin}/{config}".remove()
+  }
   install_tool_alias(bin, "clang-23", "clang")
   install_tool_alias(bin, "clang++", "clang")
   install_tool_alias(bin, "ld.lld", "lld")
@@ -565,6 +577,17 @@ proc install_prebuilt_tree(dest: Path) {
 
   require_file(fp"{target}/lib/clang/23/include/stddef.h", "Clang resource headers")
   require_file(fp"{target}/lib/clang/23/lib/linux/libclang_rt.builtins-{arch}.a", "compiler-rt builtins")
+
+  let compiler_rt = fp"{target}/lib/clang/23/lib/linux"
+  for part in ["begin", "end"] {
+    let object = fp"{compiler_rt}/clang_rt.crt{part}-{arch}.o"
+    require_file(object, f"compiler-rt crt{part}")
+    object.rename(to: fp"{compiler_rt}/crt{part}S.o", overwrite: true)
+    for alias in [f"clang_rt.crt{part}.o", f"crt{part}.o"] {
+      fp"{compiler_rt}/{alias}".remove()
+    }
+  }
+  fp"{compiler_rt}/crtbeginT.o".remove()
 
   for object in ["crtbeginS.o", "crtendS.o"] {
     let resource_object = fp"llvm23/lib/clang/23/lib/linux/{object}"
