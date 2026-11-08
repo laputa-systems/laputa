@@ -18,12 +18,12 @@ proc main(database = "", key = "") [fs, process, error] {
     exit 2
   }
 
-  var path_value: Path = /etc/passwd
+  var path_value: Path = p"/etc/passwd"
 
   if database == "passwd" {
-    path_value = /etc/passwd
+    path_value = p"/etc/passwd"
   } else if database == "group" {
-    path_value = /etc/group
+    path_value = p"/etc/group"
   } else {
     exit 2
   }

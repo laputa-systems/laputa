@@ -1,14 +1,14 @@
 #!/bin/xsh
-for dir in [/proc, /sys, /run, /dev] {
+for dir in [p"/proc", p"/sys", p"/run", p"/dev"] {
   dir.mkdir()
 }
 
-let mount_proc = linux.mount(b"proc", /proc, fstype: "proc", options: ["nosuid", "noexec", "nodev"])
-let mount_sys = linux.mount(b"sys", /sys, fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
-let mount_run = linux.mount(b"run", /run, fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
-let mount_dev = linux.mount(b"dev", /dev, fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
+let mount_proc = linux.mount(b"proc", p"/proc", fstype: "proc", options: ["nosuid", "noexec", "nodev"])
+let mount_sys = linux.mount(b"sys", p"/sys", fstype: "sysfs", options: ["nosuid", "noexec", "nodev"])
+let mount_run = linux.mount(b"run", p"/run", fstype: "tmpfs", options: ["mode=0755", "nosuid", "nodev"])
+let mount_dev = linux.mount(b"dev", p"/dev", fstype: "devtmpfs", options: ["mode=0755", "nosuid"])
 
-for dir in [/dev/pts, /dev/shm] {
+for dir in [p"/dev/pts", p"/dev/shm"] {
   dir.mkdir()
 }
 
@@ -17,7 +17,7 @@ let proc_filesystems = p"/proc/filesystems".read_text()?
 if "devpts" in proc_filesystems {
   let _ = linux.mount(
     b"devpts",
-    /dev/pts,
+    p"/dev/pts",
     fstype: "devpts",
     options: ["mode=0620", "gid=5", "ptmxmode=0666", "nosuid", "noexec"],
   )
@@ -30,13 +30,13 @@ if "devpts" in proc_filesystems {
 }
 
 if ! p"/dev/ptmx".exists() {
-  let _ = linux.mknod(/dev/ptmx, "char", 5, 2)
+  let _ = linux.mknod(p"/dev/ptmx", "char", 5, 2)
 }
 
-let mount_shm = linux.mount(b"shm", /dev/shm, fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
+let mount_shm = linux.mount(b"shm", p"/dev/shm", fstype: "tmpfs", options: ["mode=1777", "nosuid", "nodev"])
 
 if ! p"/dev/fd".exists() {
-  p"/dev/fd".symlink(to: /proc/self/fd)
+  p"/dev/fd".symlink(to: p"/proc/self/fd")
 }
 
 if ! p"/dev/stdin".exists() {
@@ -84,8 +84,8 @@ if p"/etc/hostname".exists() {
 }
 
 let sysctl_result = linux.sysctl_load_dirs(
-  [/run/sysctl.d, /etc/sysctl.d, /usr/lib/sysctl.d],
-  fallback: /etc/sysctl.conf,
+  [p"/run/sysctl.d", p"/etc/sysctl.d", p"/usr/lib/sysctl.d"],
+  fallback: p"/etc/sysctl.conf",
 )
 
 proc require_safe_terminal_policy() [fs, process, error] {
