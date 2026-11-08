@@ -19,6 +19,7 @@ test test_qemu_tinyland_ghostty_profile_has_exact_runtime_intent [fs, error] {
     "doas-rs",
     "tinyland",
     "ghostty-custom",
+    "play",
   ]
   assert value.kernel_package == "linux"
   assert ! (value.kernel_package in value.package_roots)

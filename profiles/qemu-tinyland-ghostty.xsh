@@ -1,9 +1,11 @@
-##! Opt-in Laputa kiosk profile: unprivileged tinyland through seatd-mediated devices, Ghostty on virgl.
+##! Opt-in Laputa kiosk profile: unprivileged tinyland through seatd-mediated devices, Ghostty on virgl,
+##! and Play on lavapipe Vulkan.
 use system.types
 
 ## The direct package intent for a tinyland and Ghostty system without dwl, wlroots,
-## libinput, or LLVM in the runtime closure. Ghostty renders offscreen through
-## Mesa's virgl driver and presents over wl_shm; dependencies are resolved by PM.
+## libinput, or a shared LLVM in the runtime closure. Ghostty renders offscreen through
+## Mesa's virgl driver and presents over wl_shm; Play renders through gpu-next on
+## lavapipe, whose LLVM is linked statically; dependencies are resolved by PM.
 export let profile: types.SystemProfile = types.SystemProfile(
   name: "qemu-tinyland-ghostty",
   package_roots: [
@@ -17,6 +19,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "doas-rs",
     "tinyland",
     "ghostty-custom",
+    "play",
   ],
   kernel_package: "linux",
   kernel_path: p"boot/vmlinuz",

@@ -373,6 +373,15 @@ proc main() [fs, process, time, error] {
     guest_fail("input", f"expected LAPUTA!, got {input}")
   }
 
+  guest_run_required(process.command_argv(
+    p"/usr/bin/su",
+    ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-play-proof.xsh"],
+    stdout: p"/dev/console", stderr: p"/dev/console",
+    env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
+    timeout: 120s,
+  ), "play-gpu-next")
+  guest_console("LAPUTA_TINYLAND_PLAY_GPU_NEXT_OK")?
+
   let idle_tinyland = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
   let idle_ghostty = [entry.pid for entry in process.list()? if entry.command == "ghostty-custom"]
   if idle_ghostty.len() == 1 {

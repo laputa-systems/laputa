@@ -48,6 +48,8 @@ test test_profile_plan_command_has_exact_direct_roots_and_kernel [fs, error] {
     "--root",
     "ghostty-custom",
     "--root",
+    "play",
+    "--root",
     "linux",
     "--target",
     "x86_64-linux-musl",
