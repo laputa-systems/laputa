@@ -1,4 +1,5 @@
 ##! Immutable package artifacts addressed by semantic SHA-256 keys; finals appear only after a temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
+use confined
 use local
 use remote
 use types
@@ -53,10 +54,6 @@ pure object_root(root: Path) -> Path {
 
 pure lock_path(root: Path, key: Str) -> Path {
   fp"{store_layout(root)}/locks/{key}.lock"
-}
-
-pure temporary_path(root: Path, key: Str) -> Path {
-  fp"{store_layout(root)}/tmp/{key}"
 }
 
 pure receipt_path(dir: Path) -> Path {
@@ -280,6 +277,7 @@ proc verify_dir(dir: Path, expected_key: Str) -> Result[types.ArtifactReceipt] {
 proc receipt_for(
   target: types.Target,
   node: types.PlanNode,
+  object: FsRoot,
   dir: Path,
   payload_sha256: Str,
   executor_sha256: Str,
@@ -291,14 +289,6 @@ proc receipt_for(
   require_sha256(executor_sha256, "staged executor_sha256")
   require_sha256(payload_sha256, "staged payload_sha256")
 
-  let payload = payload_path(dir)
-  let metadata = metadata_path(dir)
-  let proof = proof_path(dir)
-
-  if ! payload.exists() or ! metadata.exists() or ! proof.exists() {
-    return Err(types.PmError.PackageContract(f"staged artifact for {node.package_id} is incomplete"))
-  }
-
   {
     format: receipt_format,
     key: node.artifact_key,
@@ -309,23 +299,52 @@ proc receipt_for(
     recipe_sha256: node.recipe_sha256,
     executor_sha256,
     payload_sha256,
-    metadata_sha256: hash.sha256(metadata)?.hex(),
+    metadata_sha256: hash.sha256(object.read_bytes(p"metadata.json")?).hex(),
     proof_key: node.proof_key,
-    proof_sha256: hash.sha256(proof)?.hex(),
+    proof_sha256: hash.sha256(object.read_bytes(p"proof.json")?).hex(),
     dependency_keys: receipt_dependency_keys(node),
     runtime_dependency_keys: receipt_runtime_dependency_keys(node),
     artifact_dir: dir,
   }
 }
 
-proc write_receipt(dir: Path, value: types.ArtifactReceipt) {
-  receipt_path(dir).write(json.encode(receipt_dto(value))? + "\n")
+proc install_staged_object(source: Path, object: FsRoot, name: Str) {
+  let source_root = fs.open_root(source.parent)?
+  fs.root_install_file(source_root, confined.rel(source.name)?, object, confined.rel(name)?, 0o644)
 }
 
-proc copy_staged(dir: Path, staged: types.StagedArtifact) {
-  staged.payload.copy(to: payload_path(dir))
-  staged.metadata.copy(to: metadata_path(dir))
-  staged.proof.copy(to: proof_path(dir))
+pure staging_belongs_to(name: Str, key: Str) -> Bool {
+  name == key or (name.starts_with(f".{key}.") and name.ends_with(".tmp"))
+}
+
+proc reclaim_interrupted_staging(layout: FsRoot, key: Str) {
+  let listing = layout.children(p"tmp")?
+
+  guard listing.state == "complete" else {
+    return Err(types.PmError.PackageContract("cannot enumerate artifact store staging"))
+  }
+
+  for child in listing.children {
+    let relative = child.display()
+    continue unless staging_belongs_to(child.name, key)
+    continue unless layout.stat(confined.rel(relative)?)?.kind == "dir"
+    confined.remove_staging(layout, relative, layout.open_root(confined.rel(relative)?)?)
+  }
+}
+
+proc stage_object(
+  target: types.Target,
+  node: types.PlanNode,
+  staged: types.StagedArtifact,
+  origin: types.ArtifactOrigin,
+  object: FsRoot,
+  final_dir: Path,
+) {
+  install_staged_object(staged.payload, object, "payload.tar.gz")
+  install_staged_object(staged.metadata, object, "metadata.json")
+  install_staged_object(staged.proof, object, "proof.json")
+  let value = receipt_for(target, node, object, final_dir, staged.payload_sha256, staged.executor_sha256, origin)?
+  object.write(p"artifact.json", json.encode(receipt_dto(value))? + "\n")
 }
 
 proc commit_locked(
@@ -349,16 +368,20 @@ proc commit_locked(
     return existing
   }
 
-  let temporary = temporary_path(root, key)
-  temporary.remove()
-  defer temporary.remove()
-  temporary.mkdir()
-  copy_staged(temporary, staged)
-  let value = receipt_for(target, node, temporary, staged.payload_sha256, staged.executor_sha256, origin)?
+  object_root(root).mkdir()
+  fp"{store_layout(root)}/tmp".mkdir()
+  let layout = fs.open_root(store_layout(root))?
+  let publication_mode = 0o777.clear_bits(fs.umask()?)
+  reclaim_interrupted_staging(layout, key)
+  let staging_rel = confined.create_staging(layout, "tmp", key)?
+  let staging = layout.open_root(confined.rel(staging_rel)?)?
 
-  write_receipt(temporary, value)
-  final_dir.parent.mkdir()
-  temporary.rename(to: final_dir)
+  match stage_object(target, node, staged, origin, staging, final_dir) {
+    Ok(_) => {}
+    Err(problem) => return Err(confined.discard(layout, staging_rel, staging, problem))
+  }
+
+  confined.publish(layout, staging_rel, staging, f"sha256/{key}", publication_mode)
   read_receipt(final_dir, key)
 }
 

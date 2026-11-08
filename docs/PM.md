@@ -576,30 +576,59 @@ command links only when Laputa needs them, and keep `su` outside `/usr/bin`.
 
 ## Filesystem authority limits
 
-Current staging and no-replace publication establish atomic visibility under a
-trusted parent directory. They do not qualify an adversarially replaced parent
-or power-loss durability. Archive extraction and publication still use ambient
-`Path` operations after staging exports an `FsRoot.host_path()`.
-The supplied XSH snapshot has no rooted extraction, no-replace rename, or fsync
-operations that retain the opened root through the entire path.
+Store commit and generation composition (`store.commit`, `generation.compose`,
+`root.compose_artifacts`) open their publication directory once as an
+`FsRoot`: the Store's `v2/` layout, or the parent of the root or generation.
+`generation.compose_beneath` accepts that root from the caller. Everything
+after the open resolves beneath retained descriptors, so replacing the
+publication path or an ancestor cannot redirect a write. This covers staging,
+extraction, materialization, overlay application, receipts, synchronization,
+publication and cleanup.
 
-A scratch-only Linux probe covers cleanup ownership. It renames an owned
-temporary directory, creates a replacement tree at its saved pathname, and
-closes the handle. On the supplied XSH the close fails with "temporary root was
-moved or replaced; its directory was left in place" and retains both trees
-instead of removing the replacement, and the fixture asserts exactly that
-fail-closed outcome. The reproducer is
-`tests/system/fixtures/fsroot-cleanup-identity.xsh`. Run it with `TMPDIR` inside
-an ignored `.work/tmp`; it changes only its own temporary tree:
+- **Staging and cleanup ownership:** each operation creates its own
+  exclusive mode-0700 `.NAME.RANDOM.tmp` directory beneath the publication
+  root. On failure it empties that directory through the directory's own
+  descriptor and then unlinks the empty name. A non-empty replacement at that
+  name fails the cleanup instead of being removed. A killed process leaves only
+  its hidden staging directory. The next commit of the same Store key, or
+  `store.gc`, reclaims Store staging. Nothing reclaims generation staging
+  automatically.
+- **Payload entries:** payloads extract with `FsRoot.extract` into a private
+  sandbox under XSH's default policy, restated explicitly as `links:
+  .Contained` and `special: .Refuse`. The archive cannot name parent or
+  absolute paths, symlinks must stay inside the payload, hard links must target
+  an earlier regular file of the same payload, and devices and FIFOs are
+  refused. Every extracted file, symlink and empty directory must be declared
+  in the artifact metadata. Declared symlinks must be relative and stay inside
+  the root.
+- **Materialization:** files are copied with `fs.root_install_file`, and
+  symlinks and directories are created with rooted operations, all
+  no-replace. A payload hard link becomes an independent copy, so a generation
+  contains no hard links. Each entry is re-verified through the output root
+  after it is created.
+- **Store inputs:** staged payload, metadata and proof files are opened
+  beneath their own directory, so a staged symlink cannot pull in an outside
+  file. A commit holds the key's lock and reclaims staging left by an
+  interrupted commit of the same key, but only real directories. Other keys'
+  staging is left alone.
+- **Publication and durability:** every staged regular file and directory is
+  fsynced, children before parents. A `RENAME_NOREPLACE` rename then makes the
+  tree visible, and the destination's parent is fsynced afterwards. The rename
+  is the atomic-visibility point and the parent fsync is the durability point.
+  An existing destination is never replaced, including a dangling symlink or a
+  plain file.
 
-```bash
-TMPDIR="$PWD/.work/tmp" "$XSH_HOST" tests/system/fixtures/fsroot-cleanup-identity.xsh
-```
+The remaining limits are these:
 
-Root-backed reads and writes remain anchored in the corresponding replacement
-probe, but that does not qualify ambient extraction or cleanup.
+- The Store records the payload digest computed when the payload was staged,
+  and does not re-hash its copy. A writer that changes the staged payload
+  after hashing leaves a receipt that consumers reject at `verify_receipt`,
+  and that key stays poisoned until `store.gc`.
+- `fs.lock` is path-based.
+- The selected-root `makewhatis` process, and the reads that decide whether
+  it runs, address the staging root's host path.
+- Overlay sources are read through a root opened after the overlay was
+  digested, and are not re-hashed.
 
-LAP-33 needs retained-root extraction, publication, synchronization, and cleanup
-ownership before end-to-end confinement can be claimed. The selected PM path
-has no explicit fsync boundary. Process termination does not establish storage
-power-loss behavior.
+Kill tests establish atomic visibility only. Durability rests on the fsync
+order, observed with `strace`; power loss has not been tested.

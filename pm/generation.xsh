@@ -1,4 +1,5 @@
 ##! Deterministic runtime-only system generations assembled from verified BuildPlan artifacts.
+use confined
 use plan as build_plan
 use root as pm_root
 use store as artifact_store
@@ -51,6 +52,10 @@ pure generation_overlay_config_path(overlay_root: Path) -> Path {
 
 pure generation_receipt_path(output_root: Path) -> Path {
   fp"{output_root}/var/lib/laputa/generation.json"
+}
+
+pure generation_receipt_rel() -> RelPath {
+  p"var/lib/laputa/generation.json"
 }
 
 pure generation_empty_overlay_sha256() -> Str {
@@ -565,37 +570,28 @@ proc generation_store_artifacts(value: types.GenerationPlan, store_root: Path) -
   receipts |> sort-by .package_name
 }
 
-proc generation_apply_overlay(output_root: Path, entries: List[GenerationOverlayEntry]) {
+proc generation_apply_overlay(output: FsRoot, overlay: FsRoot, entries: List[GenerationOverlayEntry], replacements: List[Str]) {
   for entry in entries {
-    let destination = fp"{output_root}/{entry.path}"
+    let rel = confined.rel(entry.path)?
+    pm_root.root_ensure_parent(output, entry.path)
 
     if entry.kind == "dir" {
-      if destination.exists() {
-        guard destination.is_dir() else {
+      match output.mkdir(rel, mode: entry.mode) {
+        Ok(_) => {}
+        Err(_) => guard output.stat(rel)?.kind == "dir" else {
           return Err(
             types.PmError.PackageConflict(f"generation overlay directory {entry.path} cannot replace a non-directory"),
           )
         }
-      } else {
-        destination.mkdir()
       }
 
-      destination.chmod(entry.mode)
+      output.chmod(rel, entry.mode)
+    } else if entry.kind == "file" {
+      fs.root_install_file(overlay, rel, output, rel, entry.mode, overwrite: entry.path in replacements)
+    } else if entry.kind == "symlink" {
+      output.symlink(target: fp"{entry.target}", path: rel, overwrite: entry.path in replacements)
     } else {
-      destination.parent.mkdir()
-
-      if destination.exists() {
-        destination.remove(missing_ok: false)
-      }
-
-      if entry.kind == "file" {
-        entry.source.copy(to: destination)
-        destination.chmod(entry.mode)
-      } else if entry.kind == "symlink" {
-        destination.symlink(to: fp"{entry.target}")
-      } else {
-        return Err(types.PmError.PackageContract(f"generation overlay has invalid entry {entry.path}"))
-      }
+      return Err(types.PmError.PackageContract(f"generation overlay has invalid entry {entry.path}"))
     }
   }
 }
@@ -691,13 +687,66 @@ export proc read_generation_receipt(output_root: Path) [fs, error] -> Result[typ
   read_generation_receipt_file(generation_receipt_path(output_root))?
 }
 
+proc generation_read_receipt_in(output: FsRoot) -> Result[types.GenerationReceipt] {
+  let dto = json.decode(output.read_text(generation_receipt_rel())?)?.require(GenerationReceiptDto)?
+  let receipt = generation_receipt_from_dto(dto)?
+  generation_validate_receipt(receipt)
+  receipt
+}
+
+proc generation_compose_staged(
+  value: types.GenerationPlan,
+  root_plan: types.RootPlan,
+  artifacts: List[types.ArtifactReceipt],
+  overlay: FsRoot,
+  entries: List[GenerationOverlayEntry],
+  output: FsRoot,
+) -> Result[types.GenerationReceipt] {
+  let package_receipt = pm_root.root_compose_into(output, root_plan, artifacts)?
+  generation_apply_overlay(output, overlay, entries, value.profile.replacements)
+  let root_receipt = pm_root.root_index_manual_pages(output, package_receipt)?
+  let receipt = generation_receipt_for(value, root_receipt)?
+  confined.ensure_dir(output, "var/lib/laputa")
+  output.write_atomic(
+    generation_receipt_rel(),
+    json.encode(generation_receipt_dto(receipt))? + "\n",
+    replace: "regular_or_absent",
+  )
+
+  if generation_read_receipt_in(output)? != receipt {
+    return Err(types.PmError.PackageContract("generation receipt changed while composing"))
+  }
+
+  receipt
+}
+
 ## Composes a complete runtime generation after Store, package-root, and overlay ownership preflight succeeds.
+## The parent of `output_root` is opened once; composition then proceeds as `compose_beneath`.
 export proc compose(
   value: types.GenerationPlan,
   store_root: Path,
   output_root: Path,
   overlay_root: Path,
 ) [fs, process, error] -> Result[types.GenerationReceipt, Error] {
+  output_root.parent.mkdir()
+  compose_beneath(value, store_root, fs.open_root(output_root.parent)?, output_root.name, overlay_root)?
+}
+
+## Composes a generation and publishes it as the single path component `name` inside the
+## retained `publication` directory. Staging, every mutation and the no-replace publication
+## resolve beneath that descriptor, so replacing the publication path or an ancestor after it
+## was opened cannot redirect a write; an existing `name` is never replaced.
+export proc compose_beneath(
+  value: types.GenerationPlan,
+  store_root: Path,
+  publication: FsRoot,
+  name: Str,
+  overlay_root: Path,
+) [fs, process, error] -> Result[types.GenerationReceipt, Error] {
+  if name == "" or name == "." or name == ".." or "/" in name {
+    return Err(types.PmError.Usage(f"generation name must be one path component: {name}"))
+  }
+
   generation_validate_plan(value)
   let actual_overlay_sha256 = overlay_digest(overlay_root)?
 
@@ -716,39 +765,22 @@ export proc compose(
   let entries = generation_overlay_entries(overlay_root)?
   generation_preflight_overlay(entries, root_plan, value.profile)
 
-  if output_root.exists() {
-    return Err(types.PmError.PackageConflict(f"immutable generation {output_root} already exists"))
+  if publication.exists(confined.rel(name)?) {
+    return Err(types.PmError.PackageConflict(f"immutable generation {name} already exists"))
   }
 
-  output_root.parent.mkdir()
+  let overlay = fs.open_root(overlay_root)?
   let publication_mode = 0o777.clear_bits(fs.umask()?)
-  with staging_root = fs.tempdir_in(output_root.parent)? {
-    let staging_path = staging_root.host_path()?
-    let temporary = fp"{staging_path}/generation"
-    let package_receipt = pm_root.compose_artifacts(temporary, root_plan, artifacts)?
-    temporary.chmod(0o700)
-    generation_apply_overlay(temporary, entries)
-    let root_receipt = pm_root.root_index_manual_pages(temporary, package_receipt)?
-    let receipt = generation_receipt_for(value, root_receipt)?
-    let receipt_path = generation_receipt_path(temporary)
-    receipt_path.parent.mkdir()
-    receipt_path.write(json.encode(generation_receipt_dto(receipt))? + "\n")
-    let stored = read_generation_receipt(temporary)?
+  let staging_rel = confined.create_staging(publication, "", name)?
+  let staging = publication.open_root(confined.rel(staging_rel)?)?
+  let receipt = generation_compose_staged(value, root_plan, artifacts, overlay, entries, staging) ?? { |problem| return Err(confined.discard(publication, staging_rel, staging, problem)) }
+  confined.publish(publication, staging_rel, staging, name, publication_mode)
 
-    if stored != receipt {
-      return Err(types.PmError.PackageContract("generation receipt changed while composing"))
-    }
+  if generation_read_receipt_in(publication.open_root(confined.rel(name)?)?)? != receipt {
+    return Err(types.PmError.PackageContract("completed generation receipt does not match"))
+  }
 
-    temporary.chmod(publication_mode)
-    fs.rename_noreplace(temporary, output_root)
-    let final_receipt = read_generation_receipt(output_root)?
-
-    if final_receipt != receipt {
-      return Err(types.PmError.PackageContract("completed generation receipt does not match"))
-    }
-
-    receipt
-  }?
+  receipt
 }
 
 ## Verifies that a completed generation still carries its exact immutable receipt.

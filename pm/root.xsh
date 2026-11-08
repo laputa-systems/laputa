@@ -1,4 +1,5 @@
 ##! Deterministic immutable root plans composed only from verified artifact-store receipts.
+use confined
 use store as artifact_store
 use types
 use util
@@ -47,10 +48,6 @@ type RootReceiptDto = {
 type DecodedArtifactMetadata = {kind: types.PackageKind, entries: List[types.ArtifactEntry]}
 
 type RootOwnership = {plan: types.RootPlan, artifact_entries: Map[List[types.RootEntry]]}
-
-pure root_receipt_path(output: Path) -> Path {
-  fp"{output}/var/lib/laputa/root.json"
-}
 
 pure root_sha256_text_is_valid(value: Str) -> Bool {
   value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
@@ -282,9 +279,8 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
   {kind, entries: entries |> sort-by .path}
 }
 
-proc root_verify_entry_at(root: Path, entry: types.ArtifactEntry) {
-  let rel: RelPath = fp"{entry.path}".require()?
-  let root_handle = fs.open_root(root)?
+proc root_verify_entry_in(root_handle: FsRoot, entry: types.ArtifactEntry) {
+  let rel = confined.rel(entry.path)?
 
   if entry.kind == types.file_kind_symlink() {
     let target = root_handle.readlink(rel)?
@@ -325,16 +321,27 @@ pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry)
     and left.target == right.target
 }
 
+proc root_extract_payload(sandbox: FsRoot, receipt: types.ArtifactReceipt) {
+  sandbox.extract(
+    fp"{receipt.artifact_dir}/payload.tar.gz",
+    p"payload",
+    .Tar,
+    links: .Contained,
+    special: .Refuse,
+    modes: .Exact,
+  )
+}
+
 proc root_verify_payload_entries(receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
-  let sandbox_path = sandbox.host_path()?
-  let extracted = fp"{sandbox_path}/payload"
-  archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, modes: .Exact)
+  root_extract_payload(sandbox, receipt)
+  let extracted = fp"{sandbox.host_path()?}/payload"
+  let payload = sandbox.open_root(p"payload")?
   var expected: Set[Str] = set.empty()
 
   for entry in entries {
     expected = expected.add(entry.path)
-    match root_verify_entry_at(extracted, entry) {
+    match root_verify_entry_in(payload, entry) {
       Ok(_) => {}
       Err(problem) => return Err(
         types.PmError.PackageContract(
@@ -559,52 +566,57 @@ proc root_receipt_for_plan(value: types.RootPlan) -> Result[types.RootReceipt] {
   }
 }
 
-proc root_materialize_entry(source_root: Path, output: Path, entry: types.RootEntry) {
-  let source = fp"{source_root}/{entry.path}"
-  let destination = fp"{output}/{entry.path}"
+## Creates the missing parent directories of `path_value` beneath `output` without following symlinks.
+export proc root_ensure_parent(output: FsRoot, path_value: Str) [fs, error] {
+  let parent = fp"{path_value}".parent.display()
+  return when parent == "" or parent == "."
+  confined.ensure_dir(output, parent)
+}
+
+proc root_materialize_entry(source: FsRoot, output: FsRoot, entry: types.RootEntry) {
+  let rel = confined.rel(entry.path)?
+  root_ensure_parent(output, entry.path)
 
   if entry.kind == types.file_kind_tree() {
-    if destination.exists() {
-      root_verify_entry_at(output, entry)
-      return
+    match output.mkdir(rel, mode: entry.mode) {
+      Ok(_) => output.chmod(rel, entry.mode)
+      Err(_) => {}
     }
 
-    destination.mkdir()
-    destination.chmod(entry.mode)
-    root_verify_entry_at(output, entry)
+    root_verify_entry_in(output, entry)
     return
   }
 
-  if destination.exists() {
-    return Err(
-      types.PmError.PackageConflict(f"root path {entry.path} already exists while applying {entry.package_name}"),
+  let created = if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
+    fs.root_install_file(source, rel, output, rel, entry.mode)
+  } else {
+    output.symlink(target: fp"{entry.target}", path: rel)
+  }
+
+  match created {
+    Ok(_) => {}
+    Err(problem) => return Err(
+      types.PmError.PackageConflict(
+        f"root path {entry.path} cannot be created while applying {entry.package_name}: {problem.message}",
+      ),
     )
   }
 
-  destination.parent.mkdir()
-
-  if entry.kind == types.file_kind_file() or entry.kind == types.file_kind_binary() {
-    source.copy(to: destination)
-    destination.chmod(entry.mode)
-  } else if entry.kind == types.file_kind_symlink() {
-    destination.symlink(to: fp"{entry.target}")
-  }
-
-  root_verify_entry_at(output, entry)
+  root_verify_entry_in(output, entry)
 }
 
-proc root_materialize_artifact(output: Path, receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
+proc root_materialize_artifact(output: FsRoot, receipt: types.ArtifactReceipt, entries: List[types.RootEntry]) {
   let sandbox = fs.tempdir()?
-  let extracted = fp"{sandbox.host_path()?}/payload"
-  archive.extract(fp"{receipt.artifact_dir}/payload.tar.gz", extracted, .Tar, modes: .Exact)
+  root_extract_payload(sandbox, receipt)
+  let source = sandbox.open_root(p"payload")?
 
   for entry in entries {
-    root_materialize_entry(extracted, output, entry)
+    root_materialize_entry(source, output, entry)
   }
 }
 
-proc root_read_receipt(output: Path) -> Result[types.RootReceipt] {
-  let raw = json.read(root_receipt_path(output))?.require(Record)?
+proc root_read_receipt_in(output: FsRoot) -> Result[types.RootReceipt] {
+  let raw = json.decode(output.read_text(p"var/lib/laputa/root.json")?)?.require(Record)?
   if raw.get("format")?.require(Str)? != "laputa-root-2" {
     return Err(types.PmError.PackageContract("unsupported root receipt format; recompose the root"))
   }
@@ -771,6 +783,34 @@ export proc trusted_preflight(
   root_ownership(target, root_checked_artifacts(artifacts)?)?.plan
 }
 
+## Materializes verified artifacts into the empty unpublished directory `output` and writes its root receipt.
+## The caller owns `output`'s staging and publication.
+export proc root_compose_into(
+  output: FsRoot,
+  plan: types.RootPlan,
+  artifacts: List[types.ArtifactReceipt],
+) [fs, error] -> Result[types.RootReceipt, Error] {
+  let verified = root_checked_artifacts(artifacts)?
+  var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
+
+  for artifact in plan.artifacts {
+    if artifact.payload {
+      let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]
+      root_materialize_artifact(output, by_key.get(artifact.artifact_key)?, entries)
+    }
+  }
+
+  let receipt = root_receipt_for_plan(plan)?
+  root_write_receipt_in(output, receipt)
+  root_verify_in(output, receipt)
+  receipt
+}
+
+proc root_write_receipt_in(output: FsRoot, receipt: types.RootReceipt) {
+  confined.ensure_dir(output, "var/lib/laputa")
+  output.write_atomic(p"var/lib/laputa/root.json", json.encode(root_receipt_dto(receipt))? + "\n", replace: "regular_or_absent")
+}
+
 ## Composes package artifacts into a verified root plan. The explicit `compose_artifacts` spelling
 ## avoids XSH's shared-module export collision with the public `generation.compose` boundary.
 export proc compose_artifacts(
@@ -789,56 +829,48 @@ export proc compose_artifacts(
   }
 
   output.parent.mkdir()
+  let publication = fs.open_root(output.parent)?
   let publication_mode = 0o777.clear_bits(fs.umask()?)
-  with staging_root = fs.tempdir_in(output.parent)? {
-    let staging_path = staging_root.host_path()?
-    staging_root.mkdir(p"root", mode: 0o700)
-    let temporary = fp"{staging_path}/root"
-    let verified = root_checked_artifacts(artifacts)?
-    var by_key: Map[types.ArtifactReceipt] = {artifact.key: artifact for artifact in verified}
-    for artifact in plan.artifacts {
-      if artifact.payload {
-        let entries = [entry for entry in plan.entries if entry.artifact_key == artifact.artifact_key]
-        root_materialize_artifact(temporary, by_key.get(artifact.artifact_key)?, entries)
-      }
-    }
-
-    let receipt = root_receipt_for_plan(plan)?
-    root_receipt_path(temporary).parent.mkdir()
-    root_receipt_path(temporary).write(json.encode(root_receipt_dto(receipt))? + "\n")
-    verify(temporary, receipt)
-    temporary.chmod(publication_mode)
-    fs.rename_noreplace(temporary, output)
-    receipt
-  }?
+  let staging_rel = confined.create_staging(publication, "", output.name)?
+  let staging = publication.open_root(confined.rel(staging_rel)?)?
+  let receipt = root_compose_into(staging, plan, artifacts) ?? { |problem| return Err(confined.discard(publication, staging_rel, staging, problem)) }
+  confined.publish(publication, staging_rel, staging, output.name, publication_mode)
+  receipt
 }
 
-## Verifies the durable root receipt and every installed payload entry without consulting mutable package state.
-export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
+proc root_verify_in(output: FsRoot, receipt: types.RootReceipt) {
   root_validate_receipt(receipt)
-  let stored = root_read_receipt(output)?
+  let stored = root_read_receipt_in(output)?
 
   if stored != receipt {
     return Err(types.PmError.PackageContract("root receipt does not match the completed root"))
   }
 
   for entry in receipt.entries {
-    root_verify_entry_at(output, entry)
+    root_verify_entry_in(output, entry)
   }
   for entry in receipt.generated_entries {
-    root_verify_entry_at(output, entry)
+    root_verify_entry_in(output, entry)
   }
 }
 
+## Verifies the durable root receipt and every installed payload entry without consulting mutable package state.
+export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
+  root_verify_in(fs.open_root(output)?, receipt)
+}
+
 ## Generates a manual index in an unpublished staging root and records its generated contents.
-export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
+## Mutations go through `output`; the selected-root makewhatis process and its preconditions
+## still address `output.host_path()`.
+export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
   root_validate_receipt(receipt)
-  if root_read_receipt(output)? != receipt {
+  if root_read_receipt_in(output)? != receipt {
     return Err(types.PmError.PackageContract("manual index root receipt does not match"))
   }
   let mandoc = [artifact for artifact in receipt.artifacts if artifact.package_name == "mandoc" and artifact.payload]
   return receipt when mandoc.is_empty()
-  let manpath = fp"{output}/usr/share/man"
+  let host = output.host_path()?
+  let manpath = fp"{host}/usr/share/man"
   return receipt unless manpath.exists()
   var has_pages = false
   for entry in fs.walk(manpath, gitignore: false, hidden: true) {
@@ -848,9 +880,9 @@ export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [f
     }
   }
   return receipt unless has_pages
-  let loader = fp"{output}/usr/lib/ld-musl-{types.pm_target_arch(receipt.target)}.so.1"
-  let program = fp"{output}/usr/bin/makewhatis"
-  let library_path = fp"{output}/usr/lib"
+  let loader = fp"{host}/usr/lib/ld-musl-{types.pm_target_arch(receipt.target)}.so.1"
+  let program = fp"{host}/usr/bin/makewhatis"
+  let library_path = fp"{host}/usr/lib"
   for required in [loader, program, fp"{library_path}/libz.so.1"] {
     if ! required.exists() or fs.stat(required, follow_symlinks: true)?.kind != "file" {
       return Err(types.PmError.PackageContract(f"manual index requires selected-root tool or library {required}"))
@@ -871,33 +903,34 @@ export proc root_index_manual_pages(output: Path, receipt: types.RootReceipt) [f
       libraries += [fp"{library_path}/{needed}"]
     }
   }
-  let database = fp"{manpath}/mandoc.db"
-  if database.exists() {
+  let database: RelPath = p"usr/share/man/mandoc.db"
+  if output.exists(database) {
     if receipt.generated_entries.is_empty() {
       return Err(types.PmError.PackageConflict("manual index path is already owned"))
     }
-    database.remove(missing_ok: false)
+    output.remove(database)
   }
   let status = process.run(process.command_argv(loader, [loader, "--library-path", library_path, program, manpath], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"}))?
   if ! status.ok {
     return Err(types.PmError.PackageContract("selected-root makewhatis failed; generation was not published"))
   }
-  database.chmod(0o644)
-  let generated: List[types.ArtifactEntry] = [{path: "usr/share/man/mandoc.db", kind: types.file_kind_file(), mode: 0o644, sha256: hash.sha256(database)?.hex(), target: ""}]
+  output.chmod(database, 0o644)
+  let generated: List[types.ArtifactEntry] = [{path: "usr/share/man/mandoc.db", kind: types.file_kind_file(), mode: 0o644, sha256: output.read_bytes(database)?.sha256().hex(), target: ""}]
   let plan: types.RootPlan = {format: "laputa-root-plan-1", target: receipt.target, artifacts: receipt.artifacts, entries: receipt.entries, root_sha256: root_digest(receipt.target, receipt.artifacts, receipt.entries)}
   let completed: types.RootReceipt = {...receipt, generated_entries: generated, root_sha256: root_completed_digest(plan, generated)}
   root_validate_receipt(completed)
-  root_receipt_path(output).write(json.encode(root_receipt_dto(completed))? + "\n")
+  output.write_atomic(p"var/lib/laputa/root.json", json.encode(root_receipt_dto(completed))? + "\n")
   completed
 }
 
 ## Verifies generated root contents against the root identity embedded in a generation receipt.
 export proc root_verify_generated_contents(output: Path, expected_sha256: Str) [fs, error] {
-  let receipt = root_read_receipt(output)?
+  let handle = fs.open_root(output)?
+  let receipt = root_read_receipt_in(handle)?
   if receipt.root_sha256 != expected_sha256 {
     return Err(types.PmError.PackageContract("generation root identity does not match its root receipt"))
   }
   for entry in receipt.generated_entries {
-    root_verify_entry_at(output, entry)
+    root_verify_entry_in(handle, entry)
   }
 }
