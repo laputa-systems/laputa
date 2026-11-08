@@ -132,7 +132,6 @@ check_local() {
     need_command curl
     need_command cf
     need_command docker
-    need_command deno
     need_command node
     need_command date
     docker buildx version >/dev/null 2>&1 || fail 'Docker Buildx is required for mirror-build-x86_64-musl'

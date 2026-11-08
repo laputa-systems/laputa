@@ -249,11 +249,6 @@ cat >"$FAKE_BIN/docker" <<'SH'
 exit 0
 SH
 
-cat >"$FAKE_BIN/deno" <<'SH'
-#!/bin/sh
-exit 0
-SH
-
 cat >"$FAKE_BIN/node" <<'SH'
 #!/bin/sh
 exit 0

@@ -1,9 +1,9 @@
 {
   "name": "laputa-mirror",
   "private": true,
-  "packageManager": "pnpm@11.0.2",
+  "packageManager": "pnpm@12.18.0",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=26"
   },
   "scripts": {
     "build": "rolldown static/js/auth.ts --file static/js/auth.js --format iife --minify && rolldown static/js/settings.ts --file static/js/settings.js --format iife --minify",

@@ -87,7 +87,7 @@ MIRROR := mirror
 ifneq ($(origin DEPLOY_HOST),undefined)
 export DEPLOY_HOST
 endif
-PNPM_VERSION ?= 11.0.2
+PNPM_VERSION ?= 12.18.0
 PNPM_ROOT ?= target/pnpm
 
 .PHONY: check lint test test-components test-components-privileged test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
@@ -475,7 +475,7 @@ mirror-build-x86_64-musl:
 	  .
 
 mirror-frontend:
-	cd $(MIRROR) && deno install --global --force --allow-all --unsafe-proto --root "$(PNPM_ROOT)" --name pnpm npm:pnpm@$(PNPM_VERSION)
+	cd $(MIRROR) && npm install --global --prefix "$(PNPM_ROOT)" --ignore-scripts "pnpm@$(PNPM_VERSION)"
 	cd $(MIRROR) && "$(PNPM_ROOT)/bin/pnpm" install --frozen-lockfile
 	cd $(MIRROR) && "$(PNPM_ROOT)/bin/pnpm" run build
 

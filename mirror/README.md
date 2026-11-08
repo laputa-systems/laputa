@@ -91,8 +91,8 @@ host requirement, refresh behavior, and the exact TLS dependency closure.
 
 ## Frontend and passkey demo
 
-`make mirror-frontend` installs pnpm through Deno at `PNPM_VERSION` (default
-`11.0.2`), installs the locked frontend dependencies, and builds the static
+`make mirror-frontend` installs pnpm with Node's npm at `PNPM_VERSION` (default
+`12.18.0`), installs the locked frontend dependencies, and builds the static
 assets used by the mirror.
 `make mirror-demo` builds those assets and runs the in-memory demo server at
 `http://localhost:3000`. It requires a host Rust toolchain. Register a passkey as

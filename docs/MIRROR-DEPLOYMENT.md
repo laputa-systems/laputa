@@ -57,7 +57,7 @@ as root or a user with passwordless sudo, and `cloudflared` installed at
 these (`check_remote` in `infra/mirror/deploy.sh`). The deployment does not
 install host packages or configure SSH.
 
-The build machine needs Docker with Buildx, Deno, Node.js, Make, OpenSSH,
+The build machine needs Docker with Buildx, Node.js 26 or newer, Make, OpenSSH,
 `curl`, `jaq`, and the Cloudflare `cf` CLI. Preflight checks them before
 building.
 
