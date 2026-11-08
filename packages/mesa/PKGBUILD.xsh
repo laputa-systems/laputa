@@ -12,14 +12,15 @@ export const package_kind = "payload"
 export const ver = "26.2.4"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
-export const deps = ["musl", "libdrm", "wayland-libs-client"]
+export const deps = ["musl", "libdrm", "libudev-zero", "wayland-libs-client"]
 
 ## Package recipe export.
 export const mkdeps_host = [
   "llvm-toolchain",
+  "llvm-static",
   "linux-headers",
   "muon",
   "samurai",
@@ -57,7 +58,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "9938c1ac0d0ec28863b8e4ed09bc538207ffaafef6ba23cd44794bb3883bad6b",
+        sha256: "213259fbfd304e5c92f478b3e649b26c9ae95bd920173e2f7a468643202eebf6",
       },
     ],
   },
@@ -190,6 +191,10 @@ export const filetree = [
     kind: "binary",
   },
   {
+    path: p"usr/lib/libvulkan_lvp.so",
+    kind: "binary",
+  },
+  {
     path: p"usr/lib/pkgconfig/dri.pc",
     kind: "file",
   },
@@ -209,25 +214,33 @@ export const filetree = [
     path: p"usr/lib/pkgconfig/glesv2.pc",
     kind: "file",
   },
+  {
+    path: p"usr/share/vulkan/icd.d/lvp_icd.json",
+    kind: "file",
+  },
 ]
 
 # Mesa with EGL (wayland, surfaceless, and drm platforms), GBM, GLES 2/3,
-# and desktop GL on the softpipe and virgl gallium drivers, with no LLVM, no
-# Vulkan, and no X11. Desktop GL is required by the Ghostty renderer
-# (OpenGL 4.3 core); softpipe's actual desktop version is probed by the
-# proof. The vendored generated sources match exactly this option set;
-# changing it means regenerating them.
+# and desktop GL on the virgl and software gallium drivers, the lavapipe
+# Vulkan driver, and no X11. Lavapipe builds llvmpipe, which then serves
+# software GL ahead of softpipe; both JIT through statically linked LLVM.
+# Desktop GL is required by the Ghostty renderer (OpenGL 4.3 core); the
+# software desktop version is probed by the proof. The vendored generated
+# sources match exactly this option set; changing it means regenerating them.
 const mesa_options = [
   "-Dbuildtype=release",
   "-Dplatforms=wayland",
   "-Dgallium-drivers=softpipe,virgl",
-  "-Dvulkan-drivers=",
+  "-Dvulkan-drivers=swrast",
+  "-Dvulkan-manifest-per-architecture=false",
   "-Degl=enabled",
   "-Dgbm=enabled",
   "-Dgles2=enabled",
   "-Dgles1=disabled",
   "-Dopengl=true",
-  "-Dllvm=disabled",
+  "-Dllvm=enabled",
+  "-Dshared-llvm=disabled",
+  "-Dcpp_rtti=false",
   "-Dglx=disabled",
   "-Dxlib-lease=disabled",
   "-Dvalgrind=disabled",
@@ -252,6 +265,11 @@ const mesa_options = [
   "-Ddisplay-info=disabled",
   "-Dhtml-docs=disabled",
 ]
+
+# muon accepts cpp_rtti=false but does not pass -fno-rtti, so the C++ code
+# that derives from LLVM classes would reference typeinfo the RTTI-free
+# llvm-static archives do not define.
+const muon_rtti_options = ["-Dcpp_args=-fno-rtti"]
 
 const vendored_generator = "build-support/laputa-vendored-output.xsh"
 
@@ -403,10 +421,83 @@ prog_python = prog_vendored
         old: "dep_m = cc.find_library('m', required : false)",
         new: "dep_m = declare_dependency(link_args : ['-lm'])",
       },
+      {
+        old: """prog_glslang = find_program(
+  'glslangValidator',
+  native : true,
+  required : with_vulkan_overlay_layer or with_aco_tests or with_bvh
+)
+
+if prog_glslang.found()
+  _glslang_version = run_command(prog_glslang, ['--version'], check : false).stdout().split(':')[2]
+  # Check if glslang has depfile support. Support was added in 11.3.0, but
+  # Windows path support was broken until 11.9.0.
+  #
+  # It is intentional to check the build machine, since we need to ensure that
+  # glslang will output valid paths on the build platform
+  _glslang_check = build_machine.system() == 'windows' ? '>= 11.9.0' : '>= 11.3.0'
+  if _glslang_version.version_compare(_glslang_check)
+    glslang_depfile = ['--depfile', '@DEPFILE@']
+  else
+    glslang_depfile = []
+  endif
+  if with_bvh and _glslang_version.version_compare('< ' + _glslang_preamble_version)
+    error('glslang >= ' + _glslang_preamble_version + ' is required.')
+  endif
+  if run_command(prog_glslang, [ '--quiet', '--version' ], check : false).returncode() == 0
+    glslang_quiet = ['--quiet']
+  else
+    glslang_quiet = []
+  endif
+endif
+""",
+        new: f"""prog_glslang = find_program('{vendored_generator}')
+glslang_depfile = []
+glslang_quiet = []
+""",
+      },
+      # muon has no llvm-config method; llvm-static ships llvm.pc instead.
+      {
+        old: "  method : host_machine.system() == 'windows' ? 'auto' : 'config-tool',\n",
+        new: "  method : 'pkg-config',\n",
+      },
+      {
+        old: "dep_llvm.get_variable(cmake : 'LLVM_ENABLE_RTTI', configtool: 'has-rtti')",
+        new: "dep_llvm.get_variable(pkgconfig : 'has_rtti')",
+      },
       # muon has no wayland module; src/loader runs wayland-scanner itself.
       {
         old: """  # This can be renamed just `wayland` when we require at least 1.8
   mod_wl = import('unstable-wayland')
+""",
+        new: "",
+      },
+    ],
+  )
+
+  # The uninstalled devenv manifest names the build directory and host CPU,
+  # which arch-independent vendored outputs cannot hold.
+  patch_file(
+    p"src/gallium/targets/lavapipe/meson.build",
+    [
+      {
+        old: """_dev_icdname = 'lvp_devenv_icd.@0@.json'.format(host_machine.cpu())
+_dev_icd = custom_target(
+  'lvp_devenv_icd',
+  input : [vk_icd_gen, vk_api_xml],
+  output : _dev_icdname,
+  command : [
+    prog_python, '@INPUT0@',
+    '--api-version', '1.4', '--xml', '@INPUT1@',
+    '--sizeof-pointer', sizeof_pointer,
+    '--icd-lib-path', meson.current_build_dir(),
+    '--icd-filename', icd_file_name,
+    '--out', '@OUTPUT@',
+  ],
+  build_by_default : true,
+)
+
+devenv.append('VK_DRIVER_FILES', _dev_icd.full_path())
 """,
         new: "",
       },
@@ -608,7 +699,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let muon = process.which("muon")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let setup_args = pm_meson.setup_args(mesa_options)
+  let setup_args = pm_meson.setup_args(mesa_options + muon_rtti_options)
   patch_build()
 
   env ({

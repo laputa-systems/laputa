@@ -157,6 +157,38 @@ int main(void)
 }
 """
 
+const vulkan_source = """#include <stdio.h>
+#include <string.h>
+#include <vulkan/vulkan.h>
+
+int main(void)
+{
+    VkApplicationInfo app = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .apiVersion = VK_API_VERSION_1_3};
+    VkInstanceCreateInfo info = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, .pApplicationInfo = &app};
+    VkInstance instance;
+    if (vkCreateInstance(&info, NULL, &instance) != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateInstance failed\\n");
+        return 1;
+    }
+    uint32_t count = 0;
+    if (vkEnumeratePhysicalDevices(instance, &count, NULL) != VK_SUCCESS || count != 1) {
+        fprintf(stderr, "expected one physical device, found %u\\n", count);
+        return 2;
+    }
+    VkPhysicalDevice device;
+    vkEnumeratePhysicalDevices(instance, &count, &device);
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(device, &props);
+    printf("VK_DEVICE=%s\\nVK_DEVICE_TYPE=%d\\nVK_API=%u.%u\\n", props.deviceName, props.deviceType,
+           VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion));
+    vkDestroyInstance(instance, NULL);
+    return 0;
+}
+"""
+
+const lavapipe_icd = p"usr/share/vulkan/icd.d/lvp_icd.json"
+const lavapipe_library = "libvulkan_lvp.so"
+
 proc gallium_library(root: Path) -> Result[Path] {
   let found = [
     entry.path
@@ -186,6 +218,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
     p"usr/lib/libgbm.so.1.0.0",
     gallium_library(root)?,
     p"usr/lib/gbm/dri_gbm.so",
+    p"usr/lib/libvulkan_lvp.so",
   ]
 
   for rel in libraries {
@@ -211,16 +244,32 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       GBM_BACKENDS_PATH: fp"{root}/usr/lib/gbm".display(),
     }) {
       let out = run.text $binary
-      proof.ensure("GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected renderer: {out}")
-      proof.ensure("OpenGL ES 3.1 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")
+      proof.ensure("GL_RENDERER=llvmpipe (LLVM " in out, "proof-mesa", f"unexpected renderer: {out}")
+      proof.ensure("OpenGL ES 3.2 Mesa" in out, "proof-mesa", f"unexpected GL version: {out}")
       proof.ensure("rendered" in out, "proof-mesa", f"render check failed: {out}")
-      proof.ensure("DESKTOP_GL_RENDERER=softpipe" in out, "proof-mesa", f"unexpected desktop renderer: {out}")
-      # Measured ceiling, 2026-10-31: softpipe exposes desktop 3.3 compat,
-      # below the 4.3 core Ghostty requires (see its renderer/OpenGL.zig
-      # MIN_VERSION_MAJOR/MINOR). The llvmpipe/virgl decision is recorded in
-      # tinyland/docs/opengl-probe.md; changing this ceiling needs that proof.
-      proof.ensure("DESKTOP_GL_VERSION=3.3 (Compatibility Profile) Mesa" in out, "proof-mesa", f"unexpected desktop ceiling: {out}")
+      proof.ensure("DESKTOP_GL_RENDERER=llvmpipe (LLVM " in out, "proof-mesa", f"unexpected desktop renderer: {out}")
+      proof.ensure("DESKTOP_GL_VERSION=4.6 (Compatibility Profile) Mesa" in out, "proof-mesa", f"unexpected desktop ceiling: {out}")
       proof.ensure("desktop-rendered" in out, "proof-mesa", f"desktop render check failed: {out}")
+      print f"mesa ok: {out.trim().split("\n").join("; ")}"
+    }
+
+    let icd = json.read(fp"{root}/{lavapipe_icd}")?
+    let library = json.get(icd, ["ICD", "library_path"], "").require(Str)?
+    proof.ensure(library == lavapipe_library, "proof-mesa", f"lavapipe ICD names {library}")
+    let rooted_icd = fp"{tmp}/lvp_icd.json"
+    rooted_icd.write(json.encode(json.set(icd, ["ICD", "library_path"], fp"{root}/usr/lib/{lavapipe_library}".display())?)?)
+    let vulkan_probe = fp"{tmp}/proof-vulkan.c"
+    let vulkan_binary = fp"{tmp}/proof-vulkan"
+    vulkan_probe.write(vulkan_source)
+    run $cc $vulkan_probe f"-I{root}/usr/include" f"-L{root}/usr/lib" "-lvulkan" "-o" $vulkan_binary
+
+    env ({
+      LD_LIBRARY_PATH: fp"{root}/usr/lib".display(),
+      VK_DRIVER_FILES: rooted_icd.display(),
+    }) {
+      let out = run.text $vulkan_binary
+      proof.ensure("VK_DEVICE=llvmpipe" in out, "proof-mesa", f"unexpected Vulkan device: {out}")
+      proof.ensure("VK_DEVICE_TYPE=4\n" in out, "proof-mesa", f"lavapipe is not a CPU device: {out}")
       print f"mesa ok: {out.trim().split("\n").join("; ")}"
     }
   }
