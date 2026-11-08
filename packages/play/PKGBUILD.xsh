@@ -6,7 +6,7 @@ export const name = "play"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.42.2"
+export const ver = "0.43.0"
 
 ## Package recipe export.
 export const rel = "1"
@@ -34,7 +34,7 @@ export const runtime_only_deps = ["font-ttf-dejavu-sans"]
 ## Package recipe export.
 export const mkdeps_host: List[Str] = []
 
-## The release links FFmpeg statically from the ffmpeg-build play-sdk archive.
+## The release links the shared FFmpeg runtime that the ffmpeg package installs in /usr/lib.
 export const upstream_sources = [
   {
     source: p"https://github.com/joshuarli/play/releases/download/vVERSION/player-x86_64-linux-musl.tar.gz",
@@ -45,7 +45,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "1fb16ed7e180ad8a3345ccce7183280c9998f7ddbae518211abfa9ffd2aefb70",
+        sha256: "134cfc81d9bdc1d0b0b27a1a741ba77833c89286a59a33aea930ab0cda722b0a",
       },
     ],
   },
