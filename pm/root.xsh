@@ -578,11 +578,8 @@ proc root_materialize_entry(source: FsRoot, output: FsRoot, entry: types.RootEnt
   root_ensure_parent(output, entry.path)
 
   if entry.kind == types.file_kind_tree() {
-    match output.mkdir(rel, mode: entry.mode) {
-      Ok(_) => output.chmod(rel, entry.mode)
-      Err(_) => {}
-    }
-
+    confined.ensure_dir(output, entry.path)
+    output.chmod(rel, entry.mode)
     root_verify_entry_in(output, entry)
     return
   }

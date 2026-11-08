@@ -386,6 +386,18 @@ test test_root_coalesces_identical_nested_directories_with_a_canonical_owner [fs
   root.verify(output, receipt)
 }
 
+test test_root_applies_a_declared_directory_mode_after_an_earlier_package_created_it [fs, error] { |ctx|
+  let store_root = test.temp_dir(ctx, name: "root-late-directory-store")?
+  let alpha = commit_artifact(ctx, store_root, "alpha", types.Payload, [payload_file("usr/include/alpha.h", "alpha")])?
+  let base = commit_artifact(ctx, store_root, "base", types.Payload, [payload_tree("usr/include", mode: 0o700)])?
+  let plan = root.preflight(types.target_aarch64(), [alpha, base])?
+  let output = fp"{test.temp_dir(ctx, name: "root-late-directory-output")?}/root"
+  let receipt = root.compose_artifacts(output, plan, [alpha, base])?
+  assert fp"{output}/usr/include".metadata()?.mode % 512 == 0o700
+  assert fp"{output}/usr/include/alpha.h".read_text()? == "alpha"
+  root.verify(output, receipt)
+}
+
 test test_root_rejects_collisions_and_same_owner_duplicate_entries_before_mutation [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-collision-store")?
   let left = commit_artifact(ctx, store_root, "left", types.Payload, [payload_file("usr/bin/shared", "left")])?
