@@ -118,6 +118,10 @@ treating these graphical results as production qualification.
   `io.stdin_line()`.
 - aarch64 is compile and package proof only.
 
+- Mesa also ships the lavapipe Vulkan driver on static LLVM, which makes
+  llvmpipe the software GL driver. Ghostty still renders on virgl. Play's
+  gpu-next path is not yet qualified in this profile (LAP-53).
+
 Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM):
 
 | Item | Value |
@@ -125,9 +129,9 @@ Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM)
 | `tinyland` binary | 3,015,600 bytes |
 | `ghostty-custom` binary | 30,586,216 bytes |
 | Closure | 38 plan nodes |
-| Image | disk 308M, rootfs 276M |
+| Image | disk 308M, rootfs 276M; 455M and 423M with Mesa `26.2.4-3` (lavapipe) |
 | Session ready with a 4.3 context | 16.74 s guest uptime |
-| Idle RSS after input | tinyland 7,156 KB, Ghostty 41,416 KB |
+| Idle RSS after input | tinyland 7,156 KB, Ghostty 41,416 KB; tinyland 7,176 KB, Ghostty 61,604 KB with Mesa `26.2.4-3` |
 
 ## Historical graphical evidence
 
