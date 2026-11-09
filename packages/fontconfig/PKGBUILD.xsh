@@ -48,7 +48,7 @@ proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
     "fcalias.h", "fcaliastail.h", "fcftalias.h", "fcftaliastail.h",
     "fc-case/fccase.h", "fc-lang/fclang.h", "fc-const/fcconst.h",
     "fc-genericfamily/fcgenericfamily.h", "fc-genericfamily/fcgenericfamily.gperf",
-    "src/fcobjshash.h", "src/fcobjshash.gperf", "src/preprocess.p/fcobjshash.gperf.h.i",
+    "src/fcobjshash.h", "src/fcobjshash.gperf", "src/preprocessor_0.p/fcobjshash.gperf.h.i",
   ]
   let head = block[0].byte_slice(6).split(": ")[0]
   let outputs = head.split(" ")
