@@ -556,7 +556,16 @@ fn find_system_library(name: &str) -> Option<Object> {
     }
 }
 
-fn resolve_library_arguments(vm: &VM, link_args: Vec<String>) -> Vec<String> {
+/// Like Meson, a `-lname` from pkg-config becomes the library's path only
+/// when it lives in one of the `-L` directories the same output names. A
+/// library in the compiler's own search path stays `-lname`, so the linker
+/// records its SONAME instead of a build-root path.
+fn resolve_library_arguments(_vm: &VM, link_args: Vec<String>) -> Vec<String> {
+    let search_dirs: Vec<String> = link_args
+        .iter()
+        .filter_map(|argument| argument.strip_prefix("-L").map(str::to_string))
+        .filter(|dir| !dir.is_empty())
+        .collect();
     link_args
         .into_iter()
         .map(|argument| {
@@ -566,34 +575,18 @@ fn resolve_library_arguments(vm: &VM, link_args: Vec<String>) -> Vec<String> {
             if name.is_empty() || name.starts_with(':') {
                 return argument;
             }
-            match find_library_file(vm, name) {
-                Some(path) => path,
-                None => argument,
-            }
+            library_in_dirs(&search_dirs, name).unwrap_or(argument)
         })
         .collect()
 }
 
-fn find_library_file(vm: &VM, name: &str) -> Option<String> {
-    let compiler = match vm.globals.get("compiler_c") {
-        Some(Object::Compiler(c)) if !c.cmd.is_empty() => c.cmd[0].clone(),
-        _ => "cc".to_string(),
-    };
-    for suffix in [".so", ".a"] {
-        let probe = format!("lib{}{}", name, suffix);
-        let output = Command::new(&compiler)
-            .arg(format!("-print-file-name={}", probe))
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            continue;
-        }
-        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if path.is_empty() || path == probe || !path.starts_with('/') {
-            continue;
-        }
-        if std::path::Path::new(&path).is_file() {
-            return Some(normalize_absolute_path(&path));
+fn library_in_dirs(dirs: &[String], name: &str) -> Option<String> {
+    for dir in dirs {
+        for suffix in [".so", ".a"] {
+            let candidate = std::path::Path::new(dir).join(format!("lib{name}{suffix}"));
+            if candidate.is_file() {
+                return Some(normalize_absolute_path(&candidate.to_string_lossy()));
+            }
         }
     }
     None
@@ -628,5 +621,23 @@ fn try_fallback(_vm: &mut VM, _name: &str, fallback: &Object) -> Option<Object> 
             None
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod library_argument_tests {
+    use super::*;
+
+    #[test]
+    fn only_libraries_in_the_named_search_dirs_become_paths() {
+        let dir = std::env::temp_dir().join(format!("gluon-libdir-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("libfoo.so"), b"").unwrap();
+        let vm = VM::new();
+        let args = vec![format!("-L{}", dir.display()), "-lfoo".to_string(), "-lm".to_string()];
+        let resolved = resolve_library_arguments(&vm, args);
+        assert_eq!(resolved[1], dir.join("libfoo.so").to_string_lossy());
+        assert_eq!(resolved[2], "-lm");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
