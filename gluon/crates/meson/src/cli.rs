@@ -1380,27 +1380,19 @@ mod tests {
 
     #[test]
     fn ninja_spawn_failure_fails() {
+        if std::env::var_os("GLUON_EMPTY_PATH_CHILD").is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "cli::tests::ninja_spawn_failure_fails", "--test-threads=1"])
+                .env("GLUON_EMPTY_PATH_CHILD", "1")
+                .env("PATH", "")
+                .status()
+                .unwrap();
+            assert!(status.success(), "the empty-PATH child run failed");
+            return;
+        }
         let dir = temp_build("spawn");
         std::fs::create_dir_all(dir.join("meson-info")).unwrap();
         std::fs::write(dir.join("meson-info/intro-tests.json"), "[{\"name\":\"t\"}]").unwrap();
-        let old = std::env::var_os("PATH");
-        struct RestorePath(Option<std::ffi::OsString>);
-        impl Drop for RestorePath {
-            fn drop(&mut self) {
-                // SAFETY: restores the PATH this test replaced.
-                unsafe {
-                    match self.0.take() {
-                        Some(path) => std::env::set_var("PATH", path),
-                        None => std::env::remove_var("PATH"),
-                    }
-                }
-            }
-        }
-        let _restore = RestorePath(old);
-        // SAFETY: restored by RestorePath, including on panic.
-        unsafe {
-            std::env::set_var("PATH", "");
-        }
         let code = test_cli(dir.to_str().unwrap(), true).run();
         assert_ne!(code, 0);
         std::fs::remove_dir_all(&dir).ok();

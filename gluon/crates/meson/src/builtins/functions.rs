@@ -2712,9 +2712,6 @@ fn builtin_configure_file(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
         }
     } else if configuration.is_some() && command.is_empty() {
         // Configuration mode: read input, substitute @VAR@ patterns, write output
-        if output == "config.h" {
-            eprintln!("DEBUG configure_file config.h input={:?} cfg={:?}", input, configuration);
-        }
         if let Some(ref inp) = input {
             let input_path = if input_is_absolute || std::path::Path::new(inp).is_absolute() {
                 inp.clone()
