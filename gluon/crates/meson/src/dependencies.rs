@@ -79,6 +79,8 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
             version: String::new(),
             compile_args,
             link_args,
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
@@ -257,6 +259,8 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
             version: String::new(),
             compile_args: Vec::new(),
             link_args,
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
@@ -347,6 +351,7 @@ fn find_pkgconfig(
             }
         }
     }
+    let link_args = resolve_library_arguments(vm, link_args);
 
     // Get variables
     let mut variables = HashMap::new();
@@ -377,6 +382,8 @@ fn find_pkgconfig(
         version,
         compile_args,
         link_args,
+        link_with: Vec::new(),
+        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs,
         dependencies: Vec::new(),
@@ -453,6 +460,8 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
         version: String::new(),
         compile_args,
         link_args,
+        link_with: Vec::new(),
+        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs: Vec::new(),
         dependencies: Vec::new(),
@@ -508,6 +517,8 @@ fn find_config_tool(name: &str, version_req: Option<&str>) -> Option<Object> {
         version,
         compile_args,
         link_args,
+        link_with: Vec::new(),
+        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs: Vec::new(),
         dependencies: Vec::new(),
@@ -532,6 +543,8 @@ fn find_system_library(name: &str) -> Option<Object> {
             version: String::new(),
             compile_args: Vec::new(),
             link_args: vec![format!("-l{}", name)],
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
@@ -541,6 +554,67 @@ fn find_system_library(name: &str) -> Option<Object> {
         })),
         _ => None,
     }
+}
+
+fn resolve_library_arguments(vm: &VM, link_args: Vec<String>) -> Vec<String> {
+    link_args
+        .into_iter()
+        .map(|argument| {
+            let Some(name) = argument.strip_prefix("-l") else {
+                return argument;
+            };
+            if name.is_empty() || name.starts_with(':') {
+                return argument;
+            }
+            match find_library_file(vm, name) {
+                Some(path) => path,
+                None => argument,
+            }
+        })
+        .collect()
+}
+
+fn find_library_file(vm: &VM, name: &str) -> Option<String> {
+    let compiler = match vm.globals.get("compiler_c") {
+        Some(Object::Compiler(c)) if !c.cmd.is_empty() => c.cmd[0].clone(),
+        _ => "cc".to_string(),
+    };
+    for suffix in [".so", ".a"] {
+        let probe = format!("lib{}{}", name, suffix);
+        let output = Command::new(&compiler)
+            .arg(format!("-print-file-name={}", probe))
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            continue;
+        }
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if path.is_empty() || path == probe || !path.starts_with('/') {
+            continue;
+        }
+        if std::path::Path::new(&path).is_file() {
+            return Some(normalize_absolute_path(&path));
+        }
+    }
+    None
+}
+
+fn normalize_absolute_path(path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_some_and(|last| *last != "..") {
+                    parts.pop();
+                } else {
+                    parts.push("..");
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    format!("/{}", parts.join("/"))
 }
 
 fn try_fallback(_vm: &mut VM, _name: &str, fallback: &Object) -> Option<Object> {

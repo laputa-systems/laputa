@@ -200,6 +200,7 @@ pub struct BuildTarget {
     pub link_with: Vec<Object>,
     pub link_whole: Vec<Object>,
     pub link_args: Vec<String>,
+    pub link_depends: Vec<String>,
     pub c_args: Vec<String>,
     pub cpp_args: Vec<String>,
     pub rust_args: Vec<String>,

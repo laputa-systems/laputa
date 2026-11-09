@@ -525,7 +525,6 @@ impl NinjaBackend {
         };
 
         let mut object_files = Vec::new();
-        let mut order_deps = Vec::new();
 
         // Determine language for compile rule
         let lang = self.detect_target_language(target);
@@ -650,66 +649,25 @@ impl NinjaBackend {
         match target.target_type {
             TargetType::Executable => {
                 let link_rule = format!("{}_LINKER", lang);
-                let mut link_args = Vec::new();
-                let mut dep_link_inputs: Vec<String> = Vec::new();
-
-                // Add library link args
-                for dep in &target.dependencies {
-                    if let Object::Dependency(d) = dep {
-                        for arg in &d.link_args {
-                            if Self::is_target_output(build_data, arg) {
-                                dep_link_inputs.push(arg.clone());
-                            } else {
-                                link_args.push(arg.clone());
-                            }
-                        }
-                    }
-                }
-                link_args.extend(target.link_args.iter().cloned());
-
-                // Link with other targets
-                let mut link_with_paths = Vec::new();
-                for lw in &target.link_with {
-                    if let Object::BuildTarget(t) = lw {
-                        let lw_dir = if t.subdir.is_empty() {
-                            String::new()
-                        } else {
-                            format!("{}/", t.subdir)
-                        };
-                        link_with_paths.push(format!(
-                            "{}{}",
-                            lw_dir,
-                            t.outputs.first().unwrap_or(&t.name)
-                        ));
-                        order_deps.push(format!(
-                            "{}{}",
-                            lw_dir,
-                            t.outputs.first().unwrap_or(&t.name)
-                        ));
-                    }
-                }
-
-                if !target.build_rpath.is_empty() {
-                    link_args.push(format!("-Wl,-rpath,{}", target.build_rpath));
-                }
-                if !target.install_rpath.is_empty() && target.install {
-                    link_args.push(format!("-Wl,-rpath,{}", target.install_rpath));
-                }
-
-                let mut inputs: Vec<String> = object_files.clone();
-                inputs.extend(dep_link_inputs);
-                inputs.extend(link_with_paths);
+                let link_targets = self.collect_link_targets(build_data, target);
+                let link_args = self.link_arguments(target, build_data, &lang, &link_targets);
+                let mut implicit: Vec<String> = link_targets
+                    .iter()
+                    .map(|lt| Self::link_target_path(lt))
+                    .collect();
+                implicit.extend(absolute_library_inputs(&link_args));
+                implicit.extend(target.link_depends.iter().cloned());
 
                 write!(
                     out,
                     "build {}: {} {}",
                     output_path,
                     link_rule,
-                    inputs.join(" ")
+                    object_files.join(" ")
                 )
                 .unwrap();
-                if !order_deps.is_empty() {
-                    write!(out, " || {}", order_deps.join(" ")).unwrap();
+                if !implicit.is_empty() {
+                    write!(out, " | {}", implicit.join(" ")).unwrap();
                 }
                 writeln!(out).unwrap();
                 if !link_args.is_empty() {
@@ -730,68 +688,29 @@ impl NinjaBackend {
             }
             TargetType::SharedLibrary | TargetType::SharedModule => {
                 let link_rule = format!("{}_LINKER", lang);
-                let mut link_args = vec!["-shared".to_string()];
-                let mut dep_link_inputs: Vec<String> = Vec::new();
-
-                if target.target_type == TargetType::SharedLibrary {
-                    let soname = target
-                        .shared_library_soname()
-                        .unwrap_or_else(|| target.output_name.clone());
-                    if cfg!(target_os = "macos") {
-                        link_args.push(format!("-Wl,-install_name,{}", soname));
-                    } else {
-                        link_args.push(format!("-Wl,-soname,{}", soname));
-                    }
-                }
-
-                for dep in &target.dependencies {
-                    if let Object::Dependency(d) = dep {
-                        for arg in &d.link_args {
-                            if Self::is_target_output(build_data, arg) {
-                                dep_link_inputs.push(arg.clone());
-                            } else {
-                                link_args.push(arg.clone());
-                            }
-                        }
-                    }
-                }
-                link_args.extend(target.link_args.iter().cloned());
-
-                let pic_arg = if target.pic.unwrap_or(true) {
-                    " -fPIC"
-                } else {
-                    ""
-                };
-
-                let mut inputs: Vec<String> = object_files.clone();
-                inputs.extend(dep_link_inputs);
-                for lw in target.link_with.iter().chain(target.link_whole.iter()) {
-                    if let Object::BuildTarget(t) = lw {
-                        let lw_dir = if t.subdir.is_empty() {
-                            String::new()
-                        } else {
-                            format!("{}/", t.subdir)
-                        };
-                        inputs.push(format!(
-                            "{}{}",
-                            lw_dir,
-                            t.outputs.first().unwrap_or(&t.name)
-                        ));
-                    }
-                }
+                let link_targets = self.collect_link_targets(build_data, target);
+                let link_args = self.link_arguments(target, build_data, &lang, &link_targets);
+                let mut implicit: Vec<String> = link_targets
+                    .iter()
+                    .map(|lt| Self::link_target_path(lt))
+                    .collect();
+                implicit.extend(absolute_library_inputs(&link_args));
+                implicit.extend(target.link_depends.iter().cloned());
 
                 write!(
                     out,
                     "build {}: {} {}",
                     output_path,
                     link_rule,
-                    inputs.join(" ")
+                    object_files.join(" ")
                 )
                 .unwrap();
+                if !implicit.is_empty() {
+                    write!(out, " | {}", implicit.join(" ")).unwrap();
+                }
                 writeln!(out).unwrap();
-                writeln!(out, "  LINK_ARGS = {}", link_args.join(" ")).unwrap();
-                if !pic_arg.is_empty() {
-                    writeln!(out, "  ARGS = {}", pic_arg.trim()).unwrap();
+                if !link_args.is_empty() {
+                    writeln!(out, "  LINK_ARGS = {}", link_args.join(" ")).unwrap();
                 }
                 writeln!(out).unwrap();
             }
@@ -1110,21 +1029,220 @@ impl NinjaBackend {
         Ok(())
     }
 
-    fn is_target_output(build_data: &BuildData, argument: &str) -> bool {
-        build_data.targets.iter().any(|target| {
-            let dir = if target.subdir.is_empty() {
-                String::new()
-            } else {
-                format!("{}/", target.subdir)
+    fn link_target_path(target: &BuildTarget) -> String {
+        let dir = if target.subdir.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", target.subdir)
+        };
+        format!("{}{}", dir, target.output_name)
+    }
+
+    fn object_target_path(obj: &Object) -> Option<String> {
+        match obj {
+            Object::BuildTarget(r) => Some(Self::build_target_ref_path(r)),
+            Object::BothLibraries(shared, _) => match &**shared {
+                Object::BuildTarget(r) => Some(Self::build_target_ref_path(r)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn build_target_ref_path(target: &BuildTargetRef) -> String {
+        let dir = if target.subdir.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", target.subdir)
+        };
+        format!(
+            "{}{}",
+            dir,
+            target.outputs.first().unwrap_or(&target.name)
+        )
+    }
+
+    fn collect_link_targets<'a>(
+        &self,
+        build_data: &'a BuildData,
+        target: &'a BuildTarget,
+    ) -> Vec<&'a BuildTarget> {
+        let mut result = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for obj in target.link_with.iter().chain(target.link_whole.iter()) {
+            self.collect_link_object(build_data, obj, &mut result, &mut seen);
+        }
+        result
+    }
+
+    fn collect_link_object<'a>(
+        &self,
+        build_data: &'a BuildData,
+        obj: &'a Object,
+        result: &mut Vec<&'a BuildTarget>,
+        seen: &mut std::collections::HashSet<String>,
+    ) {
+        let reference = match obj {
+            Object::BuildTarget(r) => r,
+            Object::BothLibraries(shared, _) => match &**shared {
+                Object::BuildTarget(r) => r,
+                _ => return,
+            },
+            _ => return,
+        };
+        let Some(full) = build_data
+            .targets
+            .iter()
+            .find(|candidate| candidate.id == reference.id)
+        else {
+            return;
+        };
+        if !seen.insert(full.id.clone()) {
+            return;
+        }
+        result.push(full);
+        if full.target_type == TargetType::StaticLibrary {
+            for nested in full.link_with.iter().chain(full.link_whole.iter()) {
+                self.collect_link_object(build_data, nested, result, seen);
+            }
+        }
+    }
+
+    fn rpath_arguments(&self, target: &BuildTarget, link_targets: &[&BuildTarget]) -> Vec<String> {
+        let mut paths: Vec<String> = Vec::new();
+        for linked in link_targets {
+            if linked.target_type == TargetType::StaticLibrary {
+                continue;
+            }
+            let entry = format!("$ORIGIN/{}", relative_subdir(&target.subdir, &linked.subdir));
+            if !paths.contains(&entry) {
+                paths.push(entry);
+            }
+        }
+        if !target.build_rpath.is_empty() {
+            paths.push(target.build_rpath.clone());
+        }
+        if !target.install_rpath.is_empty() && target.install {
+            paths.push(target.install_rpath.clone());
+        }
+        if paths.is_empty() {
+            return Vec::new();
+        }
+        vec![quote_argument(
+            &format!("-Wl,-rpath,{}", paths.join(":")).replace('$', "$$"),
+        )]
+    }
+
+    fn dependency_link_arguments<'a>(
+        dependencies: impl Iterator<Item = &'a Object>,
+        link_args: &mut Vec<String>,
+        seen: &mut Vec<String>,
+    ) {
+        for dep in dependencies {
+            let Object::Dependency(dep) = dep else {
+                continue;
             };
-            format!("{}{}", dir, target.output_name) == argument
-        })
+            if dep.link_args.is_empty() {
+                continue;
+            }
+            let key = dep.link_args.join("\u{1f}");
+            if seen.iter().any(|existing| *existing == key) {
+                continue;
+            }
+            seen.push(key);
+            link_args.extend(dep.link_args.iter().cloned());
+        }
+    }
+
+    fn link_arguments(
+        &self,
+        target: &BuildTarget,
+        build_data: &BuildData,
+        language: &str,
+        link_targets: &[&BuildTarget],
+    ) -> Vec<String> {
+        let mut link_args = Vec::new();
+        link_args.push("-Wl,--as-needed".to_string());
+        if target.target_type == TargetType::SharedModule {
+            link_args.push("-Wl,--allow-shlib-undefined".to_string());
+        } else {
+            link_args.push("-Wl,--no-undefined".to_string());
+        }
+
+        match target.target_type {
+            TargetType::Executable => {
+                if target.pie.unwrap_or(build_data.b_pie) {
+                    link_args.push("-pie".to_string());
+                }
+            }
+            TargetType::SharedLibrary | TargetType::SharedModule => {
+                link_args.push("-shared".to_string());
+                if target.pic.unwrap_or(true) {
+                    link_args.push("-fPIC".to_string());
+                }
+                if target.target_type == TargetType::SharedLibrary {
+                    if cfg!(target_os = "macos") {
+                        link_args.push(format!("-Wl,-install_name,{}", target.shared_library_soname().unwrap_or_else(|| target.output_name.clone())));
+                    } else {
+                        link_args.push(format!("-Wl,-soname,{}", target.shared_library_soname().unwrap_or_else(|| target.output_name.clone())));
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        let whole_archives: Vec<String> = target
+            .link_whole
+            .iter()
+            .filter_map(Self::object_target_path)
+            .collect();
+        if !whole_archives.is_empty() {
+            link_args.push("-Wl,--whole-archive".to_string());
+            link_args.extend(whole_archives);
+            link_args.push("-Wl,--no-whole-archive".to_string());
+        }
+
+        link_args.extend(Self::args_for_language(
+            &build_data.project_link_args,
+            language,
+        ));
+        link_args.extend(Self::args_for_language(
+            &build_data.global_link_args,
+            language,
+        ));
+
+        link_args.extend(self.rpath_arguments(target, link_targets));
+
+        for linked in link_targets {
+            link_args.push(Self::link_target_path(linked));
+        }
+
+        link_args.extend(target.link_args.iter().cloned());
+
+        let mut seen = Vec::new();
+        Self::dependency_link_arguments(
+            target.dependencies.iter(),
+            &mut link_args,
+            &mut seen,
+        );
+        for linked in link_targets {
+            if linked.target_type == TargetType::StaticLibrary {
+                Self::dependency_link_arguments(
+                    linked.dependencies.iter(),
+                    &mut link_args,
+                    &mut seen,
+                );
+            }
+        }
+
+        group_libraries(link_args)
     }
 
     fn include_arguments(&self, include: &str) -> Vec<String> {
         if include.starts_with('/') {
             return vec![format!("-I{}", include)];
         }
+        let include = normalize_relative_path(include);
         let build_dir = format!("{}/{}", self.build_root, include);
         let mut args = Vec::new();
         if Path::new(&build_dir).is_dir() {
@@ -1275,6 +1393,79 @@ impl NinjaBackend {
             "c".to_string()
         }
     }
+}
+
+fn normalize_relative_path(path: &str) -> String {
+    if path.starts_with('/') {
+        return path.to_string();
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_some_and(|last| *last != "..") {
+                    parts.pop();
+                } else {
+                    parts.push("..");
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    parts.join("/")
+}
+
+fn relative_subdir(from: &str, to: &str) -> String {
+    let from_parts: Vec<&str> = from.split('/').filter(|s| !s.is_empty()).collect();
+    let to_parts: Vec<&str> = to.split('/').filter(|s| !s.is_empty()).collect();
+    let mut common = 0;
+    while common < from_parts.len()
+        && common < to_parts.len()
+        && from_parts[common] == to_parts[common]
+    {
+        common += 1;
+    }
+    let mut parts: Vec<String> = vec!["..".to_string(); from_parts.len() - common];
+    parts.extend(to_parts[common..].iter().map(|s| s.to_string()));
+    parts.join("/")
+}
+
+fn absolute_library_inputs(args: &[String]) -> Vec<String> {
+    args.iter()
+        .filter(|argument| {
+            argument.starts_with('/')
+                && (argument.ends_with(".a")
+                    || argument.ends_with(".so")
+                    || argument.contains(".so."))
+                && Path::new(argument).is_file()
+        })
+        .cloned()
+        .collect()
+}
+
+fn group_libraries(args: Vec<String>) -> Vec<String> {
+    let is_library = |argument: &str| {
+        if argument.starts_with("-Wl,") {
+            return argument.starts_with("-Wl,-l");
+        }
+        argument.starts_with("-l")
+            || argument.ends_with(".a")
+            || argument.ends_with(".so")
+            || argument.contains(".so.")
+    };
+    let first = args.iter().position(|arg| is_library(arg));
+    let last = args.iter().rposition(|arg| is_library(arg));
+    let (Some(first), Some(last)) = (first, last) else {
+        return args;
+    };
+    if last <= first {
+        return args;
+    }
+    let mut grouped = args;
+    grouped.insert(last + 1, "-Wl,--end-group".to_string());
+    grouped.insert(first, "-Wl,--start-group".to_string());
+    grouped
 }
 
 fn shell_escape_command(parts: &[String]) -> String {

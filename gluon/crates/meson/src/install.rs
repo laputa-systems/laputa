@@ -240,7 +240,7 @@ pub fn build_install_plan(build_data: &BuildData, ctx: &InstallContext<'_>) -> V
     for dir in &build_data.install_empty_dirs {
         plan.push(InstallEntry {
             source: InstallSource::EmptyDir,
-            destination: destination(&prefix, "", dir),
+            destination: destination(&prefix, dir, ""),
             mode: None,
             tag: "runtime".to_string(),
             built: false,
@@ -812,6 +812,7 @@ mod tests {
             link_with: Vec::new(),
             link_whole: Vec::new(),
             link_args: Vec::new(),
+            link_depends: Vec::new(),
             c_args: Vec::new(),
             cpp_args: Vec::new(),
             rust_args: Vec::new(),

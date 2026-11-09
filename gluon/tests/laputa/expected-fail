@@ -1,4 +1,0 @@
-libxkbcommon test-rules-file-includes fails to link (link arguments not propagated)
-linux-pam pam_filter/upperLOWER fails to compile
-wayland-dev src/wayland-scanner fails to link (link arguments not propagated)
-wl-clipboard src/wl-copy fails to link (transitive link_with through static libraries)

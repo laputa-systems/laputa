@@ -534,6 +534,8 @@ pub fn find_library(compiler: &CompilerData, name: &str, dirs: &[String]) -> Opt
             version: String::new(),
             compile_args: Vec::new(),
             link_args,
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),

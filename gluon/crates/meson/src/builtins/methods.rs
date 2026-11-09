@@ -2203,6 +2203,8 @@ fn subproject_dependency(vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<
                 version: String::new(),
                 compile_args: Vec::new(),
                 link_args: vec![lib_flag],
+                link_with: Vec::new(),
+                link_whole: Vec::new(),
                 sources: Vec::new(),
                 include_dirs: Vec::new(),
                 dependencies: Vec::new(),

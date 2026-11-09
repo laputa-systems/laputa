@@ -781,26 +781,38 @@ fn build_target_common(
     }
 
     let mut dependencies = Vec::new();
-    if let Some(Object::Array(arr)) = VM::get_arg_value(args, "dependencies") {
-        dependencies = arr.clone();
-    } else if let Some(dep) = VM::get_arg_value(args, "dependencies") {
-        if !matches!(dep, Object::None) {
-            dependencies.push(dep.clone());
+    if let Some(value) = VM::get_arg_value(args, "dependencies") {
+        let mut flattened = Vec::new();
+        flatten_objects(&value, &mut flattened);
+        for dep in &flattened {
+            append_dependency_tree(dep, &mut dependencies);
         }
     }
 
     let mut link_with = Vec::new();
-    if let Some(Object::Array(arr)) = VM::get_arg_value(args, "link_with") {
-        link_with = arr.clone();
-    } else if let Some(obj) = VM::get_arg_value(args, "link_with") {
-        if !matches!(obj, Object::None) {
-            link_with.push(obj.clone());
-        }
+    if let Some(value) = VM::get_arg_value(args, "link_with") {
+        flatten_objects(&value, &mut link_with);
     }
 
     let mut link_whole = Vec::new();
-    if let Some(Object::Array(arr)) = VM::get_arg_value(args, "link_whole") {
-        link_whole = arr.clone();
+    if let Some(value) = VM::get_arg_value(args, "link_whole") {
+        flatten_objects(&value, &mut link_whole);
+    }
+
+    for dep in &dependencies {
+        if let Object::Dependency(d) = dep {
+            for source in &d.sources {
+                if !sources.contains(source) {
+                    sources.push(source.clone());
+                }
+            }
+            for target in &d.link_with {
+                link_with.push(target.clone());
+            }
+            for target in &d.link_whole {
+                link_whole.push(target.clone());
+            }
+        }
     }
 
     let install = VM::get_arg_bool(args, "install", false);
@@ -821,7 +833,7 @@ fn build_target_common(
             for item in arr {
                 match item {
                     Object::IncludeDirs(d) => include_dirs.extend(d.dirs.clone()),
-                    Object::String(s) => include_dirs.push(s.clone()),
+                    Object::String(s) => include_dirs.push(join_subdir(&vm.current_subdir, &s)),
                     _ => {}
                 }
             }
@@ -830,15 +842,55 @@ fn build_target_common(
             include_dirs.extend(d.dirs.clone());
         }
         Some(Object::String(s)) => {
-            include_dirs.push(s.clone());
+            include_dirs.push(join_subdir(&vm.current_subdir, &s));
         }
         _ => {}
     }
+    let include_dirs: Vec<String> = include_dirs
+        .into_iter()
+        .map(|dir| normalize_subdir_path(&dir))
+        .collect();
 
     let c_args = VM::get_arg_string_array(args, "c_args");
     let cpp_args = VM::get_arg_string_array(args, "cpp_args");
     let rust_args = VM::get_arg_string_array(args, "rust_args");
     let link_args = VM::get_arg_string_array(args, "link_args");
+    let link_depends = {
+        let mut depends = Vec::new();
+        if let Some(value) = VM::get_arg_value(args, "link_depends") {
+            let mut items = Vec::new();
+            flatten_objects(&value, &mut items);
+            for item in items {
+                match item {
+                    Object::File(f) => {
+                        let base = if f.is_built {
+                            &vm.build_root
+                        } else {
+                            &vm.source_root
+                        };
+                        let path = if f.subdir.is_empty() {
+                            format!("{}/{}", base, f.path)
+                        } else {
+                            format!("{}/{}/{}", base, f.subdir, f.path)
+                        };
+                        depends.push(path);
+                    }
+                    Object::String(s) => {
+                        if s.starts_with('/') {
+                            depends.push(s);
+                        } else {
+                            depends.push(format!(
+                                "{}/{}/{}",
+                                vm.source_root, vm.current_subdir, s
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        depends
+    };
     let override_options = VM::get_arg_string_array(args, "override_options");
     let gnu_symbol_visibility = VM::get_arg_str(args, "gnu_symbol_visibility", usize::MAX)
         .unwrap_or("")
@@ -880,6 +932,13 @@ fn build_target_common(
     let id = format!("{}@{}", name, vm.current_subdir);
     let subdir = vm.current_subdir.clone();
 
+    let version = VM::get_arg_str(args, "version", usize::MAX).map(String::from);
+    let soversion = match VM::get_arg_value(args, "soversion") {
+        Some(Object::String(s)) => Some(s.clone()),
+        Some(Object::Int(i)) => Some(i.to_string()),
+        _ => None,
+    };
+
     // Compute output name
     let mut output_name = compute_output_name(
         &name,
@@ -906,6 +965,7 @@ fn build_target_common(
         link_with,
         link_whole,
         link_args,
+        link_depends,
         c_args,
         cpp_args,
         rust_args,
@@ -993,6 +1053,7 @@ fn compute_output_name(
         format!("{}{}.{}", prefix, name, suffix)
     }
 }
+
 
 fn is_compilable_source(path: &str) -> bool {
     let lower = path.to_lowercase();
@@ -1743,36 +1804,69 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     Ok(obj)
 }
 
-fn collect_link_with(value: &Object, link_args: &mut Vec<String>) {
+fn flatten_objects(value: &Object, out: &mut Vec<Object>) {
     match value {
         Object::Array(items) => {
             for item in items {
-                collect_link_with(item, link_args);
+                flatten_objects(item, out);
             }
         }
-        Object::BothLibraries(shared, _) => collect_link_with(shared, link_args),
-        Object::BuildTarget(t) => {
-            let dir = if t.subdir.is_empty() {
-                String::new()
-            } else {
-                format!("{}/", t.subdir)
-            };
-            let output = t.outputs.first().cloned().unwrap_or_else(|| t.name.clone());
-            link_args.push(format!("{}{}", dir, output));
-        }
-        _ => {}
+        Object::None => {}
+        other => out.push(other.clone()),
     }
+}
+
+fn append_dependency_tree(dep: &Object, out: &mut Vec<Object>) {
+    out.push(dep.clone());
+    if let Object::Dependency(d) = dep {
+        for nested in &d.dependencies {
+            if matches!(nested, Object::Dependency(_)) {
+                append_dependency_tree(nested, out);
+            }
+        }
+    }
+}
+
+fn join_subdir(subdir: &str, path: &str) -> String {
+    if path.starts_with('/') || subdir.is_empty() {
+        path.to_string()
+    } else {
+        format!("{}/{}", subdir, path)
+    }
+}
+
+fn normalize_subdir_path(path: &str) -> String {
+    if path.starts_with('/') {
+        return path.to_string();
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_some_and(|last| *last != "..") {
+                    parts.pop();
+                } else {
+                    parts.push("..");
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    parts.join("/")
 }
 
 fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let compile_args = VM::get_arg_string_array(args, "compile_args");
-    let mut link_args = VM::get_arg_string_array(args, "link_args");
+    let link_args = VM::get_arg_string_array(args, "link_args");
 
+    let mut link_with = Vec::new();
     if let Some(value) = VM::get_arg_value(args, "link_with") {
-        collect_link_with(&value, &mut link_args);
+        flatten_objects(&value, &mut link_with);
     }
+    let mut link_whole = Vec::new();
     if let Some(value) = VM::get_arg_value(args, "link_whole") {
-        collect_link_with(&value, &mut link_args);
+        flatten_objects(&value, &mut link_whole);
     }
     let include_dirs_val = VM::get_arg_value(args, "include_directories");
     let mut include_dirs = Vec::new();
@@ -1806,8 +1900,8 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
         });
 
     let mut dependencies = Vec::new();
-    if let Some(Object::Array(arr)) = VM::get_arg_value(args, "dependencies") {
-        dependencies = arr.clone();
+    if let Some(value) = VM::get_arg_value(args, "dependencies") {
+        flatten_objects(&value, &mut dependencies);
     }
 
     let mut sources = Vec::new();
@@ -1815,6 +1909,8 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
         for s in arr {
             collect_sources(s, &mut sources);
         }
+    } else if let Some(value) = VM::get_arg_value(args, "sources") {
+        collect_sources(&value, &mut sources);
     }
 
     let mut variables = HashMap::new();
@@ -1844,6 +1940,8 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
         version,
         compile_args,
         link_args,
+        link_with,
+        link_whole,
         sources,
         include_dirs,
         dependencies,
@@ -2968,6 +3066,20 @@ fn builtin_install_man(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> 
     Ok(Object::None)
 }
 
+/// Meson's documented special cases: with prefix /usr the state and
+/// configuration directories are the system ones, and with /usr/local the
+/// state directories move under /var/local.
+fn prefix_dependent_default(prefix: &str, option: &str) -> Option<&'static str> {
+    match (prefix, option) {
+        ("/usr", "sysconfdir") => Some("/etc"),
+        ("/usr", "localstatedir") => Some("/var"),
+        ("/usr", "sharedstatedir") => Some("/var/lib"),
+        ("/usr/local", "localstatedir") => Some("/var/local"),
+        ("/usr/local", "sharedstatedir") => Some("/var/local/lib"),
+        _ => None,
+    }
+}
+
 fn builtin_install_emptydir(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let positional = VM::get_positional_args(args);
     for arg in &positional {
@@ -4002,6 +4114,14 @@ fn builtin_get_option(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         return Ok(val.clone());
     }
 
+    let prefix = match vm.options.get("prefix") {
+        Some(Object::String(p)) => p.trim_end_matches('/').to_string(),
+        _ => "/usr/local".to_string(),
+    };
+    if let Some(dir) = prefix_dependent_default(&prefix, &name) {
+        return Ok(Object::String(dir.to_string()));
+    }
+
     // Return defaults for well-known options
     match name.as_str() {
         "prefix" => Ok(Object::String("/usr/local".to_string())),
@@ -4367,4 +4487,19 @@ fn builtin_add_project_dependencies(_vm: &mut VM, _args: &[CallArg]) -> Result<O
     // add_project_dependencies() adds dependencies to all targets in the project
     // For now, accept the arguments silently
     Ok(Object::None)
+}
+
+#[cfg(test)]
+mod prefix_default_tests {
+    use super::prefix_dependent_default;
+
+    #[test]
+    fn system_prefixes_use_the_system_state_and_configuration_directories() {
+        assert_eq!(prefix_dependent_default("/usr", "sysconfdir"), Some("/etc"));
+        assert_eq!(prefix_dependent_default("/usr", "localstatedir"), Some("/var"));
+        assert_eq!(prefix_dependent_default("/usr", "sharedstatedir"), Some("/var/lib"));
+        assert_eq!(prefix_dependent_default("/usr/local", "localstatedir"), Some("/var/local"));
+        assert_eq!(prefix_dependent_default("/usr/local", "sysconfdir"), None);
+        assert_eq!(prefix_dependent_default("/opt/x", "sysconfdir"), None);
+    }
 }

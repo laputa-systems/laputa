@@ -76,6 +76,7 @@ fn simd_check(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, St
                     link_with: Vec::new(),
                     link_whole: Vec::new(),
                     link_args: Vec::new(),
+                    link_depends: Vec::new(),
                     c_args: vec![flag.to_string()],
                     cpp_args: Vec::new(),
                     rust_args: Vec::new(),

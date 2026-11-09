@@ -175,6 +175,7 @@ fn python_extension_module(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Resu
         link_with: Vec::new(),
         link_whole: Vec::new(),
         link_args: Vec::new(),
+        link_depends: Vec::new(),
         c_args: Vec::new(),
         cpp_args: Vec::new(),
         rust_args: Vec::new(),
