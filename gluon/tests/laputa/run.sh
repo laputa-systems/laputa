@@ -30,7 +30,7 @@ run_impl() {
   impl=$1 src=$2 out=$3; shift 3
   if [ "$impl" = ref ]; then m=meson n=samu; else m=$MESON n=$NINJA; fi
   b=$out/$impl-build d=$out/$impl-dest
-  timeout 900 "$m" setup --prefix=/usr --libdir=lib "$@" "$b" "$src" > "$out/$impl-setup.log" 2>&1 || { echo setup; return; }
+  ( cd "$out" && timeout 900 "$m" setup --prefix=/usr --libdir=lib "$@" "$b" "$src" ) > "$out/$impl-setup.log" 2>&1 || { echo setup; return; }
   timeout 3600 "$n" -C "$b" > "$out/$impl-build.log" 2>&1 || { echo build; return; }
   DESTDIR=$d timeout 900 "$m" install -C "$b" > "$out/$impl-install.log" 2>&1 || { echo install; return; }
   tree "$d" > "$out/$impl-tree.txt"
