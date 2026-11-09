@@ -579,7 +579,10 @@ command links only when Laputa needs them, and keep `su` outside `/usr/bin`.
 Store commit and generation composition (`store.commit`, `generation.compose`,
 `root.compose_artifacts`) open their publication directory once as an
 `FsRoot`: the Store's `v2/` layout, or the parent of the root or generation.
-`generation.compose_beneath` accepts that root from the caller. Everything
+`generation.compose_beneath` accepts that root from the caller. The path-based
+`compose` and `compose_artifacts` resolve their publication path exactly once,
+at that open, before any other work; a swap before the open is the caller's
+path and is not defended. Everything
 after the open resolves beneath retained descriptors, so replacing the
 publication path or an ancestor cannot redirect a write. This covers staging,
 extraction, materialization, overlay application, receipts, synchronization,
@@ -608,7 +611,10 @@ publication and cleanup.
   after it is created.
 - **Store inputs:** staged payload, metadata and proof files are opened
   beneath their own directory, so a staged symlink cannot pull in an outside
-  file. A commit holds the key's lock and reclaims staging left by an
+  file. The payload is hashed once, while it is copied; a copy whose digest
+  differs from the staged digest fails the commit, so a writer that changes
+  the staged payload after it was hashed cannot poison the key or leave a
+  stale digest in a receipt. A commit holds the key's lock and reclaims staging left by an
   interrupted commit of the same key, but only real directories. Other keys'
   staging is left alone.
 - **Publication and durability:** every staged regular file and directory is
@@ -620,13 +626,11 @@ publication and cleanup.
 
 The remaining limits are these:
 
-- The Store records the payload digest computed when the payload was staged,
-  and does not re-hash its copy. A writer that changes the staged payload
-  after hashing leaves a receipt that consumers reject at `verify_receipt`,
-  and that key stays poisoned until `store.gc`.
 - `fs.lock` is path-based.
-- The selected-root `makewhatis` process, and the reads that decide whether
-  it runs, address the staging root's host path.
+- The selected-root `makewhatis` process starts from `output.host_path()`,
+  because a process cannot start from a directory handle. The reads that
+  decide whether it runs, and the ELF dependency walk, go through the staging
+  `FsRoot`; the walk inspects private copies of the files it read.
 - Overlay sources are read through a root opened after the overlay was
   digested, and are not re-hashed.
 
