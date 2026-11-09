@@ -1,10 +1,14 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d4c2e3877`, recorded with the other inputs in
-`infra/asterinas/inputs.lock`. It is qualified by
+The checked-in kernel pin is `434e2d626`, with XSH `d7178a221`, recorded with
+the other inputs in `infra/asterinas/inputs.lock`. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
-identical transcripts. The [roadmap](ROADMAP.md) owns the successor kernel
+identical transcripts. Two failures reproduce on the previous kernel pin
+`d4c2e3877` and are not attributed to this one: the Linux reference fails the
+clock `pause` case because its QEMU peer holds the guest for 12 to 13.5 s
+against a 5 s margin, and the DHCP `carrier` case intermittently differs when
+`dhcpc` on either backend logs a status-3 traceback after the case's SIGTERM. The [roadmap](ROADMAP.md) owns the successor kernel
 slices and the [TODO queue](../TODO.md) owns the remaining compatibility
 obligations.
 
