@@ -313,6 +313,11 @@ proc install_staged_object(source: Path, object: FsRoot, name: Str) {
   fs.root_install_file(source_root, confined.rel(source.name)?, object, confined.rel(name)?, 0o644)
 }
 
+proc install_staged_payload(source: Path, object: FsRoot, name: Str) -> Result[Str] {
+  let source_root = fs.open_root(source.parent)?
+  fs.root_install_file_sha256(source_root, confined.rel(source.name)?, object, confined.rel(name)?, 0o644)?.hex()
+}
+
 pure staging_belongs_to(name: Str, key: Str) -> Bool {
   name == key or (name.starts_with(f".{key}.") and name.ends_with(".tmp"))
 }
@@ -340,10 +345,19 @@ proc stage_object(
   object: FsRoot,
   final_dir: Path,
 ) {
-  install_staged_object(staged.payload, object, "payload.tar.gz")
+  let copied_payload_sha256 = install_staged_payload(staged.payload, object, "payload.tar.gz")?
   install_staged_object(staged.metadata, object, "metadata.json")
   install_staged_object(staged.proof, object, "proof.json")
-  let value = receipt_for(target, node, object, final_dir, staged.payload_sha256, staged.executor_sha256, origin)?
+
+  if copied_payload_sha256 != staged.payload_sha256 {
+    return Err(
+      types.PmError.PackageContract(
+        f"staged payload changed after hashing: expected SHA-256 {staged.payload_sha256}, copied {copied_payload_sha256}",
+      ),
+    )
+  }
+
+  let value = receipt_for(target, node, object, final_dir, copied_payload_sha256, staged.executor_sha256, origin)?
   object.write(p"artifact.json", json.encode(receipt_dto(value))? + "\n")
 }
 

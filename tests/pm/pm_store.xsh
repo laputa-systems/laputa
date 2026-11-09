@@ -294,6 +294,20 @@ test test_store_staging_failure_never_publishes_final [fs, error] { |ctx|
   assert store.artifact_path(root, key).exists()? == false
 }
 
+test test_store_rejects_a_payload_changed_after_it_was_hashed [fs, error] { |ctx|
+  let root = store_root(ctx, "store-late-writer")?
+  let key = digest("late-writer")
+  let stage = staged_artifact(ctx, "store-late-writer-stage")?
+  stage.staged.payload.write("late writer payload")
+  expect_store_error(ctx, store.commit(types.target_aarch64(), root, test_node(key), stage.staged), "changed after hashing")
+  assert store.artifact_path(root, key).exists()? == false
+
+  let honest = staged_artifact(ctx, "store-late-writer-honest")?
+  let receipt = store.commit(types.target_aarch64(), root, test_node(key), honest.staged)?
+  assert receipt.payload_sha256 == digest("payload")
+  assert store.verify_artifact(root, key)? == receipt
+}
+
 pure remote_node(key: Str, payload: Str, metadata: Str) -> types.PlanNode {
   {
     ...test_node(key),
