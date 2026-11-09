@@ -1,0 +1,7 @@
+# A service leader exits with status 137 while its process group owns a descendant.
+# The scanner must reap the leader's group (pid1_shutdown) before the replacement spawns.
+pid1_setup ?signals=HUP,TERM,INT ?subreaper=true ?allow_non_pid1=true
+spawn_process_group ?pid=1000 ?command=demo
+wait_pid1_event event_kind=child pid=1000 status_kind=exit status_code=137
+pid1_shutdown ?groups=1000 ?term_timeout_ms=200 ?kill_timeout_ms=100
+spawn_process_group ?pid=1001 ?command=demo

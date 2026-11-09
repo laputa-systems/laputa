@@ -1206,11 +1206,8 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
 """
 }
 
-test test_crashed_leader_group_cleanup_precedes_finish_and_respawn [fs, process, error] { |ctx|
-  let root = test.temp_dir(ctx, name: "crash-group-replay")?
+proc crash_replay_service(root: Path, unix_log: Path) [fs, error] {
   let service_dir = fp"{root}/services"
-  let run_dir = fp"{root}/run"
-  let unix_log = fp"{root}/unix.jsonl"
   service_dir.mkdir()
   fp"{service_dir}/demo.xsh".write(f"""##! Replay a leader exit while its group still owns descendants.
 
@@ -1229,26 +1226,48 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
   assert "\\\"groups\\\":\\\"1000\\\"" in events
 }}
 """)
-  test.unix_fake(ctx, {log: unix_log, event_kind: "child", pid: 1000, status_code: 137})
-  let output = xinit_text(ctx, ["supervise", "demo"], {
-    XINIT_SERVICE_DIR: service_dir.display(),
-    XINIT_RUN_DIR: run_dir.display(),
+}
+
+proc run_crash_replay(ctx: TestContext, root: Path, script: Str) [fs, process, error] -> Result[XinitRun] {
+  let unix_log = fp"{root}/unix.jsonl"
+  let replay = fp"{root}/crash-replay.txt"
+  crash_replay_service(root, unix_log)?
+  replay.write(p"xinit/tests/fixtures/crash-replay.txt".read_text()?)
+  test.unix_fake(ctx, {log: unix_log, replay: replay})?
+  let result = test.run_xsh(ctx, script, [], ["supervise", "demo"], {
+    XINIT_SERVICE_DIR: fp"{root}/services".display(),
+    XINIT_RUN_DIR: fp"{root}/run".display(),
     XINIT_TEST_MAX_EVENTS: "1",
     XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1",
-  })?
-  assert output == ""
-  let phases = unix_log.read_text()?.split("pid1_shutdown")
-  assert phases.len() == 2
-  assert phases[0].split("spawn_process_group").len() == 2
-  assert phases[1].split("spawn_process_group").len() == 2
-  assert "\"groups\":\"1000\"" in unix_log.read_text()?
+  }, name: "xinit.xsh")?
+  {success: result.success, stdout: result.stdout, stderr: result.stderr}
+}
+
+test test_crashed_leader_group_cleanup_precedes_finish_and_respawn [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "crash-group-replay")?
+  let result = run_crash_replay(ctx, root, xinit_script().read_text()?)?
+  assert result.success, result.stderr
+  assert result.stdout == ""
   test.unix_fake(ctx, {})
   let status = xinit_text(ctx, ["status", "demo"], {
-    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_RUN_DIR: fp"{root}/run".display(),
     XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1",
   })?
   assert "running pid=1001" in status
   assert "restarts=1" in status
+}
+
+test test_crash_replay_rejects_cleanup_that_skips_the_leader_group [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "crash-group-broken")?
+  let source = xinit_script().read_text()?
+  let correct = "unix.shutdown_process_groups([unit.pid], time.millis(unit.service.stop_timeout_ms), 100ms)?"
+  let broken = "unix.shutdown_process_groups([], time.millis(unit.service.stop_timeout_ms), 100ms)?"
+  assert source.split(correct).len() == 2, "the mutation must match exactly once"
+  let result = run_crash_replay(ctx, root, source.replace(correct, with: broken))?
+  assert ! result.success
+  assert "unix-fake-replay" in result.stderr, result.stderr
+  assert "replay line 6" in result.stderr, result.stderr
+  assert "field `groups` expected `1000`, observed ``" in result.stderr, result.stderr
 }
 
 test test_service_configuration_rejects_invalid_fields_before_application [fs, process, error] { |ctx|
