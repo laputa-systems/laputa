@@ -182,6 +182,9 @@ pub struct BuildTarget {
     pub rust_args: Vec<String>,
     pub install: bool,
     pub install_dir: Option<String>,
+    pub install_mode: Option<Vec<String>>,
+    pub version: Option<String>,
+    pub soversion: Option<String>,
     pub install_rpath: String,
     pub build_rpath: String,
     pub pic: Option<bool>,
@@ -208,6 +211,56 @@ pub enum TargetType {
     SharedModule,
     BothLibraries,
     Jar,
+}
+
+impl BuildTarget {
+    fn shared_library_file_version(&self) -> Option<&String> {
+        self.version.as_ref().or(self.soversion.as_ref())
+    }
+
+    pub fn shared_library_base(&self) -> Option<String> {
+        let version = self.shared_library_file_version()?;
+        let suffix = format!(".{}", version);
+        self.output_name
+            .strip_suffix(&suffix)
+            .map(|s| s.to_string())
+    }
+
+    pub fn shared_library_soname(&self) -> Option<String> {
+        let version = self.version.as_ref();
+        let base = self.shared_library_base()?;
+        let soversion = match version {
+            Some(version) => self
+                .soversion
+                .clone()
+                .unwrap_or_else(|| version.split('.').next().unwrap_or(version).to_string()),
+            None => self.soversion.clone()?,
+        };
+        Some(format!("{}.{}", base, soversion))
+    }
+
+    /// (link name, link target) pairs installed alongside the real file.
+    pub fn shared_library_symlinks(&self) -> Vec<(String, String)> {
+        let mut links = Vec::new();
+        if self.target_type != TargetType::SharedLibrary {
+            return links;
+        }
+        let base = match self.shared_library_base() {
+            Some(base) => base,
+            None => return links,
+        };
+        let soname = match self.shared_library_soname() {
+            Some(soname) => soname,
+            None => return links,
+        };
+        if soname != self.output_name {
+            links.push((soname.clone(), self.output_name.clone()));
+        }
+        if base != soname {
+            links.push((base, soname));
+        }
+        links
+    }
 }
 
 #[derive(Debug, Clone)]

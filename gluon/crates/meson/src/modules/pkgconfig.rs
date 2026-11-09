@@ -39,21 +39,42 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
     let _libraries = VM::get_arg_string_array(args, "libraries");
     let libraries_private = VM::get_arg_string_array(args, "libraries_private");
     let extra_cflags = VM::get_arg_string_array(args, "extra_cflags");
+    let dataonly = VM::get_arg_bool(args, "dataonly", false);
+    let prefix = option_value(vm, "prefix", "/usr/local");
+    let libdir = option_value(vm, "libdir", "lib");
+    let datadir = option_value(vm, "datadir", "share");
+    let includedir = option_value(vm, "includedir", "include");
     let install_dir = VM::get_arg_str(args, "install_dir", 99)
-        .unwrap_or("${libdir}/pkgconfig")
-        .to_string();
-    let variables = VM::get_arg_string_array(args, "variables");
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            if dataonly {
+                format!("{}/pkgconfig", datadir)
+            } else {
+                format!("{}/pkgconfig", libdir)
+            }
+        });
+    let mut variables: Vec<(String, String)> = Vec::new();
+    if let Some(Object::Dict(entries)) = VM::get_arg_value(args, "variables") {
+        for (key, value) in entries {
+            variables.push((key.clone(), value.to_string_value()));
+        }
+    }
     let _uninstalled_variables = VM::get_arg_string_array(args, "uninstalled_variables");
 
     // Build the .pc file content
     let pc_filename = format!("{}.pc", filebase);
 
     let mut pc = String::new();
-    pc.push_str(&format!("prefix=${{pc_sysrootdir}}${{pcfiledir}}/../..\n"));
-    pc.push_str(&format!("libdir=${{prefix}}/lib\n"));
-    pc.push_str(&format!("includedir=${{prefix}}/include\n"));
-    for var in &variables {
-        pc.push_str(&format!("{}\n", var));
+    pc.push_str(&format!("\nprefix={}\n", prefix));
+    if !dataonly {
+        pc.push_str(&format!("includedir=${{prefix}}/{}\n", includedir));
+        pc.push_str(&format!("libdir=${{prefix}}/{}\n", libdir));
+    }
+    for (key, value) in &variables {
+        if key == "prefix" {
+            continue;
+        }
+        pc.push_str(&format!("{}={}\n", key, value));
     }
     pc.push('\n');
     pc.push_str(&format!("Name: {}\n", name));
@@ -71,26 +92,31 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
             requires_private.join(", ")
         ));
     }
-    if !lib_name.is_empty() {
+    if !lib_name.is_empty() && !dataonly {
         pc.push_str(&format!("Libs: -L${{libdir}} -l{}\n", lib_name));
     }
     if !libraries_private.is_empty() {
         pc.push_str(&format!("Libs.private: {}\n", libraries_private.join(" ")));
     }
-    let mut cflags = vec!["-I${includedir}".to_string()];
-    for sub in &subdirs {
-        cflags.push(format!("-I${{includedir}}/{}", sub));
+    if !dataonly || !subdirs.is_empty() || !extra_cflags.is_empty() {
+        let mut cflags = if dataonly || !subdirs.is_empty() {
+            Vec::new()
+        } else {
+            vec!["-I${includedir}".to_string()]
+        };
+        for sub in &subdirs {
+            cflags.push(format!("-I${{includedir}}/{}", sub));
+        }
+        cflags.extend(extra_cflags);
+        if !cflags.is_empty() {
+            pc.push_str(&format!("Cflags: {}\n", cflags.join(" ")));
+        }
     }
-    cflags.extend(extra_cflags);
-    pc.push_str(&format!("Cflags: {}\n", cflags.join(" ")));
 
     // Register as install data
-    let build_path = std::path::Path::new(&vm.build_root)
-        .join(&vm.current_subdir)
-        .join(&pc_filename);
-
-    // Write the .pc file to the build directory
-    let _ = std::fs::create_dir_all(build_path.parent().unwrap_or(std::path::Path::new(".")));
+    let private_dir = std::path::Path::new(&vm.build_root).join("meson-private");
+    let _ = std::fs::create_dir_all(&private_dir);
+    let build_path = private_dir.join(&pc_filename);
     let _ = std::fs::write(&build_path, &pc);
 
     vm.build_data.install_data.push(InstallData {
@@ -98,7 +124,7 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
         install_dir: install_dir.clone(),
         install_mode: None,
         rename: Vec::new(),
-        subdir: vm.current_subdir.clone(),
+        subdir: String::new(),
         preserve_path: false,
         strip_directory: false,
         exclude_files: Vec::new(),
@@ -107,4 +133,11 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
     });
 
     Ok(Object::None)
+}
+
+fn option_value(vm: &VM, name: &str, default: &str) -> String {
+    match vm.options.get(name) {
+        Some(Object::String(s)) => s.clone(),
+        _ => default.to_string(),
+    }
 }

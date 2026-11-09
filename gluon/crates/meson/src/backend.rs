@@ -700,10 +700,13 @@ impl NinjaBackend {
                 let mut dep_link_inputs: Vec<String> = Vec::new();
 
                 if target.target_type == TargetType::SharedLibrary {
+                    let soname = target
+                        .shared_library_soname()
+                        .unwrap_or_else(|| target.output_name.clone());
                     if cfg!(target_os = "macos") {
-                        link_args.push(format!("-Wl,-install_name,{}", target.output_name));
+                        link_args.push(format!("-Wl,-install_name,{}", soname));
                     } else {
-                        link_args.push(format!("-Wl,-soname,{}", target.output_name));
+                        link_args.push(format!("-Wl,-soname,{}", soname));
                     }
                 }
 
@@ -1352,10 +1355,6 @@ pub fn write_introspection(
         JSON_PRETTY.to_string(&deser_value::Value::from(deps)).unwrap(),
     )
     .map_err(|e| format!("Cannot write introspection: {}", e))?;
-
-    // intro-installed.json
-    std::fs::write(format!("{}/intro-installed.json", intro_dir), "{}")
-        .map_err(|e| format!("Cannot write introspection: {}", e))?;
 
     // intro-benchmarks.json
     std::fs::write(format!("{}/intro-benchmarks.json", intro_dir), "[]")

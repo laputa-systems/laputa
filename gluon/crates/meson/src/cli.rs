@@ -194,9 +194,21 @@ impl Cli {
             } else if arg == "--wipe" {
                 wipe = true;
             } else if arg.starts_with("--") {
-                // --prefix=, --buildtype=, --default-library=, --libdir= etc: accept
-                // and ignore (install layout handled by caller staging, OD-4).
-                if !arg.contains('=') {
+                let rest = &arg[2..];
+                if let Some((key, value)) = rest.split_once('=') {
+                    if is_builtin_option(key) {
+                        cli_options.push((key.to_string(), value.to_string()));
+                    }
+                } else if is_builtin_option(rest) {
+                    if matches!(rest, "strip" | "werror" | "debug" | "unity") {
+                        cli_options.push((rest.to_string(), "true".to_string()));
+                    } else if let Some(next) = args.get(i + 1) {
+                        if !next.starts_with('-') {
+                            cli_options.push((rest.to_string(), next.clone()));
+                            i += 1;
+                        }
+                    }
+                } else if !arg.contains('=') {
                     // --flag value form: consume next arg if it looks like a value
                     // (not another flag) to avoid treating it as positional dir.
                     if let Some(next) = args.get(i + 1) {
@@ -794,6 +806,18 @@ impl Cli {
             eprintln!("Warning: Cannot write introspection: {}", e);
         }
 
+        let install_plan = crate::install::build_install_plan(
+            &interp.vm.build_data,
+            &crate::install::InstallContext {
+                source_root: &source_dir,
+                build_root: &build_dir,
+                options: &interp.vm.options,
+            },
+        );
+        if let Err(e) = crate::install::write_install_metadata(&build_dir, &install_plan) {
+            eprintln!("Warning: Cannot write install data: {}", e);
+        }
+
         // Write build options for reconfigure
         let cmd_line = deser_value::value!({
             "source_dir": source_dir.clone(),
@@ -950,37 +974,18 @@ impl Cli {
     }
 
     fn cmd_install(&self, args: &InstallArgs) -> i32 {
-        // Read install data from introspection
-        let installed_file = format!("{}/meson-info/intro-installed.json", args.build_dir);
-        let prefix =
-            std::env::var("MESON_INSTALL_PREFIX").unwrap_or_else(|_| "/usr/local".to_string());
-
         let destdir = args
             .destdir
             .clone()
             .or_else(|| std::env::var("DESTDIR").ok())
             .unwrap_or_default();
 
-        eprintln!("Installing into {}{}", destdir, prefix);
+        let strip = args.strip || configured_strip(&args.build_dir);
 
-        // Use ninja install
-        let mut cmd = Command::new(which_ninja());
-        cmd.current_dir(&args.build_dir);
-        cmd.arg("install");
-        if !destdir.is_empty() {
-            cmd.env("DESTDIR", &destdir);
-        }
-
-        match cmd.status() {
-            Ok(status) => {
-                if status.success() {
-                    0
-                } else {
-                    1
-                }
-            }
+        match crate::install::run_install(&args.build_dir, &destdir, strip) {
+            Ok(()) => 0,
             Err(e) => {
-                eprintln!("Failed to run ninja install: {}", e);
+                eprintln!("Install failed: {}", e);
                 1
             }
         }
@@ -1368,6 +1373,54 @@ mod tests {
         assert_ne!(code, 0);
         std::fs::remove_dir_all(&dir).ok();
     }
+}
+
+fn is_builtin_option(name: &str) -> bool {
+    matches!(
+        name,
+        "prefix"
+            | "bindir"
+            | "libdir"
+            | "libexecdir"
+            | "includedir"
+            | "datadir"
+            | "mandir"
+            | "infodir"
+            | "localedir"
+            | "sysconfdir"
+            | "localstatedir"
+            | "sharedstatedir"
+            | "sbindir"
+            | "buildtype"
+            | "default_library"
+            | "warning_level"
+            | "werror"
+            | "optimization"
+            | "debug"
+            | "unity"
+            | "strip"
+            | "backend"
+            | "wrap_mode"
+    )
+}
+
+fn configured_strip(build_dir: &str) -> bool {
+    let cmd_file = format!("{}/meson-private/cmd_line.txt", build_dir);
+    let content = match std::fs::read_to_string(&cmd_file) {
+        Ok(content) => content,
+        Err(_) => return false,
+    };
+    let saved: deser_value::Value = deser_json::from_str(&content).unwrap_or_default();
+    saved["options"]
+        .as_seq()
+        .map(|options| {
+            options.iter().any(|opt| {
+                opt.as_str()
+                    .map(|s| s == "strip=true")
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
 }
 
 fn which_ninja() -> String {

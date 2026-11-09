@@ -805,6 +805,9 @@ fn build_target_common(
 
     let install = VM::get_arg_bool(args, "install", false);
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
+    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
+    let version = VM::get_arg_str(args, "version", usize::MAX).map(String::from);
+    let soversion = VM::get_arg_str(args, "soversion", usize::MAX).map(String::from);
     let install_rpath = VM::get_arg_str(args, "install_rpath", usize::MAX)
         .unwrap_or("")
         .to_string();
@@ -878,12 +881,19 @@ fn build_target_common(
     let subdir = vm.current_subdir.clone();
 
     // Compute output name
-    let output_name = compute_output_name(
+    let mut output_name = compute_output_name(
         &name,
         &target_type,
         name_prefix.as_deref(),
         name_suffix.as_deref(),
     );
+    if target_type == TargetType::SharedLibrary {
+        if let Some(ref v) = version {
+            output_name = format!("{}.{}", output_name, v);
+        } else if let Some(ref v) = soversion {
+            output_name = format!("{}.{}", output_name, v);
+        }
+    }
 
     let target = BuildTarget {
         name: name.clone(),
@@ -901,6 +911,9 @@ fn build_target_common(
         rust_args,
         install,
         install_dir,
+        install_mode,
+        version,
+        soversion,
         install_rpath,
         build_rpath,
         pic,
@@ -989,6 +1002,16 @@ fn is_compilable_source(path: &str) -> bool {
         || lower.ends_with(".cxx")
         || lower.ends_with(".m")
         || lower.ends_with(".mm")
+}
+
+fn normalize_install_mode(value: Option<&Object>) -> Option<Vec<String>> {
+    match value {
+        Some(Object::String(s)) => Some(vec![s.clone()]),
+        Some(Object::Array(items)) => {
+            Some(items.iter().map(|v| v.to_string_value()).collect())
+        }
+        _ => None,
+    }
 }
 
 fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
@@ -2834,11 +2857,12 @@ fn builtin_install_headers(vm: &mut VM, args: &[CallArg]) -> Result<Object, Stri
         format!("{}/{}", install_dir, subdir)
     };
     let preserve_path = VM::get_arg_bool(args, "preserve_path", false);
+    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_headers.push(InstallData {
         sources,
         install_dir: full_dir,
-        install_mode: None,
+        install_mode,
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path,
@@ -2866,11 +2890,12 @@ fn builtin_install_data(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
         .to_string();
     let rename = VM::get_arg_string_array(args, "rename");
     let preserve_path = VM::get_arg_bool(args, "preserve_path", false);
+    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_data.push(InstallData {
         sources,
         install_dir,
-        install_mode: None,
+        install_mode,
         rename,
         subdir: vm.current_subdir.clone(),
         preserve_path,
@@ -2895,16 +2920,17 @@ fn builtin_install_subdir(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
         })
         .ok_or("install_subdir requires directory name")?;
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
-        .ok_or("install_subdir requires install_dir")?
+        .unwrap_or("share")
         .to_string();
     let strip_directory = VM::get_arg_bool(args, "strip_directory", false);
     let exclude_files = VM::get_arg_string_array(args, "exclude_files");
     let exclude_directories = VM::get_arg_string_array(args, "exclude_directories");
+    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_subdirs.push(InstallData {
         sources: vec![dir],
         install_dir,
-        install_mode: None,
+        install_mode,
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path: false,
@@ -2925,11 +2951,12 @@ fn builtin_install_man(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> 
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
         .unwrap_or("share/man")
         .to_string();
+    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_man.push(InstallData {
         sources,
         install_dir,
-        install_mode: None,
+        install_mode,
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path: false,
