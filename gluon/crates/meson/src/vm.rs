@@ -156,6 +156,7 @@ pub struct ProjectInfo {
 pub struct BuildData {
     pub targets: Vec<BuildTarget>,
     pub custom_targets: Vec<CustomTarget>,
+    pub preprocess_targets: Vec<PreprocessTarget>,
     pub tests: Vec<TestDef>,
     pub benchmarks: Vec<TestDef>,
     pub install_headers: Vec<InstallData>,
@@ -308,6 +309,20 @@ pub struct CustomTarget {
     pub build_always_stale: bool,
     pub env: HashMap<String, String>,
     pub subdir: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PreprocessTarget {
+    pub name: String,
+    pub subdir: String,
+    pub language: String,
+    pub command: Vec<String>,
+    pub inputs: Vec<String>,
+    pub outputs: Vec<String>,
+    pub include_dirs: Vec<String>,
+    pub dependencies: Vec<Object>,
+    pub compile_args: Vec<String>,
+    pub depends: Vec<Object>,
 }
 
 #[derive(Debug, Clone)]

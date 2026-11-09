@@ -2268,7 +2268,9 @@ fn resolved_file_path(vm: &VM, f: &FileData) -> String {
 }
 
 fn target_output_path(root: &str, subdir: &str, output: &str) -> String {
-    if subdir.is_empty() {
+    if Path::new(output).is_absolute() {
+        output.to_string()
+    } else if subdir.is_empty() {
         format!("{}/{}", root, output)
     } else {
         format!("{}/{}/{}", root, subdir, output)
@@ -2394,7 +2396,7 @@ fn script_interpreter(path: &str) -> Option<Vec<String>> {
     Some(parts)
 }
 
-fn wrap_script_command(command: &mut Vec<String>) {
+pub(crate) fn wrap_script_command(command: &mut Vec<String>) {
     if let Some(first) = command.first() {
         if let Some(interpreter) = script_interpreter(first) {
             let script = first.clone();
@@ -2402,6 +2404,62 @@ fn wrap_script_command(command: &mut Vec<String>) {
             wrapped.push(script);
             command.splice(0..1, wrapped);
         }
+    }
+}
+
+fn resolve_program_path(vm: &VM, name: &str) -> Option<String> {
+    if name.starts_with('/') {
+        return Path::new(name).is_file().then(|| name.to_string());
+    }
+    let in_subdir = if vm.current_subdir.is_empty() {
+        format!("{}/{}", vm.source_root, name)
+    } else {
+        format!("{}/{}/{}", vm.source_root, vm.current_subdir, name)
+    };
+    if Path::new(&in_subdir).is_file() {
+        return Some(in_subdir);
+    }
+    let in_root = format!("{}/{}", vm.source_root, name);
+    if Path::new(&in_root).is_file() {
+        return Some(in_root);
+    }
+    if let Ok(path_env) = std::env::var("PATH") {
+        for dir in path_env.split(':') {
+            let candidate = format!("{}/{}", dir, name);
+            if Path::new(&candidate).is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn resolve_command_program(vm: &VM, name: &str) -> Result<Object, String> {
+    if let Some(prog) = vm.build_data.find_program_overrides.get(name) {
+        return Ok(prog.clone());
+    }
+    match resolve_program_path(vm, name) {
+        Some(path) => Ok(Object::ExternalProgram(ExternalProgramData {
+            name: name.to_string(),
+            path,
+            found: true,
+            version: None,
+        })),
+        None => Err(format!("Program '{}' not found or not executable", name)),
+    }
+}
+
+fn resolve_command_first(vm: &VM, obj: &Object) -> Result<Object, String> {
+    match obj {
+        Object::Array(items) => {
+            let mut items = items.clone();
+            if let Some(Object::String(name)) = items.first().cloned() {
+                items[0] = resolve_command_program(vm, &name)?;
+            }
+            Ok(Object::Array(items))
+        }
+        Object::String(name) => resolve_command_program(vm, name),
+        other => Ok(other.clone()),
     }
 }
 
@@ -2442,7 +2500,8 @@ fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String
     let mut command = Vec::new();
     let mut command_deps = Vec::new();
     if let Some(cmd_obj) = VM::get_arg_value(args, "command") {
-        collect_command_parts(vm, cmd_obj, &mut command, &mut command_deps);
+        let cmd_obj = resolve_command_first(vm, cmd_obj)?;
+        collect_command_parts(vm, &cmd_obj, &mut command, &mut command_deps);
     }
     wrap_script_command(&mut command);
 

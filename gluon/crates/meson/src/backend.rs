@@ -66,11 +66,15 @@ impl NinjaBackend {
         writeln!(out).unwrap();
 
         // Rules
-        self.write_rules(&mut out, project)?;
+        self.write_rules(&mut out, project, build_data)?;
 
         // Build edges for each target
         for target in &build_data.targets {
             self.write_target(&mut out, target, build_data)?;
+        }
+
+        for pp in &build_data.preprocess_targets {
+            self.write_preprocess_target(&mut out, pp, build_data)?;
         }
 
         // Custom targets
@@ -190,7 +194,7 @@ impl NinjaBackend {
                 };
                 let obj_src = genout.as_deref().unwrap_or(source);
                 let obj_name = obj_src.replace('/', "_").replace('.', "_");
-                let obj_path = format!("{}{}_{}.o", target_dir, target.name, obj_name);
+                let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
                 let file_lang = self.detect_file_language(obj_src, &lang);
                 let file_rule = format!("{}_COMPILER", file_lang);
                 let mut bindings = std::collections::HashMap::new();
@@ -387,7 +391,12 @@ impl NinjaBackend {
         state
     }
 
-    fn write_rules(&self, out: &mut String, project: &ProjectInfo) -> Result<(), String> {
+    fn write_rules(
+        &self,
+        out: &mut String,
+        project: &ProjectInfo,
+        build_data: &BuildData,
+    ) -> Result<(), String> {
         // C compiler rule
         if project.languages.iter().any(|l| l == "c" || l == "objc") {
             writeln!(out, "rule c_COMPILER").unwrap();
@@ -455,6 +464,34 @@ impl NinjaBackend {
             writeln!(out, "rule vala_COMPILER").unwrap();
             writeln!(out, "  command = valac $ARGS -C $in").unwrap();
             writeln!(out, "  description = Compiling Vala source $out").unwrap();
+            writeln!(out).unwrap();
+        }
+
+        let mut preprocess_languages: Vec<&str> = Vec::new();
+        for pp in &build_data.preprocess_targets {
+            if !preprocess_languages.contains(&pp.language.as_str()) {
+                preprocess_languages.push(pp.language.as_str());
+            }
+        }
+        for language in preprocess_languages {
+            let command = build_data
+                .preprocess_targets
+                .iter()
+                .find(|pp| pp.language == language)
+                .map(|pp| shell_escape_command(&pp.command))
+                .unwrap_or_default();
+            let x_language = preprocess_language_flag(language);
+            let display = if language == "cpp" { "C++" } else { "C" };
+            writeln!(out, "rule {}_PREPROCESSOR", language).unwrap();
+            writeln!(
+                out,
+                "  command = {} -E -P -x{} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in",
+                command, x_language
+            )
+            .unwrap();
+            writeln!(out, "  deps = gcc").unwrap();
+            writeln!(out, "  depfile = $DEPFILE").unwrap();
+            writeln!(out, "  description = Compiling {} object $out", display).unwrap();
             writeln!(out).unwrap();
         }
 
@@ -543,7 +580,11 @@ impl NinjaBackend {
                 if let Some(parent) = Path::new(inner).parent() {
                     let parent = parent.to_string_lossy();
                     if !parent.is_empty() && parent != "." {
-                        gen_include_dirs.push(format!("{}/{}", self.build_root, parent));
+                        if Path::new(parent.as_ref()).is_absolute() {
+                            gen_include_dirs.push(parent.to_string());
+                        } else {
+                            gen_include_dirs.push(format!("{}/{}", self.build_root, parent));
+                        }
                     }
                 }
             }
@@ -577,8 +618,12 @@ impl NinjaBackend {
             };
 
             let obj_src = genout.as_deref().unwrap_or(source);
+            let obj_src = match obj_src.strip_prefix(&format!("{}/", self.build_root)) {
+                Some(relative) => relative,
+                None => obj_src,
+            };
             let obj_name = obj_src.replace('/', "_").replace('.', "_");
-            let obj_path = format!("{}{}_{}.o", target_dir, target.name, obj_name);
+            let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
             let file_lang = self.detect_file_language(obj_src, &lang);
             let file_compile_rule = format!("{}_COMPILER", file_lang);
 
@@ -629,7 +674,7 @@ impl NinjaBackend {
 
             let depfile = format!("{}.d", obj_path);
 
-            write!(out, "build {}: {} {}", obj_path, file_compile_rule, source_path).unwrap();
+            write!(out, "build {}: {} {}", obj_path, file_compile_rule, self.edge_path(&source_path)).unwrap();
             if !gen_order.is_empty() {
                 write!(out, " || {}", gen_order.join(" ")).unwrap();
             }
@@ -857,7 +902,7 @@ impl NinjaBackend {
             "build {}: {} {}",
             outputs.join(" "),
             rule,
-            inputs.join(" ")
+            inputs.iter().map(|i| self.edge_path(i)).collect::<Vec<_>>().join(" ")
         )
         .unwrap();
         if !order_only.is_empty() {
@@ -896,6 +941,117 @@ impl NinjaBackend {
         writeln!(out).unwrap();
 
         Ok(())
+    }
+
+    fn write_preprocess_target(
+        &self,
+        out: &mut String,
+        pp: &PreprocessTarget,
+        build_data: &BuildData,
+    ) -> Result<(), String> {
+        let private_dir = if pp.subdir.is_empty() {
+            format!("{}.p", pp.name)
+        } else {
+            format!("{}/{}.p", pp.subdir, pp.name)
+        };
+
+        let mut args = vec![format!("-I{}/{}", self.build_root, private_dir)];
+        args.push(format!("-I{}", self.build_root));
+        args.push(format!("-I{}", self.source_root));
+        if !pp.subdir.is_empty() {
+            args.push(format!("-I{}/{}", self.build_root, pp.subdir));
+            args.push(format!("-I{}/{}", self.source_root, pp.subdir));
+        }
+        for include in &pp.include_dirs {
+            if include.is_empty() {
+                continue;
+            }
+            for arg in self.include_arguments(include) {
+                if !args.contains(&arg) {
+                    args.push(arg);
+                }
+            }
+        }
+        for dep in &pp.dependencies {
+            if let Object::Dependency(d) = dep {
+                args.extend(d.compile_args.iter().cloned());
+                for include in &d.include_dirs {
+                    args.extend(self.include_arguments(include));
+                }
+            }
+        }
+        args.extend(self.compiler_base_args(&pp.language, build_data));
+        args.extend(pp.compile_args.iter().cloned());
+
+        let order_only = self.order_only_paths(&pp.depends);
+        let rule = format!("{}_PREPROCESSOR", pp.language);
+        for (input, output) in pp.inputs.iter().zip(pp.outputs.iter()) {
+            write!(out, "build {}: {} {}", output, rule, self.edge_path(input)).unwrap();
+            if !order_only.is_empty() {
+                write!(out, " | {}", order_only.join(" ")).unwrap();
+            }
+            writeln!(out).unwrap();
+            writeln!(out, "  DEPFILE = {}.d", output).unwrap();
+            if !args.is_empty() {
+                writeln!(out, "  ARGS = {}", shell_escape_command(&args)).unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
+        Ok(())
+    }
+
+    fn edge_path(&self, path: &str) -> String {
+        match path.strip_prefix(&format!("{}/", self.build_root)) {
+            Some(relative) => relative.to_string(),
+            None => path.to_string(),
+        }
+    }
+
+    fn order_only_paths(&self, depends: &[Object]) -> Vec<String> {
+        let mut order_only: Vec<String> = Vec::new();
+        for dep in depends {
+            match dep {
+                Object::CustomTarget(r) => {
+                    let d = if r.subdir.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{}/", r.subdir)
+                    };
+                    for o in &r.outputs {
+                        order_only.push(format!("{}{}", d, o));
+                    }
+                }
+                Object::CustomTargetIndex(r, idx) => {
+                    let d = if r.subdir.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{}/", r.subdir)
+                    };
+                    if let Some(o) = r.outputs.get(*idx) {
+                        order_only.push(format!("{}{}", d, o));
+                    }
+                }
+                Object::File(f) => {
+                    if Path::new(&f.path).is_absolute() {
+                        order_only.push(f.path.clone());
+                    } else if f.is_built {
+                        let d = if f.subdir.is_empty() {
+                            String::new()
+                        } else {
+                            format!("{}/", f.subdir)
+                        };
+                        order_only.push(format!("{}{}", d, f.path));
+                    } else if f.subdir.is_empty() {
+                        order_only.push(format!("{}/{}", self.source_root, f.path));
+                    } else {
+                        order_only.push(format!("{}/{}/{}", self.source_root, f.subdir, f.path));
+                    }
+                }
+                _ => {}
+            }
+        }
+        order_only
     }
 
     fn write_configure_file(&self, out: &mut String, cf: &ConfigureFile) -> Result<(), String> {
@@ -1392,6 +1548,16 @@ impl NinjaBackend {
         } else {
             "c".to_string()
         }
+    }
+}
+
+fn preprocess_language_flag(language: &str) -> &'static str {
+    match language {
+        "c" => "c",
+        "cpp" | "c++" => "c++",
+        "objc" => "objective-c",
+        "objcpp" => "objective-c++",
+        _ => "assembler-with-cpp",
     }
 }
 
