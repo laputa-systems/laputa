@@ -6,7 +6,7 @@ export const name = "play"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.43.0"
+export const ver = "0.43.1"
 
 ## Package recipe export.
 export const rel = "1"
@@ -45,7 +45,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "134cfc81d9bdc1d0b0b27a1a741ba77833c89286a59a33aea930ab0cda722b0a",
+        sha256: "fcdc391ab486e065aaa36fbc6ce847b92aac99895d98b955b085925987f743ce",
       },
     ],
   },

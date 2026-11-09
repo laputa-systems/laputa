@@ -36,7 +36,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   let player = fp"{root}/usr/bin/player"
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
     let version = run.text $player "--version"
-    proof.ensure(version.trim() == "player mpv-compatible 0.43.0", "player-version", f"unexpected player --version: {version.trim()}")
+    proof.ensure(version.trim() == "player mpv-compatible 0.43.1", "player-version", f"unexpected player --version: {version.trim()}")
 
     tempdir tmp at fp"{root}/var/tmp/proof-play" {
       let tone = fp"{tmp}/tone.wav"
@@ -45,5 +45,5 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       proof.ensure("duration=0.5\n" in played, "player-wav-playback", f"unexpected playback output:\n{played}")
     }
   }?
-  print "play ok: player 0.43.0 links Laputa's libraries and plays a WAV headlessly"
+  print "play ok: player 0.43.1 links Laputa's libraries and plays a WAV headlessly"
 }
