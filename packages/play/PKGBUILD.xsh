@@ -21,7 +21,6 @@ export const deps = [
   "ffmpeg",
   "freetype",
   "harfbuzz",
-  "libva",
   "rust-fontconfig",
   "vulkan-loader",
   "wayland-libs-client",

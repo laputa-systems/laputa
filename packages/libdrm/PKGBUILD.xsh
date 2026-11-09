@@ -14,7 +14,7 @@ export const ver = "2.4.134"
 export const rel = "1"
 
 ## Exported declaration `deps`.
-export const deps = ["musl", "libudev-zero"]
+export const deps = ["musl"]
 
 ## Exported declaration `mkdeps_host`.
 export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf", "libudev-zero"]
