@@ -283,21 +283,41 @@ bytes, and 49 ELF files. The census tool rejects this root, because at
 | `fontconfig` 2.18.3-1 | 10 | 534,251 | |
 | `expat` 2.8.5-1 | 14 | 377,760 | |
 | `rust-fontconfig` | absent | 0 | |
-| `ghostty-custom` 1.4.1-4, `usr/bin/ghostty-custom` | 6 | 30,795,370 | 30,787,208 |
+| `ghostty-custom` 1.4.1-4 (release `f2024d5d`), `usr/bin/ghostty-custom` | 6 | 30,795,370 | 30,787,208 |
 | `play` 0.43.1-1, `usr/bin/player` | 4 | 9,579,028 | 9,578,712 |
 
 In the baseline, Ghostty links Fontconfig statically; its dynamic `DT_NEEDED`
 is `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, and `libc.so`.
 Play needs `libfontconfig.so.1`, `libfreetype.so.6`, and `libharfbuzz.so.0`.
 
-Not measured:
+### Final stack, per package
 
-- The final stack, at `3c1797e` with `rust-fontconfig` 5.0.2-3. Its 11-root
-  plan has 51 artifacts, of which 41 are in the store. Ten must be built:
-  `doas-rs` 0.1.0-2, `mdevd-rs` 0.1.0-2, `seatd-rs` 0.9.3-2, `tinyland`
-  0.1.0-2, `libdrm` 2.4.134-1, `libva` 2.24.1-2, `ffmpeg` 9.0.2-2, `mesa`
-  26.2.4-3, `ghostty-custom` 1.4.1-5, and `play` 0.43.2-1.
-- Font cache build time and first-query latency. Perf gate deferred: host busy
-  (`perf-gate-ready` exit 75, load 46 to 47 on 32 cores).
-- Cache-build peak RSS. The package set ships no `fc-cache`, and no harness
-  exists for either library.
+Measured at `3c1797e`, from the store artifacts and the pinned release
+tarballs. Each executable is copied unchanged from its tarball, so the
+tarball file size is the installed size.
+
+| Package | Source | Regular files | Installed bytes |
+|---|---|---|---|
+| `rust-fontconfig` 5.0.2-3 (store artifact; plus one symlink) | fork tag `v5.0.2-laputa.2` | 8 | 1,153,681 |
+| `ghostty-custom` 1.4.1-5, `usr/bin/ghostty-custom` | release `c4f036c72`, tarball sha256 `a269c413…` verified | | 27,206,776 |
+| `play` 0.43.2-1, `usr/bin/player` | release v0.43.2, tarball sha256 `1b259f2c…` verified | | 9,574,616 |
+
+Package payloads that leave the canonical closure total 912,011 bytes:
+`fontconfig` 534,251 and `expat` 377,760.
+
+The Ghostty change in executable size, from 30,787,208 to 27,206,776 bytes
+(-3,580,432), mixes two changes: the release moves from `f2024d5d` to
+`c4f036c72`, and the font backend moves from static Fontconfig to
+rust-fontconfig. The measurement does not separate them. Play moves from
+0.43.1 (9,578,712 bytes) to 0.43.2 (9,574,616 bytes), a change of -4,096 bytes.
+
+Pending:
+
+- The composed final root (total bytes, unique regular files, ELF count, and
+  the DT_NEEDED census). Ten packages must be rebuilt, because the RUNPATH
+  change re-keyed them and their final artifacts are not in the store: `doas-rs`
+  0.1.0-2, `mdevd-rs` 0.1.0-2, `seatd-rs` 0.9.3-2, `tinyland` 0.1.0-2,
+  `libdrm` 2.4.134-1, `libva` 2.24.1-2, `ffmpeg` 9.0.2-2, `mesa` 26.2.4-3,
+  `ghostty-custom` 1.4.1-5, and `play` 0.43.2-1.
+- Cache-build peak RSS: deferred; no harness exists, and the package set ships no `fc-cache`.
+- Font cache build time and first-query latency: deferred; perf gate reported host busy (`perf-gate-ready` exit 75, load 46 to 47 on 32 cores).
