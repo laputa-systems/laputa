@@ -41,6 +41,16 @@ pub fn expand_in_edge(state: &State, edge: &Edge, value: &str) -> String {
     })
 }
 
+/// The value of `key` as Ninja evaluates it for this edge: a build-statement
+/// binding was already evaluated when the manifest was parsed, and a rule
+/// binding is expanded in the edge's scope.
+pub fn edge_binding(state: &State, edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {
+    if let Some(value) = edge.bindings.get(key) {
+        return Some(value.clone());
+    }
+    rule.bindings.get(key).map(|value| expand_in_edge(state, edge, value))
+}
+
 /// Look up `key` in `edge.bindings` first, falling back to `rule.bindings`.
 /// Returns the raw (unexpanded) value.
 pub fn lookup_either(edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {

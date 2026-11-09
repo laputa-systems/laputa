@@ -14,7 +14,7 @@
 use super::depfile;
 use super::deps_log::DepsLog;
 use super::dyndep;
-use super::expand::{expand_in_edge, lookup_either};
+use super::expand::{edge_binding, expand_in_edge, lookup_either};
 use super::jobserver::{self, Slot};
 use super::log;
 use super::plan::{build_plan, resolve_targets};
@@ -305,10 +305,9 @@ fn schedule(
         let Some(rule) = state.rules.get(&edge.rule) else {
             continue;
         };
-        let Some(depfile_raw) = lookup_either(edge, rule, "depfile") else {
+        let Some(depfile_path) = edge_binding(state, edge, rule, "depfile") else {
             continue;
         };
-        let depfile_path = expand_in_edge(state, edge, &depfile_raw);
         if depfile_path.is_empty() {
             continue;
         }
@@ -732,11 +731,10 @@ fn schedule(
                     let edge_ref = &edges[edge_idx];
                     if let Some(rule) = state.rules.get(&edge_ref.rule) {
                         let deps_kind = lookup_either(edge_ref, rule, "deps");
-                        let depfile_raw = lookup_either(edge_ref, rule, "depfile");
+                        let depfile = edge_binding(state, edge_ref, rule, "depfile");
                         if matches!(deps_kind.as_deref(), Some("gcc") | Some("msvc"))
-                            && let Some(df_raw) = depfile_raw
+                            && let Some(df_path) = depfile
                         {
-                            let df_path = expand_in_edge(state, edge_ref, &df_raw);
                             if !df_path.is_empty()
                                 && let Ok(text) = std::fs::read_to_string(&df_path)
                             {
@@ -954,19 +952,16 @@ fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, Strin
     for out in edge.outputs.iter().chain(&edge.implicit_outputs) {
         ensure_parent_dir(out);
     }
-    if let Some(depfile) = lookup_either(edge, rule, "depfile") {
-        let path = expand_in_edge(state, edge, &depfile);
+    if let Some(path) = edge_binding(state, edge, rule, "depfile") {
         if !path.is_empty() {
             ensure_parent_dir(&path);
         }
     }
 
-    let rspfile = lookup_either(edge, rule, "rspfile")
-        .map(|v| expand_in_edge(state, edge, &v))
+    let rspfile = edge_binding(state, edge, rule, "rspfile")
         .filter(|s| !s.is_empty())
         .map(|path| {
-            let content = lookup_either(edge, rule, "rspfile_content")
-                .map(|v| expand_in_edge(state, edge, &v))
+            let content = edge_binding(state, edge, rule, "rspfile_content")
                 .unwrap_or_default();
             (path, content)
         });

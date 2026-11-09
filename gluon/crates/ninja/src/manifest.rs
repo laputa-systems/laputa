@@ -616,7 +616,9 @@ impl<'a> Parser<'a> {
                 return Err(format!("expected '=' after '{key}'"));
             }
             self.bump();
-            bindings.insert(key, self.read_value());
+            let raw = self.read_value();
+            let value = expand(&raw, &|name| bindings.get(name).cloned().or_else(|| scope.bindings.get(name).cloned()));
+            bindings.insert(key, value);
         }
         // Expand paths against file-scope bindings.
         let expand_all = |v: Vec<String>| {
@@ -769,6 +771,17 @@ pub fn expand<F: Fn(&str) -> Option<String>>(s: &str, lookup: &F) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn build_bindings_are_evaluated_when_parsed() {
+        let src = "root = /r\nrule link\n  command = cc $FLAGS $LIBS\nbuild app: link a.o\n  FLAGS = -Wl,-rpath,\"\\$$ORIGIN/../lib\" lit$$x\n  LIBS = $root/lib $FLAGS\n";
+        let state = parse(src).unwrap();
+        assert_eq!(state.edges[0].bindings["FLAGS"], "-Wl,-rpath,\"\\$ORIGIN/../lib\" lit$x");
+        assert_eq!(state.edges[0].bindings["LIBS"], "/r/lib -Wl,-rpath,\"\\$ORIGIN/../lib\" lit$x");
+        let edge = &state.edges[0];
+        let command = crate::build::expand_in_edge_pub(&state, edge, &state.rules["link"].bindings["command"]);
+        assert_eq!(command, "cc -Wl,-rpath,\"\\$ORIGIN/../lib\" lit$x /r/lib -Wl,-rpath,\"\\$ORIGIN/../lib\" lit$x");
+    }
 
     #[test]
     fn plain_build_paths_round_trip() {
