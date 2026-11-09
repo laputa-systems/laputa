@@ -6,7 +6,7 @@ export const name = "play"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.43.1"
+export const ver = "0.43.2"
 
 ## Package recipe export.
 export const rel = "1"
@@ -19,10 +19,10 @@ export const deps = [
   "musl",
   "alsa-lib",
   "ffmpeg",
-  "fontconfig",
   "freetype",
   "harfbuzz",
   "libva",
+  "rust-fontconfig",
   "vulkan-loader",
   "wayland-libs-client",
   "zlib",
@@ -45,7 +45,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "fcdc391ab486e065aaa36fbc6ce847b92aac99895d98b955b085925987f743ce",
+        sha256: "1b259f2cd1bf55b130eeb79535a7223fc6a8c23b26c9ef7af5177110f97272c1",
       },
     ],
   },

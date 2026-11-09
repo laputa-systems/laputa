@@ -33,10 +33,13 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   let listed = needed.join(" ")
   proof.ensure("libgcc_s.so.1" not in needed, "player-gnu-runtime", f"player still needs libgcc_s.so.1: {listed}")
 
+  proof.ensure("librust_fontconfig.so.5.0.2" in needed, "player-rust-fontconfig", f"player does not need librust_fontconfig.so.5.0.2: {listed}")
+  proof.ensure("libfontconfig.so.1" not in needed, "player-native-fontconfig", f"player still needs libfontconfig.so.1: {listed}")
+
   let player = fp"{root}/usr/bin/player"
   env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
     let version = run.text $player "--version"
-    proof.ensure(version.trim() == "player mpv-compatible 0.43.1", "player-version", f"unexpected player --version: {version.trim()}")
+    proof.ensure(version.trim() == "player mpv-compatible 0.43.2", "player-version", f"unexpected player --version: {version.trim()}")
 
     tempdir tmp at fp"{root}/var/tmp/proof-play" {
       let tone = fp"{tmp}/tone.wav"
@@ -45,5 +48,5 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       proof.ensure("duration=0.5\n" in played, "player-wav-playback", f"unexpected playback output:\n{played}")
     }
   }?
-  print "play ok: player 0.43.1 links Laputa's libraries and plays a WAV headlessly"
+  print "play ok: player 0.43.2 links Laputa's libraries and plays a WAV headlessly"
 }
