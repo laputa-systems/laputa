@@ -59,6 +59,50 @@ needs `libfreetype.so.6`, `libharfbuzz.so.0`, `librust_fontconfig.so.5.0.2`,
 `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, and musl, with no
 RPATH or RUNPATH. Its package proof rejects `libfontconfig.so.1`.
 
+## Guest qualification of the rust-fontconfig stack
+
+On 2026-11-09 `make profile-test` booted the `qemu-tinyland-ghostty` profile in
+an x86_64/KVM guest with virgl on Laputa master `ee1fb0c` plus the changes that
+add the checks below. The profile composes `ghostty-custom` (`c4f036c72`, font
+backend `rust_fontconfig_freetype`), Play 0.43.2, and `rust-fontconfig`
+5.0.2 (`v5.0.2-laputa.2`). It forbids the `fontconfig` and `expat` packages
+in its closure. Both applications resolved `librust_fontconfig.so.5.0.2`.
+The test profile adds Noto Sans Devanagari, Noto Sans CJK, and Noto Color
+Emoji as direct roots, since no canonical package depends on them; the
+packaged default still lists them as optional.
+
+The existing guest proof passed unchanged: doas and su identities, runtime-
+directory attacks, the granted-device negative control, compositor crash,
+single keyboard removal, broker loss, application exit, scanner shutdown,
+the 4.3 core context, modifier input, the injected `LAPUTA!` line, and the
+final Ghostty marker screenshot. Compositor recovery completed behind the same
+session markers each time.
+
+Two named screenshots now carry international text, each checked by
+`system/text_pixels.xsh` as the guest runs. The guest prints
+`LAPUTA_PROOF_SCREENSHOT NAME`, the supervisor asks QMP for
+`screenshot-NAME.ppm`, and a check owned by NAME reads its pixels.
+
+| Screenshot | Content | Result |
+|---|---|---|
+| `ghostty-text` | Arabic, Devanagari with conjuncts, CJK, a ZWJ family with a color party popper, and a hieroglyph row no installed font covers | Pass |
+| `play-text` | The same five lines as one SRT cue over a black frame in Play's gpu-next output | Pass |
+
+A line passes when its words or character cells are not all one repeated
+box. Tofu repeats a single box, so the hieroglyph row must fail the same
+classifier. The ZWJ family must be one cluster no wider than two cells, and
+the party popper must hold at least 40 strongly colored pixels. Removing the
+Devanagari and CJK packages from the profile fails the guest with
+`Devanagari line rendered as tofu or blank`, and a screenshot with a tofu
+box pasted over Play's Devanagari line fails with the same message.
+Ghostty embeds an emoji fallback, so its emoji row does not show that
+discovery found the system emoji font; Play has no embedded fallback. A
+single missing glyph inside an otherwise real line is not detected, and Arabic
+is drawn in visual order because the terminal does no bidirectional reordering.
+
+The Asterinas backend has no graphical target, so this proof runs on Linux
+only. Linux aarch64 remains deferred.
+
 ## Local x86_64 qualification
 
 The measurements below compare the earlier `ghostty-custom` release

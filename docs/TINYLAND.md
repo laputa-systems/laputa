@@ -89,7 +89,10 @@ modifier input. After the input proof, `play-0.43.1` renders an FFmpeg-made
 320x240 PNG-in-Matroska fixture as laputa through `--vo=gpu-next
 --gpu-context=waylandvk` on lavapipe, the only Vulkan device the loader finds,
 and exits; tinyland then returns to Ghostty, whose marker the host screenshot
-must still show.
+must still show. The proof also captures named screenshots
+of Ghostty and Play showing Arabic, Devanagari, CJK and a ZWJ emoji, and the
+host fails the run when a line renders as tofu (see
+[font stack](FONT-STACK.md#guest-qualification-of-the-rust-fontconfig-stack)).
 
 Linux aarch64 and macOS host execution remain unverified. The root gate also
 exposed and repaired seed acceptance being persisted after activation. A
