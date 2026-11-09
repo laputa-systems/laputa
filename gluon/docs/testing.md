@@ -25,9 +25,11 @@ Gates, narrowest first:
   modes, symlink targets) must match. `tests/laputa/expected-fail` ledgers
   the packages that do not yet, with a cause; a host without a reference
   build tool reports SKIP.
-- `tests/install/run.sh` — a focused install fixture (versioned shared
-  library, headers in a subdir, pkgconfig) installed with reference Meson
-  and with gluon; the installed trees must match.
+- `tests/install/run.sh` — focused install fixtures (versioned shared
+  library, an executable linked against it, headers in a subdir, pkgconfig)
+  installed with reference Meson and with gluon; installed trees and
+  RPATH/RUNPATH must match, without rpath, with `install_rpath` and with a
+  build-only `build_rpath`.
 - `tests/upstream/musl.sh` — static-musl bins via Docker (pinned
   `rust:1.98`, `--platform linux/amd64`, `x86_64-unknown-linux-musl`) that
   run `--version` in the container. CI builds the same target directly with

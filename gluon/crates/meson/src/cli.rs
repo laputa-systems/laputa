@@ -700,6 +700,7 @@ impl Cli {
         // Load cross/native files
         if let Some(ref cross) = args.cross_file {
             let machine_config = options::parse_machine_file(cross);
+            record_strip_program(&build_dir, &machine_config);
             // Apply cross file settings
             for (section, values) in &machine_config {
                 for (key, value) in values {
@@ -733,6 +734,7 @@ impl Cli {
                 format!("{}/{}", source_dir, native)
             };
             let machine_config = options::parse_machine_file(&native_path);
+            record_strip_program(&build_dir, &machine_config);
             if let Some(properties) = machine_config.get("properties") {
                 for (key, value) in properties {
                     interp
@@ -977,6 +979,18 @@ impl Cli {
     }
 
     fn cmd_install(&self, args: &InstallArgs) -> i32 {
+        let compile = self.cmd_compile(&CompileArgs {
+            build_dir: args.build_dir.clone(),
+            targets: Vec::new(),
+            jobs: None,
+            verbose: false,
+            clean: false,
+        });
+        if compile != 0 {
+            eprintln!("Could not rebuild {}", args.build_dir);
+            return compile;
+        }
+
         let destdir = args
             .destdir
             .clone()
@@ -984,8 +998,9 @@ impl Cli {
             .unwrap_or_default();
 
         let strip = args.strip || configured_strip(&args.build_dir);
+        let strip_program = configured_strip_program(&args.build_dir);
 
-        match crate::install::run_install(&args.build_dir, &destdir, strip) {
+        match crate::install::run_install(&args.build_dir, &destdir, strip, &strip_program) {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("Install failed: {}", e);
@@ -1350,6 +1365,20 @@ mod tests {
     }
 
     #[test]
+    fn rebuild_failure_fails_the_install_command() {
+        let dir = temp_build("install-prereq");
+        let args = vec![
+            "meson".to_string(),
+            "install".to_string(),
+            "-C".to_string(),
+            dir.to_str().unwrap().to_string(),
+        ];
+        let code = Cli::parse_args_from(args).run();
+        assert_ne!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn ninja_spawn_failure_fails() {
         let dir = temp_build("spawn");
         std::fs::create_dir_all(dir.join("meson-info")).unwrap();
@@ -1405,6 +1434,43 @@ fn is_builtin_option(name: &str) -> bool {
             | "backend"
             | "wrap_mode"
     )
+}
+
+fn record_strip_program(
+    build_dir: &str,
+    machine: &HashMap<String, HashMap<String, String>>,
+) {
+    let Some(value) = machine.get("binaries").and_then(|binaries| binaries.get("strip")) else {
+        return;
+    };
+    let program = first_program(value);
+    let _ = std::fs::write(
+        format!("{}/meson-private/strip_bin.txt", build_dir),
+        program,
+    );
+}
+
+fn first_program(value: &str) -> String {
+    let trimmed = value.trim();
+    let inner = trimmed
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(trimmed);
+    let first = inner.split(',').next().unwrap_or(inner).trim();
+    let program = first.trim_matches(|c| c == '\'' || c == '"' || c == ' ');
+    if program.is_empty() {
+        "strip".to_string()
+    } else {
+        program.to_string()
+    }
+}
+
+fn configured_strip_program(build_dir: &str) -> String {
+    std::fs::read_to_string(format!("{}/meson-private/strip_bin.txt", build_dir))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "strip".to_string())
 }
 
 fn configured_strip(build_dir: &str) -> bool {

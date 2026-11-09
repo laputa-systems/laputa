@@ -10,6 +10,13 @@ foo = shared_library(
   install : true,
 )
 
+app = executable(
+  'app',
+  'main.c',
+  link_with : foo,
+  install : true,
+)
+
 pkgconfig = import('pkgconfig')
 pkgconfig.generate(
   foo,

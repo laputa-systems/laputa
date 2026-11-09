@@ -51,6 +51,7 @@ pub mod cli;
 pub mod compiler;
 pub mod compilers;
 pub mod dependencies;
+pub mod elf;
 pub mod install;
 pub mod internal;
 pub mod interpreter;

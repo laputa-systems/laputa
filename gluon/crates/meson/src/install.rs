@@ -63,11 +63,7 @@ pub fn build_install_plan(build_data: &BuildData, ctx: &InstallContext<'_>) -> V
             } else {
                 Some(target.install_rpath.clone())
             },
-            build_rpaths: if target.build_rpath.is_empty() {
-                Vec::new()
-            } else {
-                split_paths(&target.build_rpath)
-            },
+            build_rpaths: rpath_dirs_to_remove(target),
         });
         for (link_name, link_target) in target.shared_library_symlinks() {
             plan.push(InstallEntry {
@@ -334,7 +330,12 @@ fn entry_to_value(entry: &InstallEntry) -> deser_value::Value {
     }
 }
 
-pub fn run_install(build_dir: &str, destdir: &str, strip: bool) -> Result<(), String> {
+pub fn run_install(
+    build_dir: &str,
+    destdir: &str,
+    strip: bool,
+    strip_program: &str,
+) -> Result<(), String> {
     let plan_file = format!("{}/meson-private/install_plan.json", build_dir);
     let text = std::fs::read_to_string(&plan_file)
         .map_err(|e| format!("Cannot read install plan {}: {}", plan_file, e))?;
@@ -359,12 +360,12 @@ pub fn run_install(build_dir: &str, destdir: &str, strip: bool) -> Result<(), St
                     let install_rpath = entry
                         .get("install_rpath")
                         .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
+                        .unwrap_or("");
                     let build_rpaths = string_seq(entry.get("build_rpaths"));
-                    adjust_rpath(&target, install_rpath.as_deref(), &build_rpaths);
                     if strip {
-                        strip_file(&target);
+                        strip_file(&target, strip_program)?;
                     }
+                    adjust_rpath(&target, install_rpath, &build_rpaths)?;
                 }
             }
             "symlink" => {
@@ -593,32 +594,40 @@ fn is_elf(path: &Path) -> bool {
     }
 }
 
-fn adjust_rpath(target: &Path, install_rpath: Option<&str>, build_rpaths: &[String]) {
+fn adjust_rpath(target: &Path, install_rpath: &str, build_rpaths: &[String]) -> Result<(), String> {
     if !is_elf(target) {
-        return;
+        return Ok(());
     }
-    if let Some(rpath) = install_rpath {
-        let _ = std::process::Command::new("patchelf")
-            .arg("--set-rpath")
-            .arg(rpath)
-            .arg(target)
-            .status();
-    } else if !build_rpaths.is_empty() {
-        let _ = std::process::Command::new("patchelf")
-            .arg("--remove-rpath")
-            .arg(target)
-            .status();
-    }
+    crate::elf::fix_rpath(target, build_rpaths, install_rpath)
+        .map_err(|e| format!("Cannot adjust rpath on {}: {}", target.display(), e))
 }
 
-fn strip_file(target: &Path) {
+fn strip_file(target: &Path, strip_program: &str) -> Result<(), String> {
     if !is_elf(target) {
-        return;
+        return Ok(());
     }
-    let _ = std::process::Command::new("strip")
-        .arg("--strip-unneeded")
-        .arg(target)
-        .status();
+    let mut command = std::process::Command::new(strip_program);
+    if cfg!(target_os = "macos") {
+        command.arg("-S").arg("-x");
+    }
+    let output = command.arg(target).output().map_err(|e| {
+        format!(
+            "Cannot run strip program '{}' on {}: {}",
+            strip_program,
+            target.display(),
+            e
+        )
+    })?;
+    if !output.status.success() {
+        return Err(format!(
+            "strip program '{}' failed on {} ({}): {}",
+            strip_program,
+            target.display(),
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
 }
 
 fn normalize_destdir(destdir: &str) -> String {
@@ -750,6 +759,67 @@ fn split_paths(value: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
+}
+
+fn rpath_dirs_to_remove(target: &BuildTarget) -> Vec<String> {
+    let mut paths = split_paths(&target.build_rpath);
+    let mut directories = Vec::new();
+    let mut linked: Vec<&Object> = Vec::new();
+    linked.extend(target.link_with.iter());
+    linked.extend(target.link_whole.iter());
+    linked.extend(target.dependencies.iter());
+    collect_link_directories(&linked, &mut directories);
+    for directory in directories {
+        let origin = origin_relative(&target.subdir, &directory);
+        if !paths.contains(&origin) {
+            paths.push(origin);
+        }
+    }
+    paths
+}
+
+fn collect_link_directories(objects: &[&Object], directories: &mut Vec<String>) {
+    for object in objects {
+        match object {
+            Object::BuildTarget(target) => {
+                if target.target_type != "static_library" && !directories.contains(&target.subdir) {
+                    directories.push(target.subdir.clone());
+                }
+            }
+            Object::Dependency(dependency) => {
+                let nested: Vec<&Object> = dependency.dependencies.iter().collect();
+                collect_link_directories(&nested, directories);
+            }
+            Object::Array(items) => {
+                let nested: Vec<&Object> = items.iter().collect();
+                collect_link_directories(&nested, directories);
+            }
+            Object::BothLibraries(shared, _) => {
+                collect_link_directories(&[shared.as_ref()], directories);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn origin_relative(from: &str, to: &str) -> String {
+    let from_parts: Vec<&str> = from.split('/').filter(|s| !s.is_empty()).collect();
+    let to_parts: Vec<&str> = to.split('/').filter(|s| !s.is_empty()).collect();
+    let mut common = 0;
+    while common < from_parts.len() && common < to_parts.len() && from_parts[common] == to_parts[common]
+    {
+        common += 1;
+    }
+    let mut relative: Vec<&str> = Vec::new();
+    for _ in common..from_parts.len() {
+        relative.push("..");
+    }
+    relative.extend_from_slice(&to_parts[common..]);
+    if relative.is_empty() {
+        "$ORIGIN/".to_string()
+    } else {
+        format!("$ORIGIN/{}", relative.join("/"))
+    }
 }
 
 fn basename(path: &str) -> String {
@@ -949,7 +1019,7 @@ mod tests {
         let roots = (src.to_str().unwrap(), build.to_str().unwrap());
         let plan = plan_with(roots);
         write_install_metadata(roots.1, &plan).unwrap();
-        run_install(roots.1, dest.to_str().unwrap(), false).unwrap();
+        run_install(roots.1, dest.to_str().unwrap(), false, "strip").unwrap();
 
         let installed = dest.join("usr/lib/libfoo.so.1.2.3");
         assert_eq!(std::fs::read(&installed).unwrap(), b"library");
@@ -980,6 +1050,28 @@ mod tests {
         assert!(intro.contains("\"libfoo.so\""));
         assert!(intro.contains("\"/usr/include/foo/foo.h\""));
 
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn strip_failure_is_reported() {
+        let root = std::env::temp_dir().join(format!(
+            "gluon-strip-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(&root).unwrap();
+        let file = root.join("app");
+        std::fs::write(&file, b"\x7fELF\x02\x01\x01").unwrap();
+        let strip = root.join("failing-strip");
+        std::fs::write(&strip, b"#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&strip, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let error = strip_file(&file, strip.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("failed on"));
         std::fs::remove_dir_all(&root).ok();
     }
 }
