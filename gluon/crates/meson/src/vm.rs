@@ -186,6 +186,8 @@ pub struct BuildData {
     pub global_args: HashMap<String, Vec<String>>,
     pub project_link_args: HashMap<String, Vec<String>>,
     pub global_link_args: HashMap<String, Vec<String>>,
+    pub pkgconfig_metadata: HashMap<String, (String, String)>,
+    pub shared_library_only: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]

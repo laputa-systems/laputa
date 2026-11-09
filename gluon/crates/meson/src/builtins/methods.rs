@@ -2796,7 +2796,47 @@ fn compiler_check_header(_vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result
     compiler_has_header(_vm, obj, args)
 }
 
-fn compiler_has_function(_vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Object, String> {
+fn args_with_language_std(vm: &VM, compiler: &CompilerData, args: &[CallArg]) -> Vec<CallArg> {
+    let std = match compiler.language.as_str() {
+        "c" => vm.build_data.c_std.as_str(),
+        "cpp" => vm.build_data.cpp_std.as_str(),
+        _ => return args.to_vec(),
+    };
+    let std = std.split(',').next().unwrap_or("").trim();
+    if std.is_empty() || std == "none" {
+        return args.to_vec();
+    }
+    let std_arg = format!("-std={}", std);
+    let mut extended: Vec<Object> = Vec::new();
+    for arg in args {
+        if arg.name.as_deref() == Some("args") {
+            match &arg.value {
+                Object::Array(items) => extended.extend(items.iter().cloned()),
+                Object::String(value) => extended.push(Object::String(value.clone())),
+                _ => {}
+            }
+        }
+    }
+    if extended
+        .iter()
+        .any(|value| value.to_string_value().starts_with("-std="))
+    {
+        return args.to_vec();
+    }
+    extended.push(Object::String(std_arg));
+    let mut result: Vec<CallArg> = args
+        .iter()
+        .filter(|arg| arg.name.as_deref() != Some("args"))
+        .cloned()
+        .collect();
+    result.push(CallArg {
+        name: Some("args".to_string()),
+        value: Object::Array(extended),
+    });
+    result
+}
+
+fn compiler_has_function(vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Object, String> {
     if let Object::Compiler(c) = obj {
         if let Some(result) = check_required_disabled(args, "compiler.has_function") {
             return result;
@@ -2805,7 +2845,8 @@ fn compiler_has_function(_vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result
             .first()
             .map(|v| v.to_string_value())
             .unwrap_or_default();
-        let result = crate::compilers::check_function(c, &func, args);
+        let probe_args = args_with_language_std(vm, c, args);
+        let result = crate::compilers::check_function(c, &func, &probe_args);
         check_required_result(
             args,
             result,

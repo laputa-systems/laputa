@@ -1,4 +1,0 @@
-libdrm pkg-config Cflags render subdirs '.' as ${includedir}/.
-seatd-rs pkg-config Libs.private is not derived from the library's dependencies
-wayland-dev pkg-config Requires.private, Libs.private and libraries are not derived; libdir written without a library; directory variables referenced by custom variables (wayland-scanner.pc bindir) are not emitted
-wayland-protocols dataonly pkg-config file blank-line layout differs

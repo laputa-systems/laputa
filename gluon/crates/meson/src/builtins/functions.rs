@@ -744,6 +744,7 @@ fn build_target_common(
     vm: &mut VM,
     args: &[CallArg],
     target_type: TargetType,
+    shared_library_only: bool,
 ) -> Result<Object, String> {
     // Disabler propagation: if any argument is a Disabler, return Disabler
     for arg in args {
@@ -993,6 +994,9 @@ fn build_target_common(
     };
 
     vm.build_data.targets.push(target);
+    if shared_library_only {
+        vm.build_data.shared_library_only.insert(id.clone());
+    }
 
     Ok(Object::BuildTarget(BuildTargetRef {
         name,
@@ -1157,15 +1161,15 @@ fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
 }
 
 fn builtin_executable(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    build_target_common(vm, args, TargetType::Executable)
+    build_target_common(vm, args, TargetType::Executable, false)
 }
 
 fn builtin_static_library(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    build_target_common(vm, args, TargetType::StaticLibrary)
+    build_target_common(vm, args, TargetType::StaticLibrary, false)
 }
 
 fn builtin_shared_library(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    build_target_common(vm, args, TargetType::SharedLibrary)
+    build_target_common(vm, args, TargetType::SharedLibrary, true)
 }
 
 fn builtin_library(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
@@ -1182,15 +1186,15 @@ fn builtin_library(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         })
         .unwrap_or_else(|| "shared".to_string());
     match default_lib.as_str() {
-        "static" => build_target_common(vm, args, TargetType::StaticLibrary),
+        "static" => build_target_common(vm, args, TargetType::StaticLibrary, false),
         "both" => builtin_both_libraries(vm, args),
-        _ => build_target_common(vm, args, TargetType::SharedLibrary),
+        _ => build_target_common(vm, args, TargetType::SharedLibrary, false),
     }
 }
 
 fn builtin_both_libraries(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    let shared = build_target_common(vm, args, TargetType::SharedLibrary)?;
-    let static_lib = build_target_common(vm, args, TargetType::StaticLibrary)?;
+    let shared = build_target_common(vm, args, TargetType::SharedLibrary, false)?;
+    let static_lib = build_target_common(vm, args, TargetType::StaticLibrary, false)?;
     Ok(Object::BothLibraries(
         Box::new(shared),
         Box::new(static_lib),
@@ -1198,7 +1202,7 @@ fn builtin_both_libraries(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
 }
 
 fn builtin_shared_module(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    build_target_common(vm, args, TargetType::SharedModule)
+    build_target_common(vm, args, TargetType::SharedModule, true)
 }
 
 fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
@@ -3078,6 +3082,37 @@ fn prefix_dependent_default(prefix: &str, option: &str) -> Option<&'static str> 
         ("/usr/local", "sharedstatedir") => Some("/var/local/lib"),
         _ => None,
     }
+}
+
+pub(crate) fn builtin_dir_option(vm: &VM, name: &str) -> String {
+    if let Some(Object::String(value)) = vm.options.get(name) {
+        return value.clone();
+    }
+    let prefix = match vm.options.get("prefix") {
+        Some(Object::String(p)) => p.trim_end_matches('/').to_string(),
+        _ => "/usr/local".to_string(),
+    };
+    if let Some(dir) = prefix_dependent_default(&prefix, name) {
+        return dir.to_string();
+    }
+    match name {
+        "prefix" => "/usr/local",
+        "bindir" => "bin",
+        "libdir" => "lib",
+        "libexecdir" => "libexec",
+        "includedir" => "include",
+        "datadir" => "share",
+        "mandir" => "share/man",
+        "infodir" => "share/info",
+        "localedir" => "share/locale",
+        "sysconfdir" => "etc",
+        "localstatedir" => "var",
+        "sharedstatedir" => "com",
+        "sbindir" => "sbin",
+        "licensedir" => "",
+        _ => "",
+    }
+    .to_string()
 }
 
 fn builtin_install_emptydir(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
