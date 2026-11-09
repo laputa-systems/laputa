@@ -2,7 +2,8 @@
 # Laputa parity: configures, builds and installs each Meson package Laputa
 # ships from its cached upstream source, once with reference Meson 1.12.1
 # and samu and once with gluon, and compares the installed trees (paths,
-# modes, symlink targets). A package listed in expected-fail must fail; any
+# modes, symlink targets). gluon runs with GLUON_SHELL=forbid, so a generated
+# edge that needs a shell fails. A package listed in expected-fail must fail; any
 # other package must match. Usage: run.sh [PACKAGE...]; LAPUTA_SOURCE_CACHE
 # names the source cache when running from a worktree.
 set -u
@@ -28,7 +29,7 @@ tree() {
 
 run_impl() {
   impl=$1 src=$2 out=$3; shift 3
-  if [ "$impl" = ref ]; then m=meson n=samu; else m=$MESON n=$NINJA; fi
+  if [ "$impl" = ref ]; then m=meson n=samu; else m=$MESON n=$NINJA; export GLUON_SHELL=forbid; fi
   b=$out/$impl-build d=$out/$impl-dest
   ( cd "$out" && timeout 900 "$m" setup --prefix=/usr --libdir=lib "$@" "$b" "$src" ) > "$out/$impl-setup.log" 2>&1 || { echo setup; return; }
   timeout 3600 "$n" -C "$b" > "$out/$impl-build.log" 2>&1 || { echo build; return; }
