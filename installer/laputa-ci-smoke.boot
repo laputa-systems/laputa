@@ -1,13 +1,13 @@
 #!/bin/xsh
 proc main() [fs, process, time, error] {
   # 1. Assert external networking is NOT yet configured (no DHCP by default).
-  let interfaces = linux.interfaces()?
+  let observed = linux.network_dump()?
   var has_ext_addr = false
 
-  for iface in interfaces {
-    if iface.name != "lo" {
-      for addr in iface.addresses {
-        if addr.family == "inet" {
+  for iface in observed.links {
+    if (iface.name ?? "") != "lo" {
+      for addr in observed.addresses {
+        if addr.ifindex == iface.ifindex and addr.family == "inet" {
           has_ext_addr = true
         }
       }
@@ -39,12 +39,12 @@ iface eth0 inet dhcp
   var got_lease = false
 
   while elapsed < 15 {
-    let ifs = linux.interfaces()?
+    let ifs = linux.network_dump()?
 
-    for iface in ifs {
-      if iface.name != "lo" {
-        for addr in iface.addresses {
-          if addr.family == "inet" {
+    for iface in ifs.links {
+      if (iface.name ?? "") != "lo" {
+        for addr in ifs.addresses {
+          if addr.ifindex == iface.ifindex and addr.family == "inet" {
             got_lease = true
           }
         }
@@ -63,11 +63,11 @@ iface eth0 inet dhcp
   }
 
   # 5. Assert a default route exists.
-  let routes = linux.routes()?
+  let routes = linux.network_dump()?.routes
   var has_default = false
 
   for route in routes {
-    if route.dst == "default" {
+    if route.table == 254 and route.destination_prefix_length == 0 {
       has_default = true
     }
   }

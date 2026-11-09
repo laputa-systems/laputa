@@ -40,7 +40,7 @@ proc main(root: Path) [fs, process, net, env, time, io, error] {
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   let endpoint = fp"{root}/inputs/nts-endpoint".read_text()?.trim()
   var iface = ""
-  for entry in linux.interfaces()? { if entry.name != "lo" and iface == "" { iface = entry.name } }
+  for name in [entry.name ?? "" for entry in linux.network_dump()?.links] |> sort { if name != "lo" and iface == "" { iface = name } }
   assert iface != "", "guest has no network interface"
   linux.link_up(iface)?
   linux.set_ipv4_address(iface, "10.0.2.15", "255.255.255.0")?

@@ -113,9 +113,10 @@ proc wait_for_dev_vda(phase: Str) [fs, time, error] {
 
 proc bring_up_net(phase: Str) [fs, process, net, error] {
   var iface = ""
-  for entry in linux.interfaces()? {
-    if entry.name != "lo" and iface == "" {
-      iface = entry.name
+  let names = [entry.name ?? "" for entry in linux.network_dump()?.links] |> sort
+  for name in names {
+    if name != "lo" and iface == "" {
+      iface = name
     }
   }
 

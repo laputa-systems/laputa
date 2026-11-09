@@ -236,28 +236,39 @@ proc wait_for(path_value: Path) {
 }
 
 proc installer_network_interfaces() -> Result[InstallerNetwork] {
-  let interfaces = linux.interfaces()?
-  let routes = linux.routes()?
+  let dump = linux.network_dump()?
+  guard dump.state == "complete" else {
+    return Err(error.failure(f"route netlink dump is {dump.state}"))
+  }
   var iface = ""
   var address = ""
   var netmask = "255.255.255.0"
   var gateway = "10.0.2.2"
 
-  for item in interfaces {
-    if item.name != "lo" and address == "" {
-      for addr in item.addresses {
-        if addr.family == "inet" and address == "" {
-          iface = item.name
-          address = addr.addr
-          netmask = prefix_to_netmask(addr.prefix_len)
+  let names = [link.name ?? "" for link in dump.links] |> sort
+  for name in names {
+    if name != "lo" and address == "" {
+      for item in [link for link in dump.links if (link.name ?? "") == name] {
+        for addr in dump.addresses {
+          let text = addr.local ?? addr.address ?? ""
+          if addr.ifindex == item.ifindex and addr.family == "inet" and text != "" and address == "" {
+            iface = name
+            address = text
+            netmask = prefix_to_netmask(addr.prefix_length)
+          }
         }
       }
     }
   }
 
-  for route in routes {
-    if route.dst == "default" and route.gateway != "" and "." in route.gateway {
-      gateway = route.gateway
+  for route in dump.routes {
+    if route.table == 254 and route.family == "inet" and route.destination_prefix_length == 0 and route.flags.bit_and(512) == 0 {
+      let hops = if route.nexthops.is_empty() { [route.gateway] } else { [hop.gateway for hop in route.nexthops] }
+      for hop_gateway in hops {
+        if hop_gateway != null {
+          gateway = hop_gateway ?? gateway
+        }
+      }
     }
   }
 
