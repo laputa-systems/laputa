@@ -10,7 +10,7 @@ export const package_kind = "payload"
 ## Upstream version.
 export const ver = "2.18.3"
 ## Package revision.
-export const rel = "1"
+export const rel = "2"
 ## Runtime dependencies.
 export const deps = ["musl", "freetype", "expat"]
 ## Build dependencies.
@@ -32,7 +32,6 @@ export const upstream_sources = [
 ]
 ## Installed files.
 export const filetree = [
-  {path: p"etc/fonts/fonts.conf", kind: "file"},
   {path: p"usr/include/fontconfig", kind: "tree"},
   {path: p"usr/lib/libfontconfig.so", kind: "symlink"},
   {path: p"usr/lib/libfontconfig.so.1", kind: "symlink"},
@@ -129,19 +128,6 @@ export proc build(dest: Path) [fs, process, env, error] {
       run $muon "-C" "build" "install"
     }
   }?
-  fp"{dest}/etc/fonts/fonts.conf".write(
-    """<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <dir>/usr/share/fonts</dir>
-  <cachedir>/var/cache/fontconfig</cachedir>
-  <cachedir prefix="xdg">fontconfig</cachedir>
-  <alias><family>sans</family><prefer><family>DejaVu Sans</family></prefer></alias>
-  <alias><family>sans-serif</family><prefer><family>DejaVu Sans</family></prefer></alias>
-  <alias><family>serif</family><prefer><family>DejaVu Serif</family><family>DejaVu Sans</family></prefer></alias>
-  <alias><family>monospace</family><prefer><family>Hack</family></prefer></alias>
-</fontconfig>
-""",
-  )
+  fp"{dest}/etc/fonts".remove(missing_ok: false)
   fp"{dest}/var/cache/fontconfig".mkdir(true)
 }

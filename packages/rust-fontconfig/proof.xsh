@@ -47,6 +47,11 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   let link = fp"{root}/usr/lib/librust_fontconfig.so"
   proof.ensure(link.readlink()? == fp"{soname}", "proof-rust-fontconfig", "development link does not name the SONAME file")
 
+  let policy = fp"{root}/etc/fonts/fonts.conf".read_text()?
+  proof.ensure("<dir>/usr/share/fonts</dir>" in policy, "proof-rust-fontconfig", "font policy does not scan /usr/share/fonts")
+  proof.ensure("<prefer><family>Hack</family></prefer>" in policy, "proof-rust-fontconfig", "font policy does not prefer Hack for monospace")
+  proof.ensure("DejaVu Sans" in policy, "proof-rust-fontconfig", "font policy does not prefer DejaVu Sans")
+
   let header = fp"{root}/usr/include/rust-fontconfig/rust_fontconfig.h"
   let exported = defined_exports(readelf, library)?
   let declared = declared_functions(header)?

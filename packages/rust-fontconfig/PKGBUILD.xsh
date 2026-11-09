@@ -16,7 +16,7 @@ export const package_kind = "payload"
 export const ver = "5.0.2"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -82,6 +82,10 @@ export let upstream_sources = [
 
 ## Package recipe export.
 export const filetree = [
+  {
+    path: p"etc/fonts/fonts.conf",
+    kind: "file",
+  },
   {
     path: p"usr/include/rust-fontconfig/rust_fontconfig.h",
     kind: "file",
@@ -195,6 +199,19 @@ export proc build(dest: Path) [fs, process, env, error] {
   fp"{dest}/usr/lib/librust_fontconfig.so".symlink(to: fp"{soname}")
   fs.install(fp"{project}/ffi/rust_fontconfig.h", fp"{dest}/usr/include/rust-fontconfig/rust_fontconfig.h", 0o644, parents: true, overwrite: true)
   fs.install(fp"{project}/LICENSE", fp"{dest}/usr/share/licenses/rust-fontconfig/LICENSE", 0o644, parents: true, overwrite: true)
+  fp"{dest}/etc/fonts".mkdir(true)
+  fp"{dest}/etc/fonts/fonts.conf".write(
+    """<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <dir>/usr/share/fonts</dir>
+  <alias><family>sans</family><prefer><family>DejaVu Sans</family></prefer></alias>
+  <alias><family>sans-serif</family><prefer><family>DejaVu Sans</family></prefer></alias>
+  <alias><family>serif</family><prefer><family>DejaVu Serif</family><family>DejaVu Sans</family></prefer></alias>
+  <alias><family>monospace</family><prefer><family>Hack</family></prefer></alias>
+</fontconfig>
+""",
+  )
   fp"{dest}/usr/lib/pkgconfig".mkdir(true)
   fp"{dest}/usr/lib/pkgconfig/rust-fontconfig.pc".write(
     r"""prefix=/usr
