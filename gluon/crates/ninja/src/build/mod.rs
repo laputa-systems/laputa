@@ -4,6 +4,7 @@
 pub use state::depfile;
 pub use state::deps_log;
 pub use state::log;
+mod command;
 mod dyndep;
 mod expand;
 mod jobserver;

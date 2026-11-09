@@ -22,7 +22,6 @@ use crate::cli::Options;
 use crate::graph::{Edge, State};
 use crate::status::{Mode, Status};
 use std::collections::{HashMap, HashSet};
-use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
 use std::time::SystemTime;
@@ -919,6 +918,7 @@ fn merge_dyndep(
 struct Prepared {
     shown: String,
     command: String,
+    shell: super::command::ShellPolicy,
     outputs: String,
     rspfile: Option<(String, String)>,
 }
@@ -974,6 +974,7 @@ fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, Strin
     Ok(Prepared {
         shown,
         command,
+        shell: super::command::ShellPolicy::from_env(),
         outputs: edge.outputs.join(" "),
         rspfile,
     })
@@ -1019,7 +1020,7 @@ fn execute(slot: usize, p: Prepared) -> EdgeOutcome {
         }
     }
 
-    let result = Command::new("sh").arg("-c").arg(&p.command).output();
+    let result = super::command::process(&p.command, p.shell).and_then(|mut process| process.output().map_err(|e| e.to_string()));
 
     if let Some((path, _)) = &p.rspfile {
         let _ = std::fs::remove_file(path);
@@ -1118,7 +1119,7 @@ fn execute_console(slot: usize, p: Prepared) -> EdgeOutcome {
         }
     }
 
-    let result = Command::new("sh").arg("-c").arg(&p.command).status();
+    let result = super::command::process(&p.command, p.shell).and_then(|mut process| process.status().map_err(|e| e.to_string()));
 
     if let Some((path, _)) = &p.rspfile {
         let _ = std::fs::remove_file(path);
