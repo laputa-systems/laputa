@@ -192,17 +192,25 @@ remaining compatibility obligations are LAP-54 and LAP-55. In order:
 3. One ICMP error slice: ICMP receive, `IP_RECVERR`, and asynchronous socket
    errors, which together serve the Asterinas-only `tracepath` and
    `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
-   matching A3/A5 debt. Candidate kernel `2252e24b6` on `work/successor-icmp`
-   (local worktree `.work/wt/asterinas-icmp`, not integrated or pushed) stops
-   addressing limited-broadcast DHCP packets to a gateway after route
-   selection; `5da429919` replaces an obsolete Asterinas-only wildcard-bind
-   expectation with a paired UDP test. The unchanged
-   `qualify.sh all --backend both` gate on build 105 passed: baseline, device,
-   clock ABI, clock, all network-state and network cases, and ten of ten
-   recovery rounds. Remaining before integration: the A0 preservation
-   (quiet-host accounting) and resource checks against build 105; then
-   integrate the kernel, run public-input verification, and update Laputa's
-   lock and gitlink together. The checked-in pin remains `d4c2e3877`.
+   matching A3/A5 debt. **Integrated, not yet published or accepted.** The
+   slice is rebased onto the LAP-54 monotonic slew as fork branch
+   `work/successor-icmp-lap54` at `dc4b3fffd` (44 commits on `434e2d626`; the
+   rebase had no conflicts and the diff from the former candidate `2252e24b6`
+   is exactly the slew change). It includes the limited-broadcast DHCP fix
+   (stop addressing those packets to a gateway after route selection) and the
+   paired wildcard-bind UDP test. `676c828a0`, which only keeps unlisted and
+   unrun echo and IPv6 UDP sources, is not part of it. Laputa's lock and
+   gitlink now name `dc4b3fffd`, and the XSH pin is unchanged. `qualify.sh all
+   --backend both` on that kernel passed baseline, device, clock ABI,
+   network-state (16 cases) and network (10 cases), and failed only on the two
+   recorded issues: the Linux-only clock `pause` case, and `carrier` in
+   recovery rounds 1 and 4 of 10, whose only transcript difference was the
+   `dhcpc` status-3 traceback on Asterinas. The resource accounting measured
+   sizes and peak memory; its CPU time is deferred: host busy, and the A0
+   quiet-host accounting is deferred: host busy. Remaining: run the A0
+   accounting and the resource CPU time on a quiet host, and publish the fork
+   branch to its `main`: `qualify.sh published-inputs` fails until then
+   because `dc4b3fffd` exists only locally.
 4. Linux page-fault cost and `MAP_POPULATE` are active performance work after
    compatibility. Any improvement needs at least five interleaved baseline
    and candidate runs, completed-work checks, and successful readiness checks.
