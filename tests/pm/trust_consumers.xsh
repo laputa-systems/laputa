@@ -115,3 +115,52 @@ test uv_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs, p
 
   assert outcomes == [true, true, false]
 }
+
+proc cargo_or_skip() [env, process, error] -> Result[Path, Error] {
+  let root = packaged_root()?
+  return fp"{root}/usr/bin/cargo" when root != ""
+
+  match process.which("cargo") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("cargo is unavailable")
+      p"/nonexistent"
+    }
+  }
+}
+
+proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: Int, label: Str) [fs, process, env, error] -> Result[Bool, Error] {
+  let dir = test.temp_dir(ctx, name: f"cargo-{label}")?
+  let stderr = fp"{dir}/stderr"
+  let command = process.command_argv(
+    cargo,
+    [cargo.display(), "search", "--index", f"sparse+https://127.0.0.1:{port}/", "zzz"],
+    dir,
+    {CARGO_HOME: dir.display(), CARGO_HTTP_CAINFO: bundle.display(), HOME: e"HOME" ?? dir.display(), PATH: "/usr/bin:/bin"},
+    stderr:,
+    timeout: 60s,
+  )
+  let _ = process.run(command)?
+  let text = stderr.read_text()?
+  if "SSL certificate" in text {
+    return false
+  }
+
+  assert "config.json not found" in text, text
+  true
+}
+
+test cargo_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs, process, env, time, error] { |ctx|
+  let python = python_or_skip()?
+  let cargo = cargo_or_skip()?
+  let bundle = root_bundle(ctx)?
+  var outcomes: List[Bool] = []
+
+  for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
+    let server = serve_chain(ctx, f"cargo-server-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture(f"tls/{entry[1]}.key").display())?
+    defer stop_server(server)
+    outcomes += [cargo_reaches_registry(ctx, cargo, bundle, server.port, entry[0])?]
+  }
+
+  assert outcomes == [true, true, false]
+}

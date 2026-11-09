@@ -197,6 +197,8 @@ Known TLS consumers and their cutover:
 |---|---|---|
 | `tailscale` (Go daemon, xinit-supervised) | Reads system roots at startup | `xinit restart tailscale` |
 | `uv` | Upstream binary caches TLS roots; no Laputa SPKI policy | Start a new process |
+| `cargo` | Upstream binary (libcurl with OpenSSL); no Laputa SPKI policy | Start a new process |
+| `ntpd-rs` (xinit-supervised) | Rustls with the platform verifier for NTS key exchange; no Laputa SPKI policy | `xinit restart ntpd-rs` |
 | `dropbear` (SSH daemon, xinit-supervised) | Host keys only; no TLS roots | None needed |
 | `laputa-net` (`ifup`, oneshot) | No long-lived client | None needed |
 | `mdevd`, `seatd`, `wpa_supplicant` | No TLS | None needed |
@@ -228,6 +230,17 @@ read `/etc/laputa/trust-policy`. Root omission is enforced, but a blocked
 intermediate that reaches a retained root remains accepted. uv remains an
 explicit gap in per-consumer intermediate distrust enforcement.
 
+The `cargo` package repackages the upstream musl distribution and `ntpd-rs`
+is built from source against upstream `rustls-webpki` 0.103.15 through
+`rustls-platform-verifier` 0.7.1. Neither reads `/etc/laputa/trust-policy`,
+so both share the uv gap. `ntpd-rs` fetches no data over TLS beyond NTS key
+exchange with its three configured operators, but a blocked intermediate
+would be accepted there. Building these against Laputa's `webpki` and
+`rustls` forks does not close the gap: the `webpki` fork still carries
+`TODO: check_distrust` in `src/verify_cert.rs` and has no SPKI policy input,
+and each consumer's verifier (`reqwest` and platform verifier for uv, OpenSSL
+for cargo) would need its own integration.
+
 Source-built Tailscale 1.104.2 uses a package-scoped Go 1.27.3 overlay.
 Fresh and resumed TLS handshakes reread the canonical policy and check the
 provided and verified certificate paths. Once a process observes a policy,
@@ -252,11 +265,23 @@ The XSH and Tailscale regressions run real TLS connections in disposable Docker
 containers without modifying host trust. They check each cross-signed form
 with its corresponding retained root. The uv characterization uses `cross-r1`:
 
-| Chain with installed policy | XSH | `uv` | `tailscaled` |
-|---|---|---|---|
-| Unblocked control | Connects | Connects | Connects |
-| Blocked intermediate under `cross-r1` | Rejects | Connects | Rejects |
-| Blocked intermediate under `cross-r2` | Rejects | No SPKI enforcement | Rejects |
+| Chain with installed policy | XSH | `tailscaled` | `uv` | `cargo` | `ntpd-rs` |
+|---|---|---|---|---|---|
+| Unblocked control | Connects | Connects | Connects | Connects | Connects |
+| Blocked intermediate under `cross-r1` | Rejects | Rejects | Connects | Connects | Connects |
+| Blocked intermediate under `cross-r2` | Rejects | Rejects | Rejects (root omitted) | Rejects (root omitted) | Rejects (root omitted) |
+
+Enforcing consumers: XSH and `tailscaled`. Non-enforcing consumers: `uv`,
+`cargo`, and `ntpd-rs`. The `ntpd-rs` column runs its pinned
+`rustls-platform-verifier` 0.7.1 and `rustls-webpki` 0.103.15 with the
+retained `cross-r1` root as an extra root, calling `verify_server_cert`
+directly; it is not a full NTS-KE handshake. The `cargo` row was observed
+with the host `cargo` 1.99.0-nightly and `CARGO_HTTP_CAINFO`; the packaged
+binary is the same upstream OpenSSL-based build but has not been run
+through the fixture. Other packages have no TLS client (`dropbear`,
+`wpa_supplicant`, `mdevd-rs`, `seatd-rs`, `laputa-net`) or build `rustic`
+with `--no-default-features`; the `rustic` network feature set was not
+inspected.
 
 Export `XSH_HOST` and `XSHT` as described in [development](DEVELOPMENT.md).
 Run the focused package fixtures with extracted package roots:
@@ -267,8 +292,8 @@ LAPUTA_TRUST_CONSUMER_ROOT="$UV_ROOT" "$XSHT" test tests/pm/trust_consumers.xsh
 LAPUTA_TAILSCALE_ROOT="$TAILSCALE_ROOT" "$XSHT" test tests/pm/tailscale_policy.xsh
 ```
 
-The uv characterization accepts the unblocked control and the blocked
-intermediate under `cross-r1`, and rejects the chain rooted in omitted
+The uv and cargo characterizations accept the unblocked control and the
+blocked intermediate under `cross-r1`, and reject the chain rooted in omitted
 `cross-r2`. The upstream binary is retained by explicit packaging policy.
 Tailscale's package-local Go fixtures cover fresh and resumed handshakes,
 policy deletion, custom control connections, and preservation of system and
