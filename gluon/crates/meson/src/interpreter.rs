@@ -48,6 +48,7 @@ impl Interpreter {
                 obj
             };
             self.vm.options.insert(key.clone(), obj);
+            self.vm.explicit_option_keys.insert(key.clone());
         }
     }
 

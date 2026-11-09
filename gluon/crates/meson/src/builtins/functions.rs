@@ -492,8 +492,8 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
             } else {
                 crate::options::parse_option_value(val)
             };
-            if vm.caller_option_keys.contains(&key) {
-                // Caller subproject() default_options take priority; don't override
+            if vm.caller_option_keys.contains(&key) || vm.explicit_option_keys.contains(&key) {
+                // Caller subproject() defaults or an explicit -D value take priority.
                 vm.options.entry(key).or_insert(obj);
             } else {
                 // Override option file defaults and inherited parent values
@@ -549,6 +549,24 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
                             "false" => Object::Bool(false),
                             _ => val,
                         },
+                        _ => val,
+                    },
+                    "combo" | "string" => match &val {
+                        Object::String(_) => val,
+                        Object::Feature(FeatureState::Enabled) => {
+                            Object::String("enabled".to_string())
+                        }
+                        Object::Feature(FeatureState::Disabled) => {
+                            Object::String("disabled".to_string())
+                        }
+                        Object::Feature(FeatureState::Auto) => Object::String("auto".to_string()),
+                        Object::Bool(b) => Object::String(b.to_string()),
+                        Object::Int(n) => Object::String(n.to_string()),
+                        _ => val,
+                    },
+                    "integer" => match &val {
+                        Object::Int(_) => val,
+                        Object::String(s) => s.parse::<i64>().map(Object::Int).unwrap_or(val),
                         _ => val,
                     },
                     _ => val,
@@ -617,6 +635,52 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     if let Some(Object::String(s)) = vm.options.get("cpp_std").cloned() {
         vm.build_data.cpp_std = s;
     }
+
+    let option_string = |vm: &VM, name: &str, default: &str| -> String {
+        match vm.options.get(name) {
+            Some(Object::String(s)) => s.clone(),
+            Some(Object::Int(n)) => n.to_string(),
+            Some(Object::Bool(b)) => b.to_string(),
+            Some(Object::Feature(FeatureState::Enabled)) => "enabled".to_string(),
+            Some(Object::Feature(FeatureState::Disabled)) => "disabled".to_string(),
+            Some(Object::Feature(FeatureState::Auto)) => "auto".to_string(),
+            _ => default.to_string(),
+        }
+    };
+    let option_bool = |vm: &VM, name: &str, default: bool| -> bool {
+        match vm.options.get(name) {
+            Some(Object::Bool(b)) => *b,
+            Some(Object::String(s)) => s != "false",
+            Some(Object::Feature(FeatureState::Enabled)) => true,
+            Some(Object::Feature(FeatureState::Disabled)) => false,
+            _ => default,
+        }
+    };
+
+    vm.build_data.warning_level = option_string(vm, "warning_level", "1");
+    vm.build_data.werror = option_bool(vm, "werror", false);
+    vm.build_data.b_colorout = option_string(vm, "b_colorout", "always");
+    vm.build_data.b_staticpic = option_bool(vm, "b_staticpic", true);
+    vm.build_data.b_pie = option_bool(vm, "b_pie", false);
+
+    let buildtype = option_string(vm, "buildtype", "debug");
+    let (buildtype_optimization, buildtype_debug) = match buildtype.as_str() {
+        "release" => ("3", false),
+        "debugoptimized" => ("2", true),
+        "minsize" => ("s", true),
+        "plain" => ("0", false),
+        _ => ("0", true),
+    };
+    vm.build_data.optimization = if vm.options.contains_key("optimization") {
+        option_string(vm, "optimization", buildtype_optimization)
+    } else {
+        buildtype_optimization.to_string()
+    };
+    vm.build_data.debug = if vm.options.contains_key("debug") {
+        option_bool(vm, "debug", buildtype_debug)
+    } else {
+        buildtype_debug
+    };
 
     Ok(Object::None)
 }
@@ -711,11 +775,9 @@ fn build_target_common(
     for arg in positional.iter().skip(1) {
         collect_sources(arg, &mut sources);
     }
-    // Also collect from 'sources' kwarg
-    if let Some(Object::Array(arr)) = VM::get_arg_value(args, "sources") {
-        for s in arr {
-            collect_sources(s, &mut sources);
-        }
+    // Also collect from 'sources' kwarg (a single value or an array)
+    if let Some(value) = VM::get_arg_value(args, "sources") {
+        collect_sources(&value, &mut sources);
     }
 
     let mut dependencies = Vec::new();
@@ -1092,39 +1154,8 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         _ => None,
     };
 
-    // Threads is a virtual dependency - but respect required: disabled
-    if name == "threads" && !is_feature_disabled {
-        return Ok(Object::Dependency(DependencyData {
-            name: "threads".to_string(),
-            found: true,
-            version: String::new(),
-            compile_args: Vec::new(),
-            link_args: vec!["-lpthread".to_string()],
-            sources: Vec::new(),
-            include_dirs: Vec::new(),
-            dependencies: Vec::new(),
-            variables: std::collections::HashMap::new(),
-            is_internal: false,
-            kind: String::new(),
-        }));
-    }
-
-    // OpenMP is a virtual dependency provided by the compiler
-    if name == "openmp" && !is_feature_disabled {
-        return Ok(Object::Dependency(DependencyData {
-            name: "openmp".to_string(),
-            found: true,
-            version: String::new(),
-            compile_args: vec!["-fopenmp".to_string()],
-            link_args: vec!["-fopenmp".to_string()],
-            sources: Vec::new(),
-            include_dirs: Vec::new(),
-            dependencies: Vec::new(),
-            variables: std::collections::HashMap::new(),
-            is_internal: false,
-            kind: String::new(),
-        }));
-    }
+    // Threads and OpenMP are builtin/system dependencies resolved from the
+    // C compiler by the dependency lookup.
 
     // Build cache key from name + method to avoid cross-method cache hits
     let method = VM::get_arg_str(args, "method", usize::MAX).unwrap_or("auto");
@@ -1689,9 +1720,37 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     Ok(obj)
 }
 
+fn collect_link_with(value: &Object, link_args: &mut Vec<String>) {
+    match value {
+        Object::Array(items) => {
+            for item in items {
+                collect_link_with(item, link_args);
+            }
+        }
+        Object::BothLibraries(shared, _) => collect_link_with(shared, link_args),
+        Object::BuildTarget(t) => {
+            let dir = if t.subdir.is_empty() {
+                String::new()
+            } else {
+                format!("{}/", t.subdir)
+            };
+            let output = t.outputs.first().cloned().unwrap_or_else(|| t.name.clone());
+            link_args.push(format!("{}{}", dir, output));
+        }
+        _ => {}
+    }
+}
+
 fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let compile_args = VM::get_arg_string_array(args, "compile_args");
-    let link_args = VM::get_arg_string_array(args, "link_args");
+    let mut link_args = VM::get_arg_string_array(args, "link_args");
+
+    if let Some(value) = VM::get_arg_value(args, "link_with") {
+        collect_link_with(&value, &mut link_args);
+    }
+    if let Some(value) = VM::get_arg_value(args, "link_whole") {
+        collect_link_with(&value, &mut link_args);
+    }
     let include_dirs_val = VM::get_arg_value(args, "include_directories");
     let mut include_dirs = Vec::new();
     match include_dirs_val {
@@ -4147,21 +4206,60 @@ fn builtin_structured_sources(_vm: &mut VM, args: &[CallArg]) -> Result<Object, 
     Ok(Object::StructuredSources(groups))
 }
 
-fn builtin_add_project_arguments(_vm: &mut VM, _args: &[CallArg]) -> Result<Object, String> {
-    // Store for later use by backend
+fn flatten_string_objects(value: &Object, out: &mut Vec<String>) {
+    match value {
+        Object::String(s) => out.push(s.clone()),
+        Object::Array(items) => {
+            for item in items {
+                flatten_string_objects(item, out);
+            }
+        }
+        Object::File(f) => out.push(f.path.clone()),
+        _ => {}
+    }
+}
+
+fn add_arguments_to_project_or_global(
+    vm: &mut VM,
+    args: &[CallArg],
+    link: bool,
+    global: bool,
+) -> Result<Object, String> {
+    let mut values = Vec::new();
+    for value in VM::get_positional_args(args) {
+        flatten_string_objects(&value, &mut values);
+    }
+    let language = VM::get_arg_str(args, "language", usize::MAX).map(String::from);
+    let languages = match language {
+        Some(l) if !l.is_empty() => vec![l],
+        _ => vec!["*".to_string()],
+    };
+    let map = match (link, global) {
+        (false, false) => &mut vm.build_data.project_args,
+        (true, false) => &mut vm.build_data.project_link_args,
+        (false, true) => &mut vm.build_data.global_args,
+        (true, true) => &mut vm.build_data.global_link_args,
+    };
+    for lang in languages {
+        map.entry(lang).or_default().extend(values.iter().cloned());
+    }
     Ok(Object::None)
 }
 
-fn builtin_add_project_link_arguments(_vm: &mut VM, _args: &[CallArg]) -> Result<Object, String> {
-    Ok(Object::None)
+fn builtin_add_project_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
+    add_arguments_to_project_or_global(vm, args, false, false)
 }
 
-fn builtin_add_global_arguments(_vm: &mut VM, _args: &[CallArg]) -> Result<Object, String> {
-    Ok(Object::None)
+fn builtin_add_project_link_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
+    add_arguments_to_project_or_global(vm, args, true, false)
 }
 
-fn builtin_add_global_link_arguments(_vm: &mut VM, _args: &[CallArg]) -> Result<Object, String> {
-    Ok(Object::None)
+fn builtin_add_global_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
+    add_arguments_to_project_or_global(vm, args, false, true)
+}
+
+fn builtin_add_global_link_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
+    add_arguments_to_project_or_global(vm, args, true, true)
 }
 
 fn builtin_add_languages(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {

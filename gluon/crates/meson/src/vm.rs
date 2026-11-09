@@ -110,6 +110,9 @@ pub struct VM {
     pub top_subproject_dir: String,
     /// Option keys explicitly set by the caller of subproject() (to prevent subproject own defaults from overriding them)
     pub caller_option_keys: HashSet<String>,
+    /// Option keys set from the command line or a machine file. Meson gives
+    /// these priority over project()/subproject() default_options.
+    pub explicit_option_keys: HashSet<String>,
     /// Native file properties (from --native-file [properties] section)
     pub native_properties: HashMap<String, Object>,
 }
@@ -149,6 +152,17 @@ pub struct BuildData {
     pub dependency_overrides: HashMap<String, Vec<(Option<bool>, Object)>>,
     pub c_std: String,
     pub cpp_std: String,
+    pub warning_level: String,
+    pub werror: bool,
+    pub optimization: String,
+    pub debug: bool,
+    pub b_colorout: String,
+    pub b_staticpic: bool,
+    pub b_pie: bool,
+    pub project_args: HashMap<String, Vec<String>>,
+    pub global_args: HashMap<String, Vec<String>>,
+    pub project_link_args: HashMap<String, Vec<String>>,
+    pub global_link_args: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -346,6 +360,7 @@ impl VM {
             top_build_root: String::new(),
             top_subproject_dir: "subprojects".to_string(),
             caller_option_keys: HashSet::new(),
+            explicit_option_keys: HashSet::new(),
             native_properties: HashMap::new(),
         }
     }

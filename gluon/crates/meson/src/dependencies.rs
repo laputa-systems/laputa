@@ -62,12 +62,188 @@ fn run_pkgconfig(cmd: &str, args: &[&str]) -> Option<std::process::Output> {
     }
 }
 
+/// Build a dependency object for Meson's builtin/system dependency families
+/// (dl, threads, iconv, intl, openmp, atomic). These are not pkg-config
+/// lookups; Meson resolves them from the C compiler.
+fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
+    let compiler = match vm.globals.get("compiler_c") {
+        Some(Object::Compiler(c)) => Some(c.clone()),
+        _ => None,
+    };
+    let wants_builtin = method == "auto" || method == "builtin";
+    let wants_system = method == "auto" || method == "system";
+    let dependency = |compile_args: Vec<String>, link_args: Vec<String>| {
+        Object::Dependency(DependencyData {
+            name: name.to_string(),
+            found: true,
+            version: String::new(),
+            compile_args,
+            link_args,
+            sources: Vec::new(),
+            include_dirs: Vec::new(),
+            dependencies: Vec::new(),
+            variables: HashMap::new(),
+            is_internal: false,
+            kind: "system".to_string(),
+        })
+    };
+    let prefix_arg = |header: &str| CallArg {
+        name: Some("prefix".to_string()),
+        value: Object::String(format!("#include <{}>", header)),
+    };
+    let args_arg = |args: &[&str]| CallArg {
+        name: Some("args".to_string()),
+        value: Object::Array(args.iter().map(|a| Object::String(a.to_string())).collect()),
+    };
+
+    match name {
+        "dl" => {
+            if wants_builtin {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_function(c, "dlopen", &[prefix_arg("dlfcn.h")]) {
+                        return Some(dependency(Vec::new(), Vec::new()));
+                    }
+                }
+            }
+            if wants_system {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_header(c, "dlfcn.h") {
+                        if let Some(lib) = crate::compilers::find_library(c, "dl", &[]) {
+                            if let Object::Dependency(d) = lib {
+                                return Some(dependency(d.compile_args, d.link_args));
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        }
+        "threads" if wants_system => {
+            let link_args = match compiler.as_ref().map(|c| c.id.as_str()) {
+                Some("gcc") | Some("clang") if !cfg!(target_os = "macos") => {
+                    vec!["-pthread".to_string()]
+                }
+                _ => Vec::new(),
+            };
+            Some(dependency(Vec::new(), link_args))
+        }
+        "iconv" => {
+            if wants_builtin {
+                if let Some(c) = &compiler {
+                    let code = "#include <iconv.h>\nint main(void) { iconv_open(\"\", \"\"); return 0; }";
+                    if crate::compilers::try_link(c, code, &[]) {
+                        return Some(dependency(Vec::new(), Vec::new()));
+                    }
+                }
+            }
+            if wants_system {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_header(c, "iconv.h") {
+                        if let Some(Object::Dependency(d)) =
+                            crate::compilers::find_library(c, "iconv", &[])
+                        {
+                            return Some(dependency(d.compile_args, d.link_args));
+                        }
+                    }
+                }
+            }
+            None
+        }
+        "intl" => {
+            if wants_builtin {
+                if let Some(c) = &compiler {
+                    let code = "#include <libintl.h>\nint main(void) { gettext(\"Hello world\"); return 0; }";
+                    if crate::compilers::try_link(c, code, &[]) {
+                        return Some(dependency(Vec::new(), Vec::new()));
+                    }
+                }
+            }
+            if wants_system {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_header(c, "libintl.h") {
+                        if let Some(Object::Dependency(d)) =
+                            crate::compilers::find_library(c, "intl", &[])
+                        {
+                            return Some(dependency(d.compile_args, d.link_args));
+                        }
+                    }
+                }
+            }
+            None
+        }
+        "openmp" if wants_system => {
+            let c = compiler.as_ref()?;
+            let flags = match c.id.as_str() {
+                "gcc" | "clang" => vec!["-fopenmp".to_string()],
+                _ => return None,
+            };
+            let date = crate::compilers::get_define(
+                c,
+                "_OPENMP",
+                &[args_arg(&["-fopenmp"])],
+            );
+            let version = match date.trim() {
+                "202411" => "6.0",
+                "202111" => "5.2",
+                "202011" => "5.1",
+                "201811" | "201611" => "5.0",
+                "201511" => "4.5",
+                "201307" => "4.0",
+                "201107" => "3.1",
+                "200805" => "3.0",
+                "200505" => "2.5",
+                "200203" => "2.0",
+                "199810" => "1.0",
+                _ => return None,
+            };
+            if !crate::compilers::check_header(c, "omp.h") {
+                return None;
+            }
+            let mut dep = dependency(flags.clone(), flags);
+            if let Object::Dependency(d) = &mut dep {
+                d.version = version.to_string();
+            }
+            Some(dep)
+        }
+        "atomic" => {
+            if wants_builtin {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_function(
+                        c,
+                        "atomic_flag_clear",
+                        &[prefix_arg("stdatomic.h")],
+                    ) {
+                        return Some(dependency(Vec::new(), Vec::new()));
+                    }
+                }
+            }
+            if wants_system {
+                if let Some(c) = &compiler {
+                    if crate::compilers::check_header(c, "stdatomic.h") {
+                        if let Some(Object::Dependency(d)) =
+                            crate::compilers::find_library(c, "atomic", &[])
+                        {
+                            return Some(dependency(d.compile_args, d.link_args));
+                        }
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
 /// Try to find a dependency using various methods.
 pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Object> {
     let method = VM::get_arg_str(args, "method", usize::MAX).unwrap_or("auto");
     let version_req = VM::get_arg_str(args, "version", usize::MAX);
     let modules = VM::get_arg_string_array(args, "modules");
     let components = VM::get_arg_string_array(args, "components");
+
+    if let Some(dep) = special_dependency(vm, name, method) {
+        return Some(dep);
+    }
 
     if name == "appleframeworks" {
         let mut link_args = Vec::new();

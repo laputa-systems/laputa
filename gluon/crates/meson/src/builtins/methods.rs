@@ -224,6 +224,13 @@ pub fn register(vm: &mut VM) {
     vm.method_registry.insert(
         (
             "external_program".to_string(),
+            "language_version".to_string(),
+        ),
+        program_version,
+    );
+    vm.method_registry.insert(
+        (
+            "external_program".to_string(),
             "install_sources".to_string(),
         ),
         program_install_sources,
@@ -2321,36 +2328,41 @@ fn generator_process(vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Obje
             } else {
                 g.output.clone()
             };
-            for tmpl in templates {
+            let mut source_outputs = Vec::new();
+            for tmpl in &templates {
                 let out = tmpl
                     .replace("@PLAINNAME@", &plainname)
                     .replace("@BASENAME@", &basename);
-                let mut command = vec![exe_str.clone()];
-                command.extend(g.arguments.iter().cloned());
-                command.extend(extra_args.iter().cloned());
-                let id = format!("generator:{}@{}", out, vm.current_subdir);
-                let ct = CustomTarget {
-                    name: out.clone(),
-                    id: id.clone(),
-                    command,
-                    input: vec![source.clone()],
-                    output: vec![out.clone()],
-                    depends: depends.clone(),
-                    depend_files: Vec::new(),
-                    depfile: g.depfile.clone(),
-                    capture: g.capture,
-                    feed: false,
-                    install: false,
-                    install_dir: Vec::new(),
-                    install_tag: Vec::new(),
-                    build_by_default: true,
-                    build_always_stale: false,
-                    env: HashMap::new(),
-                    subdir: vm.current_subdir.clone(),
-                };
-                vm.build_data.custom_targets.push(ct);
-                outputs.push(out);
+                source_outputs.push(out);
             }
+            if source_outputs.is_empty() {
+                continue;
+            }
+            let mut command = vec![exe_str.clone()];
+            command.extend(g.arguments.iter().cloned());
+            command.extend(extra_args.iter().cloned());
+            let id = format!("generator:{}@{}", source_outputs[0], vm.current_subdir);
+            let ct = CustomTarget {
+                name: source_outputs[0].clone(),
+                id: id.clone(),
+                command,
+                input: vec![source.clone()],
+                output: source_outputs.clone(),
+                depends: depends.clone(),
+                depend_files: Vec::new(),
+                depfile: g.depfile.clone(),
+                capture: g.capture,
+                feed: false,
+                install: false,
+                install_dir: Vec::new(),
+                install_tag: Vec::new(),
+                build_by_default: true,
+                build_always_stale: false,
+                env: HashMap::new(),
+                subdir: vm.current_subdir.clone(),
+            };
+            vm.build_data.custom_targets.push(ct);
+            outputs.extend(source_outputs);
         }
 
         Ok(Object::GeneratedList(GeneratedListData {

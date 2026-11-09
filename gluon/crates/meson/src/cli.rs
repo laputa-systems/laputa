@@ -704,7 +704,8 @@ impl Cli {
                     interp
                         .vm
                         .options
-                        .insert(opt_key, crate::options::parse_option_value(value));
+                        .insert(opt_key.clone(), crate::options::parse_option_value(value));
+                    interp.vm.explicit_option_keys.insert(opt_key);
                 }
             }
         }
@@ -744,7 +745,8 @@ impl Cli {
                     interp
                         .vm
                         .options
-                        .insert(opt_key, crate::options::parse_option_value(value));
+                        .insert(opt_key.clone(), crate::options::parse_option_value(value));
+                    interp.vm.explicit_option_keys.insert(opt_key);
                 }
             }
         }
