@@ -19,6 +19,12 @@ Gates, narrowest first:
 - `cargo test --workspace` — unit/integration suites for all crates.
 - `tests/differential/run.sh` — the fixture corpus; exit 0 only with the
   ledger honored.
+- `tests/laputa/run.sh` — every Meson package Laputa ships, from its cached
+  upstream source with the recipe's options: reference Meson and samu, then
+  gluon, each configured, built and installed; the installed trees (paths,
+  modes, symlink targets) must match. `tests/laputa/expected-fail` ledgers
+  the packages that do not yet, with a cause; a host without a reference
+  build tool reports SKIP.
 - `tests/upstream/musl.sh` — static-musl bins via Docker (pinned
   `rust:1.98`, `--platform linux/amd64`, `x86_64-unknown-linux-musl`) that
   run `--version` in the container. CI builds the same target directly with
