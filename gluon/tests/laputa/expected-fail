@@ -1,7 +1,4 @@
-libdrm generator step for generated_static_table_fourcc.h fails
-libva generated va/*.h headers fail to build
 libxkbcommon external_program has no language_version method
 linux-pam dependency('dl') is not resolved to libc on musl
-seatd-rs combo option value is mis-evaluated (looks up libdisabled)
 wayland-dev custom_target command keeps a <build target> placeholder for wayland-scanner
 wl-clipboard generated protocol headers are not built before the sources that include them

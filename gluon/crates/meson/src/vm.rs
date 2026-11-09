@@ -13,6 +13,29 @@ pub struct CallArg {
     pub value: Object,
 }
 
+/// Pairs argument names with values, expanding a `kwargs` dictionary into
+/// keyword arguments the way Meson does.
+pub fn call_args(names: Vec<Option<String>>, values: Vec<Object>) -> Result<Vec<CallArg>, String> {
+    let mut args = Vec::with_capacity(values.len());
+    let mut expanded = Vec::new();
+    for (name, value) in names.into_iter().zip(values) {
+        match (name.as_deref(), value) {
+            (Some("kwargs"), Object::Dict(entries)) => expanded.extend(entries),
+            (Some("kwargs"), other) => {
+                return Err(format!("kwargs must be a dict, not {}", other.type_name()));
+            }
+            (_, value) => args.push(CallArg { name, value }),
+        }
+    }
+    for (key, value) in expanded {
+        if args.iter().any(|arg| arg.name.as_deref() == Some(key.as_str())) {
+            return Err(format!("Entry \"{key}\" defined both as a keyword argument and in a \"kwargs\" argument."));
+        }
+        args.push(CallArg { name: Some(key), value });
+    }
+    Ok(args)
+}
+
 /// Iterator state for foreach loops
 #[derive(Debug, Clone)]
 pub enum IterState {
@@ -712,14 +735,11 @@ impl VM {
             }
             OpCode::Call(nargs) => {
                 let nargs = *nargs;
-                let mut args = Vec::new();
                 let names_start = self.arg_names.len() - nargs;
                 let names: Vec<Option<String>> = self.arg_names.drain(names_start..).collect();
                 let values_start = self.stack.len() - nargs;
                 let values: Vec<Object> = self.stack.drain(values_start..).collect();
-                for (name, value) in names.into_iter().zip(values) {
-                    args.push(CallArg { name, value });
-                }
+                let args = call_args(names, values)?;
                 let func = self.stack.pop().ok_or("Stack underflow on call")?;
                 // Check for disabler in arguments - propagate through most functions
                 let has_disabler_arg = args.iter().any(|a| {
@@ -782,14 +802,11 @@ impl VM {
             OpCode::MethodCall(method, nargs) => {
                 let nargs = *nargs;
                 let method = method.clone();
-                let mut args = Vec::new();
                 let names_start = self.arg_names.len() - nargs;
                 let names: Vec<Option<String>> = self.arg_names.drain(names_start..).collect();
                 let values_start = self.stack.len() - nargs;
                 let values: Vec<Object> = self.stack.drain(values_start..).collect();
-                for (name, value) in names.into_iter().zip(values) {
-                    args.push(CallArg { name, value });
-                }
+                let args = call_args(names, values)?;
                 let obj = self.stack.pop().ok_or("Stack underflow on method call")?;
                 if matches!(obj, Object::Disabler) {
                     if method == "found" {
@@ -1228,5 +1245,37 @@ impl VM {
             }
         }
         Vec::new()
+    }
+}
+
+#[cfg(test)]
+mod call_args_tests {
+    use super::*;
+
+    #[test]
+    fn a_kwargs_dict_becomes_keyword_arguments() {
+        let names = vec![None, Some("install".to_string()), Some("kwargs".to_string())];
+        let values = vec![
+            Object::String("drm".into()),
+            Object::Bool(true),
+            Object::Dict(vec![("version".into(), Object::String("2.4.134".into()))]),
+        ];
+        let args = call_args(names, values).unwrap();
+        let named: Vec<(Option<&str>, String)> =
+            args.iter().map(|a| (a.name.as_deref(), a.value.to_string_value())).collect();
+        assert_eq!(
+            named,
+            vec![(None, "drm".to_string()), (Some("install"), "true".to_string()), (Some("version"), "2.4.134".to_string())]
+        );
+    }
+
+    #[test]
+    fn a_key_given_twice_is_refused() {
+        let names = vec![Some("version".to_string()), Some("kwargs".to_string())];
+        let values = vec![
+            Object::String("1".into()),
+            Object::Dict(vec![("version".into(), Object::String("2".into()))]),
+        ];
+        assert!(call_args(names, values).unwrap_err().contains("\"version\""));
     }
 }
