@@ -160,17 +160,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-53 · P2 · Ship a Vulkan driver so Play can render
-
-- **Area:** Graphics
-- **Where:** `packages/play/`, `profiles/qemu-tinyland-ghostty.xsh`, `guest/qemu-tinyland-ghostty-proof.xsh`
-- **Problem:** Mesa now ships lavapipe, but the packaged Play 0.43.0 cannot render in a Tinyland guest. It binds `wl_seat` and calls `get_pointer` unconditionally; Tinyland's seat is keyboard-only, and the protocol makes that request a `missing_capability` error, so Play exits before its first frame. Play's source is outside this repository.
-- **Recommendation:** Release Play with branch `fix/seat-pointer-capability` (`702c8b0` in the Play checkout), which requests keyboard and pointer only once the seat advertises them and releases them when the capability goes away, then bump `packages/play/` to that release and land the guest phase on branch `feat/lap-53-play-guest-proof`. The guest phase also needs the Tinyland focus fix (LAP-56, branch `fix/lap-56-close-focus`).
-- **Acceptance:** Play renders a fixture through `--vo=gpu-next --gpu-context=waylandvk` in a Tinyland guest, and the Ghostty proofs still pass in the same boot. Real-GPU drivers stay deferred with hardware.
-- **Progress:** Mesa `26.2.4-3` ships lavapipe on the new build-only `llvm-static` package (LLVM 23.1.5, static archives, no `libLLVM` or `libc++` soname). Venus was not chosen: host QEMU 11.1.2 offers `venus=on` and virglrenderer 1.11 carries the venus renderer, but the host has no Vulkan driver (amdgpu without RADV), and Venus cannot work on a host without one. Mesa installs 22.8 MB → 142.9 MB (libgallium 19.8 → 68.1 MB, new `libvulkan_lvp.so` 71.8 MB, each with its own LLVM); the payload archive is 5.1 → 51.4 MB, and the kiosk image grew from disk 308M / rootfs 276M to 455M / 423M. The Mesa proof enumerates one Vulkan device, `llvmpipe (LLVM 23.1.5, 256 bits)`, as a CPU device with API 1.4. Software GL is now llvmpipe (desktop 4.6 compat, GLES 3.2) instead of softpipe. The Ghostty profile proof passes on Linux x86_64/KVM with the rebuilt Mesa (virgl 4.3, idle Ghostty RSS 61,604 KB). Play gpu-next renders the fixture on host weston with this lavapipe. With a Play build from `fix/seat-pointer-capability` substituted for the release, the guest phase and the LAP-56 fix together pass `make profile-test` end to end: Play loads lavapipe, creates a libplacebo Vulkan device, registers the 1280x800 output, plays the 320x240 png fixture, exits cleanly, and the host still finds Ghostty's marker after Play exits.
-- **Fix with:** reference-parity
-- **Effort:** S (hours)
-
 ### LAP-54 · P3 · Close the Asterinas clock ABI and timestamp obligations
 
 - **Area:** Asterinas clock

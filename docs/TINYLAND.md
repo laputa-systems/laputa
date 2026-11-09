@@ -85,7 +85,11 @@ the installed doas and XSH su paths, permitted and denied identities, live
 TIOCSTI policy, runtime-directory attacks, the same-device access-granted
 negative control, compositor crash, single keyboard removal, broker loss,
 application exit, scanner shutdown, Ghostty on a 4.3 core context, and
-modifier input.
+modifier input. After the input proof, `play-0.43.1` renders an FFmpeg-made
+320x240 PNG-in-Matroska fixture as laputa through `--vo=gpu-next
+--gpu-context=waylandvk` on lavapipe, the only Vulkan device the loader finds,
+and exits; tinyland then returns to Ghostty, whose marker the host screenshot
+must still show.
 
 Linux aarch64 and macOS host execution remain unverified. The root gate also
 exposed and repaired seed acceptance being persisted after activation. A
@@ -119,8 +123,10 @@ treating these graphical results as production qualification.
 - aarch64 is compile and package proof only.
 
 - Mesa also ships the lavapipe Vulkan driver on static LLVM, which makes
-  llvmpipe the software GL driver. Ghostty still renders on virgl. Play's
-  gpu-next path is not yet qualified in this profile (LAP-53).
+  llvmpipe the software GL driver. Ghostty still renders on virgl; Play
+  renders on lavapipe. Play 0.43.1 is the first release that requests a
+  pointer only when the seat advertises one; tinyland's seat is
+  keyboard-only and rejects the request otherwise.
 
 Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM):
 
@@ -129,9 +135,9 @@ Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM)
 | `tinyland` binary | 3,015,600 bytes |
 | `ghostty-custom` binary | 30,586,216 bytes |
 | Closure | 38 plan nodes |
-| Image | disk 308M, rootfs 276M; 455M and 423M with Mesa `26.2.4-3` (lavapipe) |
+| Image | disk 308M, rootfs 276M; 455M and 423M with Mesa `26.2.4-3` (lavapipe); 498M and 466M with Play and its closure |
 | Session ready with a 4.3 context | 16.74 s guest uptime |
-| Idle RSS after input | tinyland 7,156 KB, Ghostty 41,416 KB; tinyland 7,176 KB, Ghostty 61,604 KB with Mesa `26.2.4-3` |
+| Idle RSS after input | tinyland 7,156 KB, Ghostty 41,416 KB; tinyland 7,176 KB, Ghostty 61,604 KB with Mesa `26.2.4-3`; tinyland 7,180 KB, Ghostty 61,480 KB with Play in the profile |
 
 ## Historical graphical evidence
 
