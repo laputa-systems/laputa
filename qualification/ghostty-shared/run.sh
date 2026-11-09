@@ -24,8 +24,23 @@ done
 cp "$archive" "$repo/packages/ghostty-custom/files/ghostty-local.tar.gz"
 sha=$(sha256sum "$archive")
 sha=${sha%% *}
-sed "s/LOCAL_ARCHIVE_SHA256/$sha/" "$root/qualification/ghostty-shared/PKGBUILD.xsh" > "$repo/packages/ghostty-custom/PKGBUILD.xsh"
-cp "$root/qualification/ghostty-shared/proof.xsh" "$repo/packages/ghostty-custom/proof.xsh"
+recipe="$repo/packages/ghostty-custom/PKGBUILD.xsh"
+generated="$workspace/PKGBUILD.xsh"
+expect_one() {
+  local count
+  count=$(rg -c -F -- "$2" "$1" || true)
+  if [ "$count" != 1 ]; then
+    printf 'run.sh: expected one line matching %s in %s, found %s\n' "$2" "$1" "${count:-0}" >&2
+    exit 1
+  fi
+}
+sed \
+  -e 's|source: p"https://[^"]*ghostty-custom-ARCH-linux-musl\.tar\.gz => ghostty"|source: p"files/ghostty-local.tar.gz => ghostty"|' \
+  -e "/arch: \"x86_64\",/{n;s|sha256: \"[0-9a-f]*\"|sha256: \"$sha\"|;}" \
+  "$recipe" > "$generated"
+expect_one "$generated" 'source: p"files/ghostty-local.tar.gz => ghostty"'
+expect_one "$generated" "sha256: \"$sha\""
+mv "$generated" "$recipe"
 printf 'Qualification workspace: %s\nArchive SHA-256: %s\n' "$workspace" "$sha"
 cd "$repo"
 export TMPDIR="$root/.work/tmp"
