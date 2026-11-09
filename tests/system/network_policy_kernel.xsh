@@ -1,5 +1,10 @@
 use packages.laputa-net.network_plan as policy
 use packages.laputa-net.network_kernel as kernel
+use lib.net_state
+
+pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Request, Error] {
+  Ok(net_state.request(kernel.network_change(plan, index)?)?)
+}
 
 proc fixture_plan() [fs, error] -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
@@ -21,11 +26,11 @@ pure derived_route() -> LinuxNetworkRoute {
 
 test test_address_requests_select_exact_local_prefix_and_interface [fs, error] {
   let plan = fixture_plan()?
-  let add = kernel.network_encode_operation(plan, 0)?
+  let add = request_of(plan, 0)?
   assert add.message_type == 20
   assert add.flags == 1541
   assert add.payload == b"\x02\x18\x00\x00\x07\x00\x00\x00\x08\x00\x01\x00\xc0\x00\x03\x03\x08\x00\x02\x00\xc0\x00\x03\x03"
-  let remove = kernel.network_encode_operation(plan, 1)?
+  let remove = request_of(plan, 1)?
   assert remove.message_type == 21
   assert remove.flags == 5
   assert remove.payload == b"\x02\x18\x00\x00\x07\x00\x00\x00\x08\x00\x01\x00\xc0\x00\x02\x02\x08\x00\x02\x00\xc0\x00\x02\x02"
@@ -36,20 +41,20 @@ test test_default_route_requests_include_exact_metric_gateway_and_interface [fs,
   var desired = original.intent
   desired.metric = 101
   let plan = policy.network_plan(desired, original.owned, original.before)?
-  let add = kernel.network_encode_operation(plan, 1)?
+  let add = request_of(plan, 1)?
   assert add.message_type == 24
   assert add.flags == 1541
-  assert add.payload == b"\x02\x00\x00\x00\xfe\x03\x00\x01\x00\x00\x00\x00\x08\x00\x04\x00\x07\x00\x00\x00\x08\x00\x05\x00\xc0\x00\x02\x01\x08\x00\x06\x00\x65\x00\x00\x00"
-  let remove = kernel.network_encode_operation(plan, 2)?
+  assert add.payload == b"\x02\x00\x00\x00\xfe\x03\x00\x01\x00\x00\x00\x00\x08\x00\x05\x00\xc0\x00\x02\x01\x08\x00\x04\x00\x07\x00\x00\x00\x08\x00\x06\x00\x65\x00\x00\x00\x08\x00\x0f\x00\xfe\x00\x00\x00"
+  let remove = request_of(plan, 2)?
   assert remove.message_type == 25
   assert remove.flags == 5
-  assert remove.payload == b"\x02\x00\x00\x00\xfe\x00\x00\x01\x00\x00\x00\x00\x08\x00\x04\x00\x07\x00\x00\x00\x08\x00\x05\x00\xc0\x00\x02\x01\x08\x00\x06\x00\x64\x00\x00\x00"
+  assert remove.payload == b"\x02\x00\x00\x00\xfe\x03\x00\x01\x00\x00\x00\x00\x08\x00\x05\x00\xc0\x00\x02\x01\x08\x00\x04\x00\x07\x00\x00\x00\x08\x00\x06\x00\x64\x00\x00\x00\x08\x00\x0f\x00\xfe\x00\x00\x00"
 }
 
 test test_forged_foreign_removal_is_rejected_before_encoding [fs, error] {
   var plan = fixture_plan()?
   plan.operations = [policy.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
-  match kernel.network_encode_operation(plan, 0) {
+  match kernel.network_change(plan, 0) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false
   }
@@ -59,7 +64,7 @@ test test_incomplete_dump_never_becomes_empty_success [fs, error] {
   let plan = fixture_plan()?
   let dump: LinuxNetworkDump = {state: "partial", enumeration_succeeded: false, issues: [], links: [], addresses: [], routes: [], rules: []}
   match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "complete issue-free network observation required"
+    Err(problem) => assert problem.message == "a partial dump reports no issue"
     Ok(_) => assert false
   }
 }
@@ -177,7 +182,7 @@ test test_same_prefix_addition_is_rejected_before_any_request [fs, error] {
   var desired = original.intent
   desired.address.local = "192.0.2.3"
   let plan = policy.network_plan(desired, original.owned, original.before)?
-  match kernel.network_encode_operation(plan, 0) {
+  match kernel.network_change(plan, 0) {
     Err(problem) => assert problem.message == "same-prefix IPv4 additions require explicit promotion policy"
     Ok(_) => assert false
   }
@@ -187,18 +192,23 @@ test test_consecutive_dumps_must_agree_before_projection [fs, error] {
   let plan = fixture_plan()?
   var first = primary_dump()
   first.routes = [ordinary_default()]
-  let snapshot = kernel.network_project_stable_dumps(first, first, plan.intent, 1)?
+  let state = net_state.project(first)?
+  let snapshot = kernel.network_project_stable_states(state, state, plan.intent, 1)?
   assert snapshot.routes.len() == 1
   var changed = first
   changed.routes = [{...ordinary_default(), priority: 200, attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 5, data: b"\xc0\x00\x02\x01"}, {kind: 4, data: b"\x07\x00\x00\x00"}, {kind: 6, data: b"\xc8\x00\x00\x00"}]}]
-  match kernel.network_project_stable_dumps(first, changed, plan.intent, 1) {
+  match kernel.network_project_stable_states(state, net_state.project(changed)?, plan.intent, 1) {
     Err(problem) => assert problem.message == "network observation changed between consecutive dumps"
     Ok(_) => assert false
   }
-  var incomplete = first
-  incomplete.state = "partial"
-  match kernel.network_project_stable_dumps(incomplete, incomplete, plan.intent, 1) {
-    Err(problem) => assert problem.message == "complete issue-free network observation required"
-    Ok(_) => assert false
-  }
+}
+
+test test_outcomes_and_lost_notices_map_to_replay_events [fs, error] {
+  assert kernel.network_outcome(2, Ok()) == policy.NetworkApplied(2)
+  assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Refused(errno: 101, message: "Network is unreachable"))) == policy.NetworkDenied(2)
+  assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Transport("deadline"))) == policy.NetworkFailed(2)
+  assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Unencodable("multipath"))) == policy.NetworkFailed(2)
+  assert kernel.network_lost_events(net_state.Lost("overrun")) == policy.NetworkLostEvents
+  assert kernel.network_lost_events(net_state.Changed) == null
+  assert kernel.network_lost_events(net_state.Quiet) == null
 }

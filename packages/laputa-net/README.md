@@ -73,52 +73,55 @@ full re-observation. Missing, reordered, repeated, or truncated observations
 return an invalid replay result. Partial application does not imply rollback.
 The result never authorizes retrying a mutation against a stale snapshot.
 
-## Pure codec and limited projection
+## Typed projection and changes
 
-`network_kernel.xsh` exports only pure request encoding and read-only projection.
-It provides no live apply API, mutation runner, or convergence result. The boot
-service and installed package payload remain unchanged.
+`network_kernel.xsh` plans over XSH's `lib.net_state`; it holds no raw dump
+checks or request bytes. It provides no live apply API, mutation runner, or
+convergence result. The boot service and installed package payload remain
+unchanged.
 
-`network_encode_operation` validates the complete plan before encoding exact
-route-netlink requests. Address requests include the interface index, local
-address, and prefix. Default-route requests include the table, interface index,
-gateway, and metric. Additions use exclusive creation. Encoding bytes does not
-qualify their execution against an observed host.
+`network_change` validates the complete plan, then maps one operation onto a
+`net_state.Change`. `net_state.request` encodes it. An address request carries
+the interface index, local address, and prefix; a default-route request is a
+main-table (254), boot-protocol (3), universe-scope, unicast route carrying the
+gateway, interface index, and metric (omitted when 0) with the table attribute.
+Removals send the same protocol and type, so they delete exactly the route this
+controller adds and never a route of another protocol. Additions use exclusive
+creation. Encoding bytes does not qualify their execution against an observed
+host. `network_outcome` maps a kernel `Refused` verdict to `NetworkDenied` and any
+other failure to `NetworkFailed`; `network_lost_events` maps a drained `Lost`
+notice to `NetworkLostEvents`.
 
-`network_project_dump` requires a complete, issue-free native observation of the
+`network_project_dump` requires `net_state.project` to accept the dump: an
+incomplete, interrupted, truncated or undecodable socket, link, address or route
+dump is an error, never an empty state. `network_project_state` then requires the
 selected independent virtual Ethernet interface. It rejects selected secondary
-IPv4 addresses and nonempty selected default-route cohorts. An empty projected
-route list therefore follows observed absence, never a fallback.
+IPv4 addresses, point-to-point addresses, and unsupported selected default
+routes. An empty projected route list therefore follows observed absence, never
+a fallback.
 
-The supplied XSH observer exposes the route header's TOS byte as typed integer
-`tos`. `network_project_dump` projects a selected default route only when it is
-an ordinary-traffic main-table unicast route with TOS 0, boot protocol, universe
-scope, one gateway, no multipath, source or input selectors, and only the
-interface, gateway, metric and table attributes the encoder itself writes. A
-TOS-specific default on the selected link is refused as `selected default route
-is TOS-specific and cannot converge with ordinary traffic`, even beside an
-ordinary default; other unsupported shapes are refused as outside the supported
-cohort or as carrying unsupported attributes. Defaults on other interfaces are
-not projected. `linux.network_dump` already requires `NLMSG_DONE` per dump, retries and then
-reports `NLM_F_DUMP_INTR`, and reports overrun, truncation and kernel errors as
-issues, so `state` is `complete` only when all four dumps finished cleanly. The
-four dumps are still taken one after another, with no kernel generation shared
-between them. `network_project_stable_dumps` projects two consecutive complete
-dumps only when they are identical and otherwise reports that the observation
-changed. This narrows cross-dump skew but cannot rule out a change that reverts
-between the two observations. XSH now provides `linux.netlink_route_request`
-with sequence/port validation, a deadline, and rejection of malformed or multipart
-replies. The failure-replay driver uses it; general live application stays
-withheld pending the remaining shared-boundary and convergence qualification.
+`network_project_state` projects a selected default route only when it is an
+ordinary-traffic (`tos` 0) main-table unicast route with boot protocol, universe
+scope, one gateway out of the managed link, no source or preferred-source
+selector, and no attribute `net_state.Route` does not model
+(`other_attributes` empty). A TOS-specific default on the selected link is
+refused as `selected default route is TOS-specific and cannot converge with
+ordinary traffic`, even beside an ordinary default; other unsupported shapes are
+refused as outside the supported cohort or as carrying unsupported attributes.
+Defaults on other interfaces are not projected. The four dumps behind one
+observation are still taken one after another with no shared kernel generation.
+`network_project_stable_states` projects two consecutive observations only when
+they are identical and otherwise reports that the observation changed. This
+narrows cross-dump skew but cannot rule out a change that reverts between the
+two observations. General live application stays withheld pending convergence
+qualification.
 
 The projection checks all IPv4 preferred-source dependencies on selected
 addresses, including routes through another interface. Its address-derived
-exception requires zero flags, no source selector, and exactly one unflagged
-attribute for each of table, destination, preferred source, and output interface.
-Every attribute's bytes must match the typed fields. Unknown attributes,
-duplicates, custom metrics such as MTU, and changed flags fail closed. Connected,
-local, and broadcast destinations must also match the address's exact derived
-shape. This exception does not grant mutation authority.
+exception requires zero flags, no source selector, boot-time kernel protocol,
+one hop with no gateway out of the managed link, priority 0, and no unmodeled
+attributes. Connected, local, and broadcast destinations must also match the
+address's exact derived shape. This exception does not grant mutation authority.
 
 ## Verification boundary
 

@@ -1,19 +1,16 @@
-use packages.laputa-net.network_plan as policy
-use packages.laputa-net.network_kernel as kernel
+use lib.net_state
 use lib.nettools_fixture as fixture
+use packages.laputa-net.network_kernel as kernel
+use packages.laputa-net.network_plan as policy
 use pm.generation
 
 error NetworkGuestError = Failed(message: Str)
 
-proc observed(intent: policy.NetworkIntent, sequence: Int) [process, error] -> Result[policy.NetworkSnapshot, Error] {
-  kernel.network_project_dump(linux.network_dump()?, intent, sequence)
+proc observed(intent: policy.NetworkIntent, sequence: Int) -> Result[policy.NetworkSnapshot, Error] {
+  kernel.network_project_state(net_state.observe()?, intent, sequence)
 }
 
-proc request(value: kernel.NetworkKernelRequest) [process, error] -> Result[LinuxNetlinkAck, Error] {
-  linux.netlink_route_request(value.message_type, value.flags, value.payload, 1000)
-}
-
-proc main(scope: Str) [fs, process, net, error] {
+proc main(scope: Str) [fs, process, net, env, error] {
   if scope != "disposable-vm" or !p"/mnt/self-hosting/inputs/laputa".is_dir()? {
     return Err(NetworkGuestError.Failed("run only inside the disposable self-hosting proof VM"))
   }
@@ -54,36 +51,41 @@ proc main(scope: Str) [fs, process, net, error] {
   if links.len() != 1 { return Err(NetworkGuestError.Failed("fixture veth was not observed")) }
   let intent: policy.NetworkIntent = {ifindex: links[0].ifindex, name: "lap-net0", address: {local: "198.18.1.3", prefix: 24}, gateway: "192.0.2.1", metric: 100}
   let owned: policy.NetworkOwnership = {ifindex: intent.ifindex, name: intent.name, addresses: [], routes: []}
+  let notifications = net_state.subscribe()?
+  defer unix.close_fd(notifications)
   let before = observed(intent, 1)?
   assert before.routes.is_empty()
   let plan = policy.network_plan(intent, owned, before)?
   assert plan.operations == [policy.NetworkAddAddress(intent.address), policy.NetworkAddDefaultRoute({gateway: intent.gateway, metric: intent.metric})]
-  let add_address = kernel.network_encode_operation(plan, 0)?
-  let add_route = kernel.network_encode_operation(plan, 1)?
-  assert add_address.message_type == linux.net_constants().RTM_NEWADDR
-  assert add_route.message_type == linux.net_constants().RTM_NEWROUTE
-  let address_ack = request(add_address)?
-  if address_ack.errno != 0 {
-    return Err(NetworkGuestError.Failed(f"address addition was refused with errno {address_ack.errno}"))
+  let address_event = kernel.network_outcome(0, net_state.apply(kernel.network_change(plan, 0)?))
+  if address_event != policy.NetworkApplied(0) {
+    return Err(NetworkGuestError.Failed("address addition did not apply"))
   }
   let after_address = observed(intent, 2)?
   assert intent.address in after_address.addresses
   assert {local: "198.18.0.2", prefix: 24} in after_address.addresses
   assert after_address.routes.is_empty()
-  let route_ack = request(add_route)?
-  if route_ack.errno == 0 {
-    return Err(NetworkGuestError.Failed("invalid gateway unexpectedly admitted a route"))
+  let route_result = net_state.apply(kernel.network_change(plan, 1)?)
+  let route_event = kernel.network_outcome(1, route_result)
+  let route_errno = match route_result {
+    Err(net_state.ChangeFailure.Refused {errno, ..}) => errno
+    else => { return Err(NetworkGuestError.Failed("invalid gateway was not refused by the kernel")) }
   }
-  if route_ack.errno != 22 and route_ack.errno != 101 {
-    return Err(NetworkGuestError.Failed(f"route addition was refused with unexpected errno {route_ack.errno}"))
+  if route_event != policy.NetworkDenied(1) {
+    return Err(NetworkGuestError.Failed("invalid gateway was not refused by the kernel"))
+  }
+  if route_errno != 22 and route_errno != 101 {
+    return Err(NetworkGuestError.Failed(f"route addition was refused with unexpected errno {route_errno}"))
   }
   let after_failure = observed(intent, 3)?
   assert after_failure.addresses == after_address.addresses
   assert after_failure.routes.is_empty()
-  let events = [policy.NetworkPrecondition(before), policy.NetworkApplied(0), policy.NetworkFailed(1)]
-  assert policy.network_replay(plan, events) == policy.NetworkReobserve("operation 1 failed; partial state requires observation")
+  let events = [policy.NetworkPrecondition(before), policy.NetworkApplied(0), route_event]
+  assert policy.network_replay(plan, events) == policy.NetworkReobserve("operation 1 denied; partial state requires observation")
+  let lost = kernel.network_lost_events(net_state.drain(notifications)?)
+  assert lost == null
   assert policy.network_replay(plan, events) == policy.network_replay(plan, events)
-  let capture = json.encode({kind: "network-operation-failure", input: {intent, owned, observed: before}, completed: 1, errno: route_ack.errno, error: f"route addition was refused with errno {route_ack.errno}", observed: after_failure})?
+  let capture = json.encode({kind: "network-operation-failure", input: {intent, owned, observed: before}, completed: 1, errno: route_errno, error: f"route addition was refused with errno {route_errno}", observed: after_failure})?
   assert capture.byte_len() <= policy.network_input_limit
   print f"NETWORK_FAILURE_CAPTURE {capture}"
   match policy.network_plan(intent, owned, after_failure) {
