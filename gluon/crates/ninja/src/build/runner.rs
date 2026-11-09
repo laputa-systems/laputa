@@ -1015,7 +1015,7 @@ fn execute(slot: usize, p: Prepared) -> EdgeOutcome {
         }
     }
 
-    let result = super::command::process(&p.command, p.shell).and_then(|mut process| process.output().map_err(|e| e.to_string()));
+    let result = super::command::output(&p.command, p.shell);
 
     if let Some((path, _)) = &p.rspfile {
         let _ = std::fs::remove_file(path);
@@ -1114,7 +1114,7 @@ fn execute_console(slot: usize, p: Prepared) -> EdgeOutcome {
         }
     }
 
-    let result = super::command::process(&p.command, p.shell).and_then(|mut process| process.status().map_err(|e| e.to_string()));
+    let result = super::command::status(&p.command, p.shell);
 
     if let Some((path, _)) = &p.rspfile {
         let _ = std::fs::remove_file(path);
