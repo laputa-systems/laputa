@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 56
+Next: 57
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
