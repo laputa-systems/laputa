@@ -267,3 +267,37 @@ After this baseline and Play's SRT/Core Text migrations qualify, execute
 [C-free roadmap](rfc/LAP-51-c-free-userspace.md). The cross-repository
 [XSH queue](https://github.com/laputa-systems/xsh/blob/master/TODO.md)
 records retained source and outstanding checks. macOS execution remains outside this Linux campaign.
+
+## Installed footprint before promotion
+
+Baseline: Laputa `fe1912a`, the last revision whose canonical closure still
+ships Fontconfig and Expat (`fontconfig` 2.18.3-1, `expat` 2.8.5-1,
+`ghostty-custom` 1.4.1-4, `play` 0.43.1-1). Its 11-root profile composes from
+the artifact store: all 51 plan artifacts were present, so nothing was built.
+The composed root has 32 packages, 1,548 unique regular files, 336,210,344
+bytes, and 49 ELF files. The census tool rejects this root, because at
+`3c1797e` `expat` ships an ELF file without a provider entry.
+
+| Package | Regular files | Package bytes | Executable bytes |
+|---|---|---|---|
+| `fontconfig` 2.18.3-1 | 10 | 534,251 | |
+| `expat` 2.8.5-1 | 14 | 377,760 | |
+| `rust-fontconfig` | absent | 0 | |
+| `ghostty-custom` 1.4.1-4, `usr/bin/ghostty-custom` | 6 | 30,795,370 | 30,787,208 |
+| `play` 0.43.1-1, `usr/bin/player` | 4 | 9,579,028 | 9,578,712 |
+
+In the baseline, Ghostty links Fontconfig statically; its dynamic `DT_NEEDED`
+is `libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, and `libc.so`.
+Play needs `libfontconfig.so.1`, `libfreetype.so.6`, and `libharfbuzz.so.0`.
+
+Not measured:
+
+- The final stack, at `3c1797e` with `rust-fontconfig` 5.0.2-3. Its 11-root
+  plan has 51 artifacts, of which 41 are in the store. Ten must be built:
+  `doas-rs` 0.1.0-2, `mdevd-rs` 0.1.0-2, `seatd-rs` 0.9.3-2, `tinyland`
+  0.1.0-2, `libdrm` 2.4.134-1, `libva` 2.24.1-2, `ffmpeg` 9.0.2-2, `mesa`
+  26.2.4-3, `ghostty-custom` 1.4.1-5, and `play` 0.43.2-1.
+- Font cache build time and first-query latency. Perf gate deferred: host busy
+  (`perf-gate-ready` exit 75, load 46 to 47 on 32 cores).
+- Cache-build peak RSS. The package set ships no `fc-cache`, and no harness
+  exists for either library.
