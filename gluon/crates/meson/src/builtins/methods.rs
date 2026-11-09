@@ -2802,7 +2802,10 @@ fn args_with_language_std(vm: &VM, compiler: &CompilerData, args: &[CallArg]) ->
         "cpp" => vm.build_data.cpp_std.as_str(),
         _ => return args.to_vec(),
     };
-    let std = std.split(',').next().unwrap_or("").trim();
+    let Ok(std) = crate::compilers::first_supported_std(compiler, std) else {
+        return args.to_vec();
+    };
+    let std = std.as_str();
     if std.is_empty() || std == "none" {
         return args.to_vec();
     }

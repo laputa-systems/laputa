@@ -255,6 +255,20 @@ fn compiler_command(compiler: &CompilerData) -> Command {
     command
 }
 
+/// Meson lets c_std and cpp_std name a comma-separated fallback list and
+/// uses the first standard the compiler accepts.
+pub fn first_supported_std(compiler: &CompilerData, list: &str) -> Result<String, String> {
+    if !list.contains(',') {
+        return Ok(list.to_string());
+    }
+    for candidate in list.split(',').map(str::trim).filter(|c| !c.is_empty()) {
+        if candidate == "none" || try_compile_code(compiler, "int main(void) { return 0; }\n", &[format!("-std={candidate}")]) {
+            return Ok(candidate.to_string());
+        }
+    }
+    Err(format!("None of values {list} are supported by the {} compiler", compiler.language.to_uppercase()))
+}
+
 /// Check if a function exists
 pub fn check_function(compiler: &CompilerData, func: &str, args: &[CallArg]) -> bool {
     let prefix = VM::get_arg_str(args, "prefix", usize::MAX).unwrap_or("");
@@ -906,6 +920,14 @@ mod probe_tests {
             linker_id: String::new(),
             full_version: String::new(),
         }
+    }
+
+    #[test]
+    fn a_standard_fallback_list_picks_the_first_supported_entry() {
+        let cc = host_cc();
+        assert_eq!(first_supported_std(&cc, "c11").unwrap(), "c11");
+        assert_eq!(first_supported_std(&cc, "gnu-no-such-std,c11,c99").unwrap(), "c11");
+        assert!(first_supported_std(&cc, "no-such-a,no-such-b").is_err());
     }
 
     #[test]

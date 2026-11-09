@@ -791,6 +791,19 @@ impl Cli {
         let project = interp.vm.project.clone().unwrap_or_default();
 
         // Generate build.ninja
+        for (key, std) in [("compiler_c", interp.vm.build_data.c_std.clone()), ("compiler_cpp", interp.vm.build_data.cpp_std.clone())] {
+            let Some(crate::objects::Object::Compiler(compiler)) = interp.vm.globals.get(key).cloned() else {
+                continue;
+            };
+            match crate::compilers::first_supported_std(&compiler, &std) {
+                Ok(chosen) if key == "compiler_c" => interp.vm.build_data.c_std = chosen,
+                Ok(chosen) => interp.vm.build_data.cpp_std = chosen,
+                Err(e) => {
+                    eprintln!("ERROR: {}", e);
+                    return 1;
+                }
+            }
+        }
         let backend = NinjaBackend::new(&source_dir, &build_dir).with_toolchain(toolchain(&interp.vm));
         let ninja = match backend.generate(&interp.vm.build_data, &project) {
             Ok(n) => n,
