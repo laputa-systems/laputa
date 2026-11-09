@@ -2,7 +2,7 @@
 # Laputa parity: configures, builds and installs each Meson package Laputa
 # ships from its cached upstream source, once with reference Meson 1.12.1
 # and samu and once with gluon, and compares the installed trees (paths,
-# modes, symlink targets). gluon runs with GLUON_SHELL=forbid, so a generated
+# modes, symlink targets, and the bytes of every non-ELF file). gluon runs with GLUON_SHELL=forbid, so a generated
 # edge that needs a shell fails. A package listed in expected-fail must fail; any
 # other package must match. Usage: run.sh [PACKAGE...]; LAPUTA_SOURCE_CACHE
 # names the source cache when running from a worktree.
@@ -23,7 +23,8 @@ tree() {
   ( cd "$1" && fd -H -u . | sort | while read -r f; do
       if [ -L "$f" ]; then echo "$f -> $(readlink "$f")"
       elif [ -d "$f" ]; then echo "$f/"
-      else echo "$f $(stat -c %a "$f")"; fi
+      elif [ "$(head -c 4 "$f" | od -An -c | tr -d ' ')" = '177ELF' ]; then echo "$f $(stat -c %a "$f") elf"
+      else echo "$f $(stat -c %a "$f") $(sha256sum < "$f" | cut -c1-16)"; fi
     done )
 }
 

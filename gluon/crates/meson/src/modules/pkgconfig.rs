@@ -53,28 +53,24 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
                 format!("{}/pkgconfig", libdir)
             }
         });
-    let mut variables: Vec<(String, String)> = Vec::new();
-    if let Some(Object::Dict(entries)) = VM::get_arg_value(args, "variables") {
-        for (key, value) in entries {
-            variables.push((key.clone(), value.to_string_value()));
-        }
-    }
+    let variables = pkgconfig_variables(VM::get_arg_value(args, "variables"))?;
     let _uninstalled_variables = VM::get_arg_string_array(args, "uninstalled_variables");
 
     // Build the .pc file content
     let pc_filename = format!("{}.pc", filebase);
 
     let mut pc = String::new();
-    pc.push_str(&format!("\nprefix={}\n", prefix));
+    pc.push_str(&format!("prefix={}\n", prefix));
     if !dataonly {
         pc.push_str(&format!("includedir=${{prefix}}/{}\n", includedir));
         pc.push_str(&format!("libdir=${{prefix}}/{}\n", libdir));
     }
-    for (key, value) in &variables {
-        if key == "prefix" {
-            continue;
+    let custom: Vec<&(String, String)> = variables.iter().filter(|(key, _)| key != "prefix").collect();
+    if !custom.is_empty() {
+        pc.push('\n');
+        for (key, value) in custom {
+            pc.push_str(&format!("{}={}\n", key, value));
         }
-        pc.push_str(&format!("{}={}\n", key, value));
     }
     pc.push('\n');
     pc.push_str(&format!("Name: {}\n", name));
@@ -139,5 +135,39 @@ fn option_value(vm: &VM, name: &str, default: &str) -> String {
     match vm.options.get(name) {
         Some(Object::String(s)) => s.clone(),
         _ => default.to_string(),
+    }
+}
+
+/// Meson accepts pkg-config variables as a dict or as a list of
+/// `name=value` strings.
+fn pkgconfig_variables(value: Option<&Object>) -> Result<Vec<(String, String)>, String> {
+    match value {
+        None => Ok(Vec::new()),
+        Some(Object::Dict(entries)) => Ok(entries.iter().map(|(k, v)| (k.clone(), v.to_string_value())).collect()),
+        Some(Object::Array(items)) => items
+            .iter()
+            .map(|item| {
+                let text = item.to_string_value();
+                text.split_once('=')
+                    .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+                    .ok_or_else(|| format!("pkgconfig variable '{text}' is not of the form name=value"))
+            })
+            .collect(),
+        Some(Object::String(text)) => pkgconfig_variables(Some(&Object::Array(vec![Object::String(text.clone())]))),
+        Some(other) => Err(format!("pkgconfig variables must be a dict or a list of strings, not {}", other.type_name())),
+    }
+}
+
+#[cfg(test)]
+mod variable_tests {
+    use super::*;
+
+    #[test]
+    fn list_and_dict_variables_are_read() {
+        let list = Object::Array(vec![Object::String("xkb_root=/usr/share/X11/xkb".into())]);
+        assert_eq!(pkgconfig_variables(Some(&list)).unwrap(), vec![("xkb_root".to_string(), "/usr/share/X11/xkb".to_string())]);
+        let dict = Object::Dict(vec![("a".into(), Object::String("b".into()))]);
+        assert_eq!(pkgconfig_variables(Some(&dict)).unwrap(), vec![("a".to_string(), "b".to_string())]);
+        assert!(pkgconfig_variables(Some(&Object::Array(vec![Object::String("novalue".into())]))).is_err());
     }
 }
