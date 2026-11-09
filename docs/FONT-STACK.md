@@ -9,6 +9,7 @@ linker names and load the SONAMEs through the musl dynamic loader.
 | `freetype` | 2.15.0 | `libfreetype.so.6` | `freetype2.pc`, `usr/include/freetype2` |
 | `harfbuzz` | 15.0.0 | `libharfbuzz.so.0` | `harfbuzz.pc`, `usr/include/harfbuzz` |
 | `fontconfig` | 2.18.3 | `libfontconfig.so.1` | `fontconfig.pc`, `usr/include/fontconfig` |
+| `rust-fontconfig` | 5.0.2 (fork tag `v5.0.2-laputa.2`) | `librust_fontconfig.so.5.0.2` | `rust-fontconfig.pc`, `usr/include/rust-fontconfig` |
 | `libpng` | 1.6.59 | `libpng16.so.16` | `libpng.pc`, `libpng16.pc`, `usr/include/libpng16` |
 
 FreeType uses zlib and libpng, including PNG-compressed embedded color bitmaps.
@@ -37,17 +38,32 @@ Color Emoji (10,730,124 bytes). The CJK collection covers Han, kana, and Hangul 
 Simplified Chinese, Traditional Chinese, and Hong Kong faces. Select these packages when needed; the
 default profile does not include them.
 
+The canonical graphical profile (`ghostty-custom` and `play`) uses
+`rust-fontconfig` for discovery and links no `libfontconfig.so.1`. The
+`rust-fontconfig` package owns `/etc/fonts/fonts.conf` with the
+`/usr/share/fonts` directory and the generic-family aliases above; the library
+reads only its `<dir>` and `<alias>` entries, from `$FONTCONFIG_FILE` when set.
+The `fontconfig` package ships no configuration file and is no longer a
+dependency of any canonical package. Expat is no longer a dependency of
+`wayland-libs-client`, whose library never linked it, so it leaves the
+canonical closure; `wayland-scanner` in `wayland-dev` still links it at build
+time. The remaining text of this section describes the retained C Fontconfig
+baseline.
+
 Fontconfig can use `/var/cache/fontconfig` and an XDG user cache. A writable
 user cache permits an unprivileged process to cache fonts when the system cache
 is not writable. Fontconfig can still scan fonts when a cache is unavailable.
-The default Ghostty package remains pinned to its existing release until a
-shared-font binary is built and qualified; these packages do not change that
-pin by themselves.
+The `ghostty-custom` package pins the joshuarli/ghostty release built at
+`c4f036c72` with `-Dfont-backend=rust_fontconfig_freetype`. Its executable
+needs `libfreetype.so.6`, `libharfbuzz.so.0`, `librust_fontconfig.so.5.0.2`,
+`libEGL.so.1`, `libwayland-client.so.0`, `libxkbcommon.so.0`, and musl, with no
+RPATH or RUNPATH. Its package proof rejects `libfontconfig.so.1`.
 
 ## Local x86_64 qualification
 
-The existing `ghostty-custom` package uses the published `f2024d5d2` artifact.
-A local candidate was built from Ghostty commit `6329a774e` with
+The measurements below compare the earlier `ghostty-custom` release
+`f2024d5d2`, which bundled its font stack, with a local C Fontconfig candidate;
+neither is the current package. A local candidate was built from Ghostty commit `6329a774e` with
 `-Dapp-runtime=wayland -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
 -Dstrip=true -Demit-themes=false -Di18n=false -Dcpu=baseline` and system
 integration enabled for FreeType, HarfBuzz, Fontconfig, libpng, and zlib.

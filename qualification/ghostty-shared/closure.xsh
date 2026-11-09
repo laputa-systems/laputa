@@ -51,7 +51,7 @@ cli main(root: Path) {
   for expected in [
     {package: "freetype", soname: "libfreetype.so.6"},
     {package: "harfbuzz", soname: "libharfbuzz.so.0"},
-    {package: "fontconfig", soname: "libfontconfig.so.1"},
+    {package: "rust-fontconfig", soname: "librust_fontconfig.so.5.0.2"},
   ] {
     let matches = libraries |> where .soname == expected.soname
     proof.ensure(matches.len() == 1, "font-closure", f"{expected.soname} has {matches.len()} providers")
@@ -62,17 +62,21 @@ cli main(root: Path) {
     print f"{expected.soname}: {matches[0].package}/{matches[0].path}"
   }
 
+  proof.ensure((libraries |> where .soname == "libfontconfig.so.1").is_empty(), "font-closure", "native Fontconfig is installed")
+  proof.ensure((libraries |> where .soname == "libexpat.so.1").is_empty(), "font-closure", "Expat is installed")
+
   for consumer in consumers {
     let allowed = elfdeps.runtime_dependency_closure(dependencies.get(consumer.package) ?? [], dependencies)
     let failures = elfdeps.missing_elf_runtime_dependencies_with_allowed(consumer.package, allowed, consumer.needed, consumer.interpreter, providers)
     proof.ensure(failures.is_empty(), "font-closure", f"{consumer.package}/{consumer.path} has {failures.len()} undeclared runtime dependencies")
     for soname in consumer.needed {
+      continue when soname.starts_with("libc.musl-")
       proof.ensure(soname in providers, "font-closure", f"{consumer.package}/{consumer.path} needs unresolved {soname}")
     }
   }
   let ghostty = consumers |> where .package == "ghostty-custom" and .path == p"usr/bin/ghostty-custom"
   proof.ensure(ghostty.len() == 1, "font-closure", "missing Ghostty executable")
-  for soname in ["libfreetype.so.6", "libharfbuzz.so.0", "libfontconfig.so.1"] {
+  for soname in ["libfreetype.so.6", "libharfbuzz.so.0", "librust_fontconfig.so.5.0.2"] {
     proof.ensure(soname in ghostty[0].needed, "font-closure", f"Ghostty does not import {soname}")
   }
   proof.ensure((libraries |> where .package == "ghostty-custom").is_empty(), "font-closure", "Ghostty distributes a shared library")
