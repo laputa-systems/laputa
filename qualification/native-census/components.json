@@ -1,0 +1,178 @@
+{
+  "providers": [
+    {"package": "alsa-lib", "language": "C", "retention": "retained", "role": "Play audio backend (libasound.so.2)"},
+    {"package": "ffmpeg", "language": "C", "retention": "retained-exception", "role": "ffmpeg-build runtime 9.0.2, libav* and CLI; codec replacement is out of scope"},
+    {"package": "freetype", "language": "C", "retention": "replacement-candidate", "role": "shared glyph rasterizer for Ghostty and Play"},
+    {"package": "ghostty-custom", "language": "Zig+C/C++", "retention": "prebuilt-release", "role": "terminal; statically incorporates the components listed under its binary"},
+    {"package": "harfbuzz", "language": "C++", "retention": "replacement-candidate", "role": "shared shaper for Ghostty and Play"},
+    {"package": "libdrm", "language": "C", "retention": "retained", "role": "Mesa and Vulkan driver DRM access"},
+    {"package": "libffi", "language": "C", "retention": "retained", "role": "build and Wayland scanner dependency installed with the Wayland client"},
+    {"package": "libpng", "language": "C", "retention": "replacement-candidate", "role": "FreeType PNG color bitmaps"},
+    {"package": "libudev-zero", "language": "C", "retention": "retained", "role": "libudev.so.1 for the Vulkan lavapipe driver"},
+    {"package": "libva", "language": "C", "retention": "retained-exception", "role": "VA-API loaded by the FFmpeg runtime"},
+    {"package": "libxkbcommon", "language": "C", "retention": "replacement-candidate", "role": "Ghostty keyboard translation"},
+    {"package": "mesa", "language": "C/C++", "retention": "retained-exception", "role": "EGL, virgl, lavapipe; links LLVM statically; GPU drivers are out of scope"},
+    {"package": "musl", "language": "C", "retention": "retained-exception", "role": "libc and dynamic loader"},
+    {"package": "play", "language": "Rust+C/C++", "retention": "prebuilt-release", "role": "player; statically incorporates the components listed under its binary"},
+    {"package": "rust-fontconfig", "language": "Rust", "retention": "rust", "role": "shared font discovery behind a C ABI"},
+    {"package": "seatd-rs", "language": "Rust+C", "retention": "replacement-candidate", "role": "Rust seatd daemon; libseat.so.1 is the upstream C client"},
+    {"package": "tinyland", "language": "Rust", "retention": "rust", "role": "compositor"},
+    {"package": "doas-rs", "language": "Rust", "retention": "rust", "role": "privilege escalation"},
+    {"package": "mdevd-rs", "language": "Rust", "retention": "rust", "role": "device manager"},
+    {"package": "vulkan-loader", "language": "C++", "retention": "retained", "role": "libvulkan.so.1 for Play"},
+    {"package": "wayland-libs-client", "language": "C", "retention": "replacement-candidate", "role": "Wayland client protocol library"},
+    {"package": "xsh", "language": "Rust+C", "retention": "rust", "role": "shell, tooling, and core commands"},
+    {"package": "zlib", "language": "C", "retention": "replacement-candidate", "role": "distribution libz.so.1 for Play"}
+  ],
+  "binaries": [
+    {
+      "package": "ghostty-custom",
+      "path": "usr/bin/ghostty-custom",
+      "needed": ["libfreetype.so.6", "libharfbuzz.so.0", "librust_fontconfig.so.5.0.2", "libEGL.so.1", "libwayland-client.so.0", "libxkbcommon.so.0", "libc.musl-x86_64.so.1"],
+      "runpath": "",
+      "components": [
+        {"name": "glslang", "language": "C++", "version": "14.2.0 source, version stamp 13.1.1", "origin": "pkg/glslang fetches glslang-12201278a1a0 (14.2.0); pkg/glslang/override/glslang/build_info.h stamps 13.1.1; built by the Zig build for the OpenGL renderer shader compiler", "markers": ["4.60 glslang Khronos. 13.1.1"]},
+        {"name": "SPIRV-Cross", "language": "C++", "version": "476f384eb7d9", "origin": "pkg/spirv-cross fetches spirv_cross-1220fb3b5586; Zig build", "markers": ["Must be a SPIRV-Cross bug!"]},
+        {"name": "oniguruma", "language": "C", "version": "6.9.9", "origin": "pkg/oniguruma fetches oniguruma-1220c15e72ea; Zig build", "markers": ["You didn't call onig_initialize() explicitly", "ONIG-MONITOR"]},
+        {"name": "Dear ImGui with dcimgui bindings", "language": "C++", "version": "1.92.5-docking", "origin": "pkg/dcimgui DearBindings v0.17; inspector defaults on for the OpenGL renderer", "markers": ["Dear ImGui 1.92.5 (19250)"]},
+        {"name": "wuffs", "language": "C", "version": "7411f488fe2e", "origin": "pkg/wuffs; JPEG and zlib decoders for image protocols", "markers": ["wuffs_base__image_decoder", "#deflate: bad Huffman code (over-subscribed)"]},
+        {"name": "stb_image and stb_image_resize", "language": "C", "version": "vendored", "origin": "src/stb/stb.c with STBI_ONLY_PNG", "markers": ["can't fopen", "outofmem"]},
+        {"name": "simdutf", "language": "C++", "version": "5.2.8", "origin": "pkg/simdutf; -Dsimd defaults on", "markers": ["Intel/AMD", "Generic fallback implementation"]},
+        {"name": "glad GL and EGL loaders", "language": "C", "version": "vendored", "origin": "vendor/glad/src/gl.c and glad_egl.c for the OpenGL renderer", "markers": ["glBeginQuery"]},
+        {"name": "Wayland protocol glue", "language": "C", "version": "generated", "origin": "wayland-scanner output compiled by the Zig build from pkg wayland and wayland-protocols", "markers": ["xdg_wm_base"]},
+        {"name": "sound control socket", "language": "C", "version": "first party", "origin": "src/sound/control.c", "markers": ["/tmp/ghostty-mute-"]},
+        {"name": "LLVM libc++abi bundled by Zig", "language": "C++", "version": "Zig 0.17.0 bundle", "origin": "link_libcpp in src/build/SharedDeps.zig; Zig's bundled runtime", "markers": ["libc++abi: "]},
+        {"name": "LLVM libunwind bundled by Zig", "language": "C++", "version": "Zig 0.17.0 bundle", "origin": "Zig's bundled runtime", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
+      ],
+      "absent": ["breakpad", "Sentry", "libpng error", "incorrect header check"],
+      "unknown": [
+        {"subject": "Highway 1.2.0", "evidence": "SharedDeps.addSimd links it whenever -Dsimd is on, which is the default; the stripped binary carries no Highway string", "settle": "Build the pinned commit with -Dstrip=false and run nm for hwy:: symbols, or read the Zig link command from zig build --verbose-link"},
+        {"subject": "oniguruma, wuffs, simdutf, stb, glslang and SPIRV-Cross byte share", "evidence": "the binary is stripped, so no per-component sizes exist", "settle": "Build the pinned commit with -Dstrip=false and attribute symbol sizes by archive membership as qualification/native-census/census.xsh symbols does for Play"},
+        {"subject": "compiler-rt and Zig-translated C", "evidence": "Zig links its own compiler-rt and translate-c output without version strings", "settle": "Zig 0.17.0 source tree for the build, plus an unstripped binary"}
+      ]
+    },
+    {
+      "package": "play",
+      "path": "usr/bin/player",
+      "needed": ["libz.so.1", "librust_fontconfig.so.5.0.2", "libharfbuzz.so.0", "libfreetype.so.6", "libavformat.so.63", "libavcodec.so.63", "libswscale.so.10", "libavutil.so.61", "libc.musl-x86_64.so.1", "libasound.so.2", "libvulkan.so.1", "libwayland-client.so.0"],
+      "runpath": "$ORIGIN/../lib",
+      "components": [
+        {"name": "libplacebo", "language": "C", "version": "7.387.0", "origin": "scripts/build-deps-linux.sh meson static build; linux-link.args links libplacebo.a", "markers": ["v7.387.0", "../src/glsl/spirv_shaderc.c"]},
+        {"name": "shaderc", "language": "C++", "version": "2026.4", "origin": "scripts/build-deps-linux.sh cmake build; linux-link.args links libshaderc_combined.a", "markers": ["Google Shaderc over Glslang"]},
+        {"name": "glslang", "language": "C++", "version": "e1b562a8bed2", "origin": "shaderc third_party/glslang pinned by GLSLANG_REV", "markers": ["Khronos Glslang Reference Front End"]},
+        {"name": "SPIRV-Tools", "language": "C++", "version": "ef96ed763b43", "origin": "shaderc third_party/spirv-tools pinned by SPIRV_TOOLS_REV", "markers": ["Khronos SPIR-V Tools Assembler", "Khronos SPIR-V Tools Linker"]},
+        {"name": "libstdc++", "language": "C++", "version": "GCC 15.2.0 Alpine", "origin": "linux-link.args names /usr/lib/libstdc++.a", "markers": ["libstdc++-v3", "basic_string::_M_create"]},
+        {"name": "libgcc and libgcc_eh", "language": "C", "version": "GCC 15.2.0 Alpine", "origin": "linux-link.args names libgcc.a; build-linux.sh passes -static-libgcc", "markers": ["GCC: (Alpine 15.2.0) 15.2.0"]}
+      ],
+      "absent": ["libass", "fribidi", "OpenSSL", "libcurl", "libfontconfig"],
+      "unknown": [
+        {"subject": "SPIRV-Headers", "evidence": "headers only at SPIRV_HEADERS_REV, so no object code is expected", "settle": "Archive membership of libSPIRV-Tools.a shows no SPIRV-Headers objects"},
+        {"subject": "Rust crates with build scripts", "evidence": "Cargo.lock shows cc used only by player-display for macOS and by wayland-backend; pkg-config by wayland-sys", "settle": "cargo tree --target x86_64-unknown-linux-musl -e build,normal in ~/d/play confirms no Linux C compilation"}
+      ]
+    },
+    {
+      "package": "mesa",
+      "path": "usr/lib/libgallium-26.2.4.so",
+      "needed": ["libm.so", "libdrm.so.2"],
+      "runpath": "",
+      "components": [
+        {"name": "LLVM", "language": "C++", "version": "23.1.5", "origin": "llvm-static package linked into the Mesa gallium driver", "markers": ["LLVM version 23.1.5"]},
+        {"name": "LLVM libc++abi", "language": "C++", "version": "23.1.5", "origin": "llvm-static package", "markers": ["libc++abi: "]},
+        {"name": "LLVM libunwind", "language": "C++", "version": "23.1.5", "origin": "llvm-static package", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
+      ],
+      "absent": [],
+      "unknown": [
+        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa muon/samurai build with -Wl,-Map, or the unstripped library"},
+        {"subject": "Mesa vendored C (xxhash, util, NIR)", "evidence": "XXH strings occur, but vendored sources are Mesa's own and are not separate dependencies", "settle": "Mesa 26.2.4 subprojects and src/util tree"}
+      ]
+    },
+    {
+      "package": "mesa",
+      "path": "usr/lib/libvulkan_lvp.so",
+      "needed": ["libm.so", "libdrm.so.2", "libwayland-client.so.0", "libudev.so.1"],
+      "runpath": "",
+      "components": [
+        {"name": "LLVM", "language": "C++", "version": "23.1.5", "origin": "llvm-static package linked into lavapipe", "markers": ["LLVM version 23.1.5", "llvmpipe (LLVM 23.1.5"]},
+        {"name": "LLVM libc++abi", "language": "C++", "version": "23.1.5", "origin": "llvm-static package", "markers": ["libc++abi: "]}
+      ],
+      "absent": [],
+      "unknown": [
+        {"subject": "libvulkan_lvp LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa build or the unstripped library"}
+      ]
+    },
+    {
+      "package": "tinyland",
+      "path": "usr/bin/tinyland",
+      "needed": ["libseat.so.1", "libc.so"],
+      "runpath": "/usr/lib",
+      "components": [
+        {"name": "LLVM libunwind in Rust std", "language": "C++", "version": "Rust 1.99 target runtime", "origin": "the musl target's self-contained libunwind", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
+      ],
+      "absent": ["mimalloc"],
+      "unknown": [
+        {"subject": "runtime-loaded libwayland-server.so", "evidence": "the binary carries the load-failure string could not load libwayland-server.so, while the profile forbids wayland-libs-server and tinyland/harness/audit.sh rejects the wayland-sys server feature", "settle": "cargo tree -e features -i wayland-sys in tinyland, then run the compositor in the guest without wayland-libs-server and confirm the dlopen path is unreachable"},
+        {"subject": "object compiled by clang version 23.1.5", "evidence": ".comment names clang 23.1.0-rc2 (musl crt objects) and clang 23.1.5 for another object", "settle": "Link with -Wl,-Map or list the archive members of the Rust target libunwind.a and compare their .comment"}
+      ]
+    },
+    {
+      "package": "seatd-rs",
+      "path": "usr/lib/libseat.so.1",
+      "needed": ["libc.so"],
+      "runpath": "",
+      "components": [],
+      "absent": ["mimalloc"],
+      "unknown": [
+        {"subject": "libseat client source language and backends", "evidence": "the recipe says the client is cut from the C seatd release; the package ships it beside the Rust daemon", "settle": "Read packages/seatd-rs/PKGBUILD.xsh and the built object .comment; the seatd-only client replacement is the first LAP-51 priority"}
+      ]
+    },
+    {
+      "package": "xsh",
+      "path": "usr/bin/xsh",
+      "needed": [],
+      "runpath": "",
+      "components": [
+        {"name": "mimalloc", "language": "C", "version": "libmimalloc-sys 0.1.49", "origin": "Cargo.lock libmimalloc-sys; allocator", "markers": ["mimalloc: error: "]},
+        {"name": "zstd", "language": "C", "version": "1.5.7 via zstd-sys 2.1.0", "origin": "Cargo.lock zstd-sys; xsh-archive zstd path", "markers": ["Data corruption detected", "zstd-safe-7.3.0/src"]},
+        {"name": "liblzma", "language": "C", "version": "liblzma-sys 0.4.9", "origin": "Cargo.lock liblzma-sys; xsh-archive XZ decoder", "markers": ["liblzma-0.4.9/src"]},
+        {"name": "LLVM libunwind in Rust std", "language": "C++", "version": "Rust nightly 2026-09-14 target runtime", "origin": "musl target self-contained libunwind", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
+      ],
+      "absent": [],
+      "unknown": [
+        {"subject": "xz-utils version inside liblzma-sys 0.4.9", "evidence": "the crate wrapper path is present but liblzma carries no version string", "settle": "liblzma-sys 0.4.9 xz submodule revision from the crate source"},
+        {"subject": "GCC 9.4.0 objects", "evidence": ".comment names GCC (GNU) 9.4.0, which compiled some C that is neither Alpine nor Laputa clang", "settle": "Compare .comment of libmimalloc.a, libzstd.a and liblzma.a in the xsh cargo target directory"}
+      ]
+    },
+    {
+      "package": "xsh",
+      "path": "usr/bin/xsht",
+      "needed": [],
+      "runpath": "",
+      "components": [
+        {"name": "zstd", "language": "C", "version": "1.5.7 via zstd-sys 2.1.0", "origin": "Cargo.lock zstd-sys", "markers": ["Data corruption detected"]},
+        {"name": "liblzma", "language": "C", "version": "liblzma-sys 0.4.9", "origin": "Cargo.lock liblzma-sys", "markers": ["liblzma-0.4.9/src"]}
+      ],
+      "absent": [],
+      "unknown": []
+    }
+  ],
+  "play_symbols": {
+    "binary_buildid_note": "the stripped release and the unstripped build-linux binary must share a build ID",
+    "archives": [
+      {"file": "libplacebo.a", "component": "libplacebo"},
+      {"file": "libshaderc.a", "component": "shaderc"},
+      {"file": "libglslang.a", "component": "glslang"},
+      {"file": "libglslang-default-resource-limits.a", "component": "glslang"},
+      {"file": "libSPIRV.a", "component": "glslang"},
+      {"file": "libSPIRV-Tools.a", "component": "SPIRV-Tools"},
+      {"file": "libSPIRV-Tools-opt.a", "component": "SPIRV-Tools"},
+      {"file": "libSPIRV-Tools-link.a", "component": "SPIRV-Tools"},
+      {"file": "libSPIRV-Tools-reduce.a", "component": "SPIRV-Tools"},
+      {"file": "libSPIRV-Tools-diff.a", "component": "SPIRV-Tools"},
+      {"file": "libSPIRV-Tools-lint.a", "component": "SPIRV-Tools"},
+      {"file": "libstdc++.a", "component": "libstdc++"},
+      {"file": "libgcc.a", "component": "libgcc"},
+      {"file": "libgcc_eh.a", "component": "libgcc"}
+    ],
+    "max_unattributed_native_bytes": 65536
+  }
+}

@@ -102,6 +102,8 @@ ELF dependency against the installed provider and declared dependency closure.
 Musl library aliases resolve to their actual package owner. The current root
 passes with 19 packages and 26 ELF files. Negative checks reject an added
 duplicate FreeType provider and a removed FreeType dependency declaration.
+The [native-code census](NATIVE-CENSUS.md) extends this provider audit to
+statically incorporated C and C++.
 
 Ghostty's existing font-filtered Zig tests also run against that composed
 runtime: 206 pass, 13 skip, and zero fail. The test executable imports the
