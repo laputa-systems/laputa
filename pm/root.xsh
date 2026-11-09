@@ -4,6 +4,8 @@ use store as artifact_store
 use types
 use util
 
+const manual_directory = "usr/share/man"
+
 type ArtifactEntryDto = {path: Str, kind: Str, mode: Int, sha256: Str, target: Str}
 
 type ArtifactMetadataDto = {name: Str, ver: Str, rel: Str, files: List[ArtifactEntryDto]}
@@ -856,9 +858,83 @@ export proc verify(output: Path, receipt: types.RootReceipt) [fs, error] {
   root_verify_in(fs.open_root(output)?, receipt)
 }
 
+proc root_has_manual_pages(output: FsRoot) -> Result[Bool] {
+  var pending = [manual_directory]
+
+  while ! pending.is_empty() {
+    let directory = pending[0]
+    pending = pending |> drop(1)
+    let listing = output.children(confined.rel(directory)?)?
+
+    guard listing.state == "complete" else {
+      return Err(types.PmError.PackageContract(f"cannot enumerate manual directory {directory}"))
+    }
+
+    for child in listing.children {
+      let relative = child.display()
+
+      if output.stat(confined.rel(relative)?)?.kind == "dir" {
+        pending += [relative]
+        continue
+      }
+
+      let beneath_manuals = fp"{relative}".strip_prefix(fp"{manual_directory}")?.display()
+      return true when beneath_manuals.starts_with("man") and "/" in beneath_manuals
+    }
+  }
+
+  false
+}
+
+proc root_require_regular_file(output: FsRoot, relative: Str, label: Str) {
+  let target = confined.rel(relative)?
+
+  match output.stat(target, follow_symlinks: true) {
+    Ok(found) => guard found.kind == "file" else {
+      return Err(types.PmError.PackageContract(f"manual index requires selected-root {label} {relative}"))
+    }
+    Err(problem) => return Err(
+      types.PmError.PackageContract(f"manual index requires selected-root {label} {relative}: {problem.message}"),
+    )
+  }
+}
+
+proc root_require_index_tool_closure(output: FsRoot, arch: Str) {
+  root_require_regular_file(output, f"usr/lib/ld-musl-{arch}.so.1", "tool or library")
+  root_require_regular_file(output, "usr/bin/makewhatis", "tool or library")
+  root_require_regular_file(output, "usr/lib/libz.so.1", "tool or library")
+  let scratch = fs.tempdir()?
+  var libraries = ["usr/bin/makewhatis"]
+  var checked: Set[Str] = set.empty()
+  var copies = 0
+
+  while ! libraries.is_empty() {
+    let library = libraries[0]
+    libraries = libraries |> drop(1)
+    continue when library in checked
+    checked = checked.add(library)
+    copies += 1
+    let copy = f"library-{copies}"
+    fs.root_install_file(output, confined.rel(library)?, scratch, confined.rel(copy)?, 0o600)
+    let needed_libraries = elf.inspect(fp"{scratch.host_path()?}/{copy}")?.needed
+
+    for needed in needed_libraries {
+      continue when needed == "libc.so" or needed == f"libc.musl-{arch}.so.1"
+      let dependency = f"usr/lib/{needed}"
+
+      if "/" in needed {
+        return Err(types.PmError.PackageContract(f"manual index requires selected-root library {needed}"))
+      }
+
+      root_require_regular_file(output, dependency, "library")
+      libraries += [dependency]
+    }
+  }
+}
+
 ## Generates a manual index in an unpublished staging root and records its generated contents.
-## Mutations go through `output`; the selected-root makewhatis process and its preconditions
-## still address `output.host_path()`.
+## Every read and mutation goes through `output`. Only the final makewhatis process addresses
+## `output.host_path()`, because a process cannot start from a directory handle.
 export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
   root_validate_receipt(receipt)
   if root_read_receipt_in(output)? != receipt {
@@ -866,40 +942,15 @@ export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) 
   }
   let mandoc = [artifact for artifact in receipt.artifacts if artifact.package_name == "mandoc" and artifact.payload]
   return receipt when mandoc.is_empty()
+  return receipt unless output.exists(confined.rel(manual_directory)?)
+  return receipt unless root_has_manual_pages(output)
+  let arch = types.pm_target_arch(receipt.target)
+  root_require_index_tool_closure(output, arch)
   let host = output.host_path()?
-  let manpath = fp"{host}/usr/share/man"
-  return receipt unless manpath.exists()
-  var has_pages = false
-  for entry in fs.walk(manpath, gitignore: false, hidden: true) {
-    let relative = entry.path.strip_prefix(manpath)?.display()
-    if relative.starts_with("man") and "/" in relative and entry.kind != "dir" {
-      has_pages = true
-    }
-  }
-  return receipt unless has_pages
-  let loader = fp"{host}/usr/lib/ld-musl-{types.pm_target_arch(receipt.target)}.so.1"
+  let manpath = fp"{host}/{manual_directory}"
+  let loader = fp"{host}/usr/lib/ld-musl-{arch}.so.1"
   let program = fp"{host}/usr/bin/makewhatis"
   let library_path = fp"{host}/usr/lib"
-  for required in [loader, program, fp"{library_path}/libz.so.1"] {
-    if ! required.exists() or fs.stat(required, follow_symlinks: true)?.kind != "file" {
-      return Err(types.PmError.PackageContract(f"manual index requires selected-root tool or library {required}"))
-    }
-  }
-  var libraries = [program]
-  var checked: Set[Str] = set.empty()
-  while ! libraries.is_empty() {
-    let library = libraries[0]
-    libraries = libraries |> drop(1)
-    continue when library.display() in checked
-    checked = checked.add(library.display())
-    for needed in elf.inspect(library)?.needed {
-      continue when needed == "libc.so" or needed == f"libc.musl-{types.pm_target_arch(receipt.target)}.so.1"
-      if "/" in needed or ! fp"{library_path}/{needed}".exists() or fs.stat(fp"{library_path}/{needed}", follow_symlinks: true)?.kind != "file" {
-        return Err(types.PmError.PackageContract(f"manual index requires selected-root library {needed}"))
-      }
-      libraries += [fp"{library_path}/{needed}"]
-    }
-  }
   let database: RelPath = p"usr/share/man/mandoc.db"
   if output.exists(database) {
     if receipt.generated_entries.is_empty() {

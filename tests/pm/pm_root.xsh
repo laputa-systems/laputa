@@ -653,3 +653,35 @@ test test_root_rejects_package_supplied_manual_index [fs, error] { |ctx|
   let artifact = commit_artifact(ctx, store_root, "manuals", types.Payload, [payload_file("usr/share/man/mandoc.db", "unverified index")])?
   expect_root_error(ctx, root.preflight(types.target_aarch64(), [artifact]), "may not own generated root path usr/share/man/mandoc.db")
 }
+
+test test_manual_index_preconditions_do_not_follow_a_swapped_tool_out_of_the_root [fs, process, env, error] { |ctx|
+  let store_root = test.temp_dir(ctx, name: "root-manual-index-store")?
+  let entries = [
+    payload_tree("usr"),
+    payload_tree("usr/bin"),
+    payload_tree("usr/lib"),
+    payload_tree("usr/share"),
+    payload_tree("usr/share/man"),
+    payload_tree("usr/share/man/man1"),
+    payload_file("usr/share/man/man1/laputa.1", ".TH LAPUTA 1\n"),
+    payload_file("usr/bin/makewhatis", "not a program", 0o755),
+    payload_file("usr/lib/ld-musl-aarch64.so.1", "not a loader", 0o755),
+    payload_file("usr/lib/libz.so.1", "not a library", 0o755),
+  ]
+  let mandoc = commit_artifact(ctx, store_root, "mandoc", types.Payload, entries)?
+  let plan = root.preflight(types.target_aarch64(), [mandoc])?
+  let output = fp"{test.temp_dir(ctx, name: "root-manual-index-output")?}/root"
+  let composed = root.compose_artifacts(output, plan, [mandoc])?
+  let outside = fp"{test.temp_dir(ctx, name: "root-manual-index-outside")?}/tool"
+  outside.write("outside tool", mode: 0o755)
+  fp"{output}/usr/bin/makewhatis".remove()
+  fp"{output}/usr/bin/makewhatis".symlink(to: outside)
+
+  match root.root_index_manual_pages(fs.open_root(output)?, composed) {
+    Ok(_) => test.fail("manual index accepted a tool that resolves outside the root")
+    Err(problem) => {
+      assert "selected-root" in problem.message
+      assert ! (outside.display() in problem.message)
+    }
+  }
+}
