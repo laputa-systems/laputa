@@ -32,7 +32,7 @@ export let mkdeps_target = []
 ## resolution and vendors every locked crate.
 export let upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/rust-fontconfig/archive/refs/tags/v5.0.2-laputa.1.tar.gz => source",
+    source: p"https://github.com/laputa-systems/rust-fontconfig/archive/refs/tags/v5.0.2-laputa.2.tar.gz => source",
     kind: "auto",
     architectures: [
       "all",
@@ -40,7 +40,7 @@ export let upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "2cbbc3f8ef457252a5ba822de0b5ac99138a4defc2ea04affaecf7ac90a16ace",
+        sha256: "f8ae910d451336d2241821af5748abcbf547559fd083b73eefd097eb7558f593",
       },
     ],
   },
