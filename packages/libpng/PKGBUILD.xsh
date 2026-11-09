@@ -13,7 +13,7 @@ export const rel = "1"
 ## Package declaration.
 export const deps = ["musl", "zlib"]
 ## Package declaration.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon"]
 ## Package declaration.
 export const upstream_sources = [
   {
@@ -45,12 +45,12 @@ export const filetree = [
 ## Build the shared library.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
     "-DPNG_SHARED=ON" "-DPNG_STATIC=OFF" "-DPNG_TESTS=OFF" "-DPNG_TOOLS=OFF"
-  run $samu "-C" "build" f"-j{jobs}"
+  run $ninja "-C" "build" f"-j{jobs}"
   env ({DESTDIR: dest}) {
     cd (p"build") {
       run $cmake "-P" "cmake_install.cmake"

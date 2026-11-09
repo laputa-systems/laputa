@@ -18,7 +18,7 @@ export const rel = "1"
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "pkgconf", "vulkan-headers"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon", "pkgconf", "vulkan-headers"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -50,12 +50,12 @@ export const filetree = [
 ## the Vulkan headers, not libwayland-client.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
     "-DBUILD_WSI_XCB_SUPPORT=OFF" "-DBUILD_WSI_XLIB_SUPPORT=OFF" "-DBUILD_WSI_XLIB_XRANDR_SUPPORT=OFF" \
     "-DBUILD_WSI_WAYLAND_SUPPORT=ON" "-DBUILD_TESTS=OFF"
-  run $samu "-C" "build" f"-j{make.jobs()?}"
+  run $ninja "-C" "build" f"-j{make.jobs()?}"
 
   env ({
     DESTDIR: dest,

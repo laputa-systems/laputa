@@ -18,7 +18,7 @@ export const rel = "13"
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -128,7 +128,7 @@ export const filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   let jobs_flag = f"-j{jobs}"
 
@@ -145,7 +145,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   ]
 
   run $cmake ${cmake_args}
-  run $samu "-C" "build" $jobs_flag
+  run $ninja "-C" "build" $jobs_flag
 
   env ({
     DESTDIR: dest,

@@ -22,8 +22,7 @@ export const mkdeps_host = [
   "llvm-toolchain",
   "llvm-static",
   "linux-headers",
-  "muon",
-  "samurai",
+  "gluon",
   "pkgconf",
   "libdrm",
   "wayland-dev",
@@ -696,7 +695,8 @@ Cflags: -I\${{includedir}}
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let setup_args = pm_meson.setup_args(mesa_options + muon_rtti_options)
@@ -709,14 +709,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon @setup_args
+    run $meson @setup_args
     stage_vendored_outputs()
-    run $muon "-C" "build" samu $jobs_flag
+    run $ninja "-C" "build" $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install
+      run $meson "install" "-C" "build"
     }
   }
 

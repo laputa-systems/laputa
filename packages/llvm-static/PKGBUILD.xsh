@@ -23,7 +23,7 @@ export const rel = "1"
 export const deps = ["musl"]
 
 ## Host-side build dependencies.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon"]
 
 ## Upstream source archives and checksums.
 export const upstream_sources = [
@@ -131,7 +131,7 @@ proc patch_host_triple(triple: Str) {
 ## Build and install the static LLVM libraries.
 export proc build(dest: Path) [fs, process, env, error] {
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let target = llvm_target(pm_util.target_arch()?)?
   let jobs_flag = f"-j{make.jobs()?}"
   patch_python_requirement()
@@ -174,12 +174,12 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DLLVM_TOOL_LLVM_EXEGESIS_BUILD=OFF",
   ]
   run $cmake @cmake_args
-  run $samu "-C" "build" $jobs_flag "llvm-libraries" "llvm-headers" "llvm-config"
+  run $ninja "-C" "build" $jobs_flag "llvm-libraries" "llvm-headers" "llvm-config"
 
   env ({
     DESTDIR: dest,
   }) {
-    run $samu "-C" "build" "install-llvm-libraries" "install-llvm-headers"
+    run $ninja "-C" "build" "install-llvm-libraries" "install-llvm-headers"
   }
 
   let llvm_config = fp"build/bin/llvm-config"

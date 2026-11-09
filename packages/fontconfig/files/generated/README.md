@@ -9,11 +9,11 @@ pkg-config with FreeType and Expat available. Extract the verified upstream
 archive under `.work/tmp` and run these commands from the extracted source:
 
 ```sh
-muon setup -Dprefix=/usr -Dlibdir=lib -Dsysconfdir=/etc -Dlocalstatedir=/var \
+meson setup -Dprefix=/usr -Dlibdir=lib -Dsysconfdir=/etc -Dlocalstatedir=/var \
   -Ddefault_library=shared -Dxml-backend=expat -Dtools=disabled -Ddoc=disabled \
   -Dnls=disabled -Dtests=disabled -Dtests-external-fonts=disabled \
   -Dcache-build=disabled build
-samu -C build fcalias.h fcaliastail.h fcftalias.h fcftaliastail.h \
+ninja -C build fcalias.h fcaliastail.h fcftalias.h fcftaliastail.h \
   fc-case/fccase.h fc-lang/fclang.h fc-const/fcconst.h \
   fc-genericfamily/fcgenericfamily.h src/fcobjshash.h
 ```

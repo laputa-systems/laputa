@@ -132,22 +132,25 @@ additional environment values.
 The opt-in closed cohort below qualifies a stricter invocation. Ordinary
 package-tools builds retain the authority described above.
 
-### Muon build commands
+### Meson and Ninja build commands
 
-Laputa's Muon generates structured argument metadata alongside Ninja's command
-text. Its embedded Samurai executes those arguments directly. It rejects edges
-without valid metadata instead of invoking a shell. Regenerate existing graphs
-with the packaged Muon before using its `samu` command.
+Laputa builds Meson and Ninja graphs with gluon, the in-tree Rust Meson front
+end and Ninja executor under `gluon/`, packaged as `gluon` (`usr/bin/meson`,
+`usr/bin/ninja`). A recipe configures with `meson setup`, builds with
+`ninja -C build`, and installs with `meson install -C build`. gluon's Ninja
+runs a command that parses as plain words directly and sends anything else to
+`sh -c`; with `GLUON_SHELL=forbid` such an edge fails instead, which is how the
+package proof shows Meson-generated graphs need no shell.
 
-Recipes that replace generated tool paths use `pm.muon` to update command text
-and structured arguments together. Each consumer declares `repository/pm/muon.xsh`
-as a source input so helper changes invalidate its build. Libinput's compiler
-builtins stay after the linker group in both representations.
+Recipes that replace a generated tool path, such as the native
+`wayland-scanner` in a cross build, use `pm.ninja` to rewrite that argument on
+the generated command lines; it fails when no command uses the old path. Each
+consumer declares `repository/pm/ninja.xsh` as a source input so helper changes
+invalidate its build.
 
-Linux x86_64 qualification rebuilds the affected graphical closure with `/bin/sh`
-removed from its disposable build container. The Muon proof checks literal
-arguments, scanner substitution, and rejection of missing or malformed metadata.
-This does not qualify an aarch64 build or arbitrary third-party Ninja files.
+`gluon/tests/laputa/run.sh` checks gluon against reference Meson and Ninja on
+every Meson package Laputa ships, from the cached upstream sources, by
+comparing installed trees.
 
 ## Local bootstrap
 

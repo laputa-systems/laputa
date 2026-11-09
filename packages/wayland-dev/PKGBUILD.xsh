@@ -1,6 +1,6 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
-use pm.muon as pm_muon
+use pm.ninja as pm_ninja
 use pm.util as pm_util
 
 ## Package recipe export.
@@ -19,7 +19,7 @@ export const rel = "2"
 export const deps = ["musl", "expat", "wayland-libs-client", "wayland-libs-server", "wayland-libs-cursor"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "expat", "libffi"]
+export const mkdeps_host = ["llvm-toolchain", "gluon", "pkgconf", "expat", "libffi"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -37,7 +37,7 @@ export const upstream_sources = [
     ],
   },
   {
-    source: p"repository/pm/muon.xsh => laputa-muon.xsh",
+    source: p"repository/pm/ninja.xsh => laputa-ninja.xsh",
     kind: "auto",
     architectures: ["all"],
     checksums: [{arch: "all", sha256: "SKIP"}],
@@ -229,7 +229,8 @@ endif
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
   let build_root = e"XSH_PM_BUILD_ROOT" ?? ""
@@ -249,7 +250,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
+    run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" \
       "-Ddocumentation=false" "-Ddtd_validation=false" "-Dtests=false" "build"
 
     if native_scanner != "" {
@@ -264,26 +265,21 @@ export proc build(dest: Path) [fs, process, env, error] {
           f"-I{build_root}/usr/include" f"-L{build_root}/usr/lib" f"-Wl,-rpath,{build_root}/usr/lib" "-lexpat"
       }
 
-      let ninja = p"build/build.ninja"
-      let scanner_text = native_scanner_path.display()
-      var ninja_text = ninja.read_text()?
-      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, f"{build_root}/usr/bin/wayland-scanner", scanner_text)?
-      ninja_text = pm_muon.muon_rewrite_ninja_argument(ninja_text, "src/wayland-scanner", scanner_text)?
-
-      let ninja_text_build_root = ninja_text.replace(
-        f" -- {build_root}/usr/bin/wayland-scanner ",
-        with: f" -- {scanner_text} ",
-      )
-
-      ninja.write(ninja_text_build_root.replace(" -- src/wayland-scanner ", with: f" -- {scanner_text} "))
+      let manifest = p"build/build.ninja"
+      let built_scanner = fp"{fs.cwd()?}/build/src/wayland-scanner".display()
+      manifest.write(pm_ninja.ninja_rewrite_command_arguments(
+        manifest.read_text()?,
+        [f"{build_root}/usr/bin/wayland-scanner", built_scanner],
+        native_scanner_path.display(),
+      )?)
     }
 
-    run $muon "-C" "build" samu $jobs_flag
+    run $ninja "-C" "build" $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install
+      run $meson "install" "-C" "build"
     }
   }
 

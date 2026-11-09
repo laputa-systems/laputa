@@ -21,7 +21,7 @@ export const rel = "1"
 export const deps = ["musl", "llvm-toolchain"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "linux-headers", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "gluon"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
@@ -895,7 +895,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
 """,
   )
 
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   let jobs_flag = f"-j{jobs}"
   let build_dir = p"cmake-build"
@@ -914,7 +914,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
         f"-C{init_cache}",
         "-G",
         "Ninja",
-        f"-DCMAKE_MAKE_PROGRAM={samu}",
+        f"-DCMAKE_MAKE_PROGRAM={ninja}",
         "-DCMAKE_USE_OPENSSL=OFF",
         "-DCMAKE_USE_SYSTEM_LIBRARIES=OFF",
         "-DBUILD_TESTING=OFF",
@@ -938,7 +938,7 @@ set (CMAKE_INSTALL_RPATH "$ORIGIN/../lib" CACHE STRING "Runtime library search p
         Err(ScriptError.Failed(kind: "cmake-configure-failed", message: "bootstrap cmake configure failed"))?
       }
 
-      run $samu $jobs_flag
+      run $ninja $jobs_flag
 
       env ({
         DESTDIR: dest,

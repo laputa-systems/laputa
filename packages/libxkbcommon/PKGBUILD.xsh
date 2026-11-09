@@ -17,7 +17,7 @@ export const rel = "1"
 export const deps = ["musl", "xkeyboard-config"]
 
 ## Exported declaration `mkdeps_host`.
-export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "xkeyboard-config"]
+export const mkdeps_host = ["llvm-toolchain", "gluon", "pkgconf", "xkeyboard-config"]
 
 ## Exported declaration `upstream_sources`.
 export const upstream_sources = [
@@ -166,7 +166,8 @@ endforeach
 
 ## Exported declaration `build`.
 export proc build(dest: Path) [fs, process, env, error] {
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let pc = pm_env.pkg_config_context()?
   patch_vendored_parser()
   patch_legacy_root()
@@ -180,13 +181,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   }) {
     # The extension paths default to xkeyboard-config.pc's xkb_root, which pkgconf
     # reports under the build root's sysroot; name the installed paths instead.
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d" "-Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build"
-    run $muon "-C" "build" samu "-j1" "libxkbcommon.so.0.13.2"
+    run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() "-Ddefault_library=shared" "-Dxkb-config-root=/usr/share/X11/xkb" "-Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d" "-Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d" "-Denable-docs=false" "-Denable-tools=false" "-Denable-x11=false" "-Denable-wayland=false" "-Denable-xkbregistry=false" "-Denable-bash-completion=false" "build"
+    run $ninja "-C" "build" "-j1" "libxkbcommon.so.0.13.2"
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install
+      run $meson "install" "-C" "build"
     }
   }
 

@@ -13,7 +13,7 @@ export const rel = "1"
 ## Runtime dependencies.
 export const deps = ["musl", "freetype"]
 ## Build dependencies.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai", "pkgconf"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon", "pkgconf"]
 ## Verified source archive.
 export const upstream_sources = [
   {
@@ -40,7 +40,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     with: "set_target_properties(harfbuzz PROPERTIES VERSION 0.61500.0 SOVERSION 0)\ntarget_link_libraries(harfbuzz ",
   ))
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
@@ -49,7 +49,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     "-DHB_BUILD_SUBSET=OFF" "-DHB_BUILD_RASTER=OFF" "-DHB_BUILD_VECTOR=OFF" \
     "-DHB_BUILD_GPU=OFF" "-DHB_BUILD_UTILS=OFF" "-DHB_HAVE_GLIB=OFF" \
     "-DHB_HAVE_CAIRO=OFF" "-DHB_HAVE_ICU=OFF" "-DHB_HAVE_GRAPHITE2=OFF"
-  run $samu "-v" "-C" "build" f"-j{jobs}"
+  run $ninja "-v" "-C" "build" f"-j{jobs}"
   env ({DESTDIR: dest}) {
     cd (p"build") {
       run $cmake "-P" "cmake_install.cmake"

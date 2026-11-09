@@ -48,12 +48,12 @@ proc main(root = p"/rootfs") [fs, env, error] {
     "cc",
     "c++",
     "pkg-config",
-    "samu",
+    "ninja",
     "cmake",
     "m4",
     "flex",
     "bison",
-    "muon",
+    "meson",
   ] {
     ensure_exists(fp"{root}/usr/bin/{tool}", tool)
   }
@@ -66,13 +66,12 @@ proc main(root = p"/rootfs") [fs, env, error] {
       "llvm-toolchain",
       "musl",
       "pkgconf",
-      "samurai",
+      "gluon",
       "cmake",
       "m4",
       "flex",
       "bison",
       "linux",
-      "muon",
     ],
   )
 

@@ -33,8 +33,8 @@ proc main(rootfs = p"/rootfs") [fs, process, env, error] {
 
   tempdir tmp at fp"{rootfs}/var/tmp/proof-cmake" {
 
-    let proof_samu = fp"{tmp}/proof-samu"
-    proof_samu.write(
+    let proof_ninja = fp"{tmp}/proof-ninja"
+    proof_ninja.write(
       """#!/bin/xsh
 proc main(...argv: List[Str]) [] {
   print "1.12.0"
@@ -60,7 +60,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
         "..",
         "-G",
         "Ninja",
-        f"-DCMAKE_MAKE_PROGRAM={proof_samu}",
+        f"-DCMAKE_MAKE_PROGRAM={proof_ninja}",
       ]
 
       let cmake_proc = process.command_argv(cmake_args[0], cmake_args)
@@ -73,7 +73,7 @@ file(WRITE "${CMAKE_BINARY_DIR}/proof-output.txt" "cmake runtime closure\n")
       let cache = fp"{tmp}/build/CMakeCache.txt".read_text()?
       let marker = fp"{tmp}/build/proof-output.txt".read_text()?
 
-      if proof_samu.display() not in cache or marker != "cmake runtime closure\n" {
+      if proof_ninja.display() not in cache or marker != "cmake runtime closure\n" {
         Err(ScriptError.Failed(kind: "cmake-proof", message: "configure did not use the isolated runtime proof inputs"))?
       }
 

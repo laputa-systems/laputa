@@ -319,7 +319,7 @@ Runtime-only edges are excluded: their targets may not be built yet when the
 package is proved, so proofs cannot rely on their files. Recipes see the build
 root as both `LAPUTA_ROOT` and `XSH_PM_BUILD_ROOT`, with its `bin` and `usr/bin` first on
 `PATH`, and `CC=cc` and `CXX=c++`, so tools that score every compiler they find
-(muon) take the build root's.
+take the build root's.
 
 Before a package's own proof runs, PM checks every ELF file it installs. Every
 `DT_NEEDED` name must be provided by the package itself or by its runtime

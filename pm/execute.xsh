@@ -132,8 +132,8 @@ proc execute_stage_local(
 
   # CC and CXX name the compiler PATH resolves first, the build root's. Build
   # tools that score every compiler they find instead of taking the first on
-  # PATH (muon since 0.6) would otherwise prefer a host GCC behind it, such as
-  # the package-tools image's, over the build root's clang.
+  # PATH would otherwise prefer a host GCC behind it, such as the
+  # package-tools image's, over the build root's clang.
   env ({
     LAPUTA_ROOT: build_root.display(),
     XSH_PM_BUILD_ROOT: build_root.display(),

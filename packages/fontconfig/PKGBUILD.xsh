@@ -14,7 +14,7 @@ export const rel = "2"
 ## Runtime dependencies.
 export const deps = ["musl", "freetype", "expat"]
 ## Build dependencies.
-export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf"]
+export const mkdeps_host = ["llvm-toolchain", "gluon", "pkgconf"]
 ## Verified source inputs.
 export const upstream_sources = [
   {
@@ -100,8 +100,8 @@ proc stage_generated() {
 
 ## Build the shared library.
 export proc build(dest: Path) [fs, process, env, error] {
-  let meson = p"meson.build"
-  var text = meson.read_text()?
+  let meson_build = p"meson.build"
+  var text = meson_build.read_text()?
   text = text.replace("python3 = import('python').find_installation()", with: "python3 = find_program('/bin/xsh')")
   let parts = text.split("gperf = find_program('gperf', required: false)")
   guard parts.len() == 2 else {
@@ -113,19 +113,20 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
   text = parts[0] + "gperf = find_program('/bin/xsh')\ngperf_len_type = 'size_t'\n" + suffix[1]
   text = text.replace("subdir('conf.d')", with: "preferred_hinting = get_option('default-hinting')\npreferred_sub_pixel_rendering = get_option('default-sub-pixel-rendering')\npreferred_bitmap = get_option('bitmap-conf')").replace("subdir('its')", with: "")
-  meson.write(text)
-  let muon = process.which("muon")?
+  meson_build.write(text)
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   let pc = pm_env.pkg_config_context()?
   env ({LD_LIBRARY_PATH: pc.ld_library_path, PKG_CONFIG: pc.pkg_config, PKG_CONFIG_LIBDIR: pc.pkg_config_libdir, PKG_CONFIG_PATH: pc.pkg_config_path, PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot}) {
-    run $muon "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() pm_env.meson_localstatedir_arg() \
+    run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() pm_env.meson_localstatedir_arg() \
       "-Ddefault_library=shared" "-Dxml-backend=expat" "-Dtools=disabled" "-Ddoc=disabled" \
       "-Dnls=disabled" "-Dtests=disabled" "-Dtests-external-fonts=disabled" "-Dcache-build=disabled" \
       "-Ddefault-fonts-dirs=/usr/share/fonts" "-Dadditional-fonts-dirs=" "build"
     stage_generated()
-    run $muon "-C" "build" "samu" f"-j{jobs}" "libfontconfig.so.1.17.0"
+    run $ninja "-C" "build" f"-j{jobs}" "libfontconfig.so.1.17.0"
     env ({DESTDIR: dest}) {
-      run $muon "-C" "build" "install"
+      run $meson "install" "-C" "build"
     }
   }?
   fp"{dest}/etc/fonts".remove(missing_ok: false)

@@ -96,8 +96,8 @@ Declared dependencies that no ELF file in the root imports: `play` declares
 `libva`, which only the FFmpeg runtime links; `libdrm` declares `libudev-zero`
 and `libudev-zero` declares `hwdata`, neither imported by an ELF file;
 `libxkbcommon` declares `xkeyboard-config` as data. The root also plans, but
-does not install, 20 packages: `llvm-toolchain`, `llvm-static`, `cargo`,
-`cmake`, `muon`, `samurai`, `pkgconf`, `tic`, `linux-headers`, `gnu-stubs`,
+does not install, 19 packages: `llvm-toolchain`, `llvm-static`, `cargo`,
+`cmake`, `gluon`, `pkgconf`, `tic`, `linux-headers`, `gnu-stubs`,
 `expat`, `vulkan-headers`, `wayland-dev`, `wayland-protocols`,
 `wayland-libs-server`, `wayland-libs-cursor`, and the four optional font packs.
 

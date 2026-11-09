@@ -18,13 +18,12 @@ export const deps = [
   "zlib",
   "llvm-toolchain",
   "pkgconf",
-  "samurai",
+  "gluon",
   "cmake",
   "m4",
   "flex",
   "bison",
   "linux-headers",
-  "muon",
 ]
 
 ## Exported declaration `mkdeps_host`.

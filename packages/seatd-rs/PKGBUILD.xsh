@@ -27,7 +27,7 @@ export const rel = "2"
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers", "muon", "samurai", "pkgconf"]
+export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers", "gluon", "pkgconf"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
 export const runtime_only_deps = ["xinit"]
@@ -226,7 +226,8 @@ export proc build(dest: Path) [fs, process, env, error] {
   # Rust: -Dserver=disabled drops seatd and seatd-launch from install.
   patch_realtime_dependency(p"c-seatd")
 
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
 
@@ -237,15 +238,15 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "-C" "c-seatd" "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dwerror=false" \
+    run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dwerror=false" \
       "-Dlibseat-logind=disabled" "-Dlibseat-seatd=enabled" "-Dlibseat-builtin=disabled" "-Dserver=disabled" \
-      "-Dexamples=disabled" "-Dman-pages=disabled" "build"
-    run $muon "-C" "c-seatd/build" samu $jobs_flag
+      "-Dexamples=disabled" "-Dman-pages=disabled" "c-seatd/build" "c-seatd"
+    run $ninja "-C" "c-seatd/build" $jobs_flag
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "c-seatd/build" install
+      run $meson "install" "-C" "c-seatd/build"
     }
   }
 

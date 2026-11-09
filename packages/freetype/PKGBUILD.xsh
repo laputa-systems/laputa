@@ -13,7 +13,7 @@ export const rel = "3"
 ## Runtime dependencies.
 export const deps = ["musl", "zlib", "libpng"]
 ## Build dependencies.
-export const mkdeps_host = ["llvm-toolchain", "cmake", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon"]
 ## Verified source archive.
 export const upstream_sources = [
   {
@@ -44,14 +44,14 @@ export proc build(dest: Path) [fs, process, env, error] {
     .replace("FT_USE_MODULE( FT_Driver_ClassRec, winfnt_driver_class )\n", with: "")
     )
   let cmake = process.which("cmake")?
-  let samu = process.which("samu")?
+  let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   run $cmake "-S" "." "-B" "build" "-G" "Ninja" "-DCMAKE_BUILD_TYPE=Release" \
     pm_env.cmake_install_prefix_arg() pm_env.cmake_install_libdir_arg() \
     "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON" \
     "-DBUILD_SHARED_LIBS=ON" "-DFT_REQUIRE_ZLIB=ON" "-DFT_REQUIRE_PNG=ON" \
     "-DFT_DISABLE_HARFBUZZ=ON" "-DFT_DISABLE_BZIP2=ON" "-DFT_DISABLE_BROTLI=ON"
-  run $samu "-C" "build" f"-j{jobs}"
+  run $ninja "-C" "build" f"-j{jobs}"
   env ({DESTDIR: dest}) {
     cd (p"build") {
       run $cmake "-P" "cmake_install.cmake"

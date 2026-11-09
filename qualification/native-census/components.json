@@ -82,7 +82,7 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa muon/samurai build with -Wl,-Map, or the unstripped library"},
+        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa gluon build with -Wl,-Map, or the unstripped library"},
         {"subject": "Mesa vendored C (xxhash, util, NIR)", "evidence": "XXH strings occur, but vendored sources are Mesa's own and are not separate dependencies", "settle": "Mesa 26.2.4 subprojects and src/util tree"}
       ]
     },

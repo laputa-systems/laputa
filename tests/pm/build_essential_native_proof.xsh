@@ -4,13 +4,12 @@ pure runtime_packages() -> List[Str] {
     "llvm-toolchain",
     "musl",
     "pkgconf",
-    "samurai",
+    "gluon",
     "cmake",
     "m4",
     "flex",
     "bison",
     "linux",
-    "muon",
   ]
 }
 
@@ -31,12 +30,12 @@ proc proof_root(ctx: TestContext, target: Str) -> Result[Path] {
     "cc",
     "c++",
     "pkg-config",
-    "samu",
+    "ninja",
     "cmake",
     "m4",
     "flex",
     "bison",
-    "muon",
+    "meson",
   ] {
     fp"{root}/usr/bin/{tool}".write(
       """typed proof fixture

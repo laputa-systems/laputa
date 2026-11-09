@@ -17,7 +17,7 @@ export const rel = "1"
 export let deps = []
 
 ## Package recipe export.
-export const mkdeps_host = ["muon", "pkgconf", "wayland-dev"]
+export const mkdeps_host = ["gluon", "pkgconf", "wayland-dev"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -529,7 +529,8 @@ proc prune_x_compat_protocols(root: Path) {
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let pc = pm_env.pkg_config_context()?
 
   env ({
@@ -539,13 +540,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     PKG_CONFIG_PATH: pc.pkg_config_path,
     PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
   }) {
-    run $muon "setup" pm_env.meson_prefix_arg() "-Dtests=false" "build"
-    run $muon "-C" "build" samu f"-j{cpu.count()}"
+    run $meson "setup" pm_env.meson_prefix_arg() "-Dtests=false" "build"
+    run $ninja "-C" "build" f"-j{cpu.count()}"
 
     env ({
       DESTDIR: dest,
     }) {
-      run $muon "-C" "build" install
+      run $meson "install" "-C" "build"
     }
   }
 

@@ -17,7 +17,7 @@ export const rel = "1"
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["llvm-toolchain", "linux-headers", "muon", "samurai"]
+export const mkdeps_host = ["llvm-toolchain", "linux-headers", "gluon"]
 
 ## Package recipe export.
 export const upstream_sources = [
@@ -390,7 +390,8 @@ endif
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
-  let muon = process.which("muon")?
+  let meson = process.which("meson")?
+  let ninja = process.which("ninja")?
   let jobs_flag = f"-j{cpu.count()}"
   patch_modules()
 
@@ -419,13 +420,13 @@ export proc build(dest: Path) [fs, process, env, error] {
     "build",
   ]
 
-  run $muon ${setup_args}
-  run $muon "-C" "build" samu $jobs_flag
+  run $meson ${setup_args}
+  run $ninja "-C" "build" $jobs_flag
 
   env ({
     DESTDIR: dest,
   }) {
-    run $muon "-C" "build" install
+    run $meson "install" "-C" "build"
   }
 
   fp"{dest}/etc/environment".remove()
