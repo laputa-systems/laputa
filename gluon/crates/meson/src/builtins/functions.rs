@@ -4120,18 +4120,29 @@ fn builtin_import(_vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
 }
 
 fn builtin_files(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    let positional = VM::get_positional_args(args);
     let mut files = Vec::new();
-    for arg in &positional {
-        if let Object::String(s) = arg {
-            files.push(Object::File(FileData {
-                path: s.clone(),
-                subdir: vm.current_subdir.clone(),
-                is_built: false,
-            }));
-        }
+    for arg in VM::get_positional_args(args) {
+        collect_files(vm, arg, &mut files)?;
     }
     Ok(Object::Array(files))
+}
+
+fn collect_files(vm: &VM, arg: &Object, files: &mut Vec<Object>) -> Result<(), String> {
+    match arg {
+        Object::String(s) => files.push(Object::File(FileData {
+            path: s.clone(),
+            subdir: vm.current_subdir.clone(),
+            is_built: false,
+        })),
+        Object::File(_) => files.push(arg.clone()),
+        Object::Array(items) => {
+            for item in items {
+                collect_files(vm, item, files)?;
+            }
+        }
+        other => return Err(format!("files() takes strings or files, not {}", other.type_name())),
+    }
+    Ok(())
 }
 
 fn builtin_join_paths(_vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
