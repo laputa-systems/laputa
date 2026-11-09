@@ -33,6 +33,7 @@ enum CliCommand {
     Format(FormatArgs),
     Help,
     Version,
+    Internal(Vec<String>),
 }
 
 struct SetupArgs {
@@ -150,6 +151,7 @@ impl Cli {
             "env2mfile" => CliCommand::Env2mfile,
             "format" | "fmt" => Self::parse_format(rest),
             "--version" | "version" => CliCommand::Version,
+            "--internal" => CliCommand::Internal(rest.to_vec()),
             "help" | "--help" | "-h" => CliCommand::Help,
             // If first arg is a directory, treat as setup
             _ if Path::new(cmd).is_dir() || !cmd.starts_with('-') => {
@@ -640,6 +642,7 @@ impl Cli {
                 println!("{}", crate::VERSION);
                 0
             }
+            CliCommand::Internal(args) => crate::internal::run(args),
             CliCommand::Help => {
                 self.print_help();
                 0
@@ -786,7 +789,7 @@ impl Cli {
         let project = interp.vm.project.clone().unwrap_or_default();
 
         // Generate build.ninja
-        let backend = NinjaBackend::new(&source_dir, &build_dir);
+        let backend = NinjaBackend::new(&source_dir, &build_dir).with_toolchain(toolchain(&interp.vm));
         let ninja = match backend.generate(&interp.vm.build_data, &project) {
             Ok(n) => n,
             Err(e) => {
@@ -1492,4 +1495,32 @@ fn format_meson_source(source: &str) -> String {
     }
 
     result
+}
+
+/// The absolute path of the running meson, which generated edges call for
+/// the `--internal` helpers.
+pub fn meson_program() -> String {
+    std::env::current_exe()
+        .expect("the running meson has an executable path")
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn toolchain(vm: &crate::vm::VM) -> crate::backend::Toolchain {
+    let mut toolchain = crate::backend::Toolchain { meson: meson_program(), ..Default::default() };
+    if let Some(crate::objects::Object::Compiler(c)) = vm.globals.get("compiler_c") {
+        toolchain.c = c.cmd.clone();
+    }
+    if let Some(crate::objects::Object::Compiler(c)) = vm.globals.get("compiler_cpp") {
+        toolchain.cpp = c.cmd.clone();
+    }
+    if let Some(archiver) = std::env::var("AR").ok().map(|v| split_command(&v)).filter(|w| !w.is_empty()) {
+        toolchain.archiver = archiver;
+    }
+    toolchain
+}
+
+/// Splits a program variable such as CC="ccache cc -m64" into words.
+pub fn split_command(value: &str) -> Vec<String> {
+    value.split_whitespace().map(str::to_string).collect()
 }

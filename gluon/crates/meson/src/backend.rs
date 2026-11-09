@@ -13,6 +13,28 @@ const JSON_PRETTY: SerializerConfig =
 pub struct NinjaBackend {
     pub source_root: String,
     pub build_root: String,
+    pub toolchain: Toolchain,
+}
+
+/// The programs generated rules run: the detected compilers, the archiver
+/// and this meson, which provides the `--internal` helpers.
+#[derive(Clone, Debug)]
+pub struct Toolchain {
+    pub c: Vec<String>,
+    pub cpp: Vec<String>,
+    pub archiver: Vec<String>,
+    pub meson: String,
+}
+
+impl Default for Toolchain {
+    fn default() -> Self {
+        Self {
+            c: vec!["cc".to_string()],
+            cpp: vec!["c++".to_string()],
+            archiver: vec!["ar".to_string()],
+            meson: "meson".to_string(),
+        }
+    }
 }
 
 impl NinjaBackend {
@@ -20,7 +42,13 @@ impl NinjaBackend {
         Self {
             source_root: source_root.to_string(),
             build_root: build_root.to_string(),
+            toolchain: Toolchain::default(),
         }
+    }
+
+    pub fn with_toolchain(mut self, toolchain: Toolchain) -> Self {
+        self.toolchain = toolchain;
+        self
     }
 
     pub fn generate(
@@ -365,7 +393,7 @@ impl NinjaBackend {
             writeln!(out, "rule c_COMPILER").unwrap();
             writeln!(
                 out,
-                "  command = cc $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"
+                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in", shell_escape_command(&self.toolchain.c)
             )
             .unwrap();
             writeln!(out, "  deps = gcc").unwrap();
@@ -383,7 +411,7 @@ impl NinjaBackend {
             writeln!(out, "rule cpp_COMPILER").unwrap();
             writeln!(
                 out,
-                "  command = c++ $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"
+                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in", shell_escape_command(&self.toolchain.cpp)
             )
             .unwrap();
             writeln!(out, "  deps = gcc").unwrap();
@@ -432,18 +460,24 @@ impl NinjaBackend {
 
         // Linker rules
         writeln!(out, "rule c_LINKER").unwrap();
-        writeln!(out, "  command = cc $ARGS -o $out $in $LINK_ARGS").unwrap();
+        writeln!(out, "  command = {} $ARGS -o $out $in $LINK_ARGS", shell_escape_command(&self.toolchain.c)).unwrap();
         writeln!(out, "  description = Linking target $out").unwrap();
         writeln!(out).unwrap();
 
         writeln!(out, "rule cpp_LINKER").unwrap();
-        writeln!(out, "  command = c++ $ARGS -o $out $in $LINK_ARGS").unwrap();
+        writeln!(out, "  command = {} $ARGS -o $out $in $LINK_ARGS", shell_escape_command(&self.toolchain.cpp)).unwrap();
         writeln!(out, "  description = Linking target $out").unwrap();
         writeln!(out).unwrap();
 
         // Static linker
         writeln!(out, "rule STATIC_LINKER").unwrap();
-        writeln!(out, "  command = rm -f $out && ar rcs $out $in").unwrap();
+        writeln!(
+            out,
+            "  command = {} --internal static-link $out -- {} csrD $out $in",
+            quote_argument(&self.toolchain.meson),
+            shell_escape_command(&self.toolchain.archiver)
+        )
+        .unwrap();
         writeln!(out, "  description = Linking static target $out").unwrap();
         writeln!(out).unwrap();
 
@@ -911,25 +945,27 @@ impl NinjaBackend {
             write!(out, " | {}", order_only.join(" ")).unwrap();
         }
         writeln!(out).unwrap();
-        let mut cmd_with_env: Vec<String> = Vec::new();
         let mut env_keys: Vec<&String> = ct.env.keys().collect();
         env_keys.sort();
-        for k in env_keys {
-            let v = &ct.env[k];
-            cmd_with_env.push(format!("{}={}", k, v));
-        }
-        cmd_with_env.extend(command_parts.iter().cloned());
-        let mut command_line = shell_escape_command(&cmd_with_env);
-        if ct.feed {
-            if let Some(input) = inputs.first() {
-                command_line.push_str(&format!(" < {}", shell_escape_command(&[input.clone()])));
+        let wrapped = !env_keys.is_empty() || ct.capture || ct.feed;
+        let mut argv: Vec<String> = Vec::new();
+        if wrapped {
+            argv.extend([self.toolchain.meson.clone(), "--internal".to_string(), "exe".to_string()]);
+            if ct.capture {
+                let output = outputs.first().ok_or_else(|| format!("custom target {} captures output but has none", ct.name))?;
+                argv.extend(["--capture".to_string(), output.clone()]);
             }
-        }
-        if ct.capture {
-            if let Some(output) = outputs.first() {
-                command_line.push_str(&format!(" > {}", shell_escape_command(&[output.clone()])));
+            if ct.feed {
+                let input = inputs.first().ok_or_else(|| format!("custom target {} feeds input but has none", ct.name))?;
+                argv.extend(["--feed".to_string(), input.clone()]);
             }
+            for k in env_keys {
+                argv.extend(["--env".to_string(), format!("{}={}", k, ct.env[k])]);
+            }
+            argv.push("--".to_string());
         }
+        argv.extend(command_parts.iter().cloned());
+        let command_line = shell_escape_command(&argv);
         writeln!(out, "  COMMAND = {}", command_line).unwrap();
         writeln!(out, "  DESC = Generating {}", ct.name).unwrap();
         if let Some(ref depfile) = ct.depfile {

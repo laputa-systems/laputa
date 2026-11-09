@@ -426,7 +426,9 @@ fn fs_copyfile(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, S
         name: dest_name.clone(),
         id,
         command: vec![
-            "cp".to_string(),
+            crate::cli::meson_program(),
+            "--internal".to_string(),
+            "copy".to_string(),
             "@INPUT@".to_string(),
             "@OUTPUT@".to_string(),
         ],

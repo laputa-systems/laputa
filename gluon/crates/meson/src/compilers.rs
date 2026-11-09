@@ -38,13 +38,27 @@ pub fn detect_compiler(vm: &mut VM, language: &str) -> bool {
         _ => return false,
     };
 
-    for (cmd, compiler_id) in candidates {
-        if let Some(version) = get_compiler_version(cmd, compiler_id) {
+    let from_env = compiler_env_var(language)
+        .and_then(|var| std::env::var(var).ok())
+        .map(|value| crate::cli::split_command(&value))
+        .filter(|words| !words.is_empty());
+    let candidates: Vec<(Vec<String>, &str)> = match from_env {
+        Some(words) => {
+            let id = candidates.first().map(|(_, id)| *id).unwrap_or("gcc");
+            vec![(words, id)]
+        }
+        None => candidates.into_iter().map(|(cmd, id)| (vec![cmd.to_string()], id)).collect(),
+    };
+
+    for (cmd_words, guessed_id) in candidates {
+        let cmd = cmd_words[0].as_str();
+        if let Some(version) = get_compiler_version(cmd, guessed_id) {
+            let compiler_id = identify_compiler(cmd, guessed_id);
             let compiler = CompilerData {
                 id: compiler_id.to_string(),
                 language: language.to_string(),
                 version: version.clone(),
-                cmd: vec![cmd.to_string()],
+                cmd: cmd_words.clone(),
                 linker_id: detect_linker(cmd, compiler_id),
                 full_version: version,
             };
@@ -54,6 +68,40 @@ pub fn detect_compiler(vm: &mut VM, language: &str) -> bool {
         }
     }
     false
+}
+
+fn compiler_env_var(language: &str) -> Option<&'static str> {
+    match language {
+        "c" => Some("CC"),
+        "cpp" | "c++" => Some("CXX"),
+        "objc" => Some("OBJC"),
+        "objcpp" => Some("OBJCXX"),
+        "rust" => Some("RUSTC"),
+        "fortran" => Some("FC"),
+        "d" => Some("DC"),
+        "vala" => Some("VALAC"),
+        _ => None,
+    }
+}
+
+/// A `cc` or `c++` can be either GCC or Clang; Meson tells them apart by the
+/// version banner rather than by the program name.
+fn identify_compiler<'a>(cmd: &str, guessed: &'a str) -> &'a str {
+    if guessed != "gcc" && guessed != "clang" {
+        return guessed;
+    }
+    let banner = Command::new(cmd)
+        .arg("--version")
+        .output()
+        .map(|o| format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)))
+        .unwrap_or_default();
+    if banner.contains("clang") {
+        "clang"
+    } else if banner.contains("Free Software Foundation") || banner.contains("gcc") || banner.contains("GCC") {
+        "gcc"
+    } else {
+        guessed
+    }
 }
 
 fn get_compiler_version(cmd: &str, compiler_id: &str) -> Option<String> {
