@@ -3,6 +3,13 @@ use pm.elfdeps
 use pm.local
 use pm.proof
 
+pure runpath_stays_in_usr_lib(rel: Path, runpath: Str) -> Bool {
+  let parts = rel.display().split("/")
+  return true when runpath == ""
+  return false unless parts.len() == 3 and parts[0] == "usr"
+  (parts[1] == "bin" and runpath == "$ORIGIN/../lib") or (parts[1] == "lib" and runpath == "$ORIGIN")
+}
+
 type Provider = {package: Str, path: Path, soname: Str}
 type Consumer = {package: Str, path: Path, needed: List[Str], interpreter: Str}
 
@@ -25,7 +32,7 @@ cli main(root: Path) {
       continue unless file_path.is_file()
       let info = elf.inspect(file_path)?
       continue when info.class == ""
-      proof.ensure(info.rpath == "" and info.runpath == "", "font-closure", f"{package.name}/{rel} has a private library search path")
+      proof.ensure(info.rpath == "" and runpath_stays_in_usr_lib(rel, info.runpath), "font-closure", f"{package.name}/{rel} has a private library search path")
       owners[file_path.resolve()?.display()] = package.name
       if info.soname != "" {
         libraries += [{package: package.name, path: rel, soname: info.soname}]

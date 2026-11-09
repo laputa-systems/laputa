@@ -198,14 +198,14 @@ libgallium also carries LLVM's libunwind. LLVM's share of each library is
 unknown until a link map or unstripped build exists.
 
 **tinyland.** It needs `libseat.so.1` (seatd-rs) and `libc.so` (musl) and has
-`RUNPATH /usr/lib`. Its only static native code observed is the LLVM libunwind
+no `RUNPATH`. Its only static native code observed is the LLVM libunwind
 in Rust's musl runtime. It carries the string `could not load
 libwayland-server.so` although the profile forbids `wayland-libs-server`;
 whether that path is reachable is unknown (`cargo tree -e features -i
 wayland-sys`, then a guest run without the library). One object compiled by
 clang 23.1.5 in its `.comment` is unattributed.
 
-**seatd, mdevd, doas.** Each has `RUNPATH /usr/lib`. seatd and mdevd need only
+**seatd, mdevd, doas.** Each has no `RUNPATH`. seatd and mdevd need only
 `libc.so`; doas needs `libcrypt.so` as well, both from musl. `libseat.so.1`
 (25,120 bytes) is the upstream C client; its source language and backends
 remain to be read from the recipe.
@@ -218,12 +218,13 @@ names GCC 9.4.0; which objects it compiled is unknown (compare the `.comment`
 of the three C archives in the XSH cargo target). The xz-utils revision inside
 `liblzma-sys` is also unread.
 
-**Existing closure audit.** `qualification/ghostty-shared/closure.xsh` stops on
-this root at `doas-rs/usr/bin/doas` because it rejects any `RUNPATH`. Five
-ELF files here carry `/usr/lib` (doas, mdevd, mdevd-coldplug, seatd, tinyland)
-and Play carries `$ORIGIN/../lib`. That audit was written for a
-shared-font candidate and does not cover the 11-root profile; the census
-records the paths instead of failing on them.
+**Existing closure audit.** `qualification/ghostty-shared/closure.xsh` passes
+on this root. The Rust packages (doas, mdevd, seatd, tinyland, and the other
+Rust daemons) no longer pass `-rpath /usr/lib`, which the default search path
+made redundant. The audit accepts a `RUNPATH` only when it is exactly
+`$ORIGIN/../lib` on a `usr/bin` file or `$ORIGIN` on a `usr/lib` file, both of
+which resolve to `/usr/lib`; Play and the prebuilt FFmpeg archive carry these
+and the repository has no tool that rewrites them.
 
 ## Replacement gates
 
