@@ -1557,6 +1557,28 @@ assert service_from_record(p"invalid-policy.xsh", {
   assert result.success, result.stderr
 }
 
+test test_restart_wanted_orders_mode_before_exit_status [fs, process, error] { |ctx|
+  let source = xinit_policy_source()? + """
+for item in [
+  {mode: "always", clean: true, expected: true},
+  {mode: "always", clean: false, expected: true},
+  {mode: "on_failure", clean: true, expected: false},
+  {mode: "on_failure", clean: false, expected: true},
+  {mode: "never", clean: true, expected: false},
+  {mode: "never", clean: false, expected: false},
+] {
+  assert restart_wanted(item.mode, item.clean) == item.expected
+}
+"""
+  let result = test.run_xsh(ctx, source, name: "restart-wanted.xsh")?
+  assert result.success, result.stderr
+  let body = "pure restart_wanted(restart_mode: Str, clean_exit: Bool) -> Bool {"
+  let invalid = xinit_policy_source()?.replace(body, with: f"{body}\n  let _ = fp\"/etc/hostname\".read_text()")
+  let rejected = test.run_xsh(ctx, invalid, name: "invalid-fs-policy.xsh")?
+  assert ! rejected.success
+  assert "check.pure-effect" in rejected.stderr
+}
+
 test test_restart_policy_rejects_hidden_clock_effects [fs, process, error] { |ctx|
   let source = xinit_policy_source()?
   let body = "pure restart_delay(service: Service, current_delay: Int, started_at: Int, now: Int) -> Int {"

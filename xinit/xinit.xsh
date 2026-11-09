@@ -1411,6 +1411,10 @@ pure escalate_delay(used_ms: Int, max_delay_ms: Int) -> Int {
   used_ms * 2
 }
 
+pure restart_wanted(restart_mode: Str, clean_exit: Bool) -> Bool {
+  restart_mode == "always" or (restart_mode == "on_failure" and ! clean_exit)
+}
+
 pure restart_delay(service: Service, current_delay: Int, started_at: Int, now: Int) -> Int {
   return service.delay_ms when now >= started_at and now - started_at >= service.stable_after_ms
 
@@ -1611,11 +1615,7 @@ proc mark_unit_dead(unit: ServiceUnit, child_status: Status, now: Int) -> Result
 
   run_finish(unit)
 
-  let should_restart = unit.service.restart_mode == "always" or (unit.service.restart_mode == "on_failure" and ! child_status.exited_with(
-    0,
-  ))
-
-  if ! should_restart {
+  if ! restart_wanted(unit.service.restart_mode, child_status.exited_with(0)) {
     let stopped: ServiceUnit = ServiceUnit(
       service: unit.service,
       desired: "down",
