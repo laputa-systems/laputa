@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: GLU
-Next: 14
+Next: 16
 
 ### GLU-9 · P3 · engine is not on the user build path
 - **Area:** engine
@@ -41,4 +41,20 @@ Next: 14
 - **Problem:** Setup creates `meson-logs` and leaves it empty. Failures still go only to stderr.
 - **Recommendation:** Write the log the directory is for, or stop creating it.
 - **Fix with:** none
+- **Effort:** S
+
+### GLU-14 · P2 · compiler.preprocess() produces no edge
+- **Area:** meson
+- **Where:** `crates/meson/src/builtins/methods.rs` (compiler methods)
+- **Problem:** fontconfig's `cc.preprocess('fcobjshash.gperf.h', ...)` yields no preprocess edge, so the custom target consuming it names `build/fcobjshash.gperf.h`, which nothing produces. Meson writes `src/preprocess.p/fcobjshash.gperf.h.i` from a compiler `-E` edge. Laputa's fontconfig recipe deletes these generator edges and installs pre-generated files, which hides the defect there.
+- **Recommendation:** Return the preprocessed outputs as a custom-target-like object with a compiler `-E` edge per input, named and placed as Meson does, and compare a fixture with reference Meson.
+- **Fix with:** reference-parity
+- **Effort:** M
+
+### GLU-15 · P2 · a custom_target command's first string is not resolved as a program
+- **Area:** meson
+- **Where:** `crates/meson/src/builtins/functions.rs` (custom_target command handling)
+- **Problem:** fontconfig's `command: ['cutout.py', '@INPUT@', '@OUTPUT@']` is written as the bare word `cutout.py`; Meson looks up a first string element as a program (including a script in the current source directory, run through its interpreter). Hidden in Laputa for the same reason as GLU-14.
+- **Recommendation:** Resolve a first string element with find_program semantics before building the edge, and add a fixture.
+- **Fix with:** reference-parity
 - **Effort:** S
