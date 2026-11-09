@@ -500,3 +500,23 @@ test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, e
   assert "1 cached 0 fetched" in output
   assert sources.source_cache_entry(cache, lock_sha256).exists()?
 }
+
+test test_sources_fetch_reads_an_in_tree_lockfile_from_the_repository [fs, process, env, error] { |ctx|
+  let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
+  let repository = fetch_repository(
+    ctx,
+    """{source: p"repository/tool/Cargo.lock => vendor", kind: "cargo-vendor", architectures: ["all"], checksums: [{arch: "all", sha256: "SKIP"}]},""",
+  )?
+  let lock = fp"{repository}/tool/Cargo.lock"
+  lock.parent.mkdir()
+  lock.write(crate_set_lock([crate_file.item]))
+  let cache = test.temp_dir(ctx, name: "in-tree-lock-fetch-cache")?
+  let _ = cache_file(cache, crate_file.path)?
+  let xsh = runner()?
+  let modules = path.absolute(p".")?
+
+  let output = run.text XSH_MODULE_PATH=$modules LAPUTA_SOURCE_CACHE=$cache $xsh pm.xsh -- sources fetch --repo \
+    $repository --all --target aarch64-linux-musl
+
+  assert "1 cached 0 fetched" in output
+}

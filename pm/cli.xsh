@@ -335,11 +335,15 @@ export proc pm_cli_sources_fetch(repo: Str, all: Bool, packages: List[Str], targ
 
   var crate_items: List[sources.SourceFetchItem] = []
 
-  for selection in selections {
-    for item in sources.cargo_crate_fetch_items(cache_root, selection.packages, selection.arch)? {
-      if item.sha256 not in seen {
-        crate_items += [item]
-        seen += [item.sha256]
+  env ({
+    XSH_PM_REPOSITORY_ROOT: args.repo.display(),
+  }) {
+    for selection in selections {
+      for item in sources.cargo_crate_fetch_items(cache_root, selection.packages, selection.arch)? {
+        if item.sha256 not in seen {
+          crate_items += [item]
+          seen += [item.sha256]
+        }
       }
     }
   }
