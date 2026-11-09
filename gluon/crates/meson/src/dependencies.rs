@@ -283,13 +283,13 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
     }
 
     match method {
-        "pkg-config" => find_pkgconfig(vm, name, version_req, &modules),
+        "pkg-config" => find_pkgconfig(vm, name, version_req),
         "cmake" => find_cmake(name, version_req, &components),
         "config-tool" => find_config_tool(name, version_req),
         "system" => find_system_library(name),
         "auto" | _ => {
             // Try methods in order
-            find_pkgconfig(vm, name, version_req, &modules)
+            find_pkgconfig(vm, name, version_req)
                 .or_else(|| find_cmake(name, version_req, &components))
                 .or_else(|| find_config_tool(name, version_req))
                 .or_else(|| find_system_library(name))
@@ -301,13 +301,8 @@ fn find_pkgconfig(
     vm: &VM,
     name: &str,
     version_req: Option<&str>,
-    modules: &[String],
 ) -> Option<Object> {
-    let pkg_name = if modules.is_empty() {
-        name.to_string()
-    } else {
-        modules[0].clone()
-    };
+    let pkg_name = name.to_string();
 
     let pkgconfig_cmd = pkgconfig_command(vm);
     let output = run_pkgconfig(&pkgconfig_cmd, &["--modversion", &pkg_name])?;
