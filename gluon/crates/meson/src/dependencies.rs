@@ -557,14 +557,16 @@ fn find_system_library(name: &str) -> Option<Object> {
 }
 
 /// Like Meson, a `-lname` from pkg-config becomes the library's path only
-/// when it lives in one of the `-L` directories the same output names. A
-/// library in the compiler's own search path stays `-lname`, so the linker
+/// when it lives in one of the `-L` directories the same output names and
+/// that directory is not one the compiler already searches. A library in
+/// the compiler's own library directories stays `-lname`, so the linker
 /// records its SONAME instead of a build-root path.
-fn resolve_library_arguments(_vm: &VM, link_args: Vec<String>) -> Vec<String> {
+fn resolve_library_arguments(vm: &VM, link_args: Vec<String>) -> Vec<String> {
+    let system = compiler_library_dirs(vm);
     let search_dirs: Vec<String> = link_args
         .iter()
         .filter_map(|argument| argument.strip_prefix("-L").map(str::to_string))
-        .filter(|dir| !dir.is_empty())
+        .filter(|dir| !dir.is_empty() && !system.contains(&normalize_absolute_path(dir)))
         .collect();
     link_args
         .into_iter()
@@ -578,6 +580,22 @@ fn resolve_library_arguments(_vm: &VM, link_args: Vec<String>) -> Vec<String> {
             library_in_dirs(&search_dirs, name).unwrap_or(argument)
         })
         .collect()
+}
+
+/// The library directories the C compiler searches by default, from
+/// `-print-search-dirs`.
+fn compiler_library_dirs(vm: &VM) -> Vec<String> {
+    let Some(Object::Compiler(c)) = vm.globals.get("compiler_c") else {
+        return Vec::new();
+    };
+    let Ok(output) = Command::new(&c.cmd[0]).args(&c.cmd[1..]).arg("-print-search-dirs").output() else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| line.strip_prefix("libraries: ="))
+        .map(|dirs| dirs.split(':').filter(|d| !d.is_empty()).map(normalize_absolute_path).collect())
+        .unwrap_or_default()
 }
 
 fn library_in_dirs(dirs: &[String], name: &str) -> Option<String> {
