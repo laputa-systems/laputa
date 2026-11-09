@@ -1,0 +1,12 @@
+[package]
+name = "gluon-meson"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "meson"
+path = "src/main.rs"
+
+[dependencies]
+meson = { path = "../../crates/meson" }

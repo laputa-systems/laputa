@@ -1,0 +1,5 @@
+This crate reimplements Meson (Apache-2.0, Meson Project, https://mesonbuild.com/).
+It is based on Oxidized Meson (MIT, overby-me/oxidized-meson @ 85dc2261c7f8d30007382c8ae0d54d72fc188a5e).
+The Apache-2.0 license text in LICENSE-APACHE covers the Meson reimplementation;
+the MIT license text in LICENSE-MIT covers the Oxidized codebase. Muon behavior,
+commands, and outputs were used as specification only; no GPL code is included.

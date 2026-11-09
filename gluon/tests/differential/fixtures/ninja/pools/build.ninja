@@ -1,0 +1,7 @@
+pool small
+  depth = 1
+rule cc
+  command = cc -c $in -o $out
+  pool = small
+build a.o: cc a.c
+build b.o: cc b.c

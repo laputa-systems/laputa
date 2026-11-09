@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["crates/graph", "crates/state", "crates/engine", "crates/meson", "crates/ninja", "bins/build", "bins/meson", "bins/ninja"]
+
+[workspace.package]
+edition = "2024"
+
+[profile.release]
+strip = true
+lto = true
+
+[profile.dist]
+inherits = "release"
+codegen-units = 1
+strip = true

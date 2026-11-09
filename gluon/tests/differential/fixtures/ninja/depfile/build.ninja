@@ -1,0 +1,5 @@
+rule cc
+  command = cc -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  deps = gcc
+build a.o: cc a.c

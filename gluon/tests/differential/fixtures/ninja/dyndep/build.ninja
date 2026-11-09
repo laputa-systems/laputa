@@ -1,0 +1,8 @@
+rule cc
+  command = cc -c $in -o $out
+  dyndep = a.d
+build a.o: cc a.c | a.d
+  dyndep = a.d
+rule gen_dep
+  command = python3 -c "open('a.d','w').write('ninja_dyndep_version = 1\nbuild a.o: dyndep | a.h\n')"
+build a.d: gen_dep a.c

@@ -1,0 +1,6 @@
+rule regen
+  command = python3 -c "open('build.ninja','w').write(open('build.ninja','r').read())"
+build build.ninja: regen gen.txt
+rule cc
+  command = cc -c $in -o $out
+build a.o: cc a.c

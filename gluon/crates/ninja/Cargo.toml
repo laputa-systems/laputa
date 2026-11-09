@@ -1,0 +1,17 @@
+[package]
+name = "ninja"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+graph = { path = "../graph" }
+state = { path = "../state" }
+libc = "0.2.185"
+
+[dev-dependencies]
+rustybench = { version = "0.1" }
+
+[[bench]]
+name = "ninja"
+harness = false

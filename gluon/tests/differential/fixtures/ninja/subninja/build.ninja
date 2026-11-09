@@ -1,0 +1,2 @@
+subninja sub.ninja
+build a.o: cc a.c

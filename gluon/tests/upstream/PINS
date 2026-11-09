@@ -1,0 +1,24 @@
+# Reference pins (P-3). One KEY=VALUE per line; comments start with #.
+# Verified on owner host 2026-11-09: meson 1.12.1, ninja 1.13.2, muon 0.7.0.
+
+MESON_VERSION=1.12.1
+NINJA_VERSION=1.13.2
+MUON_VERSION=0.7.0
+
+OXIDIZED_MESON_REPO=https://github.com/overby-me/oxidized-meson
+OXIDIZED_MESON_SHA=85dc2261c7f8d30007382c8ae0d54d72fc188a5e
+
+OXIDIZED_NINJA_REPO=https://github.com/overby-me/oxidized-ninja
+OXIDIZED_NINJA_SHA=bd297fec56aedec6241efe468bce3d6892092ec3
+
+CARGO_VERSION=1.98.0
+RUSTC_VERSION=1.98.0
+RUST_DOCKER_IMAGE=rust:1.98
+MUSL_TARGET=x86_64-unknown-linux-musl
+
+LIBPLACEBO_VERSION=7.387.0
+LIBPLACEBO_URL=https://code.videolan.org/videolan/libplacebo/-/archive/v7.387.0/libplacebo-v7.387.0.tar.bz2
+LIBPLACEBO_SHA256=14ceeeb14d1c08fcdb1a782a06129da11f842c6fddbf3a43c1c4061406ad03d2
+LIBPLACEBO_METAL_MR=858
+LIBPLACEBO_METAL_HEAD=ea7599ef9e71f66930b567f25e2c2de73913b38c
+LIBPLACEBO_METAL_PATCH_SHA256=355cb5119ff16f6abdcb7b410286e77045859116719ebbb76a2fb16e09ac51a7

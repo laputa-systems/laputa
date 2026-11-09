@@ -1,0 +1,4 @@
+rule gen
+  command = python3 -c "open('$out','w').write('v1\n')"
+  restat = 1
+build out.txt: gen

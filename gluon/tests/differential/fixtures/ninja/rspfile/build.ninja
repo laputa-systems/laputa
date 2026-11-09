@@ -1,0 +1,5 @@
+rule cc
+  command = cc -o $out @$out.rsp
+  rspfile = $out.rsp
+  rspfile_content = -c input.c
+build a.o: cc

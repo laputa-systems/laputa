@@ -1,0 +1,1 @@
+option('myfeat', type: 'feature', value: 'auto')
