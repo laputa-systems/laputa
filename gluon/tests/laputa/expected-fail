@@ -1,4 +1,4 @@
-libxkbcommon external_program has no language_version method
-linux-pam dependency('dl') is not resolved to libc on musl
-wayland-dev custom_target command keeps a <build target> placeholder for wayland-scanner
-wl-clipboard generated protocol headers are not built before the sources that include them
+libxkbcommon test-rules-file-includes fails to link (link arguments not propagated)
+linux-pam pam_filter/upperLOWER fails to compile
+wayland-dev src/wayland-scanner fails to link (link arguments not propagated)
+wl-clipboard src/wl-copy fails to link (transitive link_with through static libraries)
