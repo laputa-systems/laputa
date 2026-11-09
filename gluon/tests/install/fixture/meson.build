@@ -24,3 +24,12 @@ pkgconfig.generate(
   description : 'install fixture',
   subdirs : ['foo'],
 )
+
+conf = configuration_data()
+conf.set('VERSION', meson.project_version())
+configure_file(
+  input : 'version.in',
+  output : 'version.txt',
+  configuration : conf,
+  install_dir : get_option('datadir') / 'install-fixture',
+)

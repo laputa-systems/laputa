@@ -2611,8 +2611,11 @@ fn builtin_configure_file(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
     let encoding = VM::get_arg_str(args, "encoding", usize::MAX)
         .unwrap_or("utf-8")
         .to_string();
-    let install = VM::get_arg_bool(args, "install", false);
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
+    let install = match VM::get_arg_value(args, "install") {
+        Some(Object::Bool(explicit)) => *explicit,
+        _ => install_dir.as_deref().is_some_and(|dir| !dir.is_empty()),
+    };
     let install_tag = VM::get_arg_str(args, "install_tag", usize::MAX).map(String::from);
     let capture = VM::get_arg_bool(args, "capture", false);
     let depfile = VM::get_arg_str(args, "depfile", usize::MAX).map(String::from);
