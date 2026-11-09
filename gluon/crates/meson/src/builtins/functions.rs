@@ -4204,14 +4204,10 @@ fn builtin_get_option(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         "cpp_eh" => Ok(Object::String("default".to_string())),
         "cpp_rtti" => Ok(Object::Bool(true)),
         "prefer_static" => Ok(Object::Bool(false)),
-        _ => {
-            // For unknown options in subprojects, check if auto_features applies
-            if let Some(auto_feat) = vm.options.get("auto_features") {
-                Ok(auto_feat.clone())
-            } else {
-                Ok(Object::Feature(FeatureState::Auto))
-            }
-        }
+        "b_lundef" => Ok(Object::Bool(true)),
+        "b_asneeded" => Ok(Object::Bool(true)),
+        "b_colorout" => Ok(Object::String("always".to_string())),
+        _ => Err(format!("Tried to access unknown option '{}'", name)),
     }
 }
 
