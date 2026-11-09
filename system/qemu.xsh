@@ -4,6 +4,7 @@ use system.image
 use system.launcher
 use system.proof
 use system.qmp
+use system.text_pixels
 use system.types
 
 ## The host half of a QEMU invocation, which the profile does not choose: the
@@ -474,6 +475,33 @@ pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
   f"console={outputs.console_log}; qemu-log={outputs.qemu_log}; screenshot={outputs.screenshot}"
 }
 
+const capture_request_prefix = "LAPUTA_PROOF_SCREENSHOT "
+const capture_name = rx"^[a-z]+(-[a-z]+)*$"
+
+pure requested_captures(console: Str) -> List[Str] {
+  [
+    line[capture_request_prefix.byte_len()..].trim()
+    for line in console.split("\n")
+    if line.starts_with(capture_request_prefix) and capture_name.matches(line[capture_request_prefix.byte_len()..].trim())
+  ]
+}
+
+proc verify_capture(name: Str, screenshot: Path, outputs: build.ProfileOutputs) [fs, error] {
+  if ! screenshot_is_valid(screenshot)? {
+    return Err(types.LaputaError.Profile(f"QMP did not create a nonempty {name} screenshot; inspect {qemu_output_locations(outputs)}"))
+  }
+  match name {
+    "ghostty-text" => text_pixels.check_terminal_text(screenshot.read_bytes()?)
+    "play-text" => text_pixels.check_player_text(screenshot.read_bytes()?)
+    else => Err(types.LaputaError.Profile(f"the guest requested a screenshot named {name} that no check owns"))
+  }
+}
+
+## Where the screenshot a guest requested by name is written.
+export pure capture_path(outputs: build.ProfileOutputs, name: Str) -> Path {
+  fp"{outputs.root}/screenshot-{name}.ppm"
+}
+
 ## Run a bounded headless proof, inject input through QMP, and validate its output.
 export proc run_test(
   value: QemuConfig,
@@ -499,6 +527,7 @@ export proc run_test(
   let deadline = time.monotonic()? + 180000000000
   var injected = false
   var screenshot_taken = false
+  var captured: List[Str] = []
 
   while qemu_process_live(launched.pid) {
     if time.monotonic()? >= deadline {
@@ -520,6 +549,14 @@ export proc run_test(
       }
       qemu_qmp(input_operation, outputs.qmp_socket, deadline)
       injected = true
+    }
+
+    for name in requested_captures(log_text) {
+      if ! (name in captured) {
+        qemu_qmp_retry(QmpRetryScreenshot(capture_path(outputs, name)), outputs.qmp_socket, deadline)
+        captured = captured + [name]
+        verify_capture(name, capture_path(outputs, name), outputs)?
+      }
     }
 
     if proof.succeeded(profile.proof, log_text) {

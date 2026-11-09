@@ -5,6 +5,11 @@ let account = user.lookup("laputa")?
 let runtime = fp"/run/user/{account.uid}"
 fp"{runtime}/laputa-ghostty-read-ready".write(env.get("LAPUTA_SESSION_ID")?)?
 print "\x1b[48;2;255;0;255m     LAPUTA_TINYLAND_GHOSTTY_VISUAL     \x1b[0m"
+print "\x1b[48;2;48;48;48mمرحبا بالعالم\x1b[0m"
+print "\x1b[48;2;48;48;48mहिन्दी नमस्ते\x1b[0m"
+print "\x1b[48;2;48;48;48m日本語 漢字 中文\x1b[0m"
+print "\x1b[48;2;48;48;48m👨‍👩‍👧‍👦 🎉\x1b[0m"
+print "\x1b[48;2;48;48;48m𓀀 𓀁 𓀂\x1b[0m"
 io.flush_stdout()?
 fp"{runtime}/laputa-ghostty-read-started".write("started\n")?
 let input = io.stdin_line()?

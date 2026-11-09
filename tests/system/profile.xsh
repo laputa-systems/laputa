@@ -20,6 +20,9 @@ test test_qemu_tinyland_ghostty_profile_has_exact_runtime_intent [fs, error] {
     "tinyland",
     "ghostty-custom",
     "play",
+    "font-ttf-noto-sans-devanagari",
+    "font-ttc-noto-sans-cjk",
+    "font-ttf-noto-color-emoji",
   ]
   assert value.kernel_package == "linux"
   assert ! (value.kernel_package in value.package_roots)
@@ -54,6 +57,8 @@ test test_qemu_tinyland_ghostty_profile_has_exact_runtime_intent [fs, error] {
     "wlroots0.20",
     "libinput",
     "wayland-libs-server",
+    "fontconfig",
+    "expat",
   ]
   assert value.forbidden_sonames == [
     "libLLVM",

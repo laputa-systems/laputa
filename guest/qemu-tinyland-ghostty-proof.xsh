@@ -373,6 +373,9 @@ proc main() [fs, process, time, error] {
     guest_fail("input", f"expected LAPUTA!, got {input}")
   }
 
+  guest_console("LAPUTA_PROOF_SCREENSHOT ghostty-text")?
+  time.sleep(5s)
+
   guest_run_required(process.command_argv(
     p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-play-proof.xsh"],

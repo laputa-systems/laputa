@@ -20,6 +20,9 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "tinyland",
     "ghostty-custom",
     "play",
+    "font-ttf-noto-sans-devanagari",
+    "font-ttc-noto-sans-cjk",
+    "font-ttf-noto-color-emoji",
   ],
   kernel_package: "linux",
   kernel_path: p"boot/vmlinuz",
@@ -53,6 +56,8 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "wlroots0.20",
     "libinput",
     "wayland-libs-server",
+    "fontconfig",
+    "expat",
   ],
   forbidden_sonames: ["libLLVM", "libclang", "libpython", "libgtk", "libpango", "libpipewire", "libpulse", "libwlroots", "libinput"],
   proof: {
