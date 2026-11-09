@@ -13,10 +13,10 @@ export const package_kind = "payload"
 export const ver = "1.26.0"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
-export const deps = ["musl", "libffi", "expat"]
+export const deps = ["musl", "libffi"]
 
 ## Package recipe export.
 export const mkdeps_host = ["llvm-toolchain", "muon", "samurai", "pkgconf", "expat", "libffi"]
